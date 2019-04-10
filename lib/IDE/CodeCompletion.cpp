@@ -1876,10 +1876,14 @@ public:
 
   void addTypeAnnotation(CodeCompletionResultBuilder &Builder, Type T) {
     T = T->getReferenceStorageReferent();
-    if (T->isVoid())
+    if (T->isVoid()) {
       Builder.addTypeAnnotation("Void");
-    else
-      Builder.addTypeAnnotation(T.getString());
+    } else {
+      PrintOptions PO;
+      PO.OpaqueReturnTypePrinting =
+          PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+      Builder.addTypeAnnotation(T.getString(PO));
+    }
   }
 
   void addTypeAnnotationForImplicitlyUnwrappedOptional(
@@ -1897,6 +1901,8 @@ public:
     T = T->getReferenceStorageReferent();
     PrintOptions PO;
     PO.PrintOptionalAsImplicitlyUnwrapped = true;
+    PO.OpaqueReturnTypePrinting =
+        PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
     Builder.addTypeAnnotation(T.getString(PO) + suffix);
   }
 
@@ -1933,6 +1939,10 @@ public:
       // FIXME: Code completion should only deal with one or the other,
       // and not both.
       if (auto *archetypeType = t->getAs<ArchetypeType>()) {
+        // Don't erase opaque archetype.
+        if (isa<OpaqueTypeArchetypeType>(archetypeType))
+          return t;
+
         auto protos = archetypeType->getConformsTo();
         if (!protos.empty())
           return buildProtocolComposition(protos);
@@ -2476,6 +2486,8 @@ public:
               FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
 
           PrintOptions PO;
+          PO.OpaqueReturnTypePrinting =
+              PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
           PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
           ResultType.print(OS, PO);
         }

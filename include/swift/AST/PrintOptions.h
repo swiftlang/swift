@@ -263,9 +263,20 @@ struct PrintOptions {
   /// Whether to skip keywords with a prefix of underscore such as __consuming.
   bool SkipUnderscoredKeywords = false;
 
-  /// Whether to print declarations with opaque return types with a stable,
-  /// parsable internal syntax.
-  bool PrintStableReferencesToOpaqueReturnTypes = false;
+  /// How to print opaque return types.
+  enum class OpaqueReturnTypePrintingMode {
+    /// 'some P1 & P2'.
+    WithOpaqueKeyword,
+    /// 'P1 & P2'.
+    WithoutOpaqueKeyword,
+    /// Stable parsable internal syntax.
+    StableReference,
+    /// Description suitable for debugging.
+    Description
+  };
+
+  OpaqueReturnTypePrintingMode OpaqueReturnTypePrinting =
+      OpaqueReturnTypePrintingMode::WithOpaqueKeyword;
 
   /// Whether to print decl attributes that are only used internally,
   /// such as _silgen_name, transparent, etc.
@@ -524,7 +535,8 @@ struct PrintOptions {
     result.PrintInSILBody = true;
     result.PreferTypeRepr = false;
     result.PrintIfConfig = false;
-    result.PrintStableReferencesToOpaqueReturnTypes = true;
+    result.OpaqueReturnTypePrinting =
+        OpaqueReturnTypePrintingMode::StableReference;
     return result;
   }
 
