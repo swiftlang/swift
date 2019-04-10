@@ -2399,13 +2399,21 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
 }
 
 bool KeyPathSubscriptIndexHashableFailure::diagnoseAsError() {
-  auto *anchor = cast<KeyPathExpr>(getRawAnchor());
-  auto path = getLocator()->getPath();
-  const auto &componentIndex = path.back().getValue();
+  auto *anchor = getRawAnchor();
+  auto *locator = getLocator();
 
-  auto *indexExpr = anchor->getComponents()[componentIndex].getIndexExpr();
-  emitDiagnostic(indexExpr->getLoc(),
-                 diag::expr_keypath_subscript_index_not_hashable,
+  auto loc = anchor->getLoc();
+  if (locator->isKeyPathSubscriptComponent()) {
+    auto *KPE = cast<KeyPathExpr>(anchor);
+    for (auto &elt : locator->getPath()) {
+      if (elt.isKeyPathComponent()) {
+        loc = KPE->getComponents()[elt.getValue()].getLoc();
+        break;
+      }
+    }
+  }
+
+  emitDiagnostic(loc, diag::expr_keypath_subscript_index_not_hashable,
                  resolveType(NonConformingType));
   return true;
 }

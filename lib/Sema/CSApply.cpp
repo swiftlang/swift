@@ -4698,9 +4698,9 @@ namespace {
       auto fnType = overload.openedType->castTo<FunctionType>();
       for (const auto &param : fnType->getParams()) {
         auto indexType = simplifyType(param.getPlainType());
-        // index conformance to the Hashable protocol has been verified
-        // by the solver, we just need to get it again with all of the
-        // generic parameters resolved.
+        // Index type conformance to Hashable protocol has been
+        // verified by the solver, we just need to get it again
+        // with all of the generic parameters resolved.
         auto hashableConformance =
             TC.conformsToProtocol(indexType, hashable, cs.DC,
                                   (ConformanceCheckFlags::Used |
@@ -4711,7 +4711,7 @@ namespace {
         // Equatable conformance is forced into existence during type
         // checking so that it's available for SILGen.
         auto eqConformance =
-            TC.conformsToProtocol(simplifyType(indexType), equatable, cs.DC,
+            TC.conformsToProtocol(indexType, equatable, cs.DC,
                                   (ConformanceCheckFlags::Used |
                                    ConformanceCheckFlags::InExpression));
         assert(eqConformance.hasValue());
