@@ -1,10 +1,10 @@
 // RUN: %target-swift-frontend -module-name A -enforce-exclusivity=checked -Osize -emit-sil  %s | %FileCheck %s
 public protocol P {
-  func myValue() -> Int
+  func myValue() -> Int64
 }
 
-extension Int: P {
-  public func myValue() -> Int {
+extension Int64: P {
+  public func myValue() -> Int64 {
     return self
   }
 }
@@ -14,11 +14,11 @@ func useP<T: P> (_ t: T) {
   print(t)
 }
 
-public func bar(_ x: Int) -> some P {
+public func bar(_ x: Int64) -> some P {
   return x
 }
 
-public func foo(_ x: Int) -> some P {
+public func foo(_ x: Int64) -> some P {
   if x > 0 {
     return bar(x + 1)
   }
@@ -27,7 +27,7 @@ public func foo(_ x: Int) -> some P {
 }
 
 @inline(never)
-func getInt() -> Int {
+func getInt() -> Int64 {
   return 2
 }
 
@@ -38,12 +38,12 @@ func identity<T>(_ t: T) -> T {
 
 // CHECK-LABEL: sil @$s1A10testFooBaryyxAA1PRzlF : $@convention(thin) <T where T : P> (@in_guaranteed T) -> () {
 // CHECK: bb3([[FOOS_INT:%.*]] : $Builtin.Int64):
-// CHECK:  [[ID:%.*]] = function_ref @$s1A8identityyxxlFSi_Tg5 : $@convention(thin) (Int) -> Int
-// CHECK:  [[FOO_RES:%.*]] = struct $Int ([[FOOS_INT]] : $Builtin.Int64)
-// CHECK:  [[ID_RES:%.*]] = apply [[ID]]([[FOO_RES]]) : $@convention(thin) (Int) -> Int
-// CHECK:  [[USEP:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFSi_Tg5 : $@convention(thin) (Int) -> ()
-// CHECK:  %27 = apply [[USEP]]([[ID_RES]]) : $@convention(thin) (Int) -> ()
-// CHECK:  %29 = apply [[USEP]]([[FOO_RES]]) : $@convention(thin) (Int) -> ()
+// CHECK:  [[ID:%.*]] = function_ref @$s1A8identityyxxlFs5Int64V_Tg5 : $@convention(thin) (Int64) -> Int64
+// CHECK:  [[FOO_RES:%.*]] = struct $Int64 ([[FOOS_INT]] : $Builtin.Int64)
+// CHECK:  [[ID_RES:%.*]] = apply [[ID]]([[FOO_RES]]) : $@convention(thin) (Int64) -> Int64
+// CHECK:  [[USEP:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5 : $@convention(thin) (Int64) -> ()
+// CHECK:  %27 = apply [[USEP]]([[ID_RES]]) : $@convention(thin) (Int64) -> ()
+// CHECK:  %29 = apply [[USEP]]([[FOO_RES]]) : $@convention(thin) (Int64) -> ()
 
 public func testFooBar<T:P>(_ t : T) {
   let x = foo(getInt())
@@ -52,9 +52,9 @@ public func testFooBar<T:P>(_ t : T) {
 }
 
 struct AddressOnly : P{
-  var p : P = 1
+  var p : P = Int64(1)
 
-  func myValue() -> Int {
+  func myValue() -> Int64 {
     return p.myValue()
   }
 }
