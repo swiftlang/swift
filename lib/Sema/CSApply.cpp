@@ -2857,10 +2857,8 @@ namespace {
       auto tupleTy =
           TupleType::get(TupleTypeElt(paramTy, ctx.Id_dynamicMember), ctx);
 
-      auto loc = nameLoc;
-      Expr *index = TupleExpr::create(ctx, loc, argExpr, ctx.Id_dynamicMember,
-                                      loc, loc, /*hasTrailingClosure*/ false,
-                                      /*implicit*/ true);
+      Expr *index =
+          TupleExpr::createImplicit(ctx, argExpr, ctx.Id_dynamicMember);
       index->setType(tupleTy);
       cs.cacheType(index);
 
@@ -2868,7 +2866,7 @@ namespace {
       return buildSubscript(
           base, index, ctx.Id_dynamicMember,
           /*trailingClosure*/ false, cs.getConstraintLocator(expr),
-          /*isImplicit*/ false, AccessSemantics::Ordinary, overload);
+          /*isImplicit*/ true, AccessSemantics::Ordinary, overload);
     }
 
     Type getTypeOfDynamicMemberIndex(const SelectedOverload &overload) {
