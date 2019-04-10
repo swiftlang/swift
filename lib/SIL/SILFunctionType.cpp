@@ -212,13 +212,28 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     return {cotanType, conv};
   };
 
-  // Calculate WRT parameter infos, in the order that they appear in the
-  // AST-level parameter lists.
+  // Helper function testing if we are differentiating wrt this index.
+  auto isWrtIndex = [&](unsigned index) -> bool {
+    return index < parameterIndices.size() && parameterIndices[index];
+  };
+
+  // Calculate WRT parameter infos, in the order that they should appear in the
+  // results/parameters of the differential/pullback.
   SmallVector<SILParameterInfo, 4> wrtParams;
-  for (auto valueAndIndex : enumerate(getParameters()))
-    if (valueAndIndex.index() < parameterIndices.size() &&
-        parameterIndices[valueAndIndex.index()])
+  // Make the self parameter appear first in the results/parameters of the
+  // differntial/pullback, even though it's the last parameter of the original
+  // method.
+  if (getExtInfo().hasSelfParam() &&
+      isWrtIndex(getNumParameters() - 1))
+    wrtParams.push_back(getParameters()[getNumParameters() - 1]);
+  for (auto valueAndIndex : enumerate(getParameters())) {
+    // Skip the self parameter because we have already added it.
+    if (getExtInfo().hasSelfParam() &&
+        valueAndIndex.index() == getNumParameters() - 1)
+      continue;
+    if (isWrtIndex(valueAndIndex.index()))
       wrtParams.push_back(valueAndIndex.value());
+  }
 
   CanSILFunctionType closureType;
   switch (kind) {
