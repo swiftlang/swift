@@ -1,5 +1,6 @@
 // RUN: not %target-swift-frontend -typecheck %s -sdk "" 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=NO-MODULE %s
 // RUN: not %target-swift-frontend -typecheck %s -resource-dir / 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=NO-STDLIB %s
+// REQUIRES: rdar49665477
 
 // NO-MODULE: error: no such module 'NonExistent'
 
