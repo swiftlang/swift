@@ -470,7 +470,7 @@ public:
     // the underlying type.
     if (auto opaque = ResultTy->getAs<OpaqueTypeArchetypeType>()) {
       if (auto funcDecl = TheFunc->getAbstractFunctionDecl()) {
-        if (opaque->getOpaqueDecl()->getNamingDecl() == funcDecl) {
+        if (opaque->getDecl()->getNamingDecl() == funcDecl) {
           options |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
         }
       }

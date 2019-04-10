@@ -34,6 +34,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/SmallString.h"
@@ -3934,7 +3935,7 @@ void Serializer::writeType(Type ty) {
 
   case TypeKind::OpaqueTypeArchetype: {
     auto archetypeTy = cast<OpaqueTypeArchetypeType>(ty.getPointer());
-    auto declID = addDeclRef(archetypeTy->getOpaqueDecl());
+    auto declID = addDeclRef(archetypeTy->getDecl());
     auto substMapID = addSubstitutionMapRef(archetypeTy->getSubstitutions());
     unsigned abbrCode = DeclTypeAbbrCodes[OpaqueArchetypeTypeLayout::Code];
     OpaqueArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -4689,9 +4690,10 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
   DeclTable precedenceGroupDecls;
   ObjCMethodTable objcMethods;
   NestedTypeDeclsTable nestedTypeDecls;
-  LocalTypeHashTableGenerator localTypeGenerator;
+  LocalTypeHashTableGenerator localTypeGenerator, opaqueReturnTypeGenerator;
   ExtensionTable extensionDecls;
   bool hasLocalTypes = false;
+  bool hasOpaqueReturnTypes = false;
 
   Optional<DeclID> entryPointClassID;
   SmallVector<DeclID, 16> orderedTopLevelDecls;
@@ -4762,6 +4764,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
 
     SmallVector<TypeDecl *, 16> localTypeDecls;
     nextFile->getLocalTypeDecls(localTypeDecls);
+    SmallVector<OpaqueTypeDecl *, 16> opaqueReturnTypeDecls;
+    nextFile->getOpaqueReturnTypeDecls(opaqueReturnTypeDecls);
 
     for (auto TD : localTypeDecls) {
       hasLocalTypes = true;
@@ -4778,6 +4782,14 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
                                              operatorMethodDecls, objcMethods,
                                              nestedTypeDecls, /*isLocal=*/true);
       }
+    }
+    
+    for (auto OTD : opaqueReturnTypeDecls) {
+      hasOpaqueReturnTypes = true;
+      Mangle::ASTMangler Mangler;
+      auto MangledName = Mangler.mangleDeclAsUSR(OTD->getNamingDecl(),
+                                                 MANGLING_PREFIX_STR);
+      opaqueReturnTypeGenerator.insert(MangledName, addDeclRef(OTD));
     }
   }
 
@@ -4809,6 +4821,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
     if (hasLocalTypes)
       writeLocalDeclTable(DeclList, index_block::LOCAL_TYPE_DECLS,
                           localTypeGenerator);
+    if (hasOpaqueReturnTypes)
+      writeLocalDeclTable(DeclList, index_block::OPAQUE_RETURN_TYPE_DECLS,
+                          opaqueReturnTypeGenerator);
 
     if (!extensionDecls.empty()) {
       index_block::ExtensionTableLayout ExtensionTable(Out);

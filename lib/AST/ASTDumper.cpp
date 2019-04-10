@@ -3492,7 +3492,7 @@ namespace {
     void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T,
                                       StringRef label) {
       printArchetypeCommon(T, "opaque_type", label);
-      printField("decl", T->getOpaqueDecl()->getNamingDecl()->printRef());
+      printField("decl", T->getDecl()->getNamingDecl()->printRef());
       if (!T->getSubstitutions().empty()) {
         OS << '\n';
         SmallPtrSet<const ProtocolConformance *, 4> Dumped;

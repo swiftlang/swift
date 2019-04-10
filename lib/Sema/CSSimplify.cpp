@@ -1596,7 +1596,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
                       opaque1->getGenericEnvironment()->getGenericSignature())
         == arch2->getInterfaceType()->getCanonicalType(
                       opaque2->getGenericEnvironment()->getGenericSignature()));
-    assert(opaque1->getOpaqueDecl() == opaque2->getOpaqueDecl());
+    assert(opaque1->getDecl() == opaque2->getDecl());
     
     auto args1 = opaque1->getSubstitutions().getReplacementTypes();
     auto args2 = opaque2->getSubstitutions().getReplacementTypes();
@@ -2422,7 +2422,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       
       assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
       if (!type1->is<LValueType>()
-          && opaque1->getOpaqueDecl() == opaque2->getOpaqueDecl()) {
+          && opaque1->getDecl() == opaque2->getDecl()) {
         conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
       }
       break;
@@ -2445,7 +2445,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                                         ->getGenericSignature());
         if (!type1->is<LValueType>()
             && interfaceTy1 == interfaceTy2
-            && rootOpaque1->getOpaqueDecl() == rootOpaque2->getOpaqueDecl()) {
+            && rootOpaque1->getDecl() == rootOpaque2->getDecl()) {
           conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
           break;
         }

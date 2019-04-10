@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
@@ -36,6 +37,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Config.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
@@ -106,6 +108,7 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
   result.FunctionDefinitions = true;
   result.CollapseSingleGetterProperty = false;
   result.VarInitializers = true;
+  result.PrintStableReferencesToOpaqueReturnTypes = true;
 
   // We should print __consuming, __owned, etc for the module interface file.
   result.SkipUnderscoredKeywords = false;
@@ -2236,7 +2239,8 @@ void PrintAST::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
 }
 
 void PrintAST::visitOpaqueTypeDecl(OpaqueTypeDecl *decl) {
-  // TODO: Need a parsable representation for generated interfaces.
+  // TODO: If we introduce explicit opaque type decls, print them.
+  assert(decl->getName().empty());
 }
 
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
@@ -2261,6 +2265,16 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
 
   if (ShouldPrint) {
     Printer << " = ";
+    // FIXME: An inferred associated type witness type alias may reference
+    // an opaque type, but OpaqueTypeArchetypes are always canonicalized
+    // so lose type sugar for generic params. Bind the generic environment so
+    // we can map params back into the generic environment and print them
+    // correctly.
+    //
+    // Remove this when we have a way to represent non-canonical archetypes
+    // preserving sugar.
+    llvm::SaveAndRestore<GenericEnvironment*> setGenericEnv(Options.GenericEnv,
+                                                decl->getGenericEnvironment());
     printTypeLoc(decl->getUnderlyingTypeLoc());
     printGenericDeclGenericRequirements(decl);
   }
@@ -2801,6 +2815,12 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
   }
 
   printBodyIfNecessary(decl);
+  
+  // If the function has an opaque result type, print the opaque type decl.
+  if (auto opaqueResult = decl->getOpaqueResultTypeDecl()) {
+    Printer.printNewline();
+    visit(opaqueResult);
+  }
 }
 
 void PrintAST::printEnumElement(EnumElementDecl *elt) {
@@ -4156,17 +4176,48 @@ public:
   }
   
   void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
-    // TODO(opaque): present opaque types with user-facing syntax
-    Printer << "(some " << T->getOpaqueDecl()->getNamingDecl()->printRef();
-    if (!T->getSubstitutions().empty()) {
-      Printer << '<';
-      auto replacements = T->getSubstitutions().getReplacementTypes();
-      interleave(replacements.begin(), replacements.end(),
-                 [&](Type t) { visit(t); },
-                 [&] { Printer << ", "; });
-      Printer << '>';
+    // Print the type by referencing the opaque decl's synthetic name, if we
+    // were asked to.
+    OpaqueTypeDecl *decl = T->getDecl();
+    
+    if (Options.PrintStableReferencesToOpaqueReturnTypes) {
+      // Print the source of the opaque return type as a mangled name.
+      // We'll use type reconstruction while parsing the attribute to
+      // turn this back into a reference to the naming decl for the opaque
+      // type.
+      Printer << "@_opaqueReturnTypeOf(";
+      
+      SmallString<64> mangleBuf;
+      {
+        llvm::raw_svector_ostream os(mangleBuf);
+        Mangle::ASTMangler mangler;
+        os << mangler.mangleDeclAsUSR(decl->getNamingDecl(),
+                                      MANGLING_PREFIX_STR);
+      }
+      
+      Printer.printEscapedStringLiteral(mangleBuf);
+      
+      Printer << ", " << T->getInterfaceType()
+                          ->castTo<GenericTypeParamType>()
+                          ->getIndex();
+      
+      Printer << u8") \U0001F9B8";
+      printGenericArgs(T->getSubstitutions().getReplacementTypes());
+    } else {
+      // TODO(opaque): present opaque types with user-facing syntax. we should
+      // probably print this as `some P` and record the fact that we printed that
+      // so that diagnostics can add followup notes.
+      Printer << "(return type of " << T->getDecl()->getNamingDecl()->printRef();
+      Printer << ')';
+      if (!T->getSubstitutions().empty()) {
+        Printer << '<';
+        auto replacements = T->getSubstitutions().getReplacementTypes();
+        interleave(replacements.begin(), replacements.end(),
+                   [&](Type t) { visit(t); },
+                   [&] { Printer << ", "; });
+        Printer << '>';
+      }
     }
-    Printer << ')';
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {

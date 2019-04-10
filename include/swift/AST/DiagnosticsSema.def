@@ -3751,6 +3751,9 @@ WARNING(witness_swift3_objc_inference,none,
         "'@objc' inference deprecated in Swift 4",
         (DescriptiveDeclKind, DeclName, Type))
 
+ERROR(no_opaque_return_type_of,none,
+      "unable to resolve type for _opaqueReturnTypeOf attribute", ())
+
 
 ERROR(objc_observing_accessor, none,
       "observing accessors are not allowed to be marked @objc", ())

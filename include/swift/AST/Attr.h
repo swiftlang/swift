@@ -65,6 +65,14 @@ public:
 
   // For an opened existential type, the known ID.
   Optional<UUID> OpenedID;
+  
+  // For a reference to an opaque return type, the mangled name and argument
+  // index into the generic signature.
+  struct OpaqueReturnTypeRef {
+    StringRef mangledName;
+    unsigned index;
+  };
+  Optional<OpaqueReturnTypeRef> OpaqueReturnTypeOf;
 
   TypeAttributes() {}
   
@@ -80,6 +88,10 @@ public:
   
   SourceLoc getLoc(TypeAttrKind A) const {
     return AttrLocs[A];
+  }
+  
+  void setOpaqueReturnTypeOf(StringRef mangling, unsigned index) {
+    OpaqueReturnTypeOf = OpaqueReturnTypeRef{mangling, index};
   }
   
   void setAttr(TypeAttrKind A, SourceLoc L) {
