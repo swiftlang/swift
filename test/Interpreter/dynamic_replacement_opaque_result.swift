@@ -6,6 +6,7 @@
 // RUN: %target-run %t/main %t/%target-library-name(TestOpaque1) %t/%target-library-name(TestOpaque2) | %FileCheck %s
 
 // REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
 
 @_private(sourceFile: "TestOpaque1.swift") import TestOpaque1
 
