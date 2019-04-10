@@ -6708,11 +6708,6 @@ void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
 
   emitNestedTypeDecls(theEnum->getMembers());
 
-  if (shouldEmitOpaqueTypeMetadataRecord(theEnum)) {
-    emitOpaqueTypeMetadataRecord(theEnum);
-    return;
-  }
-
   emitFieldMetadataRecord(theEnum);
 
   if (!isResilient(theEnum, ResilienceExpansion::Minimal))
