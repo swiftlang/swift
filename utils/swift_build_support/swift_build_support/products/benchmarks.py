@@ -59,7 +59,8 @@ def run_build_script_helper(host_target, product, args):
 
     # We use a separate python helper to enable quicker iteration when working
     # on this by avoiding going through build-script to test small changes.
-    helper_path = os.path.join(package_path, 'utils', 'build_script_helper.py')
+    helper_path = os.path.join(package_path, 'scripts',
+                               'build_script_helper.py')
 
     build_cmd = [
         helper_path,
