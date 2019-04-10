@@ -1684,16 +1684,30 @@ public extension Tensor {
 
   @inlinable @inline(__always)
   subscript(_ indexPath: IndexPath) -> Tensor {
-    return Raw.stridedSlice(
-      self, begin: indexPath.begin, end: indexPath.end, strides: indexPath.strides,
-      beginMask: indexPath.beginMask, endMask: indexPath.endMask, 
-      ellipsisMask: indexPath.ellipsisMask, newAxisMask: indexPath.newAxisMask, 
-      shrinkAxisMask: indexPath.squeezeAxisMask)
+    get {
+      return Raw.stridedSlice(
+        self, begin: indexPath.begin, end: indexPath.end, strides: indexPath.strides,
+        beginMask: indexPath.beginMask, endMask: indexPath.endMask, 
+        ellipsisMask: indexPath.ellipsisMask, newAxisMask: indexPath.newAxisMask, 
+        shrinkAxisMask: indexPath.squeezeAxisMask)
+    }
+    set {
+      Raw.tensorStridedSliceUpdate(
+        self, begin: indexPath.begin, end: indexPath.end, strides: indexPath.strides,
+        value: newValue, beginMask: indexPath.beginMask, endMask: indexPath.endMask, 
+        ellipsisMask: indexPath.ellipsisMask, newAxisMask: indexPath.newAxisMask, 
+        shrinkAxisMask: indexPath.squeezeAxisMask)
+    }
   }
 
   @inlinable @inline(__always)
   subscript(_ indices: TensorSliceIndexProtocol...) -> Tensor {
-    return self[IndexPath(indices.map { $0.sliceIndex })]
+    get {
+      return self[IndexPath(indices.map { $0.sliceIndex })]
+    }
+    set {
+      self[IndexPath(indices.map { $0.sliceIndex })] = newValue
+    }
   }
 }
 
