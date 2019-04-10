@@ -404,7 +404,7 @@ withOpaqueTypeGenericArgs(IRGenFunction &IGF,
                           CanOpaqueTypeArchetypeType archetype,
                           llvm::function_ref<void (llvm::Value*)> body) {
   // Collect the generic arguments of the opaque decl.
-  auto opaqueDecl = archetype->getOpaqueDecl();
+  auto opaqueDecl = archetype->getDecl();
   auto generics = opaqueDecl->getGenericSignatureOfContext();
   llvm::Value *genericArgs;
   Address alloca;
@@ -454,7 +454,7 @@ MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
                                           CanOpaqueTypeArchetypeType archetype,
                                           DynamicMetadataRequest request) {
   auto accessorFn = IGF.IGM.getGetOpaqueTypeMetadataFn();
-  auto opaqueDecl = archetype->getOpaqueDecl();
+  auto opaqueDecl = archetype->getDecl();
   auto descriptor = IGF.IGM
    .getAddrOfOpaqueTypeDescriptor(opaqueDecl, ConstantInit());
 
@@ -481,7 +481,7 @@ llvm::Value *irgen::emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
                                           CanOpaqueTypeArchetypeType archetype,
                                           ProtocolDecl *protocol) {
   auto accessorFn = IGF.IGM.getGetOpaqueTypeConformanceFn();
-  auto opaqueDecl = archetype->getOpaqueDecl();
+  auto opaqueDecl = archetype->getDecl();
   auto descriptor = IGF.IGM
     .getAddrOfOpaqueTypeDescriptor(opaqueDecl, ConstantInit());
 

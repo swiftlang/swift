@@ -971,7 +971,7 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
       // If this is the opaque return type of the declaration currently being
       // mangled, use a short mangling to represent it.
       auto opaqueType = cast<OpaqueTypeArchetypeType>(tybase);
-      auto opaqueDecl = opaqueType->getOpaqueDecl();
+      auto opaqueDecl = opaqueType->getDecl();
       if (opaqueDecl->getNamingDecl() == forDecl) {
         if (opaqueType->getSubstitutions().isIdentity()) {
           return appendOperator("Qr");

@@ -3250,7 +3250,7 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
   }
 
   if (tc.validateType(typeAlias->getUnderlyingTypeLoc(),
-                      TypeResolution::forInterface(typeAlias), options)) {
+                    TypeResolution::forInterface(typeAlias, &tc), options)) {
     typeAlias->setInvalid();
     typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
   }
@@ -3938,7 +3938,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
       FD->computeType();
     }
-
+    
     if (!isa<AccessorDecl>(FD) || cast<AccessorDecl>(FD)->isGetter()) {
       auto *TyR = getTypeLocForFunctionResult(FD).getTypeRepr();
       if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
@@ -3999,11 +3999,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     }
 
     checkDeclAttributes(FD);
-    
-    // FIXME: For now, functions with opaque result types have to have their
-    // bodies type checked to get the underlying type.
-    if (FD->getOpaqueResultTypeDecl())
-      typeCheckDecl(FD);
+
+    // Mark the opaque result type as validated, if there is one.
+    if (FD->getOpaqueResultTypeDecl()) {
+      if (auto sf = FD->getDeclContext()->getParentSourceFile()) {
+        sf->markDeclWithOpaqueResultTypeAsValidated(FD);
+      }
+    }
     
     break;
   }

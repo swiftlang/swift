@@ -203,6 +203,9 @@ static SubstitutionMap
 createSubstitutionMapFromGenericArgs(GenericSignature *genericSig,
                                      ArrayRef<Type> args,
                                      ModuleDecl *moduleDecl) {
+  if (!genericSig)
+    return SubstitutionMap();
+  
   SmallVector<GenericTypeParamType *, 4> genericParams;
   genericSig->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
     if (canonical)
@@ -250,7 +253,31 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
 Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
                                    ArrayRef<Type> args,
                                    unsigned ordinal) {
-  // TODO
+  if (opaqueDescriptor->getKind() == Node::Kind::OpaqueReturnTypeOf) {
+    auto definingDecl = opaqueDescriptor->getChild(0);
+    auto mangledName = mangleNode(definingDecl);
+    auto moduleNode = findModuleNode(definingDecl);
+    if (!moduleNode)
+      return Type();
+    auto parentModule = findModule(findModuleNode(definingDecl));
+    if (!parentModule)
+      return Type();
+
+    auto opaqueDecl = parentModule->lookupOpaqueResultType(mangledName,
+                                                           Resolver);
+    if (!opaqueDecl)
+      return Type();
+    // TODO: multiple opaque types
+    assert(ordinal == 0 && "not implemented");
+    if (ordinal != 0)
+      return Type();
+
+    SubstitutionMap subs = createSubstitutionMapFromGenericArgs(
+                         opaqueDecl->getGenericSignature(), args, parentModule);
+    return OpaqueTypeArchetypeType::get(opaqueDecl, subs);
+  }
+  
+  // TODO: named opaque types
   return Type();
 }
 
