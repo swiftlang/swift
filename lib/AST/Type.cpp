@@ -2455,7 +2455,7 @@ Type ReplaceOpaqueTypesWithUnderlyingTypes::operator()(
   
   auto archetype = archetypeAndRoot->first;
   auto opaqueRoot = archetypeAndRoot->second;
-  auto subs = opaqueRoot->getOpaqueDecl()->getUnderlyingTypeSubstitutions();
+  auto subs = opaqueRoot->getDecl()->getUnderlyingTypeSubstitutions();
   // TODO: Check the resilience expansion, and handle opaque types with
   // unknown underlying types. For now, all opaque types are always
   // fragile.
@@ -2491,7 +2491,7 @@ ReplaceOpaqueTypesWithUnderlyingTypes::operator()(CanType maybeOpaqueType,
   
   auto archetype = archetypeAndRoot->first;
   auto opaqueRoot = archetypeAndRoot->second;
-  auto subs = opaqueRoot->getOpaqueDecl()->getUnderlyingTypeSubstitutions();
+  auto subs = opaqueRoot->getDecl()->getUnderlyingTypeSubstitutions();
   assert(subs.hasValue());
 
   // Apply the underlying type substitutions to the interface type of the
@@ -3703,15 +3703,15 @@ case TypeKind::Id:
     
     // FIXME: This re-looks-up conformances instead of transforming them in
     // a systematic way.
-    auto sig = opaque->getOpaqueDecl()->getGenericSignature();
+    auto sig = opaque->getDecl()->getGenericSignature();
     auto newSubMap =
       SubstitutionMap::get(sig,
        [&](SubstitutableType *t) -> Type {
          auto index = sig->getGenericParamOrdinal(cast<GenericTypeParamType>(t));
          return newSubs[index];
        },
-       LookUpConformanceInModule(opaque->getOpaqueDecl()->getModuleContext()));
-    return OpaqueTypeArchetypeType::get(opaque->getOpaqueDecl(),
+       LookUpConformanceInModule(opaque->getDecl()->getModuleContext()));
+    return OpaqueTypeArchetypeType::get(opaque->getDecl(),
                                         newSubMap);
   }
   case TypeKind::NestedArchetype: {
@@ -3728,7 +3728,7 @@ case TypeKind::Id:
     
     // Substitute the new root into the root of the interface type.
     return nestedType->getInterfaceType()->substBaseType(substRoot,
-        LookUpConformanceInModule(root->getOpaqueDecl()->getModuleContext()));
+        LookUpConformanceInModule(root->getDecl()->getModuleContext()));
   }
 
   case TypeKind::ExistentialMetatype: {
