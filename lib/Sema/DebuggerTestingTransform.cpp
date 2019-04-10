@@ -220,8 +220,9 @@ private:
     TypeChecker &TC = TypeChecker::createForContext(Ctx);
     auto *Params = ParameterList::createEmpty(Ctx);
     auto *Closure = new (Ctx)
-        ClosureExpr(Params, SourceLoc(), SourceLoc(), SourceLoc(), TypeLoc(),
-                    DF.getNextDiscriminator(), getCurrentDeclContext());
+        ClosureExpr(SourceRange(), Params, SourceLoc(), SourceLoc(), SourceLoc(),
+                    TypeLoc(), DF.getNextDiscriminator(),
+                    getCurrentDeclContext());
     Closure->setImplicit(true);
 
     // TODO: Save and return the value of $OriginalExpr.

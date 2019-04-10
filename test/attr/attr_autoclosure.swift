@@ -98,9 +98,9 @@ class TestFunc12 {
 
   func test() {
     func12a(x + foo()) // okay
-    func12c(x + foo()) 
-    // expected-error@-1{{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{13-13=self.}}
-    // expected-error@-2{{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{17-17=self.}}
+    func12c(x + foo())
+    // expected-error@-1{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note@-1{{did you mean to reference 'self' explicitly?}} {{13-13=self.}}
+    // expected-error@-2{{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note@-2{{did you mean to reference 'self' explicitly?}} {{17-17=self.}}
   }
 }
 

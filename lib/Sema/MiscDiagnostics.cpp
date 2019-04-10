@@ -1316,10 +1316,13 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
                                              const DeclContext *DC) {
   class DiagnoseWalker : public ASTWalker {
     TypeChecker &TC;
-    unsigned InClosure;
+    SmallVector<AbstractClosureExpr *, 4> Closures;
   public:
-    explicit DiagnoseWalker(TypeChecker &TC, bool isAlreadyInClosure)
-        : TC(TC), InClosure(isAlreadyInClosure) {}
+    explicit DiagnoseWalker(TypeChecker &TC, AbstractClosureExpr *ACE)
+        : TC(TC), Closures() {
+          if (ACE)
+            Closures.push_back(ACE);
+        }
 
     /// Return true if this is an implicit reference to self.
     static bool isImplicitSelfParamUse(Expr *E) {
@@ -1363,39 +1366,75 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
         // If this is a potentially-escaping closure expression, start looking
         // for references to self if we aren't already.
         if (isClosureRequiringSelfQualification(CE))
-          ++InClosure;
+          Closures.push_back(CE);
       }
 
 
       // If we aren't in a closure, no diagnostics will be produced.
-      if (!InClosure)
+      if (Closures.size() == 0)
         return { true, E };
 
-      // If we see a property reference with an implicit base from within a
-      // closure, then reject it as requiring an explicit "self." qualifier.  We
-      // do this in explicit closures, not autoclosures, because otherwise the
-      // transparence of autoclosures is lost.
+      // Diagnostics should correct the innermost closure
+      auto *ACE = Closures[Closures.size() - 1];
+      assert(ACE);
+      
+      SourceLoc memberLoc = SourceLoc();
       if (auto *MRE = dyn_cast<MemberRefExpr>(E))
         if (isImplicitSelfParamUse(MRE->getBase())) {
+          memberLoc = MRE->getLoc();
           TC.diagnose(MRE->getLoc(),
                       diag::property_use_in_closure_without_explicit_self,
-                      MRE->getMember().getDecl()->getBaseName().getIdentifier())
-            .fixItInsert(MRE->getLoc(), "self.");
-          return { false, E };
+                      MRE->getMember().getDecl()->getBaseName().getIdentifier());
         }
-
+      
       // Handle method calls with a specific diagnostic + fixit.
       if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E))
         if (isImplicitSelfParamUse(DSCE->getBase()) &&
             isa<DeclRefExpr>(DSCE->getFn())) {
           auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
+          memberLoc = DSCE->getLoc();
           TC.diagnose(DSCE->getLoc(),
                       diag::method_call_in_closure_without_explicit_self,
-                      MethodExpr->getDecl()->getBaseName().getIdentifier())
-            .fixItInsert(DSCE->getLoc(), "self.");
-          return { false, E };
+                      MethodExpr->getDecl()->getBaseName().getIdentifier());
         }
-
+      
+      // This error can be fixed by either capturing self explicitly (if in an
+      // explicit closure), or referencing self explicitly.
+      if (memberLoc.isValid()) {
+        if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
+          // If we've already captured something with the name "self", don't
+          // bother with any fix-its
+          if (CE->getCaptureListExpr())
+            for (auto capture : CE->getCaptureListExpr()->getCaptureList())
+              if (capture.Var->getName() == TC.Context.Id_self)
+                return { false, E };
+          
+          auto diag = TC.diagnose(CE->getLoc(),
+                                  diag::note_capture_self_explicitly);
+          // If there's a token immediately following the opening brace of the
+          // closure, we may need to pad the fix-it with a space.
+          auto nextLoc = CE->getLoc().getAdvancedLoc(1);
+          auto next = Lexer::getTokenAtLocation(TC.Context.SourceMgr,
+                                                CE->getLoc().getAdvancedLoc(1));
+          std::string trailing = next.getLoc() == nextLoc ? " " : "";
+          if (CE->getInLoc().isInvalid())
+            diag.fixItInsertAfter(CE->getLoc(), " [self] in" + trailing);
+          else if (CE->getBracketRange().isInvalid())
+            diag.fixItInsertAfter(CE->getLoc(), " [self]" + trailing);
+          else {
+            // Insert into an existing capture list
+            auto range = CE->getBracketRange();
+            if (range.Start.getAdvancedLoc(1) == range.End)
+              diag.fixItInsertAfter(range.Start, "self");
+            else
+              diag.fixItInsertAfter(range.Start, "self, ");
+          }
+        }
+        TC.diagnose(memberLoc, diag::note_reference_self_explicitly)
+          .fixItInsert(memberLoc, "self.");
+        return { false, E };
+      }
+      
       // Catch any other implicit uses of self with a generic diagnostic.
       if (isImplicitSelfParamUse(E))
         TC.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure);
@@ -1406,8 +1445,8 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
     Expr *walkToExprPost(Expr *E) override {
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
         if (isClosureRequiringSelfQualification(CE)) {
-          assert(InClosure);
-          --InClosure;
+          assert(Closures.size() > 0);
+          Closures.pop_back();
         }
       }
       
@@ -1415,16 +1454,16 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
     }
   };
 
-  bool isAlreadyInClosure = false;
+  AbstractClosureExpr *ACE = nullptr;
   if (DC->isLocalContext()) {
-    while (DC->getParent()->isLocalContext() && !isAlreadyInClosure) {
+    while (DC->getParent()->isLocalContext() && !ACE) {
       if (auto *closure = dyn_cast<AbstractClosureExpr>(DC))
         if (DiagnoseWalker::isClosureRequiringSelfQualification(closure))
-          isAlreadyInClosure = true;
+          ACE = const_cast<AbstractClosureExpr *>(closure);
       DC = DC->getParent();
     }
   }
-  const_cast<Expr *>(E)->walk(DiagnoseWalker(TC, isAlreadyInClosure));
+  const_cast<Expr *>(E)->walk(DiagnoseWalker(TC, ACE));
 }
 
 bool TypeChecker::getDefaultGenericArgumentsString(

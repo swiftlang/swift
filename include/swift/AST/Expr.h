@@ -3558,6 +3558,9 @@ public:
 /// \endcode
 class ClosureExpr : public AbstractClosureExpr {
 
+  /// The range of the brackets of the capture list, if present.
+  SourceRange BracketRange;
+  
   /// The location of the "throws", if present.
   SourceLoc ThrowsLoc;
   
@@ -3579,15 +3582,15 @@ class ClosureExpr : public AbstractClosureExpr {
   /// by this closure.
   CaptureListExpr *CLE;
 public:
-  ClosureExpr(ParameterList *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
-              SourceLoc inLoc, TypeLoc explicitResultType,
-              unsigned discriminator, DeclContext *parent)
+  ClosureExpr(SourceRange bracketRange, ParameterList *params,
+              SourceLoc throwsLoc, SourceLoc arrowLoc, SourceLoc inLoc,
+              TypeLoc explicitResultType, unsigned discriminator,
+              DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
-      ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
-      ExplicitResultType(explicitResultType),
-      Body(nullptr),
-      CLE(nullptr) {
+      BracketRange(bracketRange), ThrowsLoc(throwsLoc),
+      ArrowLoc(arrowLoc), InLoc(inLoc), ExplicitResultType(explicitResultType),
+      Body(nullptr), CLE(nullptr) {
     setParameterList(params);
     Bits.ClosureExpr.HasAnonymousClosureVars = false;
   }
@@ -3619,6 +3622,11 @@ public:
   /// explicitly-specified result type.
   bool hasExplicitResultType() const { return ArrowLoc.isValid(); }
 
+  /// Retrieve the range of the \c '[' and \c ']' that enclose the capture list.
+  /// Because empty capture lists are alowed, which do not result in a
+  /// CaptureListExpr, this range may be valid even if getCaptureListExpr()
+  /// returns nullptr.
+  SourceRange getBracketRange() const { return BracketRange; }
   
   /// Retrieve the location of the \c '->' for closures with an
   /// explicit result type.

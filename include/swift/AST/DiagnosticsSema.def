@@ -3024,11 +3024,15 @@ ERROR(self_assignment_var,none,
 ERROR(self_assignment_prop,none,
       "assigning a property to itself", ())
 ERROR(property_use_in_closure_without_explicit_self,none,
-      "reference to property %0 in closure requires explicit 'self.' to make"
-      " capture semantics explicit", (Identifier))
+      "reference to property %0 in closure requires explicit use of 'self' to"
+      " make capture semantics explicit", (Identifier))
 ERROR(method_call_in_closure_without_explicit_self,none,
-      "call to method %0 in closure requires explicit 'self.' to make"
+      "call to method %0 in closure requires explicit use of 'self' to make"
       " capture semantics explicit", (Identifier))
+NOTE(note_capture_self_explicitly,none,
+      "capture 'self' explicitly to enable implicit 'self' in this closure", ())
+NOTE(note_reference_self_explicitly,none,
+      "reference 'self.' explicitly", ())
 ERROR(implicit_use_of_self_in_closure,none,
       "implicit use of 'self' in closure; use 'self.' to make"
       " capture semantics explicit", ())

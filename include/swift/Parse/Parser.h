@@ -1407,6 +1407,8 @@ public:
   ///     identifier (',' identifier)* func-signature-result? 'in'
   /// \endverbatim
   ///
+  /// \param bracketRange The range of the brackets enclosing a capture list, if
+  /// present
   /// \param captureList The entries in the capture list.
   /// \param params The parsed parameter list, or null if none was provided.
   /// \param arrowLoc The location of the arrow, if present.
@@ -1415,6 +1417,7 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   bool parseClosureSignatureIfPresent(
+                                      SourceRange &bracketRange,
                                 SmallVectorImpl<CaptureListEntry> &captureList,
                                       ParameterList *&params,
                                       SourceLoc &throwsLoc,

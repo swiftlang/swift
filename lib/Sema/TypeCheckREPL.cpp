@@ -239,8 +239,9 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   unsigned discriminator = TLC.claimNextClosureDiscriminator();
 
   ClosureExpr *CE =
-      new (Context) ClosureExpr(params, SourceLoc(), SourceLoc(), SourceLoc(),
-                                TypeLoc(), discriminator, newTopLevel);
+      new (Context) ClosureExpr(SourceRange(), params, SourceLoc(), SourceLoc(),
+                                SourceLoc(), TypeLoc(), discriminator,
+                                newTopLevel);
 
   SmallVector<AnyFunctionType::Param, 1> args;
   params->getParams(args);
