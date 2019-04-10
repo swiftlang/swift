@@ -107,7 +107,8 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
   result.FunctionDefinitions = true;
   result.CollapseSingleGetterProperty = false;
   result.VarInitializers = true;
-  result.PrintStableReferencesToOpaqueReturnTypes = true;
+  result.OpaqueReturnTypePrinting =
+      OpaqueReturnTypePrintingMode::StableReference;
 
   // We should print __consuming, __owned, etc for the module interface file.
   result.SkipUnderscoredKeywords = false;
@@ -3408,7 +3409,27 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       return;
     }
 
-    if (T->hasSimpleTypeRepr()) {
+    bool isSimple = T->hasSimpleTypeRepr();
+    if (isSimple && T->is<OpaqueTypeArchetypeType>()) {
+      auto opaqueTy = T->castTo<OpaqueTypeArchetypeType>();
+      auto opaqueDecl = opaqueTy->getDecl();
+      if (!opaqueDecl->hasName()) {
+        switch (Options.OpaqueReturnTypePrinting) {
+        case PrintOptions::OpaqueReturnTypePrintingMode::StableReference:
+        case PrintOptions::OpaqueReturnTypePrintingMode::Description:
+          isSimple = true;
+          break;
+        case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
+          isSimple = false;
+          break;
+        case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword: {
+          isSimple = opaqueTy->getConformsTo().size() < 2;
+        }
+        }
+      }
+    }
+
+    if (isSimple) {
       visit(T);
     } else {
       Printer << "(";
@@ -4171,7 +4192,7 @@ public:
   }
   
   void visitNestedArchetypeType(NestedArchetypeType *T) {
-    visit(T->getParent());
+    printWithParensIfNotSimple(T->getParent());
     Printer << ".";
     printArchetypeCommon(T);
   }
@@ -4181,16 +4202,28 @@ public:
   }
   
   void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
-    // Print the type by referencing the opaque decl's synthetic name, if we
-    // were asked to.
-    OpaqueTypeDecl *decl = T->getDecl();
-    
-    if (Options.PrintStableReferencesToOpaqueReturnTypes) {
+    switch (Options.OpaqueReturnTypePrinting) {
+    case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
+      Printer << "some ";
+      LLVM_FALLTHROUGH;
+    case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword: {
+      SmallVector<Type, 2> types;
+      for (auto proto : T->getConformsTo())
+        types.push_back(proto->TypeDecl::getDeclaredInterfaceType());
+
+      // Create and visit temporary ProtocolCompositionType.
+      auto composition =
+          ProtocolCompositionType::get(T->getASTContext(), types, false);
+      visit(composition);
+      return;
+    }
+    case PrintOptions::OpaqueReturnTypePrintingMode::StableReference: {
       // Print the source of the opaque return type as a mangled name.
       // We'll use type reconstruction while parsing the attribute to
       // turn this back into a reference to the naming decl for the opaque
       // type.
       Printer << "@_opaqueReturnTypeOf(";
+      OpaqueTypeDecl *decl = T->getDecl();
       
       Printer.printEscapedStringLiteral(
                                    decl->getOpaqueReturnTypeIdentifier().str());
@@ -4201,7 +4234,9 @@ public:
       
       Printer << u8") \U0001F9B8";
       printGenericArgs(T->getSubstitutions().getReplacementTypes());
-    } else {
+      return;
+    }
+    case PrintOptions::OpaqueReturnTypePrintingMode::Description: {
       // TODO(opaque): present opaque types with user-facing syntax. we should
       // probably print this as `some P` and record the fact that we printed that
       // so that diagnostics can add followup notes.
@@ -4215,6 +4250,8 @@ public:
                    [&] { Printer << ", "; });
         Printer << '>';
       }
+      return;
+    }
     }
   }
 
