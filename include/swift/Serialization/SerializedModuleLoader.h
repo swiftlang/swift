@@ -51,6 +51,18 @@ protected:
                   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
                   bool &isFramework);
 
+  /// Attempts to search the provided directory for a loadable serialized
+  /// .swiftmodule with the provided `ModuleFilename`. Subclasses must
+  /// override this method to perform their custom module lookup behavior.
+  ///
+  /// If such a module could not be loaded, the subclass must return a
+  /// `std::error_code` indicating the failure. There are two specific error
+  /// codes that will be treated specially:
+  /// - `errc::no_such_file_or_directory`: The module loader will stop looking
+  ///   for loadable modules and will diagnose the lookup failure.
+  /// - `errc::not_supported`: The module loader will stop looking for loadable
+  ///   modules and will defer to the remaining module loaders to look up this
+  ///   module.
   virtual std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
       StringRef ModuleDocFilename,

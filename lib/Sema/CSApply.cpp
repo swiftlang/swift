@@ -811,8 +811,10 @@ namespace {
       // Figure out the actual base type, and whether we have an instance of
       // that type or its metatype.
       bool baseIsInstance = true;
+      bool isExistentialMetatype = false;
       if (auto baseMeta = baseTy->getAs<AnyMetatypeType>()) {
         baseIsInstance = false;
+        isExistentialMetatype = baseMeta->is<ExistentialMetatypeType>();
         baseTy = baseMeta->getInstanceType();
       }
 
@@ -900,11 +902,15 @@ namespace {
                  base, selfParamTy, member, semantics,
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
-        // Convert the base to an rvalue of the appropriate metatype.
-        base = coerceToType(base,
-                            MetatypeType::get(isDynamic ? selfTy : containerTy),
-                            locator.withPathElement(
-                              ConstraintLocator::MemberRefBase));
+        if (!isExistentialMetatype || openedExistential) {
+          // Convert the base to an rvalue of the appropriate metatype.
+          base = coerceToType(base,
+                              MetatypeType::get(
+                                isDynamic ? selfTy : containerTy),
+                              locator.withPathElement(
+                                ConstraintLocator::MemberRefBase));
+        }
+
         if (!base)
           return nullptr;
 
@@ -2857,10 +2863,8 @@ namespace {
       auto tupleTy =
           TupleType::get(TupleTypeElt(paramTy, ctx.Id_dynamicMember), ctx);
 
-      auto loc = nameLoc;
-      Expr *index = TupleExpr::create(ctx, loc, argExpr, ctx.Id_dynamicMember,
-                                      loc, loc, /*hasTrailingClosure*/ false,
-                                      /*implicit*/ true);
+      Expr *index =
+          TupleExpr::createImplicit(ctx, argExpr, ctx.Id_dynamicMember);
       index->setType(tupleTy);
       cs.cacheType(index);
 
@@ -2868,7 +2872,7 @@ namespace {
       return buildSubscript(
           base, index, ctx.Id_dynamicMember,
           /*trailingClosure*/ false, cs.getConstraintLocator(expr),
-          /*isImplicit*/ false, AccessSemantics::Ordinary, overload);
+          /*isImplicit*/ true, AccessSemantics::Ordinary, overload);
     }
 
     Type getTypeOfDynamicMemberIndex(const SelectedOverload &overload) {
@@ -7234,46 +7238,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
     // Try closing the existential, if there is one.
     closeExistential(result, locator);
-
-    // Extract all arguments.
-    auto *CEA = arg;
-
-    // The argument is either a ParenExpr or TupleExpr.
-    ArrayRef<Expr *> arguments;
-
-    SmallVector<Expr *, 1> Scratch;
-    if (auto *TE = dyn_cast<TupleExpr>(CEA))
-      arguments = TE->getElements();
-    else if (auto *PE = dyn_cast<ParenExpr>(CEA)) {
-      Scratch.push_back(PE->getSubExpr());
-      arguments = makeArrayRef(Scratch);
-    }
-    else {
-      Scratch.push_back(apply->getArg());
-      arguments = makeArrayRef(Scratch);
-    }
-
-    for (auto arg: arguments) {
-      bool isNoEscape = false;
-      while (1) {
-        if (auto AFT = cs.getType(arg)->getAs<AnyFunctionType>()) {
-          isNoEscape = isNoEscape || AFT->isNoEscape();
-        }
-
-        if (auto conv = dyn_cast<ImplicitConversionExpr>(arg))
-          arg = conv->getSubExpr();
-        else if (auto *PE = dyn_cast<ParenExpr>(arg))
-          arg = PE->getSubExpr();
-        else
-          break;
-      }
-      if (!isNoEscape) {
-        if (auto DRE = dyn_cast<DeclRefExpr>(arg))
-          if (auto FD = dyn_cast<FuncDecl>(DRE->getDecl())) {
-            tc.addEscapingFunctionAsArgument(FD, apply);
-          }
-      }
-    }
 
     if (unwrapResult)
       return forceUnwrapResult(result);

@@ -2534,6 +2534,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options+=(
                       -DLLDB_BUILD_FRAMEWORK:BOOL=TRUE
                       -DLLDB_CODESIGN_IDENTITY=""
+                      -DLLDB_USE_SYSTEM_DEBUGSERVER:BOOL=TRUE
+                      -DLLDB_FRAMEWORK_TOOLS="darwin-debug;lldb-argdumper;lldb-server;repl_swift"
                     )
                   fi
                 fi
@@ -3089,8 +3091,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
                     FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
                     DOTEST_EXTRA="-I${FOUNDATION_BUILD_DIR}"
-                    DOTEST_EXTRA="-Xcc -F${FOUNDATION_BUILD_DIR}"
-                    DOTEST_EXTRA="-Xcc -F${FOUNDATION_BUILD_DIR}/CoreFoundation-prefix/System/Library/Frameworks"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xcc -F${FOUNDATION_BUILD_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xcc -F${FOUNDATION_BUILD_DIR}/CoreFoundation-prefix/System/Library/Frameworks"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -I${FOUNDATION_BUILD_DIR}/swift"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -I${LIBDISPATCH_SOURCE_DIR}"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -L${FOUNDATION_BUILD_DIR}"

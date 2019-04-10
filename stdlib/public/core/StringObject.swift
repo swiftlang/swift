@@ -90,12 +90,10 @@ internal struct _StringObject {
       return .immortal(biased)
     }
 
-    @inlinable
+    @inlinable @inline(__always)
     internal var isImmortal: Bool {
-      @inline(__always) get {
-        if case .immortal = self { return true }
-        return false
-      }
+      if case .immortal = self { return true }
+      return false
     }
   }
 
@@ -191,11 +189,9 @@ extension _StringObject {
     }
   }
 #else
-  @inlinable
+  @inlinable @inline(__always)
   internal var rawBits: RawBitPattern {
-    @inline(__always) get {
-      return (_countAndFlagsBits, discriminatedObjectRawBits)
-    }
+    return (_countAndFlagsBits, discriminatedObjectRawBits)
   }
 
   @inlinable @inline(__always)
@@ -298,9 +294,9 @@ extension _StringObject.CountAndFlags {
 */
 extension _StringObject.Nibbles {
   // The canonical empty sting is an empty small string
-  @inlinable
+  @inlinable @inline(__always)
   internal static var emptyString: UInt64 {
-    @inline(__always) get { return _StringObject.Nibbles.small(isASCII: true) }
+    return _StringObject.Nibbles.small(isASCII: true)
   }
 }
 
@@ -381,9 +377,7 @@ extension _StringObject.Nibbles {
 
   // Discriminator for large, mortal (i.e. managed), swift-native strings
   @inlinable @inline(__always)
-  internal static func largeMortal() -> UInt64 {
-    return 0x0000_0000_0000_0000
-  }
+  internal static func largeMortal() -> UInt64 { return 0x0000_0000_0000_0000 }
 
   internal static func largeCocoa(providesFastUTF8: Bool) -> UInt64 {
     return providesFastUTF8 ? 0x4000_0000_0000_0000 : 0x5000_0000_0000_0000
@@ -391,38 +385,30 @@ extension _StringObject.Nibbles {
 }
 
 extension _StringObject {
-  @inlinable
+  @inlinable @inline(__always)
   internal static var nativeBias: UInt {
-    @inline(__always) get {
 #if arch(i386) || arch(arm)
-      return 20
+    return 20
 #else
-      return 32
+    return 32
 #endif
-    }
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var isImmortal: Bool {
-    @inline(__always) get {
-      return (discriminatedObjectRawBits & 0x8000_0000_0000_0000) != 0
-    }
+    return (discriminatedObjectRawBits & 0x8000_0000_0000_0000) != 0
   }
 
-  @inlinable
-  internal var isMortal: Bool {
-    @inline(__always) get { return !isImmortal }
-  }
+  @inlinable @inline(__always)
+  internal var isMortal: Bool { return !isImmortal }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var isSmall: Bool {
-    @inline(__always) get {
-      return (discriminatedObjectRawBits & 0x2000_0000_0000_0000) != 0
-    }
+    return (discriminatedObjectRawBits & 0x2000_0000_0000_0000) != 0
   }
 
-  @inlinable
-  internal var isLarge: Bool { @inline(__always) get { return !isSmall } }
+  @inlinable @inline(__always)
+  internal var isLarge: Bool { return !isSmall }
 
   // Whether this string can provide access to contiguous UTF-8 code units:
   //   - Small strings can by spilling to the stack
@@ -430,17 +416,13 @@ extension _StringObject {
   //   - Shared strings can:
   //     - Cocoa strings which respond to e.g. CFStringGetCStringPtr()
   //     - Non-Cocoa shared strings
-  @inlinable
+  @inlinable @inline(__always)
   internal var providesFastUTF8: Bool {
-    @inline(__always) get {
-      return (discriminatedObjectRawBits & 0x1000_0000_0000_0000) == 0
-    }
+    return (discriminatedObjectRawBits & 0x1000_0000_0000_0000) == 0
   }
 
-  @inlinable
-  internal var isForeign: Bool {
-    @inline(__always) get { return !providesFastUTF8 }
-  }
+  @inlinable @inline(__always)
+  internal var isForeign: Bool { return !providesFastUTF8 }
 
   // Whether we are native or shared, i.e. we have a backing class which
   // conforms to `_AbstractStringStorage`
@@ -555,26 +537,20 @@ extension _StringObject {
     return Int(truncatingIfNeeded: (x & 0x0F00_0000_0000_0000) &>> 56)
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var smallCount: Int {
-    @inline(__always)
-    get {
-      _internalInvariant(isSmall)
-      return _StringObject.getSmallCount(fromRaw: discriminatedObjectRawBits)
-    }
+    _internalInvariant(isSmall)
+    return _StringObject.getSmallCount(fromRaw: discriminatedObjectRawBits)
   }
 
   @inlinable
   internal static func getSmallIsASCII(fromRaw x: UInt64) -> Bool {
     return x & 0x4000_0000_0000_0000 != 0
   }
-  @inlinable
+  @inlinable @inline(__always)
   internal var smallIsASCII: Bool {
-    @inline(__always)
-    get {
-      _internalInvariant(isSmall)
-      return _StringObject.getSmallIsASCII(fromRaw: discriminatedObjectRawBits)
-    }
+    _internalInvariant(isSmall)
+    return _StringObject.getSmallIsASCII(fromRaw: discriminatedObjectRawBits)
   }
 
   @inlinable @inline(__always)
@@ -797,31 +773,25 @@ extension _StringObject {
     return _countAndFlags.count
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var largeAddressBits: UInt {
-    @inline(__always) get {
-      _internalInvariant(isLarge)
-      return UInt(truncatingIfNeeded:
-        discriminatedObjectRawBits & Nibbles.largeAddressMask)
-    }
+    _internalInvariant(isLarge)
+    return UInt(truncatingIfNeeded:
+      discriminatedObjectRawBits & Nibbles.largeAddressMask)
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var nativeUTF8Start: UnsafePointer<UInt8> {
-    @inline(__always) get {
-      _internalInvariant(largeFastIsTailAllocated)
-      return UnsafePointer(
-        bitPattern: largeAddressBits &+ _StringObject.nativeBias
-      )._unsafelyUnwrappedUnchecked
-    }
+    _internalInvariant(largeFastIsTailAllocated)
+    return UnsafePointer(
+      bitPattern: largeAddressBits &+ _StringObject.nativeBias
+    )._unsafelyUnwrappedUnchecked
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var nativeUTF8: UnsafeBufferPointer<UInt8> {
-    @inline(__always) get {
-      _internalInvariant(largeFastIsTailAllocated)
-      return UnsafeBufferPointer(start: nativeUTF8Start, count: largeCount)
-    }
+    _internalInvariant(largeFastIsTailAllocated)
+    return UnsafeBufferPointer(start: nativeUTF8Start, count: largeCount)
   }
 
   // Resilient way to fetch a pointer
@@ -847,47 +817,44 @@ extension _StringObject {
     }
   }
 
+  @inline(__always)
   internal var nativeStorage: __StringStorage {
-    @inline(__always) get {
 #if arch(i386) || arch(arm)
-      guard case .native(let storage) = _variant else {
-        _internalInvariantFailure()
-      }
-      return _unsafeUncheckedDowncast(storage, to: __StringStorage.self)
-#else
-      _internalInvariant(hasNativeStorage)
-      return Builtin.reinterpretCast(largeAddressBits)
-#endif
+    guard case .native(let storage) = _variant else {
+      _internalInvariantFailure()
     }
+    return _unsafeUncheckedDowncast(storage, to: __StringStorage.self)
+#else
+    _internalInvariant(hasNativeStorage)
+    return Builtin.reinterpretCast(largeAddressBits)
+#endif
   }
 
+  @inline(__always)
   internal var sharedStorage: __SharedStringStorage {
-    @inline(__always) get {
 #if arch(i386) || arch(arm)
-      guard case .native(let storage) = _variant else {
-        _internalInvariantFailure()
-      }
-      return _unsafeUncheckedDowncast(storage, to: __SharedStringStorage.self)
-#else
-      _internalInvariant(largeFastIsShared && !largeIsCocoa)
-      _internalInvariant(hasSharedStorage)
-      return Builtin.reinterpretCast(largeAddressBits)
-#endif
+    guard case .native(let storage) = _variant else {
+      _internalInvariantFailure()
     }
+    return _unsafeUncheckedDowncast(storage, to: __SharedStringStorage.self)
+#else
+    _internalInvariant(largeFastIsShared && !largeIsCocoa)
+    _internalInvariant(hasSharedStorage)
+    return Builtin.reinterpretCast(largeAddressBits)
+#endif
   }
 
+  @inline(__always)
   internal var cocoaObject: AnyObject {
-    @inline(__always) get {
 #if arch(i386) || arch(arm)
-      guard case .bridged(let object) = _variant else {
-        _internalInvariantFailure()
-      }
-      return object
-#else
-      _internalInvariant(largeIsCocoa && !isImmortal)
-      return Builtin.reinterpretCast(largeAddressBits)
-#endif
+    guard case .bridged(let object) = _variant else {
+      _internalInvariantFailure()
     }
+    return object
+#else
+    _internalInvariant(largeIsCocoa && !isImmortal)
+    return Builtin.reinterpretCast(largeAddressBits)
+#endif
   }
 }
 
@@ -896,20 +863,16 @@ extension _StringObject {
   // The number of code units stored
   //
   // TODO(String micro-performance): Check generated code
-  @inlinable
-  internal var count: Int {
-    @inline(__always) get { return isSmall ? smallCount : largeCount }
-  }
+  @inlinable @inline(__always)
+  internal var count: Int { return isSmall ? smallCount : largeCount }
 
   //
   // Whether the string is all ASCII
   //
-  @inlinable
+  @inlinable @inline(__always)
   internal var isASCII: Bool {
-    @inline(__always) get {
-      if isSmall { return smallIsASCII }
-      return _countAndFlags.isASCII
-    }
+    if isSmall { return smallIsASCII }
+    return _countAndFlags.isASCII
   }
 
   @inline(__always)

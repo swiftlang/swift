@@ -31,11 +31,6 @@ class Product(object):
         return cls.product_name()
 
     @classmethod
-    def get_build_directory_name(cls, host_target):
-        return "{}-{}".format(cls.product_name(),
-                              host_target.name)
-
-    @classmethod
     def is_build_script_impl_product(cls):
         """is_build_script_impl_product -> bool
 
@@ -43,15 +38,15 @@ class Product(object):
         """
         return True
 
-    def do_build(self, host_target):
-        """do_build() -> void
+    def build(self, host_target):
+        """build() -> void
 
         Perform the build, for a non-build-script-impl product.
         """
         raise NotImplementedError
 
-    def do_test(self, host_target):
-        """do_build() -> void
+    def test(self, host_target):
+        """test() -> void
 
         Run the tests, for a non-build-script-impl product.
         """

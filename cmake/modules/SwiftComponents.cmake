@@ -84,6 +84,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 else()
   list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "sourcekit-xpc-service")
 endif()
+list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "stdlib-experimental")
 
 macro(swift_configure_components)
   # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
