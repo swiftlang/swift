@@ -25,7 +25,8 @@ using FragileFunctionKind = TypeChecker::FragileFunctionKind;
 
 std::pair<FragileFunctionKind, bool>
 TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
-  for (; DC->isLocalContext(); DC = DC->getParent()) {
+  for (DC = DC->getLocalContext(); DC && DC->isLocalContext();
+       DC = DC->getParent()) {
     if (isa<DefaultArgumentInitializer>(DC)) {
       // Default argument generators of public functions cannot reference
       // @usableFromInline declarations; all other fragile function kinds
@@ -175,6 +176,11 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
     // implicit '_'.
     diagName = accessor->getStorage()->getFullName();
   }
+
+  // Swift 5.0 did not check the underlying types of local typealiases.
+  // FIXME: Conditionalize this once we have a new language mode.
+  if (isa<TypeAliasDecl>(DC))
+    downgradeToWarning = DowngradeToWarning::Yes;
 
   auto diagID = diag::resilience_decl_unavailable;
   if (downgradeToWarning == DowngradeToWarning::Yes)
