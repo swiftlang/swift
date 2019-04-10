@@ -675,6 +675,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
 ParserResult<TypeRepr>
 Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
                                      bool HandleCodeCompletion) {
+  SyntaxParsingContext SomeTypeContext(SyntaxContext, SyntaxKind::SomeType);
   // Check for the opaque modifier.
   // This is only semantically allowed in certain contexts, but we parse it
   // generally for diagnostics and recovery.
@@ -683,6 +684,9 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
       && Tok.is(tok::identifier)
       && Tok.getRawText() == "some") {
     opaqueLoc = consumeToken();
+  } else {
+    // This isn't a some type.
+    SomeTypeContext.setTransparent();
   }
   
   auto applyOpaque = [&](TypeRepr *type) -> TypeRepr* {
