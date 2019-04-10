@@ -5666,7 +5666,7 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
         }
       } else if (auto *E = Element.dyn_cast<Expr *>()) {
         if (auto SE = dyn_cast<SequenceExpr>(E->getSemanticsProvidingExpr())) {
-          if (SE->getNumElements() > 0 && isa<AssignExpr>(SE->getElement(1))) {
+          if (SE->getNumElements() > 1 && isa<AssignExpr>(SE->getElement(1))) {
             // This is an assignment.  We don't want to implicitly return 
             // it.
             return;
