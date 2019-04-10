@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !defined(__ELF__) && !defined(__MACH__)
+#if !defined(__ELF__) && !defined(__MACH__) && !defined(__EMSCRIPTEN__)
 
 #include "ImageInspection.h"
 #include "ImageInspectionCOFF.h"

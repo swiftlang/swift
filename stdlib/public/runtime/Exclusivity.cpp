@@ -24,7 +24,9 @@
 #include <stdio.h>
 
 // Pick a return-address strategy
-#if __GNUC__
+#if defined(__EMSCRIPTEN__)
+#define get_return_address() ((void*) 0)
+#elif __GNUC__
 #define get_return_address() __builtin_return_address(0)
 #elif _MSC_VER
 #include <intrin.h>
@@ -36,7 +38,11 @@
 
 using namespace swift;
 
+#ifdef __EMSCRIPTEN__
+bool swift::_swift_disableExclusivityChecking = true;
+#else
 bool swift::_swift_disableExclusivityChecking = false;
+#endif
 
 static const char *getAccessName(ExclusivityFlags flags) {
   switch (flags) {
