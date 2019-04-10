@@ -866,15 +866,6 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
     return emitUndefRValue(loc, refType);
   }
 
-  // If this is a reference to a type, produce a metatype.
-  if (isa<TypeDecl>(decl)) {
-    assert(refType->is<MetatypeType>() &&
-           "type declref does not have metatype type?!");
-    return RValue(*this, loc, refType,
-                  ManagedValue::forUnmanaged(
-                    B.createMetatype(loc, getLoweredType(refType))));
-  }
-  
   // If this is a reference to a var, emit it as an l-value and then load.
   if (auto *var = dyn_cast<VarDecl>(decl)) {
     assert(!declRef.isSpecialized() &&
@@ -883,6 +874,8 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
     return emitRValueForNonMemberVarDecl(loc, var, refType, semantics, C);
   }
   
+  assert(!isa<TypeDecl>(decl));
+
   // If the referenced decl isn't a VarDecl, it should be a constant of some
   // sort.
   SILDeclRef silDeclRef(decl);
@@ -2016,14 +2009,7 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *e,
                                          SGFContext resultCtx) {
   assert(!e->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
-
-  if (isa<TypeDecl>(e->getMember().getDecl())) {
-    // Emit the metatype for the associated type.
-    visit(e->getBase());
-    SILValue mt =
-        SGF.B.createMetatype(e, SGF.getLoweredLoadableType(e->getType()));
-    return RValue(SGF, e, ManagedValue::forUnmanaged(mt));
-  }
+  assert(isa<VarDecl>(e->getMember().getDecl()));
 
   // Everything else should use the l-value logic.
 

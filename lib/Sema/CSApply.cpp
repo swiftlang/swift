@@ -551,6 +551,16 @@ namespace {
                               /*isDynamic=*/false);
       }
 
+      auto type = solution.simplifyType(openedType);
+
+      if (isa<TypeDecl>(decl) && !isa<ModuleDecl>(decl)) {
+        auto typeExpr = TypeExpr::createImplicitHack(
+          loc.getBaseNameLoc(), type->getMetatypeInstanceType(),
+          ctx);
+        cs.cacheType(typeExpr);
+        return typeExpr;
+      }
+
       SubstitutionMap substitutions;
 
       // Due to a SILGen quirk, unqualified property references do not
@@ -562,7 +572,6 @@ namespace {
             locator);
       }
 
-      auto type = solution.simplifyType(openedType);
       auto declRefExpr =
         new (ctx) DeclRefExpr(ConcreteDeclRef(decl, substitutions),
                               loc, implicit, semantics, type);
@@ -842,6 +851,20 @@ namespace {
         return forceUnwrapIfExpected(DSBI, choice, memberLocator);
       }
 
+      // If we're referring to a member type, it's just a type
+      // reference.
+      if (isa<TypeDecl>(member)) {
+        Type refType = simplifyType(openedType);
+        auto ref =
+            TypeExpr::createImplicitHack(memberLoc.getBaseNameLoc(),
+                                         refType, context);
+        cs.setType(ref, refType);
+        auto *result = new (context) DotSyntaxBaseIgnoredExpr(
+            base, dotLoc, ref, refType);
+        cs.setType(result, refType);
+        return result;
+      }
+
       // The formal type of the 'self' value for the member's declaration.
       Type containerTy = getBaseType(refTy->castTo<FunctionType>());
 
@@ -983,8 +1006,8 @@ namespace {
             member->getAttrs().hasAttribute<OptionalAttr>());
       }
 
-      // For types and properties, build member references.
-      if (isa<TypeDecl>(member) || isa<VarDecl>(member)) {
+      // For properties, build member references.
+      if (isa<VarDecl>(member)) {
         assert(!dynamicSelfFnType && "Converted type doesn't make sense here");
         if (!baseIsInstance && member->isInstanceMember()) {
           assert(memberLocator.getBaseLocator() && 
