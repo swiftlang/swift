@@ -26,8 +26,8 @@ class TSanLibDispatch(product.Product):
         return "tsan-libdispatch-test"
 
     @classmethod
-    def is_build_script_impl_product(cls):
-        return False
+    def needs_toolchain(cls):
+        return True
 
     def build(self, host_target):
         """Build TSan runtime (compiler-rt)."""

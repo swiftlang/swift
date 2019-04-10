@@ -24,9 +24,6 @@ from .. import shell
 
 
 class Ninja(product.Product):
-    @classmethod
-    def is_build_script_impl_product(cls):
-        return False
 
     @classmethod
     def new_builder(cls, args, toolchain, workspace, host):

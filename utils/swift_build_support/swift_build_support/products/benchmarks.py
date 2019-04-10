@@ -25,8 +25,8 @@ class Benchmarks(product.Product):
         return "benchmarks"
 
     @classmethod
-    def is_build_script_impl_product(cls):
-        return False
+    def needs_toolchain(cls):
+        return True
 
     def build(self, host_target):
         run_build_script_helper(host_target, self, self.args)

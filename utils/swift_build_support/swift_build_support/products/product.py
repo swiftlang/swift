@@ -33,12 +33,12 @@ class Product(object):
         return cls.product_name()
 
     @classmethod
-    def is_build_script_impl_product(cls):
-        """is_build_script_impl_product -> bool
+    def needs_toolchain(cls):
+        """needs_toolchain -> bool
 
-        Whether this product is produced by build-script-impl.
+        Whether this product needs a toolchain installed to be built.
         """
-        return True
+        return False
 
     def build(self, host_target):
         """build() -> void

@@ -20,8 +20,8 @@ class SourceKitLSP(product.Product):
         return "sourcekit-lsp"
 
     @classmethod
-    def is_build_script_impl_product(cls):
-        return False
+    def needs_toolchain(cls):
+        return True
 
     def build(self, host_target):
         indexstoredb.run_build_script_helper(

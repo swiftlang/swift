@@ -521,7 +521,7 @@ class BuildScriptInvocation(object):
 
         # Compute any product specific cmake arguments.
         for product_class in self.compute_product_classes():
-            if not product_class.is_build_script_impl_product():
+            if product_class.needs_toolchain():
                 continue
 
             product_name = product_class.product_name()
@@ -930,8 +930,8 @@ class BuildScriptInvocation(object):
         # matches that of `build-script-impl`.
         product_classes = self.compute_product_classes()
 
-        impl_product_classes = [cls for cls in product_classes
-                                if cls.is_build_script_impl_product()]
+        standalone_product_classes = [cls for cls in product_classes
+                                      if not cls.needs_toolchain()]
 
         # Execute each "pass".
 
@@ -949,24 +949,24 @@ class BuildScriptInvocation(object):
                 print("Running Swift benchmarks for: {}".format(
                     " ".join(config.swift_benchmark_run_targets)))
 
-            for product_class in impl_product_classes:
+            for product_class in standalone_product_classes:
                 self._execute_build_action(host_target, product_class)
 
         # Test...
         for host_target in all_hosts:
-            for product_class in impl_product_classes:
+            for product_class in standalone_product_classes:
                 self._execute_test_action(host_target, product_class)
 
         # Install...
         for host_target in all_hosts:
-            for product_class in impl_product_classes:
+            for product_class in standalone_product_classes:
                 self._execute_install_action(host_target, product_class)
 
         # Non-build-script-impl products...
         # Note: currently only supports building for the host.
         for host_target in [self.args.host_target]:
             for product_class in product_classes:
-                if product_class.is_build_script_impl_product():
+                if not product_class.needs_toolchain():
                     continue
                 product_source = product_class.product_source_name()
                 product_name = product_class.product_name()
