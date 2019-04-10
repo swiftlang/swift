@@ -683,6 +683,8 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
   if (Context.LangOpts.EnableOpaqueResultTypes
       && Tok.is(tok::identifier)
       && Tok.getRawText() == "some") {
+    // Treat some as a keyword.
+    TokReceiver->registerTokenKindChange(Tok.getLoc(), tok::contextual_keyword);
     opaqueLoc = consumeToken();
   } else {
     // This isn't a some type.
