@@ -3620,7 +3620,10 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
 
       // If we're implicitly unwrapping from T! to Any then there's nothing to
       // diagnose.
-      if (srcType->getOptionalObjectType() &&
+      SmallVector<Type, 4> srcOptionals;
+      srcType->lookThroughAllOptionalTypes(srcOptionals);
+
+      if (srcOptionals.size() == 1 &&
           destType->lookThroughAllOptionalTypes()->isAny() &&
           hasImplicitlyUnwrappedResult(subExpr)) {
         return;
