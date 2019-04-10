@@ -615,17 +615,6 @@ void IRGenModule::emitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDec
   builder.emit();
 }
 
-bool IRGenModule::shouldEmitOpaqueTypeMetadataRecord(
-    const NominalTypeDecl *nominalDecl) {
-  if (nominalDecl->getAttrs().hasAttribute<AlignmentAttr>()) {
-    auto &ti = getTypeInfoForUnlowered(nominalDecl->getDeclaredTypeInContext());
-    if (isa<FixedTypeInfo>(ti))
-      return true;
-  }
-
-  return false;
-}
-
 /// Builds a constant LLVM struct describing the layout of a fixed-size
 /// SIL @box. These look like closure contexts, but without any necessary
 /// bindings or metadata sources, and only a single captured value.
@@ -1025,19 +1014,35 @@ void IRGenerator::emitBuiltinReflectionMetadata() {
   }
 }
 
-void IRGenModule::emitFieldMetadataRecord(const NominalTypeDecl *Decl) {
+void IRGenModule::emitFieldMetadataRecord(const NominalTypeDecl *D) {
   if (!IRGen.Opts.EnableReflectionMetadata)
     return;
 
-  // @objc enums never have generic parameters or payloads,
-  // and lower as their raw type.
-  if (auto *ED = dyn_cast<EnumDecl>(Decl))
-    if (ED->isObjC()) {
-      emitOpaqueTypeMetadataRecord(ED);
+  auto T = D->getDeclaredTypeInContext()->getCanonicalType();
+
+  if (auto *ED = dyn_cast<EnumDecl>(D)) {
+    // @objc enums never have generic parameters or payloads,
+    // and lower as their raw type.
+    if (!getEnumImplStrategy(*this, T).isReflectable()) {
+      OpaqueTypes.insert(D);
       return;
     }
+  }
 
-  FieldTypeMetadataBuilder builder(*this, Decl);
+  // If the type has custom @_alignment, emit a fixed record with the
+  // alignment since remote mirrors will need to treat the type as opaque.
+  //
+  // Note that we go on to also emit a field descriptor in this case,
+  // since in-process reflection only cares about the types of the fields
+  // and does not independently re-derive the layout.
+  if (D->getAttrs().hasAttribute<AlignmentAttr>()) {
+    auto &TI = getTypeInfoForUnlowered(T);
+    if (isa<FixedTypeInfo>(TI)) {
+      OpaqueTypes.insert(D);
+    }
+  }
+
+  FieldTypeMetadataBuilder builder(*this, D);
   FieldDescriptors.push_back(builder.emit());
 }
 
