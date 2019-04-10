@@ -1008,10 +1008,8 @@ public:
   KeyPathSubscriptIndexHashableFailure(Expr *root, ConstraintSystem &cs,
                                        Type type, ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), NonConformingType(type) {
-#ifndef NDEBUG
-    auto path = locator->getPath();
-    assert(!path.empty() && path.back().isKeyPathComponent());
-#endif
+    assert(locator->isResultOfKeyPathDynamicMemberLookup() ||
+           locator->isKeyPathSubscriptComponent());
   }
 
   bool diagnoseAsError() override;
