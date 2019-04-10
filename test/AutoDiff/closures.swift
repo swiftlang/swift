@@ -39,6 +39,8 @@ struct TF30 : Differentiable {
 let _: @differentiable (TF30) -> Float = { x in x.x }
 
 // Make sure `@nondiff` gets propagated through SIL.
-let _: @differentiable (Float, @nondiff Float) -> Float = { x, y in x }
 // Make sure `@nondiff` with non-`Differentiable` also works.
-let _: @differentiable (Float, @nondiff Int) -> Float = { x, y in x }
+public func nondiffs(_ f: @differentiable (Float, @nondiff Float) -> Float,
+                     _ g: @differentiable (Float, @nondiff Int) -> Float) {
+}
+nondiffs({ x, y in x }, { x, y in x })

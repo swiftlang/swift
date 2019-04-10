@@ -215,12 +215,10 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   // Calculate WRT parameter infos, in the order that they appear in the
   // AST-level parameter lists.
   SmallVector<SILParameterInfo, 4> wrtParams;
-  for (auto valueAndIndex : enumerate(getParameters())) {
-    llvm::errs() << "Parameter " << valueAndIndex.value() << '\n';
+  for (auto valueAndIndex : enumerate(getParameters()))
     if (valueAndIndex.index() < parameterIndices.size() &&
         parameterIndices[valueAndIndex.index()])
       wrtParams.push_back(valueAndIndex.value());
-  }
 
   CanSILFunctionType closureType;
   switch (kind) {

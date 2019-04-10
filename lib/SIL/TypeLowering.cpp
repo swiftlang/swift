@@ -247,7 +247,6 @@ namespace {
     }
     
     RetTy visitSILFunctionType(CanSILFunctionType type) {
-      llvm::errs() << "visit FnTy: " << type << '\n';
       // SWIFT_ENABLE_TENSORFLOW
       if (type->isDifferentiable())
         return asImpl().visitDifferentiableSILFunctionType(type);
