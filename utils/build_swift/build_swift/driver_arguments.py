@@ -1084,6 +1084,23 @@ def create_argument_parser():
                 'Currently only armv7 and aarch64 are supported. '
                 '%(default)s is the default.')
 
+    in_group('Build settings for Android')
+
+    option('--wasm-emscripten', store_path,
+           help='An absolute path to Emscripten that will be used as a libc '
+                'implementation for Wasm builds')
+
+    option('--wasm-icu-uc', store_path,
+           help='Path to libicuuc.so')
+    option('--wasm-icu-uc-include', store_path,
+           help='Path to a directory containing headers for libicuuc')
+    option('--wasm-icu-i18n', store_path,
+           help='Path to libicui18n.so')
+    option('--wasm-icu-i18n-include', store_path,
+           help='Path to a directory containing headers libicui18n')
+    option('--wasm-icu-data', store_path,
+           help='Path to libicudata.so')
+
     # -------------------------------------------------------------------------
     in_group('Experimental language features')
 

@@ -3,6 +3,7 @@ include(SwiftList)
 include(SwiftXcodeSupport)
 include(SwiftWindowsSupport)
 include(SwiftAndroidSupport)
+include(SwiftWasmSupport)
 
 # SWIFTLIB_DIR is the directory in the build tree where Swift resource files
 # should be placed.  Note that $CMAKE_CFG_INTDIR expands to "." for
@@ -371,6 +372,12 @@ function(_add_variant_c_compile_flags)
     foreach(path ${${CFLAGS_ARCH}_INCLUDE})
       list(APPEND result "\"${CMAKE_INCLUDE_FLAG_C}${path}\"")
     endforeach()
+  elseif(CFLAGS_SDK STREQUAL WASM)
+    list(APPEND result "-D__EMSCRIPTEN__=1")
+    swift_wasm_include_for_arch(${CFLAGS_ARCH} ${CFLAGS_ARCH}_INCLUDE)
+    foreach(path ${${CFLAGS_ARCH}_INCLUDE})
+      list(APPEND result "\"${CMAKE_INCLUDE_FLAG_C}${path}\"")
+    endforeach()
   endif()
 
   set(ICU_UC_INCLUDE_DIR ${SWIFT_${CFLAGS_SDK}_${CFLAGS_ARCH}_ICU_UC_INCLUDE})
@@ -436,6 +443,11 @@ function(_add_variant_swift_compile_flags
 
   if("${sdk}" STREQUAL "ANDROID")
     swift_android_include_for_arch(${arch} ${arch}_swift_include)
+    foreach(path IN LISTS ${arch}_swift_include)
+      list(APPEND result "\"${CMAKE_INCLUDE_FLAG_C}${path}\"")
+    endforeach()
+  elseif("${sdk}" STREQUAL "WASM")
+    swift_wasm_include_for_arch(${arch} ${arch}_swift_include)
     foreach(path IN LISTS ${arch}_swift_include)
       list(APPEND result "\"${CMAKE_INCLUDE_FLAG_C}${path}\"")
     endforeach()
@@ -516,8 +528,6 @@ function(_add_variant_link_flags)
     list(APPEND link_libraries "pthread")
   elseif("${LFLAGS_SDK}" STREQUAL "CYGWIN")
     # No extra libraries required.
-  elseif("${LFLAGS_SDK}" STREQUAL "WASM")
-    # No extra libraries required.
   elseif("${LFLAGS_SDK}" STREQUAL "WINDOWS")
     # We don't need to add -nostdlib using MSVC or clang-cl, as MSVC and clang-cl rely on auto-linking entirely.
     if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
@@ -550,6 +560,11 @@ function(_add_variant_link_flags)
       ${SWIFT_ANDROID_${LFLAGS_ARCH}_ICU_UC})
 
     swift_android_lib_for_arch(${LFLAGS_ARCH} ${LFLAGS_ARCH}_LIB)
+    foreach(path IN LISTS ${LFLAGS_ARCH}_LIB)
+      list(APPEND library_search_directories ${path})
+    endforeach()
+  elseif("${LFLAGS_SDK}" STREQUAL "WASM")
+    swift_wasm_lib_for_arch(${LFLAGS_ARCH} ${LFLAGS_ARCH}_LIB)
     foreach(path IN LISTS ${LFLAGS_ARCH}_LIB)
       list(APPEND library_search_directories ${path})
     endforeach()

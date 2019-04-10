@@ -1586,6 +1586,18 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
+                if [[ ! "${SKIP_BUILD_WASM}" ]]; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_WASM_EMSCRIPTEN_PATH:STRING="${WASM_EMSCRIPTEN}"
+                        -DSWIFT_WASM_ICU_UC:STRING="${WASM_ICU_UC}"
+                        -DSWIFT_WASM_ICU_UC_INCLUDE:STRING="${WASM_ICU_UC_INCLUDE}"
+                        -DSWIFT_WASM_ICU_I18N:STRING="${WASM_ICU_I18N}"
+                        -DSWIFT_WASM_ICU_I18N_INCLUDE:STRING="${WASM_ICU_I18N_INCLUDE}"
+                        -DSWIFT_WASM_ICU_DATA:STRING="${WASM_ICU_DATA}"
+                    )
+                fi
+
                 if [[ "${DARWIN_OVERLAY_TARGET}" != "" ]]; then
                     # Split LOCAL_HOST into a pair ``arch-sdk``
                     # Example LOCAL_HOST: macosx-x86_64

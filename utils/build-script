@@ -122,6 +122,20 @@ class BuildScriptInvocation(object):
                     "--android-icu-i18n-include, and --android-icu-data "
                     "must be specified")
 
+        if args.wasm:
+            if args.wasm_emscripten is None or \
+                    args.wasm_icu_uc is None or \
+                    args.wasm_icu_uc_include is None or \
+                    args.wasm_icu_i18n is None or \
+                    args.wasm_icu_i18n_include is None or \
+                    args.wasm_icu_data is None:
+                diagnostics.fatal(
+                    "when building for WebAssembly, --wasm-emscripten, "
+                    "--wasm-icu-uc, "
+                    "--wasm-icu-uc-include, --wasm-icu-i18n, "
+                    "--wasm-icu-i18n-include, and --wasm-icu-data "
+                    "must be specified")
+
         targets_needing_toolchain = [
             'build_indexstoredb',
             'build_sourcekitlsp',
@@ -588,6 +602,16 @@ class BuildScriptInvocation(object):
             impl_args += [
                 "--android-deploy-device-path",
                 args.android_deploy_device_path,
+            ]
+
+        if args.wasm:
+            impl_args += [
+                "--wasm-emscripten", args.wasm_emscripten,
+                "--wasm-icu-uc", args.wasm_icu_uc,
+                "--wasm-icu-uc-include", args.wasm_icu_uc_include,
+                "--wasm-icu-i18n", args.wasm_icu_i18n,
+                "--wasm-icu-i18n-include", args.wasm_icu_i18n_include,
+                "--wasm-icu-data", args.wasm_icu_data,
             ]
 
         if platform.system() == 'Darwin':
