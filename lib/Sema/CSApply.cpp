@@ -561,17 +561,10 @@ namespace {
         return typeExpr;
       }
 
-      SubstitutionMap substitutions;
-
-      // Due to a SILGen quirk, unqualified property references do not
-      // need substitutions.
-      if (!isa<VarDecl>(decl)) {
-        substitutions =
+      auto substitutions =
           solution.computeSubstitutions(
             decl->getInnermostDeclContext()->getGenericSignatureOfContext(),
             locator);
-      }
-
       auto declRefExpr =
         new (ctx) DeclRefExpr(ConcreteDeclRef(decl, substitutions),
                               loc, implicit, semantics, type);
