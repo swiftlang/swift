@@ -209,6 +209,12 @@ private:
   // The current IGM for which IR is generated.
   IRGenModule *CurrentIGM = nullptr;
 
+  /// If this is true, adding anything to the below queues is an error.
+  bool FinishedEmittingLazyDefinitions = false;
+
+  /// A map recording if metadata can be emitted lazily for each nominal type.
+  llvm::DenseMap<NominalTypeDecl *, bool> HasLazyMetadata;
+
   struct LazyTypeGlobalsInfo {
     /// Is there a use of the type metadata?
     bool IsMetadataUsed = false;
@@ -223,19 +229,10 @@ private:
     /// Have we already emitted a definition for the type descriptor with
     /// the current requirements?
     bool IsDescriptorEmitted = false;
-
-    /// Is the type a lazy type?
-    bool IsLazy = false;
   };
 
-  /// If this is true, adding anything to the below queues is an error.
-  bool FinishedEmittingLazyDefinitions = false;
-
   /// The set of type metadata that have been enqueued for lazy emission.
-  ///
-  /// It can also contain some eagerly emitted metadata. Those are ignored in
-  /// lazy emission.
-  llvm::DenseMap<NominalTypeDecl*, LazyTypeGlobalsInfo> LazyTypeGlobals;
+  llvm::DenseMap<NominalTypeDecl *, LazyTypeGlobalsInfo> LazyTypeGlobals;
 
   /// The queue of lazy type metadata to emit.
   llvm::SmallVector<NominalTypeDecl*, 4> LazyTypeMetadata;
@@ -341,10 +338,10 @@ public:
   // Emit the code to replace dynamicReplacement(for:) functions.
   void emitDynamicReplacements();
 
-  /// Checks if the metadata of \p Nominal can be emitted lazily.
-  ///
-  /// If yes, \p Nominal is added to eligibleLazyMetadata and true is returned.
-  bool tryEnableLazyTypeMetadata(NominalTypeDecl *Nominal);
+  /// Checks if metadata for this type can be emitted lazily. This is true for
+  /// non-public types as well as imported types, except for classes and
+  /// protocols which are always emitted eagerly.
+  bool hasLazyMetadata(NominalTypeDecl *type);
 
   /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
