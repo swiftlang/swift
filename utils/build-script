@@ -904,34 +904,17 @@ class BuildScriptInvocation(object):
         """Execute the invocation with the configured arguments."""
 
         # Convert to a build-script-impl invocation.
-        (impl_env, impl_args) = self.convert_to_impl_arguments()
+        (self.impl_env, self.impl_args) = self.convert_to_impl_arguments()
 
         # If using the legacy implementation, delegate all behavior to
         # `build-script-impl`.
         if self.args.legacy_impl:
             # Execute the underlying build script implementation.
-            shell.call_without_sleeping([build_script_impl] + impl_args,
-                                        env=impl_env, echo=True)
+            shell.call_without_sleeping([build_script_impl] + self.impl_args,
+                                        env=self.impl_env, echo=True)
             return
 
         # Otherwise, we compute and execute the individual actions ourselves.
-
-        def execute_one_impl_action(host=None, product_class=None, name=None):
-            if host is None:
-                assert (product_class is None and
-                        name == "merged-hosts-lipo"), "invalid action"
-                action_name = name
-            elif product_class is None:
-                assert name in ("package", "extractsymbols"), "invalid action"
-                action_name = "{}-{}".format(host.name, name)
-            else:
-                assert name is not None, "invalid action"
-                action_name = "{}-{}-{}".format(
-                    host.name, product_class.product_name(), name)
-            shell.call_without_sleeping(
-                [build_script_impl] + impl_args + [
-                    "--only-execute", action_name],
-                env=impl_env, echo=self.args.verbose_build)
 
         # Compute the list of hosts to operate on.
         all_host_names = [
@@ -965,17 +948,17 @@ class BuildScriptInvocation(object):
                     " ".join(config.swift_benchmark_run_targets)))
 
             for product_class in impl_product_classes:
-                execute_one_impl_action(host_target, product_class, "build")
+                self._execute_build_action(host_target, product_class)
 
         # Test...
         for host_target in all_hosts:
             for product_class in impl_product_classes:
-                execute_one_impl_action(host_target, product_class, "test")
+                self._execute_test_action(host_target, product_class)
 
         # Install...
         for host_target in all_hosts:
             for product_class in impl_product_classes:
-                execute_one_impl_action(host_target, product_class, "install")
+                self._execute_install_action(host_target, product_class)
 
         # Non-build-script-impl products...
         # Note: currently only supports building for the host.
@@ -996,14 +979,46 @@ class BuildScriptInvocation(object):
 
         # Extract symbols...
         for host_target in all_hosts:
-            execute_one_impl_action(host_target, name="extractsymbols")
+            self._execute_extract_symbols_action(host_target)
 
         # Package...
         for host_target in all_hosts:
-            execute_one_impl_action(host_target, name="package")
+            self._execute_package_action(host_target)
 
         # Lipo...
-        execute_one_impl_action(name="merged-hosts-lipo")
+        self._execute_merged_host_lipo_action()
+
+    def _execute_build_action(self, host_target, product_class):
+        action_name = "{}-{}-build".format(host_target.name,
+                                           product_class.product_name())
+        self._execute_action(action_name)
+
+    def _execute_test_action(self, host_target, product_class):
+        action_name = "{}-{}-test".format(host_target.name,
+                                          product_class.product_name())
+        self._execute_action(action_name)
+
+    def _execute_install_action(self, host_target, product_class):
+        action_name = "{}-{}-install".format(host_target.name,
+                                             product_class.product_name())
+        self._execute_action(action_name)
+
+    def _execute_extract_symbols_action(self, host_target):
+        action_name = "{}-extractsymbols".format(host_target.name)
+        self._execute_action(action_name)
+
+    def _execute_package_action(self, host_target):
+        action_name = "{}-package".format(host_target.name)
+        self._execute_action(action_name)
+
+    def _execute_merged_host_lipo_action(self):
+        self._execute_action("merged-hosts-lipo")
+
+    def _execute_action(self, action_name):
+        shell.call_without_sleeping(
+            [build_script_impl] + self.impl_args +
+            ["--only-execute", action_name],
+            env=self.impl_env, echo=self.args.verbose_build)
 
 
 # Provide a short delay so accidentally invoked clean builds can be canceled.
