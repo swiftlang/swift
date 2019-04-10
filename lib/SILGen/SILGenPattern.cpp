@@ -2497,36 +2497,54 @@ public:
   PatternMatchEmission &Emission;
 };
 
+namespace {
+
+struct UnexpectedEnumCaseInfo {
+  CanType subjectTy;
+  ManagedValue metatype;
+  ManagedValue rawValue;
+  NullablePtr<const EnumDecl> singleObjCEnum;
+
+  UnexpectedEnumCaseInfo(CanType subjectTy, ManagedValue metatype,
+                         ManagedValue rawValue, const EnumDecl *singleObjCEnum)
+      : subjectTy(subjectTy), metatype(metatype), rawValue(rawValue),
+        singleObjCEnum(singleObjCEnum) {
+    assert(isa<MetatypeInst>(metatype));
+    assert(bool(rawValue) && isa<UncheckedTrivialBitCastInst>(rawValue));
+    assert(singleObjCEnum->hasRawType());
+  }
+
+  UnexpectedEnumCaseInfo(CanType subjectTy, ManagedValue valueMetatype)
+      : subjectTy(subjectTy), metatype(valueMetatype), rawValue(),
+        singleObjCEnum() {
+    assert(isa<ValueMetatypeInst>(valueMetatype));
+  }
+
+  bool isSingleObjCEnum() const { return singleObjCEnum.isNonNull(); }
+
+  void cleanupInstsIfUnused() {
+    auto f = [](SILValue v) {
+      if (!v->use_empty())
+        return;
+      cast<SingleValueInstruction>(v)->eraseFromParent();
+    };
+    f(metatype.getValue());
+    if (rawValue)
+      f(rawValue.getValue());
+  }
+};
+
+} // end anonymous namespace
+
 static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
                                                   SILLocation loc,
-                                                  ManagedValue value,
-                                                  Type subjectTy,
-                                                  const EnumDecl *enumDecl) {
+                                                  UnexpectedEnumCaseInfo ueci) {
   ASTContext &ctx = SGF.getASTContext();
   auto diagnoseFailure = ctx.getDiagnoseUnexpectedEnumCaseValue();
   if (!diagnoseFailure) {
     SGF.B.createBuiltinTrap(loc);
     return;
   }
-
-  assert(enumDecl->isObjC());
-  assert(enumDecl->hasRawType());
-  assert(value.getType().isTrivial(SGF.F));
-
-  // Get the enum type as an Any.Type value.
-  SILType metatypeType = SGF.getLoweredType(
-      AbstractionPattern::getOpaque(),
-      MetatypeType::get(subjectTy));
-  SILValue metatype = SGF.B.createMetatype(loc, metatypeType);
-
-  // Bitcast the enum value to its raw type. (This is only safe for @objc
-  // enums.)
-  SILType loweredRawType = SGF.getLoweredType(enumDecl->getRawType());
-  assert(loweredRawType.isTrivial(SGF.F));
-  assert(loweredRawType.isObject());
-  auto rawValue = SGF.B.createUncheckedTrivialBitCast(loc, value,
-                                                      loweredRawType);
-  auto materializedRawValue = rawValue.materialize(SGF, loc);
 
   auto genericSig = diagnoseFailure->getGenericSignature();
   auto subs = SubstitutionMap::get(
@@ -2537,10 +2555,10 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
         assert(genericParam->getIndex() < 2);
         switch (genericParam->getIndex()) {
         case 0:
-          return subjectTy;
+          return ueci.subjectTy;
 
         case 1:
-          return enumDecl->getRawType();
+          return ueci.singleObjCEnum.get()->getRawType();
 
         default:
           llvm_unreachable("wrong generic signature for expected case value");
@@ -2548,16 +2566,14 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
       },
       LookUpConformanceInSignature(*genericSig));
 
-  SGF.emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, subs,
-                                  {ManagedValue::forUnmanaged(metatype),
-                                   materializedRawValue},
-                                  SGFContext());
+  SGF.emitApplyOfLibraryIntrinsic(
+      loc, diagnoseFailure, subs,
+      {ueci.metatype, ueci.rawValue.materialize(SGF, loc)}, SGFContext());
 }
 
 static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
                                              SILLocation loc,
-                                             ManagedValue value,
-                                             Type subjectTy) {
+                                             UnexpectedEnumCaseInfo ueci) {
   ASTContext &ctx = SGF.getASTContext();
   auto diagnoseFailure = ctx.getDiagnoseUnexpectedEnumCase();
   if (!diagnoseFailure) {
@@ -2565,21 +2581,14 @@ static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
     return;
   }
 
-  // Get the switched-upon value's type.
-  SILType metatypeType = SGF.getLoweredType(
-      AbstractionPattern::getOpaque(),
-      MetatypeType::get(subjectTy)->getCanonicalType());
-  ManagedValue metatype = SGF.B.createValueMetatype(loc, metatypeType, value);
-
   auto diagnoseSignature = diagnoseFailure->getGenericSignature();
   auto genericArgsMap = SubstitutionMap::get(
       diagnoseSignature,
-      [&](SubstitutableType *type) -> Type { return subjectTy; },
+      [&](SubstitutableType *type) -> Type { return ueci.subjectTy; },
       LookUpConformanceInSignature(*diagnoseSignature));
 
   SGF.emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, genericArgsMap,
-                                  metatype,
-                                  SGFContext());
+                                  ueci.metatype, SGFContext());
 }
 
 static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
@@ -2778,6 +2787,38 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     return {subjectMV.copy(*this, S), CastConsumptionKind::TakeAlways};
   }());
 
+  // If we need to diagnose an unexpected enum case or unexpected enum case
+  // value, we need access to a value metatype for the subject. Emit this state
+  // now before we emit the actual switch to ensure that the subject has not
+  // been consumed.
+  auto unexpectedEnumCaseInfo = ([&]() -> UnexpectedEnumCaseInfo {
+    SILLocation loc = RegularLocation::getAutoGeneratedLocation();
+    CanType canSubjectTy = subjectTy->getCanonicalType();
+    CanType metatypeType = MetatypeType::get(canSubjectTy)->getCanonicalType();
+    SILType loweredMetatypeType =
+        getLoweredType(AbstractionPattern::getOpaque(), metatypeType);
+    ManagedValue value = subject.getFinalManagedValue();
+
+    if (auto *singleEnumDecl = canSubjectTy->getEnumOrBoundGenericEnum()) {
+      if (singleEnumDecl->isObjC()) {
+        auto metatype = ManagedValue::forUnmanaged(
+            B.createMetatype(loc, loweredMetatypeType));
+
+        // Bitcast the enum value to its raw type. (This is only safe for @objc
+        // enums.)
+        SILType loweredRawType = getLoweredType(singleEnumDecl->getRawType());
+        assert(loweredRawType.isTrivial(F));
+        assert(loweredRawType.isObject());
+        auto rawValue =
+            B.createUncheckedTrivialBitCast(loc, value, loweredRawType);
+        return {canSubjectTy, metatype, rawValue, singleEnumDecl};
+      }
+    }
+
+    return {canSubjectTy,
+            B.createValueMetatype(loc, loweredMetatypeType, value)};
+  }());
+
   auto failure = [&](SILLocation location) {
     // If we fail to match anything, we trap. This can happen with a switch
     // over an @objc enum, which may contain any value of its underlying type,
@@ -2786,18 +2827,12 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     SWIFT_DEFER { B.createUnreachable(location); };
 
     // Special case: if it's a single @objc enum, we can print the raw value.
-    CanType ty = S->getSubjectExpr()->getType()->getCanonicalType();
-    if (auto *singleEnumDecl = ty->getEnumOrBoundGenericEnum()) {
-      if (singleEnumDecl->isObjC()) {
-        emitDiagnoseOfUnexpectedEnumCaseValue(*this, location,
-                                              subject.getFinalManagedValue(),
-                                              subjectTy, singleEnumDecl);
-        return;
-      }
+    if (unexpectedEnumCaseInfo.isSingleObjCEnum()) {
+      emitDiagnoseOfUnexpectedEnumCaseValue(*this, location,
+                                            unexpectedEnumCaseInfo);
+      return;
     }
-    emitDiagnoseOfUnexpectedEnumCase(*this, location,
-                                     subject.getFinalManagedValue(),
-                                     subjectTy);
+    emitDiagnoseOfUnexpectedEnumCase(*this, location, unexpectedEnumCaseInfo);
   };
 
   // Set up an initial clause matrix.
@@ -2823,6 +2858,10 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   } else {
     B.emitBlock(contBB);
   }
+
+  // Now that we have emitted everything, see if our unexpected enum case info
+  // metatypes were actually used. If not, delete them.
+  unexpectedEnumCaseInfo.cleanupInstsIfUnused();
 }
 
 void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
