@@ -737,24 +737,6 @@ MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
     llvm_unreachable("bad formal linkage");
   }
 
-  if (type->hasOpaqueArchetype()) {
-    if(auto opaque = type->getAs<OpaqueTypeArchetypeType>()) {
-      auto namingDecl = opaque->getDecl()->getNamingDecl();
-      switch (getDeclLinkage(namingDecl)) {
-      case FormalLinkage::PublicUnique:
-        return MetadataAccessStrategy::PublicUniqueAccessor;
-      case FormalLinkage::HiddenUnique:
-        return MetadataAccessStrategy::HiddenUniqueAccessor;
-      case FormalLinkage::Private:
-        return MetadataAccessStrategy::PrivateAccessor;
-
-      case FormalLinkage::PublicNonUnique:
-        return MetadataAccessStrategy::NonUniqueAccessor;
-      }
-    }
-    return MetadataAccessStrategy::PublicUniqueAccessor;
-  }
-
   // Everything else requires a shared accessor function.
   return MetadataAccessStrategy::NonUniqueAccessor;
 }
