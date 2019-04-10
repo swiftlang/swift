@@ -2447,8 +2447,8 @@ for host in "${ALL_HOSTS[@]}"; do
                         lib="lib${lib_name}.so*"
                         dylib="lib${lib_name}*.dylib"
                         rm -f "${TF_LIB_DIR}/${lib}"
-                        find "${TENSORFLOW_HOST_LIB_DIR}" -name "${lib}" -o -name "${dylib}" -exec chmod +w {} +
-                        find "${TENSORFLOW_HOST_LIB_DIR}" -name "${lib}" -o -name "${dylib}" -exec cp -p {} "${TF_LIB_DIR}" \;
+                        find "${TENSORFLOW_HOST_LIB_DIR}" \( -name "${lib}" -o -name "${dylib}" \) -exec chmod +w {} +
+                        find "${TENSORFLOW_HOST_LIB_DIR}" \( -name "${lib}" -o -name "${dylib}" \) -exec cp -p {} "${TF_LIB_DIR}" \;
                     done
 
                     if [[ ! "${TENSORFLOW_TARGET_LIB_DIR}" ]] ; then
@@ -3829,10 +3829,11 @@ for host in "${ALL_HOSTS[@]}"; do
                 mkdir -p "${TF_DEST_DIR}"
                 for lib_name in tensorflow tensorflow_framework
                 do
-                    lib="lib${lib_name}.so"
+                    lib="lib${lib_name}.so*"
+                    dylib="lib${lib_name}*.dylib"
                     echo "${TF_LIBDIR}/${lib} => ${TF_DEST_DIR}"
                     rm -f "${TF_DEST_DIR}/${lib}"
-                    cp -a "${TF_LIBDIR}/${lib}" "${TF_DEST_DIR}"
+                    find "${TF_LIBDIR}" \( -name "${lib}" -o -name "${dylib}" \) -exec cp -a {} "${TF_DEST_DIR}" \;
                 done
                 continue
                 ;;
