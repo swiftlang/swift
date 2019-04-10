@@ -2444,10 +2444,10 @@ for host in "${ALL_HOSTS[@]}"; do
                     # problematic for overwriting/stripping symbols. Thus, write
                     # permission is added here.
                     for lib_name in tensorflow tensorflow_framework; do
-                        lib="lib${lib_name}.so"
+                        lib="lib${lib_name}.so*"
                         rm -f "${TF_LIB_DIR}/${lib}"
-                        chmod +w "${TENSORFLOW_HOST_LIB_DIR}/${lib}"
-                        cp -p "${TENSORFLOW_HOST_LIB_DIR}/${lib}" "${TF_LIB_DIR}"
+                        find "${TENSORFLOW_HOST_LIB_DIR}" -name "${lib}" -exec chmod +w {} +
+                        find "${TENSORFLOW_HOST_LIB_DIR}" -name "${lib}" -exec cp -p {} "${TF_LIB_DIR}" \;
                     done
 
                     if [[ ! "${TENSORFLOW_TARGET_LIB_DIR}" ]] ; then
