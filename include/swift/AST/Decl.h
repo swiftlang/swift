@@ -2343,7 +2343,7 @@ class ValueDecl : public Decl {
     /// Whether this declaration is 'final'. A final class can't be subclassed,
     /// a final class member can't be overriden.
     unsigned isFinal : 1;
-  } LazySemanticInfo;
+  } LazySemanticInfo = { };
 
   friend class OverriddenDeclsRequest;
   friend class IsObjCRequest;
@@ -2358,14 +2358,6 @@ protected:
     Bits.ValueDecl.AlreadyInLookupTable = false;
     Bits.ValueDecl.CheckedRedeclaration = false;
     Bits.ValueDecl.IsUserAccessible = true;
-    LazySemanticInfo.isObjCComputed = false;
-    LazySemanticInfo.isObjC = false;
-    LazySemanticInfo.hasOverriddenComputed = false;
-    LazySemanticInfo.hasOverridden = false;
-    LazySemanticInfo.isDynamicComputed = false;
-    LazySemanticInfo.isDynamic = false;
-    LazySemanticInfo.isFinalComputed = false;
-    LazySemanticInfo.isFinal = false;
   }
 
   // MemberLookupTable borrows a bit from this type
