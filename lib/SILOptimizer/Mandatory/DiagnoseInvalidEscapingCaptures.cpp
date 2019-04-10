@@ -329,6 +329,26 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
   }
 }
 
+// Enforce exclusivity restrictions on recursive uses of non-escaping closures.
+// Exclusivity requires a Non-Escaping Recursion Restriction rule (SE-0176):
+// A non-escaping closure A may not be recursively invoked during the
+// execution of a non-escaping closure B which captures the same local
+// variable or inout parameter unless:
+// - A is defined within B or
+// - A is a local function declaration which is referenced directly by B.
+//
+// This is conservatively approximated with a Non-Escaping Parameter Call
+// Restriction rule (NPCR), as implemented below:
+// A function may not call a non-escaping function parameter passing a
+// non-escaping function parameter as an argument.
+// For the purposes of this rule, a closure which captures a non-escaping
+// function parameter is treated the same as the parameter.
+//
+// Note: The compiler does not enforce recursion via
+// withoutActuallyEscaping. This undefined behavior is exposed to programmers.
+//
+// TODO: Verify that all uses of noescaping function arguments are SIL patterns
+// that are recognized below to prove that this diagnostic is complete.
 static void checkApply(ASTContext &Context, FullApplySite site) {
   auto isNoEscapeParam = [&](SILValue value) -> const ParamDecl * {
     // If the value is an escaping, do not enforce any restrictions.
