@@ -5369,6 +5369,15 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   DefaultValueAndFlags.getPointer()->InitContext = initContext;
 }
 
+static Optional<unsigned>
+getParamIndex(const ParameterList *paramList, const ParamDecl *decl) {
+  ArrayRef<ParamDecl *> params = paramList->getArray();
+  for (unsigned i = 0; i < params.size(); ++i) {
+    if (params[i] == decl) return i;
+  }
+  return None;
+}
+
 StringRef
 ParamDecl::getDefaultValueStringRepresentation(
   SmallVectorImpl<char> &scratch) const {
@@ -5403,10 +5412,29 @@ ParamDecl::getDefaultValueStringRepresentation(
                                 var->getParentInitializer(),
                                 scratch);
   }
-  case DefaultArgumentKind::Inherited:
+  case DefaultArgumentKind::Inherited: {
+    // Constructors can be inherited from their parents, and their default
+    // arguments need to print properly in module interfaces. Walk the overrides
+    // to find one with a usable default value string.
+    if (auto ctor = dyn_cast<ConstructorDecl>(getDeclContext())) {
+      auto idx = getParamIndex(ctor->getParameters(), this);
+      assert(idx && "containing decl does not contain param?");
+      for (auto overridden = ctor->getOverriddenDecl();
+           overridden != nullptr;
+           overridden = overridden->getOverriddenDecl()) {
+        auto equivalentParam = overridden->getParameters()->get(*idx);
+        assert(equivalentParam && "inherited decl mismatched arguments?");
+        if (equivalentParam->getDefaultArgumentKind() ==
+            DefaultArgumentKind::Inherited)
+          continue;
+
+        return equivalentParam->getDefaultValueStringRepresentation(scratch);
+      }
+    }
     // FIXME: This needs /some/ kind of textual representation, but this isn't
     // a great one.
     return "super";
+  }
   case DefaultArgumentKind::File: return "#file";
   case DefaultArgumentKind::Line: return "#line";
   case DefaultArgumentKind::Column: return "#column";
