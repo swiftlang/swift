@@ -81,6 +81,7 @@ TYPE_NODES = [
     Node('SomeType', kind='Type',
          children=[
              Child('SomeSpecifier', kind='IdentifierToken',
+                   classification='Keyword',
                    text_choices=['some']),
              Child('BaseType', kind='Type'),
          ]),
