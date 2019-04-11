@@ -253,15 +253,6 @@ AutoDiffParameterIndices::getLowered(AnyFunctionType *functionType) const {
   return result;
 }
 
-static unsigned getNumAutoDiffParameterIndices(AnyFunctionType *fnTy) {
-  // TODO: For more correct counting, we still need to know whether it's a
-  // method or not.
-  unsigned numParameters = fnTy->getNumParams();
-  if (auto *innerFn = fnTy->getResult()->getAs<AnyFunctionType>())
-    numParameters += innerFn->getNumParams();
-  return numParameters;
-}
-
 /// Returns true if the given type conforms to `Differentiable` in the given
 /// module.
 static bool conformsToDifferentiableInModule(Type type, ModuleDecl *module) {
@@ -275,7 +266,8 @@ static bool conformsToDifferentiableInModule(Type type, ModuleDecl *module) {
 
 AutoDiffParameterIndicesBuilder::AutoDiffParameterIndicesBuilder(
     AnyFunctionType *functionType)
-    : parameters(getNumAutoDiffParameterIndices(functionType)) {}
+    : parameters(functionType->getNumParams() +
+                     (functionType->getExtInfo().hasSelfParam() ? 1 : 0)) {}
 
 AutoDiffParameterIndicesBuilder
 AutoDiffParameterIndicesBuilder::inferParameters(AnyFunctionType *functionType,
