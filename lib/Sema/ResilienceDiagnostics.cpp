@@ -119,8 +119,11 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
     return true;
 
   // Check whether the declaration comes from a publically-imported module.
-  if (diagnoseDeclRefExportability(loc, declRef, DC))
-    return true;
+  // Skip this check for accessors because the associated property or subscript
+  // will also be checked, and will provide a better error message.
+  if (!isa<AccessorDecl>(D))
+    if (diagnoseDeclRefExportability(loc, declRef, DC, Kind))
+      return true;
 
   return false;
 }

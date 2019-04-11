@@ -93,12 +93,10 @@ public func testExtensionProperty_set(s: inout StructFromIndirect) {
 
 @inlinable
 public func testExtensionSubscript_get(s: inout StructFromIndirect) {
-  // FIXME: why is this error being double-emitted?
-  _ = s[extensionSubscript: 0] // expected-error 2 {{cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
+  _ = s[extensionSubscript: 0] // expected-error {{cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
 }
 
 @inlinable
 public func testExtensionSubscript_set(s: inout StructFromIndirect) {
-  // FIXME: why is this error being double-emitted?
-  s[extensionSubscript: 0] = 5 // expected-error 2 {{cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
+  s[extensionSubscript: 0] = 5 // expected-error {{cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
 }
