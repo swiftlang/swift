@@ -1853,12 +1853,13 @@ ConstraintSystem::matchTypesBindTypeVar(
 
   // We do not allow keypaths to go through AnyObject. Let's create a fix
   // so this can be diagnosed later.
-  auto loc = getConstraintLocator(locator);
-  if (loc->isKeyPathRoot() && type->isAnyObject()) {
-    auto *fix = AllowAnyObjectKeyPathRoot::create(*this, loc);
+  if (auto loc = getConstraintLocator(locator)) {
+    if (loc->isKeyPathRoot() && type->isAnyObject()) {
+      auto *fix = AllowAnyObjectKeyPathRoot::create(*this, loc);
 
-    if (recordFix(fix))
-      return getTypeMatchFailure(locator);
+      if (recordFix(fix))
+        return getTypeMatchFailure(locator);
+    }
   }
 
   // Okay. Bind below.
