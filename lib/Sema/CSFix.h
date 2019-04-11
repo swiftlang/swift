@@ -139,6 +139,10 @@ enum class FixKind : uint8_t {
 
   /// Allow KeyPaths to use AnyObject as root type
   AllowAnyObjectKeyPathRoot,
+  
+  /// Using subscript references in the keypath requires that each
+  /// of the index arguments to be Hashable.
+  TreatKeyPathSubscriptIndexAsHashable,
 };
 
 class ConstraintFix {
@@ -740,6 +744,7 @@ public:
                                          ConstraintLocator *locator);
 };
 
+<<<<<<< HEAD
 class AllowAnyObjectKeyPathRoot final : public ConstraintFix {
 
   AllowAnyObjectKeyPathRoot(ConstraintSystem &cs, ConstraintLocator *locator)
@@ -748,12 +753,31 @@ class AllowAnyObjectKeyPathRoot final : public ConstraintFix {
 public:
   std::string getName() const override {
     return "allow anyobject as root type for a keypath";
+=======
+class TreatKeyPathSubscriptIndexAsHashable final : public ConstraintFix {
+  Type NonConformingType;
+
+  TreatKeyPathSubscriptIndexAsHashable(ConstraintSystem &cs, Type type,
+                                       ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::TreatKeyPathSubscriptIndexAsHashable,
+                      locator),
+        NonConformingType(type) {}
+
+public:
+  std::string getName() const override {
+    return "treat keypath subscript index as conforming to Hashable";
+>>>>>>> master
   }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
+<<<<<<< HEAD
   static AllowAnyObjectKeyPathRoot *create(ConstraintSystem &cs,
                                            ConstraintLocator *locator);
+=======
+  static TreatKeyPathSubscriptIndexAsHashable *
+  create(ConstraintSystem &cs, Type type, ConstraintLocator *locator);
+>>>>>>> master
 };
 
 } // end namespace constraints

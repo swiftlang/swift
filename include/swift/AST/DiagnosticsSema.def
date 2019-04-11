@@ -2393,6 +2393,14 @@ ERROR(decl_from_implementation_only_module,none,
       "cannot use %0 here; %1 has been imported as "
       "'@_implementationOnly'",
       (DeclName, Identifier))
+ERROR(conformance_from_implementation_only_module,none,
+      "cannot use conformance of %0 to %1 here; %2 has been imported as "
+      "'@_implementationOnly'",
+      (Type, DeclName, Identifier))
+ERROR(assoc_conformance_from_implementation_only_module,none,
+      "cannot use conformance of %0 to %1 in associated type %3 (inferred as "
+      "%4); %2 has been imported as '@_implementationOnly'",
+      (Type, DeclName, Identifier, Type, Type))
 
 // Derived conformances
 ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
@@ -3640,6 +3648,8 @@ ERROR(objc_invalid_on_var,none,
 ERROR(objc_invalid_on_subscript,none,
       "subscript cannot be %" OBJC_ATTR_SELECT "0 because its type "
       "cannot be represented in Objective-C", (unsigned))
+ERROR(objc_invalid_on_static_subscript,none,
+      "%0 cannot be %" OBJC_ATTR_SELECT "1", (DescriptiveDeclKind, unsigned))
 ERROR(objc_invalid_with_generic_params,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because it has generic "
       "parameters", (unsigned))

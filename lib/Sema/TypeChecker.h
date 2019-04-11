@@ -1876,7 +1876,7 @@ public:
     PropertyInitializer
   };
 
-  bool diagnoseInlinableDeclRef(SourceLoc loc, const ValueDecl *D,
+  bool diagnoseInlinableDeclRef(SourceLoc loc, ConcreteDeclRef declRef,
                                 const DeclContext *DC,
                                 FragileFunctionKind Kind,
                                 bool TreatUsableFromInlineAsPublic);
@@ -1887,12 +1887,22 @@ private:
                                       FragileFunctionKind Kind,
                                       bool TreatUsableFromInlineAsPublic);
 
-public:
   /// Given that a declaration is used from a particular context which
   /// exposes it in the interface of the current module, diagnose if it cannot
   /// reasonably be shared.
-  bool diagnoseDeclRefExportability(SourceLoc loc, const ValueDecl *D,
+  bool diagnoseDeclRefExportability(SourceLoc loc, ConcreteDeclRef declRef,
                                     const DeclContext *DC);
+
+public:
+  /// Given that a type is used from a particular context which
+  /// exposes it in the interface of the current module, diagnose if its
+  /// generic arguments require the use of conformances that cannot reasonably
+  /// be shared.
+  ///
+  /// This method \e only checks how generic arguments are used; it is assumed
+  /// that the declarations involved have already been checked elsewhere.
+  void diagnoseGenericTypeExportability(const TypeLoc &TL,
+                                        const DeclContext *DC);
 
   /// Given that \p DC is within a fragile context for some reason, describe
   /// why.

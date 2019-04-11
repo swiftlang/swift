@@ -2416,3 +2416,23 @@ bool AnyObjectKeyPathRootFailure::diagnoseAsError() {
   emitDiagnostic(loc, diag::expr_swift_keypath_anyobject_root).highlight(range);
   return true;
 }
+
+bool KeyPathSubscriptIndexHashableFailure::diagnoseAsError() {
+  auto *anchor = getRawAnchor();
+  auto *locator = getLocator();
+
+  auto loc = anchor->getLoc();
+  if (locator->isKeyPathSubscriptComponent()) {
+    auto *KPE = cast<KeyPathExpr>(anchor);
+    for (auto &elt : locator->getPath()) {
+      if (elt.isKeyPathComponent()) {
+        loc = KPE->getComponents()[elt.getValue()].getLoc();
+        break;
+      }
+    }
+  }
+
+  emitDiagnostic(loc, diag::expr_keypath_subscript_index_not_hashable,
+                 resolveType(NonConformingType));
+  return true;
+}

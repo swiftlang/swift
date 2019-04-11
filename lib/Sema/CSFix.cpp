@@ -408,3 +408,17 @@ AllowAnyObjectKeyPathRoot::create(ConstraintSystem &cs,
                                   ConstraintLocator *locator) {
   return new (cs.getAllocator()) AllowAnyObjectKeyPathRoot(cs, locator);
 }
+
+bool TreatKeyPathSubscriptIndexAsHashable::diagnose(Expr *root,
+                                                    bool asNote) const {
+  KeyPathSubscriptIndexHashableFailure failure(root, getConstraintSystem(),
+                                               NonConformingType, getLocator());
+  return failure.diagnose(asNote);
+}
+
+TreatKeyPathSubscriptIndexAsHashable *
+TreatKeyPathSubscriptIndexAsHashable::create(ConstraintSystem &cs, Type type,
+                                             ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      TreatKeyPathSubscriptIndexAsHashable(cs, type, locator);
+}

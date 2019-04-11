@@ -19,7 +19,7 @@ from .. import targets
 
 
 # Build against the current installed toolchain.
-class ToolchainBenchmarks(product.Product):
+class Benchmarks(product.Product):
     @classmethod
     def product_source_name(cls):
         return "benchmarks"
@@ -36,11 +36,14 @@ class ToolchainBenchmarks(product.Product):
            .release.
         """
         cmdline = ['--num-iters=1', 'XorLoop']
-        debug_bench = os.path.join(self.build_dir, 'debug', 'SwiftBench')
-        shell.call([debug_bench] + cmdline)
+        bench_Onone = os.path.join(self.build_dir, 'bin', 'Benchmark_Onone')
+        shell.call([bench_Onone] + cmdline)
 
-        release_bench = os.path.join(self.build_dir, 'release', 'SwiftBench')
-        shell.call([release_bench] + cmdline)
+        bench_O = os.path.join(self.build_dir, 'bin', 'Benchmark_O')
+        shell.call([bench_O] + cmdline)
+
+        bench_Osize = os.path.join(self.build_dir, 'bin', 'Benchmark_Osize')
+        shell.call([bench_Osize] + cmdline)
 
 
 def run_build_script_helper(host_target, product, args):
@@ -59,7 +62,8 @@ def run_build_script_helper(host_target, product, args):
 
     # We use a separate python helper to enable quicker iteration when working
     # on this by avoiding going through build-script to test small changes.
-    helper_path = os.path.join(package_path, 'utils', 'build_script_helper.py')
+    helper_path = os.path.join(package_path, 'scripts',
+                               'build_script_helper.py')
 
     build_cmd = [
         helper_path,

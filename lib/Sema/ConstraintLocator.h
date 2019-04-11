@@ -494,6 +494,10 @@ public:
     bool isKeyPathDynamicMember() const {
       return getKind() == PathElementKind::KeyPathDynamicMember;
     }
+
+    bool isKeyPathComponent() const {
+      return getKind() == PathElementKind::KeyPathComponent;
+    }
   };
 
   /// Return the summary flags for an entire path.
@@ -531,6 +535,14 @@ public:
 
   /// Determine whether given locator points to the keypath value
   bool isKeyPathValue() const;
+  
+  /// Determine whether given locator points to the choice picked as
+  /// as result of the key path dynamic member lookup operation.
+  bool isResultOfKeyPathDynamicMemberLookup() const;
+
+  /// Determine whether given locator points to a subscript component
+  /// of the key path at some index.
+  bool isKeyPathSubscriptComponent() const;
 
   /// Produce a profile of this locator, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
