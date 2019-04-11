@@ -63,9 +63,7 @@ public:
 
   SILType getType(IRGenModule &IGM, SILType t) const {
     auto fnTy = t.castTo<SILFunctionType>();
-    auto extInfo = fnTy->getExtInfo();
-    auto nondiffExtInfo = extInfo.withDifferentiable(false);
-    auto origFnTy = fnTy->getWithExtInfo(nondiffExtInfo);
+    auto origFnTy = fnTy->getWithoutDifferentiability();
     if (std::get<0>(Index) == AutoDiffFunctionExtractInst::Extractee::Original)
       return SILType::getPrimitiveObjectType(origFnTy);
     auto differentiationOrder = std::get<1>(Index);

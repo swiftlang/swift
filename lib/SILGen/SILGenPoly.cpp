@@ -3223,8 +3223,7 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
     auto patternType = cast<AnyFunctionType>(pattern.getType());
     pattern.rewriteType(
         pattern.getGenericSignature(),
-        patternType.withExtInfo(
-            patternType->getExtInfo().withDifferentiable(false)));
+        patternType->getWithoutDifferentiability()->getCanonicalType());
     return pattern;
   };
 

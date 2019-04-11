@@ -6778,8 +6778,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto fromEI = fromFunc->getExtInfo();
       // Handle implicit conversion from @differentiable.
       if (fromEI.isDifferentiable() && !toEI.isDifferentiable()) {
-        fromFunc = fromFunc->withExtInfo(fromEI.withDifferentiable(false))
-                ->castTo<FunctionType>();
+        fromFunc = fromFunc->getWithoutDifferentiability()
+            ->castTo<FunctionType>();
         expr = cs.cacheType(new (tc.Context)
             AutoDiffFunctionExtractOriginalExpr(expr, fromFunc));
       }
