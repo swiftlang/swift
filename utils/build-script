@@ -895,7 +895,7 @@ class BuildScriptInvocation(object):
         if self.args.build_sourcekitlsp:
             product_classes.append(products.SourceKitLSP)
         if self.args.build_toolchainbenchmarks:
-            product_classes.append(products.ToolchainBenchmarks)
+            product_classes.append(products.Benchmarks)
         return product_classes
 
     def execute(self):
