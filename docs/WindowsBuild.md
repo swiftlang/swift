@@ -366,7 +366,7 @@ cmake -G Ninja^
   -DCMAKE_CXX_COMPILER=cl^
   -DLLBUILD_PATH_TO_SQLITE_SOURCE=S:\sqlite-amalgamation-3270200^
   -DLLBUILD_PATH_TO_SQLITE_BUILD=S:\b\sqlite^
-  S:\swift-llbuild
+  S:\llbuild
 ninja
 ```
 
