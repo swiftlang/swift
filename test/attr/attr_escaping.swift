@@ -5,17 +5,17 @@ func paramDeclEscaping(@escaping fn: (Int) -> Void) {} // expected-error {{attri
 
 func wrongParamType(a: @escaping Int) {} // expected-error {{@escaping attribute only applies to function types}}
 
-func conflictingAttrs(_ fn: @noescape @escaping () -> Int) {} // expected-error {{@escaping conflicts with @noescape}}
- // expected-error@-1{{@noescape is the default and has been removed}} {{29-39=}}
+func conflictingAttrs(_ fn: @noescape @escaping () -> Int) {} // expected-error {{unknown attribute 'noescape'}}
 
 func takesEscaping(_ fn: @escaping () -> Int) {} // ok
 
 func callEscapingWithNoEscape(_ fn: () -> Int) {
   // expected-note@-1{{parameter 'fn' is implicitly non-escaping}} {{37-37=@escaping }}
-  // expected-note@-2{{parameter 'fn' is implicitly non-escaping}} {{37-37=@escaping }}
 
   takesEscaping(fn) // expected-error{{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
-  let _ = fn // expected-error{{non-escaping parameter 'fn' may only be called}}
+
+  // This is a non-escaping use:
+  let _ = fn
 }
 
 typealias IntSugar = Int
@@ -59,16 +59,6 @@ func takesEscapingAutoclosure(_ fn: @autoclosure @escaping () -> Int) {}
 
 func callEscapingAutoclosureWithNoEscape(_ fn: () -> Int) {
   takesEscapingAutoclosure(1+1)
-}
-func callEscapingAutoclosureWithNoEscape_2(_ fn: () -> Int) {
-  // expected-note@-1{{parameter 'fn' is implicitly non-escaping}}
-
-  takesEscapingAutoclosure(fn()) // expected-error{{closure use of non-escaping parameter 'fn' may allow it to escape}}
-}
-func callEscapingAutoclosureWithNoEscape_3(_ fn: @autoclosure () -> Int) {
-  // expected-note@-1{{parameter 'fn' is implicitly non-escaping}}
-
-  takesEscapingAutoclosure(fn()) // expected-error{{closure use of non-escaping parameter 'fn' may allow it to escape}}
 }
 
 let foo: @escaping (Int) -> Int // expected-error{{@escaping attribute may only be used in function parameter position}} {{10-20=}}

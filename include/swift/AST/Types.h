@@ -622,9 +622,13 @@ public:
     return getRecursiveProperties().isLValue();
   }
   
-  /// Is a type with these properties materializable: that is, is it a
-  /// first-class value type?
+  /// Is this a first-class value type, meaning it is not an InOutType or a
+  /// tuple type containing an InOutType?
   bool isMaterializable();
+
+  /// Is this a non-escaping type, that is, a non-escaping function type or a
+  /// tuple type containing a non-escaping type?
+  bool isNoEscape() const;
 
   /// Determine whether the type is dependent on DynamicSelf.
   bool hasDynamicSelfType() const {
