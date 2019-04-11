@@ -1216,7 +1216,9 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
                                         int RecursionDepth) {
   ConnectionGraph *ConGraph = &FInfo->Graph;
   FullApplySite FAS = FullApplySite::isa(I);
-  if (FAS) {
+  if (FAS &&
+      // We currently don't support co-routines. In most cases co-routines will be inlined anyway.
+      !isa<BeginApplyInst>(I)) {
     ArraySemanticsCall ASC(FAS.getInstruction());
     switch (ASC.getKind()) {
       case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
