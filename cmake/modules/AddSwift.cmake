@@ -739,7 +739,7 @@ function(_add_swift_library_single target name)
         DEPLOYMENT_VERSION_TVOS
         DEPLOYMENT_VERSION_WATCHOS
         INSTALL_IN_COMPONENT
-        LIBRARY_INSTALL_NAME_DIR
+        DARWIN_INSTALL_NAME_DIR
         MODULE_TARGET
         SDK)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
@@ -1055,8 +1055,8 @@ function(_add_swift_library_single target name)
       set(install_name_dir "@rpath")
     endif()
 
-    if(SWIFTLIB_SINGLE_LIBRARY_INSTALL_NAME_DIR)
-      set(install_name_dir "${SWIFTLIB_SINGLE_LIBRARY_INSTALL_NAME_DIR}")
+    if(SWIFTLIB_SINGLE_DARWIN_INSTALL_NAME_DIR)
+      set(install_name_dir "${SWIFTLIB_SINGLE_DARWIN_INSTALL_NAME_DIR}")
     endif()
 
     set_target_properties("${target}"
@@ -1625,7 +1625,7 @@ function(add_swift_target_library name)
         DEPLOYMENT_VERSION_TVOS
         DEPLOYMENT_VERSION_WATCHOS
         INSTALL_IN_COMPONENT
-        LIBRARY_INSTALL_NAME_DIR)
+        DARWIN_INSTALL_NAME_DIR)
   set(SWIFTLIB_multiple_parameter_options
         C_COMPILE_FLAGS
         DEPENDS
@@ -1927,7 +1927,7 @@ function(add_swift_target_library name)
         ${SWIFTLIB_TARGET_LIBRARY_keyword}
         ${SWIFTLIB_FORCE_BUILD_OPTIMIZED_keyword}
         ${SWIFTLIB_NOSWIFTRT_keyword}
-        LIBRARY_INSTALL_NAME_DIR "${SWIFTLIB_LIBRARY_INSTALL_NAME_DIR}"
+        DARWIN_INSTALL_NAME_DIR "${SWIFTLIB_DARWIN_INSTALL_NAME_DIR}"
         INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
         DEPLOYMENT_VERSION_OSX "${SWIFTLIB_DEPLOYMENT_VERSION_OSX}"
         DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
