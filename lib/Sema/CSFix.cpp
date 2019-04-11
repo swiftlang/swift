@@ -396,3 +396,17 @@ AllowInaccessibleMember::create(ConstraintSystem &cs, ValueDecl *member,
                                 ConstraintLocator *locator) {
   return new (cs.getAllocator()) AllowInaccessibleMember(cs, member, locator);
 }
+
+bool TreatKeyPathSubscriptIndexAsHashable::diagnose(Expr *root,
+                                                    bool asNote) const {
+  KeyPathSubscriptIndexHashableFailure failure(root, getConstraintSystem(),
+                                               NonConformingType, getLocator());
+  return failure.diagnose(asNote);
+}
+
+TreatKeyPathSubscriptIndexAsHashable *
+TreatKeyPathSubscriptIndexAsHashable::create(ConstraintSystem &cs, Type type,
+                                             ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      TreatKeyPathSubscriptIndexAsHashable(cs, type, locator);
+}
