@@ -6895,6 +6895,10 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
         diagnose(Tok, diag::expected_precedencegroup_associativity);
         parsedAssociativity = Associativity::None;
         invalid = true;
+      } else {
+        // "left", "right" or "none" are considered contextual keywords.
+        TokReceiver->registerTokenKindChange(Tok.getLoc(),
+                                             tok::contextual_keyword);
       }
       associativity = *parsedAssociativity;
       associativityValueLoc = consumeToken();
