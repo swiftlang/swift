@@ -3093,6 +3093,7 @@ public:
     return getExtInfo().getRepresentation();
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
   /// Given `indices`, `differentiationOrder`, and `kind`, calculates the type
   /// of the corresponding autodiff associated function.
   ///
@@ -3104,6 +3105,8 @@ public:
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
       LookupConformanceFn lookupConformance,
       GenericSignature *whereClauseGenericSignature = nullptr);
+
+  AnyFunctionType *getWithoutDifferentiability() const;
 
   /// \brief True if the parameter declaration it is attached to is guaranteed
   /// to not persist the closure for longer than the duration of the call.

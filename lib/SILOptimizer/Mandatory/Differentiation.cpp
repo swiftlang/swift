@@ -1789,8 +1789,16 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
   }
 
   // If functionSource is a @differentiable function, just extract it.
-  if (auto autodiffFnType = original->getType().castTo<SILFunctionType>()) {
-    if (autodiffFnType->isDifferentiable()) {
+  if (auto diffableFnType = original->getType().castTo<SILFunctionType>()) {
+    if (diffableFnType->isDifferentiable()) {
+      auto paramIndices = diffableFnType->getDifferentiationParameterIndices();
+      for (auto i : desiredIndices.parameters.set_bits()) {
+        if (i >= paramIndices.size() || !paramIndices[i]) {
+          context.emitNondifferentiabilityError(original, parentTask,
+              diag::autodiff_function_nondiff_parameter_not_differentiable);
+          return None;
+        }
+      }
       SILValue assocFn = builder.createAutoDiffFunctionExtract(
           original.getLoc(), kind, /*differentiationOrder*/ 1, functionSource);
       SILAutoDiffIndices indices(0, desiredIndices.parameters);

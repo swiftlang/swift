@@ -36,4 +36,13 @@ struct TF30 : Differentiable {
   @noDerivative var y: @differentiable (Float) -> Float
 }
 // Make sure this passes SIL verification.
-let _: @autodiff (TF30) -> Float = { x in x.x }
+let _: @differentiable (TF30) -> Float = { x in x.x }
+
+// Make sure `@nondiff` gets propagated through SIL.
+// Make sure `@nondiff` with non-`Differentiable` also works.
+public func nondiffs(_ f: @differentiable (Float, @nondiff Float) -> Float,
+                     _ g: @differentiable (Float, @nondiff Int) -> Float) {
+  _ = gradient(at: 0) { f($0, 1) }
+  _ = gradient(at: 0) { g($0, 1) }
+}
+nondiffs({ x, y in x }, { x, y in x })
