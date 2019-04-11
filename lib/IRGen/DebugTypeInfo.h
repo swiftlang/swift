@@ -80,9 +80,12 @@ public:
 
   TypeDecl *getDecl() const;
 
-  // Determine whether this type is an Archetype itself.
-  bool isArchetype() const {
-    return Type->getWithoutSpecifierType()->is<ArchetypeType>();
+  // Determine whether this type is an Archetype dependent on a generic context.
+  bool isContextArchetype() const {
+    if (auto archetype = Type->getWithoutSpecifierType()->getAs<ArchetypeType>()) {
+      return !isa<OpaqueTypeArchetypeType>(archetype->getRoot());
+    }
+    return false;
   }
 
   bool isNull() const { return Type == nullptr; }
