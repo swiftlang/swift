@@ -422,6 +422,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // Allow references to types as a part of:
       // - member references T.foo, T.Type, T.self, etc.
       // - constructor calls T()
+      // - Subscripts T[]
       if (auto *ParentExpr = Parent.getAsExpr()) {
         // This is an exhaustive list of the accepted syntactic forms.
         if (isa<ErrorExpr>(ParentExpr) ||
@@ -433,7 +434,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             isa<UnresolvedDotExpr>(ParentExpr) ||
             isa<DotSyntaxBaseIgnoredExpr>(ParentExpr) ||
             isa<UnresolvedSpecializeExpr>(ParentExpr) ||
-            isa<OpenExistentialExpr>(ParentExpr)) {
+            isa<OpenExistentialExpr>(ParentExpr) ||
+            isa<SubscriptExpr>(ParentExpr)) {
           return;
         }
       }
