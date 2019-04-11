@@ -1031,9 +1031,6 @@ public:
   /// without knowledge of their contents. This includes imported structs
   /// and fixed-size multi-payload enums.
   llvm::SetVector<const NominalTypeDecl *> OpaqueTypes;
-  /// Imported structs referenced by types in this module when emitting
-  /// reflection metadata.
-  llvm::SetVector<const StructDecl *> ImportedStructs;
 
   llvm::Constant *getTypeRef(CanType type, MangledTypeRefRole role);
   llvm::Constant *getMangledAssociatedConformance(
@@ -1273,7 +1270,6 @@ public:
                                              ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,
                                                ForDefinition_t forDefinition);
-  llvm::Constant *getAddrOfForeignTypeMetadataCandidate(CanType concreteType);
 
   llvm::Constant *getAddrOfClassMetadataBounds(ClassDecl *D,
                                                ForDefinition_t forDefinition);
