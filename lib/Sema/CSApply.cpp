@@ -893,6 +893,14 @@ namespace {
             }
           }
         }
+//        member->dump();
+        if (auto *sub = dyn_cast<SubscriptDecl>(member)) {
+          printf("HEREE2!!!!!!!!!!!!!!!!\n");
+          if (auto dyn = dyn_cast<DynamicSelfType>(sub->getElementInterfaceType()
+                                                   ->getCanonicalType())) {
+            refTy = refTy->replaceCovariantResultType(baseTy, 2);
+          }
+        }
       }
 
       // References to properties with accessors and storage usually go
