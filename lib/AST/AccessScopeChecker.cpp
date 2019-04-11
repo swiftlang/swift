@@ -71,17 +71,17 @@ TypeWalker::Action TypeDeclFinder::walkToTypePre(Type T) {
 }
 
 TypeWalker::Action
-SimpleTypeDeclFinder::visitNominalType(const NominalType *ty) {
+SimpleTypeDeclFinder::visitNominalType(NominalType *ty) {
   return Callback(ty->getDecl());
 }
 
 TypeWalker::Action
-SimpleTypeDeclFinder::visitBoundGenericType(const BoundGenericType *ty) {
+SimpleTypeDeclFinder::visitBoundGenericType(BoundGenericType *ty) {
   return Callback(ty->getDecl());
 }
 
 TypeWalker::Action
-SimpleTypeDeclFinder::visitTypeAliasType(const TypeAliasType *ty) {
+SimpleTypeDeclFinder::visitTypeAliasType(TypeAliasType *ty) {
   return Callback(ty->getDecl());
 }
 

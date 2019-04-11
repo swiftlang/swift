@@ -3643,23 +3643,70 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
   std::function<void(ProtocolConformanceRef)> writer
     = Conformance->populateSignatureConformances();
 
+  SourceFile *fileForCheckingImplementationOnlyUse = nullptr;
+  if (getRequiredAccessScope().isPublic() || isUsableFromInlineRequired())
+    fileForCheckingImplementationOnlyUse = DC->getParentSourceFile();
+
   class GatherConformancesListener : public GenericRequirementsCheckListener {
-    NormalProtocolConformance *conformance;
+    NormalProtocolConformance *conformanceBeingChecked;
+    SourceFile *SF;
     std::function<void(ProtocolConformanceRef)> &writer;
+
+    void checkForImplementationOnlyUse(Type depTy, Type replacementTy,
+                                       const ProtocolConformance *conformance) {
+      if (!SF)
+        return;
+
+      SubstitutionMap subs =
+          conformance->getSubstitutions(SF->getParentModule());
+      for (auto &subConformance : subs.getConformances()) {
+        if (!subConformance.isConcrete())
+          continue;
+        checkForImplementationOnlyUse(depTy, replacementTy,
+                                      subConformance.getConcrete());
+      }
+
+      const RootProtocolConformance *rootConformance =
+          conformance->getRootConformance();
+      ModuleDecl *M = rootConformance->getDeclContext()->getParentModule();
+      if (!SF->isImportedImplementationOnly(M))
+        return;
+
+      ASTContext &ctx = M->getASTContext();
+
+      Type selfTy = rootConformance->getProtocol()->getProtocolSelfType();
+      if (depTy->isEqual(selfTy)) {
+        ctx.Diags.diagnose(
+            conformanceBeingChecked->getLoc(),
+            diag::conformance_from_implementation_only_module,
+            rootConformance->getType(),
+            rootConformance->getProtocol()->getName(), M->getName());
+      } else {
+        ctx.Diags.diagnose(
+            conformanceBeingChecked->getLoc(),
+            diag::assoc_conformance_from_implementation_only_module,
+            rootConformance->getType(),
+            rootConformance->getProtocol()->getName(), M->getName(),
+            depTy, replacementTy->getCanonicalType());
+      }
+    }
+
   public:
     GatherConformancesListener(
         NormalProtocolConformance *conformance,
-        std::function<void(ProtocolConformanceRef)> &writer)
-      : conformance(conformance), writer(writer) { }
+        std::function<void(ProtocolConformanceRef)> &writer,
+        SourceFile *fileForCheckingImplementationOnlyUse)
+      : conformanceBeingChecked(conformance),
+        SF(fileForCheckingImplementationOnlyUse), writer(writer) { }
 
     void satisfiedConformance(Type depTy, Type replacementTy,
                               ProtocolConformanceRef conformance) override {
       // The conformance will use contextual types, but we want the
       // interface type equivalent.
-      if (conformance.isConcrete() &&
-          conformance.getConcrete()->getType()->hasArchetype()) {
+      if (conformance.isConcrete()) {
         auto concreteConformance = conformance.getConcrete();
 
+        if (conformance.getConcrete()->getType()->hasArchetype()) {
         // Map the conformance.
         concreteConformance = concreteConformance->subst(
             [](SubstitutableType *type) -> Type {
@@ -3669,7 +3716,12 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
             },
             MakeAbstractConformanceForGenericType());
 
-        conformance = ProtocolConformanceRef(concreteConformance);
+
+          conformance = ProtocolConformanceRef(concreteConformance);
+        }
+
+        checkForImplementationOnlyUse(depTy, replacementTy,
+                                      concreteConformance);
       }
 
       writer(conformance);
@@ -3679,13 +3731,13 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
                       const Requirement &req, Type first, Type second,
                       ArrayRef<ParentConditionalConformance> parents) override {
       // Invalidate the conformance to suppress further diagnostics.
-      if (conformance->getLoc().isValid()) {
-        conformance->setInvalid();
+      if (conformanceBeingChecked->getLoc().isValid()) {
+        conformanceBeingChecked->setInvalid();
       }
 
       return false;
     }
-  } listener(Conformance, writer);
+  } listener(Conformance, writer, fileForCheckingImplementationOnlyUse);
 
   auto result = TC.checkGenericArguments(
       DC, Loc, Loc,
