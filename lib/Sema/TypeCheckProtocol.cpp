@@ -3643,17 +3643,17 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
   std::function<void(ProtocolConformanceRef)> writer
     = Conformance->populateSignatureConformances();
 
-  SourceFile *fileForCheckingImplementationOnlyUse = nullptr;
+  SourceFile *fileForCheckingExportability = nullptr;
   if (getRequiredAccessScope().isPublic() || isUsableFromInlineRequired())
-    fileForCheckingImplementationOnlyUse = DC->getParentSourceFile();
+    fileForCheckingExportability = DC->getParentSourceFile();
 
   class GatherConformancesListener : public GenericRequirementsCheckListener {
     NormalProtocolConformance *conformanceBeingChecked;
     SourceFile *SF;
     std::function<void(ProtocolConformanceRef)> &writer;
 
-    void checkForImplementationOnlyUse(Type depTy, Type replacementTy,
-                                       const ProtocolConformance *conformance) {
+    void checkExportability(Type depTy, Type replacementTy,
+                            const ProtocolConformance *conformance) {
       if (!SF)
         return;
 
@@ -3662,8 +3662,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
       for (auto &subConformance : subs.getConformances()) {
         if (!subConformance.isConcrete())
           continue;
-        checkForImplementationOnlyUse(depTy, replacementTy,
-                                      subConformance.getConcrete());
+        checkExportability(depTy, replacementTy, subConformance.getConcrete());
       }
 
       const RootProtocolConformance *rootConformance =
@@ -3695,9 +3694,9 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
     GatherConformancesListener(
         NormalProtocolConformance *conformance,
         std::function<void(ProtocolConformanceRef)> &writer,
-        SourceFile *fileForCheckingImplementationOnlyUse)
+        SourceFile *fileForCheckingExportability)
       : conformanceBeingChecked(conformance),
-        SF(fileForCheckingImplementationOnlyUse), writer(writer) { }
+        SF(fileForCheckingExportability), writer(writer) { }
 
     void satisfiedConformance(Type depTy, Type replacementTy,
                               ProtocolConformanceRef conformance) override {
@@ -3720,8 +3719,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
           conformance = ProtocolConformanceRef(concreteConformance);
         }
 
-        checkForImplementationOnlyUse(depTy, replacementTy,
-                                      concreteConformance);
+        checkExportability(depTy, replacementTy, concreteConformance);
       }
 
       writer(conformance);
@@ -3737,7 +3735,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
 
       return false;
     }
-  } listener(Conformance, writer, fileForCheckingImplementationOnlyUse);
+  } listener(Conformance, writer, fileForCheckingExportability);
 
   auto result = TC.checkGenericArguments(
       DC, Loc, Loc,
