@@ -208,7 +208,8 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 }
 
 static bool diagnoseDeclExportability(SourceLoc loc, const ValueDecl *D,
-                                      const SourceFile &userSF) {
+                                      const SourceFile &userSF,
+                                      FragileFunctionKind fragileKind) {
   auto definingModule = D->getModuleContext();
   if (!userSF.isImportedImplementationOnly(definingModule))
     return false;
@@ -216,7 +217,9 @@ static bool diagnoseDeclExportability(SourceLoc loc, const ValueDecl *D,
   // TODO: different diagnostics
   ASTContext &ctx = definingModule->getASTContext();
   ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_implementation_only,
-                     D->getDescriptiveKind(), D->getFullName());
+                     D->getDescriptiveKind(), D->getFullName(),
+                     static_cast<unsigned>(fragileKind),
+                     definingModule->getName());
   return true;
 }
 
@@ -288,9 +291,11 @@ void TypeChecker::diagnoseGenericTypeExportability(const TypeLoc &TL,
   }));
 }
 
-bool TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
-                                               ConcreteDeclRef declRef,
-                                               const DeclContext *DC) {
+bool
+TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
+                                          ConcreteDeclRef declRef,
+                                          const DeclContext *DC,
+                                          FragileFunctionKind fragileKind) {
   // We're only interested in diagnosing uses from source files.
   auto userSF = DC->getParentSourceFile();
   if (!userSF)
@@ -305,7 +310,7 @@ bool TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
     return false;
 
   const ValueDecl *D = declRef.getDecl();
-  if (diagnoseDeclExportability(loc, D, *userSF))
+  if (diagnoseDeclExportability(loc, D, *userSF, fragileKind))
     return true;
   if (diagnoseGenericArgumentsExportability(loc, declRef.getSubstitutions(),
                                             *userSF)) {

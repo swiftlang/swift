@@ -1558,6 +1558,7 @@ class ImplementationOnlyImportChecker
                     const TypeRepr *complainRepr) {
       ModuleDecl *M = offendingType->getModuleContext();
       auto diag = TC.diagnose(D, diag::decl_from_implementation_only_module,
+                              offendingType->getDescriptiveKind(),
                               offendingType->getFullName(), M->getName());
       highlightOffendingType(TC, diag, complainRepr);
     }
@@ -1830,7 +1831,8 @@ public:
       return;
 
     auto diag = TC.diagnose(diagLoc, diag::decl_from_implementation_only_module,
-                            PGD->getName(), M->getName());
+                            PGD->getDescriptiveKind(), PGD->getName(),
+                            M->getName());
     if (refRange.isValid())
       diag.highlight(refRange);
     diag.flush();
