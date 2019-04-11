@@ -2811,13 +2811,10 @@ Parser::parseDecl(ParseDeclOptions Flags,
     break;
   case tok::kw_subscript: {
     DeclParsingContext.setCreateSyntax(SyntaxKind::SubscriptDecl);
-    if (StaticLoc.isValid()) {
-      diagnose(Tok, diag::subscript_static, StaticSpelling)
-          .fixItRemove(SourceRange(StaticLoc));
-      StaticLoc = SourceLoc();
-    }
     llvm::SmallVector<Decl *, 4> Entries;
-    DeclResult = parseDeclSubscript(Flags, Attributes, Entries);
+    DeclResult = parseDeclSubscript(StaticLoc, StaticSpelling, Flags,
+                                    Attributes, Entries);
+    StaticLoc = SourceLoc(); // we handled static if present.
     if (DeclResult.hasCodeCompletion() && isCodeCompletionFirstPass())
       break;
     std::for_each(Entries.begin(), Entries.end(), Handler);
@@ -6218,9 +6215,26 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 ///     attribute-list? 'subscript' parameter-clause '->' type
 /// \endverbatim
 ParserResult<SubscriptDecl>
-Parser::parseDeclSubscript(ParseDeclOptions Flags,
+Parser::parseDeclSubscript(SourceLoc StaticLoc,
+                           StaticSpellingKind StaticSpelling,
+                           ParseDeclOptions Flags,
                            DeclAttributes &Attributes,
                            SmallVectorImpl<Decl *> &Decls) {
+  assert(StaticLoc.isInvalid() || StaticSpelling != StaticSpellingKind::None);
+  
+  if (StaticLoc.isValid()) {
+    if (Flags.contains(PD_InStruct) || Flags.contains(PD_InEnum) ||
+               Flags.contains(PD_InProtocol)) {
+      if (StaticSpelling == StaticSpellingKind::KeywordClass) {
+        diagnose(Tok, diag::class_subscript_not_in_class,
+                 Flags.contains(PD_InProtocol))
+        .fixItReplace(StaticLoc, "static");
+        
+        StaticSpelling = StaticSpellingKind::KeywordStatic;
+      }
+    }
+  }
+  
   ParserStatus Status;
   SourceLoc SubscriptLoc = consumeToken(tok::kw_subscript);
 
@@ -6294,7 +6308,7 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
   DeclName name = DeclName(Context, DeclBaseName::createSubscript(),
                            argumentNames);
   auto *Subscript = new (Context) SubscriptDecl(name,
-                                                SourceLoc(), StaticSpellingKind::None,
+                                                StaticLoc, StaticSpelling,
                                                 SubscriptLoc, Indices.get(),
                                                 ArrowLoc, ElementTy.get(),
                                                 CurDeclContext,
@@ -6340,7 +6354,7 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
   } else {
     Status |= parseGetSet(Flags, GenericParams,
                           Indices.get(), ElementTy.get(),
-                          accessors, Subscript, /*StaticLoc=*/SourceLoc());
+                          accessors, Subscript, StaticLoc);
   }
 
   bool Invalid = false;
@@ -6351,7 +6365,7 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
   }
 
   accessors.record(*this, Subscript, (Invalid || !Status.isSuccess()),
-                   Flags, /*static*/ SourceLoc(), Attributes,
+                   Flags, StaticLoc, Attributes,
                    ElementTy.get(), Indices.get(), Decls);
 
   // No need to setLocalDiscriminator because subscripts cannot
