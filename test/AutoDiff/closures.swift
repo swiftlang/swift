@@ -46,3 +46,8 @@ public func nondiffs(_ f: @differentiable (Float, @nondiff Float) -> Float,
   _ = gradient(at: 0) { g($0, 1) }
 }
 nondiffs({ x, y in x }, { x, y in x })
+
+// Crasher when SILGen'ing @differentiable functions with generic @nondiff parameters.
+func foo<T>(_ f: @differentiable (Float, @nondiff T) -> Float, _ t: T) -> Float {
+  return f(1, t)
+}
