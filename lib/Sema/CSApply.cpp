@@ -3189,7 +3189,8 @@ namespace {
     }
 
     Expr *visitOpaqueValueExpr(OpaqueValueExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      assert(expr->isPlaceholder() && "Already type-checked");
+      return expr;
     }
 
     Expr *visitDefaultArgumentExpr(DefaultArgumentExpr *expr) {

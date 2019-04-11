@@ -5270,9 +5270,31 @@ VarDecl *VarDecl::getPropertyDelegateBackingProperty() const {
     return nullptr;
 
   auto mutableThis = const_cast<VarDecl *>(this);
-  return evaluateOrDefault(ctx.evaluator,
-                           PropertyDelegateBackingPropertyRequest{mutableThis},
-                           nullptr);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      PropertyDelegateBackingPropertyInfoRequest{mutableThis},
+      PropertyDelegateBackingPropertyInfo()).backingVar;
+}
+
+bool VarDecl::isPropertyDelegateInitializedWithInitialValue() const {
+  auto &ctx = getASTContext();
+  if (!ctx.getLazyResolver())
+    return false;
+
+  auto mutableThis = const_cast<VarDecl *>(this);
+
+  // If there is no initializer, the initialization form depends on
+  // whether the property delegate type has an init(initialValue:).
+  if (!isParentInitialized()) {
+    auto delegateTypeInfo = getAttachedPropertyDelegateTypeInfo();
+    return delegateTypeInfo.initialValueInit != nullptr;
+  }
+
+  // Otherwise, check whether the '=' initialization form was used.
+  return evaluateOrDefault(
+      ctx.evaluator,
+      PropertyDelegateBackingPropertyInfoRequest{mutableThis},
+      PropertyDelegateBackingPropertyInfo()).originalInitialValue != nullptr;
 }
 
 Identifier VarDecl::getObjCPropertyName() const {

@@ -1433,13 +1433,40 @@ void swift::completeLazyVarImplementation(VarDecl *VD) {
   Storage->overwriteSetterAccess(AccessLevel::Private);
 }
 
-llvm::Expected<VarDecl *>
-PropertyDelegateBackingPropertyRequest::evaluate(Evaluator &evaluator,
+/// Given the initializer for the given property with an attached property
+/// delegate, dig out the original initialization expression.
+static Expr *findOriginalPropertyDelegateInitialValue(VarDecl *var,
+                                                      Expr *init) {
+  auto attr = var->getAttachedPropertyDelegate();
+  assert(attr && "No attached property delegate?");
+
+  // Direct initialization implies no original initial value.
+  if (attr->getArg())
+    return nullptr;
+
+  // Look through any expressions wrapping the initializer.
+  init = init->getSemanticsProvidingExpr();
+  auto initCall = dyn_cast<CallExpr>(init);
+  if (!initCall)
+    return nullptr;
+
+  auto initArg = cast<TupleExpr>(initCall->getArg())->getElement(0);
+  initArg = initArg->getSemanticsProvidingExpr();
+  if (auto autoclosure = dyn_cast<AutoClosureExpr>(initArg)) {
+    initArg =
+        autoclosure->getSingleExpressionBody()->getSemanticsProvidingExpr();
+  }
+
+  return initArg;
+}
+
+llvm::Expected<PropertyDelegateBackingPropertyInfo>
+PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
                                                  VarDecl *var) const {
   // Determine the type of the backing property.
   auto delegateType = var->getPropertyDelegateBackingPropertyType();
   if (!delegateType)
-    return nullptr;
+    return PropertyDelegateBackingPropertyInfo();
 
   // Compute the name of the storage type.
   ASTContext &ctx = var->getASTContext();
@@ -1471,6 +1498,7 @@ PropertyDelegateBackingPropertyRequest::evaluate(Evaluator &evaluator,
   backingVar->setImplicit();
   if (isInvalid)
     backingVar->setInvalid();
+  backingVar->setOriginalDelegatedProperty(var);
   addMemberToContextIfNeeded(backingVar, dc, var);
 
   // Create the pattern binding declaration for the backing property.
@@ -1483,18 +1511,19 @@ PropertyDelegateBackingPropertyRequest::evaluate(Evaluator &evaluator,
   addMemberToContextIfNeeded(pbd, dc, var);
 
   // Take the initializer from the original property.
-  if (auto parentPBD = var->getParentPatternBinding()) {
-    unsigned patternNumber = parentPBD->getPatternEntryIndexForVarDecl(var);
-    if (parentPBD->getInit(patternNumber) &&
-        !parentPBD->isInitializerChecked(patternNumber)) {
-      auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
-      tc.typeCheckPatternBinding(parentPBD, patternNumber);
-    }
+  auto parentPBD = var->getParentPatternBinding();
+  unsigned patternNumber = parentPBD->getPatternEntryIndexForVarDecl(var);
+  if (parentPBD->getInit(patternNumber) &&
+      !parentPBD->isInitializerChecked(patternNumber)) {
+    auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+    tc.typeCheckPatternBinding(parentPBD, patternNumber);
+  }
 
-    if (Expr *init = parentPBD->getInit(patternNumber)) {
-      pbd->setInit(0, init);
-      pbd->setInitializerChecked(0);
-    }
+  Expr *originalInitialValue = nullptr;
+  if (Expr *init = parentPBD->getInit(patternNumber)) {
+    pbd->setInit(0, init);
+    pbd->setInitializerChecked(0);
+    originalInitialValue = findOriginalPropertyDelegateInitialValue(var, init);
   }
 
   // Mark the backing property as 'final'. There's no sensible way to override.
@@ -1511,7 +1540,35 @@ PropertyDelegateBackingPropertyRequest::evaluate(Evaluator &evaluator,
       std::min(AccessLevel::Internal, var->getSetterFormalAccess());
   backingVar->overwriteSetterAccess(setterAccess);
 
-  return backingVar;
+  // Get the property delegate information.
+  auto delegateInfo = var->getAttachedPropertyDelegateTypeInfo();
+  if (!delegateInfo.initialValueInit) {
+    assert(!originalInitialValue);
+    return PropertyDelegateBackingPropertyInfo(
+        backingVar, nullptr, nullptr, nullptr);
+  }
+
+  // Form the initialization of the backing property from a value of the
+  // original property's type.
+  OpaqueValueExpr *origValue =
+      new (ctx) OpaqueValueExpr(SourceLoc(), var->getType(),
+                                /*isPlaceholder=*/true);
+  auto typeExpr = TypeExpr::createImplicit(storageType, ctx);
+  Expr *initializer =
+      CallExpr::createImplicit(ctx, typeExpr, {origValue},
+                               {ctx.Id_initialValue});
+
+  // Type-check the initialization.
+  auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+  tc.typeCheckExpression(initializer, dc);
+  if (auto initializerContext =
+          dyn_cast_or_null<Initializer>(
+            pbd->getPatternEntryForVarDecl(backingVar).getInitContext())) {
+    tc.contextualizeInitializer(initializerContext, initializer);
+  }
+  tc.checkPropertyDelegateErrorHandling(parentPBD, initializer);
+  return PropertyDelegateBackingPropertyInfo(
+      backingVar, originalInitialValue, initializer, origValue);
 }
 
 static bool wouldBeCircularSynthesis(AbstractStorageDecl *storage,
@@ -1884,9 +1941,13 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
     return;
   }
 
+  // If there's a backing storage property, the memberwise initializer
+  // will be in terms of that.
+  VarDecl *backingStorageVar = var->getPropertyDelegateBackingProperty();
+
   // Set the default value to the variable. When we emit this in silgen
   // we're going to call the variable's initializer expression.
-  arg->setStoredProperty(var);
+  arg->setStoredProperty(backingStorageVar ? backingStorageVar : var);
   arg->setDefaultArgumentKind(DefaultArgumentKind::StoredProperty);
 }
 
@@ -1952,15 +2013,15 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
         // the properties are type checked.  Perhaps init() synth should be
         // moved later.
         varInterfaceType = OptionalType::get(varInterfaceType);
-      } else if (auto delegateTypeInfo =
-                     var->getAttachedPropertyDelegateTypeInfo()) {
-        // For a property that has a delegate, the presence of an
-        // init(initialValue:) in the delegate type implies that the
-        // property can be initialized from the original property type.
-        // When there is no init(initialValue:), the underlying storage
-        // type will need to be initialized.
-        if (!delegateTypeInfo.initialValueInit) {
-          varInterfaceType = var->getPropertyDelegateBackingPropertyType();
+      } else if (Type backingPropertyType =
+                     var->getPropertyDelegateBackingPropertyType()) {
+        // For a property that has a delegate, writing the initializer
+        // with an '=' implies that the memberwise initializer should also
+        // accept a value of the original property type. Otherwise, the
+        // memberwise initializer will be in terms of the backing storage
+        // type.
+        if (!var->isPropertyDelegateInitializedWithInitialValue()) {
+          varInterfaceType = backingPropertyType;
         }
       }
 

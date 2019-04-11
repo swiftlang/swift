@@ -2490,7 +2490,8 @@ namespace {
     }
 
     Type visitOpaqueValueExpr(OpaqueValueExpr *expr) {
-      llvm_unreachable("Already type checked");
+      assert(expr->isPlaceholder() && "Already type checked");
+      return expr->getType();
     }
 
     Type visitDefaultArgumentExpr(DefaultArgumentExpr *expr) {
@@ -3288,7 +3289,7 @@ namespace {
             expr = value->second;
             continue;
           } else {
-            assert(eraseOpenExistentialsOnly &&
+            assert((eraseOpenExistentialsOnly || OVE->isPlaceholder()) &&
                    "Didn't see this OVE in a containing OpenExistentialExpr?");
             // NOTE: In 'eraseOpenExistentialsOnly' mode, ASTWalker may walk
             // into other kind of expressions holding OVE.

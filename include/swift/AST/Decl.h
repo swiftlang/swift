@@ -365,7 +365,7 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 4+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 4+1+1+1+1+1,
     /// The specifier associated with this variable or parameter.  This
     /// determines the storage semantics of the value e.g. mutability.
     Specifier : 4,
@@ -384,7 +384,10 @@ protected:
 
     /// Whether this is a property defined in the debugger's REPL.
     /// FIXME: Remove this once LLDB has proper support for resilience.
-    IsREPLVar : 1
+    IsREPLVar : 1,
+
+    /// Whether this is the backing storage for a property delegate.
+    IsPropertyDelegateBackingProperty : 1
   );
 
   SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1 + NumDefaultArgumentKindBits,
@@ -4744,6 +4747,7 @@ protected:
     Bits.VarDecl.IsDebuggerVar = false;
     Bits.VarDecl.IsREPLVar = false;
     Bits.VarDecl.HasNonPatternBindingInit = false;
+    Bits.VarDecl.IsPropertyDelegateBackingProperty = false;
   }
 
   /// This is the type specified, including location information.
@@ -5071,6 +5075,22 @@ public:
   /// generic type, the backing storage property will be the appropriate
   /// bound generic version.
   VarDecl *getPropertyDelegateBackingProperty() const;
+
+  /// Whether this is a property with a property delegate that was initialized
+  /// via a value of the original type, e.g.,
+  ///
+  /// \code
+  /// @Lazy var i = 17
+  /// \end
+  bool isPropertyDelegateInitializedWithInitialValue() const;
+
+  /// If this property is the backing storage for a property with an attached
+  /// property delegate, return the original property.
+  VarDecl *getOriginalDelegatedProperty() const;
+
+  /// Set the property that delegates to this property as it's backing
+  /// property.
+  void setOriginalDelegatedProperty(VarDecl *originalProperty);
 
   /// Return the Objective-C runtime name for this property.
   Identifier getObjCPropertyName() const;
