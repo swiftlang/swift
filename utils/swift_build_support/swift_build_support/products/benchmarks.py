@@ -36,11 +36,11 @@ class ToolchainBenchmarks(product.Product):
            .release.
         """
         cmdline = ['--num-iters=1', 'XorLoop']
-        debug_bench = os.path.join(self.build_dir, 'debug', 'SwiftBench')
-        shell.call([debug_bench] + cmdline)
+        bench_Onone = os.path.join(self.build_dir, 'bin', 'Benchmark_Onone')
+        shell.call([bench_Onone] + cmdline)
 
-        release_bench = os.path.join(self.build_dir, 'release', 'SwiftBench')
-        shell.call([release_bench] + cmdline)
+        bench_O = os.path.join(self.build_dir, 'bin', 'Benchmark_O')
+        shell.call([bench_O] + cmdline)
 
 
 def run_build_script_helper(host_target, product, args):
