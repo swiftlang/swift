@@ -135,7 +135,7 @@ public let SetTests = [
     setUpFunction: { blackHole([setY, setXY]) }),
   BenchmarkInfo(
     name: "SetIsStrictSubsetInt100",
-    runFunction: { n in run_SetIsStrictSubsetInt(setP, setQ, true, 50 * n) },
+    runFunction: { n in run_SetIsStrictSubsetInt(setP, setQ, false, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setP, setQ]) }),
 
