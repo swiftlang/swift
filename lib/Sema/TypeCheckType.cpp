@@ -1032,7 +1032,12 @@ static std::string getDeclNameFromContext(DeclContext *dc,
   }
 }
 
-static Type isSE0068(TypeResolution resolution, TypeResolutionOptions options) {
+//
+// SE-0068 is "Expanding Swift Self to class members and value types"
+// https://github.com/apple/swift-evolution/blob/master/proposals/0068-universal-self.md
+//
+static Type SelfAllowedBySE0068(TypeResolution resolution,
+                                TypeResolutionOptions options) {
   auto dc = resolution.getDeclContext();
   ASTContext &ctx = dc->getASTContext();
   DeclContext *nominalDC = nullptr;
@@ -1044,23 +1049,12 @@ static Type isSE0068(TypeResolution resolution, TypeResolutionOptions options) {
     bool insideClass = nominalDC->getSelfClassDecl() != nullptr;
     AbstractFunctionDecl *methodDecl = dc->getInnermostMethodContext();
     bool declaringMethod = methodDecl &&
-    methodDecl->getDeclContext() == dc->getParentForLookup();
+      methodDecl->getDeclContext() == dc->getParentForLookup();
     bool isMutablePropertyOrSubscriptOfClass = insideClass &&
       (options.is(TypeResolverContext::PatternBindingDecl) ||
        options.is(TypeResolverContext::FunctionResult));
     bool isTypeAliasInClass = insideClass &&
       options.is(TypeResolverContext::TypeAliasDecl);
-
-//    printf("%d\n", options.getBaseContext());
-
-// Causes: Assertion failed: (hasSelfMetadataParam() && "This method can only be called if the " "SILFunction has a self-metadata parameter"), function getSelfMetadataArgument, file /Volumes/Elements/swift-self/swift/include/swift/SIL/SILFunction.h, line 955.
-
-//    if (isMutablePropertyOrSubscriptOfClass) {
-//      if (auto prop = dyn_cast_or_null<ValueDecl>
-//          (dc->getInnermostDeclarationDeclContext()))
-//        if (!prop->isSettable(dc))
-//          isMutablePropertyOrSubscriptOfClass = false;
-//    }
 
     if (((!insideClass || !declaringMethod) &&
          !isMutablePropertyOrSubscriptOfClass && !isTypeAliasInClass &&
@@ -1370,7 +1364,7 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
       return ErrorType::get(ctx);
 
     if (id == ctx.Id_Self)
-      if (auto SelfType = isSE0068(resolution, options))
+      if (auto SelfType = SelfAllowedBySE0068(resolution, options))
         return SelfType;
 
     return diagnoseUnknownType(resolution, nullptr, SourceRange(), comp,
