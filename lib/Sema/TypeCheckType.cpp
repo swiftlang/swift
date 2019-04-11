@@ -1742,6 +1742,13 @@ bool TypeChecker::validateType(TypeLoc &Loc, TypeResolution resolution,
   }
 
   Loc.setType(type);
+  if (!type->hasError()) {
+    const DeclContext *DC = resolution.getDeclContext();
+    if (options.isAnyExpr() || DC->getParent()->isLocalContext())
+      if (DC->getResilienceExpansion() == ResilienceExpansion::Minimal)
+        diagnoseGenericTypeExportability(Loc, DC);
+  }
+
   return type->hasError();
 }
 
