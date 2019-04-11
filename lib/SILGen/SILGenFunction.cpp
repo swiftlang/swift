@@ -507,7 +507,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                              SILType::getPrimitiveObjectType(mainClassMetaty));
     metaTy = B.createInitExistentialMetatype(mainClass, metaTy,
                           SILType::getPrimitiveObjectType(anyObjectMetaTy),
-                          mainClassTy, {});
+                          {});
     SILValue optNameValue = B.createApply(
         mainClass, NSStringFromClass, NSStringFromClass->getType(),
         SILType::getPrimitiveObjectType(OptNSStringTy), {}, metaTy);
