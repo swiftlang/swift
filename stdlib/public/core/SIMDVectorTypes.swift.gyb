@@ -26,7 +26,7 @@ ordinalPositions = ['first', 'second', 'third', 'fourth']
 % storageN = 4 if n == 3 else n
 /// A vector of ${spelledNumbers[n]} scalar values.
 @_fixed_layout
-public struct SIMD${n}<Scalar> : SIMD where Scalar: SIMDScalar {
+public struct SIMD${n}<Scalar>: SIMD where Scalar: SIMDScalar {
 
   public var _storage: Scalar.SIMD${storageN}Storage
 
@@ -69,9 +69,9 @@ public struct SIMD${n}<Scalar> : SIMD where Scalar: SIMDScalar {
   /// Creates a new vector from the given elements.
   ///
   /// - Parameters:
-  %  for i in range(n):
+%  for i in range(n):
   ///   - ${'xyzw'[i]}: The ${ordinalPositions[i]} element of the vector.
-  %  end
+%  end
   @_transparent
   public init(${', '.join([c + ': Scalar' for c in 'xyzw'[:n]])}) {
     self.init(${', '.join('xyzw'[:n])})
@@ -113,14 +113,14 @@ public struct SIMD${n}<Scalar> : SIMD where Scalar: SIMDScalar {
 % end
 }
 
-extension SIMD${n} where Scalar : FixedWidthInteger {
+extension SIMD${n} where Scalar: FixedWidthInteger {
   /// Creates a new vector from the given vector, truncating the bit patterns
   /// of the given vector's elements if necessary.
   ///
   /// - Parameter other: The vector to convert.
   @inlinable
   public init<Other>(truncatingIfNeeded other: SIMD${n}<Other>)
-  where Other : FixedWidthInteger {
+  where Other: FixedWidthInteger {
     self.init()
     for i in indices { self[i] = Scalar(truncatingIfNeeded: other[i]) }
   }
@@ -131,7 +131,7 @@ extension SIMD${n} where Scalar : FixedWidthInteger {
   /// - Parameter other: The vector to convert.
   @inlinable
   public init<Other>(clamping other: SIMD${n}<Other>)
-  where Other : FixedWidthInteger {
+  where Other: FixedWidthInteger {
     self.init()
     for i in indices { self[i] = Scalar(clamping: other[i]) }
   }
@@ -148,14 +148,14 @@ extension SIMD${n} where Scalar : FixedWidthInteger {
     _ other: SIMD${n}<Other>,
     rounding rule: FloatingPointRoundingRule = .towardZero
   )
-  where Other : BinaryFloatingPoint {
+  where Other: BinaryFloatingPoint {
     self.init()
     // TODO: this should clamp
     for i in indices { self[i] = Scalar(other[i].rounded(rule)) }
   }
 }
 
-extension SIMD${n} : CustomDebugStringConvertible {
+extension SIMD${n}: CustomDebugStringConvertible {
   public var debugDescription: String {
     return "SIMD${n}<\(Scalar.self)>(${', '.join(map(lambda c:
                        '\\(self['+ str(c) + '])',
@@ -163,13 +163,13 @@ extension SIMD${n} : CustomDebugStringConvertible {
   }
 }
 
-extension SIMD${n} where Scalar : BinaryFloatingPoint {
+extension SIMD${n} where Scalar: BinaryFloatingPoint {
   /// Creates a new vector from the given vector of integers.
   ///
   /// - Parameter other: The vector to convert.
   @inlinable
   public init<Other>(_ other: SIMD${n}<Other>)
-  where Other : FixedWidthInteger {
+  where Other: FixedWidthInteger {
     self.init()
     for i in indices { self[i] = Scalar(other[i]) }
   }
@@ -179,7 +179,7 @@ extension SIMD${n} where Scalar : BinaryFloatingPoint {
   /// - Parameter other: The vector to convert.
   @inlinable
   public init<Other>(_ other: SIMD${n}<Other>)
-  where Other : BinaryFloatingPoint {
+  where Other: BinaryFloatingPoint {
     self.init()
     for i in indices { self[i] = Scalar(other[i]) }
   }
@@ -187,11 +187,27 @@ extension SIMD${n} where Scalar : BinaryFloatingPoint {
 
 %end
 
+extension SIMD3 {
+  /// A three-element vector created by appending a scalar to a two-element vector.
+  @_alwaysEmitIntoClient
+  public init(_ xy: SIMD2<Scalar>, _ z: Scalar) {
+    self.init(xy.x, xy.y, z)
+  }
+}
+
+extension SIMD4 {
+  /// A four-element vector created by appending a scalar to a three-element vector.
+  @_alwaysEmitIntoClient
+  public init(_ xyz: SIMD3<Scalar>, _ w: Scalar) {
+    self.init(xyz.x, xyz.y, xyz.z, w)
+  }
+}
+
 %for self_type in all_integer_types(word_bits):
 % Self = self_type.stdlib_name
 % BuiltinName = self_type.builtin_name
 % Mask = Self if self_type.is_signed else self_type.get_opposite_signedness().stdlib_name
-extension ${Self} : SIMDScalar {
+extension ${Self}: SIMDScalar {
 
   public typealias SIMDMaskScalar = ${Mask}
 
@@ -200,7 +216,7 @@ extension ${Self} : SIMDScalar {
   /// Storage for a vector of ${spelledNumbers[n]} integers.
   @_fixed_layout
   @_alignment(${bytes if bytes <= 16 else 16})
-  public struct SIMD${n}Storage : SIMDStorage {
+  public struct SIMD${n}Storage: SIMDStorage {
 
     public var _value: Builtin.Vec${n}x${BuiltinName}
 
@@ -236,7 +252,7 @@ extension ${Self} : SIMDScalar {
 %end
 
 %for (Self, bits) in [('Float',32), ('Double',64)]:
-extension ${Self} : SIMDScalar {
+extension ${Self}: SIMDScalar {
 
   public typealias SIMDMaskScalar = Int${bits}
 
@@ -245,7 +261,7 @@ extension ${Self} : SIMDScalar {
   /// Storage for a vector of ${spelledNumbers[n]} floating-point values.
   @_fixed_layout
   @_alignment(${bytes if bytes <= 16 else 16})
-  public struct SIMD${n}Storage : SIMDStorage {
+  public struct SIMD${n}Storage: SIMDStorage {
 
     public var _value: Builtin.Vec${n}xFPIEEE${bits}
 

@@ -152,9 +152,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       if (!field->isStatic() && field->isLet() &&
           field->getParentInitializer()) {
 #ifndef NDEBUG
-        auto fieldTy = decl->getDeclContext()->mapTypeIntoContext(
-            field->getInterfaceType());
-        assert(fieldTy->isEqual(field->getParentInitializer()->getType())
+        assert(field->getType()->isEqual(field->getParentInitializer()->getType())
                && "Checked by sema");
 #endif
 
@@ -451,14 +449,9 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
 }
 
 bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
-  while (true) {
-    // If the root class was implemented in Objective-C, use Objective-C's
-    // allocation methods because they may have been overridden.
-    if (!theClass->hasSuperclass())
-      return theClass->hasClangNode();
-
-    theClass = theClass->getSuperclassDecl();
-  }
+  // If the root class was implemented in Objective-C, use Objective-C's
+  // allocation methods because they may have been overridden.
+  return theClass->checkAncestry(AncestryFlags::ClangImported);
 }
 
 void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {

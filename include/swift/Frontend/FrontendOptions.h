@@ -158,6 +158,10 @@ public:
   /// module appears to not be a public module.
   Optional<bool> SerializeOptionsForDebugging;
 
+  /// When true, check if all required SwiftOnoneSupport symbols are present in
+  /// the module.
+  bool CheckOnoneSupportCompleteness = false;
+
   /// If set, inserts instrumentation useful for testing the debugger.
   bool DebuggerTestingTransform = false;
 

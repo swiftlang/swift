@@ -1356,8 +1356,8 @@ static bool isAcceptableLookupResult(const DeclContext *dc,
   return true;
 }
 
-bool namelookup::finishLookup(const DeclContext *dc, NLOptions options,
-                              SmallVectorImpl<ValueDecl *> &decls) {
+void namelookup::pruneLookupResultSet(const DeclContext *dc, NLOptions options,
+                                      SmallVectorImpl<ValueDecl *> &decls) {
   // If we're supposed to remove overridden declarations, do so now.
   if (options & NL_RemoveOverridden)
     removeOverriddenDecls(decls);
@@ -1368,9 +1368,6 @@ bool namelookup::finishLookup(const DeclContext *dc, NLOptions options,
     removeShadowedDecls(decls, M);
 
   filterForDiscriminator(decls, M->getDebugClient());
-
-  // We're done. Report success/failure.
-  return !decls.empty();
 }
 
 /// Inspect the given type to determine which nominal type declarations it
@@ -1574,7 +1571,13 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
     }
   }
 
-  return finishLookup(this, options, decls);
+  pruneLookupResultSet(this, options, decls);
+  if (auto *debugClient = this->getParentModule()->getDebugClient()) {
+    debugClient->finishLookupInNominals(this, typeDecls, member, options,
+                                        decls);
+  }
+  // We're done. Report success/failure.
+  return !decls.empty();
 }
 
 bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
@@ -1626,7 +1629,13 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
     return !knownDecls.insert(vd).second;
   }), decls.end());
 
-  return finishLookup(this, options, decls);
+  pruneLookupResultSet(this, options, decls);
+
+  if (auto *debugClient = this->getParentModule()->getDebugClient()) {
+    debugClient->finishLookupInModule(this, module, member, options, decls);
+  }
+  // We're done. Report success/failure.
+  return !decls.empty();
 }
 
 bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
@@ -1681,7 +1690,12 @@ bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
       decls.push_back(decl);
   }
 
-  return finishLookup(this, options, decls);
+  pruneLookupResultSet(this, options, decls);
+  if (auto *debugClient = this->getParentModule()->getDebugClient()) {
+    debugClient->finishLookupInAnyObject(this, member, options, decls);
+  }
+  // We're done. Report success/failure.
+  return !decls.empty();
 }
 
 void DeclContext::lookupAllObjCMethods(
@@ -2093,6 +2107,31 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   return nominalTypes.empty() ? nullptr : nominalTypes.front();
 }
 
+llvm::Expected<NominalTypeDecl *>
+CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
+                                   CustomAttr *attr, DeclContext *dc) const {
+  // Find the types referenced by the custom attribute.
+  auto &ctx = dc->getASTContext();
+  TypeLoc &typeLoc = attr->getTypeLoc();
+  DirectlyReferencedTypeDecls decls;
+  if (auto typeRepr = typeLoc.getTypeRepr()) {
+    decls = directReferencesForTypeRepr(
+        evaluator, ctx, typeRepr, dc);
+  } else if (Type type = typeLoc.getType()) {
+    decls = directReferencesForType(type);
+  }
+
+  // Dig out the nominal type declarations.
+  SmallVector<ModuleDecl *, 2> modulesFound;
+  bool anyObject = false;
+  auto nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls,
+                                            modulesFound, anyObject);
+  if (nominals.size() == 1 && !isa<ProtocolDecl>(nominals.front()))
+    return nominals.front();
+
+  return nullptr;
+}
+
 void swift::getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
     unsigned i,
@@ -2322,8 +2361,12 @@ void FindLocalVal::visitCaseStmt(CaseStmt *S) {
       }
     }
   }
-  if (!inPatterns && !items.empty())
-    checkPattern(items[0].getPattern(), DeclVisibilityKind::LocalVariable);
+
+  if (!inPatterns && !items.empty()) {
+    for (auto *vd : S->getCaseBodyVariablesOrEmptyArray()) {
+      checkValueDecl(vd, DeclVisibilityKind::LocalVariable);
+    }
+  }
   visit(S->getBody());
 }
 

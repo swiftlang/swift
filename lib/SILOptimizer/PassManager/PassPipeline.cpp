@@ -81,6 +81,7 @@ static void addDefiniteInitialization(SILPassPipelinePlan &P) {
 
 static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Guaranteed Passes");
+  P.addDiagnoseInvalidEscapingCaptures();
   P.addDiagnoseStaticExclusivity();
   P.addCapturePromotion();
 
@@ -99,10 +100,10 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   // optimizer pipeline is run implying we can put a pass that requires OSSA
   // there.
   const auto &Options = P.getOptions();
-  if (Options.EnableMandatorySemanticARCOpts && Options.shouldOptimize()) {
+  P.addClosureLifetimeFixup();
+  if (Options.shouldOptimize()) {
     P.addSemanticARCOpts();
   }
-  P.addClosureLifetimeFixup();
   if (Options.StripOwnershipDuringDiagnosticsPipeline)
     P.addOwnershipModelEliminator();
   P.addMandatoryInlining();

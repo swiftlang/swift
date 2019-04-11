@@ -302,9 +302,6 @@ def pch_disable_validation : Flag<["-"], "pch-disable-validation">,
 def disable_sil_ownership_verifier : Flag<["-"], "disable-sil-ownership-verifier">,
   HelpText<"Do not verify ownership invariants during SIL Verification ">;
 
-def enable_mandatory_semantic_arc_opts : Flag<["-"], "enable-mandatory-semantic-arc-opts">,
-  HelpText<"Enable the mandatory semantic arc optimizer">;
-
 def suppress_static_exclusivity_swap : Flag<["-"], "suppress-static-exclusivity-swap">,
   HelpText<"Suppress static violations of exclusive access with swap()">;
 
@@ -416,6 +413,9 @@ def import_module : Separate<["-"], "import-module">,
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;
 
+def check_onone_completeness : Flag<["-"], "check-onone-completeness">,
+  HelpText<"Print errors if the compile OnoneSupport module is missing symbols">;
+
 def debugger_testing_transform : Flag<["-"], "debugger-testing-transform">,
   HelpText<"Instrument the code with calls to an intrinsic that record the expected values of "
            "local variables so they can be compared against the results from the debugger.">;
@@ -431,6 +431,10 @@ def disable_playground_transform : Flag<["-"], "disable-playground-transform">,
 
 def pc_macro : Flag<["-"], "pc-macro">,
   HelpText<"Apply the 'program counter simulation' macro">;
+
+def no_clang_module_breadcrumbs : Flag<["-"], "no-clang-module-breadcrumbs">,
+  HelpText<"Don't emit DWARF skeleton CUs for imported Clang modules. "
+           "Use this when building a redistributable static archive.">;
 
 def use_jit : Flag<["-"], "use-jit">,
   HelpText<"Register Objective-C classes as if the JIT were in use">;
@@ -517,8 +521,8 @@ def prebuilt_module_cache_path_EQ :
   Joined<["-"], "prebuilt-module-cache-path=">,
   Alias<prebuilt_module_cache_path>;
 
-def enable_resilience_bypass : Flag<["-"], "enable-resilience-bypass">,
-   HelpText<"Completely bypass resilience when accessing types in resilient frameworks">;
+def force_public_linkage : Flag<["-"], "force-public-linkage">,
+   HelpText<"Force public linkage for private symbols. Used by LLDB.">;
 
 def dump_api_path : Separate<["-"], "dump-api-path">,
   HelpText<"The path to output swift interface files for the compiled source files">;
@@ -551,5 +555,9 @@ def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">
 def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,
   HelpText<"One of 'all', 'resilient' or 'fragile'">;
+
+def enable_objc_resilient_class_stubs : Flag<["-"], "enable-resilient-objc-class-stubs">,
+  HelpText<"Emit Objective-C resilient class stubs for classes with "
+           "resiliently-sized metadata">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

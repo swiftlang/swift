@@ -103,6 +103,22 @@ public struct SourceLocStack {
   }
 }
 
+fileprivate struct AtomicBool {
+    
+    private var _value: _stdlib_AtomicInt
+    
+    init(_ b: Bool) { self._value = _stdlib_AtomicInt(b ? 1 : 0) }
+    
+    func store(_ b: Bool) { _value.store(b ? 1 : 0) }
+    
+    func load() -> Bool { return _value.load() != 0 }
+    
+    @discardableResult
+    func orAndFetch(_ b: Bool) -> Bool {
+        return _value.orAndFetch(b ? 1 : 0) != 0
+    }
+}
+
 func _printStackTrace(_ stackTrace: SourceLocStack?) {
   guard let s = stackTrace, !s.locs.isEmpty else { return }
   print("stacktrace:")
@@ -112,10 +128,8 @@ func _printStackTrace(_ stackTrace: SourceLocStack?) {
   }
 }
 
-// FIXME: these variables should be atomic, since multiple threads can call
-// `expect*()` functions.
-var _anyExpectFailed = false
-var _seenExpectCrash = false
+fileprivate var _anyExpectFailed = AtomicBool(false)
+fileprivate var _seenExpectCrash = AtomicBool(false)
 
 /// Run `body` and expect a failure to happen.
 ///
@@ -125,16 +139,16 @@ public func expectFailure(
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line, invoking body: () -> Void) {
-  let startAnyExpectFailed = _anyExpectFailed
-  _anyExpectFailed = false
+  let startAnyExpectFailed = _anyExpectFailed.load()
+  _anyExpectFailed.store(false)
   body()
-  let endAnyExpectFailed = _anyExpectFailed
-  _anyExpectFailed = false
+  let endAnyExpectFailed = _anyExpectFailed.load()
+  _anyExpectFailed.store(false)
   expectTrue(
     endAnyExpectFailed, "running `body` should produce an expected failure",
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)
   )
-  _anyExpectFailed = _anyExpectFailed || startAnyExpectFailed
+  _anyExpectFailed.orAndFetch(startAnyExpectFailed)
 }
 
 public func identity(_ element: OpaqueValue<Int>) -> OpaqueValue<Int> {
@@ -257,7 +271,7 @@ public func expectationFailure(
   _ reason: String,
   trace message: String,
   stackTrace: SourceLocStack) {
-  _anyExpectFailed = true
+  _anyExpectFailed.store(true)
   stackTrace.print()
   print(reason, terminator: reason == "" ? "" : "\n")
   print(message, terminator: message == "" ? "" : "\n")
@@ -681,12 +695,12 @@ public func expectNotNil<T>(_ value: T?,
 }
 
 public func expectCrashLater(withMessage message: String = "") {
-  print("\(_stdlibUnittestStreamPrefix);expectCrash;\(_anyExpectFailed)")
+  print("\(_stdlibUnittestStreamPrefix);expectCrash;\(_anyExpectFailed.load())")
 
   var stderr = _Stderr()
   print("\(_stdlibUnittestStreamPrefix);expectCrash;\(message)", to: &stderr)
 
-  _seenExpectCrash = true
+  _seenExpectCrash.store(true)
 }
 
 public func expectCrash(withMessage message: String = "", executing: () -> Void) -> Never {
@@ -831,10 +845,10 @@ func _childProcess() {
     }
 
     let testSuite = _allTestSuites[_testSuiteNameToIndex[testSuiteName]!]
-    _anyExpectFailed = false
+    _anyExpectFailed.store(false)
     testSuite._runTest(name: testName, parameter: testParameter)
 
-    print("\(_stdlibUnittestStreamPrefix);end;\(_anyExpectFailed)")
+    print("\(_stdlibUnittestStreamPrefix);end;\(_anyExpectFailed.load())")
 
     var stderr = _Stderr()
     print("\(_stdlibUnittestStreamPrefix);end", to: &stderr)
@@ -1212,25 +1226,27 @@ class _ParentProcess {
     if _runTestsInProcess {
       if t.stdinText != nil {
         print("The test \(fullTestName) requires stdin input and can't be run in-process, marking as failed")
-        _anyExpectFailed = true
+        _anyExpectFailed.store(true)
       } else if t.requiresOwnProcess {
         print("The test \(fullTestName) requires running in a child process and can't be run in-process, marking as failed.")
-        _anyExpectFailed = true
+        _anyExpectFailed.store(true)
       } else {
-        _anyExpectFailed = false
+        _anyExpectFailed.store(false)
         testSuite._runTest(name: t.name, parameter: testParameter)
       }
     } else {
-      (_anyExpectFailed, expectCrash, childTerminationStatus, crashStdout,
+      var anyExpectFailed = false
+      (anyExpectFailed, expectCrash, childTerminationStatus, crashStdout,
        crashStderr) =
         _runTestInChild(testSuite, t.name, parameter: testParameter)
+      _anyExpectFailed.store(anyExpectFailed)
     }
 
     // Determine if the test passed, not taking XFAILs into account.
     var testPassed = false
     switch (childTerminationStatus, expectCrash) {
     case (.none, false):
-      testPassed = !_anyExpectFailed
+      testPassed = !_anyExpectFailed.load()
 
     case (.none, true):
       testPassed = false
@@ -1241,7 +1257,7 @@ class _ParentProcess {
       print("the test crashed unexpectedly")
 
     case (.some, true):
-      testPassed = !_anyExpectFailed
+      testPassed = !_anyExpectFailed.load()
     }
     if testPassed && t.crashOutputMatches.count > 0 {
       // If we still think that the test passed, check if the crash
@@ -1761,7 +1777,7 @@ func _parseDottedVersion(_ s: String) -> [Int] {
 }
 
 public func _parseDottedVersionTriple(_ s: String) -> (Int, Int, Int) {
-  var array = _parseDottedVersion(s)
+  let array = _parseDottedVersion(s)
   if array.count >= 4 {
     fatalError("unexpected version")
   }

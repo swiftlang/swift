@@ -230,7 +230,6 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   ///     the initializer has the same magnitude as `magnitudeOf`.
   init(signOf: Self, magnitudeOf: Self)
   
-  
   /// Creates a new value, rounded to the closest possible representation.
   ///
   /// If two representable values are equally close, the result is the value

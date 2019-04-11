@@ -66,7 +66,9 @@ function(add_sourcekit_default_compiler_flags target)
     ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     LTO_OBJECT_NAME "${target}-${sdk}-${arch}"
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
-    RESULT_VAR_NAME link_flags)
+    RESULT_VAR_NAME link_flags
+    LINK_LIBRARIES_VAR_NAME link_libraries
+    LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
 
   # Convert variables to space-separated strings.
   _list_escape_for_shell("${c_compile_flags}" c_compile_flags)
@@ -77,6 +79,8 @@ function(add_sourcekit_default_compiler_flags target)
       COMPILE_FLAGS " ${c_compile_flags} -fblocks")
   set_property(TARGET "${target}" APPEND_STRING PROPERTY
       LINK_FLAGS " ${link_flags}")
+  set_property(TARGET "${target}" APPEND PROPERTY LINK_LIBRARIES ${link_libraries})
+  swift_target_link_search_directories("${target}" "${library_search_directories}")
 endfunction()
 
 # Add a new SourceKit library.

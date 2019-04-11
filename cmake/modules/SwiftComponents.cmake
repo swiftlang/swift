@@ -61,11 +61,12 @@
 #   Xcode;
 # * tools -- tools (other than the compiler) useful for developers writing
 #   Swift code.
+# * toolchain-tools -- a subset of tools that we will install to the OSS toolchain.
 # * testsuite-tools -- extra tools required to run the Swift testsuite.
 # * toolchain-dev-tools -- install development tools useful in a shared toolchain
 # * dev -- headers and libraries required to use Swift compiler as a library.
 set(_SWIFT_DEFINED_COMPONENTS
-  "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;parser-lib;editor-integration;tools;testsuite-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
+  "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;parser-lib;editor-integration;tools;testsuite-tools;toolchain-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
 
 # The default install components include all of the defined components, except
 # for the following exceptions.
@@ -83,6 +84,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 else()
   list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "sourcekit-xpc-service")
 endif()
+list(REMOVE_ITEM _SWIFT_DEFAULT_COMPONENTS "stdlib-experimental")
 
 macro(swift_configure_components)
   # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
@@ -141,6 +143,24 @@ function(swift_install_in_component component)
   endif()
 
   install(${ARGN})
+endfunction()
+
+# swift_install_in_either_component(<COMPONENT1 NAME> <COMPONENT2 NAME>
+#   <same parameters as install()>)
+#
+# Executes the specified installation actions if either one of the named
+# components is requested to be installed.
+#
+# This function accepts the same parameters as install().
+function(swift_install_in_either_component comp1 comp2)
+  foreach(component ${comp1} ${comp2})
+    precondition(component MESSAGE "Component name is required")
+    swift_is_installing_component("${component}" is_installing)
+    if(is_installing)
+      install(${ARGN})
+      return()
+    endif()
+  endforeach(component)
 endfunction()
 
 function(swift_install_symlink_component component)

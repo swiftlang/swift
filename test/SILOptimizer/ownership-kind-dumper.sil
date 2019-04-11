@@ -1,0 +1,35 @@
+// RUN: %target-sil-opt -ownership-dumper %s -o /dev/null | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+class Klass {}
+
+// CHECK-LABEL: Dumping Function: 'foo'
+// CHECK: Visiting:   %1 = unchecked_ref_cast %0 : $Builtin.NativeObject to $Klass
+// CHECK: Operand Ownership Map:
+// CHECK: Op #: 0
+// CHECK: Ownership Map: -- OperandOwnershipKindMap --
+// CHECK: unowned:  No.
+// CHECK: owned: Yes. Liveness: MustBeInvalidated
+// CHECK: guaranteed:  No.
+// CHECK: any: Yes. Liveness: MustBeLive
+// CHECK: Results Ownership Kinds:
+// CHECK: Result:   %1 = unchecked_ref_cast %0 : $Builtin.NativeObject to $Klass
+// CHECK: Kind: owned
+// CHECK: Visiting:   return %1 : $Klass
+// CHECK: Operand Ownership Map:
+// CHECK: Op #: 0
+// CHECK: Ownership Map: -- OperandOwnershipKindMap --
+// CHECK: unowned:  No.
+// CHECK: owned: Yes. Liveness: MustBeInvalidated
+// CHECK: guaranteed:  No.
+// CHECK: any: Yes. Liveness: MustBeLive
+sil [ossa] @foo : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Klass {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = unchecked_ref_cast %0 : $Builtin.NativeObject to $Klass
+  return %1 : $Klass
+}
+
+

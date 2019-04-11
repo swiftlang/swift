@@ -619,6 +619,12 @@ bindParameterSource(SILParameterInfo param, unsigned paramIndex,
       llvm::Value *metadata = getParameter(paramIndex);
       IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
                                             MetadataState::Complete);
+    } else if (metatype->getRepresentation() == MetatypeRepresentation::ObjC) {
+      paramType = metatype.getInstanceType();
+      llvm::Value *objcMetatype = getParameter(paramIndex);
+      auto *metadata = emitObjCMetadataRefForMetadata(IGF, objcMetatype);
+      IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
+                                            MetadataState::Complete);
     }
     return;
   }
@@ -1094,7 +1100,8 @@ public:
   llvm::Value *getTable(IRGenFunction &IGF,
                         llvm::Value **typeMetadataCache) const override {
     // If we're looking up a dependent type, we can't cache the result.
-    if (Conformance->getType()->hasArchetype()) {
+    if (Conformance->getType()->hasArchetype() ||
+        Conformance->getType()->hasDynamicSelfType()) {
       return emitWitnessTableAccessorCall(IGF, Conformance,
                                           typeMetadataCache);
     }

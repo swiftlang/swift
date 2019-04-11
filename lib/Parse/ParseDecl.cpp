@@ -929,6 +929,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   case DAK_RestatedObjCConformance:
   case DAK_SynthesizedProtocol:
   case DAK_ClangImporterSynthesizedType:
+  case DAK_Custom:
     llvm_unreachable("virtual attributes should not be parsed "
                      "by attribute parsing code");
   case DAK_SetterAccess:
@@ -1852,8 +1853,66 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
 
   if (TypeAttributes::getAttrKindFromString(Tok.getText()) != TAK_Count)
     diagnose(Tok, diag::type_attribute_applied_to_decl);
-  else
-    diagnose(Tok, diag::unknown_attribute, Tok.getText());
+  else if (Tok.isContextualKeyword("unknown")) {
+    diagnose(Tok, diag::unknown_attribute, "unknown");
+  } else {
+    // Parse a custom attribute.
+    auto type = parseType(diag::expected_type);
+    if (type.hasCodeCompletion() || type.isNull()) {
+      if (Tok.is(tok::l_paren))
+        skipSingle();
+
+      return true;
+    }
+
+    // Parse the optional arguments.
+    SourceLoc lParenLoc, rParenLoc;
+    SmallVector<Expr *, 2> args;
+    SmallVector<Identifier, 2> argLabels;
+    SmallVector<SourceLoc, 2> argLabelLocs;
+    Expr *trailingClosure = nullptr;
+    bool hasInitializer = false;
+
+    // If we're not in a local context, we'll need a context to parse
+    // initializers into (should we have one).  This happens for properties
+    // and global variables in libraries.
+    PatternBindingInitializer *initContext = nullptr;
+
+    if (Tok.isFollowingLParen()) {
+      SyntaxParsingContext InitCtx(SyntaxContext,
+                                   SyntaxKind::InitializerClause);
+
+      // If we have no local context to parse the initial value into, create one
+      // for the PBD we'll eventually create.  This allows us to have reasonable
+      // DeclContexts for any closures that may live inside of initializers.
+      Optional<ParseFunctionBody> initParser;
+      if (!CurDeclContext->isLocalContext()) {
+        initContext = new (Context) PatternBindingInitializer(CurDeclContext);
+        initParser.emplace(*this, initContext);
+      }
+
+      ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
+                                          /*isPostfix=*/false,
+                                          /*isExprBasic=*/true,
+                                          lParenLoc, args, argLabels,
+                                          argLabelLocs,
+                                          rParenLoc,
+                                          trailingClosure,
+                                          SyntaxKind::FunctionCallArgumentList);
+      if (status.hasCodeCompletion())
+        return true;
+
+      assert(!trailingClosure && "Cannot parse a trailing closure here");
+      hasInitializer = true;
+    }
+
+    // Form the attribute.
+    auto attr = CustomAttr::create(Context, AtLoc, type.get(), hasInitializer,
+                                   initContext, lParenLoc, args, argLabels,
+                                   argLabelLocs, rParenLoc);
+    Attributes.add(attr);
+    return false;
+  }
 
   // Recover by eating @foo(...) when foo is not known.
   consumeToken();
@@ -1940,31 +1999,10 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   StringRef Text = Tok.getText();
   SourceLoc Loc = consumeToken();
   
-  bool isAutoclosureEscaping = false;
-  SourceRange autoclosureEscapingParenRange;
   StringRef conventionName;
   StringRef witnessMethodProtocol;
 
-  // Handle @autoclosure(escaping)
-  if (attr == TAK_autoclosure) {
-    // We need to do a bit of lookahead here to make sure we parse a (weird)
-    // type like: "@autoclosure (escaping) -> Int" correctly (escaping is the
-    // name of a type here).  We also want to support the case where the
-    // function type coming up is a typealias, e.g. "@autoclosure (escaping) T".
-    if (Tok.is(tok::l_paren) && peekToken().getText() == "escaping") {
-      Parser::BacktrackingScope Backtrack(*this);
-      consumeToken(tok::l_paren);
-      consumeToken(tok::identifier);
-      isAutoclosureEscaping =
-        Tok.is(tok::r_paren) && peekToken().isNot(tok::arrow);
-    }
-
-    if (isAutoclosureEscaping) {
-      autoclosureEscapingParenRange.Start = consumeToken(tok::l_paren);
-      consumeToken(tok::identifier);
-      autoclosureEscapingParenRange.End = consumeToken(tok::r_paren);
-    }
-  } else if (attr == TAK_convention) {
+  if (attr == TAK_convention) {
     SourceLoc LPLoc;
     if (!consumeIfNotAtStartOfLine(tok::l_paren)) {
       if (!justChecking)
@@ -2027,48 +2065,10 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   switch (attr) {
   default: break;
   case TAK_autoclosure:
-    // Handle @autoclosure(escaping)
-    if (isAutoclosureEscaping) {
-      // @noescape @autoclosure(escaping) makes no sense.
-      if (Attributes.has(TAK_noescape)) {
-        diagnose(Loc, diag::attr_noescape_conflicts_escaping_autoclosure);
-      } else {
-        diagnose(Loc, diag::attr_autoclosure_escaping_deprecated)
-            .fixItReplace(autoclosureEscapingParenRange, " @escaping ");
-      }
-      Attributes.setAttr(TAK_escaping, Loc);
-    } else if (Attributes.has(TAK_noescape) && !isInSILMode()) {
-      diagnose(Loc, diag::attr_noescape_implied_by_autoclosure);
-    }
-    break;
-
-  case TAK_noescape:
-    // You can't specify @noescape and @escaping together.
-    if (Attributes.has(TAK_escaping)) {
-      diagnose(Loc, diag::attr_escaping_conflicts_noescape);
-      return false;
-    }
-
-    // @noescape after @autoclosure is redundant.
-    if (Attributes.has(TAK_autoclosure) && !isInSILMode()) {
-      diagnose(Loc, diag::attr_noescape_implied_by_autoclosure);
-    }
-
-    // @noescape is deprecated and no longer used
-    // In SIL, the polarity of @escaping is reversed.
-    // @escaping is the default and @noescape is explicit.
-    if (!isInSILMode()) {
-      diagnose(Loc, diag::attr_noescape_deprecated)
-        .fixItRemove({Attributes.AtLoc, Loc});
-    }
-    break;
   case TAK_escaping:
-    // You can't specify @noescape and @escaping together.
-    if (Attributes.has(TAK_noescape)) {
-      diagnose(Loc, diag::attr_escaping_conflicts_noescape);
-      return false;
-    }
+  case TAK_noescape:
     break;
+
   case TAK_out:
   case TAK_in:
   case TAK_owned:
@@ -6305,10 +6305,11 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
     return makeParserCodeCompletionStatus();
 
   // Parse the parameter list.
+  DefaultArgumentInfo DefaultArgs;
   SmallVector<Identifier, 4> argumentNames;
   ParserResult<ParameterList> Indices
     = parseSingleParameterClause(ParameterContextKind::Subscript,
-                                 &argumentNames);
+                                 &argumentNames, &DefaultArgs);
   Status |= Indices;
 
   SignatureHasCodeCompletion |= Indices.hasCodeCompletion();
@@ -6353,11 +6354,14 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
   DeclName name = DeclName(Context, DeclBaseName::createSubscript(),
                            argumentNames);
   auto *Subscript = new (Context) SubscriptDecl(name,
+                                                SourceLoc(), StaticSpellingKind::None,
                                                 SubscriptLoc, Indices.get(),
                                                 ArrowLoc, ElementTy.get(),
                                                 CurDeclContext,
                                                 nullptr);
   Subscript->getAttrs() = Attributes;
+
+  DefaultArgs.setFunctionContext(Subscript, Subscript->getIndices());
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {

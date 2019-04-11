@@ -734,7 +734,7 @@ extension Sequence {
   public func first(
     where predicate: (Element) throws -> Bool
   ) rethrows -> Element? {
-    for element in self  {
+    for element in self {
       if try predicate(element) {
         return element
       }

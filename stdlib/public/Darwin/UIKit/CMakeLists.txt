@@ -5,6 +5,8 @@ add_swift_target_library(swiftUIKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_
   DesignatedInitializers.mm
   UIKit.swift
 
+  "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
+
   GYB_SOURCES
     UIKit_FoundationExtensions.swift.gyb
 

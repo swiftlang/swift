@@ -18,6 +18,11 @@ module WinSDK [system] [extern_c] {
   }
 
   module core {
+    module acl {
+      header "AclAPI.h"
+      export *
+    }
+
     // api-ms-win-core-errhandling-l1-1-0.dll
     module errhandling {
       header "errhandlingapi.h"

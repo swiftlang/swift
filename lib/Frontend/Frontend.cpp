@@ -29,6 +29,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
@@ -867,7 +868,8 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
   for (auto &PM : PartialModules) {
     assert(PM.ModuleBuffer);
     if (!SML->loadAST(*MainModule, SourceLoc(), std::move(PM.ModuleBuffer),
-                      std::move(PM.ModuleDocBuffer)))
+                      std::move(PM.ModuleDocBuffer), /*isFramework*/false,
+                      /*treatAsPartialModule*/true))
       hadLoadError = true;
   }
 
@@ -1109,6 +1111,11 @@ static void performSILOptimizations(CompilerInvocation &Invocation,
     runSILOptimizationPassesWithFileSpecification(*SM, CustomPipelinePath);
   } else {
     runSILOptimizationPasses(*SM);
+  }
+  if (Invocation.getFrontendOptions().CheckOnoneSupportCompleteness &&
+      // TODO: handle non-ObjC based stdlib builds, e.g. on linux.
+      Invocation.getLangOptions().EnableObjCInterop) {
+    checkCompletenessOfPrespecializations(*SM);
   }
 }
 

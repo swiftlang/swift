@@ -460,6 +460,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     return;
 
   auto &Ctx = SF.getASTContext();
+  BufferIndirectlyCausingDiagnosticRAII cpr(SF);
 
   // Make sure we have a type checker.
   TypeChecker &TC = createTypeChecker(Ctx);

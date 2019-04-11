@@ -515,6 +515,7 @@ namespace {
         type->getElementType(), ImportTypeKind::Abstract,
         false /* No NSUIntegerAsInt */, Bridgeability::None,
         OptionalTypeKind::OTK_None);
+      if (!element) { return Type(); }
       unsigned count = type->getNumElements();
       // Import vector-of-one as the element type.
       if (count == 1) { return element; }

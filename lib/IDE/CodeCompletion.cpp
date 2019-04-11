@@ -1304,8 +1304,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
       return std::make_pair(ParsedExpr->getType(), refDecl);
     }
 
-    prepareForRetypechecking(ParsedExpr);
-
     ConcreteDeclRef ReferencedDecl = nullptr;
     Expr *ModifiedExpr = ParsedExpr;
     if (auto T = getTypeOfCompletionContextExpr(P.Context, CurDeclContext,
@@ -1643,6 +1641,7 @@ public:
 
   void setExpectedTypes(ArrayRef<Type> Types, bool isSingleExpressionBody) {
     expectedTypeContext.isSingleExpressionBody = isSingleExpressionBody;
+    expectedTypeContext.possibleTypes.clear();
     expectedTypeContext.possibleTypes.reserve(Types.size());
     for (auto T : Types)
       if (T)
@@ -1707,17 +1706,23 @@ public:
   }
 
   void collectImportedModules(llvm::StringSet<> &ImportedModules) {
+    ModuleDecl::ImportFilter ImportFilter;
+    ImportFilter |= ModuleDecl::ImportFilterKind::Public;
+    ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+    ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+
     SmallVector<ModuleDecl::ImportedModule, 16> Imported;
     SmallVector<ModuleDecl::ImportedModule, 16> FurtherImported;
     CurrDeclContext->getParentSourceFile()->getImportedModules(Imported,
-      ModuleDecl::ImportFilter::All);
+                                                               ImportFilter);
     while (!Imported.empty()) {
       ModuleDecl *MD = Imported.back().second;
       Imported.pop_back();
       if (!ImportedModules.insert(MD->getNameStr()).second)
         continue;
       FurtherImported.clear();
-      MD->getImportedModules(FurtherImported, ModuleDecl::ImportFilter::Public);
+      MD->getImportedModules(FurtherImported,
+                             ModuleDecl::ImportFilterKind::Public);
       Imported.append(FurtherImported.begin(), FurtherImported.end());
       for (auto SubMod : FurtherImported) {
         Imported.push_back(SubMod);
@@ -2238,22 +2243,56 @@ public:
     Builder.addRightParen();
   }
 
+  SemanticContextKind getSemanticContextKind(const AbstractFunctionDecl *AFD) {
+    // FIXME: to get the corect semantic context we need to know how lookup
+    // would have found the declaration AFD. For now, just infer a reasonable
+    // semantics.
+
+    if (!AFD)
+      return SemanticContextKind::CurrentModule;
+
+    DeclContext *calleeDC = AFD->getDeclContext();
+    
+    if (calleeDC->isTypeContext())
+      // FIXME: We should distinguish CurrentNominal and Super. We need to
+      // propagate the base type to do that.
+      return SemanticContextKind::CurrentNominal;
+
+    if (calleeDC->isLocalContext())
+      return SemanticContextKind::Local;
+    if (calleeDC->getParentModule() == CurrDeclContext->getParentModule())
+      return SemanticContextKind::CurrentModule;
+
+    return SemanticContextKind::OtherModule;
+  }
+
   void addFunctionCallPattern(const AnyFunctionType *AFT,
                               const AbstractFunctionDecl *AFD = nullptr) {
+    if (AFD) {
+      auto genericSig =
+          AFD->getInnermostDeclContext()->getGenericSignatureOfContext();
+      AFT = eraseArchetypes(CurrDeclContext->getParentModule(),
+                            const_cast<AnyFunctionType *>(AFT), genericSig)
+                ->castTo<AnyFunctionType>();
+    }
 
     // Add the pattern, possibly including any default arguments.
     auto addPattern = [&](ArrayRef<const ParamDecl *> declParams = {},
                           bool includeDefaultArgs = true) {
-      // FIXME: to get the corect semantic context we need to know how lookup
-      // would have found the declaration AFD. For now, just choose a reasonable
-      // default, it's most likely to be CurrentModule or CurrentNominal.
+      CommandWordsPairs Pairs;
       CodeCompletionResultBuilder Builder(
-          Sink, CodeCompletionResult::ResultKind::Pattern,
-          SemanticContextKind::CurrentModule, expectedTypeContext);
+          Sink,
+          AFD ? CodeCompletionResult::ResultKind::Declaration
+              : CodeCompletionResult::ResultKind::Pattern,
+          getSemanticContextKind(AFD), expectedTypeContext);
       if (!HaveLParen)
         Builder.addLeftParen();
       else
         Builder.addAnnotatedLeftParen();
+      if (AFD) {
+        Builder.setAssociatedDecl(AFD);
+        setClangDeclKeywords(AFD, Pairs, Builder);
+      }
 
       addCallArgumentPatterns(Builder, AFT->getParams(), declParams,
                               includeDefaultArgs);
@@ -2725,7 +2764,8 @@ public:
   void addKeyword(StringRef Name, Type TypeAnnotation = Type(),
                   SemanticContextKind SK = SemanticContextKind::None,
                   CodeCompletionKeywordKind KeyKind
-                    = CodeCompletionKeywordKind::None) {
+                    = CodeCompletionKeywordKind::None,
+                  unsigned NumBytesToErase = 0) {
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Keyword, SK,
         expectedTypeContext);
@@ -2734,6 +2774,8 @@ public:
     Builder.setKeywordKind(KeyKind);
     if (TypeAnnotation)
       addTypeAnnotation(Builder, TypeAnnotation);
+    if (NumBytesToErase > 0)
+      Builder.setNumBytesToErase(NumBytesToErase);
   }
 
   void addKeyword(StringRef Name, StringRef TypeAnnotation,
@@ -3331,7 +3373,6 @@ public:
     if (expr->getType() && !expr->getType()->hasError())
       return expr;
 
-    prepareForRetypechecking(expr);
     if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext), expr))
       return expr;
     return LHS;
@@ -3622,6 +3663,15 @@ public:
           return false;
       }
 
+      if (T->getOptionalObjectType() &&
+          VD->getModuleContext()->isStdlibModule()) {
+        // In optional context, ignore '.init(<some>)', 'init(nilLiteral:)',
+        if (isa<ConstructorDecl>(VD))
+          return false;
+        // TODO: Ignore '.some(<Wrapped>)' and '.none' too *in expression
+        // context*. They are useful in pattern context though.
+      }
+
       // Enum element decls can always be referenced by implicit member
       // expression.
       if (isa<EnumElementDecl>(VD))
@@ -3692,6 +3742,14 @@ public:
         // If this is optional type, perform completion for the object type.
         // i.e. 'let _: Enum??? = .enumMember' is legal.
         getUnresolvedMemberCompletions(objT->lookThroughAllOptionalTypes());
+
+        // Add 'nil' keyword with erasing '.' instruction.
+        unsigned bytesToErase = 0;
+        auto &SM = CurrDeclContext->getASTContext().SourceMgr;
+        if (DotLoc.isValid())
+          bytesToErase = SM.getByteDistance(DotLoc, SM.getCodeCompletionLoc());
+        addKeyword("nil", T, SemanticContextKind::ExpressionSpecific,
+                   CodeCompletionKeywordKind::kw_nil, bytesToErase);
       }
       getUnresolvedMemberCompletions(T);
     }
@@ -4992,19 +5050,30 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     bool OnRoot = !KPE->getComponents().front().isValid();
     Lookup.setIsSwiftKeyPathExpr(OnRoot);
 
-    auto ParsedType = BGT->getGenericArgs()[1];
-    auto Components = KPE->getComponents();
-    if (Components.back().getKind() ==
-        KeyPathExpr::Component::Kind::OptionalWrap) {
+    Type baseType = BGT->getGenericArgs()[OnRoot ? 0 : 1];
+    if (OnRoot && baseType->is<UnresolvedType>()) {
+      // Infer the root type of the keypath from the context type.
+      ExprContextInfo ContextInfo(CurDeclContext, ParsedExpr);
+      for (auto T : ContextInfo.getPossibleTypes()) {
+        if (auto unwrapped = T->getOptionalObjectType())
+          T = unwrapped;
+        if (!T->getAnyNominal() || !T->getAnyNominal()->getKeyPathTypeKind() ||
+            T->hasUnresolvedType() || !T->is<BoundGenericType>())
+          continue;
+        // Use the first KeyPath context type found.
+        baseType = T->castTo<BoundGenericType>()->getGenericArgs()[0];
+        break;
+      }
+    }
+    if (!OnRoot && KPE->getComponents().back().getKind() ==
+                       KeyPathExpr::Component::Kind::OptionalWrap) {
       // KeyPath expr with '?' (e.g. '\Ty.[0].prop?.another').
       // Althogh expected type is optional, we should unwrap it because it's
       // unwrapped.
-      ParsedType = ParsedType->getOptionalObjectType();
+      baseType = baseType->getOptionalObjectType();
     }
 
-    // The second generic type argument of KeyPath<Root, Value> should be
-    // the value we pull code completion results from.
-    Lookup.getValueExprCompletions(ParsedType);
+    Lookup.getValueExprCompletions(baseType);
     break;
   }
 
@@ -5032,14 +5101,17 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.setHaveLParen(true);
 
     ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
-    Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
-                            ContextInfo.isSingleExpressionBody());
+
     if (ShouldCompleteCallPatternAfterParen) {
-      if (ExprType) {
+      ExprContextInfo ParentContextInfo(CurDeclContext, ParsedExpr);
+      Lookup.setExpectedTypes(ParentContextInfo.getPossibleTypes(),
+                              ParentContextInfo.isSingleExpressionBody());
+      if (ExprType && ((*ExprType)->is<AnyFunctionType>() ||
+                       (*ExprType)->is<AnyMetatypeType>())) {
         Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
       } else {
         for (auto &typeAndDecl : ContextInfo.getPossibleCallees())
-          Lookup.getValueExprCompletions(typeAndDecl.first, typeAndDecl.second);
+          Lookup.tryFunctionCallCompletions(typeAndDecl.first, typeAndDecl.second);
       }
     } else {
       // Add argument labels, then fallthrough to get values.
@@ -5049,6 +5121,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (!Lookup.FoundFunctionCalls ||
         (Lookup.FoundFunctionCalls &&
          Lookup.FoundFunctionsWithoutFirstKeyword)) {
+      Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
+                              ContextInfo.isSingleExpressionBody());
       Lookup.setHaveLParen(false);
       DoPostfixExprBeginning();
     }
@@ -5300,9 +5374,13 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.getToplevelCompletions(Request.OnlyTypes);
 
       // Add results for all imported modules.
+      ModuleDecl::ImportFilter ImportFilter;
+      ImportFilter |= ModuleDecl::ImportFilterKind::Public;
+      ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+      ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
       SmallVector<ModuleDecl::ImportedModule, 4> Imports;
       auto *SF = CurDeclContext->getParentSourceFile();
-      SF->getImportedModules(Imports, ModuleDecl::ImportFilter::All);
+      SF->getImportedModules(Imports, ImportFilter);
 
       for (auto Imported : Imports) {
         ModuleDecl *TheModule = Imported.second;

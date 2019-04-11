@@ -79,14 +79,14 @@ class NinjaTestCase(unittest.TestCase):
 
         self.assertEqual(ninja_build.ninja_bin_path, '/path/to/build/ninja')
 
-    def test_do_build(self):
+    def test_build(self):
         ninja_build = Ninja(
             args=self.args,
             toolchain=self.toolchain,
             source_dir=self.workspace.source_dir('ninja'),
             build_dir=self.workspace.build_dir('build', 'ninja'))
 
-        ninja_build.do_build()
+        ninja_build.build()
 
         expect_env = ""
         if platform.system() == "Darwin":

@@ -27,10 +27,12 @@
 #define DECLARE_SWIFT_SECTION(name)                                            \
   PRAGMA(section("." #name "$A", long, read))                                  \
   __declspec(allocate("." #name "$A"))                                         \
+  __declspec(align(1))                                                         \
   static uintptr_t __start_##name = 0;                                         \
                                                                                \
   PRAGMA(section("." #name "$C", long, read))                                  \
   __declspec(allocate("." #name "$C"))                                         \
+  __declspec(align(1))                                                         \
   static uintptr_t __stop_##name = 0;
 
 extern "C" {

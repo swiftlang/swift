@@ -8,26 +8,8 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   message(SEND_ERROR "SourceKit cannot be built standalone")
 endif()
 
-if(NOT CMAKE_C_COMPILER_ID MATCHES Clang)
-  if(CMAKE_SYSTEM_NAME STREQUAL CMAKE_HOST_SYSTEM_NAME)
-    get_target_property(CLANG_LOCATION clang LOCATION)
-    get_filename_component(CLANG_LOCATION ${CLANG_LOCATION} DIRECTORY)
-
-    if(CMAKE_C_COMPILER_ID STREQUAL MSVC OR CMAKE_C_SIMULATE_ID STREQUAL MSVC)
-      set(CMAKE_C_COMPILER_ID
-        ${CLANG_LOCATION}/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
-      set(CMAKE_CXX_COMPILER_ID
-        ${CLANG_LOCATION}/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
-    else()
-      set(CMAKE_C_COMPILER_ID
-        ${CLANG_LOCATION}/clang${CMAKE_EXECUTABLE_SUFFIX})
-      set(CMAKE_CXX_COMPILER_ID
-        ${CLANG_LOCATION}/clang++${CMAKE_EXECUTABLE_SUFFIX})
-    endif()
-  else()
-    message(SEND_ERROR "SourceKit requires a clang based compiler")
-  endif()
-endif()
+include(SwiftWindowsSupport)
+swift_swap_compiler_if_needed("SourceKit")
 
 if (DARWIN_TOOLCHAIN_VERSION)
   set(SOURCEKIT_VERSION_STRING "${DARWIN_TOOLCHAIN_VERSION}")

@@ -607,10 +607,10 @@ struct S {
   }
 }
 
-// TODO: A conflict should also be detected here. However, the
-// typechecker does not allow it. Enable the following test if we ever
-// remove this case from the typechecker test:
-// diag_invalid_inout_captures.swift.
-// public func nestedConflict(x: inout Int) {
-//   doit(x: &x, x == 0 ? { x = 1 } : { x = 2})
-// }
+func doit(x: inout Int, _ fn: () -> ()) {}
+
+func nestedConflict(x: inout Int) {
+  doit(x: &x, x == 0 ? { x = 1 } : { x = 2})
+  // expected-error@-1 2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-note@-2 2{{conflicting access is here}}
+}

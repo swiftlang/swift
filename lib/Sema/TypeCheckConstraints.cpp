@@ -183,11 +183,8 @@ Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
   Expr *anchor = getLocatorParts(pathBuffer);
   ArrayRef<LocatorPathElt> path = pathBuffer;
 
-  Expr *targetAnchor;
-  SmallVector<LocatorPathElt, 4> targetPathBuffer;
   SourceRange range;
-
-  simplifyLocator(anchor, path, targetAnchor, targetPathBuffer, range);
+  simplifyLocator(anchor, path, range);
   return (path.empty() ? anchor : nullptr);
 }
 
@@ -3134,15 +3131,11 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
     return FVE;
   }
 
-  // Load lvalues.
-  if (exprTy->is<LValueType>())
-    return addImplicitLoadExpr(expr, getType, setType);
-
   // Walk into parenthesized expressions to update the subexpression.
   if (auto paren = dyn_cast<IdentityExpr>(expr)) {
     auto sub =  coerceToRValue(paren->getSubExpr(), getType, setType);
     paren->setSubExpr(sub);
-    setType(paren, getType(sub));
+    setType(paren, ParenType::get(Context, getType(sub)));
     return paren;
   }
 
@@ -3185,6 +3178,10 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
 
     return tuple;
   }
+
+  // Load lvalues.
+  if (exprTy->is<LValueType>())
+    return addImplicitLoadExpr(expr, getType, setType);
 
   // Nothing to do.
   return expr;
@@ -3311,6 +3308,7 @@ void Solution::dump(raw_ostream &out) const {
       break;
 
     case OverloadChoiceKind::DynamicMemberLookup:
+    case OverloadChoiceKind::KeyPathDynamicMemberLookup:
       out << "dynamic member lookup root "
           << choice.getBaseType()->getString()
           << " name='" << choice.getName() << "'\n";
@@ -3504,6 +3502,7 @@ void ConstraintSystem::print(raw_ostream &out) {
         break;
 
       case OverloadChoiceKind::DynamicMemberLookup:
+      case OverloadChoiceKind::KeyPathDynamicMemberLookup:
         out << "dynamic member lookup:"
             << choice.getBaseType()->getString() << "  name="
             << choice.getName() << "\n";
@@ -4039,6 +4038,33 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     // Cast to and from AnyObject always succeed.
     if (toType->isAnyObject() || fromType->isAnyObject())
       return CheckedCastKind::ValueCast;
+
+    // A cast from an existential type to a concrete type does not succeed. For
+    // example:
+    //
+    // struct S {}
+    // enum FooError: Error { case bar }
+    //
+    // func foo() {
+    //   do {
+    //     throw FooError.bar
+    //   } catch is X { /* Will always fail */
+    //     print("Caught bar error")
+    //   }
+    // }
+    if (fromExistential) {
+      if (auto NTD = toType->getAnyNominal()) {
+        if (!isa<ProtocolDecl>(NTD)) {
+          auto protocolDecl =
+              dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
+          if (protocolDecl &&
+              !conformsToProtocol(toType, protocolDecl, dc,
+                                  ConformanceCheckFlags::InExpression)) {
+            return failed();
+          }
+        }
+      }
+    }
 
     bool toRequiresClass;
     if (toType->isExistentialType())
