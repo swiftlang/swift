@@ -1020,8 +1020,8 @@ public:
 /// should be abstracted from callers, given a set of generic constraints that
 /// the concrete return type satisfies:
 ///
-/// func foo() -> opaque Collection { return [1,2,3] }
-/// var bar: opaque SignedInteger = 1
+/// func foo() -> some Collection { return [1,2,3] }
+/// var bar: some SignedInteger = 1
 ///
 /// It is currently illegal for this to appear in any other position.
 class OpaqueReturnTypeRepr : public TypeRepr {
