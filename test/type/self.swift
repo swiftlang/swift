@@ -46,6 +46,8 @@ final class FinalMario : Mario {
 // These references to Self are now possible (SE-0068)
 
 class A<T> {
+  typealias _Self = Self
+  // expected-error@-1 {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'A'?}}
   let b: Int
   required init(a: Int) {
     print("\(Self.self).\(#function)")
@@ -78,6 +80,13 @@ class A<T> {
   var copied: Self { // expected-error {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'A'?}}
     let copy = Self.init(a: 11)
     return copy
+  }
+  subscript (i: Int) -> Self { // expected-error {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'A'?}}
+    get {
+      return Self.init(a: i)
+    }
+    set(newValue) {
+    }
   }
 }
 
@@ -163,6 +172,13 @@ extension S2 {
     Self.x()
     return Self.init() as? Self
     // expected-warning@-1 {{conditional cast from 'S2' to 'S2' always succeeds}}
+  }
+  subscript (i: Int) -> Self {
+    get {
+      return Self.init()
+    }
+    set(newValue) {
+    }
   }
 }
 

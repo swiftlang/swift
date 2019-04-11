@@ -1033,6 +1033,44 @@ static std::string getDeclNameFromContext(DeclContext *dc,
   }
 }
 
+//
+// SE-0068 is "Expanding Swift Self to class members and value types"
+// https://github.com/apple/swift-evolution/blob/master/proposals/0068-universal-self.md
+//
+static Type SelfAllowedBySE0068(TypeResolution resolution,
+                                TypeResolutionOptions options) {
+  auto dc = resolution.getDeclContext();
+  ASTContext &ctx = dc->getASTContext();
+  DeclContext *nominalDC = nullptr;
+  NominalTypeDecl *nominal = nullptr;
+  if ((nominalDC = dc->getInnermostTypeContext()) &&
+      (nominal = nominalDC->getSelfNominalTypeDecl())) {
+    assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
+
+    bool insideClass = nominalDC->getSelfClassDecl() != nullptr;
+    AbstractFunctionDecl *methodDecl = dc->getInnermostMethodContext();
+    bool declaringMethod = methodDecl &&
+      methodDecl->getDeclContext() == dc->getParentForLookup();
+    bool isMutablePropertyOrSubscriptOfClass = insideClass &&
+      (options.is(TypeResolverContext::PatternBindingDecl) ||
+       options.is(TypeResolverContext::FunctionResult));
+    bool isTypeAliasInClass = insideClass &&
+      options.is(TypeResolverContext::TypeAliasDecl);
+
+    if (((!insideClass || !declaringMethod) &&
+         !isMutablePropertyOrSubscriptOfClass && !isTypeAliasInClass &&
+         !options.is(TypeResolverContext::GenericRequirement)) ||
+        options.is(TypeResolverContext::ExplicitCastExpr)) {
+      Type SelfType = nominal->getSelfInterfaceType();
+      if (insideClass)
+        SelfType = DynamicSelfType::get(SelfType, ctx);
+      return resolution.mapTypeIntoContext(SelfType);
+    }
+  }
+
+  return Type();
+}
+
 /// Diagnose a reference to an unknown type.
 ///
 /// This routine diagnoses a reference to an unknown type, and
@@ -1058,25 +1096,10 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       NominalTypeDecl *nominal = nullptr;
       if ((nominalDC = dc->getInnermostTypeContext()) &&
           (nominal = nominalDC->getSelfNominalTypeDecl())) {
+        // Attempt to refer to 'Self' within a non-protocol nominal
+        // type. Fix this by replacing 'Self' with the nominal type name.
         assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
 
-        bool insideClass = nominalDC->getSelfClassDecl() != nullptr;
-        AbstractFunctionDecl *methodDecl = dc->getInnermostMethodContext();
-        bool declaringMethod = methodDecl &&
-          methodDecl->getDeclContext() == dc->getParentForLookup();
-        bool isPropertyOfClass = insideClass &&
-          options.is(TypeResolverContext::PatternBindingDecl);
-
-        if (((!insideClass || !declaringMethod) && !isPropertyOfClass &&
-             !options.is(TypeResolverContext::GenericRequirement)) ||
-            options.is(TypeResolverContext::ExplicitCastExpr)) {
-          Type SelfType = nominal->getSelfInterfaceType();
-          if (insideClass)
-            SelfType = DynamicSelfType::get(SelfType, ctx);
-          return resolution.mapTypeIntoContext(SelfType);
-        }
-
-        // Attempt to refer to 'Self' within a non-protocol nominal type.
         // Produce a Fix-It replacing 'Self' with the nominal type name.
         auto name = getDeclNameFromContext(dc, nominal);
         diags.diagnose(comp->getIdLoc(), diag::self_in_nominal, name)
@@ -1340,6 +1363,10 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
     // source, bail out.
     if (options.contains(TypeResolutionFlags::SilenceErrors))
       return ErrorType::get(ctx);
+
+    if (id == ctx.Id_Self)
+      if (auto SelfType = SelfAllowedBySE0068(resolution, options))
+        return SelfType;
 
     return diagnoseUnknownType(resolution, nullptr, SourceRange(), comp,
                                options, lookupOptions);
