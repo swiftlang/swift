@@ -3136,8 +3136,23 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       if (!recordFix(fix))
         return SolutionKind::Solved;
     }
+
+    // If this is an implicit Hashable conformance check generated for each
+    // index argument of the keypath subscript component, we could just treat
+    // it as though it conforms.
+    auto *loc = getConstraintLocator(locator);
+    if (loc->isResultOfKeyPathDynamicMemberLookup() ||
+        loc->isKeyPathSubscriptComponent()) {
+      if (protocol ==
+          getASTContext().getProtocol(KnownProtocolKind::Hashable)) {
+        auto *fix =
+            TreatKeyPathSubscriptIndexAsHashable::create(*this, type, loc);
+        if (!recordFix(fix))
+          return SolutionKind::Solved;
+      }
+    }
   }
-  
+
   // There's nothing more we can do; fail.
   return SolutionKind::Error;
 }
@@ -6272,6 +6287,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowClosureParameterDestructuring:
   case FixKind::MoveOutOfOrderArgument:
   case FixKind::AllowInaccessibleMember:
+  case FixKind::TreatKeyPathSubscriptIndexAsHashable:
     llvm_unreachable("handled elsewhere");
   }
 
