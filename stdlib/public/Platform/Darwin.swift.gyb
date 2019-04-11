@@ -15,23 +15,23 @@
 public let MAP_FAILED: UnsafeMutableRawPointer! = UnsafeMutableRawPointer(bitPattern: -1)
 
 //  Constants defined by <math.h>
-@available(swift, deprecated: 3.0, message: "Please use 'Double.pi' or '.pi' to get the value of correct type and avoid casting.")
+@available(swift, deprecated: 3.0, obsoleted: 5.1, message: "Use 'Double.pi' or '.pi' to get the value of correct type and avoid casting.")
 public let M_PI = Double.pi
 
-@available(swift, deprecated: 3.0, message: "Please use 'Double.pi / 2' or '.pi / 2' to get the value of correct type and avoid casting.")
+@available(swift, deprecated: 3.0, obsoleted: 5.1, message: "Use 'Double.pi / 2' or '.pi / 2' to get the value of correct type and avoid casting.")
 public let M_PI_2 = Double.pi / 2
 
-@available(swift, deprecated: 3.0, message: "Please use 'Double.pi / 4' or '.pi / 4' to get the value of correct type and avoid casting.")
+@available(swift, deprecated: 3.0, obsoleted: 5.1, message: "Use 'Double.pi / 4' or '.pi / 4' to get the value of correct type and avoid casting.")
 public let M_PI_4 = Double.pi / 4
 
-@available(swift, deprecated: 3.0, message: "Please use '2.squareRoot()'.")
-public let M_SQRT2 = 2.squareRoot()
+@available(swift, deprecated: 3.0, obsoleted: 5.1, message: "Use 'sqrt(2)'.")
+public let M_SQRT2 = sqrt(2)
 
-@available(swift, deprecated: 3.0, message: "Please use '0.5.squareRoot()'.")
-public let M_SQRT1_2 = 0.5.squareRoot()
+@available(swift, deprecated: 3.0, obsoleted: 5.1, message: "Use 'sqrt(0.5)'.")
+public let M_SQRT1_2 = sqrt(0.5)
 
 //  Constants defined by <float.h>
-@available(swift, deprecated: 3.0, message: "Please use 'T.radix' to get the radix of a FloatingPoint type 'T'.")
+@available(swift, deprecated: 3.0, obsoleted: 5.1, message: "Use 'T.radix' to get the radix of a FloatingPoint type 'T'.")
 public let FLT_RADIX = Double.radix
 
 %for type, prefix in [('Float', 'FLT'), ('Double', 'DBL'), ('Float80', 'LDBL')]:
@@ -40,29 +40,29 @@ public let FLT_RADIX = Double.radix
 % end
 //  Where does the 1 come from? C counts the usually-implicit leading
 //  significand bit, but Swift does not. Neither is really right or wrong.
-@available(swift, deprecated: 3.0, message: "Please use '${type}.significandBitCount + 1'.")
+@available(swift, deprecated: 3.0, obsoleted: 5.1, message: "Use '${type}.significandBitCount + 1'.")
 public let ${prefix}_MANT_DIG = ${type}.significandBitCount + 1
 
 //  Where does the 1 come from? C models floating-point numbers as having a
 //  significand in [0.5, 1), but Swift (following IEEE 754) considers the
 //  significand to be in [1, 2). This rationale applies to ${prefix}_MIN_EXP
 //  as well.
-@available(swift, deprecated: 3.0, message: "Please use '${type}.greatestFiniteMagnitude.exponent + 1'.")
+@available(swift, deprecated: 3.0, obsoleted: 5.1, message: "Use '${type}.greatestFiniteMagnitude.exponent + 1'.")
 public let ${prefix}_MAX_EXP = ${type}.greatestFiniteMagnitude.exponent + 1
 
-@available(swift, deprecated: 3.0, message: "Please use '${type}.leastNormalMagnitude.exponent + 1'.")
+@available(swift, deprecated: 3.0, obsoleted: 5.1, message: "Use '${type}.leastNormalMagnitude.exponent + 1'.")
 public let ${prefix}_MIN_EXP = ${type}.leastNormalMagnitude.exponent + 1
 
-@available(swift, deprecated: 3.0, message: "Please use '${type}.greatestFiniteMagnitude' or '.greatestFiniteMagnitude'.")
+@available(swift, deprecated: 3.0, obsoleted: 5.1, message: "Use '${type}.greatestFiniteMagnitude' or '.greatestFiniteMagnitude'.")
 public let ${prefix}_MAX = ${type}.greatestFiniteMagnitude
 
-@available(swift, deprecated: 3.0, message: "Please use '${type}.ulpOfOne' or '.ulpOfOne'.")
+@available(swift, deprecated: 3.0, obsoleted: 5.1, message: "Use '${type}.ulpOfOne' or '.ulpOfOne'.")
 public let ${prefix}_EPSILON = ${type}.ulpOfOne
 
-@available(swift, deprecated: 3.0, message: "Please use '${type}.leastNormalMagnitude' or '.leastNormalMagnitude'.")
+@available(swift, deprecated: 3.0, obsoleted: 5.1, message: "Use '${type}.leastNormalMagnitude' or '.leastNormalMagnitude'.")
 public let ${prefix}_MIN = ${type}.leastNormalMagnitude
 
-@available(swift, deprecated: 3.0, message: "Please use '${type}.leastNonzeroMagnitude' or '.leastNonzeroMagnitude'.")
+@available(swift, deprecated: 3.0, obsoleted: 5.1, message: "Use '${type}.leastNonzeroMagnitude' or '.leastNonzeroMagnitude'.")
 public let ${prefix}_TRUE_MIN = ${type}.leastNonzeroMagnitude
 
 % if type == "Float80":
@@ -79,3 +79,7 @@ extension extern_proc {
         set { self.p_un.__p_starttime = newValue }
     }
 }
+
+// Hide Darwin.abs to avoid conflicts with Swift.abs
+@available(*, unavailable, message: "Use 'Swift.abs( )'.")
+public func abs(_ x: Int32) -> Int32 { fatalError() }
