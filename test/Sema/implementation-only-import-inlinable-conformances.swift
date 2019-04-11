@@ -158,3 +158,13 @@ extension NormalProtoAssocHolder {
 @inlinable public func signatureOfInlinable(_: NormalProtoAssocHolder<NormalStruct>) {} // expected-error{{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
 
 public func testDefaultArgument(_: Int = NormalProtoAssoc<NormalStruct>()) {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+
+
+public class SubclassOfNormalClass: NormalClass {}
+
+@inlinable public func testInheritedConformance() {
+  _ = NormalProtoAssocHolder<SubclassOfNormalClass>.self // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+}
+@inlinable public func testSpecializedConformance() {
+  _ = NormalProtoAssocHolder<GenericStruct<Int>>.self // expected-error {{cannot use conformance of 'GenericStruct<T>' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+}
