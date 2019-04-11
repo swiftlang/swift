@@ -16,7 +16,7 @@ public func foo(_: Int) -> some Foo {
   return 679
 }
 
-// CHECK-LABEL: public func foo<T>(_ x: T) -> some Foo where T : Foo
+// CHECK-LABEL: public func foo<T>(_ x: T) -> some Foo where T : OpaqueResultTypes.Foo
 public func foo<T: Foo>(_ x: T) -> some Foo {
   return x
 }
@@ -39,7 +39,7 @@ public struct Bar<T>: AssocTypeInference {
     return 219
   }
 
-  // CHECK-LABEL: public func foo<U>(_ x: U) -> some Foo where U : Foo
+  // CHECK-LABEL: public func foo<U>(_ x: U) -> some Foo where U : OpaqueResultTypes.Foo
   public func foo<U: Foo>(_ x: U) -> some Foo {
     return x
   }
@@ -56,7 +56,7 @@ public struct Bar<T>: AssocTypeInference {
       return 219
     }
 
-    // CHECK-LABEL: public func foo<U>(_ x: U) -> some Foo where U : Foo
+    // CHECK-LABEL: public func foo<U>(_ x: U) -> some Foo where U : OpaqueResultTypes.Foo
     public func foo<U: Foo>(_ x: U) -> some Foo {
       return x
     }
@@ -81,7 +81,7 @@ public struct Bar<T>: AssocTypeInference {
       return x
     }
 
-    // CHECK-LABEL: public func foo<V>(_ x: V) -> some Foo where V : Foo
+    // CHECK-LABEL: public func foo<V>(_ x: V) -> some Foo where V : OpaqueResultTypes.Foo
     public func foo<V: Foo>(_ x: V) -> some Foo {
       return x
     }
@@ -103,7 +103,7 @@ public struct Zim: AssocTypeInference {
     return 219
   }
 
-  // CHECK-LABEL: public func foo<U>(_ x: U) -> some Foo where U : Foo
+  // CHECK-LABEL: public func foo<U>(_ x: U) -> some Foo where U : OpaqueResultTypes.Foo
   public func foo<U: Foo>(_ x: U) -> some Foo {
     return x
   }
@@ -119,7 +119,7 @@ public struct Zim: AssocTypeInference {
       return 219
     }
 
-    // CHECK-LABEL: public func foo<U>(_ x: U) -> some Foo where U : Foo
+    // CHECK-LABEL: public func foo<U>(_ x: U) -> some Foo where U : OpaqueResultTypes.Foo
     public func foo<U: Foo>(_ x: U) -> some Foo {
       return x
     }
@@ -141,7 +141,7 @@ public struct Zim: AssocTypeInference {
       return x
     }
 
-    // CHECK-LABEL: public func foo<V>(_ x: V) -> some Foo where V : Foo
+    // CHECK-LABEL: public func foo<V>(_ x: V) -> some Foo where V : OpaqueResultTypes.Foo
     public func foo<V: Foo>(_ x: V) -> some Foo {
       return x
     }

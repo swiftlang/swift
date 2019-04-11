@@ -3074,6 +3074,8 @@ public:
                    MF.getDeclContext(contextID),
                    MF.getGenericSignature(interfaceSigID),
                    MF.getType(interfaceTypeID)->castTo<GenericTypeParamType>());
+    declOrOffset = opaqueDecl;
+
     auto genericEnv = MF.getGenericEnvironment(genericEnvID);
     opaqueDecl->setGenericEnvironment(genericEnv);
     if (underlyingTypeID)
@@ -3086,7 +3088,6 @@ public:
     auto opaqueTy = OpaqueTypeArchetypeType::get(opaqueDecl, subs);
     auto metatype = MetatypeType::get(opaqueTy);
     opaqueDecl->setInterfaceType(metatype);
-    
     return opaqueDecl;
   }
 
