@@ -346,10 +346,6 @@ class LinkEntity {
     /// The pointer is a canonical TypeBase*.
     TypeMetadataLazyCacheVariable,
 
-    /// A foreign type metadata candidate.
-    /// The pointer is a canonical TypeBase*.
-    ForeignTypeMetadataCandidate,
-
     /// A reflection metadata descriptor for a builtin or imported type.
     ReflectionBuiltinDescriptor,
 
@@ -685,12 +681,6 @@ public:
   static LinkEntity forTypeMetadataLazyCacheVariable(CanType type) {
     LinkEntity entity;
     entity.setForType(Kind::TypeMetadataLazyCacheVariable, type);
-    return entity;
-  }
-
-  static LinkEntity forForeignTypeMetadataCandidate(CanType type) {
-    LinkEntity entity;
-    entity.setForType(Kind::ForeignTypeMetadataCandidate, type);
     return entity;
   }
 
@@ -1047,14 +1037,14 @@ public:
            getKind() == Kind::ObjCResilientClassStub);
     return (TypeMetadataAddress)LINKENTITY_GET_FIELD(Data, MetadataAddress);
   }
-  bool isForeignTypeMetadataCandidate() const {
-    return getKind() == Kind::ForeignTypeMetadataCandidate;
-  }
   bool isObjCClassRef() const {
     return getKind() == Kind::ObjCClassRef;
   }
   bool isSILFunction() const {
     return getKind() == Kind::SILFunction;
+  }
+  bool isNominalTypeDescriptor() const {
+    return getKind() == Kind::NominalTypeDescriptor;
   }
 
   /// Determine whether this entity will be weak-imported.

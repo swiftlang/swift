@@ -998,9 +998,6 @@ void IRGenModule::emitBuiltinReflectionMetadata() {
     BuiltinTypes.insert(anyMetatype);
   }
 
-  for (auto SD : ImportedStructs)
-    emitFieldMetadataRecord(SD);
-
   for (auto builtinType : BuiltinTypes)
     emitBuiltinTypeMetadataRecord(builtinType);
 
