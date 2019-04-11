@@ -19,7 +19,7 @@ from .. import targets
 
 
 # Build against the current installed toolchain.
-class ToolchainBenchmarks(product.Product):
+class Benchmarks(product.Product):
     @classmethod
     def product_source_name(cls):
         return "benchmarks"
