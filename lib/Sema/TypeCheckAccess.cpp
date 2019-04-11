@@ -16,7 +16,7 @@
 
 #include "TypeChecker.h"
 #include "TypeCheckAccess.h"
-#include "swift/AST/AccessScopeChecker.h"
+#include "TypeAccessScopeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -24,6 +24,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeDeclFinder.h"
 
 using namespace swift;
 
@@ -204,7 +205,8 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
   AccessScope problematicAccessScope = AccessScope::getPublic();
   if (type) {
     Optional<AccessScope> typeAccessScope =
-      AccessScopeChecker::getAccessScope(type, useDC, checkUsableFromInline);
+        TypeAccessScopeChecker::getAccessScope(type, useDC,
+                                               checkUsableFromInline);
 
     // Note: This means that the type itself is invalid for this particular
     // context, because it references declarations from two incompatible scopes.
@@ -225,8 +227,8 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
       return;
 
     Optional<AccessScope> typeReprAccessScope =
-        AccessScopeChecker::getAccessScope(typeRepr, useDC,
-                                           checkUsableFromInline);
+        TypeAccessScopeChecker::getAccessScope(typeRepr, useDC,
+                                               checkUsableFromInline);
     if (!typeReprAccessScope.hasValue())
       return;
 
@@ -253,8 +255,8 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
       //
       // Downgrade the error to a warning in this case for source compatibility.
       Optional<AccessScope> typeReprAccessScope =
-          AccessScopeChecker::getAccessScope(typeRepr, useDC,
-                                             checkUsableFromInline);
+          TypeAccessScopeChecker::getAccessScope(typeRepr, useDC,
+                                                 checkUsableFromInline);
       assert(typeReprAccessScope && "valid Type but not valid TypeRepr?");
       if (contextAccessScope.hasEqualDeclContextWith(*typeReprAccessScope) ||
           contextAccessScope.isChildOf(*typeReprAccessScope)) {
