@@ -1001,8 +1001,8 @@ public:
       : FailureDiagnostic(root, cs, locator) {}
   
   bool diagnoseAsError() override;
-}
-  
+};
+
 /// Diagnose an attempt to reference subscript as a keypath component
 /// where at least one of the index arguments doesn't conform to Hashable e.g.
 ///

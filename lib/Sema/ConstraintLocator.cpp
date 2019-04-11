@@ -145,7 +145,6 @@ bool ConstraintLocator::isKeyPathSubscriptComponent() const {
     return component.getKind() == ComponentKind::Subscript ||
            component.getKind() == ComponentKind::UnresolvedSubscript;
   });
->>>>>>> master
 }
 
 void ConstraintLocator::dump(SourceManager *sm) {

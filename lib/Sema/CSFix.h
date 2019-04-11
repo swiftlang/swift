@@ -744,7 +744,6 @@ public:
                                          ConstraintLocator *locator);
 };
 
-<<<<<<< HEAD
 class AllowAnyObjectKeyPathRoot final : public ConstraintFix {
 
   AllowAnyObjectKeyPathRoot(ConstraintSystem &cs, ConstraintLocator *locator)
@@ -753,7 +752,14 @@ class AllowAnyObjectKeyPathRoot final : public ConstraintFix {
 public:
   std::string getName() const override {
     return "allow anyobject as root type for a keypath";
-=======
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowAnyObjectKeyPathRoot *create(ConstraintSystem &cs,
+                                           ConstraintLocator *locator);
+};
+
 class TreatKeyPathSubscriptIndexAsHashable final : public ConstraintFix {
   Type NonConformingType;
 
@@ -766,18 +772,12 @@ class TreatKeyPathSubscriptIndexAsHashable final : public ConstraintFix {
 public:
   std::string getName() const override {
     return "treat keypath subscript index as conforming to Hashable";
->>>>>>> master
   }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-<<<<<<< HEAD
-  static AllowAnyObjectKeyPathRoot *create(ConstraintSystem &cs,
-                                           ConstraintLocator *locator);
-=======
   static TreatKeyPathSubscriptIndexAsHashable *
   create(ConstraintSystem &cs, Type type, ConstraintLocator *locator);
->>>>>>> master
 };
 
 } // end namespace constraints

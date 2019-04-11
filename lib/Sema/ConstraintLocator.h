@@ -131,7 +131,7 @@ public:
     KeyPathDynamicMember,
     /// The root of a keypath
     KeyPathRoot,
-    /// The valye of a keypath
+    /// The value of a keypath
     KeyPathValue,
   };
 
