@@ -4073,7 +4073,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // Member subscripts need some special validation logic.
     if (SD->getDeclContext()->isTypeContext()) {
       // If this is a class member, mark it final if the class is final.
-      inferFinalAndDiagnoseIfNeeded(*this, SD, StaticSpellingKind::None);
+      inferFinalAndDiagnoseIfNeeded(*this, SD, SD->getStaticSpelling());
     }
 
     // Perform accessor-related validation.
