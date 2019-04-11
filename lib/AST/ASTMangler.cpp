@@ -629,6 +629,9 @@ static Optional<std::string> getOverriddenSwiftProtocolObjCName(
 }
 
 void ASTMangler::appendDeclName(const ValueDecl *decl) {
+#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  return; // not needed for the parser library.
+#endif
   DeclBaseName name = decl->getBaseName();
   assert(!name.isSpecial() && "Cannot print special names");
 
@@ -2281,6 +2284,9 @@ void ASTMangler::appendDeclType(const ValueDecl *decl, bool isFunctionMangling) 
 }
 
 bool ASTMangler::tryAppendStandardSubstitution(const GenericTypeDecl *decl) {
+#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  return false; // not needed for the parser library.
+#endif
   // Bail out if our parent isn't the swift standard library.
   if (!isStdlibType(decl))
     return false;

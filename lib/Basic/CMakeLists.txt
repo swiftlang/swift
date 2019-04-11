@@ -113,6 +113,9 @@ if(NOT SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
   target_link_libraries(swiftBasic PRIVATE
     swiftDemangling
     ${UUID_LIBRARIES})
+else()
+  target_compile_definitions(swiftBasic PRIVATE
+    SWIFT_BUILD_ONLY_SYNTAXPARSERLIB=1)
 endif()
 
 message(STATUS "Swift version: ${SWIFT_VERSION}")

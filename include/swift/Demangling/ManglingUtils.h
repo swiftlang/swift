@@ -111,7 +111,9 @@ char getStandardTypeSubst(StringRef TypeName);
 /// *) UsePunycode: A flag indicating if punycode encoding should be done.
 template <typename Mangler>
 void mangleIdentifier(Mangler &M, StringRef ident) {
-
+#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  return; // not needed for the parser library.
+#endif
   size_t WordsInBuffer = M.Words.size();
   assert(M.SubstWordsInIdent.empty());
   if (M.UsePunycode && needsPunycodeEncoding(ident)) {
