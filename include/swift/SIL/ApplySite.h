@@ -384,7 +384,7 @@ public:
     return bool(ApplySiteKind::fromNodeKind(inst->getKind()));
   }
 
-  void dump() const { getInstruction()->dump(); }
+  void dump() const LLVM_ATTRIBUTE_USED { getInstruction()->dump(); }
 };
 
 //===----------------------------------------------------------------------===//
