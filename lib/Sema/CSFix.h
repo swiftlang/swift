@@ -136,6 +136,7 @@ enum class FixKind : uint8_t {
   /// If there is a matching inaccessible member - allow it as if there
   /// no access control.
   AllowInaccessibleMember,
+
   /// Allow KeyPaths to use AnyObject as root type
   AllowAnyObjectKeyPathRoot,
 };

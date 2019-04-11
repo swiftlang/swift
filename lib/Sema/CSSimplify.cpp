@@ -1851,6 +1851,16 @@ ConstraintSystem::matchTypesBindTypeVar(
     }
   }
 
+  // We do not allow keypaths to go through AnyObject. Let's create a fix
+  // so this can be diagnosed later.
+  auto loc = getConstraintLocator(locator);
+  if (loc->isKeyPathRoot() && type->isAnyObject()) {
+    auto *fix = AllowAnyObjectKeyPathRoot::create(*this, loc);
+
+    if (recordFix(fix))
+      return getTypeMatchFailure(locator);
+  }
+
   // Okay. Bind below.
 
   // A constraint that binds any pointer to a void pointer is
@@ -4935,30 +4945,6 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
     }
   }
 
-  // We do not allow KeyPaths to go through AnyObject, so let's create a fix
-  // and allow that. This will get diagnosed later.
-  if (auto fixedRootTy =
-          getFixedTypeRecursive(rootTy, subflags, /*wantRValue=*/true)) {
-    if (fixedRootTy->isTypeVariableOrMember()) {
-      if (flags.contains(TMF_GenerateConstraints)) {
-        addUnsolvedConstraint(
-            Constraint::create(*this, ConstraintKind::KeyPath, keyPathTy,
-                               rootTy, valueTy, getConstraintLocator(locator)));
-        return SolutionKind::Solved;
-      }
-
-      return SolutionKind::Unsolved;
-    }
-
-    if (fixedRootTy->isAnyObject()) {
-      auto fix = AllowAnyObjectKeyPathRoot::create(
-          *this, getConstraintLocator(locator));
-
-      if (recordFix(fix))
-        return SolutionKind::Error;
-    }
-  }
-
   // See if we resolved overloads for all the components involved.
   enum {
     ReadOnly,
@@ -5112,19 +5098,6 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     
     // Try to match the root type.
     rootTy = getFixedTypeRecursive(rootTy, flags, /*wantRValue=*/false);
-
-    // We do not allow KeyPaths to go through AnyObject, so let's create a fix
-    // and allow that. This will get diagnosed later.
-    if (rootTy->isTypeVariableOrMember() &&
-        kpRootTy->isTypeVariableOrMember()) {
-      return unsolved();
-    } else if (rootTy->isAnyObject()) {
-      auto fix = AllowAnyObjectKeyPathRoot::create(
-          *this, getConstraintLocator(locator));
-
-      if (recordFix(fix))
-        return SolutionKind::Error;
-    }
 
     auto matchRoot = [&](ConstraintKind kind) -> bool {
       auto rootMatches = matchTypes(rootTy, kpRootTy, kind,
