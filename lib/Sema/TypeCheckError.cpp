@@ -993,6 +993,10 @@ public:
     return Context(Kind::CatchGuard);
   }
 
+  static Context forPatternBinding(PatternBindingDecl *binding) {
+    return getContextForPatternBinding(binding);
+  }
+
   Context withInterpolatedString(InterpolatedStringLiteralExpr *E) const {
     Context copy = *this;
     copy.InterpolatedString = E;
@@ -1703,4 +1707,10 @@ void TypeChecker::checkEnumElementErrorHandling(EnumElementDecl *elt) {
     CheckErrorCoverage checker(*this, Context::forEnumElementInitializer(elt));
     init->walk(checker);
   }
+}
+
+void TypeChecker::checkPropertyDelegateErrorHandling(
+    PatternBindingDecl *binding, Expr *expr) {
+  CheckErrorCoverage checker(*this, Context::forPatternBinding(binding));
+  expr->walk(checker);
 }

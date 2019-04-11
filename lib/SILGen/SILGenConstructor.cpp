@@ -20,6 +20,8 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
@@ -97,6 +99,40 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
   return RValue(SGF, loc, type, mvArg);
 }
 
+/// If the field has a property delegate for which we will need to call the
+/// delegate type's init(initialValue:), set up that evaluation and call the
+/// \c body with the expression to form the property delegate instance from
+/// the initial value type.
+///
+/// \returns true if this was such a delegate, \c false otherwise.
+static bool maybeEmitPropertyDelegateInitFromValue(
+    SILGenFunction &SGF,
+    SILLocation loc,
+    VarDecl *field,
+    RValue &&arg,
+    llvm::function_ref<void(Expr *)> body) {
+  auto originalProperty = field->getOriginalDelegatedProperty();
+  if (!originalProperty ||
+      !originalProperty->isPropertyDelegateInitializedWithInitialValue())
+    return false;
+
+  ASTContext &ctx = field->getASTContext();
+  auto delegateInfo = evaluateOrDefault(
+      ctx.evaluator,
+      PropertyDelegateBackingPropertyInfoRequest{originalProperty},
+      PropertyDelegateBackingPropertyInfo());
+  if (!delegateInfo || !delegateInfo.initializeFromOriginal)
+    return false;
+
+  SILGenFunction::OpaqueValueRAII opaqueValue(
+      SGF,
+      delegateInfo.underlyingValue,
+      std::move(arg).getAsSingleValue(SGF, loc));
+
+  body(delegateInfo.initializeFromOriginal);
+  return true;
+}
+
 static void emitImplicitValueConstructor(SILGenFunction &SGF,
                                          ConstructorDecl *ctor) {
   RegularLocation Loc(ctor);
@@ -138,7 +174,6 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
 
   // If we have an indirect return slot, initialize it in-place.
   if (resultSlot) {
-
     auto elti = elements.begin(), eltEnd = elements.end();
     for (VarDecl *field : decl->getStoredProperties()) {
       auto fieldTy = selfTy.getFieldType(field, SGF.SGM.M);
@@ -164,7 +199,14 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
 
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
-      std::move(*elti).forwardInto(SGF, Loc, init.get());
+      FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
+      if (!maybeEmitPropertyDelegateInitFromValue(
+            SGF, Loc, field, std::move(*elti),
+            [&](Expr *expr) {
+              SGF.emitExprInto(expr, init.get());
+            })) {
+        std::move(*elti).forwardInto(SGF, Loc, init.get());
+      }
       ++elti;
     }
     SGF.B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(Loc),
@@ -188,9 +230,17 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       v = SGF.emitRValue(field->getParentInitializer())
              .forwardAsSingleStorageValue(SGF, fieldTy, Loc);
     } else {
+      FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
-      v = std::move(*elti).forwardAsSingleStorageValue(SGF, fieldTy, Loc);
+      if (!maybeEmitPropertyDelegateInitFromValue(
+            SGF, Loc, field, std::move(*elti),
+            [&](Expr *expr) {
+              v = SGF.emitRValue(expr)
+                .forwardAsSingleStorageValue(SGF, fieldTy, Loc);
+            })) {
+        v = std::move(*elti).forwardAsSingleStorageValue(SGF, fieldTy, Loc);
+      }
       ++elti;
     }
 
@@ -873,6 +923,17 @@ static Type getInitializationTypeInContext(
     DeclContext *fromDC, DeclContext *toDC,
     Pattern *pattern) {
   auto interfaceType = pattern->getType()->mapTypeOutOfContext();
+
+  // If this pattern is initializing the backing storage for a property
+  // with an attached delegate that is initialized with `=`, the
+  // initialization type is the original property type.
+  if (auto singleVar = pattern->getSingleVar()) {
+    if (auto originalProperty = singleVar->getOriginalDelegatedProperty()) {
+      if (originalProperty->isPropertyDelegateInitializedWithInitialValue())
+        interfaceType = originalProperty->getValueInterfaceType();
+    }
+  }
+
   auto resultType = toDC->mapTypeIntoContext(interfaceType);
 
   return resultType;
@@ -929,6 +990,17 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
                                   init, entry, subs,
                                   resultType, origResultType,
                                   SGFContext());
+
+        // If we have the backing storage for a property with an attached
+        // property delegate initialized with `=`, inject the value into an
+        // instance of the delegate.
+        if (auto singleVar = pbd->getSingleVar()) {
+          (void)maybeEmitPropertyDelegateInitFromValue(
+              *this, init, singleVar, std::move(result),
+              [&](Expr *expr) {
+                result = emitRValue(expr);
+              });
+        }
 
         emitMemberInit(*this, selfDecl, entry.getPattern(), std::move(result));
       }

@@ -554,14 +554,21 @@ struct DefaultedMemberwiseInits {
 
   @WrapperWithInitialValue
   var y: Int = 17
+
+  @WrapperWithInitialValue(initialValue: 17)
+  var z: Int
 }
 
 func testDefaultedMemberwiseInits() {
   _ = DefaultedMemberwiseInits()
-  _ = DefaultedMemberwiseInits(x: Wrapper(value: false), y: 42)
+  _ = DefaultedMemberwiseInits(
+    x: Wrapper(value: false),
+    y: 42,
+    z: WrapperWithInitialValue(initialValue: 42))
 
   _ = DefaultedMemberwiseInits(y: 42)
   _ = DefaultedMemberwiseInits(x: Wrapper(value: false))
+  _ = DefaultedMemberwiseInits(z: WrapperWithInitialValue(initialValue: 42))
 }
 
 // ---------------------------------------------------------------------------

@@ -2049,6 +2049,8 @@ public:
   void checkFunctionErrorHandling(AbstractFunctionDecl *D);
   void checkInitializerErrorHandling(Initializer *I, Expr *E);
   void checkEnumElementErrorHandling(EnumElementDecl *D);
+  void checkPropertyDelegateErrorHandling(PatternBindingDecl *binding,
+                                          Expr *expr);
 
   void addExprForDiagnosis(Expr *E1, Expr *Result) {
     DiagnosedExprs[E1] = Result;

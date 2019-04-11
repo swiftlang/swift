@@ -30,6 +30,7 @@
 namespace swift {
 
 class GenericParamList;
+struct PropertyDelegateBackingPropertyInfo;
 class RequirementRepr;
 class SpecializeAttr;
 struct TypeLoc;
@@ -494,12 +495,12 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
-/// Request the nominal type declaration to which the given custom attribute
-/// refers.
-class PropertyDelegateBackingPropertyRequest :
-    public SimpleRequest<PropertyDelegateBackingPropertyRequest,
+/// Request information about the backing property for properties that have
+/// attached property delegates.
+class PropertyDelegateBackingPropertyInfoRequest :
+    public SimpleRequest<PropertyDelegateBackingPropertyInfoRequest,
                          CacheKind::Cached,
-                         VarDecl *,
+                         PropertyDelegateBackingPropertyInfo,
                          VarDecl *> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -508,7 +509,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<VarDecl *>
+  llvm::Expected<PropertyDelegateBackingPropertyInfo>
   evaluate(Evaluator &evaluator, VarDecl *var) const;
 
 public:

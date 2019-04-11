@@ -573,17 +573,17 @@ void PropertyDelegateBackingPropertyTypeRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
 }
-bool PropertyDelegateBackingPropertyRequest::isCached() const {
+bool PropertyDelegateBackingPropertyInfoRequest::isCached() const {
   auto var = std::get<0>(getStorage());
   return !var->getAttrs().isEmpty();
 }
 
-void PropertyDelegateBackingPropertyRequest::diagnoseCycle(
+void PropertyDelegateBackingPropertyInfoRequest::diagnoseCycle(
     DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference);
 }
 
-void PropertyDelegateBackingPropertyRequest::noteCycleStep(
+void PropertyDelegateBackingPropertyInfoRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
 }
@@ -602,6 +602,16 @@ void swift::simple_display(
     out << "null";
   out << " }";
 }
+
+void swift::simple_display(
+    llvm::raw_ostream &out,
+    const PropertyDelegateBackingPropertyInfo &backingInfo) {
+  out << "{ ";
+  if (backingInfo.backingVar)
+    backingInfo.backingVar->dumpRef(out);
+  out << " }";
+}
+
 
 template<>
 bool swift::AnyValue::Holder<Type>::equals(const HolderBase &other) const {
