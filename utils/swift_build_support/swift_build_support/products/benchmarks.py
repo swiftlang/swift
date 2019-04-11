@@ -19,7 +19,7 @@ from .. import targets
 
 
 # Build against the current installed toolchain.
-class ToolchainBenchmarks(product.Product):
+class Benchmarks(product.Product):
     @classmethod
     def product_source_name(cls):
         return "benchmarks"
@@ -41,6 +41,9 @@ class ToolchainBenchmarks(product.Product):
 
         bench_O = os.path.join(self.build_dir, 'bin', 'Benchmark_O')
         shell.call([bench_O] + cmdline)
+
+        bench_Osize = os.path.join(self.build_dir, 'bin', 'Benchmark_Osize')
+        shell.call([bench_Osize] + cmdline)
 
 
 def run_build_script_helper(host_target, product, args):

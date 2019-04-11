@@ -10,8 +10,9 @@ import subprocess
 
 def perform_build(args, swiftbuild_path, config, binary_name, opt_flag):
     assert(config in ['debug', 'release'])
-    assert(binary_name in ['Benchmark_O', 'Benchmark_Onone'])
-    assert(opt_flag in ['-O', '-Onone'])
+    assert(binary_name in ['Benchmark_O', 'Benchmark_Osize',
+                           'Benchmark_Onone'])
+    assert(opt_flag in ['-O', '-Osize', '-Onone'])
 
     inner_build_dir = os.path.join(args.build_path, binary_name)
     swiftbuild_args = [
@@ -49,6 +50,8 @@ def main():
 
     swiftbuild_path = os.path.join(args.toolchain, 'usr', 'bin', 'swift-build')
     perform_build(args, swiftbuild_path, 'debug', 'Benchmark_Onone', '-Onone')
+    perform_build(args, swiftbuild_path, 'release', 'Benchmark_Osize',
+                  '-Osize')
     perform_build(args, swiftbuild_path, 'release', 'Benchmark_O', '-O')
 
 
