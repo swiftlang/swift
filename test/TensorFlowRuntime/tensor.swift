@@ -178,14 +178,37 @@ TensorTests.testAllBackends("Reduction") {
   #if !TPU
   // 2 x 5
   let x = Tensor<Float>([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
-  expectEqual(ShapedArray(shape: [5], scalars: [2, 4, 6, 8, 10]),
-              x.sum(squeezingAxes: 0).toHost(shape: []).array)
-  expectEqual(ShapedArray(shape: [1, 5], scalars: [2, 4, 6, 8, 10]),
-              x.sum(alongAxes: 0).toHost(shape: []).array)
-  expectEqual(ShapedArray(shape: [5], scalars: [1, 4, 9, 16, 25]),
-              x.product(squeezingAxes: 0).toHost(shape: []).array)
-  expectEqual(ShapedArray(shape: [1, 5], scalars: [1, 4, 9, 16, 25]),
-              x.product(alongAxes: 0).toHost(shape: []).array)
+  expectEqual(Tensor(30), x.sum().toHost(shape: []))
+  expectEqual(Tensor(shape: [5], scalars: [2, 4, 6, 8, 10]),
+              x.sum(squeezingAxes: 0).toHost(shape: []))
+  expectEqual(Tensor(shape: [1, 5], scalars: [2, 4, 6, 8, 10]),
+              x.sum(alongAxes: 0).toHost(shape: []))
+
+  expectEqual(Tensor(14400), x.product().toHost(shape: []))
+  expectEqual(Tensor(shape: [5], scalars: [1, 4, 9, 16, 25]),
+              x.product(squeezingAxes: 0).toHost(shape: []))
+  expectEqual(Tensor(shape: [1, 5], scalars: [1, 4, 9, 16, 25]),
+              x.product(alongAxes: 0).toHost(shape: []))
+
+  expectEqual(Tensor(3), x.mean().toHost(shape: []))
+  expectEqual(Tensor(shape: [5], scalars: [1, 2, 3, 4, 5]),
+              x.mean(squeezingAxes: 0).toHost(shape: []))
+  expectEqual(Tensor(shape: [5], scalars: [1, 2, 3, 4, 5]),
+              x.mean(alongAxes: 0).toHost(shape: []))
+  expectEqual(Tensor(shape: [2], scalars: [3, 3]),
+              x.mean(squeezingAxes: 1).toHost(shape: []))
+  expectEqual(Tensor(shape: [1, 2], scalars: [3, 3]),
+              x.mean(alongAxes: 1).toHost(shape: []))
+
+  expectEqual(Tensor(2), x.variance().toHost(shape: []))
+  expectEqual(Tensor(shape: [5], scalars: [0, 0, 0, 0, 0]),
+              x.variance(squeezingAxes: 0).toHost(shape: []))
+  expectEqual(Tensor(shape: [5], scalars: [0, 0, 0, 0, 0]),
+              x.variance(alongAxes: 0).toHost(shape: []))
+  expectEqual(Tensor(shape: [2], scalars: [2, 2]),
+              x.variance(squeezingAxes: 1).toHost(shape: []))
+  expectEqual(Tensor(shape: [1, 2], scalars: [2, 2]),
+              x.variance(alongAxes: 1).toHost(shape: []))
   #endif // !TPU
 }
 
@@ -274,6 +297,26 @@ TensorTests.testAllBackends("SimpleMath") {
   expectEqual([2], array.shape)
   expectPointwiseNearlyEqual([0.833655, 0.833655], array.scalars,
                              byError: 0.0001)
+}
+
+TensorTests.testAllBackends("StandardDeviation") {
+  expectEqual(0, Tensor<Float>([1]).standardDeviation().scalarized())
+  expectEqual(
+    0.5,
+    Tensor<Float>([0, 1]).standardDeviation(alongAxes: 0).scalarized())
+  expectEqual(0.5, Tensor<Float>([0, 1]).standardDeviation().scalarized())
+  expectNearlyEqual(
+    2.87228132,
+    Tensor<Float>(rangeFrom: 0, to: 10, stride: 1).standardDeviation().scalarized(),
+    byError: 0.001)
+  let matrix = Tensor<Float>(rangeFrom: 0, to: 10, stride: 1).reshaped(to: [2, 5])
+  expectNearlyEqual(2.87228132,
+                    matrix.standardDeviation().scalarized(),
+                    byError: 0.001)
+  expectPointwiseNearlyEqual(
+    [1.4142, 1.4142],
+    matrix.standardDeviation(alongAxes: 1).array.scalars,
+    byError: 0.001)
 }
 
 TensorTests.testAllBackends("ReductionToScalar") {

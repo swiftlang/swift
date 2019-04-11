@@ -66,7 +66,7 @@ PythonRuntimeTestSuite.testWithLeakChecking("PythonList") {
 }
 
 PythonRuntimeTestSuite.testWithLeakChecking("PythonDict") {
-  let dict: PythonObject = ["a": 1, 1: 0.5]
+  let dict: PythonObject = ["a" : 1, 1 : 0.5]
   expectEqual(2, Python.len(dict))
   expectEqual(1, dict["a"])
   expectEqual(0.5, dict[1])
@@ -210,7 +210,7 @@ PythonRuntimeTestSuite.testWithLeakChecking("Tuple") {
   let element1: PythonObject = 0
   let element2: PythonObject = "abc"
   let element3: PythonObject = [0, 0]
-  let element4: PythonObject = ["a": 0, "b": "c"]
+  let element4: PythonObject = ["a" : 0, "b" : "c"]
   let pair = PythonObject(tupleOf: element1, element2)
   let (pair1, pair2) = pair.tuple2
   expectEqual(element1, pair1)
@@ -258,6 +258,8 @@ PythonRuntimeTestSuite.testWithLeakChecking("ConvertibleFromPython") {
   let five: PythonObject = 5
   let half: PythonObject = 0.5
   let string: PythonObject = "abc"
+  let intArray: PythonObject = [2, 3]
+  let dict: PythonObject = ["abc" : 97]
 
   expectEqual(-1, Int(minusOne))
   expectEqual(-1, Int8(minusOne))
@@ -285,6 +287,9 @@ PythonRuntimeTestSuite.testWithLeakChecking("ConvertibleFromPython") {
 
   expectEqual("abc", String(string))
 
+  expectEqual([2, 3], Array(intArray))
+  expectEqual(["abc" : 97], Dictionary<String, Int32>(dict))
+
   expectNil(String(zero))
   expectNil(Int(string))
   expectNil(Double(string))
@@ -293,6 +298,8 @@ PythonRuntimeTestSuite.testWithLeakChecking("ConvertibleFromPython") {
 PythonRuntimeTestSuite.testWithLeakChecking("PythonConvertible") {
   let minusOne: PythonObject = -1
   let five: PythonObject = 5
+  let intArray: PythonObject = [2, 3]
+  let dict: PythonObject = ["abc" : 7]
 
   expectEqual(minusOne, Int(-1).pythonObject)
   expectEqual(minusOne, Int8(-1).pythonObject)
@@ -309,6 +316,9 @@ PythonRuntimeTestSuite.testWithLeakChecking("PythonConvertible") {
   expectEqual(five, UInt64(5).pythonObject)
   expectEqual(five, Float(5).pythonObject)
   expectEqual(five, Double(5).pythonObject)
+
+  expectEqual(intArray, [2, 3].pythonObject)
+  expectEqual(dict, ["abc" : 7].pythonObject)
 }
 
 PythonRuntimeTestSuite.testWithLeakChecking("Optional") {

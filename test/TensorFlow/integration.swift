@@ -377,7 +377,7 @@ public func testResourceAndVariants() {
     // expected-error @+1 {{op named 'TensorDataSet' is not registered in TensorFlow}}
     #tfop("TensorDataSet", values,
           Toutput_types$dtype: [Float.tensorFlowDataType],
-          output_shapes: [TensorShape(1)])
+          output_shapes: [TensorShape([1])])
 
   // REGISTER_OP("Iterator")
   //     .Output("handle: resource")
@@ -388,7 +388,7 @@ public func testResourceAndVariants() {
   //     .SetShapeFn(shape_inference::ScalarShape);
   let iterator: ResourceHandle =
     #tfop("Iterator", shared_name: "foo", container: "bar",
-          output_types$dtype: [Float.tensorFlowDataType], output_shapes: [TensorShape(1)])
+          output_types$dtype: [Float.tensorFlowDataType], output_shapes: [TensorShape([1])])
 
   // REGISTER_OP("MakeIterator")
   //     .Input("dataset: variant")
