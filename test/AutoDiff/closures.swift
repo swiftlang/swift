@@ -42,5 +42,7 @@ let _: @differentiable (TF30) -> Float = { x in x.x }
 // Make sure `@nondiff` with non-`Differentiable` also works.
 public func nondiffs(_ f: @differentiable (Float, @nondiff Float) -> Float,
                      _ g: @differentiable (Float, @nondiff Int) -> Float) {
+  _ = gradient(at: 0) { f($0, 1) }
+  _ = gradient(at: 0) { g($0, 1) }
 }
 nondiffs({ x, y in x }, { x, y in x })
