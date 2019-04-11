@@ -368,7 +368,7 @@ public:
     noteUseOfTypeGlobals(type, true, RequireMetadata);
   }
 
-  void noteUseOfTypeMetadata(Type type) {
+  void noteUseOfTypeMetadata(CanType type) {
     type.visit([&](Type t) {
       if (auto *nominal = t->getAnyNominal())
         noteUseOfTypeMetadata(nominal);
@@ -383,6 +383,13 @@ public:
   void noteUseOfAnyParentTypeMetadata(NominalTypeDecl *type);
 
   void noteUseOfFieldDescriptor(NominalTypeDecl *type);
+
+  void noteUseOfFieldDescriptors(CanType type) {
+    type.visit([&](Type t) {
+      if (auto *nominal = t->getAnyNominal())
+        noteUseOfFieldDescriptor(nominal);
+    });
+  }
 
 private:
   void noteUseOfTypeGlobals(NominalTypeDecl *type,
@@ -1034,11 +1041,6 @@ public:
   /// Builtin types referenced by types in this module when emitting
   /// reflection metadata.
   llvm::SetVector<CanType> BuiltinTypes;
-  /// Opaque but fixed-size types for which we also emit builtin type
-  /// descriptors, allowing the reflection library to layout these types
-  /// without knowledge of their contents. This includes imported structs
-  /// and fixed-size multi-payload enums.
-  llvm::SetVector<const NominalTypeDecl *> OpaqueTypes;
 
   llvm::Constant *getTypeRef(CanType type, MangledTypeRefRole role);
   llvm::Constant *getMangledAssociatedConformance(
@@ -1086,10 +1088,6 @@ public:
   /// Emit a reflection metadata record for a builtin type referenced
   /// from this module.
   void emitBuiltinTypeMetadataRecord(CanType builtinType);
-
-  /// Emit a reflection metadata record for an imported type referenced
-  /// from this module.
-  void emitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDecl);
 
   /// Emit reflection metadata records for builtin and imported types referenced
   /// from this module.

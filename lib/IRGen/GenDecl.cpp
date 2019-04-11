@@ -1223,6 +1223,12 @@ void IRGenerator::noteUseOfFieldDescriptor(NominalTypeDecl *type) {
   if (!hasLazyMetadata(type))
     return;
 
+  // Imported classes and protocols do not need field descriptors.
+  if (type->hasClangNode() &&
+      (isa<ClassDecl>(type) ||
+       isa<ProtocolDecl>(type)))
+    return;
+
   if (!LazilyEmittedFieldMetadata.insert(type).second)
     return;
 

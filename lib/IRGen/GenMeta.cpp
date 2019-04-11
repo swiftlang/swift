@@ -1269,7 +1269,8 @@ namespace {
 
       // For any nominal type metadata required for reflection.
       for (auto *prop : properties)
-        IGM.IRGen.noteUseOfTypeMetadata(prop->getValueInterfaceType());
+        IGM.IRGen.noteUseOfTypeMetadata(prop->getValueInterfaceType()
+                                          ->getCanonicalType());
     }
     
     uint16_t getKindSpecificFlags() {
@@ -1342,7 +1343,8 @@ namespace {
 
       // For any nominal type metadata required for reflection.
       for (auto elt : Strategy.getElementsWithPayload())
-        IGM.IRGen.noteUseOfTypeMetadata(elt.decl->getArgumentInterfaceType());
+        IGM.IRGen.noteUseOfTypeMetadata(elt.decl->getArgumentInterfaceType()
+                                          ->getCanonicalType());
     }
     
     uint16_t getKindSpecificFlags() {
@@ -1663,7 +1665,8 @@ namespace {
 
       // For any nominal type metadata required for reflection.
       for (auto *prop : properties)
-        IGM.IRGen.noteUseOfTypeMetadata(prop->getValueInterfaceType());
+        IGM.IRGen.noteUseOfTypeMetadata(prop->getValueInterfaceType()
+                                          ->getCanonicalType());
     }
   };
 } // end anonymous namespace
