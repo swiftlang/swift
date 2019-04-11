@@ -359,6 +359,7 @@ path S:\b\sqlite;%PATH%
 ```cmd
 md S:\b\llbuild
 cd S:\b\llbuild
+set AR=llvm-ar
 cmake -G Ninja^
   -DCMAKE_BUILD_TYPE=RelWithDebInfo^
   -DCMAKE_C_COMPILER=cl^
