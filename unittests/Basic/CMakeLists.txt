@@ -23,6 +23,7 @@ add_swift_unittest(SwiftBasicTests
   PrefixMapTest.cpp
   RangeTest.cpp
   SourceManagerTest.cpp
+  STLExtrasTest.cpp
   StringExtrasTest.cpp
   SuccessorMapTest.cpp
   ThreadSafeRefCntPointerTest.cpp
