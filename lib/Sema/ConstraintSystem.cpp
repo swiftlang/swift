@@ -1304,6 +1304,15 @@ ConstraintSystem::getTypeOfMemberReference(
         openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
       }
     }
+    else if (auto *sub = dyn_cast<SubscriptDecl>(value)) {
+      if (auto dyn = dyn_cast<DynamicSelfType>(sub->getElementInterfaceType()
+                                               ->getCanonicalType())) {
+        fprintf(stderr, "HEREE!!!!!!!!!!!!!!!! %d\n", isDynamicResult);
+        openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
+//        openedType->dump();
+//        outerDC->dumpContext();
+      }
+    }
   } else {
     // Protocol requirements returning Self have a dynamic Self return
     // type. Erase the dynamic Self since it only comes into play during
