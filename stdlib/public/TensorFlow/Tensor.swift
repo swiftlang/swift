@@ -797,21 +797,52 @@ extension Tensor : Equatable where Scalar : Equatable {
 // Description and visualization
 //===----------------------------------------------------------------------===//
 
-/// String conversion.
+// String conversion.
 extension Tensor : CustomStringConvertible {
+  /// A textual representation of the tensor.
+  ///
+  /// - Note: use `fullDescription` for a non-pretty-printed description showing
+  ///   all scalars.
   public var description: String {
     return array.description
   }
 }
 
-/// Xcode Playground display conversion.
+public extension Tensor {
+  /// A textual representation of the tensor. Returns a summarized description
+  /// if `summarize` is true and the element count exceeds twice the
+  /// `edgeElementCount`.
+  ///
+  /// - Parameters:
+  ///   - lineWidth: The max line width for printing. Used to determine number
+  ///     of scalars to print per line.
+  ///   - edgeElementCount: The maximum number of elements to print before and
+  ///     after summarization via ellipses (`...`).
+  ///   - summarizing: If true, summarize description if element count exceeds
+  ///     twice `edgeElementCount`.
+  func description(
+    lineWidth: Int = 80, edgeElementCount: Int = 3, summarizing: Bool = false
+  ) -> String {
+    return array.description(
+      lineWidth: lineWidth, edgeElementCount: edgeElementCount,
+      summarizing: summarizing)
+  }
+
+  /// A full, non-pretty-printed textual representation of the tensor, showing
+  /// all scalars.
+  var fullDescription: String {
+    return array.fullDescription
+  }
+}
+
+// Xcode Playground display conversion.
 extension Tensor : CustomPlaygroundDisplayConvertible {
   public var playgroundDescription: Any {
     return description
   }
 }
 
-/// Mirror representation, used by debugger/REPL.
+// Mirror representation, used by debugger/REPL.
 extension Tensor : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: [], displayStyle: .struct)

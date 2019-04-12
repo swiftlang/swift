@@ -66,7 +66,7 @@ internal final class TensorBuffer<Scalar> {
   }
 }
 
-/// TF Tensor-specific initializer
+// TF Tensor-specific initializer.
 extension TensorBuffer where Scalar : _TensorFlowDataTypeCompatible {
   /// Creates a local tensor buffer from a C `TF_Tensor*` value and takes
   /// ownership of the value.
@@ -80,7 +80,7 @@ extension TensorBuffer where Scalar : _TensorFlowDataTypeCompatible {
   }
 }
 
-/// Factory methods
+// Factory methods.
 extension TensorBuffer {
   static func create(
     count: Int,
@@ -99,7 +99,7 @@ extension TensorBuffer {
   }
 }
 
-/// Unsafe address accessor
+// Unsafe address accessor.
 extension TensorBuffer {
   func withUnsafeMutableBufferPointer<R>(
     _ body: (inout UnsafeMutableBufferPointer<Scalar>) throws -> R
@@ -264,14 +264,175 @@ internal extension _ShapedArrayProtocol {
   }
 }
 
-/// Common public protocol implementations
+fileprivate extension String {
+  /// Returns a string of the specified length, padded with whitespace to the
+  /// left.
+  func leftPadded(toLength length: Int) -> String {
+    return repeatElement(" ", count: max(0, length - count)) + self
+  }
+}
+
+// Common public protocol implementations.
+
 fileprivate extension _ShapedArrayProtocol
-  where Element : _ShapedArrayProtocol {
-  var _description: String {
+  where Element : _ShapedArrayProtocol, Element == Element.Element
+{
+  /// Returns the whitespace separator between elements, given the current
+  /// indent level.
+  func separator(indentLevel: Int) -> String {
+    if rank == 1 {
+      return ", "
+    }
+    return String(repeating: "\n", count: rank - 1) +
+           String(repeating: " ", count: indentLevel + 1)
+  }
+
+  /// A textual representation of the 1-D shaped array, starting at the given
+  /// indent level. Returns a summarized description if `summarizing` is true
+  /// and the element count exceeds twice the `edgeElementCount`.
+  ///
+  /// - Parameters:
+  ///   - indentLevel: The indentation level.
+  ///   - edgeElementCount: The maximum number of elements to print before and
+  ///     after summarization via ellipses (`...`).
+  ///   - maxScalarLength: The length of the longest scalar description in the
+  ///     entire original array-to-print.
+  ///   - maxScalarCountPerLine: The maximum number of scalars to print per
+  ///     line, used when printing 1-D vectors.
+  ///   - summarizing: If true, summarize description if element count exceeds
+  ///     twice `edgeElementCount`.
+  func vectorDescription(
+    indentLevel: Int, edgeElementCount: Int, maxScalarLength: Int,
+    maxScalarCountPerLine: Int, summarizing: Bool
+  ) -> String {
+    // Get scalar descriptions.
+    func scalarDescription(_ element: Element) -> String {
+      let description = String(describing: element)
+      return description.leftPadded(toLength: maxScalarLength)
+    }
+    var scalarDescriptions: [String] = []
+    if summarizing && count > 2 * edgeElementCount {
+      scalarDescriptions +=
+        prefix(edgeElementCount).map(scalarDescription)
+      scalarDescriptions += ["..."]
+      scalarDescriptions +=
+        suffix(edgeElementCount).map(scalarDescription)
+    } else {
+      scalarDescriptions += map(scalarDescription)
+    }
+
+    // Combine scalar descriptions into lines, based on the scalar count per
+    // line.
+    let lines = stride(
+      from: scalarDescriptions.startIndex, to: scalarDescriptions.endIndex,
+      by: maxScalarCountPerLine
+    ).map { i -> ArraySlice<String> in
+      let upperBound = Swift.min(
+        i.advanced(by: maxScalarCountPerLine), scalarDescriptions.count)
+      return scalarDescriptions[i..<upperBound]
+    }
+
+    // Return lines joined with separators.
+    let lineSeparator = ",\n" + String(repeating: " ", count: indentLevel + 1)
+    return lines.enumerated().reduce(into: "[") { result, entry in
+      let (i, line) = entry
+      result += line.joined(separator: ", ")
+      result += i != lines.count - 1 ? lineSeparator : ""
+    } + "]"
+  }
+
+  /// A textual representation of the shaped array, starting at the given indent
+  /// level. Returns a summarized description if `summarizing` is true and
+  /// the element count exceeds twice the `edgeElementCount`.
+  ///
+  /// - Parameters:
+  ///   - indentLevel: The indentation level.
+  ///   - edgeElementCount: The maximum number of elements to print before and
+  ///     after summarization via ellipses (`...`).
+  ///   - maxScalarLength: The length of the longest scalar description in the
+  ///     entire original array-to-print.
+  ///   - maxScalarCountPerLine: The maximum number of scalars to print per
+  ///     line, used when printing 1-D vectors.
+  ///   - summarizing: If true, summarizing description if element count exceeds
+  ///     twice `edgeElementCount`.
+  func description(
+    indentLevel: Int, edgeElementCount: Int, maxScalarLength: Int,
+    maxScalarCountPerLine: Int, summarizing: Bool
+  ) -> String {
+    // Handle scalars.
     if let scalar = scalar {
       return String(describing: scalar)
     }
-    return "[\( map({"\($0)"}).joined(separator: ", ") )]"
+    // Handle vectors, which have special line-width-sensitive logic.
+    if rank == 1 {
+      return vectorDescription(
+        indentLevel: indentLevel, edgeElementCount: edgeElementCount,
+        maxScalarLength: maxScalarLength,
+        maxScalarCountPerLine: maxScalarCountPerLine, summarizing: summarizing)
+    }
+    // Handle higher-rank tensors.
+    func elementDescription(_ element: Element) -> String {
+      return element.description(
+        indentLevel: indentLevel + 1, edgeElementCount: edgeElementCount,
+        maxScalarLength: maxScalarLength,
+        maxScalarCountPerLine: maxScalarCountPerLine, summarizing: summarizing)
+    }
+    var elementDescriptions: [String] = []
+    if summarizing && count > 2 * edgeElementCount {
+      elementDescriptions += prefix(edgeElementCount).map(elementDescription)
+      elementDescriptions += ["..."]
+      elementDescriptions += suffix(edgeElementCount).map(elementDescription)
+    } else {
+      elementDescriptions += map(elementDescription)
+    }
+    // Return lines joined with separators.
+    let lineSeparator = "," +
+      String(repeating: "\n", count: rank - 1) +
+      String(repeating: " ", count: indentLevel + 1)
+    return elementDescriptions.enumerated().reduce(into: "[") { result, entry in
+      let (i, elementDescription) = entry
+      result += elementDescription
+      result += i != elementDescriptions.count - 1 ? lineSeparator : ""
+    } + "]"
+  }
+}
+
+public extension _ShapedArrayProtocol
+  where Element : _ShapedArrayProtocol, Element == Element.Element
+{
+  /// A textual representation of the shaped array. Returns a summarized
+  /// description if `summarizing` is true and the element count exceeds twice
+  /// the `edgeElementCount`.
+  ///
+  /// - Parameters:
+  ///   - lineWidth: The max line width for printing. Used to determine number
+  ///     of scalars to print per line.
+  ///   - edgeElementCount: The maximum number of elements to print before and
+  ///     after summarization via ellipses (`...`).
+  ///   - summarizing: If true, summarizing description if element count exceeds
+  ///     twice `edgeElementCount`.
+  func description(
+    lineWidth: Int = 80, edgeElementCount: Int = 3, summarizing: Bool = false
+  ) -> String {
+    // Compute number of scalars to print per line.
+    let maxScalarLength =
+      scalars.lazy.map { String(describing: $0).count }.max() ?? 3
+    let maxScalarCountPerLine = Swift.max(1, lineWidth / maxScalarLength)
+    // Call helper.
+    return description(
+      indentLevel: 0, edgeElementCount: edgeElementCount,
+      maxScalarLength: maxScalarLength,
+      maxScalarCountPerLine: maxScalarCountPerLine,
+      summarizing: summarizing)
+  }
+
+  /// A full, non-pretty-printed textual representation of the shaped array,
+  /// showing all scalars.
+  var fullDescription: String {
+    if let scalar = scalar {
+      return String(describing: scalar)
+    }
+    return "[\( map({"\($0.fullDescription)"}).joined(separator: ", ") )]"
   }
 }
 
@@ -485,7 +646,8 @@ extension ShapedArray : RandomAccessCollection, MutableCollection {
       precondition(!isScalar,
                    "Scalar has no elements and cannot be subscripted.")
       precondition(
-        indices ~= bounds.lowerBound && indices ~= bounds.upperBound - 1,
+        bounds.lowerBound >= startIndex && bounds.lowerBound <= endIndex &&
+        bounds.upperBound >= startIndex && bounds.upperBound <= endIndex,
         "ShapedArray indices are out of range")
       return ShapedArraySlice(base: self, bounds: bounds)
     }
@@ -543,7 +705,7 @@ public extension ShapedArray {
   }
 }
 
-/// Tensor conversion.
+// Tensor conversion.
 extension ShapedArray where Scalar : TensorFlowScalar {
   var byteCount: Int {
     return MemoryLayout<Scalar>.stride * scalarCount
@@ -574,14 +736,14 @@ extension ShapedArray where Scalar : TensorFlowScalar {
   }
 }
 
-/// Tensor conversion.
+// Tensor conversion.
 public extension Tensor {
   init(_ array: __owned ShapedArray<Scalar>) {
     self.init(handle: array.makeTensorHandle())
   }
 }
 
-/// Array literal conversion.
+// Array literal conversion.
 extension ShapedArray : ExpressibleByArrayLiteral
   where Scalar : TensorFlowScalar {
   public typealias ArrayLiteralElement = _TensorElementLiteral<Scalar>
@@ -591,14 +753,14 @@ extension ShapedArray : ExpressibleByArrayLiteral
   }
 }
 
-/// Equatable conformance.
+// Equatable conformance.
 extension ShapedArray : Equatable where Scalar : Equatable {
   public static func == (lhs: ShapedArray, rhs: ShapedArray) -> Bool {
     return lhs._isEqual(to: rhs)
   }
 }
 
-/// Hashable conformance.
+// Hashable conformance.
 extension ShapedArray : Hashable where Scalar : Hashable {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(shape)
@@ -606,29 +768,34 @@ extension ShapedArray : Hashable where Scalar : Hashable {
   }
 }
 
-/// String conversion.
+// String conversion.
 extension ShapedArray : CustomStringConvertible {
   /// A textual representation of this `ShapedArray`.
+  ///
+  /// - Note: use `fullDescription` for a non-pretty-printed description showing
+  ///   all scalars.
   public var description: String {
-    return _description
+    // Summarize if there are more than 1000 scalars.
+    let summarizing = scalarCount > 1000
+    return description(summarizing: summarizing)
   }
 }
 
-/// Xcode Playground display conversion.
+// Xcode Playground display conversion.
 extension ShapedArray : CustomPlaygroundDisplayConvertible {
   public var playgroundDescription: Any {
     return description
   }
 }
 
-/// Mirror representation, used by debugger/REPL.
+// Mirror representation, used by debugger/REPL.
 extension ShapedArray : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: [], displayStyle: .struct)
   }
 }
 
-/// Codable conformance.
+// Codable conformance.
 extension ShapedArray : Codable where Scalar : Codable {
   private enum CodingKeys: String, CodingKey {
     case shape
@@ -752,7 +919,7 @@ public extension ShapedArraySlice {
   }
 }
 
-/// Slice initializers.
+// Slice initializers.
 public extension ShapedArraySlice {
   /// Creates a `ShapedArraySlice` with the specified shape and contiguous
   /// scalars in row-major order.
@@ -953,14 +1120,14 @@ extension ShapedArraySlice : RandomAccessCollection, MutableCollection {
   }
 }
 
-/// Tensor conversion.
+// Tensor conversion.
 public extension ShapedArraySlice where Scalar : TensorFlowScalar {
   init(_ tensor: __shared Tensor<Scalar>) {
     self.init(base: tensor.array)
   }
 }
 
-/// Array literal conversion.
+// Array literal conversion.
 extension ShapedArraySlice : ExpressibleByArrayLiteral
   where Scalar : TensorFlowScalar {
   public typealias ArrayLiteralElement = _TensorElementLiteral<Scalar>
@@ -970,14 +1137,14 @@ extension ShapedArraySlice : ExpressibleByArrayLiteral
   }
 }
 
-/// Equatable conformance.
+// Equatable conformance.
 extension ShapedArraySlice : Equatable where Scalar : Equatable {
   public static func == (lhs: ShapedArraySlice, rhs: ShapedArraySlice) -> Bool {
     return lhs._isEqual(to: rhs)
   }
 }
 
-/// Hashable conformance.
+// Hashable conformance.
 extension ShapedArraySlice : Hashable where Scalar : Hashable {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(shape)
@@ -985,29 +1152,34 @@ extension ShapedArraySlice : Hashable where Scalar : Hashable {
   }
 }
 
-/// String conversion.
+// String conversion.
 extension ShapedArraySlice : CustomStringConvertible {
   /// A textual representation of this `ShapedArraySlice`.
+  ///
+  /// - Note: use `fullDescription` for a non-pretty-printed representation
+  ///   showing all scalars.
   public var description: String {
-    return _description
+    // Summarize if there are more than 1000 scalars.
+    let summarizing = scalarCount > 1000
+    return description(summarizing: summarizing)
   }
 }
 
-/// Xcode Playground display conversion.
+// Xcode Playground display conversion.
 extension ShapedArraySlice : CustomPlaygroundDisplayConvertible {
   public var playgroundDescription: Any {
     return description
   }
 }
 
-/// Mirror representation, used by debugger/REPL.
+// Mirror representation, used by debugger/REPL.
 extension ShapedArraySlice : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: [], displayStyle: .struct)
   }
 }
 
-/// Codable conformance.
+// Codable conformance.
 extension ShapedArraySlice : Codable where Scalar : Codable {
   private enum CodingKeys : String, CodingKey {
     case shape
