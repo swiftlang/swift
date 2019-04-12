@@ -823,11 +823,22 @@ namespace {
           }
         }
 //        member->dump();
-        if (auto *sub = dyn_cast<SubscriptDecl>(member)) {
-          printf("HEREE2!!!!!!!!!!!!!!!!\n");
-          if (auto dyn = dyn_cast<DynamicSelfType>(sub->getElementInterfaceType()
+//        else if (auto *sub = dyn_cast<SubscriptDecl>(member)) {
+//          fprintf(stderr, "HEREE2!!!!!!!!!!!!!!!!\n");
+//          if (auto dyn = dyn_cast<DynamicSelfType>(sub->getElementInterfaceType()
+//                                                   ->getCanonicalType())) {
+//            refTy = refTy->replaceCovariantResultType(dyn, 2);
+//          }
+//        }
+        else if (auto *sub = dyn_cast<VarDecl>(member)) {
+          if (auto dyn = dyn_cast<DynamicSelfType>(sub->getValueInterfaceType()
                                                    ->getCanonicalType())) {
-            refTy = refTy->replaceCovariantResultType(baseTy, 2);
+            refTy = refTy->replaceCovariantResultType(containerTy/*or dyn or baseTy or containerTy*/, 1);
+            fprintf(stderr, "HEREE22!!!!!!!!!!!!!!!!\n");
+            dyn.dump();
+            if (!baseTy->isEqual(containerTy)) {
+              dynamicSelfFnType = refTy->replaceCovariantResultType(containerTy, 1);
+            }
           }
         }
       }
@@ -938,7 +949,6 @@ namespace {
 
       // For properties, build member references.
       if (isa<VarDecl>(member)) {
-        assert(!dynamicSelfFnType && "Converted type doesn't make sense here");
         if (!baseIsInstance && member->isInstanceMember()) {
           assert(memberLocator.getBaseLocator() && 
                  cs.UnevaluatedRootExprs.count(

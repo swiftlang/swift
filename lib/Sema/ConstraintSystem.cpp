@@ -1308,7 +1308,17 @@ ConstraintSystem::getTypeOfMemberReference(
       if (auto dyn = dyn_cast<DynamicSelfType>(sub->getElementInterfaceType()
                                                ->getCanonicalType())) {
         fprintf(stderr, "HEREE!!!!!!!!!!!!!!!! %d\n", isDynamicResult);
-        openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
+        openedType = openedType->replaceCovariantResultType(baseObjTy/*not dyn*/, 2);
+//        openedType->dump();
+//        outerDC->dumpContext();
+      }
+    }
+    else if (auto *sub = dyn_cast<VarDecl>(value)) {
+      if (auto dyn = dyn_cast<DynamicSelfType>(sub->getInterfaceType()
+                                               ->getCanonicalType())) {
+        fprintf(stderr, "HEREEE!!!!!!!!!!!!!!!!\n");
+        dyn.dump();
+        openedType = openedType->replaceCovariantResultType(baseObjTy/*not dyn*/, 1);
 //        openedType->dump();
 //        outerDC->dumpContext();
       }
@@ -1365,6 +1375,7 @@ ConstraintSystem::getTypeOfMemberReference(
     // For a static member referenced through a metatype or an instance
     // member referenced through an instance, strip off the 'self'.
     type = openedFnType->getResult();
+//    type->dump();
   } else {
     // For an unbound instance method reference, replace the 'Self'
     // parameter with the base type.
