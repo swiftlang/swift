@@ -468,6 +468,61 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
   return std::make_pair(bridgedFunc, subMap);
 }
 
+static SILValue computeFinalCastedValue(SILBuilderWithScope &builder,
+                                        SILDynamicCastInst dynamicCast,
+                                        ApplyInst *newAI) {
+  SILValue dest = dynamicCast.getDest();
+  SILBasicBlock *failureBB = dynamicCast.getFailureBlock();
+  auto loc = dynamicCast.getLocation();
+  auto convTy = newAI->getType();
+  bool isConditional = dynamicCast.isConditional();
+  auto destTy = dest->getType().getObjectType();
+  assert(destTy == dynamicCast.getLoweredBridgedTargetObjectType() &&
+         "Expected Dest Type to be the same as BridgedTargetTy");
+
+  auto &m = dynamicCast.getModule();
+  if (convTy == destTy) {
+    return newAI;
+  }
+
+  if (destTy.isExactSuperclassOf(convTy)) {
+    return builder.createUpcast(loc, newAI, destTy);
+  }
+
+  if (convTy.isExactSuperclassOf(destTy)) {
+    // If we are not conditional, we are ok with the downcast via checked cast
+    // fails since we will trap.
+    if (!isConditional) {
+      return builder.createUnconditionalCheckedCast(loc, newAI, destTy);
+    }
+
+    // Otherwise if we /are/ emitting a conditional cast, make sure that we
+    // handle the failure gracefully.
+    auto *condBrSuccessBB =
+        newAI->getFunction()->createBasicBlockAfter(newAI->getParent());
+    condBrSuccessBB->createPhiArgument(destTy, ValueOwnershipKind::Owned,
+                                       nullptr);
+    builder.createCheckedCastBranch(loc, /* isExact*/ false, newAI, destTy,
+                                    condBrSuccessBB, failureBB);
+    builder.setInsertionPoint(condBrSuccessBB, condBrSuccessBB->begin());
+    return condBrSuccessBB->getArgument(0);
+  }
+
+  if (convTy.getASTType() ==
+          getNSBridgedClassOfCFClass(m.getSwiftModule(), destTy.getASTType()) ||
+      destTy.getASTType() ==
+          getNSBridgedClassOfCFClass(m.getSwiftModule(), convTy.getASTType())) {
+    // Handle NS <-> CF toll-free bridging here.
+    return SILValue(builder.createUncheckedRefCast(loc, newAI, destTy));
+  }
+
+  llvm_unreachable(
+      "optimizeBridgedSwiftToObjCCast: should never reach this condition: if "
+      "the Destination does not have the same type, is not a bridgeable CF "
+      "type and isn't a superclass/subclass of the source operand we should "
+      "have bailed earlier.");
+}
+
 /// Create a call of _bridgeToObjectiveC which converts an _ObjectiveCBridgeable
 /// instance into a bridged ObjC type.
 SILInstruction *
@@ -632,63 +687,18 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
     }
   }
 
-  SILInstruction *NewI = NewAI;
+  if (!Dest)
+    return NewAI;
 
-  if (Dest) {
-    // If it is addr cast then store the result.
-    auto ConvTy = NewAI->getType();
-    auto DestTy = Dest->getType().getObjectType();
-    assert(DestTy == SILType::getPrimitiveObjectType(
-                         BridgedTargetTy->getCanonicalType()) &&
-           "Expected Dest Type to be the same as BridgedTargetTy");
-    SILValue CastedValue;
-    if (ConvTy == DestTy) {
-      CastedValue = NewAI;
-    } else if (DestTy.isExactSuperclassOf(ConvTy)) {
-      CastedValue = Builder.createUpcast(Loc, NewAI, DestTy);
-    } else if (ConvTy.isExactSuperclassOf(DestTy)) {
-      // The downcast from a base class to derived class may fail.
-      if (isConditional) {
-        // In case of a conditional cast, we should handle it gracefully.
-        auto CondBrSuccessBB =
-            NewAI->getFunction()->createBasicBlockAfter(NewAI->getParent());
-        CondBrSuccessBB->createPhiArgument(DestTy, ValueOwnershipKind::Owned,
-                                           nullptr);
-        Builder.createCheckedCastBranch(Loc, /* isExact*/ false, NewAI, DestTy,
-                                        CondBrSuccessBB, FailureBB);
-        Builder.setInsertionPoint(CondBrSuccessBB, CondBrSuccessBB->begin());
-        CastedValue = CondBrSuccessBB->getArgument(0);
-      } else {
-        CastedValue = SILValue(
-            Builder.createUnconditionalCheckedCast(Loc, NewAI, DestTy));
-      }
-    } else if (ConvTy.getASTType() ==
-                   getNSBridgedClassOfCFClass(M.getSwiftModule(),
-                                              DestTy.getASTType()) ||
-               DestTy.getASTType() ==
-                   getNSBridgedClassOfCFClass(M.getSwiftModule(),
-                                              ConvTy.getASTType())) {
-      // Handle NS <-> CF toll-free bridging here.
-      CastedValue =
-          SILValue(Builder.createUncheckedRefCast(Loc, NewAI, DestTy));
-    } else {
-      llvm_unreachable("optimizeBridgedSwiftToObjCCast: should never reach "
-                       "this condition: if the Destination does not have the "
-                       "same type, is not a bridgeable CF type and isn't a "
-                       "superclass/subclass of the source operand we should "
-                       "have bailed earlier");
-    }
-    NewI = Builder.createStore(Loc, CastedValue, Dest,
-                               StoreOwnershipQualifier::Unqualified);
-    if (isConditional && NewI->getParent() != NewAI->getParent()) {
-      Builder.createBranch(Loc, SuccessBB);
-    }
+  // If it is addr cast then store the result.
+  SILValue castedValue = computeFinalCastedValue(Builder, dynamicCast, NewAI);
+  SILInstruction *NewI = Builder.createStore(
+      Loc, castedValue, Dest, StoreOwnershipQualifier::Unqualified);
+  if (isConditional && NewI->getParent() != NewAI->getParent()) {
+    Builder.createBranch(Loc, SuccessBB);
   }
 
-  if (Dest) {
-    eraseInstAction(Inst);
-  }
-
+  eraseInstAction(Inst);
   return NewI;
 }
 
