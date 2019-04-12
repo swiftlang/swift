@@ -3068,12 +3068,20 @@ public:
                                               interfaceTypeID, genericEnvID,
                                               underlyingTypeID);
     
+    auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));
+    auto declContext = MF.getDeclContext(contextID);
+    auto sig = MF.getGenericSignature(interfaceSigID);
+    auto interfaceType = MF.getType(interfaceTypeID)
+                            ->castTo<GenericTypeParamType>();
+    
+    // Check for reentrancy.
+    if (declOrOffset.isComplete())
+      return cast<OpaqueTypeDecl>(declOrOffset.get());
+      
+    // Create the decl.
     auto opaqueDecl =
-      new (ctx) OpaqueTypeDecl(cast<ValueDecl>(MF.getDecl(namingDeclID)),
-                   nullptr,
-                   MF.getDeclContext(contextID),
-                   MF.getGenericSignature(interfaceSigID),
-                   MF.getType(interfaceTypeID)->castTo<GenericTypeParamType>());
+      new (ctx) OpaqueTypeDecl(namingDecl, nullptr, declContext,
+                               sig, interfaceType);
     declOrOffset = opaqueDecl;
 
     auto genericEnv = MF.getGenericEnvironment(genericEnvID);
