@@ -68,199 +68,42 @@ class JSONDumper(json.JSONEncoder):
         return vars(o)
 
 
-class BuildScriptInvocation(object):
+class BuildScriptImplHelper(object):
+    def __init__(self, args, toolchain, workspace, product_classes):
+        self._args = args
+        self._toolchain = toolchain
+        self._workspace = workspace
+        self._product_classes = product_classes
+        (self._impl_env,
+         self._impl_args) = self._convert_to_impl_arguments()
 
-    """Represent a single build script invocation."""
+    def build(self, host_name, product_name):
+        self.execute("{}-{}-build".format(host_name, product_name))
 
-    @staticmethod
-    def validate_arguments(toolchain, args):
-        if toolchain.cc is None or toolchain.cxx is None:
-            diagnostics.fatal(
-                "can't find clang (please install clang-3.5 or a "
-                "later version)")
+    def test(self, host_name, product_name):
+        self.execute("{}-{}-test".format(host_name, product_name))
 
-        if toolchain.cmake is None:
-            diagnostics.fatal("can't find CMake (please install CMake)")
+    def install(self, host_name, product_name):
+        self.execute("{}-{}-install".format(host_name, product_name))
 
-        if args.distcc:
-            if toolchain.distcc is None:
-                diagnostics.fatal(
-                    "can't find distcc (please install distcc)")
-            if toolchain.distcc_pump is None:
-                diagnostics.fatal(
-                    "can't find distcc-pump (please install distcc-pump)")
+    def extract_symbols(self, host):
+        self.execute('{}-extractsymbols'.format(host.name))
 
-        if args.host_target is None or args.stdlib_deployment_targets is None:
-            diagnostics.fatal("unknown operating system")
+    def package(self, host):
+        self.execute('{}-package'.format(host.name))
 
-        if args.symbols_package:
-            if not os.path.isabs(args.symbols_package):
-                print(
-                    '--symbols-package must be an absolute path '
-                    '(was \'{}\')'.format(args.symbols_package))
-                return 1
-            if not args.install_symroot:
-                diagnostics.fatal(
-                    "--install-symroot is required when specifying "
-                    "--symbols-package.")
+    def lipo(self):
+        self.execute('merged-hosts-lipo')
 
-        if args.android:
-            if args.android_ndk is None or \
-                    args.android_api_level is None or \
-                    args.android_icu_uc is None or \
-                    args.android_icu_uc_include is None or \
-                    args.android_icu_i18n is None or \
-                    args.android_icu_i18n_include is None or \
-                    args.android_icu_data is None:
-                diagnostics.fatal(
-                    "when building for Android, --android-ndk, "
-                    "--android-api-level, --android-icu-uc, "
-                    "--android-icu-uc-include, --android-icu-i18n, "
-                    "--android-icu-i18n-include, and --android-icu-data "
-                    "must be specified")
+    def execute(self, action=None, echo=None):
+        command = [build_script_impl] + self._impl_args
+        if action is not None:
+            command += ['--only-execute', action]
+        if echo is None:
+            echo = self._args.verbose_build
+        shell.call_without_sleeping(command, env=self._impl_env, echo=echo)
 
-        targets_needing_toolchain = [
-            'build_indexstoredb',
-            'build_sourcekitlsp',
-            'build_toolchainbenchmarks',
-            'tsan_libdispatch_test',
-        ]
-        has_target_needing_toolchain = \
-            bool(sum(getattr(args, x) for x in targets_needing_toolchain))
-        if args.legacy_impl and has_target_needing_toolchain:
-            diagnostics.fatal(
-                "--legacy-impl is incompatible with building packages needing "
-                "a toolchain (%s)" % ", ".join(targets_needing_toolchain))
-
-    @staticmethod
-    def apply_default_arguments(toolchain, args):
-        # Infer if ninja is required
-        ninja_required = (
-            args.cmake_generator == 'Ninja' or args.build_foundation)
-        if ninja_required and toolchain.ninja is None:
-            args.build_ninja = True
-
-        # Set the default stdlib-deployment-targets, if none were provided.
-        if args.stdlib_deployment_targets is None:
-            stdlib_targets = \
-                StdlibDeploymentTarget.default_stdlib_deployment_targets()
-            args.stdlib_deployment_targets = [
-                target.name for target in stdlib_targets]
-
-        # SwiftPM and XCTest have a dependency on Foundation.
-        # On OS X, Foundation is built automatically using xcodebuild.
-        # On Linux, we must ensure that it is built manually.
-        if ((args.build_swiftpm or args.build_xctest) and
-                platform.system() != "Darwin"):
-            args.build_foundation = True
-
-        # Foundation has a dependency on libdispatch.
-        # On OS X, libdispatch is provided by the OS.
-        # On Linux, we must ensure that it is built manually.
-        if (args.build_foundation and
-                platform.system() != "Darwin"):
-            args.build_libdispatch = True
-
-        if args.build_subdir is None:
-            args.build_subdir = \
-                workspace.compute_build_subdir(args)
-
-        if args.install_destdir is None:
-            args.install_destdir = os.path.join(
-                SWIFT_BUILD_ROOT, args.build_subdir,
-                '{}-{}'.format('toolchain', args.host_target))
-
-        # Add optional stdlib-deployment-targets
-        if args.android:
-            if args.android_arch == "armv7":
-                args.stdlib_deployment_targets.append(
-                    StdlibDeploymentTarget.Android.armv7.name)
-            elif args.android_arch == "aarch64":
-                args.stdlib_deployment_targets.append(
-                    StdlibDeploymentTarget.Android.aarch64.name)
-
-        # Infer platform flags from manually-specified configure targets.
-        # This doesn't apply to Darwin platforms, as they are
-        # already configured. No building without the platform flag, though.
-
-        android_tgts = [tgt for tgt in args.stdlib_deployment_targets
-                        if StdlibDeploymentTarget.Android.contains(tgt)]
-        if not args.android and len(android_tgts) > 0:
-            args.android = True
-            args.build_android = False
-
-        # Include the Darwin supported architectures in the CMake options.
-        if args.swift_darwin_supported_archs:
-            args.extra_cmake_options.append(
-                '-DSWIFT_DARWIN_SUPPORTED_ARCHS:STRING={}'.format(
-                    args.swift_darwin_supported_archs))
-
-            # Remove unsupported Darwin archs from the standard library
-            # deployment targets.
-            supported_archs = args.swift_darwin_supported_archs.split(';')
-            targets = StdlibDeploymentTarget.get_targets_by_name(
-                args.stdlib_deployment_targets)
-
-            args.stdlib_deployment_targets = [
-                target.name
-                for target in targets
-                if (target.platform.is_darwin and
-                    target.arch in supported_archs)
-            ]
-
-        # Include the Darwin module-only architectures in the CMake options.
-        if args.swift_darwin_module_archs:
-            args.extra_cmake_options.append(
-                '-DSWIFT_DARWIN_MODULE_ARCHS:STRING={}'.format(
-                    args.swift_darwin_module_archs))
-
-# ---
-
-    def __init__(self, toolchain, args):
-        self.toolchain = toolchain
-        self.args = args
-
-        self.workspace = workspace.Workspace(
-            source_root=SWIFT_SOURCE_ROOT,
-            build_root=os.path.join(SWIFT_BUILD_ROOT, args.build_subdir))
-
-        self.build_libparser_only = args.build_libparser_only
-
-    def initialize_runtime_environment(self):
-        """Change the program environment for building."""
-
-        # Set an appropriate default umask.
-        os.umask(0o022)
-
-        # Unset environment variables that might affect how tools behave.
-        for v in [
-                'MAKEFLAGS',
-                'SDKROOT',
-                'MACOSX_DEPLOYMENT_TARGET',
-                'IPHONEOS_DEPLOYMENT_TARGET',
-                'TVOS_DEPLOYMENT_TARGET',
-                'WATCHOS_DEPLOYMENT_TARGET']:
-            os.environ.pop(v, None)
-
-        # Set NINJA_STATUS to format ninja output
-        os.environ['NINJA_STATUS'] = '[%f/%t][%p][%es] '
-
-    def build_ninja(self):
-        if not os.path.exists(self.workspace.source_dir("ninja")):
-            diagnostics.fatal(
-                "can't find source directory for ninja "
-                "(tried %s)" % (self.workspace.source_dir("ninja")))
-
-        ninja_build = products.Ninja.new_builder(
-            args=self.args,
-            toolchain=self.toolchain,
-            workspace=self.workspace,
-            host=StdlibDeploymentTarget.get_target_for_name(
-                self.args.host_target))
-        ninja_build.build()
-        self.toolchain.ninja = ninja_build.ninja_bin_path
-
-    def convert_to_impl_arguments(self):
+    def _convert_to_impl_arguments(self):
         """convert_to_impl_arguments() -> (env, args)
 
         Convert the invocation to an environment and list of arguments suitable
@@ -268,15 +111,15 @@ class BuildScriptInvocation(object):
         """
 
         # Create local shadows, for convenience.
-        args = self.args
-        toolchain = self.toolchain
+        args = self._args
+        toolchain = self._toolchain
+        workspace = self._workspace
 
-        cmake = CMake(args=args,
-                      toolchain=self.toolchain)
+        cmake = CMake(args=args, toolchain=toolchain)
 
         impl_args = [
-            "--workspace", self.workspace.source_root,
-            "--build-dir", self.workspace.build_root,
+            "--workspace", workspace.source_root,
+            "--build-dir", workspace.build_root,
             "--install-prefix", args.install_prefix,
             "--host-target", args.host_target,
             "--stdlib-deployment-targets",
@@ -326,13 +169,13 @@ class BuildScriptInvocation(object):
         ]
 
         # Compute any product specific cmake arguments.
-        for product_class in self.compute_product_classes():
+        for product_class in self._product_classes:
             if not product_class.is_build_script_impl_product():
                 continue
 
             product_name = product_class.product_name()
             product_source_name = product_class.product_source_name()
-            source_dir = self.workspace.source_dir(product_source_name)
+            source_dir = workspace.source_dir(product_source_name)
 
             if not os.path.exists(source_dir):
                 diagnostics.fatal(
@@ -341,11 +184,11 @@ class BuildScriptInvocation(object):
 
             product = product_class(
                 args=args,
-                toolchain=self.toolchain,
+                toolchain=toolchain,
                 source_dir=source_dir,
                 # FIXME: This is incorrect since it always assumes the host
                 # target I think?
-                build_dir=self.workspace.build_dir(
+                build_dir=workspace.build_dir(
                     args.host_target, product_name))
             cmake_opts = product.cmake_options
 
@@ -623,7 +466,7 @@ class BuildScriptInvocation(object):
 
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.
-        host_specific_variables = self.compute_host_specific_variables()
+        host_specific_variables = self._compute_host_specific_variables()
         impl_env = {}
         for (host_target, options) in host_specific_variables.items():
             for (name, value) in options.items():
@@ -634,14 +477,14 @@ class BuildScriptInvocation(object):
 
         return (impl_env, impl_args)
 
-    def compute_host_specific_variables(self):
+    def _compute_host_specific_variables(self):
         """compute_host_specific_variables(args) -> dict
 
         Compute the host-specific options, organized as a dictionary keyed by
         host of options.
         """
 
-        args = self.args
+        args = self._args
 
         options = {}
         for host_target in [args.host_target] + args.cross_compile_hosts:
@@ -666,6 +509,199 @@ class BuildScriptInvocation(object):
             }
 
         return options
+
+
+class BuildScriptInvocation(object):
+
+    """Represent a single build script invocation."""
+
+    @staticmethod
+    def validate_arguments(toolchain, args):
+        if toolchain.cc is None or toolchain.cxx is None:
+            diagnostics.fatal(
+                "can't find clang (please install clang-3.5 or a "
+                "later version)")
+
+        if toolchain.cmake is None:
+            diagnostics.fatal("can't find CMake (please install CMake)")
+
+        if args.distcc:
+            if toolchain.distcc is None:
+                diagnostics.fatal(
+                    "can't find distcc (please install distcc)")
+            if toolchain.distcc_pump is None:
+                diagnostics.fatal(
+                    "can't find distcc-pump (please install distcc-pump)")
+
+        if args.host_target is None or args.stdlib_deployment_targets is None:
+            diagnostics.fatal("unknown operating system")
+
+        if args.symbols_package:
+            if not os.path.isabs(args.symbols_package):
+                print(
+                    '--symbols-package must be an absolute path '
+                    '(was \'{}\')'.format(args.symbols_package))
+                return 1
+            if not args.install_symroot:
+                diagnostics.fatal(
+                    "--install-symroot is required when specifying "
+                    "--symbols-package.")
+
+        if args.android:
+            if args.android_ndk is None or \
+                    args.android_api_level is None or \
+                    args.android_icu_uc is None or \
+                    args.android_icu_uc_include is None or \
+                    args.android_icu_i18n is None or \
+                    args.android_icu_i18n_include is None or \
+                    args.android_icu_data is None:
+                diagnostics.fatal(
+                    "when building for Android, --android-ndk, "
+                    "--android-api-level, --android-icu-uc, "
+                    "--android-icu-uc-include, --android-icu-i18n, "
+                    "--android-icu-i18n-include, and --android-icu-data "
+                    "must be specified")
+
+        targets_needing_toolchain = [
+            'build_indexstoredb',
+            'build_sourcekitlsp',
+            'build_toolchainbenchmarks',
+            'tsan_libdispatch_test',
+        ]
+        has_target_needing_toolchain = \
+            bool(sum(getattr(args, x) for x in targets_needing_toolchain))
+        if args.legacy_impl and has_target_needing_toolchain:
+            diagnostics.fatal(
+                "--legacy-impl is incompatible with building packages needing "
+                "a toolchain (%s)" % ", ".join(targets_needing_toolchain))
+
+    @staticmethod
+    def apply_default_arguments(toolchain, args):
+        # Infer if ninja is required
+        ninja_required = (
+            args.cmake_generator == 'Ninja' or args.build_foundation)
+        if ninja_required and toolchain.ninja is None:
+            args.build_ninja = True
+
+        # Set the default stdlib-deployment-targets, if none were provided.
+        if args.stdlib_deployment_targets is None:
+            stdlib_targets = \
+                StdlibDeploymentTarget.default_stdlib_deployment_targets()
+            args.stdlib_deployment_targets = [
+                target.name for target in stdlib_targets]
+
+        # SwiftPM and XCTest have a dependency on Foundation.
+        # On OS X, Foundation is built automatically using xcodebuild.
+        # On Linux, we must ensure that it is built manually.
+        if ((args.build_swiftpm or args.build_xctest) and
+                platform.system() != "Darwin"):
+            args.build_foundation = True
+
+        # Foundation has a dependency on libdispatch.
+        # On OS X, libdispatch is provided by the OS.
+        # On Linux, we must ensure that it is built manually.
+        if (args.build_foundation and
+                platform.system() != "Darwin"):
+            args.build_libdispatch = True
+
+        if args.build_subdir is None:
+            args.build_subdir = \
+                workspace.compute_build_subdir(args)
+
+        if args.install_destdir is None:
+            args.install_destdir = os.path.join(
+                SWIFT_BUILD_ROOT, args.build_subdir,
+                '{}-{}'.format('toolchain', args.host_target))
+
+        # Add optional stdlib-deployment-targets
+        if args.android:
+            if args.android_arch == "armv7":
+                args.stdlib_deployment_targets.append(
+                    StdlibDeploymentTarget.Android.armv7.name)
+            elif args.android_arch == "aarch64":
+                args.stdlib_deployment_targets.append(
+                    StdlibDeploymentTarget.Android.aarch64.name)
+
+        # Infer platform flags from manually-specified configure targets.
+        # This doesn't apply to Darwin platforms, as they are
+        # already configured. No building without the platform flag, though.
+
+        android_tgts = [tgt for tgt in args.stdlib_deployment_targets
+                        if StdlibDeploymentTarget.Android.contains(tgt)]
+        if not args.android and len(android_tgts) > 0:
+            args.android = True
+            args.build_android = False
+
+        # Include the Darwin supported architectures in the CMake options.
+        if args.swift_darwin_supported_archs:
+            args.extra_cmake_options.append(
+                '-DSWIFT_DARWIN_SUPPORTED_ARCHS:STRING={}'.format(
+                    args.swift_darwin_supported_archs))
+
+            # Remove unsupported Darwin archs from the standard library
+            # deployment targets.
+            supported_archs = args.swift_darwin_supported_archs.split(';')
+            targets = StdlibDeploymentTarget.get_targets_by_name(
+                args.stdlib_deployment_targets)
+
+            args.stdlib_deployment_targets = [
+                target.name
+                for target in targets
+                if (target.platform.is_darwin and
+                    target.arch in supported_archs)
+            ]
+
+        # Include the Darwin module-only architectures in the CMake options.
+        if args.swift_darwin_module_archs:
+            args.extra_cmake_options.append(
+                '-DSWIFT_DARWIN_MODULE_ARCHS:STRING={}'.format(
+                    args.swift_darwin_module_archs))
+
+# ---
+
+    def __init__(self, toolchain, args):
+        self.toolchain = toolchain
+        self.args = args
+
+        self.workspace = workspace.Workspace(
+            source_root=SWIFT_SOURCE_ROOT,
+            build_root=os.path.join(SWIFT_BUILD_ROOT, args.build_subdir))
+
+        self.build_libparser_only = args.build_libparser_only
+
+    def initialize_runtime_environment(self):
+        """Change the program environment for building."""
+
+        # Set an appropriate default umask.
+        os.umask(0o022)
+
+        # Unset environment variables that might affect how tools behave.
+        for v in [
+                'MAKEFLAGS',
+                'SDKROOT',
+                'MACOSX_DEPLOYMENT_TARGET',
+                'IPHONEOS_DEPLOYMENT_TARGET',
+                'TVOS_DEPLOYMENT_TARGET',
+                'WATCHOS_DEPLOYMENT_TARGET']:
+            os.environ.pop(v, None)
+
+        # Set NINJA_STATUS to format ninja output
+        os.environ['NINJA_STATUS'] = '[%f/%t][%p][%es] '
+
+    def build_ninja(self):
+        if not os.path.exists(self.workspace.source_dir("ninja")):
+            diagnostics.fatal(
+                "can't find source directory for ninja "
+                "(tried %s)" % (self.workspace.source_dir("ninja")))
+
+        ninja_build = products.Ninja.new_builder(
+            args=self.args,
+            toolchain=self.toolchain,
+            workspace=self.workspace,
+            host=StdlibDeploymentTarget.get_target_for_name(
+                self.args.host_target))
+        ninja_build.build()
+        self.toolchain.ninja = ninja_build.ninja_bin_path
 
     def compute_product_classes(self):
         """compute_product_classes() -> list
@@ -716,15 +752,21 @@ class BuildScriptInvocation(object):
     def execute(self):
         """Execute the invocation with the configured arguments."""
 
+        # Compute the list of product classes to operate on.
+        #
+        # FIXME: This should really be per-host, but the current structure
+        # matches that of `build-script-impl`.
+        product_classes = self.compute_product_classes()
+
         # Convert to a build-script-impl invocation.
-        (self.impl_env, self.impl_args) = self.convert_to_impl_arguments()
+        self._impl_helper = BuildScriptImplHelper(
+            self.args, self.toolchain, self.workspace, product_classes)
 
         # If using the legacy implementation, delegate all behavior to
         # `build-script-impl`.
         if self.args.legacy_impl:
             # Execute the underlying build script implementation.
-            shell.call_without_sleeping([build_script_impl] + self.impl_args,
-                                        env=self.impl_env, echo=True)
+            self._impl_helper.execute(echo=True)
             return
 
         # Otherwise, we compute and execute the individual actions ourselves.
@@ -805,36 +847,23 @@ class BuildScriptInvocation(object):
         self._execute_merged_host_lipo_action()
 
     def _execute_build_action(self, host_target, product_class):
-        action_name = "{}-{}-build".format(host_target.name,
-                                           product_class.product_name())
-        self._execute_action(action_name)
+        self._impl_helper.build(host_target.name, product_class.product_name())
 
     def _execute_test_action(self, host_target, product_class):
-        action_name = "{}-{}-test".format(host_target.name,
-                                          product_class.product_name())
-        self._execute_action(action_name)
+        self._impl_helper.test(host_target.name, product_class.product_name())
 
     def _execute_install_action(self, host_target, product_class):
-        action_name = "{}-{}-install".format(host_target.name,
-                                             product_class.product_name())
-        self._execute_action(action_name)
+        self._impl_helper.install(
+            host_target.name, product_class.product_name())
 
     def _execute_extract_symbols_action(self, host_target):
-        action_name = "{}-extractsymbols".format(host_target.name)
-        self._execute_action(action_name)
+        self._impl_helper.extract_symbols(host_target)
 
     def _execute_package_action(self, host_target):
-        action_name = "{}-package".format(host_target.name)
-        self._execute_action(action_name)
+        self._impl_helper.package(host_target)
 
     def _execute_merged_host_lipo_action(self):
-        self._execute_action("merged-hosts-lipo")
-
-    def _execute_action(self, action_name):
-        shell.call_without_sleeping(
-            [build_script_impl] + self.impl_args +
-            ["--only-execute", action_name],
-            env=self.impl_env, echo=self.args.verbose_build)
+        self._impl_helper.lipo()
 
 
 # Provide a short delay so accidentally invoked clean builds can be canceled.
