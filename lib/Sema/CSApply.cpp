@@ -822,20 +822,10 @@ namespace {
             }
           }
         }
-//        member->dump();
-//        else if (auto *sub = dyn_cast<SubscriptDecl>(member)) {
-//          fprintf(stderr, "HEREE2!!!!!!!!!!!!!!!!\n");
-//          if (auto dyn = dyn_cast<DynamicSelfType>(sub->getElementInterfaceType()
-//                                                   ->getCanonicalType())) {
-//            refTy = refTy->replaceCovariantResultType(dyn, 2);
-//          }
-//        }
-        else if (auto *sub = dyn_cast<VarDecl>(member)) {
-          if (auto dyn = dyn_cast<DynamicSelfType>(sub->getValueInterfaceType()
+        else if (auto decl = dyn_cast<VarDecl>(member)) {
+          if (auto dyn = dyn_cast<DynamicSelfType>(decl->getValueInterfaceType()
                                                    ->getCanonicalType())) {
-            refTy = refTy->replaceCovariantResultType(containerTy/*or dyn or baseTy or containerTy*/, 1);
-//            fprintf(stderr, "HEREE22!!!!!!!!!!!!!!!!\n");
-//            dyn.dump();
+            refTy = refTy->replaceCovariantResultType(containerTy, 1);
             if (!baseTy->isEqual(containerTy)) {
               dynamicSelfFnType = refTy->replaceCovariantResultType(containerTy, 1);
             }

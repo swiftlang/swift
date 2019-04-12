@@ -77,7 +77,7 @@ class A<T> {
     return copy
   }
 
-  var copied: Self { // expected-error {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'A'?}}
+  var copied: Self {
     let copy = Self.init(a: 11)
     return copy
   }
@@ -110,7 +110,7 @@ class B: A<Int> {
     let copy = super.copy() as! Self // supported
     return copy
   }
-  override var copied: Self { // expected-error {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'B'?}}
+  override var copied: Self {
     let copy = super.copied as! Self // unsupported
     return copy
   }

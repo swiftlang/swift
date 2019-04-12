@@ -1072,6 +1072,13 @@ static Type SelfAllowedBySE0068(TypeResolution resolution,
     bool isTypeAliasInClass = insideClass &&
       options.is(TypeResolverContext::TypeAliasDecl);
 
+    if (isMutablePropertyOrSubscriptOfClass) {
+      if (auto prop = dyn_cast_or_null<ValueDecl>
+          (dc->getInnermostDeclarationDeclContext()))
+        if (!prop->isSettable(dc))
+          isMutablePropertyOrSubscriptOfClass = false;
+    }
+
     if (((!insideClass || !declaringMethod) &&
          !isMutablePropertyOrSubscriptOfClass && !isTypeAliasInClass &&
          !options.is(TypeResolverContext::GenericRequirement)) ||
