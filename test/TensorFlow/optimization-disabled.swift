@@ -43,9 +43,8 @@ public func testSendsInALoopGPU() {
 // CHECK:   bb3:
 // CHECK-NOT:  graph_op "tfc.RecvFromHost
 // CHECK:      graph_op "tfc.TensorTransfer
+// CHECK:      graph_op "tfc.TensorTransfer
 // CHECK:      graph_op "tfc.SendToHost
 // Send/Receives/Transfers correspond to warnings after the loop.
-// CHECK:  bb6:
 // CHECK-NOT:  graph_op "tfc.RecvFromHost
-// CHECK:  graph_op "tfc.TensorTransfer
 // CHECK:      } // end sil function
