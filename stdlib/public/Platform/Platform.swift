@@ -30,13 +30,15 @@ public var noErr: OSStatus { return 0 }
 /// The C type is a typedef for `unsigned char`.
 @_fixed_layout
 public struct DarwinBoolean : ExpressibleByBooleanLiteral {
-  var _value: UInt8
+  @usableFromInline var _value: UInt8
 
+  @_transparent
   public init(_ value: Bool) {
     self._value = value ? 1 : 0
   }
 
   /// The value of `self`, expressed as a `Bool`.
+  @_transparent
   public var boolValue: Bool {
     return _value != 0
   }
@@ -63,15 +65,19 @@ extension DarwinBoolean : CustomStringConvertible {
 }
 
 extension DarwinBoolean : Equatable {
+  @_transparent
   public static func ==(lhs: DarwinBoolean, rhs: DarwinBoolean) -> Bool {
     return lhs.boolValue == rhs.boolValue
   }
 }
 
+@_transparent
 public // COMPILER_INTRINSIC
 func _convertBoolToDarwinBoolean(_ x: Bool) -> DarwinBoolean {
   return DarwinBoolean(x)
 }
+
+@_transparent
 public // COMPILER_INTRINSIC
 func _convertDarwinBooleanToBool(_ x: DarwinBoolean) -> Bool {
   return x.boolValue
