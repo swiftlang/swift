@@ -251,7 +251,7 @@ SimpleMathTests.test("StructSideEffects") {
   }
 
   func double(_ input: Float) -> Point {
-    var point = Point(x: input, y: input, z: input)
+    let point = Point(x: input, y: input, z: input)
     return point + point
   }
   expectEqual(6, pullback(at: 4, in: double)(Point(x: 1, y: 1, z: 1)))
@@ -309,11 +309,15 @@ SimpleMathTests.test("StructGeneric") {
 }
 
 SimpleMathTests.test("SubsetIndices") {
-  func train(_ lossFunction: @differentiable (Float, Float) -> Float) {
-    let y = Float(0)
-    _ = gradient(at: 0) { x in lossFunction(x, y) }
+  func grad(_ lossFunction: @differentiable (Float, Float) -> Float) -> Float {
+    return gradient(at: 1) { x in lossFunction(x * x, 10.0) }
   }
-  train { x, y in x + y }
+  expectEqual(2, grad { x, y in x + y })
+
+  func gradWRTNonDiff(_ lossFunction: @differentiable (Float, @nondiff Int) -> Float) -> Float {
+    return gradient(at: 2) { x in lossFunction(x * x, 10) }
+  }
+  expectEqual(4, gradWRTNonDiff { x, y in x + Float(y) })
 }
 
 runAllTests()

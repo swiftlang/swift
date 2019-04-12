@@ -5369,19 +5369,12 @@ RValue RValueEmitter::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
 // SWIFT_ENABLE_TENSORFLOW
 RValue RValueEmitter::visitAutoDiffFunctionExpr(AutoDiffFunctionExpr *E,
                                                 SGFContext C) {
-  std::function<unsigned(Type)> countParams;
-  countParams = [&](Type type) -> unsigned {
-    auto *fnTy = type->getAs<AnyFunctionType>();
-    if (!fnTy)
-      return 0;
-    return fnTy->getNumParams() + countParams(fnTy->getResult());
-  };
-
-  // TODO(rxwei): Use the parameter indices and order specified in E's function
-  // type.
   auto orig = SGF.emitRValueAsSingleValue(E->getSubExpr());
-  auto *diffFunc = SGF.B.createAutoDiffFunction(E,
-      SmallBitVector(countParams(E->getType()), true), 1, orig.forward(SGF));
+  auto destTy = SGF.getLoweredType(E->getType()).castTo<SILFunctionType>();
+  // TODO(rxwei): Use the order specified in E's function type.
+  auto *diffFunc = SGF.B.createAutoDiffFunction(
+      E, destTy->getDifferentiationParameterIndices(), /*order*/ 1,
+      orig.forward(SGF));
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
 }
 

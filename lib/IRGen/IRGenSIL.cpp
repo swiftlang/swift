@@ -3580,10 +3580,8 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     (void)adFnExp.claimAll();
     tmpCalleeLV = LoweredValue(e);
 
-    origCalleeType = origCalleeType->getWithExtInfo(
-        origCalleeType->getExtInfo().withDifferentiable(false));
-    substCalleeType = substCalleeType->getWithExtInfo(
-        substCalleeType->getExtInfo().withDifferentiable(false));
+    origCalleeType = origCalleeType->getWithoutDifferentiability();
+    substCalleeType = substCalleeType->getWithoutDifferentiability();
   }
   const LoweredValue &calleeLV =
       tmpCalleeLV ? *tmpCalleeLV : getLoweredValue(site.getCallee());

@@ -3218,23 +3218,20 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
   // value without disabling cleanup.
   auto fnValue = fn.getValue();
 
-  auto withoutDifferentiableType = [](CanAnyFunctionType type)
-      -> CanAnyFunctionType {
-    return type.withExtInfo(type->getExtInfo().withDifferentiable(false));
-  };
   auto withoutDifferentiablePattern = [](AbstractionPattern pattern)
       -> AbstractionPattern {
     auto patternType = cast<AnyFunctionType>(pattern.getType());
     pattern.rewriteType(
         pattern.getGenericSignature(),
-        patternType.withExtInfo(
-            patternType->getExtInfo().withDifferentiable(false)));
+        patternType->getWithoutDifferentiability()->getCanonicalType());
     return pattern;
   };
 
-  auto inputSubstTypeNotDiff = withoutDifferentiableType(inputSubstType);
+  CanAnyFunctionType inputSubstTypeNotDiff(
+      inputSubstType->getWithoutDifferentiability());
   auto inputOrigTypeNotDiff = withoutDifferentiablePattern(inputOrigType);
-  auto outputSubstTypeNotDiff = withoutDifferentiableType(outputSubstType);
+  CanAnyFunctionType outputSubstTypeNotDiff(
+      outputSubstType->getWithoutDifferentiability());
   auto outputOrigTypeNotDiff = withoutDifferentiablePattern(outputOrigType);
   auto &expectedTLNotDiff = SGF.getTypeLowering(outputOrigTypeNotDiff,
                                                 outputSubstTypeNotDiff);
@@ -3246,11 +3243,12 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
       SGF, loc, managedOriginal, inputOrigTypeNotDiff, inputSubstTypeNotDiff,
       outputOrigTypeNotDiff, outputSubstTypeNotDiff, expectedTLNotDiff);
 
-  // TODO: Use parameter indices specified in the function type.
-  auto autodiffBuilder = AutoDiffParameterIndicesBuilder::inferParameters(
-      inputSubstType, SGF.getModule().getSwiftModule());
+  AutoDiffParameterIndicesBuilder paramIndicesBuilder(inputSubstType);
+  for (auto i : range(inputSubstType->getNumParams()))
+    if (!inputSubstType->getParams()[i].isNonDifferentiable())
+      paramIndicesBuilder.setParameter(i);
   auto *parameterIndices =
-      autodiffBuilder.build(inputSubstType->getASTContext());
+      paramIndicesBuilder.build(inputSubstType->getASTContext());
 
   auto getAssocFnTy =
       [&](CanAnyFunctionType fnTy, AutoDiffAssociatedFunctionKind kind)

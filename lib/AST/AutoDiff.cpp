@@ -254,15 +254,12 @@ AutoDiffParameterIndices::getLowered(AnyFunctionType *functionType) const {
 }
 
 static unsigned getNumAutoDiffParameterIndices(AnyFunctionType *fnTy) {
-  unsigned numAutoDiffParameterIndices = 0;
-  // FIXME: Compute the exact parameter count.
-  // Do not loop ad-infinitum; loop either 1 or 2 iterations, depending on
-  // whether the function is a free function/static method/instance method.
-  while (fnTy != nullptr) {
-    numAutoDiffParameterIndices += fnTy->getNumParams();
-    fnTy = fnTy->getResult()->getAs<AnyFunctionType>();
-  }
-  return numAutoDiffParameterIndices;
+  // TODO: For more correct counting, we still need to know whether it's a
+  // method or not.
+  unsigned numParameters = fnTy->getNumParams();
+  if (auto *innerFn = fnTy->getResult()->getAs<AnyFunctionType>())
+    numParameters += innerFn->getNumParams();
+  return numParameters;
 }
 
 /// Returns true if the given type conforms to `Differentiable` in the given

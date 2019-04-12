@@ -1075,8 +1075,8 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
   // of the associated function type.
   auto *origFnTy =
       firstArgGen.build(builder)->castTo<AnyFunctionType>();
-  origFnTy = origFnTy->withExtInfo(
-      origFnTy->getExtInfo().withDifferentiable(false).withNoEscape(false));
+  origFnTy = origFnTy->getWithoutDifferentiability()->withExtInfo(
+      origFnTy->getExtInfo().withNoEscape(false));
   auto autodiffBuilder = AutoDiffParameterIndicesBuilder::inferParameters(
       origFnTy, Context.getStdlibModule());
   auto *paramIndices = autodiffBuilder.build(Context);
