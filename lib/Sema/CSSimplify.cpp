@@ -4259,13 +4259,13 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
              DeclName memberName, const OverloadChoice &choice,
              ConstraintLocator *locator,
              Optional<MemberLookupResult::UnviableReason> reason = None) {
-  if (!choice.isDecl())
-    return nullptr;
-
-  auto *decl = choice.getDecl();
-  if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
-    if (auto *fix = validateInitializerRef(cs, CD, locator))
-      return fix;
+  // Not all of the choices handled here are going
+  // to refer to a declaration.
+  if (choice.isDecl()) {
+    if (auto *CD = dyn_cast<ConstructorDecl>(choice.getDecl())) {
+      if (auto *fix = validateInitializerRef(cs, CD, locator))
+        return fix;
+    }
   }
 
   if (reason) {
@@ -4275,7 +4275,8 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
       return AllowTypeOrInstanceMember::create(cs, baseTy, memberName, locator);
 
     case MemberLookupResult::UR_Inaccessible:
-      return AllowInaccessibleMember::create(cs, decl, locator);
+      assert(choice.isDecl());
+      return AllowInaccessibleMember::create(cs, choice.getDecl(), locator);
 
     case MemberLookupResult::UR_MutatingMemberOnRValue:
     case MemberLookupResult::UR_MutatingGetterOnRValue:
