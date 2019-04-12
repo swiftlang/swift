@@ -19,6 +19,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERRIDE_TestStruct | %FileCheck %s -check-prefix=OVERRIDE
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERRIDE_HasTypealias | %FileCheck %s -check-prefix=OVERRIDE_HasTypealias
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_TestProtocol_DOT | %FileCheck %s -check-prefix=POSTFIX_TestProtocol_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_TestProtocol_NODOT | %FileCheck %s -check-prefix=POSTFIX_TestProtocol_NODOT
+
 protocol MyProtocol {
   associatedtype Mistery
 }
@@ -136,3 +139,37 @@ class HasTypealias : HasAssocWithConformanceConstraint {
 // OVERRIDE_HasTypealias-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConformanceConstraint(fn: (Int) -> Int) -> ConcreteMyProtocol {|};
 // OVERRIDE_HasTypealias: End completions
 }
+
+// MARK: Postfix expession for opaque result types.
+
+protocol TestProtocol {
+  associatedtype Assoc1
+  associatedtype Assoc2: Comparable
+
+  func foo(arg1: Assoc1, arg2: (Assoc2) -> Assoc1) -> Assoc2
+  subscript(idx: Assoc1, idx2: Assoc2) -> Self { get }
+  var value: (Assoc1, Assoc2) { get }
+}
+
+func vendTestProtocol() -> some TestProtocol {
+  <#code#>
+}
+
+func postfixExpr() {
+  var value = vendTestProtocol()
+  let _ = value.#^POSTFIX_TestProtocol_DOT^#
+  let _ = value#^POSTFIX_TestProtocol_NODOT^#
+}
+// POSTFIX_TestProtocol_DOT: Begin completions, 3 items
+// POSTFIX_TestProtocol_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   foo({#arg1: TestProtocol.Assoc1#}, {#arg2: (Comparable) -> TestProtocol.Assoc1##(Comparable) -> TestProtocol.Assoc1#})[#Comparable#]; name={{.*$}}
+// POSTFIX_TestProtocol_DOT-DAG: Decl[InstanceVar]/CurrNominal:      value[#(TestProtocol.Assoc1, Comparable)#]; name={{.*$}}
+// POSTFIX_TestProtocol_DOT-DAG: Keyword[self]/CurrNominal:          self[#TestProtocol#]; name={{.*$}}
+// POSTFIX_TestProtocol_DOT: End completions
+
+// POSTFIX_TestProtocol_NODOT: Begin completions, 5 items
+// POSTFIX_TestProtocol_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .foo({#arg1: TestProtocol.Assoc1#}, {#arg2: (Comparable) -> TestProtocol.Assoc1##(Comparable) -> TestProtocol.Assoc1#})[#Comparable#]; name={{.*$}}
+// POSTFIX_TestProtocol_NODOT-DAG: Decl[Subscript]/CurrNominal:        [{#(idx): TestProtocol.Assoc1#}, {#(idx2): Comparable#}][#TestProtocol#]; name={{.*$}}
+// POSTFIX_TestProtocol_NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .value[#(TestProtocol.Assoc1, Comparable)#]; name={{.*$}}
+// POSTFIX_TestProtocol_NODOT-DAG: BuiltinOperator/None:                = {#TestProtocol#}[#Void#]; name={{.*$}}
+// POSTFIX_TestProtocol_NODOT-DAG: Keyword[self]/CurrNominal:          .self[#TestProtocol#]; name={{.*$}}
+// POSTFIX_TestProtocol_NODOT-DAG: End completions
