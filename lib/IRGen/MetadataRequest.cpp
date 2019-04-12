@@ -1946,9 +1946,6 @@ llvm::Function *irgen::getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,
 
   switch (getTypeMetadataAccessStrategy(type)) {
   case MetadataAccessStrategy::ForeignAccessor:
-    // Force the foreign candidate to exist.
-    (void) IGM.getAddrOfForeignTypeMetadataCandidate(type);
-    LLVM_FALLTHROUGH;
   case MetadataAccessStrategy::PublicUniqueAccessor:
   case MetadataAccessStrategy::HiddenUniqueAccessor:
   case MetadataAccessStrategy::PrivateAccessor:

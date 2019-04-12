@@ -1833,4 +1833,22 @@ mirrors.test("GenericNestedWithSameTypeConstraints") {
   expectEqual(expected, output)
 }
 
+@_alignment(16) struct CustomAlignment {
+  var x: Int
+  var y: Int
+}
+
+mirrors.test("CustomAlignment") {
+  let value = CustomAlignment(x: 123, y: 321)
+  var output = ""
+  dump(value, to: &output)
+
+  let expected =
+    "▿ Mirror.CustomAlignment\n" +
+    "  - x: 123\n" +
+    "  - y: 321\n"
+
+  expectEqual(expected, output)
+}
+
 runAllTests()

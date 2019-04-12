@@ -17,7 +17,7 @@ protocol Assocked {
 struct Universal : P, Q {}
 
 
-// CHECK-LABEL: @"symbolic _____ 23associated_type_witness12OuterPrivate{{.*}}V" = linkonce_odr hidden constant
+// CHECK-LABEL: @"symbolic _____ 23associated_type_witness12OuterPrivate{{.*}}InnermostV" = linkonce_odr hidden constant
 // CHECK-SAME: @"$s23associated_type_witness12OuterPrivate{{.*}}5InnerE0V9InnermostVMn"
 private struct OuterPrivate {
   struct InnerPrivate: HasSimpleAssoc {

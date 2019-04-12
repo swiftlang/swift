@@ -793,6 +793,7 @@ void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
     // Add it to the queue if it hasn't already been put there.
     if (canEmitWitnessTableLazily(wt) &&
         LazilyEmittedWitnessTables.insert(wt).second) {
+      assert(!FinishedEmittingLazyDefinitions);
       LazyWitnessTables.push_back(wt);
     }
   }
