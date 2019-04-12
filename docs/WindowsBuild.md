@@ -289,7 +289,6 @@ cmake -G Ninja^
   -DBUILD_SHARED_LIBS=YES^
   -DCMAKE_BUILD_TYPE=RelWithDebInfo^
   -DCMAKE_SWIFT_COMPILER=S:\b\swift\bin\swiftc.exe^
-  -DXCTEST_PATH_TO_COREFOUNDATION_BUILD=S:\b\foundation\CoreFoundation-prefix^
   -DXCTEST_PATH_TO_FOUNDATION_BUILD=S:\b\foundation^
   -DXCTEST_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch^
   -DXCTEST_PATH_TO_LIBDISPATCH_BUILD=S:\b\libdispatch^
