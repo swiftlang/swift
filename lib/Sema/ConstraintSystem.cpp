@@ -2197,7 +2197,8 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
       // through lvalue, inout and IUO types here
       Type lookupBaseType = newBase->getWithoutSpecifierType();
 
-      if (lookupBaseType->mayHaveMembers()) {
+      if (lookupBaseType->mayHaveMembers() ||
+          lookupBaseType->is<DynamicSelfType>()) {
         auto *proto = assocType->getProtocol();
         auto conformance = cs.DC->getParentModule()->lookupConformance(
           lookupBaseType, proto);
