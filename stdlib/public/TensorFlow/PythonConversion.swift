@@ -1,4 +1,4 @@
-//===-- PythonConversion.swift ---------------------------------*- swift -*-===//
+//===-- PythonConversion.swift --------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines conversions between Python types & 
-// custom TensorFlow types
+// This file defines conversions between Python types & custom TensorFlow types.
 //
 //===----------------------------------------------------------------------===//
 
@@ -170,8 +169,7 @@ extension TensorShape : PythonConvertible {
   }
 
   public init?(_ pythonObject: PythonObject) {
-    let hasLen = Bool(Python.hasattr(pythonObject, "__len__"))
-    if(hasLen == true) {
+    if Python.hasattr(pythonObject, "__len__") == true {
       guard let array = [Int32](pythonObject) else { return nil }
       self.init(array)
     } else {
