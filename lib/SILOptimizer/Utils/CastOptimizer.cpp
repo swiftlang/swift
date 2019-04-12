@@ -176,7 +176,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   // Retrieve the bridging operation to be used if a static conformance
   // to _BridgedToObjectiveC can be proven.
   SILFunction *bridgingFunc =
-      getObjCToSwiftBridgingFunction(FunctionBuilder, dynamicCast);
+      getObjCToSwiftBridgingFunction(functionBuilder, dynamicCast);
   if (!bridgingFunc)
     return nullptr;
 
@@ -189,7 +189,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   CanType CanBridgedTy = BridgedTargetTy->getCanonicalType();
   SILType silBridgedTy = SILType::getPrimitiveObjectType(CanBridgedTy);
 
-  SILBuilderWithScope Builder(Inst, BuilderContext);
+  SILBuilderWithScope Builder(Inst, builderContext);
 
   // If this is a conditional cast:
   //
@@ -337,7 +337,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
     Builder.createBranch(Loc, SuccessBB, SuccessBBArgs);
   }
 
-  EraseInstAction(Inst);
+  eraseInstAction(Inst);
   return (newI) ? newI : AI;
 }
 
@@ -475,7 +475,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
   SILFunction *bridgedFunc = nullptr;
   SubstitutionMap subMap;
   {
-    auto result = findBridgeToObjCFunc(FunctionBuilder, dynamicCast);
+    auto result = findBridgeToObjCFunc(functionBuilder, dynamicCast);
     if (!result)
       return nullptr;
     std::tie(bridgedFunc, subMap) = result.getValue();
@@ -489,7 +489,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
     return nullptr;
   }
 
-  SILBuilderWithScope Builder(Inst, BuilderContext);
+  SILBuilderWithScope Builder(Inst, builderContext);
   auto FnRef = Builder.createFunctionRef(Loc, bridgedFunc);
   auto ParamTypes = SubstFnTy.castTo<SILFunctionType>()->getParameters();
   if (Src->getType().isAddress() && !substConv.isSILIndirect(ParamTypes[0])) {
@@ -669,7 +669,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
   }
 
   if (Dest) {
-    EraseInstAction(Inst);
+    eraseInstAction(Inst);
   }
 
   return NewI;
@@ -756,7 +756,7 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
   auto *SuccessBB = dynamicCast.getSuccessBlock();
   auto *FailureBB = dynamicCast.getFailureBlock();
 
-  SILBuilderWithScope Builder(Inst, BuilderContext);
+  SILBuilderWithScope Builder(Inst, builderContext);
 
   // Check if we can statically predict the outcome of the cast.
   auto Feasibility =
@@ -768,8 +768,8 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
       srcTL.emitDestroyAddress(Builder, Loc, Src);
     }
     auto NewI = Builder.createBranch(Loc, FailureBB);
-    EraseInstAction(Inst);
-    WillFailAction();
+    eraseInstAction(Inst);
+    willFailAction();
     return NewI;
   }
 
@@ -810,10 +810,10 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
         auto &srcTL = Builder.getTypeLowering(Src->getType());
         srcTL.emitDestroyAddress(Builder, Loc, Src);
       }
-      EraseInstAction(Inst);
+      eraseInstAction(Inst);
       Builder.setInsertionPoint(BB);
       auto *NewI = Builder.createBranch(Loc, SuccessBB);
-      WillSucceedAction();
+      willSucceedAction();
       return NewI;
     }
 
@@ -841,14 +841,14 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
       // No optimization was possible.
       return nullptr;
     }
-    EraseInstAction(Inst);
+    eraseInstAction(Inst);
   }
   SILInstruction *NewI = &BB->back();
   if (!isa<TermInst>(NewI)) {
     Builder.setInsertionPoint(BB);
     NewI = Builder.createBranch(Loc, SuccessBB);
   }
-  WillSucceedAction();
+  willSucceedAction();
   return NewI;
 }
 
@@ -861,7 +861,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       return nullptr;
 
     // We know the dynamic type of the operand.
-    SILBuilderWithScope Builder(Inst, BuilderContext);
+    SILBuilderWithScope Builder(Inst, builderContext);
     auto Loc = dynamicCast.getLocation();
 
     if (ARI->getType() == dynamicCast.getLoweredTargetType()) {
@@ -870,8 +870,8 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       Args.push_back(ARI);
       auto *NewI =
           Builder.createBranch(Loc, dynamicCast.getSuccessBlock(), Args);
-      EraseInstAction(Inst);
-      WillSucceedAction();
+      eraseInstAction(Inst);
+      willSucceedAction();
       return NewI;
     }
 
@@ -881,8 +881,8 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     if (Builder.hasOwnership())
       Args.push_back(dynamicCast.getSource());
     auto *NewI = Builder.createBranch(Loc, dynamicCast.getFailureBlock(), Args);
-    EraseInstAction(Inst);
-    WillFailAction();
+    eraseInstAction(Inst);
+    willFailAction();
     return NewI;
   }
 
@@ -903,14 +903,14 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   auto Feasibility =
       dynamicCast.classifyFeasibility(false /*allow whole module*/);
 
-  SILBuilderWithScope Builder(Inst, BuilderContext);
+  SILBuilderWithScope Builder(Inst, builderContext);
   if (Feasibility == DynamicCastFeasibility::WillFail) {
     TinyPtrVector<SILValue> Args;
     if (Builder.hasOwnership())
       Args.push_back(Inst->getOperand());
     auto *NewI = Builder.createBranch(Loc, dynamicCast.getFailureBlock(), Args);
-    EraseInstAction(Inst);
-    WillFailAction();
+    eraseInstAction(Inst);
+    willFailAction();
     return NewI;
   }
 
@@ -958,8 +958,8 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   }
 
   auto *NewI = Builder.createBranch(Loc, SuccessBB, CastedValue);
-  EraseInstAction(Inst);
-  WillSucceedAction();
+  eraseInstAction(Inst);
+  willSucceedAction();
   return NewI;
 }
 
@@ -982,12 +982,12 @@ SILInstruction *CastOptimizer::simplifyCheckedCastValueBranchInst(
   // Check if we can statically predict the outcome of the cast.
   auto Feasibility = dynamicCast.classifyFeasibility(false /*allow wmo opts*/);
 
-  SILBuilderWithScope Builder(Inst, BuilderContext);
+  SILBuilderWithScope Builder(Inst, builderContext);
 
   if (Feasibility == DynamicCastFeasibility::WillFail) {
     auto *NewI = Builder.createBranch(Loc, FailureBB);
-    EraseInstAction(Inst);
-    WillFailAction();
+    eraseInstAction(Inst);
+    willFailAction();
     return NewI;
   }
 
@@ -1036,8 +1036,8 @@ SILInstruction *CastOptimizer::simplifyCheckedCastValueBranchInst(
   }
 
   auto *NewI = Builder.createBranch(Loc, SuccessBB, CastedValue);
-  EraseInstAction(Inst);
-  WillSucceedAction();
+  eraseInstAction(Inst);
+  willSucceedAction();
   return NewI;
 }
 
@@ -1097,7 +1097,7 @@ SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
             canUseScalarCheckedCastInstructions(
                 Inst->getModule(), MI->getType().getASTType(),
                 Inst->getTargetType())) {
-          SILBuilderWithScope B(Inst, BuilderContext);
+          SILBuilderWithScope B(Inst, builderContext);
           auto NewI = B.createCheckedCastBranch(
               Loc, false /*isExact*/, MI, Dest->getType().getObjectType(),
               SuccessBB, FailureBB, Inst->getTrueBBCount(),
@@ -1108,7 +1108,7 @@ SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
           // Store the result
           B.createStore(Loc, SuccessBB->getArgument(0), Dest,
                         StoreOwnershipQualifier::Unqualified);
-          EraseInstAction(Inst);
+          eraseInstAction(Inst);
           return NewI;
         }
       }
@@ -1156,9 +1156,9 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   // checked_cast_br %0 to ...
   if (auto *IEMI = dyn_cast<InitExistentialMetatypeInst>(Op)) {
     if (auto *MI = dyn_cast<MetatypeInst>(IEMI->getOperand())) {
-      SILBuilderWithScope B(Inst, BuilderContext);
+      SILBuilderWithScope B(Inst, builderContext);
       auto *NewI = replaceCastHelper(B, dynamicCast, MI);
-      EraseInstAction(Inst);
+      eraseInstAction(Inst);
       return NewI;
     }
   }
@@ -1217,12 +1217,12 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
                                          EMT->getRepresentation());
         auto CanMetaTy = CanTypeWrapper<MetatypeType>(MetaTy);
         auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
-        SILBuilderWithScope B(Inst, BuilderContext);
+        SILBuilderWithScope B(Inst, builderContext);
         B.getOpenedArchetypes().addOpenedArchetypeOperands(
             FoundIEI->getTypeDependentOperands());
         auto *MI = B.createMetatype(FoundIEI->getLoc(), SILMetaTy);
         auto *NewI = replaceCastHelper(B, dynamicCast, MI);
-        EraseInstAction(Inst);
+        eraseInstAction(Inst);
         return NewI;
       }
     }
@@ -1273,12 +1273,12 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
         auto *MetaTy = MetatypeType::get(ConcreteTy, EMT->getRepresentation());
         auto CanMetaTy = CanTypeWrapper<MetatypeType>(MetaTy);
         auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
-        SILBuilderWithScope B(Inst, BuilderContext);
+        SILBuilderWithScope B(Inst, builderContext);
         B.getOpenedArchetypes().addOpenedArchetypeOperands(
             FoundIERI->getTypeDependentOperands());
         auto *MI = B.createMetatype(FoundIERI->getLoc(), SILMetaTy);
         auto *NewI = replaceCastHelper(B, dynamicCast, MI);
-        EraseInstAction(Inst);
+        eraseInstAction(Inst);
         return NewI;
       }
     }
@@ -1299,10 +1299,10 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
   if (Feasibility == DynamicCastFeasibility::WillFail) {
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
-    SILBuilderWithScope Builder(Inst, BuilderContext);
+    SILBuilderWithScope Builder(Inst, builderContext);
     auto *Trap = Builder.createBuiltinTrap(Loc);
     Inst->replaceAllUsesWithUndef();
-    EraseInstAction(Inst);
+    eraseInstAction(Inst);
     Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(Trap)));
     auto *UnreachableInst =
         Builder.createUnreachable(ArtificialUnreachableLocation());
@@ -1311,29 +1311,29 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
     // move before the trap.
     deleteInstructionsAfterUnreachable(UnreachableInst, Trap);
 
-    WillFailAction();
+    willFailAction();
     return Trap;
   }
 
   if (Feasibility == DynamicCastFeasibility::WillSucceed) {
 
     if (Inst->use_empty()) {
-      EraseInstAction(Inst);
-      WillSucceedAction();
+      eraseInstAction(Inst);
+      willSucceedAction();
       return nullptr;
     }
   }
 
-  SILBuilderWithScope Builder(Inst, BuilderContext);
+  SILBuilderWithScope Builder(Inst, builderContext);
 
   // Try to apply the bridged casts optimizations
   auto NewI = optimizeBridgedCasts(dynamicCast);
   if (NewI) {
     // FIXME: I'm not sure why this is true!
     auto newValue = cast<SingleValueInstruction>(NewI);
-    ReplaceInstUsesAction(Inst, newValue);
-    EraseInstAction(Inst);
-    WillSucceedAction();
+    replaceInstUsesAction(Inst, newValue);
+    eraseInstAction(Inst);
+    willSucceedAction();
     return newValue;
   }
 
@@ -1356,9 +1356,9 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
     return nullptr;
   }
 
-  ReplaceInstUsesAction(Inst, Result);
-  EraseInstAction(Inst);
-  WillSucceedAction();
+  replaceInstUsesAction(Inst, Result);
+  eraseInstAction(Inst);
+  willSucceedAction();
   return Result;
 }
 
@@ -1377,7 +1377,7 @@ void CastOptimizer::deleteInstructionsAfterUnreachable(
         continue;
       }
     CurInst->replaceAllUsesOfAllResultsWithUndef();
-    EraseInstAction(CurInst);
+    eraseInstAction(CurInst);
   }
 }
 
@@ -1496,7 +1496,7 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
   if (Feasibility == DynamicCastFeasibility::WillFail) {
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
-    SILBuilderWithScope Builder(Inst, BuilderContext);
+    SILBuilderWithScope Builder(Inst, builderContext);
     // mem2reg's invariants get unhappy if we don't try to
     // initialize a loadable result.
     if (!dynamicCast.getLoweredTargetType().isAddressOnly(
@@ -1508,7 +1508,7 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
                                       StoreOwnershipQualifier::Init);
     }
     auto *TrapI = Builder.createBuiltinTrap(Loc);
-    EraseInstAction(Inst);
+    eraseInstAction(Inst);
     Builder.setInsertionPoint(std::next(TrapI->getIterator()));
     auto *UnreachableInst =
         Builder.createUnreachable(ArtificialUnreachableLocation());
@@ -1517,7 +1517,7 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     // move before the trap.
     deleteInstructionsAfterUnreachable(UnreachableInst, TrapI);
 
-    WillFailAction();
+    willFailAction();
   }
 
   if (Feasibility == DynamicCastFeasibility::WillSucceed ||
@@ -1545,19 +1545,19 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     }
 
     if (ResultNotUsed) {
-      SILBuilderWithScope B(Inst, BuilderContext);
+      SILBuilderWithScope B(Inst, builderContext);
       B.createDestroyAddr(Loc, dynamicCast.getSource());
       if (DestroyDestInst)
-        EraseInstAction(DestroyDestInst);
-      EraseInstAction(Inst);
-      WillSucceedAction();
+        eraseInstAction(DestroyDestInst);
+      eraseInstAction(Inst);
+      willSucceedAction();
       return nullptr;
     }
 
     // Try to apply the bridged casts optimizations.
     auto NewI = optimizeBridgedCasts(dynamicCast);
     if (NewI) {
-      WillSucceedAction();
+      willSucceedAction();
       return nullptr;
     }
 
@@ -1567,22 +1567,22 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     assert(Feasibility == DynamicCastFeasibility::WillSucceed);
 
     if (optimizeStaticallyKnownProtocolConformance(Inst)) {
-      EraseInstAction(Inst);
-      WillSucceedAction();
+      eraseInstAction(Inst);
+      willSucceedAction();
       return nullptr;
     }
 
     if (dynamicCast.isBridgingCast())
       return nullptr;
 
-    SILBuilderWithScope Builder(Inst, BuilderContext);
+    SILBuilderWithScope Builder(Inst, builderContext);
     if (!emitSuccessfulIndirectUnconditionalCast(Builder, Loc, dynamicCast)) {
       // No optimization was possible.
       return nullptr;
     }
 
-    EraseInstAction(Inst);
-    WillSucceedAction();
+    eraseInstAction(Inst);
+    willSucceedAction();
   }
 
   return nullptr;
@@ -1605,27 +1605,27 @@ SILValue CastOptimizer::optimizeMetatypeConversion(
   auto replaceCast = [&](SILValue newValue) -> SILValue {
     assert(ty.getAs<AnyMetatypeType>()->getRepresentation() ==
            newValue->getType().getAs<AnyMetatypeType>()->getRepresentation());
-    ReplaceValueUsesAction(mci, newValue);
-    EraseInstAction(mci);
+    replaceValueUsesAction(mci, newValue);
+    eraseInstAction(mci);
     return newValue;
   };
 
   if (auto *mi = dyn_cast<MetatypeInst>(op)) {
     return replaceCast(
-        SILBuilderWithScope(mci, BuilderContext).createMetatype(loc, ty));
+        SILBuilderWithScope(mci, builderContext).createMetatype(loc, ty));
   }
 
   // For metatype instructions that require an operand, generate the new
   // metatype at the same position as the original to avoid extending the
   // lifetime of `op` past its destroy.
   if (auto *vmi = dyn_cast<ValueMetatypeInst>(op)) {
-    return replaceCast(SILBuilderWithScope(vmi, BuilderContext)
+    return replaceCast(SILBuilderWithScope(vmi, builderContext)
                            .createValueMetatype(loc, ty, vmi->getOperand()));
   }
 
   if (auto *emi = dyn_cast<ExistentialMetatypeInst>(op)) {
     return replaceCast(
-        SILBuilderWithScope(emi, BuilderContext)
+        SILBuilderWithScope(emi, builderContext)
             .createExistentialMetatype(loc, ty, emi->getOperand()));
   }
 
