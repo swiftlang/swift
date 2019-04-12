@@ -142,6 +142,29 @@ SWIFT_RUNTIME_STDLIB_API
 __swift_uintptr_t
 _swift_stdlib_unsafeAddressOfClass(id _Nonnull obj);
   
+
+
+static inline __swift_uint8_t _swift_stdlib_taggedPointerTableLookup(__swift_uint8_t character) {
+  // *Approximate* lookup table for what can fit in a tagged NSString
+  // This cannot be relied on for correctness, but may be useful for performance
+  // heuristics
+#define BAD 0xFF
+  static const __swift_uint8_t table[256] = {
+    /* 0 - 31 */    BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD,
+    //                                                                                              '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
+    /* 32 - 63  */  15,  BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, 46,  7,   60,  29,  30,  40,  31,  28,  43,  44,  48,  42,  49,  BAD, BAD, BAD, BAD, BAD, BAD,
+    //                   'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
+    /* 64 - 95 */   BAD, 50,  47,  27,  33,  53,  51,  58,  61,  13,  59,  52,  39,  19,  34,  41,  45,  BAD, 24,  20,  23,  38,  55,  54,  63,  62,  BAD, BAD, BAD, BAD, BAD, 56,
+    /* 96 - 127 */  BAD, 8,   32,  14,  10,  0,   17,  26,  21,  1,   22,  18,  2,   6,   11,  3,   9,   BAD, 5,   12,  4,   16,  35,  36,  25,  37,  57,  BAD, BAD, BAD, BAD, BAD,
+    /*   */         BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD,
+    /*   */         BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD,
+    /*   */         BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD,
+    /*   */         BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD, BAD
+  };
+  return table[character];
+#undef BAD
+}
+  
 #endif // __OBJC2__
 
 #ifdef __cplusplus

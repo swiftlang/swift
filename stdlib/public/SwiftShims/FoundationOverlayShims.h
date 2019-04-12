@@ -71,3 +71,6 @@ static inline _Bool _withStackOrHeapBuffer(size_t amount, void (__attribute__((n
     }
     return true;
 }
+
+#undef BAD
+
