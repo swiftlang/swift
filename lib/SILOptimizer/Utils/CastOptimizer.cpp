@@ -166,7 +166,6 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   SILInstruction *Inst = dynamicCast.getInstruction();
   bool isConditional = dynamicCast.isConditional();
   SILValue Dest = dynamicCast.getDest();
-  CanType BridgedTargetTy = dynamicCast.getBridgedTargetType();
   SILBasicBlock *SuccessBB = dynamicCast.getSuccessBlock();
   SILBasicBlock *FailureBB = dynamicCast.getFailureBlock();
   auto *F = Inst->getFunction();
@@ -185,9 +184,6 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   assert(paramTypes[0].getConvention() ==
              ParameterConvention::Direct_Guaranteed &&
          "Parameter should be @guaranteed");
-
-  CanType CanBridgedTy = BridgedTargetTy->getCanonicalType();
-  SILType silBridgedTy = SILType::getPrimitiveObjectType(CanBridgedTy);
 
   SILBuilderWithScope Builder(Inst, builderContext);
 
@@ -214,6 +210,8 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
     // Generate a load for the source argument.
     SILValue load =
         Builder.createLoad(Loc, src, LoadOwnershipQualifier::Unqualified);
+
+    SILType silBridgedTy = *dynamicCast.getLoweredBridgedTargetObjectType();
 
     // If type of the source and the expected ObjC type are equal, there is no
     // need to generate the conversion from ObjCTy to
