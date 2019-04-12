@@ -92,11 +92,6 @@
 // CHECK:  (result
 // CHECK:    (tuple))
 
-// CHECK: TypesToReflect.S.NestedS
-// CHECK: ------------------------
-// CHECK: aField: Swift.Int
-// CHECK: (struct Swift.Int)
-
 // CHECK: TypesToReflect.S
 // CHECK: ----------------
 // CHECK: aClass: TypesToReflect.C
@@ -140,6 +135,11 @@
 // CHECK: aFunctionWithCRepresentation: @convention(c) () -> ()
 // CHECK: (function convention=c
 // CHECK:   (tuple))
+
+// CHECK: TypesToReflect.S.NestedS
+// CHECK: ------------------------
+// CHECK: aField: Swift.Int
+// CHECK: (struct Swift.Int)
 
 // CHECK: TypesToReflect.E
 // CHECK: ----------------

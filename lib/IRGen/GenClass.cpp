@@ -930,13 +930,16 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   auto &resilientLayout =
     classTI.getClassLayout(*this, selfType, /*forBackwardDeployment=*/false);
 
+  // As a matter of policy, class metadata is never emitted lazily for now.
+  assert(!IRGen.hasLazyMetadata(D));
+
   // Emit the class metadata.
   emitClassMetadata(*this, D, fragileLayout, resilientLayout);
+  emitFieldDescriptor(D);
 
   IRGen.addClassForEagerInitialization(D);
 
   emitNestedTypeDecls(D->getMembers());
-  emitFieldMetadataRecord(D);
 }
 
 namespace {
