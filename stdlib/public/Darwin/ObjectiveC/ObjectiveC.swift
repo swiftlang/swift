@@ -27,26 +27,30 @@ import _SwiftObjectiveCOverlayShims
 public struct ObjCBool : ExpressibleByBooleanLiteral {
 #if os(macOS) || (os(iOS) && (arch(i386) || arch(arm)))
   // On OS X and 32-bit iOS, Objective-C's BOOL type is a "signed char".
-  var _value: Int8
+  @usableFromInline var _value: Int8
 
+  @_transparent
   init(_ value: Int8) {
     self._value = value
   }
 
+  @_transparent
   public init(_ value: Bool) {
     self._value = value ? 1 : 0
   }
 
 #else
   // Everywhere else it is C/C++'s "Bool"
-  var _value: Bool
+  @usableFromInline var _value: Bool
 
+  @_transparent
   public init(_ value: Bool) {
     self._value = value
   }
 #endif
 
   /// The value of `self`, expressed as a `Bool`.
+  @_transparent
   public var boolValue: Bool {
 #if os(macOS) || (os(iOS) && (arch(i386) || arch(arm)))
     return _value != 0
@@ -78,11 +82,13 @@ extension ObjCBool : CustomStringConvertible {
 
 // Functions used to implicitly bridge ObjCBool types to Swift's Bool type.
 
+@_transparent
 public // COMPILER_INTRINSIC
 func _convertBoolToObjCBool(_ x: Bool) -> ObjCBool {
   return ObjCBool(x)
 }
 
+@_transparent
 public // COMPILER_INTRINSIC
 func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool {
   return x.boolValue
