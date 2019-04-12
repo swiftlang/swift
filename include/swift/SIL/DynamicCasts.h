@@ -448,6 +448,13 @@ public:
     return t->getCanonicalType();
   }
 
+  Optional<SILType> getLoweredBridgedTargetObjectType() const {
+    CanType t = getBridgedTargetType();
+    if (!t)
+      return None;
+    return SILType::getPrimitiveObjectType(t);
+  }
+
   bool isConditional() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst: {
