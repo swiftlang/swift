@@ -2680,7 +2680,9 @@ public:
   }
 
   SILParameterInfo subst(SILParameterInfo orig) {
-    return SILParameterInfo(visit(orig.getType()), orig.getConvention());
+    // SWIFT_ENABLE_TENSORFLOW
+    return SILParameterInfo(visit(orig.getType()), orig.getConvention(),
+                            orig.getDifferentiability());
   }
 
   /// Tuples need to have their component types substituted by these
