@@ -266,18 +266,32 @@ extension String {
   }
 }
 
+@_effects(releasenone)
+private func _createCFString(
+  _ ptr: UnsafePointer<UInt8>,
+  _ count: Int,
+  _ encoding: UInt32
+) -> AnyObject {
+  return _swift_stdlib_CFStringCreateWithBytes(
+    nil, //ignored in the shim for perf reasons
+    ptr,
+    count,
+    kCFStringEncodingUTF8,
+    0
+  ) as AnyObject
+}
+
 extension String {
   @_effects(releasenone)
   public // SPI(Foundation)
   func _bridgeToObjectiveCImpl() -> AnyObject {
     if _guts.isSmall {
       return _guts.asSmall.withUTF8 { bufPtr in
-        // TODO(String bridging): worth isASCII check for different encoding?
-        return _swift_stdlib_CFStringCreateWithBytes(
-            nil, bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+        return _createCFString(
+            bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
             bufPtr.count,
-            kCFStringEncodingUTF8, 0)
-        as AnyObject
+            kCFStringEncodingUTF8
+        )
       }
     }
     if _guts._object.isImmortal {
