@@ -467,15 +467,17 @@ extension SIMD where Scalar: Comparable {
     return lhs .> Self(repeating: rhs)
   }
   
+  /*  Temporarily removed pending plan for Swift.min / Swift.max
   @_alwaysEmitIntoClient
   public mutating func clamp(lowerBound: Self, upperBound: Self) {
     self = self.clamped(lowerBound: lowerBound, upperBound: upperBound)
   }
-  
+
   @_alwaysEmitIntoClient
   public func clamped(lowerBound: Self, upperBound: Self) -> Self {
     return Swift.min(upperBound, Swift.max(lowerBound, self))
   }
+  */
 }
 
 extension SIMD where Scalar: FixedWidthInteger {
@@ -1341,6 +1343,10 @@ public func all<Storage>(_ mask: SIMDMask<Storage>) -> Bool {
   return mask._storage.max() < 0
 }
 
+/*
+Temporarily removed while we investigate compile-time regressions caused by
+introducing these global functions.
+ 
 /// The lanewise minimum of two vectors.
 ///
 /// Each element of the result is the minimum of the corresponding elements
@@ -1397,3 +1403,4 @@ where V: SIMD, V.Scalar: FloatingPoint {
   }
   return result
 }
+*/
