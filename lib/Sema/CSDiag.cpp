@@ -758,6 +758,7 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
     case MemberLookupResult::UR_LabelMismatch:
     case MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember:
     case MemberLookupResult::UR_ReferenceWritableKeyPathOnMutatingMember:
+    case MemberLookupResult::UR_KeyPathWithAnyObjectRootType:
       break;
     case MemberLookupResult::UR_UnavailableInExistential:
       diagnose(loc, diag::could_not_use_member_on_existential,

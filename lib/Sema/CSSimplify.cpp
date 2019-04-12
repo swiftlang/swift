@@ -3607,8 +3607,14 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   if (memberName.isSimpleName() &&
       memberName.getBaseName().getKind() == DeclBaseName::Kind::Subscript &&
       !isKeyPathDynamicMemberLookup(memberLocator)) {
-    result.ViableCandidates.push_back(
-        OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication));
+    if (baseTy->isAnyObject()) {
+      result.addUnviable(
+          OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication),
+          MemberLookupResult::UR_KeyPathWithAnyObjectRootType);
+    } else {
+      result.ViableCandidates.push_back(
+          OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication));
+    }
   }
 
   // If the base type is a tuple type, look for the named or indexed member
@@ -4288,6 +4294,8 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
     case MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember:
     case MemberLookupResult::UR_ReferenceWritableKeyPathOnMutatingMember:
       break;
+    case MemberLookupResult::UR_KeyPathWithAnyObjectRootType:
+      return AllowAnyObjectKeyPathRoot::create(cs, locator);
     }
   }
 
