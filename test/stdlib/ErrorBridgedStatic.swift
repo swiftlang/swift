@@ -8,6 +8,9 @@
 // REQUIRES: objc_interop
 // REQUIRES: static_stdlib
 
+// isTypeMetadata is asserting on the 5.1 branch...
+// REQUIRES: rdar49699316
+
 import StdlibUnittest
 
 class Bar: Foo {
