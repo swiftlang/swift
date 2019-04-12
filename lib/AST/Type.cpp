@@ -2337,9 +2337,17 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
   }
 
   // Class-to-class.
-  if (matchMode.contains(TypeMatchFlags::AllowOverride))
-    if (t2->isExactSuperclassOf(t1))
+  if (matchMode.contains(TypeMatchFlags::AllowOverride)) {
+    if (auto dyn = dyn_cast<DynamicSelfType>(t2
+                                             ->getCanonicalType())) {
+//      dyn->dump();
+//      t1->dump();
+      if (dyn->getSelfType()->isExactSuperclassOf(t1))
+        return true;
+    }
+    else if (t2->isExactSuperclassOf(t1))
       return true;
+  }
 
   if (matchMode.contains(TypeMatchFlags::AllowABICompatible))
     if (isABICompatibleEvenAddingOptional(t1, t2))
