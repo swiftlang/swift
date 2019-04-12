@@ -1422,7 +1422,7 @@ bb0(%0 : $@convention(thin) () -> ()):
 // X.deinit
 // CHECK-LABEL: CG of $s4main1XCfD
 // CHECK:        Arg %0 Esc: A, Succ:
-// CHECKL:      End
+// CHECK:      End
 sil @$s4main1XCfD: $@convention(method) (@owned X) -> () {
 bb0(%0 : $X):
   fix_lifetime %0 : $X
@@ -1437,7 +1437,7 @@ bb0(%0 : $X):
 // CHECK:        Con %0.2 Esc: G, Succ:
 // CHECK:        Val %3 Esc: G, Succ: (%3.1)
 // CHECK:        Con %3.1 Esc: G, Succ: %0.2
-// CHECKL:      End
+// CHECK:      End
 sil @$s4main1ZCfD: $@convention(method) (@owned Z) -> () {
 bb0(%0 : $Z):
   %1 = ref_element_addr %0 : $Z, #Z.x
@@ -1467,7 +1467,7 @@ bb0(%0 : $X):
 // CHECK-LABEL: CG of call_public_external_func
 // CHECK:        Val %0 Esc: G, Succ: (%0.1)
 // CHECK:        Con %0.1 Esc: G, Succ: 
-// CHECKL:      End
+// CHECK:      End
 sil @call_public_external_func : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_ref $X
