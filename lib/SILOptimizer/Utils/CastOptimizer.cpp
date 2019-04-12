@@ -75,6 +75,72 @@ static SubstitutionMap lookupBridgeToObjCProtocolSubs(SILModule &mod,
                                                    target, conf);
 }
 
+/// Given that our insertion point is at the cast that we are trying to
+/// optimize, convert our incoming value to something that can be passed to the
+/// bridge call.
+static std::pair<SILValue, SILInstruction *>
+convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
+                                      SILDynamicCastInst dynamicCast,
+                                      SILValue src) {
+  auto *f = dynamicCast.getFunction();
+  auto loc = dynamicCast.getLocation();
+  bool isConditional = dynamicCast.isConditional();
+
+  SILValue load =
+      builder.createLoad(loc, src, LoadOwnershipQualifier::Unqualified);
+
+  SILType silBridgedTy = *dynamicCast.getLoweredBridgedTargetObjectType();
+
+  // If we are not conditional...
+  if (!isConditional) {
+    // and our loaded type is our bridged type, just return the load as our
+    // SILValue and signal to our caller that we did not create a new cast
+    // instruction by returning nullptr as second.
+    if (load->getType() == silBridgedTy) {
+      return {load, nullptr};
+    }
+
+    // Otherwise, just perform an unconditional checked cast to the sil bridged
+    // ty. We return the cast as our value and as our new cast instruction.
+    auto *cast =
+        builder.createUnconditionalCheckedCast(loc, load, silBridgedTy);
+    return {cast, cast};
+  }
+
+  // If we /are/ conditional and we do not need to bridge the load to the sil,
+  // then we just create our cast success block and branch from the end of the
+  // cast instruction block to the cast success block. We leave our insertion
+  // point in the cast success block since when we return, we are going to
+  // insert the bridge call/switch there. We return the argument of the cast
+  // success block as the value to be passed to the bridging function.
+  if (load->getType() == silBridgedTy) {
+    SILBasicBlock *castSuccessBB = f->createBasicBlock();
+    castSuccessBB->createPhiArgument(silBridgedTy, ValueOwnershipKind::Owned);
+    builder.createBranch(loc, castSuccessBB, load);
+    builder.setInsertionPoint(castSuccessBB);
+    return {castSuccessBB->getArgument(0), nullptr};
+  }
+
+  auto *castFailBB = ([&]() -> SILBasicBlock * {
+    auto *failureBB = dynamicCast.getFailureBlock();
+    SILBuilderWithScope failureBBBuilder(&(*failureBB->begin()), builder);
+    return splitBasicBlockAndBranch(failureBBBuilder, &(*failureBB->begin()),
+                                    nullptr, nullptr);
+  }());
+
+  // Ok, we need to perform the full cast optimization. This means that we are
+  // going to replace the cast terminator in inst_block with a
+  // checked_cast_br. This in turn means
+  auto *castSuccessBB = f->createBasicBlock();
+  castSuccessBB->createPhiArgument(silBridgedTy, ValueOwnershipKind::Owned);
+
+  auto *ccbi = builder.createCheckedCastBranch(loc, false, load, silBridgedTy,
+                                               castSuccessBB, castFailBB);
+  splitEdge(ccbi, /* EdgeIdx to CastFailBB */ 1);
+  builder.setInsertionPoint(castSuccessBB);
+  return {castSuccessBB->getArgument(0), ccbi};
+}
+
 /// Create a call of _forceBridgeFromObjectiveC_bridgeable or
 /// _conditionallyBridgeFromObjectiveC_bridgeable which converts an ObjC
 /// instance into a corresponding Swift type, conforming to
@@ -187,62 +253,15 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
 
   SILBuilderWithScope Builder(Inst, builderContext);
 
-  // If this is a conditional cast:
-  //
-  // We need a new fail BB in order to add a dealloc_stack to it
-  SILBasicBlock *CastFailBB = nullptr;
-  if (isConditional) {
-    auto CurrInsPoint = Builder.getInsertionPoint();
-    CastFailBB = splitBasicBlockAndBranch(Builder, &(*FailureBB->begin()),
-                                          nullptr, nullptr);
-    Builder.setInsertionPoint(CurrInsPoint);
-  }
-
-  // Check if we can simplify a cast into:
-  // - ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
-  // - then convert _ObjectiveCBridgeable._ObjectiveCType to
-  // a Swift type using _forceBridgeFromObjectiveC.
-
-  // Inline constructor.
+  // Generate a load for the source argument since as part of our optimization
+  // we are going to promote the cast to work with objects instead of
+  // addresses. Additionally, if we have an objc object that is not bridgeable,
+  // but that could be converted to something that is bridgeable, we try to
+  // convert to the bridgeable type.
   SILValue srcOp;
   SILInstruction *newI;
-  std::tie(srcOp, newI) = [&]() -> std::pair<SILValue, SILInstruction *> {
-    // Generate a load for the source argument.
-    SILValue load =
-        Builder.createLoad(Loc, src, LoadOwnershipQualifier::Unqualified);
-
-    SILType silBridgedTy = *dynamicCast.getLoweredBridgedTargetObjectType();
-
-    // If type of the source and the expected ObjC type are equal, there is no
-    // need to generate the conversion from ObjCTy to
-    // _ObjectiveCBridgeable._ObjectiveCType.
-    if (load->getType() == silBridgedTy) {
-      if (isConditional) {
-        SILBasicBlock *castSuccessBB = F->createBasicBlock();
-        castSuccessBB->createPhiArgument(silBridgedTy,
-                                         ValueOwnershipKind::Owned);
-        Builder.createBranch(Loc, castSuccessBB, load);
-        Builder.setInsertionPoint(castSuccessBB);
-        return {castSuccessBB->getArgument(0), nullptr};
-      }
-
-      return {load, nullptr};
-    }
-
-    if (isConditional) {
-      SILBasicBlock *castSuccessBB = F->createBasicBlock();
-      castSuccessBB->createPhiArgument(silBridgedTy, ValueOwnershipKind::Owned);
-      auto *ccbi = Builder.createCheckedCastBranch(
-          Loc, false, load, silBridgedTy, castSuccessBB, CastFailBB);
-      splitEdge(ccbi, /* EdgeIdx to CastFailBB */ 1);
-      Builder.setInsertionPoint(castSuccessBB);
-      return {castSuccessBB->getArgument(0), ccbi};
-    }
-
-    auto *cast =
-        Builder.createUnconditionalCheckedCast(Loc, load, silBridgedTy);
-    return {cast, cast};
-  }();
+  std::tie(srcOp, newI) =
+      convertObjectToLoadableBridgeableType(Builder, dynamicCast, src);
 
   // Now emit the a cast from the casted ObjC object into a target type.
   // This is done by means of calling _forceBridgeFromObjectiveC or
