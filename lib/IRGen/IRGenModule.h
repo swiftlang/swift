@@ -380,8 +380,6 @@ public:
     noteUseOfTypeGlobals(type, false, requireMetadata);
   }
 
-  void noteUseOfAnyParentTypeMetadata(NominalTypeDecl *type);
-
   void noteUseOfFieldDescriptor(NominalTypeDecl *type);
 
   void noteUseOfFieldDescriptors(CanType type) {
