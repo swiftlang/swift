@@ -1011,7 +1011,7 @@ void IRGenerator::emitBuiltinReflectionMetadata() {
   }
 }
 
-void IRGenModule::emitFieldMetadataRecord(const NominalTypeDecl *D) {
+void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
   if (!IRGen.Opts.EnableReflectionMetadata)
     return;
 
