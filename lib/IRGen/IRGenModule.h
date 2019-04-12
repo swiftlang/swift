@@ -222,12 +222,10 @@ private:
     /// Is there a use of the nominal type descriptor?
     bool IsDescriptorUsed = false;
 
-    /// Have we already emitted a definition for the type metadata with
-    /// the current requirements?
+    /// Have we already emitted type metadata?
     bool IsMetadataEmitted = false;
 
-    /// Have we already emitted a definition for the type descriptor with
-    /// the current requirements?
+    /// Have we already emitted a type context descriptor?
     bool IsDescriptorEmitted = false;
   };
 
@@ -235,19 +233,27 @@ private:
   llvm::DenseMap<NominalTypeDecl *, LazyTypeGlobalsInfo> LazyTypeGlobals;
 
   /// The queue of lazy type metadata to emit.
-  llvm::SmallVector<NominalTypeDecl*, 4> LazyTypeMetadata;
+  llvm::SmallVector<NominalTypeDecl *, 4> LazyTypeMetadata;
 
   /// The queue of lazy type context descriptors to emit.
-  llvm::SmallVector<NominalTypeDecl*, 4> LazyTypeContextDescriptors;
+  llvm::SmallVector<NominalTypeDecl *, 4> LazyTypeContextDescriptors;
 
-  llvm::SmallPtrSet<SILFunction*, 4> LazilyEmittedFunctions;
+  /// Field metadata records that have already been lazily emitted, or are
+  /// queued up.
+  llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyEmittedFieldMetadata;
 
-  llvm::SetVector<SILFunction*> DynamicReplacements;
+  /// The queue of lazy field metadata records to emit.
+  llvm::SmallVector<NominalTypeDecl *, 4> LazyFieldDescriptors;
 
-  /// SIL functions that we need to emit lazily.
-  llvm::SmallVector<SILFunction*, 4> LazyFunctionDefinitions;
+  llvm::SetVector<SILFunction *> DynamicReplacements;
 
-  /// The set of witness tables that have been enqueue for lazy emission.
+  /// SIL functions that have already been lazily emitted, or are queued up.
+  llvm::SmallPtrSet<SILFunction *, 4> LazilyEmittedFunctions;
+
+  /// The queue of SIL functions to emit.
+  llvm::SmallVector<SILFunction *, 4> LazyFunctionDefinitions;
+
+  /// Witness tables that have already been lazily emitted, or are queued up.
   llvm::SmallPtrSet<SILWitnessTable *, 4> LazilyEmittedWitnessTables;
 
   /// The queue of lazy witness tables to emit.
@@ -375,6 +381,8 @@ public:
   }
 
   void noteUseOfAnyParentTypeMetadata(NominalTypeDecl *type);
+
+  void noteUseOfFieldDescriptor(NominalTypeDecl *type);
 
 private:
   void noteUseOfTypeGlobals(NominalTypeDecl *type,
@@ -1073,7 +1081,7 @@ public:
                                            bool inProtocolContext);
 
   void emitAssociatedTypeMetadataRecord(const RootProtocolConformance *C);
-  void emitFieldMetadataRecord(const NominalTypeDecl *Decl);
+  void emitFieldDescriptor(const NominalTypeDecl *Decl);
 
   /// Emit a reflection metadata record for a builtin type referenced
   /// from this module.
@@ -1082,10 +1090,6 @@ public:
   /// Emit a reflection metadata record for an imported type referenced
   /// from this module.
   void emitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDecl);
-
-  /// Some nominal type declarations require us to emit a fixed-size type
-  /// descriptor, because they have special layout considerations.
-  bool shouldEmitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDecl);
 
   /// Emit reflection metadata records for builtin and imported types referenced
   /// from this module.

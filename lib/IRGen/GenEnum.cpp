@@ -6703,12 +6703,12 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
 }
 
 void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
-  if (!IRGen.hasLazyMetadata(theEnum))
+  if (!IRGen.hasLazyMetadata(theEnum)) {
     emitEnumMetadata(*this, theEnum);
+    emitFieldDescriptor(theEnum);
+  }
 
   emitNestedTypeDecls(theEnum->getMembers());
-
-  emitFieldMetadataRecord(theEnum);
 
   if (!isResilient(theEnum, ResilienceExpansion::Minimal))
     return;
