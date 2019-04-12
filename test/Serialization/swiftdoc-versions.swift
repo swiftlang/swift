@@ -17,4 +17,4 @@
 // RUN: cp %S/Inputs/swiftdoc-versions/empty-0.7.swiftdoc %t/empty.swiftdoc
 // RUN: %target-swift-frontend -typecheck -I %t %s -verify -show-diagnostics-after-fatal
 
-import empty // expected-error{{malformed module file}}
+import empty // expected-error{{malformed compiled module}}

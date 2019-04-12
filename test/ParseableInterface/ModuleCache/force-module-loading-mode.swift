@@ -69,7 +69,7 @@
 
 import Lib
 // NO-SUCH-MODULE: [[@LINE-1]]:8: error: no such module 'Lib'
-// BAD-MODULE: [[@LINE-2]]:8: error: malformed module file: {{.*}}Lib.swiftmodule
+// BAD-MODULE: [[@LINE-2]]:8: error: malformed compiled module: {{.*}}Lib.swiftmodule
 
 struct X {}
 let _: X = Lib.testValue
