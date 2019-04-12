@@ -1768,6 +1768,12 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
   if (tryAppendStandardSubstitution(decl))
     return;
 
+  // Mangle opaque type names.
+  if (auto opaque = dyn_cast<OpaqueTypeDecl>(decl)) {
+    appendOpaqueDeclName(opaque);
+    return;
+  }
+  
   auto *nominal = dyn_cast<NominalTypeDecl>(decl);
 
   // For generic types, this uses the unbound type.

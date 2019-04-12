@@ -2815,6 +2815,18 @@ public:
   
   // Opaque type decls are currently always implicit
   SourceRange getSourceRange() const { return SourceRange(); }
+  
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::OpaqueType;
+  }
+  static bool classof(const GenericTypeDecl *D) {
+    return D->getKind() == DeclKind::OpaqueType;
+  }
+  static bool classof(const DeclContext *C) {
+    if (auto D = C->getAsDecl())
+      return classof(D);
+    return false;
+  }
 };
 
 /// TypeAliasDecl - This is a declaration of a typealias, for example:
