@@ -1563,16 +1563,29 @@ private:
   }
 
   bool shouldUseTrailingClosureInTuple(TupleExpr *TE,
-                                       SourceLoc PlaceHolderStartLoc) {
-    if (!TE->getElements().empty()) {
-      for (unsigned I = 0, N = TE->getNumElements(); I < N; ++ I) {
-        bool IsLast = I == N - 1;
-        Expr *E = TE->getElement(I);
-        if (IsLast) {
-          return E->getStartLoc() == PlaceHolderStartLoc;
-        } else if (containClosure(E)) {
-          return false;
+                                       SourceLoc PlaceHolderStartLoc,
+                                       bool &isWrappedWithBraces) {
+    if (TE->getElements().empty())
+      return false;
+
+    for (unsigned I = 0, N = TE->getNumElements(); I < N; ++ I) {
+      bool IsLast = I == N - 1;
+      Expr *E = TE->getElement(I);
+
+      // Placeholders wrapped in braces {<#T##() -> Int#>} can also
+      // be valid for trailing syntax.
+      if (auto CE = dyn_cast<ClosureExpr>(E)) {
+        if (CE->hasSingleExpressionBody() &&
+            CE->getSingleExpressionBody()->getStartLoc()
+              == PlaceHolderStartLoc) {
+          // We found the placeholder.
+          isWrappedWithBraces = true;
+          return IsLast;
         }
+      } else if (IsLast) {
+        return E->getStartLoc() == PlaceHolderStartLoc;
+      } else if (containClosure(E)) {
+        return false;
       }
     }
     return false;
@@ -1587,6 +1600,7 @@ public:
   bool scan(SourceFile &SF, unsigned BufID, unsigned Offset,
              unsigned Length, std::function<void(Expr *Args,
                                                  bool UseTrailingClosure,
+                                                 bool isWrappedWithBraces,
                                                  ArrayRef<Param>,
                                                  CharSourceRange)> Callback,
             std::function<bool(EditorPlaceholderExpr*)> NonClosureCallback) {
@@ -1603,18 +1617,21 @@ public:
     // and if the call parens can be removed in that case.
     // We'll first find the enclosing CallExpr, and then do further analysis.
     bool UseTrailingClosure = false;
+    bool isWrappedWithBraces = false;
     auto ECE = enclosingCallExprArg(SF, PlaceholderStartLoc);
     Expr *Args = ECE.first;
     if (Args && ECE.second) {
       if (isa<ParenExpr>(Args)) {
         UseTrailingClosure = true;
       } else if (auto *TE = dyn_cast<TupleExpr>(Args)) {
-        UseTrailingClosure = shouldUseTrailingClosureInTuple(TE,
-                                                          PlaceholderStartLoc);
+        UseTrailingClosure = shouldUseTrailingClosureInTuple(
+                               TE, PlaceholderStartLoc,
+                               isWrappedWithBraces);
       }
     }
 
-    Callback(Args, UseTrailingClosure, TargetClosureInfo.Params,
+    Callback(Args, UseTrailingClosure, isWrappedWithBraces,
+             TargetClosureInfo.Params,
              TargetClosureInfo.ReturnTypeRange);
     return true;
   }
@@ -1919,7 +1936,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
 
   Scanner.scan(SF, BufID, Offset, Length,
           [&](Expr *Args,
-              bool UseTrailingClosure,
+              bool UseTrailingClosure, bool isWrappedWithBraces,
               ArrayRef<PlaceholderExpansionScanner::Param> ClosureParams,
               CharSourceRange ClosureReturnTypeRange) {
 
@@ -1963,8 +1980,10 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
           unsigned End = SM.getLocOffsetInBuffer(Args->getEndLoc(), BufID);
           EffectiveLength = (End + 1) - EffectiveOffset;
         }
-
-        OS << "{ ";
+        // Trailing closure syntax handling will replace braces anyway.
+        bool printBraces = !isWrappedWithBraces || UseTrailingClosure;
+        if (printBraces)
+          OS << "{ ";
 
         bool ReturningVoid = isReturningVoid(SM, ClosureReturnTypeRange);
 
@@ -2006,7 +2025,8 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
         if (HasSignature)
           OS << "in";
         OS << "\n" << getCodePlaceholder() << "\n";
-        OS << "}";
+        if (printBraces)
+          OS << "}";
       }
       Consumer.handleSourceText(ExpansionStr);
       Consumer.recordAffectedRange(EffectiveOffset, EffectiveLength);
