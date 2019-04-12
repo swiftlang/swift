@@ -2029,7 +2029,7 @@ void Remangler::mangleSugaredParen(Node *node) {
 void Remangler::mangleOpaqueReturnType(Node *node) {
   unreachable("unsupported");
 }
-void Remangler::mangleOpaqueReturnTypeOf(Node *node) {
+void Remangler::mangleOpaqueReturnTypeOf(Node *node, EntityContext &ctx) {
   unreachable("unsupported");
 }
 void Remangler::mangleOpaqueType(Node *node) {

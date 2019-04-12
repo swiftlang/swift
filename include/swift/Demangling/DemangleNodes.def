@@ -267,7 +267,7 @@ NODE(OpaqueType)
 NODE(OpaqueTypeDescriptorSymbolicReference)
 NODE(OpaqueTypeDescriptor)
 NODE(OpaqueReturnType)
-NODE(OpaqueReturnTypeOf)
+CONTEXT_NODE(OpaqueReturnTypeOf)
 
 #undef CONTEXT_NODE
 #undef NODE
