@@ -1304,11 +1304,9 @@ ConstraintSystem::getTypeOfMemberReference(
         openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
       }
     }
-    else if (auto decl = dyn_cast<VarDecl>(value)) {
-      if (auto dyn = dyn_cast<DynamicSelfType>(decl->getValueInterfaceType()
-                                               ->getCanonicalType())) {
-        openedType = openedType->replaceCovariantResultType(baseObjTy, 1);
-      }
+    else if (isa<DynamicSelfType>(value->getInterfaceType()
+                                  ->getCanonicalType())) {
+      openedType = openedType->replaceCovariantResultType(baseObjTy, 1);
     }
   } else {
     // Protocol requirements returning Self have a dynamic Self return

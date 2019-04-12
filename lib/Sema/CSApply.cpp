@@ -822,13 +822,11 @@ namespace {
             }
           }
         }
-        else if (auto decl = dyn_cast<VarDecl>(member)) {
-          if (auto dyn = dyn_cast<DynamicSelfType>(decl->getValueInterfaceType()
-                                                   ->getCanonicalType())) {
-            refTy = refTy->replaceCovariantResultType(containerTy, 1);
-            if (!baseTy->isEqual(containerTy)) {
-              dynamicSelfFnType = refTy->replaceCovariantResultType(containerTy, 1);
-            }
+        else if (isa<DynamicSelfType>(member->getInterfaceType()
+                                      ->getCanonicalType())) {
+          refTy = refTy->replaceCovariantResultType(containerTy, 1);
+          if (!baseTy->isEqual(containerTy)) {
+            dynamicSelfFnType = refTy->replaceCovariantResultType(containerTy, 1);
           }
         }
       }

@@ -1050,6 +1050,8 @@ static std::string getDeclNameFromContext(DeclContext *dc,
 
 //
 // SE-0068 is "Expanding Swift Self to class members and value types"
+// Returns a Type if 'Self' is available in the current implementation.
+//
 // https://github.com/apple/swift-evolution/blob/master/proposals/0068-universal-self.md
 //
 static Type SelfAllowedBySE0068(TypeResolution resolution,
