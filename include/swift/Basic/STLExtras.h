@@ -834,6 +834,44 @@ public:
   }
 };
 
+/// Removes all runs of values that match \p pred from the range of \p begin
+/// to \p end.
+///
+/// This is similar to std::unique, but std::unique leaves the first value in
+/// place in a run of matching values, whereas this code removes all of them.
+///
+/// \returns The new end iterator for the container. You should erase elements
+/// between this value and the existing end of the container.
+template <typename Iterator, typename BinaryPredicate>
+Iterator removeAdjacentIf(const Iterator first, const Iterator last,
+                          BinaryPredicate pred) {
+  using element_reference_t =
+      typename std::iterator_traits<Iterator>::reference;
+
+  auto nextOverlap = std::adjacent_find(first, last, pred);
+  auto insertionPoint = nextOverlap;
+  while (nextOverlap != last) {
+    // We want to erase *all* the matching elements. There could be three or
+    // more of them. Search for the end of the run.
+    auto lastOverlapInRun =
+        std::adjacent_find(std::next(nextOverlap), last,
+                           [&pred](element_reference_t left,
+                                   element_reference_t right) -> bool {
+      return !pred(left, right);
+    });
+    // If we get the end iterator back, that means all remaining elements match.
+    // If we don't, that means (lastOverlapInRun+1) is part of a different run.
+    if (lastOverlapInRun != last)
+      ++lastOverlapInRun;
+
+    nextOverlap = std::adjacent_find(lastOverlapInRun, last, pred);
+    insertionPoint = std::move(lastOverlapInRun, nextOverlap, insertionPoint);
+  }
+
+  return insertionPoint;
+}
+
+
 } // end namespace swift
 
 #endif // SWIFT_BASIC_INTERLEAVE_H

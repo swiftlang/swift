@@ -11,7 +11,7 @@
 
 @inlinable
 public func testStructFromDirect() {
-  _ = StructFromDirect() // expected-error {{cannot be used in an inlinable function because its module was imported implementation-only}}
+  _ = StructFromDirect() // expected-error {{struct 'StructFromDirect' cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
 }
 
 @inlinable
@@ -21,7 +21,7 @@ public func testStructFromIndirect() {
 
 @inlinable
 public func testAliasFromDirect() {
-  _ = AliasFromDirect() // expected-error {{cannot be used in an inlinable function because its module was imported implementation-only}}
+  _ = AliasFromDirect() // expected-error {{type alias 'AliasFromDirect' cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
 }
 
 @inlinable
@@ -31,7 +31,7 @@ public func testAliasFromIndirect() {
 
 @inlinable
 public func testGenericAliasFromDirect() {
-  _ = GenericAliasFromDirect<Int>() // expected-error {{cannot be used in an inlinable function because its module was imported implementation-only}}
+  _ = GenericAliasFromDirect<Int>() // expected-error {{type alias 'GenericAliasFromDirect' cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
 }
 
 @inlinable
@@ -44,7 +44,7 @@ public func testGenericAliasFromIndirect() {
 
 @inlinable
 public func testFunctionFromDirect() {
-  globalFunctionFromDirect() // expected-error {{cannot be used in an inlinable function because its module was imported implementation-only}}
+  globalFunctionFromDirect() // expected-error {{global function 'globalFunctionFromDirect()' cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
 }
 
 @inlinable
@@ -56,7 +56,7 @@ public func testFunctionFromIndirect() {
 
 @inlinable
 public func testVariableFromDirect_get() {
-  _ = globalVariableFromDirect // expected-error {{cannot be used in an inlinable function because its module was imported implementation-only}}
+  _ = globalVariableFromDirect // expected-error {{var 'globalVariableFromDirect' cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
 }
 
 @inlinable
@@ -66,7 +66,7 @@ public func testVariableFromIndirect_get() {
 
 @inlinable
 public func testVariableFromDirect_set() {
-  globalVariableFromDirect = 5 // expected-error {{cannot be used in an inlinable function because its module was imported implementation-only}}
+  globalVariableFromDirect = 5 // expected-error {{var 'globalVariableFromDirect' cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
 }
 
 @inlinable
@@ -78,27 +78,25 @@ public func testVariableFromIndirect_set() {
 
 @inlinable
 public func testExtensionMethod(s: inout StructFromIndirect) {
-  s.extensionMethodFromDirect() // expected-error {{cannot be used in an inlinable function because its module was imported implementation-only}}
+  s.extensionMethodFromDirect() // expected-error {{instance method 'extensionMethodFromDirect()' cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
 }
 
 @inlinable
 public func testExtensionProperty_get(s: inout StructFromIndirect) {
-  _ = s.extensionPropertyFromDirect // expected-error {{cannot be used in an inlinable function because its module was imported implementation-only}}
+  _ = s.extensionPropertyFromDirect // expected-error {{property 'extensionPropertyFromDirect' cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
 }
 
 @inlinable
 public func testExtensionProperty_set(s: inout StructFromIndirect) {
-  s.extensionPropertyFromDirect = 5 // expected-error {{cannot be used in an inlinable function because its module was imported implementation-only}}
+  s.extensionPropertyFromDirect = 5 // expected-error {{property 'extensionPropertyFromDirect' cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
 }
 
 @inlinable
 public func testExtensionSubscript_get(s: inout StructFromIndirect) {
-  // FIXME: why is this error being double-emitted?
-  _ = s[extensionSubscript: 0] // expected-error 2 {{cannot be used in an inlinable function because its module was imported implementation-only}}
+  _ = s[extensionSubscript: 0] // expected-error {{cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
 }
 
 @inlinable
 public func testExtensionSubscript_set(s: inout StructFromIndirect) {
-  // FIXME: why is this error being double-emitted?
-  s[extensionSubscript: 0] = 5 // expected-error 2 {{cannot be used in an inlinable function because its module was imported implementation-only}}
+  s[extensionSubscript: 0] = 5 // expected-error {{cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
 }
