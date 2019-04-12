@@ -251,7 +251,7 @@ SimpleMathTests.test("StructSideEffects") {
   }
 
   func double(_ input: Float) -> Point {
-    var point = Point(x: input, y: input, z: input)
+    let point = Point(x: input, y: input, z: input)
     return point + point
   }
   expectEqual(6, pullback(at: 4, in: double)(Point(x: 1, y: 1, z: 1)))
@@ -306,6 +306,18 @@ SimpleMathTests.test("StructGeneric") {
   }
   // FIXME(TF-274): The true expected result is `405`, like other variants of `fifthPower` above.
   expectEqual(405, gradient(at: 3, in: fifthPower))
+}
+
+SimpleMathTests.test("SubsetIndices") {
+  func grad(_ lossFunction: @differentiable (Float, Float) -> Float) -> Float {
+    return gradient(at: 1) { x in lossFunction(x * x, 10.0) }
+  }
+  expectEqual(2, grad { x, y in x + y })
+
+  func gradWRTNonDiff(_ lossFunction: @differentiable (Float, @nondiff Int) -> Float) -> Float {
+    return gradient(at: 2) { x in lossFunction(x * x, 10) }
+  }
+  expectEqual(4, gradWRTNonDiff { x, y in x + Float(y) })
 }
 
 runAllTests()

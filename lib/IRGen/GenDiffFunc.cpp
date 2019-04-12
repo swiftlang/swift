@@ -38,11 +38,15 @@ using DiffFuncIndex =
 namespace {
 class DiffFuncFieldInfo final : public RecordField<DiffFuncFieldInfo> {
 public:
-  DiffFuncFieldInfo(DiffFuncIndex index, const TypeInfo &type)
-      : RecordField(type), Index(index) {}
+  DiffFuncFieldInfo(DiffFuncIndex index, const TypeInfo &type,
+                    const SmallBitVector &parameterIndices)
+      : RecordField(type), Index(index), ParameterIndices(parameterIndices) {}
 
   /// The field index.
   const DiffFuncIndex Index;
+
+  /// The parameter indices.
+  SmallBitVector ParameterIndices;
 
   std::string getFieldName() const {
     auto extractee = std::get<0>(Index);
@@ -59,17 +63,14 @@ public:
 
   SILType getType(IRGenModule &IGM, SILType t) const {
     auto fnTy = t.castTo<SILFunctionType>();
-    auto extInfo = fnTy->getExtInfo();
-    auto nondiffExtInfo = extInfo.withDifferentiable(false);
-    auto origFnTy = fnTy->getWithExtInfo(nondiffExtInfo);
+    auto origFnTy = fnTy->getWithoutDifferentiability();
     if (std::get<0>(Index) == AutoDiffFunctionExtractInst::Extractee::Original)
       return SILType::getPrimitiveObjectType(origFnTy);
     auto differentiationOrder = std::get<1>(Index);
     auto kind = *std::get<0>(Index).getExtracteeAsAssociatedFunction();
     auto assocTy = origFnTy->getAutoDiffAssociatedFunctionType(
-        SmallBitVector(origFnTy->getNumParameters(), true), /*resultIndex*/ 0,
-        differentiationOrder, kind, IGM.getSILModule(),
-        LookUpConformanceInModule(IGM.getSwiftModule()));
+        ParameterIndices, /*resultIndex*/ 0, differentiationOrder, kind,
+        IGM.getSILModule(), LookUpConformanceInModule(IGM.getSwiftModule()));
     return SILType::getPrimitiveObjectType(assocTy);
   }
 };
@@ -118,14 +119,13 @@ class DiffFuncTypeBuilder
                                DiffFuncIndex> {
 
   SILFunctionType *origFnTy;
+  SmallBitVector parameterIndices;
 
 public:
   DiffFuncTypeBuilder(IRGenModule &IGM, SILFunctionType *fnTy)
-      : RecordTypeBuilder(IGM) {
+      : RecordTypeBuilder(IGM), origFnTy(fnTy->getWithoutDifferentiability()),
+        parameterIndices(fnTy->getDifferentiationParameterIndices()) {
     assert(fnTy->isDifferentiable());
-    auto extInfo = fnTy->getExtInfo();
-    auto nondiffExtInfo = extInfo.withDifferentiable(false);
-    origFnTy = fnTy->getWithExtInfo(nondiffExtInfo);
   }
 
   TypeInfo *createFixed(ArrayRef<DiffFuncFieldInfo> fields,
@@ -150,7 +150,7 @@ public:
 
   DiffFuncFieldInfo getFieldInfo(unsigned index, DiffFuncIndex field,
                                  const TypeInfo &fieldTI) {
-    return DiffFuncFieldInfo(field, fieldTI);
+    return DiffFuncFieldInfo(field, fieldTI, parameterIndices);
   }
 
   SILType getType(DiffFuncIndex field) {
@@ -159,9 +159,8 @@ public:
     auto differentiationOrder = std::get<1>(field);
     auto kind = *std::get<0>(field).getExtracteeAsAssociatedFunction();
     auto assocTy = origFnTy->getAutoDiffAssociatedFunctionType(
-        SmallBitVector(origFnTy->getNumParameters(), true), /*resultIndex*/ 0,
-        differentiationOrder, kind, IGM.getSILModule(),
-        LookUpConformanceInModule(IGM.getSwiftModule()));
+        parameterIndices, /*resultIndex*/ 0, differentiationOrder, kind,
+        IGM.getSILModule(), LookUpConformanceInModule(IGM.getSwiftModule()));
     return SILType::getPrimitiveObjectType(assocTy);
   }
 

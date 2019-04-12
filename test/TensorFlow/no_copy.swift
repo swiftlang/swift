@@ -52,7 +52,7 @@ public func testConvolution(x: Tensor<Float>, filter: Tensor<Float>) -> Tensor<F
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConvolution
 // CHECK: sil private @{{.*}}testConvolution{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Float>):
-// CHECK: [[A:%.*]] = graph_op "Conv2D"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {T$dtype: i32 1, strides: [$Int32: (i32 1), (i32 2), (i32 3), (i32 4)], use_cudnn_on_gpu: i1 -1, padding: "SAME", data_format: "NHWC", dilations: [$Int32: (i32 1), (i32 1), (i32 1), (i32 1)], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
+// CHECK: [[A:%.*]] = graph_op "Conv2D"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {T$dtype: i32 1, strides: [$Int32: (i32 1), (i32 2), (i32 3), (i32 4)], use_cudnn_on_gpu: i1 -1, padding: "SAME", explicit_paddings: [$Int32: ], data_format: "NHWC", dilations: [$Int32: (i32 1), (i32 1), (i32 1), (i32 1)], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
 // CHECK-NEXT:  return [[A]] : $TensorHandle<Float>
 // CHECK-NEXT:}
 

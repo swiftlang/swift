@@ -4304,3 +4304,18 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
 
   return associatedFunction;
 }
+
+AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
+  SmallVector<Param, 8> newParams;
+  for (auto &param : getParams()) {
+    Param newParam(param.getPlainType(), param.getLabel(),
+                   param.getParameterFlags().withNonDifferentiable(false));
+    newParams.push_back(newParam);
+  }
+  auto nonDiffExtInfo = getExtInfo().withDifferentiable(false);
+  if (isa<FunctionType>(this))
+    return FunctionType::get(newParams, getResult(), nonDiffExtInfo);
+  assert(isa<GenericFunctionType>(this));
+  return GenericFunctionType::get(getOptGenericSignature(), newParams,
+                                  getResult(), nonDiffExtInfo);
+}

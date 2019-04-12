@@ -218,7 +218,8 @@ private class TraceContext {
 
   /// Execute the trace graph function, and return the list of output tensors
   /// from the trace execution. These output tensors are owned by the caller.
-  func execute(traceeInputs: [_AnyTensorHandle]) -> [CTensorHandle] {
+  func execute(
+    traceeInputs: [_AnyTensorHandle], useXla: Bool = false) -> [CTensorHandle] {
     // We must be in the `notTracing` enum mode.
     internalConsistencyCheck(_RuntimeConfig.traceState.context == nil)
     internalConsistencyCheck(traceGraphFn != nil)
@@ -234,6 +235,11 @@ private class TraceContext {
       debugLog("Placing the trace func on device \(deviceName).")
       TFE_OpSetDevice(op, deviceName, status)
       checkOk(status)
+    }
+
+    if useXla {
+      debugLog("Enabling XLA compilation")
+      TFE_OpSetAttrBool(op, "_XlaCompile", 1)
     }
 
     debugLog("Adding \(traceeInputs.count) tracee input tensors.")
@@ -990,6 +996,47 @@ public func _tffunc<State : _TensorArrayProtocolEnhanced,
   }
   return {
     data in traceContext.specializeTFFunction(with: data.cTensorHandles)
+  }
+}
+
+// Trace the given function to generate a TF graph and return a closure
+// that can be used to launch the graph.
+public func _graph<In : TensorGroup, Out : TensorGroup>(
+  _ fn: (In) -> Out, useXla: Bool = false
+) -> (In) -> Out {
+  let traceContext: TraceContext = withoutActuallyEscaping(fn) { escapableFn in
+    let wrappedFn = {
+      (inputs: [CTensorHandle]) -> [CTensorHandle] in
+      let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(
+        capacity: Int(inputs.count))
+      var ptr = buffer
+      for input in inputs {
+        ptr.initialize(to: input)
+        ptr = ptr.advanced(by: 1)
+      }
+      let symbolicIn = In(_owning: buffer)
+      let symbolicOut = escapableFn(symbolicIn)
+      return symbolicOut.cTensorHandles
+    }
+    let dtypes = In._typeList.map { $0._cDataType }
+    return _trace(with: dtypes, in: wrappedFn)
+  }
+  // The result is a closure that captures and executes the trace graph
+  // function in the trace context.
+  return { (input: In) -> (Out) in
+    debugLog("Running trace function over input \(input).")
+
+    debugLog("Getting input state tensor handles.")
+    let inputStateTensorHandles =  input.cTensorHandles
+    let inputTensors = inputStateTensorHandles.map {
+      _TFCCreateTensorHandleFromC($0)
+    }
+    debugLog("Executing trace graph function.")
+    let returnValues = traceContext.execute(
+      traceeInputs: inputTensors, useXla: useXla)
+
+    debugLog("Creating output model instance.")
+    return Out(_copying: returnValues)
   }
 }
 

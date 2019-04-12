@@ -6778,8 +6778,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto fromEI = fromFunc->getExtInfo();
       // Handle implicit conversion from @differentiable.
       if (fromEI.isDifferentiable() && !toEI.isDifferentiable()) {
-        fromFunc = fromFunc->withExtInfo(fromEI.withDifferentiable(false))
-                ->castTo<FunctionType>();
+        fromFunc = fromFunc->getWithoutDifferentiability()
+            ->castTo<FunctionType>();
         expr = cs.cacheType(new (tc.Context)
             AutoDiffFunctionExtractOriginalExpr(expr, fromFunc));
       }
@@ -6831,9 +6831,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
 
       // SWIFT_ENABLE_TENSORFLOW
-      auto toEINoAdConversion =
+      auto toEINoADConversion =
           toEI.withDifferentiable(fromEI.isDifferentiable());
-      auto toFuncNoADConversion = toFunc->withExtInfo(toEINoAdConversion);
+      auto toFuncNoADConversion = toFunc->withExtInfo(toEINoADConversion);
+      if (toEI.isDifferentiable() && !fromEI.isDifferentiable())
+        toFuncNoADConversion =
+            toFuncNoADConversion->getWithoutDifferentiability();
       expr = cs.cacheType(new (tc.Context)
                               FunctionConversionExpr(expr,
                                                      toFuncNoADConversion));
@@ -6842,10 +6845,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // because some of the other conversions are not currently supported on
       // @differentiable functions. (e.g. escape_to_noescape).
       // After we do support those conversions, the order will no longer matter.
-      if (!fromEI.isDifferentiable() && toEI.isDifferentiable()) {
+      if (!fromEI.isDifferentiable() && toEI.isDifferentiable())
         expr = cs.cacheType(new (tc.Context)
-                            AutoDiffFunctionExpr(expr, toFunc));
-      }
+                                AutoDiffFunctionExpr(expr, toFunc));
 
       return expr;
     }
