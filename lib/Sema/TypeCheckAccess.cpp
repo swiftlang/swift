@@ -1401,19 +1401,18 @@ public:
   }
 };
 
-class ImplementationOnlyImportChecker
-    : public DeclVisitor<ImplementationOnlyImportChecker> {
-  using CheckImplementationOnlyTypeCallback =
+class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
+  using CheckExportabilityTypeCallback =
       llvm::function_ref<void(const TypeDecl *, const TypeRepr *)>;
-  using CheckImplementationOnlyConformanceCallback =
+  using CheckExportabilityConformanceCallback =
       llvm::function_ref<void(const ProtocolConformance *)>;
 
   TypeChecker &TC;
 
   void checkTypeImpl(
       Type type, const TypeRepr *typeRepr, const SourceFile &SF,
-      CheckImplementationOnlyTypeCallback diagnoseType,
-      CheckImplementationOnlyConformanceCallback diagnoseConformance) {
+      CheckExportabilityTypeCallback diagnoseType,
+      CheckExportabilityConformanceCallback diagnoseConformance) {
     // Don't bother checking errors.
     if (type && type->hasError())
       return;
@@ -1448,13 +1447,13 @@ class ImplementationOnlyImportChecker
 
     class ProblematicTypeFinder : public TypeDeclFinder {
       const SourceFile &SF;
-      CheckImplementationOnlyTypeCallback diagnoseType;
-      CheckImplementationOnlyConformanceCallback diagnoseConformance;
+      CheckExportabilityTypeCallback diagnoseType;
+      CheckExportabilityConformanceCallback diagnoseConformance;
     public:
       ProblematicTypeFinder(
           const SourceFile &SF,
-          CheckImplementationOnlyTypeCallback diagnoseType,
-          CheckImplementationOnlyConformanceCallback diagnoseConformance)
+          CheckExportabilityTypeCallback diagnoseType,
+          CheckExportabilityConformanceCallback diagnoseConformance)
         : SF(SF), diagnoseType(diagnoseType),
           diagnoseConformance(diagnoseConformance) {}
 
@@ -1510,8 +1509,8 @@ class ImplementationOnlyImportChecker
 
   void checkType(
       Type type, const TypeRepr *typeRepr, const Decl *context,
-      CheckImplementationOnlyTypeCallback diagnoseType,
-      CheckImplementationOnlyConformanceCallback diagnoseConformance) {
+      CheckExportabilityTypeCallback diagnoseType,
+      CheckExportabilityConformanceCallback diagnoseConformance) {
     auto *SF = context->getDeclContext()->getParentSourceFile();
     assert(SF && "checking a non-source declaration?");
     return checkTypeImpl(type, typeRepr, *SF, diagnoseType,
@@ -1520,8 +1519,8 @@ class ImplementationOnlyImportChecker
 
   void checkType(
       const TypeLoc &TL, const Decl *context,
-      CheckImplementationOnlyTypeCallback diagnoseType,
-      CheckImplementationOnlyConformanceCallback diagnoseConformance) {
+      CheckExportabilityTypeCallback diagnoseType,
+      CheckExportabilityConformanceCallback diagnoseConformance) {
     checkType(TL.getType(), TL.getTypeRepr(), context, diagnoseType,
               diagnoseConformance);
   }
@@ -1558,6 +1557,7 @@ class ImplementationOnlyImportChecker
                     const TypeRepr *complainRepr) {
       ModuleDecl *M = offendingType->getModuleContext();
       auto diag = TC.diagnose(D, diag::decl_from_implementation_only_module,
+                              offendingType->getDescriptiveKind(),
                               offendingType->getFullName(), M->getName());
       highlightOffendingType(TC, diag, complainRepr);
     }
@@ -1573,11 +1573,11 @@ class ImplementationOnlyImportChecker
 
   static_assert(
       std::is_convertible<DiagnoseGenerically,
-                          CheckImplementationOnlyTypeCallback>::value,
+                          CheckExportabilityTypeCallback>::value,
       "DiagnoseGenerically has wrong call signature");
   static_assert(
       std::is_convertible<DiagnoseGenerically,
-                          CheckImplementationOnlyConformanceCallback>::value,
+                          CheckExportabilityConformanceCallback>::value,
       "DiagnoseGenerically has wrong call signature for conformance diags");
 
   DiagnoseGenerically getDiagnoseCallback(const Decl *D) {
@@ -1585,7 +1585,7 @@ class ImplementationOnlyImportChecker
   }
 
 public:
-  explicit ImplementationOnlyImportChecker(TypeChecker &TC) : TC(TC) {}
+  explicit ExportabilityChecker(TypeChecker &TC) : TC(TC) {}
 
   static bool shouldSkipChecking(const ValueDecl *VD) {
     // Is this part of the module's API or ABI?
@@ -1620,7 +1620,7 @@ public:
       if (shouldSkipChecking(VD))
         return;
 
-    DeclVisitor<ImplementationOnlyImportChecker>::visit(D);
+    DeclVisitor<ExportabilityChecker>::visit(D);
 
     if (auto *extension = dyn_cast<ExtensionDecl>(D->getDeclContext())) {
       checkType(extension->getExtendedTypeLoc(), extension,
@@ -1830,7 +1830,8 @@ public:
       return;
 
     auto diag = TC.diagnose(diagLoc, diag::decl_from_implementation_only_module,
-                            PGD->getName(), M->getName());
+                            PGD->getDescriptiveKind(), PGD->getName(),
+                            M->getName());
     if (refRange.isValid())
       diag.highlight(refRange);
     diag.flush();
@@ -1904,5 +1905,5 @@ void swift::checkAccessControl(TypeChecker &TC, Decl *D) {
     checkExtensionGenericParamAccess(TC, ED);
   }
 
-  ImplementationOnlyImportChecker(TC).visit(D);
+  ExportabilityChecker(TC).visit(D);
 }

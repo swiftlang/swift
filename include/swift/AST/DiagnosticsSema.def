@@ -2395,16 +2395,15 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
      "construct %0 from unwrapped %1 value", (Type, Type))
 
 ERROR(decl_from_implementation_only_module,none,
-      "cannot use %0 here; %1 has been imported as "
-      "'@_implementationOnly'",
-      (DeclName, Identifier))
+      "cannot use %0 %1 here; %2 has been imported as implementation-only",
+      (DescriptiveDeclKind, DeclName, Identifier))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 here; %2 has been imported as "
-      "'@_implementationOnly'",
+      "implementation-only",
       (Type, DeclName, Identifier))
 ERROR(assoc_conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 in associated type %3 (inferred as "
-      "%4); %2 has been imported as '@_implementationOnly'",
+      "%4); %2 has been imported as implementation-only",
       (Type, DeclName, Identifier, Type, Type))
 
 // Derived conformances
@@ -4091,9 +4090,9 @@ WARNING(resilience_decl_unavailable_warn,
         (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
 
 ERROR(inlinable_decl_ref_implementation_only,
-      none, "%0 %1 cannot be used in an inlinable "
-      "function because its module was imported implementation-only",
-      (DescriptiveDeclKind, DeclName))
+      none, "%0 %1 cannot be used in " FRAGILE_FUNC_KIND "2 "
+      "because %3 was imported implementation-only",
+      (DescriptiveDeclKind, DeclName, unsigned, Identifier))
 
 #undef FRAGILE_FUNC_KIND
 
