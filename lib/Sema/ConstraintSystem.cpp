@@ -1304,23 +1304,20 @@ ConstraintSystem::getTypeOfMemberReference(
         openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
       }
     }
-    else if (auto *sub = dyn_cast<SubscriptDecl>(value)) {
-      if (auto dyn = dyn_cast<DynamicSelfType>(sub->getElementInterfaceType()
+//    else if (auto *decl = dyn_cast<SubscriptDecl>(value)) {
+//      if (auto dyn = dyn_cast<DynamicSelfType>(decl->getElementInterfaceType()
+//                                               ->getCanonicalType())) {
+//        fprintf(stderr, "HEREE!!!!!!!!!!!!!!!! %d\n", isDynamicResult);
+//        openedType = openedType->replaceCovariantResultType(baseObjTy/*not dyn*/, 2);
+//        baseObjTy->dump();
+////        outerDC->dumpContext();
+//      }
+//    }
+    else if (auto *decl = dyn_cast<VarDecl>(value)) {
+      if (auto dyn = dyn_cast<DynamicSelfType>(decl->getInterfaceType()
                                                ->getCanonicalType())) {
-        fprintf(stderr, "HEREE!!!!!!!!!!!!!!!! %d\n", isDynamicResult);
-        openedType = openedType->replaceCovariantResultType(baseObjTy/*not dyn*/, 2);
-//        openedType->dump();
-//        outerDC->dumpContext();
-      }
-    }
-    else if (auto *sub = dyn_cast<VarDecl>(value)) {
-      if (auto dyn = dyn_cast<DynamicSelfType>(sub->getInterfaceType()
-                                               ->getCanonicalType())) {
-        fprintf(stderr, "HEREEE!!!!!!!!!!!!!!!!\n");
-        dyn.dump();
+//        fprintf(stderr, "HEREEE!!!!!!!!!!!!!!!!\n");
         openedType = openedType->replaceCovariantResultType(baseObjTy/*not dyn*/, 1);
-//        openedType->dump();
-//        outerDC->dumpContext();
       }
     }
   } else {

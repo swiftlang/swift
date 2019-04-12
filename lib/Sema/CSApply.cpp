@@ -834,8 +834,8 @@ namespace {
           if (auto dyn = dyn_cast<DynamicSelfType>(sub->getValueInterfaceType()
                                                    ->getCanonicalType())) {
             refTy = refTy->replaceCovariantResultType(containerTy/*or dyn or baseTy or containerTy*/, 1);
-            fprintf(stderr, "HEREE22!!!!!!!!!!!!!!!!\n");
-            dyn.dump();
+//            fprintf(stderr, "HEREE22!!!!!!!!!!!!!!!!\n");
+//            dyn.dump();
             if (!baseTy->isEqual(containerTy)) {
               dynamicSelfFnType = refTy->replaceCovariantResultType(containerTy, 1);
             }
