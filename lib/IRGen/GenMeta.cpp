@@ -1266,11 +1266,6 @@ namespace {
 
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(FieldVectorOffset / IGM.getPointerSize());
-
-      // For any nominal type metadata required for reflection.
-      for (auto *prop : properties)
-        IGM.IRGen.noteUseOfTypeMetadata(prop->getValueInterfaceType()
-                                          ->getCanonicalType());
     }
     
     uint16_t getKindSpecificFlags() {
@@ -1340,11 +1335,6 @@ namespace {
 
       // uint32_t NumEmptyCases;
       B.addInt32(Strategy.getElementsWithNoPayload().size());
-
-      // For any nominal type metadata required for reflection.
-      for (auto elt : Strategy.getElementsWithPayload())
-        IGM.IRGen.noteUseOfTypeMetadata(elt.decl->getArgumentInterfaceType()
-                                          ->getCanonicalType());
     }
     
     uint16_t getKindSpecificFlags() {
@@ -1662,11 +1652,6 @@ namespace {
 
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(getFieldVectorOffset() / IGM.getPointerSize());
-
-      // For any nominal type metadata required for reflection.
-      for (auto *prop : properties)
-        IGM.IRGen.noteUseOfTypeMetadata(prop->getValueInterfaceType()
-                                          ->getCanonicalType());
     }
   };
 } // end anonymous namespace
@@ -3181,8 +3166,6 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
       break;
     }
   }
-
-  IGM.IRGen.noteUseOfAnyParentTypeMetadata(classDecl);
 }
 
 llvm::Value *IRGenFunction::emitInvariantLoad(Address address,
@@ -3548,18 +3531,6 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
 
   IGM.defineTypeMetadata(declaredType, isPattern, canBeConstant,
                          init.finishAndCreateFuture());
-
-  IGM.IRGen.noteUseOfAnyParentTypeMetadata(structDecl);
-}
-
-void IRGenerator::noteUseOfAnyParentTypeMetadata(NominalTypeDecl *type) {
-  // If this is a nested type we also potentially might need the outer types.
-  auto *declCtxt = type->getDeclContext();
-  auto *parentNominalDecl = declCtxt->getSelfNominalTypeDecl();
-  if (!parentNominalDecl)
-    return;
-
-  noteUseOfTypeMetadata(parentNominalDecl);
 }
 
 // Enums
@@ -3743,8 +3714,6 @@ void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
 
   IGM.defineTypeMetadata(declaredType, isPattern, canBeConstant,
                          init.finishAndCreateFuture());
-
-  IGM.IRGen.noteUseOfAnyParentTypeMetadata(theEnum);
 }
 
 llvm::Value *IRGenFunction::emitObjCSelectorRefLoad(StringRef selector) {
@@ -4061,14 +4030,6 @@ void irgen::emitForeignTypeMetadata(IRGenModule &IGM, NominalTypeDecl *decl) {
     builder.createMetadataAccessFunction();
   } else {
     llvm_unreachable("foreign metadata for unexpected type?!");
-  }
-  
-  // If the enclosing type is also an imported type, force its metadata too.
-  if (auto enclosing = type->getNominalParent()) {
-    auto canonicalEnclosing = enclosing->getCanonicalType();
-    if (requiresForeignTypeMetadata(canonicalEnclosing)) {
-      IGM.IRGen.noteUseOfTypeMetadata(canonicalEnclosing);
-    }
   }
 }
 
