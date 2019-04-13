@@ -1259,16 +1259,16 @@ public extension Tensor where Scalar : Numeric {
     where Scalar : TensorFlowFloatingPoint
   )
   func sum() -> Tensor {
-    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.sum(self, reductionIndices: axes)
+    let flat = reshaped(to: [-1])
+    return Raw.sum(flat, reductionIndices: [0])
   }
 
   // NOTE: This overload is necessary, otherwise `sum()` would refer
   // to the variadic method `sum(squeezingAxes:)` with zero indices.
   @inlinable @inline(__always)
   func product() -> Tensor {
-    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.prod(self, reductionIndices: axes)
+    let flat = reshaped(to: [-1])
+    return Raw.prod(flat, reductionIndices: [0])
   }
 
   // NOTE: This overload is necessary, otherwise `mean()` would refer
@@ -1279,8 +1279,8 @@ public extension Tensor where Scalar : Numeric {
   )
   @inlinable @inline(__always)
   func mean() -> Tensor {
-    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.mean(self, reductionIndices: axes)
+    let flat = reshaped(to: [-1])
+    return Raw.mean(flat, reductionIndices: [0])
   }
 
   // NOTE: This overload is necessary, otherwise `mean()` would refer
