@@ -178,6 +178,36 @@ bb0:
   return %3 : $(Builtin.Int8)
 }
 
+// Test overflow diagnostics.
+// FIXME: Imprecision:  the following builtin operations return a tuple where
+// the second element indicate whether an overflow happened or not.
+// The interpreter currently makes the entire tuple unknown in the case of
+// overflow. This should be replaced by the correct semantics of the builtin
+// which produces a trucated value for the first element and returns true for
+// the second element.
+
+// CHECK-LABEL: @interpretSignedTruncationError
+sil @interpretSignedTruncationError : $@convention(thin) () -> Builtin.Int8 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, -1
+  %1 = builtin "s_to_u_checked_trunc_Int64_Int8"(%0 : $Builtin.Int64) : $(Builtin.Int8, Builtin.Int1)
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: integer overflow detected
+  %2 = tuple_extract %1 : $(Builtin.Int8, Builtin.Int1), 0
+  return %2 : $(Builtin.Int8)
+}
+
+// CHECK-LABEL: @interpretBuiltinAddOverflow
+sil @interpretBuiltinAddOverflow : $@convention(thin) () -> Builtin.Int8 {
+bb0:
+  %0 = integer_literal $Builtin.Int8, 127
+  %1 = integer_literal $Builtin.Int8, 1
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = builtin "sadd_with_overflow_Int8"(%0 : $Builtin.Int8, %1 : $Builtin.Int8, %2: $Builtin.Int1) : $(Builtin.Int8, Builtin.Int1)
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: integer overflow detected
+  %4 = tuple_extract %3 : $(Builtin.Int8, Builtin.Int1), 0
+  return %4 : $(Builtin.Int8)
+}
+
 // Test function calls
 
 sil hidden @identity : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
@@ -233,6 +263,17 @@ bb0:
   %3 = apply %2(%0) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
   return %3 : $Builtin.Int64
 } // CHECK: Returns int: 120
+
+// CHECK-LABEL: @interpretAndDiagnoseLongRecursion
+sil hidden @interpretAndDiagnoseLongRecursion : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, -5
+  %2 = function_ref @factorial : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %3 = apply %2(%0) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: exceeded instruction limit: 512 when evaluating the expression at compile time
+    // CHECK: {{.*}}: note: limit exceeded here
+  return %3 : $Builtin.Int64
+}
 
 // Test meta types.
 
@@ -393,6 +434,56 @@ bb0:
   return %5 : $Builtin.Int1
 } // CHECK: Returns int: -1
 
+// Test non-constant diagnostics.
+
+// CHECK-LABEL: @interpretAndDiagnoseNonConstantVars
+sil hidden @interpretAndDiagnoseNonConstantVars : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %4 = struct_extract %0 : $Int, #Int._value
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: cannot evaluate expression as constant here
+  %10 = tuple ()
+  return %10 : $()
+}
+
+sil @$ss8readLine16strippingNewlineSSSgSb_tF : $@convention(thin) (Bool) -> @owned Optional<String>
+
+// CHECK-LABEL: @interpretAndDiagnoseNonConstantCalls
+sil @interpretAndDiagnoseNonConstantCalls : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int1, -1
+  %1 = struct $Bool (%0 : $Builtin.Int1)
+  // function_ref readLine(strippingNewline:)
+  %2 = function_ref @$ss8readLine16strippingNewlineSSSgSb_tF : $@convention(thin) (Bool) -> @owned Optional<String>
+  %3 = apply %2(%1) : $@convention(thin) (Bool) -> @owned Optional<String>
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: encountered call to a function whose body is not available
+  release_value %3 : $Optional<String>
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// Test loop diagnostics.
+
+// CHECK-LABEL: @interpretAndDiagnoseLoops
+sil hidden @interpretAndDiagnoseLoops : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = integer_literal $Builtin.Int64, 100
+
+  %5 = builtin "cmp_slt_Int64"(%3 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %5, bb2, bb3
+
+bb2:
+  br bb1
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: control-flow loop found during evaluation 
+
+bb3:
+  %10 = tuple ()
+  return %10 : $()
+}
+
 // Test stack allocation and memory access.
 
 // CHECK-LABEL @interpretLoadStore
@@ -520,6 +611,20 @@ bb0:
   %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   return %5 : $String
 } // CHECK: Returns string: "plain string"
+
+// TODO: Provide a more descriptive note that mentions the actual error.
+// CHECK-LABEL: @interpretAndDiagnoseStringInitError
+sil hidden @interpretAndDiagnoseStringInitError: $@convention(thin) () ->  @owned String {
+bb0:
+  %0 = string_literal utf8 "\u{1F496}"
+  %1 = integer_literal $Builtin.Word, 1  // The byte length of the literal is wrong.
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = metatype $@thin String.Type
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+      // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: operation with invalid operands encountered during evaluation
+  return %5 : $String
+}
 
 // static String.+= infix(_:_:)
 // The semantics attribute is used by the interpreter.
