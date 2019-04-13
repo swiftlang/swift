@@ -157,9 +157,9 @@ void _swift_stdlib_immortalize(void *obj) {
 }
   
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-void _swift_stdlib_forbid_objc_complications(void *obj) {
+void _swift_stdlib_set_objc_complications_forbidden(void *obj, bool forbid) {
   auto heapObj = reinterpret_cast<HeapObject *>(obj);
-  heapObj->refCounts.setHasNoObjCComplications(true);
+  heapObj->refCounts.setHasNoObjCComplications(forbid);
 }
 
 // namespace swift
