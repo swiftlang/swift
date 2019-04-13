@@ -78,6 +78,7 @@ namespace swift {
   class ParameterTypeFlags;
   class Pattern;
   struct PrintOptions;
+  struct PropertyDelegateBackingPropertyInfo;
   struct PropertyDelegateTypeInfo;
   class ProtocolDecl;
   class ProtocolType;
@@ -4717,6 +4718,17 @@ public:
   }
 };
 
+/// Describes which synthesized property for a property with an attached
+/// delegate is being referenced.
+enum class PropertyDelegateSynthesizedPropertyKind {
+  /// The backing storage property, which is a stored property of the
+  /// delegate type.
+  Backing,
+  /// A storage delegate (e.g., `$foo`), which is a wrapper over the
+  /// delegate instance's `storageValue` property.
+  StorageDelegate,
+};
+
 /// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public AbstractStorageDecl {
 public:
@@ -5065,6 +5077,11 @@ public:
   /// unbound generic types. It will be the type of the backing property.
   Type getPropertyDelegateBackingPropertyType() const;
 
+  /// Retrieve information about the backing properties of the attached
+  /// property delegate.
+  PropertyDelegateBackingPropertyInfo
+      getPropertyDelegateBackingPropertyInfo() const;
+
   /// Retrieve the backing storage property for a property that has an
   /// attached property delegate.
   ///
@@ -5086,7 +5103,11 @@ public:
 
   /// If this property is the backing storage for a property with an attached
   /// property delegate, return the original property.
-  VarDecl *getOriginalDelegatedProperty() const;
+  ///
+  /// \param kind If not \c None, only returns the original property when
+  /// \c this property is the specified synthesized property.
+  VarDecl *getOriginalDelegatedProperty(
+      Optional<PropertyDelegateSynthesizedPropertyKind> kind = None) const;
 
   /// Set the property that delegates to this property as it's backing
   /// property.

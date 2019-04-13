@@ -21,7 +21,6 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyDelegates.h"
-#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
@@ -116,11 +115,7 @@ static bool maybeEmitPropertyDelegateInitFromValue(
       !originalProperty->isPropertyDelegateInitializedWithInitialValue())
     return false;
 
-  ASTContext &ctx = field->getASTContext();
-  auto delegateInfo = evaluateOrDefault(
-      ctx.evaluator,
-      PropertyDelegateBackingPropertyInfoRequest{originalProperty},
-      PropertyDelegateBackingPropertyInfo());
+  auto delegateInfo = originalProperty->getPropertyDelegateBackingPropertyInfo();
   if (!delegateInfo || !delegateInfo.initializeFromOriginal)
     return false;
 
