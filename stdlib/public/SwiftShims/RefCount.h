@@ -760,6 +760,11 @@ class RefCounts {
                                               std::memory_order_relaxed));
   }
   
+  bool getHasNoObjCComplications() {
+    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    return bits.hasNoObjCComplications()
+  }
+  
   // Initialize from another refcount bits.
   // Only inline -> out-of-line is allowed (used for new side table entries).
   void init(InlineRefCountBits newBits) {
