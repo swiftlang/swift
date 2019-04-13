@@ -18,24 +18,6 @@ struct Wrapper<T> {
   }
 }
 
-@propertyDelegate
-final class ClassWrapper<T> {
-  var value: T {
-    didSet {
-      print("  .. set \(value)")
-    }
-  }
-
-  init(initialValue: T) {
-    print("  .. init \(initialValue)")
-    self.value = initialValue
-  }
-
-  deinit {
-    print("  .. deinit \(value)")
-  }
-}
-
 protocol IntInitializable {
   init(_: Int)
 }
@@ -153,34 +135,6 @@ final class GenericClass<T : IntInitializable> {
   }
 }
 
-/*
-
-This does not work yet.
-
-struct IntStructWithClassWrapper {
-  @ClassWrapper var wrapped: Int
-
-  init() {
-     wrapped = 42
-     wrapped = 27
-  }
-
-  init(conditional b: Bool) {
-     if b {
-       self.$wrapped = ClassWrapper(initialValue: 32)
-     } else {
-       wrapped = 42
-     }
-  }
-
-  init(dynamic b: Bool) {
-     if b {
-       wrapped = 42
-     }
-     wrapped = 27
-  }
-}
-*/
 
 func testIntStruct() {
   // CHECK: ## IntStruct
@@ -350,55 +304,9 @@ func testGenericClass() {
   }
 }
 
-/*
-func testIntStructWithClassWrapper() {
-  // CHECK-DISABLED: ## IntStructWithClassWrapper
-  print("\n## IntStructWithClassWrapper")
-
-  if true {
-    // CHECK-NEXT-DISABLED:   .. init 42
-    // CHECK-NEXT-DISABLED:   .. set 27
-    let t1 = IntStructWithClassWrapper()
-    // CHECK-NEXT-DISABLED: 27
-    print(t1.wrapped)
-    // CHECK-NEXT-DISABLED:   .. deinit 27
-  }
-  if true {
-    // CHECK-NEXT-DISABLED:   .. init 42
-    let t2 = IntStructWithClassWrapper(conditional: false)
-    // CHECK-NEXT-DISABLED: 42
-    print(t2.wrapped)
-    // CHECK-NEXT-DISABLED:   .. deinit 42
-  }
-  if true {
-    // CHECK-NEXT-DISABLED:   .. init 32
-    let t3 = IntStructWithClassWrapper(conditional: true)
-    // CHECK-NEXT-DISABLED: 32
-    print(t3.wrapped)
-    // CHECK-NEXT-DISABLED:   .. deinit 32
-  }
-  if true {
-    // CHECK-NEXT-DISABLED:   .. init 27
-    let t4 = IntStructWithClassWrapper(dynamic: false)
-    // CHECK-NEXT-DISABLED: 27
-    print(t4.wrapped)
-    // CHECK-NEXT-DISABLED:   .. deinit 27
-  }
-  if true {
-    // CHECK-NEXT-DISABLED:   .. init 42
-    // CHECK-NEXT-DISABLED:   .. deinit 42
-    // CHECK-NEXT-DISABLED:   .. init 27
-    let t5 = IntStructWithClassWrapper(dynamic: true)
-    // CHECK-NEXT-DISABLED: 27
-    print(t5.wrapped)
-    // CHECK-NEXT-DISABLED:   .. deinit 27
-  }
-}
-*/
 
 testIntStruct()
 testIntClass()
 testRefStruct()
 testGenericClass()
-//testIntStructWithClassWrapper()
 

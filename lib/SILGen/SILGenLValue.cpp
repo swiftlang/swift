@@ -1292,8 +1292,26 @@ namespace {
 
     bool hasPropertyDelegate() const {
       if (auto *VD = dyn_cast<VarDecl>(Storage)) {
-        if (auto delegateInfo = VD->getAttachedPropertyDelegateTypeInfo())
-          return delegateInfo.initialValueInit != nullptr;
+        if (auto delegateInfo = VD->getAttachedPropertyDelegateTypeInfo()) {
+          // If there is no init(initialValue:), we cannot rewrite an
+          // assignment into an initialization.
+          if (!delegateInfo.initialValueInit)
+            return false;
+
+          // If we have a nonmutating setter on a value type, the call
+          // captures all of 'self' and we cannot rewrite an assignment
+          // into an initialization.
+          auto setter = VD->getSetter();
+          if (setter->isNonMutating() &&
+              setter->getDeclContext()->getSelfNominalTypeDecl() &&
+              setter->isInstanceMember() &&
+              !setter->getDeclContext()->getDeclaredInterfaceType()
+                  ->hasReferenceSemantics()) {
+            return false;
+          }
+
+          return true;
+        }
       }
       return false;
     }
