@@ -225,6 +225,12 @@ AttachedPropertyDelegateRequest::evaluate(Evaluator &evaluator,
       return nullptr;
     }
 
+    // A property delegate cannot be attached to a 'let'.
+    if (var->isLet()) {
+      ctx.Diags.diagnose(attr->getLocation(), diag::property_delegate_let);
+      return nullptr;
+    }
+
     // Check for conflicting attributes.
     if (var->getAttrs().hasAttribute<LazyAttr>() ||
         var->getAttrs().hasAttribute<NSCopyingAttr>() ||
@@ -341,6 +347,7 @@ PropertyDelegateBackingPropertyTypeRequest::evaluate(
   ASTContext &ctx = var->getASTContext();
   TypeChecker &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
   if (binding->isInitialized(index)) {
+    tc.validateDecl(var);
     if (!binding->isInitializerChecked(index))
       tc.typeCheckPatternBinding(binding, index);
 
