@@ -35,3 +35,12 @@ let some = Some(keyPath: \Demo.here)
 // expected-note@-2 {{arguments to generic parameter 'Value' ('(() -> Void)?' and '((Any) -> Void)?') are expected to be equal}}
 // expected-error@-3 {{generic parameter 'V' could not be inferred}}
 // expected-note@-4 {{explicitly specify the generic arguments to fix this issue}}
+
+// SE-0249
+func testFunc() {
+  let _: (S) -> Int = \.i
+  _ = ([S]()).map(\.i)
+  _ = ([S]()).map(\.init)
+  // expected-error@-1 {{static member 'init' cannot be used on instance of type 'S'}}
+}
+>>>>>>> Add typechecking tests
