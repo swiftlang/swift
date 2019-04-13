@@ -188,3 +188,20 @@ struct DelegateWithDidSetWillSet {
     self.x = x
   }
 }
+
+@propertyDelegate
+struct WrapperWithStorageValue<T> {
+  var value: T
+
+  var storageValue: Wrapper<T> {
+    return Wrapper(value: value)
+  }
+}
+
+struct UseWrapperWithStorageValue {
+  // UseWrapperWithStorageValue.$x.getter
+  // CHECK-LABEL: sil hidden [transparent] [ossa] @$s18property_delegates26UseWrapperWithStorageValueV2$xAA0D0VySiGvg : $@convention(method) (UseWrapperWithStorageValue) -> Wrapper<Int>
+  // CHECK-NOT: return
+  // CHECK: function_ref @$s18property_delegates23WrapperWithStorageValueV07storageF0AA0C0VyxGvg
+  @WrapperWithStorageValue(value: 17) var x: Int
+}

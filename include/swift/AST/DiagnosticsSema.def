@@ -4348,10 +4348,10 @@ WARNING(hashvalue_implementation,none,
 //------------------------------------------------------------------------------
 ERROR(property_delegate_no_value_property, none,
   "property delegate type %0 does not contain a non-static property "
-  "named 'value'", (Type))
+  "named %1", (Type, Identifier))
 ERROR(property_delegate_ambiguous_value_property, none,
   "property delegate type %0 has multiple non-static properties "
-  "named 'value'", (Type))
+  "named %1", (Type, Identifier))
 ERROR(property_delegate_wrong_initial_value_init, none,
       "'init(initialValue:)' parameter type (%0) must be the same as its "
       "'value' property type (%1) or an @autoclosure thereof", (Type, Type))

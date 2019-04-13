@@ -24,13 +24,14 @@
 #include "swift/AST/TypeCheckRequests.h"
 using namespace swift;
 
-/// Find the "value" property in a property delegate to which access will
+/// Find the named property in a property delegate to which access will
 /// be delegated.
-static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal) {
+static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
+                                  Identifier name, bool allowMissing) {
   SmallVector<VarDecl *, 2> vars;
   {
     SmallVector<ValueDecl *, 2> decls;
-    nominal->lookupQualified(nominal, ctx.Id_value, NL_QualifiedDefault, decls);
+    nominal->lookupQualified(nominal, name, NL_QualifiedDefault, decls);
     for (const auto &foundDecl : decls) {
       auto foundVar = dyn_cast<VarDecl>(foundDecl);
       if (!foundVar || foundVar->isStatic() ||
@@ -41,11 +42,13 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal) {
     }
   }
 
-  // Diagnose missing or ambiguous "value" properties.
+  // Diagnose missing or ambiguous properties.
   switch (vars.size()) {
   case 0:
-    nominal->diagnose(diag::property_delegate_no_value_property,
-                      nominal->getDeclaredType());
+    if (!allowMissing) {
+      nominal->diagnose(diag::property_delegate_no_value_property,
+                        nominal->getDeclaredType(), name);
+    }
     return nullptr;
 
   case 1:
@@ -53,7 +56,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal) {
 
   default:
     nominal->diagnose(diag::property_delegate_ambiguous_value_property,
-                      nominal->getDeclaredType());
+                      nominal->getDeclaredType(), name);
     for (auto var : vars) {
       var->diagnose(diag::kind_declname_declared_here,
                     var->getDescriptiveKind(), var->getFullName());
@@ -61,7 +64,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal) {
     return nullptr;
   }
 
-  // The 'value' property must be as accessible as the nominal type.
+  // The property must be as accessible as the nominal type.
   VarDecl *var = vars.front();
   if (var->getFormalAccess() < nominal->getFormalAccess()) {
     var->diagnose(diag::property_delegate_type_requirement_not_accessible,
@@ -175,13 +178,16 @@ PropertyDelegateTypeInfoRequest::evaluate(
   // Look for a non-static property named "value" in the property delegate
   // type.
   ASTContext &ctx = nominal->getASTContext();
-  auto valueVar = findValueProperty(ctx, nominal);
+  auto valueVar =
+      findValueProperty(ctx, nominal, ctx.Id_value, /*allowMissing=*/false);
   if (!valueVar)
     return PropertyDelegateTypeInfo();
 
   PropertyDelegateTypeInfo result;
   result.valueVar = valueVar;
   result.initialValueInit = findInitialValueInit(ctx, nominal, valueVar);
+  result.storageValueVar =
+    findValueProperty(ctx, nominal, ctx.Id_storageValue, /*allowMissing=*/true);
 
   return result;
 }

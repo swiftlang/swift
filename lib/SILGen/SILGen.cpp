@@ -1120,10 +1120,8 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
   // If this is the backing storage for a property with an attached delegate
   // that was initialized with `=`, use that expression as the initializer.
   if (auto originalProperty = var->getOriginalDelegatedProperty()) {
-    auto delegateInfo = evaluateOrDefault(
-        getASTContext().evaluator,
-        PropertyDelegateBackingPropertyInfoRequest{originalProperty},
-        PropertyDelegateBackingPropertyInfo());
+    auto delegateInfo =
+        originalProperty->getPropertyDelegateBackingPropertyInfo();
     if (delegateInfo.originalInitialValue)
       init = delegateInfo.originalInitialValue;
   }

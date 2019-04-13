@@ -37,7 +37,17 @@ struct PropertyDelegateTypeInfo {
 
   /// The initializer init(initialValue:) that will be called when the
   /// initiqlizing the property delegate type from a value of the property type.
+  ///
+  /// This initializer is optional, but if present will be used for the `=`
+  /// initialization syntax.
   ConstructorDecl *initialValueInit = nullptr;
+
+  /// The property through which the storage value ($foo) will be accessed,
+  /// hiding the underlying storage completely.
+  ///
+  /// This property is optional. If present, a computed property for `$foo`
+  /// will be created that redirects to this property.
+  VarDecl *storageValueVar = nullptr;
 
   /// Whether this is a valid property delegate.
   bool isValid() const {
@@ -57,6 +67,10 @@ struct PropertyDelegateTypeInfo {
 struct PropertyDelegateBackingPropertyInfo {
   /// The backing property.
   VarDecl *backingVar = nullptr;
+
+  /// The storage delegate property, if any. When present, this takes the name
+  /// '$foo' from `backingVar`.
+  VarDecl *storageDelegateVar = nullptr;
 
   /// When the original default value is specified in terms of an '='
   /// initializer on the initial property, e.g.,
@@ -81,10 +95,12 @@ struct PropertyDelegateBackingPropertyInfo {
   PropertyDelegateBackingPropertyInfo() { }
   
   PropertyDelegateBackingPropertyInfo(VarDecl *backingVar,
+                                      VarDecl *storageDelegateVar,
                                       Expr *originalInitialValue,
                                       Expr *initializeFromOriginal,
                                       OpaqueValueExpr *underlyingValue)
-    : backingVar(backingVar), originalInitialValue(originalInitialValue),
+    : backingVar(backingVar), storageDelegateVar(storageDelegateVar),
+      originalInitialValue(originalInitialValue),
       initializeFromOriginal(initializeFromOriginal),
       underlyingValue(underlyingValue) { }
 

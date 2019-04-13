@@ -605,3 +605,38 @@ func testDefaultInitializers() {
   _ = DefaultInitializerClass()
   _ = NoDefaultInitializerStruct() // expected-error{{missing argument for parameter 'x' in call}}
 }
+
+// ---------------------------------------------------------------------------
+// Storage references
+// ---------------------------------------------------------------------------
+@propertyDelegate
+struct WrapperWithStorageRef<T> {
+  var value: T
+
+  var storageValue: Wrapper<T> {
+    return Wrapper(value: value)
+  }
+}
+
+extension Wrapper {
+  var wrapperOnlyAPI: Int { return 17 }
+}
+
+struct TestStorageRef {
+  @WrapperWithStorageRef var x: Int
+
+  mutating func test() {
+    let _: Wrapper = $x
+    let i = $x.wrapperOnlyAPI
+    let _: Int = i
+
+    // x is mutable, $x is not
+    x = 17
+    $x = Wrapper(value: 42) // expected-error{{cannot assign to property: '$x' is immutable}}
+  }
+}
+
+func testStorageRef(tsr: TestStorageRef) {
+  let _: Wrapper = tsr.$x
+}
+

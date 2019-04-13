@@ -31,6 +31,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/PropertyDelegates.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -5248,13 +5249,25 @@ void ASTContext::setSideCachedPropertyDelegateBackingPropertyType(
   getImpl().PropertyDelegateBackingVarTypes[var] = type;
 }
 
-VarDecl *VarDecl::getOriginalDelegatedProperty() const {
+VarDecl *VarDecl::getOriginalDelegatedProperty(
+    Optional<PropertyDelegateSynthesizedPropertyKind> kind) const {
   if (!Bits.VarDecl.IsPropertyDelegateBackingProperty)
     return nullptr;
 
   ASTContext &ctx = getASTContext();
   assert(ctx.getImpl().OriginalDelegatedProperties.count(this) > 0);
-  return ctx.getImpl().OriginalDelegatedProperties[this];
+  auto original = ctx.getImpl().OriginalDelegatedProperties[this];
+  if (!kind)
+    return original;
+
+  auto delegateInfo = original->getPropertyDelegateBackingPropertyInfo();
+  switch (*kind) {
+  case PropertyDelegateSynthesizedPropertyKind::Backing:
+    return this == delegateInfo.backingVar ? original : nullptr;
+
+  case PropertyDelegateSynthesizedPropertyKind::StorageDelegate:
+    return this == delegateInfo.storageDelegateVar ? original : nullptr;
+  }
 }
 
 void VarDecl::setOriginalDelegatedProperty(VarDecl *originalProperty) {

@@ -314,10 +314,16 @@ static void maybeMarkTransparent(AccessorDecl *accessor, ASTContext &ctx) {
 
   // Getters/setters for a property with a delegate are not @_transparent if
   // the backing variable has more-restrictive access than the original
-  // property.
+  // property. The same goes for its storage delegate.
   if (auto var = dyn_cast<VarDecl>(accessor->getStorage())) {
     if (auto backingVar = var->getPropertyDelegateBackingProperty()) {
       if (backingVar->getFormalAccess() < var->getFormalAccess())
+        return;
+    }
+
+    if (auto original = var->getOriginalDelegatedProperty(
+            PropertyDelegateSynthesizedPropertyKind::StorageDelegate)) {
+      if (var->getFormalAccess() < original->getFormalAccess())
         return;
     }
   }
@@ -534,7 +540,11 @@ namespace {
     /// We're referencing the superclass's implementation of the storage.
     Super,
     /// We're referencing the backing property for a property with a delegate
+    /// through the 'value' property.
     Delegate,
+    /// We're referencing the backing property for a property with a delegate
+    /// through the 'storage' property.
+    DelegateStorage,
   };
 } // end anonymous namespace
 
@@ -592,6 +602,17 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     auto var = cast<VarDecl>(accessor->getStorage());
     storage = var->getPropertyDelegateBackingProperty();
     underlyingVar = var->getAttachedPropertyDelegateTypeInfo().valueVar;
+    semantics = AccessSemantics::DirectToStorage;
+    selfAccessKind = SelfAccessorKind::Peer;
+    break;
+  }
+
+  case TargetImpl::DelegateStorage: {
+    auto var =
+      cast<VarDecl>(accessor->getStorage())->getOriginalDelegatedProperty();
+    storage = var->getPropertyDelegateBackingProperty();
+    underlyingVar = var->getAttachedPropertyDelegateTypeInfo().storageValueVar;
+    assert(underlyingVar);
     semantics = AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
     break;
@@ -779,7 +800,8 @@ static void synthesizeTrivialGetterBody(AccessorDecl *getter,
                                         ASTContext &ctx) {
   auto storage = getter->getStorage();
   assert(!isSynthesizedComputedProperty(storage) ||
-         target == TargetImpl::Delegate);
+         target == TargetImpl::Delegate ||
+         target == TargetImpl::DelegateStorage);
 
   SourceLoc loc = storage->getLoc();
 
@@ -1463,18 +1485,87 @@ static Expr *findOriginalPropertyDelegateInitialValue(VarDecl *var,
   return initArg;
 }
 
+/// Synthesize a computed property `$foo` for a property with an attached
+/// delegate that has a `storageValue` property.
+static VarDecl *synthesizePropertyDelegateStorageDelegateProperty(
+    ASTContext &ctx, VarDecl *var, Type delegateType,
+    VarDecl *storageValueVar) {
+  // Compute the name of the storage type.
+  SmallString<64> nameBuf;
+  nameBuf = "$";
+  nameBuf += var->getName().str();
+  Identifier name = ctx.getIdentifier(nameBuf);
+
+  // Determine the type of the property.
+  Type propertyType = delegateType->getTypeOfMember(
+      var->getModuleContext(), storageValueVar,
+      storageValueVar->getValueInterfaceType());
+  Type propertyInterfaceType = propertyType->mapTypeOutOfContext();
+
+  // Form the property.
+  auto dc = var->getDeclContext();
+  VarDecl *property = new (ctx) VarDecl(/*IsStatic=*/var->isStatic(),
+                                        VarDecl::Specifier::Var,
+                                        /*IsCaptureList=*/false,
+                                        var->getLoc(),
+                                        name, dc);
+  property->setInterfaceType(propertyInterfaceType);
+  property->setType(propertyType);
+  property->setImplicit();
+  property->setOriginalDelegatedProperty(var);
+  addMemberToContextIfNeeded(property, dc, var);
+
+  // Create the pattern binding declaration for the property.
+  Pattern *pbdPattern = new (ctx) NamedPattern(property, /*implicit=*/true);
+  pbdPattern->setType(propertyType);
+  pbdPattern = TypedPattern::createImplicit(ctx, pbdPattern, propertyType);
+  auto pbd = PatternBindingDecl::createImplicit(
+      ctx, property->getCorrectStaticSpelling(), pbdPattern,
+      /*init*/nullptr, dc, SourceLoc());
+  addMemberToContextIfNeeded(pbd, dc, var);
+
+  // Determine the access level for the property.
+  AccessLevel access =
+    std::min(AccessLevel::Internal, var->getFormalAccess());
+  property->overwriteAccess(access);
+
+  // Determine setter access.
+  AccessLevel setterAccess =
+    std::min(AccessLevel::Internal, var->getSetterFormalAccess());
+  property->overwriteSetterAccess(setterAccess);
+
+  // Add the accessors we need.
+  bool hasSetter = storageValueVar->isSettable(nullptr) &&
+      storageValueVar->isSetterAccessibleFrom(var->getInnermostDeclContext());
+  addGetterToStorage(property, ctx);
+  if (hasSetter) {
+    addSetterToStorage(property, ctx);
+    property->overwriteImplInfo(StorageImplInfo::getMutableComputed());
+  } else {
+    property->overwriteImplInfo(StorageImplInfo::getImmutableComputed());
+  }
+  addExpectedOpaqueAccessorsToStorage(property, ctx);
+
+  return property;
+}
+
 llvm::Expected<PropertyDelegateBackingPropertyInfo>
 PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
-                                                 VarDecl *var) const {
+                                                     VarDecl *var) const {
   // Determine the type of the backing property.
   auto delegateType = var->getPropertyDelegateBackingPropertyType();
   if (!delegateType)
     return PropertyDelegateBackingPropertyInfo();
 
+  auto delegateInfo = var->getAttachedPropertyDelegateTypeInfo();
+
   // Compute the name of the storage type.
   ASTContext &ctx = var->getASTContext();
   SmallString<64> nameBuf;
-  nameBuf = "$";
+  if (delegateInfo.storageValueVar)
+    nameBuf = "$__delegate_storage_$_";
+  else
+    nameBuf = "$";
   nameBuf += var->getName().str();
   Identifier name = ctx.getIdentifier(nameBuf);
 
@@ -1543,12 +1634,19 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
       std::min(AccessLevel::Internal, var->getSetterFormalAccess());
   backingVar->overwriteSetterAccess(setterAccess);
 
+  // If there is a storage delegate property (storageValue) in the delegate,
+  // synthesize a computed property for '$foo'.
+  VarDecl *storageVar = nullptr;
+  if (delegateInfo.storageValueVar) {
+    storageVar = synthesizePropertyDelegateStorageDelegateProperty(
+        ctx, var, delegateType, delegateInfo.storageValueVar);
+  }
+
   // Get the property delegate information.
-  auto delegateInfo = var->getAttachedPropertyDelegateTypeInfo();
   if (!delegateInfo.initialValueInit) {
     assert(!originalInitialValue);
     return PropertyDelegateBackingPropertyInfo(
-        backingVar, nullptr, nullptr, nullptr);
+        backingVar, storageVar, nullptr, nullptr, nullptr);
   }
 
   // Form the initialization of the backing property from a value of the
@@ -1571,7 +1669,7 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   }
   tc.checkPropertyDelegateErrorHandling(parentPBD, initializer);
   return PropertyDelegateBackingPropertyInfo(
-      backingVar, originalInitialValue, initializer, origValue);
+      backingVar, storageVar, originalInitialValue, initializer, origValue);
 }
 
 static bool wouldBeCircularSynthesis(AbstractStorageDecl *storage,
@@ -1579,6 +1677,10 @@ static bool wouldBeCircularSynthesis(AbstractStorageDecl *storage,
   // All property delegate accessors are non-circular.
   if (auto var = dyn_cast<VarDecl>(storage)) {
     if (var->getAttachedPropertyDelegate())
+      return false;
+
+    if (var->getOriginalDelegatedProperty(
+            PropertyDelegateSynthesizedPropertyKind::StorageDelegate))
       return false;
   }
 
@@ -1798,6 +1900,12 @@ static void synthesizeGetterBody(AccessorDecl *getter,
       synthesizePropertyDelegateGetterBody(getter, ctx);
       return;
     }
+
+    if (var->getOriginalDelegatedProperty(
+            PropertyDelegateSynthesizedPropertyKind::StorageDelegate)) {
+      synthesizeTrivialGetterBody(getter, TargetImpl::DelegateStorage, ctx);
+      return;
+    }
   }
 
   if (getter->hasForcedStaticDispatch()) {
@@ -1842,6 +1950,17 @@ static void synthesizeSetterBody(AccessorDecl *setter,
       }
 
       synthesizePropertyDelegateSetterBody(setter, ctx);
+      return;
+    }
+
+    // Synthesize a getter for the storage delegate property of a property
+    // with an attached delegate.
+    if (auto original = var->getOriginalDelegatedProperty(
+            PropertyDelegateSynthesizedPropertyKind::StorageDelegate)) {
+      auto backingVar = original->getPropertyDelegateBackingProperty();
+      synthesizeTrivialSetterBodyWithStorage(setter,
+                                             TargetImpl::DelegateStorage,
+                                             backingVar, ctx);
       return;
     }
   }
