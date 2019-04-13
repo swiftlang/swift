@@ -1086,8 +1086,8 @@ def create_argument_parser():
 
     in_group('Build settings for Android')
 
-    option('--wasm-emscripten', store_path,
-           help='An absolute path to Emscripten that will be used as a libc '
+    option('--wasm-wasi-sdk', store_path,
+           help='An absolute path to WASI SDK that will be used as a libc '
                 'implementation for Wasm builds')
 
     option('--wasm-icu-uc', store_path,

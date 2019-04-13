@@ -81,7 +81,7 @@ typedef int __swift_thread_key_t;
 typedef unsigned long __swift_thread_key_t;
 # elif defined(__HAIKU__)
 typedef int __swift_thread_key_t;
-# elif defined(__EMSCRIPTEN__)
+# elif defined(__wasi__)
 typedef unsigned int __swift_thread_key_t;
 # else
 typedef unsigned long __swift_thread_key_t;

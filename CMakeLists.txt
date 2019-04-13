@@ -781,7 +781,7 @@ if(swift_build_windows AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
   configure_sdk_windows("Windows" "msvc" "${SWIFT_SDK_WINDOWS_ARCHITECTURES}")
 endif()
 
-# Should we cross-compile the standard library for WebAssembly (Emscripten)?
+# Should we cross-compile the standard library for WebAssembly (WASI)?
 is_sdk_requested(WASM swift_build_wasm)
 if(swift_build_wasm AND NOT "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WASM")
   #if ("${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")

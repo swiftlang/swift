@@ -123,14 +123,14 @@ class BuildScriptInvocation(object):
                     "must be specified")
 
         if args.wasm:
-            if args.wasm_emscripten is None or \
+            if args.wasm_wasi_sdk is None or \
                     args.wasm_icu_uc is None or \
                     args.wasm_icu_uc_include is None or \
                     args.wasm_icu_i18n is None or \
                     args.wasm_icu_i18n_include is None or \
                     args.wasm_icu_data is None:
                 diagnostics.fatal(
-                    "when building for WebAssembly, --wasm-emscripten, "
+                    "when building for WebAssembly, --wasm-wasi-sdk, "
                     "--wasm-icu-uc, "
                     "--wasm-icu-uc-include, --wasm-icu-i18n, "
                     "--wasm-icu-i18n-include, and --wasm-icu-data "
@@ -606,7 +606,7 @@ class BuildScriptInvocation(object):
 
         if args.wasm:
             impl_args += [
-                "--wasm-emscripten", args.wasm_emscripten,
+                "--wasm-wasi-sdk", args.wasm_wasi_sdk,
                 "--wasm-icu-uc", args.wasm_icu_uc,
                 "--wasm-icu-uc-include", args.wasm_icu_uc_include,
                 "--wasm-icu-i18n", args.wasm_icu_i18n,

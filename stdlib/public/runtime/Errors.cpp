@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if defined(__CYGWIN__) || defined(__HAIKU__) || defined(__EMSCRIPTEN__)
+#if defined(__CYGWIN__) || defined(__HAIKU__) || defined(__wasi__)
 #define SWIFT_SUPPORTS_BACKTRACE_REPORTING 0
 #else
 #define SWIFT_SUPPORTS_BACKTRACE_REPORTING 1
