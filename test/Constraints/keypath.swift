@@ -34,3 +34,10 @@ class Demo {
 let some = Some(keyPath: \Demo.here)
 // expected-error@-1 {{cannot convert value of type 'ReferenceWritableKeyPath<Demo, (() -> Void)?>' to expected argument type 'KeyPath<_, ((_) -> Void)?>'}}
 
+// SE-0249
+func testFunc() {
+  let _: (S) -> Int = \.i
+  _ = ([S]()).map(\.i)
+  _ = ([S]()).map(\.init)
+  // expected-error@-1 {{static member 'init' cannot be used on instance of type 'S'}}
+}
