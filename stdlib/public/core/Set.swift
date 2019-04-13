@@ -1274,7 +1274,7 @@ extension Set {
     // safe to copy the state.  So, we cannot implement Index that is a value
     // type for bridged NSSet in terms of Cocoa enumeration facilities.
 
-    @_frozen
+    @frozen
     @usableFromInline
     internal enum _Variant {
       case native(_HashTable.Index)
@@ -1463,7 +1463,7 @@ extension Set {
     // IteratorProtocol, which is being consumed as iteration proceeds.
 
     @usableFromInline
-    @_frozen
+    @frozen
     internal enum _Variant {
       case native(_NativeSet<Element>.Iterator)
 #if _runtime(_ObjC)

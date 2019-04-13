@@ -827,7 +827,7 @@ extension Comparable {
 ///     let word2 = "grisly"
 ///     let changes = countLetterChanges(word1[...], word2[...])
 ///     // changes == 2
-@_frozen // namespace
+@frozen // namespace
 public enum UnboundedRange_ {
   // FIXME: replace this with a computed var named `...` when the language makes
   // that possible.

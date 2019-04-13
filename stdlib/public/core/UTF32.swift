@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 extension Unicode {
-  @_frozen
+  @frozen
   public enum UTF32 {
   case _swift3Codec
   }

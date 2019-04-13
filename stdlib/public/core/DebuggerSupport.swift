@@ -12,7 +12,7 @@
 
 import SwiftShims
 
-@_frozen // namespace
+@frozen // namespace
 public enum _DebuggerSupport {
   private enum CollectionStatus {
     case notACollection

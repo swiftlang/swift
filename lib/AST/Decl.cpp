@@ -3188,7 +3188,7 @@ bool NominalTypeDecl::isFormallyResilient() const {
                             /*treatUsableFromInlineAsPublic=*/true).isPublic())
     return false;
 
-  // Check for an explicit @_fixed_layout or @_frozen attribute.
+  // Check for an explicit @_fixed_layout or @frozen attribute.
   if (getAttrs().hasAttribute<FixedLayoutAttr>() ||
       getAttrs().hasAttribute<FrozenAttr>()) {
     return false;

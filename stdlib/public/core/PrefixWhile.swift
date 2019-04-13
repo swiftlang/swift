@@ -112,7 +112,7 @@ public typealias LazyPrefixWhileCollection<T: Collection> = LazyPrefixWhileSeque
 extension LazyPrefixWhileCollection {
   /// A position in the base collection of a `LazyPrefixWhileCollection` or the
   /// end of that collection.
-  @_frozen // lazy-performance
+  @frozen // lazy-performance
   @usableFromInline
   internal enum _IndexRepresentation {
     case index(Base.Index)

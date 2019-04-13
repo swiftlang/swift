@@ -66,7 +66,7 @@ struct fixedLayoutStruct2 {
   public var BecomeFixedBinaryOrder = 1
 }
 
-@_frozen
+@frozen
 public enum FrozenKind {
   case Unchanged
   case Rigid

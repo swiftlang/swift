@@ -1261,7 +1261,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     // The actual storage for Data's various representations.
     // Inlinability strategy: almost everything should be inlinable as forwarding the underlying implementations. (Inlining can also help avoid retain-release traffic around pulling values out of enums.)
     @usableFromInline
-    @_frozen
+    @frozen
     internal enum _Representation {
         case empty
         case inline(InlineData)

@@ -48,7 +48,7 @@ extension JoinedSequence {
     @usableFromInline // lazy-performance
     internal var _separator: ContiguousArray<Element>.Iterator?
     
-    @_frozen // lazy-performance
+    @frozen // lazy-performance
     @usableFromInline // lazy-performance
     internal enum _JoinIteratorState {
       case start

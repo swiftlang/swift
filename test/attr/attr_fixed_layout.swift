@@ -15,7 +15,7 @@
 
 // RESILIENCE-ON: enum_decl{{.*}}"ChooseYourOwnAdventure" interface type='ChooseYourOwnAdventure.Type' access=public non-resilient
 // RESILIENCE-OFF: enum_decl{{.*}}"ChooseYourOwnAdventure" interface type='ChooseYourOwnAdventure.Type' access=public non-resilient
-@_frozen public enum ChooseYourOwnAdventure {
+@frozen public enum ChooseYourOwnAdventure {
   case JumpIntoRabbitHole
   case EatMushroom
 }

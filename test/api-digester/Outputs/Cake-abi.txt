@@ -42,7 +42,7 @@ cake1: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
 
 /* Decl Attribute changes */
 cake1: Class C5 is now without @objc
-cake1: Enum IceKind is now without @_frozen
+cake1: Enum IceKind is now without @frozen
 cake1: Func C1.foo1() is now not static
 cake1: Func C5.dy_foo() is now with dynamic
 cake1: Func FinalFuncContainer.NewFinalFunc() is now with final

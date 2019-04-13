@@ -8,7 +8,7 @@
 // CHECK-RESILIENT: Frozen_DECL_ATTR
 // CHECK-NON-RESILIENT-NOT: Frozen_DECL_ATTR
 
-@_frozen // expected-warning {{@_frozen has no effect without -enable-library-evolution}}
+@frozen // expected-warning {{@frozen has no effect without -enable-library-evolution}}
 public enum SomeEnum {
   case x
 }

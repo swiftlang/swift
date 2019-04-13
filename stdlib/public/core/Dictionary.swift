@@ -1713,7 +1713,7 @@ extension Dictionary: CustomStringConvertible, CustomDebugStringConvertible {
 }
 
 @usableFromInline
-@_frozen
+@frozen
 internal enum _MergeError: Error {
   case keyCollision
 }
@@ -1739,7 +1739,7 @@ extension Dictionary {
     // safe to copy the state.  So, we cannot implement Index that is a value
     // type for bridged NSDictionary in terms of Cocoa enumeration facilities.
 
-    @_frozen
+    @frozen
     @usableFromInline
     internal enum _Variant {
       case native(_HashTable.Index)
@@ -1921,7 +1921,7 @@ extension Dictionary {
     // IteratorProtocol, which is being consumed as iteration proceeds.
 
     @usableFromInline
-    @_frozen
+    @frozen
     internal enum _Variant {
       case native(_NativeDictionary<Key, Value>.Iterator)
 #if _runtime(_ObjC)

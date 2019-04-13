@@ -15,7 +15,7 @@
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
 public struct CollectionDifference<ChangeElement> {
   /// A single change to a collection.
-  @_frozen
+  @frozen
   public enum Change {
     /// An insertion.
     ///
