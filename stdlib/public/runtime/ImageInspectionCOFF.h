@@ -19,7 +19,7 @@
 #ifndef SWIFT_RUNTIME_IMAGEINSPECTIONCOFF_H
 #define SWIFT_RUNTIME_IMAGEINSPECTIONCOFF_H
 
-#if !defined(__ELF__) && !defined(__MACH__) && !defined(__EMSCRIPTEN__)
+#if !defined(__ELF__) && !defined(__MACH__) && !defined(__wasm__)
 
 #include "../SwiftShims/Visibility.h"
 #include <cstdint>

@@ -21,7 +21,7 @@
 
 #define SWIFT_REFLECTION_METADATA_ELF_NOTE_MAGIC_STRING "swift_reflection_metadata_magic_string"
 
-#if defined(__ELF__) || defined(__EMSCRIPTEN__)
+#if defined(__ELF__) || defined(__wasm__)
 
 #include "../SwiftShims/Visibility.h"
 #include <cstdint>
