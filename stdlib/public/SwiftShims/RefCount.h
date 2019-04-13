@@ -762,7 +762,7 @@ class RefCounts {
   
   bool getHasNoObjCComplications() {
     auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
-    return bits.hasNoObjCComplications()
+    return bits.hasNoObjCComplications();
   }
   
   // Initialize from another refcount bits.

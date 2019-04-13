@@ -192,11 +192,10 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
          _ContiguousArrayStorage<Element>.self,
          realMinimumCapacity._builtinWordValue, Element.self)
       
-      if !_isBridgedVerbatimToObjectiveC(Element.self) {
-        _swift_stdlib_forbid_objc_complications(self)
-      }
-
       let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_storage))
+      if !_isBridgedVerbatimToObjectiveC(Element.self) {
+        _swift_stdlib_forbid_objc_complications(storageAddr)
+      }
       let endAddr = storageAddr + _swift_stdlib_malloc_size(storageAddr)
       let realCapacity = endAddr.assumingMemoryBound(to: Element.self) - firstElementAddress
 
