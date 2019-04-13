@@ -1462,6 +1462,12 @@ ConstExprEvaluator::ConstExprEvaluator(SymbolicValueAllocator &alloc)
 
 ConstExprEvaluator::~ConstExprEvaluator() {}
 
+/// An explicit copy constructor.
+ConstExprEvaluator::ConstExprEvaluator(const ConstExprEvaluator &other)
+    : allocator(other.allocator) {
+  callStack = other.callStack;
+}
+
 SymbolicValue ConstExprEvaluator::getUnknown(SILNode *node,
                                              UnknownReason reason) {
   return SymbolicValue::getUnknown(node, reason, getCallStack(),
@@ -1488,4 +1494,55 @@ void ConstExprEvaluator::computeConstantValues(
     // at.  We don't want lots of constants folded to trigger a limit.
     numInstEvaluated = 0;
   }
+}
+
+//===----------------------------------------------------------------------===//
+// ConstExprStepEvaluator implementation.
+//===----------------------------------------------------------------------===//
+
+ConstExprStepEvaluator::ConstExprStepEvaluator(SymbolicValueAllocator &alloc,
+                                               SILFunction *fun)
+    : evaluator(ConstExprEvaluator(alloc)),
+      internalState(
+          new ConstExprFunctionState(evaluator, fun, {}, stepsEvaluated)) {
+  assert(fun);
+}
+
+ConstExprStepEvaluator::~ConstExprStepEvaluator() { delete internalState; }
+
+Optional<SymbolicValue> ConstExprStepEvaluator::incrementStepsAndCheckLimit(
+    SILInstruction *inst, bool includeInInstructionLimit) {
+  if (includeInInstructionLimit && ++stepsEvaluated > ConstExprLimit) {
+    // Note that there is no call stack to associate with the unknown value
+    // as the interpreter is at the top-level here.
+    return SymbolicValue::getUnknown(inst, UnknownReason::TooManyInstructions,
+                                     {}, evaluator.getAllocator());
+  }
+  return None;
+}
+
+std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+ConstExprStepEvaluator::evaluate(SILBasicBlock::iterator instI,
+                                 bool includeInInstructionLimit) {
+  // Diagnose whether evaluating this instruction exceeds the instruction
+  // limit, unless asked to not include this instruction in the limit.
+  auto limitError =
+      incrementStepsAndCheckLimit(&(*instI), includeInInstructionLimit);
+  if (limitError) {
+    return {None, limitError.getValue()};
+  }
+  return internalState->evaluateInstructionAndGetNext(instI, visitedBlocks);
+}
+
+Optional<SymbolicValue>
+ConstExprStepEvaluator::lookupConstValue(SILValue value) {
+  auto res = internalState->lookupValue(value);
+  if (res && !res->isConstant()) {
+    return None;
+  }
+  return res;
+}
+
+bool ConstExprStepEvaluator::isKnownFunction(SILFunction *fun) {
+  return classifyFunction(fun).hasValue();
 }
