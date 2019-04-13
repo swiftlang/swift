@@ -292,7 +292,10 @@ extension String {
 
     _internalInvariant(_guts._object.hasObjCBridgeableObject,
       "Unknown non-bridgeable object case")
-    return _guts._object.objCBridgeableObject
+    let bridged = _guts._object.objCBridgeableObject
+    let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(bridged))
+    _swift_stdlib_set_objc_complications_forbidden(storageAddr, 0)
+    return bridged
   }
 }
 

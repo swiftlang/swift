@@ -421,6 +421,9 @@ extension _DictionaryStorage {
       bucketCount._builtinWordValue, Key.self,
       bucketCount._builtinWordValue, Value.self)
 
+    let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(storage))
+    _swift_stdlib_set_objc_complications_forbidden(storageAddr, 1)
+    
     let metadataAddr = Builtin.projectTailElems(storage, _HashTable.Word.self)
     let keysAddr = Builtin.getTailAddr_Word(
       metadataAddr, wordCount._builtinWordValue, _HashTable.Word.self,
