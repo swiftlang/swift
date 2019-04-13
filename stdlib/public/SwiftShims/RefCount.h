@@ -238,11 +238,19 @@ struct RefCountBitOffsets;
 // 32-bit out of line
 template <>
 struct RefCountBitOffsets<8> {
-  static const size_t IsImmortalShift = 0;
-  static const size_t IsImmortalBitCount = 1;
-  static const uint64_t IsImmortalMask = maskForField(IsImmortal);
+  /*
+   This field is used as a 2 bit flag with the UseSlowRC field:
+   ImmortalOrFast | SlowRC | Result
+   0              | 0      | Normal RC
+   1              | 0      | Normal RC, no objc_destructInstance (fast dealloc)
+   0              | 1      | Slow (sidetable) RC
+   1              | 1      | Immortal
+   */
+  static const size_t IsImmortalOrFastDeallocShift = 0;
+  static const size_t IsImmortalOrFastDeallocBitCount = 1;
+  static const uint64_t IsImmortalOrFastDeallocMask = maskForField(IsImmortalOrFastDealloc);
 
-  static const size_t UnownedRefCountShift = shiftAfterField(IsImmortal);
+  static const size_t UnownedRefCountShift = shiftAfterField(IsImmortalOrFastDealloc);
   static const size_t UnownedRefCountBitCount = 31;
   static const uint64_t UnownedRefCountMask = maskForField(UnownedRefCount);
 
@@ -271,11 +279,11 @@ struct RefCountBitOffsets<8> {
 // 32-bit inline
 template <>
 struct RefCountBitOffsets<4> {
-  static const size_t IsImmortalShift = 0;
-  static const size_t IsImmortalBitCount = 1;
-  static const uint64_t IsImmortalMask = maskForField(IsImmortal);
+  static const size_t IsImmortalOrFastDeallocShift = 0;
+  static const size_t IsImmortalOrFastDeallocBitCount = 1;
+  static const uint64_t IsImmortalOrFastDeallocMask = maskForField(IsImmortalOrFastDealloc);
   
-  static const size_t UnownedRefCountShift = shiftAfterField(IsImmortal);
+  static const size_t UnownedRefCountShift = shiftAfterField(IsImmortalOrFastDealloc);
   static const size_t UnownedRefCountBitCount = 7;
   static const uint32_t UnownedRefCountMask = maskForField(UnownedRefCount);
 
@@ -370,13 +378,26 @@ class RefCountBitsT {
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   bool isImmortal() const {
-    return bool(getField(IsImmortal));
+    return bool(getField(IsImmortalOrFastDealloc)) &&
+           bool(getField(UseSlowRC));
   }
   
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   void setIsImmortal(bool value) {
-    setField(IsImmortal, value);
+    setField(IsImmortalOrFastDealloc, value);
     setField(UseSlowRC, value);
+  }
+  
+  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  bool hasNoObjCComplications() const {
+    return bool(getField(IsImmortalOrFastDealloc)) &&
+           !bool(getField(UseSlowRC));
+  }
+  
+  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  void setHasNoObjCComplications(bool value) {
+    if (bool(getField(IsImmortalOrFastDealloc))) return;
+    setField(NoObjC, value);
   }
   
   LLVM_ATTRIBUTE_ALWAYS_INLINE
@@ -394,7 +415,7 @@ class RefCountBitsT {
   RefCountBitsT(Immortal_t immortal)
     : bits((BitsType(2) << Offsets::StrongExtraRefCountShift) |
            (BitsType(2) << Offsets::UnownedRefCountShift) |
-           (BitsType(1) << Offsets::IsImmortalShift) |
+           (BitsType(1) << Offsets::IsImmortalOrFastDeallocShift) |
            (BitsType(1) << Offsets::UseSlowRCShift))
   { }
 
@@ -558,7 +579,7 @@ class RefCountBitsT {
     static_assert(Offsets::UnownedRefCountBitCount +
                   Offsets::IsDeinitingBitCount +
                   Offsets::StrongExtraRefCountBitCount +
-                  Offsets::IsImmortalBitCount +
+                  Offsets::IsImmortalOrFastDeallocBitCount +
                   Offsets::UseSlowRCBitCount == sizeof(bits)*8,
                   "inspect isUniquelyReferenced after adding fields");
 
@@ -725,7 +746,20 @@ class RefCounts {
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
   }
-
+  
+  void setHasNoObjCComplications(bool nonobjc) {
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    if (oldbits.hasNoObjCComplications()) {
+      return;
+    }
+    RefCountBits newbits;
+    do {
+      newbits = oldbits;
+      newbits.setHasNoObjCComplications(nonobjc);
+    } while (!refCounts.compare_exchange_weak(oldbits, newbits,
+                                              std::memory_order_relaxed));
+  }
+  
   // Initialize from another refcount bits.
   // Only inline -> out-of-line is allowed (used for new side table entries).
   void init(InlineRefCountBits newBits) {

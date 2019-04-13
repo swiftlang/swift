@@ -597,7 +597,9 @@ void swift::swift_deallocClassInstance(HeapObject *object,
 #if SWIFT_OBJC_INTEROP
   // We need to let the ObjC runtime clean up any associated objects or weak
   // references associated with this object.
-  objc_destructInstance((id)object);
+  if (!refCounts.hasNoObjCComplications()) {
+    objc_destructInstance((id)object);
+  }
 #endif
   swift_deallocObject(object, allocatedSize, allocatedAlignMask);
 }

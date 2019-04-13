@@ -155,6 +155,12 @@ void _swift_stdlib_immortalize(void *obj) {
   auto heapObj = reinterpret_cast<HeapObject *>(obj);
   heapObj->refCounts.setIsImmortal(true);
 }
+  
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+void _swift_stdlib_forbid_objc_complications(void *obj) {
+  auto heapObj = reinterpret_cast<HeapObject *>(obj);
+  heapObj->refCounts.setHasNoObjCComplications(true);
+}
 
 // namespace swift
 } // namespace swift
