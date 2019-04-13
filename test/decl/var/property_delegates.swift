@@ -422,7 +422,7 @@ struct UseMutatingnessDelegates {
   @DelegateWithMutatingGetter
   var y = 17
 
-  @DelegateWithNonMutatingSetter
+  @DelegateWithNonMutatingSetter // expected-error{{property delegate can only be applied to a 'var'}}
   let z = 3.14159 // expected-note 2{{change 'let' to 'var' to make it mutable}}
 
   @ClassDelegate
