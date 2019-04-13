@@ -397,7 +397,7 @@ class RefCountBitsT {
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   void setHasNoObjCComplications(bool value) {
     if (bool(getField(IsImmortalOrFastDealloc))) return;
-    setField(NoObjC, value);
+    setField(IsImmortalOrFastDealloc, value);
   }
   
   LLVM_ATTRIBUTE_ALWAYS_INLINE
