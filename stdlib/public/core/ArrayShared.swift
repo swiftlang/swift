@@ -37,8 +37,6 @@ func _allocateUninitializedArray<Element>(_  builtinCount: Builtin.Word)
     // semantics function enables stack propagation of the buffer.
     let bufferObject = Builtin.allocWithTailElems_1(
       _ContiguousArrayStorage<Element>.self, builtinCount, Element.self)
-    let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(bufferObject))
-    _swift_stdlib_set_objc_complications_forbidden(storageAddr, 1)
     
     let (array, ptr) = Array<Element>._adoptStorage(bufferObject, count: count)
     return (array, ptr._rawValue)
