@@ -44,7 +44,10 @@
 #else
 #include <sys/mman.h>
 #include <unistd.h>
+// WASI doesn't have dynamic linking yet
+#ifndef __wasi__
 #include <dlfcn.h>
+#endif //__wasi
 #endif
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
