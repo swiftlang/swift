@@ -49,7 +49,7 @@ SWIFT_RUNTIME_STDLIB_API
 void _swift_stdlib_immortalize(void *obj);
   
 SWIFT_RUNTIME_STDLIB_API
-void _swift_stdlib_set_objc_complications_forbidden(void *obj, bool forbid);
+void _swift_stdlib_set_objc_complications_forbidden(void *obj, int forbid);
   
 SWIFT_RUNTIME_STDLIB_API
 void _swift_stdlib_flockfile_stdout(void);
