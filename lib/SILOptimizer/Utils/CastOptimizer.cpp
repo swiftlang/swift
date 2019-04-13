@@ -45,6 +45,10 @@
 
 using namespace swift;
 
+//===----------------------------------------------------------------------===//
+//                  ObjC -> Swift Bridging Cast Optimization
+//===----------------------------------------------------------------------===//
+
 static SILFunction *
 getObjCToSwiftBridgingFunction(SILOptFunctionBuilder &funcBuilder,
                                SILDynamicCastInst dynamicCast) {
@@ -357,6 +361,10 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   eraseInstAction(Inst);
   return (newI) ? newI : AI;
 }
+
+//===----------------------------------------------------------------------===//
+//                  Swift -> ObjC Bridging Cast Optimization
+//===----------------------------------------------------------------------===//
 
 static bool canOptimizeCast(const swift::Type &BridgedTargetTy,
                             swift::SILModule &M,
@@ -702,6 +710,10 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
   return NewI;
 }
 
+//===----------------------------------------------------------------------===//
+//               Top Level Bridge Cast Optimization Entrypoint
+//===----------------------------------------------------------------------===//
+
 /// Make use of the fact that some of these casts cannot fail.  For
 /// example, if the ObjC type is exactly the expected _ObjectiveCType
 /// type, then it would always succeed for NSString, NSNumber, etc.
@@ -767,6 +779,10 @@ CastOptimizer::optimizeBridgedCasts(SILDynamicCastInst dynamicCast) {
 
   llvm_unreachable("Unknown kind of bridging");
 }
+
+//===----------------------------------------------------------------------===//
+//                         Cast Optimizer Public API
+//===----------------------------------------------------------------------===//
 
 SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
     CheckedCastAddrBranchInst *Inst) {
