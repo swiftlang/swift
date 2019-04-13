@@ -151,4 +151,70 @@ AnyDerivativeTests.test("Derivatives") {
   }
 }
 
+AnyDerivativeTests.test("Pair") {
+  func pairTripled(_ x: AnyDerivative, _ y: AnyDerivative) -> AnyDerivativePair {
+    let pair = AnyDerivativePair(x, y)
+    return pair + pair + pair
+  }
+
+  func pairTripledErased(_ x: AnyDerivative, _ y: AnyDerivative) -> AnyDerivative {
+    let pair = AnyDerivativePair(x, y)
+    return AnyDerivative(pair) + AnyDerivative(pair) + AnyDerivative(pair)
+  }
+
+  do {
+    let x = AnyDerivative(Float(4))
+    let y = AnyDerivative(Float(-2))
+    let v = AnyDerivativePair(
+      AnyDerivative(Float(1)),
+      AnyDerivative(Float(1)))
+    let vErased = AnyDerivative(v)
+    let expectedVJP: Float = 3
+
+    var (𝛁x, 𝛁y) = pullback(at: x, y, in: pairTripled)(v)
+    expectEqual(expectedVJP, 𝛁x.base as? Float)
+    expectEqual(expectedVJP, 𝛁y.base as? Float)
+
+    (𝛁x, 𝛁y) = pullback(at: x, y, in: pairTripledErased)(vErased)
+    expectEqual(expectedVJP, 𝛁x.base as? Float)
+    expectEqual(expectedVJP, 𝛁x.base as? Float)
+  }
+
+  do {
+    let x = AnyDerivative(Vector.TangentVector(x: 4, y: 5))
+    let y = AnyDerivative(Vector.TangentVector(x: -2, y: -1))
+    let v = AnyDerivativePair(
+      AnyDerivative(Vector.CotangentVector(x: 1, y: 1)),
+      AnyDerivative(Vector.CotangentVector(x: 1, y: 1)))
+    let vErased = AnyDerivative(v)
+    let expectedVJP = Vector.CotangentVector(x: 3, y: 3)
+
+    var (𝛁x, 𝛁y) = pullback(at: x, y, in: pairTripled)(v)
+    expectEqual(expectedVJP, 𝛁x.base as? Vector.CotangentVector)
+    expectEqual(expectedVJP, 𝛁y.base as? Vector.CotangentVector)
+
+    (𝛁x, 𝛁y) = pullback(at: x, y, in: pairTripledErased)(vErased)
+    expectEqual(expectedVJP, 𝛁x.base as? Vector.CotangentVector)
+    expectEqual(expectedVJP, 𝛁y.base as? Vector.CotangentVector)
+  }
+
+  do {
+    let x = AnyDerivative(Generic<Double>.TangentVector(x: 4))
+    let y = AnyDerivative(Generic<Double>.TangentVector(x: -2))
+    let v = AnyDerivativePair(
+      AnyDerivative(Generic<Double>.CotangentVector(x: 1)),
+      AnyDerivative(Generic<Double>.CotangentVector(x: 1)))
+    let vErased = AnyDerivative(v)
+    let expectedVJP = Generic<Double>.CotangentVector(x: 3)
+
+    var (𝛁x, 𝛁y) = pullback(at: x, y, in: pairTripled)(v)
+    expectEqual(expectedVJP, 𝛁x.base as? Generic<Double>.CotangentVector)
+    expectEqual(expectedVJP, 𝛁y.base as? Generic<Double>.CotangentVector)
+
+    (𝛁x, 𝛁y) = pullback(at: x, y, in: pairTripledErased)(vErased)
+    expectEqual(expectedVJP, 𝛁x.base as? Generic<Double>.CotangentVector)
+    expectEqual(expectedVJP, 𝛁y.base as? Generic<Double>.CotangentVector)
+  }
+}
+
 runAllTests()

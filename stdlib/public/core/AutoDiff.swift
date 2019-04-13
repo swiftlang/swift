@@ -766,6 +766,57 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
   }
 }
 
+/// A pair of type-erased derivatives.
+public struct AnyDerivativePair : Differentiable & AdditiveArithmetic {
+  public var first: AnyDerivative
+  public var second: AnyDerivative
+
+  @differentiable(vjp: _vjpInit(_:_:))
+  public init(_ first: AnyDerivative, _ second: AnyDerivative) {
+    self.first = first
+    self.second = second
+  }
+
+  @usableFromInline internal static func _vjpInit(
+    _ first: AnyDerivative, _ second: AnyDerivative
+  ) -> (AnyDerivativePair,
+        (AnyDerivativePair) -> (AnyDerivative, AnyDerivative)) {
+    return (AnyDerivativePair(first, second), { v in (v.first, v.second) })
+  }
+
+  public static func + (
+    lhs: AnyDerivativePair, rhs: AnyDerivativePair
+  ) -> AnyDerivativePair {
+    return AnyDerivativePair(lhs.first + rhs.first, lhs.second + rhs.second)
+  }
+
+  @differentiating(+)
+  @usableFromInline internal static func _vjpAdd(
+    lhs: AnyDerivativePair, rhs: AnyDerivativePair
+  ) -> (
+    value: AnyDerivativePair,
+    pullback: (AnyDerivativePair) -> (AnyDerivativePair, AnyDerivativePair)
+  ) {
+    return (lhs + rhs, { v in (v, v) })
+  }
+
+  public static func - (
+    lhs: AnyDerivativePair, rhs: AnyDerivativePair
+  ) -> AnyDerivativePair {
+    return AnyDerivativePair(lhs.first - rhs.first, lhs.second - rhs.second)
+  }
+
+  @differentiating(-)
+  @usableFromInline internal static func _vjpSubtract(
+    lhs: AnyDerivativePair, rhs: AnyDerivativePair
+  ) -> (
+    value: AnyDerivativePair,
+    pullback: (AnyDerivativePair) -> (AnyDerivativePair, AnyDerivativePair)
+  ) {
+    return (lhs - rhs, { v in (v, .zero - v) })
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Builtins
 //===----------------------------------------------------------------------===//
