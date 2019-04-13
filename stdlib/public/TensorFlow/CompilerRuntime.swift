@@ -1938,15 +1938,16 @@ func _TFCOpSetAttrOptionalTensorShapeArray(_ op: CTFEOp,
 }
 
 /// Given dimensions and ranks in the form described below, makes the
-/// appropriate call to TFE_OpSetAttrShapeList(op, attrName, ..., status).
+/// appropriate call to `TFE_OpSetAttrShapeList(op, attrName, ..., status)`.
 ///
 /// - Parameters
 ///   - flattenedDims: all the shapes' dimensions concatenated together in
 ///     order
 ///   - ranks: all the shapes' ranks (-1 denotes unknown rank)
-func setAttrShapeList(op: CTFEOp, attrName: UnsafePointer<Int8>,
-                      flattenedDims: Array<Int64>, ranks: Array<Int32>,
-                      status: CTFStatus) {
+fileprivate func setAttrShapeList(
+  op: CTFEOp, attrName: UnsafePointer<Int8>, flattenedDims: Array<Int64>,
+  ranks: Array<Int32>, status: CTFStatus
+) {
   flattenedDims.withUnsafeBufferPointer { flattenedDimsBuffer in
     var dimsPtr: UnsafePointer<Int64>? = flattenedDimsBuffer.baseAddress
     var dims: [UnsafePointer<Int64>?] = []
