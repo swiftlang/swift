@@ -445,6 +445,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
       return _emptyArrayStorage
     }
     if _isBridgedVerbatimToObjectiveC(Element.self) {
+      let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_storage))
       _swift_stdlib_set_objc_complications_forbidden(storageAddr, 0)
       return _storage
     }
