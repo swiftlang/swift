@@ -2444,12 +2444,11 @@ for host in "${ALL_HOSTS[@]}"; do
                     # problematic for overwriting/stripping symbols. Thus, write
                     # permission is added here.
                     for lib_name in tensorflow tensorflow_framework; do
-                        lib="lib${lib_name}.so*"
-                        dylib="lib${lib_name}*.dylib"
-                        rm -f "${TF_LIB_DIR}/${lib}"
-                        rm -f "${TF_LIB_DIR}/${dylib}"
-                        find "${TENSORFLOW_HOST_LIB_DIR}" \( -name "${lib}" -o -name "${dylib}" \) -exec chmod +w {} +
-                        find "${TENSORFLOW_HOST_LIB_DIR}" \( -name "${lib}" -o -name "${dylib}" \) -exec cp -p {} "${TF_LIB_DIR}" \;
+                        lib=".*lib${lib_name}.so[0-9.]*"
+                        dylib=".*lib${lib_name}[0-9.]*.dylib"
+                        find "${TF_LIB_DIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec rm -f {} \;
+                        find "${TENSORFLOW_HOST_LIB_DIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec chmod +w {} +
+                        find "${TENSORFLOW_HOST_LIB_DIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec cp -p {} "${TF_LIB_DIR}" \;
                     done
 
                     if [[ ! "${TENSORFLOW_TARGET_LIB_DIR}" ]] ; then
@@ -3830,10 +3829,10 @@ for host in "${ALL_HOSTS[@]}"; do
                 mkdir -p "${TF_DEST_DIR}"
                 for lib_name in tensorflow tensorflow_framework
                 do
-                    lib="lib${lib_name}.so*"
-                    dylib="lib${lib_name}*.dylib"
-                    echo "${TF_LIBDIR}/${lib} => ${TF_DEST_DIR}"
-                    find "${TF_LIBDIR}" \( -name "${lib}" -o -name "${dylib}" \) -exec cp -a {} "${TF_DEST_DIR}" \;
+                    lib=".*lib${lib_name}.so[0-9.]*"
+                    dylib=".*lib${lib_name}[0-9.]*.dylib"
+                    find "${TF_LIBDIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec echo "{} => ${TF_DEST_DIR}" \;
+                    find "${TF_LIBDIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec cp -a {} "${TF_DEST_DIR}" \;
                 done
                 continue
                 ;;
