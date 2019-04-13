@@ -137,15 +137,4 @@ ShapedArrayTests.test("Hashable") {
   checkHashable([ShapedArraySlice(shape: [2, 3], scalars: Array(0..<6))], equalityOracle: { $0 == $1 })
 }
 
-ShapedArrayTests.test("StringDescription") {
-  let scalar = ShapedArray(shape: [], scalars: [1.0])
-  expectEqual("1.0", scalar.description)
-
-  let x = ShapedArray(shape: [2, 3], scalars: [1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
-  expectEqual("[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]", x.description)
-
-  let y = ShapedArraySlice(shape: [2, 3], scalars: [1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
-  expectEqual("[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]", y.description)
-}
-
 runAllTests()
