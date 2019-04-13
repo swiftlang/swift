@@ -227,7 +227,7 @@ static std::unique_ptr<llvm::MemoryBuffer> getBufferOfDependency(
                                     /*RequiresNullTerminator=*/false);
   if (!depBuf) {
     diags.diagnose(diagnosticLoc,
-                   diag::missing_dependency_of_parseable_module_interface,
+                   diag::missing_dependency_of_module_interface,
                    depPath, interfacePath, depBuf.getError().message());
     return nullptr;
   }
@@ -240,7 +240,7 @@ static Optional<llvm::vfs::Status> getStatusOfDependency(
   auto status = fs.status(depPath);
   if (!status) {
     diags.diagnose(diagnosticLoc,
-                   diag::missing_dependency_of_parseable_module_interface,
+                   diag::missing_dependency_of_module_interface,
                    depPath, interfacePath, status.getError().message());
     return None;
   }
@@ -348,7 +348,7 @@ class swift::ParseableInterfaceBuilder {
 
     // Tell the subinvocation to serialize dependency hashes if asked to do so.
     auto &frontendOpts = subInvocation.getFrontendOptions();
-    frontendOpts.SerializeParseableModuleInterfaceDependencyHashes =
+    frontendOpts.SerializeModuleInterfaceDependencyHashes =
       serializeDependencyHashes;
   }
 
@@ -367,12 +367,12 @@ class swift::ParseableInterfaceBuilder {
     SmallVector<StringRef, 1> VersMatches, FlagMatches;
     if (!VersRe.match(SB, &VersMatches)) {
       diags.diagnose(diagnosticLoc,
-                     diag::error_extracting_version_from_parseable_interface);
+                     diag::error_extracting_version_from_module_interface);
       return true;
     }
     if (!FlagRe.match(SB, &FlagMatches)) {
       diags.diagnose(diagnosticLoc,
-                     diag::error_extracting_flags_from_parseable_interface);
+                     diag::error_extracting_flags_from_module_interface);
       return true;
     }
     assert(VersMatches.size() == 2);
@@ -515,7 +515,7 @@ public:
       // compatible field variant.
       if (Vers.asMajorVersion() != InterfaceFormatVersion.asMajorVersion()) {
         diags.diagnose(diagnosticLoc,
-                       diag::unsupported_version_of_parseable_interface,
+                       diag::unsupported_version_of_module_interface,
                        interfacePath, Vers);
         SubError = true;
         return;
@@ -580,7 +580,7 @@ public:
       SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
       SmallVector<FileDependency, 16> Deps;
       if (collectDepsForSerialization(SubInstance, Deps,
-            FEOpts.SerializeParseableModuleInterfaceDependencyHashes)) {
+            FEOpts.SerializeModuleInterfaceDependencyHashes)) {
         SubError = true;
         return;
       }
@@ -858,7 +858,7 @@ class ParseableInterfaceModuleLoaderImpl {
       // The rest of the function should be covered by this.
       break;
     case ModuleLoadingMode::OnlySerialized:
-      llvm_unreachable("parseable module loader should not have been created");
+      llvm_unreachable("module interface loader should not have been created");
     }
 
     // First, check the cached module path. Whatever's in this cache represents

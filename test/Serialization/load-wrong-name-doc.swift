@@ -6,4 +6,4 @@
 // RUN: mv %t/empty.swiftdoc %t/empty2.swiftdoc
 // RUN: %target-swift-frontend -typecheck -I %t %s -verify -show-diagnostics-after-fatal
 
-import empty2 // expected-error{{malformed module file}}
+import empty2 // expected-error{{malformed compiled module}}

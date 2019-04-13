@@ -131,7 +131,7 @@ public:
     MergeModules,   ///< Merge modules only
 
     /// Build from a swiftinterface, as close to `import` as possible
-    BuildModuleFromParseableInterface,
+    CompileModuleFromInterface,
 
     EmitSIBGen, ///< Emit serialized AST + raw SIL
     EmitSIB,    ///< Emit serialized AST + canonical SIL
@@ -269,8 +269,8 @@ public:
   bool TrackSystemDeps = false;
 
   /// Should we serialize the hashes of dependencies (vs. the modification
-  /// times) when compiling a parseable module interface?
-  bool SerializeParseableModuleInterfaceDependencyHashes = false;
+  /// times) when compiling a module interface?
+  bool SerializeModuleInterfaceDependencyHashes = false;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {

@@ -119,7 +119,7 @@ ERROR(error_mode_cannot_emit_module,none,
 ERROR(error_mode_cannot_emit_module_doc,none,
       "this mode does not support emitting module documentation files", ())
 ERROR(error_mode_cannot_emit_interface,none,
-      "this mode does not support emitting parseable interface files", ())
+      "this mode does not support emitting module interface files", ())
 
 WARNING(emit_reference_dependencies_without_primary_file,none,
   "ignoring -emit-reference-dependencies (requires -primary-file)", ())
@@ -258,18 +258,18 @@ ERROR(error_invalid_debug_prefix_map, none,
 ERROR(invalid_vfs_overlay_file,none,
       "invalid virtual overlay file '%0'", (StringRef))
 
-WARNING(parseable_interface_scoped_import_unsupported,none,
-        "scoped imports are not yet supported in parseable module interfaces",
+WARNING(module_interface_scoped_import_unsupported,none,
+        "scoped imports are not yet supported in module interfaces",
         ())
-ERROR(error_extracting_version_from_parseable_interface,none,
-      "error extracting version from parseable module interface", ())
-ERROR(unsupported_version_of_parseable_interface,none,
-      "unsupported version of parseable module interface '%0': '%1'",
+ERROR(error_extracting_version_from_module_interface,none,
+      "error extracting version from module interface", ())
+ERROR(unsupported_version_of_module_interface,none,
+      "unsupported version of module interface '%0': '%1'",
       (StringRef, llvm::VersionTuple))
-ERROR(error_extracting_flags_from_parseable_interface,none,
-      "error extracting flags from parseable module interface", ())
-ERROR(missing_dependency_of_parseable_module_interface,none,
-      "missing dependency '%0' of parseable module interface '%1': %2",
+ERROR(error_extracting_flags_from_module_interface,none,
+      "error extracting flags from module interface", ())
+ERROR(missing_dependency_of_module_interface,none,
+      "missing dependency '%0' of module interface '%1': %2",
       (StringRef, StringRef, StringRef))
 ERROR(error_extracting_dependencies_from_cached_module,none,
       "error extracting dependencies from cached module '%0'",

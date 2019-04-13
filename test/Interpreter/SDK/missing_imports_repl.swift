@@ -33,7 +33,7 @@ MKMapRectIsNull(x)
 
 
 import Corrupted_Module
-// CHECK-ERROR: error: malformed module file
+// CHECK-ERROR: error: malformed compiled module
 
 "unreached"
 // CHECK-NOT: unreached
