@@ -23,7 +23,7 @@ public func testPointwiseBinaryOp<T : TensorFlowScalar & Equatable>(
   let lhsScalars: [Float] = [3, 1, 4, 1, 5, 9, 2, 7]
   let rhsScalars: [Float] = [2, 7, 1, 8, 2, 8, 1, 7]
   let shape = [2, 4]
-  let tensorShape: TensorShape = TensorShape(shape.map { Int32($0) })
+  let tensorShape = TensorShape(shape)
   let lhs = Tensor<Float>(shape: tensorShape, scalars: lhsScalars)
   let rhs = Tensor<Float>(shape: tensorShape, scalars: rhsScalars)
 
