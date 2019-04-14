@@ -248,7 +248,7 @@ popd
 
 ```cmd
 pushd "S:\libxml2\win32"
-cscript configure.js iconv=no
+cscript //E:jscript configure.js iconv=no
 nmake /f Makefile.msvc
 popd
 ```
