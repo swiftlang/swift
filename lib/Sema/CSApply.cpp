@@ -878,6 +878,8 @@ namespace {
         openedExistential = true;
       }
 
+//      member->dump();
+
       // If this is a method whose result type is dynamic Self, or a
       // construction, replace the result type with the actual object type.
       Type dynamicSelfFnType;
@@ -887,17 +889,21 @@ namespace {
                cast<FuncDecl>(func)->hasDynamicSelf()) ||
               (isa<ConstructorDecl>(func) &&
                containerTy->getClassOrBoundGenericClass())) {
+            fprintf(stderr, "buildMemberRef FuncDecl !!!!!!!!!!!!!!!!\n");
             refTy = refTy->replaceCovariantResultType(containerTy, 2);
             if (!baseTy->isEqual(containerTy)) {
               dynamicSelfFnType = refTy->replaceCovariantResultType(baseTy, 2);
             }
           }
         }
-        else if (isa<DynamicSelfType>(member->getInterfaceType()
-                                      ->getCanonicalType())) {
-          refTy = refTy->replaceCovariantResultType(containerTy, 1);
-          if (!baseTy->isEqual(containerTy)) {
-            dynamicSelfFnType = refTy->replaceCovariantResultType(containerTy, 1);
+        else if (auto *decl = dyn_cast<VarDecl>(member)) {
+          fprintf(stderr, "buildMemberRef VarDecl !!!!!!!!!!!!!!!!\n");
+          if (decl->getValueInterfaceType()->hasDynamicSelfType()) {
+            refTy = refTy->replaceCovariantResultType(containerTy, 1);
+            if (!baseTy->isEqual(containerTy)) {
+              fprintf(stderr, "buildMemberRef dynamicSelfFnType !!!!!!!!!!!!!!!!\n");
+              dynamicSelfFnType = refTy->replaceCovariantResultType(baseTy, 1);
+            }
           }
         }
       }
@@ -921,6 +927,7 @@ namespace {
           if (cs.getType(base)->is<LValueType>())
             selfParamTy = InOutType::get(selfTy);
 
+//        cs.setType(base, DynamicSelfType::get(baseTy, context));
         base = coerceObjectArgumentToType(
                  base, selfParamTy, member, semantics,
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
@@ -1029,6 +1036,11 @@ namespace {
         cs.setType(memberRefExpr, simplifyType(openedType));
         Expr *result = memberRefExpr;
         closeExistential(result, locator);
+//        if (dynamicSelfFnType) {
+//          result = new (context) CovariantFunctionConversionExpr(result,
+//                                                              dynamicSelfFnType);
+//          cs.cacheType(result);
+//        }
         return forceUnwrapIfExpected(result, choice, memberLocator);
       }
       
@@ -1069,6 +1081,7 @@ namespace {
         }
       }
 
+      ///openedType->dump();
       return finishApply(apply, openedType, locator);
     }
     
@@ -1235,6 +1248,8 @@ namespace {
                          AccessSemantics semantics,
                          Optional<SelectedOverload> selected = None) {
 
+//      base->dump();
+
       // Determine the declaration selected for this subscript operation.
       if (!selected)
         selected = solution.getOverloadChoiceIfAvailable(
@@ -1298,6 +1313,7 @@ namespace {
                                   locator.withPathElement(locatorKind));
       }
 
+//      newSubscript->dump();
       return newSubscript;
     }
 
