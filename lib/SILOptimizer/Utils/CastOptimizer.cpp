@@ -483,7 +483,6 @@ static SILValue computeFinalCastedValue(SILBuilderWithScope &builder,
                                         SILDynamicCastInst dynamicCast,
                                         ApplyInst *newAI) {
   SILValue dest = dynamicCast.getDest();
-  SILBasicBlock *failureBB = dynamicCast.getFailureBlock();
   auto loc = dynamicCast.getLocation();
   auto convTy = newAI->getType();
   bool isConditional = dynamicCast.isConditional();
@@ -509,6 +508,15 @@ static SILValue computeFinalCastedValue(SILBuilderWithScope &builder,
 
     // Otherwise if we /are/ emitting a conditional cast, make sure that we
     // handle the failure gracefully.
+    //
+    // Since we are being returned the value at +1, we need to destroy the
+    // newAI on failure.
+    auto *failureBB = dynamicCast.getFailureBlock();
+    {
+      SILBuilderWithScope innerBuilder(&*failureBB->begin(), builder);
+      innerBuilder.emitDestroyValueOperation(loc, newAI);
+    }
+
     auto *condBrSuccessBB =
         newAI->getFunction()->createBasicBlockAfter(newAI->getParent());
     condBrSuccessBB->createPhiArgument(destTy, ValueOwnershipKind::Owned,
@@ -691,7 +699,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
     assert((bool)SuccessBB == (bool)FailureBB);
     if (SuccessBB) {
       SuccBuilder->createDeallocStack(Loc, Src);
-      SILBuilder FailBuilder(FailureBB->begin());
+      SILBuilderWithScope FailBuilder(&*FailureBB->begin(), Builder);
       FailBuilder.createDeallocStack(Loc, Src);
     } else {
       Builder.createDeallocStack(Loc, Src);
