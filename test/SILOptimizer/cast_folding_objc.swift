@@ -312,14 +312,25 @@ public class MyString: NSString {}
 // Check that the cast-optimizer bails out on a conditional downcast to a subclass of a
 // bridged ObjC class.
 // CHECK-LABEL: sil [noinline] @{{.*}}testConditionalBridgedCastFromSwiftToNSObjectDerivedClass{{.*}}
-// CHECK: function_ref @$sSS10FoundationE19_bridgeToObjectiveC{{[_0-9a-zA-Z]*}}F
-// CHECK: apply
+// CHECK: bb0([[ARG:%.*]] : $String):
+// CHECK:   [[FUNC:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveC{{[_0-9a-zA-Z]*}}F
+// CHECK:   [[BRIDGED_VALUE:%.*]] = apply [[FUNC]]([[ARG]])
 // CHECK-NOT: apply
 // CHECK-NOT: unconditional_checked_cast
-// CHECK: checked_cast_br
-// CHECK-NOT: apply
-// CHECK-NOT: unconditional
-// CHECK: return
+// CHECK: checked_cast_br [[BRIDGED_VALUE]] : $NSString to $MyString, [[SUCC_BB:bb[0-9]+]], [[FAIL_BB:bb[0-9]+]]
+//
+// CHECK: [[SUCC_BB]]([[CAST_BRIDGED_VALUE:%.*]] : $MyString)
+// CHECK:   [[SOME:%.*]] = enum $Optional<MyString>, #Optional.some!enumelt.1, [[CAST_BRIDGED_VALUE]] : $MyString
+// CHECK:   br [[CONT_BB:bb[0-9]+]]([[SOME]] :
+//
+// CHECK: [[FAIL_BB]]:
+// CHECK:   strong_release [[BRIDGED_VALUE]]
+// CHECK:   [[NONE:%.*]] = enum $Optional<MyString>, #Optional.none!enumelt
+// CHECK:   br [[CONT_BB]]([[NONE]] :
+//
+// CHECK: [[CONT_BB:bb[0-9]+]]([[RESULT:%.*]] :
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function '${{.*}}testConditionalBridgedCastFromSwiftToNSObjectDerivedClass{{.*}}'
 @inline(never)
 public func testConditionalBridgedCastFromSwiftToNSObjectDerivedClass(_ s: String) -> MyString? {
   return s as? MyString
