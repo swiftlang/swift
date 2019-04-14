@@ -164,11 +164,19 @@ void RequirementRepr::print(ASTPrinter &out) const {
 void GenericParamList::print(llvm::raw_ostream &OS) {
   OS << '<';
   interleave(*this,
-             [&](const GenericTypeParamDecl *P) {
-               OS << P->getName();
-               if (!P->getInherited().empty()) {
-                 OS << " : ";
-                 P->getInherited()[0].getType().print(OS);
+             [&](const GenericParamDecl *GPD) {
+               switch (GPD->getKind()) {
+               case GenericParamDecl::ParamKind::TypeParameter: {
+                 auto P = GPD->getGenericTypeParamDecl();
+                 OS << P->getName();
+                 if (!P->getInherited().empty()) {
+                   OS << " : ";
+                   P->getInherited()[0].getType().print(OS);
+                 }
+                 break;
+               }
+               default:
+                 llvm_unreachable("Unhandled GenericParamDecl::getKind()");
                }
              },
              [&] { OS << ", "; });

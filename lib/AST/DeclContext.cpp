@@ -98,9 +98,15 @@ GenericTypeParamType *DeclContext::getProtocolSelfType() const {
   if (genericParams == nullptr)
     return nullptr;
 
-  return genericParams->getParams().front()
-      ->getDeclaredInterfaceType()
-      ->castTo<GenericTypeParamType>();
+  auto GPD = genericParams->getParams().front();
+    
+  switch (GPD.getKind()) {
+  case GenericParamDecl::ParamKind::TypeParameter:
+    return GPD.getGenericTypeParamDecl()
+              ->getDeclaredInterfaceType()
+              ->castTo<GenericTypeParamType>();
+  }
+  llvm_unreachable("Unhandled GenericParamDecl::getKind()");
 }
 
 Type DeclContext::getDeclaredTypeInContext() const {
