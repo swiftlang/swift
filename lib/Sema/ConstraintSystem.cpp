@@ -1301,12 +1301,21 @@ ConstraintSystem::getTypeOfMemberReference(
     if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
       if ((isa<FuncDecl>(func) && cast<FuncDecl>(func)->hasDynamicSelf()) ||
           (isa<ConstructorDecl>(func) && !baseObjTy->getOptionalObjectType())) {
+        fprintf(stderr, "getTypeOfMemberReference AbstractFunctionDecl !!!!!!!\n");
         openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
       }
     }
-    else if (isa<DynamicSelfType>(value->getInterfaceType()
-                                  ->getCanonicalType())) {
-      openedType = openedType->replaceCovariantResultType(baseObjTy, 1);
+    else if (auto *decl = dyn_cast<SubscriptDecl>(value)) {
+      if (decl->getElementInterfaceType()->hasDynamicSelfType()) {
+        fprintf(stderr, "getTypeOfMemberReference SubscriptDecl !!!!!!!\n");
+        openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
+      }
+    }
+    else if (auto *decl = dyn_cast<VarDecl>(value)) {
+      if (decl->getValueInterfaceType()->hasDynamicSelfType()) {
+        fprintf(stderr, "getTypeOfMemberReference VarDecl !!!!!!!\n");
+        openedType = openedType->replaceCovariantResultType(baseObjTy, 1);
+      }
     }
   } else {
     // Protocol requirements returning Self have a dynamic Self return
