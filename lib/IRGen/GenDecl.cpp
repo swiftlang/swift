@@ -3071,6 +3071,11 @@ IRGenModule::emitDirectRelativeReference(llvm::Constant *target,
   // Convert the target to an integer.
   auto targetAddr = llvm::ConstantExpr::getPtrToInt(target, SizeTy);
 
+  // WebAssembly hack: WebAssembly doesn't support PC-relative references
+  if (TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
+    return targetAddr;
+  }
+
   SmallVector<llvm::Constant*, 4> indices;
   indices.push_back(llvm::ConstantInt::get(Int32Ty, 0));
   for (unsigned baseIndex : baseIndices) {
