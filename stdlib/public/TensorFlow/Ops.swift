@@ -1692,7 +1692,7 @@ public extension Tensor {
         shrinkAxisMask: indexPath.squeezeAxisMask)
     }
     set {
-      Raw.tensorStridedSliceUpdate(
+      self = Raw.tensorStridedSliceUpdate(
         self, begin: indexPath.begin, end: indexPath.end, strides: indexPath.strides,
         value: newValue, beginMask: indexPath.beginMask, endMask: indexPath.endMask, 
         ellipsisMask: indexPath.ellipsisMask, newAxisMask: indexPath.newAxisMask, 
