@@ -137,8 +137,11 @@ enum class FixKind : uint8_t {
   /// no access control.
   AllowInaccessibleMember,
 
+  /// Allow KeyPaths to use AnyObject as root type
+  AllowAnyObjectKeyPathRoot,
+  
   /// Using subscript references in the keypath requires that each
-  // of the index arguments to be Hashable.
+  /// of the index arguments to be Hashable.
   TreatKeyPathSubscriptIndexAsHashable,
 };
 
@@ -739,6 +742,22 @@ public:
   static AllowInaccessibleMember *create(ConstraintSystem &cs,
                                          ValueDecl *member,
                                          ConstraintLocator *locator);
+};
+
+class AllowAnyObjectKeyPathRoot final : public ConstraintFix {
+
+  AllowAnyObjectKeyPathRoot(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowAnyObjectKeyPathRoot, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow anyobject as root type for a keypath";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowAnyObjectKeyPathRoot *create(ConstraintSystem &cs,
+                                           ConstraintLocator *locator);
 };
 
 class TreatKeyPathSubscriptIndexAsHashable final : public ConstraintFix {
