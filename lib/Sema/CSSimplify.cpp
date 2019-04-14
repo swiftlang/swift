@@ -1851,6 +1851,22 @@ ConstraintSystem::matchTypesBindTypeVar(
     }
   }
 
+  // We do not allow keypaths to go through AnyObject. Let's create a fix
+  // so this can be diagnosed later.
+  if (auto loc = typeVar->getImpl().getLocator()) {
+    auto locPath = loc->getPath();
+
+    if (!locPath.empty() &&
+        locPath.back().getKind() == ConstraintLocator::KeyPathRoot &&
+        type->isAnyObject()) {
+      auto *fix = AllowAnyObjectKeyPathRoot::create(
+          *this, getConstraintLocator(locator));
+
+      if (recordFix(fix))
+        return getTypeMatchFailure(locator);
+    }
+  }
+
   // Okay. Bind below.
 
   // A constraint that binds any pointer to a void pointer is
@@ -3591,8 +3607,14 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   if (memberName.isSimpleName() &&
       memberName.getBaseName().getKind() == DeclBaseName::Kind::Subscript &&
       !isKeyPathDynamicMemberLookup(memberLocator)) {
-    result.ViableCandidates.push_back(
-        OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication));
+    if (baseTy->isAnyObject()) {
+      result.addUnviable(
+          OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication),
+          MemberLookupResult::UR_KeyPathWithAnyObjectRootType);
+    } else {
+      result.ViableCandidates.push_back(
+          OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication));
+    }
   }
 
   // If the base type is a tuple type, look for the named or indexed member
@@ -4273,6 +4295,8 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
     case MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember:
     case MemberLookupResult::UR_ReferenceWritableKeyPathOnMutatingMember:
       break;
+    case MemberLookupResult::UR_KeyPathWithAnyObjectRootType:
+      return AllowAnyObjectKeyPathRoot::create(cs, locator);
     }
   }
 
@@ -4950,7 +4974,7 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
         return SolutionKind::Error;
     }
   }
-  
+
   // See if we resolved overloads for all the components involved.
   enum {
     ReadOnly,
@@ -5085,7 +5109,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     }
     return SolutionKind::Unsolved;
   };
-  
+
   if (auto clas = keyPathTy->getAs<NominalType>()) {
     if (clas->getDecl() == getASTContext().getAnyKeyPathDecl()) {
       // Read-only keypath, whose projected value is upcast to `Any?`.
@@ -6288,6 +6312,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowClosureParameterDestructuring:
   case FixKind::MoveOutOfOrderArgument:
   case FixKind::AllowInaccessibleMember:
+  case FixKind::AllowAnyObjectKeyPathRoot:
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
     llvm_unreachable("handled elsewhere");
   }

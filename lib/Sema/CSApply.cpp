@@ -4342,15 +4342,6 @@ namespace {
       Type baseTy = keyPathTy->getGenericArgs()[0];
       Type leafTy = keyPathTy->getGenericArgs()[1];
 
-      // We do not allow keypaths to go through AnyObject
-      if (baseTy->isAnyObject()) {
-        auto rootTyRepr = E->getRootType();
-        cs.TC.diagnose(rootTyRepr->getLoc(),
-                       diag::expr_swift_keypath_invalid_component)
-             .highlight(rootTyRepr->getSourceRange());
-        return nullptr;
-      }
-
       for (unsigned i : indices(E->getComponents())) {
         auto &origComponent = E->getMutableComponents()[i];
         
