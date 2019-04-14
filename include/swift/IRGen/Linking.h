@@ -1095,6 +1095,14 @@ public:
     if (Triple.isOSBinFormatELF())
       return;
 
+    // WebAssembly: disable COMDATs.
+    // LLVM's Wasm COMDAT code assumes each COMDAT will be in its own section.
+    // This works for C++ on Clang, since each COMDAT is emitted into its own
+    // .rodata.<symbol name> section,
+    // but not for Swift metadata, which are all placed in the same section.
+    if (Triple.isOSBinFormatWasm())
+      return;
+
     if (IRL.Linkage == llvm::GlobalValue::LinkOnceODRLinkage ||
         IRL.Linkage == llvm::GlobalValue::WeakODRLinkage)
       if (Triple.supportsCOMDAT())
