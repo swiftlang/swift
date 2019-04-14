@@ -902,21 +902,20 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     else
       assert(A->getOption().matches(options::OPT_gnone) &&
              "unknown -g<kind> option");
-
-    if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables) {
-      if (Args.hasArg(options::OPT_debug_info_store_invocation)) {
-        ArgStringList RenderedArgs;
-        for (auto A : Args)
-          A->render(Args, RenderedArgs);
-        CompilerInvocation::buildDebugFlags(Opts.DebugFlags,
-                                            RenderedArgs, SDKPath,
-                                            ResourceDir);
-      }
-      // TODO: Should we support -fdebug-compilation-dir?
-      llvm::SmallString<256> cwd;
-      llvm::sys::fs::current_path(cwd);
-      Opts.DebugCompilationDir = cwd.str();
+  }
+  if (Opts.DebugInfoLevel >= IRGenDebugInfoLevel::LineTables) {
+    if (Args.hasArg(options::OPT_debug_info_store_invocation)) {
+      ArgStringList RenderedArgs;
+      for (auto A : Args)
+        A->render(Args, RenderedArgs);
+      CompilerInvocation::buildDebugFlags(Opts.DebugFlags,
+                                          RenderedArgs, SDKPath,
+                                          ResourceDir);
     }
+    // TODO: Should we support -fdebug-compilation-dir?
+    llvm::SmallString<256> cwd;
+    llvm::sys::fs::current_path(cwd);
+    Opts.DebugCompilationDir = cwd.str();
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_debug_info_format)) {
