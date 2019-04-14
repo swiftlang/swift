@@ -173,7 +173,7 @@ public:
                                            CanSILFunctionType thunkType,
                                            CanSILFunctionType fromType,
                                            CanSILFunctionType toType,
-                                           IsSerialized_t Serialized);
+                                           CanType dynamicSelfType);
 
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.
