@@ -82,6 +82,11 @@ public:
 
   void addRelativeAddress(llvm::Constant *target) {
     assert(!isa<llvm::ConstantPointerNull>(target));
+    if (IGM().TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
+      // WebAssembly: hack: doesn't support PCrel data relocations
+      add(llvm::ConstantExpr::getPtrToInt(target, IGM().RelativeAddressTy, false));
+      return;
+    }
     addRelativeOffset(IGM().RelativeAddressTy, target);
   }
 
@@ -90,6 +95,13 @@ public:
   /// a "GOT-equivalent", i.e. a pointer to an external object; if so,
   /// set the low bit of the offset to indicate that this is true.
   void addRelativeAddress(ConstantReference reference) {
+    if (IGM().TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
+      // WebAssembly: hack: doesn't support PCrel data relocations
+      // also, we should set the lowest bit, but I don't know how to do that
+      // there's no GOT on WebAssembly anyways though
+      add(llvm::ConstantExpr::getPtrToInt(reference.getValue(), IGM().RelativeAddressTy, false));
+      return;
+    }
     addTaggedRelativeOffset(IGM().RelativeAddressTy,
                             reference.getValue(),
                             unsigned(reference.isIndirect()));
@@ -99,6 +111,11 @@ public:
   /// The target must be a "GOT-equivalent", i.e. a pointer to an
   /// external object.
   void addIndirectRelativeAddress(ConstantReference reference) {
+    if (IGM().TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
+      // WebAssembly: hack: doesn't support PCrel data relocations
+      add(llvm::ConstantExpr::getPtrToInt(reference.getValue(), IGM().RelativeAddressTy, false));
+      return;
+    }
     assert(reference.isIndirect());
     addRelativeOffset(IGM().RelativeAddressTy,
                       reference.getValue());
