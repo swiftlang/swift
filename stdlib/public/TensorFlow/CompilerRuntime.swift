@@ -219,7 +219,7 @@ private class TraceContext {
   /// Execute the trace graph function, and return the list of output tensors
   /// from the trace execution. These output tensors are owned by the caller.
   func execute(
-    traceeInputs: [_AnyTensorHandle], useXla: Bool = false) -> [CTensorHandle] {
+    traceeInputs: [_AnyTensorHandle], useXLA: Bool = false) -> [CTensorHandle] {
     // We must be in the `notTracing` enum mode.
     internalConsistencyCheck(_RuntimeConfig.traceState.context == nil)
     internalConsistencyCheck(traceGraphFn != nil)
@@ -237,7 +237,7 @@ private class TraceContext {
       checkOk(status)
     }
 
-    if useXla {
+    if useXLA {
       debugLog("Enabling XLA compilation")
       TFE_OpSetAttrBool(op, "_XlaCompile", 1)
     }
@@ -1002,11 +1002,10 @@ public func _tffunc<State : _TensorArrayProtocolEnhanced,
 // Trace the given function to generate a TF graph and return a closure
 // that can be used to launch the graph.
 public func _graph<In : TensorGroup, Out : TensorGroup>(
-  _ fn: (In) -> Out, useXla: Bool = false
+  _ fn: (In) -> Out, useXLA: Bool = false
 ) -> (In) -> Out {
   let traceContext: TraceContext = withoutActuallyEscaping(fn) { escapableFn in
-    let wrappedFn = {
-      (inputs: [CTensorHandle]) -> [CTensorHandle] in
+    let wrappedFn = { (inputs: [CTensorHandle]) -> [CTensorHandle] in
       let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(
         capacity: Int(inputs.count))
       var ptr = buffer
@@ -1033,7 +1032,7 @@ public func _graph<In : TensorGroup, Out : TensorGroup>(
     }
     debugLog("Executing trace graph function.")
     let returnValues = traceContext.execute(
-      traceeInputs: inputTensors, useXla: useXla)
+      traceeInputs: inputTensors, useXLA: useXLA)
 
     debugLog("Creating output model instance.")
     return Out(_copying: returnValues)
@@ -1939,15 +1938,16 @@ func _TFCOpSetAttrOptionalTensorShapeArray(_ op: CTFEOp,
 }
 
 /// Given dimensions and ranks in the form described below, makes the
-/// appropriate call to TFE_OpSetAttrShapeList(op, attrName, ..., status).
+/// appropriate call to `TFE_OpSetAttrShapeList(op, attrName, ..., status)`.
 ///
 /// - Parameters
 ///   - flattenedDims: all the shapes' dimensions concatenated together in
 ///     order
 ///   - ranks: all the shapes' ranks (-1 denotes unknown rank)
-func setAttrShapeList(op: CTFEOp, attrName: UnsafePointer<Int8>,
-                      flattenedDims: Array<Int64>, ranks: Array<Int32>,
-                      status: CTFStatus) {
+fileprivate func setAttrShapeList(
+  op: CTFEOp, attrName: UnsafePointer<Int8>, flattenedDims: Array<Int64>,
+  ranks: Array<Int32>, status: CTFStatus
+) {
   flattenedDims.withUnsafeBufferPointer { flattenedDimsBuffer in
     var dimsPtr: UnsafePointer<Int64>? = flattenedDimsBuffer.baseAddress
     var dims: [UnsafePointer<Int64>?] = []

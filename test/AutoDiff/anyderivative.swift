@@ -75,6 +75,7 @@ AnyDerivativeTests.test("Casting") {
 }
 
 AnyDerivativeTests.test("Derivatives") {
+  // Test `AnyDerivative` operations.
   func tripleSum(_ x: AnyDerivative, _ y: AnyDerivative) -> AnyDerivative {
     let sum = x + y
     return sum + sum + sum
@@ -111,6 +112,42 @@ AnyDerivativeTests.test("Derivatives") {
     let (𝛁x, 𝛁y) = pullback(at: x, y, in: tripleSum)(v)
     expectEqual(expectedVJP, 𝛁x.base as? Generic<Double>.CotangentVector)
     expectEqual(expectedVJP, 𝛁y.base as? Generic<Double>.CotangentVector)
+  }
+
+  // Test `AnyDerivative` initializer.
+  func typeErased<T>(_ x: T) -> AnyDerivative
+    where T : Differentiable, T.TangentVector == T,
+          T.AllDifferentiableVariables == T,
+          // NOTE: The requirement below should be defined on `Differentiable`.
+          // But it causes a crash due to generic signature minimization bug.
+          T.CotangentVector == T.CotangentVector.AllDifferentiableVariables
+  {
+    let any = AnyDerivative(x)
+    return any + any
+  }
+
+  do {
+    let x: Float = 3
+    let v = AnyDerivative(Float(1))
+    let 𝛁x = pullback(at: x, in: { x in typeErased(x) })(v)
+    let expectedVJP: Float = 2
+    expectEqual(expectedVJP, 𝛁x)
+  }
+
+  do {
+    let x = Vector.TangentVector(x: 4, y: 5)
+    let v = AnyDerivative(Vector.CotangentVector(x: 1, y: 1))
+    let 𝛁x = pullback(at: x, in: { x in typeErased(x) })(v)
+    let expectedVJP = Vector.CotangentVector(x: 2, y: 2)
+    expectEqual(expectedVJP, 𝛁x)
+  }
+
+  do {
+    let x = Generic<Double>.TangentVector(x: 4)
+    let v = AnyDerivative(Generic<Double>.CotangentVector(x: 1))
+    let 𝛁x = pullback(at: x, in: { x in typeErased(x) })(v)
+    let expectedVJP = Generic<Double>.CotangentVector(x: 2)
+    expectEqual(expectedVJP, 𝛁x)
   }
 }
 
