@@ -514,13 +514,18 @@ static SILValue computeFinalCastedValue(SILBuilderWithScope &builder,
     auto *failureBB = dynamicCast.getFailureBlock();
     {
       SILBuilderWithScope innerBuilder(&*failureBB->begin(), builder);
-      innerBuilder.emitDestroyValueOperation(loc, newAI);
+      auto valueToDestroy = ([&]() -> SILValue {
+        if (!innerBuilder.hasOwnership())
+          return newAI;
+        return failureBB->createPhiArgument(newAI->getType(),
+                                            ValueOwnershipKind::Owned);
+      }());
+      innerBuilder.emitDestroyValueOperation(loc, valueToDestroy);
     }
 
     auto *condBrSuccessBB =
         newAI->getFunction()->createBasicBlockAfter(newAI->getParent());
-    condBrSuccessBB->createPhiArgument(destTy, ValueOwnershipKind::Owned,
-                                       nullptr);
+    condBrSuccessBB->createPhiArgument(destTy, ValueOwnershipKind::Owned);
     builder.createCheckedCastBranch(loc, /* isExact*/ false, newAI, destTy,
                                     condBrSuccessBB, failureBB);
     builder.setInsertionPoint(condBrSuccessBB, condBrSuccessBB->begin());
@@ -709,10 +714,13 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
   if (!Dest)
     return NewAI;
 
-  // If it is addr cast then store the result.
+  // If it is addr cast then store the result into the dest.
+  //
+  // NOTE: We assume that dest was uninitialized when passed to us.
   SILValue castedValue = computeFinalCastedValue(Builder, dynamicCast, NewAI);
-  SILInstruction *NewI = Builder.createStore(
-      Loc, castedValue, Dest, StoreOwnershipQualifier::Unqualified);
+  auto qual = Builder.hasOwnership() ? StoreOwnershipQualifier::Init
+                                     : StoreOwnershipQualifier::Unqualified;
+  SILInstruction *NewI = Builder.createStore(Loc, castedValue, Dest, qual);
   if (isConditional && NewI->getParent() != NewAI->getParent()) {
     Builder.createBranch(Loc, SuccessBB);
   }
