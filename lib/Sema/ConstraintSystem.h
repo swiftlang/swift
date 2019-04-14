@@ -855,25 +855,25 @@ struct MemberLookupResult {
   enum UnviableReason {
     /// Argument labels don't match.
     UR_LabelMismatch,
-    
+
     /// This uses a type like Self in its signature that cannot be used on an
     /// existential box.
     UR_UnavailableInExistential,
-    
+
     /// This is an instance member being accessed through something of metatype
     /// type.
     UR_InstanceMemberOnType,
-    
+
     /// This is a static/class member being accessed through an instance.
     UR_TypeMemberOnInstance,
-    
+
     /// This is a mutating member, being used on an rvalue.
     UR_MutatingMemberOnRValue,
-    
+
     /// The getter for this subscript or computed property is mutating and we
     /// only have an rvalue base.  This is more specific than the former one.
     UR_MutatingGetterOnRValue,
-    
+
     /// The member is inaccessible (e.g. a private member in another file).
     UR_Inaccessible,
 
@@ -882,11 +882,15 @@ struct MemberLookupResult {
     /// because it's not known upfront what access capability would the
     /// member have.
     UR_WritableKeyPathOnReadOnlyMember,
+
     /// This is a `ReferenceWritableKeyPath` being used to look up mutating
     /// member, used in situations involving dynamic member lookup via keypath,
     /// because it's not known upfront what access capability would the
     /// member have.
     UR_ReferenceWritableKeyPathOnMutatingMember,
+
+    /// This is a KeyPath whose root type is AnyObject
+    UR_KeyPathWithAnyObjectRootType
   };
 
   /// This is a list of considered (but rejected) candidates, along with a

@@ -987,6 +987,22 @@ public:
   bool diagnoseAsError() override;
 };
 
+
+// Diagnose an attempt to use AnyObject as the root type of a KeyPath
+//
+// ```swift
+// let keyPath = \AnyObject.bar
+// ```
+class AnyObjectKeyPathRootFailure final : public FailureDiagnostic {
+
+public:
+  AnyObjectKeyPathRootFailure(Expr *root, ConstraintSystem &cs,
+                              ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator) {}
+  
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose an attempt to reference subscript as a keypath component
 /// where at least one of the index arguments doesn't conform to Hashable e.g.
 ///

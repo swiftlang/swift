@@ -2399,6 +2399,24 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
   return true;
 }
 
+bool AnyObjectKeyPathRootFailure::diagnoseAsError() {
+  // Diagnose use of AnyObject as root for a keypath
+
+  auto anchor = getAnchor();
+  auto loc = anchor->getLoc();
+  auto range = anchor->getSourceRange();
+
+  if (auto KPE = dyn_cast<KeyPathExpr>(anchor)) {
+    if (auto rootTyRepr = KPE->getRootType()) {
+      loc = rootTyRepr->getLoc();
+      range = rootTyRepr->getSourceRange();
+    }
+  }
+
+  emitDiagnostic(loc, diag::expr_swift_keypath_anyobject_root).highlight(range);
+  return true;
+}
+
 bool KeyPathSubscriptIndexHashableFailure::diagnoseAsError() {
   auto *anchor = getRawAnchor();
   auto *locator = getLocator();

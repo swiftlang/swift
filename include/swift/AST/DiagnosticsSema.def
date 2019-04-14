@@ -506,6 +506,8 @@ ERROR(expr_keypath_subscript_index_not_hashable, none,
 ERROR(expr_smart_keypath_application_type_mismatch,none,
       "key path of type %0 cannot be applied to a base of type %1",
       (Type, Type))
+ERROR(expr_swift_keypath_anyobject_root,none,
+      "the root type of a Swift key path cannot be 'AnyObject'", ())
 WARNING(expr_deprecated_writable_keypath,none,
         "forming a writable keypath to property %0 that is read-only in this context "
         "is deprecated and will be removed in a future release",(DeclName))
