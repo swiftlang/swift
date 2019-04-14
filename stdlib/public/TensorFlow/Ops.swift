@@ -1606,14 +1606,35 @@ public extension Tensor {
   /// - Parameter lowerBounds: The lower bounds at each dimension.
   /// - Parameter upperBounds: The upper bounds at each dimension.
   @inlinable @inline(__always)
+  @differentiable(wrt: self)
   func slice(lowerBounds: [Int32], upperBounds: [Int32]) -> Tensor {
     /// TODO: Precondition `lowerBounds.count == upperBounds.count`,
     /// preferably in graph.
     let lowerBoundsTensor = Tensor<Int32>(lowerBounds)
-    return Raw.slice(
-      self,
+    return self.slice(
       begin: lowerBoundsTensor,
       size: Tensor<Int32>(upperBounds) - lowerBoundsTensor)
+  }
+
+  @inlinable @inline(__always)
+  @differentiable(wrt: self, vjp: _vjpSlice)
+  func slice(begin: Tensor<Int32>, size: Tensor<Int32>) -> Tensor {
+    return Raw.slice(self, begin: begin, size: size)
+  }
+
+  @inlinable @inline(__always)
+  internal func _vjpSlice(
+    begin: Tensor<Int32>,
+    size: Tensor<Int32>
+  ) -> (Tensor, (Tensor) -> Tensor) {
+    let value = slice(begin: begin, size: size)
+    let afterPaddings = shapeTensor - value.shapeTensor - begin
+    return (value, { [after = afterPaddings] v in
+      let beforePaddings = begin.expandingShape(at: 1)
+      let afterPaddings = after.expandingShape(at: 1)
+      let paddings = Tensor<Int32>(concatenating: [beforePaddings, afterPaddings], alongAxis: 1)
+      return Raw.pad(v, paddings: paddings)
+    })
   }
 }
 
@@ -1731,7 +1752,7 @@ public extension Tensor {
   @inlinable @inline(__always)
   internal func _vjpSubscript(_ indexPath: IndexPath) -> (Tensor, (Tensor) -> Tensor) {
     return (self[indexPath], { [shape = shapeTensor] v in
-      Tensor<Scalar>._pullbackSubscript(v, indexPath, shape)
+      return Tensor<Scalar>._pullbackSubscript(v, indexPath, shape)
     })
   }
 
