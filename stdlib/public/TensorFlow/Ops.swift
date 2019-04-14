@@ -1682,6 +1682,21 @@ public extension Tensor {
   public struct IndexPath {
     public let begin, end, strides: Tensor<Int32>
     public let beginMask, endMask, ellipsisMask, newAxisMask, squeezeAxisMask: Int64
+    
+    @inlinable @inline(__always)
+    public init(
+      begin: Tensor<Int32>, end: Tensor<Int32>, strides: Tensor<Int32>, beginMask: Int64,
+      endMask: Int64, ellipsisMask: Int64, newAxisMask: Int64, squeezeAxisMask: Int64
+    ) {
+      self.begin = begin
+      self.end = end
+      self.strides = strides
+      self.beginMask = beginMask
+      self.endMask = endMask
+      self.ellipsisMask = ellipsisMask
+      self.newAxisMask = newAxisMask
+      self.squeezeAxisMask = squeezeAxisMask
+    }
   }
 
   @inlinable @inline(__always)
@@ -1704,17 +1719,6 @@ public extension Tensor {
   }
 
   @inlinable @inline(__always)
-  internal func _vjpSubscript(_ indexPath: IndexPath) -> (Tensor, (Tensor) -> Tensor) {
-    return (self[indexPath], { [shape = shapeTensor] v in
-      Raw.stridedSliceGrad(
-        shape: shape, begin: indexPath.begin, end: indexPath.end, strides: indexPath.strides,
-        dy: v, beginMask: indexPath.beginMask, endMask: indexPath.endMask, 
-        ellipsisMask: indexPath.ellipsisMask, newAxisMask: indexPath.newAxisMask, 
-        shrinkAxisMask: indexPath.squeezeAxisMask)
-    })
-  }
-
-  @inlinable @inline(__always)
   subscript(_ indices: TensorSliceIndexProtocol...) -> Tensor {
     get {
       return self[IndexPath(indices.map { $0.sliceIndex })]
@@ -1722,6 +1726,42 @@ public extension Tensor {
     set {
       self[IndexPath(indices.map { $0.sliceIndex })] = newValue
     }
+  }
+
+  @inlinable @inline(__always)
+  internal func _vjpSubscript(_ indexPath: IndexPath) -> (Tensor, (Tensor) -> Tensor) {
+    return (self[indexPath], { [shape = shapeTensor] v in
+      Tensor<Scalar>._pullbackSubscript(v, indexPath, shape)
+    })
+  }
+
+  @inlinable @inline(__always)
+  @differentiable(wrt: seed, vjp: _vjpPullbackSubscript)
+  internal static func _pullbackSubscript(
+    _ seed: Tensor,
+    _ indexPath: IndexPath,
+    _ shape: Tensor<Int32>
+  ) -> Tensor {
+    return Raw.stridedSliceGrad(
+      shape: shape, begin: indexPath.begin, end: indexPath.end, strides: indexPath.strides,
+      dy: seed, beginMask: indexPath.beginMask, endMask: indexPath.endMask,
+      ellipsisMask: indexPath.ellipsisMask, newAxisMask: indexPath.newAxisMask,
+      shrinkAxisMask: indexPath.squeezeAxisMask)
+  }
+
+  @inlinable @inline(__always)
+  internal static func _vjpPullbackSubscript(
+    _ seed: Tensor,
+    _ indexPath: IndexPath,
+    shape: Tensor<Int32>
+  ) -> (Tensor, (Tensor) -> Tensor) {
+    return (Tensor<Scalar>._pullbackSubscript(seed, indexPath, shape), { v in
+      return v[IndexPath(
+        begin: indexPath.begin, end: indexPath.end, strides: indexPath.strides,
+        beginMask: indexPath.beginMask, endMask: indexPath.endMask,
+        ellipsisMask: indexPath.ellipsisMask, newAxisMask: indexPath.newAxisMask,
+        squeezeAxisMask: indexPath.squeezeAxisMask)]
+    })
   }
 }
 
