@@ -175,8 +175,11 @@ InFlightDiagnostic &InFlightDiagnostic::fixItRemove(SourceRange R) {
   // space around its hole.  Specifically, check to see there is whitespace
   // before and after the end of range.  If so, nuke the space afterward to keep
   // things consistent.
+  // Also nuke white space if there is an opening parentheses before the range
+  // we remove.
   if (extractCharAfter(SM, charRange.getEnd()) == ' ' &&
-      isspace(extractCharBefore(SM, charRange.getStart()))) {
+      (isspace(extractCharBefore(SM, charRange.getStart())) ||
+       extractCharBefore(SM, charRange.getStart()) == '(')) {
     charRange = CharSourceRange(charRange.getStart(),
                                 charRange.getByteLength()+1);
   }
