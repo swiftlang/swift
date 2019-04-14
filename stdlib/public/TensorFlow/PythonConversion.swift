@@ -167,16 +167,6 @@ extension TensorShape : PythonConvertible {
   public var pythonObject: PythonObject {
     return dimensions.pythonObject
   }
-
-  public init?(_ pythonObject: PythonObject) {
-    if Python.hasattr(pythonObject, "__len__") == true {
-      guard let array = [Int32](pythonObject) else { return nil }
-      self.init(array)
-    } else {
-      guard let num = Int32(pythonObject) else { return nil }
-      self.init(num)
-    }
-  }
 }
 
 #endif // canImport(Python)

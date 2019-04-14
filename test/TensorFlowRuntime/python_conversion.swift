@@ -1,7 +1,6 @@
 // RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
 // RUN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize
 // REQUIRES: tensorflow
 //
 // Python conversion and `numpy.ndarray` tests.
@@ -60,9 +59,9 @@ PythonConversionTests.test("shaped-array-conversion") {
 
   let numpyArray1D = np.ones(28)
   let reshaped3D = np.reshape(numpyArray1D, [2, 7, 2] as TensorShape)
-  expectEqual(TensorShape(reshaped3D.shape), [2, 7, 2])
+  expectEqual(reshaped3D.shape, [2, 7, 2])
   let reshaped2D = np.reshape(reshaped3D, [14, 2] as TensorShape)
-  expectEqual(TensorShape(reshaped2D.shape), [14, 2])
+  expectEqual(reshaped2D.shape, [14, 2])
 
   let numpyArrayStrided = np.array([[1, 2], [1, 2]], dtype: np.int32)[
       Python.slice(Python.None), 1]
@@ -140,7 +139,6 @@ PythonConversionTests.test("tensor-round-trip") {
 PythonConversionTests.test("tensor-shape") {
   let pyArray = [2, 3].pythonObject
   expectEqual(pyArray, TensorShape(2, 3).pythonObject)
-  expectEqual(TensorShape(2, 3), TensorShape(pyArray))
 }
 #endif
 
