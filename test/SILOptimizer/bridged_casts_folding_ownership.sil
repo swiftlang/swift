@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name bridged_casts_folding -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-ownership-stripping-after-serialization -module-name bridged_casts_folding -O -emit-sil %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -10,10 +10,12 @@ import Foundation
 class NSObjectSubclass : NSObject {}
 sil_vtable NSObjectSubclass {}
 
-// CHECK-LABEL: sil @anyhashable_cast_unconditional
+// CHECK-LABEL: sil @anyhashable_cast_unconditional :
 // CHECK:         [[BRIDGED:%.*]] = apply {{.*}}(%0)
 // CHECK-NEXT:    destroy_addr %0
 // CHECK-NEXT:    [[CAST:%.*]] = unconditional_checked_cast [[BRIDGED]] : $NSObject to $NSObjectSubclass
+// CHECK-NEXT:    return [[CAST]]
+// CHECK: } // end sil function 'anyhashable_cast_unconditional'
 sil [ossa] @anyhashable_cast_unconditional : $@convention(thin) (@in AnyHashable) -> @owned NSObjectSubclass {
 entry(%0 : $*AnyHashable):
   %1 = alloc_stack $NSObjectSubclass
