@@ -1597,6 +1597,8 @@ public extension Tensor where Scalar : Numeric {
 // Indexing and slicing
 //===----------------------------------------------------------------------===//
 
+// TODO: Negative indexing and strides syntax.
+
 public extension Tensor {
   /// Extracts a slice from the tensor defined by lower and upper bounds for
   /// each dimension.
@@ -1683,6 +1685,7 @@ public extension Tensor {
   }
 
   @inlinable @inline(__always)
+  @differentiable(wrt: self, vjp: _vjpSubscript)
   subscript(_ indexPath: IndexPath) -> Tensor {
     get {
       return Raw.stridedSlice(
@@ -1698,6 +1701,17 @@ public extension Tensor {
         ellipsisMask: indexPath.ellipsisMask, newAxisMask: indexPath.newAxisMask, 
         shrinkAxisMask: indexPath.squeezeAxisMask)
     }
+  }
+
+  @inlinable @inline(__always)
+  internal func _vjpSubscript(_ indexPath: IndexPath) -> (Tensor, (Tensor) -> Tensor) {
+    return (self[indexPath], { [shape = shapeTensor] v in
+      Raw.stridedSliceGrad(
+        shape: shape, begin: indexPath.begin, end: indexPath.end, strides: indexPath.strides,
+        dy: v, beginMask: indexPath.beginMask, endMask: indexPath.endMask, 
+        ellipsisMask: indexPath.ellipsisMask, newAxisMask: indexPath.newAxisMask, 
+        shrinkAxisMask: indexPath.squeezeAxisMask)
+    })
   }
 
   @inlinable @inline(__always)
