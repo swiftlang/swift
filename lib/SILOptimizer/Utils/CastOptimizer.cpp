@@ -228,26 +228,29 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   // TODO: Is it safe to just eliminate the initial retain?
   Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
 
-  // If the source of a cast should be destroyed, emit a release.
+  // If we have an unconditional_checked_cast_addr, return early. We do not need
+  // to handle any conditional code.
   if (isa<UnconditionalCheckedCastAddrInst>(Inst)) {
+    // Destroy the source value as unconditional_checked_cast_addr would.
     Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
+    EraseInstAction(Inst);
+    return (newI) ? newI : AI;
   }
 
-  if (auto *CCABI = dyn_cast<CheckedCastAddrBranchInst>(Inst)) {
-    switch (CCABI->getConsumptionKind()) {
-    case CastConsumptionKind::TakeAlways:
-      Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
-      break;
-    case CastConsumptionKind::TakeOnSuccess:
-      // Insert a release in the success BB.
-      Builder.setInsertionPoint(SuccessBB->begin());
-      Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
-      break;
-    case CastConsumptionKind::BorrowAlways:
-      llvm_unreachable("checked_cast_addr_br never has BorrowAlways");
-    case CastConsumptionKind::CopyOnSuccess:
-      break;
-    }
+  auto *CCABI = cast<CheckedCastAddrBranchInst>(Inst);
+  switch (CCABI->getConsumptionKind()) {
+  case CastConsumptionKind::TakeAlways:
+    Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
+    break;
+  case CastConsumptionKind::TakeOnSuccess:
+    // Insert a release in the success BB.
+    Builder.setInsertionPoint(SuccessBB->begin());
+    Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
+    break;
+  case CastConsumptionKind::BorrowAlways:
+    llvm_unreachable("checked_cast_addr_br never has BorrowAlways");
+  case CastConsumptionKind::CopyOnSuccess:
+    break;
   }
 
   // Results should be checked in case we process a conditional
