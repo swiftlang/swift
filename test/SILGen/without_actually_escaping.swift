@@ -86,8 +86,8 @@ func modifyAndPerform<T>(_ _: UnsafeMutablePointer<T>, closure: () ->()) {
 // CHECK: [[CLOSURE_1:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_1_FUN]](
 // CHECK: [[BORROWED_CLOSURE_1:%.*]] = begin_borrow [[CLOSURE_1]]
 // CHECK: [[COPY_BORROWED_CLOSURE_1:%.*]] = copy_value [[BORROWED_CLOSURE_1]]
-// CHECK: [[THUNK_FUNC:%.*]] = function_ref @$sIeg_Ieg_TR :
 // CHECK: [[COPY_2_BORROWED_CLOSURE_1:%.*]] = copy_value [[COPY_BORROWED_CLOSURE_1]]
+// CHECK: [[THUNK_FUNC:%.*]] = function_ref @$sIeg_Ieg_TR :
 // CHECK: [[THUNK_PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FUNC]]([[COPY_2_BORROWED_CLOSURE_1]])
 // CHECK: [[THUNK_PA_MDI:%.*]] = mark_dependence [[THUNK_PA]] : $@callee_guaranteed () -> () on [[COPY_BORROWED_CLOSURE_1]] : $@callee_guaranteed () -> ()
 // CHECK: destroy_value [[THUNK_PA_MDI]]

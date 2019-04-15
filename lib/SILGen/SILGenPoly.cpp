@@ -3228,23 +3228,22 @@ static ManagedValue createThunk(SILGenFunction &SGF,
 static CanSILFunctionType buildWithoutActuallyEscapingThunkType(
     SILGenFunction &SGF, CanSILFunctionType &noEscapingType,
     CanSILFunctionType &escapingType, GenericEnvironment *&genericEnv,
-    SubstitutionMap &interfaceSubs) {
+    SubstitutionMap &interfaceSubs, CanType &dynamicSelfType) {
 
   assert(escapingType->getExtInfo() ==
          noEscapingType->getExtInfo().withNoEscape(false));
 
   CanType inputSubstType, outputSubstType;
-  CanType dynamicSelfType;
   auto type = SGF.buildThunkType(noEscapingType, escapingType,
                                  inputSubstType, outputSubstType,
                                  genericEnv, interfaceSubs,
                                  dynamicSelfType,
                                  /*withoutActuallyEscaping=*/true);
-  assert(!dynamicSelfType && "not implemented");
   return type;
 }
 
-static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF) {
+static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF,
+                                                  CanType dynamicSelfType) {
   PrettyStackTraceSILFunction stackTrace(
       "emitting withoutAcutallyEscaping thunk in", &SGF.F);
 
@@ -3255,6 +3254,11 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF) {
   SmallVector<ManagedValue, 8> params;
   SmallVector<SILArgument*, 8> indirectResults;
   SGF.collectThunkParams(loc, params, &indirectResults);
+
+  // Ignore the self parameter at the SIL level. IRGen will use it to
+  // recover type metadata.
+  if (dynamicSelfType)
+    params.pop_back();
 
   ManagedValue fnValue = params.pop_back_val();
   auto fnType = fnValue.getType().castTo<SILFunctionType>();
@@ -3297,47 +3301,37 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
   auto noEscapingFnTy =
       noEscapingFunctionValue.getType().castTo<SILFunctionType>();
 
+  CanType dynamicSelfType;
   auto thunkType = buildWithoutActuallyEscapingThunkType(
-      *this, noEscapingFnTy, escapingFnTy, genericEnv, interfaceSubs);
+      *this, noEscapingFnTy, escapingFnTy, genericEnv, interfaceSubs,
+      dynamicSelfType);
 
   auto *thunk = SGM.getOrCreateReabstractionThunk(
-      thunkType, noEscapingFnTy, escapingFnTy,
-      /*dynamicSelfType=*/CanType());
+      thunkType, noEscapingFnTy, escapingFnTy, dynamicSelfType);
 
   if (thunk->empty()) {
     thunk->setWithoutActuallyEscapingThunk();
     thunk->setGenericEnvironment(genericEnv);
     SILGenFunction thunkSGF(SGM, *thunk, FunctionDC);
-    buildWithoutActuallyEscapingThunkBody(thunkSGF);
+    buildWithoutActuallyEscapingThunkBody(thunkSGF, dynamicSelfType);
   }
   assert(thunk->isWithoutActuallyEscapingThunk());
 
-  CanSILFunctionType substFnTy = thunkType;
-  // Use the subsitution map in the context of the current function.
-  // thunk->getForwardingSubstitutionMap() / thunk might have been created in a
-  // different function's generic enviroment.
-  if (thunkType->getGenericSignature()) {
-    substFnTy = thunkType->substGenericArgs(F.getModule(), interfaceSubs);
-  }
-
-  // Create it in our current function.
-  auto thunkValue = B.createFunctionRefFor(loc, thunk);
-
   // Create a copy for the noescape value, so we can mark_dependence upon the
   // original value.
-  SILValue noEscapeValue =
-      noEscapingFunctionValue.copy(*this, loc).forward(*this);
-  SingleValueInstruction *thunkedFn = B.createPartialApply(
-      loc, thunkValue,
-      SILType::getPrimitiveObjectType(substFnTy),
-      interfaceSubs,
-      noEscapeValue,
-      SILType::getPrimitiveObjectType(escapingFnTy));
+  auto noEscapeValue = noEscapingFunctionValue.copy(*this, loc);
+
+  auto thunkedFn =
+    createPartialApplyOfThunk(*this, loc, thunk, interfaceSubs, dynamicSelfType,
+                              escapingFnTy, noEscapeValue);
+
   // We need to ensure the 'lifetime' of the trivial values context captures. As
   // long as we represent these captures by the same value the following works.
-  thunkedFn = B.createMarkDependence(loc, thunkedFn, noEscapingFunctionValue.getValue());
+  thunkedFn = emitManagedRValueWithCleanup(
+    B.createMarkDependence(loc, thunkedFn.forward(*this),
+                           noEscapingFunctionValue.getValue()));
 
-  return emitManagedRValueWithCleanup(thunkedFn);
+  return thunkedFn;
 }
 
 ManagedValue Transform::transformFunction(ManagedValue fn,
