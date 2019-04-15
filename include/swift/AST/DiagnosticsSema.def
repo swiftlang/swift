@@ -2049,8 +2049,9 @@ NOTE(same_type_redundancy_here,none,
      "inferred from type here}0",
      (unsigned, Type, Type))
 ERROR(requires_superclass_conflict,none,
-      "%select{generic parameter |protocol |}0%1 cannot be a subclass of both "
-      "%2 and %3", (unsigned, Type, Type, Type))
+      "%select{generic parameter %1 cannot|protocol %1 cannot require 'Self' to|" 
+      "%1 cannot}0 be a subclass of both %2 and %3",
+      (unsigned, Type, Type, Type))
 WARNING(redundant_superclass_constraint,none,
         "redundant superclass constraint %0 : %1", (Type, Type))
 NOTE(superclass_redundancy_here,none,
