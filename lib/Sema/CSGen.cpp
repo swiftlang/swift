@@ -2902,8 +2902,10 @@ namespace {
       
       // For native key paths, traverse the key path components to set up
       // appropriate type relationships at each level.
+      auto rootLocator =
+          CS.getConstraintLocator(E, ConstraintLocator::KeyPathRoot);
       auto locator = CS.getConstraintLocator(E);
-      Type root = CS.createTypeVariable(locator);
+      Type root = CS.createTypeVariable(rootLocator);
 
       // If a root type was explicitly given, then resolve it now.
       if (auto rootRepr = E->getRootType()) {
@@ -3010,7 +3012,9 @@ namespace {
         base = optTy;
       }
 
-      auto rvalueBase = CS.createTypeVariable(locator);
+      auto baseLocator =
+          CS.getConstraintLocator(E, ConstraintLocator::KeyPathValue);
+      auto rvalueBase = CS.createTypeVariable(baseLocator);
       CS.addConstraint(ConstraintKind::Equal, base, rvalueBase, locator);
       
       // The result is a KeyPath from the root to the end component.

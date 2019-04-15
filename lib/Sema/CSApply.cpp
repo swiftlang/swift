@@ -4379,7 +4379,7 @@ namespace {
       auto keyPathTy = cs.getType(E)->castTo<BoundGenericType>();
       Type baseTy = keyPathTy->getGenericArgs()[0];
       Type leafTy = keyPathTy->getGenericArgs()[1];
-      
+
       for (unsigned i : indices(E->getComponents())) {
         auto &origComponent = E->getMutableComponents()[i];
         
