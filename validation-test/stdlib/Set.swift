@@ -2646,7 +2646,16 @@ SetTestSuite.test("SetUpcastBridged") {
 // Set downcasts
 //
 
-SetTestSuite.test("SetDowncastEntryPoint") {
+SetTestSuite.test("SetDowncastEntryPoint")
+  .skip(.custom(
+    {
+#if os(iOS)
+      return true
+#else
+      return false
+#endif
+    }, reason: "Autorelease Failure. rdar://49791522"))
+.code {
   var s = Set<NSObject>(minimumCapacity: 32)
   for i in [1010, 2020, 3030] {
       s.insert(TestObjCKeyTy(i))
@@ -2662,7 +2671,16 @@ SetTestSuite.test("SetDowncastEntryPoint") {
   expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
 
-SetTestSuite.test("SetDowncast") {
+SetTestSuite.test("SetDowncast")
+  .skip(.custom(
+    {
+#if os(iOS)
+      return true
+#else
+      return false
+#endif
+    }, reason: "Autorelease Failure. rdar://49791522"))
+.code {
   var s = Set<NSObject>(minimumCapacity: 32)
   for i in [1010, 2020, 3030] {
       s.insert(TestObjCKeyTy(i))
@@ -2738,7 +2756,16 @@ SetTestSuite.test("SetBridgeFromObjectiveCEntryPoint") {
   }
 }
 
-SetTestSuite.test("SetBridgeFromObjectiveC") {
+SetTestSuite.test("SetBridgeFromObjectiveC")
+  .skip(.custom(
+    {
+#if os(iOS)
+      return true
+#else
+      return false
+#endif
+    }, reason: "Autorelease Failure. rdar://49791522"))
+.code {
   var s = Set<NSObject>(minimumCapacity: 32)
   for i in [1010, 2020, 3030] {
       s.insert(TestObjCKeyTy(i))
