@@ -3395,27 +3395,6 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     }
 
     static bool hasImplicitlyUnwrappedResult(Expr *E) {
-      auto getDeclForExpr = [&](Expr *E) -> ValueDecl * {
-        if (auto *call = dyn_cast<CallExpr>(E))
-          E = call->getDirectCallee();
-
-        if (auto *subscript = dyn_cast<SubscriptExpr>(E)) {
-          if (subscript->hasDecl())
-            return subscript->getDecl().getDecl();
-
-          return nullptr;
-        }
-
-        if (auto *memberRef = dyn_cast<MemberRefExpr>(E))
-          return memberRef->getMember().getDecl();
-        if (auto *declRef = dyn_cast<DeclRefExpr>(E))
-          return declRef->getDecl();
-        if (auto *apply = dyn_cast<ApplyExpr>(E))
-          return apply->getCalledValue();
-
-        return nullptr;
-      };
-
       // Look through implicit conversions like loads, derived-to-base
       // conversion, etc.
       if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E))
@@ -3425,6 +3404,27 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
 
       return decl
         && decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    }
+
+    static ValueDecl *getDeclForExpr(Expr *E) {
+      if (auto *call = dyn_cast<CallExpr>(E))
+        E = call->getDirectCallee();
+
+      if (auto *subscript = dyn_cast<SubscriptExpr>(E)) {
+        if (subscript->hasDecl())
+          return subscript->getDecl().getDecl();
+
+        return nullptr;
+      }
+
+      if (auto *memberRef = dyn_cast<MemberRefExpr>(E))
+        return memberRef->getMember().getDecl();
+      if (auto *declRef = dyn_cast<DeclRefExpr>(E))
+        return declRef->getDecl();
+      if (auto *apply = dyn_cast<ApplyExpr>(E))
+        return apply->getCalledValue();
+
+      return nullptr;
     }
 
     void visitErasureExpr(ErasureExpr *E, OptionalToAnyCoercion coercion) {
@@ -3452,17 +3452,6 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       auto srcType = subExpr->getType();
       auto destType = coercion.DestType;
 
-      // If we're implicitly unwrapping from T! to Any then there's nothing to
-      // diagnose.
-      SmallVector<Type, 4> srcOptionals;
-      srcType->lookThroughAllOptionalTypes(srcOptionals);
-
-      if (srcOptionals.size() == 1 &&
-          destType->lookThroughAllOptionalTypes()->isAny() &&
-          hasImplicitlyUnwrappedResult(subExpr)) {
-        return;
-      }
-
       size_t optionalityDifference = 0;
       if (!isOptionalToAnyCoercion(srcType, destType, optionalityDifference))
         return;
@@ -3470,6 +3459,21 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
                   /* from */ srcType, /* to */ destType)
         .highlight(subExpr->getSourceRange());
+
+      if (auto decl = getDeclForExpr(subExpr)) {
+        auto kind = [&](ValueDecl *decl) -> unsigned {
+          if (isa<VarDecl>(decl)) {
+            return 0; // Variable
+          } else if (isa<ParamDecl>(decl)) {
+            return 1; // Function parameter
+          } else {
+            return 2; // Function result
+          }
+        };
+
+        TC.diagnose(decl->getLoc(), diag::optional_to_any_coercion_note,
+                    kind(decl), decl->getBaseName().getIdentifier());
+      }
 
       if (optionalityDifference == 1) {
         TC.diagnose(subExpr->getLoc(), diag::default_optional_to_any)
