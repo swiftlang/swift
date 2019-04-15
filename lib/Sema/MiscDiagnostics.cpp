@@ -3455,30 +3455,38 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       size_t optionalityDifference = 0;
       if (!isOptionalToAnyCoercion(srcType, destType, optionalityDifference))
         return;
-
-      TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
-                  /* from */ srcType, /* to */ destType)
+      
+      // If we're implicitly unwrapping from IUO to Any then emit a custom
+      // diagnostic
+      if (hasImplicitlyUnwrappedResult(subExpr)) {
+        if (auto decl = getDeclForExpr(subExpr)) {
+          auto kind = [&](ValueDecl *decl) -> unsigned {
+            if (isa<VarDecl>(decl)) {
+              return 0; // Variable
+            } else if (isa<ParamDecl>(decl)) {
+              return 1; // Function parameter
+            } else {
+              return 2; // Function result
+            }
+          };
+          
+          TC.diagnose(subExpr->getStartLoc(), diag::iuo_to_any_coercion,
+                      /* from */ srcType, /* to */ destType)
+          .highlight(subExpr->getSourceRange());
+          
+          TC.diagnose(decl->getLoc(), diag::iuo_to_any_coercion_note,
+                      kind(decl), decl->getBaseName().getIdentifier());
+        }
+      } else {
+        TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
+                    /* from */ srcType, /* to */ destType)
         .highlight(subExpr->getSourceRange());
-
-      if (auto decl = getDeclForExpr(subExpr)) {
-        auto kind = [&](ValueDecl *decl) -> unsigned {
-          if (isa<VarDecl>(decl)) {
-            return 0; // Variable
-          } else if (isa<ParamDecl>(decl)) {
-            return 1; // Function parameter
-          } else {
-            return 2; // Function result
-          }
-        };
-
-        TC.diagnose(decl->getLoc(), diag::optional_to_any_coercion_note,
-                    kind(decl), decl->getBaseName().getIdentifier());
       }
-
+      
       if (optionalityDifference == 1) {
         TC.diagnose(subExpr->getLoc(), diag::default_optional_to_any)
-          .highlight(subExpr->getSourceRange())
-          .fixItInsertAfter(subExpr->getEndLoc(), " ?? <#default value#>");
+        .highlight(subExpr->getSourceRange())
+        .fixItInsertAfter(subExpr->getEndLoc(), " ?? <#default value#>");
       }
 
       SmallString<4> forceUnwrapString;
