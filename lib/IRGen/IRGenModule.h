@@ -214,7 +214,7 @@ private:
   bool FinishedEmittingLazyDefinitions = false;
 
   /// A map recording if metadata can be emitted lazily for each nominal type.
-  llvm::DenseMap<NominalTypeDecl *, bool> HasLazyMetadata;
+  llvm::DenseMap<TypeDecl *, bool> HasLazyMetadata;
 
   struct LazyTypeGlobalsInfo {
     /// Is there a use of the type metadata?
@@ -356,8 +356,7 @@ public:
   /// Checks if metadata for this type can be emitted lazily. This is true for
   /// non-public types as well as imported types, except for classes and
   /// protocols which are always emitted eagerly.
-  bool hasLazyMetadata(NominalTypeDecl *type);
-  bool hasLazyMetadata(OpaqueTypeDecl *type);
+  bool hasLazyMetadata(TypeDecl *type);
 
   /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
