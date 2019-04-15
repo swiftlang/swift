@@ -1057,10 +1057,12 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
 
 /// Given a VarDecl with a willSet: and/or didSet: specifier, synthesize the
 /// setter which calls them.
-static void synthesizeObservedSetterBody(AccessorDecl *Set,
-                                         TargetImpl target,
-                                         ASTContext &Ctx) {
-  auto VD = cast<VarDecl>(Set->getStorage());
+static void
+synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
+                             ASTContext &Ctx,
+                             AbstractStorageDecl *storageToUse = nullptr) {
+  auto VD = storageToUse ? cast<VarDecl>(storageToUse)
+                         : cast<VarDecl>(Set->getStorage());
 
   SourceLoc Loc = VD->getLoc();
 
@@ -1070,7 +1072,7 @@ static void synthesizeObservedSetterBody(AccessorDecl *Set,
   // Okay, the getter is done, create the setter now.  Start by finding the
   // decls for 'self' and 'value'.
   auto *SelfDecl = Set->getImplicitSelfDecl();
-  VarDecl *ValueDecl = Set->getParameters()->get(0);
+  VarDecl *ValueDecl = getFirstParamDecl(Set);
 
   // The setter loads the oldValue, invokes willSet with the incoming value,
   // does a direct store, then invokes didSet with the oldValue.
@@ -1081,9 +1083,11 @@ static void synthesizeObservedSetterBody(AccessorDecl *Set,
   // TODO: check the body of didSet to only do this load (which may call the
   // superclass getter) if didSet takes an argument.
   VarDecl *OldValue = nullptr;
-  if (VD->getDidSetFunc()) {
-    Expr *OldValueExpr
-      = createPropertyLoadOrCallSuperclassGetter(Set, VD, target, Ctx);
+  AccessorDecl *didSetFunc =
+      storageToUse ? Set->getStorage()->getDidSetFunc() : VD->getDidSetFunc();
+  if (didSetFunc) {
+    Expr *OldValueExpr = createPropertyLoadOrCallSuperclassGetter(
+        Set, Set->getStorage(), target, Ctx);
 
     OldValue = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
                                  /*IsCaptureList*/false, SourceLoc(),
@@ -1102,8 +1106,11 @@ static void synthesizeObservedSetterBody(AccessorDecl *Set,
   //              (declrefexpr(value)))
   // or:
   //   (call_expr (decl_ref_expr(willSet)), (declrefexpr(value)))
-  if (auto willSet = VD->getWillSetFunc()) {
-    Expr *Callee = new (Ctx) DeclRefExpr(willSet, DeclNameLoc(), /*imp*/true);
+  AccessorDecl *willSetFunc =
+      storageToUse ? Set->getStorage()->getWillSetFunc() : VD->getWillSetFunc();
+  if (willSetFunc) {
+    Expr *Callee =
+        new (Ctx) DeclRefExpr(willSetFunc, DeclNameLoc(), /*imp*/ true);
     auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, DeclNameLoc(),
                                            /*imp*/true);
     if (SelfDecl) {
@@ -1126,10 +1133,11 @@ static void synthesizeObservedSetterBody(AccessorDecl *Set,
   //              (decl_ref_expr(tmp)))
   // or:
   //   (call_expr (decl_ref_expr(didSet)), (decl_ref_expr(tmp)))
-  if (auto didSet = VD->getDidSetFunc()) {
+  if (didSetFunc) {
     auto *OldValueExpr = new (Ctx) DeclRefExpr(OldValue, DeclNameLoc(),
                                                /*impl*/true);
-    Expr *Callee = new (Ctx) DeclRefExpr(didSet, DeclNameLoc(), /*imp*/true);
+    Expr *Callee =
+        new (Ctx) DeclRefExpr(didSetFunc, DeclNameLoc(), /*imp*/ true);
     if (SelfDecl) {
       auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, DeclNameLoc(),
                                             /*imp*/true);
@@ -1328,20 +1336,27 @@ static void synthesizeLazySetterBody(AbstractFunctionDecl *fn, void *context) {
   auto *setter = cast<AccessorDecl>(fn);
   auto *underlyingStorage = (VarDecl *) context;
   auto &ctx = setter->getASTContext();
+  auto setterStorage = setter->getStorage();
 
   if (setter->isInvalid() || ctx.hadError())
     return;
 
-  synthesizeTrivialSetterBodyWithStorage(setter, TargetImpl::Storage,
-                                         underlyingStorage, ctx);
+  if (setterStorage->getAccessor(AccessorKind::WillSet) ||
+      setterStorage->getAccessor(AccessorKind::DidSet)) {
+    synthesizeObservedSetterBody(setter, TargetImpl::Storage, ctx,
+                                 underlyingStorage);
+  } else {
+    synthesizeTrivialSetterBodyWithStorage(setter, TargetImpl::Storage,
+                                           underlyingStorage, ctx);
+  }
 }
 
 void swift::completeLazyVarImplementation(VarDecl *VD) {
   auto &Context = VD->getASTContext();
 
   assert(VD->getAttrs().hasAttribute<LazyAttr>());
-  assert(VD->getReadImpl() == ReadImplKind::Get);
-  assert(VD->getWriteImpl() == WriteImplKind::Set);
+  // assert(VD->getReadImpl() == ReadImplKind::Get);
+  // assert(VD->getWriteImpl() == WriteImplKind::Set);
   assert(!VD->isStatic() && "Static vars are already lazy on their own");
 
   // Create the storage property as an optional of VD's type.

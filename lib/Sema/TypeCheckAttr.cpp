@@ -583,7 +583,7 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
   if (impl.isSimpleStored()) {
     // ok
   } else if (VD->hasStorage()) {
-    diagnoseAndRemoveAttr(attr, diag::lazy_not_observable);
+    // ok
   } else {
     diagnoseAndRemoveAttr(attr, diag::lazy_not_on_computed);
   }
