@@ -1640,34 +1640,34 @@ public extension Tensor {
 }
 
 public enum TensorRange : TensorRangeExpression {
-  case ellipsis
-  case newAxis
-  case squeezeAxis
-  case index(Int32)
-  case range(Range<Int32>, stride: Int32)
-  case closedRange(ClosedRange<Int32>, stride: Int32)
-  case partialRangeFrom(PartialRangeFrom<Int32>, stride: Int32)
-  case partialRangeUpTo(PartialRangeUpTo<Int32>, stride: Int32)
-  case partialRangeThrough(PartialRangeThrough<Int32>, stride: Int32)
+  case _ellipsis
+  case _newAxis
+  case _squeezeAxis
+  case _index(Int32)
+  case _range(Range<Int32>, stride: Int32)
+  case _closedRange(ClosedRange<Int32>, stride: Int32)
+  case _partialRangeFrom(PartialRangeFrom<Int32>, stride: Int32)
+  case _partialRangeUpTo(PartialRangeUpTo<Int32>, stride: Int32)
+  case _partialRangeThrough(PartialRangeThrough<Int32>, stride: Int32)
 
   public var tensorRange: TensorRange { return self }
 }
 
-extension TensorRange: Equatable {
+extension TensorRange : Equatable {
   public static func == (lhs: TensorRange, rhs: TensorRange) -> Bool {
     switch (lhs, rhs) {
-    case (.ellipsis, .ellipsis): return true
-    case (.newAxis, .newAxis): return true
-    case (.squeezeAxis, .squeezeAxis): return true
-    case (let .index(i1), let .index(i2)): return i1 == i2
-    case (let .range(r1, s1), let .range(r2, s2)): return r1 == r2 && s1 == s2
-    case (let .closedRange(r1, s1), let .closedRange(r2, s2)):
+    case (._ellipsis, ._ellipsis): return true
+    case (._newAxis, ._newAxis): return true
+    case (._squeezeAxis, ._squeezeAxis): return true
+    case (let ._index(i1), let ._index(i2)): return i1 == i2
+    case (let ._range(r1, s1), let ._range(r2, s2)): return r1 == r2 && s1 == s2
+    case (let ._closedRange(r1, s1), let ._closedRange(r2, s2)):
       return r1 == r2 && s1 == s2
-    case (let .partialRangeFrom(r1, s1), let .partialRangeFrom(r2, s2)):
+    case (let ._partialRangeFrom(r1, s1), let ._partialRangeFrom(r2, s2)):
       return r1.lowerBound == r2.lowerBound && s1 == s2
-    case (let .partialRangeUpTo(r1, s1), let .partialRangeUpTo(r2, s2)):
+    case (let ._partialRangeUpTo(r1, s1), let ._partialRangeUpTo(r2, s2)):
       return r1.upperBound == r2.upperBound && s1 == s2
-    case (let .partialRangeThrough(r1, s1), let .partialRangeThrough(r2, s2)):
+    case (let ._partialRangeThrough(r1, s1), let ._partialRangeThrough(r2, s2)):
       return r1.upperBound == r2.upperBound && s1 == s2
     default: return false
     }
@@ -1679,52 +1679,99 @@ public protocol TensorRangeExpression {
 }
 
 public extension TensorRangeExpression {
-  var ellipsis: TensorRange { return .ellipsis }
-  var newAxis: TensorRange { return .newAxis }
-  var squeezeAxis: TensorRange { return .squeezeAxis }
+  static var ellipsis: TensorRangeExpression {
+    return TensorRange._ellipsis
+  }
+
+  static var newAxis: TensorRangeExpression {
+    return TensorRange._newAxis
+  }
+
+  static var squeezeAxis: TensorRangeExpression {
+    return TensorRange._squeezeAxis
+  }
+
+  static func index(_ value: Int32) -> TensorRangeExpression {
+    return TensorRange._index(value)
+  }
+
+  static func range(
+    _ value: Range<Int32>,
+    stride: Int32
+  ) -> TensorRangeExpression {
+    return TensorRange._range(value, stride: stride)
+  }
+
+  static func closedRange(
+    _ value: ClosedRange<Int32>,
+    stride: Int32
+  ) -> TensorRangeExpression {
+    return TensorRange._closedRange(value, stride: stride)
+  }
+
+  static func partialRangeFrom(
+    _ value: PartialRangeFrom<Int32>,
+    stride: Int32
+  ) -> TensorRangeExpression {
+    return TensorRange._partialRangeFrom(value, stride: stride)
+  }
+
+  static func partialRangeUpTo(
+    _ value: PartialRangeUpTo<Int32>,
+    stride: Int32
+  ) -> TensorRangeExpression {
+    return TensorRange._partialRangeUpTo(value, stride: stride)
+  }
+
+  static func partialRangeThrough(
+    _ value: PartialRangeThrough<Int32>,
+    stride: Int32
+  ) -> TensorRangeExpression {
+    return TensorRange._partialRangeThrough(value, stride: stride)
+  }
 }
 
 // TODO: Cannot extend non-nominal type 'UnboundedRange'.
 // extension UnboundedRange : TensorRangeExpression {
-//   public var tensorRange: TensorRange { return .ellipsis }
+//   public var tensorRange: TensorRange { return ._ellipsis }
 // }
 
 extension Int32 : TensorRangeExpression {
-  public var tensorRange: TensorRange { return .index(self) }
+  public var tensorRange: TensorRange { return ._index(self) }
 }
 
 extension Int : TensorRangeExpression {
-  public var tensorRange: TensorRange { return .index(Int32(self)) }
+  public var tensorRange: TensorRange { return ._index(Int32(self)) }
 }
 
 extension Range : TensorRangeExpression where Bound == Int {
   public var tensorRange: TensorRange {
-    return .range(Int32(self.lowerBound)..<Int32(self.upperBound), stride: 1)
+    return ._range(Int32(self.lowerBound)..<Int32(self.upperBound), stride: 1)
   }
 }
 
 extension ClosedRange : TensorRangeExpression where Bound == Int {
   public var tensorRange: TensorRange {
-    return .closedRange(
+    return ._closedRange(
       Int32(self.lowerBound)...Int32(self.upperBound), stride: 1)
   }
 }
 
 extension PartialRangeFrom : TensorRangeExpression where Bound == Int {
   public var tensorRange: TensorRange {
-    return .partialRangeFrom(Int32(self.lowerBound)..., stride: 1)
+    return ._partialRangeFrom(Int32(self.lowerBound)..., stride: 1)
   }
 }
 
 extension PartialRangeUpTo : TensorRangeExpression where Bound == Int {
   public var tensorRange: TensorRange {
-    return .partialRangeUpTo(..<Int32(self.upperBound), stride: 1)
+    return ._partialRangeUpTo(..<Int32(self.upperBound), stride: 1)
   }
 }
 
 extension PartialRangeThrough : TensorRangeExpression where Bound == Int {
   public var tensorRange: TensorRange {
-    return .partialRangeThrough(...Int32(self.upperBound), stride: 1)
+    return ._partialRangeThrough(...Int32(self.upperBound), stride: 1)
   }
 }
 
@@ -1832,7 +1879,7 @@ public extension Tensor.IndexPath {
   @inlinable @inline(__always)
   init(_ ranges: [TensorRange]) {
     precondition(!ranges.isEmpty, "The tensor range collection cannot be empty.")
-    precondition(ranges.count { $0 == TensorRange.ellipsis } < 2,
+    precondition(ranges.count { $0 == TensorRange._ellipsis } < 2,
                  "Only one ellipsis is allowed per tensor range collection.")
 
     var begin = [Int32](repeating: 0, count: ranges.count)
@@ -1845,33 +1892,33 @@ public extension Tensor.IndexPath {
     var squeezeAxisMask: Int64 = 0
     for (i, index) in ranges.enumerated() {
       switch index {
-      case .ellipsis: ellipsisMask |= 1 << i
-      case .newAxis: newAxisMask |= 1 << i
-      case .squeezeAxis: squeezeAxisMask |= 1 << i
-      case .index(let idx):
+      case ._ellipsis: ellipsisMask |= 1 << i
+      case ._newAxis: newAxisMask |= 1 << i
+      case ._squeezeAxis: squeezeAxisMask |= 1 << i
+      case ._index(let idx):
         begin[i] = idx
         end[i] = idx + 1
         squeezeAxisMask |= 1 << i
-      case .range(let range, let stride):
+      case ._range(let range, let stride):
         begin[i] = range.lowerBound
         end[i] = range.upperBound
         strides[i] = stride
-      case .closedRange(let range, let stride):
+      case ._closedRange(let range, let stride):
         begin[i] = range.lowerBound
         switch range.upperBound {
         case -1: endMask |= 1 << i
         case let u: end[i] = u + 1
         }
         strides[i] = stride
-      case .partialRangeFrom(let range, let stride):
+      case ._partialRangeFrom(let range, let stride):
         begin[i] = range.lowerBound
         strides[i] = stride
         endMask |= 1 << i
-      case .partialRangeUpTo(let range, let stride):
+      case ._partialRangeUpTo(let range, let stride):
         end[i] = range.upperBound
         strides[i] = stride
         beginMask |= 1 << i
-      case .partialRangeThrough(let range, let stride):
+      case ._partialRangeThrough(let range, let stride):
         end[i] = range.upperBound + 1
         strides[i] = stride
         beginMask |= 1 << i
