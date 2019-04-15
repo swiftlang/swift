@@ -8,7 +8,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set(UUID_LIBRARIES "rpcrt4.lib")
 else()
   find_package(UUID REQUIRED)
-  set(UUID_INCLUDE "-I${UUID_INCLUDE_DIRS}")
+  set(UUID_INCLUDE "${UUID_INCLUDE_DIRS}")
 endif()
 
 # Figure out if we can track VC revisions.
