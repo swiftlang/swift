@@ -1106,7 +1106,8 @@ extension PartialRangeFrom : PythonConvertible where Bound : PythonConvertible {
   }
 }
 
-extension PartialRangeFrom : ConvertibleFromPython where Bound : ConvertibleFromPython {
+extension PartialRangeFrom : ConvertibleFromPython
+  where Bound : ConvertibleFromPython {
   public init?(_ pythonObject: PythonObject) {
     guard isType(pythonObject, type: PySlice_Type) else { return nil }
     guard let lowerBound = Bound(pythonObject.start) else { return nil }
