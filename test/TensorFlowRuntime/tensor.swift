@@ -249,7 +249,7 @@ TensorTests.testAllBackends("AdvancedIndexing") {
   // and the ShapedArray is tested.
   let tensor3D = Tensor<Float>(shape: [3, 4, 5],
                                scalars: Array(stride(from: 0.0, to: 60, by: 1)))
-  let element2D = tensor3D[1 ..< 3, 0, 3...]
+  let element2D = tensor3D[1..<3, 0, 3...]
   let array2D = element2D.array
 
   // Test shape

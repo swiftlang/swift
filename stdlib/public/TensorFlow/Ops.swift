@@ -1611,28 +1611,29 @@ public extension Tensor {
     /// TODO: Precondition `lowerBounds.count == upperBounds.count`,
     /// preferably in graph.
     let lowerBoundsTensor = Tensor<Int32>(lowerBounds)
-    return self.slice(
-      begin: lowerBoundsTensor,
-      size: Tensor<Int32>(upperBounds) - lowerBoundsTensor)
+    return slice(
+      lowerBounds: lowerBoundsTensor,
+      sizes: Tensor<Int32>(upperBounds) - lowerBoundsTensor)
   }
 
   @inlinable @inline(__always)
   @differentiable(wrt: self, vjp: _vjpSlice)
-  func slice(begin: Tensor<Int32>, size: Tensor<Int32>) -> Tensor {
-    return Raw.slice(self, begin: begin, size: size)
+  func slice(lowerBounds: Tensor<Int32>, sizes: Tensor<Int32>) -> Tensor {
+    return Raw.slice(self, begin: lowerBounds, size: sizes)
   }
 
   @inlinable @inline(__always)
   internal func _vjpSlice(
-    begin: Tensor<Int32>,
-    size: Tensor<Int32>
+    lowerBounds: Tensor<Int32>,
+    sizes: Tensor<Int32>
   ) -> (Tensor, (Tensor) -> Tensor) {
-    let value = slice(begin: begin, size: size)
-    let afterPaddings = shapeTensor - value.shapeTensor - begin
+    let value = slice(lowerBounds: lowerBounds, sizes: sizes)
+    let afterPaddings = shapeTensor - value.shapeTensor - lowerBounds
     return (value, { [after = afterPaddings] v in
-      let beforePaddings = begin.expandingShape(at: 1)
+      let beforePaddings = lowerBounds.expandingShape(at: 1)
       let afterPaddings = after.expandingShape(at: 1)
-      let paddings = Tensor<Int32>(concatenating: [beforePaddings, afterPaddings], alongAxis: 1)
+      let paddings = Tensor<Int32>(
+        concatenating: [beforePaddings, afterPaddings], alongAxis: 1)
       return Raw.pad(v, paddings: paddings)
     })
   }
@@ -1650,6 +1651,27 @@ public enum TensorSliceIndex : TensorSliceIndexProtocol {
   case partialRangeThrough(PartialRangeThrough<Int32>, stride: Int32)
 
   public var sliceIndex: TensorSliceIndex { return self }
+}
+
+extension TensorSliceIndex: Equatable {
+  public static func == (lhs: TensorSliceIndex, rhs: TensorSliceIndex) -> Bool {
+    switch (lhs, rhs) {
+    case (.ellipsis, .ellipsis): return true
+    case (.newAxis, .newAxis): return true
+    case (.squeezeAxis, .squeezeAxis): return true
+    case (let .index(i1), let .index(i2)): return i1 == i2
+    case (let .range(r1, s1), let .range(r2, s2)): return r1 == r2 && s1 == s2
+    case (let .closedRange(r1, s1), let .closedRange(r2, s2)):
+      return r1 == r2 && s1 == s2
+    case (let .partialRangeFrom(r1, s1), let .partialRangeFrom(r2, s2)):
+      return r1.lowerBound == r2.lowerBound && s1 == s2
+    case (let .partialRangeUpTo(r1, s1), let .partialRangeUpTo(r2, s2)):
+      return r1.upperBound == r2.upperBound && s1 == s2
+    case (let .partialRangeThrough(r1, s1), let .partialRangeThrough(r2, s2)):
+      return r1.upperBound == r2.upperBound && s1 == s2
+    default: return false
+    }
+  }
 }
 
 public protocol TensorSliceIndexProtocol {
@@ -1677,7 +1699,8 @@ extension Range : TensorSliceIndexProtocol where Bound == Int {
 
 extension ClosedRange : TensorSliceIndexProtocol where Bound == Int {
   public var sliceIndex: TensorSliceIndex {
-    return .closedRange(Int32(self.lowerBound)...Int32(self.upperBound), stride: 1)
+    return .closedRange(
+      Int32(self.lowerBound)...Int32(self.upperBound), stride: 1)
   }
 }
 
@@ -1700,14 +1723,18 @@ extension PartialRangeThrough : TensorSliceIndexProtocol where Bound == Int {
 }
 
 public extension Tensor {
-  public struct IndexPath {
-    public let begin, end, strides: Tensor<Int32>
-    public let beginMask, endMask, ellipsisMask, newAxisMask, squeezeAxisMask: Int64
-    
+  struct IndexPath {
+    @usableFromInline
+    let begin, end, strides: Tensor<Int32>
+
+    @usableFromInline
+    let beginMask, endMask, ellipsisMask, newAxisMask, squeezeAxisMask: Int64
+
     @inlinable @inline(__always)
     public init(
-      begin: Tensor<Int32>, end: Tensor<Int32>, strides: Tensor<Int32>, beginMask: Int64,
-      endMask: Int64, ellipsisMask: Int64, newAxisMask: Int64, squeezeAxisMask: Int64
+      begin: Tensor<Int32>, end: Tensor<Int32>, strides: Tensor<Int32>,
+      beginMask: Int64, endMask: Int64, ellipsisMask: Int64, newAxisMask: Int64,
+      squeezeAxisMask: Int64
     ) {
       self.begin = begin
       self.end = end
@@ -1725,16 +1752,19 @@ public extension Tensor {
   subscript(_ indexPath: IndexPath) -> Tensor {
     get {
       return Raw.stridedSlice(
-        self, begin: indexPath.begin, end: indexPath.end, strides: indexPath.strides,
-        beginMask: indexPath.beginMask, endMask: indexPath.endMask, 
-        ellipsisMask: indexPath.ellipsisMask, newAxisMask: indexPath.newAxisMask, 
+        self, begin: indexPath.begin, end: indexPath.end,
+        strides: indexPath.strides, beginMask: indexPath.beginMask,
+        endMask: indexPath.endMask, ellipsisMask: indexPath.ellipsisMask, 
+        newAxisMask: indexPath.newAxisMask,
         shrinkAxisMask: indexPath.squeezeAxisMask)
     }
     set {
       self = Raw.tensorStridedSliceUpdate(
-        self, begin: indexPath.begin, end: indexPath.end, strides: indexPath.strides,
-        value: newValue, beginMask: indexPath.beginMask, endMask: indexPath.endMask, 
-        ellipsisMask: indexPath.ellipsisMask, newAxisMask: indexPath.newAxisMask, 
+        self, begin: indexPath.begin, end: indexPath.end,
+        strides: indexPath.strides, value: newValue,
+        beginMask: indexPath.beginMask, endMask: indexPath.endMask,
+        ellipsisMask: indexPath.ellipsisMask,
+        newAxisMask: indexPath.newAxisMask,
         shrinkAxisMask: indexPath.squeezeAxisMask)
     }
   }
@@ -1750,9 +1780,11 @@ public extension Tensor {
   }
 
   @inlinable @inline(__always)
-  internal func _vjpSubscript(_ indexPath: IndexPath) -> (Tensor, (Tensor) -> Tensor) {
+  internal func _vjpSubscript(
+    _ indexPath: IndexPath
+  ) -> (Tensor, (Tensor) -> Tensor) {
     return (self[indexPath], { [shape = shapeTensor] v in
-      return Tensor<Scalar>._pullbackSubscript(v, indexPath, shape)
+      Tensor<Scalar>._pullbackSubscript(v, indexPath, shape)
     })
   }
 
@@ -1764,9 +1796,10 @@ public extension Tensor {
     _ shape: Tensor<Int32>
   ) -> Tensor {
     return Raw.stridedSliceGrad(
-      shape: shape, begin: indexPath.begin, end: indexPath.end, strides: indexPath.strides,
-      dy: seed, beginMask: indexPath.beginMask, endMask: indexPath.endMask,
-      ellipsisMask: indexPath.ellipsisMask, newAxisMask: indexPath.newAxisMask,
+      shape: shape, begin: indexPath.begin, end: indexPath.end,
+      strides: indexPath.strides, dy: seed, beginMask: indexPath.beginMask,
+      endMask: indexPath.endMask, ellipsisMask: indexPath.ellipsisMask,
+      newAxisMask: indexPath.newAxisMask,
       shrinkAxisMask: indexPath.squeezeAxisMask)
   }
 
@@ -1780,7 +1813,8 @@ public extension Tensor {
       return v[IndexPath(
         begin: indexPath.begin, end: indexPath.end, strides: indexPath.strides,
         beginMask: indexPath.beginMask, endMask: indexPath.endMask,
-        ellipsisMask: indexPath.ellipsisMask, newAxisMask: indexPath.newAxisMask,
+        ellipsisMask: indexPath.ellipsisMask,
+        newAxisMask: indexPath.newAxisMask,
         squeezeAxisMask: indexPath.squeezeAxisMask)]
     })
   }
@@ -1790,13 +1824,8 @@ public extension Tensor.IndexPath {
   @inlinable @inline(__always)
   init(_ indices: [TensorSliceIndex]) {
     precondition(!indices.isEmpty, "The index path cannot be empty.")
-    precondition(indices.count(where: {
-      if case .ellipsis = $0 {
-        return true
-      } else {
-        return false
-      }
-    }) < 2, "Only one ellipsis is allowed per index path.")
+    precondition(indices.count { $0 == .ellipsis } < 2,
+                 "Only one ellipsis is allowed per index path.")
 
     var begin = [Int32](repeating: 0, count: indices.count)
     var end = [Int32](repeating: 0, count: indices.count)
