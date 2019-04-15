@@ -2454,8 +2454,9 @@ public:
       {
         llvm::raw_svector_ostream OS(TypeStr);
         if (IsImplicitlyCurriedInstanceMethod) {
-          ResultType->castTo<AnyFunctionType>()->printParams(OS);
-          ResultType = ResultType->castTo<AnyFunctionType>()->getResult();
+          auto *FnType = ResultType->castTo<AnyFunctionType>();
+          AnyFunctionType::printParams(FnType->getParams(), OS);
+          ResultType = FnType->getResult();
           OS << " -> ";
         }
 
