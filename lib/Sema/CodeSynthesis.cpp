@@ -608,7 +608,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     auto var =
       cast<VarDecl>(accessor->getStorage())->getOriginalDelegatedProperty();
     storage = var->getPropertyDelegateBackingProperty();
-    underlyingVar = var->getAttachedPropertyDelegateTypeInfo().storageValueVar;
+    underlyingVar = var->getAttachedPropertyDelegateTypeInfo().delegateValueVar;
     assert(underlyingVar);
     semantics = AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
@@ -1483,10 +1483,10 @@ static Expr *findOriginalPropertyDelegateInitialValue(VarDecl *var,
 }
 
 /// Synthesize a computed property `$foo` for a property with an attached
-/// delegate that has a `storageValue` property.
+/// delegate that has a `delegateValue` property.
 static VarDecl *synthesizePropertyDelegateStorageDelegateProperty(
     ASTContext &ctx, VarDecl *var, Type delegateType,
-    VarDecl *storageValueVar) {
+    VarDecl *delegateVarVar) {
   // Compute the name of the storage type.
   SmallString<64> nameBuf;
   nameBuf = "$";
@@ -1495,8 +1495,8 @@ static VarDecl *synthesizePropertyDelegateStorageDelegateProperty(
 
   // Determine the type of the property.
   Type propertyType = delegateType->getTypeOfMember(
-      var->getModuleContext(), storageValueVar,
-      storageValueVar->getValueInterfaceType());
+      var->getModuleContext(), delegateVarVar,
+      delegateVarVar->getValueInterfaceType());
   Type propertyInterfaceType = propertyType->mapTypeOutOfContext();
 
   // Form the property.
@@ -1532,8 +1532,8 @@ static VarDecl *synthesizePropertyDelegateStorageDelegateProperty(
   property->overwriteSetterAccess(setterAccess);
 
   // Add the accessors we need.
-  bool hasSetter = storageValueVar->isSettable(nullptr) &&
-      storageValueVar->isSetterAccessibleFrom(var->getInnermostDeclContext());
+  bool hasSetter = delegateVarVar->isSettable(nullptr) &&
+      delegateVarVar->isSetterAccessibleFrom(var->getInnermostDeclContext());
   addGetterToStorage(property, ctx);
   if (hasSetter) {
     addSetterToStorage(property, ctx);
@@ -1559,7 +1559,7 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   // Compute the name of the storage type.
   ASTContext &ctx = var->getASTContext();
   SmallString<64> nameBuf;
-  if (delegateInfo.storageValueVar)
+  if (delegateInfo.delegateValueVar)
     nameBuf = "$__delegate_storage_$_";
   else
     nameBuf = "$";
@@ -1631,12 +1631,12 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
       std::min(AccessLevel::Internal, var->getSetterFormalAccess());
   backingVar->overwriteSetterAccess(setterAccess);
 
-  // If there is a storage delegate property (storageValue) in the delegate,
+  // If there is a storage delegate property (delegateVar) in the delegate,
   // synthesize a computed property for '$foo'.
   VarDecl *storageVar = nullptr;
-  if (delegateInfo.storageValueVar) {
+  if (delegateInfo.delegateValueVar) {
     storageVar = synthesizePropertyDelegateStorageDelegateProperty(
-        ctx, var, delegateType, delegateInfo.storageValueVar);
+        ctx, var, delegateType, delegateInfo.delegateValueVar);
   }
 
   // Get the property delegate information.
