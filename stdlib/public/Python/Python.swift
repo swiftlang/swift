@@ -988,7 +988,8 @@ extension Optional : PythonConvertible where Wrapped : PythonConvertible {
 // `ConvertibleFromPython` conformance for `Optional`
 //===----------------------------------------------------------------------===//
 
-extension Optional : ConvertibleFromPython where Wrapped : ConvertibleFromPython {
+extension Optional : ConvertibleFromPython
+  where Wrapped : ConvertibleFromPython {
   public init?(_ object: PythonObject) {
     if object == Python.None {
       self = .none
