@@ -4741,7 +4741,7 @@ enum class PropertyDelegateSynthesizedPropertyKind {
   /// delegate type.
   Backing,
   /// A storage delegate (e.g., `$foo`), which is a wrapper over the
-  /// delegate instance's `storageValue` property.
+  /// delegate instance's `delegateValue` property.
   StorageDelegate,
 };
 

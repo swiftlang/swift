@@ -186,8 +186,8 @@ PropertyDelegateTypeInfoRequest::evaluate(
   PropertyDelegateTypeInfo result;
   result.valueVar = valueVar;
   result.initialValueInit = findInitialValueInit(ctx, nominal, valueVar);
-  result.storageValueVar =
-    findValueProperty(ctx, nominal, ctx.Id_storageValue, /*allowMissing=*/true);
+  result.delegateValueVar =
+    findValueProperty(ctx, nominal, ctx.Id_delegateValue, /*allowMissing=*/true);
 
   return result;
 }

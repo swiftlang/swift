@@ -42,12 +42,12 @@ struct PropertyDelegateTypeInfo {
   /// initialization syntax.
   ConstructorDecl *initialValueInit = nullptr;
 
-  /// The property through which the storage value ($foo) will be accessed,
+  /// The property through which the delegate value ($foo) will be accessed,
   /// hiding the underlying storage completely.
   ///
   /// This property is optional. If present, a computed property for `$foo`
   /// will be created that redirects to this property.
-  VarDecl *storageValueVar = nullptr;
+  VarDecl *delegateValueVar = nullptr;
 
   /// Whether this is a valid property delegate.
   bool isValid() const {

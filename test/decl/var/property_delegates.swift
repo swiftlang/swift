@@ -613,7 +613,7 @@ func testDefaultInitializers() {
 struct WrapperWithStorageRef<T> {
   var value: T
 
-  var storageValue: Wrapper<T> {
+  var delegateValue: Wrapper<T> {
     return Wrapper(value: value)
   }
 }
