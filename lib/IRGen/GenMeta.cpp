@@ -4516,6 +4516,12 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
           unsigned tag = unsigned(descriptorRef.isIndirect());
           if (protocol->isObjC())
             tag |= 0x02;
+          // WebAssembly: hack: Wasm doesn't support PC-relative offsets.
+          // also doesn't handle tag yet
+          if (IGM.TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
+            B.add(llvm::ConstantExpr::getPtrToInt(descriptorRef.getValue(), IGM.RelativeAddressTy, false));
+            return;
+          }
           
           B.addTaggedRelativeOffset(IGM.RelativeAddressTy,
                                     descriptorRef.getValue(),
