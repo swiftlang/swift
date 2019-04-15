@@ -1149,17 +1149,21 @@ void IRGenerator::addLazyFunction(SILFunction *f) {
   DefaultIGMForFunction.insert(std::make_pair(f, CurrentIGM));
 }
 
-bool IRGenerator::hasLazyMetadata(NominalTypeDecl *type) {
+bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
   auto found = HasLazyMetadata.find(type);
   if (found != HasLazyMetadata.end())
     return found->second;
 
   auto canBeLazy = [&]() -> bool {
-    if (isa<ClangModuleUnit>(type->getModuleScopeContext())) {
-      return requiresForeignTypeMetadata(type);
-    } else if (type->getParentModule() == SIL.getSwiftModule()) {
-      // When compiling with -Onone keep all metadata for the debugger. Even if it
-      // is not used by the program itself.
+    if (isa<ClangModuleUnit>(type->getInnermostDeclContext()
+                                 ->getModuleScopeContext())) {
+      if (auto nominal = dyn_cast<NominalTypeDecl>(type)) {
+        return requiresForeignTypeMetadata(nominal);
+      }
+    } else if (type->getInnermostDeclContext()->getParentModule()
+                                                     == SIL.getSwiftModule()) {
+      // When compiling with -Onone keep all metadata for the debugger. Even if
+      // it is not used by the program itself.
       if (!Opts.shouldOptimize())
         return false;
       if (Opts.UseJIT)
