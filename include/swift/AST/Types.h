@@ -3023,9 +3023,13 @@ public:
   /// replaced.
   AnyFunctionType *withExtInfo(ExtInfo info) const;
 
-  void printParams(raw_ostream &OS,
-                   const PrintOptions &PO = PrintOptions()) const;
-  void printParams(ASTPrinter &Printer, const PrintOptions &PO) const;
+  static void printParams(ArrayRef<Param> Params, raw_ostream &OS,
+                          const PrintOptions &PO = PrintOptions());
+  static void printParams(ArrayRef<Param> Params, ASTPrinter &Printer,
+                          const PrintOptions &PO);
+
+  static std::string getParamListAsString(ArrayRef<Param> Params,
+                                          const PrintOptions &PO = PrintOptions());
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

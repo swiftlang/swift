@@ -4204,15 +4204,26 @@ void Type::print(ASTPrinter &Printer, const PrintOptions &PO) const {
   TypePrinter(Printer, PO).visit(*this);
 }
 
-void AnyFunctionType::printParams(raw_ostream &OS, const
-                                  PrintOptions &PO) const {
+void AnyFunctionType::printParams(ArrayRef<AnyFunctionType::Param> Params,
+                                  raw_ostream &OS,
+                                  const PrintOptions &PO) {
   StreamPrinter Printer(OS);
-  printParams(Printer, PO);
+  printParams(Params, Printer, PO);
 }
-void AnyFunctionType::printParams(ASTPrinter &Printer,
-                                  const PrintOptions &PO) const {
-  TypePrinter(Printer, PO).visitAnyFunctionTypeParams(getParams(),
+void AnyFunctionType::printParams(ArrayRef<AnyFunctionType::Param> Params,
+                                  ASTPrinter &Printer,
+                                  const PrintOptions &PO) {
+  TypePrinter(Printer, PO).visitAnyFunctionTypeParams(Params,
                                                       /*printLabels*/true);
+}
+
+std::string
+AnyFunctionType::getParamListAsString(ArrayRef<AnyFunctionType::Param> Params,
+                                      const PrintOptions &PO) {
+  SmallString<16> Scratch;
+  llvm::raw_svector_ostream OS(Scratch);
+  AnyFunctionType::printParams(Params, OS);
+  return OS.str();
 }
 
 void LayoutConstraintInfo::print(raw_ostream &OS,
