@@ -205,3 +205,48 @@ struct UseWrapperWithStorageValue {
   // CHECK: function_ref @$s18property_delegates23WrapperWithStorageValueV07storageF0AA0C0VyxGvg
   @WrapperWithStorageValue(value: 17) var x: Int
 }
+
+@propertyDelegate
+enum Lazy<Value> {
+  case uninitialized(() -> Value)
+  case initialized(Value)
+
+  init(initialValue: @autoclosure @escaping () -> Value) {
+    self = .uninitialized(initialValue)
+  }
+
+  var value: Value {
+    mutating get {
+      switch self {
+      case .uninitialized(let initializer):
+        let value = initializer()
+        self = .initialized(value)
+        return value
+      case .initialized(let value):
+        return value
+      }
+    }
+    set {
+      self = .initialized(newValue)
+    }
+  }
+}
+
+struct UseLazy<T: DefaultInit> {
+  @Lazy var foo = 17
+  @Lazy var bar = T()
+  @Lazy var wibble = [1, 2, 3]
+
+  // CHECK-LABEL: sil hidden [ossa] @$s18property_delegates7UseLazyV3foo3bar6wibbleACyxGSi_xSaySiGtcfC : $@convention(method) <T where T : DefaultInit> (Int, @in T, @owned Array<Int>, @thin UseLazy<T>.Type) -> @out UseLazy<T>
+  // CHECK: function_ref @$s18property_delegates7UseLazyV4$fooAA0D0OySiGvpfiSiycfu_ : $@convention(thin) (@owned Int) -> Int
+  // CHECK: function_ref @$s18property_delegates4LazyO12initialValueACyxGxyXA_tcfC : $@convention(method) <τ_0_0> (@owned @callee_guaranteed () -> @out τ_0_0, @thin Lazy<τ_0_0>.Type) -> @out Lazy<τ_0_0>
+}
+
+struct X { }
+
+func triggerUseLazy() {
+  _ = UseLazy<Int>()
+  _ = UseLazy<Int>(foo: 17)
+  _ = UseLazy(bar: 17)
+  _ = UseLazy<Int>(wibble: [1, 2, 3])
+}
