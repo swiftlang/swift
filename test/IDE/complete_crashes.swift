@@ -300,7 +300,7 @@ func test_28188259(x: ((Int) -> Void) -> Void) {
 }
 // RDAR_28188259: Begin completions
 // RDAR_28188259-DAG: Pattern/CurrModule:                 ({#Int#})[#Void#]; name=(Int)
-// RDAR_28188259-DAG: Keyword[self]/CurrNominal:          .self[#(Int) -> ()#]; name=self
+// RDAR_28188259-DAG: Keyword[self]/CurrNominal:          .self[#(Int) -> Void#]; name=self
 // RDAR_28188259: End completions
 
 // rdar://problem/40956846

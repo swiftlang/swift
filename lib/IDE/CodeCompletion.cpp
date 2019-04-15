@@ -1894,14 +1894,11 @@ public:
 
   void addTypeAnnotation(CodeCompletionResultBuilder &Builder, Type T) {
     T = T->getReferenceStorageReferent();
-    if (T->isVoid()) {
-      Builder.addTypeAnnotation("Void");
-    } else {
-      PrintOptions PO;
-      PO.OpaqueReturnTypePrinting =
-          PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
-      Builder.addTypeAnnotation(T.getString(PO));
-    }
+    PrintOptions PO;
+    PO.OpaqueReturnTypePrinting =
+        PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+    PO.PrintEmptyTupleTypeAsVoid = true;
+    Builder.addTypeAnnotation(T.getString(PO));
   }
 
   void addTypeAnnotationForImplicitlyUnwrappedOptional(
@@ -1921,6 +1918,7 @@ public:
     PO.PrintOptionalAsImplicitlyUnwrapped = true;
     PO.OpaqueReturnTypePrinting =
         PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+    PO.PrintEmptyTupleTypeAsVoid = true;
     Builder.addTypeAnnotation(T.getString(PO) + suffix);
   }
 
@@ -2457,9 +2455,7 @@ public:
       llvm::SmallString<32> TypeStr;
 
       if (!AFT) {
-        llvm::raw_svector_ostream OS(TypeStr);
-        FunctionType.print(OS);
-        Builder.addTypeAnnotation(OS.str());
+        addTypeAnnotation(Builder, FunctionType);
         return;
       }
 
@@ -2493,22 +2489,19 @@ public:
         }
 
         // What's left is the result type.
-        if (ResultType->isVoid()) {
-          OS << "Void";
-        } else {
-          // As we did with parameters in addParamPatternFromFunction,
-          // for regular methods we'll print '!' after implicitly
-          // unwrapped optional results.
-          bool IsIUO =
-              !IsImplicitlyCurriedInstanceMethod &&
-              FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+        // As we did with parameters in addParamPatternFromFunction,
+        // for regular methods we'll print '!' after implicitly
+        // unwrapped optional results.
+        bool IsIUO =
+            !IsImplicitlyCurriedInstanceMethod &&
+            FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
 
-          PrintOptions PO;
-          PO.OpaqueReturnTypePrinting =
-              PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
-          PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
-          ResultType.print(OS, PO);
-        }
+        PrintOptions PO;
+        PO.OpaqueReturnTypePrinting =
+            PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+        PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
+        PO.PrintEmptyTupleTypeAsVoid = true;
+        ResultType.print(OS, PO);
       }
       Builder.addTypeAnnotation(TypeStr);
     };

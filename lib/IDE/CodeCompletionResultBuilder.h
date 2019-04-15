@@ -375,6 +375,7 @@ public:
     PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
     PO.OpaqueReturnTypePrinting =
         PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+    PO.PrintEmptyTupleTypeAsVoid = true;
     std::string TypeName = Ty->getString(PO);
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallParameterType,
                      TypeName);
@@ -389,6 +390,7 @@ public:
       PO.SkipAttributes = true;
       PO.OpaqueReturnTypePrinting =
           PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+      PO.PrintEmptyTupleTypeAsVoid = true;
       addChunkWithText(
           CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType,
           AFT->getString(PO));

@@ -301,12 +301,12 @@ func testInfix17(x: Void) {
 }
 
 // VOID_OPERATORS: Begin completions
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  != {#()#}[#Bool#]; name=!= ()
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#()#}[#Bool#]; name=== ()
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  <= {#()#}[#Bool#]; name=<= ()
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  >= {#()#}[#Bool#]; name=>= ()
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  < {#()#}[#Bool#]; name=< ()
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  > {#()#}[#Bool#]; name=> ()
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  != {#Void#}[#Bool#]; name=!= Void
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#Void#}[#Bool#]; name=== Void
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  <= {#Void#}[#Bool#]; name=<= Void
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  >= {#Void#}[#Bool#]; name=>= Void
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  < {#Void#}[#Bool#]; name=< Void
+// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  > {#Void#}[#Bool#]; name=> Void
 // VOID_OPERATORS: End completions
 
 func testInfix18(x: (S2, S2) {

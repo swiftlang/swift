@@ -43,12 +43,12 @@ func test1() {
 // GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global2 {|}[#Void#]
 // GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global3 {|}[' rethrows'][#Void#]
 // GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global4 {|}[#Void#]
-// GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global1({#() -> ()##() -> ()#})[#Void#]
-// GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global2({#label: () -> ()##() -> ()#})[#Void#]
-// GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global3({#() throws -> ()##() throws -> ()#})[' rethrows'][#Void#]
-// GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global4({#() -> ()##() -> ()#})[#Void#]
-// GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global4({#x: Int#}, {#y: Int#}, {#() -> ()##() -> ()#})[#Void#]
-// GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      nonTrivial1({#(Int) -> ()##(Int) -> ()#})[#Void#]
+// GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global1({#() -> Void##() -> Void#})[#Void#]
+// GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global2({#label: () -> Void##() -> Void#})[#Void#]
+// GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global3({#() throws -> Void##() throws -> Void#})[' rethrows'][#Void#]
+// GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global4({#() -> Void##() -> Void#})[#Void#]
+// GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global4({#x: Int#}, {#y: Int#}, {#() -> Void##() -> Void#})[#Void#]
+// GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      nonTrivial1({#(Int) -> Void##(Int) -> Void#})[#Void#]
 // GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      nonTrivial2({#() -> Int##() -> Int#})[#Void#]
 // GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      nonTrivial3({#x: Int#}, {#() -> Int##() -> Int#})[#Void#]
 // GLOBAL_1: End completions
@@ -63,9 +63,9 @@ struct S {
   }
 // METHOD_1: Begin completions
 // METHOD_1: Decl[InstanceMethod]/CurrNominal:   method1 {|}[#Void#]
-// METHOD_1: Decl[InstanceMethod]/CurrNominal:   method1({#() -> ()##() -> ()#})[#Void#]
-// METHOD_1: Decl[InstanceMethod]/CurrNominal:   nonTrivial1({#(Int) -> ()##(Int) -> ()#})[#Void#]
-// METHOD_1: Decl[InstanceMethod]/CurrNominal:   nonTrivial2({#()#})[#Void#]
+// METHOD_1: Decl[InstanceMethod]/CurrNominal:   method1({#() -> Void##() -> Void#})[#Void#]
+// METHOD_1: Decl[InstanceMethod]/CurrNominal:   nonTrivial1({#(Int) -> Void##(Int) -> Void#})[#Void#]
+// METHOD_1: Decl[InstanceMethod]/CurrNominal:   nonTrivial2({#Void#})[#Void#]
 // METHOD_1: End completions
 
   func test3() {
@@ -93,8 +93,8 @@ class C {
   }
 // METHOD_4: Begin completions
 // METHOD_4: Decl[InstanceMethod]/CurrNominal:   method1 {|}[#Void#]
-// METHOD_4: Decl[InstanceMethod]/CurrNominal:   method1({#() -> ()##() -> ()#})[#Void#]
-// METHOD_4: Decl[InstanceMethod]/CurrNominal:   nonTrivial1({#(Int) -> ()##(Int) -> ()#})[#Void#]
+// METHOD_4: Decl[InstanceMethod]/CurrNominal:   method1({#() -> Void##() -> Void#})[#Void#]
+// METHOD_4: Decl[InstanceMethod]/CurrNominal:   nonTrivial1({#(Int) -> Void##(Int) -> Void#})[#Void#]
 // METHOD_4: End completions
 
   func test7() {

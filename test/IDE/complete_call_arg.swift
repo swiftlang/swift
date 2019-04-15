@@ -608,8 +608,8 @@ class TestImplicitlyCurriedSelf {
     TestImplicitlyCurriedSelf.foo(#^CURRIED_SELF_3^#
 
 // CURRIED_SELF_1: Begin completions, 2 items
-// CURRIED_SELF_1-DAG: Decl[InstanceMethod]/CurrNominal: ['(']{#(self): TestImplicitlyCurriedSelf#}[')'][#(Int) -> ()#]{{; name=.+$}}
-// CURRIED_SELF_1-DAG: Decl[InstanceMethod]/CurrNominal: ['(']{#(self): TestImplicitlyCurriedSelf#}[')'][#(Int, Int) -> ()#]{{; name=.+$}}
+// CURRIED_SELF_1-DAG: Decl[InstanceMethod]/CurrNominal: ['(']{#(self): TestImplicitlyCurriedSelf#}[')'][#(Int) -> Void#]{{; name=.+$}}
+// CURRIED_SELF_1-DAG: Decl[InstanceMethod]/CurrNominal: ['(']{#(self): TestImplicitlyCurriedSelf#}[')'][#(Int, Int) -> Void#]{{; name=.+$}}
 // CURRIED_SELF_1: End completions
   }
 }

@@ -377,6 +377,9 @@ struct PrintOptions {
   /// for optionals that are nested within other optionals.
   bool PrintOptionalAsImplicitlyUnwrapped = false;
 
+  /// When printing empty tuple type. Print them as 'Void' instead of '()'.
+  bool PrintEmptyTupleTypeAsVoid = false;
+
   /// Replaces the name of private and internal properties of types with '_'.
   bool OmitNameOfInaccessibleProperties = false;
 

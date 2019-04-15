@@ -568,37 +568,37 @@ func testImplicitlyCurriedFunc(_ fs: inout FooStruct) {
   FooStruct.instanceFunc0(&fs)#^IMPLICITLY_CURRIED_FUNC_0^#
 // IMPLICITLY_CURRIED_FUNC_0: Begin completions
 // IMPLICITLY_CURRIED_FUNC_0-NEXT: Decl[InstanceMethod]/CurrNominal: ()[#Void#]{{; name=.+$}}
-// IMPLICITLY_CURRIED_FUNC_0-NEXT: Keyword[self]/CurrNominal: .self[#() -> ()#]; name=self
+// IMPLICITLY_CURRIED_FUNC_0-NEXT: Keyword[self]/CurrNominal: .self[#() -> Void#]; name=self
 // IMPLICITLY_CURRIED_FUNC_0-NEXT: End completions
 
   FooStruct.instanceFunc1(&fs)#^IMPLICITLY_CURRIED_FUNC_1^#
 // IMPLICITLY_CURRIED_FUNC_1: Begin completions
 // IMPLICITLY_CURRIED_FUNC_1-NEXT: Decl[InstanceMethod]/CurrNominal: ({#(a): Int#})[#Void#]{{; name=.+$}}
-// IMPLICITLY_CURRIED_FUNC_1-NEXT: Keyword[self]/CurrNominal: .self[#(Int) -> ()#]; name=self
+// IMPLICITLY_CURRIED_FUNC_1-NEXT: Keyword[self]/CurrNominal: .self[#(Int) -> Void#]; name=self
 // IMPLICITLY_CURRIED_FUNC_1-NEXT: End completions
 
   FooStruct.instanceFunc2(&fs)#^IMPLICITLY_CURRIED_FUNC_2^#
 // IMPLICITLY_CURRIED_FUNC_2: Begin completions
 // IMPLICITLY_CURRIED_FUNC_2-NEXT: Decl[InstanceMethod]/CurrNominal: ({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
-// IMPLICITLY_CURRIED_FUNC_2-NEXT: Keyword[self]/CurrNominal: .self[#(Int, inout Double) -> ()#]; name=self
+// IMPLICITLY_CURRIED_FUNC_2-NEXT: Keyword[self]/CurrNominal: .self[#(Int, inout Double) -> Void#]; name=self
 // IMPLICITLY_CURRIED_FUNC_2-NEXT: End completions
 
   FooStruct.varargInstanceFunc0(&fs)#^IMPLICITLY_CURRIED_VARARG_FUNC_0^#
 // IMPLICITLY_CURRIED_VARARG_FUNC_0: Begin completions
 // IMPLICITLY_CURRIED_VARARG_FUNC_0-NEXT: Decl[InstanceMethod]/CurrNominal: ({#(v): Int...#})[#Void#]{{; name=.+$}}
-// IMPLICITLY_CURRIED_VARARG_FUNC_0-NEXT: Keyword[self]/CurrNominal: .self[#(Int...) -> ()#]; name=self
+// IMPLICITLY_CURRIED_VARARG_FUNC_0-NEXT: Keyword[self]/CurrNominal: .self[#(Int...) -> Void#]; name=self
 // IMPLICITLY_CURRIED_VARARG_FUNC_0-NEXT: End completions
 
   FooStruct.varargInstanceFunc1(&fs)#^IMPLICITLY_CURRIED_VARARG_FUNC_1^#
 // IMPLICITLY_CURRIED_VARARG_FUNC_1: Begin completions
 // IMPLICITLY_CURRIED_VARARG_FUNC_1-NEXT: Decl[InstanceMethod]/CurrNominal: ({#(a): Float#}, {#v: Int...#})[#Void#]{{; name=.+$}}
-// IMPLICITLY_CURRIED_VARARG_FUNC_1-NEXT: Keyword[self]/CurrNominal: .self[#(Float, Int...) -> ()#]; name=self
+// IMPLICITLY_CURRIED_VARARG_FUNC_1-NEXT: Keyword[self]/CurrNominal: .self[#(Float, Int...) -> Void#]; name=self
 // IMPLICITLY_CURRIED_VARARG_FUNC_1-NEXT: End completions
 
   FooStruct.varargInstanceFunc2(&fs)#^IMPLICITLY_CURRIED_VARARG_FUNC_2^#
 // IMPLICITLY_CURRIED_VARARG_FUNC_2: Begin completions
 // IMPLICITLY_CURRIED_VARARG_FUNC_2-NEXT: Decl[InstanceMethod]/CurrNominal: ({#(a): Float#}, {#b: Double#}, {#v: Int...#})[#Void#]{{; name=.+$}}
-// IMPLICITLY_CURRIED_VARARG_FUNC_2-NEXT: Keyword[self]/CurrNominal: .self[#(Float, Double, Int...) -> ()#]; name=self
+// IMPLICITLY_CURRIED_VARARG_FUNC_2-NEXT: Keyword[self]/CurrNominal: .self[#(Float, Double, Int...) -> Void#]; name=self
 // IMPLICITLY_CURRIED_VARARG_FUNC_2-NEXT: End completions
 
   // This call is ambiguous, and the expression is invalid.
@@ -1157,7 +1157,7 @@ func testFuncParenPattern3(_ fpp: inout FuncParenPattern) {
   fpp.instanceFunc#^FUNC_PAREN_PATTERN_3^#
 // FUNC_PAREN_PATTERN_3: Begin completions
 // FUNC_PAREN_PATTERN_3-NEXT: Decl[InstanceMethod]/CurrNominal: ({#Int#})[#Void#]{{; name=.+$}}
-// FUNC_PAREN_PATTERN_3-NEXT: Keyword[self]/CurrNominal: .self[#(Int) -> ()#]; name=self
+// FUNC_PAREN_PATTERN_3-NEXT: Keyword[self]/CurrNominal: .self[#(Int) -> Void#]; name=self
 // FUNC_PAREN_PATTERN_3-NEXT: End completions
 }
 
@@ -1951,7 +1951,7 @@ func testThrows002() {
   globalFuncRethrows#^THROWS2^#
 
 // THROWS2: Begin completions
-// THROWS2: Decl[FreeFunction]/CurrModule: ({#(x): () throws -> ()##() throws -> ()#})[' rethrows'][#Void#]; name=(x: () throws -> ()) rethrows
+// THROWS2: Decl[FreeFunction]/CurrModule: ({#(x): () throws -> Void##() throws -> Void#})[' rethrows'][#Void#]; name=(x: () throws -> Void) rethrows
 // THROWS2: End completions
 }
 func testThrows003(_ x: HasThrowingMembers) {
@@ -1959,7 +1959,7 @@ func testThrows003(_ x: HasThrowingMembers) {
 // MEMBER_THROWS1: Begin completions
 // MEMBER_THROWS1-DAG: Decl[InstanceMethod]/CurrNominal:   memberThrows()[' throws'][#Void#]
 // MEMBER_THROWS1-DAG: Decl[InstanceMethod]/CurrNominal:   memberRethrows {|}[' rethrows'][#Void#]
-// MEMBER_THROWS1-DAG: Decl[InstanceMethod]/CurrNominal:   memberRethrows({#(x): () throws -> ()##() throws -> ()#})[' rethrows'][#Void#]
+// MEMBER_THROWS1-DAG: Decl[InstanceMethod]/CurrNominal:   memberRethrows({#(x): () throws -> Void##() throws -> Void#})[' rethrows'][#Void#]
 // MEMBER_THROWS1: End completions
 }
 func testThrows004(_ x: HasThrowingMembers) {
@@ -1971,13 +1971,13 @@ func testThrows004(_ x: HasThrowingMembers) {
 func testThrows005(_ x: HasThrowingMembers) {
   x.memberRethrows#^MEMBER_THROWS3^#
 // MEMBER_THROWS3: Begin completions
-// MEMBER_THROWS3: Decl[InstanceMethod]/CurrNominal: ({#(x): () throws -> ()##() throws -> ()#})[' rethrows'][#Void#]; name=(x: () throws -> ()) rethrows
+// MEMBER_THROWS3: Decl[InstanceMethod]/CurrNominal: ({#(x): () throws -> Void##() throws -> Void#})[' rethrows'][#Void#]; name=(x: () throws -> Void) rethrows
 // MEMBER_THROWS3: End completions
 }
 func testThrows006() {
   HasThrowingMembers(#^INIT_THROWS1^#
 // INIT_THROWS1: Begin completions
-// INIT_THROWS1: Decl[Constructor]/CurrNominal:      ['(']{#x: () throws -> ()##() throws -> ()#}[')'][' rethrows'][#HasThrowingMembers#]
+// INIT_THROWS1: Decl[Constructor]/CurrNominal:      ['(']{#x: () throws -> Void##() throws -> Void#}[')'][' rethrows'][#HasThrowingMembers#]
 // INIT_THROWS1: End completions
 }
 

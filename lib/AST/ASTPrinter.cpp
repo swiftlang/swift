@@ -3637,12 +3637,17 @@ public:
   }
 
   void visitTupleType(TupleType *T) {
+    auto Fields = T->getElements();
+    if (Fields.empty() && Options.PrintEmptyTupleTypeAsVoid) {
+      Printer << "Void";
+      return;
+    }
+
     Printer.callPrintStructurePre(PrintStructureKind::TupleType);
     SWIFT_DEFER { Printer.printStructurePost(PrintStructureKind::TupleType); };
 
     Printer << "(";
 
-    auto Fields = T->getElements();
     for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
       if (i)
         Printer << ", ";
