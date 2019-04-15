@@ -569,25 +569,15 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
 
 extension Tensor where Scalar : TensorFlowFloatingPoint {
   @inlinable
-  func _vjpSum() -> (Tensor, (Tensor) -> Tensor) {
-    return (sum(), { [shape = shapeTensor] in $0.broadcast(toShape: shape) })
-  }
-
-  @inlinable
-  func _vjpMean() -> (Tensor, (Tensor) -> Tensor) {
-    return (mean(), { [shape = shapeTensor, count = scalarCountTensor] in
-      ($0 / Tensor(count)).broadcast(toShape: shape)
-    })
-  }
-
-  @inlinable
-  func _vjpSum(alongAxes axes: [Int32]) -> (Tensor, (Tensor) -> Tensor) {
+  func _vjpSum(alongAxes axes: Tensor<Int32>) -> (Tensor, (Tensor) -> Tensor) {
     let value = sum(alongAxes: axes)
     return (value, { [shape = shapeTensor] in $0.broadcast(toShape: shape) })
   }
 
   @inlinable
-  func _vjpSum(squeezingAxes axes: [Int32]) -> (Tensor, (Tensor) -> Tensor) {
+  func _vjpSum(
+    squeezingAxes axes: Tensor<Int32>
+  ) -> (Tensor, (Tensor) -> Tensor) {
     let value = sum(squeezingAxes: axes)
     return (value, { [shape = shapeTensor] in $0.broadcast(toShape: shape) })
   }
@@ -602,20 +592,13 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   }
 
   @inlinable
-  func _vjpMean(squeezingAxes axes: [Int32]) -> (Tensor, (Tensor) -> Tensor) {
+  func _vjpMean(
+    squeezingAxes axes: Tensor<Int32>
+  ) -> (Tensor, (Tensor) -> Tensor) {
     let value = mean(squeezingAxes: axes)
-    return (value, { [shape = shapeTensor,
-                      count = axes.map { shape[$0] }.reduce(1, *)] in
-      $0.broadcast(toShape: shape) / Tensor(Scalar(count))
-    })
-  }
-
-  @inlinable
-  func _vjpMean(alongAxes axes: [Int32]) -> (Tensor, (Tensor) -> Tensor) {
-    let value = mean(alongAxes: axes)
-    return (value, { [shape = shapeTensor,
-                      count = axes.map { shape[$0] }.reduce(1, *)] in
-      $0.broadcast(toShape: shape) / Tensor(Scalar(count))
+    let count = Raw.gather(params: shapeTensor, indices: axes).product()
+    return (value, { [shape = shapeTensor] in
+      $0.broadcast(toShape: shape) / Tensor(count)
     })
   }
 }
