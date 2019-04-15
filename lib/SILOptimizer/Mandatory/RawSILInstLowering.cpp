@@ -166,13 +166,16 @@ static void lowerAssignByDelegateInstruction(SILBuilderWithScope &b,
 }
 
 static void deleteDeadAccessMarker(BeginAccessInst *BA) {
+  SmallVector<SILInstruction *, 4> Users;
   for (Operand *Op : BA->getUses()) {
     SILInstruction *User = Op->getUser();
     if (!isa<EndAccessInst>(User))
       return;
+
+    Users.push_back(User);
   }
-  for (Operand *Op : BA->getUses()) {
-    Op->getUser()->eraseFromParent();
+  for (SILInstruction *User: Users) {
+    User->eraseFromParent();
   }
   BA->eraseFromParent();
 }
