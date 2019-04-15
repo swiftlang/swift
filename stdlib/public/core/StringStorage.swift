@@ -370,9 +370,6 @@ extension __StringStorage {
       UInt64(truncatingIfNeeded: realCodeUnitCapacity)
     storage._countAndFlags = countAndFlags
 #endif
-    
-    let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(storage))
-    _swift_stdlib_set_objc_complications_forbidden(storageAddr, 1)
 
     storage._breadcrumbsAddress.initialize(to: nil)
     storage.terminator.pointee = 0 // nul-terminated

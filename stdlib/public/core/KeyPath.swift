@@ -148,8 +148,6 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
                  "capacity must be multiple of 4 bytes")
     let result = Builtin.allocWithTailElems_1(self, (bytes/4)._builtinWordValue,
                                               Int32.self)
-    let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(result))
-    _swift_stdlib_set_objc_complications_forbidden(storageAddr, 1)
     result._kvcKeyPathStringPtr = nil
     let base = UnsafeMutableRawPointer(Builtin.projectTailElems(result,
                                                                 Int32.self))

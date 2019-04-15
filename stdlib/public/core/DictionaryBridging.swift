@@ -40,9 +40,6 @@ extension _NativeDictionary { // Bridging
     } else if _isBridgedVerbatimToObjectiveC(Key.self),
       _isBridgedVerbatimToObjectiveC(Value.self) {
       
-      let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_storage))
-      _swift_stdlib_set_objc_complications_forbidden(storageAddr, 0)
-      
       nsDictionary = unsafeDowncast(
         _storage,
         to: _DictionaryStorage<Key, Value>.self)

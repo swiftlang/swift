@@ -407,6 +407,7 @@ class RefCountBitsT {
   constexpr
   RefCountBitsT(uint32_t strongExtraCount, uint32_t unownedCount)
     : bits((BitsType(strongExtraCount) << Offsets::StrongExtraRefCountShift) |
+           (BitsType(1)                << Offsets::IsImmortalOrFastDeallocShift) |
            (BitsType(unownedCount)     << Offsets::UnownedRefCountShift))
   { }
   
