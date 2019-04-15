@@ -358,7 +358,7 @@ public extension Tensor {
   @differentiable(vjp: _vjpInit(repeating:shape:)
                   where Scalar : TensorFlowFloatingPoint)
   init(repeating repeatedValue: Scalar, shape: TensorShape) {
-    self = Raw.fill(dims: Tensor<Int32>(shape.dimensions.map(Int32.init)),
+    self = Raw.fill(dims: Tensor<Int64>(shape.dimensions.map(Int64.init)),
                     value: Tensor(repeatedValue))
   }
 }
@@ -645,9 +645,7 @@ public extension TensorFlowScalar {
   /// 1.
   @inlinable @inline(__always)
   func makeTensor(rank: Int) -> Tensor<Self> {
-    return Raw.fill(
-      dims: Tensor<Int32>(ones: TensorShape(rank)),
-      value: Tensor(self))
+    return Tensor(repeating: self, shape: TensorShape(rank))
   }
 }
 
@@ -665,6 +663,7 @@ public extension Tensor {
   @inlinable @inline(__always)
   @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func reshaped(to newShape: TensorShape) -> Tensor {
+    // TODO(TF-433): Remove workaround for differentiating `map`.
     return reshaped(toShape: Tensor<Int32>({newShape.dimensions.map(Int32.init)}()))
   }
 

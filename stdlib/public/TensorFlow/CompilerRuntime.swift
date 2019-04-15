@@ -1927,12 +1927,7 @@ func _TFCOpSetAttrOptionalTensorShapeArray(_ op: CTFEOp,
     }
     return []
   }
-  let ranks = value.map { tensorShapeOpt -> Int32 in
-    if let tensorShape = tensorShapeOpt {
-      return Int32(tensorShape.rank)
-    }
-    return -1
-  }
+  let ranks = value.map { shape in (shape?.rank).map(Int32.init) ?? -1 }
   setAttrShapeList(op: op, attrName: attrName, flattenedDims: flattenedDims,
                    ranks: ranks, status: status)
 }

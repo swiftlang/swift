@@ -32,6 +32,14 @@ public struct TensorShape : ExpressibleByArrayLiteral {
     self.dimensions = dimensions
   }
 
+  /// Initialize with a collection of dimensions. The rank of the tensor is the
+  /// length of the collection.
+  /// - Parameter dimensions: The shape dimensions.
+  @inlinable @inline(__always)
+  public init<C : Collection>(_ dimensions: C) where C.Element == Int {
+    self.dimensions = Array(dimensions)
+  }
+
   /// Initialize with an array literal representing the shape dimensions. The rank
   /// of the tensor is the number of dimensions.
   /// - Parameter dimensions: The shape dimensions.
@@ -112,27 +120,9 @@ public extension TensorShape {
   @inlinable
   subscript(index: Int) -> Int {
     @inline(__always)
-    _read {
-      yield dimensions[index]
-    }
+    _read { yield dimensions[index] }
     @inline(__always)
-    _modify {
-      yield &dimensions[index]
-    }
-  }
-
-  /// Access the size of the i-th dimension.
-  /// - Parameter index: The index of a dimension.
-  @inlinable
-  subscript(index: Int32) -> Int {
-    @inline(__always)
-    _read {
-      yield self[Int(index)]
-    }
-    @inline(__always)
-    _modify {
-      yield &self[Int(index)]
-    }
+    _modify { yield &dimensions[index] }
   }
 
   /// Access the size of the i-th dimension.
@@ -141,7 +131,7 @@ public extension TensorShape {
   subscript(bounds: Range<Int>) -> TensorShape {
     @inline(__always)
     get {
-      return TensorShape(Array(dimensions[bounds]))
+      return TensorShape(dimensions[bounds])
     }
     @inline(__always)
     set {

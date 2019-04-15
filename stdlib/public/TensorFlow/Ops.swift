@@ -704,7 +704,6 @@ public extension Tensor {
   }
 }
 
-
 public extension Tensor {
   /// Returns a concatenated tensor of the given tensors.
   /// - Precondition: The tensors must have the same dimensions, except for the
@@ -1490,6 +1489,7 @@ public extension Tensor where Scalar : Numeric {
   @inlinable @inline(__always)
   @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func variance(alongAxes axes: [Int]) -> Tensor {
+    // TODO(TF-433): Remove workaround for differentiating `map`.
     return variance(alongAxes: Tensor<Int32>({axes.map(Int32.init)}()))
   }
 
