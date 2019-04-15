@@ -1652,7 +1652,7 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   // Form the initialization of the backing property from a value of the
   // original property's type.
   OpaqueValueExpr *origValue =
-      new (ctx) OpaqueValueExpr(SourceLoc(), var->getType(),
+      new (ctx) OpaqueValueExpr(var->getLoc(), var->getType(),
                                 /*isPlaceholder=*/true);
   auto typeExpr = TypeExpr::createImplicit(storageType, ctx);
   Expr *initializer =

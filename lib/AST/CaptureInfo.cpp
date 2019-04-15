@@ -51,6 +51,8 @@ void CaptureInfo::print(raw_ostream &OS) const {
     OS << "<generic> ";
   if (hasDynamicSelfCapture())
     OS << "<dynamic_self> ";
+  if (hasOpaqueValueCapture())
+    OS << "<opaque_value> ";
 
   interleave(getCaptures(),
              [&](const CapturedValue &capture) {
