@@ -577,7 +577,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   auto thunk = SGM.getOrCreateReabstractionThunk(invokeTy,
                                                  loweredFuncTy,
                                                  loweredBlockTy,
-                                                 F.isSerialized());
+                                                 /*dynamicSelfType=*/CanType());
 
   // Build it if necessary.
   if (thunk->empty()) {
@@ -937,7 +937,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
   auto thunk = SGM.getOrCreateReabstractionThunk(thunkTy,
                                                  loweredBlockTy,
                                                  loweredFuncTyWithoutNoEscape,
-                                                 F.isSerialized());
+                                                 /*dynamicSelfType=*/CanType());
 
   // Build it if necessary.
   if (thunk->empty()) {

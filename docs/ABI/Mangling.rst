@@ -191,7 +191,9 @@ types where the metadata itself has unknown layout.)
   global ::= global specialization       // function specialization
   global ::= global 'Tm'                 // merged function
   global ::= entity                      // some identifiable thing
-  global ::= type type generic-signature? 'T' REABSTRACT-THUNK-TYPE   // reabstraction thunk helper function
+  global ::= from-type to-type generic-signature? 'TR'  // reabstraction thunk
+  global ::= from-type to-type self-type generic-signature? 'Ty'  // reabstraction thunk with dynamic 'Self' capture
+  global ::= from-type to-type generic-signature? 'Tr'  // obsolete mangling for reabstraction thunk
   global ::= entity generic-signature? type type* 'TK' // key path getter
   global ::= entity generic-signature? type type* 'Tk' // key path setter
   global ::= type generic-signature 'TH' // key path equality
@@ -204,11 +206,11 @@ types where the metadata itself has unknown layout.)
   global ::= type assoc-type-list protocol 'TN' // default associated conformance witness accessor
   global ::= type protocol 'Tb'          // base conformance descriptor
 
-  REABSTRACT-THUNK-TYPE ::= 'R'          // reabstraction thunk helper function
-  REABSTRACT-THUNK-TYPE ::= 'r'          // reabstraction thunk
+  REABSTRACT-THUNK-TYPE ::= 'R'          // reabstraction thunk
+  REABSTRACT-THUNK-TYPE ::= 'r'          // reabstraction thunk (obsolete)
 
-The types in a reabstraction thunk helper function are always non-polymorphic
-``<impl-function-type>`` types.
+The `from-type` and `to-type` in a reabstraction thunk helper function
+are always non-polymorphic ``<impl-function-type>`` types.
 
 ::
 

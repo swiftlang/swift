@@ -344,6 +344,7 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
                                             CanSILFunctionType ThunkType,
                                             Type FromType,
                                             Type ToType,
+                                            Type SelfType,
                                             ModuleDecl *Module) {
   Mod = Module;
   GenericSignature *GenSig = ThunkType->getGenericSignature();
@@ -353,10 +354,17 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
   beginMangling();
   appendType(FromType);
   appendType(ToType);
+  if (SelfType)
+    appendType(SelfType);
+
   if (GenSig)
     appendGenericSignature(GenSig);
-  // TODO: mangle ThunkType->isPseudogeneric()
-  appendOperator("TR");
+
+  if (SelfType)
+    appendOperator("Ty");
+  else
+    appendOperator("TR");
+
   return finalize();
 }
 
