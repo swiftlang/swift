@@ -1639,7 +1639,7 @@ public extension Tensor {
   }
 }
 
-public enum TensorSliceIndex : TensorSliceIndexProtocol {
+public enum TensorRange : TensorRangeExpression {
   case ellipsis
   case newAxis
   case squeezeAxis
@@ -1650,11 +1650,11 @@ public enum TensorSliceIndex : TensorSliceIndexProtocol {
   case partialRangeUpTo(PartialRangeUpTo<Int32>, stride: Int32)
   case partialRangeThrough(PartialRangeThrough<Int32>, stride: Int32)
 
-  public var sliceIndex: TensorSliceIndex { return self }
+  public var tensorRange: TensorRange { return self }
 }
 
-extension TensorSliceIndex: Equatable {
-  public static func == (lhs: TensorSliceIndex, rhs: TensorSliceIndex) -> Bool {
+extension TensorRange: Equatable {
+  public static func == (lhs: TensorRange, rhs: TensorRange) -> Bool {
     switch (lhs, rhs) {
     case (.ellipsis, .ellipsis): return true
     case (.newAxis, .newAxis): return true
@@ -1674,55 +1674,62 @@ extension TensorSliceIndex: Equatable {
   }
 }
 
-public protocol TensorSliceIndexProtocol {
-  var sliceIndex: TensorSliceIndex { get }
+public protocol TensorRangeExpression {
+  var tensorRange: TensorRange { get }
+}
+
+public extension TensorRangeExpression {
+  var ellipsis: TensorRange { return .ellipsis }
+  var newAxis: TensorRange { return .newAxis }
+  var squeezeAxis: TensorRange { return .squeezeAxis }
 }
 
 // TODO: Cannot extend non-nominal type 'UnboundedRange'.
-// extension UnboundedRange : TensorSliceIndexProtocol {
-//   public var sliceIndex: TensorSliceIndex { return .ellipsis }
+// extension UnboundedRange : TensorRangeExpression {
+//   public var tensorRange: TensorRange { return .ellipsis }
 // }
 
-extension Int32 : TensorSliceIndexProtocol {
-  public var sliceIndex: TensorSliceIndex { return .index(self) }
+extension Int32 : TensorRangeExpression {
+  public var tensorRange: TensorRange { return .index(self) }
 }
 
-extension Int : TensorSliceIndexProtocol {
-  public var sliceIndex: TensorSliceIndex { return .index(Int32(self)) }
+extension Int : TensorRangeExpression {
+  public var tensorRange: TensorRange { return .index(Int32(self)) }
 }
 
-extension Range : TensorSliceIndexProtocol where Bound == Int {
-  public var sliceIndex: TensorSliceIndex {
+extension Range : TensorRangeExpression where Bound == Int {
+  public var tensorRange: TensorRange {
     return .range(Int32(self.lowerBound)..<Int32(self.upperBound), stride: 1)
   }
 }
 
-extension ClosedRange : TensorSliceIndexProtocol where Bound == Int {
-  public var sliceIndex: TensorSliceIndex {
+extension ClosedRange : TensorRangeExpression where Bound == Int {
+  public var tensorRange: TensorRange {
     return .closedRange(
       Int32(self.lowerBound)...Int32(self.upperBound), stride: 1)
   }
 }
 
-extension PartialRangeFrom : TensorSliceIndexProtocol where Bound == Int {
-  public var sliceIndex: TensorSliceIndex {
+extension PartialRangeFrom : TensorRangeExpression where Bound == Int {
+  public var tensorRange: TensorRange {
     return .partialRangeFrom(Int32(self.lowerBound)..., stride: 1)
   }
 }
 
-extension PartialRangeUpTo : TensorSliceIndexProtocol where Bound == Int {
-  public var sliceIndex: TensorSliceIndex {
+extension PartialRangeUpTo : TensorRangeExpression where Bound == Int {
+  public var tensorRange: TensorRange {
     return .partialRangeUpTo(..<Int32(self.upperBound), stride: 1)
   }
 }
 
-extension PartialRangeThrough : TensorSliceIndexProtocol where Bound == Int {
-  public var sliceIndex: TensorSliceIndex {
+extension PartialRangeThrough : TensorRangeExpression where Bound == Int {
+  public var tensorRange: TensorRange {
     return .partialRangeThrough(...Int32(self.upperBound), stride: 1)
   }
 }
 
 public extension Tensor {
+  @_fixed_layout
   struct IndexPath {
     @usableFromInline
     let begin, end, strides: Tensor<Int32>
@@ -1770,12 +1777,13 @@ public extension Tensor {
   }
 
   @inlinable @inline(__always)
-  subscript(_ indices: TensorSliceIndexProtocol...) -> Tensor {
+  // TODO: @differentiable(wrt: self)
+  subscript(_ ranges: TensorRangeExpression...) -> Tensor {
     get {
-      return self[IndexPath(indices.map { $0.sliceIndex })]
+      return self[IndexPath(ranges.map { $0.tensorRange })]
     }
     set {
-      self[IndexPath(indices.map { $0.sliceIndex })] = newValue
+      self[IndexPath(ranges.map { $0.tensorRange })] = newValue
     }
   }
 
@@ -1822,20 +1830,20 @@ public extension Tensor {
 
 public extension Tensor.IndexPath {
   @inlinable @inline(__always)
-  init(_ indices: [TensorSliceIndex]) {
-    precondition(!indices.isEmpty, "The index path cannot be empty.")
-    precondition(indices.count { $0 == .ellipsis } < 2,
-                 "Only one ellipsis is allowed per index path.")
+  init(_ ranges: [TensorRange]) {
+    precondition(!ranges.isEmpty, "The tensor range collection cannot be empty.")
+    precondition(ranges.count { $0 == TensorRange.ellipsis } < 2,
+                 "Only one ellipsis is allowed per tensor range collection.")
 
-    var begin = [Int32](repeating: 0, count: indices.count)
-    var end = [Int32](repeating: 0, count: indices.count)
-    var strides = [Int32](repeating: 1, count: indices.count)
+    var begin = [Int32](repeating: 0, count: ranges.count)
+    var end = [Int32](repeating: 0, count: ranges.count)
+    var strides = [Int32](repeating: 1, count: ranges.count)
     var beginMask: Int64 = 0
     var endMask: Int64 = 0
     var ellipsisMask: Int64 = 0
     var newAxisMask: Int64 = 0
     var squeezeAxisMask: Int64 = 0
-    for (i, index) in indices.enumerated() {
+    for (i, index) in ranges.enumerated() {
       switch index {
       case .ellipsis: ellipsisMask |= 1 << i
       case .newAxis: newAxisMask |= 1 << i
