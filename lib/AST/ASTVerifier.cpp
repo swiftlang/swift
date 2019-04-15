@@ -1783,7 +1783,7 @@ public:
                "\nArgument type: ";
         InputExprTy.print(Out);
         Out << "\nParameter types: ";
-        FT->printParams(Out);
+        AnyFunctionType::printParams(FT->getParams(), Out);
         Out << "\n";
         E->dump(Out);
         Out << "\n";
