@@ -141,6 +141,19 @@ extension vDSP {
     /// - Parameter vector: Source vector.
     /// - Parameter bounds: Clipping threshold.
     /// - Returns: The clipped result.
+    ///
+    /// This function performs the following operation where `A` is `vector`, `B` is `bounds.lowerBound`,
+    /// `C` is `bounds.upperBound`, and `D` is the inverted clip result:
+    /// ```
+    /// for (int n = 0; n < N; ++n) {
+    ///     if (A[n] <= *B || A[n] >= *C)
+    ///         D[n] = A[n];
+    ///     else if (A[n] < 0)
+    ///         D[n] = *B;
+    ///     else
+    ///         D[n] = *C;
+    /// }
+    /// ```
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func invertedClip<U>(_ vector: U,
@@ -167,6 +180,19 @@ extension vDSP {
     /// - Parameter vector: Source vector.
     /// - Parameter bounds: Clipping threshold.
     /// - Parameter result: The clipped result.
+    ///
+    /// This function performs the following operation where `A` is `vector`, `B` is `bounds.lowerBound`,
+    /// `C` is `bounds.upperBound`, and `D` is the inverted clip result:
+    /// ```
+    /// for (int n = 0; n < N; ++n) {
+    ///     if (A[n] <= *B || A[n] >= *C)
+    ///         D[n] = A[n];
+    ///     else if (A[n] < 0)
+    ///         D[n] = *B;
+    ///     else
+    ///         D[n] = *C;
+    /// }
+    /// ```
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func invertedClip<U, V>(_ vector: U,
@@ -200,6 +226,19 @@ extension vDSP {
     /// - Parameter vector: Source vector.
     /// - Parameter bounds: Clipping threshold.
     /// - Returns: The clipped result.
+    ///
+    /// This function performs the following operation where `A` is `vector`, `B` is `bounds.lowerBound`,
+    /// `C` is `bounds.upperBound`, and `D` is the inverted clip result:
+    /// ```
+    /// for (int n = 0; n < N; ++n) {
+    ///     if (A[n] <= *B || A[n] >= *C)
+    ///         D[n] = A[n];
+    ///     else if (A[n] < 0)
+    ///         D[n] = *B;
+    ///     else
+    ///         D[n] = *C;
+    /// }
+    /// ```
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func invertedClip<U>(_ vector: U,
@@ -226,6 +265,19 @@ extension vDSP {
     /// - Parameter vector: Source vector.
     /// - Parameter bounds: Clipping threshold.
     /// - Parameter result: The clipped result.
+    ///
+    /// This function performs the following operation where `A` is `vector`, `B` is `bounds.lowerBound`,
+    /// `C` is `bounds.upperBound`, and `D` is the inverted clip result:
+    /// ```
+    /// for (int n = 0; n < N; ++n) {
+    ///     if (A[n] <= *B || A[n] >= *C)
+    ///         D[n] = A[n];
+    ///     else if (A[n] < 0)
+    ///         D[n] = *B;
+    ///     else
+    ///         D[n] = *C;
+    /// }
+    /// ```
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func invertedClip<U, V>(_ vector: U,
