@@ -156,12 +156,6 @@ private class CodingH : NSObject, AlsoNSCoding { // expected-error{{private clas
   func encode(coder: NSCoder) { }
 }
 
-@NSKeyedArchiverClassName( "abc" ) // expected-error {{@NSKeyedArchiverClassName has been removed; use @objc instead}} {{2-26=objc}} {{28-29=}} {{32-33=}}
-class OldArchiverAttribute: NSObject {}
-
-@NSKeyedArchiverEncodeNonGenericSubclassesOnly // expected-error {{@NSKeyedArchiverEncodeNonGenericSubclassesOnly is no longer necessary}} {{1-48=}}
-class OldArchiverAttributeGeneric<T>: NSObject {}
-
 // Don't allow one to write @_staticInitializeObjCMetadata!
 @_staticInitializeObjCMetadata // expected-error{{unknown attribute '_staticInitializeObjCMetadata'}}
 class DontAllowStaticInits { }
