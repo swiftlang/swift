@@ -882,7 +882,7 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
 void IRGenModule::emitFuncDecl(FuncDecl *fd) {
   // If there's an opaque return type for this function, emit its descriptor.
   if (auto opaque = fd->getOpaqueResultTypeDecl()) {
-    if (!IRGen.tryEnableLazyTypeMetadata(opaque))
+    if (!IRGen.hasLazyMetadata(opaque))
       emitOpaqueTypeDecl(opaque);
   }
 }
