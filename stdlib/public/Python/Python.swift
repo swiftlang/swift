@@ -1076,7 +1076,7 @@ extension Dictionary : ConvertibleFromPython
 }
 
 //===----------------------------------------------------------------------===//
-// `PythonConvertible` and `ConvertibleFromPython` conformance
+// `PythonConvertible` and `ConvertibleFromPython` conformances
 // for `Range` types
 //===----------------------------------------------------------------------===//
 
