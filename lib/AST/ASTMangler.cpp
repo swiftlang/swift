@@ -344,6 +344,7 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
                                             CanSILFunctionType ThunkType,
                                             Type FromType,
                                             Type ToType,
+                                            Type SelfType,
                                             ModuleDecl *Module) {
   Mod = Module;
   GenericSignature *GenSig = ThunkType->getGenericSignature();
@@ -353,10 +354,17 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
   beginMangling();
   appendType(FromType);
   appendType(ToType);
+  if (SelfType)
+    appendType(SelfType);
+
   if (GenSig)
     appendGenericSignature(GenSig);
-  // TODO: mangle ThunkType->isPseudogeneric()
-  appendOperator("TR");
+
+  if (SelfType)
+    appendOperator("Ty");
+  else
+    appendOperator("TR");
+
   return finalize();
 }
 
@@ -1905,11 +1913,9 @@ void ASTMangler::appendTypeList(Type listTy) {
       return appendOperator("y");
     bool firstField = true;
     for (auto &field : tuple->getElements()) {
-      // FIXME: We shouldn't put @escaping in non-parameter list tuples
-      auto flags = field.getParameterFlags().withEscaping(false);
-
-      assert(flags.isNone());
-      appendTypeListElement(field.getName(), field.getRawType(), flags);
+      assert(field.getParameterFlags().isNone());
+      appendTypeListElement(field.getName(), field.getRawType(),
+                            ParameterTypeFlags());
       appendListSeparator(firstField);
     }
   } else {

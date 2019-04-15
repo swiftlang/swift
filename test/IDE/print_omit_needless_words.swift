@@ -146,7 +146,7 @@
 // CHECK-FOUNDATION: func doSomethingElse(with: NSCopying & NSObjectProtocol)
 
 // Note: Function type -> "Function".
-// CHECK-FOUNDATION: func sort(_: @escaping @convention(c) (Any, Any) -> Int)
+// CHECK-FOUNDATION: func sort(_: @convention(c) (Any, Any) -> Int)
 
 // Note: Plural: NSArray without type arguments -> "Objects".
 // CHECK-FOUNDATION: func remove(_: [Any])

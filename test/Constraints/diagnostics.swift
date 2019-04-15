@@ -626,7 +626,7 @@ struct Radar21692808<Element> {
   init(count: Int, value: Element) {}
 }
 func radar21692808() -> Radar21692808<Int> {
-  return Radar21692808<Int>(count: 1) { // expected-error {{cannot invoke initializer for type 'Radar21692808<Int>' with an argument list of type '(count: Int, () -> Int)'}}
+  return Radar21692808<Int>(count: 1) { // expected-error {{cannot invoke initializer for type 'Radar21692808<Int>' with an argument list of type '(count: Int, @escaping () -> Int)'}}
     // expected-note @-1 {{expected an argument list of type '(count: Int, value: Element)'}}
     return 1
   }

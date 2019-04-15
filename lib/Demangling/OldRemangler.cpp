@@ -715,15 +715,15 @@ void Remangler::mangleBaseWitnessTableAccessor(Node *node) {
 }
 
 void Remangler::mangleReabstractionThunkHelper(Node *node) {
-  Buffer << "TR";
-  if (node->getNumChildren() == 3) Buffer << 'G';
-  mangleChildNodes(node); // generic signature?, type, type
+  Buffer << "<reabstraction-thunk-helper>";
+}
+
+void Remangler::mangleReabstractionThunkHelperWithSelf(Node *node) {
+  Buffer << "<reabstraction-thunk-helper-with-self>";
 }
 
 void Remangler::mangleReabstractionThunk(Node *node) {
-  Buffer << "Tr";
-  if (node->getNumChildren() == 3) Buffer << 'G';
-  mangleChildNodes(node); // generic signature?, type, type
+  Buffer << "<reabstraction-thunk>";
 }
 
 void Remangler::mangleProtocolSelfConformanceWitness(Node *node) {

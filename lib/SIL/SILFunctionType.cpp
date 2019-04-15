@@ -2155,9 +2155,8 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
       auto baseParams = baseFunc.getParams();
       assert(derivedParams.size() == baseParams.size());
       for (unsigned i = 0, e = derivedParams.size(); i < e; i++) {
-        // FIXME: Why are 'escaping' flags set inconsistently?
-        assert(derivedParams[i].getParameterFlags().withEscaping(false) ==
-               baseParams[i].getParameterFlags().withEscaping(false));
+        assert(derivedParams[i].getParameterFlags() ==
+               baseParams[i].getParameterFlags());
 
         params.emplace_back(
           copyOptionalityFromDerivedToBase(

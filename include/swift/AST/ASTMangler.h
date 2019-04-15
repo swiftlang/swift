@@ -143,6 +143,7 @@ public:
 
   std::string mangleReabstractionThunkHelper(CanSILFunctionType ThunkType,
                                              Type FromType, Type ToType,
+                                             Type SelfType,
                                              ModuleDecl *Module);
   
   std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
