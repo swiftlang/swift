@@ -1776,8 +1776,8 @@ extension PartialRangeThrough : TensorRangeExpression where Bound == Int {
 }
 
 public extension Tensor {
-  @_fixed_layout
-  struct IndexPath {
+  @_fixed_layout @usableFromInline
+  internal struct IndexPath {
     @usableFromInline
     let begin, end, strides: Tensor<Int32>
 
@@ -1801,9 +1801,9 @@ public extension Tensor {
     }
   }
 
-  @inlinable @inline(__always)
+  @usableFromInline
   @differentiable(wrt: self, vjp: _vjpSubscript)
-  subscript(_ indexPath: IndexPath) -> Tensor {
+  internal subscript(_ indexPath: IndexPath) -> Tensor {
     get {
       return Raw.stridedSlice(
         self, begin: indexPath.begin, end: indexPath.end,
@@ -1834,48 +1834,22 @@ public extension Tensor {
     }
   }
 
-  @inlinable @inline(__always)
+  @usableFromInline
   internal func _vjpSubscript(
     _ indexPath: IndexPath
   ) -> (Tensor, (Tensor) -> Tensor) {
     return (self[indexPath], { [shape = shapeTensor] v in
-      Tensor<Scalar>._pullbackSubscript(v, indexPath, shape)
-    })
-  }
-
-  @inlinable @inline(__always)
-  @differentiable(wrt: seed, vjp: _vjpPullbackSubscript)
-  internal static func _pullbackSubscript(
-    _ seed: Tensor,
-    _ indexPath: IndexPath,
-    _ shape: Tensor<Int32>
-  ) -> Tensor {
-    return Raw.stridedSliceGrad(
-      shape: shape, begin: indexPath.begin, end: indexPath.end,
-      strides: indexPath.strides, dy: seed, beginMask: indexPath.beginMask,
-      endMask: indexPath.endMask, ellipsisMask: indexPath.ellipsisMask,
-      newAxisMask: indexPath.newAxisMask,
-      shrinkAxisMask: indexPath.squeezeAxisMask)
-  }
-
-  @inlinable @inline(__always)
-  internal static func _vjpPullbackSubscript(
-    _ seed: Tensor,
-    _ indexPath: IndexPath,
-    shape: Tensor<Int32>
-  ) -> (Tensor, (Tensor) -> Tensor) {
-    return (Tensor<Scalar>._pullbackSubscript(seed, indexPath, shape), { v in
-      return v[IndexPath(
-        begin: indexPath.begin, end: indexPath.end, strides: indexPath.strides,
-        beginMask: indexPath.beginMask, endMask: indexPath.endMask,
-        ellipsisMask: indexPath.ellipsisMask,
+      Raw.stridedSliceGrad(
+        shape: shape, begin: indexPath.begin, end: indexPath.end,
+        strides: indexPath.strides, dy: v, beginMask: indexPath.beginMask,
+        endMask: indexPath.endMask, ellipsisMask: indexPath.ellipsisMask,
         newAxisMask: indexPath.newAxisMask,
-        squeezeAxisMask: indexPath.squeezeAxisMask)]
+        shrinkAxisMask: indexPath.squeezeAxisMask)
     })
   }
 }
 
-public extension Tensor.IndexPath {
+internal extension Tensor.IndexPath {
   @inlinable @inline(__always)
   init(_ ranges: [TensorRange]) {
     precondition(!ranges.isEmpty, "The tensor range collection cannot be empty.")
