@@ -577,45 +577,6 @@ public extension Tensor where Scalar : FloatingPoint & Equatable {
   }
 }
 
-public extension Tensor where Scalar : TensorFlowFloatingPoint {
-  // TODO: standardDeviation() should handle non floating point Tensors.
-
-  /// Returns the standard deviation of the elements along the specified axes.
-  /// The reduced dimensions are retained with value `1`. Does not apply
-  /// Bessel's correction.
-  ///
-  /// - Parameter axes: The dimensions to reduce.
-  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
-  @differentiable(wrt: self)
-  func standardDeviation() -> Tensor {
-    // Reduce along all dimensions.
-    return standardDeviation(alongAxes: Array(0..<shape.rank))
-  }
-
-  /// Returns the standard deviation of the elements along the specified axes.
-  /// The reduced dimensions are retained with value `1`. Does not apply
-  /// Bessel's correction.
-  ///
-  /// - Parameter axes: The dimensions to reduce.
-  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
-  @differentiable(wrt: self)
-  func standardDeviation(alongAxes axes: Int32...) -> Tensor {
-    return standardDeviation(alongAxes: axes)
-  }
-
-  /// Returns the standard deviation of the elements along the specified axes.
-  /// The reduced dimensions are retained with value `1`. Does not apply
-  /// Bessel's correction.
-  ///
-  /// - Parameter axes: The dimensions to reduce.
-  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
-  @inlinable @inline(__always)
-  @differentiable(wrt: self)
-  func standardDeviation(alongAxes axes: [Int32]) -> Tensor {
-    return sqrt(variance(alongAxes: axes))
-  }
-}
-
 public extension Tensor where Scalar == Bool {
   /// Computes `!self` element-wise.
   @inlinable @inline(__always)
@@ -702,7 +663,6 @@ public extension Tensor {
     return transposed(withPermutations: Tensor<Int32>(defaultPermutations))
   }
 }
-
 
 public extension Tensor {
   /// Concatenates tensors along the specified axis.
@@ -1462,16 +1422,6 @@ public extension Tensor where Scalar : Numeric {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
   @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
-  func variance(alongAxes axes: Int32...) -> Tensor {
-    return variance(alongAxes: axes)
-  }
-
-  /// Returns the variance along the specified axes. The reduced dimensions are
-  /// retained with value 1. Does not apply Bessel's correction.
-  /// - Parameter axes: The dimensions to reduce.
-  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
-  @inlinable @inline(__always)
-  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func variance(alongAxes axes: Tensor<Int32>) -> Tensor {
     let mean = self.mean(alongAxes: axes)
     let squaredDiff = (self - mean).squared()
@@ -1486,6 +1436,101 @@ public extension Tensor where Scalar : Numeric {
   @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func variance(alongAxes axes: [Int32]) -> Tensor {
     return variance(alongAxes: Tensor<Int32>(axes))
+  }
+
+  /// Returns the variance along the specified axes. The reduced dimensions are
+  /// retained with value 1. Does not apply Bessel's correction.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  func variance(alongAxes axes: Int32...) -> Tensor {
+    return variance(alongAxes: axes)
+  }
+}
+
+// TODO: Consider making the return type be generic over `FloatingPoint` types
+// so that `self`'s scalar type can be any `Numeric` type.
+public extension Tensor where Scalar : TensorFlowFloatingPoint {
+  /// Returns the standard deviation of the elements along the specified axes.
+  /// The reduced dimensions are retained with value `1`. Does not apply
+  /// Bessel's correction.
+  ///
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @differentiable(wrt: self)
+  func standardDeviation() -> Tensor {
+    // Reduce along all dimensions.
+    return standardDeviation(squeezingAxes: Array(0..<shape.rank))
+  }
+
+  /// Returns the standard deviation of the elements along the specified axes.
+  /// The reduced dimensions are retained with value `1`. Does not apply
+  /// Bessel's correction.
+  ///
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self)
+  func standardDeviation(squeezingAxes axes: Tensor<Int32>) -> Tensor {
+    return sqrt(variance(squeezingAxes: axes))
+  }
+
+  /// Returns the standard deviation of the elements along the specified axes.
+  /// The reduced dimensions are retained with value `1`. Does not apply
+  /// Bessel's correction.
+  ///
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self)
+  func standardDeviation(squeezingAxes axes: [Int32]) -> Tensor {
+    return sqrt(variance(squeezingAxes: axes))
+  }
+
+  /// Returns the standard deviation of the elements along the specified axes.
+  /// The reduced dimensions are retained with value `1`. Does not apply
+  /// Bessel's correction.
+  ///
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @differentiable(wrt: self)
+  func standardDeviation(squeezingAxes axes: Int32...) -> Tensor {
+    return standardDeviation(squeezingAxes: axes)
+  }
+
+  /// Returns the standard deviation of the elements along the specified axes.
+  /// The reduced dimensions are retained with value `1`. Does not apply
+  /// Bessel's correction.
+  ///
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @differentiable(wrt: self)
+  func standardDeviation(alongAxes axes: Tensor<Int32>) -> Tensor {
+    return sqrt(variance(alongAxes: axes))
+  }
+
+  /// Returns the standard deviation of the elements along the specified axes.
+  /// The reduced dimensions are retained with value `1`. Does not apply
+  /// Bessel's correction.
+  ///
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @differentiable(wrt: self)
+  func standardDeviation(alongAxes axes: [Int32]) -> Tensor {
+    return standardDeviation(alongAxes: Tensor<Int32>(axes))
+  }
+
+  /// Returns the standard deviation of the elements along the specified axes.
+  /// The reduced dimensions are retained with value `1`. Does not apply
+  /// Bessel's correction.
+  ///
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self)
+  func standardDeviation(alongAxes axes: Int32...) -> Tensor {
+    return sqrt(variance(alongAxes: axes))
   }
 }
 
