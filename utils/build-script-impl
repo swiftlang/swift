@@ -2522,6 +2522,7 @@ for host in "${ALL_HOSTS[@]}"; do
                       -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                       -DClang_DIR:PATH=${llvm_build_dir}/lib/cmake/clang
                       -DLLVM_DIR:PATH=${llvm_build_dir}/lib/cmake/llvm
+                      -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
                       -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
                       -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
                       -DLLDB_IS_BUILDBOT_BUILD:BOOL="${LLDB_IS_BUILDBOT_BUILD}"
