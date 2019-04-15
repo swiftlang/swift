@@ -2398,3 +2398,23 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
   emitDiagnostic(Member, diag::decl_declared_here, Member->getFullName());
   return true;
 }
+
+bool KeyPathSubscriptIndexHashableFailure::diagnoseAsError() {
+  auto *anchor = getRawAnchor();
+  auto *locator = getLocator();
+
+  auto loc = anchor->getLoc();
+  if (locator->isKeyPathSubscriptComponent()) {
+    auto *KPE = cast<KeyPathExpr>(anchor);
+    for (auto &elt : locator->getPath()) {
+      if (elt.isKeyPathComponent()) {
+        loc = KPE->getComponents()[elt.getValue()].getLoc();
+        break;
+      }
+    }
+  }
+
+  emitDiagnostic(loc, diag::expr_keypath_subscript_index_not_hashable,
+                 resolveType(NonConformingType));
+  return true;
+}

@@ -606,60 +606,8 @@ public:
   llvm::DenseMap<AnyFunctionRef, std::vector<Expr*>> LocalCFunctionPointers;
 
 private:
-  /// Return statements with functions as return values.
-  llvm::DenseMap<AbstractFunctionDecl *, llvm::DenseSet<ReturnStmt *>>
-    FunctionAsReturnValue;
-
-  /// Function apply expressions with a certain function as an argument.
-  llvm::DenseMap<AbstractFunctionDecl *, llvm::DenseSet<ApplyExpr *>>
-    FunctionAsEscapingArg;
-
   /// The # of times we have performed typo correction.
   unsigned NumTypoCorrections = 0;
-
-public:
-  /// Record an occurrence of a function that captures inout values as an
-  /// argument.
-  ///
-  /// \param decl the function that occurs as an argument.
-  ///
-  /// \param apply the expression in which the function appears.
-  void addEscapingFunctionAsArgument(AbstractFunctionDecl *decl,
-                                     ApplyExpr *apply) {
-    FunctionAsEscapingArg[decl].insert(apply);
-  }
-
-  /// Find occurrences of a function that captures inout values as arguments.
-  ///
-  /// \param decl the function that occurs as an argument.
-  ///
-  /// \returns Expressions in which the function appears as arguments.
-  llvm::DenseSet<ApplyExpr *> &
-  getEscapingFunctionAsArgument(AbstractFunctionDecl *decl) {
-    return FunctionAsEscapingArg[decl];
-  }
-
-  /// Record an occurrence of a function that captures inout values as a return
-  /// value
-  ///
-  /// \param decl the function that occurs as a return value.
-  ///
-  /// \param stmt the expression in which the function appears.
-  void addEscapingFunctionAsReturnValue(AbstractFunctionDecl *decl,
-                                        ReturnStmt *stmt) {
-    FunctionAsReturnValue[decl].insert(stmt);
-  }
-
-  /// Find occurrences of a function that captures inout values as return
-  /// values.
-  ///
-  /// \param decl the function that occurs as a return value.
-  ///
-  /// \returns Expressions in which the function appears as arguments.
-  llvm::DenseSet<ReturnStmt *> &
-  getEscapingFunctionAsReturnValue(AbstractFunctionDecl *decl) {
-    return FunctionAsReturnValue[decl];
-  }
 
 private:
   Type MaxIntegerType;
@@ -1928,7 +1876,7 @@ public:
     PropertyInitializer
   };
 
-  bool diagnoseInlinableDeclRef(SourceLoc loc, const ValueDecl *D,
+  bool diagnoseInlinableDeclRef(SourceLoc loc, ConcreteDeclRef declRef,
                                 const DeclContext *DC,
                                 FragileFunctionKind Kind,
                                 bool TreatUsableFromInlineAsPublic);
@@ -1939,12 +1887,23 @@ private:
                                       FragileFunctionKind Kind,
                                       bool TreatUsableFromInlineAsPublic);
 
-public:
   /// Given that a declaration is used from a particular context which
   /// exposes it in the interface of the current module, diagnose if it cannot
   /// reasonably be shared.
-  bool diagnoseDeclRefExportability(SourceLoc loc, const ValueDecl *D,
-                                    const DeclContext *DC);
+  bool diagnoseDeclRefExportability(SourceLoc loc, ConcreteDeclRef declRef,
+                                    const DeclContext *DC,
+                                    FragileFunctionKind fragileKind);
+
+public:
+  /// Given that a type is used from a particular context which
+  /// exposes it in the interface of the current module, diagnose if its
+  /// generic arguments require the use of conformances that cannot reasonably
+  /// be shared.
+  ///
+  /// This method \e only checks how generic arguments are used; it is assumed
+  /// that the declarations involved have already been checked elsewhere.
+  void diagnoseGenericTypeExportability(const TypeLoc &TL,
+                                        const DeclContext *DC);
 
   /// Given that \p DC is within a fragile context for some reason, describe
   /// why.

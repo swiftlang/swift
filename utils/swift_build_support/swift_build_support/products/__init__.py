@@ -10,6 +10,7 @@
 #
 # ----------------------------------------------------------------------------
 
+from .benchmarks import Benchmarks
 from .cmark import CMark
 from .foundation import Foundation
 from .indexstoredb import IndexStoreDB
@@ -47,4 +48,5 @@ __all__ = [
     'SwiftEvolve',
     'IndexStoreDB',
     'SourceKitLSP',
+    'Benchmarks',
 ]

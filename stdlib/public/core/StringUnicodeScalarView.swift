@@ -91,19 +91,15 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   /// nonempty.
   ///
   /// If the string is empty, `startIndex` is equal to `endIndex`.
-  @inlinable
-  public var startIndex: Index {
-    @inline(__always) get { return _guts.startIndex }
-  }
+  @inlinable @inline(__always)
+  public var startIndex: Index { return _guts.startIndex }
 
   /// The "past the end" position---that is, the position one greater than
   /// the last valid subscript argument.
   ///
   /// In an empty Unicode scalars view, `endIndex` is equal to `startIndex`.
-  @inlinable
-  public var endIndex: Index {
-    @inline(__always) get { return _guts.endIndex }
-  }
+  @inlinable @inline(__always)
+  public var endIndex: Index { return _guts.endIndex }
 
   /// Returns the next consecutive location after `i`.
   ///
@@ -156,13 +152,11 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   ///
   /// - Parameter position: A valid index of the character view. `position`
   ///   must be less than the view's end index.
-  @inlinable
+  @inlinable @inline(__always)
   public subscript(position: Index) -> Unicode.Scalar {
-    @inline(__always) get {
-      String(_guts)._boundsCheck(position)
-      let i = _guts.scalarAlign(position)
-      return _guts.errorCorrectedScalar(startingAt: i._encodedOffset).0
-    }
+    String(_guts)._boundsCheck(position)
+    let i = _guts.scalarAlign(position)
+    return _guts.errorCorrectedScalar(startingAt: i._encodedOffset).0
   }
 }
 
@@ -201,10 +195,8 @@ extension String.UnicodeScalarView {
 }
 
 extension String.UnicodeScalarView: CustomStringConvertible {
- @inlinable
- public var description: String {
-   @inline(__always) get { return String(_guts) }
- }
+ @inlinable @inline(__always)
+ public var description: String { return String(_guts) }
 }
 
 extension String.UnicodeScalarView: CustomDebugStringConvertible {

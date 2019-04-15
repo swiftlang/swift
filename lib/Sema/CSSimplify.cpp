@@ -1641,12 +1641,12 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     return getTypeMatchFailure(locator);
 
   // FIXME; Feels like a hack...nothing actually "conforms" here, and
-  // we need to disallow conversions from @noescape functions to Any.
+  // we need to disallow conversions from types containing @noescape
+  // functions to Any.
 
   // Conformance to 'Any' always holds.
   if (type2->isAny()) {
-    auto *fnTy = type1->getAs<FunctionType>();
-    if (!fnTy || !fnTy->isNoEscape())
+    if (!type1->isNoEscape())
       return getTypeMatchSuccess();
 
     if (shouldAttemptFixes()) {
@@ -1835,21 +1835,19 @@ ConstraintSystem::matchTypesBindTypeVar(
     return getTypeMatchFailure(locator);
   }
 
-  // Disallow bindings of noescape functions to type variables that
-  // represent an opened archetype. If we allowed this it would allow
-  // the noescape function to potentially escape.
-  if (auto *fnTy = type->getAs<FunctionType>()) {
-    if (fnTy->isNoEscape() && typeVar->getImpl().getGenericParameter()) {
-      if (shouldAttemptFixes()) {
-        auto *fix = MarkExplicitlyEscaping::create(
-            *this, getConstraintLocator(locator));
-        if (recordFix(fix))
-          return getTypeMatchFailure(locator);
-
-        // Allow no-escape function to be bound with recorded fix.
-      } else {
+  // Disallow bindings of types containing noescape functions to type
+  // variables that represent an opened generic parameter. If we allowed
+  // this it would allow noescape functions to potentially escape.
+  if (type->isNoEscape() && typeVar->getImpl().getGenericParameter()) {
+    if (shouldAttemptFixes()) {
+      auto *fix = MarkExplicitlyEscaping::create(
+          *this, getConstraintLocator(locator));
+      if (recordFix(fix))
         return getTypeMatchFailure(locator);
-      }
+
+      // Allow no-escape function to be bound with recorded fix.
+    } else {
+      return getTypeMatchFailure(locator);
     }
   }
 
@@ -2413,23 +2411,21 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         type2->isExistentialType()) {
 
       // Penalize conversions to Any, and disallow conversions of
-      // noescape functions to Any.
+      // types containing noescape functions to Any.
       if (kind >= ConstraintKind::Conversion && type2->isAny()) {
-        if (auto *fnTy = type1->getAs<FunctionType>()) {
-          if (fnTy->isNoEscape()) {
-            if (shouldAttemptFixes()) {
-              auto &ctx = getASTContext();
-              auto *fix = MarkExplicitlyEscaping::create(
-                  *this, getConstraintLocator(locator), ctx.TheAnyType);
-              if (recordFix(fix))
-                return getTypeMatchFailure(locator);
-
-              // Allow 'no-escape' functions to be converted to 'Any'
-              // with a recorded fix that helps us to properly diagnose
-              // such situations.
-            } else {
+        if (type1->isNoEscape()) {
+          if (shouldAttemptFixes()) {
+            auto &ctx = getASTContext();
+            auto *fix = MarkExplicitlyEscaping::create(
+                *this, getConstraintLocator(locator), ctx.TheAnyType);
+            if (recordFix(fix))
               return getTypeMatchFailure(locator);
-            }
+
+            // Allow 'no-escape' functions to be converted to 'Any'
+            // with a recorded fix that helps us to properly diagnose
+            // such situations.
+          } else {
+            return getTypeMatchFailure(locator);
           }
         }
 
@@ -3140,8 +3136,23 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       if (!recordFix(fix))
         return SolutionKind::Solved;
     }
+
+    // If this is an implicit Hashable conformance check generated for each
+    // index argument of the keypath subscript component, we could just treat
+    // it as though it conforms.
+    auto *loc = getConstraintLocator(locator);
+    if (loc->isResultOfKeyPathDynamicMemberLookup() ||
+        loc->isKeyPathSubscriptComponent()) {
+      if (protocol ==
+          getASTContext().getProtocol(KnownProtocolKind::Hashable)) {
+        auto *fix =
+            TreatKeyPathSubscriptIndexAsHashable::create(*this, type, loc);
+        if (!recordFix(fix))
+          return SolutionKind::Solved;
+      }
+    }
   }
-  
+
   // There's nothing more we can do; fail.
   return SolutionKind::Error;
 }
@@ -4232,13 +4243,13 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
              DeclName memberName, const OverloadChoice &choice,
              ConstraintLocator *locator,
              Optional<MemberLookupResult::UnviableReason> reason = None) {
-  if (!choice.isDecl())
-    return nullptr;
-
-  auto *decl = choice.getDecl();
-  if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
-    if (auto *fix = validateInitializerRef(cs, CD, locator))
-      return fix;
+  // Not all of the choices handled here are going
+  // to refer to a declaration.
+  if (choice.isDecl()) {
+    if (auto *CD = dyn_cast<ConstructorDecl>(choice.getDecl())) {
+      if (auto *fix = validateInitializerRef(cs, CD, locator))
+        return fix;
+    }
   }
 
   if (reason) {
@@ -4248,7 +4259,8 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
       return AllowTypeOrInstanceMember::create(cs, baseTy, memberName, locator);
 
     case MemberLookupResult::UR_Inaccessible:
-      return AllowInaccessibleMember::create(cs, decl, locator);
+      assert(choice.isDecl());
+      return AllowInaccessibleMember::create(cs, choice.getDecl(), locator);
 
     case MemberLookupResult::UR_MutatingMemberOnRValue:
     case MemberLookupResult::UR_MutatingGetterOnRValue:
@@ -6276,6 +6288,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowClosureParameterDestructuring:
   case FixKind::MoveOutOfOrderArgument:
   case FixKind::AllowInaccessibleMember:
+  case FixKind::TreatKeyPathSubscriptIndexAsHashable:
     llvm_unreachable("handled elsewhere");
   }
 

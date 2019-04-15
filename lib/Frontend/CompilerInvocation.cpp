@@ -178,7 +178,7 @@ static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
   OS << '"';
 }
 
-/// Save a copy of any flags marked as ParseableInterfaceOption, if running
+/// Save a copy of any flags marked as ModuleInterfaceOption, if running
 /// in a mode that is going to emit a .swiftinterface file.
 static void SaveParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
                                        FrontendOptions &FOpts,
@@ -187,7 +187,7 @@ static void SaveParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
     return;
   ArgStringList RenderedArgs;
   for (auto A : Args) {
-    if (A->getOption().hasFlag(options::ParseableInterfaceOption))
+    if (A->getOption().hasFlag(options::ModuleInterfaceOption))
       A->render(Args, RenderedArgs);
   }
   llvm::raw_string_ostream OS(Opts.ParseableInterfaceFlags);

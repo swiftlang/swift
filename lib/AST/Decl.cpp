@@ -150,7 +150,6 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(GenericTypeParam);
   TRIVIAL_KIND(AssociatedType);
   TRIVIAL_KIND(Protocol);
-  TRIVIAL_KIND(Subscript);
   TRIVIAL_KIND(Constructor);
   TRIVIAL_KIND(Destructor);
   TRIVIAL_KIND(EnumElement);
@@ -185,6 +184,18 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
        return DescriptiveDeclKind::StaticProperty;
      case StaticSpellingKind::KeywordClass:
        return DescriptiveDeclKind::ClassProperty;
+     }
+   }
+
+   case DeclKind::Subscript: {
+     auto subscript = cast<SubscriptDecl>(this);
+     switch (subscript->getCorrectStaticSpelling()) {
+     case StaticSpellingKind::None:
+       return DescriptiveDeclKind::Subscript;
+     case StaticSpellingKind::KeywordStatic:
+       return DescriptiveDeclKind::StaticSubscript;
+     case StaticSpellingKind::KeywordClass:
+       return DescriptiveDeclKind::ClassSubscript;
      }
    }
 
@@ -279,6 +290,8 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(GenericClass, "generic class");
   ENTRY(GenericType, "generic type");
   ENTRY(Subscript, "subscript");
+  ENTRY(StaticSubscript, "static subscript");
+  ENTRY(ClassSubscript, "class subscript");
   ENTRY(Constructor, "initializer");
   ENTRY(Destructor, "deinitializer");
   ENTRY(LocalFunction, "local function");

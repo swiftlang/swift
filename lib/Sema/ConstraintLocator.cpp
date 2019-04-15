@@ -101,6 +101,30 @@ bool ConstraintLocator::isSubscriptMemberRef() const {
   return path.back().getKind() == ConstraintLocator::SubscriptMember;
 }
 
+bool ConstraintLocator::isResultOfKeyPathDynamicMemberLookup() const {
+  return llvm::any_of(getPath(), [](const LocatorPathElt &elt) {
+    return elt.isKeyPathDynamicMember();
+  });
+}
+
+bool ConstraintLocator::isKeyPathSubscriptComponent() const {
+  auto *anchor = getAnchor();
+  auto *KPE = dyn_cast_or_null<KeyPathExpr>(anchor);
+  if (!KPE)
+    return false;
+
+  using ComponentKind = KeyPathExpr::Component::Kind;
+  return llvm::any_of(getPath(), [&](const LocatorPathElt &elt) {
+    if (!elt.isKeyPathComponent())
+      return false;
+
+    auto index = elt.getValue();
+    auto &component = KPE->getComponents()[index];
+    return component.getKind() == ComponentKind::Subscript ||
+           component.getKind() == ComponentKind::UnresolvedSubscript;
+  });
+}
+
 void ConstraintLocator::dump(SourceManager *sm) {
   dump(sm, llvm::errs());
   llvm::errs() << "\n";

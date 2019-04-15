@@ -543,19 +543,6 @@ bool TypeBase::isBool() {
   return false;
 }
 
-
-bool TypeBase::isAssignableType() {
-  if (hasLValueType()) return true;
-  if (auto tuple = getAs<TupleType>()) {
-    for (auto eltType : tuple->getElementTypes()) {
-      if (!eltType->isAssignableType())
-        return false;
-    }
-    return true;
-  }
-  return false;
-}
-
 Type TypeBase::getRValueType() {
   // If the type is not an lvalue, this is a no-op.
   if (!hasLValueType())
@@ -3077,6 +3064,24 @@ const DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
   });
 
   return unresolvedDepMemTy;
+}
+
+bool TypeBase::isNoEscape() const {
+  auto type = getCanonicalType();
+
+  if (auto silFuncTy = dyn_cast<SILFunctionType>(type))
+    return silFuncTy->isNoEscape();
+
+  if (auto funcTy = dyn_cast<FunctionType>(type))
+    return funcTy->isNoEscape();
+
+  if (auto tupleTy = dyn_cast<TupleType>(type)) {
+    for (auto eltTy : tupleTy.getElementTypes())
+      if (eltTy->isNoEscape())
+        return true;
+  }
+
+  return false;
 }
 
 static Type getConcreteTypeForSuperclassTraversing(Type t) {

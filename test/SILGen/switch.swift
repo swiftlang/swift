@@ -1029,8 +1029,8 @@ func testOptionalEnumMix(_ a : Int?) -> Int {
   case let x?:
     return 0
 
-  // CHECK: [[SOMEBB]](%3 : $Int):
-  // CHECK-NEXT: debug_value %3 : $Int, let, name "x"
+  // CHECK: [[SOMEBB]]([[X:%.*]] : $Int):
+  // CHECK-NEXT: debug_value [[X]] : $Int, let, name "x"
   // CHECK: integer_literal $Builtin.IntLiteral, 0
 
   case .none:
@@ -1051,8 +1051,8 @@ func testOptionalEnumMixWithNil(_ a : Int?) -> Int {
   case let x?:
     return 0
 
-  // CHECK: [[SOMEBB]](%3 : $Int):
-  // CHECK-NEXT: debug_value %3 : $Int, let, name "x"
+  // CHECK: [[SOMEBB]]([[X:%.*]] : $Int):
+  // CHECK-NEXT: debug_value [[X]] : $Int, let, name "x"
   // CHECK: integer_literal $Builtin.IntLiteral, 0
 
   case nil:

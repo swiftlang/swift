@@ -136,6 +136,10 @@ enum class FixKind : uint8_t {
   /// If there is a matching inaccessible member - allow it as if there
   /// no access control.
   AllowInaccessibleMember,
+
+  /// Using subscript references in the keypath requires that each
+  // of the index arguments to be Hashable.
+  TreatKeyPathSubscriptIndexAsHashable,
 };
 
 class ConstraintFix {
@@ -735,6 +739,26 @@ public:
   static AllowInaccessibleMember *create(ConstraintSystem &cs,
                                          ValueDecl *member,
                                          ConstraintLocator *locator);
+};
+
+class TreatKeyPathSubscriptIndexAsHashable final : public ConstraintFix {
+  Type NonConformingType;
+
+  TreatKeyPathSubscriptIndexAsHashable(ConstraintSystem &cs, Type type,
+                                       ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::TreatKeyPathSubscriptIndexAsHashable,
+                      locator),
+        NonConformingType(type) {}
+
+public:
+  std::string getName() const override {
+    return "treat keypath subscript index as conforming to Hashable";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static TreatKeyPathSubscriptIndexAsHashable *
+  create(ConstraintSystem &cs, Type type, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

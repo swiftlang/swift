@@ -1699,6 +1699,20 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                        Type boundType,
                                        OverloadChoice choice,
                                        DeclContext *useDC) {
+  // Add a conformance constraint to make sure that given type conforms
+  // to Hashable protocol, which is important for key path subscript
+  // components.
+  auto verifyThatArgumentIsHashable = [&](unsigned index, Type argType,
+                                          ConstraintLocator *locator) {
+    if (auto *hashable = TC.getProtocol(choice.getDecl()->getLoc(),
+                                        KnownProtocolKind::Hashable)) {
+      addConstraint(ConstraintKind::ConformsTo, argType,
+                    hashable->getDeclaredType(),
+                    getConstraintLocator(
+                        locator, LocatorPathElt::getTupleElement(index)));
+    }
+  };
+
   // Determine the type to which we'll bind the overload set's type.
   Type refType;
   Type openedFullType;
@@ -1872,15 +1886,22 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       assert(refFnType->getParams().size() == 1 &&
              "subscript always has one arg");
       auto argType = refFnType->getParams()[0].getPlainType();
-      
-      auto protoKind = KnownProtocolKind::ExpressibleByStringLiteral;
-      auto protocol = getTypeChecker().getProtocol(choice.getDecl()->getLoc(),
-                                                   protoKind);
-      if (!protocol)
+
+      auto &TC = getTypeChecker();
+
+      auto stringLiteral =
+          TC.getProtocol(choice.getDecl()->getLoc(),
+                         KnownProtocolKind::ExpressibleByStringLiteral);
+      if (!stringLiteral)
         break;
+
       addConstraint(ConstraintKind::LiteralConformsTo, argType,
-                    protocol->getDeclaredType(),
-                    locator);
+                    stringLiteral->getDeclaredType(), locator);
+
+      // If this is used inside of the keypath expression, we need to make
+      // sure that argument is Hashable.
+      if (isa<KeyPathExpr>(locator->getAnchor()))
+        verifyThatArgumentIsHashable(0, argType, locator);
     }
 
     if (kind == OverloadChoiceKind::KeyPathDynamicMemberLookup) {
@@ -1998,6 +2019,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         // type into "leaf" directly.
         addConstraint(ConstraintKind::Equal, memberTy, leafTy, keyPathLoc);
       }
+
+      if (isa<KeyPathExpr>(locator->getAnchor()))
+        verifyThatArgumentIsHashable(0, keyPathTy, locator);
     }
     break;
   }
@@ -2064,6 +2088,21 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
           CD->hasThrows() != boundFunctionType->throws()) {
         boundType = boundFunctionType->withExtInfo(
             boundFunctionType->getExtInfo().withThrows());
+      }
+    }
+
+    if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
+      if (locator->isResultOfKeyPathDynamicMemberLookup() ||
+          locator->isKeyPathSubscriptComponent()) {
+        // Subscript type has a format of (Self[.Type) -> (Arg...) -> Result
+        auto declTy = openedFullType->castTo<FunctionType>();
+        auto subscriptTy = declTy->getResult()->castTo<FunctionType>();
+        // If we have subscript, each of the arguments has to conform to
+        // Hashable, because it would be used as a component inside key path.
+        for (auto index : indices(subscriptTy->getParams())) {
+          const auto &param = subscriptTy->getParams()[index];
+          verifyThatArgumentIsHashable(index, param.getPlainType(), locator);
+        }
       }
     }
 
@@ -2158,7 +2197,8 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
       // through lvalue, inout and IUO types here
       Type lookupBaseType = newBase->getWithoutSpecifierType();
 
-      if (lookupBaseType->mayHaveMembers()) {
+      if (lookupBaseType->mayHaveMembers() ||
+          lookupBaseType->is<DynamicSelfType>()) {
         auto *proto = assocType->getProtocol();
         auto conformance = cs.DC->getParentModule()->lookupConformance(
           lookupBaseType, proto);

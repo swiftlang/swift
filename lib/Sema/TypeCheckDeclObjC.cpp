@@ -827,6 +827,16 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   if (checkObjCInForeignClassContext(SD, Reason))
     return false;
 
+  // ObjC doesn't support class subscripts.
+  if (!SD->isInstanceMember()) {
+    if (Diagnose) {
+      SD->diagnose(diag::objc_invalid_on_static_subscript,
+                   SD->getDescriptiveKind(), Reason);
+      describeObjCReason(SD, Reason);
+    }
+    return true;
+  }
+
   if (!SD->hasInterfaceType()) {
     SD->getASTContext().getLazyResolver()->resolveDeclSignature(
                                               const_cast<SubscriptDecl *>(SD));

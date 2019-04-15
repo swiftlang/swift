@@ -249,8 +249,8 @@ enum SR7799 {
 // CHECK: bb0(%0 : $Optional<SR7799>):
 // CHECK-NEXT:  debug_value %0 : $Optional<SR7799>, let, name "bar", argno 1
 // CHECK-NEXT:  switch_enum %0 : $Optional<SR7799>, case #Optional.some!enumelt.1: bb1, default bb4
-// CHECK: bb1(%3 : $SR7799):
-// CHECK-NEXT:  switch_enum %3 : $SR7799, case #SR7799.one!enumelt: bb2, case #SR7799.two!enumelt: bb3
+// CHECK: bb1([[PHI_ARG:%.*]] : $SR7799):
+// CHECK-NEXT:  switch_enum [[PHI_ARG]] : $SR7799, case #SR7799.one!enumelt: bb2, case #SR7799.two!enumelt: bb3
 func sr7799(bar: SR7799?) {
   switch bar {
   case .one: print("one")

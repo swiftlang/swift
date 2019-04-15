@@ -60,3 +60,14 @@ extension Substring {
     return try copy.withUTF8(body)
   }
 }
+
+// This function is no longer used but must be kept for ABI compatibility
+// because references to it may have been inlined.
+@usableFromInline
+internal func _branchHint(_ actual: Bool, expected: Bool) -> Bool {
+  // The LLVM intrinsic underlying int_expect_Int1 now requires an immediate
+  // argument for the expected value so we cannot call it here. This should
+  // never be called in cases where performance matters, so just return the
+  // value without any branch hint.
+  return actual
+}

@@ -987,6 +987,34 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an attempt to reference subscript as a keypath component
+/// where at least one of the index arguments doesn't conform to Hashable e.g.
+///
+/// ```swift
+/// protocol P {}
+///
+/// struct S {
+///   subscript<T: P>(x: Int, _ y: T) -> Bool { return true }
+/// }
+///
+/// func foo<T: P>(_ x: Int, _ y: T) {
+///   _ = \S.[x, y]
+/// }
+/// ```
+class KeyPathSubscriptIndexHashableFailure final : public FailureDiagnostic {
+  Type NonConformingType;
+
+public:
+  KeyPathSubscriptIndexHashableFailure(Expr *root, ConstraintSystem &cs,
+                                       Type type, ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), NonConformingType(type) {
+    assert(locator->isResultOfKeyPathDynamicMemberLookup() ||
+           locator->isKeyPathSubscriptComponent());
+  }
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

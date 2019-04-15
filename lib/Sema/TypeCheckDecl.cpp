@@ -2085,10 +2085,12 @@ public:
 
   void visitOperatorDecl(OperatorDecl *OD) {
     TC.validateDecl(OD);
+    checkAccessControl(TC, OD);
   }
 
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
     TC.validateDecl(PGD);
+    checkAccessControl(TC, PGD);
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *MMD) {
@@ -2992,8 +2994,7 @@ public:
     if (!ED->isInvalid())
       TC.checkDeclAttributes(ED);
 
-    if (auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>())
-      checkExtensionGenericParamAccess(TC, ED, AA->getAccess());
+    checkAccessControl(TC, ED);
 
     // Trigger the creation of all of the conformances associated with this
     // nominal type.
@@ -4080,7 +4081,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // Member subscripts need some special validation logic.
     if (SD->getDeclContext()->isTypeContext()) {
       // If this is a class member, mark it final if the class is final.
-      inferFinalAndDiagnoseIfNeeded(*this, SD, StaticSpellingKind::None);
+      inferFinalAndDiagnoseIfNeeded(*this, SD, SD->getStaticSpelling());
     }
 
     // Perform accessor-related validation.

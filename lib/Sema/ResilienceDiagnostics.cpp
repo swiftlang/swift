@@ -15,17 +15,21 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "TypeCheckAvailability.h"
+#include "swift/AST/AccessScopeChecker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Initializer.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/Initializer.h"
+#include "swift/AST/ProtocolConformance.h"
 
 using namespace swift;
 using FragileFunctionKind = TypeChecker::FragileFunctionKind;
 
 std::pair<FragileFunctionKind, bool>
 TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
-  for (; DC->isLocalContext(); DC = DC->getParent()) {
+  for (DC = DC->getLocalContext(); DC && DC->isLocalContext();
+       DC = DC->getParent()) {
     if (isa<DefaultArgumentInitializer>(DC)) {
       // Default argument generators of public functions cannot reference
       // @usableFromInline declarations; all other fragile function kinds
@@ -98,15 +102,12 @@ enum class DowngradeToWarning: bool {
 };
 
 bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
-                                           const ValueDecl *D,
+                                           ConcreteDeclRef declRef,
                                            const DeclContext *DC,
                                            FragileFunctionKind Kind,
                                            bool TreatUsableFromInlineAsPublic) {
+  const ValueDecl *D = declRef.getDecl();
   // Do some important fast-path checks that apply to all cases.
-
-  // Local declarations are OK.
-  if (D->getDeclContext()->isLocalContext())
-    return false;
 
   // Type parameters are OK.
   if (isa<AbstractTypeParamDecl>(D))
@@ -118,8 +119,11 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
     return true;
 
   // Check whether the declaration comes from a publically-imported module.
-  if (diagnoseDeclRefExportability(loc, D, DC))
-    return true;
+  // Skip this check for accessors because the associated property or subscript
+  // will also be checked, and will provide a better error message.
+  if (!isa<AccessorDecl>(D))
+    if (diagnoseDeclRefExportability(loc, declRef, DC, Kind))
+      return true;
 
   return false;
 }
@@ -129,6 +133,10 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
                                            const DeclContext *DC,
                                            FragileFunctionKind Kind,
                                            bool TreatUsableFromInlineAsPublic) {
+  // Local declarations are OK.
+  if (D->getDeclContext()->isLocalContext())
+    return false;
+
   // Public declarations are OK.
   if (D->getFormalAccessScope(/*useDC=*/nullptr,
                               TreatUsableFromInlineAsPublic).isPublic())
@@ -176,6 +184,11 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
     diagName = accessor->getStorage()->getFullName();
   }
 
+  // Swift 5.0 did not check the underlying types of local typealiases.
+  // FIXME: Conditionalize this once we have a new language mode.
+  if (isa<TypeAliasDecl>(DC))
+    downgradeToWarning = DowngradeToWarning::Yes;
+
   auto diagID = diag::resilience_decl_unavailable;
   if (downgradeToWarning == DowngradeToWarning::Yes)
     diagID = diag::resilience_decl_unavailable_warn;
@@ -197,9 +210,95 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   return (downgradeToWarning == DowngradeToWarning::No);
 }
 
-bool TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
-                                               const ValueDecl *D,
-                                               const DeclContext *DC) {
+static bool diagnoseDeclExportability(SourceLoc loc, const ValueDecl *D,
+                                      const SourceFile &userSF,
+                                      FragileFunctionKind fragileKind) {
+  auto definingModule = D->getModuleContext();
+  if (!userSF.isImportedImplementationOnly(definingModule))
+    return false;
+
+  // TODO: different diagnostics
+  ASTContext &ctx = definingModule->getASTContext();
+  ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_implementation_only,
+                     D->getDescriptiveKind(), D->getFullName(),
+                     static_cast<unsigned>(fragileKind),
+                     definingModule->getName());
+  return true;
+}
+
+static bool
+diagnoseGenericArgumentsExportability(SourceLoc loc,
+                                      const SubstitutionMap &subs,
+                                      const SourceFile &userSF) {
+  bool hadAnyIssues = false;
+  for (ProtocolConformanceRef conformance : subs.getConformances()) {
+    if (!conformance.isConcrete())
+      continue;
+    const ProtocolConformance *concreteConf = conformance.getConcrete();
+
+    SubstitutionMap subConformanceSubs =
+        concreteConf->getSubstitutions(userSF.getParentModule());
+    diagnoseGenericArgumentsExportability(loc, subConformanceSubs, userSF);
+
+    const RootProtocolConformance *rootConf =
+        concreteConf->getRootConformance();
+    ModuleDecl *M = rootConf->getDeclContext()->getParentModule();
+    if (!userSF.isImportedImplementationOnly(M))
+      continue;
+
+    ASTContext &ctx = M->getASTContext();
+    ctx.Diags.diagnose(loc, diag::conformance_from_implementation_only_module,
+                       rootConf->getType(),
+                       rootConf->getProtocol()->getFullName(), M->getName());
+    hadAnyIssues = true;
+  }
+  return hadAnyIssues;
+}
+
+void TypeChecker::diagnoseGenericTypeExportability(const TypeLoc &TL,
+                                                   const DeclContext *DC) {
+  class GenericTypeFinder : public TypeDeclFinder {
+    using Callback = llvm::function_ref<void(SubstitutionMap)>;
+
+    const SourceFile &SF;
+    Callback callback;
+  public:
+    GenericTypeFinder(const SourceFile &SF, Callback callback)
+        : SF(SF), callback(callback) {}
+
+    Action visitBoundGenericType(BoundGenericType *ty) override {
+      ModuleDecl *useModule = SF.getParentModule();
+      SubstitutionMap subs = ty->getContextSubstitutionMap(useModule,
+                                                           ty->getDecl());
+      callback(subs);
+      return Action::Continue;
+    }
+
+    Action visitTypeAliasType(TypeAliasType *ty) override {
+      callback(ty->getSubstitutionMap());
+      return Action::Continue;
+    }
+  };
+
+  assert(TL.getType() && "type not validated yet");
+
+  const SourceFile *SF = DC->getParentSourceFile();
+  if (!SF)
+    return;
+
+  TL.getType().walk(GenericTypeFinder(*SF, [&](SubstitutionMap subs) {
+    // FIXME: It would be nice to highlight just the part of the type that's
+    // problematic, but unfortunately the TypeRepr doesn't have the
+    // information we need and the Type doesn't easily map back to it.
+    (void)diagnoseGenericArgumentsExportability(TL.getLoc(), subs, *SF);
+  }));
+}
+
+bool
+TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
+                                          ConcreteDeclRef declRef,
+                                          const DeclContext *DC,
+                                          FragileFunctionKind fragileKind) {
   // We're only interested in diagnosing uses from source files.
   auto userSF = DC->getParentSourceFile();
   if (!userSF)
@@ -213,22 +312,12 @@ bool TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
   if (!userSF->hasImplementationOnlyImports())
     return false;
 
-  auto userModule = userSF->getParentModule();
-  auto definingModule = D->getModuleContext();
-
-  // Nothing to diagnose in the very common case of the same module.
-  if (userModule == definingModule)
-    return false;
-
-  // Nothing to diagnose in the very common case that the module is
-  // imported for use in signatures.
-  if (!userSF->isImportedImplementationOnly(definingModule))
-    return false;
-
-  // TODO: different diagnostics
-  diagnose(loc, diag::inlinable_decl_ref_implementation_only,
-           D->getDescriptiveKind(), D->getFullName());
-
-  // TODO: notes explaining why
-  return true;
+  const ValueDecl *D = declRef.getDecl();
+  if (diagnoseDeclExportability(loc, D, *userSF, fragileKind))
+    return true;
+  if (diagnoseGenericArgumentsExportability(loc, declRef.getSubstitutions(),
+                                            *userSF)) {
+    return true;
+  }
+  return false;
 }

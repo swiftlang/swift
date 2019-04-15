@@ -392,8 +392,6 @@ ERROR(expected_lbrace_subscript_protocol,PointsToFirstBadToken,
       "{ get set } specifier", ())
 ERROR(subscript_without_get,none,
       "subscript declarations must have a getter", ())
-ERROR(subscript_static,none,
-      "subscript cannot be marked %0", (StaticSpellingKind))
 
 // initializer
 ERROR(invalid_nested_init,none,
@@ -1376,21 +1374,6 @@ WARNING(attr_availability_platform_agnostic_infeasible_option,none,
 WARNING(attr_availability_nonspecific_platform_unexpected_version,none,
       "unexpected version number in '%0' attribute for non-specific platform "
       "'*'", (StringRef))
-
-// autoclosure
-ERROR(attr_autoclosure_expected_r_paren,PointsToFirstBadToken,
-      "expected ')' in @autoclosure", ())
-ERROR(attr_noescape_conflicts_escaping_autoclosure,none,
-      "@noescape conflicts with @autoclosure(escaping)", ())
-ERROR(attr_noescape_implied_by_autoclosure,none,
-      "@noescape is implied by @autoclosure and should not be "
-      "redundantly specified", ())
-ERROR(attr_autoclosure_escaping_deprecated,none,
-      "@autoclosure(escaping) has been removed; use @autoclosure @escaping instead",
-      ())
-ERROR(attr_noescape_deprecated,none,
-      "@noescape is the default and has been removed",
-      ())
 
 // convention
 ERROR(convention_attribute_expected_lparen,none,

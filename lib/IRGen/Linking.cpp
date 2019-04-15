@@ -176,9 +176,6 @@ std::string LinkEntity::mangleAsString() const {
     return mangler.mangleTypeMetadataPattern(
                                         cast<NominalTypeDecl>(getDecl()));
 
-  case Kind::ForeignTypeMetadataCandidate:
-    return mangler.mangleTypeMetadataFull(getType());
-
   case Kind::SwiftMetaclassStub:
     return mangler.mangleClassMetaClass(cast<ClassDecl>(getDecl()));
 
@@ -469,13 +466,18 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return SILLinkage::Private;
   }
 
-  case Kind::TypeMetadata:
+  case Kind::TypeMetadata: {
+    auto *nominal = getType().getAnyNominal();
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata:
+      // For imported types, the full metadata object is a candidate
+      // for uniquing.
+      if (getDeclLinkage(nominal) == FormalLinkage::PublicNonUnique)
+        return SILLinkage::Shared;
+
       // The full metadata object is private to the containing module.
       return SILLinkage::Private;
     case TypeMetadataAddress::AddressPoint: {
-      auto *nominal = getType().getAnyNominal();
       return getSILLinkage(nominal
                            ? getDeclLinkage(nominal)
                            : FormalLinkage::PublicUnique,
@@ -483,6 +485,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     }
     }
     llvm_unreachable("bad kind");
+  }
 
   // ...but we don't actually expose individual value witnesses (right now).
   case Kind::ValueWitness: {
@@ -491,11 +494,6 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
       return SILLinkage::Shared;
     return forDefinition ? SILLinkage::Private : SILLinkage::PrivateExternal;
   }
-
-  // Foreign type metadata candidates are always shared; the runtime
-  // does the uniquing.
-  case Kind::ForeignTypeMetadataCandidate:
-    return SILLinkage::Shared;
 
   case Kind::TypeMetadataAccessFunction:
     switch (getTypeMetadataAccessStrategy(getType())) {
@@ -522,7 +520,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ObjCResilientClassStub: {
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata:
-      // The full class stub object is private to the containing module.
+      // The full class stub object is private to the containing module,
+      // excpet for foreign types.
       return SILLinkage::Private;
     case TypeMetadataAddress::AddressPoint: {
       auto *classDecl = cast<ClassDecl>(getDecl());
@@ -705,10 +704,6 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::ValueWitnessTable:
   case Kind::TypeMetadata:
     return ::isAvailableExternally(IGM, getType());
-
-  case Kind::ForeignTypeMetadataCandidate:
-    assert(!::isAvailableExternally(IGM, getType()));
-    return false;
 
   case Kind::ObjCClass:
   case Kind::ObjCMetaclass:
@@ -1022,7 +1017,6 @@ bool LinkEntity::isWeakImported(ModuleDecl *module,
   case Kind::ValueWitness:
   case Kind::ValueWitnessTable:
   case Kind::TypeMetadataLazyCacheVariable:
-  case Kind::ForeignTypeMetadataCandidate:
   case Kind::ReflectionBuiltinDescriptor:
   case Kind::ReflectionFieldDescriptor:
   case Kind::CoroutineContinuationPrototype:
@@ -1141,7 +1135,6 @@ const SourceFile *LinkEntity::getSourceFileForEmission() const {
   case Kind::ObjCClassRef:
   case Kind::TypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
-  case Kind::ForeignTypeMetadataCandidate:
     return nullptr;
 
   // TODO

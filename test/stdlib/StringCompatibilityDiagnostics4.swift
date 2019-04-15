@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -typecheck -swift-version 4 %s -verify
 
 func testPopFirst() {
-  var str = "abc"
+  let str = "abc"
   var charView: String.CharacterView // expected-warning{{'CharacterView' is deprecated: Please use String directly}}
   charView = str.characters // expected-warning{{'characters' is deprecated: Please use String directly}}
   dump(charView)

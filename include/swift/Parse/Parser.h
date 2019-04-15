@@ -1006,7 +1006,8 @@ public:
                                                DeclAttributes &Attributes);
 
   ParserResult<SubscriptDecl>
-  parseDeclSubscript(ParseDeclOptions Flags, DeclAttributes &Attributes,
+  parseDeclSubscript(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
+                     ParseDeclOptions Flags, DeclAttributes &Attributes,
                      SmallVectorImpl<Decl *> &Decls);
 
   ParserResult<ConstructorDecl>

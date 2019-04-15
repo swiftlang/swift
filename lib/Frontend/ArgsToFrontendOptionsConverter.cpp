@@ -80,8 +80,8 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.TrackSystemDeps |= Args.hasArg(OPT_track_system_dependencies);
 
-  Opts.SerializeParseableModuleInterfaceDependencyHashes |=
-    Args.hasArg(OPT_serialize_parseable_module_interface_dependency_hashes);
+  Opts.SerializeModuleInterfaceDependencyHashes |=
+    Args.hasArg(OPT_serialize_module_interface_dependency_hashes);
 
   computePrintStatsOptions();
   computeDebugTimeOptions();
@@ -380,8 +380,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::REPL;
   if (Opt.matches(OPT_interpret))
     return FrontendOptions::ActionType::Immediate;
-  if (Opt.matches(OPT_build_module_from_parseable_interface))
-    return FrontendOptions::ActionType::BuildModuleFromParseableInterface;
+  if (Opt.matches(OPT_compile_module_from_interface))
+    return FrontendOptions::ActionType::CompileModuleFromInterface;
 
   llvm_unreachable("Unhandled mode option");
 }

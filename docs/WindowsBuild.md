@@ -289,7 +289,6 @@ cmake -G Ninja^
   -DBUILD_SHARED_LIBS=YES^
   -DCMAKE_BUILD_TYPE=RelWithDebInfo^
   -DCMAKE_SWIFT_COMPILER=S:\b\swift\bin\swiftc.exe^
-  -DXCTEST_PATH_TO_COREFOUNDATION_BUILD=S:\b\foundation\CoreFoundation-prefix^
   -DXCTEST_PATH_TO_FOUNDATION_BUILD=S:\b\foundation^
   -DXCTEST_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch^
   -DXCTEST_PATH_TO_LIBDISPATCH_BUILD=S:\b\libdispatch^
@@ -346,7 +345,7 @@ ninja -C S:\b\foundation test
 ```cmd
 md S:\b\sqlite
 cd S:\b\sqlite
-cl /MD /Ox /Zi /LD /DSQLITE_API=__declspec(dllexport) S:\sqlite-amalgamation-3270200\sqlite.c
+cl /MD /Ox /Zi /LD /DSQLITE_API=__declspec(dllexport) S:\sqlite-amalgamation-3270200\sqlite3.c
 ```
 
  - Add SQLite3 to your path:
@@ -359,13 +358,18 @@ path S:\b\sqlite;%PATH%
 ```cmd
 md S:\b\llbuild
 cd S:\b\llbuild
+set AR=llvm-ar
 cmake -G Ninja^
   -DCMAKE_BUILD_TYPE=RelWithDebInfo^
   -DCMAKE_C_COMPILER=cl^
   -DCMAKE_CXX_COMPILER=cl^
+  -DFOUNDATION_BUILD_DIR=S:\b\foundation^
+  -DLIBDISPATCH_BUILD_DIR=S:\b\libdispatch^
+  -DLIBDISPATCH_SOURCE_DIR=S:\swift-corelibs-libdispatch^
   -DLLBUILD_PATH_TO_SQLITE_SOURCE=S:\sqlite-amalgamation-3270200^
   -DLLBUILD_PATH_TO_SQLITE_BUILD=S:\b\sqlite^
-  S:\swift-llbuild
+  -DLLBUILD_SUPPORT_BINDINGS=Swift^
+  S:\llbuild
 ninja
 ```
 

@@ -139,6 +139,8 @@ enum class DescriptiveDeclKind : uint8_t {
   GenericClass,
   GenericType,
   Subscript,
+  StaticSubscript,
+  ClassSubscript,
   Constructor,
   Destructor,
   LocalFunction,

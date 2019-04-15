@@ -160,7 +160,9 @@ public:
 
   void print(raw_ostream &OS, const PrintOptions &Opts = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
-  void dump() const;
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump() const LLVM_ATTRIBUTE_USED,
+      "only for use within the debugger");
 
   /// Clone the given type representation.
   TypeRepr *clone(const ASTContext &ctx) const;
