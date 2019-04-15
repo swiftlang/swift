@@ -3507,7 +3507,10 @@ bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
       }
     }
   }
-  parseMatchingToken(tok::r_brace, RBLoc, ErrorDiag, LBLoc);
+  if (parseMatchingToken(tok::r_brace, RBLoc, ErrorDiag, LBLoc)) {
+    // Synthesize an r_brace syntax node if the token is absent
+    SyntaxContext->synthesize(tok::r_brace, RBLoc);
+  }
 
   // Increase counter.
   if (auto *stat = Context.Stats) {
