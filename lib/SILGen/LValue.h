@@ -413,7 +413,7 @@ public:
   }
 
   void addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
-                                VarDecl *var, Optional<SubstitutionMap> subs,
+                                VarDecl *var, SubstitutionMap subs,
                                 LValueOptions options,
                                 SGFAccessKind accessKind,
                                 AccessStrategy strategy,
