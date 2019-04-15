@@ -179,6 +179,7 @@ TensorTests.testAllBackends("Reduction") {
   // 2 x 5
   let x = Tensor<Float>([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
   expectEqual(Tensor(30), x.sum().toHost(shape: []))
+  expectEqual(0, x.rank)
   expectEqual(Tensor(shape: [5], scalars: [2, 4, 6, 8, 10]),
               x.sum(squeezingAxes: 0).toHost(shape: []))
   expectEqual(Tensor(shape: [1, 5], scalars: [2, 4, 6, 8, 10]),
