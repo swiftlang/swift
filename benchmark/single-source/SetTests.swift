@@ -68,32 +68,32 @@ public let SetTests = [
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, setE]) }),
   BenchmarkInfo(
-    name: "Set.isSubset.Int0",
+    name: "SetIsSubsetInt0",
     runFunction: { n in run_SetIsSubsetInt(setAB, setCD, false, 5000 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, setCD]) }),
   BenchmarkInfo(
-    name: "Set.isSubset.Box0",
+    name: "SetIsSubsetBox0",
     runFunction: { n in run_SetIsSubsetBox(setOAB, setOCD, false, 5000 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOAB, setOCD]) }),
   BenchmarkInfo(
-    name: "Set.isSubset.Int25",
+    name: "SetIsSubsetInt25",
     runFunction: { n in run_SetIsSubsetInt(setB, setAB, true, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setB, setAB]) }),
   BenchmarkInfo(
-    name: "Set.isSubset.Box25",
+    name: "SetIsSubsetBox25",
     runFunction: { n in run_SetIsSubsetBox(setOB, setOAB, true, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOB, setOAB]) }),
   BenchmarkInfo(
-    name: "Set.isSubset.Int50",
+    name: "SetIsSubsetInt50",
     runFunction: { n in run_SetIsSubsetInt(setY, setXY, true, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setY, setXY]) }),
   BenchmarkInfo(
-    name: "Set.isSubset.Int100",
+    name: "SetIsSubsetInt100",
     runFunction: { n in run_SetIsSubsetInt(setP, setQ, true, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setP, setQ]) }),
@@ -191,94 +191,94 @@ public let SetTests = [
     setUpFunction: { blackHole([setP, setQ]) }),
 
   BenchmarkInfo(
-    name: "Set.symmetricDifference.Int0",
+    name: "SetSymmetricDifferenceInt0",
     runFunction: { n in run_SetSymmetricDifferenceInt(setAB, setCD, countABCD, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, setCD]) }),
   BenchmarkInfo(
-    name: "Set.symmetricDifference.Box0",
+    name: "SetSymmetricDifferenceBox0",
     runFunction: { n in run_SetSymmetricDifferenceBox(setOAB, setOCD, countABCD, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOAB, setOCD]) }),
   BenchmarkInfo(
-    name: "Set.symmetricDifference.Int25",
+    name: "SetSymmetricDifferenceInt25",
     runFunction: { n in run_SetSymmetricDifferenceInt(setAB, setBC, countAC, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, setBC]) }),
   BenchmarkInfo(
-    name: "Set.symmetricDifference.Box25",
+    name: "SetSymmetricDifferenceBox25",
     runFunction: { n in run_SetSymmetricDifferenceBox(setOAB, setOBC, countAC, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOAB, setOBC]) }),
   BenchmarkInfo(
-    name: "Set.symmetricDifference.Int50",
+    name: "SetSymmetricDifferenceInt50",
     runFunction: { n in run_SetSymmetricDifferenceInt(setXY, setYZ, size, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setXY, setYZ]) }),
   BenchmarkInfo(
-    name: "Set.symmetricDifference.Int100",
+    name: "SetSymmetricDifferenceInt100",
     runFunction: { n in run_SetSymmetricDifferenceInt(setP, setQ, 0, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setP, setQ]) }),
 
   BenchmarkInfo(
-    name: "Set.intersection.Int0",
+    name: "SetIntersectionInt0",
     runFunction: { n in run_SetIntersectionInt(setAB, setCD, 0, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, setCD]) }),
   BenchmarkInfo(
-    name: "Set.intersection.Box0",
+    name: "SetIntersectionBox0",
     runFunction: { n in run_SetIntersectionBox(setOAB, setOCD, 0, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOAB, setOCD]) }),
   BenchmarkInfo(
-    name: "Set.intersection.Int25",
+    name: "SetIntersectionInt25",
     runFunction: { n in run_SetIntersectionInt(setAB, setBC, countB, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, setBC]) }),
   BenchmarkInfo(
-    name: "Set.intersection.Box25",
+    name: "SetIntersectionBox25",
     runFunction: { n in run_SetIntersectionBox(setOAB, setOBC, countB, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOAB, setOBC]) }),
   BenchmarkInfo(
-    name: "Set.intersection.Int50",
+    name: "SetIntersectionInt50",
     runFunction: { n in run_SetIntersectionInt(setXY, setYZ, half, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setXY, setYZ]) }),
   BenchmarkInfo(
-    name: "Set.intersection.Int100",
+    name: "SetIntersectionInt100",
     runFunction: { n in run_SetIntersectionInt(setP, setQ, size, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setP, setQ]) }),
 
   BenchmarkInfo(
-    name: "Set.union.Int0",
+    name: "SetUnionInt0",
     runFunction: { n in run_SetUnionInt(setAB, setCD, countABCD, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, setCD]) }),
   BenchmarkInfo(
-    name: "Set.union.Box0",
+    name: "SetUnionBox0",
     runFunction: { n in run_SetUnionBox(setOAB, setOCD, countABCD, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOAB, setOCD]) }),
   BenchmarkInfo(
-    name: "Set.union.Int25",
+    name: "SetUnionInt25",
     runFunction: { n in run_SetUnionInt(setAB, setBC, countABC, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, setBC]) }),
   BenchmarkInfo(
-    name: "Set.union.Box25",
+    name: "SetUnionBox25",
     runFunction: { n in run_SetUnionBox(setOAB, setOBC, countABC, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOAB, setOBC]) }),
   BenchmarkInfo(
-    name: "Set.union.Int50",
+    name: "SetUnionInt50",
     runFunction: { n in run_SetUnionInt(setXY, setYZ, size + half, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setXY, setYZ]) }),
   BenchmarkInfo(
-    name: "Set.union.Int100",
+    name: "SetUnionInt100",
     runFunction: { n in run_SetUnionInt(setP, setQ, size, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setP, setQ]) }),
@@ -304,59 +304,59 @@ public let SetTests = [
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOAB, setOE]) }),
   BenchmarkInfo(
-    name: "Set.subtracting.Int0",
+    name: "SetSubtractingInt0",
     runFunction: { n in run_SetSubtractingInt(setAB, setCD, countAB, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, setCD]) }),
   BenchmarkInfo(
-    name: "Set.subtracting.Box0",
+    name: "SetSubtractingBox0",
     runFunction: { n in run_SetSubtractingBox(setOAB, setOCD, countAB, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOAB, setOCD]) }),
   BenchmarkInfo(
-    name: "Set.subtracting.Int25",
+    name: "SetSubtractingInt25",
     runFunction: { n in run_SetSubtractingInt(setAB, setBC, countA, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, setBC]) }),
   BenchmarkInfo(
-    name: "Set.subtracting.Box25",
+    name: "SetSubtractingBox25",
     runFunction: { n in run_SetSubtractingBox(setOAB, setOBC, countA, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOAB, setOBC]) }),
   BenchmarkInfo(
-    name: "Set.subtracting.Int50",
+    name: "SetSubtractingInt50",
     runFunction: { n in run_SetSubtractingInt(setXY, setYZ, half, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setXY, setYZ]) }),
   BenchmarkInfo(
-    name: "Set.subtracting.Int100",
+    name: "SetSubtractingInt100",
     runFunction: { n in run_SetSubtractingInt(setP, setQ, 0, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setP, setQ]) }),
 
   // Legacy benchmarks, kept for continuity with previous releases.
   BenchmarkInfo(
-    name: "Set.ExclusiveOr", // ~"SetSymmetricDifferenceInt0"
+    name: "SetExclusiveOr", // ~"SetSymmetricDifferenceInt0"
     runFunction: { n in run_SetSymmetricDifferenceInt(setAB, setCD, countABCD, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, setCD]) }, legacyFactor: 10),
   BenchmarkInfo(
-    name: "Set.ExclusiveOr_OfObjects", // ~"SetSymmetricDifferenceBox0"
+    name: "SetExclusiveOr_OfObjects", // ~"SetSymmetricDifferenceBox0"
     runFunction: { n in run_SetSymmetricDifferenceBox(setOAB, setOCD, countABCD, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOAB, setOCD]) }, legacyFactor: 10),
   BenchmarkInfo(
-    name: "Set.Intersect", // ~"SetIntersectionInt0"
+    name: "SetIntersect", // ~"SetIntersectionInt0"
     runFunction: { n in run_SetIntersectionInt(setAB, setCD, 0, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, setCD]) }, legacyFactor: 10),
   BenchmarkInfo(
-    name: "Set.Union", // ~"SetUnionInt0"
+    name: "SetUnion", // ~"SetUnionInt0"
     runFunction: { n in run_SetUnionInt(setAB, setCD, countABCD, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, setCD]) }, legacyFactor: 10),
   BenchmarkInfo(
-    name: "Set.Union_OfObjects", // ~"SetUnionBox0"
+    name: "SetUnion_OfObjects", // ~"SetUnionBox0"
     runFunction: { n in run_SetUnionBox(setOAB, setOCD, countABCD, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOAB, setOCD]) }, legacyFactor: 10),
