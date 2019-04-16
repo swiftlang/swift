@@ -214,6 +214,10 @@ namespace swift {
   /// \param DC The DeclContext from which the subscript is being referenced.
   Optional<Type> getRootTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
                                                    const DeclContext *DC);
+
+  /// Determine whether the given property is part of the memberwise initializer
+  /// for a struct.
+  bool isMemberwiseInitialized(VarDecl *var);
 }
 
 #endif
