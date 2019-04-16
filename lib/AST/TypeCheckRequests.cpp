@@ -248,6 +248,10 @@ void IsFinalRequest::cacheResult(bool value) const {
   auto decl = std::get<0>(getStorage());
   decl->LazySemanticInfo.isFinalComputed = true;
   decl->LazySemanticInfo.isFinal = value;
+
+  // Register Final in attributes, to preserve print order
+  if (value && !decl->getAttrs().hasAttribute<FinalAttr>())
+    decl->getAttrs().add(new (decl->getASTContext()) FinalAttr(/*Implicit=*/true));
 }
 
 //----------------------------------------------------------------------------//
