@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
 
 // REQUIRES: objc_interop
+// REQUIRES: rdar49942212
 
 import ObjectiveC
 
