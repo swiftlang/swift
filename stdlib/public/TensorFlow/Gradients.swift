@@ -509,7 +509,7 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
 
   @inlinable
   func _vjpTransposed(
-    withPermutations permutations: [Int32]
+    withPermutations permutations: [Int]
   ) -> (Tensor, (Tensor) -> Tensor) {
     let value = transposed(withPermutations: permutations)
     return (value, { $0.transposed(withPermutations: permutations) })
@@ -517,7 +517,7 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
 
   @inlinable
   func _vjpTransposed(
-    withPermutations permutations: Int32...
+    withPermutations permutations: Int...
   ) -> (Tensor, (Tensor) -> Tensor) {
     let value = transposed(withPermutations: permutations)
     return (value, { $0.transposed(withPermutations: permutations) })
@@ -545,7 +545,7 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   }
 
   @inlinable
-  func _vjpSqueezingShape(at axes: [Int32]) -> (Tensor, (Tensor) -> Tensor) {
+  func _vjpSqueezingShape(at axes: [Int]) -> (Tensor, (Tensor) -> Tensor) {
     let value = squeezingShape(at: axes)
     return (value, { [shape = shapeTensor] v in
       v.reshaped(toShape: shape)
@@ -554,7 +554,7 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
 
   @inlinable
   func _vjpExpandingShape(
-    at shapeIndex: Int32
+    at shapeIndex: Int
   ) -> (Tensor, (Tensor) -> Tensor) {
     let value = expandingShape(at: shapeIndex)
     return (value, { v in
@@ -588,6 +588,15 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
     let count = Raw.gather(params: shapeTensor, indices: axes).product()
     return (value, { [shape = shapeTensor] in
       $0.broadcast(toShape: shape) / Tensor(count)
+    })
+  }
+
+  @inlinable
+  func _vjpMean(squeezingAxes axes: [Int]) -> (Tensor, (Tensor) -> Tensor) {
+    let value = mean(squeezingAxes: axes)
+    return (value, { [shape = shapeTensor,
+                      count = axes.map { shape[$0] }.reduce(1, *)] in
+      $0.broadcast(toShape: shape) / Tensor(Scalar(count))
     })
   }
 

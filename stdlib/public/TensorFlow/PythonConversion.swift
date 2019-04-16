@@ -54,7 +54,7 @@ extension ShapedArray : ConvertibleFromNumpyArray
     }
 
     let pyShape = numpyArray.__array_interface__["shape"]
-    guard let shape = Array<Int>(pyShape) else {
+    guard let shape = [Int](pyShape) else {
       debugLogNumpyError("cannot access shape of 'numpy.ndarray' instance.")
       return nil
     }
@@ -119,7 +119,7 @@ extension Tensor : ConvertibleFromNumpyArray
     }
 
     let pyShape = numpyArray.__array_interface__["shape"]
-    guard let dimensions = Array<Int32>(pyShape) else {
+    guard let dimensions = [Int](pyShape) else {
       debugLogNumpyError("cannot access shape of 'numpy.ndarray' instance.")
       return nil
     }

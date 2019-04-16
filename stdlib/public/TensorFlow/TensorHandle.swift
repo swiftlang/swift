@@ -73,7 +73,7 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
   /// capacity. `bufferInitializer` must initialize the entire buffer.
   @usableFromInline
   convenience init(
-    shape: [Int32],
+    shape: [Int],
     byteCount: Int,
     bufferInitializer: (UnsafeMutableRawPointer) -> Void
   ) {
@@ -106,10 +106,10 @@ extension TensorHandle where Scalar : TensorFlowScalar {
   /// order.
   @usableFromInline
   convenience init(
-    shape: [Int32],
+    shape: [Int],
     scalarsInitializer: (UnsafeMutablePointer<Scalar>) -> Void
   ) {
-    let contiguousSize = shape.lazy.map(Int.init).reduce(1, *)
+    let contiguousSize = shape.reduce(1, *)
     let byteCount = contiguousSize * MemoryLayout<Scalar>.stride
     self.init(shape: shape, byteCount: byteCount) { buffer in
       scalarsInitializer(buffer.bindMemory(to: Scalar.self,

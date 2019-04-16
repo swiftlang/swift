@@ -26,7 +26,7 @@ DatasetAPITests.testAllBackends("SingleValueManualIterator") {
     .reshaped(to: [5, 1])
   let dataset = Dataset(elements: scalars)
   var iterator = dataset.makeIterator()
-  var i: Int32 = 0
+  var i: Int = 0
   while let item = iterator.next() {
     expectEqual(scalars[i].array, item.array)
     i += 1
@@ -38,7 +38,7 @@ DatasetAPITests.testAllBackends("DatasetIteration") {
   let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
     .reshaped(to: [5, 1])
   let dataset = Dataset(elements: scalars)
-  var i: Int32 = 0
+  var i: Int = 0
   for item in dataset {
     expectEqual(scalars[i].array, item.array)
     i += 1
@@ -94,7 +94,7 @@ DatasetAPITests.testAllBackends("DoubleValueDatasetIteration") {
   let scalars2 = Tensor<Int32>(rangeFrom: 5, to: 10, stride: 1)
   let datasetLeft = Dataset(elements: scalars1)
   let datasetRight = Dataset(elements: scalars2)
-  var i: Int32 = 0
+  var i: Int = 0
   for pair in zip(datasetLeft, datasetRight) {
     expectEqual(scalars1[i].array, pair.first.array)
     expectEqual(scalars2[i].array, pair.second.array)

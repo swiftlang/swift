@@ -517,8 +517,8 @@ public func graphFuncReturningOpaqueHandles() -> (ResourceHandle, ResourceHandle
 }
 // CHECK-LABEL --- TFPartition Accelerator Result: {{.*}}graphFuncReturningOpaqueHandles{{.*}}
 // CHECK: bb0:
-// CHECK:  [[A:%.*]] = graph_op "Iterator"() {shared_name: "foo", container: "bar", output_shapes: [$TensorShape: ([$Int32: ])], output_types$dtype: [$TensorDataType: (((i32 1)))], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $ResourceHandle 
-// CHECK:  [[B:%.*]] = graph_op "Iterator"() {shared_name: "foo", container: "bar", output_shapes: [$TensorShape: ([$Int32: ])], output_types$dtype: [$TensorDataType: (((i32 1)))], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $ResourceHandle 
+// CHECK:  [[A:%.*]] = graph_op "Iterator"() {shared_name: "foo", container: "bar", output_shapes: [$TensorShape: ([$Int: ])], output_types$dtype: [$TensorDataType: (((i32 1)))], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $ResourceHandle
+// CHECK:  [[B:%.*]] = graph_op "Iterator"() {shared_name: "foo", container: "bar", output_shapes: [$TensorShape: ([$Int: ])], output_types$dtype: [$TensorDataType: (((i32 1)))], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $ResourceHandle
 // CHECK:  [[C:%.*]] = tuple ([[A]] : $ResourceHandle, [[B]] : $ResourceHandle)
 // CHECK:  return [[C]] : $(ResourceHandle, ResourceHandle)   
 

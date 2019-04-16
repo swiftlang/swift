@@ -44,9 +44,9 @@ public struct StringTensor {
 @usableFromInline @inline(never)
 @_silgen_name("__tf_string_tensor_from_strings")
 func _TFStringTensorFromStrings(
-  _ scalars: [String], shape: [Int32]
+  _ scalars: [String], shape: [Int]
 ) -> TensorHandle<String> {
-  let contiguousSize = shape.map(Int.init).reduce(1, *)
+  let contiguousSize = shape.reduce(1, *)
   precondition(scalars.count == contiguousSize,
                "The number of scalars does not match the shape.")
 
@@ -110,7 +110,7 @@ func _TFStringTensorFromString(_ scalar: String) -> TensorHandle<String> {
 @usableFromInline @inline(never)
 @_silgen_name("__tf_string_tensor_from_strings_1d")
 func _TFStringTensorFromStrings1D(_ scalars: [String]) -> TensorHandle<String> {
-  return _TFStringTensorFromStrings(scalars, shape: [Int32(scalars.count)])
+  return _TFStringTensorFromStrings(scalars, shape: [scalars.count])
 }
 
 //===----------------------------------------------------------------------===//
