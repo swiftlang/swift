@@ -469,9 +469,6 @@ public:
   /// Retrieve the type Swift.Never.
   CanType getNeverType() const;
 
-  /// Retrieve the declaration of Swift.Void.
-  TypeAliasDecl *getVoidDecl() const;
-
   /// Retrieve the declaration of ObjectiveC.ObjCBool.
   StructDecl *getObjCBoolDecl() const;
 
@@ -529,12 +526,6 @@ public:
   /// Retrieve the declaration of
   /// Array.reserveCapacityForAppend(newElementsCount: Int)
   FuncDecl *getArrayReserveCapacityDecl() const;
-
-  /// Retrieve the declaration of Swift._unimplementedInitializer.
-  FuncDecl *getUnimplementedInitializerDecl() const;
-
-  /// Retrieve the declaration of Swift._undefined.
-  FuncDecl *getUndefinedDecl() const;
 
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl() const;

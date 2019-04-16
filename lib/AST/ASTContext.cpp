@@ -178,9 +178,6 @@ struct ASTContext::Implementation {
   
   /// The declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.memory.
   VarDecl *AutoreleasingUnsafeMutablePointerMemoryDecl = nullptr;
-
-  /// The declaration of Swift.Void.
-  TypeAliasDecl *VoidDecl = nullptr;
   
   /// The declaration of ObjectiveC.ObjCBool.
   StructDecl *ObjCBoolDecl = nullptr;
@@ -209,12 +206,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 
   /// func reserveCapacityForAppend(newElementsCount: Int)
   FuncDecl *ArrayReserveCapacityDecl = nullptr;
-
-  /// func _unimplementedInitializer(className: StaticString).
-  FuncDecl *UnimplementedInitializerDecl = nullptr;
-
-  /// func _undefined<T>(msg: StaticString, file: StaticString, line: UInt) -> T
-  FuncDecl *UndefinedDecl = nullptr;
 
   /// func _stdlib_isOSVersionAtLeast(Builtin.Word,Builtin.Word, Builtin.word)
   //    -> Builtin.Int1
@@ -641,25 +632,6 @@ void ASTContext::lookupInSwiftModule(
   M->lookupValue({ }, identifier, NLKind::UnqualifiedLookup, results);
 }
 
-/// Find the generic implementation declaration for the named syntactic-sugar
-/// type.
-static NominalTypeDecl *findStdlibType(const ASTContext &ctx, StringRef name,
-                                       unsigned genericParams) {
-  // Find all of the declarations with this name in the Swift module.
-  SmallVector<ValueDecl *, 1> results;
-  ctx.lookupInSwiftModule(name, results);
-  for (auto result : results) {
-    if (auto nominal = dyn_cast<NominalTypeDecl>(result)) {
-      auto params = nominal->getGenericParams();
-      if (genericParams == (params == nullptr ? 0 : params->size())) {
-        // We found it.
-        return nominal;
-      }
-    }
-  }
-  return nullptr;
-}
-
 FuncDecl *ASTContext::getPlusFunctionOnRangeReplaceableCollection() const {
   if (getImpl().PlusFunctionOnRangeReplaceableCollection) {
     return getImpl().PlusFunctionOnRangeReplaceableCollection;
@@ -716,10 +688,20 @@ FuncDecl *ASTContext::getPlusFunctionOnString() const {
 
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   DECL_CLASS *ASTContext::get##NAME##Decl() const { \
-    if (!getImpl().NAME##Decl) \
-      getImpl().NAME##Decl = dyn_cast_or_null<DECL_CLASS>( \
-        findStdlibType(*this, #NAME, NUM_GENERIC_PARAMS)); \
-    return getImpl().NAME##Decl; \
+    if (getImpl().NAME##Decl) \
+      return getImpl().NAME##Decl; \
+    SmallVector<ValueDecl *, 1> results; \
+    lookupInSwiftModule(#NAME, results); \
+    for (auto result : results) { \
+      if (auto type = dyn_cast<DECL_CLASS>(result)) { \
+        auto params = type->getGenericParams(); \
+        if (NUM_GENERIC_PARAMS == (params == nullptr ? 0 : params->size())) { \
+          getImpl().NAME##Decl = type; \
+          return type; \
+        } \
+      } \
+    } \
+    return nullptr; \
   }
 #include "swift/AST/KnownStdlibTypes.def"
 
@@ -818,24 +800,6 @@ CanType ASTContext::getNeverType() const {
   if (!neverDecl)
     return CanType();
   return neverDecl->getDeclaredType()->getCanonicalType();
-}
-
-TypeAliasDecl *ASTContext::getVoidDecl() const {
-  if (getImpl().VoidDecl) {
-    return getImpl().VoidDecl;
-  }
-
-  // Go find 'Void' in the Swift module.
-  SmallVector<ValueDecl *, 1> results;
-  lookupInSwiftModule("Void", results);
-  for (auto result : results) {
-    if (auto typeAlias = dyn_cast<TypeAliasDecl>(result)) {
-      getImpl().VoidDecl = typeAlias;
-      return typeAlias;
-    }
-  }
-
-  return getImpl().VoidDecl;
 }
 
 StructDecl *ASTContext::getObjCBoolDecl() const {
@@ -1184,39 +1148,6 @@ FuncDecl *ASTContext::getArrayReserveCapacityDecl() const {
     }
   }
   return nullptr;
-}
-
-FuncDecl *
-ASTContext::getUnimplementedInitializerDecl() const {
-  if (getImpl().UnimplementedInitializerDecl)
-    return getImpl().UnimplementedInitializerDecl;
-
-  // Look for the function.
-  auto decl = findLibraryIntrinsic(*this, "_unimplementedInitializer");
-  if (!decl)
-    return nullptr;
-
-  if (!getIntrinsicCandidateType(decl, /*allowTypeMembers=*/false))
-    return nullptr;
-
-  // FIXME: Check inputs and outputs.
-
-  getImpl().UnimplementedInitializerDecl = decl;
-  return decl;
-}
-
-FuncDecl *
-ASTContext::getUndefinedDecl() const {
-  if (getImpl().UndefinedDecl)
-    return getImpl().UndefinedDecl;
-
-  // Look for the function.
-  auto decl = findLibraryIntrinsic(*this, "_undefined");
-  if (!decl)
-    return nullptr;
-
-  getImpl().UndefinedDecl = decl;
-  return decl;
 }
 
 FuncDecl *ASTContext::getIsOSVersionAtLeastDecl() const {
