@@ -968,3 +968,73 @@ internal func _fastWithNormalizedCodeUnitsImpl(
     }
   }
 }
+
+// Allow for Swift String class to convert itself to int/float/double using dot notation
+// This will allow for an easier time when casting a string to various types of numbers
+// Since it returns a non-optional value, unwrapping isn't necessary
+// Before we would have to do Float(value) ?? 0.0, where as now it would be simply value.intValue etc.
+extension String {
+    func intValue() -> Int {
+        if let value = Int(self) {
+            return value;
+        }
+        else {
+            return 0;
+        }
+    }
+    
+    func int8Value() -> Int8 {
+        if let value = Int8(self) {
+            return value;
+        }
+        else {
+            return 0;
+        }
+    }
+    
+    func int16Value() -> Int16 {
+        if let value = Int16(self) {
+            return value;
+        }
+        else {
+            return 0;
+        }
+    }
+    
+    func int16Value() -> Int32 {
+        if let value = Int32(self) {
+            return value;
+        }
+        else {
+            return 0;
+        }
+    }
+    
+    func int16Value() -> Int64 {
+        if let value = Int64(self) {
+            return value;
+        }
+        else {
+            return 0;
+        }
+    }
+    
+    
+    func doubleValue() -> Double {
+        if let value = Double(self) {
+            return value;
+        }
+        else {
+            return 0.0;
+        }
+    }
+    
+    func floatValue() -> Float {
+        if let float = Float(self) {
+            return float;
+        }
+        else {
+            return 0.0;
+        }
+    }
+}
