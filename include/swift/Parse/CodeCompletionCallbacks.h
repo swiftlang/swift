@@ -177,9 +177,6 @@ public:
   /// Complete at the beginning of a case stmt pattern.
   virtual void completeCaseStmtBeginning() {};
 
-  /// Complete a case stmt pattern that starts with a dot.
-  virtual void completeCaseStmtDotPrefix() {};
-
   /// Complete at the beginning of member of a nominal decl member -- no tokens
   /// provided by user.
   virtual void completeNominalMemberBeginning(
