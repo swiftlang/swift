@@ -59,9 +59,9 @@ PythonConversionTests.test("shaped-array-conversion") {
 
   let numpyArray1D = np.ones(28)
   let reshaped3D = np.reshape(numpyArray1D, [2, 7, 2] as TensorShape)
-  expectEqual(reshaped3D.shape, [2, 7, 2])
+  expectEqual(reshaped3D.shape, Python.tuple([2, 7, 2]))
   let reshaped2D = np.reshape(reshaped3D, [14, 2] as TensorShape)
-  expectEqual(reshaped2D.shape, [14, 2])
+  expectEqual(reshaped2D.shape, Python.tuple([14, 2]))
 
   let numpyArrayStrided = np.array([[1, 2], [1, 2]], dtype: np.int32)[
       Python.slice(Python.None), 1]
