@@ -240,9 +240,9 @@ TensorTests.testAllBackends("EllipsisIndexing") {
   // ShapedArray is tested instead.
   var tensor3D = Tensor<Float>(
     shape: [3, 4, 5], scalars: Array(stride(from: 0.0, to: 60, by: 1)))
-  tensor3D[2, ellipsis] = Tensor<Float>(
+  tensor3D[2, TensorRange.ellipsis] = Tensor<Float>(
     shape: [4, 5], scalars: Array(stride(from: 20.0, to: 40, by: 1)))
-  let slice3D = tensor3D[2..., ellipsis]
+  let slice3D = tensor3D[2..., TensorRange.ellipsis]
   let slice2D = tensor3D[1][0..<2]
   let slice1D = tensor3D[0][0][3..<5]
 
@@ -268,6 +268,8 @@ TensorTests.testAllBackends("NewAxisIndexing") {
   // ShapedArray is tested instead.
   let tensor3D = Tensor<Float>(
     shape: [3, 4, 5], scalars: Array(stride(from: 0.0, to: 60, by: 1)))
+  let newAxis = TensorRange.newAxis
+  let ellipsis = TensorRange.ellipsis
   let slice3D = tensor3D[2..., newAxis, ellipsis]
   let slice2D = tensor3D[1, newAxis][0..<1, 0..<2]
   let slice1D = tensor3D[0][newAxis, 0][0..<1, 3..<5, newAxis]
@@ -294,6 +296,9 @@ TensorTests.testAllBackends("SqueezeAxisIndexing") {
   // ShapedArray is tested instead.
   let tensor3D = Tensor<Float>(
     shape: [3, 4, 5], scalars: Array(stride(from: 0.0, to: 60, by: 1)))
+  let newAxis = TensorRange.newAxis
+  let ellipsis = TensorRange.ellipsis
+  let squeezeAxis = TensorRange.squeezeAxis
   let slice3D = tensor3D[2..., newAxis, ellipsis][squeezeAxis, squeezeAxis]
   let slice2D = tensor3D[1, newAxis][squeezeAxis, 0..<2]
   let slice1D = tensor3D[0..<1, 0, 3..<5, newAxis][
@@ -321,7 +326,7 @@ TensorTests.testAllBackends("StridedSliceIndexingAssignment") {
   // ShapedArray is tested instead.
   var tensor3D = Tensor<Float>(
     shape: [3, 4, 5], scalars: Array(stride(from: 0.0, to: 60, by: 1)))
-  tensor3D[2, strided(0..<5, by: 2), 0..<6] = Tensor<Float>(
+  tensor3D[2, 0..<5..2, 0..<6] = Tensor<Float>(
     shape: [2, 5], scalars: Array(stride(from: 20.0, to: 40, by: 2)))
   let slice3D = tensor3D[2...]
   let slice2D = tensor3D[1][0..<2]

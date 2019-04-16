@@ -1675,42 +1675,6 @@ extension TensorRange : Equatable {
   }
 }
 
-public let ellipsis: TensorRange = .ellipsis
-public let newAxis: TensorRange = .newAxis
-public let squeezeAxis: TensorRange = .squeezeAxis
-
-public func strided(_ value: Range<Int32>, by stride: Int32) -> TensorRange {
-  return .range(value, stride: stride)
-}
-
-public func strided(
-  _ value: ClosedRange<Int32>,
-  by stride: Int32
-) -> TensorRange {
-  return .closedRange(value, stride: stride)
-}
-
-public func strided(
-  _ value: PartialRangeFrom<Int32>,
-  by stride: Int32
-) -> TensorRange {
-  return .partialRangeFrom(value, stride: stride)
-}
-
-public func strided(
-  _ value: PartialRangeUpTo<Int32>,
-  by stride: Int32
-) -> TensorRange {
-  return .partialRangeUpTo(value, stride: stride)
-}
-
-public func strided(
-  _ value: PartialRangeThrough<Int32>,
-  by stride: Int32
-) -> TensorRange {
-  return .partialRangeThrough(value, stride: stride)
-}
-
 public protocol TensorRangeExpression {
   var tensorRange: TensorRange { get }
 }
@@ -1730,32 +1694,71 @@ extension Int : TensorRangeExpression {
 
 extension Range : TensorRangeExpression where Bound == Int {
   public var tensorRange: TensorRange {
-    return .range(Int32(self.lowerBound)..<Int32(self.upperBound), stride: 1)
+    return .range(Int32(lowerBound)..<Int32(upperBound), stride: 1)
   }
 }
 
 extension ClosedRange : TensorRangeExpression where Bound == Int {
   public var tensorRange: TensorRange {
     return .closedRange(
-      Int32(self.lowerBound)...Int32(self.upperBound), stride: 1)
+      Int32(lowerBound)...Int32(upperBound), stride: 1)
   }
 }
 
 extension PartialRangeFrom : TensorRangeExpression where Bound == Int {
   public var tensorRange: TensorRange {
-    return .partialRangeFrom(Int32(self.lowerBound)..., stride: 1)
+    return .partialRangeFrom(Int32(lowerBound)..., stride: 1)
   }
 }
 
 extension PartialRangeUpTo : TensorRangeExpression where Bound == Int {
   public var tensorRange: TensorRange {
-    return .partialRangeUpTo(..<Int32(self.upperBound), stride: 1)
+    return .partialRangeUpTo(..<Int32(upperBound), stride: 1)
   }
 }
 
 extension PartialRangeThrough : TensorRangeExpression where Bound == Int {
   public var tensorRange: TensorRange {
-    return .partialRangeThrough(...Int32(self.upperBound), stride: 1)
+    return .partialRangeThrough(...Int32(upperBound), stride: 1)
+  }
+}
+
+infix operator ..: TensorRangePrecedence
+precedencegroup TensorRangePrecedence {
+  associativity: left
+  higherThan: CastingPrecedence
+  lowerThan: RangeFormationPrecedence
+}
+
+public extension Range where Bound == Int {
+  static func .. (range: Range, stride: Int) -> TensorRange {
+    return .range(
+      Int32(range.lowerBound)..<Int32(range.upperBound), stride: Int32(stride))
+  }
+}
+
+public extension ClosedRange where Bound == Int {
+  static func .. (range: ClosedRange, stride: Int) -> TensorRange {
+    return .closedRange(
+      Int32(range.lowerBound)...Int32(range.upperBound), stride: Int32(stride))
+  }
+}
+
+public extension PartialRangeFrom where Bound == Int {
+  static func .. (range: PartialRangeFrom, stride: Int) -> TensorRange {
+    return .partialRangeFrom(Int32(range.lowerBound)..., stride: Int32(stride))
+  }
+}
+
+public extension PartialRangeUpTo where Bound == Int {
+  static func .. (range: PartialRangeUpTo, stride: Int) -> TensorRange {
+    return .partialRangeUpTo(..<Int32(range.upperBound), stride: Int32(stride))
+  }
+}
+
+public extension PartialRangeThrough where Bound == Int {
+  static func .. (range: PartialRangeThrough, stride: Int) -> TensorRange {
+    return .partialRangeThrough(...Int32(range.upperBound), stride: Int32(stride))
   }
 }
 
