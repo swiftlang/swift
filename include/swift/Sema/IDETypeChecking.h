@@ -202,6 +202,18 @@ namespace swift {
   /// the decl context.
   bool resolveProtocolNames(DeclContext *DC, ArrayRef<const char *> names,
                             llvm::MapVector<ProtocolDecl*, StringRef> &result);
+
+  /// Return true if the specified type or a super-class/super-protocol has the
+  /// @dynamicMemberLookup attribute on it.
+  bool hasDynamicMemberLookupAttribute(Type type);
+
+  /// Returns the root type of the keypath type in a keypath dynamic member
+  /// lookup subscript, or \c None if it cannot be determined.
+  ///
+  /// \param subscript The potential keypath dynamic member lookup subscript.
+  /// \param DC The DeclContext from which the subscript is being referenced.
+  Optional<Type> getRootTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
+                                                   const DeclContext *DC);
 }
 
 #endif
