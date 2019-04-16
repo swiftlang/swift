@@ -2804,6 +2804,13 @@ void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
   // to determine the underlying type.
   if (auto opaqueResultTy = AFD->getOpaqueResultTypeDecl()) {
     OpaqueUnderlyingTypeChecker(TC, AFD, opaqueResultTy).check();
+  } else if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
+    if (accessor->isGetter()) {
+      if (auto opaqueResultTy
+                          = accessor->getStorage()->getOpaqueResultTypeDecl()) {
+        OpaqueUnderlyingTypeChecker(TC, AFD, opaqueResultTy).check();
+      }
+    }
   }
 }
 

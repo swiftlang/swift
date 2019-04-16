@@ -15,22 +15,23 @@ class D: C, P, Q { func paul() {}; func priscilla() {}; func quinn() {} }
 // TODO: Should be valid
 
 let property: some P = 1 // TODO expected-error{{cannot convert}}
+let deflessProperty: some P // TODO e/xpected-error{{butz}}
 
 struct GenericProperty<T: P> {
   var x: T
   var property: some P {
-    return x // TODO expected-error{{cannot convert}}
+    return x
   }
 }
 
 let (bim, bam): some P = (1, 2) // expected-error{{'some' type can only be declared on a single property declaration}}
 var computedProperty: some P {
-  get { return 1 } // TODO expected-error{{cannot convert}}
+  get { return 1 }
   set { _ = newValue + 1 } // TODO expected-error{{}} expected-note{{}}
 }
 struct SubscriptTest {
   subscript(_ x: Int) -> some P {
-    return x // TODO expected-error{{cannot convert}}
+    return x
   }
 }
 
@@ -180,6 +181,24 @@ func mismatchedReturnTypes(_ x: Bool, _ y: Int, _ z: String) -> some P { // expe
     return y // expected-note{{underlying type 'Int'}}
   } else {
     return z // expected-note{{underlying type 'String'}}
+  }
+}
+
+var mismatchedReturnTypesProperty: some P { // expected-error{{do not have matching underlying types}}
+  if true {
+    return 0 // expected-note{{underlying type 'Int'}}
+  } else {
+    return "" // expected-note{{underlying type 'String'}}
+  }
+}
+
+struct MismatchedReturnTypesSubscript {
+  subscript(x: Bool, y: Int, z: String) -> some P { // expected-error{{do not have matching underlying types}}
+    if x {
+      return y // expected-note{{underlying type 'Int'}}
+    } else {
+      return z // expected-note{{underlying type 'String'}}
+    }
   }
 }
 
