@@ -606,16 +606,16 @@ ERROR(sema_opening_import,Fatal,
 ERROR(serialization_load_failed,Fatal,
       "failed to load module %0", (Identifier))
 ERROR(serialization_malformed_module,Fatal,
-      "malformed module file: %0", (StringRef))
+      "malformed compiled module: %0", (StringRef))
 ERROR(serialization_module_too_new,Fatal,
-      "module file was created by a newer version of the compiler: %0",
+      "compiled module was created by a newer version of the compiler: %0",
       (StringRef))
 ERROR(serialization_module_language_version_mismatch,Fatal,
       "module compiled with Swift %0 cannot be imported by the Swift %1 "
       "compiler: %2",
       (StringRef, StringRef, StringRef))
 ERROR(serialization_module_too_old,Fatal,
-      "module file was created by an older version of the compiler; "
+      "compiled module was created by an older version of the compiler; "
       "rebuild %0 and try again: %1",
       (Identifier, StringRef))
 ERROR(serialization_missing_single_dependency,Fatal,
