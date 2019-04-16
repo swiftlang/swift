@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5
 
-// See test/Compatibility/tuple_arguments_3.swift for the Swift 3 behavior.
-// See test/Compatibility/tuple_arguments_4.swift for the Swift 4 behavior.
+// See test/Compatibility/tuple_arguments_4.swift for some
+// Swift 4-specific tests.
 
 func concrete(_ x: Int) {}
 func concreteLabeled(x: Int) {}
