@@ -2440,6 +2440,12 @@ void AttributeChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
   }
 }
 
+void TypeChecker::checkParameterAttributes(ParameterList *params) {
+  for (auto param: *params) {
+    checkDeclAttributes(param);
+  }
+}
+
 void TypeChecker::checkDeclAttributes(Decl *D) {
   AttributeChecker Checker(*this, D);
 
