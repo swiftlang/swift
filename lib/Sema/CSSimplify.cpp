@@ -24,6 +24,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Compiler.h"
 
@@ -3563,6 +3564,12 @@ static bool hasDynamicMemberLookupAttribute(Type type,
   return result;
 }
 
+// for IDETypeChecking
+bool swift::hasDynamicMemberLookupAttribute(Type type) {
+  llvm::DenseMap<CanType, bool> DynamicMemberLookupCache;
+  return ::hasDynamicMemberLookupAttribute(type, DynamicMemberLookupCache);
+}
+
 static bool isKeyPathDynamicMemberLookup(ConstraintLocator *locator) {
   auto path = locator ? locator->getPath() : None;
   return !path.empty() && path.back().isKeyPathDynamicMember();
@@ -3937,8 +3944,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // as representing "dynamic lookup" unless it's a direct call
     // to such subscript (in that case label is expected to match).
     if (auto *subscript = dyn_cast<SubscriptDecl>(cand)) {
-      if (hasDynamicMemberLookupAttribute(instanceTy,
-                                          DynamicMemberLookupCache) &&
+      if (::hasDynamicMemberLookupAttribute(instanceTy,
+                                            DynamicMemberLookupCache) &&
           isValidKeyPathDynamicMemberLookup(subscript, TC)) {
         auto info =
             getArgumentLabels(*this, ConstraintLocatorBuilder(memberLocator));
@@ -4030,7 +4037,8 @@ retry_after_fail:
       constraintKind == ConstraintKind::ValueMember &&
       memberName.isSimpleName() && !memberName.isSpecial()) {
     auto name = memberName.getBaseIdentifier();
-    if (hasDynamicMemberLookupAttribute(instanceTy, DynamicMemberLookupCache)) {
+    if (::hasDynamicMemberLookupAttribute(instanceTy,
+                                          DynamicMemberLookupCache)) {
       auto &ctx = getASTContext();
 
       // Recursively look up `subscript(dynamicMember:)` methods in this type.
