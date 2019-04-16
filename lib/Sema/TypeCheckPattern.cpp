@@ -684,7 +684,28 @@ static bool validateTypedPattern(TypeChecker &TC,
     return TP->getType()->hasError();
 
   TypeLoc TL = TP->getTypeLoc();
-  bool hadError = TC.validateType(TL, resolution, options);
+  
+  bool hadError;
+  
+  // If the pattern declares an opaque type, and applies to a single
+  // variable binding, then we can bind the opaque return type from the
+  // property definition.
+  if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(TL.getTypeRepr())) {
+    auto named = dyn_cast<NamedPattern>(
+                           TP->getSubPattern()->getSemanticsProvidingPattern());
+    if (named) {
+      auto opaqueTy = TC.getOrCreateOpaqueResultType(resolution,
+                                                     named->getDecl(),
+                                                     opaqueRepr);
+      TL.setType(opaqueTy);
+      hadError = opaqueTy->hasError();
+    } else {
+      TC.diagnose(TP->getLoc(), diag::opaque_type_unsupported_pattern);
+      hadError = true;
+    }
+  } else {
+    hadError = TC.validateType(TL, resolution, options);
+  }
 
   if (hadError) {
     TP->setType(ErrorType::get(TC.Context));

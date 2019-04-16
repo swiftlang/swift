@@ -2319,6 +2319,8 @@ void ValueDecl::setOverriddenDecls(ArrayRef<ValueDecl *> overridden) {
 OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
   if (auto func = dyn_cast<FuncDecl>(this)) {
     return func->getOpaqueResultTypeDecl();
+  } else if (auto storage = dyn_cast<AbstractStorageDecl>(this)) {
+    return storage->getOpaqueResultTypeDecl();
   } else {
     return nullptr;
   }
@@ -2327,6 +2329,8 @@ OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
 void ValueDecl::setOpaqueResultTypeDecl(OpaqueTypeDecl *D) {
   if (auto func = dyn_cast<FuncDecl>(this)) {
     func->setOpaqueResultTypeDecl(D);
+  } else if (auto storage = dyn_cast<AbstractStorageDecl>(this)){
+    storage->setOpaqueResultTypeDecl(D);
   } else {
     llvm_unreachable("decl does not support opaque result types");
   }
