@@ -50,7 +50,7 @@ set(SOURCES
   Utilities.swift
   Threading.swift
   # NumPy bridging for `ShapedArray` and `Tensor`.
-  NumpyConversion.swift)
+  PythonConversion.swift)
 
 # Copy TensorFlow bindings file, if it exists.
 if (TENSORFLOW_SWIFT_BINDINGS)
@@ -65,7 +65,7 @@ if (TENSORFLOW_SWIFT_APIS)
   list(APPEND SOURCES "${TENSORFLOW_SWIFT_API_SOURCES}")
 endif()
 
-# When Python exists, NumpyConversion.swift imports it, so it must be
+# When Python exists, PythonConversion.swift imports it, so it must be
 # available at link time.
 set(TENSORFLOW_DEPENDS_PYTHON)
 if (SWIFT_PYTHON_EXISTS)

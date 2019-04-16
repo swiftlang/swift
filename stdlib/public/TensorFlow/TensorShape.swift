@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Python
-
 // NOTE: it may be possible to edit `TensorShape` to support "labeled tensors".
 // Dimensions may be either an Int or an enum representing a label.
 
@@ -159,22 +157,5 @@ extension TensorShape : Codable {
     let container = try decoder.singleValueContainer()
     let dimensions = try container.decode([Int].self)
     self.init(dimensions)
-  }
-}
-
-extension TensorShape : PythonConvertible {
-  public var pythonObject: PythonObject {
-    return dimensions.pythonObject
-  }
-
-  public init?(_ pythonObject: PythonObject) {
-    let hasLen = Bool(Python.hasattr(pythonObject, "__len__"))
-    if (hasLen == true) {
-      guard let array = [Int](pythonObject) else { return nil }
-      self.init(array)
-    } else {
-      guard let num = Int(pythonObject) else { return nil }
-      self.init(num)
-    }
   }
 }
