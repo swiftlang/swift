@@ -3290,6 +3290,7 @@ void Serializer::writeDecl(const Decl *D) {
                           addTypeRef(ty),
                           addDeclRef(var->getOverriddenDecl()),
                           rawAccessLevel, rawSetterAccessLevel,
+                          addDeclRef(var->getOpaqueResultTypeDecl()),
                           accessorsAndDependencies);
     break;
   }
@@ -3566,6 +3567,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 rawStaticSpelling,
                                 subscript->
                                   getFullName().getArgumentNames().size(),
+                                addDeclRef(subscript->getOpaqueResultTypeDecl()),
                                 nameComponentsAndDependencies);
 
     writeGenericParams(subscript->getGenericParams());
