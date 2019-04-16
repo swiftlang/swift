@@ -5,4 +5,6 @@
 import OpaqueCrossFileB
 
 dump(anyFoo())
+dump(anyFooProp)
+dump(Subscript()[])
 
