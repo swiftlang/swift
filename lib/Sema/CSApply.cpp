@@ -4572,10 +4572,8 @@ namespace {
           }
 
           // Key paths don't currently support static members.
-          if (varDecl->isStatic()) {
-            cs.TC.diagnose(componentLoc, diag::expr_keypath_static_member,
-                           property->getFullName());
-          }
+          // There is a fix which diagnoses such situation already.
+          assert(!varDecl->isStatic());
         }
 
         cs.TC.requestMemberLayout(property);
