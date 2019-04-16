@@ -160,6 +160,10 @@ AttachedFunctionBuilderRequest::evaluate(Evaluator &evaluator,
                                      CustomAttrNominalRequest{mutableAttr, dc},
                                      nullptr);
 
+    // Ignore unresolvable custom attributes.
+    if (!nominal)
+      continue;
+
     // Return the first custom attribute that is a function builder type.
     if (nominal->getAttrs().hasAttribute<FunctionBuilderAttr>())
       return mutableAttr;
