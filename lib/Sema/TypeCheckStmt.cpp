@@ -2061,6 +2061,8 @@ bool TypeChecker::typeCheckDestructorBodyUntil(DestructorDecl *DD,
 }
 
 bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
+  checkParameterAttributes(closure->getParameters());
+
   BraceStmt *body = closure->getBody();
 
   Optional<FunctionBodyTimer> timer;
