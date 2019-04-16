@@ -334,6 +334,7 @@ private:
     // get label locations
     auto *MemberwiseInit = DeclRef->getDecl();
     std::vector<SourceLoc> LabelLocs;
+    ArrayRef<Identifier> Labels;
     auto NameLoc = DeclRef->getNameLoc();
     if (NameLoc.isCompound()) {
       size_t LabelIndex = 0;
@@ -341,12 +342,16 @@ private:
       while ((ArgLoc = NameLoc.getArgumentLabelLoc(LabelIndex++)).isValid()) {
         LabelLocs.push_back(ArgLoc);
       }
+      Labels = MemberwiseInit->getFullName().getArgumentNames();
     } else if (auto *CallParent = dyn_cast_or_null<CallExpr>(getParentExpr())) {
       LabelLocs = CallParent->getArgumentLabelLocs();
+      Labels = CallParent->getArgumentLabels();
     }
 
     if (LabelLocs.empty())
       return;
+
+    assert(Labels.size() == LabelLocs.size());
 
     // match labels to properties
     auto *TypeContext =
@@ -354,14 +359,22 @@ private:
     if (!TypeContext || !shouldIndex(TypeContext, false))
       return;
 
-    auto LabelIt = LabelLocs.begin();
+    unsigned CurLabel = 0;
     for (auto Prop : TypeContext->getStoredProperties()) {
-      if (Prop->getParentInitializer() && Prop->isLet())
+      if (auto Original = Prop->getOriginalDelegatedProperty())
+        Prop = Original;
+
+      if (!isMemberwiseInitialized(Prop))
         continue;
 
-      assert(LabelIt != LabelLocs.end());
+      if (CurLabel == LabelLocs.size())
+        break;
+
+      if (Labels[CurLabel] != Prop->getName())
+        continue;
+
       IndexSymbol Info;
-      if (initIndexSymbol(Prop, *LabelIt++, /*IsRef=*/true, Info))
+      if (initIndexSymbol(Prop, LabelLocs[CurLabel++], /*IsRef=*/true, Info))
         continue;
       if (startEntity(Prop, Info, /*IsRef=*/true))
         finishCurrentEntity();
