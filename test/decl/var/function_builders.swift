@@ -33,6 +33,14 @@ func makerParamConflict(@Maker // expected-error {{only one function builder att
                         @Inventor // expected-note {{previous function builder specified here}}
                         fn: () -> ()) {}
 
+func makerParamMissing1(@Missing // expected-error {{unknown attribute 'Missing'}}
+                        @Maker
+                        fn: () -> ()) {}
+
+func makerParamMissing2(@Maker
+                        @Missing // expected-error {{unknown attribute 'Missing'}}
+                        fn: () -> ()) {}
+
 func makerParamExtra(@Maker(5) // expected-error {{function builder attributes cannot have arguments}}
                      fn: () -> ()) {}
 
