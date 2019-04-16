@@ -5341,7 +5341,7 @@ public:
 
   /// Retrieve the @functionBuilder type attached to this parameter,
   /// if there is one.
-  NominalTypeDecl *getFunctionBuilderType() const;
+  Type getFunctionBuilderType() const;
   
   SourceRange getSourceRange() const;
 

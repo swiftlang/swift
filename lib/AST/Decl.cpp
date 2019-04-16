@@ -5740,16 +5740,17 @@ void ParamDecl::setStoredProperty(VarDecl *var) {
   DefaultValueAndFlags.getPointer()->DefaultArg = var;
 }
 
-NominalTypeDecl *ParamDecl::getFunctionBuilderType() const {
+Type ParamDecl::getFunctionBuilderType() const {
   auto attr = getAttachedFunctionBuilder();
-  if (!attr) return nullptr;
+  if (!attr) return Type();
 
   auto mutableAttr = const_cast<CustomAttr*>(attr);
   auto &ctx = getASTContext();
   auto dc = getDeclContext();
   return evaluateOrDefault(ctx.evaluator,
-                           CustomAttrNominalRequest{mutableAttr, dc},
-                           nullptr);
+                           CustomAttrTypeRequest{mutableAttr, dc,
+                             CustomAttrTypeKind::NonGeneric},
+                           Type());
 }
 
 CustomAttr *ParamDecl::getAttachedFunctionBuilder() const {
