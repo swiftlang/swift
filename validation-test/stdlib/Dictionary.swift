@@ -3222,7 +3222,16 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
 }
 
 
-DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_ParallelArray") {
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_ParallelArray")
+  .skip(.custom(
+    {
+#if os(iOS)
+      return true
+#else
+      return false
+#endif
+    }, reason: "Autorelease Failure. rdar://49791522"))
+.code {
 autoreleasepoolIfUnoptimizedReturnAutoreleased {
   // Add an autorelease pool because ParallelArrayDictionary autoreleases
   // values in objectForKey.
@@ -4283,7 +4292,16 @@ DictionaryTestSuite.test("DictionaryUpcastBridged") {
 // Dictionary downcasts
 //===---
 
-DictionaryTestSuite.test("DictionaryDowncastEntryPoint") {
+DictionaryTestSuite.test("DictionaryDowncastEntryPoint")
+  .skip(.custom(
+    {
+#if os(iOS)
+      return true
+#else
+      return false
+#endif
+    }, reason: "Autorelease Failure. rdar://49791522"))
+.code {
   var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
@@ -4304,7 +4322,16 @@ DictionaryTestSuite.test("DictionaryDowncastEntryPoint") {
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
-DictionaryTestSuite.test("DictionaryDowncast") {
+DictionaryTestSuite.test("DictionaryDowncast")
+  .skip(.custom(
+    {
+#if os(iOS)
+      return true
+#else
+      return false
+#endif
+    }, reason: "Autorelease Failure. rdar://49791522"))
+.code {
   var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
