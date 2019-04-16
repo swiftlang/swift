@@ -1039,6 +1039,7 @@ namespace decls_block {
     DeclIDField,  // overridden decl
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
+    DeclIDField, // opaque return type decl
     BCArray<TypeIDField> // accessors and dependencies
   >;
 
@@ -1198,6 +1199,7 @@ namespace decls_block {
     AccessLevelField, // setter access, if applicable
     StaticSpellingKindField,    // is subscript static?
     BCVBR<5>,    // number of parameter name components
+    DeclIDField, // opaque return type decl
     BCArray<IdentifierIDField> // name components,
                                // followed by DeclID accessors,
                                // followed by TypeID dependencies
