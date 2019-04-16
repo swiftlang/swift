@@ -13,7 +13,7 @@
 import SwiftPrivate
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(Wasm)
 import Glibc
 #elseif os(Windows)
 import MSVCRT
@@ -125,6 +125,8 @@ public func _stdlib_pipe() -> (readEnd: CInt, writeEnd: CInt, error: CInt) {
   let ret = fds.withUnsafeMutableBufferPointer { unsafeFds -> CInt in
 #if os(Windows)
     return _pipe(unsafeFds.baseAddress, 0, 0)
+#elseif os(Wasm)
+    fatalError("no pipes on WebAssembly")
 #else
     return pipe(unsafeFds.baseAddress)
 #endif

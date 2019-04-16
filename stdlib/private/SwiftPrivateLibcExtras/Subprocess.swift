@@ -21,6 +21,9 @@ import WinSDK
 #endif
 
 internal func _signalToString(_ signal: Int) -> String {
+#if os(Wasm)
+  return "unsupported"
+#else
   switch CInt(signal) {
   case SIGILL:  return "SIGILL"
   case SIGABRT: return "SIGABRT"
@@ -33,6 +36,7 @@ internal func _signalToString(_ signal: Int) -> String {
 #endif
   default:      return "SIG???? (\(signal))"
   }
+#endif // os(Wasm)
 }
 
 public enum ProcessTerminationStatus : CustomStringConvertible {
@@ -140,6 +144,15 @@ public func waitProcess(_ process: HANDLE) -> ProcessTerminationStatus {
     return .signal(Int(status))
   }
   return .exit(Int(status))
+}
+#elseif os(Wasm)
+// Oops, we can't launch tests in subprocesses yet!
+public func spawnChild(_ args: [String])
+  -> (pid: pid_t, stdinFD: CInt, stdoutFD: CInt, stderrFD: CInt) {
+  fatalError("Not supported on WebAssembly!")
+}
+public func posixWaitpid(_ pid: pid_t) -> ProcessTerminationStatus {
+  fatalError("Not supported on WebAssembly!")
 }
 #else
 // posix_spawn is not available on Android.
