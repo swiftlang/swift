@@ -1182,10 +1182,11 @@ static bool isSingleTupleParam(ASTContext &ctx,
     return false;
 
   const auto &param = params.front();
-  if (param.isVariadic() || param.isInOut())
+  if (param.isVariadic() || param.isInOut() || param.hasLabel())
     return false;
 
   auto paramType = param.getPlainType();
+
   // Support following case which was allowed until 5:
   //
   // func bar(_: (Int, Int) -> Void) {}
@@ -1195,11 +1196,9 @@ static bool isSingleTupleParam(ASTContext &ctx,
   if (!ctx.isSwiftVersionAtLeast(5))
     paramType = paramType->lookThroughAllOptionalTypes();
 
-  // Parameter should not have a label and be either a tuple,
-  // type variable or a dependent member, which might later be
-  // assigned (or resolved to) a tuple type, e.g. opened generic parameter.
-  return !param.hasLabel() &&
-         (paramType->is<TupleType>() || paramType->isTypeVariableOrMember());
+  // Parameter type should either a tuple or something that can become a
+  // tuple later on.
+  return (paramType->is<TupleType>() || paramType->isTypeVariableOrMember());
 }
 
 /// Attempt to fix missing arguments by introducing type variables
@@ -1359,7 +1358,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       return false;
 
     for (auto param : params)
-      if (param.isVariadic() || param.isInOut())
+      if (param.isVariadic() || param.isInOut() || param.isAutoClosure())
         return false;
 
     return true;

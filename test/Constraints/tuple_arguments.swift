@@ -1718,3 +1718,23 @@ func rdar48443263() {
     foo(s2, fn) // expected-error {{cannot convert value of type '() -> Void' to expected argument type '(_) -> Void'}}
   }
 }
+
+func autoclosureSplat() {
+  func takeFn<T>(_: (T) -> ()) {}
+
+  takeFn { (fn: @autoclosure () -> Int) in }
+  // This type checks because we find a solution T:= @escaping () -> Int and
+  // wrap the closure in a function conversion.
+
+  takeFn { (fn: @autoclosure () -> Int, x: Int) in }
+  // expected-error@-1 {{contextual closure type '(_) -> ()' expects 1 argument, but 2 were used in closure body}}
+
+  takeFn { (fn: @autoclosure @escaping () -> Int) in }
+  // FIXME: It looks like matchFunctionTypes() does not check @autoclosure at all.
+  // Perhaps this is intentional, but we should document it eventually. In the
+  // interim, this test serves as "documentation"; if it fails, please investigate why
+  // instead of changing the test.
+
+  takeFn { (fn: @autoclosure @escaping () -> Int, x: Int) in }
+  // expected-error@-1 {{contextual closure type '(_) -> ()' expects 1 argument, but 2 were used in closure body}}
+}
