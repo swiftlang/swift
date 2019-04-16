@@ -2430,10 +2430,7 @@ static bool isEscaping(Type type) {
           FunctionTypeRepresentation::CFunctionPointer)
       return false;
 
-    if (funcType->getExtInfo().isNoEscape())
-      return false;
-
-    return true;
+    return !funcType->getExtInfo().isNoEscape();
   }
 
   return false;
@@ -2443,8 +2440,6 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
                                 ParameterTypeFlags flags, bool escaping) {
   if (!options.excludeAttrKind(TAK_autoclosure) && flags.isAutoClosure())
     printer << "@autoclosure ";
-  if (!options.excludeAttrKind(TAK_escaping) && escaping)
-    printer << "@escaping ";
 
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:
@@ -2460,6 +2455,9 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
     printer.printKeyword("__owned", options, " ");
     break;
   }
+
+  if (!options.excludeAttrKind(TAK_escaping) && escaping)
+    printer << "@escaping ";
 }
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
@@ -3556,7 +3554,8 @@ public:
 
   void visitParenType(ParenType *T) {
     Printer << "(";
-    printParameterFlags(Printer, Options, T->getParameterFlags(), false);
+    printParameterFlags(Printer, Options, T->getParameterFlags(),
+                        /*escaping*/ false);
     visit(T->getUnderlyingType()->getInOutObjectType());
     Printer << ")";
   }
@@ -3587,7 +3586,8 @@ public:
         visit(TD.getVarargBaseTy());
         Printer << "...";
       } else {
-        printParameterFlags(Printer, Options, TD.getParameterFlags(), false);
+        printParameterFlags(Printer, Options, TD.getParameterFlags(),
+                            /*escaping*/ false);
         visit(EltType);
       }
     }
