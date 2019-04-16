@@ -66,10 +66,22 @@ void Parser::DefaultArgumentInfo::setFunctionContext(
 
 static ParserStatus parseDefaultArgument(
     Parser &P, Parser::DefaultArgumentInfo *defaultArgs, unsigned argIndex,
-    Expr *&init, Parser::ParameterContextKind paramContext) {
+    Expr *&init, bool &hasInheritedDefaultArg,
+    Parser::ParameterContextKind paramContext) {
   SyntaxParsingContext DefaultArgContext(P.SyntaxContext,
                                          SyntaxKind::InitializerClause);
   SourceLoc equalLoc = P.consumeToken(tok::equal);
+  // Handle the special '= super' syntax for inherited default values in module
+  // interface files
+  if (P.SF.Kind == SourceFileKind::Interface) {
+    if (P.Tok.is(tok::kw_super) && P.peekToken().isAny(tok::comma, tok::r_paren)) {
+      hasInheritedDefaultArg = true;
+      P.consumeToken(tok::kw_super);
+      P.SyntaxContext->createNodeInPlace(SyntaxKind::SuperRefExpr);
+      defaultArgs->HasDefaultArgument = true;
+      return ParserStatus();
+    }
+  }
 
   // Enter a fresh default-argument context with a meaningless parent.
   // We'll change the parent to the function later after we've created
@@ -365,7 +377,9 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     if (Tok.is(tok::equal)) {
       SourceLoc EqualLoc = Tok.getLoc();
       status |= parseDefaultArgument(*this, defaultArgs, defaultArgIndex,
-                                     param.DefaultArg, paramContext);
+                                     param.DefaultArg,
+                                     param.hasInheritedDefaultArg,
+                                     paramContext);
 
       if (param.EllipsisLoc.isValid() && param.DefaultArg) {
         // The range of the complete default argument.
@@ -604,7 +618,7 @@ mapParsedParameters(Parser &parser,
     }
 
     assert (((!param.DefaultArg &&
-              !param.Attrs.hasAttribute<InheritedDefaultValueAttr>()) ||
+              !param.hasInheritedDefaultArg) ||
              paramContext == Parser::ParameterContextKind::Function ||
              paramContext == Parser::ParameterContextKind::Operator ||
              paramContext == Parser::ParameterContextKind::Initializer ||
@@ -616,7 +630,7 @@ mapParsedParameters(Parser &parser,
       DefaultArgumentKind kind = getDefaultArgKind(param.DefaultArg);
       result->setDefaultArgumentKind(kind);
       result->setDefaultValue(param.DefaultArg);
-    } else if (param.Attrs.hasAttribute<InheritedDefaultValueAttr>()) {
+    } else if (param.hasInheritedDefaultArg) {
       result->setDefaultArgumentKind(DefaultArgumentKind::Inherited);
     }
 

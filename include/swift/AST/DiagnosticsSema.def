@@ -1282,13 +1282,14 @@ WARNING(expr_dynamic_lookup_swift3_objc_inference,none,
         (DescriptiveDeclKind, DeclName, Identifier))
 
 ERROR(inherited_default_value_not_on_constructor_param,none,
-      "@_inheritedDefaultValue is only valid on parameter declarations of initializers", ())
+      "default value inheritance via 'super' is only valid for initializer "
+      "parameters", ())
 ERROR(corresponding_param_not_defaulted,none,
-      "@_inheritedDefaultValue requires that the corresponding parameter of "
-      "the overridden initializer has a default value", ())
+      "default value inheritance via 'super' requires that the corresponding "
+      "parameter of the overridden initializer has a default value", ())
 ERROR(inherited_default_value_used_in_non_overriding_constructor,none,
-      "@_inheritedDefaultValue can only be used on the parameters of "
-      "overriding initializers", ())
+      "default value inheritance via 'super' can only be used on the "
+      "parameters of overriding initializers", ())
 
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
