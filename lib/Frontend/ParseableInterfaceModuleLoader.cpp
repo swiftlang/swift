@@ -247,6 +247,32 @@ static Optional<llvm::vfs::Status> getStatusOfDependency(
   return status.get();
 }
 
+/// If the file dependency in \p FullDepPath is inside the \p Base directory,
+/// this returns its path relative to \p Base. Otherwise it returns None.
+static Optional<StringRef> getRelativeDepPath(StringRef DepPath,
+                                              StringRef Base) {
+  // If Base is the root directory, or DepPath does not start with Base, bail.
+  if (Base.size() <= 1 || !DepPath.startswith(Base)) {
+    return None;
+  }
+
+  assert(DepPath.size() > Base.size() &&
+      "should never depend on a directory");
+
+  // Is the DepName something like ${Base}/foo.h"?
+  if (path::is_separator(DepPath[Base.size()]))
+    return DepPath.substr(Base.size() + 1);
+
+  // Is the DepName something like "${Base}foo.h", where Base
+  // itself contains a trailing slash?
+  if (path::is_separator(Base.back()))
+    return DepPath.substr(Base.size());
+
+  // We have something next to Base, like "Base.h", that's somehow
+  // become a dependency.
+  return None;
+}
+
 #pragma mark - Module Building
 
 /// Builds a parseable module interface into a .swiftmodule at the provided
@@ -365,17 +391,46 @@ class swift::ParseableInterfaceBuilder {
   bool collectDepsForSerialization(CompilerInstance &SubInstance,
                                    SmallVectorImpl<FileDependency> &Deps,
                                    bool IsHashBased) {
-    StringRef SDKPath = SubInstance.getASTContext().SearchPathOpts.SDKPath;
-    StringRef ResourcePath =
-        SubInstance.getASTContext().SearchPathOpts.RuntimeResourcePath;
+    auto &Opts = SubInstance.getASTContext().SearchPathOpts;
+    SmallString<128> SDKPath(Opts.SDKPath);
+    path::native(SDKPath);
+    SmallString<128> ResourcePath(Opts.RuntimeResourcePath);
+    path::native(ResourcePath);
+
     auto DTDeps = SubInstance.getDependencyTracker()->getDependencies();
     SmallVector<StringRef, 16> InitialDepNames(DTDeps.begin(), DTDeps.end());
     InitialDepNames.push_back(interfacePath);
     llvm::StringSet<> AllDepNames;
+    SmallString<128> Scratch;
 
-    for (auto const &DepName : InitialDepNames) {
+    for (const auto &InitialDepName : InitialDepNames) {
+      path::native(InitialDepName, Scratch);
+      StringRef DepName = Scratch.str();
+
       assert(moduleCachePath.empty() || !DepName.startswith(moduleCachePath));
-      assert(prebuiltCachePath.empty() || !DepName.startswith(prebuiltCachePath));
+
+      // Serialize the paths of dependencies in the SDK relative to it.
+      Optional<StringRef> SDKRelativePath = getRelativeDepPath(DepName, SDKPath);
+      StringRef DepNameToStore = SDKRelativePath.getValueOr(DepName);
+      bool IsSDKRelative = SDKRelativePath.hasValue();
+
+      // Forwarding modules add the underlying prebuilt module to their
+      // dependency list -- don't serialize that.
+      if (!prebuiltCachePath.empty() && DepName.startswith(prebuiltCachePath))
+        continue;
+
+      if (AllDepNames.insert(DepName).second && dependencyTracker) {
+        dependencyTracker->addDependency(DepName, /*isSystem*/IsSDKRelative);
+      }
+
+      // Don't serialize compiler-relative deps so the cache is relocatable.
+      if (DepName.startswith(ResourcePath))
+        continue;
+
+      auto Status = getStatusOfDependency(fs, DepName, interfacePath,
+                                          diags, diagnosticLoc);
+      if (!Status)
+        return true;
 
       /// Lazily load the dependency buffer if we need it. If we're not
       /// dealing with a hash-based dependencies, and if the dependency is
@@ -390,40 +445,6 @@ class swift::ParseableInterfaceBuilder {
         }
         return nullptr;
       };
-
-      // Adjust the paths of dependences in the SDK to be relative to it
-      bool IsSDKRelative = false;
-      StringRef DepNameToStore = DepName;
-      if (SDKPath.size() > 1 && DepName.startswith(SDKPath)) {
-        assert(DepName.size() > SDKPath.size() &&
-            "should never depend on a directory");
-        if (llvm::sys::path::is_separator(DepName[SDKPath.size()])) {
-          // Is the DepName something like ${SDKPath}/foo.h"?
-          DepNameToStore = DepName.substr(SDKPath.size() + 1);
-          IsSDKRelative = true;
-        } else if (llvm::sys::path::is_separator(SDKPath.back())) {
-          // Is the DepName something like "${SDKPath}foo.h", where SDKPath
-          // itself contains a trailing slash?
-          DepNameToStore = DepName.substr(SDKPath.size());
-          IsSDKRelative = true;
-        } else {
-          // We have something next to an SDK, like "Foo.sdk.h", that's somehow
-          // become a dependency.
-        }
-      }
-
-      if (AllDepNames.insert(DepName).second && dependencyTracker) {
-        dependencyTracker->addDependency(DepName, /*isSystem*/IsSDKRelative);
-      }
-
-      // Don't serialize compiler-relative deps so the cache is relocatable.
-      if (DepName.startswith(ResourcePath))
-        continue;
-
-      auto Status = getStatusOfDependency(fs, DepName, interfacePath,
-                                          diags, diagnosticLoc);
-      if (!Status)
-        return true;
 
       if (IsHashBased) {
         auto buf = getDepBuf();
@@ -683,8 +704,7 @@ class ParseableInterfaceModuleLoaderImpl {
     if (!dep.isSDKRelative())
       return dep.getPath();
 
-    StringRef SDKPath = ctx.SearchPathOpts.SDKPath;
-    scratch.assign(SDKPath.begin(), SDKPath.end());
+    path::native(ctx.SearchPathOpts.SDKPath, scratch);
     llvm::sys::path::append(scratch, dep.getPath());
     return StringRef(scratch.data(), scratch.size());
   }
@@ -812,6 +832,10 @@ class ParseableInterfaceModuleLoaderImpl {
     }
     path::append(scratch, path::filename(modulePath));
 
+    // If there isn't a file at this location, skip returning a path.
+    if (!fs.exists(scratch))
+      return None;
+
     return scratch.str();
   }
 
@@ -898,7 +922,7 @@ class ParseableInterfaceModuleLoaderImpl {
           return DiscoveredModule::prebuilt(*path, std::move(moduleBuffer));
         } else {
           LLVM_DEBUG(llvm::dbgs() << "Found out-of-date prebuilt module at "
-                     << modulePath << "\n");
+                                  << path->str() << "\n");
         }
       }
     }
@@ -935,40 +959,62 @@ class ParseableInterfaceModuleLoaderImpl {
 
   /// Writes the "forwarding module" that will forward to a module in the
   /// prebuilt cache.
+  ///
   /// Since forwarding modules track dependencies separately from the module
   /// they point to, we'll need to grab the up-to-date file status while doing
-  /// this.
-  bool writeForwardingModule(const DiscoveredModule &mod,
-                             StringRef outputPath,
-                             ArrayRef<FileDependency> deps) {
+  /// this. If the write was successful, it also updates the
+  /// list of dependencies to match what was written to the forwarding file.
+  bool writeForwardingModuleAndUpdateDeps(
+      const DiscoveredModule &mod, StringRef outputPath,
+      SmallVectorImpl<FileDependency> &deps) {
     assert(mod.isPrebuilt() &&
            "cannot write forwarding file for non-prebuilt module");
     ForwardingModule fwd(mod.path);
 
+    SmallVector<FileDependency, 16> depsAdjustedToMTime;
+
     // FIXME: We need to avoid re-statting all these dependencies, otherwise
     //        we may record out-of-date information.
-    auto addDependency = [&](StringRef path) {
+    auto addDependency = [&](StringRef path) -> FileDependency {
       auto status = fs.status(path);
       uint64_t mtime =
         status->getLastModificationTime().time_since_epoch().count();
       fwd.addDependency(path, status->getSize(), mtime);
+
+      // Construct new FileDependency matching what we've added to the
+      // forwarding module. This is no longer SDK-relative because the absolute
+      // path has already been resolved.
+      return FileDependency::modTimeBased(path, /*isSDKRelative*/false,
+                                          status->getSize(), mtime);
     };
 
-    // Add the prebuilt module as a dependency of the forwarding module.
-    addDependency(fwd.underlyingModulePath);
+    // Add the prebuilt module as a dependency of the forwarding module, but
+    // don't add it to the outer dependency list.
+    (void)addDependency(fwd.underlyingModulePath);
 
-    // Add all the dependencies from the prebuilt module.
+    // Add all the dependencies from the prebuilt module, and update our list
+    // of dependencies to reflect what's recorded in the forwarding module.
     SmallString<128> SDKRelativeBuffer;
     for (auto dep : deps) {
-      addDependency(getFullDependencyPath(dep, SDKRelativeBuffer));
+      auto adjustedDep =
+          addDependency(getFullDependencyPath(dep, SDKRelativeBuffer));
+      depsAdjustedToMTime.push_back(adjustedDep);
     }
 
-    return withOutputFile(diags, outputPath,
+    auto hadError = withOutputFile(diags, outputPath,
       [&](llvm::raw_pwrite_stream &out) {
         llvm::yaml::Output yamlWriter(out);
         yamlWriter << fwd;
         return false;
       });
+
+    if (hadError)
+      return true;
+
+    // If and only if we succeeded writing the forwarding file, update the
+    // provided list of dependencies.
+    deps = depsAdjustedToMTime;
+    return false;
   }
 
   /// Looks up the best module to load for a given interface, and returns a
@@ -1017,9 +1063,11 @@ class ParseableInterfaceModuleLoaderImpl {
     if (moduleOrErr) {
       auto module = std::move(moduleOrErr.get());
 
-      // If it's prebuilt, use this time to generate a forwarding module.
+      // If it's prebuilt, use this time to generate a forwarding module and
+      // update the dependencies to use modification times.
       if (module.isPrebuilt())
-        if (writeForwardingModule(module, cachedOutputPath, allDeps))
+        if (writeForwardingModuleAndUpdateDeps(module, cachedOutputPath,
+                                               allDeps))
           return std::make_error_code(std::errc::not_supported);
 
       // Report the module's dependencies to the dependencyTracker
@@ -1027,7 +1075,8 @@ class ParseableInterfaceModuleLoaderImpl {
         SmallString<128> SDKRelativeBuffer;
         for (auto &dep: allDeps) {
           StringRef fullPath = getFullDependencyPath(dep, SDKRelativeBuffer);
-          dependencyTracker->addDependency(fullPath, dep.isSDKRelative());
+          dependencyTracker->addDependency(fullPath,
+                                           /*IsSystem=*/dep.isSDKRelative());
         }
       }
 
