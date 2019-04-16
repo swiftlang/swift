@@ -424,7 +424,9 @@ TreatKeyPathSubscriptIndexAsHashable::create(ConstraintSystem &cs, Type type,
 }
 
 bool AllowStaticMemberRefInKeyPath::diagnose(Expr *root, bool asNote) const {
-  return false;
+  InvalidStaticMemberRefInKeyPath failure(root, getConstraintSystem(), Member,
+                                          getLocator());
+  return failure.diagnose(asNote);
 }
 
 AllowStaticMemberRefInKeyPath *
