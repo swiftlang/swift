@@ -14,14 +14,23 @@ class D: C, P, Q { func paul() {}; func priscilla() {}; func quinn() {} }
 
 // TODO: Should be valid
 
-let foo: some P = 1 // FIXME expected-error{{'opaque' types are only implemented}}
-var computedFoo: some P {  // FIXME expected-error{{'opaque' types are only implemented}}
-  get { return 1 }
-  set { _ = newValue + 1 }
+let property: some P = 1 // TODO expected-error{{cannot convert}}
+
+struct GenericProperty<T: P> {
+  var x: T
+  var property: some P {
+    return x // TODO expected-error{{cannot convert}}
+  }
+}
+
+let (bim, bam): some P = (1, 2) // expected-error{{'some' type can only be declared on a single property declaration}}
+var computedProperty: some P {
+  get { return 1 } // TODO expected-error{{cannot convert}}
+  set { _ = newValue + 1 } // TODO expected-error{{}} expected-note{{}}
 }
 struct SubscriptTest {
-  subscript(_ x: Int) -> some P { // expected-error{{'opaque' types are only implemented}}
-    return x
+  subscript(_ x: Int) -> some P {
+    return x // TODO expected-error{{cannot convert}}
   }
 }
 
@@ -64,23 +73,23 @@ struct Test {
   let inferredOpaqueStructural2 = (bar(), bas()) // expected-error{{inferred type}}
 }
 
-//let zingle = {() -> some P in 1 } // FIXME ex/pected-error{{'opaque' types are only implemented}}
+//let zingle = {() -> some P in 1 } // FIXME ex/pected-error{{'some' types are only implemented}}
 
 // Invalid positions
 
-typealias Foo = some P // expected-error{{'opaque' types are only implemented}}
+typealias Foo = some P // expected-error{{'some' types are only implemented}}
 
-func blibble(blobble: some P) {} // expected-error{{'opaque' types are only implemented}}
+func blibble(blobble: some P) {} // expected-error{{'some' types are only implemented}}
 
-let blubble: () -> some P = { 1 } // expected-error{{'opaque' types are only implemented}}
+let blubble: () -> some P = { 1 } // expected-error{{'some' types are only implemented}}
 
-func blib() -> P & some Q { return 1 } // expected-error{{'opaque' should appear at the beginning}}
-func blab() -> (P, some Q) { return (1, 2) } // expected-error{{'opaque' types are only implemented}}
-func blob() -> (some P) -> P { return { $0 } } // expected-error{{'opaque' types are only implemented}}
-func blorb<T: some P>(_: T) { } // expected-error{{'opaque' types are only implemented}}
-func blub<T>() -> T where T == some P { return 1 } // expected-error{{'opaque' types are only implemented}} expected-error{{cannot convert}}
+func blib() -> P & some Q { return 1 } // expected-error{{'some' should appear at the beginning}}
+func blab() -> (P, some Q) { return (1, 2) } // expected-error{{'some' types are only implemented}}
+func blob() -> (some P) -> P { return { $0 } } // expected-error{{'some' types are only implemented}}
+func blorb<T: some P>(_: T) { } // expected-error{{'some' types are only implemented}}
+func blub<T>() -> T where T == some P { return 1 } // expected-error{{'some' types are only implemented}} expected-error{{cannot convert}}
 
-protocol OP: some P {} // expected-error{{'opaque' types are only implemented}}
+protocol OP: some P {} // expected-error{{'some' types are only implemented}}
 
 func foo() -> some P {
   let x = (some P).self // expected-error*{{}}
@@ -89,9 +98,9 @@ func foo() -> some P {
 
 // Invalid constraints
 
-let zug: some Int = 1 // FIXME expected-error{{'opaque' types are only implemented}}
-let zwang: some () = () // FIXME expected-error{{'opaque' types are only implemented}}
-let zwoggle: some (() -> ()) = {} // FIXME expected-error{{'opaque' types are only implemented}}
+let zug: some Int = 1 // FIXME expected-error{{must specify only}}
+let zwang: some () = () // FIXME expected-error{{must specify only}}
+let zwoggle: some (() -> ()) = {} // FIXME expected-error{{must specify only}}
 
 // Type-checking of expressions of opaque type
 
@@ -249,6 +258,12 @@ func associatedTypeIdentity() {
 struct DoesNotConform {}
 
 func doesNotConform() -> some P {
+  return DoesNotConform()
+}
+
+var doesNotConformProp: some P = DoesNotConform()
+
+var DoesNotConformComputedProp: some P {
   return DoesNotConform()
 }
 */

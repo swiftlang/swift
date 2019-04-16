@@ -4391,6 +4391,8 @@ protected:
   }
 
   void computeIsValidKeyPathComponent();
+  
+  OpaqueTypeDecl *OpaqueReturn = nullptr;
 
 public:
 
@@ -4675,6 +4677,14 @@ public:
   bool hasPrivateAccessor() const;
 
   bool hasDidSetOrWillSetDynamicReplacement() const;
+
+  OpaqueTypeDecl *getOpaqueResultTypeDecl() const {
+    return OpaqueReturn;
+  }
+  void setOpaqueResultTypeDecl(OpaqueTypeDecl *decl) {
+    assert(!OpaqueReturn && "already has opaque type decl");
+    OpaqueReturn = decl;
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
