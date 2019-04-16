@@ -3,8 +3,29 @@
 // RUN: %target-swift-frontend -merge-modules -emit-module -o %t/Test.swiftmodule %t/Test~partial.swiftmodule
 // RUN: %target-swift-ide-test -print-module -module-to-print=Test -source-filename=x -I %t | %FileCheck %s
 
-// RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path %t.swiftinterface -enable-library-evolution %s
-// RUN: %FileCheck %s < %t.swiftinterface
+// RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path %t/Test.swiftinterface -enable-library-evolution %s
+// RUN: rm %t/Test.swiftmodule
+// RUN: echo "import Test" > %t/test-client.swift
+// RUN: %target-swift-frontend -typecheck -I%t %t/test-client.swift
+// RUN: %FileCheck %s < %t/Test.swiftinterface
+
+// CHECK: class Base {
+public class Base {
+  // CHECK: init(x: Int = 3)
+	public init(x: Int = 3) {}
+	// CHECK: foo(y: Int = 42)
+	public func foo(y: Int = 42) {}
+}
+
+// CHECK: class Derived : Base {
+public class Derived: Base {
+	// CHECK: init(y: Int)
+	public convenience init(y: Int) {
+		self.init()
+	}
+
+	// CHECK: override {{(public )?}}init(@_inheritedDefaultValue x: Int)
+}
 
 public enum Enum {
   // CHECK: case pie(filling: String = "apple")

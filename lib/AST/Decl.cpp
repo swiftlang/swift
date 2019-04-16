@@ -5403,10 +5403,6 @@ ParamDecl::getDefaultValueStringRepresentation(
                                 var->getParentInitializer(),
                                 scratch);
   }
-  case DefaultArgumentKind::Inherited:
-    // FIXME: This needs /some/ kind of textual representation, but this isn't
-    // a great one.
-    return "super";
   case DefaultArgumentKind::File: return "#file";
   case DefaultArgumentKind::Line: return "#line";
   case DefaultArgumentKind::Column: return "#column";
@@ -5415,6 +5411,10 @@ ParamDecl::getDefaultValueStringRepresentation(
   case DefaultArgumentKind::NilLiteral: return "nil";
   case DefaultArgumentKind::EmptyArray: return "[]";
   case DefaultArgumentKind::EmptyDictionary: return "[:]";
+  case DefaultArgumentKind::Inherited:
+    // Inherited default values are set via the @_inheritedDefaultValue
+    // attribute, so should be printed in the attribute position
+    llvm_unreachable("inherted default should be printed as an attribute");
   }
   llvm_unreachable("unhandled kind");
 }
