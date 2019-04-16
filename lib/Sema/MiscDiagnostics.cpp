@@ -3465,22 +3465,25 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
         if (auto decl = getDeclForImplicitlyUnwrappedExpr(subExpr)) {
           TC.diagnose(subExpr->getStartLoc(), diag::iuo_to_any_coercion,
                       /* from */ srcType, /* to */ destType)
-          .highlight(subExpr->getSourceRange());
+              .highlight(subExpr->getSourceRange());
 
-          TC.diagnose(decl->getLoc(), diag::iuo_to_any_coercion_note,
-                      decl->getDescriptiveKind(),
-                      decl->getBaseName().userFacingName());
+          auto noteDiag = isa<FuncDecl>(decl)
+                              ? diag::iuo_to_any_coercion_note_func_result
+                              : diag::iuo_to_any_coercion_note;
+
+          TC.diagnose(decl->getLoc(), noteDiag, decl->getDescriptiveKind(),
+                      DeclName(decl->getBaseName()));
         }
       } else {
         TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
                     /* from */ srcType, /* to */ destType)
-        .highlight(subExpr->getSourceRange());
+            .highlight(subExpr->getSourceRange());
       }
       
       if (optionalityDifference == 1) {
         TC.diagnose(subExpr->getLoc(), diag::default_optional_to_any)
-        .highlight(subExpr->getSourceRange())
-        .fixItInsertAfter(subExpr->getEndLoc(), " ?? <#default value#>");
+            .highlight(subExpr->getSourceRange())
+            .fixItInsertAfter(subExpr->getEndLoc(), " ?? <#default value#>");
       }
 
       SmallString<4> forceUnwrapString;
