@@ -361,6 +361,9 @@ private:
 
     unsigned CurLabel = 0;
     for (auto Prop : TypeContext->getStoredProperties()) {
+      if (auto Original = Prop->getOriginalDelegatedProperty())
+        Prop = Original;
+
       if (!isMemberwiseInitialized(Prop))
         continue;
 
