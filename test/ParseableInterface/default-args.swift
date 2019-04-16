@@ -24,7 +24,7 @@ public class Derived: Base {
 		self.init()
 	}
 
-	// CHECK: override {{(public )?}}init(@_inheritedDefaultValue x: Int)
+	// CHECK: override {{(public )?}}init(x: Int = super)
 }
 
 public enum Enum {
