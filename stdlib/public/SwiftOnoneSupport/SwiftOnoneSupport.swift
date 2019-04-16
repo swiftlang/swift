@@ -199,6 +199,7 @@ extension _ContiguousArrayBuffer {
   func _prespecializeContiguousArrayBuffer(buffer: _ContiguousArrayBuffer<Element>, index: Int) {}
 }
 
+#if _runtime(_ObjC)
 extension _ArrayBuffer {
   // requestNativeBuffer() -> Swift._ContiguousArrayBuffer<A>?
   @_semantics("prespecialize.$ss12_ArrayBufferV013requestNativeB0s011_ContiguousaB0VyxGSgyF")
@@ -248,6 +249,7 @@ extension _ArrayBuffer {
   @_semantics("prespecialize.$ss12_ArrayBufferV7_buffer19shiftedToStartIndexAByxGs011_ContiguousaB0VyxG_SitcfC")
   func _prespecializeArrayBuffer(buffer: _ContiguousArrayBuffer<Element>, index: Int) {}
 }
+#endif // ObjC
 
 extension Range {
   // contains(A) -> Swift.Bool
@@ -334,6 +336,7 @@ func prespecializeCollections<T>(_ element: T) {
   cab._prespecializeContiguousArrayBuffer(count: 0, capacity: 0)
   cab._prespecializeContiguousArrayBuffer(buffer: cab, index: 0)
 
+#if _runtime(_ObjC)
   let ab = _ArrayBuffer<T>()
   ab._prespecializeArrayBuffer()
   ab._prespecializeArrayBuffer(index: 0)
@@ -344,6 +347,7 @@ func prespecializeCollections<T>(_ element: T) {
   ab._prespecializeRandomAccessCollection(after: 0)
   ab._prespecializeRandomAccessCollection()
   ab._prespecializeCollection(index: 0, range: (0..<0))
+#endif // ObjC
 
   var ca = ContiguousArray<T>()
   ca._prespecializeRandomAccessCollection()
