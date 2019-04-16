@@ -375,7 +375,7 @@ ninja
 
  - Add llbuild to your path:
 ```cmd
-path S:\b\llbuild;%PATH%
+path S:\b\llbuild\bin;%PATH%
 ```
 
 ## 21. Build swift-package-manager
@@ -395,3 +395,11 @@ ninja -C S:\b\swift install
 ```
 
 - Add the Swift on Windows binaries path (`C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin`)  to the `PATH` environment variable.
+
+## Resuming Builds
+
+If you resume development from a new shell, the path will need to be readjusted.  The following will add the correct search order to the path:
+
+```cmd
+path S:\thirdparty\icu4c-63_1-Win64-MSVC2017\bin64;S:\b\llvm\bin;S:\b\swift\bin;S:\b\libdispatch;S:\b\libdispatch\src;S:\b\foundation;S:\b\xctest;S:\b\llbuild\bin;S:\b\sqlite;%PATH%;%ProgramFiles%\Git\usr\bin
+```
