@@ -1251,7 +1251,8 @@ static bool fixMissingArguments(ConstraintSystem &cs, Expr *anchor,
   for (unsigned i = args.size(), n = params.size(); i != n; ++i) {
     auto *argLoc = cs.getConstraintLocator(
         anchor, LocatorPathElt::getSynthesizedArgument(i));
-    args.push_back(params[i].withType(cs.createTypeVariable(argLoc)));
+    args.push_back(params[i].withType(cs.createTypeVariable(argLoc,
+                                                      TVO_CanBindToNoEscape)));
   }
 
   ArrayRef<AnyFunctionType::Param> argsRef(args);
@@ -1381,7 +1382,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     // a single tuple element formed when no arguments were present.
     auto argLoc = argumentLocator.withPathElement(
         LocatorPathElt::getSynthesizedArgument(0));
-    auto *typeVar = createTypeVariable(getConstraintLocator(argLoc));
+    auto *typeVar = createTypeVariable(getConstraintLocator(argLoc),
+                                       TVO_CanBindToNoEscape);
     params.emplace_back(typeVar);
     assignFixedType(typeVar, input);
   };
@@ -1834,6 +1836,21 @@ ConstraintSystem::matchTypesBindTypeVar(
     return getTypeMatchFailure(locator);
   }
 
+  // If the left-hand type variable cannot bind to a non-escaping type,
+  // but we still have a non-escaping type, fail.
+  if (!typeVar->getImpl().canBindToNoEscape() && type->isNoEscape()) {
+    if (shouldAttemptFixes()) {
+      auto *fix = MarkExplicitlyEscaping::create(
+          *this, getConstraintLocator(locator));
+      if (recordFix(fix))
+        return getTypeMatchFailure(locator);
+
+      // Allow no-escape function to be bound with recorded fix.
+    } else {
+      return getTypeMatchFailure(locator);
+    }
+  }
+
   // Disallow bindings of types containing noescape functions to type
   // variables that represent an opened generic parameter. If we allowed
   // this it would allow noescape functions to potentially escape.
@@ -1877,14 +1894,21 @@ ConstraintSystem::matchTypesBindTypeVar(
     return getTypeMatchSuccess();
   }
 
-  if (!typeVar->getImpl().canBindToLValue()) {
-    // When binding a fixed type to a type variable that cannot contain
-    // lvalues, any type variables within the fixed type cannot contain
-    // lvalues either.
+  // When binding a fixed type to a type variable that cannot contain
+  // lvalues or noescape types, any type variables within the fixed
+  // type cannot contain lvalues or noescape types either.
+  if (type->hasTypeVariable()) {
     type.visit([&](Type t) {
-      if (auto *tvt = dyn_cast<TypeVariableType>(t.getPointer()))
-        typeVar->getImpl().setCanBindToLValue(getSavedBindings(),
-                                              /*enabled=*/false);
+      if (auto *tvt = dyn_cast<TypeVariableType>(t.getPointer())) {
+        if (!typeVar->getImpl().canBindToLValue()) {
+          typeVar->getImpl().setCanBindToLValue(getSavedBindings(),
+                                                /*enabled=*/false);
+        }
+        if (!typeVar->getImpl().canBindToNoEscape()) {
+          typeVar->getImpl().setCanBindToNoEscape(getSavedBindings(),
+                                                  /*enabled=*/false);
+        }
+      }
     });
   }
 
@@ -2974,7 +2998,8 @@ ConstraintSystem::simplifyConstructionConstraint(
 
   auto fnLocator = getConstraintLocator(locator,
                                         ConstraintLocator::ApplyFunction);
-  auto memberType = createTypeVariable(fnLocator);
+  auto memberType = createTypeVariable(fnLocator,
+                                       TVO_CanBindToNoEscape);
 
   // The constructor will have function type T -> T2, for a fresh type
   // variable T. T2 is the result type provided via the construction
@@ -2995,6 +3020,7 @@ ConstraintSystem::simplifyConstructionConstraint(
         getConstraintLocator(locator, ConstraintLocator::ApplyArgument),
         (TVO_CanBindToLValue |
          TVO_CanBindToInOut |
+         TVO_CanBindToNoEscape |
          TVO_PrefersSubtypeBinding));
     addConstraint(ConstraintKind::FunctionInput, memberType, argType, locator);
   }
@@ -4410,7 +4436,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       // The result of the member access can either be the expected member type
       // (for '!' or optional members with '?'), or the original member type
       // with one extra level of optionality ('?' with non-optional members).
-      auto innerTV = createTypeVariable(locator, TVO_CanBindToLValue);
+      auto innerTV = createTypeVariable(locator,
+                                        TVO_CanBindToLValue |
+                                        TVO_CanBindToNoEscape);
       Type optTy = getTypeChecker().getOptionalType(
           locator->getAnchor()->getSourceRange().Start, innerTV);
       SmallVector<Constraint *, 2> optionalities;
@@ -5743,7 +5771,9 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
 
   // Create a type variable for the `dynamicallyCall` method.
   auto loc = getConstraintLocator(locator);
-  auto tv = createTypeVariable(loc, TVO_CanBindToLValue);
+  auto tv = createTypeVariable(loc,
+                               TVO_CanBindToLValue |
+                               TVO_CanBindToNoEscape);
 
   // Record the 'dynamicallyCall` method overload set.
   SmallVector<OverloadChoice, 4> choices;
@@ -5757,7 +5787,7 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   addOverloadSet(tv, choices, DC, loc);
 
   // Create a type variable for the argument to the `dynamicallyCall` method.
-  auto tvParam = createTypeVariable(loc);
+  auto tvParam = createTypeVariable(loc, TVO_CanBindToNoEscape);
   AnyFunctionType *funcType =
     FunctionType::get({ AnyFunctionType::Param(tvParam) }, func1->getResult());
   addConstraint(ConstraintKind::DynamicCallableApplicableFunction,
@@ -6124,7 +6154,9 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       return SolutionKind::Error;
 
     auto constraintLocator = getConstraintLocator(locator);
-    auto tv = createTypeVariable(constraintLocator, TVO_PrefersSubtypeBinding);
+    auto tv = createTypeVariable(constraintLocator,
+                                 TVO_PrefersSubtypeBinding |
+                                 TVO_CanBindToNoEscape);
     
     addConstraint(ConstraintKind::ConformsTo, tv,
                   hashableProtocol->getDeclaredType(), constraintLocator);

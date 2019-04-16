@@ -329,11 +329,11 @@ protected:
     ID : 32 - NumTypeBaseBits,
 
     /// Type variable options.
-    Options : 3,
+    Options : 4,
 
     ///  Index into the list of type variables, as used by the
     ///  constraint graph.
-    GraphIndex : 29
+    GraphIndex : 28
   );
 
   SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+3+1+2,
@@ -5060,13 +5060,15 @@ END_CAN_TYPE_WRAPPER(Name##StorageType, ReferenceStorageType)
 #undef REF_STORAGE_HELPER
 
 /// A type variable used during type checking.
-class TypeVariableType : public TypeBase {
+class alignas(1 << TypeVariableAlignInBits)
+TypeVariableType : public TypeBase {
   // Note: We can't use llvm::TrailingObjects here because the trailing object
   // type is opaque.
 
   TypeVariableType(const ASTContext &C, unsigned ID)
     : TypeBase(TypeKind::TypeVariable, &C,
                RecursiveTypeProperties::HasTypeVariable) {
+    // Note: the ID may overflow, but its only used for printing.
     Bits.TypeVariableType.ID = ID;
   }
 
@@ -5103,6 +5105,8 @@ public:
     return reinterpret_cast<Implementation *>(this + 1);
   }
 
+  /// Type variable IDs are not globally unique and are only meant as a visual
+  /// aid when dumping AST.
   unsigned getID() const { return Bits.TypeVariableType.ID; }
 
   // Implement isa/cast/dyncast/etc.

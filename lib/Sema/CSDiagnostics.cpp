@@ -401,17 +401,21 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
     return true;
   }
 
+  GenericTypeParamType *paramTy = nullptr;
+
   auto path = getLocator()->getPath();
-  if (path.empty())
-    return false;
+  if (!path.empty()) {
+    auto &last = path.back();
+    if (last.getKind() == ConstraintLocator::GenericParameter)
+      paramTy = last.getGenericParameter();
+  }
 
-  auto &last = path.back();
-  if (last.getKind() != ConstraintLocator::GenericParameter)
-    return false;
-
-  auto *paramTy = last.getGenericParameter();
-  emitDiagnostic(anchor->getLoc(), diag::converting_noescape_to_type,
-                 paramTy);
+  if (paramTy) {
+    emitDiagnostic(anchor->getLoc(), diag::converting_noescape_to_type,
+                  paramTy);
+  } else {
+    emitDiagnostic(anchor->getLoc(), diag::unknown_escaping_use_of_noescape);
+  }
   return true;
 }
 

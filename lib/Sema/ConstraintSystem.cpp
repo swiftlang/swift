@@ -1084,7 +1084,8 @@ void ConstraintSystem::openGeneric(
         locator.withPathElement(LocatorPathElt(gp)));
 
     auto typeVar = createTypeVariable(locatorPtr,
-                                      TVO_PrefersSubtypeBinding);
+                                      TVO_PrefersSubtypeBinding |
+                                      TVO_CanBindToNoEscape);
     auto result = replacements.insert(
       std::make_pair(cast<GenericTypeParamType>(gp->getCanonicalType()),
                      typeVar));
@@ -1535,9 +1536,11 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     // existentials (as seen from the current abstraction level), which can't
     // be expressed in the type system currently.
     auto input = CS.createTypeVariable(
-        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument));
+        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+        TVO_CanBindToNoEscape);
     auto output = CS.createTypeVariable(
-        CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult));
+        CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
+        TVO_CanBindToNoEscape);
 
     FunctionType::Param inputArg(input,
                                  CS.getASTContext().getIdentifier("of"));
@@ -1553,14 +1556,17 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     // receives a copy of the argument closure that is temporarily made
     // @escaping.
     auto noescapeClosure = CS.createTypeVariable(
-        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument));
+        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+        TVO_CanBindToNoEscape);
     auto escapeClosure = CS.createTypeVariable(
-        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument));
+        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+        TVO_CanBindToNoEscape);
     CS.addConstraint(ConstraintKind::EscapableFunctionOf,
          escapeClosure, noescapeClosure,
          CS.getConstraintLocator(locator, ConstraintLocator::RValueAdjustment));
     auto result = CS.createTypeVariable(
-        CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult));
+        CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
+        TVO_CanBindToNoEscape);
     FunctionType::Param arg(escapeClosure);
     auto bodyClosure = FunctionType::get(arg, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
@@ -1582,14 +1588,17 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     // The body closure receives a freshly-opened archetype constrained by the
     // existential type as its input.
     auto openedTy = CS.createTypeVariable(
-        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument));
+        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+        TVO_CanBindToNoEscape);
     auto existentialTy = CS.createTypeVariable(
-        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument));
+        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+        TVO_CanBindToNoEscape);
     CS.addConstraint(ConstraintKind::OpenedExistentialOf,
          openedTy, existentialTy,
          CS.getConstraintLocator(locator, ConstraintLocator::RValueAdjustment));
     auto result = CS.createTypeVariable(
-        CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult));
+        CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
+        TVO_CanBindToNoEscape);
     FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
     auto bodyClosure = FunctionType::get(bodyArgs, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
@@ -1775,7 +1784,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
           // For our original type T -> U?? we will generate:
           // A disjunction V = { U?, U }
           // and a disjunction boundType = { T -> V?, T -> V }
-          Type ty = createTypeVariable(locator);
+          Type ty = createTypeVariable(locator, TVO_CanBindToNoEscape);
 
           buildDisjunctionForImplicitlyUnwrappedOptional(ty, optTy, locator);
 
@@ -1843,7 +1852,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
         // Build the disjunction to attempt binding both T? and T (or
         // function returning T? and function returning T).
-        Type ty = createTypeVariable(locator, TVO_CanBindToLValue);
+        Type ty = createTypeVariable(locator,
+                                     TVO_CanBindToLValue |
+                                     TVO_CanBindToNoEscape);
         buildDisjunctionForImplicitlyUnwrappedOptional(ty, refType, locator);
         addConstraint(ConstraintKind::Bind, boundType,
                       OptionalType::get(ty->getRValueType()), locator);
@@ -1918,7 +1929,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
       // Member would either point to mutable or immutable property, we
       // don't which at the moment, so let's allow its type to be l-value.
-      auto memberTy = createTypeVariable(keyPathLoc, TVO_CanBindToLValue);
+      auto memberTy = createTypeVariable(keyPathLoc,
+                                         TVO_CanBindToLValue |
+                                         TVO_CanBindToNoEscape);
       // Attempt to lookup a member with a give name in the root type and
       // assign result to the leaf type of the keypath.
       bool isSubscriptRef = locator->isSubscriptMemberRef();
@@ -1986,7 +1999,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         auto subscriptResultTy = createTypeVariable(
             getConstraintLocator(locator->getAnchor(),
                                  ConstraintLocator::FunctionResult),
-            TVO_CanBindToLValue);
+            TVO_CanBindToLValue |
+            TVO_CanBindToNoEscape);
 
         auto adjustedFnTy =
             FunctionType::get(fnType->getParams(), subscriptResultTy);
@@ -2035,12 +2049,14 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // The element type is T or @lvalue T based on the key path subtype and
     // the mutability of the base.
     auto keyPathIndexTy = createTypeVariable(
-        getConstraintLocator(locator, ConstraintLocator::FunctionArgument));
+        getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+        TVO_CanBindToInOut);
     auto elementTy = createTypeVariable(
             getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-            TVO_CanBindToLValue);
+            TVO_CanBindToLValue | TVO_CanBindToNoEscape);
     auto elementObjTy = createTypeVariable(
-        getConstraintLocator(locator, ConstraintLocator::FunctionArgument));
+        getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+        TVO_CanBindToNoEscape);
     addConstraint(ConstraintKind::Equal, elementTy, elementObjTy, locator);
 
     // The element result is an lvalue or rvalue based on the key path class.
