@@ -3395,35 +3395,38 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     }
 
     static bool hasImplicitlyUnwrappedResult(Expr *E) {
-      // Look through implicit conversions like loads, derived-to-base
-      // conversion, etc.
-      if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E))
-        E = ICE->getSubExpr();
-
-      auto *decl = getDeclForExpr(E);
+      auto *decl = getDeclForImplicitlyUnwrappedExpr(E);
 
       return decl
         && decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
     }
 
-    static ValueDecl *getDeclForExpr(Expr *E) {
-      if (auto *call = dyn_cast<CallExpr>(E))
-        E = call->getDirectCallee();
+    static ValueDecl *getDeclForImplicitlyUnwrappedExpr(Expr *E) {
+      E = E->getValueProvidingExpr();
+
+      // Look through implicit conversions like loads, derived-to-base
+      // conversion, etc.
+      if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E)) {
+        E = ICE->getSubExpr();
+      }
 
       if (auto *subscript = dyn_cast<SubscriptExpr>(E)) {
         if (subscript->hasDecl())
           return subscript->getDecl().getDecl();
-
         return nullptr;
       }
 
       if (auto *memberRef = dyn_cast<MemberRefExpr>(E))
         return memberRef->getMember().getDecl();
+
       if (auto *declRef = dyn_cast<DeclRefExpr>(E))
         return declRef->getDecl();
-      if (auto *apply = dyn_cast<ApplyExpr>(E))
-        return apply->getCalledValue();
 
+      if (auto *apply = dyn_cast<ApplyExpr>(E)) {
+        auto *decl = apply->getCalledValue();
+        if (decl && isa<AbstractFunctionDecl>(decl))
+          return decl;
+      }
       return nullptr;
     }
 
@@ -3459,23 +3462,14 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       // If we're implicitly unwrapping from IUO to Any then emit a custom
       // diagnostic
       if (hasImplicitlyUnwrappedResult(subExpr)) {
-        if (auto decl = getDeclForExpr(subExpr)) {
-          auto kind = [&](ValueDecl *decl) -> unsigned {
-            if (isa<VarDecl>(decl)) {
-              return 0; // Variable
-            } else if (isa<ParamDecl>(decl)) {
-              return 1; // Function parameter
-            } else {
-              return 2; // Function result
-            }
-          };
-          
+        if (auto decl = getDeclForImplicitlyUnwrappedExpr(subExpr)) {
           TC.diagnose(subExpr->getStartLoc(), diag::iuo_to_any_coercion,
                       /* from */ srcType, /* to */ destType)
           .highlight(subExpr->getSourceRange());
-          
+
           TC.diagnose(decl->getLoc(), diag::iuo_to_any_coercion_note,
-                      kind(decl), decl->getBaseName().getIdentifier());
+                      decl->getDescriptiveKind(),
+                      decl->getBaseName().userFacingName());
         }
       } else {
         TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
