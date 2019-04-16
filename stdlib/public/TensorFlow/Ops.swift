@@ -1605,7 +1605,7 @@ public extension Tensor {
   ///
   /// - Parameter lowerBounds: The lower bounds at each dimension.
   /// - Parameter upperBounds: The upper bounds at each dimension.
-  @inlinable @inline(__always)
+  @inlinable
   @differentiable(wrt: self)
   func slice(lowerBounds: [Int32], upperBounds: [Int32]) -> Tensor {
     /// TODO: Precondition `lowerBounds.count == upperBounds.count`,
@@ -1616,13 +1616,13 @@ public extension Tensor {
       sizes: Tensor<Int32>(upperBounds) - lowerBoundsTensor)
   }
 
-  @inlinable @inline(__always)
+  @inlinable
   @differentiable(wrt: self, vjp: _vjpSlice)
   func slice(lowerBounds: Tensor<Int32>, sizes: Tensor<Int32>) -> Tensor {
     return Raw.slice(self, begin: lowerBounds, size: sizes)
   }
 
-  @inlinable @inline(__always)
+  @inlinable
   internal func _vjpSlice(
     lowerBounds: Tensor<Int32>,
     sizes: Tensor<Int32>
@@ -1656,9 +1656,10 @@ public enum TensorRange : TensorRangeExpression {
 extension TensorRange : Equatable {
   public static func == (lhs: TensorRange, rhs: TensorRange) -> Bool {
     switch (lhs, rhs) {
-    case (._ellipsis, ._ellipsis): return true
-    case (._newAxis, ._newAxis): return true
-    case (._squeezeAxis, ._squeezeAxis): return true
+    case (._ellipsis, ._ellipsis),
+         (._newAxis, ._newAxis),
+         (._squeezeAxis, ._squeezeAxis):
+      return true
     case (let ._index(i1), let ._index(i2)): return i1 == i2
     case (let ._range(r1, s1), let ._range(r2, s2)): return r1 == r2 && s1 == s2
     case (let ._closedRange(r1, s1), let ._closedRange(r2, s2)):
@@ -1784,7 +1785,7 @@ public extension Tensor {
     @usableFromInline
     let beginMask, endMask, ellipsisMask, newAxisMask, squeezeAxisMask: Int64
 
-    @inlinable @inline(__always)
+    @inlinable
     public init(
       begin: Tensor<Int32>, end: Tensor<Int32>, strides: Tensor<Int32>,
       beginMask: Int64, endMask: Int64, ellipsisMask: Int64, newAxisMask: Int64,
@@ -1801,7 +1802,7 @@ public extension Tensor {
     }
   }
 
-  @usableFromInline
+  @inlinable
   @differentiable(wrt: self, vjp: _vjpSubscript)
   internal subscript(_ indexPath: IndexPath) -> Tensor {
     get {
@@ -1823,7 +1824,7 @@ public extension Tensor {
     }
   }
 
-  @inlinable @inline(__always)
+  @inlinable
   // TODO: @differentiable(wrt: self)
   subscript(_ ranges: TensorRangeExpression...) -> Tensor {
     get {
@@ -1850,7 +1851,7 @@ public extension Tensor {
 }
 
 internal extension Tensor.IndexPath {
-  @inlinable @inline(__always)
+  @inlinable
   init(_ ranges: [TensorRange]) {
     precondition(!ranges.isEmpty, "The tensor range collection cannot be empty.")
     precondition(ranges.count { $0 == TensorRange._ellipsis } < 2,
@@ -1869,9 +1870,9 @@ internal extension Tensor.IndexPath {
       case ._ellipsis: ellipsisMask |= 1 << i
       case ._newAxis: newAxisMask |= 1 << i
       case ._squeezeAxis: squeezeAxisMask |= 1 << i
-      case ._index(let idx):
-        begin[i] = idx
-        end[i] = idx + 1
+      case ._index(let index):
+        begin[i] = index
+        end[i] = index + 1
         squeezeAxisMask |= 1 << i
       case ._range(let range, let stride):
         begin[i] = range.lowerBound
