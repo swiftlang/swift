@@ -1738,3 +1738,20 @@ func autoclosureSplat() {
   takeFn { (fn: @autoclosure @escaping () -> Int, x: Int) in }
   // expected-error@-1 {{contextual closure type '(_) -> ()' expects 1 argument, but 2 were used in closure body}}
 }
+
+func noescapeSplat() {
+  func takesFn<T>(_ fn: (T) -> ()) -> T {}
+  func takesEscaping(_: @escaping () -> Int) {}
+
+  do {
+    let t = takesFn { (fn: () -> Int) in }
+    takesEscaping(t)
+    // This type checks because we find a solution T:= (@escaping () -> Int).
+  }
+
+  do {
+    let t = takesFn { (fn: () -> Int, x: Int) in }
+    // expected-error@-1 {{converting non-escaping value to 'T' may allow it to escape}}
+    takesEscaping(t.0)
+  }
+}

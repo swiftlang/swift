@@ -1851,22 +1851,6 @@ ConstraintSystem::matchTypesBindTypeVar(
     }
   }
 
-  // Disallow bindings of types containing noescape functions to type
-  // variables that represent an opened generic parameter. If we allowed
-  // this it would allow noescape functions to potentially escape.
-  if (type->isNoEscape() && typeVar->getImpl().getGenericParameter()) {
-    if (shouldAttemptFixes()) {
-      auto *fix = MarkExplicitlyEscaping::create(
-          *this, getConstraintLocator(locator));
-      if (recordFix(fix))
-        return getTypeMatchFailure(locator);
-
-      // Allow no-escape function to be bound with recorded fix.
-    } else {
-      return getTypeMatchFailure(locator);
-    }
-  }
-
   // We do not allow keypaths to go through AnyObject. Let's create a fix
   // so this can be diagnosed later.
   if (auto loc = typeVar->getImpl().getLocator()) {
@@ -2449,27 +2433,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     if (!type1->is<LValueType>() &&
         type2->isExistentialType()) {
 
-      // Penalize conversions to Any, and disallow conversions of
-      // types containing noescape functions to Any.
-      if (kind >= ConstraintKind::Conversion && type2->isAny()) {
-        if (type1->isNoEscape()) {
-          if (shouldAttemptFixes()) {
-            auto &ctx = getASTContext();
-            auto *fix = MarkExplicitlyEscaping::create(
-                *this, getConstraintLocator(locator), ctx.TheAnyType);
-            if (recordFix(fix))
-              return getTypeMatchFailure(locator);
-
-            // Allow 'no-escape' functions to be converted to 'Any'
-            // with a recorded fix that helps us to properly diagnose
-            // such situations.
-          } else {
-            return getTypeMatchFailure(locator);
-          }
-        }
-
+      // Penalize conversions to Any.
+      if (kind >= ConstraintKind::Conversion && type2->isAny())
         increaseScore(ScoreKind::SK_EmptyExistentialConversion);
-      }
 
       conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
     }

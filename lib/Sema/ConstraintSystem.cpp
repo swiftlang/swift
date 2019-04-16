@@ -1084,8 +1084,7 @@ void ConstraintSystem::openGeneric(
         locator.withPathElement(LocatorPathElt(gp)));
 
     auto typeVar = createTypeVariable(locatorPtr,
-                                      TVO_PrefersSubtypeBinding |
-                                      TVO_CanBindToNoEscape);
+                                      TVO_PrefersSubtypeBinding);
     auto result = replacements.insert(
       std::make_pair(cast<GenericTypeParamType>(gp->getCanonicalType()),
                      typeVar));
