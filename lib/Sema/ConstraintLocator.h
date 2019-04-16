@@ -540,9 +540,13 @@ public:
   /// as result of the key path dynamic member lookup operation.
   bool isResultOfKeyPathDynamicMemberLookup() const;
 
-  /// Determine whether given locator points to a subscript component
+  /// Determine whether this locator points to a subscript component
   /// of the key path at some index.
   bool isKeyPathSubscriptComponent() const;
+
+  /// Determine whether this locator points to one of the key path
+  /// components.
+  bool isForKeyPathComponent() const;
 
   /// Produce a profile of this locator, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id, Expr *anchor,

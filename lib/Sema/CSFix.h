@@ -139,10 +139,13 @@ enum class FixKind : uint8_t {
 
   /// Allow KeyPaths to use AnyObject as root type
   AllowAnyObjectKeyPathRoot,
-  
+
   /// Using subscript references in the keypath requires that each
   /// of the index arguments to be Hashable.
   TreatKeyPathSubscriptIndexAsHashable,
+
+  /// Allow a reference to a static member as a key path component.
+  AllowStaticMemberRefInKeyPath,
 };
 
 class ConstraintFix {
@@ -778,6 +781,25 @@ public:
 
   static TreatKeyPathSubscriptIndexAsHashable *
   create(ConstraintSystem &cs, Type type, ConstraintLocator *locator);
+};
+
+class AllowStaticMemberRefInKeyPath final : public ConstraintFix {
+  ValueDecl *Member;
+
+  AllowStaticMemberRefInKeyPath(ConstraintSystem &cs, ValueDecl *member,
+                                ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowStaticMemberRefInKeyPath, locator),
+        Member(member) {}
+
+public:
+  std::string getName() const override {
+    return "allow reference to a static member as a key path component";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowStaticMemberRefInKeyPath *
+  create(ConstraintSystem &cs, ValueDecl *member, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

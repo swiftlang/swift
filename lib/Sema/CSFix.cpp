@@ -422,3 +422,16 @@ TreatKeyPathSubscriptIndexAsHashable::create(ConstraintSystem &cs, Type type,
   return new (cs.getAllocator())
       TreatKeyPathSubscriptIndexAsHashable(cs, type, locator);
 }
+
+bool AllowStaticMemberRefInKeyPath::diagnose(Expr *root, bool asNote) const {
+  InvalidStaticMemberRefInKeyPath failure(root, getConstraintSystem(), Member,
+                                          getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowStaticMemberRefInKeyPath *
+AllowStaticMemberRefInKeyPath::create(ConstraintSystem &cs, ValueDecl *member,
+                                      ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowStaticMemberRefInKeyPath(cs, member, locator);
+}

@@ -1748,12 +1748,16 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
 
   Expr *expr = getParentExpr();
   SourceRange baseRange = expr ? expr->getSourceRange() : SourceRange();
-  auto resolvedOverloadChoice = getResolvedOverload(locator)->Choice;
+
+  auto overload = getOverloadChoiceIfAvailable(locator);
+  if (!overload)
+    return false;
 
   ValueDecl *decl = nullptr;
 
-  if (!resolvedOverloadChoice.isDecl()) {
-    if (auto MT = resolvedOverloadChoice.getBaseType()->getAs<MetatypeType>()) {
+  if (!overload->choice.isDecl()) {
+    auto baseTy = overload->choice.getBaseType();
+    if (auto MT = baseTy->getAs<MetatypeType>()) {
       if (auto VD = dyn_cast<ValueDecl>(
               MT->getMetatypeInstanceType()->getAnyNominal()->getAsDecl())) {
         decl = VD;
@@ -1763,7 +1767,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
   }
 
-  auto member = decl ? decl : resolvedOverloadChoice.getDecl();
+  auto member = decl ? decl : overload->choice.getDecl();
 
   // If the base is an implicit self type reference, and we're in a
   // an initializer, then the user wrote something like:
@@ -1933,16 +1937,24 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
       
       return true;
     }
-    
+
+    // If this is a reference to a static member by one of the key path
+    // components, let's provide a tailored diagnostic and return because
+    // that is unsupported so there is no fix-it.
+    if (locator->isForKeyPathComponent()) {
+      InvalidStaticMemberRefInKeyPath failure(expr, getConstraintSystem(),
+                                              member, locator);
+      return failure.diagnoseAsError();
+    }
+
     if (isa<EnumElementDecl>(member)) {
-      Diag.emplace(emitDiagnostic(loc, diag::could_not_use_enum_element_on_instance,
-                                  Name));
+      Diag.emplace(emitDiagnostic(
+          loc, diag::could_not_use_enum_element_on_instance, Name));
+    } else {
+      Diag.emplace(emitDiagnostic(
+          loc, diag::could_not_use_type_member_on_instance, baseObjTy, Name));
     }
-    else {
-      Diag.emplace(emitDiagnostic(loc, diag::could_not_use_type_member_on_instance,
-                                  baseObjTy, Name));
-    }
-    
+
     Diag->highlight(getAnchor()->getSourceRange());
 
     if (Name.isSimpleName(DeclBaseName::createConstructor()) &&
@@ -2002,7 +2014,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         }
       }
     }
-    
+
     // Fall back to a fix-it with a full type qualifier
     auto nominal = member->getDeclContext()->getSelfNominalTypeDecl();
     SmallString<32> typeName;
@@ -2434,5 +2446,24 @@ bool KeyPathSubscriptIndexHashableFailure::diagnoseAsError() {
 
   emitDiagnostic(loc, diag::expr_keypath_subscript_index_not_hashable,
                  resolveType(NonConformingType));
+  return true;
+}
+
+bool InvalidStaticMemberRefInKeyPath::diagnoseAsError() {
+  auto *anchor = getRawAnchor();
+  auto loc = anchor->getLoc();
+
+  if (auto *KPE = dyn_cast<KeyPathExpr>(anchor)) {
+    auto *locator = getLocator();
+    auto component =
+        llvm::find_if(locator->getPath(), [](const LocatorPathElt &elt) {
+          return elt.isKeyPathComponent();
+        });
+
+    assert(component != locator->getPath().end());
+    loc = KPE->getComponents()[component->getValue()].getLoc();
+  }
+
+  emitDiagnostic(loc, diag::expr_keypath_static_member, Member->getBaseName());
   return true;
 }
