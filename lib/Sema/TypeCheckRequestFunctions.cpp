@@ -172,6 +172,46 @@ AttachedFunctionBuilderRequest::evaluate(Evaluator &evaluator,
   return nullptr;
 }
 
+llvm::Expected<Type>
+CustomAttrTypeRequest::evaluate(Evaluator &evaluator,
+                                CustomAttr *attr, DeclContext *dc,
+                                CustomAttrTypeKind typeKind) const {
+  auto resolution = TypeResolution::forContextual(dc);
+  TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
+
+  // Property delegates allow their type to be an unbound generic.
+  if (typeKind == CustomAttrTypeKind::PropertyDelegate)
+    options |= TypeResolutionFlags::AllowUnboundGenerics;
+
+  ASTContext &ctx = dc->getASTContext();
+  auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+  if (tc.validateType(attr->getTypeLoc(), resolution, options))
+    return ErrorType::get(ctx);
+
+  // We always require the type to resolve to a nominal type.
+  Type type = attr->getTypeLoc().getType();
+  if (!type->getAnyNominal()) {
+    assert(ctx.Diags.hadAnyError());
+    return ErrorType::get(ctx);
+  }
+
+  switch (typeKind) {
+  case CustomAttrTypeKind::NonGeneric:
+    if (type->hasArchetype()) {
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::function_builder_type_contextual, type);
+      return ErrorType::get(ctx);
+    }
+    break;
+
+  case CustomAttrTypeKind::PropertyDelegate:
+    // No further logic required here.
+    break;
+  }
+
+  return type;
+}
+
 // Define request evaluation functions for each of the type checker requests.
 static AbstractRequestFunction *typeCheckerRequestFunctions[] = {
 #define SWIFT_TYPEID(Name)                                    \
