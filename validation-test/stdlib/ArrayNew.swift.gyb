@@ -988,16 +988,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/ObjectEnumerator/FastEnumeration/UseFr
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
 }
 
-ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Cast")
-  .skip(.custom(
-    {
-#if os(iOS)
-      return true
-#else
-      return false
-#endif
-    }, reason: "Autorelease Failure. rdar://49791522"))
-.code {
+ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Cast") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3)
 
   var v: AnyObject = a[0] as AnyObject
