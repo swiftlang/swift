@@ -1001,7 +1001,7 @@ extension String {
         }
     }
     
-    func int16Value() -> Int32 {
+    func int32Value() -> Int32 {
         if let value = Int32(self) {
             return value;
         }
@@ -1010,7 +1010,7 @@ extension String {
         }
     }
     
-    func int16Value() -> Int64 {
+    func int64Value() -> Int64 {
         if let value = Int64(self) {
             return value;
         }
