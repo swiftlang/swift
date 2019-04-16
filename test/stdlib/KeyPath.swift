@@ -967,9 +967,7 @@ keyPath.test("key path literal closures") {
   
   // Did we compute the indices once per closure construction, or once per
   // closure application?
-  // FIXME: Currently fails.
-  // expectEqual(2, callsToComputeIndex)
-  expectEqual(4, callsToComputeIndex)
+  expectEqual(2, callsToComputeIndex)
 }
 
 // SR-6096

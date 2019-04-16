@@ -4419,42 +4419,98 @@ namespace {
       if (!isFunctionType)
         return E;
 
-      // Construct an implicit closure which applies this KeyPath.
-      auto resultTy = cs.getType(E);
+      // If we've gotten here, the user has used key path literal syntax to form
+      // a closure. The type checker has given E a function type to indicate
+      // this; we're going to change E's type to KeyPath<baseTy, leafTy> and
+      // then wrap it in a larger closure expression with the appropriate type.
+
+      // baseTy has been overwritten by the loop above; restore it.
+      baseTy = exprType->getAs<FunctionType>()->getParams()[0].getPlainType();
+
+      // Compute KeyPath<baseTy, leafTy> and set E's type back to it.
+      auto kpDecl = cs.getASTContext().getKeyPathDecl();
+      auto keyPathTy =
+          BoundGenericType::get(kpDecl, nullptr, { baseTy, leafTy });
+      E->setType(keyPathTy);
+      cs.cacheType(E);
+
+      // To ensure side effects of the key path expression (mainly indices in
+      // subscripts) are only evaluated once, we construct an outer closure,
+      // which is immediately evaluated, and an inner closure, which it returns.
+      // The result looks like this:
+      //
+      //     return "{ $kp$ in { $0[keyPath: $kp$] } }( \(E) )"
+
       auto &ctx = cs.getASTContext();
-      auto toFunc = exprType->getAs<FunctionType>();
-      auto argTy = toFunc->getParams()[0].getPlainType();
       auto discriminator = AutoClosureExpr::InvalidDiscriminator;
+
+      // The inner closure.
+      //
+      //     let closure = "{ $0[keyPath: $kp$] }"
+      auto closureTy =
+          FunctionType::get({ FunctionType::Param(baseTy) }, leafTy);
       auto closure = new (ctx)
-          AutoClosureExpr(E, toFunc->getResult(), discriminator, cs.DC);
-      auto param = new (ctx) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
-                                       SourceLoc(), Identifier(), SourceLoc(),
-                                       ctx.getIdentifier("$0"), closure);
-      param->setType(argTy);
-      param->setInterfaceType(argTy->mapTypeOutOfContext());
+          AutoClosureExpr(E, leafTy, discriminator, cs.DC);
+      auto param = new (ctx)
+          ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
+                    /*argument label*/ SourceLoc(), Identifier(),
+                    /*parameter name*/ SourceLoc(), ctx.getIdentifier("$0"),
+                    closure);
+      param->setType(baseTy);
+      param->setInterfaceType(baseTy->mapTypeOutOfContext());
+
+      // The outer closure.
+      //
+      //    let outerClosure = "{ $kp$ in \(closure) }"
+      auto outerClosureTy =
+          FunctionType::get({ FunctionType::Param(keyPathTy) }, closureTy);
+      auto outerClosure = new (ctx)
+          AutoClosureExpr(closure, closureTy, discriminator, cs.DC);
+      auto outerParam = new (ctx)
+          ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
+                    /*argument label*/ SourceLoc(), Identifier(),
+                    /*parameter name*/ SourceLoc(), ctx.getIdentifier("$kp$"),
+                    outerClosure);
+      outerParam->setType(keyPathTy);
+      outerParam->setInterfaceType(keyPathTy->mapTypeOutOfContext());
+
+      // let paramRef = "$0"
       auto *paramRef = new (ctx)
           DeclRefExpr(param, DeclNameLoc(E->getLoc()), /*Implicit=*/true);
-      paramRef->setType(argTy);
+      paramRef->setType(baseTy);
       cs.cacheType(paramRef);
 
-      if (resultTy->is<FunctionType>()) {
-        auto kpDecl = cs.getASTContext().getKeyPathDecl();
-        E->setType(BoundGenericType::get(kpDecl, nullptr,
-                                         {argTy, toFunc->getResult()}));
-        cs.cacheType(E);
-      }
+      // let outerParamRef = "$kp$"
+      auto outerParamRef = new (ctx)
+          DeclRefExpr(outerParam, DeclNameLoc(E->getLoc()), /*Implicit=*/true);
+      outerParamRef->setType(keyPathTy);
+      cs.cacheType(outerParamRef);
+
+      // let application = "\(paramRef)[keyPath: \(outerParamRef)]"
       auto *application = new (ctx)
-          KeyPathApplicationExpr(paramRef, E->getStartLoc(), E, E->getEndLoc(),
-                                 toFunc->getResult(), /*implicit=*/true);
+          KeyPathApplicationExpr(paramRef,
+                                 E->getStartLoc(), outerParamRef, E->getEndLoc(),
+                                 leafTy, /*implicit=*/true);
       cs.cacheType(application);
+
+      // Finish up the inner closure.
       closure->setParameterList(ParameterList::create(ctx, {param}));
       closure->setBody(application);
-
-      if (!resultTy->is<FunctionType>())
-        resultTy = toFunc->withExtInfo(toFunc->getExtInfo().withThrows(false));
-      closure->setType(resultTy);
+      closure->setType(closureTy);
       cs.cacheType(closure);
-      return coerceToType(closure, exprType, cs.getConstraintLocator(E));
+
+      // Finish up the outer closure.
+      outerClosure->setParameterList(ParameterList::create(ctx, {outerParam}));
+      outerClosure->setBody(closure);
+      outerClosure->setType(outerClosureTy);
+      cs.cacheType(outerClosure);
+
+      // let outerApply = "\( outerClosure )( \(E) )"
+      auto outerApply = CallExpr::createImplicit(ctx, outerClosure, {E}, {});
+      outerApply->setType(closureTy);
+      cs.cacheExprTypes(outerApply);
+
+      return coerceToType(outerApply, exprType, cs.getConstraintLocator(E));
     }
 
     KeyPathExpr::Component
