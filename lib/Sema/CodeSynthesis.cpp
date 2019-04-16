@@ -1802,7 +1802,7 @@ static void synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
   auto *ctor = cast<ConstructorDecl>(fn);
   auto &ctx = ctor->getASTContext();
 
-  auto unimplementedInitDecl = ctx.getUnimplementedInitializerDecl();
+  auto unimplementedInitDecl = ctx.getUnimplementedInitializer();
   auto classDecl = ctor->getDeclContext()->getSelfClassDecl();
   if (!unimplementedInitDecl) {
     ctx.Diags.diagnose(classDecl->getLoc(),
