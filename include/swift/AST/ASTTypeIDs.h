@@ -26,6 +26,8 @@ struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperTypeInfo;
 class Type;
 class VarDecl;
+class TypeAliasDecl;
+class Type;
 
 #define SWIFT_AST_TYPEID_ZONE 1
 

@@ -548,12 +548,54 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
+/// Kinds of types for CustomAttr.
+enum class CustomAttrTypeKind {
+  /// The type is required to not be expressed in terms of
+  /// any contextual type parameters.
+  NonGeneric,
+
+  /// Property delegates have some funky rules, like allowing
+  /// unbound generic types.
+  PropertyDelegate,
+};
+
+void simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value);
+
+/// Request the type spelled out in a custom attribute.
+///
+/// Different parameters cannot be used for the same attribute.
+class CustomAttrTypeRequest :
+    public SimpleRequest<CustomAttrTypeRequest,
+                         CacheKind::Cached,
+                         Type,
+                         CustomAttr *,
+                         DeclContext *,
+                         CustomAttrTypeKind> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<Type>
+  evaluate(Evaluator &evaluator, CustomAttr *attr, DeclContext *dc,
+           CustomAttrTypeKind typeKind) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
 bool AnyValue::Holder<Type>::equals(const HolderBase &other) const;
 
-void simple_display(llvm::raw_ostream &out, const Type &type);
+void simple_display(llvm::raw_ostream &out, Type value);
 
 /// The zone number for the type checker.
 #define SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE 10

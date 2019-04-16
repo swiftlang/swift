@@ -613,7 +613,6 @@ void swift::simple_display(
   out << " }";
 }
 
-
 template<>
 bool swift::AnyValue::Holder<Type>::equals(const HolderBase &other) const {
   assert(typeID == other.typeID && "Caller should match type IDs");
@@ -621,11 +620,38 @@ bool swift::AnyValue::Holder<Type>::equals(const HolderBase &other) const {
   static_cast<const Holder<Type> &>(other).value.getPointer();
 }
 
-void swift::simple_display(llvm::raw_ostream &out, const Type &type) {
+void swift::simple_display(llvm::raw_ostream &out, Type type) {
   if (type)
     type.print(out);
   else
     out << "null";
+}
+
+//----------------------------------------------------------------------------//
+// CustomAttrTypeRequest.
+//----------------------------------------------------------------------------//
+
+void CustomAttrTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto attr = std::get<0>(getStorage());
+  diags.diagnose(attr->getLocation(), diag::circular_reference);
+}
+
+void CustomAttrTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto attr = std::get<0>(getStorage());
+  diags.diagnose(attr->getLocation(), diag::circular_reference_through);
+}
+
+void swift::simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value) {
+  switch (value) {
+  case CustomAttrTypeKind::NonGeneric:
+    out << "non-generic";
+    return;
+
+  case CustomAttrTypeKind::PropertyDelegate:
+    out << "property-delegate";
+    return;
+  }
+  llvm_unreachable("bad kind");
 }
 
 //----------------------------------------------------------------------------//
