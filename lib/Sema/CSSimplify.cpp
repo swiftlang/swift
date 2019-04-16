@@ -168,13 +168,12 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
   }
 
   auto params = levelTy->getParams();
-  SmallBitVector defaultMap =
-    computeDefaultMap(params, decl, hasCurriedSelf);
+  ParameterListInfo paramInfo(params, decl, hasCurriedSelf);
 
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 8> unusedParamBindings;
 
-  return !matchCallArguments(argInfos, params, defaultMap,
+  return !matchCallArguments(argInfos, params, paramInfo,
                              hasTrailingClosure,
                              /*allow fixes*/ false,
                              listener, unusedParamBindings);
@@ -211,12 +210,12 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
 bool constraints::
 matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
                    ArrayRef<AnyFunctionType::Param> params,
-                   const SmallBitVector &defaultMap,
+                   const ParameterListInfo &paramInfo,
                    bool hasTrailingClosure,
                    bool allowFixes,
                    MatchCallArgumentListener &listener,
                    SmallVectorImpl<ParamBinding> &parameterBindings) {
-  assert(params.size() == defaultMap.size() && "Default map does not match");
+  assert(params.size() == paramInfo.size() && "Default map does not match");
 
   // Keep track of the parameter we're matching and what argument indices
   // got bound to each parameter.
@@ -233,10 +232,6 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
   // Indicates whether any of the arguments are potentially out-of-order,
   // requiring further checking at the end.
   bool potentiallyOutOfOrder = false;
-
-  auto hasDefault = [&defaultMap, &numParams](unsigned idx) -> bool {
-    return idx < numParams ? defaultMap.test(idx) : false;
-  };
 
   // Local function that claims the argument at \c argNumber, returning the
   // index of the claimed argument. This is primarily a helper for
@@ -327,7 +322,8 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         // func foo(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
         // foo(1, c: 2, 3) // -> `3` will be claimed as '_ b:'.
         // ```
-        if (argLabel.empty() && (hasDefault(i) || !forVariadic))
+        if (argLabel.empty() &&
+            (paramInfo.hasDefaultArgument(i) || !forVariadic))
           continue;
 
         potentiallyOutOfOrder = true;
@@ -531,7 +527,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         // now if label doesn't match because it's incorrect
         // or argument belongs to some other parameter, so
         // we just leave this parameter unfulfilled.
-        if (defaultMap.test(i))
+        if (paramInfo.hasDefaultArgument(i))
           continue;
 
         // Looks like there was no parameter claimed at the same
@@ -568,7 +564,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         continue;
 
       // Parameters with defaults can be unfulfilled.
-      if (hasDefault(paramIdx))
+      if (paramInfo.hasDefaultArgument(paramIdx))
         continue;
 
       listener.missingArgument(paramIdx);
@@ -601,7 +597,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         // If we are moving the the position with a different label
         // and there is no default value for it, can't diagnose the
         // problem as a simple re-ordering.
-        if (!defaultMap.test(actualIndex))
+        if (!paramInfo.hasDefaultArgument(actualIndex))
           return false;
       }
 
@@ -609,7 +605,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         if (oldLabel == params[i].getLabel())
           break;
 
-        if (!defaultMap.test(i))
+        if (!paramInfo.hasDefaultArgument(i))
           return false;
       }
 
@@ -914,8 +910,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   std::tie(callee, hasCurriedSelf, argLabels, hasTrailingClosure) =
     getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
 
-  SmallBitVector defaultMap =
-    computeDefaultMap(params, callee, hasCurriedSelf);
+  ParameterListInfo paramInfo(params, callee, hasCurriedSelf);
 
   // Apply labels to arguments.
   SmallVector<AnyFunctionType::Param, 8> argsWithLabels;
@@ -926,7 +921,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   SmallVector<ParamBinding, 4> parameterBindings;
   ArgumentFailureTracker listener(cs, parameterBindings, locator);
   if (constraints::matchCallArguments(argsWithLabels, params,
-                                      defaultMap,
+                                      paramInfo,
                                       hasTrailingClosure,
                                       cs.shouldAttemptFixes(), listener,
                                       parameterBindings))

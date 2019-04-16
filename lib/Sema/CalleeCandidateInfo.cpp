@@ -320,8 +320,8 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
     return {CC_GeneralMismatch, {}};
 
   auto candArgs = candidate.getParameters();
-  SmallBitVector candDefaultMap =
-    computeDefaultMap(candArgs, candidate.getDecl(), candidate.skipCurriedSelf);
+  ParameterListInfo candParamInfo(candArgs, candidate.getDecl(),
+                                  candidate.skipCurriedSelf);
   
   struct OurListener : public MatchCallArgumentListener {
     CandidateCloseness result = CC_ExactMatch;
@@ -362,7 +362,7 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
   // types of the arguments, looking only at the argument labels etc.
   SmallVector<ParamBinding, 4> paramBindings;
   if (matchCallArguments(actualArgs, candArgs,
-                         candDefaultMap,
+                         candParamInfo,
                          hasTrailingClosure,
                          /*allowFixes:*/ true,
                          listener, paramBindings))
