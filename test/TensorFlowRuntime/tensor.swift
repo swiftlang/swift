@@ -233,6 +233,119 @@ TensorTests.testAllBackends("SliceIndexingAssignment") {
   expectEqual(Array(stride(from: 3.0, to: 5, by: 1)), array1D.scalars)
 }
 
+TensorTests.testAllBackends("EllipsisIndexing") {
+  // NOTE: cannot test `Tensor.shape` or `Tensor.scalars` directly until send
+  // and receive are implemented (without writing a bunch of mini tests).
+  // Instead, `Tensor.array` is called to make a ShapedArray host copy and the
+  // ShapedArray is tested instead.
+  var tensor3D = Tensor<Float>(
+    shape: [3, 4, 5], scalars: Array(stride(from: 0.0, to: 60, by: 1)))
+  tensor3D[2, ellipsis] = Tensor<Float>(
+    shape: [4, 5], scalars: Array(stride(from: 20.0, to: 40, by: 1)))
+  let slice3D = tensor3D[2..., ellipsis]
+  let slice2D = tensor3D[1][0..<2]
+  let slice1D = tensor3D[0][0][3..<5]
+
+  let array3D = slice3D.array
+  let array2D = slice2D.array
+  let array1D = slice1D.array
+
+  /// Test shapes
+  expectEqual([1, 4, 5], array3D.shape)
+  expectEqual([2, 5], array2D.shape)
+  expectEqual([2], array1D.shape)
+
+  /// Test scalars
+  expectEqual(Array(stride(from: 20.0, to: 40, by: 1)), array3D.scalars)
+  expectEqual(Array(stride(from: 20.0, to: 30, by: 1)), array2D.scalars)
+  expectEqual(Array(stride(from: 3.0, to: 5, by: 1)), array1D.scalars)
+}
+
+TensorTests.testAllBackends("NewAxisIndexing") {
+  // NOTE: cannot test `Tensor.shape` or `Tensor.scalars` directly until send
+  // and receive are implemented (without writing a bunch of mini tests).
+  // Instead, `Tensor.array` is called to make a ShapedArray host copy and the
+  // ShapedArray is tested instead.
+  let tensor3D = Tensor<Float>(
+    shape: [3, 4, 5], scalars: Array(stride(from: 0.0, to: 60, by: 1)))
+  let slice3D = tensor3D[2..., newAxis, ellipsis]
+  let slice2D = tensor3D[1, newAxis][0..<1, 0..<2]
+  let slice1D = tensor3D[0][newAxis, 0][0..<1, 3..<5, newAxis]
+
+  let array3D = slice3D.array
+  let array2D = slice2D.array
+  let array1D = slice1D.array
+
+  /// Test shapes
+  expectEqual([1, 1, 4, 5], array3D.shape)
+  expectEqual([1, 2, 5], array2D.shape)
+  expectEqual([1, 2, 1], array1D.shape)
+
+  /// Test scalars
+  expectEqual(Array(stride(from: 40.0, to: 60, by: 1)), array3D.scalars)
+  expectEqual(Array(stride(from: 20.0, to: 30, by: 1)), array2D.scalars)
+  expectEqual(Array(stride(from: 3.0, to: 5, by: 1)), array1D.scalars)
+}
+
+TensorTests.testAllBackends("SqueezeAxisIndexing") {
+  // NOTE: cannot test `Tensor.shape` or `Tensor.scalars` directly until send
+  // and receive are implemented (without writing a bunch of mini tests).
+  // Instead, `Tensor.array` is called to make a ShapedArray host copy and the
+  // ShapedArray is tested instead.
+  let tensor3D = Tensor<Float>(
+    shape: [3, 4, 5], scalars: Array(stride(from: 0.0, to: 60, by: 1)))
+  let slice3D = tensor3D[2..., newAxis, ellipsis][squeezeAxis, squeezeAxis]
+  let slice2D = tensor3D[1, newAxis][squeezeAxis, 0..<2]
+  let slice1D = tensor3D[0..<1, 0, 3..<5, newAxis][
+    squeezeAxis, ellipsis, squeezeAxis]
+
+  let array3D = slice3D.array
+  let array2D = slice2D.array
+  let array1D = slice1D.array
+
+  /// Test shapes
+  expectEqual([4, 5], array3D.shape)
+  expectEqual([2, 5], array2D.shape)
+  expectEqual([2], array1D.shape)
+
+  /// Test scalars
+  expectEqual(Array(stride(from: 40.0, to: 60, by: 1)), array3D.scalars)
+  expectEqual(Array(stride(from: 20.0, to: 30, by: 1)), array2D.scalars)
+  expectEqual(Array(stride(from: 3.0, to: 5, by: 1)), array1D.scalars)
+}
+
+TensorTests.testAllBackends("StridedSliceIndexingAssignment") {
+  // NOTE: cannot test `Tensor.shape` or `Tensor.scalars` directly until send
+  // and receive are implemented (without writing a bunch of mini tests).
+  // Instead, `Tensor.array` is called to make a ShapedArray host copy and the
+  // ShapedArray is tested instead.
+  var tensor3D = Tensor<Float>(
+    shape: [3, 4, 5], scalars: Array(stride(from: 0.0, to: 60, by: 1)))
+  tensor3D[2, strided(0..<5, by: 2), 0..<6] = Tensor<Float>(
+    shape: [2, 5], scalars: Array(stride(from: 20.0, to: 40, by: 2)))
+  let slice3D = tensor3D[2...]
+  let slice2D = tensor3D[1][0..<2]
+  let slice1D = tensor3D[0][0][3..<5]
+
+  let array3D = slice3D.array
+  let array2D = slice2D.array
+  let array1D = slice1D.array
+
+  /// Test shapes
+  expectEqual([1, 4, 5], array3D.shape)
+  expectEqual([2, 5], array2D.shape)
+  expectEqual([2], array1D.shape)
+
+  /// Test scalars
+  expectEqual(
+    Array(stride(from: 20.0, to: 30, by: 2)) + 
+    Array(stride(from: 45.0, to: 50, by: 1)) + 
+    Array(stride(from: 30.0, to: 40, by: 2)) + 
+    Array(stride(from: 55.0, to: 60, by: 1)), array3D.scalars)
+  expectEqual(Array(stride(from: 20.0, to: 30, by: 1)), array2D.scalars)
+  expectEqual(Array(stride(from: 3.0, to: 5, by: 1)), array1D.scalars)
+}
+
 TensorTests.test("WholeTensorSlicing") {
   let t: Tensor<Int32> = [[[1, 1, 1], [2, 2, 2]],
                           [[3, 3, 3], [4, 4, 4]],
