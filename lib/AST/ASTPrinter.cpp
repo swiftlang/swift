@@ -2499,12 +2499,6 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     Printer.printStructurePost(PrintStructureKind::FunctionParameter, param);
   };
 
-  bool inheritsDefault =
-      param->getDefaultArgumentKind() == DefaultArgumentKind::Inherited;
-  if (inheritsDefault) {
-    Printer << "@_inheritedDefaultValue ";
-  }
-
   auto printArgName = [&]() {
     // Print argument name.
     auto ArgName = param->getArgumentName();
@@ -2571,7 +2565,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
   if (param->isVariadic())
     Printer << "...";
 
-  if (param->isDefaultArgument() && !inheritsDefault) {
+  if (param->isDefaultArgument()) {
     SmallString<128> scratch;
     auto defaultArgStr = param->getDefaultValueStringRepresentation(scratch);
 

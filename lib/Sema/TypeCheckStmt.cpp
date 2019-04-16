@@ -1742,25 +1742,29 @@ getParamIndex(const ParameterList *paramList, const ParamDecl *decl) {
 
 static void
 checkInheritedDefaultValueRestrictions(TypeChecker &TC, ParamDecl *PD) {
-  auto *attr = PD->getAttrs().getAttribute<InheritedDefaultValueAttr>();
-  if (!attr)
+  if (PD->getDefaultArgumentKind() != DefaultArgumentKind::Inherited)
     return;
 
   auto *DC = PD->getInnermostDeclContext();
+  const SourceFile *SF = DC->getParentSourceFile();
+  if (!SF || SF->Kind != SourceFileKind::Interface)
+    return;
+
   if (!isa<ConstructorDecl>(DC)) {
-    TC.diagnose(attr->getLocation(),
+    TC.diagnose(PD->getLoc(),
                 diag::inherited_default_value_not_on_constructor_param);
-    attr->setInvalid();
     return;
   }
 
   // Check the matching parameter of an overriden decl has a default value
   auto ctor = cast<ConstructorDecl>(DC);
   Optional<unsigned> idx = getParamIndex(ctor->getParameters(), PD);
+  bool foundOverriden = false;
   assert(idx && "containing decl does not contain param?");
   for (auto overridden = ctor->getOverriddenDecl();
        overridden != nullptr;
        overridden = overridden->getOverriddenDecl()) {
+    foundOverriden = true;
     auto equivalentParam = overridden->getParameters()->get(*idx);
     assert(equivalentParam && "inherited decl mismatched arguments?");
 
@@ -1771,18 +1775,23 @@ checkInheritedDefaultValueRestrictions(TypeChecker &TC, ParamDecl *PD) {
 
     // If it doesn't have a default value, diagnose it
     if (equivalentParam->getDefaultArgumentKind() == DefaultArgumentKind::None) {
-      TC.diagnose(attr->getLocation(),
+      TC.diagnose(PD->getLoc(),
                   diag::corresponding_param_not_defaulted);
-      attr->setInvalid();
     }
     // We found a match: it's valid
     return;
   }
 
-  // used on a param of a non-overriding initializer
-  TC.diagnose(attr->getLocation(),
+  // Used with a param of a non-overriding initializer, or one where the
+  // corresponding param in the overridden decl was also inherited but *it*
+  // didn't override anything. Diagnose the first case and ignore the second.
+  // The second will be diagnosed when checking the default args of the
+  // overridden declaration.
+  if (foundOverriden)
+    return;
+
+  TC.diagnose(PD->getLoc(),
               diag::inherited_default_value_used_in_non_overriding_constructor);
-  attr->setInvalid();
 }
 
 /// Check the default arguments that occur within this pattern.
