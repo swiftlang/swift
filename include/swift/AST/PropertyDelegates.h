@@ -126,6 +126,10 @@ void simple_display(
     llvm::raw_ostream &out,
     const PropertyDelegateBackingPropertyInfo &backingInfo);
 
+/// Given the initializer for the given property with an attached property
+/// delegate, dig out the original initialization expression.
+Expr *findOriginalPropertyDelegateInitialValue(VarDecl *var, Expr *init);
+
 } // end namespace swift
 
 #endif // SWIFT_AST_PROPERTY_DELEGATES_H
