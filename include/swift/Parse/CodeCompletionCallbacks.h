@@ -175,7 +175,7 @@ public:
   virtual void completeCaseStmtKeyword() {};
 
   /// Complete at the beginning of a case stmt pattern.
-  virtual void completeCaseStmtBeginning() {};
+  virtual void completeCaseStmtBeginning(CodeCompletionExpr *E) {};
 
   /// Complete at the beginning of member of a nominal decl member -- no tokens
   /// provided by user.
