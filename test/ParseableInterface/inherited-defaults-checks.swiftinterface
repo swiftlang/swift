@@ -1,0 +1,27 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name InheritedDefaults
+
+// RUN: %empty-directory(%t)
+// RUN: %target-typecheck-verify-swift
+// BUN: %target-swift-frontend -typecheck -verify -module-cache-path %t/MCP -o %t/InheritedDefaults.swiftmodule -module-name InheritedDefaults %s
+
+import Swift
+
+public class Bar {
+  public init(x: Int = 24, y: Int)
+}
+
+public class Foo: Bar {
+  public override init(@_inheritedDefaultValue x: Int, y: Int)
+  public subscript(@_inheritedDefaultValue k: Int) -> Int { get } // expected-error {{@_inheritedDefaultValue is only valid on parameter declarations of initializers}}
+  public func foo(@_inheritedDefaultValue z: Int) // expected-error {{@_inheritedDefaultValue is only valid on parameter declarations of initializers}}
+}
+
+public class Baz: Bar {
+  public override init(@_inheritedDefaultValue x: Int, @_inheritedDefaultValue y: Int) // expected-error {{@_inheritedDefaultValue requires that the corresponding parameter of the overridden initializer has a default value}}
+}
+
+@_inheritedDefaultValue public enum Bob { // expected-error {{@_inheritedDefaultValue may only be used on 'parameter' declarations}}
+  case bar(p: Int)
+  public init(@_inheritedDefaultValue foo: String) // expected-error {{@_inheritedDefaultValue can only be used on the parameters of overriding initializers}}
+}

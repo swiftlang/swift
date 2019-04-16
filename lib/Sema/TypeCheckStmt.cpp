@@ -1737,10 +1737,65 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   return BS;
 }
 
+static Optional<unsigned>
+getParamIndex(const ParameterList *paramList, const ParamDecl *decl) {
+  ArrayRef<ParamDecl *> params = paramList->getArray();
+  for (unsigned i = 0; i < params.size(); ++i) {
+    if (params[i] == decl) return i;
+  }
+  return None;
+}
+
+static void
+checkInheritedDefaultValueRestrictions(TypeChecker &TC, ParamDecl *PD) {
+  auto *attr = PD->getAttrs().getAttribute<InheritedDefaultValueAttr>();
+  if (!attr)
+    return;
+
+  auto *DC = PD->getInnermostDeclContext();
+  if (!isa<ConstructorDecl>(DC)) {
+    TC.diagnose(attr->getLocation(),
+                diag::inherited_default_value_not_on_constructor_param);
+    attr->setInvalid();
+    return;
+  }
+
+  // Check the matching parameter of an overriden decl has a default value
+  auto ctor = cast<ConstructorDecl>(DC);
+  Optional<unsigned> idx = getParamIndex(ctor->getParameters(), PD);
+  assert(idx && "containing decl does not contain param?");
+  for (auto overridden = ctor->getOverriddenDecl();
+       overridden != nullptr;
+       overridden = overridden->getOverriddenDecl()) {
+    auto equivalentParam = overridden->getParameters()->get(*idx);
+    assert(equivalentParam && "inherited decl mismatched arguments?");
+
+    // If the corresponding overridden param is also inherited, keep looking
+    if (equivalentParam->getDefaultArgumentKind() ==
+        DefaultArgumentKind::Inherited)
+      continue;
+
+    // If it doesn't have a default value, diagnose it
+    if (equivalentParam->getDefaultArgumentKind() == DefaultArgumentKind::None) {
+      TC.diagnose(attr->getLocation(),
+                  diag::corresponding_param_not_defaulted);
+      attr->setInvalid();
+    }
+    // We found a match: it's valid
+    return;
+  }
+
+  // used on a param of a non-overriding initializer
+  TC.diagnose(attr->getLocation(),
+              diag::inherited_default_value_used_in_non_overriding_constructor);
+  attr->setInvalid();
+}
+
 /// Check the default arguments that occur within this pattern.
 void TypeChecker::checkDefaultArguments(ParameterList *params,
                                         ValueDecl *VD) {
   for (auto *param : *params) {
+    checkInheritedDefaultValueRestrictions(*this, param);
     if (!param->getDefaultValue() ||
         !param->hasInterfaceType() ||
         param->getInterfaceType()->hasError())
