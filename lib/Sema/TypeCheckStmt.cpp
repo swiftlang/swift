@@ -468,11 +468,26 @@ public:
     
     // If the result type is an opaque type, this is an opportunity to resolve
     // the underlying type.
+    auto isOpaqueReturnTypeOfCurrentFunc = [&](OpaqueTypeDecl *opaque) -> bool {
+      // Closures currently don't support having opaque types.
+      auto funcDecl = TheFunc->getAbstractFunctionDecl();
+      if (!funcDecl)
+        return false;
+      // Either the function is declared with its own opaque return type...
+      if (opaque->getNamingDecl() == funcDecl)
+        return true;
+      // ...or the function is a getter for a property or subscript with an
+      // opaque return type.
+      if (auto accessor = dyn_cast<AccessorDecl>(funcDecl)) {
+        return accessor->isGetter()
+          && opaque->getNamingDecl() == accessor->getStorage();
+      }
+      return false;
+    };
+    
     if (auto opaque = ResultTy->getAs<OpaqueTypeArchetypeType>()) {
-      if (auto funcDecl = TheFunc->getAbstractFunctionDecl()) {
-        if (opaque->getDecl()->getNamingDecl() == funcDecl) {
-          options |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
-        }
+      if (isOpaqueReturnTypeOfCurrentFunc(opaque->getDecl())) {
+        options |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
       }
     }
 
