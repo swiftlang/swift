@@ -495,7 +495,6 @@ enum class CompletionKind {
   TypeIdentifierWithoutDot,
   CaseStmtKeyword,
   CaseStmtBeginning,
-  CaseStmtDotPrefix,
   NominalMemberBeginning,
   AccessorBeginning,
   AttributeBegin,

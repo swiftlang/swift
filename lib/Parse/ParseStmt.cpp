@@ -1096,17 +1096,6 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     status.setHasCodeCompletion();
     return;
   }
-  if (parsingContext == GuardedPatternContext::Case &&
-      P.Tok.isAny(tok::period_prefix, tok::period) &&
-      P.peekToken().is(tok::code_complete)) {
-    P.consumeToken();
-    if (P.CodeCompletion)
-      P.CodeCompletion->completeCaseStmtDotPrefix();
-    auto loc = P.consumeToken(tok::code_complete);
-    result.ThePattern = new (P.Context) AnyPattern(loc);
-    status.setHasCodeCompletion();
-    return;
-  }
 
   // If this is a 'catch' clause and we have "catch {" or "catch where...",
   // then we get an implicit "let error" pattern.

@@ -1378,7 +1378,6 @@ public:
 
   void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning() override;
-  void completeCaseStmtDotPrefix() override;
   void completeDeclAttrBeginning(bool Sil, bool isIndependent) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeInPrecedenceGroup(SyntaxKind SK) override;
@@ -4727,13 +4726,6 @@ void CodeCompletionCallbacksImpl::completeCaseStmtBeginning() {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeCaseStmtDotPrefix() {
-  assert(!InEnumElementRawValue);
-
-  Kind = CompletionKind::CaseStmtDotPrefix;
-  CurDeclContext = P.CurDeclContext;
-}
-
 void CodeCompletionCallbacksImpl::completeImportDecl(
     std::vector<std::pair<Identifier, SourceLoc>> &Path) {
   Kind = CompletionKind::Import;
@@ -5017,7 +5009,6 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::SuperExpr:
   case CompletionKind::SuperExprDot:
   case CompletionKind::CaseStmtBeginning:
-  case CompletionKind::CaseStmtDotPrefix:
   case CompletionKind::TypeIdentifierWithDot:
   case CompletionKind::TypeIdentifierWithoutDot:
     break;
@@ -5419,13 +5410,6 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::CaseStmtBeginning: {
     SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
     Lookup.getValueCompletionsInDeclContext(Loc);
-    Lookup.getTypeContextEnumElementCompletions(Loc);
-    break;
-  }
-
-  case CompletionKind::CaseStmtDotPrefix: {
-    Lookup.setHaveDot(SourceLoc());
-    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
     Lookup.getTypeContextEnumElementCompletions(Loc);
     break;
   }
