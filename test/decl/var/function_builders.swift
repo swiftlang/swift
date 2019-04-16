@@ -44,3 +44,28 @@ func makerParamMissing2(@Maker
 func makerParamExtra(@Maker(5) // expected-error {{function builder attributes cannot have arguments}}
                      fn: () -> ()) {}
 
+@functionBuilder
+struct GenericMaker<T> {} // expected-note {{generic type 'GenericMaker' declared here}}
+
+struct GenericContainer<T> {  // expected-note {{generic type 'GenericContainer' declared here}}
+  @functionBuilder
+  struct Maker {}
+}
+
+func makeParamUnbound(@GenericMaker // expected-error {{reference to generic type 'GenericMaker' requires arguments}}
+                      fn: () -> ()) {}
+
+func makeParamBound(@GenericMaker<Int>
+                    fn: () -> ()) {}
+
+func makeParamNestedUnbound(@GenericContainer.Maker // expected-error {{reference to generic type 'GenericContainer' requires arguments}}
+                            fn: () -> ()) {}
+
+func makeParamNestedBound(@GenericContainer<Int>.Maker
+                          fn: () -> ()) {}
+
+
+struct WithinGeneric<U> {
+  func makeParamBoundInContext(@GenericMaker<U>  // expected-error {{function builder type 'GenericMaker<U>' cannot depend on the current generic context}}
+                               fn: () -> ()) {}
+}

@@ -2612,6 +2612,10 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
                   diag::previous_function_builder_here);
       attr->setInvalid();
       return;
+    } else {
+      // Force any diagnostics associated with computing the function-builder
+      // type.
+      (void) param->getFunctionBuilderType();
     }
 
     return;
