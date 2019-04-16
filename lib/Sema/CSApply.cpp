@@ -5345,8 +5345,7 @@ Expr *ExprRewriter::coerceCallArguments(
   // Determine whether this application has curried self.
   bool skipCurriedSelf = apply ? hasCurriedSelf(cs, callee, apply) : true;
   // Determine the parameter bindings.
-  SmallBitVector defaultMap
-    = computeDefaultMap(params, callee.getDecl(), skipCurriedSelf);
+  ParameterListInfo paramInfo(params, callee.getDecl(), skipCurriedSelf);
 
   SmallVector<AnyFunctionType::Param, 8> args;
   AnyFunctionType::decomposeInput(cs.getType(arg), args);
@@ -5361,7 +5360,7 @@ Expr *ExprRewriter::coerceCallArguments(
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 4> parameterBindings;
   bool failed = constraints::matchCallArguments(args, params,
-                                                defaultMap,
+                                                paramInfo,
                                                 hasTrailingClosure,
                                                 /*allowFixes=*/false, listener,
                                                 parameterBindings);

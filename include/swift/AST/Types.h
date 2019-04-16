@@ -3113,12 +3113,28 @@ BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
   }
 END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
 
-/// Map the given parameter list onto a bitvector describing whether
-/// the argument type at each index has a default argument associated with
-/// it.
-SmallBitVector
-computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
-                  const ValueDecl *paramOwner, bool skipCurriedSelf);
+/// Provides information about the parameter list of a given declaration, including whether each parameter
+/// has a default argument.
+struct ParameterListInfo {
+  SmallBitVector defaultArguments;
+
+public:
+  ParameterListInfo() { }
+
+  ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
+                    const ValueDecl *paramOwner, bool skipCurriedSelf);
+
+  /// Whether the parameter at the given index has a default argument.
+  bool hasDefaultArgument(unsigned paramIdx) const;
+
+  /// Retrieve the number of non-defaulted parameters.
+  unsigned numNonDefaultedParameters() const {
+    return defaultArguments.count();
+  }
+
+  /// Retrieve the number of parameters for which we have information.
+  unsigned size() const { return defaultArguments.size(); }
+};
 
 /// Turn a param list into a symbolic and printable representation that does not
 /// include the types, something like (: , b:, c:)

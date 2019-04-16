@@ -3700,7 +3700,7 @@ public:
 ///
 /// \param args The arguments.
 /// \param params The parameters.
-/// \param defaultMap A map indicating if the parameter at that index has a default value.
+/// \param paramInfo Declaration-level information about the parameters.
 /// \param hasTrailingClosure Whether the last argument is a trailing closure.
 /// \param allowFixes Whether to allow fixes when matching arguments.
 ///
@@ -3712,7 +3712,7 @@ public:
 /// \returns true if the call arguments could not be matched to the parameters.
 bool matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
                         ArrayRef<AnyFunctionType::Param> params,
-                        const SmallBitVector &defaultMap,
+                        const ParameterListInfo &paramInfo,
                         bool hasTrailingClosure,
                         bool allowFixes,
                         MatchCallArgumentListener &listener,
@@ -4086,7 +4086,7 @@ public:
 /// in the custom function when necessary.
 class InputMatcher {
   size_t NumSkippedParameters;
-  const SmallBitVector DefaultValueMap;
+  const ParameterListInfo &ParamInfo;
   const ArrayRef<AnyFunctionType::Param> Params;
 
 public:
@@ -4102,7 +4102,7 @@ public:
   };
 
   InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
-               const SmallBitVector &defaultValueMap);
+               const ParameterListInfo &paramInfo);
 
   /// Matching a given array of inputs.
   ///
