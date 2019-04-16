@@ -30,6 +30,7 @@
 namespace swift {
 
 class GenericParamList;
+class ParamDecl;
 struct PropertyWrapperBackingPropertyInfo;
 class RequirementRepr;
 class SpecializeAttr;
@@ -620,6 +621,32 @@ public:
 
   // Caching.
   bool isCached() const { return true; }
+};
+
+/// Request the custom attribute which attaches a function builder to the
+/// given parameter.
+class AttachedFunctionBuilderRequest :
+    public SimpleRequest<AttachedFunctionBuilderRequest,
+                         CacheKind::Cached,
+                         CustomAttr *,
+                         ParamDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<CustomAttr *>
+  evaluate(Evaluator &evaluator, ParamDecl *) const;
+
+public:
+  // Caching
+  bool isCached() const;
+
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

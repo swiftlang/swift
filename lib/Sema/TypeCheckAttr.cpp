@@ -131,6 +131,7 @@ public:
   IGNORED_ATTR(Custom)
   IGNORED_ATTR(PropertyWrapper)
   IGNORED_ATTR(DisfavoredOverload)
+  IGNORED_ATTR(FunctionBuilder)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -853,6 +854,7 @@ public:
   void visitNonOverrideAttr(NonOverrideAttr *attr);
   void visitCustomAttr(CustomAttr *attr);
   void visitPropertyWrapperAttr(PropertyWrapperAttr *attr);
+  void visitFunctionBuilderAttr(FunctionBuilderAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2563,6 +2565,48 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     return;
   }
 
+  // If the nominal type is a function builder type, verify that D is a
+  // parameter of function type.
+  if (nominal->getAttrs().hasAttribute<FunctionBuilderAttr>()) {
+    auto param = dyn_cast<ParamDecl>(D);
+    if (!param) {
+      TC.diagnose(attr->getLocation(),
+                  diag::function_builder_attribute_not_on_parameter,
+                  nominal->getFullName());
+      attr->setInvalid();
+      return;
+    }
+
+    // If we can't resolve an interface type here, we should be in invalid
+    // code.
+    Type type = param->getInterfaceType();
+    if (type && !type->is<FunctionType>()) {
+      TC.diagnose(attr->getLocation(),
+                  diag::function_builder_parameter_not_of_function_type,
+                  nominal->getFullName());
+      attr->setInvalid();
+      return;
+    }
+
+    // Diagnose and ignore arguments.
+    if (attr->getArg()) {
+      TC.diagnose(attr->getLocation(), diag::function_builder_arguments)
+        .highlight(attr->getArg()->getSourceRange());
+    }
+
+    // Complain if this isn't the primary function-builder attribute.
+    auto attached = param->getAttachedFunctionBuilder();
+    if (attached != attr) {
+      TC.diagnose(attr->getLocation(), diag::function_builder_multiple);
+      TC.diagnose(attached->getLocation(),
+                  diag::previous_function_builder_here);
+      attr->setInvalid();
+      return;
+    }
+
+    return;
+  }
+
   TC.diagnose(attr->getLocation(), diag::nominal_type_not_attribute,
               nominal->getDescriptiveKind(), nominal->getFullName());
   nominal->diagnose(diag::decl_declared_here, nominal->getFullName());
@@ -2583,6 +2627,26 @@ void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
 
   // Force checking of the property wrapper type.
   (void)nominal->getPropertyWrapperTypeInfo();
+}
+
+void AttributeChecker::visitFunctionBuilderAttr(FunctionBuilderAttr *attr) {
+  auto nominal = dyn_cast<NominalTypeDecl>(D);
+  if (!nominal)
+    return;
+
+  // Make sure the name isn't reserved.
+  if (isReservedAttributeName(nominal->getName().str())) {
+    nominal->diagnose(diag::function_builder_reserved_name);
+  }
+
+  // TODO: check that the type at least provides a `sequence` factory?
+  // Any other validation?
+}
+
+void TypeChecker::checkParameterAttributes(ParameterList *params) {
+  for (auto param: *params) {
+    checkDeclAttributes(param);
+  }
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {

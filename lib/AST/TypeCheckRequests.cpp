@@ -706,3 +706,23 @@ void StructuralTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 void StructuralTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
   diags.diagnose(SourceLoc(), diag::circular_reference_through);
 }
+
+//----------------------------------------------------------------------------//
+// Finding the attached @functionBuilder for a parameter.
+//----------------------------------------------------------------------------//
+
+bool AttachedFunctionBuilderRequest::isCached() const {
+  // Only needs to be cached if there are any custom attributes.
+  auto var = std::get<0>(getStorage());
+  return var->getAttrs().hasAttribute<CustomAttr>();
+}
+
+void AttachedFunctionBuilderRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void AttachedFunctionBuilderRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}

@@ -5334,6 +5334,14 @@ public:
     assert(isVariadic());
     return getVarargBaseTy(getInterfaceType());
   }
+
+  /// Retrieve the attribute marking this as a function builder parameter,
+  /// if there is one.
+  CustomAttr *getAttachedFunctionBuilder() const;
+
+  /// Retrieve the @functionBuilder type attached to this parameter,
+  /// if there is one.
+  NominalTypeDecl *getFunctionBuilderType() const;
   
   SourceRange getSourceRange() const;
 
