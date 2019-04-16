@@ -627,3 +627,23 @@ void swift::simple_display(llvm::raw_ostream &out, const Type &type) {
   else
     out << "null";
 }
+
+//----------------------------------------------------------------------------//
+// Finding the attached @functionBuilder for a parameter.
+//----------------------------------------------------------------------------//
+
+bool AttachedFunctionBuilderRequest::isCached() const {
+  // Only needs to be cached if there are any custom attributes.
+  auto var = std::get<0>(getStorage());
+  return var->getAttrs().hasAttribute<CustomAttr>();
+}
+
+void AttachedFunctionBuilderRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void AttachedFunctionBuilderRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}

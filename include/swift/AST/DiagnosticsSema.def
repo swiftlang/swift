@@ -4441,6 +4441,25 @@ ERROR(property_wrapper_type_not_usable_from_inline,none,
       "must be '@usableFromInline' or public",
       (bool, bool))
 
+//------------------------------------------------------------------------------
+// MARK: function builder diagnostics
+//------------------------------------------------------------------------------
+ERROR(function_builder_reserved_name, none,
+      "function builder type name must start with an uppercase letter", ())
+ERROR(function_builder_attribute_not_on_parameter, none,
+      "function builder attribute %0 can only be applied to a parameter",
+      (DeclName))
+ERROR(function_builder_parameter_not_of_function_type, none,
+      "function builder attribute %0 can only be applied to a parameter of "
+      "function type",
+      (DeclName))
+ERROR(function_builder_multiple, none,
+      "only one function builder attribute can be attached to a parameter", ())
+NOTE(previous_function_builder_here, none,
+     "previous function builder specified here", ())
+ERROR(function_builder_arguments, none,
+      "function builder attributes cannot have arguments", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

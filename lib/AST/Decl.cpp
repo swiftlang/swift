@@ -5649,6 +5649,30 @@ void ParamDecl::setStoredProperty(VarDecl *var) {
   DefaultValueAndFlags.getPointer()->DefaultArg = var;
 }
 
+NominalTypeDecl *ParamDecl::getFunctionBuilderType() const {
+  auto attr = getAttachedFunctionBuilder();
+  if (!attr) return nullptr;
+
+  auto mutableAttr = const_cast<CustomAttr*>(attr);
+  auto &ctx = getASTContext();
+  auto dc = getDeclContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           CustomAttrNominalRequest{mutableAttr, dc},
+                           nullptr);
+}
+
+CustomAttr *ParamDecl::getAttachedFunctionBuilder() const {
+  // Fast path: most parameters do not have any attributes at all,
+  // much less custom ones.
+  if (!getAttrs().hasAttribute<CustomAttr>()) return nullptr;
+
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<ParamDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           AttachedFunctionBuilderRequest{mutableThis},
+                           nullptr);
+}
+
 void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   assert(DefaultValueAndFlags.getPointer());
   DefaultValueAndFlags.getPointer()->InitContext = initContext;

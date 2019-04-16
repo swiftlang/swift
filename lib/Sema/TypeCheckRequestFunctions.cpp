@@ -12,9 +12,11 @@
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Types.h"
 #include "swift/Subsystems.h"
@@ -144,6 +146,26 @@ EnumRawTypeRequest::evaluate(Evaluator &evaluator, EnumDecl *enumDecl,
 
   // No raw type.
   return Type();
+}
+
+llvm::Expected<CustomAttr *>
+AttachedFunctionBuilderRequest::evaluate(Evaluator &evaluator,
+                                         ParamDecl *param) const {
+  ASTContext &ctx = param->getASTContext();
+  auto dc = param->getDeclContext();
+  for (auto attr : param->getAttrs().getAttributes<CustomAttr>()) {
+    auto mutableAttr = const_cast<CustomAttr *>(attr);
+    // Figure out which nominal declaration this custom attribute refers to.
+    auto nominal = evaluateOrDefault(ctx.evaluator,
+                                     CustomAttrNominalRequest{mutableAttr, dc},
+                                     nullptr);
+
+    // Return the first custom attribute that is a function builder type.
+    if (nominal->getAttrs().hasAttribute<FunctionBuilderAttr>())
+      return mutableAttr;
+  }
+
+  return nullptr;
 }
 
 // Define request evaluation functions for each of the type checker requests.

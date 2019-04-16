@@ -1329,7 +1329,7 @@ namespace  {
     UNINTERESTING_ATTR(Custom)
     UNINTERESTING_ATTR(PropertyWrapper)
     UNINTERESTING_ATTR(DisfavoredOverload)
-
+    UNINTERESTING_ATTR(FunctionBuilder)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
