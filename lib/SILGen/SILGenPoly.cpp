@@ -3041,15 +3041,22 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   expectedType = cast<SILFunctionType>(
     substIntoThunkContext(expectedType));
 
+  bool hasDynamicSelf = false;
+
   if (inputSubstType) {
     inputSubstType = cast<AnyFunctionType>(
       substIntoThunkContext(inputSubstType));
+    hasDynamicSelf |= inputSubstType->hasDynamicSelfType();
   }
 
   if (outputSubstType) {
     outputSubstType = cast<AnyFunctionType>(
       substIntoThunkContext(outputSubstType));
+    hasDynamicSelf |= outputSubstType->hasDynamicSelfType();
   }
+
+  hasDynamicSelf |= sourceType->hasDynamicSelfType();
+  hasDynamicSelf |= expectedType->hasDynamicSelfType();
 
   // If our parent function was pseudogeneric, this thunk must also be
   // pseudogeneric, since we have no way to pass generic parameters.
@@ -3072,8 +3079,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
 
   // If this thunk involves DynamicSelfType in any way, add a capture for it
   // in case we need to recover metadata.
-  if (sourceType->hasDynamicSelfType() ||
-      expectedType->hasDynamicSelfType()) {
+  if (hasDynamicSelf) {
     dynamicSelfType = F.getSelfMetadataArgument()->getType().getASTType();
     if (!isa<MetatypeType>(dynamicSelfType)) {
       dynamicSelfType = CanMetatypeType::get(dynamicSelfType,
@@ -3127,6 +3133,36 @@ CanSILFunctionType SILGenFunction::buildThunkType(
                               getASTContext());
 }
 
+static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
+                                              SILLocation loc,
+                                              SILFunction *thunk,
+                                              SubstitutionMap interfaceSubs,
+                                              CanType dynamicSelfType,
+                                              CanSILFunctionType toType,
+                                              ManagedValue fn) {
+  CanSILFunctionType substFnType = thunk->getLoweredFunctionType();
+
+  if (substFnType->getGenericSignature()) {
+    substFnType = substFnType->substGenericArgs(SGF.F.getModule(),
+                                                interfaceSubs);
+  }
+
+  auto thunkValue = SGF.B.createFunctionRefFor(loc, thunk);
+  SmallVector<ManagedValue, 2> thunkArgs;
+  thunkArgs.push_back(fn);
+  if (dynamicSelfType) {
+    SILType dynamicSILType = SGF.getLoweredType(dynamicSelfType);
+    SILValue value = SGF.B.createMetatype(loc, dynamicSILType);
+    thunkArgs.push_back(ManagedValue::forUnmanaged(value));
+  }
+
+  return
+    SGF.B.createPartialApply(loc, thunkValue,
+                             SILType::getPrimitiveObjectType(substFnType),
+                             interfaceSubs, thunkArgs,
+                             SILType::getPrimitiveObjectType(toType));
+}
+
 /// Create a reabstraction thunk.
 static ManagedValue createThunk(SILGenFunction &SGF,
                                 SILLocation loc,
@@ -3160,7 +3196,7 @@ static ManagedValue createThunk(SILGenFunction &SGF,
                                        thunkType,
                                        sourceType,
                                        toType,
-                                       SGF.F.isSerialized());
+                                       dynamicSelfType);
 
   // Build it if necessary.
   if (thunk->empty()) {
@@ -3175,28 +3211,9 @@ static ManagedValue createThunk(SILGenFunction &SGF,
                    dynamicSelfType);
   }
 
-  CanSILFunctionType substFnType = thunkType;
-
-  if (thunkType->getGenericSignature()) {
-    substFnType = thunkType->substGenericArgs(SGF.F.getModule(),
-                                              interfaceSubs);
-  }
-
-  // Create it in our current function.
-  auto thunkValue = SGF.B.createFunctionRefFor(loc, thunk);
-  SmallVector<ManagedValue, 2> thunkArgs;
-  thunkArgs.push_back(fn.ensurePlusOne(SGF, loc));
-  if (dynamicSelfType) {
-    SILType dynamicSILType = SGF.getLoweredType(dynamicSelfType);
-    SILValue value = SGF.B.createMetatype(loc, dynamicSILType);
-    thunkArgs.push_back(ManagedValue::forUnmanaged(value));
-  }
-
-  ManagedValue thunkedFn =
-    SGF.B.createPartialApply(loc, thunkValue,
-                             SILType::getPrimitiveObjectType(substFnType),
-                             interfaceSubs, thunkArgs,
-                             SILType::getPrimitiveObjectType(toType));
+  auto thunkedFn =
+    createPartialApplyOfThunk(SGF, loc, thunk, interfaceSubs, dynamicSelfType,
+                              toType, fn.ensurePlusOne(SGF, loc));
 
   if (!expectedType->isNoEscape()) {
     return thunkedFn;
@@ -3284,7 +3301,8 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
       *this, noEscapingFnTy, escapingFnTy, genericEnv, interfaceSubs);
 
   auto *thunk = SGM.getOrCreateReabstractionThunk(
-      thunkType, noEscapingFnTy, escapingFnTy, F.isSerialized());
+      thunkType, noEscapingFnTy, escapingFnTy,
+      /*dynamicSelfType=*/CanType());
 
   if (thunk->empty()) {
     thunk->setWithoutActuallyEscapingThunk();
