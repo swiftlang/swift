@@ -1773,8 +1773,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
     }
   };
 
-  // FIXME: This renaming happened before Swift 3, we can probably remove
-  // the specific fallback path at some point.
+  // Check if attr is availability, and suggest available instead
   checkInvalidAttrName("availability", "available", DAK_Available, diag::attr_renamed);
 
   // Check if attr is inlineable, and suggest inlinable instead
