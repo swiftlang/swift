@@ -12,15 +12,26 @@ public class Bar {
 }
 
 public class Foo: Bar {
-  public override init(@_inheritedDefaultValue x: Int, y: Int)
-  public func foo(@_inheritedDefaultValue z: Int) // expected-error {{@_inheritedDefaultValue is only valid on parameter declarations of initializers}}
+  public override init(x: Int = super, y: Int)
+  public func foo(z: Int = super) // expected-error {{default value inheritance via 'super' is only valid for initializer parameters}}
 }
 
 public class Baz: Bar {
-  public override init(@_inheritedDefaultValue x: Int, @_inheritedDefaultValue y: Int) // expected-error {{@_inheritedDefaultValue requires that the corresponding parameter of the overridden initializer has a default value}}
+  public override init(x: Int = super, y: Int = super) // expected-error {{default value inheritance via 'super' requires that the corresponding parameter of the overridden initializer has a default value}}
 }
 
-@_inheritedDefaultValue public enum Bob { // expected-error {{@_inheritedDefaultValue may only be used on 'parameter' declarations}}
+public class Direct: Bar {
+  public override init(x: Int = super, y: Int)
+  public override init(other: Int = super, value: Int) // expected-error {{argument labels for initializer 'init(other:value:)' do not match those of overridden initializer 'init(x:y:)'}}
+  // expected-error@-1 {{default value inheritance via 'super' can only be used on the parameters of overriding initializers}}
+}
+
+public class Indirect: Direct {
+  public override init(x: Int = super, y: Int)
+  public override init(other: Int = super, value: Int)
+}
+
+public enum Bob {
   case bar(p: Int)
-  public init(@_inheritedDefaultValue foo: String) // expected-error {{@_inheritedDefaultValue can only be used on the parameters of overriding initializers}}
+  public init(foo: String = super /*comment*/) // expected-error {{default value inheritance via 'super' can only be used on the parameters of overriding initializers}}
 }
