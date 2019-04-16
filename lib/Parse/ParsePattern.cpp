@@ -605,15 +605,20 @@ mapParsedParameters(Parser &parser,
       }
     }
 
+    assert (((!param.DefaultArg &&
+              !param.Attrs.hasAttribute<InheritedDefaultValueAttr>()) ||
+             paramContext == Parser::ParameterContextKind::Function ||
+             paramContext == Parser::ParameterContextKind::Operator ||
+             paramContext == Parser::ParameterContextKind::Initializer ||
+             paramContext == Parser::ParameterContextKind::EnumElement) &&
+            "Default arguments are only permitted on the first param clause");
+
     if (param.DefaultArg) {
-      assert((paramContext == Parser::ParameterContextKind::Function ||
-              paramContext == Parser::ParameterContextKind::Operator ||
-              paramContext == Parser::ParameterContextKind::Initializer ||
-              paramContext == Parser::ParameterContextKind::EnumElement) &&
-             "Default arguments are only permitted on the first param clause");
       DefaultArgumentKind kind = getDefaultArgKind(param.DefaultArg);
       result->setDefaultArgumentKind(kind);
       result->setDefaultValue(param.DefaultArg);
+    } else if (param.Attrs.hasAttribute<InheritedDefaultValueAttr>()) {
+      result->setDefaultArgumentKind(DefaultArgumentKind::Inherited);
     }
 
     elements.push_back(result);

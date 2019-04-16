@@ -124,6 +124,7 @@ public:
   IGNORED_ATTR(WeakLinked)
   IGNORED_ATTR(DynamicReplacement)
   IGNORED_ATTR(PrivateImport)
+  IGNORED_ATTR(InheritedDefaultValue)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -757,6 +758,7 @@ public:
     IGNORED_ATTR(ImplementationOnly)
     IGNORED_ATTR(ImplicitlyUnwrappedOptional)
     IGNORED_ATTR(Indirect)
+    IGNORED_ATTR(InheritedDefaultValue)
     IGNORED_ATTR(Inline)
     IGNORED_ATTR(Lazy)      // checked early.
     IGNORED_ATTR(LLDBDebuggerFunction)
