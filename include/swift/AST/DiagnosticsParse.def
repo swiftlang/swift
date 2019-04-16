@@ -854,8 +854,8 @@ ERROR(parameter_specifier_as_attr_disallowed,none,
 ERROR(parameter_specifier_repeated,none,
       "parameter must not have multiple '__owned', 'inout', '__shared',"
       " 'var', or 'let' specifiers", ())
-ERROR(parameter_let_var_as_attr,none,
-      "'%0' as a parameter attribute is not allowed",
+WARNING(parameter_let_var_as_attr,none,
+      "'%0' in this position is interpreted as an argument label",
       (StringRef))
 
 
