@@ -786,7 +786,7 @@ ERROR(sil_box_expected_r_angle,none,
 
 // Opaque types
 ERROR(opaque_mid_composition,none,
-      "'opaque' should appear at the beginning of a composition", ())
+      "'some' should appear at the beginning of a composition", ())
 
 //------------------------------------------------------------------------------
 // MARK: Layout constraint diagnostics

@@ -3534,7 +3534,10 @@ ERROR(unreferenced_generic_parameter,none,
 
 // Opaque types
 ERROR(unsupported_opaque_type,none,
-      "'opaque' types are only implemented for the declared type of properties and subscripts and the return type of functions", ())
+      "'some' types are only implemented for the declared type of properties and subscripts and the return type of functions", ())
+
+ERROR(opaque_type_unsupported_pattern,none,
+      "'some' type can only be declared on a single property declaration", ())
 
 // SIL
 ERROR(opened_non_protocol,none,

@@ -2110,6 +2110,10 @@ public:
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.
   DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
+  
+  Type getOrCreateOpaqueResultType(TypeResolution resolution,
+                                   ValueDecl *originatingDecl,
+                                   OpaqueReturnTypeRepr *repr);
 };
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic
