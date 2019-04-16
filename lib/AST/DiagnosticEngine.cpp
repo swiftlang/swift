@@ -173,10 +173,12 @@ InFlightDiagnostic &InFlightDiagnostic::fixItRemove(SourceRange R) {
   // If we're removing something (e.g. a keyword), do a bit of extra work to
   // make sure that we leave the code in a good place, without extraneous white
   // space around its hole.  Specifically, check to see there is whitespace
-  // before and after the end of range.  If so, nuke the space afterward to keep
-  // things consistent.
+  // or a paren before and whitespace after the end of range.  If so, nuke
+  // the space afterward to keep things consistent.
+  char charBefore = extractCharBefore(SM, charRange.getStart());
+
   if (extractCharAfter(SM, charRange.getEnd()) == ' ' &&
-      isspace(extractCharBefore(SM, charRange.getStart()))) {
+      (isspace(charBefore) || charBefore == '(')) {
     charRange = CharSourceRange(charRange.getStart(),
                                 charRange.getByteLength()+1);
   }
