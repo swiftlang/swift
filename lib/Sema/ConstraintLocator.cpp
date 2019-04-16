@@ -147,6 +147,12 @@ bool ConstraintLocator::isKeyPathSubscriptComponent() const {
   });
 }
 
+bool ConstraintLocator::isForKeyPathComponent() const {
+  return llvm::any_of(getPath(), [&](const LocatorPathElt &elt) {
+    return elt.isKeyPathComponent();
+  });
+}
+
 void ConstraintLocator::dump(SourceManager *sm) {
   dump(sm, llvm::errs());
   llvm::errs() << "\n";
