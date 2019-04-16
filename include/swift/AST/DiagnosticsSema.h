@@ -29,7 +29,9 @@ namespace swift {
       Constructor,
       Func,
       Var,
-      Subscript
+      Subscript,
+      // SWIFT_ENABLE_TENSORFLOW
+      Call
     };
 
   // Declare common diagnostics objects with their appropriate types.

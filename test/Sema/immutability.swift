@@ -59,7 +59,8 @@ class FooClass {
     self = FooClass()  // expected-error {{cannot assign to value: 'self' is immutable}}
   }
   
-  mutating init(a : Bool) {}     // expected-error {{'mutating' may only be used on 'func' declarations}} {{3-12=}}
+  // SWIFT_ENABLE_TENSORFLOW
+  mutating init(a : Bool) {}     // expected-error {{'mutating' modifier cannot be applied to this declaration}} {{3-12=}}
   
   mutating            // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}} {{3-12=}}
   func baz() {}

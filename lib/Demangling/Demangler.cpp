@@ -2704,6 +2704,10 @@ NodePointer Demangler::demangleFunctionEntity() {
       Args = TypeAndMaybePrivateName; Kind = Node::Kind::Allocator; break;
     case 'c':
       Args = TypeAndMaybePrivateName; Kind = Node::Kind::Constructor; break;
+    // SWIFT_ENABLE_TENSORFLOW
+    case 'F':
+      Args = TypeAndMaybePrivateName; Kind = Node::Kind::CallDeclaration; break;
+    // SWIFT_ENABLE_TENSORFLOW END
     case 'U': Args = TypeAndIndex; Kind = Node::Kind::ExplicitClosure; break;
     case 'u': Args = TypeAndIndex; Kind = Node::Kind::ImplicitClosure; break;
     case 'A': Args = Index; Kind = Node::Kind::DefaultArgumentInitializer; break;

@@ -398,6 +398,8 @@ enum class CodeCompletionDeclKind {
   Constructor,
   Destructor,
   Subscript,
+  // SWIFT_ENABLE_TENSORFLOW
+  Call,
   StaticMethod,
   InstanceMethod,
   PrefixOperatorFunction,

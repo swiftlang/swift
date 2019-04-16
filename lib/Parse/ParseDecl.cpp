@@ -3105,6 +3105,18 @@ Parser::parseDecl(ParseDeclOptions Flags,
     StaticLoc = SourceLoc(); // we handled static if present.
     MayNeedOverrideCompletion = true;
     break;
+  // SWIFT_ENABLE_TENSORFLOW
+  case tok::kw_call:
+    // Collect all modifiers into a modifier list.
+    DeclParsingContext.setCreateSyntax(SyntaxKind::CallDecl);
+    if (StaticLoc.isValid()) {
+      diagnose(Tok, diag::call_decl_static, StaticSpelling)
+          .fixItRemove(SourceRange(StaticLoc));
+      StaticLoc = SourceLoc();
+    }
+    DeclResult = parseDeclCall(Flags, Attributes);
+    MayNeedOverrideCompletion = true;
+    break;
   case tok::kw_subscript: {
     DeclParsingContext.setCreateSyntax(SyntaxKind::SubscriptDecl);
     if (StaticLoc.isValid()) {
@@ -3184,6 +3196,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
       SmallVector<StringRef, 3> Keywords;
       switch (OrigTok.getKind()) {
       case tok::kw_func:
+      // SWIFT_ENABLE_TENSORFLOW
+      case tok::kw_call:
       case tok::kw_subscript:
       case tok::kw_var:
       case tok::kw_let:
@@ -3559,7 +3573,8 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
                         StringRef DeclKindName, tok ResyncT1, tok ResyncT2,
                         tok ResyncT3, tok ResyncT4,
                         TokenProperty ResyncP1) {
-  if (P.Tok.is(tok::identifier)) {
+  // SWIFT_ENABLE_TENSORFLOW
+  if (P.Tok.is(tok::identifier) || P.Tok.is(tok::kw_call)) {
     Loc = P.consumeIdentifier(&Result);
 
     // We parsed an identifier for the declaration. If we see another
@@ -5741,9 +5756,13 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   ParameterList *BodyParams;
   SourceLoc throwsLoc;
   bool rethrows;
+  // SWIFT_ENABLE_TENSORFLOW
+  ParameterContextKind paramContext = SimpleName.isOperator() ?
+      ParameterContextKind::Operator : ParameterContextKind::Function;
   ParserStatus SignatureStatus =
-      parseFunctionSignature(SimpleName, FullName, BodyParams, DefaultArgs,
-                             throwsLoc, rethrows, FuncRetTy);
+      // SWIFT_ENABLE_TENSORFLOW
+      parseFunctionSignature(SimpleName, FullName, paramContext, BodyParams,
+                             DefaultArgs, throwsLoc, rethrows, FuncRetTy);
 
   SignatureHasCodeCompletion |= SignatureStatus.hasCodeCompletion();
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
@@ -5813,6 +5832,122 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   addToScope(FD);
   return DCC.fixupParserResult(FD);
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+/// \brief Parse a `call` declaration, returning null on error. The caller
+/// handles this case and does recovery as appropriate.
+///
+/// \verbatim
+///   decl-call:
+///     attribute-list? 'mutating'? 'call' 'func'
+///               generic-params? func-signature where-clause?
+///               stmt-brace?
+/// \endverbatim
+///
+/// \note The caller of this method must ensure that the next token is 'call'.
+ParserResult<CallDecl>
+Parser::parseDeclCall(ParseDeclOptions Flags, DeclAttributes &Attributes) {
+  assert(Tok.is(tok::kw_call));
+  SourceLoc callLoc = consumeToken(tok::kw_call);
+  // `call` keyword must be followed by `func`.
+  if (!consumeIf(tok::kw_func))
+    diagnose(Tok, diag::call_decl_expected_func_keyword);
+
+  // Reject `call` declarations outside of types.
+  if (!Flags.contains(PD_HasContainerType))
+    diagnose(Tok, diag::call_decl_wrong_scope);
+
+  // Reject named `call` declarations. e.g. `call func foo()'.
+  if (Tok.is(tok::identifier) &&
+      (peekToken().is(tok::l_paren) || startsWithLess(peekToken()))) {
+    diagnose(Tok, diag::call_decl_cannot_have_name).fixItRemove(Tok.getLoc());
+    consumeToken(tok::identifier);
+  }
+
+  auto simpleName = Context.getIdentifier("$call");
+  DebuggerContextChange DCC(*this, simpleName, DeclKind::Call);
+
+  // Parse the generic parameters, if present.
+  Scope genericsScope(this, ScopeKind::Generics);
+  auto genericParamsResult = maybeParseGenericParams();
+  bool signatureHasCodeCompletion = false;
+  GenericParamList *genericParams = genericParamsResult.getPtrOrNull();
+  if (genericParamsResult.hasCodeCompletion())
+    return makeParserCodeCompletionStatus();
+
+  DefaultArgumentInfo defaultArgs;
+  TypeRepr *funcRetTy = nullptr;
+  DeclName fullName;
+  ParameterList *params;
+  SourceLoc throwsLoc;
+  bool rethrows;
+  ParserStatus signatureStatus =
+      parseFunctionSignature(simpleName, fullName, ParameterContextKind::Call,
+                             params, defaultArgs, throwsLoc, rethrows,
+                             funcRetTy);
+
+  signatureHasCodeCompletion |= signatureStatus.hasCodeCompletion();
+  if (signatureStatus.hasCodeCompletion() && !CodeCompletion) {
+    // Trigger delayed parsing, no need to continue.
+    return signatureStatus;
+  }
+
+  diagnoseWhereClauseInGenericParamList(genericParams);
+
+   // Create the 'call` declaration and add it to the parent scope.
+  auto *CD = CallDecl::create(Context, fullName, callLoc,
+                              /*throws*/ throwsLoc.isValid(), throwsLoc,
+                              /*genericParams*/ nullptr, params, funcRetTy,
+                              CurDeclContext);
+
+   // Parse a 'where' clause if present, adding it to our GenericParamList.
+  if (Tok.is(tok::kw_where)) {
+    ContextChange CC(*this, CD);
+
+    auto whereStatus = parseFreestandingGenericWhereClause(genericParams);
+    signatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
+    if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
+      // Trigger delayed parsing, no need to continue.
+      return whereStatus;
+    }
+  }
+
+  CD->setGenericParams(genericParams);
+
+  // Protocol method arguments may not have default values.
+  if (Flags.contains(PD_InProtocol) && defaultArgs.HasDefaultArgument) {
+    diagnose(callLoc, diag::protocol_method_argument_init);
+    return nullptr;
+  }
+
+  // Add the 'rethrows' attribute.
+  if (rethrows)
+    Attributes.add(new (Context) RethrowsAttr(throwsLoc));
+
+  // Add the attributes here so if we need them while parsing the body
+  // they are available.
+  CD->getAttrs() = Attributes;
+
+  // Pass the function signature to code completion.
+  if (signatureHasCodeCompletion)
+    CodeCompletion->setParsedDecl(CD);
+
+  defaultArgs.setFunctionContext(CD, CD->getParameters());
+  setLocalDiscriminator(CD);
+
+  if (Flags.contains(PD_InProtocol)) {
+    if (Tok.is(tok::l_brace)) {
+      diagnose(Tok, diag::protocol_method_with_body);
+      skipSingle();
+    }
+  } else {
+    parseAbstractFunctionBody(CD);
+  }
+
+  addToScope(CD);
+  return DCC.fixupParserResult(CD);
+}
+// SWIFT_ENABLE_TENSORFLOW END
 
 /// Parse function body into \p AFD.
 void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
@@ -6033,7 +6168,8 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       return Status;
     }
 
-    if (Tok.is(tok::identifier)) {
+    // SWIFT_ENABLE_TENSORFLOW
+    if (Tok.is(tok::identifier) || Tok.is(tok::kw_call)) {
       Status |= parseIdentifierDeclName(*this, Name, NameLoc, "enum 'case'",
                                         tok::l_paren, tok::kw_case, tok::colon,
                                         tok::r_brace);

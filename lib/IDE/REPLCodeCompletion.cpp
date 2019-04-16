@@ -119,6 +119,8 @@ static void toDisplayString(CodeCompletionResult *Result,
         case CodeCompletionDeclKind::Destructor:
           continue;
 
+        // SWIFT_ENABLE_TENSORFLOW
+        case CodeCompletionDeclKind::Call:
         case CodeCompletionDeclKind::Subscript:
         case CodeCompletionDeclKind::StaticMethod:
         case CodeCompletionDeclKind::InstanceMethod:

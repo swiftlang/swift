@@ -730,6 +730,11 @@ void Remangler::mangleConstructor(Node *node) {
   mangleAnyConstructor(node, 'c');
 }
 
+void Remangler::mangleCallDeclaration(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "fF";
+}
+
 void Remangler::mangleCoroutineContinuationPrototype(Node *node) {
   mangleChildNodes(node);
   Buffer << "TC";

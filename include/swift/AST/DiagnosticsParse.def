@@ -398,6 +398,19 @@ ERROR(subscript_without_get,none,
 ERROR(subscript_static,none,
       "subscript cannot be marked %0", (StaticSpellingKind))
 
+// SWIFT_ENABLE_TENSORFLOW
+// `call` method
+ERROR(call_decl_static,none,
+      "'call' method cannot be marked %0", (StaticSpellingKind))
+ERROR(call_decl_wrong_scope,none,
+      "'call' methods may only be declared within a type", ())
+ERROR(expected_lparen_call,PointsToFirstBadToken,
+      "expected '(' for 'call' member parameters", ())
+ERROR(call_decl_cannot_have_name,PointsToFirstBadToken,
+      "'call' method cannot have a name", ())
+ERROR(call_decl_expected_func_keyword,PointsToFirstBadToken,
+      "'call' must be followed by 'func'", ())
+
 // initializer
 ERROR(invalid_nested_init,none,
       "missing '%select{super.|self.}0' at initializer invocation", (bool))

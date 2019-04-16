@@ -1515,6 +1515,14 @@ namespace {
       getMethodList(constructor).push_back(constructor);
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
+    /// Call methods need to be collected into the appropriate methods list.
+    void visitCallDecl(CallDecl *method) {
+      if (!isBuildingProtocol() && !requiresObjCMethodDescriptor(method))
+        return;
+      getMethodList(method).push_back(method);
+    }
+
     /// Determine whether the given destructor has an Objective-C
     /// definition.
     bool hasObjCDeallocDefinition(DestructorDecl *destructor) {

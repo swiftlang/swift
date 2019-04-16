@@ -2876,6 +2876,47 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
   printBodyIfNecessary(decl);
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+void PrintAST::visitCallDecl(CallDecl *decl) {
+  printDocumentationComment(decl);
+  printAttributes(decl);
+  printAccess(decl);
+  printContextIfNeeded(decl);
+  recordDeclLoc(decl, [&]{
+    Printer << "call";
+  }, [&] { // Parameters
+    printGenericDeclGenericParams(decl);
+    printFunctionParameters(decl);
+  });
+  Printer << " -> ";
+
+   Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
+  Type ResultTy = decl->getResultInterfaceType();
+  if (ResultTy && !ResultTy->isVoid()) {
+    TypeLoc ResultTyLoc = decl->getBodyResultTypeLoc();
+    if (!ResultTyLoc.getTypeRepr())
+      ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
+    // FIXME: Hacky way to workaround the fact that 'Self' as return
+    // TypeRepr is not getting 'typechecked'. See
+    // \c resolveTopLevelIdentTypeComponent function in TypeCheckType.cpp.
+    if (auto *simId = dyn_cast_or_null<SimpleIdentTypeRepr>(ResultTyLoc.getTypeRepr())) {
+      if (simId->getIdentifier().str() == "Self")
+        ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
+    }
+    Printer << " -> ";
+    Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
+    if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+      printTypeLocForImplicitlyUnwrappedOptional(ResultTyLoc);
+    else
+      printTypeLoc(ResultTyLoc);
+    Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
+  }
+  printGenericDeclGenericRequirements(decl);
+  Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
+  printGenericDeclGenericRequirements(decl);
+  printBodyIfNecessary(decl);
+}
+
 void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
   Printer.printKeyword("infix");
   Printer << " " << tok::kw_operator << " ";

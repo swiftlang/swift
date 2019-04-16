@@ -203,6 +203,10 @@ namespace irgen {
   /// True if the ConstructorDecl requires an ObjC method descriptor.
   bool requiresObjCMethodDescriptor(ConstructorDecl *constructor);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// True if the CallDecl requires an ObjC method descriptor.
+  bool requiresObjCMethodDescriptor(CallDecl *method);
+
   /// True if the VarDecl requires ObjC accessor methods and a property
   /// descriptor.
   bool requiresObjCPropertyDescriptor(IRGenModule &IGM,

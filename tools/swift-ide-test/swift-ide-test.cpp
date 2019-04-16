@@ -1107,6 +1107,8 @@ private:
       case SyntaxStructureKind::EnumElement: return "enum-elem";
       case SyntaxStructureKind::TypeAlias: return "typealias";
       case SyntaxStructureKind::Subscript: return "subscript";
+      // SWIFT_ENABLE_TENSORFLOW
+      case SyntaxStructureKind::Call: return "call";
       case SyntaxStructureKind::AssociatedType: return "associatedtype";
       case SyntaxStructureKind::GenericTypeParam: return "generic-param";
       case SyntaxStructureKind::Parameter: return "param";
