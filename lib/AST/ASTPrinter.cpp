@@ -977,7 +977,8 @@ void PrintAST::printAttributes(const Decl *D) {
         !VD->getAttrs().hasAttribute<FinalAttr>() &&
         // Don't print a redundant 'final' if printing a 'let' or 'static' decl.
         !(VarD && VarD->isLet()) &&
-        getCorrectStaticSpelling(D) != StaticSpellingKind::KeywordStatic) {
+        getCorrectStaticSpelling(D) != StaticSpellingKind::KeywordStatic &&
+        VD->getKind() != DeclKind::Accessor) {
       Printer.printAttrName("final");
       Printer << " ";
     }
