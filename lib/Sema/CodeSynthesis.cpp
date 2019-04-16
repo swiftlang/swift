@@ -1455,33 +1455,6 @@ void swift::completeLazyVarImplementation(VarDecl *VD) {
   Storage->overwriteSetterAccess(AccessLevel::Private);
 }
 
-/// Given the initializer for the given property with an attached property
-/// delegate, dig out the original initialization expression.
-static Expr *findOriginalPropertyDelegateInitialValue(VarDecl *var,
-                                                      Expr *init) {
-  auto attr = var->getAttachedPropertyDelegate();
-  assert(attr && "No attached property delegate?");
-
-  // Direct initialization implies no original initial value.
-  if (attr->getArg())
-    return nullptr;
-
-  // Look through any expressions wrapping the initializer.
-  init = init->getSemanticsProvidingExpr();
-  auto initCall = dyn_cast<CallExpr>(init);
-  if (!initCall)
-    return nullptr;
-
-  auto initArg = cast<TupleExpr>(initCall->getArg())->getElement(0);
-  initArg = initArg->getSemanticsProvidingExpr();
-  if (auto autoclosure = dyn_cast<AutoClosureExpr>(initArg)) {
-    initArg =
-        autoclosure->getSingleExpressionBody()->getSemanticsProvidingExpr();
-  }
-
-  return initArg;
-}
-
 /// Synthesize a computed property `$foo` for a property with an attached
 /// delegate that has a `delegateValue` property.
 static VarDecl *synthesizePropertyDelegateStorageDelegateProperty(
@@ -1604,7 +1577,7 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   // Take the initializer from the original property.
   auto parentPBD = var->getParentPatternBinding();
   unsigned patternNumber = parentPBD->getPatternEntryIndexForVarDecl(var);
-  if (parentPBD->getInit(patternNumber) &&
+  if (parentPBD->isInitialized(patternNumber) &&
       !parentPBD->isInitializerChecked(patternNumber)) {
     auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
     tc.typeCheckPatternBinding(parentPBD, patternNumber);
