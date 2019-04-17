@@ -117,7 +117,7 @@ public extension Raw {
   ///   - sizeSplits: list containing the sizes of each output tensor along the split
   ///     dimension. Must sum to the dimension of value along split_dim.
   ///     Can contain one -1 indicating that dimension is to be inferred.
-  ///   - split_dim: 0-D.  The dimension along which to split.  Must be in the range
+  ///   - splitDim: 0-D.  The dimension along which to split.  Must be in the range
   ///     `[-rank(value), rank(value))`.
   ///
   /// - Returns: Tensors whose shape matches that of `value`
