@@ -2943,6 +2943,15 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
   // Obvious nonsense.
   default:
+    if (FoundCCTokenInAttr) {
+      if (!CodeCompletion) {
+        delayParseFromBeginningToHere(BeginParserPosition, Flags);
+      } else {
+        CodeCompletion->completeDeclAttrBeginning(nullptr, isInSILMode(),
+                                                  false);
+      }
+    }
+
     diagnose(Tok, diag::expected_decl);
 
     if (CurDeclContext) {
