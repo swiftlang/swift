@@ -18,7 +18,7 @@ import SwiftPrivateLibcExtras
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import Foundation
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(Wasm)
 import Glibc
 #elseif os(Windows)
 import MSVCRT
@@ -748,6 +748,8 @@ extension ProcessTerminationStatus {
     case .signal(let signal):
 #if os(Windows)
       return CInt(signal) == SIGILL
+#elseif os(Wasm)
+      return false
 #else
       return CInt(signal) == SIGILL || CInt(signal) == SIGTRAP
 #endif
@@ -1746,6 +1748,7 @@ public enum OSVersion : CustomStringConvertible {
   case windowsCygnus
   case windows
   case haiku
+  case wasm
 
   public var description: String {
     switch self {
@@ -1777,6 +1780,8 @@ public enum OSVersion : CustomStringConvertible {
       return "Windows"
     case .haiku:
       return "Haiku"
+    case .wasm:
+      return "Wasm"
     }
   }
 }
@@ -1821,6 +1826,8 @@ func _getOSVersion() -> OSVersion {
   return .windows
 #elseif os(Haiku)
   return .haiku
+#elseif os(Wasm)
+  return .wasm
 #else
   let productVersion = _getSystemVersionPlistProperty("ProductVersion")!
   let (major, minor, bugFix) = _parseDottedVersionTriple(productVersion)

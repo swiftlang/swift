@@ -26,6 +26,9 @@
 
 #include "swift/Runtime/Config.h"
 
+// WebAssembly: no signals on WASI yet
+#ifndef __wasi__
+
 static void CrashCatcher(int Sig) {
   const char *Msg;
   switch (Sig) {
@@ -65,10 +68,15 @@ VectoredCrashHandler(PEXCEPTION_POINTERS ExceptionInfo) {
 }
 #endif
 
+#endif // __wasi__
+
 SWIFT_CC(swift) SWIFT_RUNTIME_LIBRARY_VISIBILITY extern "C"
 void installTrapInterceptor() {
   // Disable buffering on stdout so that everything is printed before crashing.
   setbuf(stdout, 0);
+
+// WebAssembly: no signals on WASI
+#ifndef __wasi__
 
 #if defined(_WIN32)
   _set_abort_behavior(0, _WRITE_ABORT_MSG);
@@ -85,5 +93,6 @@ void installTrapInterceptor() {
   signal(SIGBUS,  CrashCatcher);
   signal(SIGSYS,  CrashCatcher);
 #endif
-}
 
+#endif // __wasi__
+}
