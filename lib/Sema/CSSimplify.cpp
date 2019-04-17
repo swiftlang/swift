@@ -5009,9 +5009,24 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       if (!choices[i].isDecl()) {
         return SolutionKind::Error;
       }
+
       auto storage = dyn_cast<AbstractStorageDecl>(choices[i].getDecl());
       if (!storage) {
         return SolutionKind::Error;
+      }
+
+      // Referencing static members in key path is not currently allowed.
+      if (storage->isStatic()) {
+        if (!shouldAttemptFixes())
+          return SolutionKind::Error;
+
+        auto componentLoc =
+            locator.withPathElement(LocatorPathElt::getKeyPathComponent(i));
+        auto *fix = AllowStaticMemberRefInKeyPath::create(
+            *this, choices[i].getDecl(), getConstraintLocator(componentLoc));
+
+        if (recordFix(fix))
+          return SolutionKind::Error;
       }
 
       if (isReadOnlyKeyPathComponent(storage)) {
@@ -6308,6 +6323,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowInaccessibleMember:
   case FixKind::AllowAnyObjectKeyPathRoot:
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
+  case FixKind::AllowStaticMemberRefInKeyPath:
     llvm_unreachable("handled elsewhere");
   }
 

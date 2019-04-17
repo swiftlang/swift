@@ -1031,6 +1031,30 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an attempt to reference a static member as a key path component
+/// e.g.
+///
+/// ```swift
+/// struct S {
+///   static var foo: Int = 42
+/// }
+///
+/// _ = \S.Type.foo
+/// ```
+class InvalidStaticMemberRefInKeyPath final : public FailureDiagnostic {
+  ValueDecl *Member;
+
+public:
+  InvalidStaticMemberRefInKeyPath(Expr *root, ConstraintSystem &cs,
+                                  ValueDecl *member, ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), Member(member) {
+    assert(member->hasName());
+    assert(locator->isForKeyPathComponent());
+  }
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
