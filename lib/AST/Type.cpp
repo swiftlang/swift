@@ -1612,8 +1612,8 @@ bool TypeBase::isBindableTo(Type b) {
           if (origConf.isConcrete()) {
             if (!substConf.isConcrete())
               return false;
-            if (origConf.getConcrete()->getRootNormalConformance()
-                  != substConf.getConcrete()->getRootNormalConformance())
+            if (origConf.getConcrete()->getRootConformance()
+                  != substConf.getConcrete()->getRootConformance())
               return false;
           }
         }

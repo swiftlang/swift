@@ -664,33 +664,20 @@ void SubstitutionMap::verify() const {
     if (conformance.isInvalid())
       continue;
 
-    // An existential type can have an abstract conformance to
-    // AnyObject or an @objc protocol.
-    if (conformance.isAbstract() &&
-        substType->isExistentialType()) {
-      auto *proto = conformance.getRequirement();
-      if (!proto->isObjC()) {
-        llvm::dbgs() << "Existential type conforms to something:\n";
-        substType->dump();
-        llvm::dbgs() << "SubstitutionMap:\n";
-        dump(llvm::dbgs());
-        llvm::dbgs() << "\n";
-      }
-
-      assert(proto->isObjC() &&
-             "an existential type can conform only to an "
-             "@objc-protocol");
-      continue;
-    }
     // All of the conformances should be concrete.
     if (!conformance.isConcrete()) {
-      llvm::dbgs() << "Concrete substType type:\n";
+      llvm::dbgs() << "Concrete type cannot have abstract conformance:\n";
       substType->dump(llvm::dbgs());
       llvm::dbgs() << "SubstitutionMap:\n";
       dump(llvm::dbgs());
       llvm::dbgs() << "\n";
     }
     assert(conformance.isConcrete() && "Conformance should be concrete");
+
+    if (substType->isExistentialType()) {
+      assert(isa<SelfProtocolConformance>(conformance.getConcrete()) &&
+              "Existential type cannot have normal conformance");
+    }
 
     ++conformanceIndex;
   }
