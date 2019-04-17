@@ -59,6 +59,20 @@ void swift::simple_display(llvm::raw_ostream &out,
   }
 }
 
+template<>
+bool swift::AnyValue::Holder<Type>::equals(const HolderBase &other) const {
+  assert(typeID == other.typeID && "Caller should match type IDs");
+  return value.getPointer() ==
+  static_cast<const Holder<Type> &>(other).value.getPointer();
+}
+
+void swift::simple_display(llvm::raw_ostream &out, Type type) {
+  if (type)
+    type.print(out);
+  else
+    out << "null";
+}
+
 //----------------------------------------------------------------------------//
 // Inherited type computation.
 //----------------------------------------------------------------------------//
@@ -613,20 +627,6 @@ void swift::simple_display(
   out << " }";
 }
 
-template<>
-bool swift::AnyValue::Holder<Type>::equals(const HolderBase &other) const {
-  assert(typeID == other.typeID && "Caller should match type IDs");
-  return value.getPointer() ==
-  static_cast<const Holder<Type> &>(other).value.getPointer();
-}
-
-void swift::simple_display(llvm::raw_ostream &out, Type type) {
-  if (type)
-    type.print(out);
-  else
-    out << "null";
-}
-
 //----------------------------------------------------------------------------//
 // CustomAttrTypeRequest.
 //----------------------------------------------------------------------------//
@@ -655,7 +655,7 @@ void swift::simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value) {
 }
 
 //----------------------------------------------------------------------------//
-// Finding the attached @functionBuilder for a parameter.
+// FunctionBuilder-related requests.
 //----------------------------------------------------------------------------//
 
 bool AttachedFunctionBuilderRequest::isCached() const {
@@ -671,5 +671,13 @@ void AttachedFunctionBuilderRequest::diagnoseCycle(
 
 void AttachedFunctionBuilderRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}
+
+void FunctionBuilderTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void FunctionBuilderTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
 }

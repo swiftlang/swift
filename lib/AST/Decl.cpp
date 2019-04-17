@@ -5650,15 +5650,14 @@ void ParamDecl::setStoredProperty(VarDecl *var) {
 }
 
 Type ParamDecl::getFunctionBuilderType() const {
-  auto attr = getAttachedFunctionBuilder();
-  if (!attr) return Type();
+  // Fast path: most parameters do not have any attributes at all,
+  // much less custom ones.
+  if (!getAttrs().hasAttribute<CustomAttr>()) return Type();
 
-  auto mutableAttr = const_cast<CustomAttr*>(attr);
   auto &ctx = getASTContext();
-  auto dc = getDeclContext();
+  auto mutableThis = const_cast<ParamDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
-                           CustomAttrTypeRequest{mutableAttr, dc,
-                             CustomAttrTypeKind::NonGeneric},
+                           FunctionBuilderTypeRequest{mutableThis},
                            Type());
 }
 

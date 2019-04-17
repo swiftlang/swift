@@ -173,40 +173,53 @@ AttachedFunctionBuilderRequest::evaluate(Evaluator &evaluator,
 }
 
 llvm::Expected<Type>
-CustomAttrTypeRequest::evaluate(Evaluator &evaluator,
-                                CustomAttr *attr, DeclContext *dc,
-                                CustomAttrTypeKind typeKind) const {
-  auto resolution = TypeResolution::forContextual(dc);
-  TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
+FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
+                                     ParamDecl *param) const {
+  // Look for a function-builder custom attribute.
+  auto attr = param->getAttachedFunctionBuilder();
+  if (!attr) return Type();
 
-  // Property delegates allow their type to be an unbound generic.
-  if (typeKind == CustomAttrTypeKind::PropertyDelegate)
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
+  // Resolve a type for the attribute.
+  auto mutableAttr = const_cast<CustomAttr*>(attr);
+  auto dc = param->getDeclContext();
+  auto &ctx = dc->getASTContext();
+  Type type = resolveCustomAttrType(mutableAttr, dc,
+                                    CustomAttrTypeKind::NonGeneric);
+  if (!type) return Type();
 
-  ASTContext &ctx = dc->getASTContext();
-  auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
-  if (tc.validateType(attr->getTypeLoc(), resolution, options))
-    return ErrorType::get(ctx);
-
-  // We always require the type to resolve to a nominal type.
-  Type type = attr->getTypeLoc().getType();
-  if (!type->getAnyNominal()) {
-    assert(ctx.Diags.hadAnyError());
-    return ErrorType::get(ctx);
+  // The type must not be contextually-dependent.
+  if (type->hasArchetype()) {
+    ctx.Diags.diagnose(attr->getLocation(),
+                       diag::function_builder_type_contextual, type);
+    return Type();
   }
 
-  switch (typeKind) {
-  case CustomAttrTypeKind::NonGeneric:
-    if (type->hasArchetype()) {
-      ctx.Diags.diagnose(attr->getLocation(),
-                         diag::function_builder_type_contextual, type);
-      return ErrorType::get(ctx);
-    }
-    break;
+  auto nominal = type->getAnyNominal();
+  if (!nominal) {
+    assert(ctx.Diags.hadAnyError());
+    return Type();
+  }
 
-  case CustomAttrTypeKind::PropertyDelegate:
-    // No further logic required here.
-    break;
+  // The parameter had better already have an interface type.
+  Type paramType = param->getInterfaceType();
+  assert(paramType);
+  auto paramFnType = paramType->getAs<FunctionType>();
+
+  // Require the parameter to be an interface type.
+  if (!paramFnType) {
+    ctx.Diags.diagnose(attr->getLocation(),
+                       diag::function_builder_parameter_not_of_function_type,
+                       nominal->getFullName());
+    mutableAttr->setInvalid();
+    return Type();
+  }
+
+  if (param->isAutoClosure()) {
+    ctx.Diags.diagnose(attr->getLocation(),
+                       diag::function_builder_parameter_autoclosure,
+                       nominal->getFullName());
+    mutableAttr->setInvalid();
+    return Type();
   }
 
   return type;

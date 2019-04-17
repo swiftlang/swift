@@ -44,6 +44,9 @@ func makerParamMissing2(@Maker
 func makerParamExtra(@Maker(5) // expected-error {{function builder attributes cannot have arguments}}
                      fn: () -> ()) {}
 
+func makerParamAutoclosure(@Maker // expected-error {{function builder attribute 'Maker' cannot be applied to an autoclosure parameter}}
+                           fn: @autoclosure () -> ()) {}
+
 @_functionBuilder
 struct GenericMaker<T> {} // expected-note {{generic type 'GenericMaker' declared here}}
 
