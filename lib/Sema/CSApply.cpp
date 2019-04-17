@@ -1698,8 +1698,11 @@ namespace {
       }
 
       assert(componentExpr);
-      componentExpr->setType(simplifyType(cs.getType(anchor)));
+      Type ty = simplifyType(cs.getType(anchor));
+      componentExpr->setType(ty);
       cs.cacheType(componentExpr);
+
+      cs.setType(keyPath, 0, ty);
 
       keyPath->setParsedPath(componentExpr);
       keyPath->resolveComponents(ctx, {component});
@@ -4358,6 +4361,13 @@ namespace {
       Type baseTy = keyPathTy->getGenericArgs()[0];
       Type leafTy = keyPathTy->getGenericArgs()[1];
 
+      // Updates the constraint system with the type of the last resolved
+      // component. We do it this way because we sometimes insert new
+      // components.
+      auto updateCSWithResolvedComponent = [&]() {
+        cs.setType(E, resolvedComponents.size() - 1, baseTy);
+      };
+
       for (unsigned i : indices(E->getComponents())) {
         auto &origComponent = E->getMutableComponents()[i];
         
@@ -4434,6 +4444,7 @@ namespace {
           resolvedComponents.push_back(component);
 
           if (shouldForceUnwrapResult(foundDecl->choice, locator)) {
+            updateCSWithResolvedComponent();
             auto objectTy = getObjectType(baseTy);
             auto loc = origComponent.getLoc();
             component = KeyPathExpr::Component::forOptionalForce(objectTy, loc);
@@ -4461,6 +4472,7 @@ namespace {
           resolvedComponents.push_back(component);
 
           if (shouldForceUnwrapResult(foundDecl->choice, locator)) {
+            updateCSWithResolvedComponent();
             auto objectTy = getObjectType(baseTy);
             auto loc = origComponent.getLoc();
             component = KeyPathExpr::Component::forOptionalForce(objectTy, loc);
@@ -4512,6 +4524,9 @@ namespace {
         case KeyPathExpr::Component::Kind::TupleElement:
           llvm_unreachable("already resolved");
         }
+
+        // By now, "baseTy" is the result type of this component.
+        updateCSWithResolvedComponent();
       }
       
       // Wrap a non-optional result if there was chaining involved.
@@ -4524,6 +4539,7 @@ namespace {
         auto component = KeyPathExpr::Component::forOptionalWrap(leafTy);
         resolvedComponents.push_back(component);
         baseTy = leafTy;
+        updateCSWithResolvedComponent();
       }
       E->resolveComponents(cs.getASTContext(), resolvedComponents);
       

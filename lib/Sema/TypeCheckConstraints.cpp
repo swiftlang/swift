@@ -3408,27 +3408,9 @@ void ConstraintSystem::print(raw_ostream &out, Expr *E) {
     return Type();
   };
   auto getTypeOfKeyPathComponent =
-      [&](const KeyPathExpr *E, unsigned index) -> Type {
-    // CSGen attaches the type var for each key path component to the
-    // "key path component #n -> function result" locator. This is the natural
-    // place subscript result types will end up, and it's otherwise unused by
-    // other components.
-    auto componentLocator = getConstraintLocator(E,
-        ConstraintLocator::PathElement::getKeyPathComponent(index));
-    auto resultLocator = getConstraintLocator(componentLocator,
-        ConstraintLocator::FunctionResult);
-
-    // Find the first type variable with this locator and return it.
-    for (auto &typeVar : TypeVariables) {
-      if ((*typeVar)->getLocator() != resultLocator)
-        continue;
-
-      if (auto fixedTy = (*typeVar)->getFixedType(getSavedBindings()))
-        return fixedTy;
-
-      return typeVar;
-    }
-
+      [&](const KeyPathExpr *KP, unsigned I) -> Type {
+    if (hasType(KP, I))
+      return getType(KP, I);
     return Type();
   };
 

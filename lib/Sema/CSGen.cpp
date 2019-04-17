@@ -3054,6 +3054,10 @@ namespace {
         case KeyPathExpr::Component::Kind::Identity:
           continue;
         }
+
+        // By now, `base` is the result type of this component. Set it in the
+        // constraint system so we can find it later.
+        CS.setType(E, i, base);
       }
       
       // If there was an optional chaining component, the end result must be
