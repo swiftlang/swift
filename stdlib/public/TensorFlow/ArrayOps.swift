@@ -120,7 +120,7 @@ public extension Raw {
   ///   - split_dim: 0-D.  The dimension along which to split.  Must be in the range
   ///     `[-rank(value), rank(value))`.
   ///
-  /// - Output output: Tensors whose shape matches that of `value`
+  /// - Returns: Tensors whose shape matches that of `value`
   ///   except along `axis`, where their sizes are
   ///   `size_splits[i]`.
   @inlinable @inline(__always)
