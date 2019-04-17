@@ -175,8 +175,7 @@ def disable_objc_attr_requires_foundation_module :
            "Foundation module">;
 
 def enable_resilience : Flag<["-"], "enable-resilience">,
-   HelpText<"Compile the module to export resilient interfaces for all "
-            "public declarations by default">;
+   HelpText<"Deprecated, use -enable-library-evolution instead">;
 
 def enable_class_resilience : Flag<["-"], "enable-class-resilience">,
    HelpText<"Enable resilient layout for classes containing resilient value types">;

@@ -214,7 +214,7 @@ public:
   /// Enables the "fully resilient" resilience strategy.
   ///
   /// \see ResilienceStrategy::Resilient
-  bool EnableResilience = false;
+  bool EnableLibraryEvolution = false;
 
   /// Indicates that the frontend should emit "verbose" SIL
   /// (if asked to emit SIL).

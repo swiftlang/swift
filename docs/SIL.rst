@@ -3958,7 +3958,7 @@ unless the enum can be exhaustively switched in the current function, i.e. when
 the compiler can be sure that it knows all possible present and future values
 of the enum in question. This is generally true for enums defined in Swift, but
 there are two exceptions: *non-frozen enums* declared in libraries compiled
-with the ``-enable-resilience`` flag, which may grow new cases in the future in
+with the ``-enable-library-evolution`` flag, which may grow new cases in the future in
 an ABI-compatible way; and enums marked with the ``objc`` attribute, for which
 other bit patterns are permitted for compatibility with C. All enums imported
 from C are treated as "non-exhaustive" for the same reason, regardless of the
