@@ -24,12 +24,24 @@ extension Int: O, O2 {
   public func baz() {}
 }
 
+public var globalProp: some O {
+  return 0
+}
+
 public class C: P, Q {
   public func poo() -> some O {
     return 0
   }
 
   public func qoo() -> some O & O2 {
+    return 0
+  }
+
+  public var prop: some O {
+    return 0
+  }
+
+  public subscript() -> some O {
     return 0
   }
 }
