@@ -40,25 +40,6 @@ using namespace swift;
 using namespace constraints;
 
 namespace swift {
-  std::string getTypeListString(Type type) {
-    std::string result;
-    
-    // Always make sure to have at least one set of parens
-    bool forceParens =
-    !type->is<TupleType>() && !type->hasParenSugar();
-    if (forceParens)
-      result.push_back('(');
-    
-    llvm::raw_string_ostream OS(result);
-    type->print(OS);
-    OS.flush();
-    
-    if (forceParens)
-      result.push_back(')');
-    
-    return result;
-  }
-
   Type replaceTypeParametersWithUnresolved(Type ty) {
     if (!ty) return ty;
     
@@ -4382,8 +4363,11 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
                     overloadName, CS.getType(ArgExpr));
       } else {
         bool isInitializer = isa<ConstructorDecl>(Candidate);
+
+        SmallVector<AnyFunctionType::Param, 8> Params;
+        AnyFunctionType::decomposeInput(CS.getType(ArgExpr), Params);
         TC.diagnose(ArgExpr->getLoc(), diag::cannot_call_with_params,
-                    overloadName, getTypeListString(CS.getType(ArgExpr)),
+                    overloadName, AnyFunctionType::getParamListAsString(Params),
                     isInitializer);
       }
 
@@ -5094,9 +5078,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
 
     // If we have multiple candidates that we fail to match, just say we have
     // the wrong labels and list the candidates out.
-    
-    // TODO: It would be nice to use an analog of getTypeListString that
-    // doesn't include the argument types.
     diagnose(callExpr->getLoc(), diag::wrong_argument_labels_overload,
              getParamListAsString(args))
       .highlight(argExpr->getSourceRange());
@@ -5284,7 +5265,9 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (diagnoseRawRepresentableMismatch(calleeInfo, argExpr, argLabels))
     return true;
 
-  std::string argString = getTypeListString(CS.getType(argExpr));
+  SmallVector<AnyFunctionType::Param, 8> params;
+  AnyFunctionType::decomposeInput(CS.getType(argExpr), params);
+  auto argString = AnyFunctionType::getParamListAsString(params);
 
   // If we couldn't get the name of the callee, then it must be something of a
   // more complex "value of function type".

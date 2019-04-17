@@ -1411,7 +1411,7 @@ func processArrayOfFunctions(f1: [((Bool, Bool)) -> ()],
   }
 
   f2.forEach { (block: ((Bool, Bool)) -> ()) in
-  // expected-error@-1 {{cannot convert value of type '(((Bool, Bool)) -> ()) -> ()' to expected argument type '((Bool, Bool) -> ()) -> Void}}
+  // expected-error@-1 {{cannot convert value of type '(((Bool, Bool)) -> ()) -> ()' to expected argument type '(@escaping (Bool, Bool) -> ()) -> Void}}
     block(p)
     block((c, c))
     block(c, c)
@@ -1693,7 +1693,7 @@ _ = x.map { (_: Void) in return () }
 // https://bugs.swift.org/browse/SR-9470
 do {
   func f(_: Int...) {}
-  let _ = [(1, 2, 3)].map(f) // expected-error {{cannot invoke 'map' with an argument list of type '((Int...) -> ())'}}
+  let _ = [(1, 2, 3)].map(f) // expected-error {{cannot invoke 'map' with an argument list of type '(@escaping (Int...) -> ())'}}
 }
 
 // rdar://problem/48443263 - cannot convert value of type '() -> Void' to expected argument type '(_) -> Void'
@@ -1717,4 +1717,24 @@ func rdar48443263() {
     foo(s1, fn) // Ok because s.V is Void
     foo(s2, fn) // expected-error {{cannot convert value of type '() -> Void' to expected argument type '(_) -> Void'}}
   }
+}
+
+func autoclosureSplat() {
+  func takeFn<T>(_: (T) -> ()) {}
+
+  takeFn { (fn: @autoclosure () -> Int) in }
+  // This type checks because we find a solution T:= @escaping () -> Int and
+  // wrap the closure in a function conversion.
+
+  takeFn { (fn: @autoclosure () -> Int, x: Int) in }
+  // expected-error@-1 {{contextual closure type '(_) -> ()' expects 1 argument, but 2 were used in closure body}}
+
+  takeFn { (fn: @autoclosure @escaping () -> Int) in }
+  // FIXME: It looks like matchFunctionTypes() does not check @autoclosure at all.
+  // Perhaps this is intentional, but we should document it eventually. In the
+  // interim, this test serves as "documentation"; if it fails, please investigate why
+  // instead of changing the test.
+
+  takeFn { (fn: @autoclosure @escaping () -> Int, x: Int) in }
+  // expected-error@-1 {{contextual closure type '(_) -> ()' expects 1 argument, but 2 were used in closure body}}
 }

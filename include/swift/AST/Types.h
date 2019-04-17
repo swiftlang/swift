@@ -1723,11 +1723,10 @@ class ParameterTypeFlags {
     None        = 0,
     Variadic    = 1 << 0,
     AutoClosure = 1 << 1,
-    Escaping    = 1 << 2,
-    OwnershipShift = 3,
+    OwnershipShift = 2,
     Ownership   = 7 << OwnershipShift,
 
-    NumBits = 6
+    NumBits = 5
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits < 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -1740,10 +1739,9 @@ public:
     return ParameterTypeFlags(OptionSet<ParameterFlags>(raw));
   }
 
-  ParameterTypeFlags(bool variadic, bool autoclosure, bool escaping,
+  ParameterTypeFlags(bool variadic, bool autoclosure,
                      ValueOwnership ownership)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
-              (escaping ? Escaping : 0) |
               uint8_t(ownership) << OwnershipShift) {}
 
   /// Create one from what's present in the parameter type
@@ -1754,7 +1752,6 @@ public:
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
   bool isAutoClosure() const { return value.contains(AutoClosure); }
-  bool isEscaping() const { return value.contains(Escaping); }
   bool isInOut() const { return getValueOwnership() == ValueOwnership::InOut; }
   bool isShared() const { return getValueOwnership() == ValueOwnership::Shared;}
   bool isOwned() const { return getValueOwnership() == ValueOwnership::Owned; }
@@ -1766,11 +1763,6 @@ public:
   ParameterTypeFlags withVariadic(bool variadic) const {
     return ParameterTypeFlags(variadic ? value | ParameterTypeFlags::Variadic
                                        : value - ParameterTypeFlags::Variadic);
-  }
-
-  ParameterTypeFlags withEscaping(bool escaping) const {
-    return ParameterTypeFlags(escaping ? value | ParameterTypeFlags::Escaping
-                                       : value - ParameterTypeFlags::Escaping);
   }
 
   ParameterTypeFlags withInOut(bool isInout) const {
@@ -1865,7 +1857,6 @@ public:
   ParameterTypeFlags asParamFlags() const {
     return ParameterTypeFlags(/*variadic*/ false,
                               /*autoclosure*/ false,
-                              /*escaping*/ false,
                               getValueOwnership());
   }
 
@@ -1936,9 +1927,6 @@ public:
   /// Determine whether this field is an autoclosure parameter closure.
   bool isAutoClosure() const { return Flags.isAutoClosure(); }
 
-  /// Determine whether this field is an escaping parameter closure.
-  bool isEscaping() const { return Flags.isEscaping(); }
-  
   /// Determine whether this field is marked 'inout'.
   bool isInOut() const { return Flags.isInOut(); }
   
@@ -2729,9 +2717,6 @@ public:
     /// Whether the parameter is marked '@autoclosure'
     bool isAutoClosure() const { return Flags.isAutoClosure(); }
     
-    /// Whether the parameter is marked '@escaping'
-    bool isEscaping() const { return Flags.isEscaping(); }
-    
     /// Whether the parameter is marked 'inout'
     bool isInOut() const { return Flags.isInOut(); }
     
@@ -3028,9 +3013,13 @@ public:
   /// replaced.
   AnyFunctionType *withExtInfo(ExtInfo info) const;
 
-  void printParams(raw_ostream &OS,
-                   const PrintOptions &PO = PrintOptions()) const;
-  void printParams(ASTPrinter &Printer, const PrintOptions &PO) const;
+  static void printParams(ArrayRef<Param> Params, raw_ostream &OS,
+                          const PrintOptions &PO = PrintOptions());
+  static void printParams(ArrayRef<Param> Params, ASTPrinter &Printer,
+                          const PrintOptions &PO);
+
+  static std::string getParamListAsString(ArrayRef<Param> Params,
+                                          const PrintOptions &PO = PrintOptions());
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -5375,8 +5364,6 @@ inline ParameterTypeFlags
 ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
                                       bool isAutoClosure,
                                       ValueOwnership ownership) {
-  bool escaping = paramTy->is<AnyFunctionType>() &&
-                  !paramTy->castTo<AnyFunctionType>()->isNoEscape();
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -5386,7 +5373,7 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
            ownership == ValueOwnership::InOut);
     ownership = ValueOwnership::InOut;
   }
-  return {isVariadic, isAutoClosure, escaping, ownership};
+  return {isVariadic, isAutoClosure, ownership};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

@@ -1913,11 +1913,9 @@ void ASTMangler::appendTypeList(Type listTy) {
       return appendOperator("y");
     bool firstField = true;
     for (auto &field : tuple->getElements()) {
-      // FIXME: We shouldn't put @escaping in non-parameter list tuples
-      auto flags = field.getParameterFlags().withEscaping(false);
-
-      assert(flags.isNone());
-      appendTypeListElement(field.getName(), field.getRawType(), flags);
+      assert(field.getParameterFlags().isNone());
+      appendTypeListElement(field.getName(), field.getRawType(),
+                            ParameterTypeFlags());
       appendListSeparator(firstField);
     }
   } else {
