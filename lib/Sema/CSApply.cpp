@@ -7541,6 +7541,21 @@ namespace {
         // metadata types/conformances during IRGen.
         tc.requestRequiredNominalTypeLayoutForParameters(params);
 
+        // If this closure had a function builder applied, rewrite it to a
+        // closure with a single expression body containing the builder
+        // invocations.
+        auto builder =
+            Rewriter.solution.builderTransformedClosures.find(closure);
+        if (builder != Rewriter.solution.builderTransformedClosures.end()) {
+          auto singleExpr = builder->second.second;
+          auto returnStmt = new (tc.Context) ReturnStmt(
+             singleExpr->getStartLoc(), singleExpr, /*implicit=*/true);
+          auto braceStmt = BraceStmt::create(
+              tc.Context, returnStmt->getStartLoc(), ASTNode(returnStmt),
+              returnStmt->getEndLoc(), /*implicit=*/true);
+          closure->setBody(braceStmt, /*isSingleExpression=*/true);
+        }
+
         // If this is a single-expression closure, convert the expression
         // in the body to the result type of the closure.
         if (closure->hasSingleExpressionBody()) {

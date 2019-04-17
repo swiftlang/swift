@@ -2764,3 +2764,194 @@ bool constraints::isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl) {
          decl == ctx.getReferenceWritableKeyPathDecl() ||
          decl == ctx.getPartialKeyPathDecl() || decl == ctx.getAnyKeyPathDecl();
 }
+
+namespace {
+  /// Visitor to classify the contents of the given closure.
+  class BuilderClosureVisitor
+    : public StmtVisitor<BuilderClosureVisitor, Expr *> {
+    ASTContext &ctx;
+    Type builderType;
+
+  public:
+    BuilderClosureVisitor(ASTContext &ctx, Type builderType)
+      : ctx(ctx), builderType(builderType) { }
+
+    ReturnStmt *returnStmt = nullptr;
+    Stmt *controlFlowStmt = nullptr;
+    Decl *decl = nullptr;
+
+#define CONTROL_FLOW_STMT(StmtClass)                      \
+    Expr *visit##StmtClass##Stmt(StmtClass##Stmt *stmt) { \
+      if (!controlFlowStmt)                               \
+        controlFlowStmt = stmt;                           \
+                                                          \
+      return nullptr;                                     \
+    }
+
+    Expr *visitBraceStmt(BraceStmt *braceStmt) {
+      SmallVector<Expr *, 4> expressions;
+      for (const auto &node : braceStmt->getElements()) {
+        if (auto stmt = node.dyn_cast<Stmt *>()) {
+          auto expr = visit(stmt);
+          if (expr)
+            expressions.push_back(expr);
+          continue;
+        }
+
+        if (auto decl = node.dyn_cast<Decl *>()) {
+          if (!this->decl)
+            this->decl = decl;
+
+          continue;
+        }
+
+        auto expr = node.get<Expr *>();
+        expressions.push_back(expr);
+      }
+
+      if (!builderType)
+        return nullptr;
+
+      // Call Builder.buildBlock(... args ...)
+      auto typeExpr = TypeExpr::createImplicit(builderType, ctx);
+      auto memberRef = new (ctx) UnresolvedDotExpr(
+          typeExpr, SourceLoc(), ctx.Id_buildBlock, DeclNameLoc(),
+          /*implicit=*/true);
+      return CallExpr::createImplicit(ctx, memberRef, expressions, { });
+    }
+
+    Expr *visitReturnStmt(ReturnStmt *returnStmt) {
+      if (!this->returnStmt)
+        this->returnStmt = returnStmt;
+      return nullptr;
+    }
+
+    CONTROL_FLOW_STMT(Do)
+    CONTROL_FLOW_STMT(Yield)
+    CONTROL_FLOW_STMT(Defer)
+    CONTROL_FLOW_STMT(If)
+    CONTROL_FLOW_STMT(Guard)
+    CONTROL_FLOW_STMT(While)
+    CONTROL_FLOW_STMT(DoCatch)
+    CONTROL_FLOW_STMT(RepeatWhile)
+    CONTROL_FLOW_STMT(ForEach)
+    CONTROL_FLOW_STMT(Switch)
+    CONTROL_FLOW_STMT(Case)
+    CONTROL_FLOW_STMT(Catch)
+    CONTROL_FLOW_STMT(Break)
+    CONTROL_FLOW_STMT(Continue)
+    CONTROL_FLOW_STMT(Fallthrough)
+    CONTROL_FLOW_STMT(Fail)
+    CONTROL_FLOW_STMT(Throw)
+    CONTROL_FLOW_STMT(PoundAssert)
+
+#undef CONTROL_FLOW_STMT
+  };
+}
+
+BuilderClosureKind swift::classifyBuilderClosure(ASTContext &ctx,
+                                                 ClosureExpr *closure,
+                                                 bool diagnose) {
+  if (closure->hasSingleExpressionBody())
+    return BuilderClosureKind::SingleExpression;
+
+  BuilderClosureVisitor visitor(ctx, Type());
+  (void)visitor.visit(closure->getBody());
+
+  // The presence of an explicit return makes this not a builder.
+  if (visitor.returnStmt) {
+    if (diagnose) {
+      ctx.Diags.diagnose(visitor.returnStmt->getReturnLoc(),
+                         diag::closure_builder_return_stmt);
+    }
+
+    return BuilderClosureKind::ExplicitReturn;
+  }
+
+  // The presence of control flow makes this not work with closure builders.
+  if (visitor.controlFlowStmt) {
+    if (diagnose) {
+      ctx.Diags.diagnose(visitor.controlFlowStmt->getStartLoc(),
+                         diag::closure_builder_control_flow);
+    }
+
+    return BuilderClosureKind::UnsupportedConstruct;
+  }
+
+  // The presence of any declaration makes this not work with closure builders.
+  if (visitor.decl) {
+    if (diagnose) {
+      visitor.decl->diagnose(diag::closure_builder_decl);
+    }
+
+    return BuilderClosureKind::UnsupportedConstruct;
+  }
+
+  return BuilderClosureKind::Supported;
+}
+
+
+void ConstraintSystem::applyFunctionBuilder(ClosureExpr *closure,
+                                            Type builderType,
+                                            ConstraintLocatorBuilder locator) {
+  auto builder = builderType->getAnyNominal();
+  assert(builder && "Bad function builder type");
+  assert(builder->getAttrs().hasAttribute<FunctionBuilderAttr>());
+  switch (classifyBuilderClosure(
+              getASTContext(), closure, /*diagnose=*/false)) {
+  case BuilderClosureKind::ExplicitReturn:
+  case BuilderClosureKind::UnsupportedConstruct:
+    return;
+
+  case BuilderClosureKind::SingleExpression:
+    // FIXME: We might be able to do this, but it's not clear.
+    return;
+
+  case BuilderClosureKind::Supported:
+    break;
+  }
+
+  auto &appliedBuilders = TC.appliedFunctionBuilders[closure];
+
+  // Check whether we have already applied this function builder to
+  // this closure.
+  Expr *singleExpr = nullptr;
+  for (const auto &applied : appliedBuilders) {
+    if (applied.first->isEqual(builderType)) {
+      singleExpr = applied.second;
+      break;
+    }
+  }
+
+  // If we didn't find anything yet, go build the expression.
+  if (!singleExpr) {
+    BuilderClosureVisitor visitor(getASTContext(), builderType);
+    singleExpr = visitor.visit(closure->getBody());
+
+    // FIXME: Failure mode.
+    (void)TC.preCheckExpression(singleExpr, DC);
+
+    // Record this expression for later.
+    TC.appliedFunctionBuilders[closure].push_back(
+        {builderType->getCanonicalType(), singleExpr});
+  }
+
+
+  singleExpr = generateConstraints(singleExpr);
+  if (!singleExpr)
+    return;
+
+  Type transformedType = getType(singleExpr);
+  assert(transformedType && "Missing type");
+
+  // Record the transformation.
+  builderTransformedClosures.push_back(
+    std::make_tuple(closure, builderType, singleExpr));
+
+  // Bind the result type of the closure to the type of the transformed
+  // expression.
+  Type closureType = getType(closure);
+  auto fnType = closureType->castTo<FunctionType>();
+  addConstraint(ConstraintKind::Equal, fnType->getResult(), transformedType,
+                locator);
+}

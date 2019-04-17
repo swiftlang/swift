@@ -669,6 +669,13 @@ private:
   /// when executing scripts.
   bool InImmediateMode = false;
 
+public:
+  /// Cached mapping from closure expressions that have had function builders applied
+  /// to the (builder type, resulting single expression) pairs for that closure expression.
+  llvm::DenseMap<ClosureExpr *, SmallVector<std::pair<CanType, Expr *>, 2>>
+    appliedFunctionBuilders;
+
+private:
   /// A helper to construct and typecheck call to super.init().
   ///
   /// \returns NULL if the constructed expression does not typecheck.

@@ -619,6 +619,10 @@ public:
   llvm::SmallVector<std::pair<ConstraintLocator *, ProtocolConformanceRef>, 8>
       Conformances;
 
+  /// The set of closures that have been transformed by a function builder.
+  llvm::MapVector<ClosureExpr *, std::pair<Type, Expr *>>
+      builderTransformedClosures;
+
   /// Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
   Type simplifyType(Type type) const;
@@ -1101,6 +1105,10 @@ private:
   SmallVector<std::pair<ConstraintLocator *, ProtocolConformanceRef>, 8>
       CheckedConformances;
 
+  /// The set of closures that have been transformed by a function builder.
+  SmallVector<std::tuple<ClosureExpr *, Type, Expr *>, 4>
+      builderTransformedClosures;
+
 public:
   /// The locators of \c Defaultable constraints whose defaults were used.
   SmallVector<ConstraintLocator *, 8> DefaultedConstraints;
@@ -1567,6 +1575,8 @@ public:
     unsigned numDisabledConstraints;
 
     unsigned numFavoredConstraints;
+
+    unsigned numBuilderTransformedClosures;
 
     /// The previous score.
     Score PreviousScore;
@@ -2965,6 +2975,10 @@ public:
   SolutionKind simplifyConstraint(const Constraint &constraint);
   /// Simplify the given disjunction choice.
   void simplifyDisjunctionChoice(Constraint *choice);
+
+  /// Apply the given function builder to the closure expression.
+  void applyFunctionBuilder(ClosureExpr *closure, Type builderType,
+                            ConstraintLocatorBuilder locator);
 
 private:
   /// The kind of bindings that are permitted.
