@@ -969,72 +969,101 @@ internal func _fastWithNormalizedCodeUnitsImpl(
   }
 }
 
-// Allow for Swift String class to convert itself to int/float/double using dot notation
-// This will allow for an easier time when casting a string to various types of numbers
-// Since it returns a non-optional value, unwrapping isn't necessary
-// Before we would have to do Float(value) ?? 0.0, where as now it would be simply value.intValue etc.
+/* Conforms String class to NSString functions, "integerValue", "doubleValue", "floatValue"
+ * Allow for dot notation string to number conversion
+ * Currently to transform a string to a number we must cast using Float(string) which returns an optional
+ * In Obj-c the same conversoin would return 0.0, which may be much more convenient for a more swift development process
+ */
 extension String {
-    func intValue() -> Int {
-        if let value = Int(self) {
-            return value;
-        }
-        else {
-            return 0;
+    
+    // Returns an integer value of the string
+    //  If the value can not be an integer returns 0 instead
+    public var intValue: Int {
+        get {
+            if let value = Int(self) {
+                return value;
+            }
+            else {
+                return 0;
+            }
         }
     }
     
-    func int8Value() -> Int8 {
-        if let value = Int8(self) {
-            return value;
-        }
-        else {
-            return 0;
-        }
-    }
-    
-    func int16Value() -> Int16 {
-        if let value = Int16(self) {
-            return value;
-        }
-        else {
-            return 0;
+    // Returns a short value of the string
+    //  If the value can not be a short returns 0 instead
+    public var int8Value: Int8 {
+        get {
+            if let value = Int8(self) {
+                return value;
+            }
+            else {
+                return 0;
+            }
         }
     }
     
-    func int32Value() -> Int32 {
-        if let value = Int32(self) {
-            return value;
-        }
-        else {
-            return 0;
-        }
-    }
-    
-    func int64Value() -> Int64 {
-        if let value = Int64(self) {
-            return value;
-        }
-        else {
-            return 0;
+    // Returns a int16 value of the string
+    //  If the value can not be an int16 returns 0 instead
+    public var int16Value: Int16 {
+        get {
+            if let value = Int16(self) {
+                return value;
+            }
+            else {
+                return 0;
+            }
         }
     }
     
-    
-    func doubleValue() -> Double {
-        if let value = Double(self) {
-            return value;
-        }
-        else {
-            return 0.0;
+    // Returns a int32 value of the string
+    //  If the value can not be an int32 returns 0 instead
+    public var int32Value: Int32 {
+        get {
+            if let value = Int32(self) {
+                return value;
+            }
+            else {
+                return 0;
+            }
         }
     }
     
-    func floatValue() -> Float {
-        if let float = Float(self) {
-            return float;
+    // Returns a int64 value of the string
+    //  If the value can not be an int64 returns 0 instead
+    public var int64Value: Int64 {
+        get {
+            if let value = Int64(self) {
+                return value;
+            }
+            else {
+                return 0;
+            }
         }
-        else {
-            return 0.0;
+    }
+    
+    // Returns a Double value of the string
+    //  If the value can not be a Double returns 0 instead
+    public var doubleValue: Double {
+        get {
+            if let value = Double(self) {
+                return value;
+            }
+            else {
+                return 0.0;
+            }
+        }
+    }
+    
+    // Returns a Float value of the string
+    //  If the value can not be a Float returns 0 instead
+    public var floatValue: Float {
+        get {
+            if let float = Float(self) {
+                return float;
+            }
+            else {
+                return 0.0;
+            }
         }
     }
 }
