@@ -1132,7 +1132,7 @@ ConstraintSystem::solveImpl(Expr *&expr,
     if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
       convertType = convertType.transform([&](Type type) -> Type {
         if (type->is<UnresolvedType>())
-          return createTypeVariable(convertTypeLocator);
+          return createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
         return type;
       });
     }

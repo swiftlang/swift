@@ -2115,7 +2115,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
     assert(!convertTo && "convertType and type check options conflict");
     auto *convertTypeLocator = cs.getConstraintLocator(
         cs.getConstraintLocator(expr), ConstraintLocator::ContextualType);
-    Type var = cs.createTypeVariable(convertTypeLocator);
+    Type var = cs.createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
     convertTo = getOptionalType(expr->getLoc(), var);
   }
 
@@ -2650,7 +2650,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         return true;
       }
 
-      SequenceType = cs.createTypeVariable(Locator);
+      SequenceType = cs.createTypeVariable(Locator, TVO_CanBindToNoEscape);
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        SequenceType, Locator);
       cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
@@ -2723,7 +2723,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       }
 
       if (elementType.isNull()) {
-        elementType = cs.createTypeVariable(elementLocator);
+        elementType = cs.createTypeVariable(elementLocator,
+                                            TVO_CanBindToNoEscape);
       }
 
       // Add a conversion constraint between the element type of the sequence
@@ -2967,7 +2968,8 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
           return Type();
         
         auto locator = cs.getConstraintLocator(nullptr);
-        auto replacement = cs.createTypeVariable(locator);
+        auto replacement = cs.createTypeVariable(locator,
+                                                 TVO_CanBindToNoEscape);
 
         if (auto superclass = archetypeType->getSuperclass()) {
           cs.addConstraint(ConstraintKind::Subtype, replacement,
@@ -2984,7 +2986,8 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
       // FIXME: Remove this case
       assert(cast<GenericTypeParamType>(origType));
       auto locator = cs.getConstraintLocator(nullptr);
-      auto replacement = cs.createTypeVariable(locator);
+      auto replacement = cs.createTypeVariable(locator,
+                                               TVO_CanBindToNoEscape);
       types[origType] = replacement;
       return replacement;
     },
@@ -3428,6 +3431,8 @@ void ConstraintSystem::print(raw_ostream &out) {
       out << " [lvalue allowed]";
     if (tv->getImpl().canBindToInOut())
       out << " [inout allowed]";
+    if (tv->getImpl().canBindToNoEscape())
+      out << " [noescape allowed]";
     auto rep = getRepresentative(tv);
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {

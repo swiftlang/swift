@@ -899,3 +899,10 @@ do {
     }
   }
 }
+
+// Don't allow result type of a closure to end up as a noescape type
+
+// The funny error is because we infer the type of badResult as () -> ()
+// via the 'T -> U => T -> ()' implicit conversion.
+let badResult = { (fn: () -> ()) in fn }
+// expected-error@-1 {{expression resolves to an unused function}}

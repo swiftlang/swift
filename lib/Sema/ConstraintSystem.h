@@ -70,7 +70,7 @@ namespace constraints {
 /// can be restored.
 class SavedTypeVariableBinding {
   /// The type variable and type variable options.
-  llvm::PointerIntPair<TypeVariableType *, 3> TypeVarAndOptions;
+  llvm::PointerIntPair<TypeVariableType *, 4> TypeVarAndOptions;
   
   /// The parent or fixed type.
   llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
@@ -164,9 +164,12 @@ enum TypeVariableOptions {
   /// Whether the type variable can be bound to an inout type or not.
   TVO_CanBindToInOut = 0x02,
 
+  /// Whether the type variable can be bound to a non-escaping type or not.
+  TVO_CanBindToNoEscape = 0x04,
+
   /// Whether a more specific deduction for this type variable implies a
   /// better solution to the constraint system.
-  TVO_PrefersSubtypeBinding = 0x04
+  TVO_PrefersSubtypeBinding = 0x08,
 };
 
 /// The implementation object for a type variable used within the
@@ -225,6 +228,9 @@ public:
 
   /// Whether this type variable can bind to an inout type.
   bool canBindToInOut() const { return getRawOptions() & TVO_CanBindToInOut; }
+
+  /// Whether this type variable can bind to an inout type.
+  bool canBindToNoEscape() const { return getRawOptions() & TVO_CanBindToNoEscape; }
 
   /// Whether this type variable prefers a subtype binding over a supertype
   /// binding.
@@ -350,6 +356,12 @@ public:
         recordBinding(*record);
       getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToInOut;
     }
+
+    if (canBindToNoEscape() && !otherRep->getImpl().canBindToNoEscape()) {
+      if (record)
+        recordBinding(*record);
+      getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToNoEscape;
+    }
   }
 
   /// Retrieve the fixed type that corresponds to this type variable,
@@ -393,6 +405,20 @@ public:
     else
       impl.getTypeVariable()->Bits.TypeVariableType.Options &=
           ~TVO_CanBindToLValue;
+  }
+
+  void setCanBindToNoEscape(constraints::SavedTypeVariableBindings *record,
+                            bool enabled) {
+    auto &impl = getRepresentative(record)->getImpl();
+    if (record)
+      impl.recordBinding(*record);
+
+    if (enabled)
+      impl.getTypeVariable()->Bits.TypeVariableType.Options |=
+          TVO_CanBindToNoEscape;
+    else
+      impl.getTypeVariable()->Bits.TypeVariableType.Options &=
+          ~TVO_CanBindToNoEscape;
   }
 
   /// Print the type variable to the given output stream.
@@ -1686,7 +1712,7 @@ public:
 
   /// Create a new type variable.
   TypeVariableType *createTypeVariable(ConstraintLocator *locator,
-                                       unsigned options = 0);
+                                       unsigned options);
 
   /// Retrieve the set of active type variables.
   ArrayRef<TypeVariableType *> getTypeVariables() const {
