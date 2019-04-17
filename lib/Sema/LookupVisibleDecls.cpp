@@ -407,32 +407,34 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
     else
       ReasonForThisProtocol = getReasonForSuper(Reason);
 
-    auto NormalConformance = Conformance->getRootNormalConformance();
-    for (auto Member : Proto->getMembers()) {
-      if (auto *ATD = dyn_cast<AssociatedTypeDecl>(Member)) {
-        // Skip type decls if they aren't visible, or any type that has a
-        // witness. This cuts down on duplicates.
-        if (areTypeDeclsVisibleInLookupMode(LS) &&
-            !NormalConformance->hasTypeWitness(ATD)) {
-          Consumer.foundDecl(ATD, ReasonForThisProtocol);
+    if (auto NormalConformance = dyn_cast<NormalProtocolConformance>(
+          Conformance->getRootConformance())) {
+      for (auto Member : Proto->getMembers()) {
+        if (auto *ATD = dyn_cast<AssociatedTypeDecl>(Member)) {
+          // Skip type decls if they aren't visible, or any type that has a
+          // witness. This cuts down on duplicates.
+          if (areTypeDeclsVisibleInLookupMode(LS) &&
+              !Conformance->hasTypeWitness(ATD)) {
+            Consumer.foundDecl(ATD, ReasonForThisProtocol);
+          }
+          continue;
         }
-        continue;
-      }
-      if (auto *VD = dyn_cast<ValueDecl>(Member)) {
-        if (TypeResolver) {
-          TypeResolver->resolveDeclSignature(VD);
-          if (!NormalConformance->hasWitness(VD) &&
-              (Conformance->getDeclContext()->getParentSourceFile() !=
-              FromContext->getParentSourceFile()))
-            TypeResolver->resolveWitness(NormalConformance, VD);
-        }
-        // Skip value requirements that have corresponding witnesses. This cuts
-        // down on duplicates.
-        if (!NormalConformance->hasWitness(VD) ||
-            !NormalConformance->getWitness(VD, nullptr) ||
-            NormalConformance->getWitness(VD, nullptr).getDecl()->getFullName()
-              != VD->getFullName()) {
-          Consumer.foundDecl(VD, ReasonForThisProtocol);
+        if (auto *VD = dyn_cast<ValueDecl>(Member)) {
+          if (TypeResolver) {
+            TypeResolver->resolveDeclSignature(VD);
+            if (!NormalConformance->hasWitness(VD) &&
+                (Conformance->getDeclContext()->getParentSourceFile() !=
+                FromContext->getParentSourceFile()))
+              TypeResolver->resolveWitness(NormalConformance, VD);
+          }
+          // Skip value requirements that have corresponding witnesses. This cuts
+          // down on duplicates.
+          if (!NormalConformance->hasWitness(VD) ||
+              !NormalConformance->getWitness(VD, nullptr) ||
+              NormalConformance->getWitness(VD, nullptr).getDecl()->getFullName()
+                != VD->getFullName()) {
+            Consumer.foundDecl(VD, ReasonForThisProtocol);
+          }
         }
       }
     }

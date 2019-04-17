@@ -3600,15 +3600,16 @@ void ConformanceChecker::addUsedConformances(
   if (!visited.insert(conformance).second)
     return;
 
-  auto normalConf = conformance->getRootNormalConformance();
+  if (auto normalConf = dyn_cast<NormalProtocolConformance>(
+        conformance->getRootConformance())) {;
+    if (normalConf->isIncomplete())
+      TC.UsedConformances.insert(normalConf);
 
-  if (normalConf->isIncomplete())
-    TC.UsedConformances.insert(normalConf);
-
-  // Mark each conformance in the signature as used.
-  for (auto sigConformance : normalConf->getSignatureConformances()) {
-    if (sigConformance.isConcrete())
-      addUsedConformances(sigConformance.getConcrete(), visited);
+    // Mark each conformance in the signature as used.
+    for (auto sigConformance : normalConf->getSignatureConformances()) {
+      if (sigConformance.isConcrete())
+        addUsedConformances(sigConformance.getConcrete(), visited);
+    }
   }
 }
 
@@ -4276,17 +4277,18 @@ void TypeChecker::markConformanceUsed(ProtocolConformanceRef conformance,
                                       DeclContext *dc) {
   if (conformance.isAbstract()) return;
 
-  auto normalConformance =
-    conformance.getConcrete()->getRootNormalConformance();
+  if (auto normalConformance =
+        dyn_cast<NormalProtocolConformance>(
+          conformance.getConcrete()->getRootConformance())) {;
+    // Make sure that the type checker completes this conformance.
+    if (normalConformance->isIncomplete())
+      UsedConformances.insert(normalConformance);
 
-  // Make sure that the type checker completes this conformance.
-  if (normalConformance->isIncomplete())
-    UsedConformances.insert(normalConformance);
-
-  // Record the usage of this conformance in the enclosing source
-  // file.
-  if (auto sf = dc->getParentSourceFile()) {
-    sf->addUsedConformance(normalConformance);
+    // Record the usage of this conformance in the enclosing source
+    // file.
+    if (auto sf = dc->getParentSourceFile()) {
+      sf->addUsedConformance(normalConformance);
+    }
   }
 }
 

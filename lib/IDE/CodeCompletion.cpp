@@ -4212,13 +4212,12 @@ public:
       auto Proto = Conformance->getProtocol();
       if (!Proto->isAccessibleFrom(CurrDeclContext))
         continue;
-      auto NormalConformance = Conformance->getRootNormalConformance();
       for (auto Member : Proto->getMembers()) {
         auto *ATD = dyn_cast<AssociatedTypeDecl>(Member);
         if (!ATD)
           continue;
         // FIXME: Also exclude the type alias that has already been specified.
-        if (!NormalConformance->hasTypeWitness(ATD) ||
+        if (!Conformance->hasTypeWitness(ATD) ||
             !ATD->getDefaultDefinitionLoc().isNull())
           continue;
         addTypeAlias(ATD,

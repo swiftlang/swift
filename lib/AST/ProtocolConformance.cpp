@@ -1055,12 +1055,12 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
 
   // Local function to determine whether we will end up referring to a
   // tentative witness that may not be chosen.
-  auto normal = GenericConformance->getRootNormalConformance();
+  auto root = GenericConformance->getRootConformance();
   auto isTentativeWitness = [&] {
-    if (normal->getState() != ProtocolConformanceState::CheckingTypeWitnesses)
+    if (root->getState() != ProtocolConformanceState::CheckingTypeWitnesses)
       return false;
 
-    return !normal->hasTypeWitness(assocType, nullptr);
+    return !root->hasTypeWitness(assocType, nullptr);
   };
 
   auto genericWitnessAndDecl
