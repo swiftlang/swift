@@ -5,7 +5,7 @@
 // RUN: %FileCheck %s -check-prefix=CORRUPTED < %t/result.txt
 
 // RUN: %target-swift-frontend -emit-module %s -module-name HasArray -o %t -module-cache-path %t/mcp -group-info-path %S/Inputs/group_info.json -emit-module-doc &> %t/result.txt
-// RUN: strings %t/HasArray.swiftdoc > %t/doc_strings.txt
+// RUN: %llvm-strings %t/HasArray.swiftdoc > %t/doc_strings.txt
 // RUN: %FileCheck %s -check-prefix=INCLUDED < %t/doc_strings.txt
 // RUN: %FileCheck %s -check-prefix=EXCLUDED < %t/doc_strings.txt
 
