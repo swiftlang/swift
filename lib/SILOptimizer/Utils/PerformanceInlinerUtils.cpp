@@ -562,33 +562,63 @@ static bool calleeIsSelfRecursive(SILFunction *Callee) {
   return false;
 }
 
-// Returns true if a given apply site should be skipped during the
-// early inlining pass.
-//
-// NOTE: Add here the checks for any specific @_semantics/@_effects
-// attributes causing a given callee to be excluded from the inlining
-// during the early inlining pass.
-static bool shouldSkipApplyDuringEarlyInlining(FullApplySite AI) {
-  // Add here the checks for any specific @_semantics attributes that need
-  // to be skipped during the early inlining pass.
+// Returns true if a given apply site with @_semantics should be inlined during
+// the early inlining pass.
+static bool shouldInlineSemanticApplyDuringEarlyInlining(FullApplySite AI) {
+  // Skip all array semantic calls for various array optimizations.
   ArraySemanticsCall ASC(AI.getInstruction());
   if (ASC)
-    return true;
+    return false;
 
   SILFunction *Callee = AI.getReferencedFunctionOrNull();
-  if (!Callee)
-    return false;
+  assert(Callee && "The caller checks for a known callee.");
 
   if (Callee->hasSemanticsAttr("self_no_escaping_closure") ||
       Callee->hasSemanticsAttr("pair_no_escaping_closure"))
-    return true;
+    return false;
 
-  // Add here the checks for any specific @_effects attributes that need
-  // to be skipped during the early inlining pass.
-  if (Callee->hasEffectsKind())
-    return true;
+  if (Callee->hasSemanticsAttr("inline_late"))
+    return false;
 
-  return false;
+  return true;
+}
+
+// Return true if the given @_semantics call should be inlined.
+bool shouldInlineSemanticCall(FullApplySite AI, InlineSelection WhatToInline) {
+  SILFunction *Callee = AI.getReferencedFunctionOrNull();
+  assert(Callee && "The caller checks for a known callee.");
+
+  switch (WhatToInline) {
+  case InlineSelection::NoSemanticsAndGlobalInit:
+    return shouldInlineSemanticApplyDuringEarlyInlining(AI);
+
+  case InlineSelection::NoGlobalInit:
+    // Don't inline availability checks before serialization.
+    if (Callee->hasSemanticsAttrThatStartsWith("availability")
+        || (Callee->hasSemanticsAttrThatStartsWith("inline_late")))
+      return false;
+
+    // Handle nested semantics. Never inline a semantic call into
+    // another. First, the outer semantic call must be inlined. Then a full
+    // round of mid-level optimizations must rerun (all array
+    // optimizations). Finally the inner semantic call can be
+    // inlined. Afterward, all mid-level optimizations will be rerun yet
+    // again. This relies on no unannotated functions on the call stack between
+    // the outer and inner semantic functions.
+    if (Callee->hasSemanticsAttrs() && AI.getFunction()->hasSemanticsAttrs())
+      return false;
+
+    break;
+  case InlineSelection::Everything: {
+    ModuleDecl *SwiftModule = Callee->getModule().getSwiftModule();
+    bool IsInStdlib =
+        (SwiftModule->isStdlibModule() || SwiftModule->isOnoneSupportModule());
+    if (Callee->hasSemanticsAttrThatStartsWith("inline_late") && IsInStdlib) {
+      return false;
+    }
+  }
+  }
+  return true;
 }
 
 /// Checks if a generic callee and caller have compatible layout constraints.
@@ -635,42 +665,25 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
                                         InlineSelection WhatToInline) {
   SILFunction *Callee = AI.getReferencedFunctionOrNull();
 
-  if (!Callee) {
+  if (!Callee)
     return nullptr;
-  }
 
   // Not all apply sites can be inlined, even if they're direct.
   if (!SILInliner::canInlineApplySite(AI))
     return nullptr;
 
-  ModuleDecl *SwiftModule = Callee->getModule().getSwiftModule();
-  bool IsInStdlib = (SwiftModule->isStdlibModule() ||
-                     SwiftModule->isOnoneSupportModule());
+  // Don't inline functions marked with @_effects in the first inlining pass.
+  if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit
+      && Callee->hasEffectsKind())
+    return nullptr;
 
-  // Don't inline functions that are marked with the @_semantics or @_effects
-  // attribute if the inliner is asked not to inline them.
-  if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
-    if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
-      if (shouldSkipApplyDuringEarlyInlining(AI))
-        return nullptr;
-      if (Callee->hasSemanticsAttr("inline_late"))
-        return nullptr;
-    }
-    // The "availability" semantics attribute is treated like global-init.
-    if (Callee->hasSemanticsAttrs() &&
-        WhatToInline != InlineSelection::Everything &&
-        (Callee->hasSemanticsAttrThatStartsWith("availability") ||
-         (Callee->hasSemanticsAttrThatStartsWith("inline_late")))) {
+  // Check if an @_semantics attribute inhibits inlining.
+  if (Callee->hasSemanticsAttrs()) {
+    if (!shouldInlineSemanticCall(AI, WhatToInline))
       return nullptr;
-    }
-    if (Callee->hasSemanticsAttrs() &&
-        WhatToInline == InlineSelection::Everything) {
-      if (Callee->hasSemanticsAttrThatStartsWith("inline_late") && IsInStdlib) {
-        return nullptr;
-      }
-    }
+  }
 
-  } else if (Callee->isGlobalInit()) {
+  if (Callee->isGlobalInit()) {
     if (WhatToInline != InlineSelection::Everything) {
       return nullptr;
     }
