@@ -110,7 +110,7 @@ public extension Raw {
     return out
   }
 
-  /// Splits a tensor into `num_split` tensors along one dimension.
+  /// Splits a tensor into `numSplit` tensors along one dimension.
   ///
   /// - Parameters:
   ///   - value: The tensor to split.
