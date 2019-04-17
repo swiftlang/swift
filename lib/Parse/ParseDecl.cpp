@@ -5197,12 +5197,22 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       pattern = patternRes.get();
     }
     
+    bool hasOpaqueReturnTy = false;
+    if (auto typedPattern = dyn_cast<TypedPattern>(pattern)) {
+      hasOpaqueReturnTy =
+                        isa<OpaqueReturnTypeRepr>(typedPattern->getTypeRepr());
+    }
+    auto sf = CurDeclContext->getParentSourceFile();
+    
     // Configure all vars with attributes, 'static' and parent pattern.
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
       VD->getAttrs() = Attributes;
       setLocalDiscriminator(VD);
       Decls.push_back(VD);
+      if (hasOpaqueReturnTy && sf) {
+        sf->addUnvalidatedDeclWithOpaqueResultType(VD);
+      }
     });
 
     // Remember this pattern/init pair for our ultimate PatternBindingDecl. The
@@ -6364,6 +6374,13 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
                                                 CurDeclContext,
                                                 nullptr);
   Subscript->getAttrs() = Attributes;
+  
+  // Let the source file track the opaque return type mapping, if any.
+  if (ElementTy.get() && isa<OpaqueReturnTypeRepr>(ElementTy.get())) {
+    if (auto sf = CurDeclContext->getParentSourceFile()) {
+      sf->addUnvalidatedDeclWithOpaqueResultType(Subscript);
+    }
+  }
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
