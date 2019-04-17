@@ -2,9 +2,7 @@
 // RUN: %target-run %t.out
 
 // REQUIRES: executable_test
-// REQUIRES: objc_interop
 // REQUIRES: CPU=arm64 || CPU=x86_64
-// REQUIRES: rdar49026133
 
 //
 // Tests for small strings
@@ -59,6 +57,7 @@ extension _SmallString {
     }
     self = smol
   }
+
   init?(_ codeUnits: Array<UInt16>) {
     let str = codeUnits.withUnsafeBufferPointer {
       return String._uncheckedFromUTF16($0)
@@ -68,14 +67,18 @@ extension _SmallString {
     }
     self.init(str._guts._object)
   }
+
+#if _runtime(_ObjC)
   init?(_cocoaString ns: NSString) {
     guard _isObjCTaggedPointer(ns) else { return nil }
     self.init(taggedCocoa: ns)
   }
+#endif
 
   func _appending(_ other: _SmallString) -> _SmallString? {
     return _SmallString(self, appending: other)
   }
+
   func _repeated(_ n: Int) -> _SmallString? {
     var base = self
     let toAppend = self
@@ -127,6 +130,7 @@ SmallStringTests.test("FitsInSmall") {
 
 }
 
+#if _runtime(_ObjC)
 SmallStringTests.test("Bridging") {
   // Test bridging retains small string form
   func bridge(_ small: _SmallString) -> String {
@@ -144,10 +148,17 @@ SmallStringTests.test("Bridging") {
   }
 
   // Pass tests
-  //
-  expectDoesNotThrow({ try runTestSmall("abc") })
-  expectDoesNotThrow({ try runTestSmall("defghijk") })
-  expectDoesNotThrow({ try runTestSmall("aaaaaaaaaaa") })
+
+  if #available(macOS 10.10, iOS 9, *) {
+    expectDoesNotThrow({ try runTestSmall("abc") })
+    expectDoesNotThrow({ try runTestSmall("defghijk") })
+    expectDoesNotThrow({ try runTestSmall("aaaaaaaaaaa") })
+  } else {
+    // OS X 10.9, iOS 7/8 did not have tagged strings
+    expectThrows("Didn't fit", { try runTestSmall("abc") })
+    expectThrows("Didn't fit", { try runTestSmall("defghijk") })
+    expectThrows("Didn't fit", { try runTestSmall("aaaaaaaaaaa") })
+  }
 
   // Fail tests
   //
@@ -158,6 +169,7 @@ SmallStringTests.test("Bridging") {
   expectThrows("Didn't fit", { try runTestSmall("👨‍👩‍👦") })
   expectThrows("Didn't fit", { try runTestSmall("👨‍👦abcde") })
 }
+#endif
 
 SmallStringTests.test("Append, repeating") {
   let strings = [
