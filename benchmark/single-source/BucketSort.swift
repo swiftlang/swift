@@ -111,7 +111,7 @@ let NUMBUCKETS: Int = 10
 let items: [Int] = {
   var array: [Int]? = [Int]()
   for _ in 0..<NUMITEMS {
-    array!.append( Int(arc4random_uniform( UInt32( MAXBUCKETSIZE ) ) ) )
+    array!.append(Int.random(in: 0..<MAXBUCKETSIZE))
   }
   return array!
 }()
