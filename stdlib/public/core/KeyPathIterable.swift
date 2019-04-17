@@ -104,13 +104,6 @@ extension Array : KeyPathIterable {
   }
 }
 
-extension Array.DifferentiableView : KeyPathIterable {
-  public typealias AllKeyPaths = [PartialKeyPath<Array.DifferentiableView>]
-  public var allKeyPaths: [PartialKeyPath<Array.DifferentiableView>] {
-    return array.indices.map { \Array.DifferentiableView.array[$0] }
-  }
-}
-
 extension Dictionary : KeyPathIterable {
   public typealias AllKeyPaths = [PartialKeyPath<Dictionary>]
   public var allKeyPaths: [PartialKeyPath<Dictionary>] {

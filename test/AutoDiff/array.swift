@@ -11,9 +11,10 @@ ArrayAutodiffTests.test("ArrayIdentity") {
     return x
   }
 
+  let backprop = pullback(at: [5, 6, 7, 8], in: arrayIdentity)
   expectEqual(
     FloatArrayGrad([1, 2, 3, 4]),
-    pullback(at: [5, 6, 7, 8], in: arrayIdentity)(FloatArrayGrad([1, 2, 3, 4])))
+    backprop(FloatArrayGrad([1, 2, 3, 4])))
 }
 
 ArrayAutodiffTests.test("ArraySubscript") {
@@ -38,14 +39,26 @@ ArrayAutodiffTests.test("ArrayConcat") {
   }
 
   expectEqual(
-    TwoArrays.CotangentVector(a: FloatArrayGrad([1, 1]), b: FloatArrayGrad([1, 0])),
-    gradient(at: TwoArrays(a: [0, 0], b: [0, 0]), in: sumFirstThreeConcatted))
+    TwoArrays.CotangentVector(
+      a: FloatArrayGrad([1, 1]),
+      b: FloatArrayGrad([1, 0])),
+    gradient(
+      at: TwoArrays(a: [0, 0], b: [0, 0]),
+      in: sumFirstThreeConcatted))
   expectEqual(
-    TwoArrays.CotangentVector(a: FloatArrayGrad([1, 1, 1, 0]), b: FloatArrayGrad([0, 0])),
-    gradient(at: TwoArrays(a: [0, 0, 0, 0], b: [0, 0]), in: sumFirstThreeConcatted))
+    TwoArrays.CotangentVector(
+      a: FloatArrayGrad([1, 1, 1, 0]),
+      b: FloatArrayGrad([0, 0])),
+    gradient(
+      at: TwoArrays(a: [0, 0, 0, 0], b: [0, 0]),
+      in: sumFirstThreeConcatted))
   expectEqual(
-    TwoArrays.CotangentVector(a: FloatArrayGrad([]), b: FloatArrayGrad([1, 1, 1, 0])),
-    gradient(at: TwoArrays(a: [], b: [0, 0, 0, 0]), in: sumFirstThreeConcatted))
+    TwoArrays.CotangentVector(
+      a: FloatArrayGrad([]),
+      b: FloatArrayGrad([1, 1, 1, 0])),
+    gradient(
+      at: TwoArrays(a: [], b: [0, 0, 0, 0]),
+      in: sumFirstThreeConcatted))
 }
 
 ArrayAutodiffTests.test("Array.DifferentiableView.init") {
@@ -60,16 +73,30 @@ ArrayAutodiffTests.test("Array.DifferentiableView.init") {
     backprop(FloatArrayGrad([1, 2, 3, 4])))
 }
 
-ArrayAutodiffTests.test("Array.DifferentiableView.array") {
+ArrayAutodiffTests.test("Array.DifferentiableView.base") {
   @differentiable
-  func accessArray(_ x: Array<Float>.DifferentiableView) -> [Float] {
-    return x.array
+  func accessBase(_ x: Array<Float>.DifferentiableView) -> [Float] {
+    return x.base
   }
 
-  let backprop = pullback(at: Array<Float>.DifferentiableView([5, 6, 7, 8]), in: accessArray)
+  let backprop = pullback(
+    at: Array<Float>.DifferentiableView([5, 6, 7, 8]),
+    in: accessBase)
   expectEqual(
     FloatArrayGrad([1, 2, 3, 4]),
     backprop(FloatArrayGrad([1, 2, 3, 4])))
+}
+
+ArrayAutodiffTests.test("Array.DifferentiableView : KeyPathIterable") {
+  struct Container : KeyPathIterable {
+    let a: Array<Float>.DifferentiableView
+  }
+  let container = Container(a: Array<Float>.DifferentiableView([1, 2, 3]))
+  expectEqual(
+    [1, 2, 3],
+    container.recursivelyAllKeyPaths(to: Float.self).map {
+      container[keyPath: $0]
+    })
 }
 
 runAllTests()
