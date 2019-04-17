@@ -147,14 +147,20 @@ extension PythonObject : CustomReflectable {
 //===----------------------------------------------------------------------===//
 
 public protocol PythonConvertible {
+  /// A `PythonObject` instance representing this value.
+  var pythonObject: PythonObject { get }
+}
+
+//===----------------------------------------------------------------------===//
+// `PythonConvertible` protocol
+//===----------------------------------------------------------------------===//
+
+public protocol ConvertibleFromPython {
   /// Creates a new instance from the given `PythonObject`, if possible.
   /// - Note: Conversion may fail if the given `PythonObject` instance is
   ///   incompatible (e.g. a Python `string` object cannot be converted into an
   ///   `Int`).
   init?(_ object: PythonObject)
-
-  /// A `PythonObject` instance representing this value.
-  var pythonObject: PythonObject { get }
 }
 
 public extension PythonObject {
@@ -177,7 +183,7 @@ fileprivate extension PythonConvertible {
 }
 
 // `PythonObject` is trivially `PythonConvertible`.
-extension PythonObject : PythonConvertible {
+extension PythonObject : PythonConvertible, ConvertibleFromPython {
   public init(_ object: PythonObject) {
     self.init(consuming: object.ownedPyObject)
   }
@@ -747,7 +753,7 @@ private func isType(_ object: PythonObject,
   return pyObject != _Py_ZeroStruct
 }
 
-extension Bool : PythonConvertible {
+extension Bool : PythonConvertible, ConvertibleFromPython {
   public init?(_ pythonObject: PythonObject) {
     guard isType(pythonObject, type: PyBool_Type) else { return nil }
 
@@ -763,7 +769,7 @@ extension Bool : PythonConvertible {
   }
 }
 
-extension String : PythonConvertible {
+extension String : PythonConvertible, ConvertibleFromPython {
   public init?(_ pythonObject: PythonObject) {
     let pyObject = pythonObject.ownedPyObject
     defer { Py_DecRef(pyObject) }
@@ -808,7 +814,7 @@ fileprivate extension PythonObject {
   }
 }
 
-extension Int : PythonConvertible {
+extension Int : PythonConvertible, ConvertibleFromPython {
   public init?(_ pythonObject: PythonObject) {
     // `PyInt_AsLong` return -1 and sets an error if the Python object is not
     // integer compatible.
@@ -825,7 +831,7 @@ extension Int : PythonConvertible {
   }
 }
 
-extension UInt : PythonConvertible {
+extension UInt : PythonConvertible, ConvertibleFromPython {
   public init?(_ pythonObject: PythonObject) {
     // `PyInt_AsUnsignedLongMask` isn't documented as such, but in fact it does
     // return -1 and set an error if the Python object is not integer
@@ -843,7 +849,7 @@ extension UInt : PythonConvertible {
   }
 }
 
-extension Double : PythonConvertible {
+extension Double : PythonConvertible, ConvertibleFromPython {
   public init?(_ pythonObject: PythonObject) {
     // `PyFloat_AsDouble` return -1 and sets an error if the Python object is
     // not float compatible.
@@ -867,7 +873,7 @@ extension Double : PythonConvertible {
 // Any `FixedWidthInteger` type is `PythonConvertible` via the `Int`/`UInt`
 // implementation.
 
-extension Int8 : PythonConvertible {
+extension Int8 : PythonConvertible, ConvertibleFromPython {
   public init?(_ pythonObject: PythonObject) {
     guard let i = Int(pythonObject) else { return nil }
     self.init(i)
@@ -878,7 +884,7 @@ extension Int8 : PythonConvertible {
   }
 }
 
-extension Int16 : PythonConvertible {
+extension Int16 : PythonConvertible, ConvertibleFromPython {
   public init?(_ pythonObject: PythonObject) {
     guard let i = Int(pythonObject) else { return nil }
     self.init(i)
@@ -889,7 +895,7 @@ extension Int16 : PythonConvertible {
   }
 }
 
-extension Int32 : PythonConvertible {
+extension Int32 : PythonConvertible, ConvertibleFromPython {
   public init?(_ pythonObject: PythonObject) {
     guard let i = Int(pythonObject) else { return nil }
     self.init(i)
@@ -900,7 +906,7 @@ extension Int32 : PythonConvertible {
   }
 }
 
-extension Int64 : PythonConvertible {
+extension Int64 : PythonConvertible, ConvertibleFromPython {
   public init?(_ pythonObject: PythonObject) {
     guard let i = Int(pythonObject) else { return nil }
     self.init(i)
@@ -911,7 +917,7 @@ extension Int64 : PythonConvertible {
   }
 }
 
-extension UInt8 : PythonConvertible {
+extension UInt8 : PythonConvertible, ConvertibleFromPython {
   public init?(_ pythonObject: PythonObject) {
     guard let i = UInt(pythonObject) else { return nil }
     self.init(i)
@@ -922,7 +928,7 @@ extension UInt8 : PythonConvertible {
   }
 }
 
-extension UInt16 : PythonConvertible {
+extension UInt16 : PythonConvertible, ConvertibleFromPython {
   public init?(_ pythonObject: PythonObject) {
     guard let i = UInt(pythonObject) else { return nil }
     self.init(i)
@@ -933,7 +939,7 @@ extension UInt16 : PythonConvertible {
   }
 }
 
-extension UInt32 : PythonConvertible {
+extension UInt32 : PythonConvertible, ConvertibleFromPython {
   public init?(_ pythonObject: PythonObject) {
     guard let i = UInt(pythonObject) else { return nil }
     self.init(i)
@@ -944,7 +950,7 @@ extension UInt32 : PythonConvertible {
   }
 }
 
-extension UInt64 : PythonConvertible {
+extension UInt64 : PythonConvertible, ConvertibleFromPython {
   public init?(_ pythonObject: PythonObject) {
     guard let i = UInt(pythonObject) else { return nil }
     self.init(i)
@@ -957,7 +963,7 @@ extension UInt64 : PythonConvertible {
 
 // `Float` is `PythonConvertible` via the `Double` implementation.
 
-extension Float : PythonConvertible {
+extension Float : PythonConvertible, ConvertibleFromPython {
   public init?(_ pythonObject: PythonObject) {
     guard let v = Double(pythonObject) else { return nil }
     self.init(v)
@@ -973,6 +979,17 @@ extension Float : PythonConvertible {
 //===----------------------------------------------------------------------===//
 
 extension Optional : PythonConvertible where Wrapped : PythonConvertible {
+  public var pythonObject: PythonObject {
+    return self?.pythonObject ?? Python.None
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// `ConvertibleFromPython` conformance for `Optional`
+//===----------------------------------------------------------------------===//
+
+extension Optional : ConvertibleFromPython
+  where Wrapped : ConvertibleFromPython {
   public init?(_ object: PythonObject) {
     if object == Python.None {
       self = .none
@@ -983,27 +1000,16 @@ extension Optional : PythonConvertible where Wrapped : PythonConvertible {
       self = .some(converted)
     }
   }
-
-  public var pythonObject: PythonObject {
-    return self?.pythonObject ?? Python.None
-  }
 }
 
 //===----------------------------------------------------------------------===//
-// `PythonConvertible` conformance for `Array` and `Dictionary`
+// `PythonConvertible` and `ConvertibleFromPython conformance for
+// `Array` and `Dictionary`
 //===----------------------------------------------------------------------===//
 
 // `Array` conditionally conforms to `PythonConvertible` if the `Element`
 // associated type does.
 extension Array : PythonConvertible where Element : PythonConvertible {
-  public init?(_ pythonObject: PythonObject) {
-    self = []
-    for elementObject in pythonObject {
-      guard let element = Element(elementObject) else { return nil }
-      append(element)
-    }
-  }
-
   public var pythonObject: PythonObject {
     _ = Python // Ensure Python is initialized.
     let list = PyList_New(count)!
@@ -1015,10 +1021,36 @@ extension Array : PythonConvertible where Element : PythonConvertible {
   }
 }
 
+extension Array : ConvertibleFromPython where Element : ConvertibleFromPython {
+  public init?(_ pythonObject: PythonObject) {
+    self = []
+    for elementObject in pythonObject {
+      guard let element = Element(elementObject) else { return nil }
+      append(element)
+    }
+  }
+}
+
 // `Dictionary` conditionally conforms to `PythonConvertible` if the `Key` and
 // `Value` associated types do.
 extension Dictionary : PythonConvertible
   where Key : PythonConvertible, Value : PythonConvertible {
+  public var pythonObject: PythonObject {
+    _ = Python // Ensure Python is initialized.
+    let dict = PyDict_New()!
+    for (key, value) in self {
+      let k = key.ownedPyObject
+      let v = value.ownedPyObject
+      PyDict_SetItem(dict, k, v)
+      Py_DecRef(k)
+      Py_DecRef(v)
+    }
+    return PythonObject(consuming: dict)
+  }
+}
+
+extension Dictionary : ConvertibleFromPython
+  where Key : ConvertibleFromPython, Value : ConvertibleFromPython {
   public init?(_ pythonDict: PythonObject) {
     self = [:]
 
@@ -1042,26 +1074,21 @@ extension Dictionary : PythonConvertible
       }
     }
   }
-
-  public var pythonObject: PythonObject {
-    _ = Python // Ensure Python is initialized.
-    let dict = PyDict_New()!
-    for (key, value) in self {
-      let k = key.ownedPyObject
-      let v = value.ownedPyObject
-      PyDict_SetItem(dict, k, v)
-      Py_DecRef(k)
-      Py_DecRef(v)
-    }
-    return PythonObject(consuming: dict)
-  }
 }
 
 //===----------------------------------------------------------------------===//
-// `PythonConvertible` conformance for `Range` types
+// `PythonConvertible` and `ConvertibleFromPython` conformances
+// for `Range` types
 //===----------------------------------------------------------------------===//
 
 extension Range : PythonConvertible where Bound : PythonConvertible {
+  public var pythonObject: PythonObject {
+    _ = Python // Ensure Python is initialized.
+    return Python.slice(lowerBound, upperBound, Python.None)
+  }
+}
+
+extension Range : ConvertibleFromPython where Bound : ConvertibleFromPython {
   public init?(_ pythonObject: PythonObject) {
     guard isType(pythonObject, type: PySlice_Type) else { return nil }
     guard let lowerBound = Bound(pythonObject.start),
@@ -1071,14 +1098,17 @@ extension Range : PythonConvertible where Bound : PythonConvertible {
     guard pythonObject.step == Python.None else { return nil }
     self.init(uncheckedBounds: (lowerBound, upperBound))
   }
-
-  public var pythonObject: PythonObject {
-    _ = Python // Ensure Python is initialized.
-    return Python.slice(lowerBound, upperBound, Python.None)
-  }
 }
 
 extension PartialRangeFrom : PythonConvertible where Bound : PythonConvertible {
+  public var pythonObject: PythonObject {
+    _ = Python // Ensure Python is initialized.
+    return Python.slice(lowerBound, Python.None, Python.None)
+  }
+}
+
+extension PartialRangeFrom : ConvertibleFromPython
+  where Bound : ConvertibleFromPython {
   public init?(_ pythonObject: PythonObject) {
     guard isType(pythonObject, type: PySlice_Type) else { return nil }
     guard let lowerBound = Bound(pythonObject.start) else { return nil }
@@ -1088,14 +1118,17 @@ extension PartialRangeFrom : PythonConvertible where Bound : PythonConvertible {
     }
     self.init(lowerBound)
   }
-
-  public var pythonObject: PythonObject {
-    _ = Python // Ensure Python is initialized.
-    return Python.slice(lowerBound, Python.None, Python.None)
-  }
 }
 
 extension PartialRangeUpTo : PythonConvertible where Bound : PythonConvertible {
+  public var pythonObject: PythonObject {
+    _ = Python // Ensure Python is initialized.
+    return Python.slice(Python.None, upperBound, Python.None)
+  }
+}
+
+extension PartialRangeUpTo : ConvertibleFromPython
+  where Bound : ConvertibleFromPython {
   public init?(_ pythonObject: PythonObject) {
     guard isType(pythonObject, type: PySlice_Type) else { return nil }
     guard let upperBound = Bound(pythonObject.stop) else { return nil }
@@ -1104,11 +1137,6 @@ extension PartialRangeUpTo : PythonConvertible where Bound : PythonConvertible {
        return nil
     }
     self.init(upperBound)
-  }
-
-  public var pythonObject: PythonObject {
-    _ = Python // Ensure Python is initialized.
-    return Python.slice(Python.None, upperBound, Python.None)
   }
 }
 

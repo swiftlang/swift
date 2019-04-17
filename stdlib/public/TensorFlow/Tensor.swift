@@ -95,9 +95,9 @@ func _TFGetScalar<Scalar : TensorFlowScalar>(
 @usableFromInline @inline(never)
 @_silgen_name("__tf_tensor_from_scalars")
 func _TFTensorFromScalars<Scalar : TensorFlowScalar>(
-  _ scalars: [Scalar], shape: [Int32]
+  _ scalars: [Scalar], shape: [Int]
 ) -> TensorHandle<Scalar> {
-  let contiguousSize = shape.map(Int.init).reduce(1, *)
+  let contiguousSize = shape.reduce(1, *)
   precondition(scalars.count == contiguousSize,
                "The number of scalars does not match the shape.")
   return TensorHandle(
@@ -139,7 +139,7 @@ func _TFTensorFromScalar<Scalar : TensorFlowScalar>(
 @_silgen_name("__tf_tensor_from_scalars_1d")
 func _TFTensorFromScalars1D<Scalar : TensorFlowScalar>(_ scalars: [Scalar])
   -> TensorHandle<Scalar> {
-  return _TFTensorFromScalars(scalars, shape: [Int32(scalars.count)])
+  return _TFTensorFromScalars(scalars, shape: [scalars.count])
 }
 
 @inlinable @inline(__always)
@@ -254,7 +254,7 @@ public extension Tensor {
   init<C : RandomAccessCollection>(_ vector: C) where C.Element == Scalar {
     let handle = _TFHoistable {
       TensorHandle<Scalar>(
-        shape: [Int32(vector.count)],
+        shape: [vector.count],
         scalarsInitializer: { addr in
           var currentAddr = addr
           for scalar in vector {
@@ -300,7 +300,7 @@ public extension Tensor {
         shape: shape.dimensions,
         scalarsInitializer: { addr in
           addr.initialize(from: scalars.baseAddress!,
-                          count: Int(shape.contiguousSize))
+                          count: shape.contiguousSize)
         }
       )
     }
@@ -337,7 +337,8 @@ public extension Tensor {
 }
 
 public extension Tensor {
-  /// Creates a tensor with the specified shape and a single, repeated scalar value.
+  /// Creates a tensor with the specified shape and a single, repeated scalar
+  /// value.
   ///
   /// - Parameters:
   ///   - shape: The dimensions of the tensor.
@@ -357,7 +358,7 @@ public extension Tensor {
   @differentiable(vjp: _vjpInit(repeating:shape:)
                   where Scalar : TensorFlowFloatingPoint)
   init(repeating repeatedValue: Scalar, shape: TensorShape) {
-    self = Raw.fill(dims: Tensor<Int32>(shape.dimensions),
+    self = Raw.fill(dims: Tensor<Int64>(shape.dimensions.map(Int64.init)),
                     value: Tensor(repeatedValue))
   }
 }
@@ -378,7 +379,7 @@ public extension Tensor {
   /// all dimensions being 1.
   @inlinable @inline(__always)
   // @differentiable(where Scalar : TensorFlowFloatingPoint)
-  init(broadcasting scalar: Scalar, rank: Int32) {
+  init(broadcasting scalar: Scalar, rank: Int) {
     self = Tensor(scalar).reshaped(to: TensorShape(repeating: 1, count: rank))
   }
 
@@ -526,11 +527,11 @@ extension Tensor : ExpressibleByArrayLiteral {
 public extension Tensor {
   /// The number of dimensions of the `Tensor`.
   @inlinable
-  var rank: Int32 {
+  var rank: Int {
     @inline(__always)
     @_semantics("autodiff.nonvarying")
     get {
-      return _TFGetScalarOrDie(rankTensor.handle)
+      return Int(_TFGetScalarOrDie(rankTensor.handle))
     }
   }
 
@@ -540,16 +541,16 @@ public extension Tensor {
     @inline(__always)
     @_semantics("autodiff.nonvarying")
     get {
-      return TensorShape(shapeTensor.scalars)
+      return TensorShape(shapeTensor.scalars.map(Int.init))
     }
   }
 
   /// The number of scalars in the `Tensor`.
   @inlinable
-  var scalarCount: Int32 {
+  var scalarCount: Int {
     @inline(__always)
     get {
-      return _TFGetScalarOrDie(scalarCountTensor.handle)
+      return Int(_TFGetScalarOrDie(scalarCountTensor.handle))
     }
   }
 }
@@ -623,11 +624,11 @@ public extension Tensor where Scalar : Numeric {
   ///   - axis: The axis to fill. The default is `-1`, a new inner-most axis.
   ///
   @inlinable @inline(__always)
-  init(oneHotAtIndices indices: Tensor<Int32>, depth: Int32,
+  init(oneHotAtIndices indices: Tensor<Int32>, depth: Int,
        onValue: Scalar = 1, offValue: Scalar = 0, axis: Int = -1) {
     self = Raw.oneHot(
       indices: indices,
-      depth: Tensor<Int32>(depth),
+      depth: Tensor<Int32>(Int32(depth)),
       onValue: Tensor(onValue),
       offValue: Tensor(offValue),
       axis: Int64(axis)
@@ -643,10 +644,8 @@ public extension TensorFlowScalar {
   /// Convert to a tensor with the specified rank, with all dimensions equal to
   /// 1.
   @inlinable @inline(__always)
-  func makeTensor(rank: Int32) -> Tensor<Self> {
-    return Raw.fill(
-      dims: Tensor<Int32>(ones: TensorShape(rank)),
-      value: Tensor(self))
+  func makeTensor(rank: Int) -> Tensor<Self> {
+    return Tensor(repeating: self, shape: TensorShape(rank))
   }
 }
 
@@ -664,7 +663,8 @@ public extension Tensor {
   @inlinable @inline(__always)
   @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func reshaped(to newShape: TensorShape) -> Tensor {
-    return reshaped(toShape: Tensor<Int32>(newShape.dimensions))
+    // TODO(TF-433): Remove workaround for differentiating `map`.
+    return reshaped(toShape: Tensor<Int32>({newShape.dimensions.map(Int32.init)}()))
   }
 
   /// Reshape to the specified `Tensor` representing a shape.
@@ -700,8 +700,8 @@ public extension Tensor {
     wrt: self, vjp: _vjpExpandingShape(at:)
     where Scalar : TensorFlowFloatingPoint
   )
-  func expandingShape(at shapeIndex: Int32) -> Tensor {
-    return Raw.expandDims(self, dim: Tensor<Int32>(shapeIndex))
+  func expandingShape(at shapeIndex: Int) -> Tensor {
+    return Raw.expandDims(self, dim: Tensor<Int32>(Int32(shapeIndex)))
   }
 
   /// Remove the specified dimensions of size 1 from the shape of a tensor. If
@@ -709,7 +709,7 @@ public extension Tensor {
   /// removed.
   @inlinable @inline(__always)
   @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
-  func squeezingShape(at axes: Int32...) -> Tensor {
+  func squeezingShape(at axes: Int...) -> Tensor {
     return squeezingShape(at: axes)
   }
 
@@ -721,8 +721,8 @@ public extension Tensor {
     wrt: self, vjp: _vjpSqueezingShape(at:)
     where Scalar : TensorFlowFloatingPoint
   )
-  func squeezingShape(at axes: [Int32]) -> Tensor {
-    return Raw.squeeze(self, squeezeDims: axes)
+  func squeezingShape(at axes: [Int]) -> Tensor {
+    return Raw.squeeze(self, squeezeDims: axes.map(Int32.init))
   }
 
   /// Reshape to scalar.

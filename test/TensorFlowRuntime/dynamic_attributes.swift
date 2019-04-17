@@ -32,9 +32,9 @@ func loadDtypeDouble() -> TensorDataType {
   return dtypeDouble
 }
 
-var stridesInt32 = (Int32(1), Int32(1), Int32(1), Int32(1))
+var stridesInt32 = [Int32(1), Int32(1), Int32(1), Int32(1)]
 @inline(never)
-func loadStridesInt32() -> (Int32, Int32, Int32, Int32) {
+func loadStridesInt32() -> [Int32] {
   return stridesInt32
 }
 
@@ -259,9 +259,10 @@ DynamicAttributeTests.testAllBackends("NormalAttribute Array<Bool>") {
 }
 
 DynamicAttributeTests.testAllBackends("NormalAttribute Array<Int32>") {
-  let result = convImage.convolved2D(withFilter: convFilter,
-                                     strides: loadStridesInt32(),
-                                     padding: .valid)
+  let result: Tensor<Float> = #tfop("Conv2D", convImage, convFilter,
+                                    T$dtype: Float.tensorFlowDataType,
+                                    strides: loadStridesInt32(),
+                                    padding: "VALID")
   expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
 

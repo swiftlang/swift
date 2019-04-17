@@ -725,7 +725,7 @@ extension ShapedArray where Scalar : TensorFlowScalar {
         Int32.max.
         """)
       return TensorHandle<Scalar>(
-        shape: shape.map(Int32.init),
+        shape: shape,
         scalarsInitializer: { addr in
           addr.initialize(from: box.array, count: scalarCount)
         }
