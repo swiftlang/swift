@@ -5351,7 +5351,8 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
                         (ConformanceCheckFlags::Used|
                          ConformanceCheckFlags::SkipConditionalRequirements),
                          SourceLoc())) {
-      if (auto *conformance = ref->getConcrete()->getRootNormalConformance()) {
+      if (auto *conformance = dyn_cast<NormalProtocolConformance>(
+            ref->getConcrete()->getRootConformance())) {
         if (conformance->getState() == ProtocolConformanceState::Incomplete) {
           checkConformance(conformance);
         }

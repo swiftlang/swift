@@ -905,7 +905,7 @@ getWitnessMethodSubstitutions(
   auto baseSubMap = conformance->getSubstitutions(mod);
 
   unsigned baseDepth = 0;
-  auto *rootConformance = conformance->getRootNormalConformance();
+  auto *rootConformance = conformance->getRootConformance();
   if (auto *witnessSig = rootConformance->getGenericSignature())
     baseDepth = witnessSig->getGenericParams().back()->getDepth() + 1;
 

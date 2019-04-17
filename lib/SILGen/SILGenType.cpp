@@ -382,8 +382,7 @@ public:
   IsSerialized_t Serialized;
 
   SILGenConformance(SILGenModule &SGM, NormalProtocolConformance *C)
-    // We only need to emit witness tables for base NormalProtocolConformances.
-    : SGM(SGM), Conformance(C->getRootNormalConformance()),
+    : SGM(SGM), Conformance(C),
       Linkage(getLinkageForProtocolConformance(Conformance,
                                                ForDefinition)),
       Serialized(isConformanceSerialized(Conformance))
@@ -454,11 +453,11 @@ public:
     });
 
     // Emit the witness table for the base conformance if it is shared.
-    if (getLinkageForProtocolConformance(
-                                        conformance->getRootNormalConformance(),
-                                        NotForDefinition)
+    auto *normal = conformance->getRootNormalConformance();
+
+    if (getLinkageForProtocolConformance(normal, NotForDefinition)
           == SILLinkage::Shared)
-      SGM.getWitnessTable(conformance->getRootNormalConformance());
+      SGM.getWitnessTable(normal);
   }
 
   Witness getWitness(ValueDecl *decl) {
@@ -571,20 +570,18 @@ getWitnessTableToInsertAfter(SILGenModule &SGM,
 }
 
 SILWitnessTable *
-SILGenModule::getWitnessTable(ProtocolConformance *conformance) {
-  auto normal = conformance->getRootNormalConformance();
-
+SILGenModule::getWitnessTable(NormalProtocolConformance *conformance) {
   // If we've already emitted this witness table, return it.
-  auto found = emittedWitnessTables.find(normal);
+  auto found = emittedWitnessTables.find(conformance);
   if (found != emittedWitnessTables.end())
     return found->second;
 
-  SILWitnessTable *table = SILGenConformance(*this, normal).emit();
-  emittedWitnessTables.insert({normal, table});
+  SILWitnessTable *table = SILGenConformance(*this, conformance).emit();
+  emittedWitnessTables.insert({conformance, table});
 
   // If we delayed emission of this witness table, move it to its rightful
   // place within the module.
-  auto foundDelayed = delayedConformances.find(normal);
+  auto foundDelayed = delayedConformances.find(conformance);
   if (foundDelayed != delayedConformances.end()) {
     M.witnessTables.remove(table);
     auto insertAfter = getWitnessTableToInsertAfter(*this,
@@ -597,7 +594,7 @@ SILGenModule::getWitnessTable(ProtocolConformance *conformance) {
   } else {
     // We would have marked a delayed conformance as "last emitted" when it
     // was delayed.
-    lastEmittedConformance = normal;
+    lastEmittedConformance = conformance;
   }
   return table;
 }
@@ -978,9 +975,10 @@ public:
     // are existential and do not have witness tables.
     for (auto *conformance : theType->getLocalConformances(
                                ConformanceLookupKind::All, nullptr)) {
-      if (conformance->isComplete() &&
-          isa<NormalProtocolConformance>(conformance))
-        SGM.getWitnessTable(conformance);
+      if (conformance->isComplete()) {
+        if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
+          SGM.getWitnessTable(normal);
+      }
     }
   }
 
@@ -1079,9 +1077,10 @@ public:
       for (auto *conformance : e->getLocalConformances(
                                  ConformanceLookupKind::All,
                                  nullptr)) {
-        if (conformance->isComplete() &&
-            isa<NormalProtocolConformance>(conformance))
-          SGM.getWitnessTable(conformance);
+        if (conformance->isComplete()) {
+          if (auto *normal =dyn_cast<NormalProtocolConformance>(conformance))
+            SGM.getWitnessTable(normal);
+        }
       }
     }
   }
