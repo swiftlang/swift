@@ -1823,8 +1823,8 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
       DebugInfo->emitImport(cast<ImportDecl>(D));
     return;
 
-  // We emit these as part of the PatternBindingDecl.
   case DeclKind::Var:
+    emitAbstractStorageDecl(cast<AbstractStorageDecl>(D));
     return;
 
   case DeclKind::Accessor:
@@ -3730,6 +3730,9 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
 
     case DeclKind::Var:
     case DeclKind::Subscript:
+      emitAbstractStorageDecl(cast<AbstractStorageDecl>(member));
+      continue;
+        
     case DeclKind::PatternBinding:
     case DeclKind::Accessor:
     case DeclKind::Constructor:
