@@ -1119,7 +1119,9 @@ namespace {
     }
 
   public:
-    ConstraintGenerator(ConstraintSystem &CS) : CS(CS), CurDC(CS.DC) { }
+    ConstraintGenerator(ConstraintSystem &CS, DeclContext *DC)
+      : CS(CS), CurDC(DC ? DC : CS.DC) { }
+
     virtual ~ConstraintGenerator() {
       // We really ought to have this assertion:
       //   assert(DCStack.empty() && CurDC == CS.DC);
@@ -3045,8 +3047,7 @@ namespace {
 
     Type visitTapExpr(TapExpr *expr) {
       DeclContext *varDC = expr->getVar()->getDeclContext();
-      assert(varDC == CS.DC || (varDC && isa<AbstractClosureExpr>(varDC) &&
-              cast<AbstractClosureExpr>(varDC)->hasSingleExpressionBody()) &&
+      assert(varDC == CS.DC || (varDC && isa<AbstractClosureExpr>(varDC)) &&
              "TapExpr var should be in the same DeclContext we're checking it in!");
       
       auto locator = CS.getConstraintLocator(expr);
@@ -3606,7 +3607,7 @@ namespace {
 
 } // end anonymous namespace
 
-Expr *ConstraintSystem::generateConstraints(Expr *expr) {
+Expr *ConstraintSystem::generateConstraints(Expr *expr, DeclContext *dc) {
   // Remove implicit conversions from the expression.
   expr = expr->walk(SanitizeExpr(*this));
 
@@ -3614,7 +3615,7 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   expr->walk(ArgumentLabelWalker(*this, expr));
 
   // Walk the expression, generating constraints.
-  ConstraintGenerator cg(*this);
+  ConstraintGenerator cg(*this, dc);
   ConstraintWalker cw(cg);
   
   Expr* result = expr->walk(cw);
@@ -3627,7 +3628,7 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
 
 Type ConstraintSystem::generateConstraints(Pattern *pattern,
                                            ConstraintLocatorBuilder locator) {
-  ConstraintGenerator cg(*this);
+  ConstraintGenerator cg(*this, nullptr);
   return cg.getTypeForPattern(pattern, locator);
 }
 
