@@ -1007,6 +1007,16 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
         }
       }
 
+      // If the parameter has a function builder type and the argument is a
+      // closure, apply the function builder transformation.
+      if (Type functionBuilderType
+              = paramInfo.getFunctionBuilderType(paramIdx)) {
+        Expr *arg = getArgumentExpr(locator.getAnchor(), argIdx);
+        if (auto closure = dyn_cast_or_null<ClosureExpr>(arg)) {
+          cs.applyFunctionBuilder(closure, functionBuilderType, locator);
+        }
+      }
+
       // If argument comes for declaration it should loose
       // `@autoclosure` flag, because in context it's used
       // as a function type represented by autoclosure.

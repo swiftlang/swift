@@ -172,6 +172,13 @@ Solution ConstraintSystem::finalize() {
   for (auto &e : CheckedConformances)
     solution.Conformances.push_back({e.first, e.second});
 
+  for (const auto &transformed : builderTransformedClosures) {
+    solution.builderTransformedClosures.insert(
+      std::make_pair(std::get<0>(transformed),
+                     std::make_pair(std::get<1>(transformed),
+                                    std::get<2>(transformed))));
+  }
+
   return solution;
 }
 
@@ -237,6 +244,13 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   for (auto &conformance : solution.Conformances)
     CheckedConformances.push_back(conformance);
 
+  for (const auto &transformed : solution.builderTransformedClosures) {
+    builderTransformedClosures.push_back(
+      std::make_tuple(transformed.first,
+                      transformed.second.first,
+                      transformed.second.second));
+  }
+    
   // Register any fixes produced along this path.
   Fixes.append(solution.Fixes.begin(), solution.Fixes.end());
 
@@ -432,6 +446,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numMissingMembers = cs.MissingMembers.size();
   numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
   numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
+  numBuilderTransformedClosures = cs.builderTransformedClosures.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -485,6 +500,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any missing members found along the current path.
   truncate(cs.MissingMembers, numMissingMembers);
+
+  /// Remove any builder transformed closures.
+  truncate(cs.builderTransformedClosures, numBuilderTransformedClosures);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;

@@ -734,6 +734,7 @@ ParameterListInfo::ParameterListInfo(
     const ValueDecl *paramOwner,
     bool skipCurriedSelf) {
   defaultArguments.resize(params.size());
+  functionBuilderTypes.resize(params.size());
 
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
@@ -777,10 +778,15 @@ ParameterListInfo::ParameterListInfo(
     break;
   }
 
-  // Note which parameters have default arguments.
+  // Note which parameters have default arguments and/or function builders.
   for (auto i : range(0, params.size())) {
-    if (paramList->get(i)->isDefaultArgument()) {
+    auto param = paramList->get(i);
+    if (param->isDefaultArgument()) {
       defaultArguments.set(i);
+    }
+
+    if (Type functionBuilderType = param->getFunctionBuilderType()) {
+      functionBuilderTypes[i] = functionBuilderType;
     }
   }
 }
@@ -788,6 +794,12 @@ ParameterListInfo::ParameterListInfo(
 bool ParameterListInfo::hasDefaultArgument(unsigned paramIdx) const {
   return paramIdx < defaultArguments.size() ? defaultArguments[paramIdx]
       : false;
+}
+
+Type ParameterListInfo::getFunctionBuilderType(unsigned paramIdx) const {
+  return paramIdx < functionBuilderTypes.size()
+      ? functionBuilderTypes[paramIdx]
+      : Type();
 }
 
 /// Turn a param list into a symbolic and printable representation that does not
