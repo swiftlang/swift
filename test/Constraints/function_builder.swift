@@ -22,16 +22,22 @@ struct TupleBuilder {
   ) -> (T1, T2, T3, T4, T5) {
     return (t1, t2, t3, t4, t5)
   }
+
+  static func buildDo<T>(_ value: T) -> T { return value }
 }
 
 func tuplify<T>(@TupleBuilder body: () -> T) {
   print(body())
 }
 
-// CHECK: (17, 3.14159, "Hello, DSL")
+// CHECK: (17, 3.14159, "Hello, DSL", (["nested", "do"], 6))
 let name = "dsl"
 tuplify {
   17
   3.14159
   "Hello, \(name.map { $0.uppercased() }.joined())"
+  do {
+    ["nested", "do"]
+    1 + 2 + 3
+  }
 }

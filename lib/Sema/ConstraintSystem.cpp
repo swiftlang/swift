@@ -2768,17 +2768,55 @@ bool constraints::isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl) {
 namespace {
   /// Visitor to classify the contents of the given closure.
   class BuilderClosureVisitor
-    : public StmtVisitor<BuilderClosureVisitor, Expr *> {
+      : public StmtVisitor<BuilderClosureVisitor, Expr *> {
     ASTContext &ctx;
+    bool wantExpr;
     Type builderType;
+    NominalTypeDecl *builder = nullptr;
+    llvm::SmallDenseMap<Identifier, bool> supportedOps;
 
   public:
-    BuilderClosureVisitor(ASTContext &ctx, Type builderType)
-      : ctx(ctx), builderType(builderType) { }
-
     ReturnStmt *returnStmt = nullptr;
     Stmt *controlFlowStmt = nullptr;
     Decl *decl = nullptr;
+
+  private:
+    /// Produce a builder call to the given named function with the given arguments.
+    CallExpr *buildCallIfWanted(Identifier fnName, ArrayRef<Expr *> args) {
+      if (!wantExpr)
+        return nullptr;
+
+      auto typeExpr = TypeExpr::createImplicit(builderType, ctx);
+      auto memberRef = new (ctx) UnresolvedDotExpr(
+          typeExpr, SourceLoc(), fnName, DeclNameLoc(), /*implicit=*/true);
+      return CallExpr::createImplicit(ctx, memberRef, args, { });
+    }
+
+    /// Check whether the builder supports the given operation.
+    bool builderSupports(Identifier fnName) {
+      auto known = supportedOps.find(fnName);
+      if (known != supportedOps.end()) {
+        return known->second;
+      }
+
+      bool found = false;
+      for (auto decl : builder->lookupDirect(fnName)) {
+        if (auto func = dyn_cast<FuncDecl>(decl)) {
+          if (func->isStatic()) {
+            found = true;
+            break;
+          }
+        }
+      }
+
+      return supportedOps[fnName] = found;
+    }
+
+  public:
+    BuilderClosureVisitor(ASTContext &ctx, bool wantExpr, Type builderType)
+        : ctx(ctx), wantExpr(wantExpr), builderType(builderType) {
+      builder = builderType->getAnyNominal();
+    }
 
 #define CONTROL_FLOW_STMT(StmtClass)                      \
     Expr *visit##StmtClass##Stmt(StmtClass##Stmt *stmt) { \
@@ -2809,15 +2847,8 @@ namespace {
         expressions.push_back(expr);
       }
 
-      if (!builderType)
-        return nullptr;
-
       // Call Builder.buildBlock(... args ...)
-      auto typeExpr = TypeExpr::createImplicit(builderType, ctx);
-      auto memberRef = new (ctx) UnresolvedDotExpr(
-          typeExpr, SourceLoc(), ctx.Id_buildBlock, DeclNameLoc(),
-          /*implicit=*/true);
-      return CallExpr::createImplicit(ctx, memberRef, expressions, { });
+      return buildCallIfWanted(ctx.Id_buildBlock, expressions);
     }
 
     Expr *visitReturnStmt(ReturnStmt *returnStmt) {
@@ -2826,7 +2857,19 @@ namespace {
       return nullptr;
     }
 
-    CONTROL_FLOW_STMT(Do)
+    Expr *visitDoStmt(DoStmt *doStmt) {
+      if (!builderSupports(ctx.Id_buildDo)) {
+        this->controlFlowStmt = doStmt;
+        return nullptr;
+      }
+
+      auto arg = visit(doStmt->getBody());
+      if (!arg)
+        return nullptr;
+
+      return buildCallIfWanted(ctx.Id_buildDo, arg);
+    }
+
     CONTROL_FLOW_STMT(Yield)
     CONTROL_FLOW_STMT(Defer)
     CONTROL_FLOW_STMT(If)
@@ -2851,11 +2894,12 @@ namespace {
 
 BuilderClosureKind swift::classifyBuilderClosure(ASTContext &ctx,
                                                  ClosureExpr *closure,
+                                                 Type builderType,
                                                  bool diagnose) {
   if (closure->hasSingleExpressionBody())
     return BuilderClosureKind::SingleExpression;
 
-  BuilderClosureVisitor visitor(ctx, Type());
+  BuilderClosureVisitor visitor(ctx, /*wantExpr=*/false, builderType);
   (void)visitor.visit(closure->getBody());
 
   // The presence of an explicit return makes this not a builder.
@@ -2898,7 +2942,7 @@ void ConstraintSystem::applyFunctionBuilder(ClosureExpr *closure,
   assert(builder && "Bad function builder type");
   assert(builder->getAttrs().hasAttribute<FunctionBuilderAttr>());
   switch (classifyBuilderClosure(
-              getASTContext(), closure, /*diagnose=*/false)) {
+              getASTContext(), closure, builderType, /*diagnose=*/false)) {
   case BuilderClosureKind::ExplicitReturn:
   case BuilderClosureKind::UnsupportedConstruct:
     return;
@@ -2925,7 +2969,8 @@ void ConstraintSystem::applyFunctionBuilder(ClosureExpr *closure,
 
   // If we didn't find anything yet, go build the expression.
   if (!singleExpr) {
-    BuilderClosureVisitor visitor(getASTContext(), builderType);
+    BuilderClosureVisitor visitor(
+        getASTContext(), /*wantExpr=*/true, builderType);
     singleExpr = visitor.visit(closure->getBody());
 
     // FIXME: Failure mode.
