@@ -597,18 +597,8 @@ bool Decl::isWeakImported(ModuleDecl *fromModule,
   return false;
 }
 
-void GenericParamDecl::setDepth(unsigned int depth) const {
-  switch (getKind()) {
-  case ParamKind::TypeParameter: {
-    getGenericTypeParamDecl()->setDepth(depth);
-    return;
-  }
-  }
-  llvm_unreachable("Unhandled GenericParamDecl::getKind()")
-}
-
 GenericParamList::GenericParamList(SourceLoc LAngleLoc,
-                                   ArrayRef<GenericParamDecl> Params,
+                                   ArrayRef<GenericTypeParamDecl *> Params,
                                    SourceLoc WhereLoc,
                                    MutableArrayRef<RequirementRepr> Requirements,
                                    SourceLoc RAngleLoc)
@@ -618,15 +608,15 @@ GenericParamList::GenericParamList(SourceLoc LAngleLoc,
     FirstTrailingWhereArg(Requirements.size())
 {
   std::uninitialized_copy(Params.begin(), Params.end(),
-                          getTrailingObjects<GenericParamDecl>());
+                          getTrailingObjects<GenericTypeParamDecl *>());
 }
 
 GenericParamList *
 GenericParamList::create(ASTContext &Context,
                          SourceLoc LAngleLoc,
-                         ArrayRef<GenericParamDecl> Params,
+                         ArrayRef<GenericTypeParamDecl *> Params,
                          SourceLoc RAngleLoc) {
-  unsigned Size = totalSizeToAlloc<GenericParamDecl>(Params.size());
+  unsigned Size = totalSizeToAlloc<GenericTypeParamDecl *>(Params.size());
   void *Mem = Context.Allocate(Size, alignof(GenericParamList));
   return new (Mem) GenericParamList(LAngleLoc, Params, SourceLoc(),
                                     MutableArrayRef<RequirementRepr>(),
@@ -636,11 +626,11 @@ GenericParamList::create(ASTContext &Context,
 GenericParamList *
 GenericParamList::create(const ASTContext &Context,
                          SourceLoc LAngleLoc,
-                         ArrayRef<GenericParamDecl> Params,
+                         ArrayRef<GenericTypeParamDecl *> Params,
                          SourceLoc WhereLoc,
                          ArrayRef<RequirementRepr> Requirements,
                          SourceLoc RAngleLoc) {
-  unsigned Size = totalSizeToAlloc<GenericParamDecl>(Params.size());
+  unsigned Size = totalSizeToAlloc<GenericTypeParamDecl *>(Params.size());
   void *Mem = Context.Allocate(Size, alignof(GenericParamList));
   return new (Mem) GenericParamList(LAngleLoc, Params,
                                     WhereLoc,
@@ -651,26 +641,18 @@ GenericParamList::create(const ASTContext &Context,
 GenericParamList *
 GenericParamList::clone(DeclContext *dc) const {
   auto &ctx = dc->getASTContext();
-  SmallVector<GenericParamDecl, 2> params;
-  for (auto GPD : getParams()) {
-    switch (GPD.getKind()) {
-    case GenericParamDecl::ParamKind::TypeParameter: {
-      auto GTPD = GPD.getGenericTypeParamDecl();
-        
-      auto *newParam = new (ctx) GenericTypeParamDecl(
-        dc, GTPD->getName(), GTPD->getNameLoc(),
-        GenericTypeParamDecl::InvalidDepth,
-        GTPD->getIndex());
-      params.push_back(newParam);
-        
-      SmallVector<TypeLoc, 2> inherited;
-      for (auto loc : GTPD->getInherited())
-        inherited.push_back(loc.clone(ctx));
-      newParam->setInherited(ctx.AllocateCopy(inherited));
-        
-      break;
-    }
-    }
+  SmallVector<GenericTypeParamDecl *, 2> params;
+  for (auto param : getParams()) {
+    auto *newParam = new (ctx) GenericTypeParamDecl(
+      dc, param->getName(), param->getNameLoc(),
+      GenericTypeParamDecl::InvalidDepth,
+      param->getIndex());
+    params.push_back(newParam);
+
+    SmallVector<TypeLoc, 2> inherited;
+    for (auto loc : param->getInherited())
+      inherited.push_back(loc.clone(ctx));
+    newParam->setInherited(ctx.AllocateCopy(inherited));
   }
 
   SmallVector<RequirementRepr, 2> requirements;
@@ -739,7 +721,7 @@ void GenericParamList::addTrailingWhereClause(
 
 void GenericParamList::setDepth(unsigned depth) {
   for (auto param : *this)
-    param.setDepth(depth);
+    param->setDepth(depth);
 }
 
 TrailingWhereClause::TrailingWhereClause(
@@ -781,14 +763,8 @@ void GenericContext::setGenericParams(GenericParamList *params) {
   GenericParams = params;
 
   if (GenericParams) {
-    for (auto param : *GenericParams) {
-      switch (param.getKind()) {
-      case GenericParamDecl::ParamKind::TypeParameter: {
-        param.getGenericTypeParamDecl()->setDeclContext(this);
-        break;
-      }
-      }
-    }
+    for (auto param : *GenericParams)
+      param->setDeclContext(this);
   }
 }
 

@@ -424,7 +424,7 @@ static const char * const GenericParamNames[] = {
   "Z"
 };
 
-static GenericParamDecl
+static GenericTypeParamDecl*
 createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   ModuleDecl *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
@@ -432,13 +432,13 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   auto genericParam =
     new (ctx) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                    ident, SourceLoc(), 0, index);
-  return GenericParamDecl(genericParam);
+  return genericParam;
 }
 
 /// Create a generic parameter list with multiple generic parameters.
 static GenericParamList *getGenericParams(ASTContext &ctx,
                                           unsigned numParameters,
-                       SmallVectorImpl<GenericParamDecl> &genericParams) {
+                       SmallVectorImpl<GenericTypeParamDecl*> &genericParams) {
   assert(numParameters <= llvm::array_lengthof(GenericParamNames));
   assert(genericParams.empty());
 
@@ -457,7 +457,7 @@ namespace {
 
   private:
     GenericParamList *TheGenericParamList;
-    SmallVector<GenericParamDecl, 2> GenericParams;
+    SmallVector<GenericTypeParamDecl*, 2> GenericTypeParams;
     GenericEnvironment *GenericEnv = nullptr;
     SmallVector<AnyFunctionType::Param, 4> InterfaceParams;
     Type InterfaceResult;
@@ -466,10 +466,10 @@ namespace {
     BuiltinGenericSignatureBuilder(ASTContext &ctx, unsigned numGenericParams = 1)
         : Context(ctx) {
       TheGenericParamList = getGenericParams(ctx, numGenericParams,
-                                             GenericParams);
+                                             GenericTypeParams);
 
       GenericSignatureBuilder Builder(ctx);
-      for (auto gp : GenericParams) {
+      for (auto gp : GenericTypeParams) {
         Builder.addGenericParameter(gp);
       }
 

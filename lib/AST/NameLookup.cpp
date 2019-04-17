@@ -2246,14 +2246,8 @@ void FindLocalVal::checkGenericParams(GenericParamList *Params) {
   if (!Params)
     return;
 
-  for (auto P : *Params) {
-    switch (P.getKind()) {
-    case GenericParamDecl::ParamKind::TypeParameter:
-      checkValueDecl(P.getGenericTypeParamDecl(),
-                     DeclVisibilityKind::GenericParameter);
-      break;
-    }
-  }
+  for (auto P : *Params)
+    checkValueDecl(P, DeclVisibilityKind::GenericParameter);
 }
 
 void FindLocalVal::checkSourceFile(const SourceFile &SF) {
