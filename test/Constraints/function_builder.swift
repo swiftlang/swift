@@ -28,9 +28,10 @@ func tuplify<T>(@TupleBuilder body: () -> T) {
   print(body())
 }
 
-// CHECK: (17, 3.14159, "Hello")
+// CHECK: (17, 3.14159, "Hello, DSL")
+let name = "dsl"
 tuplify {
   17
   3.14159
-  "Hello"
+  "Hello, \(name.map { $0.uppercased() }.joined())"
 }

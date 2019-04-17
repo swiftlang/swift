@@ -2928,7 +2928,7 @@ void ConstraintSystem::applyFunctionBuilder(ClosureExpr *closure,
     singleExpr = visitor.visit(closure->getBody());
 
     // FIXME: Failure mode.
-    (void)TC.preCheckExpression(singleExpr, DC);
+    (void)TC.preCheckExpression(singleExpr, closure);
 
     // Record this expression for later.
     TC.appliedFunctionBuilders[closure].push_back(
@@ -2936,7 +2936,7 @@ void ConstraintSystem::applyFunctionBuilder(ClosureExpr *closure,
   }
 
 
-  singleExpr = generateConstraints(singleExpr);
+  singleExpr = generateConstraints(singleExpr, closure);
   if (!singleExpr)
     return;
 

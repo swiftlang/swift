@@ -2529,7 +2529,7 @@ public:
   /// Generate constraints for the given (unchecked) expression.
   ///
   /// \returns a possibly-sanitized expression, or null if an error occurred.
-  Expr *generateConstraints(Expr *E);
+  Expr *generateConstraints(Expr *E, DeclContext *dc = nullptr);
 
   /// Generate constraints for binding the given pattern to the
   /// value of the given expression.
