@@ -232,8 +232,9 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
 
 void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
   // If there's an opaque return type, its descriptor is exported.
-  if (auto opaqueResult = FD->getOpaqueResultTypeDecl())
+  if (auto opaqueResult = FD->getOpaqueResultTypeDecl()) {
     addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));
+  }
   visitAbstractFunctionDecl(FD);
 }
 
@@ -248,6 +249,11 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   // Add the property descriptor if the decl needs it.
   if (ASD->exportsPropertyDescriptor()) {
     addSymbol(LinkEntity::forPropertyDescriptor(ASD));
+  }
+  
+  // ...and the opaque result decl if it has one.
+  if (auto opaqueResult = ASD->getOpaqueResultTypeDecl()) {
+    addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));
   }
 
   // Explicitly look at each accessor here: see visitAccessorDecl.

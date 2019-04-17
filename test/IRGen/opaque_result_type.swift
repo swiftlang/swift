@@ -2,10 +2,10 @@
 // RUN: %{python} %utils/chex.py < %s > %t/opaque_result_type.swift
 // RUN: %target-swift-frontend -emit-ir %t/opaque_result_type.swift | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-NODEBUG %t/opaque_result_type.swift
 
-protocol O {
+public protocol O {
   func bar()
 }
-protocol O2 {
+public protocol O2 {
   func baz()
 }
 
@@ -21,12 +21,12 @@ protocol Q: AnyObject {
 }
 
 extension Int: O, O2 {
-  func bar() {}
-  func baz() {}
+  public func bar() {}
+  public func baz() {}
 }
 
 extension String: P {
-  // CHECK-LABEL: @"$sSS18opaque_result_typeE3pooQryFQOMQ" = {{.*}} constant <{ {{.*}} }> <{
+  // CHECK-LABEL: @"$sSS18opaque_result_typeE3pooQryFQOMQ" = {{.*}}constant <{ {{.*}} }> <{
   // -- header: opaque type context (0x4), generic (0x80), unique (0x40), two entries (0x2_0000)
   // CHECK-SAME:         <i32 0x2_00c4>,
   // -- parent context: module, or anon context for function
@@ -39,6 +39,21 @@ extension String: P {
   func poo() -> some O {
     return 0
   }
+
+  // CHECK-LABEL: @"$sSS18opaque_result_typeE4propQrvpQOMQ" = {{.*}}constant
+  public var prop: some O {
+    return 0
+  }
+
+  // CHECK-LABEL: @"$sSS18opaque_result_typeEQrycipQOMQ" = {{.*}}constant
+  public subscript() -> some O {
+    return 0
+  }
+}
+
+// CHECK-LABEL: @"$s18opaque_result_type10globalPropQrvpQOMQ" = {{.*}}constant
+public var globalProp: some O {
+  return 0
 }
 
 public class C: P, Q {
