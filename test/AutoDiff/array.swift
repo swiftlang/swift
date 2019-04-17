@@ -4,12 +4,16 @@ import StdlibUnittest
 
 var ArrayAutodiffTests = TestSuite("ArrayAutodiff")
 
+typealias FloatArrayGrad = Array<Float>.CotangentVector
+
 ArrayAutodiffTests.test("ArrayIdentity") {
   func arrayIdentity(_ x: [Float]) -> [Float] {
     return x
   }
-  let backprop = pullback(at: [1, 2, 3, 4], in: arrayIdentity)
-  expectEqual([1.0, 1.0, 1.0, 1.0], backprop(.zero).elements)
+
+  expectEqual(
+    FloatArrayGrad([1, 2, 3, 4]),
+    pullback(at: [5, 6, 7, 8], in: arrayIdentity)(FloatArrayGrad([1, 2, 3, 4])))
 }
 
 ArrayAutodiffTests.test("ArraySubscript") {
@@ -18,76 +22,54 @@ ArrayAutodiffTests.test("ArraySubscript") {
   }
 
   expectEqual(
-    [1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
-    gradient(at: [0.5, 0.2, 0.3, 0.7, 0.6, 1.0], in: sumFirstThree).elements)
+    FloatArrayGrad([1, 1, 1, 0, 0, 0]),
+    gradient(at: [2, 3, 4, 5, 6, 7], in: sumFirstThree))
 }
 
-struct Parameter : Equatable {
-  @differentiable(wrt: (self), vjp: vjpX)
-  let x: Float
-
-  func vjpX() -> (Float, (Float) -> Parameter) {
-    return (x, { dx in Parameter(x: dx) } )
+ArrayAutodiffTests.test("ArrayConcat") {
+  struct TwoArrays : Differentiable {
+    let a: [Float]
+    let b: [Float]
   }
+
+  func sumFirstThreeConcatted(_ arrs: TwoArrays) -> Float {
+    let c = arrs.a + arrs.b
+    return c[0] + c[1] + c[2]
+  }
+
+  expectEqual(
+    TwoArrays.CotangentVector(a: FloatArrayGrad([1, 1]), b: FloatArrayGrad([1, 0])),
+    gradient(at: TwoArrays(a: [0, 0], b: [0, 0]), in: sumFirstThreeConcatted))
+  expectEqual(
+    TwoArrays.CotangentVector(a: FloatArrayGrad([1, 1, 1, 0]), b: FloatArrayGrad([0, 0])),
+    gradient(at: TwoArrays(a: [0, 0, 0, 0], b: [0, 0]), in: sumFirstThreeConcatted))
+  expectEqual(
+    TwoArrays.CotangentVector(a: FloatArrayGrad([]), b: FloatArrayGrad([1, 1, 1, 0])),
+    gradient(at: TwoArrays(a: [], b: [0, 0, 0, 0]), in: sumFirstThreeConcatted))
 }
 
-extension Parameter {
-  func squared() -> Float {
-    return x * x
+ArrayAutodiffTests.test("Array.DifferentiableView.init") {
+  @differentiable
+  func constructView(_ x: [Float]) -> Array<Float>.DifferentiableView {
+    return Array<Float>.DifferentiableView(x)
   }
 
-  static func * (_ a: Parameter, _ b: Parameter) -> Float {
-    return a.x * b.x
-  }
+  let backprop = pullback(at: [5, 6, 7, 8], in: constructView)
+  expectEqual(
+    FloatArrayGrad([1, 2, 3, 4]),
+    backprop(FloatArrayGrad([1, 2, 3, 4])))
 }
 
-extension Parameter : Differentiable, VectorNumeric {
-  typealias TangentVector = Parameter
-  typealias CotangentVector = Parameter
-  typealias Scalar = Float
-  typealias Shape = ()
-
-  init(repeating repeatedValue: Float, shape: ()) {
-    self.init(x: repeatedValue)
+ArrayAutodiffTests.test("Array.DifferentiableView.array") {
+  @differentiable
+  func accessArray(_ x: Array<Float>.DifferentiableView) -> [Float] {
+    return x.array
   }
 
-  static func + (lhs: Parameter, rhs: Parameter) -> Parameter {
-    return Parameter(x: lhs.x + rhs.x)
-  }
-
-  static func - (lhs: Parameter, rhs: Parameter) -> Parameter {
-    return Parameter(x: lhs.x - rhs.x)
-  }
-
-  static func * (lhs: Scalar, rhs: Parameter) -> Parameter {
-    return Parameter(x: lhs * rhs.x)
-  }
-
-  static var zero: Parameter { return Parameter(x: 0) }
-}
-
-ArrayAutodiffTests.test("ArraySimpleMethod") {
-  func f(_ p: [Parameter]) -> Float {
-    return 100 * p[0].squared()
-  }
-  expectEqual([Parameter(x: 4 * 100)], 
-              gradient(at: [Parameter(x: 2)], in: f).elements)
-  expectEqual([Parameter(x: 40 * 100)], 
-              gradient(at: [Parameter(x: 20)], in: f).elements)
-}
-
-ArrayAutodiffTests.test("ArrayPairMethod") {
-  let g = { (a: [Parameter]) in a[0] * a[1] }
-  expectEqual([Parameter(x: 100), Parameter(x: 200)],
-              gradient(
-                at: [Parameter(x: 200), Parameter(x: 100)], 
-                in: g
-              ).elements)
-  expectEqual([Parameter(x: 200), Parameter(x: 100)],
-              gradient(
-                at: [Parameter(x: 100), Parameter(x: 200)], 
-                in: g
-              ).elements)
+  let backprop = pullback(at: Array<Float>.DifferentiableView([5, 6, 7, 8]), in: accessArray)
+  expectEqual(
+    FloatArrayGrad([1, 2, 3, 4]),
+    backprop(FloatArrayGrad([1, 2, 3, 4])))
 }
 
 runAllTests()
