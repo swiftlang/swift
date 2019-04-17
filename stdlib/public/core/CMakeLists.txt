@@ -205,6 +205,7 @@ set(SWIFTLIB_SOURCES
   CollectionOfOne.swift
   Diffing.swift
   ExistentialCollection.swift.gyb
+  MathFunctions.swift.gyb
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
@@ -217,6 +218,7 @@ set(SWIFTLIB_SOURCES
   Zip.swift
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
   )
+
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
 set(swift_core_link_flags "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
 set(swift_core_framework_depends)

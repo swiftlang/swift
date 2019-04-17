@@ -1,1 +1,9 @@
-
+Func _cos(_:) has been removed
+Func _exp(_:) has been removed
+Func _exp2(_:) has been removed
+Func _log(_:) has been removed
+Func _log10(_:) has been removed
+Func _log2(_:) has been removed
+Func _nearbyint(_:) has been removed
+Func _rint(_:) has been removed
+Func _sin(_:) has been removed
