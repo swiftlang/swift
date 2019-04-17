@@ -623,6 +623,42 @@ static void lookupVisibleMemberDeclsImpl(
   } while (1);
 }
 
+static void lookupVisibleDynamicMemberLookupDecls(
+    Type baseType, VisibleDeclConsumer &consumer, const DeclContext *dc,
+    LookupState LS, DeclVisibilityKind reason, LazyResolver *typeResolver,
+    GenericSignatureBuilder *GSB, VisitedSet &visited) {
+
+  assert(hasDynamicMemberLookupAttribute(baseType));
+  auto &ctx = dc->getASTContext();
+
+  // Lookup the `subscript(dynamicMember:)` methods in this type.
+  auto subscriptName =
+      DeclName(ctx, DeclBaseName::createSubscript(), ctx.Id_dynamicMember);
+
+  SmallVector<ValueDecl *, 2> subscripts;
+  dc->lookupQualified(baseType, subscriptName, NL_QualifiedDefault,
+                      typeResolver, subscripts);
+
+  for (ValueDecl *VD : subscripts) {
+    auto *subscript = dyn_cast<SubscriptDecl>(VD);
+    if (!subscript)
+      continue;
+
+    auto rootType = getRootTypeOfKeypathDynamicMember(subscript, dc);
+    if (!rootType)
+      continue;
+
+    auto subs =
+        baseType->getMemberSubstitutionMap(dc->getParentModule(), subscript);
+    auto memberType = rootType->subst(subs);
+    if (!memberType || !memberType->mayHaveMembers())
+      continue;
+
+    lookupVisibleMemberDeclsImpl(memberType, consumer, dc, LS, reason,
+                                 typeResolver, GSB, visited);
+  }
+}
+
 namespace {
 
 struct FoundDeclTy {
@@ -824,6 +860,18 @@ public:
     DeclsToReport.insert(FoundDeclTy(VD, Reason));
   }
 };
+
+struct ShadowedKeyPathMembers : public VisibleDeclConsumer {
+  VisibleDeclConsumer &consumer;
+  llvm::DenseSet<DeclBaseName> &seen;
+  ShadowedKeyPathMembers(VisibleDeclConsumer &consumer, llvm::DenseSet<DeclBaseName> &knownMembers) : consumer(consumer), seen(knownMembers) {}
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind reason) override {
+    // Dynamic lookup members are only visible if they are not shadowed by
+    // non-dynamic members.
+    if (seen.count(VD->getBaseName()) == 0)
+      consumer.foundDecl(VD, reason);
+  }
+};  
 } // end anonymous namespace
 
 /// Enumerate all members in \c BaseTy (including members of extensions,
@@ -840,6 +888,16 @@ static void lookupVisibleMemberDecls(
   VisitedSet Visited;
   lookupVisibleMemberDeclsImpl(BaseTy, overrideConsumer, CurrDC, LS, Reason,
                                TypeResolver, GSB, Visited);
+
+  if (hasDynamicMemberLookupAttribute(BaseTy)) {
+    llvm::DenseSet<DeclBaseName> knownMembers;
+    for (auto &kv : overrideConsumer.FoundDecls) {
+      knownMembers.insert(kv.first);
+    }
+    ShadowedKeyPathMembers dynamicConsumer(overrideConsumer, knownMembers);
+    lookupVisibleDynamicMemberLookupDecls(BaseTy, dynamicConsumer, CurrDC, LS,
+                                          Reason, TypeResolver, GSB, Visited);
+  }
 
   // Report the declarations we found to the real consumer.
   for (const auto &DeclAndReason : overrideConsumer.DeclsToReport)
