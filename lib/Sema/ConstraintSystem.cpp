@@ -2871,7 +2871,51 @@ namespace {
 
     CONTROL_FLOW_STMT(Yield)
     CONTROL_FLOW_STMT(Defer)
-    CONTROL_FLOW_STMT(If)
+
+    static Expr *getTrivialBooleanCondition(StmtCondition condition) {
+      if (condition.size() != 1)
+        return nullptr;
+
+      return condition.front().getBooleanOrNull();
+    }
+
+    Expr *visitIfStmt(IfStmt *ifStmt) {
+      if (!builderSupports(ctx.Id_buildIf) ||
+          ifStmt->getElseStmt() ||
+          !getTrivialBooleanCondition(ifStmt->getCond())) {
+        this->controlFlowStmt = ifStmt;
+        return nullptr;
+      }
+
+      auto thenArg = visit(ifStmt->getThenStmt());
+      if (!thenArg)
+        return nullptr;
+
+      if (!wantExpr)
+        return nullptr;
+
+      auto optionalDecl = ctx.getOptionalDecl();
+      auto optionalType = optionalDecl->getDeclaredType();
+
+      auto optionalTypeExpr = TypeExpr::createImplicit(optionalType, ctx);
+      auto someRef = new (ctx) UnresolvedDotExpr(
+          optionalTypeExpr, SourceLoc(), ctx.getIdentifier("some"),
+          DeclNameLoc(), /*implicit=*/true);
+      auto someCall = CallExpr::createImplicit(ctx, someRef, thenArg, { });
+
+      optionalTypeExpr = TypeExpr::createImplicit(optionalType, ctx);
+      auto noneRef = new (ctx) UnresolvedDotExpr(
+          optionalTypeExpr, ifStmt->getEndLoc(), ctx.getIdentifier("none"),
+          DeclNameLoc(ifStmt->getEndLoc()), /*implicit=*/true);
+
+      auto ifExpr = new (ctx) IfExpr(
+          getTrivialBooleanCondition(ifStmt->getCond()),
+          SourceLoc(), someCall,
+          SourceLoc(), noneRef);
+      ifExpr->setImplicit();
+      return buildCallIfWanted(ctx.Id_buildIf, ifExpr);
+    }
+
     CONTROL_FLOW_STMT(Guard)
     CONTROL_FLOW_STMT(While)
     CONTROL_FLOW_STMT(DoCatch)

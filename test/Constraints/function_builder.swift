@@ -24,20 +24,34 @@ struct TupleBuilder {
   }
 
   static func buildDo<T>(_ value: T) -> T { return value }
+  static func buildIf<T>(_ value: T?) -> T? { return value }
 }
 
-func tuplify<T>(@TupleBuilder body: () -> T) {
-  print(body())
+func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
+  print(body(cond))
 }
 
-// CHECK: (17, 3.14159, "Hello, DSL", (["nested", "do"], 6))
+// CHECK: (17, 3.14159, "Hello, DSL", (["nested", "do"], 6), Optional((2.71828, ["if", "stmt"])))
 let name = "dsl"
-tuplify {
+tuplify(true) {
   17
   3.14159
   "Hello, \(name.map { $0.uppercased() }.joined())"
   do {
     ["nested", "do"]
     1 + 2 + 3
+  }
+  if $0 {
+    2.71828
+    ["if", "stmt"]
+  }
+}
+
+// CHECK: ("Empty optional", nil)
+tuplify(false) {
+  "Empty optional"
+  if $0 {
+    2.71828
+    ["if", "stmt"]
   }
 }
