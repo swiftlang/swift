@@ -319,6 +319,34 @@ TensorTests.testAllBackends("SqueezeAxisIndexing") {
   expectEqual(Array(stride(from: 3.0, to: 5, by: 1)), array1D.scalars)
 }
 
+TensorTests.testAllBackends("StridedSliceIndexing") {
+  // NOTE: cannot test `Tensor.shape` or `Tensor.scalars` directly until send
+  // and receive are implemented (without writing a bunch of mini tests).
+  // Instead, `Tensor.array` is called to make a ShapedArray host copy and the
+  // ShapedArray is tested instead.
+  let tensor3D = Tensor<Float>(
+    shape: [3, 4, 5], scalars: Array(stride(from: 0.0, to: 60, by: 1)))
+  let slice3D = tensor3D[2...]
+  let slice2D = tensor3D[1][0..<3..2]
+  let slice1D = tensor3D[0][0][1..<5..2]
+
+  let array3D = slice3D.array
+  let array2D = slice2D.array
+  let array1D = slice1D.array
+
+  /// Test shapes
+  expectEqual([1, 4, 5], array3D.shape)
+  expectEqual([2, 5], array2D.shape)
+  expectEqual([2], array1D.shape)
+
+  /// Test scalars
+  expectEqual(Array(stride(from: 40.0, to: 60, by: 1)), array3D.scalars)
+  expectEqual(
+    Array(stride(from: 20.0, to: 25, by: 1)) + 
+    Array(stride(from: 30.0, to: 35, by: 1)), array2D.scalars)
+  expectEqual(Array(stride(from: 1.0, to: 5, by: 2)), array1D.scalars)
+}
+
 TensorTests.testAllBackends("StridedSliceIndexingAssignment") {
   // NOTE: cannot test `Tensor.shape` or `Tensor.scalars` directly until send
   // and receive are implemented (without writing a bunch of mini tests).

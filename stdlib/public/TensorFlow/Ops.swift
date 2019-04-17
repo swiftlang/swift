@@ -1845,8 +1845,8 @@ extension PartialRangeThrough : TensorRangeExpression where Bound == Int {
   }
 }
 
-infix operator .. : TensorRangePrecedence
-precedencegroup TensorRangePrecedence {
+infix operator .. : StridedRangeFormationPrecedence
+precedencegroup StridedRangeFormationPrecedence {
   associativity: left
   higherThan: CastingPrecedence
   lowerThan: RangeFormationPrecedence
