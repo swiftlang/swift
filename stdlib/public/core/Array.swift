@@ -1303,6 +1303,7 @@ extension Array: RangeReplaceableCollection {
 // operator in the same expression.
 extension Array {
   @inlinable
+  // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpPlus where Element : Differentiable)
   public static func + (lhs: Array, rhs: Array) -> Array {
     var lhs = lhs
