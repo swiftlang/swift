@@ -1727,14 +1727,17 @@ public:
   raw_ostream &OS;
   llvm::function_ref<Type(const Expr *)> GetTypeOfExpr;
   llvm::function_ref<Type(const TypeLoc &)> GetTypeOfTypeLoc;
+  llvm::function_ref<Type(const KeyPathExpr *E, unsigned index)> GetTypeOfKeyPathComponent;
   unsigned Indent;
 
   PrintExpr(raw_ostream &os,
             llvm::function_ref<Type(const Expr *)> getTypeOfExpr,
             llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
+            llvm::function_ref<Type(const KeyPathExpr *E, unsigned index)> getTypeOfKeyPathComponent,
             unsigned indent)
       : OS(os), GetTypeOfExpr(getTypeOfExpr),
-        GetTypeOfTypeLoc(getTypeOfTypeLoc), Indent(indent) {}
+        GetTypeOfTypeLoc(getTypeOfTypeLoc),
+        GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent), Indent(indent) {}
 
   void printRec(Expr *E) {
     Indent += 2;
@@ -2612,7 +2615,8 @@ public:
     printCommon(E, "keypath_expr");
     if (E->isObjC())
       OS << " objc";
-    for (auto &component : E->getComponents()) {
+    for (unsigned i : indices(E->getComponents())) {
+      auto &component = E->getComponents()[i];
       OS << '\n';
       OS.indent(Indent + 2);
       OS << "(component=";
@@ -2643,7 +2647,9 @@ public:
         OS << "subscript ";
         printDeclRef(component.getDeclRef());
         OS << '\n';
-        component.getIndexExpr()->dump(OS, Indent + 4);
+        Indent += 2;
+        printRec(component.getIndexExpr());
+        Indent -= 2;
         OS.indent(Indent + 4);
         break;
       
@@ -2656,7 +2662,9 @@ public:
       case KeyPathExpr::Component::Kind::UnresolvedSubscript:
         OS << "unresolved_subscript";
         OS << '\n';
-        component.getIndexExpr()->dump(OS, Indent + 4);
+        Indent += 2;
+        printRec(component.getIndexExpr());
+        Indent -= 2;
         OS.indent(Indent + 4);
         break;
       case KeyPathExpr::Component::Kind::Identity:
@@ -2670,7 +2678,7 @@ public:
         break;
       }
       OS << "type=";
-      component.getComponentType().print(OS);
+      GetTypeOfKeyPathComponent(E, i).print(OS);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     if (auto stringLiteral = E->getObjCStringLiteralExpr()) {
@@ -2723,8 +2731,9 @@ void Expr::dump() const {
 void Expr::dump(raw_ostream &OS,
                  llvm::function_ref<Type(const Expr *)> getTypeOfExpr,
                  llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
+                 llvm::function_ref<Type(const KeyPathExpr *E, unsigned index)> getTypeOfKeyPathComponent,
                  unsigned Indent) const {
-  PrintExpr(OS, getTypeOfExpr, getTypeOfTypeLoc, Indent)
+  PrintExpr(OS, getTypeOfExpr, getTypeOfTypeLoc, getTypeOfKeyPathComponent, Indent)
       .visit(const_cast<Expr *>(this));
 }
 
@@ -2733,7 +2742,10 @@ void Expr::dump(raw_ostream &OS, unsigned Indent) const {
   auto getTypeOfTypeLoc = [](const TypeLoc &TL) -> Type {
     return TL.getType();
   };
-  dump(OS, getTypeOfExpr, getTypeOfTypeLoc, Indent);
+  auto getTypeOfKeyPathComponent = [](const KeyPathExpr *E, unsigned index) -> Type {
+    return E->getComponents()[index].getComponentType();
+  };
+  dump(OS, getTypeOfExpr, getTypeOfTypeLoc, getTypeOfKeyPathComponent, Indent);
 }
 
 void Expr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
