@@ -2940,7 +2940,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
       if (!CodeCompletion) {
         delayParseFromBeginningToHere(BeginParserPosition, Flags);
       } else {
-        CodeCompletion->completeDeclAttrKeyword(nullptr, isInSILMode(), false);
+        CodeCompletion->completeDeclAttrBeginning(nullptr, isInSILMode(),
+                                                  false);
       }
     }
 
@@ -3012,9 +3013,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
   if (FoundCCTokenInAttr) {
     if (CodeCompletion) {
-      CodeCompletion->completeDeclAttrKeyword(DeclResult.getPtrOrNull(),
-                                              isInSILMode(),
-                                              false);
+      CodeCompletion->completeDeclAttrBeginning(DeclResult.getPtrOrNull(),
+                                                isInSILMode(), false);
     } else {
       delayParseFromBeginningToHere(BeginParserPosition, Flags);
       return makeParserError();
