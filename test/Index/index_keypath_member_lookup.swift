@@ -48,8 +48,8 @@ func testRead1(r: Lens<Rectangle>, a: Lens<[Int]>) {
 // CHECK: [[TL_LINE:[0-9]+]]:7 | param/Swift | r
 
 // => implicit dynamicMember subscript (topLeft)
-// CHECK: [[TL_LINE]]:9 | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB_USR]] | Ref,Read,Impl,RelCont | rel: 1
-// CHECK: [[TL_LINE]]:9 | instance-method/acc-get/Swift | getter:subscript(dynamicMember:) | [[SUB_GET_USR]] | Ref,Call,Impl,RelRec,RelCall,RelCont | rel: 2
+// CHECK: [[TL_LINE]]:8 | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB_USR]] | Ref,Read,Impl,RelCont | rel: 1
+// CHECK: [[TL_LINE]]:8 | instance-method/acc-get/Swift | getter:subscript(dynamicMember:) | [[SUB_GET_USR]] | Ref,Call,Impl,RelRec,RelCall,RelCont | rel: 2
 
 // => property topLeft
 // CHECK: [[TL_LINE]]:9 | instance-property/Swift | topLeft | [[TL_USR]] | Ref,Read,RelCont | rel: 1
@@ -59,16 +59,16 @@ func testRead1(r: Lens<Rectangle>, a: Lens<[Int]>) {
 // CHECK: [[BR_LINE:[0-9]+]]:7 | param/Swift | r
 
 // => implicit dynamicMember subscript (bottomRight)
-// CHECK: [[BR_LINE]]:9 | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB_USR]] | Ref,Read,Impl,RelCont | rel: 1
-// CHECK: [[BR_LINE]]:9 | instance-method/acc-get/Swift | getter:subscript(dynamicMember:) | [[SUB_GET_USR]] | Ref,Call,Impl,RelRec,RelCall,RelCont | rel: 2
+// CHECK: [[BR_LINE]]:8 | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB_USR]] | Ref,Read,Impl,RelCont | rel: 1
+// CHECK: [[BR_LINE]]:8 | instance-method/acc-get/Swift | getter:subscript(dynamicMember:) | [[SUB_GET_USR]] | Ref,Call,Impl,RelRec,RelCall,RelCont | rel: 2
 
 // => property bottomRight
 // CHECK: [[BR_LINE]]:9 | instance-property/Swift | bottomRight | [[BR_USR]] | Ref,Read,RelCont | rel: 1
 // CHECK: [[BR_LINE]]:9 | instance-method/acc-get/Swift | getter:bottomRight | [[BR_GET_USR]] | Ref,Call,Impl,RelCall,RelCont | rel: 1
 
 // => implicit dynamicMember subscript (y)
-// CHECK: [[BR_LINE]]:21 | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB_USR]] | Ref,Read,Impl,RelCont | rel: 1
-// CHECK: [[BR_LINE]]:21 | instance-method/acc-get/Swift | getter:subscript(dynamicMember:) | [[SUB_GET_USR]] | Ref,Call,Impl,RelRec,RelCall,RelCont | rel: 2
+// CHECK: [[BR_LINE]]:20 | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB_USR]] | Ref,Read,Impl,RelCont | rel: 1
+// CHECK: [[BR_LINE]]:20 | instance-method/acc-get/Swift | getter:subscript(dynamicMember:) | [[SUB_GET_USR]] | Ref,Call,Impl,RelRec,RelCall,RelCont | rel: 2
 
 // => property y
 // CHECK: [[BR_LINE]]:21 | instance-property/Swift | y | [[PY_USR]] | Ref,Read,RelCont | rel: 1
@@ -92,8 +92,8 @@ func testWrite1(r: inout Lens<Rectangle>, p: Lens<Point>, a: inout Lens<[Int]>) 
 // CHECK: [[WTL_LINE:[0-9]+]]:3 | param/Swift | r
 
 // => implicit dynamicMember subscript (topLeft)
-// CHECK: [[WTL_LINE]]:5 | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB_USR]] | Ref,Writ,Impl,RelCont | rel: 1
-// CHECK: [[WTL_LINE]]:5 | instance-method/acc-set/Swift | setter:subscript(dynamicMember:) | [[SUB_SET_USR]] | Ref,Call,Impl,RelCall,RelCont | rel: 1
+// CHECK: [[WTL_LINE]]:4 | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB_USR]] | Ref,Writ,Impl,RelCont | rel: 1
+// CHECK: [[WTL_LINE]]:4 | instance-method/acc-set/Swift | setter:subscript(dynamicMember:) | [[SUB_SET_USR]] | Ref,Call,Impl,RelCall,RelCont | rel: 1
 
 // => property topLeft
 // CHECK: [[WTL_LINE]]:5 | instance-property/Swift | topLeft | [[TL_USR]] | Ref,Writ,RelCont | rel: 1
@@ -103,9 +103,9 @@ func testWrite1(r: inout Lens<Rectangle>, p: Lens<Point>, a: inout Lens<[Int]>) 
 // CHECK: [[WBR_LINE:[0-9]+]]:3 | param/Swift | r
 
 // => implicit dynamicMember subscript (bottomRight)
-// CHECK: [[WBR_LINE:[0-9]+]]:5 | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB_USR]] | Ref,Read,Writ,Impl,RelCont | rel: 1
-// CHECK: [[WBR_LINE:[0-9]+]]:5 | instance-method/acc-get/Swift | getter:subscript(dynamicMember:) | [[SUB_GET_USR]] | Ref,Call,Impl,RelCall,RelCont | rel: 1
-// CHECK: [[WBR_LINE:[0-9]+]]:5 | instance-method/acc-set/Swift | setter:subscript(dynamicMember:) | [[SUB_SET_USR]] | Ref,Call,Impl,RelCall,RelCont | rel: 1
+// CHECK: [[WBR_LINE:[0-9]+]]:4 | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB_USR]] | Ref,Read,Writ,Impl,RelCont | rel: 1
+// CHECK: [[WBR_LINE:[0-9]+]]:4 | instance-method/acc-get/Swift | getter:subscript(dynamicMember:) | [[SUB_GET_USR]] | Ref,Call,Impl,RelCall,RelCont | rel: 1
+// CHECK: [[WBR_LINE:[0-9]+]]:4 | instance-method/acc-set/Swift | setter:subscript(dynamicMember:) | [[SUB_SET_USR]] | Ref,Call,Impl,RelCall,RelCont | rel: 1
 
 // => property bottomRight
 // CHECK: [[WBR_LINE:[0-9]+]]:5 | instance-property/Swift | bottomRight | [[BR_USR]] | Ref,Read,Writ,RelCont | rel: 1
@@ -113,8 +113,8 @@ func testWrite1(r: inout Lens<Rectangle>, p: Lens<Point>, a: inout Lens<[Int]>) 
 // CHECK: [[WBR_LINE:[0-9]+]]:5 | instance-method/acc-set/Swift | setter:bottomRight | [[BR_SET_USR]] | Ref,Call,Impl,RelCall,RelCont | rel: 1
 
 // => implicit dynamicMember subscript (y)
-// CHECK: [[WBR_LINE:[0-9]+]]:17 | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB_USR]] | Ref,Writ,Impl,RelCont | rel: 1
-// CHECK: [[WBR_LINE:[0-9]+]]:17 | instance-method/acc-set/Swift | setter:subscript(dynamicMember:) | [[SUB_SET_USR]] | Ref,Call,Impl,RelCall,RelCont | rel: 1
+// CHECK: [[WBR_LINE:[0-9]+]]:16 | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB_USR]] | Ref,Writ,Impl,RelCont | rel: 1
+// CHECK: [[WBR_LINE:[0-9]+]]:16 | instance-method/acc-set/Swift | setter:subscript(dynamicMember:) | [[SUB_SET_USR]] | Ref,Call,Impl,RelCall,RelCont | rel: 1
 
 // => property y
 // CHECK: [[WBR_LINE:[0-9]+]]:17 | instance-property/Swift | y | [[PY_USR]] | Ref,Writ,RelCont | rel: 1
