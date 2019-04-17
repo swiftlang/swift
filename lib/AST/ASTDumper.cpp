@@ -2615,88 +2615,94 @@ public:
     printCommon(E, "keypath_expr");
     if (E->isObjC())
       OS << " objc";
+
+    OS << '\n';
+    Indent += 2;
+    OS.indent(Indent);
+    PrintWithColorRAII(OS, ParenthesisColor) << '(';
+    PrintWithColorRAII(OS, ExprColor) << "components";
+    OS.indent(Indent + 2);
     for (unsigned i : indices(E->getComponents())) {
       auto &component = E->getComponents()[i];
       OS << '\n';
       OS.indent(Indent + 2);
-      OS << "(component=";
+      PrintWithColorRAII(OS, ParenthesisColor) << '(';
       switch (component.getKind()) {
       case KeyPathExpr::Component::Kind::Invalid:
-        OS << "invalid ";
+        PrintWithColorRAII(OS, ASTNodeColor) << "invalid";
         break;
 
       case KeyPathExpr::Component::Kind::OptionalChain:
-        OS << "optional_chain ";
+        PrintWithColorRAII(OS, ASTNodeColor) << "optional_chain";
         break;
         
       case KeyPathExpr::Component::Kind::OptionalForce:
-        OS << "optional_force ";
+        PrintWithColorRAII(OS, ASTNodeColor) << "optional_force";
         break;
         
       case KeyPathExpr::Component::Kind::OptionalWrap:
-        OS << "optional_wrap ";
+        PrintWithColorRAII(OS, ASTNodeColor) << "optional_wrap";
         break;
         
       case KeyPathExpr::Component::Kind::Property:
-        OS << "property ";
+        PrintWithColorRAII(OS, ASTNodeColor) << "property";
+        PrintWithColorRAII(OS, DeclColor) << " decl=";
         printDeclRef(component.getDeclRef());
-        OS << " ";
         break;
       
       case KeyPathExpr::Component::Kind::Subscript:
-        OS << "subscript ";
+        PrintWithColorRAII(OS, ASTNodeColor) << "subscript";
+        PrintWithColorRAII(OS, DeclColor) << " decl='";
         printDeclRef(component.getDeclRef());
-        OS << '\n';
-        Indent += 2;
-        printRec(component.getIndexExpr());
-        Indent -= 2;
-        OS.indent(Indent + 4);
+        PrintWithColorRAII(OS, DeclColor) << "'";
         break;
       
       case KeyPathExpr::Component::Kind::UnresolvedProperty:
-        OS << "unresolved_property ";
-        component.getUnresolvedDeclName().print(OS);
-        OS << " ";
+        PrintWithColorRAII(OS, ASTNodeColor) << "unresolved_property";
+        PrintWithColorRAII(OS, IdentifierColor)
+          << " decl_name='" << component.getUnresolvedDeclName() << "'";
         break;
         
       case KeyPathExpr::Component::Kind::UnresolvedSubscript:
-        OS << "unresolved_subscript";
-        OS << '\n';
-        Indent += 2;
-        printRec(component.getIndexExpr());
-        Indent -= 2;
-        OS.indent(Indent + 4);
+        PrintWithColorRAII(OS, ASTNodeColor) << "unresolved_subscript";
+        printArgumentLabels(component.getSubscriptLabels());
         break;
       case KeyPathExpr::Component::Kind::Identity:
-        OS << "identity";
-        OS << '\n';
+        PrintWithColorRAII(OS, ASTNodeColor) << "identity";
         break;
+
       case KeyPathExpr::Component::Kind::TupleElement:
-        OS << "tuple_element ";
-        OS << "#" << component.getTupleIndex();
-        OS << " ";
+        PrintWithColorRAII(OS, ASTNodeColor) << "tuple_element ";
+        PrintWithColorRAII(OS, DiscriminatorColor)
+          << "#" << component.getTupleIndex();
         break;
       }
-      OS << "type=";
-      GetTypeOfKeyPathComponent(E, i).print(OS);
+      PrintWithColorRAII(OS, TypeColor)
+        << " type='" << GetTypeOfKeyPathComponent(E, i) << "'";
+      if (auto indexExpr = component.getIndexExpr()) {
+        OS << '\n';
+        Indent += 2;
+        printRec(indexExpr);
+        Indent -= 2;
+      }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
+
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    Indent -= 2;
+
     if (auto stringLiteral = E->getObjCStringLiteralExpr()) {
       OS << '\n';
-      printRec(stringLiteral);
+      printRecLabeled(stringLiteral, "objc_string_literal");
     }
     if (!E->isObjC()) {
-      OS << "\n";
       if (auto root = E->getParsedRoot()) {
-        printRec(root);
-      } else {
-        OS.indent(Indent + 2) << "<<null>>";
+        OS << "\n";
+        printRecLabeled(root, "parsed_root");
       }
-      OS << "\n";
       if (auto path = E->getParsedPath()) {
-        printRec(path);
-      } else {
-        OS.indent(Indent + 2) << "<<null>>";
+        OS << "\n";
+        printRecLabeled(path, "parsed_path");
       }
     }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
