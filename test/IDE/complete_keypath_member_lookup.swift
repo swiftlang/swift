@@ -12,6 +12,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testProtocolConform1 | %FileCheck %s -check-prefix=testProtocolConform1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OnSelf1 | %FileCheck %s -check-prefix=OnSelf1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testSelfExtension1 | %FileCheck %s -check-prefix=testSelfExtension1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testInvalid1 | %FileCheck %s -check-prefix=testInvalid1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testInvalid2 | %FileCheck %s -check-prefix=testInvalid2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testInvalid3 | %FileCheck %s -check-prefix=testInvalid3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testInvalid4 | %FileCheck %s -check-prefix=testInvalid4
 
 struct Point {
   var x: Int
@@ -219,3 +223,48 @@ extension Lens where T: HalfRect {
 // testSelfExtension1-NOT: bottomRight
 // testSelfExtension1: Decl[InstanceVar]/CurrNominal:      topLeft[#Point#];
 // testSelfExtension1-NOT: bottomRight
+
+struct Invalid1 {
+  subscript<U>(dynamicMember member: KeyPath<Rectangle, U>) -> U {
+    return Point(x: 0, y: 1)[keyPath: member]
+  }
+}
+func testInvalid1(r: Invalid1) {
+  r.#^testInvalid1^#
+}
+// testInvalid1-NOT: topLeft
+
+@dynamicMemberLookup
+struct Invalid2 {
+  subscript<U>(dynamicMember: KeyPath<Rectangle, U>) -> U {
+    return Point(x: 0, y: 1)[keyPath: dynamicMember]
+  }
+}
+func testInvalid2(r: Invalid2) {
+  r.#^testInvalid2^#
+}
+// testInvalid2-NOT: topLeft
+
+@dynamicMemberLookup
+struct Invalid3 {
+  subscript<U>(dynamicMember member: Rectangle) -> U {
+    return Point(x: 0, y: 1)[keyPath: member]
+  }
+}
+func testInvalid3(r: Invalid3) {
+  r.#^testInvalid3^#
+}
+// testInvalid3-NOT: topLeft
+
+struct NotKeyPath<T, U> {}
+
+@dynamicMemberLookup
+struct Invalid4 {
+  subscript<U>(dynamicMember member: NotKeyPath<Rectangle, U>) -> U {
+    return Point(x: 0, y: 1)[keyPath: member]
+  }
+}
+func testInvalid4(r: Invalid4) {
+  r.#^testInvalid4^#
+}
+// testInvalid4-NOT: topLeft
