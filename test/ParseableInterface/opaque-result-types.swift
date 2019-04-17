@@ -23,8 +23,13 @@ public func foo<T: Foo>(_ x: T) -> some Foo {
 
 public protocol AssocTypeInference {
   associatedtype Assoc: Foo
+  associatedtype AssocProperty: Foo
+  associatedtype AssocSubscript: Foo
 
   func foo(_: Int) -> Assoc
+
+  var prop: AssocProperty { get }
+  subscript() -> AssocSubscript { get }
 }
 
 public struct Bar<T>: AssocTypeInference {
@@ -61,7 +66,16 @@ public struct Bar<T>: AssocTypeInference {
       return x
     }
 
+    public var prop: some Foo {
+      return 123
+    }
+    public subscript() -> some Foo {
+      return 123
+    }
+
     // CHECK-LABEL: public typealias Assoc = @_opaqueReturnTypeOf("{{.*}}", 0) {{.*}}<T>
+    // CHECK-LABEL: public typealias AssocProperty = @_opaqueReturnTypeOf("{{.*}}", 0) {{.*}}<T>
+    // CHECK-LABEL: public typealias AssocSubscript = @_opaqueReturnTypeOf("{{.*}}", 0) {{.*}}<T>
   }
 
   public struct Bass<U: Foo>: AssocTypeInference {
@@ -85,11 +99,28 @@ public struct Bar<T>: AssocTypeInference {
     public func foo<V: Foo>(_ x: V) -> some Foo {
       return x
     }
+    public var prop: some Foo {
+      return 123
+    }
+    public subscript() -> some Foo {
+      return 123
+    }
 
     // CHECK-LABEL: public typealias Assoc = @_opaqueReturnTypeOf("{{.*}}", 0) {{.*}}<T, U>
+    // CHECK-LABEL: public typealias AssocProperty = @_opaqueReturnTypeOf("{{.*}}", 0) {{.*}}<T, U>
+    // CHECK-LABEL: public typealias AssocSubscript = @_opaqueReturnTypeOf("{{.*}}", 0) {{.*}}<T, U>
+  }
+
+  public var prop: some Foo {
+    return 123
+  }
+  public subscript() -> some Foo {
+    return 123
   }
 
   // CHECK-LABEL: public typealias Assoc = @_opaqueReturnTypeOf("{{.*}}", 0) {{.*}}<T>
+  // CHECK-LABEL: public typealias AssocProperty = @_opaqueReturnTypeOf("{{.*}}", 0) {{.*}}<T>
+  // CHECK-LABEL: public typealias AssocSubscript = @_opaqueReturnTypeOf("{{.*}}", 0) {{.*}}<T>
 }
 
 public struct Zim: AssocTypeInference {
@@ -123,6 +154,13 @@ public struct Zim: AssocTypeInference {
     public func foo<U: Foo>(_ x: U) -> some Foo {
       return x
     }
+
+    public var prop: some Foo {
+      return 123
+    }
+    public subscript() -> some Foo {
+      return 123
+    }
   }
 
   public struct Zung<U: Foo>: AssocTypeInference {
@@ -146,6 +184,22 @@ public struct Zim: AssocTypeInference {
       return x
     }
 
+    public var prop: some Foo {
+      return 123
+    }
+    public subscript() -> some Foo {
+      return 123
+    }
+
     // CHECK-LABEL: public typealias Assoc = @_opaqueReturnTypeOf("{{.*}}", 0) {{.*}}<U>
+    // CHECK-LABEL: public typealias AssocProperty = @_opaqueReturnTypeOf("{{.*}}", 0) {{.*}}<U>
+    // CHECK-LABEL: public typealias AssocSubscript = @_opaqueReturnTypeOf("{{.*}}", 0) {{.*}}<U>
+  }
+
+  public var prop: some Foo {
+    return 123
+  }
+  public subscript() -> some Foo {
+    return 123
   }
 }

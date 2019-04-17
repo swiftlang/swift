@@ -1981,6 +1981,12 @@ static bool shouldUseOpaqueReadAccessor(TypeChecker &TC,
 
 static void validateAbstractStorageDecl(TypeChecker &TC,
                                         AbstractStorageDecl *storage) {
+  if (storage->getOpaqueResultTypeDecl()) {
+    if (auto sf = storage->getInnermostDeclContext()->getParentSourceFile()) {
+      sf->markDeclWithOpaqueResultTypeAsValidated(storage);
+    }
+  }
+  
   if (shouldUseOpaqueReadAccessor(TC, storage))
     storage->setOpaqueReadOwnership(OpaqueReadOwnership::Borrowed);
 
