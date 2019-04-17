@@ -15,6 +15,7 @@ import Foundation
 
 var StringDescriptionTests = TestSuite("StringDescriptionTests")
 
+#if !CUDA
 StringDescriptionTests.test("Empty") {
   let empty = Tensor<Float>([] as [Float])
   expectEqual("[]", empty.description)
@@ -253,5 +254,6 @@ StringDescriptionTests.test("FullDescription") {
   expectEqual("[[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]]",
               vector.fullDescription)
 }
+#endif // !CUDA
 
 runAllTests()
