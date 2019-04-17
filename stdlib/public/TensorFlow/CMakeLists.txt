@@ -48,7 +48,9 @@ set(SOURCES
   TensorProtocol.swift
   TensorShape.swift
   Utilities.swift
+  ArrayOps.swift
   Threading.swift
+  ExecuteOp.swift.gyb
   # NumPy bridging for `ShapedArray` and `Tensor`.
   PythonConversion.swift)
 

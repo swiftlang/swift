@@ -1749,6 +1749,29 @@ func _TFCOpAddInputFromTensorGroup<T : TensorArrayProtocol>(
   return count
 }
 
+/// Special protocol for calling tensorflow operations that take heterogeneous
+/// arrays as input.
+public protocol AnyTensor {
+  var _rawTensorHandle: CTensorHandle { get }
+  var _tensorFlowDataType: TensorDataType { get }
+}
+
+extension Tensor : AnyTensor {
+  public var _rawTensorHandle: CTensorHandle { return handle._cTensorHandle }
+  public var _tensorFlowDataType: TensorDataType { return Scalar.tensorFlowDataType }
+}
+
+@usableFromInline
+func _TFCOpAddInputFromAnyTensors(
+  _ op: CTFEOp, _ tensors: [AnyTensor], _ status: CTFStatus
+) {
+  for tensor in tensors {
+    let handle = tensor._rawTensorHandle
+    TFE_OpAddInput(op, handle, status)
+    checkOk(status)
+  }
+}
+
 /// Initializes a TensorGroup value, taking ownership of all the tensor
 /// handles in `tensorHandles`.
 @usableFromInline
