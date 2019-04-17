@@ -2577,17 +2577,6 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       return;
     }
 
-    // If we can't resolve an interface type here, we should be in invalid
-    // code.
-    Type type = param->getInterfaceType();
-    if (type && !type->is<FunctionType>()) {
-      TC.diagnose(attr->getLocation(),
-                  diag::function_builder_parameter_not_of_function_type,
-                  nominal->getFullName());
-      attr->setInvalid();
-      return;
-    }
-
     // Diagnose and ignore arguments.
     if (attr->getArg()) {
       TC.diagnose(attr->getLocation(), diag::function_builder_arguments)

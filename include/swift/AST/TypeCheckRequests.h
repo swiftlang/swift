@@ -649,29 +649,14 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
-/// Kinds of types for CustomAttr.
-enum class CustomAttrTypeKind {
-  /// The type is required to not be expressed in terms of
-  /// any contextual type parameters.
-  NonGeneric,
-
-  /// Property delegates have some funky rules, like allowing
-  /// unbound generic types.
-  PropertyDelegate,
-};
-
-void simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value);
-
 /// Request the type spelled out in a custom attribute.
 ///
 /// Different parameters cannot be used for the same attribute.
-class CustomAttrTypeRequest :
-    public SimpleRequest<CustomAttrTypeRequest,
+class FunctionBuilderTypeRequest :
+    public SimpleRequest<FunctionBuilderTypeRequest,
                          CacheKind::Cached,
                          Type,
-                         CustomAttr *,
-                         DeclContext *,
-                         CustomAttrTypeKind> {
+                         ParamDecl *> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -679,8 +664,7 @@ private:
   friend SimpleRequest;
 
   llvm::Expected<Type>
-  evaluate(Evaluator &evaluator, CustomAttr *attr, DeclContext *dc,
-           CustomAttrTypeKind typeKind) const;
+  evaluate(Evaluator &evaluator, ParamDecl *param) const;
 
 public:
   // Caching

@@ -4475,6 +4475,10 @@ ERROR(function_builder_parameter_not_of_function_type, none,
       "function builder attribute %0 can only be applied to a parameter of "
       "function type",
       (DeclName))
+ERROR(function_builder_parameter_autoclosure, none,
+      "function builder attribute %0 cannot be applied to an autoclosure "
+      "parameter",
+      (DeclName))
 ERROR(function_builder_multiple, none,
       "only one function builder attribute can be attached to a parameter", ())
 NOTE(previous_function_builder_here, none,
