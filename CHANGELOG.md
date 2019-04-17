@@ -25,7 +25,7 @@ CHANGELOG
 Swift 5.1
 ---------
 
-* [SE-0256][]:
+* [SE-0254][]:
 
   Subscripts can now be declared `static` or (inside classes) `class`.
 
@@ -226,6 +226,8 @@ Swift 5.1
 
 Swift 5.0
 ---------
+
+### 2019-03-25 (Xcode 10.2)
 
 * [SE-0235][]:
 
@@ -486,8 +488,6 @@ Swift 5.0
     }
   }
   ```
-
-**Add new entries to the top of this section, not here!**
 
 Swift 4.2
 ---------
@@ -7631,6 +7631,8 @@ Swift 1.0
 [SE-0235]: <https://github.com/apple/swift-evolution/blob/master/proposals/0235-add-result.md>
 [SE-0242]: <https://github.com/apple/swift-evolution/blob/master/proposals/0242-default-values-memberwise.md>
 [SE-0245]: <https://github.com/apple/swift-evolution/blob/master/proposals/0245-array-uninitialized-initializer.md>
+[SE-0252]: <https://github.com/apple/swift-evolution/blob/master/proposals/0252-keypath-dynamic-member-lookup.md>
+[SE-0254]: <https://github.com/apple/swift-evolution/blob/master/proposals/0254-static-subscripts.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>
