@@ -30,7 +30,6 @@ func test(r: Lens<Rectangle>) {
 // SUBSCRIPT: source.lang.swift.decl.function.subscript (18:3-18:12)
 // SUBSCRIPT: subscript(dynamicMember:)
 // SUBSCRIPT: <T, U> (dynamicMember: WritableKeyPath<T, U>) -> Lens<U>
-// SUBSCRIPT: <decl.function.subscript><syntaxtype.keyword>subscript</syntaxtype.keyword>&lt;<decl.generic_type_param usr="s:33cursor_info_keypath_member_lookup4LensV1UL_qd__mfp"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>dynamicMember</decl.var.parameter.argument_label> <decl.var.parameter.name>member</decl.var.parameter.name>: <decl.var.parameter.type><ref.class usr="s:s15WritableKeyPathC">WritableKeyPath</ref.class>&lt;<ref.generic_type_param usr="s:33cursor_info_keypath_member_lookup4LensV1Txmfp">T</ref.generic_type_param>, <ref.generic_type_param usr="s:33cursor_info_keypath_member_lookup4LensV1UL_qd__mfp">U</ref.generic_type_param>&gt;</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr="s:33cursor_info_keypath_member_lookup4LensV">Lens</ref.struct>&lt;<ref.generic_type_param usr="s:33cursor_info_keypath_member_lookup4LensV1UL_qd__mfp">U</ref.generic_type_param>&gt;</decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.function.subscript>
 // SUBSCRIPT: ACTIONS BEGIN
 // FIXME: should not allow rename since that would break the contract.
 // SUBSCRIPT: source.refactoring.kind.rename.global
