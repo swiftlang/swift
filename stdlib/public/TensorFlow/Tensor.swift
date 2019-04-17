@@ -358,7 +358,7 @@ public extension Tensor {
   @differentiable(vjp: _vjpInit(repeating:shape:)
                   where Scalar : TensorFlowFloatingPoint)
   init(repeating repeatedValue: Scalar, shape: TensorShape) {
-    self = Raw.fill(dims: Tensor<Int64>(shape.dimensions.map(Int64.init)),
+    self = Raw.fill(dims: Tensor<Int32>(shape.dimensions.map(Int32.init)),
                     value: Tensor(repeatedValue))
   }
 }
