@@ -243,10 +243,6 @@ struct GenericConstrained<T> {
 extension GenericConstrained : Differentiable
   where T : Differentiable {}
 
-// TF-161: Test conditional conformance of `Array`.
-// expected-warning @+1 {{stored property '_buffer' has no derivative because it does not conform to 'Differentiable'; add '@noDerivative' to make it explicit}}
-extension Array : Differentiable where Element : Differentiable {}
-
 struct TF_260<T : Differentiable> : Differentiable & AdditiveArithmetic {
   var x: T.CotangentVector
 }
