@@ -626,9 +626,7 @@ static void lookupVisibleDynamicMemberLookupDecls(
     LookupState LS, DeclVisibilityKind reason, LazyResolver *typeResolver,
     GenericSignatureBuilder *GSB, VisitedSet &visited) {
 
-  if (!hasDynamicMemberLookupAttribute(baseType))
-    return;
-
+  assert(hasDynamicMemberLookupAttribute(baseType));
   auto &ctx = dc->getASTContext();
 
   // Lookup the `subscript(dynamicMember:)` methods in this type.
@@ -650,9 +648,12 @@ static void lookupVisibleDynamicMemberLookupDecls(
 
     auto subs =
         baseType->getMemberSubstitutionMap(dc->getParentModule(), subscript);
-    if (auto memberType = rootType->subst(subs))
-      lookupVisibleMemberDeclsImpl(memberType, consumer, dc, LS, reason,
-                                   typeResolver, GSB, visited);
+    auto memberType = rootType->subst(subs);
+    if (!memberType || !memberType->mayHaveMembers())
+      continue;
+
+    lookupVisibleMemberDeclsImpl(memberType, consumer, dc, LS, reason,
+                                 typeResolver, GSB, visited);
   }
 }
 
@@ -886,13 +887,15 @@ static void lookupVisibleMemberDecls(
   lookupVisibleMemberDeclsImpl(BaseTy, overrideConsumer, CurrDC, LS, Reason,
                                TypeResolver, GSB, Visited);
 
-  llvm::DenseSet<DeclBaseName> knownMembers;
-  for (auto &kv : overrideConsumer.FoundDecls) {
-    knownMembers.insert(kv.first);
+  if (hasDynamicMemberLookupAttribute(BaseTy)) {
+    llvm::DenseSet<DeclBaseName> knownMembers;
+    for (auto &kv : overrideConsumer.FoundDecls) {
+      knownMembers.insert(kv.first);
+    }
+    ShadowedKeyPathMembers dynamicConsumer(overrideConsumer, knownMembers);
+    lookupVisibleDynamicMemberLookupDecls(BaseTy, dynamicConsumer, CurrDC, LS,
+                                          Reason, TypeResolver, GSB, Visited);
   }
-  ShadowedKeyPathMembers dynamicConsumer(overrideConsumer, knownMembers);
-  lookupVisibleDynamicMemberLookupDecls(BaseTy, dynamicConsumer, CurrDC, LS,
-                                        Reason, TypeResolver, GSB, Visited);
 
   // Report the declarations we found to the real consumer.
   for (const auto &DeclAndReason : overrideConsumer.DeclsToReport)
