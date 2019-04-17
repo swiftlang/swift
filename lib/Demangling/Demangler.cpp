@@ -1941,7 +1941,9 @@ NodePointer Demangler::demangleArchetype() {
       if (retroactiveConformances)
         opaque->addChild(retroactiveConformances, *this);
       
-      return createType(opaque);
+      auto opaqueTy = createType(opaque);
+      addSubstitution(opaqueTy);
+      return opaqueTy;
     }
     case 'r': {
       return createType(createNode(Node::Kind::OpaqueReturnType));

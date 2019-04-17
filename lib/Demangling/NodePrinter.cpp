@@ -2268,7 +2268,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << ">>";
     return nullptr;
   case Node::Kind::OpaqueType:
-    printChildren(Node);
+    print(Node->getChild(0));
+    Printer << '.';
+    print(Node->getChild(1));
     return nullptr;
   case Node::Kind::AccessorFunctionReference:
     Printer << "accessor function at " << Node->getIndex();
