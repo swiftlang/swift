@@ -4,7 +4,7 @@
 
 import TestsUtils
 
-public let NibbleSort = BenchmarkInfo(
+public var NibbleSort = BenchmarkInfo(
   name: "NibbleSort",
   runFunction: run_NibbleSort,
   tags: [.validation],

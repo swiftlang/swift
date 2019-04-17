@@ -91,7 +91,7 @@ let charactersMultiplier = baseMultiplier / 5
 
 // An extended benchmark suite exercising finer-granularity behavior of our
 // Strings.
-public let StringWalk = [
+public var StringWalk = [
   BenchmarkInfo(
     name: "StringWalk",
     runFunction: run_StringWalk,

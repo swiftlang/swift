@@ -5,7 +5,7 @@
 
 import TestsUtils
 
-public let LuhnAlgoLazy = BenchmarkInfo(
+public var LuhnAlgoLazy = BenchmarkInfo(
   name: "LuhnAlgoLazy",
   runFunction: run_LuhnAlgoLazy,
   tags: [.algorithm]

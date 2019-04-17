@@ -208,23 +208,23 @@ public let StringNormalization: [BenchmarkInfo] = [
   ),
 ]
 
-let Workload_ascii: Workload! = Workload.ascii
+var Workload_ascii: Workload! = Workload.ascii
 
-let Workload_latin1: Workload! = Workload.latin1
+var Workload_latin1: Workload! = Workload.latin1
 
-let Workload_fastPrenormal: Workload! = Workload.fastPrenormal
+var Workload_fastPrenormal: Workload! = Workload.fastPrenormal
 
-let Workload_slowerPrenormal: Workload! = Workload.slowerPrenormal
+var Workload_slowerPrenormal: Workload! = Workload.slowerPrenormal
 
-let Workload_nonBMPSlowestPrenormal: Workload! = Workload.nonBMPSlowestPrenormal
+var Workload_nonBMPSlowestPrenormal: Workload! = Workload.nonBMPSlowestPrenormal
 
-let Workload_emoji: Workload! = Workload.emoji
+var Workload_emoji: Workload! = Workload.emoji
 
-let Workload_abnormal: Workload! = Workload.abnormal
+var Workload_abnormal: Workload! = Workload.abnormal
 
-let Workload_zalgo: Workload! = Workload.zalgo
+var Workload_zalgo: Workload! = Workload.zalgo
 
-let Workload_longSharedPrefix: Workload! = Workload.longSharedPrefix
+var Workload_longSharedPrefix: Workload! = Workload.longSharedPrefix
 
 
 @inline(never)

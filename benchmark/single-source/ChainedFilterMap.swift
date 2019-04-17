@@ -1,6 +1,6 @@
 import TestsUtils
 
-public let ChainedFilterMap = [
+public var ChainedFilterMap = [
   BenchmarkInfo(name: "ChainedFilterMap", runFunction: run_ChainedFilterMap,
     tags: [.algorithm], setUpFunction: { blackHole(first100k) },
     legacyFactor: 9),

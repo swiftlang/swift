@@ -1050,7 +1050,7 @@ public func run_SortSortedStrings(_ N: Int) {
   }
 }
 
-let unicodeWords: [String] = [
+var unicodeWords: [String] = [
   "❄️woodshed",
   "❄️lakism",
   "❄️gastroperiodynia",

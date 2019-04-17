@@ -22,7 +22,7 @@ import Foundation
 //  7% objc_msgSend
 //  5% _swift_release_
 //  2% _swift_retain_
-public let SevenBoom = BenchmarkInfo(
+public var SevenBoom = BenchmarkInfo(
   name: "SevenBoom",
   runFunction: run_SevenBoom,
   tags: [.runtime, .exceptions, .bridging, .cpubench]
