@@ -1070,6 +1070,34 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an attempt to reference a member which has a mutating getter as a
+/// key path component e.g.
+///
+/// ```swift
+/// struct S {
+///   var foo: Int {
+///     mutating get { return 42 }
+///   }
+///
+///   subscript(_: Int) -> Bool {
+///     mutating get { return false }
+///   }
+/// }
+///
+/// _ = \S.foo
+/// _ = \S.[42]
+/// ```
+class InvalidMemberWithMutatingGetterInKeyPath final
+    : public InvalidMemberRefInKeyPath {
+public:
+  InvalidMemberWithMutatingGetterInKeyPath(Expr *root, ConstraintSystem &cs,
+                                           ValueDecl *member,
+                                           ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(root, cs, member, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

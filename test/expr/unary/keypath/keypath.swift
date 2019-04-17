@@ -732,7 +732,7 @@ func test_keypath_with_static_members(_ p: P_With_Static_Members) {
     static var baz: Int = 42
   }
 
-func foo(_ s: S) {
+  func foo(_ s: S) {
     let _ = \S.Type.foo
     // expected-error@-1 {{key path cannot refer to static member 'foo'}}
     let _ = s[keyPath: \.foo]
@@ -745,6 +745,34 @@ func foo(_ s: S) {
     // expected-error@-1 {{key path cannot refer to static member 'baz'}}
     let _ = s[keyPath: \.bar.baz]
     // expected-error@-1 {{key path cannot refer to static member 'baz'}}
+  }
+}
+
+func test_keypath_with_mutating_getter() {
+  struct S {
+    var foo: Int {
+      mutating get { return 42 }
+    }
+
+    subscript(_: Int) -> [Int] {
+      mutating get { return [] }
+    }
+  }
+
+  _ = \S.foo
+  // expected-error@-1 {{key path cannot refer to 'foo', which has a mutating getter}}
+  let _: KeyPath<S, Int> = \.foo
+  // expected-error@-1 {{key path cannot refer to 'foo', which has a mutating getter}}
+  _ = \S.[0]
+  // expected-error@-1 {{key path cannot refer to 'subscript(_:)', which has a mutating getter}}
+  _ = \S.[0].count
+  // expected-error@-1 {{key path cannot refer to 'subscript(_:)', which has a mutating getter}}
+
+  func test_via_subscript(_ s: S) {
+    _ = s[keyPath: \.foo]
+    // expected-error@-1 {{key path cannot refer to 'foo', which has a mutating getter}}
+    _ = s[keyPath: \.[0].count]
+    // expected-error@-1 {{key path cannot refer to 'subscript(_:)', which has a mutating getter}}
   }
 }
 

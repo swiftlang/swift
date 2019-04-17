@@ -432,7 +432,9 @@ bool AllowInvalidRefInKeyPath::diagnose(Expr *root, bool asNote) const {
   }
 
   case RefKind::MutatingGetter: {
-    return false;
+    InvalidMemberWithMutatingGetterInKeyPath failure(
+        root, getConstraintSystem(), Member, getLocator());
+    return failure.diagnose(asNote);
   }
   }
 }

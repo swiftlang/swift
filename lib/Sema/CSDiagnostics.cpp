@@ -2470,3 +2470,8 @@ bool InvalidStaticMemberRefInKeyPath::diagnoseAsError() {
   emitDiagnostic(getLoc(), diag::expr_keypath_static_member, getName());
   return true;
 }
+
+bool InvalidMemberWithMutatingGetterInKeyPath::diagnoseAsError() {
+  emitDiagnostic(getLoc(), diag::expr_keypath_mutating_getter, getName());
+  return true;
+}
