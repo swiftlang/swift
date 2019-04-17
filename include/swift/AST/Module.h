@@ -117,7 +117,7 @@ enum class ResilienceStrategy : unsigned {
   /// Public nominal types: resilient
   /// Non-inlinable function bodies: resilient
   ///
-  /// This is the behavior with -enable-resilience.
+  /// This is the behavior with -enable-library-evolution.
   Resilient
 };
 

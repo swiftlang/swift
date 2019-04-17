@@ -305,7 +305,7 @@ int main(int argc, char **argv) {
     Invocation.setTargetTriple(Target);
   if (!ResourceDir.empty())
     Invocation.setRuntimeResourcePath(ResourceDir);
-  Invocation.getFrontendOptions().EnableResilience = EnableResilience;
+  Invocation.getFrontendOptions().EnableLibraryEvolution = EnableResilience;
   // Set the module cache path. If not passed in we use the default swift module
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
