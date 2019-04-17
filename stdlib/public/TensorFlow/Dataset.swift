@@ -132,12 +132,12 @@ public extension Dataset {
 public extension Dataset {
   @inlinable @inline(__always)
   func shuffled(
-    sampleCount: Int64, randomSeed: Int64
+    sampleCount: Int, randomSeed: Int64
   ) -> Dataset {
     let (seed1, seed2) = _tensorSeeds(Tensor(randomSeed))
     return Dataset(
       _handle: #tfop(
-        "ShuffleDataset", _handle, Tensor<Int64>(sampleCount), seed1, seed2,
+        "ShuffleDataset", _handle, Tensor(Int64(sampleCount)), seed1, seed2,
         output_types$dtype: Element._typeList,
         output_shapes: Element._unknownShapeList
       )
@@ -145,10 +145,10 @@ public extension Dataset {
   }
 
   @inlinable @inline(__always)
-  func batched(_ batchSize: Int64) -> Dataset {
+  func batched(_ batchSize: Int) -> Dataset {
     return Dataset(
       _handle: #tfop(
-        "BatchDataset", _handle, Tensor<Int64>(batchSize),
+        "BatchDataset", _handle, Tensor(Int64(batchSize)),
         output_types$dtype: Element._typeList,
         output_shapes: Element._unknownShapeList
       )
