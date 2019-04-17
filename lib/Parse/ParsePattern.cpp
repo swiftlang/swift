@@ -221,10 +221,15 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     unsigned defaultArgIndex = defaultArgs ? defaultArgs->NextIndex++ : 0;
 
     // Attributes.
-    if (paramContext != ParameterContextKind::EnumElement) {
-      auto AttrStatus = parseDeclAttributeList(param.Attrs);
-      if (AttrStatus.hasCodeCompletion())
-        status.setHasCodeCompletion();
+    bool FoundCCToken = false;
+    if (paramContext != ParameterContextKind::EnumElement)
+      parseDeclAttributeList(param.Attrs, FoundCCToken);
+    if (FoundCCToken) {
+      if (CodeCompletion) {
+        CodeCompletion->completeDeclAttrBeginning(nullptr, isInSILMode(), true);
+      } else {
+        status |= makeParserCodeCompletionStatus();
+      }
     }
     
     // ('inout' | 'let' | 'var' | '__shared' | '__owned')?
