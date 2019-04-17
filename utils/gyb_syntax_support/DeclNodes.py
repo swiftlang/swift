@@ -459,6 +459,7 @@ DECL_NODES = [
              Child('Modifiers', kind='ModifierList',
                    is_optional=True),
              Child('CallKeyword', kind='CallToken'),
+             Child('FuncKeyword', kind='FuncToken'),
              Child('GenericParameterClause', kind='GenericParameterClause',
                    is_optional=True),
              Child('Signature', kind='FunctionSignature'),
