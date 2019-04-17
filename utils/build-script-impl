@@ -3492,6 +3492,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [ "${BUILD_LIBPARSER_ONLY}" ]; then
                     INSTALL_TARGETS=tools/libSwiftSyntaxParser/install
                 fi
+                INSTALL_TARGETS=install-components
                 ;;
             llbuild)
                 if [[ -z "${INSTALL_LLBUILD}" ]] ; then

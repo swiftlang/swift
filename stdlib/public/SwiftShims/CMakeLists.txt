@@ -105,17 +105,16 @@ add_custom_command_target(unused_var
     COMMENT "Symlinking Clang resource headers into ${SWIFTLIB_DIR}/clang")
 add_dependencies(copy_shim_headers symlink_clang_headers)
 
-swift_install_in_component(stdlib
-    FILES ${sources}
-    DESTINATION "lib/swift/shims")
+install(FILES ${sources}
+        DESTINATION "lib/swift/shims"
+        COMPONENT stdlib)
 
 # Install Clang headers under the Swift library so that an installed Swift's
 # module importer can find the compiler headers corresponding to its Clang.
-swift_install_in_component(clang-builtin-headers
-    DIRECTORY "${clang_headers_location}/"
-    DESTINATION "lib/swift/clang"
-    PATTERN "*.h")
-
+install(DIRECTORY "${clang_headers_location}/"
+        DESTINATION "lib/swift/clang"
+        COMPONENT clang-builtin-headers
+        PATTERN "*.h")
 swift_install_symlink_component(clang-resource-dir-symlink
   LINK_NAME clang
   TARGET ../clang/${CLANG_VERSION}
@@ -126,7 +125,7 @@ swift_install_symlink_component(clang-resource-dir-symlink
 # should be used in conjunction with clang-resource-dir-symlink.
 file(TO_CMAKE_PATH "${LLVM_LIBRARY_OUTPUT_INTDIR}"
   _SWIFT_SHIMS_PATH_TO_CLANG_BUILD)
-swift_install_in_component(clang-builtin-headers-in-clang-resource-dir
-    DIRECTORY "${_SWIFT_SHIMS_PATH_TO_CLANG_BUILD}/lib/clang"
-    DESTINATION "lib"
-    PATTERN "*.h")
+install(DIRECTORY "${_SWIFT_SHIMS_PATH_TO_CLANG_BUILD}/lib/clang"
+        DESTINATION "lib"
+        COMPONENT clang-builtin-headers-in-clang-resource-dir
+        PATTERN "*.h")

@@ -468,6 +468,16 @@ include(SwiftConfigureSDK)
 include(SwiftComponents)
 include(SwiftList)
 
+include(SwiftSharedCMakeConfig)
+
+# Support building Swift as a standalone project, using LLVM as an
+# external library.
+if(SWIFT_BUILT_STANDALONE)
+  swift_common_standalone_build_config(SWIFT)
+else()
+  swift_common_unified_build_config(SWIFT)
+endif()
+
 # Configure swift include, install, build components.
 swift_configure_components()
 
@@ -485,16 +495,6 @@ if(NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
       COMMAND "uname" "-m"
       OUTPUT_VARIABLE CMAKE_SYSTEM_PROCESSOR
       OUTPUT_STRIP_TRAILING_WHITESPACE)
-endif()
-
-include(SwiftSharedCMakeConfig)
-
-# Support building Swift as a standalone project, using LLVM as an
-# external library.
-if(SWIFT_BUILT_STANDALONE)
-  swift_common_standalone_build_config(SWIFT)
-else()
-  swift_common_unified_build_config(SWIFT)
 endif()
 
 get_filename_component(SWIFT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR} REALPATH)
@@ -998,17 +998,17 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
   else()
     set(SOURCEKIT_RUNTIME_DIR lib)
   endif()
-  swift_install_in_component(sourcekit-inproc
-                             FILES
-                               $<TARGET_FILE:dispatch>
-                               $<TARGET_FILE:BlocksRuntime>
-                             DESTINATION ${SOURCEKIT_RUNTIME_DIR})
+  install(FILES
+            $<TARGET_FILE:dispatch>
+            $<TARGET_FILE:BlocksRuntime>
+          DESTINATION ${SOURCEKIT_RUNTIME_DIR}
+          COMPONENT sourcekit-inproc)
   if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
-    swift_install_in_component(sourcekit-inproc
-                               FILES
-                                 $<TARGET_LINKER_FILE:dispatch>
-                                 $<TARGET_LINKER_FILE:BlocksRuntime>
-                               DESTINATION lib)
+    install(FILES
+              $<TARGET_LINKER_FILE:dispatch>
+              $<TARGET_LINKER_FILE:BlocksRuntime>
+            DESTINATION lib
+            COMPONENT sourcekit-inproc)
   endif()
 
 
@@ -1083,9 +1083,9 @@ endif()
 
 add_subdirectory(cmake/modules)
 
-swift_install_in_component(license
-  FILES "LICENSE.txt"
-  DESTINATION "share/swift")
+install(FILES "LICENSE.txt"
+        DESTINATION "share/swift"
+        COMPONENT license)
 
 # Add a documentation target so that documentation shows up in the
 # Xcode project.

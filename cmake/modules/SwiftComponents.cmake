@@ -92,10 +92,15 @@ macro(swift_configure_components)
     "A semicolon-separated list of components to install from the set ${_SWIFT_DEFINED_COMPONENTS}")
 
   foreach(component ${_SWIFT_DEFINED_COMPONENTS})
+    add_custom_target(${component})
+    add_swift_install_target(${component} ${component})
+
     string(TOUPPER "${component}" var_name_piece)
     string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
     set(SWIFT_INSTALL_${var_name_piece} FALSE)
   endforeach()
+
+  add_custom_target(install-components)
 
   foreach(component ${SWIFT_INSTALL_COMPONENTS})
     if(NOT "${component}" IN_LIST _SWIFT_DEFINED_COMPONENTS)
@@ -106,6 +111,7 @@ macro(swift_configure_components)
     string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
     if(NOT SWIFT_INSTALL_EXCLUDE_${var_name_piece})
       set(SWIFT_INSTALL_${var_name_piece} TRUE)
+      add_dependencies(install-components install-${component})
     endif()
   endforeach()
 endmacro()
@@ -125,42 +131,6 @@ function(swift_is_installing_component component result_var_name)
     string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
     set("${result_var_name}" "${SWIFT_INSTALL_${var_name_piece}}" PARENT_SCOPE)
   endif()
-endfunction()
-
-# swift_install_in_component(<COMPONENT NAME>
-#   <same parameters as install()>)
-#
-# Executes the specified installation actions if the named component is
-# requested to be installed.
-#
-# This function accepts the same parameters as install().
-function(swift_install_in_component component)
-  precondition(component MESSAGE "Component name is required")
-
-  swift_is_installing_component("${component}" is_installing)
-  if(NOT is_installing)
-    return()
-  endif()
-
-  install(${ARGN})
-endfunction()
-
-# swift_install_in_either_component(<COMPONENT1 NAME> <COMPONENT2 NAME>
-#   <same parameters as install()>)
-#
-# Executes the specified installation actions if either one of the named
-# components is requested to be installed.
-#
-# This function accepts the same parameters as install().
-function(swift_install_in_either_component comp1 comp2)
-  foreach(component ${comp1} ${comp2})
-    precondition(component MESSAGE "Component name is required")
-    swift_is_installing_component("${component}" is_installing)
-    if(is_installing)
-      install(${ARGN})
-      return()
-    endif()
-  endforeach(component)
 endfunction()
 
 function(swift_install_symlink_component component)

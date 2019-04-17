@@ -1,6 +1,13 @@
-swift_install_in_either_component(tools toolchain-tools
-  FILES "swift-api-checker.py"
-  DESTINATION "bin")
-swift_install_in_either_component(tools toolchain-tools
-  DIRECTORY "sdk-module-lists"
-  DESTINATION "bin")
+install(FILES "swift-api-checker.py"
+        DESTINATION "bin"
+        COMPONENT tools)
+install(FILES "swift-api-checker.py"
+        DESTINATION "bin"
+        COMPONENT toolchain-tools)
+
+install(DIRECTORY "sdk-module-lists"
+        DESTINATION "bin"
+        COMPONENT tools)
+install(DIRECTORY "sdk-module-lists"
+        DESTINATION "bin"
+        COMPONENT toolchain-tools)

@@ -31,7 +31,7 @@ add_custom_target("copy_apinotes"
 # This is treated as an OPTIONAL target because if we don't build the SDK
 # overlay, the files will be missing anyway. It also allows us to build
 # single overlays without installing the API notes.
-swift_install_in_component(sdk-overlay
-    DIRECTORY "${output_dir}"
-    DESTINATION "lib/swift/"
-    OPTIONAL)
+install(DIRECTORY "${output_dir}"
+        DESTINATION "lib/swift/"
+        COMPONENT sdk-overlay
+        OPTIONAL)

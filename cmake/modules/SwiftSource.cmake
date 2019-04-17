@@ -340,14 +340,14 @@ function(_compile_swift_files
   endif()
 
   if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
-    swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
-      DIRECTORY "${specific_module_dir}"
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
-      OPTIONAL)
+    install(DIRECTORY "${specific_module_dir}"
+            DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
+            COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
+            OPTIONAL)
   else()
-    swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
-      FILES ${module_outputs}
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
+    install(FILES ${module_outputs}
+            DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
+            COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}")
   endif()
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")

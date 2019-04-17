@@ -24,6 +24,7 @@ if(SWIFT_ANALYZE_CODE_COVERAGE)
     LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
 endif()
 
-swift_install_in_component(tools
-    TARGETS complete-test
-    RUNTIME DESTINATION bin)
+add_dependencies(tools complete-test)
+install(TARGETS complete-test
+        RUNTIME DESTINATION bin
+        COMPONENT tools)
