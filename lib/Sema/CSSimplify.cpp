@@ -5028,7 +5028,7 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
 
         auto componentLoc =
             locator.withPathElement(LocatorPathElt::getKeyPathComponent(i));
-        auto *fix = AllowStaticMemberRefInKeyPath::create(
+        auto *fix = AllowInvalidRefInKeyPath::forStaticMember(
             *this, choices[i].getDecl(), getConstraintLocator(componentLoc));
 
         if (recordFix(fix))
@@ -6329,7 +6329,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowInaccessibleMember:
   case FixKind::AllowAnyObjectKeyPathRoot:
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
-  case FixKind::AllowStaticMemberRefInKeyPath:
+  case FixKind::AllowInvalidRefInKeyPath:
     llvm_unreachable("handled elsewhere");
   }
 
