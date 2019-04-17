@@ -199,6 +199,11 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
       info.Kind = SymbolKind::InstanceProperty;
       info.SubKind = SymbolSubKind::SwiftSubscript;
       break;
+    // SWIFT_ENABLE_TENSORFLOW
+    case DeclKind::Call:
+      info.Kind = SymbolKind::InstanceMethod;
+      // info.SubKind = SymbolSubKind::SwiftCall;
+      break;
     case DeclKind::Constructor:      info.Kind = SymbolKind::Constructor; break;
     case DeclKind::Destructor:       info.Kind = SymbolKind::Destructor; break;
     case DeclKind::Param:

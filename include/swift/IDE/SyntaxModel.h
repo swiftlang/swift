@@ -97,6 +97,8 @@ enum class SyntaxStructureKind : uint8_t {
   EnumElement,
   TypeAlias,
   Subscript,
+  // SWIFT_ENABLE_TENSORFLOW
+  Call,
   AssociatedType,
   GenericTypeParam,
 

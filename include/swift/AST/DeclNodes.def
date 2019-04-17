@@ -170,7 +170,9 @@ ABSTRACT_DECL(Value, Decl)
     ABSTRACT_FUNCTION_DECL(Destructor, AbstractFunctionDecl)
     ABSTRACT_FUNCTION_DECL(Func, AbstractFunctionDecl)
       ABSTRACT_FUNCTION_DECL(Accessor, FuncDecl)
-    DECL_RANGE(AbstractFunction, Constructor, Accessor)
+      // SWIFT_ENABLE_TENSORFLOW
+      ABSTRACT_FUNCTION_DECL(Call, FuncDecl)
+    DECL_RANGE(AbstractFunction, Constructor, Call)
   VALUE_DECL(EnumElement, ValueDecl)
   DECL_RANGE(Value, Enum, EnumElement)
 

@@ -918,7 +918,9 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   case DeclKind::Func:
   case DeclKind::Accessor:
   case DeclKind::Constructor:
-  case DeclKind::Destructor: {
+  case DeclKind::Destructor:
+  // SWIFT_ENABLE_TENSORFLOW
+  case DeclKind::Call: {
     auto abstractFunction = cast<AbstractFunctionDecl>(decl);
 
     // If we have a generic function and our parent isn't describing our generic

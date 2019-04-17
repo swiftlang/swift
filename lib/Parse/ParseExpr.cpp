@@ -1537,6 +1537,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       
   case tok::identifier:  // foo
   case tok::kw_self:     // self
+  // SWIFT_ENABLE_TENSORFLOW
+  case tok::kw_call:     // call, treated as a keyword when parsing declarations
 
     // If we are parsing a refutable pattern and are inside a let/var pattern,
     // the identifiers change to be value bindings instead of decl references.
@@ -2127,7 +2129,8 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
   // Consume the base name.
   DeclBaseName baseName;
   SourceLoc baseNameLoc;
-  if (Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_self)) {
+  // SWIFT_ENABLE_TENSORFLOW
+  if (Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_self, tok::kw_call)) {
     baseName = Context.getIdentifier(Tok.getText());
     baseNameLoc = consumeToken();
   } else if (allowOperators && Tok.isAnyOperator()) {
@@ -2235,7 +2238,8 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
 ///   expr-identifier:
 ///     unqualified-decl-name generic-args?
 Expr *Parser::parseExprIdentifier() {
-  assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
+  // SWIFT_ENABLE_TENSORFLOW
+  assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self, tok::kw_call));
   SyntaxParsingContext IDSyntaxContext(SyntaxContext,
                                        SyntaxKind::IdentifierExpr);
   Token IdentTok = Tok;

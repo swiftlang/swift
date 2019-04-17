@@ -768,6 +768,8 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
     StringRef OnlyKind;
     switch (PossibleDeclKinds) {
     case DeclAttribute::OnAccessor:    OnlyKind = "accessor"; break;
+    // SWIFT_ENABLE_TENSORFLOW
+    case DeclAttribute::OnCall:        OnlyKind = "call"; break;
     case DeclAttribute::OnClass:       OnlyKind = "class"; break;
     case DeclAttribute::OnConstructor: OnlyKind = "init"; break;
     case DeclAttribute::OnDestructor:  OnlyKind = "deinit"; break;

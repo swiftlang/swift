@@ -89,6 +89,8 @@ static ParserStatus parseDefaultArgument(
   Diag<> diagID = { DiagID() };
   switch (paramContext) {
   case Parser::ParameterContextKind::Function:
+  // SWIFT_ENABLE_TENSORFLOW
+  case Parser::ParameterContextKind::Call:
   case Parser::ParameterContextKind::Operator:
   case Parser::ParameterContextKind::Initializer:
     break;
@@ -541,6 +543,8 @@ mapParsedParameters(Parser &parser,
     case Parser::ParameterContextKind::Curried:
     case Parser::ParameterContextKind::Initializer:
     case Parser::ParameterContextKind::Function:
+    // SWIFT_ENABLE_TENSORFLOW
+    case Parser::ParameterContextKind::Call:
       isKeywordArgumentByDefault = true;
       break;
     }
@@ -605,6 +609,8 @@ mapParsedParameters(Parser &parser,
       assert((paramContext == Parser::ParameterContextKind::Function ||
               paramContext == Parser::ParameterContextKind::Operator ||
               paramContext == Parser::ParameterContextKind::Initializer ||
+              // SWIFT_ENABLE_TENSORFLOW
+              paramContext == Parser::ParameterContextKind::Call ||
               paramContext == Parser::ParameterContextKind::EnumElement) &&
              "Default arguments are only permitted on the first param clause");
       DefaultArgumentKind kind = getDefaultArgKind(param.DefaultArg);
@@ -630,6 +636,10 @@ Parser::parseSingleParameterClause(ParameterContextKind paramContext,
     // If we don't have the leading '(', complain.
     Diag<> diagID;
     switch (paramContext) {
+    // SWIFT_ENABLE_TENSORFLOW
+    case ParameterContextKind::Call:
+      diagID = diag::expected_lparen_call;
+      break;
     case ParameterContextKind::Function:
     case ParameterContextKind::Operator:
       diagID = diag::func_decl_without_paren;
@@ -716,6 +726,8 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 ParserStatus
 Parser::parseFunctionSignature(Identifier SimpleName,
                                DeclName &FullName,
+                               // SWIFT_ENABLE_TENSORFLOW
+                               ParameterContextKind paramContext,
                                ParameterList *&bodyParams,
                                DefaultArgumentInfo &defaultArgs,
                                SourceLoc &throwsLoc,
@@ -725,8 +737,6 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   SmallVector<Identifier, 4> NamePieces;
   ParserStatus Status;
 
-  ParameterContextKind paramContext = SimpleName.isOperator() ?
-    ParameterContextKind::Operator : ParameterContextKind::Function;
   Status |= parseFunctionArguments(NamePieces, bodyParams, paramContext,
                                    defaultArgs);
   FullName = DeclName(Context, SimpleName, NamePieces);
@@ -912,7 +922,9 @@ ParserResult<Pattern> Parser::parsePattern() {
     PatternCtx.setCreateSyntax(SyntaxKind::WildcardPattern);
     return makeParserResult(new (Context) AnyPattern(consumeToken(tok::kw__)));
     
-  case tok::identifier: {
+  case tok::identifier:
+  // SWIFT_ENABLE_TENSORFLOW
+  case tok::kw_call: {
     PatternCtx.setCreateSyntax(SyntaxKind::IdentifierPattern);
     Identifier name;
     SourceLoc loc = consumeIdentifier(&name);

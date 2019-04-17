@@ -85,6 +85,9 @@ public:
     MemberRefBase,
     /// \brief The lookup for a subscript member.
     SubscriptMember,
+    // SWIFT_ENABLE_TENSORFLOW
+    /// \brief The lookup for a call method.
+    CallMethod,
     /// \brief The lookup for a constructor member.
     ConstructorMember,
     /// \brief An implicit @lvalue-to-inout conversion; only valid for operator
@@ -141,6 +144,8 @@ public:
     case MemberRefBase:
     case UnresolvedMember:
     case SubscriptMember:
+    // SWIFT_ENABLE_TENSORFLOW
+    case CallMethod:
     case ConstructorMember:
     case LValueConversion:
     case RValueAdjustment:
@@ -204,6 +209,8 @@ public:
     case LValueConversion:
     case RValueAdjustment:
     case SubscriptMember:
+    // SWIFT_ENABLE_TENSORFLOW
+    case CallMethod:
     case OpenedGeneric:
     case GenericParameter:
     case GenericArgument:

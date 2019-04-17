@@ -457,7 +457,9 @@ public:
   }
 
   SourceLoc consumeIdentifier(Identifier *Result = nullptr) {
-    assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
+    // SWIFT_ENABLE_TENSORFLOW
+    assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self,
+                     tok::kw_call));
     if (Result)
       *Result = Context.getIdentifier(Tok.getText());
     return consumeToken();
@@ -959,6 +961,9 @@ public:
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  ParserResult<CallDecl>
+  parseDeclCall(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserResult<SubscriptDecl>
   parseDeclSubscript(ParseDeclOptions Flags, DeclAttributes &Attributes,
                      SmallVectorImpl<Decl *> &Decls);
@@ -1119,6 +1124,9 @@ public:
     Closure,
     /// A subscript.
     Subscript,
+    // SWIFT_ENABLE_TENSORFLOW
+    /// A callable method.
+    Call,
     /// A curried argument clause.
     Curried,
     /// An enum element.
@@ -1157,6 +1165,8 @@ public:
                                       DefaultArgumentInfo &defaultArgs);
   ParserStatus parseFunctionSignature(Identifier functionName,
                                       DeclName &fullName,
+                                      // SWIFT_ENABLE_TENSORFLOW
+                                      ParameterContextKind paramContext,
                                       ParameterList *&bodyParams,
                                       DefaultArgumentInfo &defaultArgs,
                                       SourceLoc &throws,

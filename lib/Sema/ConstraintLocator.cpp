@@ -54,6 +54,8 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case MemberRefBase:
     case UnresolvedMember:
     case SubscriptMember:
+    // SWIFT_ENABLE_TENSORFLOW
+    case CallMethod:
     case ConstructorMember:
     case LValueConversion:
     case RValueAdjustment:
@@ -192,6 +194,11 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case SequenceIteratorProtocol:
       out << "sequence iterator type";
+      break;
+
+    // SWIFT_ENABLE_TENSORFLOW
+    case CallMethod:
+      out << "call method";
       break;
 
     case SubscriptMember:

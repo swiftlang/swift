@@ -1399,7 +1399,9 @@ void SILGenModule::emitExternalWitnessTable(ProtocolConformance *c) {
 void SILGenModule::emitExternalDefinition(Decl *d) {
   switch (d->getKind()) {
   case DeclKind::Func:
-  case DeclKind::Accessor: {
+  case DeclKind::Accessor:
+  // SWIFT_ENABLE_TENSORFLOW
+  case DeclKind::Call: {
     emitFunction(cast<FuncDecl>(d));
     break;
   }

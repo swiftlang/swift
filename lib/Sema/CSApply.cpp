@@ -7549,6 +7549,11 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       llvm_unreachable("Unhandled DeclTypeCheckingSemantics in switch.");
     };
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // Save the original potentially lvalue function for rewriting `call` method
+  // applications.
+  auto *originalFn = fn;
+  // SWIFT_ENABLE_TENSORFLOW END
   // The function is always an rvalue.
   fn = cs.coerceToRValue(fn);
 
@@ -7758,6 +7763,57 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     // Tail-recur to actually call the constructor.
     return finishApply(apply, openedType, locator);
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Handle `call` method applications.
+  auto &ctx = cs.getASTContext();
+
+  TupleExpr *arg = dyn_cast<TupleExpr>(apply->getArg());
+  if (auto parenExpr = dyn_cast<ParenExpr>(apply->getArg()))
+    arg = TupleExpr::createImplicit(ctx, parenExpr->getSubExpr(), {});
+
+  // Get resolved `call` method and verify it.
+  auto loc = locator.withPathElement(ConstraintLocator::ApplyFunction);
+  auto selected = solution.getOverloadChoice(cs.getConstraintLocator(loc));
+  auto choice = selected.choice;
+  if (auto *method = dyn_cast<CallDecl>(selected.choice.getDecl())) {
+    auto methodType =
+        simplifyType(selected.openedType)->castTo<AnyFunctionType>();
+    auto selfParam = method->getImplicitSelfDecl();
+    // Diagnose `mutating` method call on immutable value.
+    if (!cs.getType(originalFn)->hasLValueType() && selfParam->isInOut()) {
+      AssignmentFailure failure(originalFn, cs, originalFn->getLoc(),
+                                diag::cannot_pass_rvalue_mutating_subelement,
+                                diag::cannot_pass_rvalue_mutating);
+      failure.diagnose();
+      return nullptr;
+    }
+    // Create direct reference to `call` method.
+    bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
+    Expr *declRef = buildMemberRef(originalFn, selected.openedFullType,
+                                   /*dotLoc=*/SourceLoc(), choice,
+                                   DeclNameLoc(fn->getEndLoc()),
+                                   selected.openedType, loc, loc,
+                                   /*Implicit=*/true,
+                                   choice.getFunctionRefKind(),
+                                   AccessSemantics::Ordinary, isDynamic);
+    if (!declRef)
+      return nullptr;
+    declRef->setImplicit(apply->isImplicit());
+    apply->setFn(declRef);
+    // Coerce argument to input type of `call` method.
+    SmallVector<Identifier, 2> argLabelsScratch;
+    auto *arg = coerceCallArguments(apply->getArg(), methodType, apply,
+                                    apply->getArgumentLabels(argLabelsScratch),
+                                    apply->hasTrailingClosure(), loc);
+    if (!arg)
+      return nullptr;
+    apply->setArg(arg);
+    cs.setType(apply, methodType->getResult());
+    cs.cacheExprTypes(apply);
+    return apply;
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   // Handle @dynamicCallable applications.
   // At this point, all other ApplyExpr cases have been handled.
