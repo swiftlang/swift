@@ -3044,6 +3044,9 @@ ERROR(general_noescape_to_escaping,none,
 ERROR(converting_noescape_to_type,none,
       "converting non-escaping value to %0 may allow it to escape",
       (Type))
+ERROR(unknown_escaping_use_of_noescape,none,
+      "using non-escaping value in a context where it may escape",
+      ())
 
 ERROR(capture_across_type_decl,none,
       "%0 declaration cannot close over value %1 defined in outer scope",

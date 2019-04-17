@@ -586,6 +586,8 @@ void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
 
 Optional<ProtocolConformanceRef>
 ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
+  ASTContext &ctx = getASTContext();
+
   assert(type->isExistentialType());
 
   // If the existential type cannot be represented or the protocol does not
@@ -606,7 +608,7 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
     if (protocol->requiresSelfConformanceWitnessTable() &&
         type->is<ProtocolType>() &&
         type->castTo<ProtocolType>()->getDecl() == protocol)
-      return ProtocolConformanceRef(protocol);
+      return ProtocolConformanceRef(ctx.getSelfConformance(protocol));
 
     return None;
   }
@@ -625,7 +627,7 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
     // If we found the protocol we're looking for, return an abstract
     // conformance to it.
     if (protoDecl == protocol)
-      return ProtocolConformanceRef(protocol);
+      return ProtocolConformanceRef(ctx.getSelfConformance(protocol));
 
     // If the protocol has a superclass constraint, we might conform
     // concretely.
@@ -636,7 +638,7 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
 
     // Now check refined protocols.
     if (protoDecl->inheritsFrom(protocol))
-      return ProtocolConformanceRef(protocol);
+      return ProtocolConformanceRef(ctx.getSelfConformance(protocol));
   }
 
   // We didn't find our protocol in the existential's list; it doesn't
@@ -715,7 +717,7 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
   // compiler.
   if (auto inherited = dyn_cast<InheritedProtocolConformance>(conformance)) {
     // Dig out the conforming nominal type.
-    auto rootConformance = inherited->getRootNormalConformance();
+    auto rootConformance = inherited->getRootConformance();
     auto conformingClass
       = rootConformance->getType()->getClassOrBoundGenericClass();
 

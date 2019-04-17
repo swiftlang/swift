@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5
 
-// See test/Compatibility/tuple_arguments_3.swift for the Swift 3 behavior.
-// See test/Compatibility/tuple_arguments_4.swift for the Swift 4 behavior.
+// See test/Compatibility/tuple_arguments_4.swift for some
+// Swift 4-specific tests.
 
 func concrete(_ x: Int) {}
 func concreteLabeled(x: Int) {}
@@ -1716,5 +1716,42 @@ func rdar48443263() {
   func bar(_ s1: S1, _ s2: S2, _ fn: () -> Void) {
     foo(s1, fn) // Ok because s.V is Void
     foo(s2, fn) // expected-error {{cannot convert value of type '() -> Void' to expected argument type '(_) -> Void'}}
+  }
+}
+
+func autoclosureSplat() {
+  func takeFn<T>(_: (T) -> ()) {}
+
+  takeFn { (fn: @autoclosure () -> Int) in }
+  // This type checks because we find a solution T:= @escaping () -> Int and
+  // wrap the closure in a function conversion.
+
+  takeFn { (fn: @autoclosure () -> Int, x: Int) in }
+  // expected-error@-1 {{contextual closure type '(_) -> ()' expects 1 argument, but 2 were used in closure body}}
+
+  takeFn { (fn: @autoclosure @escaping () -> Int) in }
+  // FIXME: It looks like matchFunctionTypes() does not check @autoclosure at all.
+  // Perhaps this is intentional, but we should document it eventually. In the
+  // interim, this test serves as "documentation"; if it fails, please investigate why
+  // instead of changing the test.
+
+  takeFn { (fn: @autoclosure @escaping () -> Int, x: Int) in }
+  // expected-error@-1 {{contextual closure type '(_) -> ()' expects 1 argument, but 2 were used in closure body}}
+}
+
+func noescapeSplat() {
+  func takesFn<T>(_ fn: (T) -> ()) -> T {}
+  func takesEscaping(_: @escaping () -> Int) {}
+
+  do {
+    let t = takesFn { (fn: () -> Int) in }
+    takesEscaping(t)
+    // This type checks because we find a solution T:= (@escaping () -> Int).
+  }
+
+  do {
+    let t = takesFn { (fn: () -> Int, x: Int) in }
+    // expected-error@-1 {{converting non-escaping value to 'T' may allow it to escape}}
+    takesEscaping(t.0)
   }
 }
