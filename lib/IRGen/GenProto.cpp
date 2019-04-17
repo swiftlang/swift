@@ -1509,16 +1509,6 @@ void WitnessTableBuilder::defineAssociatedTypeWitnessTableAccessFunction(
 
   const ConformanceInfo *conformanceI = nullptr;
 
-  // Rewrite (abstract) self conformances to the concrete conformance.
-  if (associatedConformance.isAbstract() && !hasArchetype) {
-    // This must be a self conformance.
-    auto proto = associatedConformance.getRequirement();
-    assert(proto->requiresSelfConformanceWitnessTable());
-    assert(cast<ProtocolType>(associatedType)->getDecl() == proto);
-    auto concreteConformance = IGF.IGM.Context.getSelfConformance(proto);
-    associatedConformance = ProtocolConformanceRef(concreteConformance);
-  }
-
   if (associatedConformance.isConcrete()) {
     assert(associatedType->isEqual(associatedConformance.getConcrete()->getType()));
 
@@ -2750,13 +2740,8 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   // requirements of the archetype. Look at what's locally bound.
   ProtocolConformance *concreteConformance;
   if (conformance.isAbstract()) {
-    if (auto archetype = dyn_cast<ArchetypeType>(srcType))
-      return emitArchetypeWitnessTableRef(IGF, archetype, proto);
-
-    // Otherwise, this must be a self-conformance.
-    assert(proto->requiresSelfConformanceWitnessTable());
-    assert(cast<ProtocolType>(srcType)->getDecl() == proto);
-    concreteConformance = IGF.IGM.Context.getSelfConformance(proto);
+    auto archetype = cast<ArchetypeType>(srcType);
+    return emitArchetypeWitnessTableRef(IGF, archetype, proto);
 
   // All other source types should be concrete enough that we have
   // conformance info for them.  However, that conformance info might be
