@@ -4610,6 +4610,8 @@ void CodeCompletionCallbacksImpl::completeDeclAttrKeyword(Decl *D,
     AttTargetDK = DeclKind::Param;
   } else if (D) {
     AttTargetDK = D->getKind();
+    if (AttTargetDK == DeclKind::PatternBinding)
+      AttTargetDK = DeclKind::Var;
   }
   CurDeclContext = P.CurDeclContext;
 }
