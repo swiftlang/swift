@@ -6,6 +6,7 @@ CHANGELOG
 
 | Contents               |
 | :--------------------- |
+| [Swift Next](#swift-next) |
 | [Swift 5.1](#swift-51) |
 | [Swift 5.0](#swift-50) |
 | [Swift 4.2](#swift-42) |
@@ -21,6 +22,24 @@ CHANGELOG
 | [Swift 1.0](#swift-10) |
 
 </details>
+
+Swift Next
+----------
+
+* [SR-6118][]:
+
+  Subscripts can now declare default arguments:
+
+  ```swift
+  struct Subscriptable {
+    subscript(x: Int, y: Int = 0) {
+      ...
+    }
+  }
+
+  let s = Subscriptable()
+  print(s[0])
+  ```
 
 Swift 5.1
 ---------
