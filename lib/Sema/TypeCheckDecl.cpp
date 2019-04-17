@@ -2415,6 +2415,8 @@ public:
     if (SD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
       TC.checkDynamicReplacementAttribute(SD);
     }
+
+    TC.checkParameterAttributes(SD->getIndices());
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -2926,6 +2928,8 @@ public:
     if (FD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
       TC.checkDynamicReplacementAttribute(FD);
     }
+
+    TC.checkParameterAttributes(FD->getParameters());
   }
 
   void visitModuleDecl(ModuleDecl *) { }
@@ -2939,6 +2943,10 @@ public:
 
     TC.validateDecl(EED);
     TC.checkDeclAttributes(EED);
+
+    if (auto *PL = EED->getParameterList()) {
+      TC.checkParameterAttributes(PL);
+    }
 
     checkAccessControl(TC, EED);
   }
@@ -3122,6 +3130,7 @@ public:
     }
 
     TC.checkDeclAttributes(CD);
+    TC.checkParameterAttributes(CD->getParameters());
 
     checkAccessControl(TC, CD);
 
