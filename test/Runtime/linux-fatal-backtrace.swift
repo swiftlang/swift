@@ -4,7 +4,7 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=linux-gnu
 // REQUIRES: lldb
-// UNSUPPORTED: CPU=aarch64
+// XFAIL: CPU=aarch64
 
 // Backtraces are not emitted when optimizations are enabled. This test can not
 // run when optimizations are enabled.
