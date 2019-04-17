@@ -31,6 +31,26 @@ class ModuleDecl;
 
 namespace ide {
 
+/// The expected contextual type(s) for code-completion.
+struct ExpectedTypeContext {
+  /// Possible types of the code completion expression.
+  llvm::SmallVector<Type, 4> possibleTypes;
+
+  /// Whether the `ExpectedTypes` comes from a single-expression body, e.g.
+  /// `foo({ here })`.
+  ///
+  /// Since the input may be incomplete, we take into account that the types are
+  /// only a hint.
+  bool isSingleExpressionBody = false;
+
+  bool empty() const { return possibleTypes.empty(); }
+
+  ExpectedTypeContext() = default;
+  ExpectedTypeContext(ArrayRef<Type> types, bool isSingleExpressionBody)
+      : possibleTypes(types.begin(), types.end()),
+        isSingleExpressionBody(isSingleExpressionBody) {}
+};
+
 class CodeCompletionResultBuilder {
   CodeCompletionResultSink &Sink;
   CodeCompletionResult::ResultKind Kind;
@@ -43,7 +63,7 @@ class CodeCompletionResultBuilder {
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
   llvm::PointerUnion<const ModuleDecl *, const clang::Module *>
       CurrentModule;
-  ArrayRef<Type> ExpectedDeclTypes;
+  ExpectedTypeContext declTypeContext;
   CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
       CodeCompletionResult::Unrelated;
   bool Cancelled = false;
@@ -78,9 +98,9 @@ public:
   CodeCompletionResultBuilder(CodeCompletionResultSink &Sink,
                               CodeCompletionResult::ResultKind Kind,
                               SemanticContextKind SemanticContext,
-                              ArrayRef<Type> ExpectedDeclTypes)
+                              const ExpectedTypeContext &declTypeContext)
       : Sink(Sink), Kind(Kind), SemanticContext(SemanticContext),
-        ExpectedDeclTypes(ExpectedDeclTypes) {}
+        declTypeContext(declTypeContext) {}
 
   ~CodeCompletionResultBuilder() {
     finishResult();

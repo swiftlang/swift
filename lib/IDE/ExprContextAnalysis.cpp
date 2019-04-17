@@ -512,6 +512,7 @@ class ExprContextAnalyzer {
   SmallVectorImpl<Type> &PossibleTypes;
   SmallVectorImpl<StringRef> &PossibleNames;
   SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees;
+  bool &singleExpressionBody;
 
   void recordPossibleType(Type ty) {
     if (!ty || ty->is<ErrorType>())
@@ -618,6 +619,13 @@ class ExprContextAnalyzer {
       }
       break;
     }
+    case ExprKind::Closure: {
+      auto *CE = cast<ClosureExpr>(Parent);
+      assert(isSingleExpressionBodyForCodeCompletion(CE->getBody()));
+      singleExpressionBody = true;
+      recordPossibleType(getReturnTypeFromContext(CE));
+      break;
+    }
     default:
       llvm_unreachable("Unhandled expression kind.");
     }
@@ -707,14 +715,20 @@ class ExprContextAnalyzer {
     }
   }
 
+  static bool isSingleExpressionBodyForCodeCompletion(BraceStmt *body) {
+    return body->getNumElements() == 1 && body->getElements()[0].is<Expr *>();
+  }
+
 public:
   ExprContextAnalyzer(DeclContext *DC, Expr *ParsedExpr,
                       SmallVectorImpl<Type> &PossibleTypes,
                       SmallVectorImpl<StringRef> &PossibleNames,
-                      SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees)
+                      SmallVectorImpl<FunctionTypeAndDecl> &PossibleCallees,
+                      bool &singleExpressionBody)
       : DC(DC), ParsedExpr(ParsedExpr), SM(DC->getASTContext().SourceMgr),
         Context(DC->getASTContext()), PossibleTypes(PossibleTypes),
-        PossibleNames(PossibleNames), PossibleCallees(PossibleCallees) {}
+        PossibleNames(PossibleNames), PossibleCallees(PossibleCallees),
+        singleExpressionBody(singleExpressionBody) {}
 
   void Analyze() {
     // We cannot analyze without target.
@@ -736,6 +750,15 @@ public:
           return !ParentE ||
                  (!isa<CallExpr>(ParentE) && !isa<SubscriptExpr>(ParentE) &&
                   !isa<BinaryExpr>(ParentE) && !isa<ArgumentShuffleExpr>(ParentE));
+        }
+        case ExprKind::Closure: {
+          // Note: we cannot use hasSingleExpressionBody, because we explicitly
+          // do not use the single-expression-body when there is code-completion
+          // in the expression in order to avoid a base expression affecting
+          // the type. However, now that we've typechecked, we will take the
+          // context type into account.
+          return isSingleExpressionBodyForCodeCompletion(
+              cast<ClosureExpr>(E)->getBody());
         }
         default:
           return false;
@@ -795,6 +818,6 @@ public:
 
 ExprContextInfo::ExprContextInfo(DeclContext *DC, Expr *TargetExpr) {
   ExprContextAnalyzer Analyzer(DC, TargetExpr, PossibleTypes, PossibleNames,
-                               PossibleCallees);
+                               PossibleCallees, singleExpressionBody);
   Analyzer.Analyze();
 }
