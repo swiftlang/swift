@@ -69,3 +69,8 @@ public let ${prefix}_TRUE_MIN = ${type}.leastNonzeroMagnitude
 #endif
 % end
 %end
+
+#if os(Wasm)
+// WebAssembly's error.h uses a macro that Swift can't import.
+public let EINVAL:Int32 = 28
+#endif
