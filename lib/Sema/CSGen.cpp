@@ -2977,7 +2977,7 @@ namespace {
         auto memberLocator = CS.getConstraintLocator(
             locator, ConstraintLocator::PathElement::getKeyPathComponent(i));
         auto resultLocator = CS.getConstraintLocator(
-            memberLocator, ConstraintLocator::FunctionResult);
+            memberLocator, ConstraintLocator::KeyPathComponentResult);
 
         switch (auto kind = component.getKind()) {
         case KeyPathExpr::Component::Kind::Invalid:
