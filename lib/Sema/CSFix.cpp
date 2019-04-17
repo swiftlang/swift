@@ -430,6 +430,10 @@ bool AllowInvalidRefInKeyPath::diagnose(Expr *root, bool asNote) const {
                                             getLocator());
     return failure.diagnose(asNote);
   }
+
+  case RefKind::MutatingGetter: {
+    return false;
+  }
   }
 }
 

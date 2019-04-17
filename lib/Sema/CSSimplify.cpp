@@ -5022,14 +5022,21 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       }
 
       // Referencing static members in key path is not currently allowed.
-      if (storage->isStatic()) {
+      if (storage->isStatic() || storage->isGetterMutating()) {
         if (!shouldAttemptFixes())
           return SolutionKind::Error;
 
-        auto componentLoc =
-            locator.withPathElement(LocatorPathElt::getKeyPathComponent(i));
-        auto *fix = AllowInvalidRefInKeyPath::forStaticMember(
-            *this, choices[i].getDecl(), getConstraintLocator(componentLoc));
+        auto *componentLoc = getConstraintLocator(
+            locator.withPathElement(LocatorPathElt::getKeyPathComponent(i)));
+
+        ConstraintFix *fix = nullptr;
+        if (storage->isStatic()) {
+          fix = AllowInvalidRefInKeyPath::forStaticMember(
+              *this, choices[i].getDecl(), componentLoc);
+        } else {
+          fix = AllowInvalidRefInKeyPath::forMutatingGetter(
+              *this, choices[i].getDecl(), componentLoc);
+        }
 
         if (recordFix(fix))
           return SolutionKind::Error;

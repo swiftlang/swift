@@ -788,6 +788,9 @@ class AllowInvalidRefInKeyPath final : public ConstraintFix {
   enum RefKind {
     // Allow a reference to a static member as a key path component.
     StaticMember,
+    // Allow a reference to a declaration with mutating getter as
+    // a key path component.
+    MutatingGetter,
   } Kind;
 
   ValueDecl *Member;
@@ -802,6 +805,9 @@ public:
     switch (Kind) {
     case RefKind::StaticMember:
       return "allow reference to a static member as a key path component";
+    case RefKind::MutatingGetter:
+      return "allow reference to a member with mutating getter as a key "
+             "path component";
     }
   }
 
@@ -811,6 +817,12 @@ public:
                                                    ValueDecl *member,
                                                    ConstraintLocator *locator) {
     return create(cs, RefKind::StaticMember, member, locator);
+  }
+
+  static AllowInvalidRefInKeyPath *
+  forMutatingGetter(ConstraintSystem &cs, ValueDecl *member,
+                    ConstraintLocator *locator) {
+    return create(cs, RefKind::MutatingGetter, member, locator);
   }
 
 private:
