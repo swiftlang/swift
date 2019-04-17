@@ -7,6 +7,9 @@ protocol P0 {
 func testProtocol(_ x: P0) {
   _ = x()
 }
+func testGeneric<T : P0>(_ x: T) {
+  _ = x()
+}
 
 protocol P1 {
   call func() -> Self
