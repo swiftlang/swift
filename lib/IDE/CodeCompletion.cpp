@@ -1369,7 +1369,7 @@ public:
   void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning() override;
   void completeCaseStmtDotPrefix() override;
-  void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) override;
+  void completeDeclAttrBeginning(Decl *D, bool Sil, bool Param) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeInPrecedenceGroup(SyntaxKind SK) override;
   void completeNominalMemberBeginning(
@@ -4607,9 +4607,8 @@ void CodeCompletionCallbacksImpl::completeDeclAttrParam(DeclAttrKind DK,
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeDeclAttrKeyword(Decl *D,
-                                                          bool Sil,
-                                                          bool Param) {
+void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(Decl *D, bool Sil,
+                                                            bool Param) {
   Kind = CompletionKind::AttributeBegin;
   IsInSil = Sil;
   if (Param) {
@@ -5384,6 +5383,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::AttributeBegin: {
     Lookup.getAttributeDeclCompletions(IsInSil, AttTargetDK);
+
+    // Provide any type name for property delegate.
+    if (!AttTargetDK || *AttTargetDK == DeclKind::Var)
+      Lookup.getTypeCompletionsInDeclContext(
+          P.Context.SourceMgr.getCodeCompletionLoc());
     break;
   }
   case CompletionKind::AttributeDeclParen: {

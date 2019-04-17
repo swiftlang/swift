@@ -186,7 +186,7 @@ public:
   virtual void completeAccessorBeginning(CodeCompletionExpr *E) {};
 
   /// Complete the keyword in attribute, for instance, @available.
-  virtual void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) {};
+  virtual void completeDeclAttrBeginning(Decl *D, bool Sil, bool Param) {};
 
   /// Complete the parameters in attribute, for instance, version specifier for
   /// @available.
