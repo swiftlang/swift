@@ -914,8 +914,23 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
                     current->getFullName());
         tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
       } else {
-        tc.diagnose(current, diag::invalid_redecl, current->getFullName());
-        tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
+        const auto *otherInit = dyn_cast<ConstructorDecl>(other);
+        // Provide a better description for implicit initializers.
+        if (otherInit && otherInit->isImplicit()) {
+          enum {
+            Synthetic, SyntheticMemberwise, Inherited
+          } kind = Synthetic;
+          if (otherInit->isMemberwiseInitializer())
+            kind = SyntheticMemberwise;
+          else if (otherInit->getOverriddenDecl())
+            kind = Inherited;
+
+          tc.diagnose(current, diag::invalid_redecl_init,
+                      current->getFullName(), kind);
+        } else {
+          tc.diagnose(current, diag::invalid_redecl, current->getFullName());
+          tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
+        }
         markInvalid();
       }
 

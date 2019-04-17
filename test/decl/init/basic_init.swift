@@ -13,8 +13,26 @@ class C {
 typealias t = t // expected-error {{type alias 't' references itself}}
 // expected-note@-1{{type declared here}}
 
+extension Foo {
+  convenience init() {} // expected-error{{invalid redeclaration of synthesized 'init()'}}
+}
 
+class InitClass {
+  init(arg: Bool) {} // expected-note{{add '@objc' to make this declaration overridable}}
+}
+class InitSubclass: InitClass {}
+extension InitSubclass {
+  convenience init(arg: Bool) {}
+  // expected-error@-1{{invalid redeclaration of inherited 'init(arg:)'}}
+  // expected-error@-2{{overriding non-@objc declarations from extensions is not supported}}
+}
 
+struct InitStruct {
+  let foo: Int
+}
+extension InitStruct {
+  init(foo: Int) {} // expected-error{{invalid redeclaration of synthesized memberwise 'init(foo:)'}}
+}
 
 // <rdar://problem/17564699> QoI: Structs should get convenience initializers
 struct MyStruct {
