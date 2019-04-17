@@ -3557,6 +3557,7 @@ public:
                             "only for use within the debugger");
 
   void print(raw_ostream &out);
+  void print(raw_ostream &out, Expr *);
 };
 
 /// Compute the shuffle required to map from a given tuple type to
