@@ -484,7 +484,8 @@ func _vjpMatmul<Scalar : TensorFlowFloatingPoint>(
 ) -> (Tensor<Scalar>, (Tensor<Scalar>) -> (Tensor<Scalar>, Tensor<Scalar>)) {
   let value = matmul(lhs, rhs)
   return (value, { v in 
-    return (matmul(v, rhs.transposed()), matmul(lhs.transposed(), v))
+    return (Raw.matMul(v, rhs, transposeB: true),
+            Raw.matMul(lhs, v, transposeA: true))
   })
 }
 
