@@ -11,21 +11,21 @@ func takesOptionalAny(_: Any?, _: Any?) {}
 class C {
   var a: Int! // expected-note 2{{implicitly unwrapped property 'a' declared here}}
   var b: Any?! // expected-note {{implicitly unwrapped property 'b' declared here}}
-  func returningIUO() -> Int! { return a } // expected-note {{instance method 'returningIUO' with implicitly unwrapped result type is declared here}}
+  func returningIUO() -> Int! { return a } // expected-note {{instance method 'returningIUO()' with implicitly unwrapped result type is declared here}}
   func returningAny() -> Any { return a } // expected-warning {{coercion of implicitly unwrappable value of type 'Int?' to 'Any' does not unwrap optional}}
   // expected-note@-1 {{provide a default value to avoid this warning}}{{40-40= ?? <#default value#>}}
   // expected-note@-2 {{force-unwrap the value to avoid this warning}}{{40-40=!}}
   // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{40-40= as Any}}
 
-  subscript(i: Int) -> Int! { return 0 } // expected-note {{implicitly unwrapped subscript 'subscript' declared here}}
-  subscript(i: Float) -> Any! { return 0 } // expected-note {{implicitly unwrapped subscript 'subscript' declared here}}
+  subscript(i: Int) -> Int! { return 0 } // expected-note {{implicitly unwrapped subscript 'subscript(_:)' declared here}}
+  subscript(i: Float) -> Any! { return 0 } // expected-note {{implicitly unwrapped subscript 'subscript(_:)' declared here}}
 }
 
 class D {
-  init!() {} // expected-note 2{{implicitly unwrapped initializer 'init' declared here}}
+  init!() {} // expected-note 2{{implicitly unwrapped initializer 'init()' declared here}}
 }
 
-func returningIUO() -> Int! { return 1 } // expected-note {{global function 'returningIUO' with implicitly unwrapped result type is declared here}}
+func returningIUO() -> Int! { return 1 } // expected-note {{global function 'returningIUO()' with implicitly unwrapped result type is declared here}}
 
 func warnIUOToAnyCoercion(_ a: Int!, _ b: Any?!) { // expected-note {{implicitly unwrapped parameter 'a' declared here}} // expected-note {{implicitly unwrapped parameter 'b' declared here}}
   _ = takeAny(a, b) // expected-warning {{coercion of implicitly unwrappable value of type 'Int?' to 'Any' does not unwrap optional}}

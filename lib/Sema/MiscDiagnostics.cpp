@@ -3472,7 +3472,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
                               : diag::iuo_to_any_coercion_note;
 
           TC.diagnose(decl->getLoc(), noteDiag, decl->getDescriptiveKind(),
-                      DeclName(decl->getBaseName()));
+                      decl->getFullName());
         }
       } else {
         TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
