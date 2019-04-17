@@ -1729,13 +1729,15 @@ public extension Tensor {
   /// - Parameter upperBounds: The upper bounds at each dimension.
   @inlinable
   @differentiable(wrt: self)
-  func slice(lowerBounds: [Int32], upperBounds: [Int32]) -> Tensor {
-    /// TODO: Precondition `lowerBounds.count == upperBounds.count`,
-    /// preferably in graph.
-    let lowerBoundsTensor = Tensor<Int32>(lowerBounds)
+  func slice(lowerBounds: [Int], upperBounds: [Int]) -> Tensor {
+    // TODO: Precondition `lowerBounds.count == upperBounds.count`,
+    // preferably in graph.
+    // TODO: Differentiating control flow is not supported yet, thus the thunks.
+    let lowerBoundsTensor = Tensor<Int32>({lowerBounds.map(Int32.init)}())
+    let upperBoundsTensor = Tensor<Int32>({upperBounds.map(Int32.init)}())
     return slice(
       lowerBounds: lowerBoundsTensor,
-      sizes: Tensor<Int32>(upperBounds) - lowerBoundsTensor)
+      sizes: upperBoundsTensor - lowerBoundsTensor)
   }
 
   @inlinable
@@ -1765,12 +1767,12 @@ public enum TensorRange : TensorRangeExpression {
   case ellipsis
   case newAxis
   case squeezeAxis
-  case index(Int32)
-  case range(Range<Int32>, stride: Int32)
-  case closedRange(ClosedRange<Int32>, stride: Int32)
-  case partialRangeFrom(PartialRangeFrom<Int32>, stride: Int32)
-  case partialRangeUpTo(PartialRangeUpTo<Int32>, stride: Int32)
-  case partialRangeThrough(PartialRangeThrough<Int32>, stride: Int32)
+  case index(Int)
+  case range(Range<Int>, stride: Int)
+  case closedRange(ClosedRange<Int>, stride: Int)
+  case partialRangeFrom(PartialRangeFrom<Int>, stride: Int)
+  case partialRangeUpTo(PartialRangeUpTo<Int>, stride: Int)
+  case partialRangeThrough(PartialRangeThrough<Int>, stride: Int)
 
   public var tensorRange: TensorRange { return self }
 }
@@ -1806,42 +1808,37 @@ public protocol TensorRangeExpression {
 //   public var tensorRange: TensorRange { return .ellipsis }
 // }
 
-extension Int32 : TensorRangeExpression {
-  public var tensorRange: TensorRange { return .index(self) }
-}
-
 extension Int : TensorRangeExpression {
-  public var tensorRange: TensorRange { return .index(Int32(self)) }
+  public var tensorRange: TensorRange { return .index(self) }
 }
 
 extension Range : TensorRangeExpression where Bound == Int {
   public var tensorRange: TensorRange {
-    return .range(Int32(lowerBound)..<Int32(upperBound), stride: 1)
+    return .range(self, stride: 1)
   }
 }
 
 extension ClosedRange : TensorRangeExpression where Bound == Int {
   public var tensorRange: TensorRange {
-    return .closedRange(
-      Int32(lowerBound)...Int32(upperBound), stride: 1)
+    return .closedRange(self, stride: 1)
   }
 }
 
 extension PartialRangeFrom : TensorRangeExpression where Bound == Int {
   public var tensorRange: TensorRange {
-    return .partialRangeFrom(Int32(lowerBound)..., stride: 1)
+    return .partialRangeFrom(self, stride: 1)
   }
 }
 
 extension PartialRangeUpTo : TensorRangeExpression where Bound == Int {
   public var tensorRange: TensorRange {
-    return .partialRangeUpTo(..<Int32(upperBound), stride: 1)
+    return .partialRangeUpTo(self, stride: 1)
   }
 }
 
 extension PartialRangeThrough : TensorRangeExpression where Bound == Int {
   public var tensorRange: TensorRange {
-    return .partialRangeThrough(...Int32(upperBound), stride: 1)
+    return .partialRangeThrough(self, stride: 1)
   }
 }
 
@@ -1854,33 +1851,31 @@ precedencegroup StridedRangeFormationPrecedence {
 
 public extension Range where Bound == Int {
   static func .. (range: Range, stride: Int) -> TensorRange {
-    return .range(
-      Int32(range.lowerBound)..<Int32(range.upperBound), stride: Int32(stride))
+    return .range(range, stride: stride)
   }
 }
 
 public extension ClosedRange where Bound == Int {
   static func .. (range: ClosedRange, stride: Int) -> TensorRange {
-    return .closedRange(
-      Int32(range.lowerBound)...Int32(range.upperBound), stride: Int32(stride))
+    return .closedRange(range, stride: stride)
   }
 }
 
 public extension PartialRangeFrom where Bound == Int {
   static func .. (range: PartialRangeFrom, stride: Int) -> TensorRange {
-    return .partialRangeFrom(Int32(range.lowerBound)..., stride: Int32(stride))
+    return .partialRangeFrom(range, stride: stride)
   }
 }
 
 public extension PartialRangeUpTo where Bound == Int {
   static func .. (range: PartialRangeUpTo, stride: Int) -> TensorRange {
-    return .partialRangeUpTo(..<Int32(range.upperBound), stride: Int32(stride))
+    return .partialRangeUpTo(range, stride: stride)
   }
 }
 
 public extension PartialRangeThrough where Bound == Int {
   static func .. (range: PartialRangeThrough, stride: Int) -> TensorRange {
-    return .partialRangeThrough(...Int32(range.upperBound), stride: Int32(stride))
+    return .partialRangeThrough(range, stride: stride)
   }
 }
 
@@ -1979,31 +1974,31 @@ internal extension Tensor.IndexPath {
       case .newAxis: newAxisMask |= 1 << i
       case .squeezeAxis: squeezeAxisMask |= 1 << i
       case .index(let index):
-        begin[i] = index
-        end[i] = index + 1
+        begin[i] = Int32(index)
+        end[i] = Int32(index) + 1
         squeezeAxisMask |= 1 << i
       case .range(let range, let stride):
-        begin[i] = range.lowerBound
-        end[i] = range.upperBound
-        strides[i] = stride
+        begin[i] = Int32(range.lowerBound)
+        end[i] = Int32(range.upperBound)
+        strides[i] = Int32(stride)
       case .closedRange(let range, let stride):
-        begin[i] = range.lowerBound
-        switch range.upperBound {
+        begin[i] = Int32(range.lowerBound)
+        switch Int32(range.upperBound) {
         case -1: endMask |= 1 << i
         case let u: end[i] = u + 1
         }
-        strides[i] = stride
+        strides[i] = Int32(stride)
       case .partialRangeFrom(let range, let stride):
-        begin[i] = range.lowerBound
-        strides[i] = stride
+        begin[i] = Int32(range.lowerBound)
+        strides[i] = Int32(stride)
         endMask |= 1 << i
       case .partialRangeUpTo(let range, let stride):
-        end[i] = range.upperBound
-        strides[i] = stride
+        end[i] = Int32(range.upperBound)
+        strides[i] = Int32(stride)
         beginMask |= 1 << i
       case .partialRangeThrough(let range, let stride):
-        end[i] = range.upperBound + 1
-        strides[i] = stride
+        end[i] = Int32(range.upperBound) + 1
+        strides[i] = Int32(stride)
         beginMask |= 1 << i
       }
     }
