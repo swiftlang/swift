@@ -4170,6 +4170,27 @@ bool exprNeedsParensOutsideFollowingOperator(
 /// Determine whether this is a SIMD operator.
 bool isSIMDOperator(ValueDecl *value);
 
+/// Describes how a particular closure can be used with a closure builder (or not).
+enum class BuilderClosureKind {
+  /// The closure appears to be supported for use with a closure builder.
+  Supported,
+  /// The closure contains a single expression.
+  SingleExpression,
+  /// The closure contains an explicit return.
+  ExplicitReturn,
+  /// The closure contains an unsupported construct.
+  UnsupportedConstruct,
+};
+
+/// Classify the given closure based on its suitability as a builder closure.
+///
+/// \param diagnoseNonBuilder whether we should diagnose any constructs that occur in the closure
+/// that won't work with a closure builder.
+BuilderClosureKind classifyBuilderClosure(ASTContext &ctx,
+                                          ClosureExpr *closure,
+                                          Type builderType,
+                                          bool diagnoseNonBuilder);
+
 } // end namespace swift
 
 #endif // LLVM_SWIFT_SEMA_CONSTRAINT_SYSTEM_H
