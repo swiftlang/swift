@@ -1,15 +1,15 @@
 // RUN: %target-typecheck-verify-swift
 
-@functionBuilder // expected-error {{'@functionBuilder' attribute cannot be applied to this declaration}}
+@_functionBuilder // expected-error {{'@_functionBuilder' attribute cannot be applied to this declaration}}
 var globalBuilder: Int
 
-@functionBuilder // expected-error {{'@functionBuilder' attribute cannot be applied to this declaration}}
+@_functionBuilder // expected-error {{'@_functionBuilder' attribute cannot be applied to this declaration}}
 func globalBuilderFunction() -> Int { return 0 }
 
-@functionBuilder
+@_functionBuilder
 struct Maker {}
 
-@functionBuilder
+@_functionBuilder
 class Inventor {}
 
 @Maker // expected-error {{function builder attribute 'Maker' can only be applied to a parameter}}
@@ -44,11 +44,11 @@ func makerParamMissing2(@Maker
 func makerParamExtra(@Maker(5) // expected-error {{function builder attributes cannot have arguments}}
                      fn: () -> ()) {}
 
-@functionBuilder
+@_functionBuilder
 struct GenericMaker<T> {} // expected-note {{generic type 'GenericMaker' declared here}}
 
 struct GenericContainer<T> {  // expected-note {{generic type 'GenericContainer' declared here}}
-  @functionBuilder
+  @_functionBuilder
   struct Maker {}
 }
 
