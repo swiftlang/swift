@@ -1065,6 +1065,8 @@ private:
   llvm::DenseMap<const Expr *, TypeBase *> ExprTypes;
   llvm::DenseMap<const TypeLoc *, TypeBase *> TypeLocTypes;
   llvm::DenseMap<const ParamDecl *, TypeBase *> ParamTypes;
+  llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
+      KeyPathComponentTypes;
 
   /// Maps closure parameters to type variables.
   llvm::DenseMap<const ParamDecl *, TypeVariableType *>
@@ -1446,6 +1448,11 @@ private:
       if (expr->getType())
         CS.cacheType(expr);
 
+      if (auto kp = dyn_cast<KeyPathExpr>(expr))
+        for (auto i : indices(kp->getComponents()))
+          if (kp->getComponents()[i].getComponentType())
+            CS.cacheType(kp, i);
+
       return expr;
     }
 
@@ -1476,6 +1483,15 @@ private:
       assert(!CS.getType(expr)->hasTypeVariable() &&
              "Should not write type variable into expression!");
       expr->setType(CS.getType(expr));
+
+      if (auto kp = dyn_cast<KeyPathExpr>(expr)) {
+        for (auto i : indices(kp->getComponents())) {
+          Type componentType;
+          if (CS.hasType(kp, i))
+            componentType = CS.getType(kp, i);
+          kp->getMutableComponents()[i].setComponentType(componentType);
+        }
+      }
 
       return expr;
     }
@@ -1757,6 +1773,12 @@ public:
     ParamTypes[P] = T.getPointer();
   }
 
+  void setType(KeyPathExpr *KP, unsigned I, Type T) {
+    assert(KP && "Expected non-null key path parameter!");
+    assert(T && "Expected non-null type!");
+    KeyPathComponentTypes[std::make_pair(KP, I)] = T.getPointer();
+  }
+
   /// Check to see if we have a type for an expression.
   bool hasType(const Expr *E) const {
     assert(E != nullptr && "Expected non-null expression!");
@@ -1770,6 +1792,12 @@ public:
   bool hasType(const ParamDecl *P) const {
     assert(P != nullptr && "Expected non-null parameter!");
     return ParamTypes.find(P) != ParamTypes.end();
+  }
+
+  bool hasType(const KeyPathExpr *KP, unsigned I) const {
+    assert(KP && "Expected non-null key path parameter!");
+    return KeyPathComponentTypes.find(std::make_pair(KP, I))
+              != KeyPathComponentTypes.end();
   }
 
   /// Get the type for an expression.
@@ -1800,12 +1828,26 @@ public:
     return wantInterfaceType ? D->getInterfaceType() : D->getType();
   }
 
+  Type getType(const KeyPathExpr *KP, unsigned I) const {
+    assert(hasType(KP, I) && "Expected type to have been set!");
+    return KeyPathComponentTypes.find(std::make_pair(KP, I))->second;
+  }
+
   /// Cache the type of the expression argument and return that same
   /// argument.
   template <typename T>
   T *cacheType(T *E) {
     assert(E->getType() && "Expected a type!");
     setType(E, E->getType());
+    return E;
+  }
+
+  /// Cache the type of the expression argument and return that same
+  /// argument.
+  KeyPathExpr *cacheType(KeyPathExpr *E, unsigned I) {
+    auto componentTy = E->getComponents()[I].getComponentType();
+    assert(componentTy && "Expected a type!");
+    setType(E, I, componentTy);
     return E;
   }
 
@@ -3557,6 +3599,7 @@ public:
                             "only for use within the debugger");
 
   void print(raw_ostream &out);
+  void print(raw_ostream &out, Expr *);
 };
 
 /// Compute the shuffle required to map from a given tuple type to

@@ -3393,6 +3393,10 @@ void ConstraintSystem::dump() {
 }
 
 void ConstraintSystem::dump(Expr *E) {
+  print(llvm::errs(), E);
+}
+
+void ConstraintSystem::print(raw_ostream &out, Expr *E) {
   auto getTypeOfExpr = [&](const Expr *E) -> Type {
     if (hasType(E))
       return getType(E);
@@ -3403,8 +3407,14 @@ void ConstraintSystem::dump(Expr *E) {
       return getType(TL);
     return Type();
   };
+  auto getTypeOfKeyPathComponent =
+      [&](const KeyPathExpr *KP, unsigned I) -> Type {
+    if (hasType(KP, I))
+      return getType(KP, I);
+    return Type();
+  };
 
-  E->dump(llvm::errs(), getTypeOfExpr, getTypeOfTypeLoc);
+  E->dump(out, getTypeOfExpr, getTypeOfTypeLoc, getTypeOfKeyPathComponent);
 }
 
 void ConstraintSystem::print(raw_ostream &out) {
