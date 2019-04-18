@@ -1350,6 +1350,17 @@ public:
         Consumer(Consumer) {
   }
 
+  void setAttrTargetDecl(Decl *D) override {
+    if (D == nullptr) {
+      AttTargetDK = None;
+      return;
+    }
+    auto DK = D->getKind();
+    if (DK == DeclKind::PatternBinding)
+      DK = DeclKind::Var;
+    AttTargetDK = DK;
+  }
+
   void completeExpr() override;
   void completeDotExpr(Expr *E, SourceLoc DotLoc) override;
   void completeStmtOrExpr(CodeCompletionExpr *E) override;
@@ -1369,7 +1380,7 @@ public:
   void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning() override;
   void completeCaseStmtDotPrefix() override;
-  void completeDeclAttrBeginning(Decl *D, bool Sil, bool Param) override;
+  void completeDeclAttrBeginning(bool Sil) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeInPrecedenceGroup(SyntaxKind SK) override;
   void completeNominalMemberBeginning(
@@ -4607,17 +4618,9 @@ void CodeCompletionCallbacksImpl::completeDeclAttrParam(DeclAttrKind DK,
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(Decl *D, bool Sil,
-                                                            bool Param) {
+void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(bool Sil) {
   Kind = CompletionKind::AttributeBegin;
   IsInSil = Sil;
-  if (Param) {
-    AttTargetDK = DeclKind::Param;
-  } else if (D) {
-    AttTargetDK = D->getKind();
-    if (AttTargetDK == DeclKind::PatternBinding)
-      AttTargetDK = DeclKind::Var;
-  }
   CurDeclContext = P.CurDeclContext;
 }
 
