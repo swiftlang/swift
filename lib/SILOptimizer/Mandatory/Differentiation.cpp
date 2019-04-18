@@ -4151,9 +4151,8 @@ public:
       else {
         auto origArg = ai->getArgument(origNumIndRes + selfParamIndex);
         if (cotanWrtSelf->getType().isAddress()) {
-          addToAdjointBuffer(origArg, ValueWithCleanup(
-              cotanWrtSelf,
-              makeCleanup(cotanWrtSelf, emitCleanup, {seed.getCleanup()})));
+          addToAdjointBuffer(origArg, cotanWrtSelf);
+          emitCleanup(builder, loc, cotanWrtSelf);
         } else {
           if (origArg->getType().isAddress()) {
             auto adjBuf = getAdjointBuffer(origArg);
