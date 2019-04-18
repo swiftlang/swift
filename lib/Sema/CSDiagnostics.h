@@ -1316,6 +1316,8 @@ public:
   UnhandledNode unhandled;
   NominalTypeDecl *builder;
 
+  void diagnosePrimary(bool asNote);
+
 public:
   SkipUnhandledConstructInFunctionBuilderFailure(Expr *root,
                                                  ConstraintSystem &cs,
@@ -1326,7 +1328,6 @@ public:
       unhandled(unhandled),
       builder(builder) { }
 
-public:
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
 };
