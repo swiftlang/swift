@@ -24,6 +24,11 @@ public let INFINITE: DWORD = DWORD(bitPattern: -1)
 // WinBase.h
 public let WAIT_OBJECT_0: DWORD = 0
 
+// WinBase.h
+public let STD_INPUT_HANDLE: DWORD = DWORD(bitPattern: -10)
+public let STD_OUTPUT_HANDLE: DWORD = DWORD(bitPattern: -11)
+public let STD_ERROR_HANDLE: DWORD = DWORD(bitPattern: -12)
+
 // minwindef.h
 public let FALSE: BOOL = 0
 
