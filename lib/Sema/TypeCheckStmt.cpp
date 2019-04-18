@@ -1760,8 +1760,7 @@ checkInheritedDefaultValueRestrictions(TypeChecker &TC, ParamDecl *PD) {
   auto ctor = dyn_cast<ConstructorDecl>(DC);
   if (!ctor || ctor->isConvenienceInit()) {
     TC.diagnose(
-        PD->getLoc(),
-        diag::inherited_default_value_not_in_designated_constructor);
+        PD, diag::inherited_default_value_not_in_designated_constructor);
     return;
   }
 
@@ -1769,10 +1768,9 @@ checkInheritedDefaultValueRestrictions(TypeChecker &TC, ParamDecl *PD) {
   auto overridden = ctor->getOverriddenDecl();
   if (!overridden || overridden->isConvenienceInit()) {
     TC.diagnose(
-        PD->getLoc(),
-        diag::inherited_default_value_used_in_non_overriding_constructor);
+        PD, diag::inherited_default_value_used_in_non_overriding_constructor);
     if (overridden)
-      TC.diagnose(overridden->getLoc(), diag::overridden_here);
+      TC.diagnose(overridden, diag::overridden_here);
     return;
   }
 
@@ -1781,8 +1779,8 @@ checkInheritedDefaultValueRestrictions(TypeChecker &TC, ParamDecl *PD) {
   assert(idx && "containing decl does not contain param?");
   ParamDecl *equivalentParam = overridden->getParameters()->get(*idx);
   if (equivalentParam->getDefaultArgumentKind() == DefaultArgumentKind::None) {
-    TC.diagnose(PD->getLoc(), diag::corresponding_param_not_defaulted);
-    TC.diagnose(equivalentParam->getLoc(), diag::inherited_default_param_here);
+    TC.diagnose(PD, diag::corresponding_param_not_defaulted);
+    TC.diagnose(equivalentParam, diag::inherited_default_param_here);
   }
 }
 
