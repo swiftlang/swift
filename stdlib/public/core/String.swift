@@ -1092,7 +1092,7 @@ extension String {
     ///     print(zero.boolValue)
     ///     // Prints "false"
     ///
-    /// - Returns: A float copy of the string.
+    /// - Returns: A bool copy of the string.
     public var boolValue: Bool {
         get {
             return NSString(string: self).boolValue
