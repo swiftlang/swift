@@ -50,6 +50,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Demangling/ManglingMacros.h"
 
 #include "clang/Basic/CharInfo.h"
 #include "clang/AST/Attr.h"
@@ -5931,6 +5932,22 @@ OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
 {
   // Always implicit.
   setImplicit();
+}
+
+Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
+  assert(getNamingDecl() && "not an opaque return type");
+  if (!OpaqueReturnTypeIdentifier.empty())
+    return OpaqueReturnTypeIdentifier;
+  
+  SmallString<64> mangleBuf;
+  {
+    llvm::raw_svector_ostream os(mangleBuf);
+    Mangle::ASTMangler mangler;
+    os << mangler.mangleDeclAsUSR(getNamingDecl(), MANGLING_PREFIX_STR);
+  }
+
+  OpaqueReturnTypeIdentifier = getASTContext().getIdentifier(mangleBuf);
+  return OpaqueReturnTypeIdentifier;
 }
 
 void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {

@@ -521,6 +521,7 @@ struct PrintOptions {
     result.PrintInSILBody = true;
     result.PreferTypeRepr = false;
     result.PrintIfConfig = false;
+    result.PrintStableReferencesToOpaqueReturnTypes = true;
     return result;
   }
 

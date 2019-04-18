@@ -2786,6 +2786,8 @@ class OpaqueTypeDecl : public GenericTypeDecl {
   /// signature of the original declaration.
   Optional<SubstitutionMap> UnderlyingTypeSubstitutions;
   
+  mutable Identifier OpaqueReturnTypeIdentifier;
+  
 public:
   OpaqueTypeDecl(ValueDecl *NamingDecl,
                  GenericParamList *GenericParams,
@@ -2814,6 +2816,10 @@ public:
   
   // Opaque type decls are currently always implicit
   SourceRange getSourceRange() const { return SourceRange(); }
+  
+  // Get the identifier string that can be used to cross-reference unnamed
+  // opaque return types across files.
+  Identifier getOpaqueReturnTypeIdentifier() const;
   
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::OpaqueType;
