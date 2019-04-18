@@ -177,10 +177,6 @@ extension Decimal : Hashable, Comparable {
         return _isNegative != 0 ? -d : d
     }
 
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(doubleValue)
-    }
-
     public var hashValue: Int {
         return Int(bitPattern: __CFHashDouble(doubleValue))
     }

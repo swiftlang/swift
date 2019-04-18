@@ -136,10 +136,6 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     public init() {
         _handle = _MutablePairHandle(NSIndexSet(), copying: false)
     }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(_handle.map { $0.hash })
-    }
     
     public var hashValue: Int {
         return _handle.map { $0.hash }

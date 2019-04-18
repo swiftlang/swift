@@ -228,10 +228,6 @@ public struct URLRequest : ReferenceConvertible, Equatable, Hashable {
             _applyMutation { $0.httpShouldUsePipelining = newValue }
         }
     }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(_handle.map { $0.hashValue })
-    }
     
     public var hashValue: Int {
         return _handle.map { $0.hashValue }

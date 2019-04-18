@@ -70,10 +70,6 @@ public struct PersonNameComponents : ReferenceConvertible, Hashable, Equatable, 
         get { return _handle.map { $0.phoneticRepresentation } }
         set { _applyMutation { $0.phoneticRepresentation = newValue } }
     }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(_handle.map { $0 })
-    }
     
     public var hashValue : Int {
         return _handle.map { $0.hash }

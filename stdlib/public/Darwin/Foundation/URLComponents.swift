@@ -291,10 +291,6 @@ public struct URLComponents : ReferenceConvertible, Hashable, Equatable, _Mutabl
         get { return _handle.map { $0.percentEncodedQueryItems } }
         set { _applyMutation { $0.percentEncodedQueryItems = newValue } }
     }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(_handle.map { $0.hash })
-    }
 	
     public var hashValue: Int {
         return _handle.map { $0.hash }
@@ -406,10 +402,6 @@ public struct URLQueryItem : ReferenceConvertible, Hashable, Equatable {
     public var value : String? {
         get { return _queryItem.value }
         set { _queryItem = NSURLQueryItem(name: name, value: newValue) }
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(_queryItem.hash)
     }
     
     public var hashValue: Int { return _queryItem.hash }

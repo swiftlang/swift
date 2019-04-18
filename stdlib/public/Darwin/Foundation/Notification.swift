@@ -39,10 +39,6 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
         self.userInfo = userInfo
     }
 
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(name)
-    }
-
     public var hashValue: Int {
         return name.rawValue.hash
     }

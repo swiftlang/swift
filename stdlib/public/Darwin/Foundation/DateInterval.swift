@@ -155,10 +155,6 @@ public struct DateInterval : ReferenceConvertible, Comparable, Hashable, Codable
         return false
     }
     
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(start)
-    }
-
     public var hashValue: Int {
         var buf: (UInt, UInt) = (UInt(start.timeIntervalSinceReferenceDate), UInt(end.timeIntervalSinceReferenceDate))
         return withUnsafeMutablePointer(to: &buf) {

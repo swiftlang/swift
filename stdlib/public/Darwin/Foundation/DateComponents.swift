@@ -262,10 +262,6 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
     }
     
     // MARK: -
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(_handle.map { $0 })
-    }
     
     public var hashValue : Int {
         return _handle.map { $0.hash }

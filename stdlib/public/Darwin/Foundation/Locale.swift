@@ -404,11 +404,6 @@ public struct Locale : Hashable, Equatable, ReferenceConvertible {
 
     // MARK: -
     //
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(_wrapped)
-        hasher.combine(_autoupdating)
-    }
     
     public var hashValue : Int {
         if _autoupdating {
