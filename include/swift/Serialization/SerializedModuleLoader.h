@@ -222,6 +222,9 @@ public:
                            SmallVectorImpl<ValueDecl*> &results) const override;
 
   virtual TypeDecl *lookupLocalType(StringRef MangledName) const override;
+  
+  virtual OpaqueTypeDecl *
+  lookupOpaqueResultType(StringRef MangledName, LazyResolver *resolver) override;
 
   virtual TypeDecl *
   lookupNestedType(Identifier name,
@@ -269,6 +272,8 @@ public:
 
   virtual void
   getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &results) const override;
+  virtual void
+  getOpaqueReturnTypeDecls(SmallVectorImpl<OpaqueTypeDecl*> &results) const override;
 
   virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const override;
 

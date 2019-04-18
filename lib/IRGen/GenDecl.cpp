@@ -686,7 +686,85 @@ void IRGenModule::emitRuntimeRegistration() {
 }
 
 /// Return the address of the context descriptor representing the given
-/// decl context.
+/// decl context, used as a parent reference for another decl.
+///
+/// For a nominal type context, this returns the address of the nominal type
+/// descriptor.
+/// For an extension context, this returns the address of the extension
+/// context descriptor.
+/// For a module or file unit context, this returns the address of the module
+/// context descriptor.
+/// For any other kind of context, this returns an anonymous context descriptor
+/// for the context.
+ConstantReference
+IRGenModule::getAddrOfContextDescriptorForParent(DeclContext *parent,
+                                                 DeclContext *ofChild,
+                                                 bool fromAnonymousContext) {
+  switch (parent->getContextKind()) {
+  case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
+  case DeclContextKind::EnumElementDecl:
+  case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::Initializer:
+  case DeclContextKind::SerializedLocal:
+    return {getAddrOfAnonymousContextDescriptor(
+              fromAnonymousContext ? parent : ofChild),
+            ConstantReference::Direct};
+
+  case DeclContextKind::GenericTypeDecl:
+    if (auto nomTy = dyn_cast<NominalTypeDecl>(parent)) {
+      return {getAddrOfTypeContextDescriptor(nomTy, DontRequireMetadata),
+              ConstantReference::Direct};
+    }
+    return {getAddrOfAnonymousContextDescriptor(
+              fromAnonymousContext ? parent : ofChild),
+            ConstantReference::Direct};
+
+  case DeclContextKind::ExtensionDecl: {
+    auto ext = cast<ExtensionDecl>(parent);
+    // If the extension is equivalent to its extended context (that is, it's
+    // in the same module as the original non-protocol type and
+    // has no constraints), then we can use the original nominal type context
+    // (assuming there is one).
+    if (ext->isEquivalentToExtendedContext()) {
+      auto nominal = ext->getExtendedNominal();
+      // If the extended type is an ObjC class, it won't have a nominal type
+      // descriptor, so we'll just emit an extension context.
+      auto clas = dyn_cast<ClassDecl>(nominal);
+      if (!clas || clas->isForeign() || hasKnownSwiftMetadata(*this, clas)) {
+        // Some targets don't support relative references to undefined symbols.
+        // If the extension is in a different file from the original type
+        // declaration, it may not get emitted in this TU. Use an indirect
+        // reference to work around the object format limitation.
+        auto shouldBeIndirect =
+            parent->getModuleScopeContext() != ofChild->getModuleScopeContext()
+          ? ConstantReference::Indirect
+          : ConstantReference::Direct;
+        
+        IRGen.noteUseOfTypeContextDescriptor(nominal, DontRequireMetadata);
+        return getAddrOfLLVMVariableOrGOTEquivalent(
+                                LinkEntity::forNominalTypeDescriptor(nominal),
+                                shouldBeIndirect);
+      }
+    }
+    return {getAddrOfExtensionContextDescriptor(ext),
+            ConstantReference::Direct};
+  }
+      
+  case DeclContextKind::FileUnit:
+    parent = parent->getParentModule();
+    LLVM_FALLTHROUGH;
+      
+  case DeclContextKind::Module:
+    return {getAddrOfModuleContextDescriptor(cast<ModuleDecl>(parent)),
+            ConstantReference::Direct};
+  }
+  llvm_unreachable("unhandled kind");
+}
+
+/// Return the address of the context descriptor representing the parent of
+/// the given decl context.
 ///
 /// For a nominal type context, this returns the address of the nominal type
 /// descriptor.
@@ -722,69 +800,8 @@ IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from,
               ConstantReference::Direct};
   }
   
-  auto parent = from->getParent();
-  
-  switch (parent->getContextKind()) {
-  case DeclContextKind::AbstractClosureExpr:
-  case DeclContextKind::AbstractFunctionDecl:
-  case DeclContextKind::SubscriptDecl:
-  case DeclContextKind::EnumElementDecl:
-  case DeclContextKind::TopLevelCodeDecl:
-  case DeclContextKind::Initializer:
-  case DeclContextKind::SerializedLocal:
-    return {getAddrOfAnonymousContextDescriptor(
-              fromAnonymousContext ? parent : from),
-            ConstantReference::Direct};
-
-  case DeclContextKind::GenericTypeDecl:
-    if (auto nomTy = dyn_cast<NominalTypeDecl>(parent)) {
-      return {getAddrOfTypeContextDescriptor(nomTy, DontRequireMetadata),
-              ConstantReference::Direct};
-    }
-    return {getAddrOfAnonymousContextDescriptor(
-              fromAnonymousContext ? parent : from),
-            ConstantReference::Direct};
-
-  case DeclContextKind::ExtensionDecl: {
-    auto ext = cast<ExtensionDecl>(parent);
-    // If the extension is equivalent to its extended context (that is, it's
-    // in the same module as the original non-protocol type and
-    // has no constraints), then we can use the original nominal type context
-    // (assuming there is one).
-    if (ext->isEquivalentToExtendedContext()) {
-      auto nominal = ext->getExtendedNominal();
-      // If the extended type is an ObjC class, it won't have a nominal type
-      // descriptor, so we'll just emit an extension context.
-      auto clas = dyn_cast<ClassDecl>(nominal);
-      if (!clas || clas->isForeign() || hasKnownSwiftMetadata(*this, clas)) {
-        // Some targets don't support relative references to undefined symbols.
-        // If the extension is in a different file from the original type
-        // declaration, it may not get emitted in this TU. Use an indirect
-        // reference to work around the object format limitation.
-        auto shouldBeIndirect =
-            parent->getModuleScopeContext() != from->getModuleScopeContext()
-          ? ConstantReference::Indirect
-          : ConstantReference::Direct;
-        
-        IRGen.noteUseOfTypeContextDescriptor(nominal, DontRequireMetadata);
-        return getAddrOfLLVMVariableOrGOTEquivalent(
-                                LinkEntity::forNominalTypeDescriptor(nominal),
-                                shouldBeIndirect);
-      }
-    }
-    return {getAddrOfExtensionContextDescriptor(ext),
-            ConstantReference::Direct};
-  }
-      
-  case DeclContextKind::FileUnit:
-    parent = parent->getParentModule();
-    LLVM_FALLTHROUGH;
-      
-  case DeclContextKind::Module:
-    return {getAddrOfModuleContextDescriptor(cast<ModuleDecl>(parent)),
-            ConstantReference::Direct};
-  }
-  llvm_unreachable("unhandled kind");
+  return getAddrOfContextDescriptorForParent(from->getParent(), from,
+                                             fromAnonymousContext);
 }
 
 /// Add the given global value to @llvm.used.
@@ -1127,17 +1144,21 @@ void IRGenerator::addLazyFunction(SILFunction *f) {
   DefaultIGMForFunction.insert(std::make_pair(f, CurrentIGM));
 }
 
-bool IRGenerator::hasLazyMetadata(NominalTypeDecl *type) {
+bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
   auto found = HasLazyMetadata.find(type);
   if (found != HasLazyMetadata.end())
     return found->second;
 
   auto canBeLazy = [&]() -> bool {
-    if (isa<ClangModuleUnit>(type->getModuleScopeContext())) {
-      return requiresForeignTypeMetadata(type);
-    } else if (type->getParentModule() == SIL.getSwiftModule()) {
-      // When compiling with -Onone keep all metadata for the debugger. Even if it
-      // is not used by the program itself.
+    if (isa<ClangModuleUnit>(type->getInnermostDeclContext()
+                                 ->getModuleScopeContext())) {
+      if (auto nominal = dyn_cast<NominalTypeDecl>(type)) {
+        return requiresForeignTypeMetadata(nominal);
+      }
+    } else if (type->getInnermostDeclContext()->getParentModule()
+                                                     == SIL.getSwiftModule()) {
+      // When compiling with -Onone keep all metadata for the debugger. Even if
+      // it is not used by the program itself.
       if (!Opts.shouldOptimize())
         return false;
       if (Opts.UseJIT)
@@ -1235,6 +1256,21 @@ void IRGenerator::noteUseOfFieldDescriptor(NominalTypeDecl *type) {
 
   assert(!FinishedEmittingLazyDefinitions);
   LazyFieldDescriptors.push_back(type);
+}
+
+void IRGenerator::noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque) {
+  if (!opaque)
+    return;
+  
+  auto insertResult = LazyOpaqueTypes.try_emplace(opaque);
+  auto &entry = insertResult.first->second;
+
+  bool isNovelUseOfDescriptor = !entry.IsDescriptorUsed;
+  entry.IsDescriptorUsed = true;
+  
+  if (isNovelUseOfDescriptor) {
+    LazyOpaqueTypeDescriptors.push_back(opaque);
+  }
 }
 
 static std::string getDynamicReplacementSection(IRGenModule &IGM) {
@@ -1783,15 +1819,19 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
       DebugInfo->emitImport(cast<ImportDecl>(D));
     return;
 
-  // We emit these as part of the PatternBindingDecl.
   case DeclKind::Var:
+    emitAbstractStorageDecl(cast<AbstractStorageDecl>(D));
     return;
 
-  case DeclKind::Func:
   case DeclKind::Accessor:
     // Handled in SIL.
     return;
 
+  case DeclKind::Func:
+    // The function body itself is lowered to SIL, but there may be associated
+    // decls to emit.
+    return emitFuncDecl(cast<FuncDecl>(D));
+  
   case DeclKind::TopLevelCode:
     // All the top-level code will be lowered separately.
     return;
@@ -1804,6 +1844,11 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
     return;
 
   case DeclKind::Module:
+    return;
+      
+  case DeclKind::OpaqueType:
+    // TODO: Eventually we'll need to emit descriptors to access the opaque
+    // type's metadata.
     return;
   }
 
@@ -3436,6 +3481,16 @@ llvm::Constant *IRGenModule::getAddrOfTypeContextDescriptor(NominalTypeDecl *D,
                                DebugTypeInfo());
 }
 
+llvm::Constant *IRGenModule::getAddrOfOpaqueTypeDescriptor(
+                                               OpaqueTypeDecl *opaqueType,
+                                               ConstantInit definition) {
+  IRGen.noteUseOfOpaqueTypeDescriptor(opaqueType);
+  auto entity = LinkEntity::forOpaqueTypeDescriptor(opaqueType);
+  return getAddrOfLLVMVariable(entity,
+                               definition,
+                               DebugTypeInfo());
+}
+
 llvm::Constant *IRGenModule::
 getAddrOfReflectionBuiltinDescriptor(CanType type,
                                      ConstantInit definition) {
@@ -3669,10 +3724,16 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::PoundDiagnostic:
       continue;
 
+    case DeclKind::Func:
+      emitFuncDecl(cast<FuncDecl>(member));
+      continue;
+
     case DeclKind::Var:
     case DeclKind::Subscript:
+      emitAbstractStorageDecl(cast<AbstractStorageDecl>(member));
+      continue;
+        
     case DeclKind::PatternBinding:
-    case DeclKind::Func:
     case DeclKind::Accessor:
     case DeclKind::Constructor:
     case DeclKind::Destructor:
@@ -3688,6 +3749,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
       continue;
 
     case DeclKind::TypeAlias:
+    case DeclKind::OpaqueType:
       // Do nothing.
       continue;
 

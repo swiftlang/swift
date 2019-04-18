@@ -6545,6 +6545,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
   case TypeKind::NestedArchetype:
+  case TypeKind::OpaqueTypeArchetype:
     if (!cast<ArchetypeType>(desugaredFromType)->requiresClass())
       break;
     LLVM_FALLTHROUGH;
@@ -6738,6 +6739,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
   case TypeKind::NestedArchetype:
+  case TypeKind::OpaqueTypeArchetype:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
   case TypeKind::Function:
@@ -6752,6 +6754,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return cs.cacheType(new (tc.Context)
                             UnresolvedTypeConversionExpr(expr, toType));
 
+  // Use an opaque type to abstract a value of the underlying concrete type.
+  if (toType->getAs<OpaqueTypeArchetypeType>()) {
+    return cs.cacheType(new (tc.Context)
+                        UnderlyingToOpaqueExpr(expr, toType));
+  }
+  
   llvm_unreachable("Unhandled coercion");
 }
 

@@ -140,6 +140,7 @@ namespace irgen {
   class Signature;
   class StructMetadataLayout;
   struct SymbolicMangling;
+  struct GenericRequirement;
   class TypeConverter;
   class TypeInfo;
   enum class TypeMetadataAddress;
@@ -213,7 +214,7 @@ private:
   bool FinishedEmittingLazyDefinitions = false;
 
   /// A map recording if metadata can be emitted lazily for each nominal type.
-  llvm::DenseMap<NominalTypeDecl *, bool> HasLazyMetadata;
+  llvm::DenseMap<TypeDecl *, bool> HasLazyMetadata;
 
   struct LazyTypeGlobalsInfo {
     /// Is there a use of the type metadata?
@@ -241,6 +242,14 @@ private:
   /// Field metadata records that have already been lazily emitted, or are
   /// queued up.
   llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyEmittedFieldMetadata;
+  struct LazyOpaqueInfo {
+    bool IsLazy = false;
+    bool IsDescriptorUsed = false;
+  };
+  /// The set of opaque types enqueued for lazy emission.
+  llvm::DenseMap<OpaqueTypeDecl*, LazyOpaqueInfo> LazyOpaqueTypes;
+  /// The queue of opaque type descriptors to emit.
+  llvm::SmallVector<OpaqueTypeDecl*, 4> LazyOpaqueTypeDescriptors;
 
   /// The queue of lazy field metadata records to emit.
   llvm::SmallVector<NominalTypeDecl *, 4> LazyFieldDescriptors;
@@ -347,7 +356,7 @@ public:
   /// Checks if metadata for this type can be emitted lazily. This is true for
   /// non-public types as well as imported types, except for classes and
   /// protocols which are always emitted eagerly.
-  bool hasLazyMetadata(NominalTypeDecl *type);
+  bool hasLazyMetadata(TypeDecl *type);
 
   /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
@@ -379,6 +388,8 @@ public:
                                       RequireMetadata_t requireMetadata) {
     noteUseOfTypeGlobals(type, false, requireMetadata);
   }
+  
+  void noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque);
 
   void noteUseOfFieldDescriptor(NominalTypeDecl *type);
 
@@ -612,6 +623,8 @@ public:
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
   llvm::PointerType *WitnessTablePtrPtrTy;   /// i8***
+  llvm::StructType *OpaqueTypeDescriptorTy;
+  llvm::PointerType *OpaqueTypeDescriptorPtrTy;
   llvm::Type *FloatTy;
   llvm::Type *DoubleTy;
   llvm::StructType *DynamicReplacementsTy; // { i8**, i8* }
@@ -865,6 +878,8 @@ public:
                                            ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfKeyPathPattern(KeyPathPattern *pattern,
                                           SILLocation diagLoc);
+  llvm::Constant *getAddrOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaqueType,
+                                                ConstantInit forDefinition);
   ConstantReference getConstantReferenceForProtocolDescriptor(ProtocolDecl *proto);
 
   ConstantIntegerLiteral getConstantIntegerLiteral(APInt value);
@@ -1041,6 +1056,10 @@ public:
   llvm::SetVector<CanType> BuiltinTypes;
 
   llvm::Constant *getTypeRef(CanType type, MangledTypeRefRole role);
+  llvm::Constant *emitWitnessTableRefString(CanType type,
+                                            ProtocolConformanceRef conformance,
+                                            GenericSignature *genericSig,
+                                            bool shouldSetLowBit);
   llvm::Constant *getMangledAssociatedConformance(
                                   const NormalProtocolConformance *conformance,
                                   const AssociatedConformance &requirement);
@@ -1182,6 +1201,9 @@ public:
   void emitStructDecl(StructDecl *D);
   void emitClassDecl(ClassDecl *D);
   void emitExtension(ExtensionDecl *D);
+  void emitFuncDecl(FuncDecl *D);
+  void emitAbstractStorageDecl(AbstractStorageDecl *D);
+  void emitOpaqueTypeDecl(OpaqueTypeDecl *D);
   void emitSILGlobalVariable(SILGlobalVariable *gv);
   void emitCoverageMapping();
   void emitSILFunction(SILFunction *f);
@@ -1293,6 +1315,9 @@ public:
   llvm::Constant *getAddrOfClangImporterModuleContextDescriptor();
   ConstantReference getAddrOfParentContextDescriptor(DeclContext *from,
                                                      bool fromAnonymousContext);
+  ConstantReference getAddrOfContextDescriptorForParent(DeclContext *parent,
+                                                    DeclContext *ofChild,
+                                                    bool fromAnonymousContext);
   llvm::Constant *getAddrOfGenericEnvironment(CanGenericSignature signature);
   llvm::Constant *getAddrOfProtocolRequirementsBaseDescriptor(
                                                   ProtocolDecl *proto);

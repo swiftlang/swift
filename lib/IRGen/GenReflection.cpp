@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -25,12 +26,15 @@
 #include "swift/SIL/SILModule.h"
 
 #include "ConstantBuilder.h"
+#include "Explosion.h"
 #include "GenClass.h"
 #include "GenDecl.h"
 #include "GenEnum.h"
 #include "GenHeap.h"
 #include "GenProto.h"
 #include "GenType.h"
+#include "IRGenDebugInfo.h"
+#include "IRGenFunction.h"
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
@@ -185,6 +189,86 @@ llvm::Constant *IRGenModule::getTypeRef(CanType type, MangledTypeRefRole role) {
   auto SymbolicName = Mangler.mangleTypeForReflection(*this, type);
   return getAddrOfStringForTypeRef(SymbolicName, role);
 }
+
+/// Emit a mangled string referencing a specific protocol conformance, so that
+/// the runtime can fetch its witness table.
+///
+/// TODO: Currently this uses a stub mangling that just refers to an accessor
+/// function. We need to fully develop the mangling with the ability to refer
+/// to dependent conformances to be able to use mangled strings.
+llvm::Constant *
+IRGenModule::emitWitnessTableRefString(CanType type,
+                                      ProtocolConformanceRef conformance,
+                                      GenericSignature *origGenericSig,
+                                      bool shouldSetLowBit) {
+  auto origType = type;
+  CanGenericSignature genericSig;
+  SmallVector<GenericRequirement, 4> requirements;
+  GenericEnvironment *genericEnv = nullptr;
+
+  if (origGenericSig) {
+    genericSig = origGenericSig->getCanonicalSignature();
+    enumerateGenericSignatureRequirements(genericSig,
+                [&](GenericRequirement reqt) { requirements.push_back(reqt); });
+    genericEnv = genericSig->createGenericEnvironment();
+  }
+
+  IRGenMangler mangler;
+  std::string symbolName =
+    mangler.mangleSymbolNameForKeyPathMetadata(
+      "get_witness_table", genericSig, type, conformance);
+
+  return getAddrOfStringForMetadataRef(symbolName, /*alignment=*/2,
+      shouldSetLowBit,
+      [&](ConstantInitBuilder &B) {
+        // Build a stub that loads the necessary bindings from the key path's
+        // argument buffer then fetches the metadata.
+        auto fnTy = llvm::FunctionType::get(WitnessTablePtrTy,
+                                            {Int8PtrTy}, /*vararg*/ false);
+        auto accessorThunk =
+          llvm::Function::Create(fnTy, llvm::GlobalValue::PrivateLinkage,
+                                 symbolName, getModule());
+        accessorThunk->setAttributes(constructInitialAttributes());
+        
+        {
+          IRGenFunction IGF(*this, accessorThunk);
+          if (DebugInfo)
+            DebugInfo->emitArtificialFunction(IGF, accessorThunk);
+
+          if (type->hasTypeParameter()) {
+            auto bindingsBufPtr = IGF.collectParameters().claimNext();
+
+            bindFromGenericRequirementsBuffer(IGF, requirements,
+                Address(bindingsBufPtr, getPointerAlignment()),
+                MetadataState::Complete,
+                [&](CanType t) {
+                  return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
+                });
+
+            type = genericEnv->mapTypeIntoContext(type)->getCanonicalType();
+          }
+          if (origType->hasTypeParameter())
+            conformance = conformance.subst(origType,
+              QueryInterfaceTypeSubstitutions(genericEnv),
+              LookUpConformanceInSignature(*genericEnv->getGenericSignature()));
+          auto ret = emitWitnessTableRef(IGF, type, conformance);
+          IGF.Builder.CreateRet(ret);
+        }
+
+        // Form the mangled name with its relative reference.
+        auto S = B.beginStruct();
+        S.setPacked(true);
+        S.add(llvm::ConstantInt::get(Int8Ty, 255));
+        S.add(llvm::ConstantInt::get(Int8Ty, 9));
+        S.addRelativeAddress(accessorThunk);
+
+        // And a null terminator!
+        S.addInt(Int8Ty, 0);
+
+        return S.finishAndCreateFuture();
+      });
+}
+
 
 llvm::Constant *IRGenModule::getMangledAssociatedConformance(
                                   const NormalProtocolConformance *conformance,
