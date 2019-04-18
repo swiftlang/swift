@@ -219,7 +219,7 @@ internal extension Tensor where Scalar : TensorFlowFloatingPoint {
   static func _vjpCast<OtherScalar : TensorFlowFloatingPoint>(
     _ other: Tensor<OtherScalar>
   ) -> (Tensor, (Tensor) -> Tensor<OtherScalar>) {
-    return (Tensor<Scalar>(other), { v in Tensor<OtherScalar>(v) })
+    return (Tensor(other), { v in Tensor<OtherScalar>(v) })
   }
 }
 
