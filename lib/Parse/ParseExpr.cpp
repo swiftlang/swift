@@ -2109,15 +2109,7 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
     // the syntax for referring to the function pointer (foo(_:)),
     auto escaped = Tok.isEscapedIdentifier();
     auto underscore = Tok.is(tok::kw__) || (escaped && text == "_");
-    
-    auto requiresEscaping = [](StringRef identifier) {
-      return llvm::StringSwitch<bool>(identifier)
-        .Case("let", false)
-        .Case("var", false)
-        .Default(canBeArgumentLabel(identifier));
-    };
-    
-    if (escaped && !underscore && requiresEscaping(text)) {
+    if (escaped && !underscore && canBeArgumentLabel(text)) {
       SourceLoc start = Tok.getLoc();
       SourceLoc end = start.getAdvancedLoc(Tok.getLength());
       diagnose(Tok, diag::escaped_parameter_name, text)

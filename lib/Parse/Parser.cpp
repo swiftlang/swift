@@ -741,23 +741,29 @@ void Parser::skipUntilDeclStmtRBrace(tok T1, tok T2) {
   }
 }
 
-void Parser::skipListUntilDeclRBrace(tok T1, tok T2) {
+void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
   while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif,
                    tok::pound_else, tok::pound_elseif)) {
+    bool hasDelimiter = Tok.getLoc() == startLoc || consumeIf(tok::comma);
+    bool possibleDeclStartsLine = Tok.isAtStartOfLine();
+    
     if (isStartOfDecl()) {
       
       // Could have encountered something like `_ var:` 
       // or `let foo:` or `var:`
       if (Tok.isAny(tok::kw_var, tok::kw_let)) {
-        Parser::BacktrackingScope backtrack(*this);
+        if (possibleDeclStartsLine && !hasDelimiter) {
+          break;
+        }
         
+        Parser::BacktrackingScope backtrack(*this);
         // Consume the let or var
         consumeToken();
         
         // If the following token is either <identifier> or :, it means that
         // this `var` or `let` shoud be interpreted as a label
         if ((Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) ||
-            peekToken().is(tok::colon)) {
+             peekToken().is(tok::colon)) {
           backtrack.cancelBacktrack();
           continue;
         }
@@ -1028,7 +1034,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     // If we haven't made progress, or seeing any error, skip ahead.
     if (Tok.getLoc() == StartLoc || Status.isError()) {
       assert(Status.isError() && "no progress without error");
-      skipListUntilDeclRBrace(RightK, tok::comma);
+      skipListUntilDeclRBrace(LeftLoc, RightK, tok::comma);
       if (Tok.is(RightK) || Tok.isNot(tok::comma))
         break;
     }

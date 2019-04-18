@@ -84,23 +84,15 @@ func SR698(_ a: Int, b: Int) {}
 SR698(1, b: 2,) // expected-error {{unexpected ',' separator}}
 
 // SR-979 - Two inout crash compiler
-func SR979a(a : inout inout Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{17-23=}}
+func SR979a(a : inout inout Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{17-23=}}
 func SR979b(inout inout b: Int) {} // expected-error {{inout' before a parameter name is not allowed, place it before the parameter type instead}} {{13-18=}} {{28-28=inout }} 
-// expected-error@-1 {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{19-25=}}
-func SR979c(let a: inout Int) {} // expected-warning {{'let' in this position is interpreted as an argument label}} {{13-16=`let`}}
+// expected-error@-1 {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{19-25=}}
 func SR979d(let let a: Int) {} // expected-warning {{'let' in this position is interpreted as an argument label}} {{13-16=`let`}}
 // expected-error @-1 {{expected ',' separator}} {{20-20=,}} 
 // expected-error @-2 {{parameter requires an explicit type}}
 // expected-warning @-3 {{extraneous duplicate parameter name; 'let' already has an argument label}} {{13-17=}}
-func SR979e(inout x: inout String) {} // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{13-18=}}
-func SR979g(inout i: inout Int) {} // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{13-18=}}
-class VarTester {
-  init(var a: Int, var b: Int) {} // expected-warning {{'var' in this position is interpreted as an argument label}} {{8-11=`var`}}
-  // expected-warning @-1 {{'var' in this position is interpreted as an argument label}} {{20-23=`var`}}
-  func x(var b: Int) { //expected-warning {{'var' in this position is interpreted as an argument label}} {{10-13=`var`}}
-    b += 10 // expected-error {{left side of mutating operator isn't mutable: 'b' is a 'let' constant}}
-  }
-}
+func SR979e(inout x: inout String) {} // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{13-18=}}
+func SR979g(inout i: inout Int) {} // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{13-18=}}
 
 func repeat() {}
 // expected-error @-1 {{keyword 'repeat' cannot be used as an identifier here}}

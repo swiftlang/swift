@@ -587,7 +587,7 @@ public:
 
   void skipUntilDeclRBrace(tok T1, tok T2);
   
-  void skipListUntilDeclRBrace(tok T1, tok T2);
+  void skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2);
   
   /// Skip a single token, but match parentheses, braces, and square brackets.
   ///
