@@ -2594,8 +2594,8 @@ public:
   }
 
   void addSubscriptCall(const SubscriptDecl *SD, DeclVisibilityKind Reason) {
-    // Don't add subscript call to meta types.
-    if (!ExprType || ExprType->is<AnyMetatypeType>())
+    // Don't add subscript call to unqualified completion.
+    if (!ExprType)
       return;
 
     // Subscript after '.' is valid only after type part of Swift keypath
