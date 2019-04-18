@@ -1314,6 +1314,20 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                  importedFromClang, isStatic, None, values);
     break;
   }
+      
+  case XREF_OPAQUE_RETURN_TYPE_PATH_PIECE: {
+    IdentifierID DefiningDeclNameID;
+    
+    XRefOpaqueReturnTypePathPieceLayout::readRecord(scratch, DefiningDeclNameID);
+    
+    auto name = getIdentifier(DefiningDeclNameID);
+    pathTrace.addOpaqueReturnType(name);
+    
+    if (auto opaque = baseModule->lookupOpaqueResultType(name.str(), nullptr)) {
+      values.push_back(opaque);
+    }
+    break;
+  }
 
   case XREF_EXTENSION_PATH_PIECE:
     llvm_unreachable("can only extend a nominal");
@@ -1375,6 +1389,22 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         XRefValuePathPieceLayout::readRecord(scratch, None, IID, None, None,
                                              None);
         result = getIdentifier(IID);
+        break;
+      }
+      case XREF_OPAQUE_RETURN_TYPE_PATH_PIECE: {
+        IdentifierID IID;
+        XRefOpaqueReturnTypePathPieceLayout::readRecord(scratch, IID);
+        auto mangledName = getIdentifier(IID);
+        
+        SmallString<64> buf;
+        {
+          llvm::raw_svector_ostream os(buf);
+          os << "<<opaque return type of ";
+          os << mangledName.str();
+          os << ">>";
+        }
+        
+        result = getContext().getIdentifier(buf);
         break;
       }
       case XREF_INITIALIZER_PATH_PIECE:
@@ -1681,6 +1711,22 @@ giveUpFastPath:
             pathTrace, getXRefDeclNameForError());
       }
 
+      break;
+    }
+        
+    case XREF_OPAQUE_RETURN_TYPE_PATH_PIECE: {
+      values.clear();
+      IdentifierID DefiningDeclNameID;
+      
+      XRefOpaqueReturnTypePathPieceLayout::readRecord(scratch, DefiningDeclNameID);
+      
+      auto name = getIdentifier(DefiningDeclNameID);
+      pathTrace.addOpaqueReturnType(name);
+      
+      if (auto opaqueTy = baseModule->lookupOpaqueResultType(name.str(),
+                                                             nullptr)) {
+        values.push_back(opaqueTy);
+      }
       break;
     }
 
