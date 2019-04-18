@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 479; // stored property default arg
+const uint16_t SWIFTMODULE_VERSION_MINOR = 481; // Last change: custom attrs
 
 using DeclIDField = BCFixed<31>;
 
@@ -452,6 +452,8 @@ enum class EnumElementRawValueKind : uint8_t {
   /// TODO: Float, string, char, etc.
 };
 
+using EnumElementRawValueKindField = BCFixed<4>;
+
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum class ResilienceExpansion : uint8_t {
@@ -459,7 +461,17 @@ enum class ResilienceExpansion : uint8_t {
   Maximal,
 };
 
-using EnumElementRawValueKindField = BCFixed<4>;
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class ImportControl : uint8_t {
+  /// `import FooKit`
+  Normal = 0,
+  /// `@_exported import FooKit`
+  Exported,
+  /// `@_uncheckedImplementationOnly import FooKit`
+  ImplementationOnly
+};
+using ImportControlField = BCFixed<2>;
 
 /// The various types of blocks that can occur within a serialized Swift
 /// module.
@@ -636,8 +648,8 @@ namespace input_block {
 
   using ImportedModuleLayout = BCRecordLayout<
     IMPORTED_MODULE,
-    BCFixed<1>, // exported?
-    BCFixed<1>, // scoped?
+    ImportControlField, // import kind
+    BCFixed<1>,         // scoped?
     BCBlob // module name, with submodule path pieces separated by \0s.
            // If the 'scoped' flag is set, the final path piece is an access
            // path within the module.
@@ -1596,6 +1608,12 @@ namespace decls_block {
     DeclIDField, // replaced function
     BCVBR<4>,   // # of arguments (+1) or zero if no name
     BCArray<IdentifierIDField>
+  >;
+
+  using CustomDeclAttrLayout = BCRecordLayout<
+    Custom_DECL_ATTR,
+    BCFixed<1>,  // implicit flag
+    TypeIDField // type referenced by this custom attribute
   >;
 
 }

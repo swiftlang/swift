@@ -1462,6 +1462,9 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
     return RESULT(External, Hidden, Default);
 
   case SILLinkage::Private: {
+    if (info.forcePublicDecls() && !isDefinition)
+      return getIRLinkage(info, SILLinkage::PublicExternal, isDefinition,
+                          isWeakImported);
     auto linkage = info.needLinkerToMergeDuplicateSymbols()
                        ? llvm::GlobalValue::LinkOnceODRLinkage
                        : llvm::GlobalValue::InternalLinkage;
@@ -1637,7 +1640,7 @@ bool LinkInfo::isUsed(IRLinkage IRL) {
 llvm::GlobalVariable *swift::irgen::createVariable(
     IRGenModule &IGM, LinkInfo &linkInfo, llvm::Type *storageType,
     Alignment alignment, DebugTypeInfo DbgTy, Optional<SILLocation> DebugLoc,
-    StringRef DebugName, bool inFixedBuffer, bool indirectForDebugInfo) {
+    StringRef DebugName, bool inFixedBuffer) {
   auto name = linkInfo.getName();
   llvm::GlobalValue *existingValue = IGM.Module.getNamedGlobal(name);
   if (existingValue) {
@@ -1671,7 +1674,7 @@ llvm::GlobalVariable *swift::irgen::createVariable(
   if (IGM.DebugInfo && !DbgTy.isNull() && linkInfo.isForDefinition())
     IGM.DebugInfo->emitGlobalVariableDeclaration(
         var, DebugName.empty() ? name : DebugName, name, DbgTy,
-        var->hasInternalLinkage(), indirectForDebugInfo, DebugLoc);
+        var->hasInternalLinkage(), inFixedBuffer, DebugLoc);
 
   return var;
 }
@@ -1809,13 +1812,6 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   Size fixedSize;
   Alignment fixedAlignment;
   bool inFixedBuffer = false;
-  bool indirectForDebugInfo = false;
-
-  // FIXME: Remove this once LLDB has proper support for resilience.
-  bool isREPLVar = false;
-  if (auto *decl = var->getDecl())
-    if (decl->isREPLVar())
-      isREPLVar = true;
 
   if (var->isInitializedObject()) {
     assert(ti.isFixedSize(expansion));
@@ -1837,7 +1833,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     fixedAlignment = Layout->getAlignment();
     castStorageToType = cast<FixedTypeInfo>(ti).getStorageType();
     assert(fixedAlignment >= TargetInfo.HeapObjectAlignment);
-  } else if (isREPLVar || ti.isFixedSize(expansion)) {
+  } else if (ti.isFixedSize(expansion)) {
     // Allocate static storage.
     auto &fixedTI = cast<FixedTypeInfo>(ti);
     storageType = fixedTI.getStorageType();
@@ -1850,28 +1846,6 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     storageType = getFixedBufferTy();
     fixedSize = Size(DataLayout.getTypeAllocSize(storageType));
     fixedAlignment = Alignment(DataLayout.getABITypeAlignment(storageType));
-
-    // DebugInfo is not resilient for now, so disable resilience to figure out
-    // if lldb needs to dereference the global variable or not.
-    //
-    // FIXME: Once lldb can make use of remote mirrors to calculate layouts
-    // at runtime, this should be removed.
-    {
-      LoweringModeScope Scope(*this, TypeConverter::Mode::CompletelyFragile);
-
-      SILType loweredTy = var->getLoweredType();
-      auto &nonResilientTI = cast<FixedTypeInfo>(getTypeInfo(loweredTy));
-      auto packing = nonResilientTI.getFixedPacking(*this);
-      switch (packing) {
-      case FixedPacking::OffsetZero:
-        break;
-      case FixedPacking::Allocate:
-        indirectForDebugInfo = true;
-        break;
-      default:
-        llvm_unreachable("Bad packing");
-      }
-    }
   }
 
   // Check whether we've created the global variable already.
@@ -1913,8 +1887,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       auto DbgTy = DebugTypeInfo::getGlobal(var, storageTypeWithContainer,
                                             fixedSize, fixedAlignment);
       gvar = createVariable(*this, link, storageTypeWithContainer,
-                            fixedAlignment, DbgTy, loc, name, inFixedBuffer,
-                            indirectForDebugInfo);
+                            fixedAlignment, DbgTy, loc, name, inFixedBuffer);
     }
     /// Add a zero initializer.
     if (forDefinition)
@@ -2960,7 +2933,7 @@ IRGenModule::getAddrOfMetaclassObject(ClassDecl *decl,
 llvm::Function *
 IRGenModule::getAddrOfObjCMetadataUpdateFunction(ClassDecl *classDecl,
                                                  ForDefinition_t forDefinition) {
-  IRGen.noteUseOfTypeMetadata(classDecl);
+  assert(ObjCInterop);
 
   LinkEntity entity = LinkEntity::forObjCMetadataUpdateFunction(classDecl);
   llvm::Function *&entry = GlobalFuncs[entity];
@@ -2970,12 +2943,23 @@ IRGenModule::getAddrOfObjCMetadataUpdateFunction(ClassDecl *classDecl,
   }
 
   // Class _Nullable callback(Class _Nonnull cls, void * _Nullable arg);
-  llvm::Type *params[] = { ObjCClassPtrTy, Int8PtrTy };
-  auto fnType = llvm::FunctionType::get(ObjCClassPtrTy, params, false);
-  Signature signature(fnType, llvm::AttributeList(), DefaultCC);
+  Signature signature(ObjCUpdateCallbackTy, llvm::AttributeList(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
   return entry;
+}
+
+/// Fetch the declaration of an Objective-C resilient class stub.
+llvm::Constant *
+IRGenModule::getAddrOfObjCResilientClassStub(ClassDecl *classDecl,
+                                             ForDefinition_t forDefinition,
+                                             TypeMetadataAddress addr) {
+  assert(ObjCInterop);
+  assert(getClassMetadataStrategy(classDecl) ==
+         ClassMetadataStrategy::Resilient);
+
+  LinkEntity entity = LinkEntity::forObjCResilientClassStub(classDecl, addr);
+  return getAddrOfLLVMVariable(entity, forDefinition, DebugTypeInfo());
 }
 
 /// Fetch the type metadata access function for a non-generic type.

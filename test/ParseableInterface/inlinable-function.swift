@@ -4,7 +4,10 @@
 // RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -disable-objc-attr-requires-foundation-module -emit-parseable-module-interface-path %t/TestFromModule.swiftinterface -module-name Test
 // RUN: %FileCheck %s --check-prefix FROMMODULE --check-prefix CHECK < %t/TestFromModule.swiftinterface
 
-// CHECK: public struct Foo : Hashable {
+// FIXME: These shouldn't be different, or we'll get different output from
+// WMO and non-WMO builds.
+// FROMSOURCE-LABEL: public struct Foo : Hashable {
+// FROMMODULE-LABEL: public struct Foo : Swift.Hashable {
 public struct Foo: Hashable {
   // CHECK: public var inlinableGetPublicSet: [[INT:(Swift.)?Int]] {
   public var inlinableGetPublicSet: Int {

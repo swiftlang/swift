@@ -168,6 +168,10 @@ public:
   /// Emit mangled names of anonymous context descriptors.
   unsigned EnableAnonymousContextMangledNames : 1;
 
+  /// Force public linkage for private symbols. Used only by the LLDB
+  /// expression evaluator.
+  unsigned ForcePublicLinkage : 1;
+  
   /// Bypass resilience when accessing resilient frameworks.
   unsigned EnableResilienceBypass : 1;
 
@@ -234,6 +238,7 @@ public:
         EmbedMode(IRGenEmbedMode::None), HasValueNamesSetting(false),
         ValueNames(false), EnableReflectionMetadata(true),
         EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
+        ForcePublicLinkage(false),
         EnableResilienceBypass(false), LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
         UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),

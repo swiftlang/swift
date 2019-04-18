@@ -1368,8 +1368,7 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
   // stored) and doesn't have a setter with less-than-public visibility.
   auto expansion = ResilienceExpansion::Maximal;
 
-  switch (SGM.M.getSwiftModule()->getResilienceStrategy()) {
-  case ResilienceStrategy::Default: {
+  if (!SGM.M.getSwiftModule()->isResilient()) {
     if (SGM.canStorageUseStoredKeyPathComponent(decl, expansion)) {
       // External modules can't directly access storage, unless this is a
       // property in a fixed-layout type.
@@ -1387,18 +1386,15 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
 
     return false;
   }
-  case ResilienceStrategy::Resilient: {
-    // A resilient module needs to handle binaries compiled against its older
-    // versions. This means we have to be a bit more conservative, since in
-    // earlier versions, a settable property may have withheld the setter,
-    // or a fixed-layout type may not have been.
-    // Without availability information, only get-only computed properties
-    // can resiliently use trivial descriptors.
-    return !SGM.canStorageUseStoredKeyPathComponent(decl, expansion)
-      && decl->getSetter() == nullptr;
-  }
-  }
-  llvm_unreachable("unhandled strategy");
+
+  // A resilient module needs to handle binaries compiled against its older
+  // versions. This means we have to be a bit more conservative, since in
+  // earlier versions, a settable property may have withheld the setter,
+  // or a fixed-layout type may not have been.
+  // Without availability information, only get-only computed properties
+  // can resiliently use trivial descriptors.
+  return !SGM.canStorageUseStoredKeyPathComponent(decl, expansion)
+    && decl->getSetter() == nullptr;
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {

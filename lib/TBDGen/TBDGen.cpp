@@ -343,18 +343,17 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
 
   visitNominalTypeDecl(CD);
 
-  auto hasResilientAncestor =
-      CD->hasResilientMetadata(SwiftModule, ResilienceExpansion::Minimal);
-  auto ancestor = CD->getSuperclassDecl();
-  while (ancestor && !hasResilientAncestor) {
-    hasResilientAncestor |=
-        ancestor->hasResilientMetadata(SwiftModule, ResilienceExpansion::Maximal);
-    ancestor = ancestor->getSuperclassDecl();
-  }
-
   // Types with resilient superclasses have some extra symbols.
-  if (hasResilientAncestor)
+  if (CD->checkAncestry(AncestryFlags::ResilientOther) ||
+      CD->hasResilientMetadata()) {
     addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
+
+    auto &Ctx = CD->getASTContext();
+    if (Ctx.LangOpts.EnableObjCResilientClassStubs) {
+      addSymbol(LinkEntity::forObjCResilientClassStub(
+          CD, TypeMetadataAddress::AddressPoint));
+    }
+  }
 
   // Emit dispatch thunks for every new vtable entry.
   struct VTableVisitor : public SILVTableVisitor<VTableVisitor> {
@@ -590,7 +589,8 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   auto &ctx = M->getASTContext();
   auto isWholeModule = singleFile == nullptr;
   const auto &target = ctx.LangOpts.Target;
-  UniversalLinkageInfo linkInfo(target, opts.HasMultipleIGMs, isWholeModule);
+  UniversalLinkageInfo linkInfo(target, opts.HasMultipleIGMs, false,
+                                isWholeModule);
   auto availCtx = AvailabilityContext::forDeploymentTarget(ctx);
 
   tapi::internal::InterfaceFile file;

@@ -12,7 +12,13 @@
 #define EOF (-1)
 #define UINT32_MAX 0xFFFFFFFFU
 #define INT64_MAX 0x7FFFFFFFFFFFFFFFLL
+#if defined(_WIN32)
+// MSVC compatibility will always return a signed value when the suffix is `LL`
+// or `i64` and other targets will promote it to an unsigned type.
+#define UINT64_MAX 0xFFFFFFFFFFFFFFFFULL
+#else
 #define UINT64_MAX 0xFFFFFFFFFFFFFFFFLL
+#endif
 #define MINUS_THREE -3
 #define true 1
 #define false 0

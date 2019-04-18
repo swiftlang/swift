@@ -490,47 +490,64 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
     // info than that, unlike a typealias
   }
 
+  if (!parentTy)
+    return;
+
   // If this decl is generic, the constraints are handled when the generic
   // parameters are applied, so we don't have to handle them here (which makes
   // getting the right substitution maps easier).
-  if (decl && !decl->isGeneric()) {
-    auto extension = dyn_cast<ExtensionDecl>(decl->getDeclContext());
-    if (parentTy && extension && extension->isConstrainedExtension()) {
-      auto contextSubMap = parentTy->getContextSubstitutionMap(
-          extension->getParentModule(),
-          extension->getSelfNominalTypeDecl());
-      if (!subMap) {
-        // The substitution map wasn't set above, meaning we should grab the map
-        // for the extension itself.
-        subMap = parentTy->getContextSubstitutionMap(
-            extension->getParentModule(), extension);
-      }
+  if (!decl || decl->isGeneric())
+    return;
 
-      if (auto *signature = decl->getGenericSignature()) {
-        cs.openGenericRequirements(
-            extension, signature, /*skipProtocolSelfConstraint*/ true, locator,
-            [&](Type type) {
-              // Why do we look in two substitution maps? We have to use the
-              // context substitution map to find types, because we need to
-              // avoid thinking about them when handling the constraints, or all
-              // the requirements in the signature become tautologies (if the
-              // extension has 'T == Int', subMap will map T -> Int, so the
-              // requirement becomes Int == Int no matter what the actual types
-              // are here). However, we need the conformances for the extension
-              // because the requirements might look like `T: P, T.U: Q`, where
-              // U is an associated type of protocol P.
-              return type.subst(QuerySubstitutionMap{contextSubMap},
-                                LookUpConformanceInSubstitutionMap(subMap),
-                                SubstFlags::UseErrorType);
-            });
-      }
+  // struct A<T> {
+  //   let foo: [T]
+  // }
+  //
+  // extension A : Codable where T: Codable {
+  //   enum CodingKeys: String, CodingKey {
+  //     case foo = "foo"
+  //   }
+  // }
+  //
+  // Reference to `A.CodingKeys.foo` would point to `A` as an
+  // unbound generic type. Conditional requirements would be
+  // added when `A` is "opened". Les delay this check until then.
+  if (parentTy->hasUnboundGenericType())
+    return;
+
+  auto extension = dyn_cast<ExtensionDecl>(decl->getDeclContext());
+  if (extension && extension->isConstrainedExtension()) {
+    auto contextSubMap = parentTy->getContextSubstitutionMap(
+        extension->getParentModule(), extension->getSelfNominalTypeDecl());
+    if (!subMap) {
+      // The substitution map wasn't set above, meaning we should grab the map
+      // for the extension itself.
+      subMap = parentTy->getContextSubstitutionMap(extension->getParentModule(),
+                                                   extension);
     }
 
-    // And now make sure sure the parent is okay, for things like X<T>.Y.Z.
-    if (parentTy) {
-      checkNestedTypeConstraints(cs, parentTy, locator);
+    if (auto *signature = decl->getGenericSignature()) {
+      cs.openGenericRequirements(
+          extension, signature, /*skipProtocolSelfConstraint*/ true, locator,
+          [&](Type type) {
+            // Why do we look in two substitution maps? We have to use the
+            // context substitution map to find types, because we need to
+            // avoid thinking about them when handling the constraints, or all
+            // the requirements in the signature become tautologies (if the
+            // extension has 'T == Int', subMap will map T -> Int, so the
+            // requirement becomes Int == Int no matter what the actual types
+            // are here). However, we need the conformances for the extension
+            // because the requirements might look like `T: P, T.U: Q`, where
+            // U is an associated type of protocol P.
+            return type.subst(QuerySubstitutionMap{contextSubMap},
+                              LookUpConformanceInSubstitutionMap(subMap),
+                              SubstFlags::UseErrorType);
+          });
     }
   }
+
+  // And now make sure sure the parent is okay, for things like X<T>.Y.Z.
+  checkNestedTypeConstraints(cs, parentTy, locator);
 }
 
 Type ConstraintSystem::openUnboundGenericType(

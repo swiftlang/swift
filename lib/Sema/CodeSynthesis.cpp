@@ -322,7 +322,7 @@ static void maybeMarkTransparent(AccessorDecl *accessor, ASTContext &ctx) {
   // Accessors for classes with @objc ancestry are not @_transparent,
   // since they use a field offset variable which is not exported.
   if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
-    if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC)
+    if (classDecl->checkAncestry(AncestryFlags::ObjC))
       return;
 
   // Accessors synthesized on-demand are never transaprent.
@@ -457,7 +457,8 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
   }
   
   // A single unlabeled value is not a tuple.
-  if (args.size() == 1 && labels[0].empty()) {
+  if (args.size() == 1 && labels[0].empty() &&
+      !isa<VarargExpansionExpr>(args[0])) {
     return new (ctx) ParenExpr(SourceLoc(), args[0], SourceLoc(),
                                /*hasTrailingClosure=*/false);
   }

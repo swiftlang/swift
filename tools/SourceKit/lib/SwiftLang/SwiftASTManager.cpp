@@ -788,8 +788,16 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
     return;
 
   auto ClangModuleLoader = TopMod->getASTContext().getClangModuleLoader();
+
+  ModuleDecl::ImportFilter ImportFilter;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+  if (Visited.empty()) {
+    // Only collect implementation-only dependencies from the main module.
+    ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  }
   SmallVector<ModuleDecl::ImportedModule, 8> Imports;
-  TopMod->getImportedModules(Imports, ModuleDecl::ImportFilter::All);
+  TopMod->getImportedModules(Imports, ImportFilter);
 
   for (auto Import : Imports) {
     ModuleDecl *Mod = Import.second;

@@ -9,6 +9,8 @@ add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_
     POSIXError.swift
     MachError.swift
 
+    "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
+
     GYB_SOURCES
       ${swift_platform_gyb_sources}
       Darwin.swift.gyb

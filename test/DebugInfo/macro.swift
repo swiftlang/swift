@@ -1,4 +1,3 @@
-// REQUIRES: objc-interop
 // RUN: %target-swift-frontend -emit-ir %s -g -I %S/Inputs -o - \
 // RUN:    -parse-as-library | %FileCheck %s
 
@@ -7,7 +6,7 @@
 
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "macro_enum",
 // CHECK-SAME:             file: ![[MACRO_H:[0-9]+]]
-// CHECK: ![[MACRO_H]] = !DIFile(filename: "{{.*}}/Inputs/Macro.h",
+// CHECK: ![[MACRO_H]] = !DIFile(filename: "{{.*}}{{(/|\\5C)}}Inputs{{(/|\\5C)}}Macro.h",
 
 import Macro
 

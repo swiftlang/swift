@@ -129,9 +129,6 @@ public:
   /// Emit extra exclusvity markers for memory access and verify coverage.
   bool VerifyExclusivity = false;
 
-  /// Enable the mandatory semantic arc optimizer.
-  bool EnableMandatorySemanticARCOpts = false;
-
   /// Enable large loadable types IRGen pass.
   bool EnableLargeLoadableTypes = true;
 

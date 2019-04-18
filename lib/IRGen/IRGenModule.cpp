@@ -430,7 +430,24 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                     // point too.
   };
   ObjCBlockStructTy->setBody(objcBlockElts);
-  
+
+  // Class _Nullable callback(Class _Nonnull cls, void * _Nullable arg);
+  llvm::Type *params[] = { ObjCClassPtrTy, Int8PtrTy };
+  ObjCUpdateCallbackTy = llvm::FunctionType::get(ObjCClassPtrTy, params, false);
+
+  // The full class stub structure, including a word before the address point.
+  ObjCFullResilientClassStubTy = createStructType(*this, "objc_full_class_stub", {
+    SizeTy, // zero padding to appease the linker
+    SizeTy, // isa pointer -- always 1
+    ObjCUpdateCallbackTy->getPointerTo() // the update callback
+  });
+
+  // What we actually export.
+  ObjCResilientClassStubTy = createStructType(*this, "objc_class_stub", {
+    SizeTy, // isa pointer -- always 1
+    ObjCUpdateCallbackTy->getPointerTo() // the update callback
+  });
+
   auto ErrorStructTy = llvm::StructType::create(LLVMContext, "swift.error");
   // ErrorStruct is currently opaque to the compiler.
   ErrorPtrTy = ErrorStructTy->getPointerTo(DefaultAS);

@@ -458,12 +458,7 @@ bool NormalProtocolConformance::isResilient() const {
   if (!getType()->getAnyNominal()->isResilient())
     return false;
 
-  switch (getDeclContext()->getParentModule()->getResilienceStrategy()) {
-  case ResilienceStrategy::Resilient:
-    return true;
-  case ResilienceStrategy::Default:
-    return false;
-  }
+  return getDeclContext()->getParentModule()->isResilient();
 }
 
 Optional<ArrayRef<Requirement>>

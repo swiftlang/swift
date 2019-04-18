@@ -508,14 +508,20 @@ irgen::getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
 /// Attempts to return a constant heap metadata reference for a
 /// class type.  This is generally only valid for specific kinds of
 /// ObjC reference, like superclasses or category references.
-llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
-                                                      CanType type,
-                                              bool allowDynamicUninitialized) {
+llvm::Constant *
+irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
+                                      CanType type,
+                                      bool allowDynamicUninitialized,
+                                      bool allowStub) {
   auto theDecl = type->getClassOrBoundGenericClass();
   assert(theDecl && "emitting constant heap metadata ref for non-class type?");
 
   switch (IGM.getClassMetadataStrategy(theDecl)) {
   case ClassMetadataStrategy::Resilient:
+    if (allowStub && IGM.Context.LangOpts.EnableObjCResilientClassStubs) {
+      return IGM.getAddrOfObjCResilientClassStub(theDecl, NotForDefinition,
+                                            TypeMetadataAddress::AddressPoint);
+    }
     return nullptr;
 
   case ClassMetadataStrategy::Singleton:

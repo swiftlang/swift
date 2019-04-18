@@ -12,6 +12,7 @@
 
 #include "SpecializedEmitter.h"
 
+#include "ArgumentSource.h"
 #include "Cleanup.h"
 #include "Initialization.h"
 #include "LValue.h"
@@ -30,57 +31,29 @@
 using namespace swift;
 using namespace Lowering;
 
-static bool isTrivialShuffle(ArgumentShuffleExpr *shuffle) {
-  // Each element must be mapped to the corresponding element of the input.
-  auto mapping = shuffle->getElementMapping();
-  for (auto index : indices(mapping)) {
-    if (mapping[index] < 0 || unsigned(mapping[index]) != index)
-      return false;
-  }
-  return true;
-}
-
 /// Break down an expression that's the formal argument expression to
 /// a builtin function, returning its individualized arguments.
 ///
 /// Because these are builtin operations, we can make some structural
 /// assumptions about the expression used to call them.
-static ArrayRef<Expr*> decomposeArguments(SILGenFunction &SGF,
-                                          Expr *arg,
-                                          unsigned expectedCount) {
-  assert(expectedCount >= 2);
-  assert(arg->getType()->is<TupleType>());
-  assert(arg->getType()->castTo<TupleType>()->getNumElements()
-           == expectedCount);
+static Optional<SmallVector<Expr*, 2>>
+decomposeArguments(SILGenFunction &SGF,
+                   SILLocation loc,
+                   PreparedArguments &&args,
+                   unsigned expectedCount) {
+  SmallVector<Expr*, 2> result;
+  auto sources = std::move(args).getSources();
 
-  // The use of owned parameters can trip up CSApply enough to introduce
-  // a trivial tuple shuffle here.
-  arg = arg->getSemanticsProvidingExpr();
-  if (auto shuffle = dyn_cast<ArgumentShuffleExpr>(arg)) {
-    if (isTrivialShuffle(shuffle))
-      arg = shuffle->getSubExpr();
+  if (sources.size() == expectedCount) {
+    for (auto &&source : sources)
+      result.push_back(std::move(source).asKnownExpr());
+    return result;
   }
 
-  auto tuple = dyn_cast<TupleExpr>(arg);
-  if (tuple && tuple->getElements().size() == expectedCount) {
-    return tuple->getElements();
-  }
-
-  SGF.SGM.diagnose(arg, diag::invalid_sil_builtin,
+  SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
                    "argument to builtin should be a literal tuple");
 
-  auto tupleTy = arg->getType()->castTo<TupleType>();
-
-  // This is well-typed but may cause code to be emitted redundantly.
-  auto &ctxt = SGF.getASTContext();
-  SmallVector<Expr*, 4> args;
-  for (auto index : indices(tupleTy->getElementTypes())) {
-    Expr *projection = new (ctxt) TupleElementExpr(arg, SourceLoc(),
-                                                   index, SourceLoc(),
-                                          tupleTy->getElementType(index));
-    args.push_back(projection);
-  }
-  return ctxt.AllocateCopy(args);
+  return None;
 }
 
 static ManagedValue emitBuiltinRetain(SILGenFunction &SGF,
@@ -252,9 +225,13 @@ static ManagedValue emitBuiltinAssign(SILGenFunction &SGF,
 static ManagedValue emitBuiltinInit(SILGenFunction &SGF,
                                     SILLocation loc,
                                     SubstitutionMap substitutions,
-                                    Expr *tuple,
+                                    PreparedArguments &&preparedArgs,
                                     SGFContext C) {
-  auto args = decomposeArguments(SGF, tuple, 2);
+  auto argsOrError = decomposeArguments(SGF, loc, std::move(preparedArgs), 2);
+  if (!argsOrError)
+    return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+
+  auto args = *argsOrError;
 
   CanType formalType =
     substitutions.getReplacementTypes()[0]->getCanonicalType();
@@ -421,23 +398,29 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
 static ManagedValue emitBuiltinAddressOf(SILGenFunction &SGF,
                                          SILLocation loc,
                                          SubstitutionMap substitutions,
-                                         Expr *argument,
+                                         PreparedArguments &&preparedArgs,
                                          SGFContext C) {
-  auto rawPointerTy = SILType::getRawPointerType(SGF.getASTContext());
+  SILType rawPointerType = SILType::getRawPointerType(SGF.getASTContext());
+
+  auto argsOrError = decomposeArguments(SGF, loc, std::move(preparedArgs), 1);
+  if (!argsOrError)
+    return SGF.emitUndef(rawPointerType);
+
+  auto argument = (*argsOrError)[0];
+
   // If the argument is inout, try forming its lvalue. This builtin only works
   // if it's trivially physically projectable.
   auto inout = cast<InOutExpr>(argument->getSemanticsProvidingExpr());
   auto lv = SGF.emitLValue(inout->getSubExpr(), SGFAccessKind::ReadWrite);
   if (!lv.isPhysical() || !lv.isLoadingPure()) {
     SGF.SGM.diagnose(argument->getLoc(), diag::non_physical_addressof);
-    return SGF.emitUndef(rawPointerTy);
+    return SGF.emitUndef(rawPointerType);
   }
   
   auto addr = SGF.emitAddressOfLValue(argument, std::move(lv))
                  .getLValueAddress();
   
   // Take the address argument and cast it to RawPointer.
-  SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());
   SILValue result = SGF.B.createAddressToPointer(loc, addr,
                                                  rawPointerType);
   return ManagedValue::forUnmanaged(result);
@@ -447,9 +430,16 @@ static ManagedValue emitBuiltinAddressOf(SILGenFunction &SGF,
 static ManagedValue emitBuiltinAddressOfBorrow(SILGenFunction &SGF,
                                                SILLocation loc,
                                                SubstitutionMap substitutions,
-                                               Expr *argument,
+                                               PreparedArguments &&preparedArgs,
                                                SGFContext C) {
-  auto rawPointerTy = SILType::getRawPointerType(SGF.getASTContext());
+  SILType rawPointerType = SILType::getRawPointerType(SGF.getASTContext());
+
+  auto argsOrError = decomposeArguments(SGF, loc, std::move(preparedArgs), 1);
+  if (!argsOrError)
+    return SGF.emitUndef(rawPointerType);
+
+  auto argument = (*argsOrError)[0];
+
   SILValue addr;
   // Try to borrow the argument at +0. We only support if it's
   // naturally emitted borrowed in memory.
@@ -457,13 +447,12 @@ static ManagedValue emitBuiltinAddressOfBorrow(SILGenFunction &SGF,
      .getAsSingleValue(SGF, argument);
   if (!borrow.isPlusZero() || !borrow.getType().isAddress()) {
     SGF.SGM.diagnose(argument->getLoc(), diag::non_borrowed_indirect_addressof);
-    return SGF.emitUndef(rawPointerTy);
+    return SGF.emitUndef(rawPointerType);
   }
   
   addr = borrow.getValue();
   
   // Take the address argument and cast it to RawPointer.
-  SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());
   SILValue result = SGF.B.createAddressToPointer(loc, addr,
                                                  rawPointerType);
   return ManagedValue::forUnmanaged(result);

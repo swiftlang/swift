@@ -765,6 +765,9 @@ ERROR(module_not_testable,Fatal,
 ERROR(module_not_compiled_for_private_import,none,
       "module %0 was not compiled for private import", (Identifier))
 
+ERROR(import_implementation_cannot_be_exported,none,
+      "module %0 cannot be both exported and implementation-only", (Identifier))
+
 
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
@@ -814,13 +817,6 @@ ERROR(precedence_group_redeclared,none,
       "precedence group redeclared", ())
 NOTE(previous_precedence_group_decl,none,
      "previous precedence group declaration here", ())
-
-//------------------------------------------------------------------------------
-// MARK: Type Check Coercions
-//------------------------------------------------------------------------------
-
-ERROR(tuple_conversion_not_expressible,none,
-      "cannot express tuple conversion %0 to %1", (Type, Type))
 
 //------------------------------------------------------------------------------
 // MARK: Expression Type Checking Errors
@@ -1107,6 +1103,9 @@ ERROR(attribute_requires_operator_identifier,none,
       "'%0' requires a function with an operator identifier", (StringRef))
 ERROR(attribute_requires_single_argument,none,
       "'%0' requires a function with one argument", (StringRef))
+
+ERROR(nominal_type_not_attribute,none,
+      "%0 %1 cannot be used as an attribute", (DescriptiveDeclKind, DeclName))
 
 ERROR(mutating_invalid_global_scope,none, "%0 is only valid on methods",
       (SelfAccessKind))
@@ -3592,9 +3591,11 @@ ERROR(invalid_nonobjc_extension,none,
 ERROR(objc_in_extension_context,none,
       "members of constrained extensions cannot be declared @objc", ())
 ERROR(objc_in_generic_extension,none,
-      "members of extensions of "
-      "%select{classes from generic context|generic classes}0 "
-      "cannot be declared @objc", (bool))
+      "extensions of %select{classes from generic context|generic classes}0 "
+      "cannot contain '@objc' members", (bool))
+ERROR(objc_in_resilient_extension,none,
+      "extensions of classes built with library evolution support "
+      "cannot contain '@objc' members", ())
 ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,
@@ -3615,6 +3616,10 @@ NOTE(objc_inference_swift3_addnonobjc,none,
 ERROR(objc_for_generic_class,none,
       "generic subclasses of '@objc' classes cannot have an explicit '@objc' "
       "because they are not directly visible from Objective-C", ())
+ERROR(objc_for_resilient_class,none,
+      "classes built with library evolution support cannot have explicit "
+      "'@objc' subclasses because they are not directly "
+      "visible from Objective-C", ())
 ERROR(objc_getter_for_nonobjc_property,none,
       "'@objc' getter for non-'@objc' property", ())
 ERROR(objc_getter_for_nonobjc_subscript,none,

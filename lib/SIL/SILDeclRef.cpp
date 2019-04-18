@@ -330,8 +330,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     d = cast<NominalTypeDecl>(d->getDeclContext());
 
     // FIXME: This should always be true.
-    if (d->getDeclContext()->getParentModule()->getResilienceStrategy() ==
-        ResilienceStrategy::Resilient)
+    if (d->getModuleContext()->isResilient())
       limit = Limit::NeverPublic;
   }
 

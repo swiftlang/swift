@@ -324,6 +324,10 @@ public:
     Bits.ModuleDecl.RawResilienceStrategy = unsigned(strategy);
   }
 
+  bool isResilient() const {
+    return getResilienceStrategy() != ResilienceStrategy::Default;
+  }
+
   /// Look up a (possibly overloaded) value set at top-level scope
   /// (but with the specified access path, which may come from an import decl)
   /// within the current module.
@@ -415,18 +419,23 @@ public:
          SmallVectorImpl<AbstractFunctionDecl *> &results) const;
 
   /// \sa getImportedModules
-  enum class ImportFilter {
-    All,
-    Public,
-    Private
+  enum class ImportFilterKind {
+    /// Include imports declared with `@_exported`.
+    Public = 1 << 0,
+    /// Include "regular" imports with no special annotation.
+    Private = 1 << 1,
+    /// Include imports declared with `@_implementationOnly`.
+    ImplementationOnly = 1 << 2
   };
+  /// \sa getImportedModules
+  using ImportFilter = OptionSet<ImportFilterKind>;
 
   /// Looks up which modules are imported by this module.
   ///
   /// \p filter controls whether public, private, or any imports are included
   /// in this list.
   void getImportedModules(SmallVectorImpl<ImportedModule> &imports,
-                          ImportFilter filter = ImportFilter::Public) const;
+                          ImportFilter filter = ImportFilterKind::Public) const;
 
   /// Looks up which modules are imported by this module, ignoring any that
   /// won't contain top-level decls.
@@ -754,7 +763,7 @@ public:
   /// \see ModuleDecl::getImportedModulesForLookup
   virtual void getImportedModulesForLookup(
       SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const {
-    return getImportedModules(imports, ModuleDecl::ImportFilter::Public);
+    return getImportedModules(imports, ModuleDecl::ImportFilterKind::Public);
   }
 
   /// Generates the list of libraries needed to link this file, based on its
@@ -887,23 +896,29 @@ public:
     /// This source file has access to private declarations in the imported
     /// module.
     PrivateImport = 0x4,
+
+    /// The imported module is an implementation detail of this file and should
+    /// not be required to be present if the main module is ever imported
+    /// elsewhere.
+    ///
+    /// Mutually exclusive with Exported.
+    ImplementationOnly = 0x8
   };
 
   /// \see ImportFlags
   using ImportOptions = OptionSet<ImportFlags>;
-
-  typedef std::pair<ImportOptions, StringRef> ImportOptionsAndFilename;
 
   struct ImportedModuleDesc {
     ModuleDecl::ImportedModule module;
     ImportOptions importOptions;
     StringRef filename;
 
-    ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options)
-        : module(module), importOptions(options) {}
     ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options,
-                       StringRef filename)
-        : module(module), importOptions(options), filename(filename) {}
+                       StringRef filename = {})
+        : module(module), importOptions(options), filename(filename) {
+      assert(!(importOptions.contains(ImportFlags::Exported) &&
+               importOptions.contains(ImportFlags::ImplementationOnly)));
+    }
   };
 
 private:

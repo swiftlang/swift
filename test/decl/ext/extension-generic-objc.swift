@@ -15,7 +15,7 @@ class A<T> : NSObject {
 }
 extension A {
     // This should throw an error
-    @objc func a1() {} // expected-error{{members of extensions of generic classes cannot be declared @objc}}
+    @objc func a1() {} // expected-error{{extensions of generic classes cannot contain '@objc' members}}
     // This should *not* throw an error
     func a2() {}
 }
@@ -51,6 +51,6 @@ class Outer<T> {
 
 extension Outer.Inner {
     @objc func outerInner1() {}
-    // expected-error@-1{{members of extensions of classes from generic context cannot be declared @objc}}
+    // expected-error@-1{{extensions of classes from generic context cannot contain '@objc' members}}
     func outerInner2() {}
 }
