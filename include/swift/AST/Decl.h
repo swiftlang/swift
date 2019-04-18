@@ -5610,6 +5610,9 @@ public:
   bool isStatic() const {
     return Bits.FuncDecl.IsStatic;
   }
+  bool isCallable() const {
+    return getName().str() == "call" && isInstanceMember();
+  }
   /// \returns the way 'static'/'class' was spelled in the source.
   StaticSpellingKind getStaticSpelling() const {
     return static_cast<StaticSpellingKind>(Bits.FuncDecl.StaticSpelling);
