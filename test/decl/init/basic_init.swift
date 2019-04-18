@@ -19,12 +19,18 @@ extension Foo {
 
 class InitClass {
   init(arg: Bool) {} // expected-note{{add '@objc' to make this declaration overridable}}
+  @objc init(baz: Int) {} // expected-note{{overridden declaration is here}}
+  @objc dynamic init(bar: Int) {}
 }
 class InitSubclass: InitClass {}
+// expected-note@-1 {{'init(bar:)' previously overridden here}}
+// expected-note@-2 {{'init(baz:)' previously overridden here}}
 extension InitSubclass {
-  convenience init(arg: Bool) {}
-  // expected-error@-1{{invalid redeclaration of inherited 'init(arg:)'}}
-  // expected-error@-2{{overriding non-@objc declarations from extensions is not supported}}
+  convenience init(arg: Bool) {} // expected-error{{overriding non-@objc declarations from extensions is not supported}}
+  convenience override init(baz: Int) {}
+  // expected-error@-1 {{cannot override a non-dynamic class declaration from an extension}}
+  // expected-error@-2 {{'init(baz:)' has already been overridden}}
+  convenience override init(bar: Int) {} // expected-error{{'init(bar:)' has already been overridden}}
 }
 
 struct InitStruct {

@@ -917,16 +917,14 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
         const auto *otherInit = dyn_cast<ConstructorDecl>(other);
         // Provide a better description for implicit initializers.
         if (otherInit && otherInit->isImplicit()) {
-          enum {
-            Synthetic, SyntheticMemberwise, Inherited
-          } kind = Synthetic;
-          if (otherInit->isMemberwiseInitializer())
-            kind = SyntheticMemberwise;
-          else if (otherInit->getOverriddenDecl())
-            kind = Inherited;
-
-          tc.diagnose(current, diag::invalid_redecl_init,
-                      current->getFullName(), kind);
+          // Skip conflicts with inherited initializers, which only happen
+          // when the current declaration is within an extension. The override
+          // checker should have already taken care of emitting a more
+          // productive diagnostic.
+          if (!other->getOverriddenDecl())
+            tc.diagnose(current, diag::invalid_redecl_init,
+                        current->getFullName(),
+                        otherInit->isMemberwiseInitializer());
         } else {
           tc.diagnose(current, diag::invalid_redecl, current->getFullName());
           tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
