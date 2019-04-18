@@ -315,6 +315,7 @@ private:
       return Node->getChild(0)->getChild(0)->getNumChildren() == 0;
 
     case Node::Kind::ProtocolListWithClass:
+    case Node::Kind::AccessorFunctionReference:
     case Node::Kind::Allocator:
     case Node::Kind::ArgumentTuple:
     case Node::Kind::AssociatedConformanceDescriptor:
@@ -413,6 +414,7 @@ private:
     case Node::Kind::ObjCBlock:
     case Node::Kind::ObjCMetadataUpdateFunction:
     case Node::Kind::ObjCResilientClassStub:
+    case Node::Kind::OpaqueTypeDescriptor:
     case Node::Kind::Owned:
     case Node::Kind::OwningAddressor:
     case Node::Kind::OwningMutableAddressor:
@@ -510,6 +512,10 @@ private:
     case Node::Kind::DynamicallyReplaceableFunctionKey:
     case Node::Kind::DynamicallyReplaceableFunctionImpl:
     case Node::Kind::DynamicallyReplaceableFunctionVar:
+    case Node::Kind::OpaqueType:
+    case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
+    case Node::Kind::OpaqueReturnType:
+    case Node::Kind::OpaqueReturnTypeOf:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -1582,6 +1588,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "type symbolic reference 0x";
     Printer.writeHex(Node->getIndex());
     return nullptr;
+  case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
+    Printer << "opaque type symbolic reference 0x";
+    Printer.writeHex(Node->getIndex());
+    return nullptr;
   case Node::Kind::DynamicallyReplaceableFunctionKey:
     if (!Options.ShortenThunk) {
       Printer << "dynamically replaceable key for ";
@@ -1717,6 +1727,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::NominalTypeDescriptor:
     Printer << "nominal type descriptor for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::OpaqueTypeDescriptor:
+    Printer << "opaque type descriptor for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::CoroutineContinuationPrototype:
@@ -2244,6 +2258,22 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "(";
     print(Node->getChild(0));
     Printer << ")";
+    return nullptr;
+  case Node::Kind::OpaqueReturnType:
+    Printer << "some";
+    return nullptr;
+  case Node::Kind::OpaqueReturnTypeOf:
+    Printer << "<<opaque return type of ";
+    printChildren(Node);
+    Printer << ">>";
+    return nullptr;
+  case Node::Kind::OpaqueType:
+    print(Node->getChild(0));
+    Printer << '.';
+    print(Node->getChild(1));
+    return nullptr;
+  case Node::Kind::AccessorFunctionReference:
+    Printer << "accessor function at " << Node->getIndex();
     return nullptr;
   }
   printer_unreachable("bad node kind!");

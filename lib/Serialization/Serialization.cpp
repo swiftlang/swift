@@ -34,6 +34,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/SmallString.h"
@@ -1769,6 +1770,9 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::EnumCase:
     return false;
 
+  case DeclKind::OpaqueType:
+    return true;
+      
   case DeclKind::EnumElement:
   case DeclKind::Protocol:
   case DeclKind::Constructor:
@@ -3280,6 +3284,7 @@ void Serializer::writeDecl(const Decl *D) {
                           addTypeRef(ty),
                           addDeclRef(var->getOverriddenDecl()),
                           rawAccessLevel, rawSetterAccessLevel,
+                          addDeclRef(var->getOpaqueResultTypeDecl()),
                           accessorsAndDependencies);
     break;
   }
@@ -3361,6 +3366,7 @@ void Serializer::writeDecl(const Decl *D) {
                              fn->getFullName().isCompoundName(),
                            rawAccessLevel,
                            fn->needsNewVTableEntry(),
+                           addDeclRef(fn->getOpaqueResultTypeDecl()),
                            nameComponentsAndDependencies);
 
     writeGenericParams(fn->getGenericParams());
@@ -3376,6 +3382,31 @@ void Serializer::writeDecl(const Decl *D) {
     break;
   }
       
+  case DeclKind::OpaqueType: {
+    auto opaqueDecl = cast<OpaqueTypeDecl>(D);
+    verifyAttrSerializable(opaqueDecl);
+    
+    auto namingDeclID = addDeclRef(opaqueDecl->getNamingDecl());
+    auto contextID = addDeclContextRef(opaqueDecl->getDeclContext());
+    auto interfaceSigID =
+      addGenericSignatureRef(opaqueDecl->getOpaqueInterfaceGenericSignature());
+    auto interfaceTypeID =
+      addTypeRef(opaqueDecl->getUnderlyingInterfaceType());
+    
+    auto genericEnvID = addGenericEnvironmentRef(opaqueDecl->getGenericEnvironment());
+    
+    SubstitutionMapID underlyingTypeID = 0;
+    if (auto underlying = opaqueDecl->getUnderlyingTypeSubstitutions())
+      underlyingTypeID = addSubstitutionMapRef(*underlying);
+    
+    unsigned abbrCode = DeclTypeAbbrCodes[OpaqueTypeLayout::Code];
+    OpaqueTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                 contextID, namingDeclID, interfaceSigID,
+                                 interfaceTypeID, genericEnvID,
+                                 underlyingTypeID);
+    break;
+  }
+
   case DeclKind::Accessor: {
     auto fn = cast<AccessorDecl>(D);
     verifyAttrSerializable(fn);
@@ -3518,6 +3549,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 rawStaticSpelling,
                                 subscript->
                                   getFullName().getArgumentNames().size(),
+                                addDeclRef(subscript->getOpaqueResultTypeDecl()),
                                 nameComponentsAndDependencies);
 
     writeGenericParams(subscript->getGenericParams());
@@ -3881,6 +3913,15 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
+  case TypeKind::OpaqueTypeArchetype: {
+    auto archetypeTy = cast<OpaqueTypeArchetypeType>(ty.getPointer());
+    auto declID = addDeclRef(archetypeTy->getDecl());
+    auto substMapID = addSubstitutionMapRef(archetypeTy->getSubstitutions());
+    unsigned abbrCode = DeclTypeAbbrCodes[OpaqueArchetypeTypeLayout::Code];
+    OpaqueArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                          declID, substMapID);
+    break;
+  }
   case TypeKind::NestedArchetype: {
     auto archetypeTy = cast<NestedArchetypeType>(ty.getPointer());
     auto rootTypeID = addTypeRef(archetypeTy->getRoot());
@@ -4147,6 +4188,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<ExistentialMetatypeTypeLayout>();
   registerDeclTypeAbbr<PrimaryArchetypeTypeLayout>();
   registerDeclTypeAbbr<OpenedArchetypeTypeLayout>();
+  registerDeclTypeAbbr<OpaqueArchetypeTypeLayout>();
   registerDeclTypeAbbr<NestedArchetypeTypeLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
@@ -4170,6 +4212,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<ParamLayout>();
   registerDeclTypeAbbr<FuncLayout>();
   registerDeclTypeAbbr<AccessorLayout>();
+  registerDeclTypeAbbr<OpaqueTypeLayout>();
   registerDeclTypeAbbr<PatternBindingLayout>();
   registerDeclTypeAbbr<ProtocolLayout>();
   registerDeclTypeAbbr<DefaultWitnessTableLayout>();
@@ -4627,9 +4670,10 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
   DeclTable precedenceGroupDecls;
   ObjCMethodTable objcMethods;
   NestedTypeDeclsTable nestedTypeDecls;
-  LocalTypeHashTableGenerator localTypeGenerator;
+  LocalTypeHashTableGenerator localTypeGenerator, opaqueReturnTypeGenerator;
   ExtensionTable extensionDecls;
   bool hasLocalTypes = false;
+  bool hasOpaqueReturnTypes = false;
 
   Optional<DeclID> entryPointClassID;
   SmallVector<DeclID, 16> orderedTopLevelDecls;
@@ -4700,6 +4744,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
 
     SmallVector<TypeDecl *, 16> localTypeDecls;
     nextFile->getLocalTypeDecls(localTypeDecls);
+    SmallVector<OpaqueTypeDecl *, 16> opaqueReturnTypeDecls;
+    nextFile->getOpaqueReturnTypeDecls(opaqueReturnTypeDecls);
 
     for (auto TD : localTypeDecls) {
       hasLocalTypes = true;
@@ -4716,6 +4762,14 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
                                              operatorMethodDecls, objcMethods,
                                              nestedTypeDecls, /*isLocal=*/true);
       }
+    }
+    
+    for (auto OTD : opaqueReturnTypeDecls) {
+      hasOpaqueReturnTypes = true;
+      Mangle::ASTMangler Mangler;
+      auto MangledName = Mangler.mangleDeclAsUSR(OTD->getNamingDecl(),
+                                                 MANGLING_PREFIX_STR);
+      opaqueReturnTypeGenerator.insert(MangledName, addDeclRef(OTD));
     }
   }
 
@@ -4747,6 +4801,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
     if (hasLocalTypes)
       writeLocalDeclTable(DeclList, index_block::LOCAL_TYPE_DECLS,
                           localTypeGenerator);
+    if (hasOpaqueReturnTypes)
+      writeLocalDeclTable(DeclList, index_block::OPAQUE_RETURN_TYPE_DECLS,
+                          opaqueReturnTypeGenerator);
 
     if (!extensionDecls.empty()) {
       index_block::ExtensionTableLayout ExtensionTable(Out);

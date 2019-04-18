@@ -2620,7 +2620,7 @@ public:
     uint8_t rawAccessLevel, rawSetterAccessLevel;
     TypeID interfaceTypeID;
     ModuleFile::AccessorRecord accessors;
-    DeclID overriddenID;
+    DeclID overriddenID, opaqueReturnTypeID;
     ArrayRef<uint64_t> accessorAndDependencyIDs;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
@@ -2633,6 +2633,7 @@ public:
                                        interfaceTypeID,
                                        overriddenID,
                                        rawAccessLevel, rawSetterAccessLevel,
+                                       opaqueReturnTypeID,
                                        accessorAndDependencyIDs);
 
     Identifier name = MF.getIdentifier(nameID);
@@ -2733,6 +2734,11 @@ public:
     if (var->hasStorage())
       AddAttribute(new (ctx) HasStorageAttr(/*isImplicit:*/true));
 
+    if (opaqueReturnTypeID) {
+      var->setOpaqueResultTypeDecl(
+                         cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
+    }
+    
     return var;
   }
 
@@ -2809,6 +2815,7 @@ public:
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
     bool needsNewVTableEntry;
+    DeclID opaqueResultTypeDeclID;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -2822,6 +2829,7 @@ public:
                                           numNameComponentsBiased,
                                           rawAccessLevel,
                                           needsNewVTableEntry,
+                                          opaqueResultTypeDeclID,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -2996,6 +3004,10 @@ public:
     fn->setForcedStaticDispatch(hasForcedStaticDispatch);
     fn->setNeedsNewVTableEntry(needsNewVTableEntry);
 
+    if (opaqueResultTypeDeclID)
+      fn->setOpaqueResultTypeDecl(
+                     cast<OpaqueTypeDecl>(MF.getDecl(opaqueResultTypeDeclID)));
+
     // Set the interface type.
     fn->computeType();
 
@@ -3009,6 +3021,51 @@ public:
   Expected<Decl *> deserializeAccessor(ArrayRef<uint64_t> scratch,
                                        StringRef blobData) {
     return deserializeAnyFunc(scratch, blobData, /*isAccessor*/true);
+  }
+      
+  Expected<Decl *> deserializeOpaqueType(ArrayRef<uint64_t> scratch,
+                                         StringRef blobData) {
+    DeclID namingDeclID;
+    DeclContextID contextID;
+    GenericSignatureID interfaceSigID;
+    TypeID interfaceTypeID;
+    GenericEnvironmentID genericEnvID;
+    SubstitutionMapID underlyingTypeID;
+    
+    decls_block::OpaqueTypeLayout::readRecord(scratch, contextID,
+                                              namingDeclID, interfaceSigID,
+                                              interfaceTypeID, genericEnvID,
+                                              underlyingTypeID);
+    
+    auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));
+    auto declContext = MF.getDeclContext(contextID);
+    auto sig = MF.getGenericSignature(interfaceSigID);
+    auto interfaceType = MF.getType(interfaceTypeID)
+                            ->castTo<GenericTypeParamType>();
+    
+    // Check for reentrancy.
+    if (declOrOffset.isComplete())
+      return cast<OpaqueTypeDecl>(declOrOffset.get());
+      
+    // Create the decl.
+    auto opaqueDecl =
+      new (ctx) OpaqueTypeDecl(namingDecl, nullptr, declContext,
+                               sig, interfaceType);
+    declOrOffset = opaqueDecl;
+
+    auto genericEnv = MF.getGenericEnvironment(genericEnvID);
+    opaqueDecl->setGenericEnvironment(genericEnv);
+    if (underlyingTypeID)
+      opaqueDecl->setUnderlyingTypeSubstitutions(
+                                       MF.getSubstitutionMap(underlyingTypeID));
+    SubstitutionMap subs;
+    if (genericEnv) {
+      subs = genericEnv->getGenericSignature()->getIdentitySubstitutionMap();
+    }
+    auto opaqueTy = OpaqueTypeArchetypeType::get(opaqueDecl, subs);
+    auto metatype = MetatypeType::get(opaqueTy);
+    opaqueDecl->setInterfaceType(metatype);
+    return opaqueDecl;
   }
 
   Expected<Decl *> deserializePatternBinding(ArrayRef<uint64_t> scratch,
@@ -3492,7 +3549,7 @@ public:
     GenericEnvironmentID genericEnvID;
     TypeID elemInterfaceTypeID;
     ModuleFile::AccessorRecord accessors;
-    DeclID overriddenID;
+    DeclID overriddenID, opaqueReturnTypeID;
     uint8_t rawAccessLevel, rawSetterAccessLevel, rawStaticSpelling;
     uint8_t opaqueReadOwnership, readImpl, writeImpl, readWriteImpl;
     unsigned numArgNames, numAccessors;
@@ -3509,6 +3566,7 @@ public:
                                              overriddenID, rawAccessLevel,
                                              rawSetterAccessLevel,
                                              rawStaticSpelling, numArgNames,
+                                             opaqueReturnTypeID,
                                              argNameAndDependencyIDs);
     // Resolve the name ids.
     SmallVector<Identifier, 2> argNames;
@@ -3593,6 +3651,12 @@ public:
     subscript->setOverriddenDecl(cast_or_null<SubscriptDecl>(overridden.get()));
     if (subscript->getOverriddenDecl())
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
+    
+    if (opaqueReturnTypeID) {
+      subscript->setOpaqueResultTypeDecl(
+                         cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
+    }
+    
     return subscript;
   }
 
@@ -4083,6 +4147,7 @@ DeclDeserializer::getDeclCheckedImpl() {
   CASE(Var)
   CASE(Param)
   CASE(Func)
+  CASE(OpaqueType)
   CASE(Accessor)
   CASE(PatternBinding)
   CASE(Protocol)
@@ -4673,6 +4738,19 @@ public:
     return OpenedArchetypeType::get(MF.getType(existentialID));
   }
       
+  Expected<Type> deserializeOpaqueArchetypeType(ArrayRef<uint64_t> scratch,
+                                                StringRef blobData) {
+    DeclID opaqueDeclID;
+    SubstitutionMapID subsID;
+    decls_block::OpaqueArchetypeTypeLayout::readRecord(scratch,
+                                                       opaqueDeclID, subsID);
+
+    auto opaqueDecl = cast<OpaqueTypeDecl>(MF.getDecl(opaqueDeclID));
+    auto subs = MF.getSubstitutionMap(subsID);
+
+    return OpaqueTypeArchetypeType::get(opaqueDecl, subs);
+  }
+      
   Expected<Type> deserializeNestedArchetypeType(ArrayRef<uint64_t> scratch,
                                                 StringRef blobData) {
     TypeID rootID, interfaceTyID;
@@ -5103,6 +5181,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
   CASE(DynamicSelf)
   CASE(ReferenceStorage)
   CASE(PrimaryArchetype)
+  CASE(OpaqueArchetype)
   CASE(OpenedArchetype)
   CASE(NestedArchetype)
   CASE(GenericTypeParam)
