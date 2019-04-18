@@ -1110,6 +1110,38 @@ namespace decls_block {
     // - inlinable body text, if any
   >;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // TODO: remove the unnecessary FuncDecl components here
+  using CallLayout = BCRecordLayout<
+    CALL_DECL,
+    DeclContextIDField,  // context decl
+    BCFixed<1>,   // implicit?
+    BCFixed<1>,   // is 'static' or 'class'?
+    StaticSpellingKindField, // spelling of 'static' or 'class'
+    BCFixed<1>,   // isObjC?
+    SelfAccessKindField,   // self access kind
+    BCFixed<1>,   // has dynamic self?
+    BCFixed<1>,   // has forced static dispatch?
+    BCFixed<1>,   // throws?
+    GenericEnvironmentIDField, // generic environment
+    TypeIDField,  // result interface type
+    DeclIDField,  // operator decl
+    DeclIDField,  // overridden function
+    BCVBR<5>,     // 0 for a simple name, otherwise the number of parameter name
+                  // components plus one
+    AccessLevelField, // access level
+    BCFixed<1>,   // requires a new vtable slot
+    BCFixed<1>,   // default argument resilience expansion
+    BCArray<IdentifierIDField> // name components,
+                               // followed by TypeID dependencies
+    // The record is trailed by:
+    // - its _silgen_name, if any
+    // - its generic parameters, if any
+    // - body parameter patterns
+    // - the foreign error convention, if any
+    // - inlinable body text, if any
+  >;
+
   using PatternBindingLayout = BCRecordLayout<
     PATTERN_BINDING_DECL,
     DeclContextIDField, // context decl

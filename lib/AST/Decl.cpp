@@ -5899,7 +5899,16 @@ CallDecl *CallDecl::createImpl(ASTContext &ctx, DeclName name,
    return D;
 }
 
- CallDecl *CallDecl::create(ASTContext &ctx, DeclName name, SourceLoc declLoc,
+CallDecl *CallDecl::createDeserialized(ASTContext &ctx, DeclName name,
+                                       SourceLoc declLoc, bool throws,
+                                       SourceLoc throwsLoc,
+                                       GenericParamList *genericParams,
+                                       DeclContext *parent) {
+  return createImpl(ctx, name, declLoc, throws, throwsLoc, genericParams,
+                    parent, ClangNode());
+}
+
+CallDecl *CallDecl::create(ASTContext &ctx, DeclName name, SourceLoc declLoc,
                            bool throws, SourceLoc throwsLoc,
                            GenericParamList *genericParams,
                            ParameterList *bodyParams, TypeLoc fnRetType,

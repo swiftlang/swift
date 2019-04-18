@@ -3147,8 +3147,11 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
   }
 
   case decls_block::FUNC_DECL:
-  case decls_block::ACCESSOR_DECL: {
+  case decls_block::ACCESSOR_DECL:
+  // SWIFT_ENABLE_TENSORFLOW
+  case decls_block::CALL_DECL: {
     bool isAccessor = (recordID == decls_block::ACCESSOR_DECL);
+    bool isCall = (recordID == decls_block::CALL_DECL);
 
     DeclContextID contextID;
     bool isImplicit;
@@ -3166,8 +3169,23 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     uint8_t rawDefaultArgumentResilienceExpansion;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
-    if (!isAccessor) {
-      decls_block::FuncLayout::readRecord(scratch, contextID, isImplicit,
+    // SWIFT_ENABLE_TENSORFLOW
+    if (isAccessor) {
+      decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
+                                          isStatic, rawStaticSpelling, isObjC,
+                                          rawMutModifier, hasDynamicSelf,
+                                          hasForcedStaticDispatch, throws,
+                                          genericEnvID,
+                                          resultInterfaceTypeID,
+                                          overriddenID,
+                                          accessorStorageDeclID,
+                                          rawAccessorKind,
+                                          rawAccessLevel,
+                                          needsNewVTableEntry,
+                                          rawDefaultArgumentResilienceExpansion,
+                                          nameAndDependencyIDs);
+    } else if (isCall) {
+      decls_block::CallLayout::readRecord(scratch, contextID, isImplicit,
                                           isStatic, rawStaticSpelling, isObjC,
                                           rawMutModifier, hasDynamicSelf,
                                           hasForcedStaticDispatch, throws,
@@ -3180,15 +3198,14 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                                           rawDefaultArgumentResilienceExpansion,
                                           nameAndDependencyIDs);
     } else {
-      decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
+      decls_block::FuncLayout::readRecord(scratch, contextID, isImplicit,
                                           isStatic, rawStaticSpelling, isObjC,
                                           rawMutModifier, hasDynamicSelf,
                                           hasForcedStaticDispatch, throws,
                                           genericEnvID,
                                           resultInterfaceTypeID,
-                                          overriddenID,
-                                          accessorStorageDeclID,
-                                          rawAccessorKind,
+                                          associatedDeclID, overriddenID,
+                                          numNameComponentsBiased,
                                           rawAccessLevel,
                                           needsNewVTableEntry,
                                           rawDefaultArgumentResilienceExpansion,
@@ -3281,17 +3298,22 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       return declOrOffset;
 
     FuncDecl *fn;
-    if (!isAccessor) {
-      fn = FuncDecl::createDeserialized(
-        ctx, /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
-        /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
-        /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
-        genericParams, DC);
-    } else {
+    // SWIFT_ENABLE_TENSORFLOW
+    if (isAccessor) {
       fn = AccessorDecl::createDeserialized(
         ctx, /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
         accessorKind, storage,
         /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
+        /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
+        genericParams, DC);
+    } else if (isCall) {
+      fn = CallDecl::createDeserialized(
+        ctx, name, /*declLoc=*/ SourceLoc(), /*throws*/ throws,
+        /*throwsLoc*/ SourceLoc(), genericParams, DC);
+    } else {
+      fn = FuncDecl::createDeserialized(
+        ctx, /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
+        /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
         /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
         genericParams, DC);
     }

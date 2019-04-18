@@ -5914,6 +5914,12 @@ class CallDecl final : public FuncDecl {
                               DeclContext *parent, ClangNode clangNode);
 
 public:
+  static CallDecl *createDeserialized(ASTContext &ctx, DeclName name,
+                                      SourceLoc declLoc, bool throws,
+                                      SourceLoc throwsLoc,
+                                      GenericParamList *genericParams,
+                                      DeclContext *parent);
+
   static CallDecl *create(ASTContext &ctx, DeclName fullName, SourceLoc declLoc,
                           bool throws, SourceLoc throwsLoc,
                           GenericParamList *genericParams,

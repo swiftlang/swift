@@ -3412,7 +3412,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto contextID = addDeclContextRef(fn->getDeclContext());
 
-    unsigned abbrCode = DeclTypeAbbrCodes[FuncLayout::Code];
+    unsigned abbrCode = DeclTypeAbbrCodes[CallLayout::Code];
     SmallVector<IdentifierID, 4> nameComponentsAndDependencies;
     nameComponentsAndDependencies.push_back(
         addDeclBaseNameRef(fn->getFullName().getBaseName()));
@@ -3428,7 +3428,7 @@ void Serializer::writeDecl(const Decl *D) {
     for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
       nameComponentsAndDependencies.push_back(addTypeRef(dependency));
 
-    FuncLayout::emitRecord(Out, ScratchRecord, abbrCode,
+    CallLayout::emitRecord(Out, ScratchRecord, abbrCode,
                            contextID,
                            fn->isImplicit(),
                            fn->isStatic(),
@@ -3441,7 +3441,7 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->hasForcedStaticDispatch(),
                            fn->hasThrows(),
                            addGenericEnvironmentRef(
-                                                  fn->getGenericEnvironment()),
+                             fn->getGenericEnvironment()),
                            addTypeRef(fn->getResultInterfaceType()),
                            addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()),
@@ -3454,7 +3454,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     writeGenericParams(fn->getGenericParams());
 
-     // Write the body parameters.
+    // Write the body parameters.
     writeParameterList(fn->getParameters());
 
     if (auto errorConvention = fn->getForeignErrorConvention())
@@ -4219,6 +4219,8 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<ParamLayout>();
   registerDeclTypeAbbr<FuncLayout>();
   registerDeclTypeAbbr<AccessorLayout>();
+  // SWIFT_ENABLE_TENSORFLOW
+  registerDeclTypeAbbr<CallLayout>();
   registerDeclTypeAbbr<PatternBindingLayout>();
   registerDeclTypeAbbr<ProtocolLayout>();
   registerDeclTypeAbbr<DefaultWitnessTableLayout>();
