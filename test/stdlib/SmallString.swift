@@ -9,7 +9,9 @@
 //
 
 import StdlibUnittest
+#if _runtime(_ObjC)
 import Foundation
+#endif
 var SmallStringTests = TestSuite("SmallStringTests")
 
 extension String: Error {}
