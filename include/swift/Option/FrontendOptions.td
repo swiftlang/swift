@@ -18,9 +18,6 @@ let Flags = [FrontendOption, NoDriverOption] in {
 
 def triple : Separate<["-"], "triple">, Alias<target>;
 
-def color_diagnostics : Flag<["-"], "color-diagnostics">,
-  HelpText<"Print diagnostics in color">;
-
 def primary_file : Separate<["-"], "primary-file">,
   HelpText<"Produce output for this file, not the whole module">;
 
