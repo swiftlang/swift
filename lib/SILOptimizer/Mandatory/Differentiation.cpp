@@ -4354,12 +4354,17 @@ public:
       case AdjointValueKind::Aggregate: {
         SmallVector<AdjointValue, 8> eltVals;
         for (auto *field : cotangentVectorDecl->getStoredProperties()) {
-          if (field == cotanField)
+          if (field == cotanField) {
             eltVals.push_back(av);
-          else
-            eltVals.push_back(makeZeroAdjointValue(
-                SILType::getPrimitiveObjectType(
-                    field->getType()->getCanonicalType())));
+          } else {
+            auto substMap = cotangentVectorTy->getMemberSubstitutionMap(
+                field->getModuleContext(), field);
+            auto fieldTy = field->getType().subst(substMap);
+            auto fieldSILTy =
+                getContext().getTypeConverter().getLoweredType(fieldTy);
+            assert(fieldSILTy.isObject());
+            eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
+          }
         }
         addAdjointValue(sei->getOperand(),
             makeAggregateAdjointValue(cotangentVectorSILTy, eltVals));
