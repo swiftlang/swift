@@ -2174,8 +2174,7 @@ void IRGenModule::emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
   auto accessor =
       getAddrOfOpaqueTypeDescriptorAccessFunction(opaque, ForDefinition, false);
 
-  if (cast<AbstractFunctionDecl>(opaque->getNamingDecl())
-      ->isNativeDynamic()) {
+  if (opaque->getNamingDecl()->isNativeDynamic()) {
     auto thunk = accessor;
     auto impl =
       getAddrOfOpaqueTypeDescriptorAccessFunction(opaque, ForDefinition, true);
