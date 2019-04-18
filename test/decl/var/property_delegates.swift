@@ -640,3 +640,15 @@ func testStorageRef(tsr: TestStorageRef) {
   let _: Wrapper = tsr.$x
 }
 
+// ---------------------------------------------------------------------------
+// Misc. semantic issues
+// ---------------------------------------------------------------------------
+@propertyDelegate
+struct BrokenLazy { }
+// expected-error@-1{{property delegate type 'BrokenLazy' does not contain a non-static property named 'value'}}
+// expected-note@-2{{'BrokenLazy' declared here}}
+
+struct S {
+  @BrokenLazy // expected-error{{struct 'BrokenLazy' cannot be used as an attribute}}
+  var value: Int
+}

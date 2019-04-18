@@ -1531,6 +1531,8 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
     return PropertyDelegateBackingPropertyInfo();
 
   auto delegateInfo = var->getAttachedPropertyDelegateTypeInfo();
+  if (!delegateInfo)
+    return PropertyDelegateBackingPropertyInfo();
 
   // Compute the name of the storage type.
   ASTContext &ctx = var->getASTContext();
