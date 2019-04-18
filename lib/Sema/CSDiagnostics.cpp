@@ -2909,18 +2909,24 @@ MissingContextualConformanceFailure::getDiagnosticFor(
   return None;
 }
 
-bool SkipUnhandledConstructInFunctionBuilderFailure::diagnoseAsError() {
+void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
+    bool asNote) {
   if (auto stmt = unhandled.dyn_cast<Stmt *>()) {
     emitDiagnostic(stmt->getStartLoc(),
-                   diag::function_builder_control_flow,
+                   asNote? diag::note_function_builder_control_flow
+                         : diag::function_builder_control_flow,
                    builder->getFullName());
   } else {
     auto decl = unhandled.get<Decl *>();
     emitDiagnostic(decl,
-                   diag::function_builder_decl,
+                   asNote ? diag::note_function_builder_decl
+                          : diag::function_builder_decl,
                    builder->getFullName());
   }
+}
 
+bool SkipUnhandledConstructInFunctionBuilderFailure::diagnoseAsError() {
+  diagnosePrimary(/*asNote=*/false);
   emitDiagnostic(builder,
                  diag::kind_declname_declared_here,
                  builder->getDescriptiveKind(),
@@ -2929,16 +2935,6 @@ bool SkipUnhandledConstructInFunctionBuilderFailure::diagnoseAsError() {
 }
 
 bool SkipUnhandledConstructInFunctionBuilderFailure::diagnoseAsNote() {
-  if (auto stmt = unhandled.dyn_cast<Stmt *>()) {
-    emitDiagnostic(stmt->getStartLoc(),
-                   diag::note_function_builder_control_flow,
-                   builder->getFullName());
-  } else {
-    auto decl = unhandled.get<Decl *>();
-    emitDiagnostic(decl,
-                   diag::note_function_builder_decl,
-                   builder->getFullName());
-  }
-
+  diagnosePrimary(/*asNote=*/true);
   return true;
 }
