@@ -969,120 +969,112 @@ internal func _fastWithNormalizedCodeUnitsImpl(
   }
 }
 
-/// The following convenience methods allow for dot notation string to number conversion without dealing with optional values
+/// The following convenience properties provide the value of the string in various numeric representations, such as Int and Double.
 extension String {
     
-    /// Returns an integer version of the string.
+    /// Returns an `Int` version of the string.
     ///
-    /// The following example transforms a string to an integer:
+    /// The following example transforms a string to an `Int`:
     ///
     ///     let five = "5"
     ///     print(five.intValue)
     ///     // Prints "5"
     ///
+    /// - Note: Returns 0 for invalid strings
     /// - Returns: An integer copy of the string.
     public var intValue: Int {
-        get {
-            return Int(self) ?? 0
-        }
+        return Int(self) ?? 0
     }
     
-    /// Returns an int8 (short) version of the string.
+    /// Returns an `Int8` (short) version of the string.
     ///
-    /// The following example transforms a string to an int8:
+    /// The following example transforms a string to an `Int8`:
     ///
     ///     let five = "5"
     ///     print(five.int8Value)
     ///     // Prints "5"
     ///
+    /// - Note: Returns 0 for invalid strings
     /// - Returns: An int8 (short) copy of the string.
     public var int8Value: Int8 {
-        get {
-            return Int8(self) ?? 0
-        }
+        return Int8(self) ?? 0
     }
     
-    /// Returns an int16 version of the string.
+    /// Returns an `Int16` version of the string.
     ///
-    /// The following example transforms a string to an int16:
+    /// The following example transforms a string to an `Int16`:
     ///
     ///     let five = "5"
     ///     print(five.int16Value)
     ///     // Prints "5"
     ///
+    /// - Note: Returns 0 for invalid strings
     /// - Returns: An int16 copy of the string.
     public var int16Value: Int16 {
-        get {
-            return Int16(self) ?? 0
-        }
+        return Int16(self) ?? 0
     }
     
-    /// Returns an int32 version of the string.
+    /// Returns an `Int32` version of the string.
     ///
-    /// The following example transforms a string to an int32:
+    /// The following example transforms a string to an `Int32`:
     ///
     ///     let five = "5"
     ///     print(five.int32Value)
     ///     // Prints "5"
     ///
+    /// - Note: Returns 0 for invalid strings
     /// - Returns: An int32 copy of the string.
     public var int32Value: Int32 {
-        get {
-            return Int32(self) ?? 0
-        }
+        return Int32(self) ?? 0
     }
     
-        
-    /// Returns an int64 version of the string.
+    
+    /// Returns an `Int64` version of the string.
     ///
-    /// The following example transforms a string to an int64:
+    /// The following example transforms a string to an `Int64`:
     ///
     ///     let five = "5"
     ///     print(five.int64Value)
     ///     // Prints "5"
     ///
+    /// - Note: Returns 0 for invalid strings
     /// - Returns: An int64 copy of the string.
     public var int64Value: Int64 {
-        get {
-            return Int64(self) ?? 0
-        }
+        return Int64(self) ?? 0
     }
     
-        
-    /// Returns an double version of the string.
+    
+    /// Returns a `Double` version of the string.
     ///
-    /// The following example transforms a string to an double:
+    /// The following example transforms a string to a `Double`:
     ///
     ///     let five = "5"
     ///     print(five.doubleValue)
     ///     // Prints "5.0"
     ///
+    /// - Note: Returns 0.0 for invalid strings
     /// - Returns: A double copy of the string.
     public var doubleValue: Double {
-        get {
-            return Double(self) ?? 0
-        }
+        return Double(self) ?? 0
     }
     
-        
-    /// Returns an float version of the string.
+    
+    /// Returns a `Float` version of the string.
     ///
-    /// The following example transforms a string to an float:
+    /// The following example transforms a string to a `Float`:
     ///
     ///     let five = "5"
     ///     print(five.floatValue)
-    ///     // Prints "5"
-    ///
+    ///     // Prints "5"///
+    /// - Note: Returns 0.0 for invalid strings
     /// - Returns: A float copy of the string.
     public var floatValue: Float {
-        get {
-            return Float(self) ?? 0
-        }
+        return Float(self) ?? 0
     }
     
-    /// Returns a bool version of the string.
+    /// Returns a `Bool` version of the string.
     ///
-    /// The following example transforms a string to an bool:
+    /// The following example transforms a string to a `Bool`:
     ///
     ///     let five = "5"
     ///     print(five.boolValue)
@@ -1092,10 +1084,10 @@ extension String {
     ///     print(zero.boolValue)
     ///     // Prints "false"
     ///
+    /// - Note: Returns false for invalid strings
     /// - Returns: A bool copy of the string.
     public var boolValue: Bool {
-        get {
-            return NSString(string: self).boolValue
-        }
+        return NSString(string: self).boolValue
     }
 }
+
