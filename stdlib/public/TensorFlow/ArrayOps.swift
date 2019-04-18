@@ -109,4 +109,50 @@ public extension Raw {
     }
     return out
   }
+
+  /// Splits a tensor into `numSplit` tensors along one dimension.
+  ///
+  /// - Parameters:
+  ///   - value: The tensor to split.
+  ///   - sizeSplits: list containing the sizes of each output tensor along the split
+  ///     dimension. Must sum to the dimension of value along split_dim.
+  ///     Can contain one -1 indicating that dimension is to be inferred.
+  ///   - splitDim: 0-D.  The dimension along which to split.  Must be in the range
+  ///     `[-rank(value), rank(value))`.
+  ///
+  /// - Returns: Tensors whose shape matches that of `value`
+  ///   except along `axis`, where their sizes are
+  ///   `size_splits[i]`.
+  @inlinable @inline(__always)
+  static func splitV<T: TensorFlowScalar, Tlen: BinaryInteger & TensorFlowScalar>(
+    value: Tensor<T>,
+    sizeSplits: Tensor<Tlen>,
+    splitDim: Tensor<Int32>,
+    numSplit: Int64
+  ) -> [Tensor<T>] {
+    let s: CTFStatus = TF_NewStatus()
+    defer { TF_DeleteStatus(s) }
+    let op: CTFEOp = TFE_NewOp(_ExecutionContext.global.eagerContext, "SplitV", s)
+    defer { TFE_DeleteOp(op) }
+    let _ = _TFCOpAddInputFromTensorGroup(op, value, s)
+    let _ = _TFCOpAddInputFromTensorGroup(op, sizeSplits, s)
+    let _ = _TFCOpAddInputFromTensorGroup(op, splitDim, s)
+    TFE_OpSetAttrInt(op, "num_split", numSplit)
+    TFE_OpSetAttrType(op, "T", T.tensorFlowDataType._cDataType)
+    TFE_OpSetAttrType(op, "Tlen", Tlen.tensorFlowDataType._cDataType)
+    var count: Int32 = Int32(numSplit)
+    let buffer: UnsafeMutablePointer<CTensorHandle> =
+      UnsafeMutablePointer.allocate(capacity: Int(count))
+    defer { buffer.deallocate() }
+    _TFCEagerExecute(op, UnsafeMutablePointer<CTensorHandle?>(buffer), &count, s)
+    checkOk(s)
+
+    var out: [Tensor<T>] = []
+    var cursor = buffer
+    for _ in 0..<numSplit {
+      out.append(Tensor<T>(handle: TensorHandle(_owning: cursor.pointee)))
+      cursor = cursor.advanced(by: 1)
+    }
+    return out
+  }
 }
