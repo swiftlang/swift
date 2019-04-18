@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+//  TODO: Support vectors with `count > Int32.max` by calling vvceilf in a
+//  loop, processing 0x40000000 elements at a go.
+
 // Array-Oriented Arithmetic and Auxiliary Functions
 
 extension vForce {
