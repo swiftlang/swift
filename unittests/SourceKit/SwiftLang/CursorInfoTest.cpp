@@ -90,6 +90,8 @@ public:
 };
 
 struct TestCursorInfo {
+  // Empty if no error.
+  std::string Error;
   std::string Name;
   std::string Typename;
   std::string Filename;
@@ -146,7 +148,8 @@ public:
 
     TestCursorInfo TestInfo;
     getLang().getCursorInfo(DocName, Offset, 0, false, false, Args,
-      [&](const CursorInfoData &Info) {
+      [&](const CursorInfoData &Info, StringRef Error) {
+        TestInfo.Error = Error;
         TestInfo.Name = Info.Name;
         TestInfo.Typename = Info.TypeName;
         TestInfo.Filename = Info.Filename;

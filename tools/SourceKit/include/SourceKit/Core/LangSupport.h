@@ -386,8 +386,6 @@ struct RelatedIdentsInfo {
 
 /// Filled out by LangSupport::findInterfaceDocument().
 struct InterfaceDocInfo {
-  /// Non-empty if an error occurred.
-  StringRef Error;
   /// Non-empty if a generated interface editor document has previously been
   /// opened for the requested module name.
   StringRef ModuleInterfaceName;
@@ -666,37 +664,43 @@ public:
                              unsigned Length, bool Actionables,
                              bool CancelOnSubsequentRequest,
                              ArrayRef<const char *> Args,
-                      std::function<void(const CursorInfoData &)> Receiver) = 0;
+                      std::function<void(const CursorInfoData &,
+                                         StringRef Error)> Receiver) = 0;
 
 
   virtual void getNameInfo(StringRef Filename, unsigned Offset,
                            NameTranslatingInfo &Input,
                            ArrayRef<const char *> Args,
-                std::function<void(const NameTranslatingInfo &)> Receiver) = 0;
+                std::function<void(const NameTranslatingInfo &,
+                                   StringRef Error)> Receiver) = 0;
 
   virtual void getRangeInfo(StringRef Filename, unsigned Offset, unsigned Length,
                             bool CancelOnSubsequentRequest,
                             ArrayRef<const char *> Args,
-                            std::function<void(const RangeInfo&)> Receiver) = 0;
+                            std::function<void(const RangeInfo&,
+                                               StringRef Error)> Receiver) = 0;
 
   virtual void
   getCursorInfoFromUSR(StringRef Filename, StringRef USR,
                        bool CancelOnSubsequentRequest,
                        ArrayRef<const char *> Args,
-                     std::function<void(const CursorInfoData &)> Receiver) = 0;
+                     std::function<void(const CursorInfoData &,
+                                        StringRef Error)> Receiver) = 0;
 
   virtual void findRelatedIdentifiersInFile(StringRef Filename,
                                             unsigned Offset,
                                             bool CancelOnSubsequentRequest,
                                             ArrayRef<const char *> Args,
-                   std::function<void(const RelatedIdentsInfo &)> Receiver) = 0;
+                   std::function<void(const RelatedIdentsInfo &,
+                                      StringRef Error)> Receiver) = 0;
 
   virtual llvm::Optional<std::pair<unsigned, unsigned>>
       findUSRRange(StringRef DocumentName, StringRef USR) = 0;
 
   virtual void findInterfaceDocument(StringRef ModuleName,
                                      ArrayRef<const char *> Args,
-                    std::function<void(const InterfaceDocInfo &)> Receiver) = 0;
+                    std::function<void(const InterfaceDocInfo &,
+                                       StringRef Error)> Receiver) = 0;
 
   virtual void findModuleGroups(StringRef ModuleName,
                                 ArrayRef<const char *> Args,
@@ -724,7 +728,8 @@ public:
   virtual void collectExpressionTypes(StringRef FileName,
                                       ArrayRef<const char *> Args,
                                       ArrayRef<const char *> ExpectedProtocols,
-                                      std::function<void(const ExpressionTypesInFile&)> Receiver) = 0;
+                                      std::function<void(const ExpressionTypesInFile&,
+                                                         StringRef Error)> Receiver) = 0;
 
   virtual void getDocInfo(llvm::MemoryBuffer *InputBuf,
                           StringRef ModuleName,
