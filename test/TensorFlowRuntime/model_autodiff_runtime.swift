@@ -22,8 +22,8 @@ public protocol Layer: Differentiable & KeyPathIterable
   where AllDifferentiableVariables : KeyPathIterable {
   associatedtype Input: Differentiable
   associatedtype Output: Differentiable
-  @differentiable
-  call func(_ input: Input) -> Output
+  @differentiable(wrt: (self, input))
+  func applied(to input: Input) -> Output
 }
 
 @_fixed_layout
@@ -40,7 +40,7 @@ public struct Dense<Scalar: TensorFlowFloatingPoint>: Layer {
   }
 
   @differentiable
-  public call func(_ input: Tensor<Scalar>) -> Tensor<Scalar> {
+  public func applied(to input: Tensor<Scalar>) -> Tensor<Scalar> {
     return activation(matmul(input, weight) + bias)
   }
 }
@@ -78,7 +78,7 @@ public struct Conv2D<Scalar: TensorFlowFloatingPoint>: Layer {
   }
 
   @differentiable
-  public call func(_ input: Tensor<Scalar>) -> Tensor<Scalar> {
+  public func applied(to input: Tensor<Scalar>) -> Tensor<Scalar> {
       return activation(input.convolved2D(withFilter: filter,
                                           strides: (1, strides.0, strides.1, 1),
                                           padding: padding) + bias)
@@ -116,7 +116,9 @@ public class RiemannSGD<Model: Layer, Scalar: FloatingPoint>: Optimizer
 ModelADTests.testAllBackends("SimpleLayerAD") {
   let ones = Tensor<Float>(ones: [2, 2])
   let dense = Dense<Float>(inputSize: 2, outputSize: 2, activation: { $0 })
-  let grad = gradient(at: dense) { dense in dense(ones).sum() }
+  let grad = gradient(at: dense) { dense in
+    dense.applied(to: ones).sum()
+  }
   expectEqual([[2, 2], [2, 2]], grad.weight)
   expectEqual([2, 2], grad.bias)
 }
@@ -128,9 +130,10 @@ ModelADTests.testAllBackends("XORTraining") {
       l1 = Dense<Float>(inputSize: 2, outputSize: hiddenSize, activation: relu)
       l2 = Dense<Float>(inputSize: hiddenSize, outputSize: 1, activation: relu)
     }
-    @differentiable
-    call func(_ input: Tensor<Float>) -> Tensor<Float> {
-      return l2(l1(input))
+    @differentiable(wrt: (self, input))
+    func applied(to input: Tensor<Float>) -> Tensor<Float> {
+      let h1 = l1.applied(to: input)
+      return l2.applied(to: h1)
     }
   }
   var classifier = Classifier(hiddenSize: 4)
@@ -139,12 +142,12 @@ ModelADTests.testAllBackends("XORTraining") {
   let y: Tensor<Float> = [0, 1, 1, 0]
   for _ in 0..<1000 {
     let 𝛁model = classifier.gradient { classifier -> Tensor<Float> in
-      let ŷ = classifier(x)
+      let ŷ = classifier.applied(to: x)
       return meanSquaredError(predicted: ŷ, expected: y)
     }
     optimizer.update(&classifier.allDifferentiableVariables, along: 𝛁model)
   }
-  _ = classifier([[0, 0], [0, 1], [1, 0], [1, 1]])
+  print(classifier.applied(to: [[0, 0], [0, 1], [1, 0], [1, 1]]))
 }
 
 ModelADTests.testAllBackends("WithRespectToModel") {
@@ -152,17 +155,18 @@ ModelADTests.testAllBackends("WithRespectToModel") {
     var bar: Tensor<Scalar>
     var baz: Tensor<Scalar>
 
-    @differentiable
-    call func(_ input: Tensor<Scalar>) -> Tensor<Scalar> {
+    @differentiable(wrt: (self, input))
+    func applied(to input: Tensor<Scalar>) -> Tensor<Scalar> {
       return bar + input
     }
   }
   let x = Tensor<Float>(0)
   var model = Foo<Float>(bar: x, baz: x)
-  let 𝛁model = gradient(at: model) { model in model(x) }
-  expectEqual(
-    Foo<Float>.AllDifferentiableVariables(bar: Tensor(1.0), baz: Tensor(0.0)),
-    𝛁model)
+  let d = gradient(at: model) { model in
+    model.applied(to: x)
+  }
+  expectEqual(Foo<Float>.AllDifferentiableVariables(bar: Tensor(1.0),
+                                                    baz: Tensor(0.0)), d)
 }
 
 runAllTests()

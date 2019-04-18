@@ -1755,8 +1755,6 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Param:
   case DeclKind::Func:
   case DeclKind::Accessor:
-  // SWIFT_ENABLE_TENSORFLOW
-  case DeclKind::Call:
     return true;
   }
 
@@ -3405,67 +3403,6 @@ void Serializer::writeDecl(const Decl *D) {
     break;
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  case DeclKind::Call: {
-    auto fn = cast<CallDecl>(D);
-    verifyAttrSerializable(fn);
-
-    auto contextID = addDeclContextRef(fn->getDeclContext());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[CallLayout::Code];
-    SmallVector<IdentifierID, 4> nameComponentsAndDependencies;
-    nameComponentsAndDependencies.push_back(
-        addDeclBaseNameRef(fn->getFullName().getBaseName()));
-    for (auto argName : fn->getFullName().getArgumentNames())
-      nameComponentsAndDependencies.push_back(addDeclBaseNameRef(argName));
-
-    uint8_t rawAccessLevel = getRawStableAccessLevel(fn->getFormalAccess());
-    uint8_t rawDefaultArgumentResilienceExpansion =
-      getRawStableResilienceExpansion(
-          fn->getDefaultArgumentResilienceExpansion());
-
-    Type ty = fn->getInterfaceType();
-    for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
-      nameComponentsAndDependencies.push_back(addTypeRef(dependency));
-
-    CallLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                           contextID,
-                           fn->isImplicit(),
-                           fn->isStatic(),
-                           uint8_t(
-                             getStableStaticSpelling(fn->getStaticSpelling())),
-                           fn->isObjC(),
-                           uint8_t(
-                             getStableSelfAccessKind(fn->getSelfAccessKind())),
-                           fn->hasDynamicSelf(),
-                           fn->hasForcedStaticDispatch(),
-                           fn->hasThrows(),
-                           addGenericEnvironmentRef(
-                             fn->getGenericEnvironment()),
-                           addTypeRef(fn->getResultInterfaceType()),
-                           addDeclRef(fn->getOperatorDecl()),
-                           addDeclRef(fn->getOverriddenDecl()),
-                           fn->getFullName().getArgumentNames().size() +
-                             fn->getFullName().isCompoundName(),
-                           rawAccessLevel,
-                           fn->needsNewVTableEntry(),
-                           rawDefaultArgumentResilienceExpansion,
-                           nameComponentsAndDependencies);
-
-    writeGenericParams(fn->getGenericParams());
-
-    // Write the body parameters.
-    writeParameterList(fn->getParameters());
-
-    if (auto errorConvention = fn->getForeignErrorConvention())
-      writeForeignErrorConvention(*errorConvention);
-
-    writeInlinableBodyTextIfNeeded(fn);
-
-    break;
-  }
-  // SWIFT_ENABLE_TENSORFLOW END
-
   case DeclKind::EnumElement: {
     auto elem = cast<EnumElementDecl>(D);
     auto contextID = addDeclContextRef(elem->getDeclContext());
@@ -4219,8 +4156,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<ParamLayout>();
   registerDeclTypeAbbr<FuncLayout>();
   registerDeclTypeAbbr<AccessorLayout>();
-  // SWIFT_ENABLE_TENSORFLOW
-  registerDeclTypeAbbr<CallLayout>();
   registerDeclTypeAbbr<PatternBindingLayout>();
   registerDeclTypeAbbr<ProtocolLayout>();
   registerDeclTypeAbbr<DefaultWitnessTableLayout>();

@@ -7550,7 +7550,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     };
 
   // SWIFT_ENABLE_TENSORFLOW
-  // Save the original potentially lvalue function for rewriting `call` method
+  // Save the original potentially lvalue function for rewriting call method
   // applications.
   auto *originalFn = fn;
   // SWIFT_ENABLE_TENSORFLOW END
@@ -7765,21 +7765,22 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // Handle `call` method applications.
+  // Handle call method applications.
   auto &ctx = cs.getASTContext();
 
   TupleExpr *arg = dyn_cast<TupleExpr>(apply->getArg());
   if (auto parenExpr = dyn_cast<ParenExpr>(apply->getArg()))
     arg = TupleExpr::createImplicit(ctx, parenExpr->getSubExpr(), {});
 
-  // Get resolved `call` method and verify it.
+  // Get resolved call method and verify it.
   auto loc = locator.withPathElement(ConstraintLocator::ApplyFunction);
   auto selected = solution.getOverloadChoice(cs.getConstraintLocator(loc));
   auto choice = selected.choice;
-  if (auto *method = dyn_cast<CallDecl>(selected.choice.getDecl())) {
+  auto *callMethod = dyn_cast<FuncDecl>(selected.choice.getDecl());
+  if (callMethod && callMethod->isCallable()) {
     auto methodType =
         simplifyType(selected.openedType)->castTo<AnyFunctionType>();
-    auto selfParam = method->getImplicitSelfDecl();
+    auto selfParam = callMethod->getImplicitSelfDecl();
     // Diagnose `mutating` method call on immutable value.
     if (!cs.getType(originalFn)->hasLValueType() && selfParam->isInOut()) {
       AssignmentFailure failure(originalFn, cs, originalFn->getLoc(),
@@ -7788,7 +7789,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       failure.diagnose();
       return nullptr;
     }
-    // Create direct reference to `call` method.
+    // Create direct reference to call method.
     bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
     Expr *declRef = buildMemberRef(originalFn, selected.openedFullType,
                                    /*dotLoc=*/SourceLoc(), choice,
@@ -7801,7 +7802,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       return nullptr;
     declRef->setImplicit(apply->isImplicit());
     apply->setFn(declRef);
-    // Coerce argument to input type of `call` method.
+    // Coerce argument to input type of call method.
     SmallVector<Identifier, 2> argLabelsScratch;
     auto *arg = coerceCallArguments(apply->getArg(), methodType, apply,
                                     apply->getArgumentLabels(argLabelsScratch),

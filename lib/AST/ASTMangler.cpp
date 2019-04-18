@@ -2240,23 +2240,6 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
         accessor->getStorage(), accessor->isStatic());
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // Handle call declarations specially.
-  if (auto callDecl = dyn_cast<CallDecl>(decl)) {
-    appendContextOf(decl);
-    bindGenericParameters(decl->getDeclContext());
-    appendDeclType(decl);
-    StringRef privateDiscriminator = getPrivateDiscriminatorIfNecessary(decl);
-    if (!privateDiscriminator.empty()) {
-      appendIdentifier(privateDiscriminator);
-      appendOperator("Ll");
-    }
-    appendOperator("fF");
-    if (callDecl->isStatic())
-      appendOperator("Z");
-    return;
-  }
-
   if (auto storageDecl = dyn_cast<AbstractStorageDecl>(decl))
     return appendAccessorEntity("p", storageDecl, decl->isStatic());
   if (isa<GenericTypeParamDecl>(decl))

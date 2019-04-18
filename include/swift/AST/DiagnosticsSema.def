@@ -1052,7 +1052,6 @@ NOTE(archetype_declared_in_type,none,
 NOTE(unbound_generic_parameter_explicit_fix,none,
      "explicitly specify the generic arguments to fix this issue", ())
 
-// SWIFT_ENABLE_TENSORFLOW
 ERROR(invalid_dynamic_callable_type,none,
       "@dynamicCallable attribute requires %0 to have either a valid "
       "'dynamicallyCall(withArguments:)' method or "
@@ -1690,17 +1689,15 @@ ERROR(witness_requires_class_implementation,none,
       (DeclName, Type))
 ERROR(witness_not_accessible_proto,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
-      // SWIFT_ENABLE_TENSORFLOW
-      "|subscript%select{| setter}2|'call' method}0 must be declared "
+      "|subscript%select{| setter}2}0 must be declared "
       "%select{%error|fileprivate|internal|public|%error}3 because it matches a "
       "requirement in %select{private|fileprivate|internal|public|%error}4 protocol "
       "%5",
       (RequirementKind, DeclName, bool, AccessLevel, AccessLevel, DeclName))
 ERROR(witness_not_accessible_type,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
-      // SWIFT_ENABLE_TENSORFLOW
-      "|subscript%select{| setter}2|'call' method}0 must be as accessible as "
-      "its enclosing type because it matches a requirement in protocol %5",
+      "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
+      "type because it matches a requirement in protocol %5",
       (RequirementKind, DeclName, bool, AccessLevel, AccessLevel, DeclName))
 ERROR(type_witness_not_accessible_proto,none,
       "%0 %1 must be declared %select{%error|fileprivate|internal|public|%error}2 "
@@ -1764,24 +1761,19 @@ NOTE(inherited_protocol_does_not_conform,none,
      "type %0 does not conform to inherited protocol %1", (Type, Type))
 NOTE(no_witnesses,none,
      "protocol requires "
-      // SWIFT_ENABLE_TENSORFLOW
-     "%select{initializer %1|function %1|property %1|subscript|'call' method}0 "
-     "with type %2%select{|; do you want to add a stub?}3",
+     "%select{initializer %1|function %1|property %1|subscript}0 with type %2"
+     "%select{|; do you want to add a stub?}3",
      (RequirementKind, DeclName, Type, bool))
 NOTE(missing_witnesses_general,none, "do you want to add protocol stubs?",
      ())
 NOTE(ambiguous_witnesses,none,
      "multiple matching "
      "%select{initializers named %1|functions named %1|properties named %1|"
-      // SWIFT_ENABLE_TENSORFLOW
-     "subscript operators|'call' method}0 with type %2",
-     (RequirementKind, DeclName, Type))
+     "subscript operators}0 with type %2", (RequirementKind, DeclName, Type))
 NOTE(ambiguous_witnesses_wrong_name,none,
      "multiple matching "
      "%select{initializers named %1|functions named %1|properties named %1|"
-      // SWIFT_ENABLE_TENSORFLOW
-     "subscript operators|'call' method}0 with type %2",
-     (RequirementKind, DeclName, Type))
+     "subscript operators}0 with type %2", (RequirementKind, DeclName, Type))
 NOTE(no_witnesses_type,none,
      "protocol requires nested type %0; do you want to add it?", (Identifier))
 NOTE(default_associated_type_req_fail,none,
@@ -1845,8 +1837,7 @@ NOTE(protocol_witness_renamed,none,
      "rename to %0 to satisfy this requirement%1", (DeclName, StringRef))
 NOTE(protocol_witness_kind_conflict,none,
      "candidate is not %select{an initializer|a function|a variable|"
-      // SWIFT_ENABLE_TENSORFLOW
-     "a subscript|a 'call' method}0", (RequirementKind))
+     "a subscript}0", (RequirementKind))
 NOTE(protocol_witness_type_conflict,none,
      "candidate has non-matching type %0%1", (Type, StringRef))
 NOTE(protocol_witness_missing_requirement,none,

@@ -3284,42 +3284,6 @@ public:
     }
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  void visitCallDecl(CallDecl *CD) {
-    TC.validateDecl(CD);
-
-    if (!CD->isInvalid()) {
-      checkGenericParams(CD->getGenericParams(), CD);
-      TC.checkReferencedGenericParams(CD);
-      TC.checkProtocolSelfRequirements(CD);
-    }
-
-    checkAccessControl(TC, CD);
-
-    if (!checkOverrides(CD)) {
-      // If a method has an 'override' keyword but does not
-      // override anything, complain.
-      if (auto *OA = CD->getAttrs().getAttribute<OverrideAttr>()) {
-        if (!CD->getOverriddenDecl()) {
-          TC.diagnose(CD, diag::method_does_not_override)
-            .highlight(OA->getLocation());
-          OA->setInvalid();
-        }
-      }
-    }
-
-    if (requiresDefinition(CD) && !CD->hasBody()) {
-      // Complain if we should have a body.
-      TC.diagnose(CD->getLoc(), diag::func_decl_without_brace);
-    } else {
-      // Record the body.
-      TC.definedFunctions.push_back(CD);
-    }
-
-    if (CD->getAttrs().hasAttribute<DynamicReplacementAttr>())
-      TC.checkDynamicReplacementAttribute(CD);
-  }
-
   void visitModuleDecl(ModuleDecl *) { }
 
   void visitEnumCaseDecl(EnumCaseDecl *ECD) {
@@ -4156,9 +4120,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   }
 
   case DeclKind::Func:
-  case DeclKind::Accessor:
-  // SWIFT_ENABLE_TENSORFLOW
-  case DeclKind::Call: {
+  case DeclKind::Accessor: {
     auto *FD = cast<FuncDecl>(D);
     assert(!FD->hasInterfaceType());
 

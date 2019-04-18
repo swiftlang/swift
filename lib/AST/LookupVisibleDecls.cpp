@@ -336,9 +336,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       // with the same signature.
 
       case DeclKind::Accessor:
-      case DeclKind::Func:
-      // SWIFT_ENABLE_TENSORFLOW
-      case DeclKind::Call: {
+      case DeclKind::Func: {
         auto FD = cast<FuncDecl>(D);
         assert(FD->hasImplicitSelfDecl() && "should not find free functions");
         (void)FD;

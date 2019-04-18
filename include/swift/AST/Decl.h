@@ -53,8 +53,6 @@ namespace swift {
   struct ASTNode;
   class ASTPrinter;
   class ASTWalker;
-  // SWIFT_ENABLE_TENSORFLOW
-  class CallDecl;
   class ConstructorDecl;
   class DestructorDecl;
   class DiagnosticEngine;
@@ -138,8 +136,6 @@ enum class DescriptiveDeclKind : uint8_t {
   GenericStruct,
   GenericClass,
   GenericType,
-  // SWIFT_ENABLE_TENSORFLOW
-  Call,
   Subscript,
   Constructor,
   Destructor,
@@ -5614,6 +5610,9 @@ public:
   bool isStatic() const {
     return Bits.FuncDecl.IsStatic;
   }
+  bool isCallable() const {
+    return getName().str() == "call" && isInstanceMember();
+  }
   /// \returns the way 'static'/'class' was spelled in the source.
   StaticSpellingKind getStaticSpelling() const {
     return static_cast<StaticSpellingKind>(Bits.FuncDecl.StaticSpelling);
@@ -5731,9 +5730,7 @@ public:
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Func ||
-           D->getKind() == DeclKind::Accessor ||
-           // SWIFT_ENABLE_TENSORFLOW
-           D->getKind() == DeclKind::Call;
+           D->getKind() == DeclKind::Accessor;
   }
   static bool classof(const AbstractFunctionDecl *D) {
     return classof(static_cast<const Decl*>(D));
@@ -5886,60 +5883,7 @@ AbstractStorageDecl::AccessorRecord::getAccessor(AccessorKind kind) const {
   }
   return nullptr;
 }
-
-// SWIFT_ENABLE_TENSORFLOW
-/// CallDecl - Declares a callable method for a type. For example:
-///
-/// \code
-/// struct Adder {
-///   var base: Int
-///   call(_ x: Int) -> Int {
-///      return base + x
-///   }
-/// }
-/// \endcode
-class CallDecl final : public FuncDecl {
-  CallDecl(DeclName fullName, SourceLoc declLoc, bool throws,
-           SourceLoc throwsLoc, unsigned numParameterLists,
-           GenericParamList *genericParams, DeclContext *parent)
-    : FuncDecl(DeclKind::Call,
-               /*staticLoc*/ SourceLoc(), StaticSpellingKind::None,
-               /*func loc*/ declLoc, /*name*/ fullName, /*name loc*/ declLoc,
-               throws, throwsLoc, numParameterLists, genericParams, parent) {}
-
-  static CallDecl *createImpl(ASTContext &ctx, DeclName fullName,
-                              SourceLoc declLoc, bool throws,
-                              SourceLoc throwsLoc,
-                              GenericParamList *genericParams,
-                              DeclContext *parent, ClangNode clangNode);
-
-public:
-  static CallDecl *createDeserialized(ASTContext &ctx, DeclName name,
-                                      SourceLoc declLoc, bool throws,
-                                      SourceLoc throwsLoc,
-                                      GenericParamList *genericParams,
-                                      DeclContext *parent);
-
-  static CallDecl *create(ASTContext &ctx, DeclName fullName, SourceLoc declLoc,
-                          bool throws, SourceLoc throwsLoc,
-                          GenericParamList *genericParams,
-                          ParameterList *parameterList,
-                          TypeLoc fnRetType, DeclContext *parent,
-                          ClangNode clangNode = ClangNode());
-
-  static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::Call;
-  }
-  static bool classof(const AbstractFunctionDecl *D) {
-    return classof(static_cast<const Decl*>(D));
-  }
-  static bool classof(const DeclContext *DC) {
-    if (auto D = DC->getAsDecl())
-      return classof(D);
-    return false;
-  }
-};
-
+  
 /// \brief This represents a 'case' declaration in an 'enum', which may declare
 /// one or more individual comma-separated EnumElementDecls.
 class EnumCaseDecl final : public Decl,
@@ -6852,8 +6796,6 @@ inline ParamDecl **AbstractFunctionDecl::getImplicitSelfDeclStorage() {
     return cast<DestructorDecl>(this)->getImplicitSelfDeclStorage();
   case DeclKind::Func:
   case DeclKind::Accessor:
-  // SWIFT_ENABLE_TENSORFLOW
-  case DeclKind::Call:
     return cast<FuncDecl>(this)->getImplicitSelfDeclStorage();
   }
 }
@@ -6862,13 +6804,11 @@ inline ParamDecl **FuncDecl::getImplicitSelfDeclStorage() {
   if (!hasImplicitSelfDecl())
     return nullptr;
 
-  if (isa<AccessorDecl>(this))
-    return reinterpret_cast<ParamDecl **>(static_cast<AccessorDecl *>(this)+1);
-  // SWIFT_ENABLE_TENSORFLOW
-  else if (isa<CallDecl>(this))
-    return reinterpret_cast<ParamDecl **>(static_cast<CallDecl *>(this)+1);
-  assert(getKind() == DeclKind::Func && "no new kinds of functions");
-  return reinterpret_cast<ParamDecl **>(this+1);
+  if (!isa<AccessorDecl>(this)) {
+    assert(getKind() == DeclKind::Func && "no new kinds of functions");
+    return reinterpret_cast<ParamDecl **>(this+1);
+  }
+  return reinterpret_cast<ParamDecl **>(static_cast<AccessorDecl*>(this)+1);
 }
 
 inline DeclIterator &DeclIterator::operator++() {

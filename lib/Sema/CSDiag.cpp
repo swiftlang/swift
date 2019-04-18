@@ -5333,9 +5333,10 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         CS.DynamicCallableCache[fnType->getCanonicalType()].isValid();
 
     auto *nominal = fnType->getAnyNominal();
-    auto hasCallDecls = nominal &&
+    auto hasCallMethods = nominal &&
         llvm::any_of(nominal->getMembers(), [](Decl *member) {
-          return isa<CallDecl>(member);
+          auto funcDecl = dyn_cast<FuncDecl>(member);
+          return funcDecl && funcDecl->isCallable();
         });
 
     // Diagnose @dynamicCallable errors.
@@ -5394,7 +5395,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       }
 
     // SWIFT_ENABLE_TENSORFLOW
-    if (!isDynamicCallable && !hasCallDecls)
+    if (!isDynamicCallable && !hasCallMethods)
       return true;
   }
   

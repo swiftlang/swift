@@ -4586,29 +4586,28 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // Handle applications of types with `call` methods.
+  // Handle applications of types with call methods.
   if (desugar2->mayHaveMembers()) {
     auto &ctx = getASTContext();
-    // Get all `call` methods of the nominal type.
-    SmallVector<CallDecl *, 4> callDecls;
-    auto candidates =
-        lookupMember(desugar2, DeclName(ctx.getIdentifier("$call")));
+    // Get all call methods of the nominal type.
+    SmallVector<FuncDecl *, 4> callMethods;
+    auto candidates = lookupMember(desugar2, DeclName(ctx.Id_call));
     for (auto entry : candidates) {
-      auto callDecl = dyn_cast<CallDecl>(entry.getValueDecl());
-      if (!callDecl)
+      auto callMethod = dyn_cast<FuncDecl>(entry.getValueDecl());
+      if (!callMethod)
         continue;
-      callDecls.push_back(callDecl);
+      callMethods.push_back(callMethod);
     }
 
-    // Handle `call` methods calls.
-    if (!callDecls.empty()) {
-      // Create a type variable for the `call` method.
+    // Handle call methods calls.
+    if (!callMethods.empty()) {
+      // Create a type variable for the call method.
       auto loc = getConstraintLocator(locator);
       auto tv = createTypeVariable(loc, TVO_CanBindToLValue);
 
-      // Record the `call` method overload set.
+      // Record the call method overload set.
       SmallVector<OverloadChoice, 4> choices;
-      for (auto candidate : callDecls) {
+      for (auto candidate : callMethods) {
         TC.validateDecl(candidate);
         if (candidate->isInvalid()) continue;
         choices.push_back(

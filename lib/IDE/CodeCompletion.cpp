@@ -623,9 +623,6 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
     return CodeCompletionDeclKind::PrecedenceGroup;
   case DeclKind::EnumElement:
     return CodeCompletionDeclKind::EnumElement;
-  // SWIFT_ENABLE_TENSORFLOW
-  case DeclKind::Call:
-    return CodeCompletionDeclKind::Call;
   case DeclKind::Subscript:
     return CodeCompletionDeclKind::Subscript;
   }
@@ -667,10 +664,6 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
       break;
     case CodeCompletionDeclKind::Destructor:
       Prefix.append("[Destructor]");
-      break;
-    // SWIFT_ENABLE_TENSORFLOW
-    case CodeCompletionDeclKind::Call:
-      Prefix.append("[Call]");
       break;
     case CodeCompletionDeclKind::Subscript:
       Prefix.append("[Subscript]");
@@ -5990,8 +5983,6 @@ void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
       case CodeCompletionDeclKind::EnumElement:
       case CodeCompletionDeclKind::Constructor:
       case CodeCompletionDeclKind::Destructor:
-      // SWIFT_ENABLE_TENSORFLOW
-      case CodeCompletionDeclKind::Call:
       case CodeCompletionDeclKind::Subscript:
       case CodeCompletionDeclKind::StaticMethod:
       case CodeCompletionDeclKind::InstanceMethod:

@@ -74,8 +74,6 @@ EXPR_NODES = [
                        'IdentifierToken',
                        'SelfToken',
                        'CapitalSelfToken',
-                       # SWIFT_ENABLE_TENSORFLOW
-                       'CallToken',
                        'DollarIdentifierToken',
                        'SpacedBinaryOperatorToken',
                    ]),
