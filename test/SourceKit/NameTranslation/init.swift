@@ -9,9 +9,9 @@ func foo2 () {
 // RUN: %sourcekitd-test -req=translate -objc-selector initWithFloat2: -pos=4:15 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK1 %s
 // RUN: %sourcekitd-test -req=translate -objc-selector initWithFloat2 -pos=4:15 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK1 %s
 // RUN: %sourcekitd-test -req=translate -objc-selector initWithFloat2:second2: -pos=5:15 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK2 %s
-// RUN: %sourcekitd-test -req=translate -objc-selector initWithFloat2:second2:third: -pos=5:15 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK-NONE %s
+// RUN: not %sourcekitd-test -req=translate -objc-selector initWithFloat2:second2:third: -pos=5:15 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s 2>&1 | %FileCheck -check-prefix=CHECK-FAIL %s
 // RUN: %sourcekitd-test -req=translate -objc-selector initFloat2:second2: -pos=5:15 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK2 %s
 
-// CHECK-NONE: <empty name translation info>
+// CHECK-FAIL: (Request Failed): Unable to resolve ObjC declaration name
 // CHECK1: init(float2:)
 // CHECK2: init(float2:second2:)

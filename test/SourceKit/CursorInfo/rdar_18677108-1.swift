@@ -1,6 +1,6 @@
 // Checks that we don't crash.
-// RUN: %sourcekitd-test -req=cursor -pos=7:5 %s -- %s | %FileCheck %s
-// CHECK: <empty cursor info>
+// RUN: not %sourcekitd-test -req=cursor -pos=7:5 %s -- %s 2>&1 | %FileCheck %s
+// CHECK: (Request Failed): Unable to resolve cursor info
 
 class CameraViewController
 {
