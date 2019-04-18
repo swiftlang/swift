@@ -122,7 +122,7 @@ public extension Raw {
   ///   except along `axis`, where their sizes are
   ///   `value.shape[axis] / numSplit`.
   @inlinable @inline(__always)
-  static func split<T: TensorFlowScalar, Tlen: BinaryInteger & TensorFlowScalar>(
+  static func split<T: TensorFlowScalar>(
     splitDim: Tensor<Int32>,
     value: Tensor<T>,
     numSplit: Int64
