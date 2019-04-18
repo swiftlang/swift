@@ -60,6 +60,7 @@ namespace swift {
   class ParameterList;
   class EnumElementDecl;
   class CallExpr;
+  class KeyPathExpr;
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -539,6 +540,7 @@ public:
   void dump(raw_ostream &OS, unsigned Indent = 0) const;
   void dump(raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getType,
             llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
+            llvm::function_ref<Type(const KeyPathExpr *E, unsigned index)> getTypeOfKeyPathComponent,
             unsigned Indent = 0) const;
   
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
