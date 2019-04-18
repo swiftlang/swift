@@ -12,8 +12,10 @@ let _ = #"\##("invalid")"#
 let _ = ####"invalid"###
 // expected-error@-1{{unterminated string literal}}
 
-let _ = ###"""invalid"##
-// expected-error@-1{{unterminated string literal}}
+let _ = ###"""invalid"######
+// expected-error@-1{{too many '#' characters in closing delimiter}}{{26-29=}}
+// expected-error@-2{{consecutive statements on a line must be separated by ';'}}
+// expected-error@-3{{expected expression}}
 
 let _ = ###"invalid"######
 // expected-error@-1{{too many '#' characters in closing delimiter}}{{24-27=}}
