@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
 extension vDSP {
     
     // MARK: Integer to floating-point conversion
@@ -22,8 +20,8 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -49,8 +47,8 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -76,8 +74,8 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -103,8 +101,8 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -130,8 +128,8 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -157,8 +155,8 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -184,8 +182,8 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -211,8 +209,8 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -238,8 +236,8 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -265,8 +263,8 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -292,8 +290,8 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -319,8 +317,8 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -353,9 +351,9 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V,
-                                     rounding: RoundingMode)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V,
+                                             rounding: RoundingMode)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -386,9 +384,9 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V,
-                                     rounding: RoundingMode)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V,
+                                             rounding: RoundingMode)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -419,9 +417,9 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V,
-                                     rounding: RoundingMode)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V,
+                                             rounding: RoundingMode)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -452,9 +450,9 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V,
-                                     rounding: RoundingMode)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V,
+                                             rounding: RoundingMode)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -485,9 +483,9 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V,
-                                     rounding: RoundingMode)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V,
+                                             rounding: RoundingMode)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -518,9 +516,9 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V,
-                                     rounding: RoundingMode)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V,
+                                             rounding: RoundingMode)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -552,9 +550,9 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V,
-                                     rounding: RoundingMode)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V,
+                                             rounding: RoundingMode)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -585,9 +583,9 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V,
-                                     rounding: RoundingMode)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V,
+                                             rounding: RoundingMode)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -618,9 +616,9 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V,
-                                     rounding: RoundingMode)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V,
+                                             rounding: RoundingMode)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -651,9 +649,9 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V,
-                                     rounding: RoundingMode)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V,
+                                             rounding: RoundingMode)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -684,9 +682,9 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V,
-                                     rounding: RoundingMode)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V,
+                                             rounding: RoundingMode)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -717,9 +715,9 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V,
-                                     rounding: RoundingMode)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V,
+                                             rounding: RoundingMode)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -750,8 +748,8 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -775,8 +773,8 @@ extension vDSP {
     /// - Parameter destination: Destination vector.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func convert<U, V>(_ source: U,
-                                     to destination: inout V)
+    public static func convertElements<U, V>(of source: U,
+                                             to destination: inout V)
         where
         U: _ContiguousCollection,
         V: _MutableContiguousCollection,
@@ -837,8 +835,8 @@ extension vDSP {
                 let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer)
+                    convertElements(of: vector,
+                                    to: &buffer)
                     
                     initializedCount = vector.count
                 }
@@ -848,8 +846,8 @@ extension vDSP {
                 let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer)
+                    convertElements(of: vector,
+                                    to: &buffer)
                     
                     initializedCount = vector.count
                 }
@@ -879,8 +877,8 @@ extension vDSP {
                 let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer)
+                    convertElements(of: vector,
+                                    to: &buffer)
                     
                     initializedCount = vector.count
                 }
@@ -890,8 +888,8 @@ extension vDSP {
                 let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer)
+                    convertElements(of: vector,
+                                    to: &buffer)
                     
                     initializedCount = vector.count
                 }
@@ -921,8 +919,8 @@ extension vDSP {
                 let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer)
+                    convertElements(of: vector,
+                                    to: &buffer)
                     
                     initializedCount = vector.count
                 }
@@ -932,8 +930,8 @@ extension vDSP {
                 let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer)
+                    convertElements(of: vector,
+                                    to: &buffer)
                     
                     initializedCount = vector.count
                 }
@@ -963,8 +961,8 @@ extension vDSP {
                 let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer)
+                    convertElements(of: vector,
+                                    to: &buffer)
                     
                     initializedCount = vector.count
                 }
@@ -974,8 +972,8 @@ extension vDSP {
                 let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer)
+                    convertElements(of: vector,
+                                    to: &buffer)
                     
                     initializedCount = vector.count
                 }
@@ -1005,8 +1003,8 @@ extension vDSP {
                 let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer)
+                    convertElements(of: vector,
+                                    to: &buffer)
                     
                     initializedCount = vector.count
                 }
@@ -1016,8 +1014,8 @@ extension vDSP {
                 let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer)
+                    convertElements(of: vector,
+                                    to: &buffer)
                     
                     initializedCount = vector.count
                 }
@@ -1047,8 +1045,8 @@ extension vDSP {
                 let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer)
+                    convertElements(of: vector,
+                                    to: &buffer)
                     
                     initializedCount = vector.count
                 }
@@ -1058,8 +1056,8 @@ extension vDSP {
                 let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer)
+                    convertElements(of: vector,
+                                    to: &buffer)
                     
                     initializedCount = vector.count
                 }
@@ -1092,9 +1090,9 @@ extension vDSP {
                 let result = Array<UInt8>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer,
-                            rounding: rounding)
+                    convertElements(of: vector,
+                                    to: &buffer,
+                                    rounding: rounding)
                     
                     initializedCount = vector.count
                 }
@@ -1104,9 +1102,9 @@ extension vDSP {
                 let result = Array<UInt16>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer,
-                            rounding: rounding)
+                    convertElements(of: vector,
+                                    to: &buffer,
+                                    rounding: rounding)
                     
                     initializedCount = vector.count
                 }
@@ -1116,9 +1114,9 @@ extension vDSP {
                 let result = Array<UInt32>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer,
-                            rounding: rounding)
+                    convertElements(of: vector,
+                                    to: &buffer,
+                                    rounding: rounding)
                     
                     initializedCount = vector.count
                 }
@@ -1128,9 +1126,9 @@ extension vDSP {
                 let result = Array<Int8>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer,
-                            rounding: rounding)
+                    convertElements(of: vector,
+                                    to: &buffer,
+                                    rounding: rounding)
                     
                     initializedCount = vector.count
                 }
@@ -1140,9 +1138,9 @@ extension vDSP {
                 let result = Array<Int16>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer,
-                            rounding: rounding)
+                    convertElements(of: vector,
+                                    to: &buffer,
+                                    rounding: rounding)
                     
                     initializedCount = vector.count
                 }
@@ -1152,9 +1150,9 @@ extension vDSP {
                 let result = Array<Int32>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer,
-                            rounding: rounding)
+                    convertElements(of: vector,
+                                    to: &buffer,
+                                    rounding: rounding)
                     
                     initializedCount = vector.count
                 }
@@ -1184,9 +1182,9 @@ extension vDSP {
                 let result = Array<UInt8>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer,
-                            rounding: rounding)
+                    convertElements(of: vector,
+                                    to: &buffer,
+                                    rounding: rounding)
                     
                     initializedCount = vector.count
                 }
@@ -1196,9 +1194,9 @@ extension vDSP {
                 let result = Array<UInt16>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer,
-                            rounding: rounding)
+                    convertElements(of: vector,
+                                    to: &buffer,
+                                    rounding: rounding)
                     
                     initializedCount = vector.count
                 }
@@ -1208,9 +1206,9 @@ extension vDSP {
                 let result = Array<UInt32>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer,
-                            rounding: rounding)
+                    convertElements(of: vector,
+                                    to: &buffer,
+                                    rounding: rounding)
                     
                     initializedCount = vector.count
                 }
@@ -1220,9 +1218,9 @@ extension vDSP {
                 let result = Array<Int8>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer,
-                            rounding: rounding)
+                    convertElements(of: vector,
+                                    to: &buffer,
+                                    rounding: rounding)
                     
                     initializedCount = vector.count
                 }
@@ -1232,9 +1230,9 @@ extension vDSP {
                 let result = Array<Int16>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer,
-                            rounding: rounding)
+                    convertElements(of: vector,
+                                    to: &buffer,
+                                    rounding: rounding)
                     
                     initializedCount = vector.count
                 }
@@ -1244,9 +1242,9 @@ extension vDSP {
                 let result = Array<Int32>(unsafeUninitializedCapacity: vector.count) {
                     buffer, initializedCount in
                     
-                    convert(vector,
-                            to: &buffer,
-                            rounding: rounding)
+                    convertElements(of: vector,
+                                    to: &buffer,
+                                    rounding: rounding)
                     
                     initializedCount = vector.count
                 }
@@ -1272,8 +1270,8 @@ extension vDSP {
             let result = Array<Double>(unsafeUninitializedCapacity: source.count) {
                 buffer, initializedCount in
                 
-                convert(source,
-                        to: &buffer)
+                convertElements(of: source,
+                                to: &buffer)
                 
                 initializedCount = source.count
             }
@@ -1294,8 +1292,8 @@ extension vDSP {
             let result = Array<Float>(unsafeUninitializedCapacity: source.count) {
                 buffer, initializedCount in
                 
-                convert(source,
-                        to: &buffer)
+                convertElements(of: source,
+                                to: &buffer)
                 
                 initializedCount = source.count
             }

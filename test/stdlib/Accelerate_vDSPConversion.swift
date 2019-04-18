@@ -33,7 +33,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Double](repeating: 0, count: source.count)
         var legacyResult = [Double](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result)
+        vDSP.convertElements(of: source, to: &result)
         
         vDSP_vspdp(source, 1,
                    &legacyResult, 1,
@@ -50,7 +50,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Float](repeating: 0, count: source.count)
         var legacyResult = [Float](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result)
+        vDSP.convertElements(of: source, to: &result)
         
         vDSP_vdpsp(source, 1,
                    &legacyResult, 1,
@@ -67,7 +67,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Float](repeating: 0, count: source.count)
         var legacyResult = [Float](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result)
+        vDSP.convertElements(of: source, to: &result)
         
         vDSP_vfltu8(source, 1,
                     &legacyResult, 1,
@@ -85,7 +85,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Double](repeating: 0, count: source.count)
         var legacyResult = [Double](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result)
+        vDSP.convertElements(of: source, to: &result)
         
         vDSP_vfltu8D(source, 1,
                      &legacyResult, 1,
@@ -103,7 +103,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Float](repeating: 0, count: source.count)
         var legacyResult = [Float](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result)
+        vDSP.convertElements(of: source, to: &result)
         
         vDSP_vfltu16(source, 1,
                      &legacyResult, 1,
@@ -121,7 +121,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Double](repeating: 0, count: source.count)
         var legacyResult = [Double](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result)
+        vDSP.convertElements(of: source, to: &result)
         
         vDSP_vfltu16D(source, 1,
                       &legacyResult, 1,
@@ -139,7 +139,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Float](repeating: 0, count: source.count)
         var legacyResult = [Float](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result)
+        vDSP.convertElements(of: source, to: &result)
         
         vDSP_vfltu32(source, 1,
                      &legacyResult, 1,
@@ -157,7 +157,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Double](repeating: 0, count: source.count)
         var legacyResult = [Double](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result)
+        vDSP.convertElements(of: source, to: &result)
         
         vDSP_vfltu32D(source, 1,
                       &legacyResult, 1,
@@ -175,7 +175,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Float](repeating: 0, count: source.count)
         var legacyResult = [Float](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result)
+        vDSP.convertElements(of: source, to: &result)
         
         vDSP_vflt8(source, 1,
                    &legacyResult, 1,
@@ -193,7 +193,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Double](repeating: 0, count: source.count)
         var legacyResult = [Double](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result)
+        vDSP.convertElements(of: source, to: &result)
         
         vDSP_vflt8D(source, 1,
                     &legacyResult, 1,
@@ -211,7 +211,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Float](repeating: 0, count: source.count)
         var legacyResult = [Float](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result)
+        vDSP.convertElements(of: source, to: &result)
         
         vDSP_vflt16(source, 1,
                     &legacyResult, 1,
@@ -229,7 +229,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Double](repeating: 0, count: source.count)
         var legacyResult = [Double](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result)
+        vDSP.convertElements(of: source, to: &result)
         
         vDSP_vflt16D(source, 1,
                      &legacyResult, 1,
@@ -247,7 +247,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Float](repeating: 0, count: source.count)
         var legacyResult = [Float](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result)
+        vDSP.convertElements(of: source, to: &result)
         
         vDSP_vflt32(source, 1,
                     &legacyResult, 1,
@@ -265,7 +265,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Double](repeating: 0, count: source.count)
         var legacyResult = [Double](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result)
+        vDSP.convertElements(of: source, to: &result)
         
         vDSP_vflt32D(source, 1,
                      &legacyResult, 1,
@@ -283,7 +283,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Int32](repeating: 0, count: source.count)
         var legacyResult = [Int32](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardZero)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardZero)
         
         vDSP_vfix32(source, 1,
                     &legacyResult, 1,
@@ -302,7 +302,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Int32](repeating: 0, count: source.count)
         var legacyResult = [Int32](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixr32(source, 1,
                      &legacyResult, 1,
@@ -321,7 +321,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Int32](repeating: 0, count: source.count)
         var legacyResult = [Int32](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardZero)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardZero)
         
         vDSP_vfix32D(source, 1,
                      &legacyResult, 1,
@@ -340,7 +340,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Int32](repeating: 0, count: source.count)
         var legacyResult = [Int32](repeating: -1, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixr32D(source, 1,
                       &legacyResult, 1,
@@ -359,7 +359,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [UInt16](repeating: 0, count: source.count)
         var legacyResult = [UInt16](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardZero)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardZero)
         
         vDSP_vfixu16(source, 1,
                      &legacyResult, 1,
@@ -378,7 +378,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [UInt16](repeating: 0, count: source.count)
         var legacyResult = [UInt16](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixru16(source, 1,
                       &legacyResult, 1,
@@ -397,7 +397,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [UInt16](repeating: 0, count: source.count)
         var legacyResult = [UInt16](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardZero)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardZero)
         
         vDSP_vfixu16D(source, 1,
                       &legacyResult, 1,
@@ -416,7 +416,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [UInt16](repeating: 0, count: source.count)
         var legacyResult = [UInt16](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixru16D(source, 1,
                        &legacyResult, 1,
@@ -435,7 +435,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [UInt32](repeating: 0, count: source.count)
         var legacyResult = [UInt32](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardZero)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardZero)
         
         vDSP_vfixu32(source, 1,
                      &legacyResult, 1,
@@ -454,7 +454,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [UInt32](repeating: 0, count: source.count)
         var legacyResult = [UInt32](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixru32(source, 1,
                       &legacyResult, 1,
@@ -473,7 +473,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [UInt32](repeating: 0, count: source.count)
         var legacyResult = [UInt32](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardZero)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardZero)
         
         vDSP_vfixu32D(source, 1,
                       &legacyResult, 1,
@@ -492,7 +492,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [UInt32](repeating: 0, count: source.count)
         var legacyResult = [UInt32](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixru32D(source, 1,
                        &legacyResult, 1,
@@ -511,7 +511,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Int16](repeating: 0, count: source.count)
         var legacyResult = [Int16](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardZero)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardZero)
         
         vDSP_vfix16(source, 1,
                     &legacyResult, 1,
@@ -530,7 +530,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Int16](repeating: 0, count: source.count)
         var legacyResult = [Int16](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixr16(source, 1,
                      &legacyResult, 1,
@@ -549,7 +549,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Int16](repeating: 0, count: source.count)
         var legacyResult = [Int16](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardZero)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardZero)
         
         vDSP_vfix16D(source, 1,
                      &legacyResult, 1,
@@ -568,7 +568,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Int16](repeating: 0, count: source.count)
         var legacyResult = [Int16](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixr16D(source, 1,
                       &legacyResult, 1,
@@ -587,7 +587,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Int8](repeating: 0, count: source.count)
         var legacyResult = [Int8](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardZero)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardZero)
         
         vDSP_vfix8(source, 1,
                    &legacyResult, 1,
@@ -606,7 +606,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Int8](repeating: 0, count: source.count)
         var legacyResult = [Int8](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixr8(source, 1,
                     &legacyResult, 1,
@@ -625,7 +625,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Int8](repeating: 0, count: source.count)
         var legacyResult = [Int8](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardZero)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardZero)
         
         vDSP_vfix8D(source, 1,
                     &legacyResult, 1,
@@ -644,7 +644,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [Int8](repeating: 0, count: source.count)
         var legacyResult = [Int8](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixr8D(source, 1,
                      &legacyResult, 1,
@@ -663,7 +663,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [UInt8](repeating: 0, count: source.count)
         var legacyResult = [UInt8](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardZero)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardZero)
         
         vDSP_vfixu8(source, 1,
                     &legacyResult, 1,
@@ -682,7 +682,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [UInt8](repeating: 0, count: source.count)
         var legacyResult = [UInt8](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixru8(source, 1,
                      &legacyResult, 1,
@@ -701,7 +701,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [UInt8](repeating: 0, count: source.count)
         var legacyResult = [UInt8](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardZero)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardZero)
         
         vDSP_vfixu8D(source, 1,
                      &legacyResult, 1,
@@ -720,7 +720,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         var result = [UInt8](repeating: 0, count: source.count)
         var legacyResult = [UInt8](repeating: 99, count: source.count)
         
-        vDSP.convert(source, to: &result, rounding: .towardNearestInteger)
+        vDSP.convertElements(of: source, to: &result, rounding: .towardNearestInteger)
         
         vDSP_vfixru8D(source, 1,
                       &legacyResult, 1,
