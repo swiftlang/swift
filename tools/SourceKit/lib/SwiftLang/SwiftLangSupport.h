@@ -489,26 +489,31 @@ public:
                      unsigned Length, bool Actionables,
                      bool CancelOnSubsequentRequest,
                      ArrayRef<const char *> Args,
-                 std::function<void(const CursorInfoData &)> Receiver) override;
+                 std::function<void(const CursorInfoData &,
+                                    StringRef Error)> Receiver) override;
 
   void getNameInfo(StringRef Filename, unsigned Offset,
                    NameTranslatingInfo &Input,
                    ArrayRef<const char *> Args,
-                   std::function<void(const NameTranslatingInfo &)> Receiver) override;
+                   std::function<void(const NameTranslatingInfo &,
+                                      StringRef Error)> Receiver) override;
 
   void getRangeInfo(StringRef Filename, unsigned Offset, unsigned Length,
                     bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-                    std::function<void(const RangeInfo&)> Receiver) override;
+                    std::function<void(const RangeInfo&,
+                                       StringRef Error)> Receiver) override;
 
   void getCursorInfoFromUSR(
       StringRef Filename, StringRef USR, bool CancelOnSubsequentRequest,
       ArrayRef<const char *> Args,
-      std::function<void(const CursorInfoData &)> Receiver) override;
+      std::function<void(const CursorInfoData &,
+                         StringRef Errro)> Receiver) override;
 
   void findRelatedIdentifiersInFile(StringRef Filename, unsigned Offset,
                                     bool CancelOnSubsequentRequest,
                                     ArrayRef<const char *> Args,
-              std::function<void(const RelatedIdentsInfo &)> Receiver) override;
+              std::function<void(const RelatedIdentsInfo &,
+                                 StringRef Errror)> Receiver) override;
 
   void syntacticRename(llvm::MemoryBuffer *InputBuf,
                        ArrayRef<RenameLocations> RenameLocations,
@@ -526,7 +531,8 @@ public:
 
   void collectExpressionTypes(StringRef FileName, ArrayRef<const char *> Args,
                               ArrayRef<const char *> ExpectedProtocols,
-                              std::function<void(const ExpressionTypesInFile&)> Receiver) override;
+                              std::function<void(const ExpressionTypesInFile&,
+                                                 StringRef Errror)> Receiver) override;
 
   void semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
                            ArrayRef<const char*> Args,
@@ -541,10 +547,12 @@ public:
       findUSRRange(StringRef DocumentName, StringRef USR) override;
 
   void findInterfaceDocument(StringRef ModuleName, ArrayRef<const char *> Args,
-               std::function<void(const InterfaceDocInfo &)> Receiver) override;
+               std::function<void(const InterfaceDocInfo &,
+                                  StringRef Error)> Receiver) override;
 
   void findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
-               std::function<void(ArrayRef<StringRef>, StringRef Error)> Receiver) override;
+               std::function<void(ArrayRef<StringRef>,
+                                  StringRef Error)> Receiver) override;
 
   void getExpressionContextInfo(llvm::MemoryBuffer *inputBuf, unsigned Offset,
                                 ArrayRef<const char *> Args,

@@ -140,13 +140,14 @@ static sourcekitd_response_t reportDocInfo(llvm::MemoryBuffer *InputBuf,
                                            StringRef ModuleName,
                                            ArrayRef<const char *> Args);
 
-static void reportCursorInfo(const CursorInfoData &Info, ResponseReceiver Rec);
+static void reportCursorInfo(const CursorInfoData &Info, ResponseReceiver Rec, StringRef Error);
 
-static void reportExpressionTypeInfo(const ExpressionTypesInFile &Info, ResponseReceiver Rec);
+static void reportExpressionTypeInfo(const ExpressionTypesInFile &Info, ResponseReceiver Rec,
+                                     StringRef Error);
 
-static void reportRangeInfo(const RangeInfo &Info, ResponseReceiver Rec);
+static void reportRangeInfo(const RangeInfo &Info, ResponseReceiver Rec, StringRef Error);
 
-static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec);
+static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec, StringRef Error);
 
 static void findRelatedIdents(StringRef Filename,
                               int64_t Offset,
@@ -935,12 +936,16 @@ handleSemanticRequest(RequestDict Req,
       Req.getInt64(KeyRetrieveRefactorActions, Actionables, /*isOptional=*/true);
       return Lang.getCursorInfo(
           *SourceFile, Offset, Length, Actionables, CancelOnSubsequentRequest,
-          Args, [Rec](const CursorInfoData &Info) { reportCursorInfo(Info, Rec); });
+          Args, [Rec](const CursorInfoData &Info, StringRef Error) {
+            reportCursorInfo(Info, Rec, Error);
+          });
     }
     if (auto USR = Req.getString(KeyUSR)) {
       return Lang.getCursorInfoFromUSR(
           *SourceFile, *USR, CancelOnSubsequentRequest, Args,
-          [Rec](const CursorInfoData &Info) { reportCursorInfo(Info, Rec); });
+          [Rec](const CursorInfoData &Info, StringRef Error) {
+            reportCursorInfo(Info, Rec, Error);
+          });
     }
 
     return Rec(createErrorRequestInvalid(
@@ -959,7 +964,9 @@ handleSemanticRequest(RequestDict Req,
       if (!Req.getInt64(KeyLength, Length, /*isOptional=*/false)) {
         return Lang.getRangeInfo(*SourceFile, Offset, Length,
                                  CancelOnSubsequentRequest, Args,
-          [Rec](const RangeInfo &Info) { reportRangeInfo(Info, Rec); });
+          [Rec](const RangeInfo &Info, StringRef Error) {
+            reportRangeInfo(Info, Rec, Error);
+          });
       }
     }
 
@@ -1010,8 +1017,8 @@ handleSemanticRequest(RequestDict Req,
     if (Req.getStringArray(KeyExpectedTypes, ExpectedProtocols, true))
       return Rec(createErrorRequestInvalid("invalid 'key.interested_protocols'"));
     return Lang.collectExpressionTypes(*SourceFile, Args, ExpectedProtocols,
-      [Rec](const ExpressionTypesInFile &Info) {
-        reportExpressionTypeInfo(Info, Rec);
+      [Rec](const ExpressionTypesInFile &Info, StringRef Error) {
+        reportExpressionTypeInfo(Info, Rec, Error);
       });
   }
 
@@ -1070,7 +1077,9 @@ handleSemanticRequest(RequestDict Req,
                    std::back_inserter(Input.ArgNames),
                    [](const char *C) { return StringRef(C); });
     return Lang.getNameInfo(*SourceFile, Offset, Input, Args,
-      [Rec](const NameTranslatingInfo &Info) { reportNameInfo(Info, Rec); });
+      [Rec](const NameTranslatingInfo &Info, StringRef Error) {
+        reportNameInfo(Info, Rec, Error);
+      });
   }
 
   if (ReqUID == RequestRelatedIdents) {
@@ -1608,10 +1617,12 @@ bool SKDocConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info) {
 // ReportCursorInfo
 //===----------------------------------------------------------------------===//
 
-static void reportCursorInfo(const CursorInfoData &Info, ResponseReceiver Rec) {
-
+static void reportCursorInfo(const CursorInfoData &Info, ResponseReceiver Rec,
+                             StringRef Error) {
   if (Info.IsCancelled)
     return Rec(createErrorRequestCancelled());
+  if (!Error.empty())
+    return Rec(createErrorRequestFailed(Error.str().c_str()));
 
   ResponseBuilder RespBuilder;
   if (Info.Kind.isInvalid())
@@ -1694,9 +1705,13 @@ static void reportCursorInfo(const CursorInfoData &Info, ResponseReceiver Rec) {
 // ReportRangeInfo
 //===----------------------------------------------------------------------===//
 
-static void reportRangeInfo(const RangeInfo &Info, ResponseReceiver Rec) {
+static void reportRangeInfo(const RangeInfo &Info, ResponseReceiver Rec,
+                            StringRef Error) {
   if (Info.IsCancelled)
     return Rec(createErrorRequestCancelled());
+  if (!Error.empty())
+    return Rec(createErrorRequestFailed(Error.str().c_str()));
+
   ResponseBuilder RespBuilder;
   auto Elem = RespBuilder.getDictionary();
   Elem.set(KeyKind, Info.RangeKind);
@@ -1709,9 +1724,12 @@ static void reportRangeInfo(const RangeInfo &Info, ResponseReceiver Rec) {
 // ReportNameInfo
 //===----------------------------------------------------------------------===//
 
-static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec) {
+static void reportNameInfo(const NameTranslatingInfo &Info,
+                           ResponseReceiver Rec, StringRef Error) {
   if (Info.IsCancelled)
     return Rec(createErrorRequestCancelled());
+  if (!Error.empty())
+    return Rec(createErrorRequestFailed(Error.str().c_str()));
 
   ResponseBuilder RespBuilder;
   if (Info.NameKind.isInvalid())
@@ -1744,7 +1762,10 @@ static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec
 // ReportExpressionTypeInfo
 //===----------------------------------------------------------------------===//
 static void reportExpressionTypeInfo(const ExpressionTypesInFile &Info,
-                                     ResponseReceiver Rec) {
+                                     ResponseReceiver Rec, StringRef Error) {
+  if (!Error.empty())
+    return Rec(createErrorRequestFailed(Error.str().c_str()));
+
   ResponseBuilder Builder;
   auto Dict = Builder.getDictionary();
   ExpressionTypeArrayBuilder ArrBuilder(Info.TypeBuffer);
@@ -1767,9 +1788,12 @@ static void findRelatedIdents(StringRef Filename,
                               ResponseReceiver Rec) {
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.findRelatedIdentifiersInFile(Filename, Offset, CancelOnSubsequentRequest,
-                                    Args, [Rec](const RelatedIdentsInfo &Info) {
+                                    Args, [Rec](const RelatedIdentsInfo &Info,
+                                                StringRef Error) {
     if (Info.IsCancelled)
       return Rec(createErrorRequestCancelled());
+    if (!Error.empty())
+      return Rec(createErrorRequestFailed(Error.str().c_str()));
 
     ResponseBuilder RespBuilder;
     auto Arr = RespBuilder.getDictionary().setArray(KeyResults);
@@ -2739,10 +2763,9 @@ editorFindInterfaceDoc(StringRef ModuleName, ArrayRef<const char *> Args) {
   sourcekitd_response_t Resp;
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.findInterfaceDocument(ModuleName, Args,
-    [&](const InterfaceDocInfo &Info) {
-      if (!Info.Error.empty()) {
-        SmallString<128> Err(Info.Error);
-        Resp = createErrorRequestFailed(Err.c_str());
+    [&](const InterfaceDocInfo &Info, StringRef Error) {
+      if (!Error.empty()) {
+        Resp = createErrorRequestFailed(Error.str().c_str());
         return;
       }
 
