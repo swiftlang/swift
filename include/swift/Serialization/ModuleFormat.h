@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 485; // remove @escaping parameter flag
+const uint16_t SWIFTMODULE_VERSION_MINOR = 486; // Last change: Opaque result types
 
 using DeclIDField = BCFixed<31>;
 
@@ -792,6 +792,12 @@ namespace decls_block {
     TypeIDField         // the existential type
   >;
   
+  using OpaqueArchetypeTypeLayout = BCRecordLayout<
+    OPAQUE_ARCHETYPE_TYPE,
+    DeclIDField,           // the opaque type decl
+    SubstitutionMapIDField // the arguments
+  >;
+  
   using NestedArchetypeTypeLayout = BCRecordLayout<
     NESTED_ARCHETYPE_TYPE,
     TypeIDField, // root archetype
@@ -1033,6 +1039,7 @@ namespace decls_block {
     DeclIDField,  // overridden decl
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
+    DeclIDField, // opaque return type decl
     BCArray<TypeIDField> // accessors and dependencies
   >;
 
@@ -1068,6 +1075,7 @@ namespace decls_block {
                   // components plus one
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
+    DeclIDField,  // opaque result type decl
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:
@@ -1078,6 +1086,16 @@ namespace decls_block {
     // - inlinable body text, if any
   >;
   
+  using OpaqueTypeLayout = BCRecordLayout<
+    OPAQUE_TYPE_DECL,
+    DeclContextIDField, // decl context
+    DeclIDField, // naming decl
+    GenericSignatureIDField, // interface generic signature
+    TypeIDField, // interface type for opaque type
+    GenericEnvironmentIDField, // generic environment
+    SubstitutionMapIDField // optional substitution map for underlying type
+  >;
+
   // TODO: remove the unnecessary FuncDecl components here
   using AccessorLayout = BCRecordLayout<
     ACCESSOR_DECL,
@@ -1181,6 +1199,7 @@ namespace decls_block {
     AccessLevelField, // setter access, if applicable
     StaticSpellingKindField,    // is subscript static?
     BCVBR<5>,    // number of parameter name components
+    DeclIDField, // opaque return type decl
     BCArray<IdentifierIDField> // name components,
                                // followed by DeclID accessors,
                                // followed by TypeID dependencies
@@ -1687,6 +1706,7 @@ namespace index_block {
     LOCAL_DECL_CONTEXT_OFFSETS,
     DECL_CONTEXT_OFFSETS,
     LOCAL_TYPE_DECLS,
+    OPAQUE_RETURN_TYPE_DECLS,
     GENERIC_ENVIRONMENT_OFFSETS,
     NORMAL_CONFORMANCE_OFFSETS,
     SIL_LAYOUT_OFFSETS,

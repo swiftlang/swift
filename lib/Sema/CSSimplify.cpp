@@ -24,6 +24,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Compiler.h"
 
@@ -1081,6 +1082,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     subKind = ConstraintKind::Conversion;
     break;
 
+  case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::Bind:
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
@@ -1143,6 +1145,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::Equal:
     return rep1 != rep2;
 
+  case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::BridgingConversion:
@@ -1312,6 +1315,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
+  case ConstraintKind::OpaqueUnderlyingType:
     subKind = ConstraintKind::Subtype;
     break;
 
@@ -1565,11 +1569,49 @@ ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
   return getTypeMatchFailure(locator);
 }
 
+static ConstraintSystem::TypeMatchResult
+matchDeepTypeArguments(ConstraintSystem &cs,
+                       ConstraintSystem::TypeMatchOptions subflags,
+                       ArrayRef<Type> args1,
+                       ArrayRef<Type> args2,
+                       ConstraintLocatorBuilder locator) {
+  if (args1.size() != args2.size()) {
+    return cs.getTypeMatchFailure(locator);
+  }
+  for (unsigned i = 0, n = args1.size(); i != n; ++i) {
+    auto result = cs.matchTypes(args1[i], args2[i], ConstraintKind::Bind,
+                                subflags, locator.withPathElement(
+                                        LocatorPathElt::getGenericArgument(i)));
+
+    if (result.isFailure())
+      return result;
+  }
+
+  return cs.getTypeMatchSuccess();
+}
+
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
                                          ConstraintLocatorBuilder locator) {
   TypeMatchOptions subflags = TMF_GenerateConstraints;
 
+  // Handle opaque archetypes.
+  if (auto arch1 = type1->getAs<ArchetypeType>()) {
+    auto arch2 = type2->castTo<ArchetypeType>();
+    auto opaque1 = cast<OpaqueTypeArchetypeType>(arch1->getRoot());
+    auto opaque2 = cast<OpaqueTypeArchetypeType>(arch2->getRoot());
+    assert(arch1->getInterfaceType()->getCanonicalType(
+                      opaque1->getGenericEnvironment()->getGenericSignature())
+        == arch2->getInterfaceType()->getCanonicalType(
+                      opaque2->getGenericEnvironment()->getGenericSignature()));
+    assert(opaque1->getDecl() == opaque2->getDecl());
+    
+    auto args1 = opaque1->getSubstitutions().getReplacementTypes();
+    auto args2 = opaque2->getSubstitutions().getReplacementTypes();
+    // Match up the replacement types of the respective substitution maps.
+    return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
+  }
+  
   // Handle nominal types that are not directly generic.
   if (auto nominal1 = type1->getAs<NominalType>()) {
     auto nominal2 = type2->castTo<NominalType>();
@@ -1604,19 +1646,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   // Match up the generic arguments, exactly.
   auto args1 = bound1->getGenericArgs();
   auto args2 = bound2->getGenericArgs();
-  if (args1.size() != args2.size()) {
-    return getTypeMatchFailure(locator);
-  }
-  for (unsigned i = 0, n = args1.size(); i != n; ++i) {
-    auto result = matchTypes(args1[i], args2[i], ConstraintKind::Bind,
-                             subflags, locator.withPathElement(
-                                        LocatorPathElt::getGenericArgument(i)));
-
-    if (result.isFailure())
-      return result;
-  }
-
-  return getTypeMatchSuccess();
+  return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
 }
 
 ConstraintSystem::TypeMatchResult
@@ -2183,6 +2213,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::OperatorArgumentConversion:
       return formUnsolvedResult();
 
+    case ConstraintKind::OpaqueUnderlyingType:
     case ConstraintKind::ApplicableFunction:
     case ConstraintKind::DynamicCallableApplicableFunction:
     case ConstraintKind::BindOverload:
@@ -2252,7 +2283,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Module:
     case TypeKind::PrimaryArchetype:
     case TypeKind::OpenedArchetype:
-    case TypeKind::NestedArchetype:
       // If two module types or archetypes were not already equal, there's
       // nothing more we can do.
       return getTypeMatchFailure(locator);
@@ -2381,6 +2411,48 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       if (bound1->getDecl() == bound2->getDecl())
         conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
       break;
+    }
+
+    // Opaque archetypes are globally bound, so we can match them for deep
+    // equality.
+    case TypeKind::OpaqueTypeArchetype: {
+      auto opaque1 = cast<OpaqueTypeArchetypeType>(desugar1);
+      auto opaque2 = cast<OpaqueTypeArchetypeType>(desugar2);
+      
+      assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
+      if (!type1->is<LValueType>()
+          && opaque1->getDecl() == opaque2->getDecl()) {
+        conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
+      }
+      break;
+    }
+    
+    // Same for nested archetypes rooted in opaque types.
+    case TypeKind::NestedArchetype: {
+      auto nested1 = cast<NestedArchetypeType>(desugar1);
+      auto nested2 = cast<NestedArchetypeType>(desugar2);
+      
+      auto rootOpaque1 = dyn_cast<OpaqueTypeArchetypeType>(nested1->getRoot());
+      auto rootOpaque2 = dyn_cast<OpaqueTypeArchetypeType>(nested2->getRoot());
+      if (rootOpaque1 && rootOpaque2) {
+        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
+        auto interfaceTy1 = nested1->getInterfaceType()
+          ->getCanonicalType(rootOpaque1->getGenericEnvironment()
+                                        ->getGenericSignature());
+        auto interfaceTy2 = nested2->getInterfaceType()
+          ->getCanonicalType(rootOpaque2->getGenericEnvironment()
+                                        ->getGenericSignature());
+        if (!type1->is<LValueType>()
+            && interfaceTy1 == interfaceTy2
+            && rootOpaque1->getDecl() == rootOpaque2->getDecl()) {
+          conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
+          break;
+        }
+      }
+
+      // If the archetypes aren't rooted in an opaque type, or are rooted in
+      // completely different decls, then there's nothing else we can do.
+      return getTypeMatchFailure(locator);
     }
     }
   }
@@ -2941,6 +3013,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
   case TypeKind::NestedArchetype:
+  case TypeKind::OpaqueTypeArchetype:
   case TypeKind::DynamicSelf:
   case TypeKind::ProtocolComposition:
   case TypeKind::Protocol:
@@ -3554,6 +3627,12 @@ static bool hasDynamicMemberLookupAttribute(Type type,
   return result;
 }
 
+// for IDETypeChecking
+bool swift::hasDynamicMemberLookupAttribute(Type type) {
+  llvm::DenseMap<CanType, bool> DynamicMemberLookupCache;
+  return ::hasDynamicMemberLookupAttribute(type, DynamicMemberLookupCache);
+}
+
 static bool isKeyPathDynamicMemberLookup(ConstraintLocator *locator) {
   auto path = locator ? locator->getPath() : None;
   return !path.empty() && path.back().isKeyPathDynamicMember();
@@ -3928,8 +4007,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // as representing "dynamic lookup" unless it's a direct call
     // to such subscript (in that case label is expected to match).
     if (auto *subscript = dyn_cast<SubscriptDecl>(cand)) {
-      if (hasDynamicMemberLookupAttribute(instanceTy,
-                                          DynamicMemberLookupCache) &&
+      if (::hasDynamicMemberLookupAttribute(instanceTy,
+                                            DynamicMemberLookupCache) &&
           isValidKeyPathDynamicMemberLookup(subscript, TC)) {
         auto info =
             getArgumentLabels(*this, ConstraintLocatorBuilder(memberLocator));
@@ -4021,7 +4100,8 @@ retry_after_fail:
       constraintKind == ConstraintKind::ValueMember &&
       memberName.isSimpleName() && !memberName.isSpecial()) {
     auto name = memberName.getBaseIdentifier();
-    if (hasDynamicMemberLookupAttribute(instanceTy, DynamicMemberLookupCache)) {
+    if (::hasDynamicMemberLookupAttribute(instanceTy,
+                                          DynamicMemberLookupCache)) {
       auto &ctx = getASTContext();
 
       // Recursively look up `subscript(dynamicMember:)` methods in this type.
@@ -4597,6 +4677,40 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyOpaqueUnderlyingTypeConstraint(Type type1, Type type2,
+                                             TypeMatchOptions flags,
+                                             ConstraintLocatorBuilder locator) {
+  // Open the second type, which must be an opaque archetype, to try to
+  // infer the first type using its constraints.
+  auto opaque2 = type2->castTo<OpaqueTypeArchetypeType>();
+
+  // Open the generic signature of the opaque decl, and bind the "outer" generic
+  // params to our context. The remaining axes of freedom on the type variable
+  // corresponding to the underlying type should be the constraints on the
+  // underlying return type.
+  OpenedTypeMap replacements;
+  openGeneric(nullptr, DC, opaque2->getBoundSignature(),
+              /*skip self*/ false,
+              locator, replacements);
+  
+  auto underlyingTyVar = openType(opaque2->getInterfaceType(),
+                                  replacements);
+  assert(underlyingTyVar);
+  
+  if (auto dcSig = DC->getGenericSignatureOfContext()) {
+    for (auto param : dcSig->getGenericParams()) {
+      addConstraint(ConstraintKind::Bind,
+                    openType(param, replacements),
+                    DC->mapTypeIntoContext(param),
+                    locator);
+    }
+  }
+
+  addConstraint(ConstraintKind::Equal, type1, underlyingTyVar, locator);
+  return getTypeMatchSuccess();
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyBridgingConstraint(Type type1,
                                              Type type2,
                                              TypeMatchOptions flags,
@@ -5015,14 +5129,21 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       }
 
       // Referencing static members in key path is not currently allowed.
-      if (storage->isStatic()) {
+      if (storage->isStatic() || storage->isGetterMutating()) {
         if (!shouldAttemptFixes())
           return SolutionKind::Error;
 
-        auto componentLoc =
-            locator.withPathElement(LocatorPathElt::getKeyPathComponent(i));
-        auto *fix = AllowStaticMemberRefInKeyPath::create(
-            *this, choices[i].getDecl(), getConstraintLocator(componentLoc));
+        auto *componentLoc = getConstraintLocator(
+            locator.withPathElement(LocatorPathElt::getKeyPathComponent(i)));
+
+        ConstraintFix *fix = nullptr;
+        if (storage->isStatic()) {
+          fix = AllowInvalidRefInKeyPath::forStaticMember(
+              *this, choices[i].getDecl(), componentLoc);
+        } else {
+          fix = AllowInvalidRefInKeyPath::forMutatingGetter(
+              *this, choices[i].getDecl(), componentLoc);
+        }
 
         if (recordFix(fix))
           return SolutionKind::Error;
@@ -6326,7 +6447,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowInaccessibleMember:
   case FixKind::AllowAnyObjectKeyPathRoot:
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
-  case FixKind::AllowStaticMemberRefInKeyPath:
+  case FixKind::AllowInvalidRefInKeyPath:
     llvm_unreachable("handled elsewhere");
   }
 
@@ -6352,6 +6473,10 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
     return matchTypes(first, second, kind, subflags, locator);
+
+  case ConstraintKind::OpaqueUnderlyingType:
+    return simplifyOpaqueUnderlyingTypeConstraint(first, second,
+                                                  subflags, locator);
 
   case ConstraintKind::BridgingConversion:
     return simplifyBridgingConstraint(first, second, subflags, locator);
@@ -6605,7 +6730,8 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
-  case ConstraintKind::OperatorArgumentConversion: {
+  case ConstraintKind::OperatorArgumentConversion:
+  case ConstraintKind::OpaqueUnderlyingType: {
     // Relational constraints.
     auto matchKind = constraint.getKind();
 

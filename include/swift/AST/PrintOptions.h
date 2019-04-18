@@ -260,6 +260,10 @@ struct PrintOptions {
   /// Whether to skip keywords with a prefix of underscore such as __consuming.
   bool SkipUnderscoredKeywords = false;
 
+  /// Whether to print declarations with opaque return types with a stable,
+  /// parsable internal syntax.
+  bool PrintStableReferencesToOpaqueReturnTypes = false;
+
   /// Whether to print decl attributes that are only used internally,
   /// such as _silgen_name, transparent, etc.
   bool PrintUserInaccessibleAttrs = true;

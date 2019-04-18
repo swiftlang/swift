@@ -133,6 +133,8 @@ public:
     KeyPathRoot,
     /// The value of a keypath
     KeyPathValue,
+    /// The result type of a key path component. Not used for subscripts.
+    KeyPathComponentResult,
   };
 
   /// Determine the number of numeric values used for the given path
@@ -165,6 +167,7 @@ public:
     case ContextualType:
     case KeyPathRoot:
     case KeyPathValue:
+    case KeyPathComponentResult:
       return 0;
 
     case OpenedGeneric:
@@ -233,6 +236,7 @@ public:
     case KeyPathDynamicMember:
     case KeyPathRoot:
     case KeyPathValue:
+    case KeyPathComponentResult:
       return 0;
 
     case FunctionArgument:

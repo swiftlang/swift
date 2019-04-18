@@ -979,6 +979,15 @@ static void validatePatternBindingEntry(TypeChecker &tc,
   if (!pattern->hasType() || pattern->getType()->hasUnboundGenericType()) {
     if (tc.typeCheckPatternBinding(binding, entryNumber))
       return;
+    
+    // A pattern binding at top level is not allowed to pick up another decl's
+    // opaque result type as its type by type inference.
+    if (!binding->getDeclContext()->isLocalContext()
+        && binding->getInit(entryNumber)->getType()->hasOpaqueArchetype()) {
+      // TODO: Check whether the type is the pattern binding's own opaque type.
+      tc.diagnose(binding, diag::inferred_opaque_type,
+                  binding->getInit(entryNumber)->getType());
+    }
   }
 
   // If the pattern binding appears in a type or library file context, then
@@ -1972,6 +1981,12 @@ static bool shouldUseOpaqueReadAccessor(TypeChecker &TC,
 
 static void validateAbstractStorageDecl(TypeChecker &TC,
                                         AbstractStorageDecl *storage) {
+  if (storage->getOpaqueResultTypeDecl()) {
+    if (auto sf = storage->getInnermostDeclContext()->getParentSourceFile()) {
+      sf->markDeclWithOpaqueResultTypeAsValidated(storage);
+    }
+  }
+  
   if (shouldUseOpaqueReadAccessor(TC, storage))
     storage->setOpaqueReadOwnership(OpaqueReadOwnership::Borrowed);
 
@@ -2430,6 +2445,15 @@ public:
     TC.checkDeclAttributes(TAD);
 
     checkAccessControl(TC, TAD);
+  }
+  
+  void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
+    TC.checkDeclAttributesEarly(OTD);
+    
+    TC.validateDecl(OTD);
+    TC.checkDeclAttributes(OTD);
+    
+    checkAccessControl(TC, OTD);
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
@@ -3229,7 +3253,7 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
   }
 
   if (tc.validateType(typeAlias->getUnderlyingTypeLoc(),
-                      TypeResolution::forInterface(typeAlias), options)) {
+                    TypeResolution::forInterface(typeAlias, &tc), options)) {
     typeAlias->setInvalid();
     typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
   }
@@ -3608,6 +3632,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     validateTypealiasType(*this, typeAlias);
     break;
   }
+      
+  case DeclKind::OpaqueType: {
+    auto opaque = cast<OpaqueTypeDecl>(D);
+    DeclValidationRAII IBV(opaque);
+    validateGenericTypeSignature(opaque);
+    break;
+  }
 
   case DeclKind::Enum:
   case DeclKind::Struct:
@@ -3910,7 +3941,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
       FD->computeType();
     }
-
+    
     if (!isa<AccessorDecl>(FD) || cast<AccessorDecl>(FD)->isGetter()) {
       auto *TyR = getTypeLocForFunctionResult(FD).getTypeRepr();
       if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
@@ -3971,6 +4002,14 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     }
 
     checkDeclAttributes(FD);
+
+    // Mark the opaque result type as validated, if there is one.
+    if (FD->getOpaqueResultTypeDecl()) {
+      if (auto sf = FD->getDeclContext()->getParentSourceFile()) {
+        sf->markDeclWithOpaqueResultTypeAsValidated(FD);
+      }
+    }
+    
     break;
   }
 
@@ -4547,12 +4586,7 @@ static Type formExtensionInterfaceType(
     auto typealiasSig = typealias->getGenericSignature();
     SubstitutionMap subMap;
     if (typealiasSig) {
-      subMap = SubstitutionMap::get(
-          typealiasSig,
-          [](SubstitutableType *type) -> Type {
-            return Type(type);
-          },
-          MakeAbstractConformanceForGenericType());
+      subMap = typealiasSig->getIdentitySubstitutionMap();
 
       mustInferRequirements = true;
     }

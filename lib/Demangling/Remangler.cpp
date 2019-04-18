@@ -1594,6 +1594,11 @@ void Remangler::mangleNominalTypeDescriptor(Node *node) {
   Buffer << "Mn";
 }
 
+void Remangler::mangleOpaqueTypeDescriptor(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MQ";
+}
+
 void Remangler::manglePropertyDescriptor(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "MV";
@@ -2302,6 +2307,11 @@ void Remangler::mangleProtocolSymbolicReference(Node *node) {
                          (const void *)node->getIndex()));
 }
 
+void Remangler::mangleOpaqueTypeDescriptorSymbolicReference(Node *node) {
+  return mangle(Resolver(SymbolicReferenceKind::Context,
+                         (const void *)node->getIndex()));
+}
+
 void Remangler::mangleSugaredOptional(Node *node) {
   mangleType(node->getChild(0));
   Buffer << "XSq";
@@ -2321,6 +2331,33 @@ void Remangler::mangleSugaredDictionary(Node *node) {
 void Remangler::mangleSugaredParen(Node *node) {
   mangleType(node->getChild(0));
   Buffer << "XSp";
+}
+
+void Remangler::mangleOpaqueReturnType(Node *node) {
+  Buffer << "Qr";
+}
+void Remangler::mangleOpaqueReturnTypeOf(Node *node) {
+  mangle(node->getChild(0));
+  Buffer << "QO";
+}
+void Remangler::mangleOpaqueType(Node *node) {
+  mangle(node->getChild(0));
+  auto boundGenerics = node->getChild(2);
+  for (unsigned i = 0; i < boundGenerics->getNumChildren(); ++i) {
+    Buffer << (i == 0 ? 'y' : '_');
+    mangleChildNodes(boundGenerics->getChild(i));
+  }
+  if (node->getNumChildren() >= 4) {
+    auto retroactiveConformances = node->getChild(3);
+    for (unsigned i = 0; i < retroactiveConformances->getNumChildren(); ++i) {
+      mangle(retroactiveConformances->getChild(i));
+    }
+  }
+  Buffer << "Qo";
+  mangleIndex(node->getChild(1)->getIndex());
+}
+void Remangler::mangleAccessorFunctionReference(Node *node) {
+  unreachable("can't remangle");
 }
 
 } // anonymous namespace
