@@ -71,9 +71,16 @@ static ParserStatus parseDefaultArgument(
   SyntaxParsingContext DefaultArgContext(P.SyntaxContext,
                                          SyntaxKind::InitializerClause);
   SourceLoc equalLoc = P.consumeToken(tok::equal);
-  // Handle the special '= super' syntax for inherited default values in module
-  // interface files
+
   if (P.SF.Kind == SourceFileKind::Interface) {
+    // Swift module interfaces don't synthesize inherited intializers and
+    // instead include them explicitly in subclasses. Since the
+    // \c DefaultArgumentKind of these initializers is \c Inherited, this is
+    // represented textually as `= super` in the interface.
+
+    // If we're in a module interface and the default argument is exactly
+    // `super` (i.e. the token after that is `,` or `)` which end a parameter)
+    // report an inherited default argument to the caller and return.
     if (P.Tok.is(tok::kw_super) && P.peekToken().isAny(tok::comma, tok::r_paren)) {
       hasInheritedDefaultArg = true;
       P.consumeToken(tok::kw_super);
