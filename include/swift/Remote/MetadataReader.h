@@ -362,6 +362,9 @@ public:
     bool isBridged = false;
 
     auto Meta = readMetadata(*MetadataAddress);
+    if (!Meta)
+      return None;
+
     if (auto ClassMeta = dyn_cast<TargetClassMetadata<Runtime>>(Meta)) {
       if (ClassMeta->isPureObjC()) {
         // If we can determine the Objective-C class name, this is probably an
