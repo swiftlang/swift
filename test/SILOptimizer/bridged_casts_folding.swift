@@ -1,4 +1,3 @@
-
 // RUN: %target-swift-frontend -O -emit-sil -enforce-exclusivity=unchecked %s | %FileCheck %s
 
 // REQUIRES: objc_interop
