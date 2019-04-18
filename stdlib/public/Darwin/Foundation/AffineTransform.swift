@@ -275,6 +275,15 @@ public struct AffineTransform : ReferenceConvertible, Hashable, CustomStringConv
         newSize.height = (m12 * size.width) + (m22 * size.height)
         return newSize
     }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(m11)
+        hasher.combine(m12)
+        hasher.combine(m21)
+        hasher.combine(m22)
+        hasher.combine(tX)
+        hasher.combine(tY)
+    }
     
     public var hashValue : Int {
         return Int(m11 + m12 + m21 + m22 + tX + tY)
