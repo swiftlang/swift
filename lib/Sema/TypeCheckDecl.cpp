@@ -248,6 +248,8 @@ static void checkInheritanceClause(
     inheritedClause = typeDecl->getInherited();
   }
 
+  // Can this declaration's inheritance clause contain a class or
+  // subclass existential?
   bool canHaveSuperclass = (isa<ClassDecl>(decl) ||
                             (isa<ProtocolDecl>(decl) &&
                              !cast<ProtocolDecl>(decl)->isObjC()));
@@ -351,34 +353,38 @@ static void checkInheritanceClause(
     if (inheritedTy->isExistentialType()) {
       auto layout = inheritedTy->getExistentialLayout();
 
-      // Inheritance from protocol compositions that do not contain classes
-      // or AnyObject is always OK.
-      if (!layout.hasExplicitAnyObject &&
-          !layout.explicitSuperclass)
+      // Subclass existentials are not allowed except on classes and
+      // non-@objc protocols.
+      if (layout.explicitSuperclass &&
+          !canHaveSuperclass) {
+        decl->diagnose(diag::inheritance_from_protocol_with_superclass,
+                       inheritedTy);
         continue;
-
-      // Protocols can inherit from AnyObject.
-      if (layout.hasExplicitAnyObject &&
-          isa<ProtocolDecl>(decl))
-        continue;
-
-      // Class-constrained protocol compositions are not allowed except in
-      // special cases.
-      if (layout.explicitSuperclass) {
-        if (!canHaveSuperclass) {
-          decl->diagnose(diag::inheritance_from_protocol_with_superclass,
-                         inheritedTy);
-          continue;
-        }
-
-        // Classes can inherit from protocol compositions that contain a
-        // superclass, but not AnyObject.
-        if (isa<ClassDecl>(decl) &&
-            !layout.hasExplicitAnyObject) {
-          // Superclass inheritance is handled below.
-          inheritedTy = layout.explicitSuperclass;
-        }
       }
+
+      // AnyObject is not allowed except on protocols.
+      if (layout.hasExplicitAnyObject &&
+          !isa<ProtocolDecl>(decl)) {
+        decl->diagnose(canHaveSuperclass
+                       ? diag::inheritance_from_non_protocol_or_class
+                       : diag::inheritance_from_non_protocol,
+                       inheritedTy);
+        continue;
+      }
+
+      // If the existential did not have a class constraint, we're done.
+      if (!layout.explicitSuperclass)
+        continue;
+
+      // Classes and protocols can inherit from subclass existentials.
+      // For classes, we check for a duplicate superclass below.
+      // For protocols, the GSB emits its own warning instead.
+      if (isa<ProtocolDecl>(decl))
+        continue;
+
+      assert(isa<ClassDecl>(decl));
+      assert(canHaveSuperclass);
+      inheritedTy = layout.explicitSuperclass;
     }
 
     // If this is an enum inheritance clause, check for a raw type.
@@ -418,7 +424,9 @@ static void checkInheritanceClause(
       continue;
     }
 
-    // If this is a class type, it may be the superclass.
+    // If this is a class type, it may be the superclass. We end up here when
+    // the inherited type is either itself a class, or when it is a subclass
+    // existential via the existential type path above.
     if (inheritedTy->getClassOrBoundGenericClass()) {
       // First, check if we already had a superclass.
       if (superclassTy) {
