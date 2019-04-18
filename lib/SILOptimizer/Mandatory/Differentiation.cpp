@@ -4195,8 +4195,8 @@ public:
         continue;
       }
       if (cotan->getType().isAddress()) {
-        addToAdjointBuffer(origArg, ValueWithCleanup(
-            cotan, makeCleanup(cotan, emitCleanup, {seed.getCleanup()})));
+        addToAdjointBuffer(origArg, cotan);
+        emitCleanup(builder, loc, cotan);
       } else {
         if (origArg->getType().isAddress()) {
           auto adjBuf = getAdjointBuffer(origArg);
@@ -4219,10 +4219,8 @@ public:
       }
     }
     // Deallocate pullback indirect results.
-    for (auto *alloc : reversed(pullbackIndirectResults)) {
-      emitCleanup(builder, loc, alloc);
+    for (auto *alloc : reversed(pullbackIndirectResults))
       builder.createDeallocStack(loc, alloc);
-    }
   }
 
   /// Handle `struct` instruction.
