@@ -1856,25 +1856,18 @@ void Remangler::mangleProtocolWitnessTableAccessor(Node *node) {
 }
 
 void Remangler::mangleReabstractionThunk(Node *node) {
-  if (node->getNumChildren() == 3) {
-    mangleChildNode(node, 1); // type 1
-    mangleChildNode(node, 2); // type 2
-    mangleChildNode(node, 0); // generic signature
-  } else {
-    mangleChildNodes(node);
-  }
+  mangleChildNodesReversed(node);
   Buffer << "Tr";
 }
 
 void Remangler::mangleReabstractionThunkHelper(Node *node) {
-  if (node->getNumChildren() == 3) {
-    mangleChildNode(node, 1); // type 1
-    mangleChildNode(node, 2); // type 2
-    mangleChildNode(node, 0); // generic signature
-  } else {
-    mangleChildNodes(node);
-  }
+  mangleChildNodesReversed(node);
   Buffer << "TR";
+}
+
+void Remangler::mangleReabstractionThunkHelperWithSelf(Node *node) {
+  mangleChildNodesReversed(node);
+  Buffer << "Ty";
 }
 
 void Remangler::mangleReadAccessor(Node *node) {
@@ -2133,6 +2126,16 @@ void Remangler::mangleMethodLookupFunction(Node *node) {
 void Remangler::mangleObjCMetadataUpdateFunction(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "MU";
+}
+
+void Remangler::mangleObjCResilientClassStub(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Ms";
+}
+
+void Remangler::mangleFullObjCResilientClassStub(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Mt";
 }
 
 void Remangler::mangleThrowsAnnotation(Node *node) {

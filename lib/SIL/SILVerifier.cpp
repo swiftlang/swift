@@ -2291,10 +2291,8 @@ public:
         ->getInstanceType()->getClassOrBoundGenericClass();
     require(class2,
             "Second operand of dealloc_partial_ref must be a class metatype");
-    while (class1 != class2) {
-      class1 = class1->getSuperclassDecl();
-      require(class1, "First operand not superclass of second instance type");
-    }
+    require(class2->isSuperclassOf(class1),
+            "First operand not superclass of second instance type");
   }
 
   void checkAllocBoxInst(AllocBoxInst *AI) {
@@ -4981,13 +4979,8 @@ void SILVTable::verify(const SILModule &M) const {
     assert(theClass && "vtable entry must refer to a class member");
 
     // The class context must be the vtable's class, or a superclass thereof.
-    auto c = getClass();
-    do {
-      if (c == theClass)
-        break;
-      c = c->getSuperclassDecl();
-    } while (c);
-    assert(c && "vtable entry must refer to a member of the vtable's class");
+    assert(theClass->isSuperclassOf(getClass()) &&
+           "vtable entry must refer to a member of the vtable's class");
 
     // All function vtable entries must be at their natural uncurry level.
     assert(!entry.Method.isCurried && "vtable entry must not be curried");

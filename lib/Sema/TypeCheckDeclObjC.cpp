@@ -383,6 +383,21 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
     }
 
     if (auto classDecl = ED->getSelfClassDecl()) {
+      auto *mod = value->getModuleContext();
+      auto &ctx = mod->getASTContext();
+
+      if (!ctx.LangOpts.EnableObjCResilientClassStubs) {
+        if (classDecl->checkAncestry().contains(
+              AncestryFlags::ResilientOther) ||
+            classDecl->hasResilientMetadata(mod,
+                                            ResilienceExpansion::Maximal)) {
+          if (diagnose) {
+            value->diagnose(diag::objc_in_resilient_extension);
+          }
+          return true;
+        }
+      }
+
       if (classDecl->isGenericContext()) {
         if (!classDecl->usesObjCGenericsModel()) {
           if (diagnose) {
@@ -812,6 +827,16 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   if (checkObjCInForeignClassContext(SD, Reason))
     return false;
 
+  // ObjC doesn't support class subscripts.
+  if (!SD->isInstanceMember()) {
+    if (Diagnose) {
+      SD->diagnose(diag::objc_invalid_on_static_subscript,
+                   SD->getDescriptiveKind(), Reason);
+      describeObjCReason(SD, Reason);
+    }
+    return true;
+  }
+
   if (!SD->hasInterfaceType()) {
     SD->getASTContext().getLazyResolver()->resolveDeclSignature(
                                               const_cast<SubscriptDecl *>(SD));
@@ -993,17 +1018,17 @@ static bool isMemberOfObjCMembersClass(const ValueDecl *VD) {
   auto classDecl = VD->getDeclContext()->getSelfClassDecl();
   if (!classDecl) return false;
 
-  return classDecl->hasObjCMembers();
+  return classDecl->checkAncestry(AncestryFlags::ObjCMembers);
 }
 
 // A class is @objc if it does not have generic ancestry, and it either has
 // an explicit @objc attribute, or its superclass is @objc.
 static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
   ASTContext &ctx = CD->getASTContext();
-  ObjCClassKind kind = CD->checkObjCAncestry();
+  auto ancestry = CD->checkAncestry();
 
   if (auto attr = CD->getAttrs().getAttribute<ObjCAttr>()) {
-    if (kind == ObjCClassKind::ObjCMembers) {
+    if (ancestry.contains(AncestryFlags::Generic)) {
       if (attr->hasName() && !CD->isGenericContext()) {
         // @objc with a name on a non-generic subclass of a generic class is
         // just controlling the runtime name. Don't diagnose this case.
@@ -1016,9 +1041,24 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
         .fixItRemove(attr->getRangeWithAt());
     }
 
+    // If the class has resilient ancestry, @objc just controls the runtime
+    // name unless -enable-resilient-objc-class-stubs is enabled.
+    if (ancestry.contains(AncestryFlags::ResilientOther) &&
+        !ctx.LangOpts.EnableObjCResilientClassStubs) {
+      if (attr->hasName()) {
+        const_cast<ClassDecl *>(CD)->getAttrs().add(
+          new (ctx) ObjCRuntimeNameAttr(*attr));
+        return None;
+      }
+
+      ctx.Diags.diagnose(attr->getLocation(), diag::objc_for_resilient_class)
+        .fixItRemove(attr->getRangeWithAt());
+    }
+
     // Only allow ObjC-rooted classes to be @objc.
     // (Leave a hole for test cases.)
-    if (kind == ObjCClassKind::ObjCWithSwiftRoot) {
+    if (ancestry.contains(AncestryFlags::ObjC) &&
+        !ancestry.contains(AncestryFlags::ClangImported)) {
       if (ctx.LangOpts.EnableObjCAttrRequiresFoundation)
         ctx.Diags.diagnose(attr->getLocation(),
                            diag::invalid_objc_swift_rooted_class)
@@ -1031,9 +1071,18 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
     return ObjCReason(ObjCReason::ExplicitlyObjC);
   }
 
-  if (kind == ObjCClassKind::ObjCWithSwiftRoot ||
-      kind == ObjCClassKind::ObjC)
+  if (ancestry.contains(AncestryFlags::ObjC)) {
+    if (ancestry.contains(AncestryFlags::Generic)) {
+      return None;
+    }
+
+    if (ancestry.contains(AncestryFlags::ResilientOther) &&
+        !ctx.LangOpts.EnableObjCResilientClassStubs) {
+      return None;
+    }
+
     return ObjCReason(ObjCReason::ImplicitlyObjC);
+  }
 
   return None;
 }
@@ -1214,9 +1263,8 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
     if (classDecl->isForeign())
       return None;
 
-    if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC) {
+    if (classDecl->checkAncestry(AncestryFlags::ObjC))
       return ObjCReason(ObjCReason::MemberOfObjCSubclass);
-    }
   }
 
   return None;
@@ -1340,7 +1388,7 @@ IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
           proto->diagnose(diag::objc_protocol_inherits_non_objc_protocol,
                           proto->getDeclaredType(),
                           inherited->getDeclaredType());
-          inherited->diagnose(diag::kind_identifier_declared_here,
+          inherited->diagnose(diag::kind_declname_declared_here,
                               DescriptiveDeclKind::Protocol,
                               inherited->getName());
           isObjC = None;

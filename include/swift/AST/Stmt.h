@@ -1055,15 +1055,26 @@ public:
     return UnknownAttrLoc.isValid();
   }
 
-  Optional<ArrayRef<VarDecl *>> getCaseBodyVariables() const {
-    if (!CaseBodyVariables)
-      return None;
+  /// Return an ArrayRef containing the case body variables of this CaseStmt.
+  ///
+  /// Asserts if case body variables was not explicitly initialized. In contexts
+  /// where one wants a non-asserting version, \see
+  /// getCaseBodyVariablesOrEmptyArray.
+  ArrayRef<VarDecl *> getCaseBodyVariables() const {
     ArrayRef<VarDecl *> a = *CaseBodyVariables;
     return a;
   }
 
-  Optional<MutableArrayRef<VarDecl *>> getCaseBodyVariables() {
-    return CaseBodyVariables;
+  bool hasCaseBodyVariables() const { return CaseBodyVariables.hasValue(); }
+
+  /// Return an MutableArrayRef containing the case body variables of this
+  /// CaseStmt.
+  ///
+  /// Asserts if case body variables was not explicitly initialized. In contexts
+  /// where one wants a non-asserting version, \see
+  /// getCaseBodyVariablesOrEmptyArray.
+  MutableArrayRef<VarDecl *> getCaseBodyVariables() {
+    return *CaseBodyVariables;
   }
 
   ArrayRef<VarDecl *> getCaseBodyVariablesOrEmptyArray() const {

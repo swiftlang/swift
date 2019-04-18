@@ -543,19 +543,6 @@ bool TypeBase::isBool() {
   return false;
 }
 
-
-bool TypeBase::isAssignableType() {
-  if (hasLValueType()) return true;
-  if (auto tuple = getAs<TupleType>()) {
-    for (auto eltType : tuple->getElementTypes()) {
-      if (!eltType->isAssignableType())
-        return false;
-    }
-    return true;
-  }
-  return false;
-}
-
 Type TypeBase::getRValueType() {
   // If the type is not an lvalue, this is a no-op.
   if (!hasLValueType())
@@ -1625,8 +1612,8 @@ bool TypeBase::isBindableTo(Type b) {
           if (origConf.isConcrete()) {
             if (!substConf.isConcrete())
               return false;
-            if (origConf.getConcrete()->getRootNormalConformance()
-                  != substConf.getConcrete()->getRootNormalConformance())
+            if (origConf.getConcrete()->getRootConformance()
+                  != substConf.getConcrete()->getRootConformance())
               return false;
           }
         }
@@ -3079,6 +3066,24 @@ const DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
   return unresolvedDepMemTy;
 }
 
+bool TypeBase::isNoEscape() const {
+  auto type = getCanonicalType();
+
+  if (auto silFuncTy = dyn_cast<SILFunctionType>(type))
+    return silFuncTy->isNoEscape();
+
+  if (auto funcTy = dyn_cast<FunctionType>(type))
+    return funcTy->isNoEscape();
+
+  if (auto tupleTy = dyn_cast<TupleType>(type)) {
+    for (auto eltTy : tupleTy.getElementTypes())
+      if (eltTy->isNoEscape())
+        return true;
+  }
+
+  return false;
+}
+
 static Type getConcreteTypeForSuperclassTraversing(Type t) {
   if (t->isExistentialType()) {
     return t->getExistentialLayout().getSuperclass();
@@ -3110,9 +3115,7 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
 #ifndef NDEBUG
   auto *currentClass = getConcreteTypeForSuperclassTraversing(this)
       ->getClassOrBoundGenericClass();
-  while (currentClass && currentClass != baseClass)
-    currentClass = currentClass->getSuperclassDecl();
-  assert(currentClass == baseClass &&
+  assert(baseClass->isSuperclassOf(currentClass) &&
          "no inheritance relationship between given classes");
 #endif
 
@@ -3950,13 +3953,9 @@ bool UnownedStorageType::isLoadable(ResilienceExpansion resilience) const {
 }
 
 static ReferenceCounting getClassReferenceCounting(ClassDecl *theClass) {
-  while (auto superclass = theClass->getSuperclassDecl()) {
-    theClass = superclass;
-  }
-
-  return theClass->hasClangNode()
-           ? ReferenceCounting::ObjC
-           : ReferenceCounting::Native;
+  return (theClass->checkAncestry(AncestryFlags::ClangImported)
+          ? ReferenceCounting::ObjC
+          : ReferenceCounting::Native);
 }
 
 ReferenceCounting TypeBase::getReferenceCounting() {

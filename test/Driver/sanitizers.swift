@@ -86,7 +86,7 @@
 // TSAN_watchOS_SIM: unsupported option '-sanitize=thread' for target 'i386-apple-watchos2.0'
 // TSAN_watchOS: unsupported option '-sanitize=thread' for target 'armv7k-apple-watchos2.0'
 // FUZZER_NONEXISTENT: unsupported option '-sanitize=fuzzer' for target 'x86_64-apple-macosx10.9'
-// TSAN_LINUX: -fsanitize=thread
+// TSAN_LINUX: -fsanitize=thread -lBlocksRuntime -ldispatch
 // TSAN_WINDOWS: unsupported option '-sanitize=thread' for target 'x86_64-unknown-windows-msvc'
 
 // TSAN: -rpath @executable_path
@@ -106,7 +106,7 @@
 
 // UBSAN: -rpath @executable_path
 
-// MULTIPLE_SAN_LINUX: -fsanitize=address,fuzzer,undefined
+// MULTIPLE_SAN_LINUX: -fsanitize=address,undefined,fuzzer
 
 // BADARG: unsupported argument 'unknown' to option '-sanitize='
 // INCOMPATIBLESANITIZERS: argument '-sanitize=address' is not allowed with '-sanitize=thread'

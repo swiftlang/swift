@@ -414,6 +414,36 @@ class SelfReplaceClass : SelfReplaceable {
   }
 }
 
+public protocol EmptyProtocol { }
+
+public extension EmptyProtocol {
+  func run(_: (Self) -> ()) { }
+}
+
+func doEscaping<T>(_: @escaping (T) -> ()) {}
+
+public class FunctionConversionTest : EmptyProtocol {
+  // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self22FunctionConversionTestC07convertC0yACXDyypXEF : $@convention(method) (@noescape @callee_guaranteed (@in_guaranteed Any) -> (), @guaranteed FunctionConversionTest) -> @owned FunctionConversionTest {
+  func convertFunction(_ fn: (Any) -> ()) -> Self {
+    // The reabstraction thunk captures a self metatype here:
+    // CHECK: function_ref @$s12dynamic_self22FunctionConversionTestCIgg_ACIegn_ACXMTTy : $@convention(thin) (@in_guaranteed FunctionConversionTest, @noescape @callee_guaranteed (@guaranteed FunctionConversionTest) -> (), @thick FunctionConversionTest.Type) -> ()
+    run(fn)
+    return self
+  }
+
+  func convertWithoutEscaping(_ fn: (Any.Type) -> ()) -> Self {
+    func takesNoEscapeWithSelf(_ _fn: (Self.Type) -> ()) {
+      withoutActuallyEscaping(_fn) { __fn in
+        doEscaping(__fn)
+      }
+    }
+
+    takesNoEscapeWithSelf(fn)
+
+    return self
+  }
+}
+
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {
 // CHECK: method #P.f!1: {{.*}} : @$s12dynamic_self1XCAA1PA2aDP1f{{[_0-9a-zA-Z]*}}FTW
 

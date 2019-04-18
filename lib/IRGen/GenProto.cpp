@@ -619,6 +619,12 @@ bindParameterSource(SILParameterInfo param, unsigned paramIndex,
       llvm::Value *metadata = getParameter(paramIndex);
       IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
                                             MetadataState::Complete);
+    } else if (metatype->getRepresentation() == MetatypeRepresentation::ObjC) {
+      paramType = metatype.getInstanceType();
+      llvm::Value *objcMetatype = getParameter(paramIndex);
+      auto *metadata = emitObjCMetadataRefForMetadata(IGF, objcMetatype);
+      IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
+                                            MetadataState::Complete);
     }
     return;
   }
@@ -1094,7 +1100,8 @@ public:
   llvm::Value *getTable(IRGenFunction &IGF,
                         llvm::Value **typeMetadataCache) const override {
     // If we're looking up a dependent type, we can't cache the result.
-    if (Conformance->getType()->hasArchetype()) {
+    if (Conformance->getType()->hasArchetype() ||
+        Conformance->getType()->hasDynamicSelfType()) {
       return emitWitnessTableAccessorCall(IGF, Conformance,
                                           typeMetadataCache);
     }
@@ -1501,16 +1508,6 @@ void WitnessTableBuilder::defineAssociatedTypeWitnessTableAccessFunction(
   ProtocolDecl *associatedProtocol = requirement.getAssociatedRequirement();
 
   const ConformanceInfo *conformanceI = nullptr;
-
-  // Rewrite (abstract) self conformances to the concrete conformance.
-  if (associatedConformance.isAbstract() && !hasArchetype) {
-    // This must be a self conformance.
-    auto proto = associatedConformance.getRequirement();
-    assert(proto->requiresSelfConformanceWitnessTable());
-    assert(cast<ProtocolType>(associatedType)->getDecl() == proto);
-    auto concreteConformance = IGF.IGM.Context.getSelfConformance(proto);
-    associatedConformance = ProtocolConformanceRef(concreteConformance);
-  }
 
   if (associatedConformance.isConcrete()) {
     assert(associatedType->isEqual(associatedConformance.getConcrete()->getType()));
@@ -2157,11 +2154,8 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Record this conformance descriptor.
   addProtocolConformance(std::move(description));
 
-  // Trigger the lazy emission of the foreign type metadata.
-  CanType conformingType = conf->getType()->getCanonicalType();
-  if (requiresForeignTypeMetadata(conformingType)) {
-    (void)getAddrOfForeignTypeMetadataCandidate(conformingType);
-  }
+  IRGen.noteUseOfTypeContextDescriptor(conf->getType()->getAnyNominal(),
+                                       RequireMetadata);
 }
 
 /// True if a function's signature in LLVM carries polymorphic parameters.
@@ -2746,13 +2740,8 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   // requirements of the archetype. Look at what's locally bound.
   ProtocolConformance *concreteConformance;
   if (conformance.isAbstract()) {
-    if (auto archetype = dyn_cast<ArchetypeType>(srcType))
-      return emitArchetypeWitnessTableRef(IGF, archetype, proto);
-
-    // Otherwise, this must be a self-conformance.
-    assert(proto->requiresSelfConformanceWitnessTable());
-    assert(cast<ProtocolType>(srcType)->getDecl() == proto);
-    concreteConformance = IGF.IGM.Context.getSelfConformance(proto);
+    auto archetype = cast<ArchetypeType>(srcType);
+    return emitArchetypeWitnessTableRef(IGF, archetype, proto);
 
   // All other source types should be concrete enough that we have
   // conformance info for them.  However, that conformance info might be

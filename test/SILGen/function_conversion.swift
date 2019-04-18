@@ -338,8 +338,8 @@ func convFuncExistential(_ f1: @escaping (Any) -> (Int) -> Int) {
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sypS2iIegyd_Iegno_S2iIegyd_ypIeggr_TR : $@convention(thin) (@guaranteed @callee_guaranteed (Int) -> Int, @guaranteed @callee_guaranteed (@in_guaranteed Any) -> @owned @callee_guaranteed (Int) -> Int) -> @out Any {
 // CHECK:         alloc_stack $Any
+// CHECK:         [[COPIED_VAL:%.*]] = copy_value
 // CHECK:         function_ref @$sS2iIegyd_S2iIegnr_TR
-// CHECK-NEXT:    [[COPIED_VAL:%.*]] = copy_value
 // CHECK-NEXT:    partial_apply [callee_guaranteed] {{%.*}}([[COPIED_VAL]])
 // CHECK-NEXT:    init_existential_addr %3 : $*Any, $(Int) -> Int
 // CHECK-NEXT:    store

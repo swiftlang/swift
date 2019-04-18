@@ -107,6 +107,10 @@ protocol P : Initable {
   func bar(_ x: Int)
   mutating func mut(_ x: Int)
   static func tum()
+  
+  typealias E = Int
+  typealias F = Self.E
+  typealias G = Array
 }
 
 protocol ClassP : class {
@@ -216,6 +220,16 @@ func staticExistential(_ p: P.Type, pp: P.Protocol) {
   // Static member of metatype -- not allowed
   _ = pp.tum // expected-error{{static member 'tum' cannot be used on protocol metatype 'P.Protocol'}}
   _ = P.tum // expected-error{{static member 'tum' cannot be used on protocol metatype 'P.Protocol'}}
+
+  // Access typealias through protocol and existential metatypes
+  _ = pp.E.self
+  _ = p.E.self
+
+  _ = pp.F.self
+  _ = p.F.self
+
+  // Make sure that we open generics
+  let _: [Int].Type = p.G.self
 }
 
 protocol StaticP {
@@ -339,9 +353,7 @@ func testClonableArchetype<T : Clonable>(_ t: T) {
 func testClonableExistential(_ v: Clonable, _ vv: Clonable.Type) {
   let _: Clonable? = v.maybeClone()
   let _: Clonable?? = v.doubleMaybeClone()
-  // FIXME: Tuple-to-tuple conversions are not implemented
   let _: (Clonable, Clonable) = v.subdivideClone()
-  // expected-error@-1{{cannot express tuple conversion '(Clonable, Clonable)' to '(Clonable, Clonable)'}}
   let _: Clonable.Type = v.metatypeOfClone()
   let _: () -> Clonable = v.goodClonerFn()
 

@@ -178,7 +178,7 @@ static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
   OS << '"';
 }
 
-/// Save a copy of any flags marked as ParseableInterfaceOption, if running
+/// Save a copy of any flags marked as ModuleInterfaceOption, if running
 /// in a mode that is going to emit a .swiftinterface file.
 static void SaveParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
                                        FrontendOptions &FOpts,
@@ -187,7 +187,7 @@ static void SaveParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
     return;
   ArgStringList RenderedArgs;
   for (auto A : Args) {
-    if (A->getOption().hasFlag(options::ParseableInterfaceOption))
+    if (A->getOption().hasFlag(options::ModuleInterfaceOption))
       A->render(Args, RenderedArgs);
   }
   llvm::raw_string_ostream OS(Opts.ParseableInterfaceFlags);
@@ -449,6 +449,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DisableConstraintSolverPerformanceHacks |=
       Args.hasArg(OPT_disable_constraint_solver_performance_hacks);
+
+  Opts.EnableObjCResilientClassStubs =
+      Args.hasArg(OPT_enable_objc_resilient_class_stubs);
 
   // Must be processed after any other language options that could affect
   // platform conditions.
@@ -768,9 +771,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.DisableSILPartialApply |=
     Args.hasArg(OPT_disable_sil_partial_apply);
   Opts.VerifySILOwnership &= !Args.hasArg(OPT_disable_sil_ownership_verifier);
-  Opts.EnableMandatorySemanticARCOpts |=
-      Args.hasArg(OPT_enable_mandatory_semantic_arc_opts);
   Opts.EnableLargeLoadableTypes |= Args.hasArg(OPT_enable_large_loadable_types);
+  Opts.StripOwnershipAfterSerialization |= Args.hasArg(OPT_enable_ownership_stripping_after_serialization);
 
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_path))
     Opts.OptRecordFile = A->getValue();
@@ -901,21 +903,20 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     else
       assert(A->getOption().matches(options::OPT_gnone) &&
              "unknown -g<kind> option");
-
-    if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables) {
-      if (Args.hasArg(options::OPT_debug_info_store_invocation)) {
-        ArgStringList RenderedArgs;
-        for (auto A : Args)
-          A->render(Args, RenderedArgs);
-        CompilerInvocation::buildDebugFlags(Opts.DebugFlags,
-                                            RenderedArgs, SDKPath,
-                                            ResourceDir);
-      }
-      // TODO: Should we support -fdebug-compilation-dir?
-      llvm::SmallString<256> cwd;
-      llvm::sys::fs::current_path(cwd);
-      Opts.DebugCompilationDir = cwd.str();
+  }
+  if (Opts.DebugInfoLevel >= IRGenDebugInfoLevel::LineTables) {
+    if (Args.hasArg(options::OPT_debug_info_store_invocation)) {
+      ArgStringList RenderedArgs;
+      for (auto A : Args)
+        A->render(Args, RenderedArgs);
+      CompilerInvocation::buildDebugFlags(Opts.DebugFlags,
+                                          RenderedArgs, SDKPath,
+                                          ResourceDir);
     }
+    // TODO: Should we support -fdebug-compilation-dir?
+    llvm::SmallString<256> cwd;
+    llvm::sys::fs::current_path(cwd);
+    Opts.DebugCompilationDir = cwd.str();
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_debug_info_format)) {
@@ -1001,6 +1002,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.ModuleName = FrontendOpts.ModuleName;
 
+  if (Args.hasArg(OPT_no_clang_module_breadcrumbs))
+    Opts.DisableClangModuleSkeletonCUs = true;
+
   if (Args.hasArg(OPT_use_jit))
     Opts.UseJIT = true;
   
@@ -1081,8 +1085,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EnableReflectionNames = false;
   }
 
-  if (Args.hasArg(OPT_enable_resilience_bypass)) {
-    Opts.EnableResilienceBypass = true;
+  if (Args.hasArg(OPT_force_public_linkage)) {
+    Opts.ForcePublicLinkage = true;
   }
 
   // PE/COFF cannot deal with the cross-module reference to the metadata parent

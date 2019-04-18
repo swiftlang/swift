@@ -50,7 +50,7 @@ static void diagnoseScopedImports(DiagnosticEngine &diags,
     if (importPair.first.empty())
       continue;
     diags.diagnose(importPair.first.front().second,
-                   diag::parseable_interface_scoped_import_unsupported);
+                   diag::module_interface_scoped_import_unsupported);
   }
 }
 
@@ -86,15 +86,19 @@ llvm::Regex swift::getSwiftInterfaceModuleFlagsRegex() {
 static void printImports(raw_ostream &out, ModuleDecl *M) {
   // FIXME: This is very similar to what's in Serializer::writeInputBlock, but
   // it's not obvious what higher-level optimization would be factored out here.
+  ModuleDecl::ImportFilter allImportFilter;
+  allImportFilter |= ModuleDecl::ImportFilterKind::Public;
+  allImportFilter |= ModuleDecl::ImportFilterKind::Private;
+
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;
-  M->getImportedModules(allImports, ModuleDecl::ImportFilter::All);
+  M->getImportedModules(allImports, allImportFilter);
   ModuleDecl::removeDuplicateImports(allImports);
   diagnoseScopedImports(M->getASTContext().Diags, allImports);
 
   // Collect the public imports as a subset so that we can mark them with
   // '@_exported'.
   SmallVector<ModuleDecl::ImportedModule, 8> publicImports;
-  M->getImportedModules(publicImports, ModuleDecl::ImportFilter::Public);
+  M->getImportedModules(publicImports, ModuleDecl::ImportFilterKind::Public);
   llvm::SmallSet<ModuleDecl::ImportedModule, 8,
                  ModuleDecl::OrderImportedModules> publicImportSet;
   publicImportSet.insert(publicImports.begin(), publicImports.end());

@@ -28,15 +28,19 @@ func testTribool() {
   _ = b.rawValue
 }
 
+func verifyIsInt(_: inout Int) { }
+func verifyIsUInt(_: inout UInt) { }
+func verifyIsUInt64(_: inout UInt64) { }
+
 func testAnonEnum() {
   var a = AnonConst1
   a = AnonConst2
-#if arch(i386) || arch(arm)
-  _ = a as CUnsignedLongLong
+#if os(Windows)
+  verifyIsInt(&a)
+#elseif arch(i386) || arch(arm)
+  verifyIsUInt64(&a)
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  _ = a as CUnsignedLong
-#else
-  __portMe()
+  verifyIsUInt(&a)
 #endif
 }
 
@@ -204,8 +208,10 @@ func testFunctionPointers() {
   var anotherFP: @convention(c) (CInt, CLong, UnsafeMutableRawPointer?) -> Void
     = getFunctionPointer2()
 
+  var sizedFP: (@convention(c) (CInt, CInt, UnsafeMutableRawPointer?) -> Void)?
+
   useFunctionPointer2(anotherFP)
-  anotherFP = fp // expected-error {{cannot assign value of type 'fptr?' (aka 'Optional<@convention(c) (Int32) -> Int32>') to type '@convention(c) (CInt, CLong, UnsafeMutableRawPointer?) -> Void' (aka '@convention(c) (Int32, Int, Optional<UnsafeMutableRawPointer>) -> ()')}}
+  sizedFP = fp // expected-error {{cannot assign value of type 'fptr?' (aka 'Optional<@convention(c) (Int32) -> Int32>') to type '(@convention(c) (CInt, CInt, UnsafeMutableRawPointer?) -> Void)?'}}
 }
 
 func testStructDefaultInit() {

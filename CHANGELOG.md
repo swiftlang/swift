@@ -6,6 +6,7 @@ CHANGELOG
 
 | Contents               |
 | :--------------------- |
+| [Swift Next](#swift-next) |
 | [Swift 5.1](#swift-51) |
 | [Swift 5.0](#swift-50) |
 | [Swift 4.2](#swift-42) |
@@ -22,12 +23,146 @@ CHANGELOG
 
 </details>
 
+Swift Next
+----------
+
+* [SR-6118][]:
+
+  Subscripts can now declare default arguments:
+
+  ```swift
+  struct Subscriptable {
+    subscript(x: Int, y: Int = 0) {
+      ...
+    }
+  }
+
+  let s = Subscriptable()
+  print(s[0])
+  ```
+
 Swift 5.1
 ---------
 
+* [SE-0256][]:
+
+  Subscripts can now be declared `static` or (inside classes) `class`.
+
+* [SE-0252][]:
+
+  The existing `@dynamicMemberLookup` attribute has been extended with a
+  support for strongly-typed keypath implementations:
+
+  ```swift
+  @dynamicMemberLookup
+  struct Lens<T> {
+    let getter: () -> T
+    let setter: (T) -> Void
+
+    var value: T {
+      get {
+        return getter()
+      }
+      set {
+        setter(newValue)
+      }
+    }
+
+    subscript<U>(dynamicMember keyPath: WritableKeyPath<T, U>) -> Lens<U> {
+      return Lens<U>(
+          getter: { self.value[keyPath: keyPath] },
+          setter: { self.value[keyPath: keyPath] = $0 })
+    }
+  }
+  ```
+
+* [SR-8546][], [SR-9043][]:
+
+  More thorough checking has been implemented for restrictions around
+  escaping closures capturing `inout` parameters or values of noescape type.
+  While most code should not be affected, there are edge cases where
+  the Swift 5.0 compiler would accept code violating these restrictions.
+  This could result in runtime crashes or silent data corruption.
+  
+  An example of invalid code which was incorrectly accepted by the Swift 5.0
+  compiler is an `@escaping` closure calling a local function which
+  references an `inout` parameter from an outer scope:
+
+  ```swift
+  struct BadCaptureExample {
+    var escapingClosure: () -> ()
+
+    mutating func takesInOut(_ x: inout Int) {
+      func localFunction() {
+        x += 1
+      }
+
+      escapingClosure = { localFunction() }
+    }
+  }
+  ```
+
+  The compiler now correctly diagnoses the above code by pointing out that
+  the capture of `x` by `localFunction()` is invalid, since `localFunction()`
+  is referenced from an `@escaping` closure.
+
+  This also addresses certain cases where the compiler incorrectly diagnosed
+  certain code as invalid, when in fact no violation of restrictions had
+  taken place. For example,
+
+  ```swift
+  func takesNoEscape(_ fn: () -> ()) {
+    func localFunction() {
+      fn()
+    }
+
+    { localFunction() }()
+  }
+  ```
+
+* [SR-2672][]:
+
+  Conversions between tuple types are now fully implemented.
+  Previously, the following would diagnose an error:
+
+  ```swift
+  let values: (Int, Int) = (10, 15)
+  let converted: (Int?, Any) = values
+
+* [SE-0242][]:
+
+  The memberwise initializer for structures now provide default values for variables that hold default expressions.
+
+  ```swift
+  struct Dog {
+    var name = "Generic dog name"
+    var age = 0
+
+    // The synthesized memberwise initializer
+    init(name: String = "Generic dog name", age: Int = 0)
+  }
+
+  let sparky = Dog(name: "Sparky") // Dog(name: "Sparky", age: 0)
+  ```
+
 * [SE-0068][]:
 
-  `Self` can now be used inside member functions and for function arguments of structs and enums to refer to the containing type.
+  It is now possible to use `Self` to refer to the innermost nominal
+  type inside struct, enum and class declarations. For example, the
+  two method declarations inside this struct are equivalent:
+  
+  ```swift
+  struct Box<Value> {
+    func transform1() -> Self { return self }
+    func transform2() -> Box<Value> { return self }
+  }
+  ```
+
+  In classes, `Self` is the dynamic type of the `self` value, as before.
+  Existing restrictions on `Self` in declaration types still apply;
+  that is, `Self` can only appear as the return type of a method.
+  However, `Self` can now be used inside the body of a method
+  without limitation.
 
 * [SR-7799][]:
 
@@ -46,12 +181,12 @@ Swift 5.1
   }
   ```
 
-* `weak` and `unowned` variables can now be used inside types that
-   declare `Equatable` or `Hashable` conformance.
+* `weak` and `unowned` stored properties no longer inhibit the
+   automatic synthesis of `Equatable` or `Hashable` conformance.
 
 * [SR-2688][]:
 
-  An `@autoclosure` closure can now be a typealias.
+  An `@autoclosure` parameter can now be declared with a typealias type.
 
   ```swift
   class Foo {
@@ -62,10 +197,12 @@ Swift 5.1
 
 * [SR-7601][]:
 
-  Functions marked with `@objc` can now return `Self`
+  Methods declared `@objc` inside a class can now return `Self`:
 
   ```swift
-  @objc func returnDynamicSelf() -> Self { return self }
+  class MyClass : NSObject {
+    @objc func clone() -> Self { return self }
+  }
   ```
 
 * [SR-2176][]:
@@ -7511,6 +7648,7 @@ Swift 1.0
 [SE-0228]: <https://github.com/apple/swift-evolution/blob/master/proposals/0228-fix-expressiblebystringinterpolation.md>
 [SE-0230]: <https://github.com/apple/swift-evolution/blob/master/proposals/0230-flatten-optional-try.md>
 [SE-0235]: <https://github.com/apple/swift-evolution/blob/master/proposals/0235-add-result.md>
+[SE-0242]: <https://github.com/apple/swift-evolution/blob/master/proposals/0242-default-values-memberwise.md>
 [SE-0245]: <https://github.com/apple/swift-evolution/blob/master/proposals/0245-array-uninitialized-initializer.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
@@ -7525,6 +7663,7 @@ Swift 1.0
 [SR-2388]: <https://bugs.swift.org/browse/SR-2388>
 [SR-2394]: <https://bugs.swift.org/browse/SR-2394>
 [SR-2608]: <https://bugs.swift.org/browse/SR-2608>
+[SR-2672]: <https://bugs.swift.org/browse/SR-2672>
 [SR-2688]: <https://bugs.swift.org/browse/SR-2688>
 [SR-4248]: <https://bugs.swift.org/browse/SR-4248>
 [SR-5581]: <https://bugs.swift.org/browse/SR-5581>
@@ -7534,3 +7673,5 @@ Swift 1.0
 [SR-7601]: <https://bugs.swift.org/browse/SR-7601>
 [SR-7799]: <https://bugs.swift.org/browse/SR-7799>
 [SR-8109]: <https://bugs.swift.org/browse/SR-8109>
+[SR-8546]: <https://bugs.swift.org/browse/SR-8546>
+[SR-9043]: <https://bugs.swift.org/browse/SR-9043>

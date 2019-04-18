@@ -1871,9 +1871,6 @@ SILFunction *GenericFuncSpecializer::lookupSpecialization() {
   return nullptr;
 }
 
-/// Forward decl for prespecialization support.
-static bool linkSpecialization(SILModule &M, SILFunction *F);
-
 void ReabstractionInfo::verify() const {
   assert((!SpecializedGenericSig && !SpecializedGenericEnv &&
           !getSpecializedType()->isPolymorphic()) ||
@@ -1904,8 +1901,6 @@ SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
          (!SpecializedF->getLoweredFunctionType()->isPolymorphic() &&
           !SpecializedF->getGenericEnvironment()));
   assert(!SpecializedF->hasOwnership());
-  // Check if this specialization should be linked for prespecialization.
-  linkSpecialization(M, SpecializedF);
   // Store the meta-information about how this specialization was created.
   auto *Caller = ReInfo.getApply() ? ReInfo.getApply().getFunction() : nullptr;
   SubstitutionMap Subs = Caller ? ReInfo.getApply().getSubstitutionMap()
@@ -2325,6 +2320,10 @@ static bool createPrespecialized(StringRef UnspecializedName,
   if (!SpecializedF)
     return false;
 
+  // Link after prespecializing to pull in everything referenced from another
+  // module in case some referenced functions have non-public linkage.
+  M.linkFunction(SpecializedF, SILModule::LinkingMode::LinkAll);
+
   SpecializedF->setLinkage(SILLinkage::Public);
   SpecializedF->setSerialized(IsNotSerialized);
   return true;
@@ -2454,11 +2453,7 @@ void swift::trySpecializeApplyOfGeneric(
                                          RefF, Apply.getSubstitutionMap(),
                                          ReInfo);
   SILFunction *SpecializedF = FuncSpecializer.lookupSpecialization();
-  if (SpecializedF) {
-    // Even if the pre-specialization exists already, try to preserve it
-    // if it is one of our known pre-specializations for -Onone support.
-    linkSpecialization(M, SpecializedF);
-  } else {
+  if (!SpecializedF) {
     SpecializedF = FuncSpecializer.tryCreateSpecialization();
     if (!SpecializedF)
       return;
@@ -2540,35 +2535,7 @@ void swift::trySpecializeApplyOfGeneric(
 
 // =============================================================================
 // Prespecialized symbol lookup.
-//
-// This uses the SIL linker to checks for the does not load the body of the pres
 // =============================================================================
-
-/// Link a specialization for generating prespecialized code.
-///
-/// For now, it is performed only for specializations in the
-/// standard library. But in the future, one could think of
-/// maintaining a cache of optimized specializations.
-///
-/// Mark specializations as public, so that they can be used by user
-/// applications. These specializations are generated during -O compilation of
-/// the library, but only used only by client code compiled at -Onone. They
-/// should be never inlined.
-static bool linkSpecialization(SILModule &M, SILFunction *F) {
-  if (F->getLinkage() == SILLinkage::Public)
-    return true;
-  // Do not remove functions that are known prespecializations.
-  // Keep them around. Change their linkage to public, so that other
-  // applications can refer to them.
-  if (M.isOptimizedOnoneSupportModule()) {
-    if (isKnownPrespecialization(F->getName())) {
-      F->setLinkage(SILLinkage::Public);
-      F->setSerialized(IsNotSerialized);
-      return true;
-    }
-  }
-  return false;
-}
 
 #define PRESPEC_SYMBOL(s) MANGLE_AS_STRING(s),
 static const char *PrespecSymbols[] = {

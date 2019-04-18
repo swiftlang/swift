@@ -283,8 +283,7 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
 
   // If the class has an @objc ancestry it can be dynamically subclassed and we
   // can't therefore statically know the default case.
-  auto Ancestry = CD->checkObjCAncestry();
-  if (Ancestry != ObjCClassKind::NonObjC)
+  if (CD->checkAncestry(AncestryFlags::ObjC))
     return false;
 
   // Without an associated context we cannot perform any

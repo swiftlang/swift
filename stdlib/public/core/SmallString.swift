@@ -32,10 +32,8 @@ internal struct _SmallString {
   @usableFromInline
   internal var _storage: RawBitPattern
 
-  @inlinable
-  internal var rawBits: RawBitPattern {
-    @inline(__always) get { return _storage }
-  }
+  @inlinable @inline(__always)
+  internal var rawBits: RawBitPattern { return _storage }
 
   @inlinable
   internal var leadingRawBits: UInt64 {
@@ -76,15 +74,13 @@ internal struct _SmallString {
 }
 
 extension _SmallString {
-  @inlinable
+  @inlinable @inline(__always)
   internal static var capacity: Int {
-    @inline(__always) get {
 #if arch(i386) || arch(arm)
-      return 10
+    return 10
 #else
-      return 15
+    return 15
 #endif
-    }
   }
 
   // Get an integer equivalent to the _StringObject.discriminatedObjectRawBits
@@ -95,30 +91,20 @@ extension _SmallString {
     return _storage.1.littleEndian
   }
 
-  @inlinable
-  internal var capacity: Int {
-    @inline(__always) get {
-      return _SmallString.capacity
-    }
-  }
+  @inlinable @inline(__always)
+  internal var capacity: Int { return _SmallString.capacity }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var count: Int {
-    @inline(__always) get {
-      return _StringObject.getSmallCount(fromRaw: rawDiscriminatedObject)
-    }
+    return _StringObject.getSmallCount(fromRaw: rawDiscriminatedObject)
   }
 
-  @inlinable
-  internal var unusedCapacity: Int {
-    @inline(__always) get { return capacity &- count }
-  }
+  @inlinable @inline(__always)
+  internal var unusedCapacity: Int { return capacity &- count }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var isASCII: Bool {
-    @inline(__always) get {
-      return _StringObject.getSmallIsASCII(fromRaw: rawDiscriminatedObject)
-    }
+    return _StringObject.getSmallIsASCII(fromRaw: rawDiscriminatedObject)
   }
 
   // Give raw, nul-terminated code units. This is only for limited internal
@@ -170,11 +156,11 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
   @usableFromInline
   internal typealias SubSequence = _SmallString
 
-  @inlinable
-  internal var startIndex: Int { @inline(__always) get { return 0 } }
+  @inlinable @inline(__always)
+  internal var startIndex: Int { return 0 }
 
-  @inlinable
-  internal var endIndex: Int { @inline(__always) get { return count } }
+  @inlinable @inline(__always)
+  internal var endIndex: Int { return count }
 
   @inlinable
   internal subscript(_ idx: Int) -> UInt8 {
@@ -196,15 +182,12 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
     }
   }
 
-  @inlinable // FIXME(inline-always) was usableFromInline
-  // testable
+  @inlinable  @inline(__always)
   internal subscript(_ bounds: Range<Index>) -> SubSequence {
-    @inline(__always) get {
-      // TODO(String performance): In-vector-register operation
-      return self.withUTF8 { utf8 in
-        let rebased = UnsafeBufferPointer(rebasing: utf8[bounds])
-        return _SmallString(rebased)._unsafelyUnwrappedUnchecked
-      }
+    // TODO(String performance): In-vector-register operation
+    return self.withUTF8 { utf8 in
+      let rebased = UnsafeBufferPointer(rebasing: utf8[bounds])
+      return _SmallString(rebased)._unsafelyUnwrappedUnchecked
     }
   }
 }

@@ -165,7 +165,7 @@ protocol Prot {
 infix operator *-* : FunnyPrecedence
 
 // CHECK: <kw>precedencegroup</kw> FunnyPrecedence
-// CHECK-NEXT: <kw>associativity</kw>: left{{$}}
+// CHECK-NEXT: <kw>associativity</kw>: <kw>left</kw>{{$}}
 // CHECK-NEXT: <kw>higherThan</kw>: MultiplicationPrecedence
 precedencegroup FunnyPrecedence {
   associativity: left

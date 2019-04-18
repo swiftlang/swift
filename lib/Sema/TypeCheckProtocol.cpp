@@ -490,12 +490,10 @@ swift::matchWitness(
   } else if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness)) {
     auto *reqASD = cast<AbstractStorageDecl>(req);
     
-    // If this is a property requirement, check that the static-ness matches.
-    if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
-      if (cast<VarDecl>(req)->isStatic() != vdWitness->isStatic())
-        return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
-    }
-    
+    // Check that the static-ness matches.
+    if (reqASD->isStatic() != witnessASD->isStatic())
+      return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
+
     // If the requirement is settable and the witness is not, reject it.
     if (req->isSettable(req->getDeclContext()) &&
         !witness->isSettable(witness->getDeclContext()))
@@ -2518,16 +2516,15 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
       AccessScope requiredAccessScope = getRequiredAccessScope();
 
       if (!TC.Context.isSwiftVersionAtLeast(5) &&
-          DC->getParentModule()->getResilienceStrategy() !=
-              ResilienceStrategy::Resilient) {
+          !DC->getParentModule()->isResilient()) {
         // HACK: In pre-Swift-5, these typealiases were synthesized with the
         // same access level as the conforming type, which might be more
         // visible than the associated type witness. Preserve that behavior
         // when the underlying type has sufficient access, but only in
         // non-resilient modules.
         Optional<AccessScope> underlyingTypeScope =
-            TypeAccessScopeChecker::getAccessScope(type, DC,
-                                                   /*usableFromInline*/false);
+            AccessScopeChecker::getAccessScope(type, DC,
+                                               /*usableFromInline*/false);
         assert(underlyingTypeScope.hasValue() &&
                "the type is already invalid and we shouldn't have gotten here");
 
@@ -3603,15 +3600,16 @@ void ConformanceChecker::addUsedConformances(
   if (!visited.insert(conformance).second)
     return;
 
-  auto normalConf = conformance->getRootNormalConformance();
+  if (auto normalConf = dyn_cast<NormalProtocolConformance>(
+        conformance->getRootConformance())) {;
+    if (normalConf->isIncomplete())
+      TC.UsedConformances.insert(normalConf);
 
-  if (normalConf->isIncomplete())
-    TC.UsedConformances.insert(normalConf);
-
-  // Mark each conformance in the signature as used.
-  for (auto sigConformance : normalConf->getSignatureConformances()) {
-    if (sigConformance.isConcrete())
-      addUsedConformances(sigConformance.getConcrete(), visited);
+    // Mark each conformance in the signature as used.
+    for (auto sigConformance : normalConf->getSignatureConformances()) {
+      if (sigConformance.isConcrete())
+        addUsedConformances(sigConformance.getConcrete(), visited);
+    }
   }
 }
 
@@ -3646,23 +3644,69 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
   std::function<void(ProtocolConformanceRef)> writer
     = Conformance->populateSignatureConformances();
 
+  SourceFile *fileForCheckingExportability = nullptr;
+  if (getRequiredAccessScope().isPublic() || isUsableFromInlineRequired())
+    fileForCheckingExportability = DC->getParentSourceFile();
+
   class GatherConformancesListener : public GenericRequirementsCheckListener {
-    NormalProtocolConformance *conformance;
+    NormalProtocolConformance *conformanceBeingChecked;
+    SourceFile *SF;
     std::function<void(ProtocolConformanceRef)> &writer;
+
+    void checkExportability(Type depTy, Type replacementTy,
+                            const ProtocolConformance *conformance) {
+      if (!SF)
+        return;
+
+      SubstitutionMap subs =
+          conformance->getSubstitutions(SF->getParentModule());
+      for (auto &subConformance : subs.getConformances()) {
+        if (!subConformance.isConcrete())
+          continue;
+        checkExportability(depTy, replacementTy, subConformance.getConcrete());
+      }
+
+      const RootProtocolConformance *rootConformance =
+          conformance->getRootConformance();
+      ModuleDecl *M = rootConformance->getDeclContext()->getParentModule();
+      if (!SF->isImportedImplementationOnly(M))
+        return;
+
+      ASTContext &ctx = M->getASTContext();
+
+      Type selfTy = rootConformance->getProtocol()->getProtocolSelfType();
+      if (depTy->isEqual(selfTy)) {
+        ctx.Diags.diagnose(
+            conformanceBeingChecked->getLoc(),
+            diag::conformance_from_implementation_only_module,
+            rootConformance->getType(),
+            rootConformance->getProtocol()->getName(), M->getName());
+      } else {
+        ctx.Diags.diagnose(
+            conformanceBeingChecked->getLoc(),
+            diag::assoc_conformance_from_implementation_only_module,
+            rootConformance->getType(),
+            rootConformance->getProtocol()->getName(), M->getName(),
+            depTy, replacementTy->getCanonicalType());
+      }
+    }
+
   public:
     GatherConformancesListener(
         NormalProtocolConformance *conformance,
-        std::function<void(ProtocolConformanceRef)> &writer)
-      : conformance(conformance), writer(writer) { }
+        std::function<void(ProtocolConformanceRef)> &writer,
+        SourceFile *fileForCheckingExportability)
+      : conformanceBeingChecked(conformance),
+        SF(fileForCheckingExportability), writer(writer) { }
 
     void satisfiedConformance(Type depTy, Type replacementTy,
                               ProtocolConformanceRef conformance) override {
       // The conformance will use contextual types, but we want the
       // interface type equivalent.
-      if (conformance.isConcrete() &&
-          conformance.getConcrete()->getType()->hasArchetype()) {
+      if (conformance.isConcrete()) {
         auto concreteConformance = conformance.getConcrete();
 
+        if (conformance.getConcrete()->getType()->hasArchetype()) {
         // Map the conformance.
         concreteConformance = concreteConformance->subst(
             [](SubstitutableType *type) -> Type {
@@ -3672,7 +3716,11 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
             },
             MakeAbstractConformanceForGenericType());
 
-        conformance = ProtocolConformanceRef(concreteConformance);
+
+          conformance = ProtocolConformanceRef(concreteConformance);
+        }
+
+        checkExportability(depTy, replacementTy, concreteConformance);
       }
 
       writer(conformance);
@@ -3682,13 +3730,13 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
                       const Requirement &req, Type first, Type second,
                       ArrayRef<ParentConditionalConformance> parents) override {
       // Invalidate the conformance to suppress further diagnostics.
-      if (conformance->getLoc().isValid()) {
-        conformance->setInvalid();
+      if (conformanceBeingChecked->getLoc().isValid()) {
+        conformanceBeingChecked->setInvalid();
       }
 
       return false;
     }
-  } listener(Conformance, writer);
+  } listener(Conformance, writer, fileForCheckingExportability);
 
   auto result = TC.checkGenericArguments(
       DC, Loc, Loc,
@@ -4227,17 +4275,18 @@ void TypeChecker::markConformanceUsed(ProtocolConformanceRef conformance,
                                       DeclContext *dc) {
   if (conformance.isAbstract()) return;
 
-  auto normalConformance =
-    conformance.getConcrete()->getRootNormalConformance();
+  if (auto normalConformance =
+        dyn_cast<NormalProtocolConformance>(
+          conformance.getConcrete()->getRootConformance())) {;
+    // Make sure that the type checker completes this conformance.
+    if (normalConformance->isIncomplete())
+      UsedConformances.insert(normalConformance);
 
-  // Make sure that the type checker completes this conformance.
-  if (normalConformance->isIncomplete())
-    UsedConformances.insert(normalConformance);
-
-  // Record the usage of this conformance in the enclosing source
-  // file.
-  if (auto sf = dc->getParentSourceFile()) {
-    sf->addUsedConformance(normalConformance);
+    // Record the usage of this conformance in the enclosing source
+    // file.
+    if (auto sf = dc->getParentSourceFile()) {
+      sf->addUsedConformance(normalConformance);
+    }
   }
 }
 
@@ -4859,19 +4908,6 @@ diagnoseUnstableName(TypeChecker &tc, ProtocolConformance *conformance,
   }
 }
 
-/// Determine whether a particular class has generic ancestry.
-static bool hasGenericAncestry(ClassDecl *classDecl) {
-  SmallPtrSet<ClassDecl *, 4> visited;
-  while (classDecl && visited.insert(classDecl).second) {
-    if (classDecl->isGenericContext())
-      return true;
-
-    classDecl = classDecl->getSuperclassDecl();
-  }
-
-  return false;
-}
-
 /// Infer the attribute tostatic-initialize the Objective-C metadata for the
 /// given class, if needed.
 static void inferStaticInitializeObjCMetadata(TypeChecker &tc,
@@ -4882,7 +4918,7 @@ static void inferStaticInitializeObjCMetadata(TypeChecker &tc,
 
   // If we know that the Objective-C metadata will be statically registered,
   // there's nothing to do.
-  if (!hasGenericAncestry(classDecl)) {
+  if (!classDecl->checkAncestry(AncestryFlags::Generic)) {
     return;
   }
 

@@ -592,7 +592,8 @@ CanType getRuntimeReifiedType(IRGenModule &IGM, CanType type);
 /// by a constant.
 llvm::Constant *tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
                                                CanType type,
-                                               bool allowUninitialized);
+                                               bool allowUninitialized,
+                                               bool allowStub);
 
 enum class MetadataValueType { ObjCClass, TypeMetadata };
 

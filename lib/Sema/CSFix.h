@@ -136,6 +136,16 @@ enum class FixKind : uint8_t {
   /// If there is a matching inaccessible member - allow it as if there
   /// no access control.
   AllowInaccessibleMember,
+
+  /// Allow KeyPaths to use AnyObject as root type
+  AllowAnyObjectKeyPathRoot,
+
+  /// Using subscript references in the keypath requires that each
+  /// of the index arguments to be Hashable.
+  TreatKeyPathSubscriptIndexAsHashable,
+
+  /// Allow a reference to a static member as a key path component.
+  AllowStaticMemberRefInKeyPath,
 };
 
 class ConstraintFix {
@@ -735,6 +745,61 @@ public:
   static AllowInaccessibleMember *create(ConstraintSystem &cs,
                                          ValueDecl *member,
                                          ConstraintLocator *locator);
+};
+
+class AllowAnyObjectKeyPathRoot final : public ConstraintFix {
+
+  AllowAnyObjectKeyPathRoot(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowAnyObjectKeyPathRoot, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow anyobject as root type for a keypath";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowAnyObjectKeyPathRoot *create(ConstraintSystem &cs,
+                                           ConstraintLocator *locator);
+};
+
+class TreatKeyPathSubscriptIndexAsHashable final : public ConstraintFix {
+  Type NonConformingType;
+
+  TreatKeyPathSubscriptIndexAsHashable(ConstraintSystem &cs, Type type,
+                                       ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::TreatKeyPathSubscriptIndexAsHashable,
+                      locator),
+        NonConformingType(type) {}
+
+public:
+  std::string getName() const override {
+    return "treat keypath subscript index as conforming to Hashable";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static TreatKeyPathSubscriptIndexAsHashable *
+  create(ConstraintSystem &cs, Type type, ConstraintLocator *locator);
+};
+
+class AllowStaticMemberRefInKeyPath final : public ConstraintFix {
+  ValueDecl *Member;
+
+  AllowStaticMemberRefInKeyPath(ConstraintSystem &cs, ValueDecl *member,
+                                ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowStaticMemberRefInKeyPath, locator),
+        Member(member) {}
+
+public:
+  std::string getName() const override {
+    return "allow reference to a static member as a key path component";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowStaticMemberRefInKeyPath *
+  create(ConstraintSystem &cs, ValueDecl *member, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

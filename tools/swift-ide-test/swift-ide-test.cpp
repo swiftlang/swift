@@ -1434,15 +1434,15 @@ private:
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type Ty,
                           ReferenceMetaData Data) override {
-    annotateSourceEntity({ Range, D, CtorTyRef, /*IsRef=*/true });
+    if (!Data.isImplicit)
+      annotateSourceEntity({ Range, D, CtorTyRef, /*IsRef=*/true });
     return true;
   }
 
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
-                               Optional<AccessKind> AccKind,
+                               ReferenceMetaData Data,
                                bool IsOpenBracket) override {
-    return visitDeclReference(D, Range, nullptr, nullptr, Type(),
-                      ReferenceMetaData(SemaReferenceKind::SubscriptRef, AccKind));
+    return visitDeclReference(D, Range, nullptr, nullptr, Type(), Data);
   }
 
   bool visitCallArgName(Identifier Name, CharSourceRange Range,
@@ -2644,7 +2644,8 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
       llvm::outs() << ":\n";
 
       scratch.clear();
-      next.second->getImportedModules(scratch, ModuleDecl::ImportFilter::Public);
+      next.second->getImportedModules(scratch,
+                                      ModuleDecl::ImportFilterKind::Public);
       for (auto &import : scratch) {
         llvm::outs() << "\t" << import.second->getName();
         for (auto accessPathPiece : import.first) {

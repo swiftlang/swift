@@ -893,8 +893,8 @@ public:
 } // unnamed namespace
 
 static StaticSpellingKind getCorrectStaticSpelling(const Decl *D) {
-  if (auto *VD = dyn_cast<VarDecl>(D)) {
-    return VD->getCorrectStaticSpelling();
+  if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
+    return ASD->getCorrectStaticSpelling();
   } else if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
     return PBD->getCorrectStaticSpelling();
   } else if (auto *FD = dyn_cast<FuncDecl>(D)) {
@@ -985,6 +985,33 @@ void PrintAST::printTypedPattern(const TypedPattern *TP) {
   printTypeLoc(TP->getTypeLoc());
 }
 
+/// Determines if we are required to print the name of a property declaration,
+/// or if we can elide it by printing a '_' instead.
+static bool mustPrintPropertyName(VarDecl *decl, PrintOptions opts) {
+  // If we're not allowed to omit the name, we must print it.
+  if (!opts.OmitNameOfInaccessibleProperties) return true;
+
+  // If it contributes to the parent's storage, we must print it because clients
+  // need to be able to directly access the storage.
+  // FIXME: We might be able to avoid printing names for some of these
+  //        if we serialized references to them using field indices.
+  if (contributesToParentTypeStorage(decl)) return true;
+
+  // If it's public or @usableFromInline, we must print the name because it's a
+  // visible entry-point.
+  if (isPublicOrUsableFromInline(decl)) return true;
+
+  // If it has an initial value, we must print the name because it's used in
+  // the mangled name of the initializer expression generator function.
+  // FIXME: We _could_ figure out a way to generate an entry point
+  //        for the initializer expression without revealing the name. We just
+  //        don't have a mangling for it.
+  if (decl->hasInitialValue()) return true;
+
+  // If none of those are true, we can elide the name of the variable.
+  return false;
+}
+
 void PrintAST::printPattern(const Pattern *pattern) {
   switch (pattern->getKind()) {
   case PatternKind::Any:
@@ -995,16 +1022,13 @@ void PrintAST::printPattern(const Pattern *pattern) {
     auto named = cast<NamedPattern>(pattern);
     auto decl = named->getDecl();
     recordDeclLoc(decl, [&]{
-      if (Options.OmitNameOfInaccessibleProperties &&
-          contributesToParentTypeStorage(decl) &&
-          !isPublicOrUsableFromInline(decl) &&
-          // FIXME: We need to figure out a way to generate an entry point
-          //        for the initializer expression without revealing the name.
-          !decl->hasInitialValue())
-        Printer << "_";
-      else
+      // FIXME: This always returns true now, because of the FIXMEs listed in
+      //        mustPrintPropertyName.
+      if (mustPrintPropertyName(decl, Options))
         Printer.printName(named->getBoundName());
-      });
+      else
+        Printer << "_";
+    });
     break;
   }
 
@@ -2400,12 +2424,22 @@ static bool isStructOrClassContext(DeclContext *dc) {
   return isa<ClassDecl>(nominal) || isa<StructDecl>(nominal);
 }
 
+static bool isEscaping(Type type) {
+  if (auto *funcType = type->getAs<AnyFunctionType>()) {
+    if (funcType->getExtInfo().getRepresentation() ==
+          FunctionTypeRepresentation::CFunctionPointer)
+      return false;
+
+    return !funcType->getExtInfo().isNoEscape();
+  }
+
+  return false;
+}
+
 static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
-                                ParameterTypeFlags flags) {
+                                ParameterTypeFlags flags, bool escaping) {
   if (!options.excludeAttrKind(TAK_autoclosure) && flags.isAutoClosure())
     printer << "@autoclosure ";
-  if (!options.excludeAttrKind(TAK_escaping) && flags.isEscaping())
-    printer << "@escaping ";
 
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:
@@ -2421,6 +2455,9 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
     printer.printKeyword("__owned", options, " ");
     break;
   }
+
+  if (!options.excludeAttrKind(TAK_escaping) && escaping)
+    printer << "@escaping ";
 }
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
@@ -2537,29 +2574,17 @@ void PrintAST::printOneParameter(const ParamDecl *param,
       TheTypeLoc.setType(BGT->getGenericArgs()[0]);
   }
 
-  // Special case, if we're not going to use the type repr printing, peek
-  // through the paren types so that we don't print excessive @escapings.
-  unsigned numParens = 0;
-  if (!willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
+  if (!param->isVariadic() &&
+      !willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
     auto type = TheTypeLoc.getType();
-
-    printParameterFlags(Printer, Options, paramFlags);
-    while (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
-      ++numParens;
-      type = parenTy->getUnderlyingType();
-    }
-
-    TheTypeLoc = TypeLoc::withoutLoc(type);
+    printParameterFlags(Printer, Options, paramFlags,
+                        isEscaping(type));
   }
 
-  for (unsigned i = 0; i < numParens; ++i)
-    Printer << "(";
   if (param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
     printTypeLocForImplicitlyUnwrappedOptional(TheTypeLoc);
   else
     printTypeLoc(TheTypeLoc);
-  for (unsigned i = 0; i < numParens; ++i)
-    Printer << ")";
 
   if (param->isVariadic())
     Printer << "...";
@@ -2781,8 +2806,13 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
                                       ->castTo<AnyFunctionType>()
                                       ->getParams();
     }
+
+    // @escaping is not valid in enum element position, even though the
+    // attribute is implicitly added. Ignore it when printing the parameters.
+    Options.ExcludeAttrList.push_back(TAK_escaping);
     printParameterList(PL, params,
                        /*isAPINameByDefault*/true);
+    Options.ExcludeAttrList.pop_back();
   }
 
   auto *raw = elt->getRawValueExpr();
@@ -2845,6 +2875,9 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccess(decl);
+  if (!Options.SkipIntroducerKeywords && decl->isStatic() &&
+      Options.PrintStaticKeyword)
+    printStaticKeyword(decl->getCorrectStaticSpelling());
   printContextIfNeeded(decl);
   recordDeclLoc(decl, [&]{
     Printer << "subscript";
@@ -3375,7 +3408,11 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     if (!Options.FullyQualifiedTypesIfAmbiguous)
       return false;
 
-    Decl *D = T->getAnyGeneric();
+    Decl *D;
+    if (auto *TAT = dyn_cast<TypeAliasType>(T))
+      D = TAT->getDecl();
+    else
+      D = T->getAnyGeneric();
 
     // If we cannot find the declaration, be extra careful and print
     // the type qualified.
@@ -3507,6 +3544,8 @@ public:
     if (auto parent = T->getParent()) {
       visit(parent);
       Printer << ".";
+    } else if (shouldPrintFullyQualified(T)) {
+      printModuleContext(T);
     }
 
     printTypeDeclName(T);
@@ -3515,7 +3554,8 @@ public:
 
   void visitParenType(ParenType *T) {
     Printer << "(";
-    printParameterFlags(Printer, Options, T->getParameterFlags());
+    printParameterFlags(Printer, Options, T->getParameterFlags(),
+                        /*escaping*/ false);
     visit(T->getUnderlyingType()->getInOutObjectType());
     Printer << ")";
   }
@@ -3546,7 +3586,8 @@ public:
         visit(TD.getVarargBaseTy());
         Printer << "...";
       } else {
-        printParameterFlags(Printer, Options, TD.getParameterFlags());
+        printParameterFlags(Printer, Options, TD.getParameterFlags(),
+                            /*escaping*/ false);
         visit(EltType);
       }
     }
@@ -3803,10 +3844,15 @@ public:
         Printer << ": ";
       }
 
-      printParameterFlags(Printer, Options, Param.getParameterFlags());
-      visit(Param.getPlainType());
-      if (Param.isVariadic())
+      auto type = Param.getPlainType();
+      if (Param.isVariadic()) {
+        visit(type);
         Printer << "...";
+      } else {
+        printParameterFlags(Printer, Options, Param.getParameterFlags(),
+                            isEscaping(type));
+        visit(type);
+      }
     }
 
     Printer << ")";
@@ -4024,6 +4070,10 @@ public:
   }
 
   void visitProtocolType(ProtocolType *T) {
+    if (shouldPrintFullyQualified(T)) {
+      printModuleContext(T);
+    }
+
     printTypeDeclName(T);
   }
 
@@ -4162,15 +4212,26 @@ void Type::print(ASTPrinter &Printer, const PrintOptions &PO) const {
   TypePrinter(Printer, PO).visit(*this);
 }
 
-void AnyFunctionType::printParams(raw_ostream &OS, const
-                                  PrintOptions &PO) const {
+void AnyFunctionType::printParams(ArrayRef<AnyFunctionType::Param> Params,
+                                  raw_ostream &OS,
+                                  const PrintOptions &PO) {
   StreamPrinter Printer(OS);
-  printParams(Printer, PO);
+  printParams(Params, Printer, PO);
 }
-void AnyFunctionType::printParams(ASTPrinter &Printer,
-                                  const PrintOptions &PO) const {
-  TypePrinter(Printer, PO).visitAnyFunctionTypeParams(getParams(),
+void AnyFunctionType::printParams(ArrayRef<AnyFunctionType::Param> Params,
+                                  ASTPrinter &Printer,
+                                  const PrintOptions &PO) {
+  TypePrinter(Printer, PO).visitAnyFunctionTypeParams(Params,
                                                       /*printLabels*/true);
+}
+
+std::string
+AnyFunctionType::getParamListAsString(ArrayRef<AnyFunctionType::Param> Params,
+                                      const PrintOptions &PO) {
+  SmallString<16> Scratch;
+  llvm::raw_svector_ostream OS(Scratch);
+  AnyFunctionType::printParams(Params, OS);
+  return OS.str();
 }
 
 void LayoutConstraintInfo::print(raw_ostream &OS,

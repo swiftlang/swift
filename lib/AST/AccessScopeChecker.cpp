@@ -24,12 +24,11 @@ using namespace swift;
 AccessScopeChecker::AccessScopeChecker(const DeclContext *useDC,
                                        bool treatUsableFromInlineAsPublic)
   : File(useDC->getParentSourceFile()),
-    TreatUsableFromInlineAsPublic(treatUsableFromInlineAsPublic),
-    Context(File->getASTContext()) {}
+    TreatUsableFromInlineAsPublic(treatUsableFromInlineAsPublic) {}
 
 bool
-AccessScopeChecker::visitDecl(ValueDecl *VD) {
-  if (!VD || isa<GenericTypeParamDecl>(VD))
+AccessScopeChecker::visitDecl(const ValueDecl *VD) {
+  if (isa<GenericTypeParamDecl>(VD))
     return true;
 
   auto AS = VD->getFormalAccessScope(File, TreatUsableFromInlineAsPublic);
@@ -37,55 +36,64 @@ AccessScopeChecker::visitDecl(ValueDecl *VD) {
   return Scope.hasValue();
 }
 
-TypeReprAccessScopeChecker::TypeReprAccessScopeChecker(const DeclContext *useDC,
-                                                       bool treatUsableFromInlineAsPublic)
-  : AccessScopeChecker(useDC, treatUsableFromInlineAsPublic) {
-}
-
-bool
-TypeReprAccessScopeChecker::walkToTypeReprPre(TypeRepr *TR) {
-  if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR))
-    return visitDecl(CITR->getBoundDecl());
-  return true;
-}
-
-bool
-TypeReprAccessScopeChecker::walkToTypeReprPost(TypeRepr *TR) {
-  return Scope.hasValue();
+bool TypeReprIdentFinder::walkToTypeReprPost(TypeRepr *TR) {
+  auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR);
+  if (!CITR || !CITR->getBoundDecl())
+    return true;
+  return Callback(CITR);
 }
 
 Optional<AccessScope>
-TypeReprAccessScopeChecker::getAccessScope(TypeRepr *TR, const DeclContext *useDC,
-                                           bool treatUsableFromInlineAsPublic) {
-  TypeReprAccessScopeChecker checker(useDC, treatUsableFromInlineAsPublic);
-  TR->walk(checker);
+AccessScopeChecker::getAccessScope(TypeRepr *TR, const DeclContext *useDC,
+                                   bool treatUsableFromInlineAsPublic) {
+  AccessScopeChecker checker(useDC, treatUsableFromInlineAsPublic);
+  TR->walk(TypeReprIdentFinder([&](const ComponentIdentTypeRepr *typeRepr) {
+    return checker.visitDecl(typeRepr->getBoundDecl());
+  }));
   return checker.Scope;
 }
 
-TypeAccessScopeChecker::TypeAccessScopeChecker(const DeclContext *useDC,
-                                               bool treatUsableFromInlineAsPublic)
-  : AccessScopeChecker(useDC, treatUsableFromInlineAsPublic) {}
+TypeWalker::Action TypeDeclFinder::walkToTypePre(Type T) {
+  if (auto *TAT = dyn_cast<TypeAliasType>(T.getPointer()))
+    return visitTypeAliasType(TAT);
 
-TypeWalker::Action
-TypeAccessScopeChecker::walkToTypePre(Type T) {
-  ValueDecl *VD;
-  if (auto *BNAD = dyn_cast<TypeAliasType>(T.getPointer()))
-    VD = BNAD->getDecl();
-  else if (auto *NTD = T->getAnyNominal())
-    VD = NTD;
-  else
-    VD = nullptr;
-
-  if (!visitDecl(VD))
-    return Action::Stop;
+  // FIXME: We're looking through sugar here so that we visit, e.g.,
+  // Swift.Array when we see `[Int]`. But that means we do redundant work when
+  // we see sugar that's purely structural, like `(Int)`. Fortunately, paren
+  // types are the only such purely structural sugar at the time this comment
+  // was written, and they're not so common in the first place.
+  if (auto *BGT = T->getAs<BoundGenericType>())
+    return visitBoundGenericType(BGT);
+  if (auto *NT = T->getAs<NominalType>())
+    return visitNominalType(NT);
 
   return Action::Continue;
 }
 
+TypeWalker::Action
+SimpleTypeDeclFinder::visitNominalType(NominalType *ty) {
+  return Callback(ty->getDecl());
+}
+
+TypeWalker::Action
+SimpleTypeDeclFinder::visitBoundGenericType(BoundGenericType *ty) {
+  return Callback(ty->getDecl());
+}
+
+TypeWalker::Action
+SimpleTypeDeclFinder::visitTypeAliasType(TypeAliasType *ty) {
+  return Callback(ty->getDecl());
+}
+
+
 Optional<AccessScope>
-TypeAccessScopeChecker::getAccessScope(Type T, const DeclContext *useDC,
-                                       bool treatUsableFromInlineAsPublic) {
-  TypeAccessScopeChecker checker(useDC, treatUsableFromInlineAsPublic);
-  T.walk(checker);
+AccessScopeChecker::getAccessScope(Type T, const DeclContext *useDC,
+                                   bool treatUsableFromInlineAsPublic) {
+  AccessScopeChecker checker(useDC, treatUsableFromInlineAsPublic);
+  T.walk(SimpleTypeDeclFinder([&](const ValueDecl *VD) {
+    if (checker.visitDecl(VD))
+      return TypeWalker::Action::Continue;
+    return TypeWalker::Action::Stop;
+  }));
   return checker.Scope;
 }

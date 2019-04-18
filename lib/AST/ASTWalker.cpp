@@ -37,7 +37,7 @@
 //      Note that semantic components will generally preserve the
 //      syntactic order of their children because doing something else
 //      could illegally change order of evaluation.  This is why, for
-//      example, shuffling a TupleExpr creates a TupleShuffleExpr
+//      example, shuffling a TupleExpr creates a DestructureTupleExpr
 //      instead of just making a new TupleExpr with the elements in
 //      different order.
 //
@@ -443,6 +443,17 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) { return E; }
 
+  Expr *visitDefaultArgumentExpr(DefaultArgumentExpr *E) { return E; }
+
+  Expr *visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *E) {
+    if (auto subExpr = doIt(E->getSubExpr())) {
+      E->setSubExpr(subExpr);
+      return E;
+    }
+
+    return nullptr;
+  }
+
   Expr *visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
     HANDLE_SEMANTIC_EXPR(E);
 
@@ -639,28 +650,17 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
   
-  Expr *visitTupleShuffleExpr(TupleShuffleExpr *E) {
-    if (Expr *E2 = doIt(E->getSubExpr())) {
-      E->setSubExpr(E2);
+  Expr *visitDestructureTupleExpr(DestructureTupleExpr *E) {
+    if (auto *src = doIt(E->getSubExpr())) {
+      E->setSubExpr(src);
     } else {
       return nullptr;
     }
 
-    return E;
-  }
-
-  Expr *visitArgumentShuffleExpr(ArgumentShuffleExpr *E) {
-    if (Expr *E2 = doIt(E->getSubExpr())) {
-      E->setSubExpr(E2);
+    if (auto *dst = doIt(E->getResultExpr())) {
+      E->setResultExpr(dst);
     } else {
       return nullptr;
-    }
-
-    for (auto &defaultArg : E->getCallerDefaultArgs()) {
-      if (Expr *newDefaultArg = doIt(defaultArg))
-        defaultArg = newDefaultArg;
-      else
-        return nullptr;
     }
 
     return E;
@@ -754,6 +754,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
       return nullptr;
     }
+
+    if (!Walker.shouldWalkIntoNonSingleExpressionClosure())
+      return expr;
 
     // Handle other closures.
     if (BraceStmt *body = cast_or_null<BraceStmt>(doIt(expr->getBody()))) {
@@ -1065,11 +1068,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (auto oldSubExpr = E->getSubExpr()) {
       if (auto subExpr = doIt(oldSubExpr)) {
         E->setSubExpr(subExpr);
-      }
-      else {
+      } else {
         return nullptr;
       }
     }
+
+    if (!Walker.shouldWalkIntoNonSingleExpressionClosure())
+      return E;
 
     if (auto oldBody = E->getBody()) {
       if (auto body = doIt(oldBody)) {

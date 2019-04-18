@@ -120,11 +120,15 @@ public:
 
   void
   getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &Modules) const {
+    ModuleDecl::ImportFilter ImportFilter;
+    ImportFilter |= ModuleDecl::ImportFilterKind::Public;
+    ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+    ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+
     if (auto *SF = SFOrMod.dyn_cast<SourceFile *>()) {
-      SF->getImportedModules(Modules, ModuleDecl::ImportFilter::All);
+      SF->getImportedModules(Modules, ImportFilter);
     } else {
-      SFOrMod.get<ModuleDecl *>()->getImportedModules(Modules,
-                                                  ModuleDecl::ImportFilter::All);
+      SFOrMod.get<ModuleDecl *>()->getImportedModules(Modules, ImportFilter);
     }
   }
 };
@@ -390,6 +394,10 @@ private:
       return true;
 
     IndexSymbol Info;
+
+    if (Data.isImplicit)
+      Info.roles |= (unsigned)SymbolRole::Implicit;
+
     if (CtorTyRef)
       if (!reportRef(CtorTyRef, Loc, Info, Data.AccKind))
         return false;
@@ -923,8 +931,7 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
     Info.symInfo.Kind = SymbolKind::Function;
     if (D->getDeclContext()->isTypeContext()) {
       if (D->isStatic()) {
-        if (isa<VarDecl>(D) &&
-            cast<VarDecl>(D)->getCorrectStaticSpelling() == StaticSpellingKind::KeywordClass)
+        if (D->getCorrectStaticSpelling() == StaticSpellingKind::KeywordClass)
           Info.symInfo.Kind = SymbolKind::ClassMethod;
         else
           Info.symInfo.Kind = SymbolKind::StaticMethod;
@@ -1536,8 +1543,11 @@ void IndexSwiftASTWalker::collectRecursiveModuleImports(
     return;
   }
 
+  ModuleDecl::ImportFilter ImportFilter;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
   SmallVector<ModuleDecl::ImportedModule, 8> Imports;
-  TopMod.getImportedModules(Imports, ModuleDecl::ImportFilter::All);
+  TopMod.getImportedModules(Imports);
 
   for (auto Import : Imports) {
     collectRecursiveModuleImports(*Import.second, Visited);

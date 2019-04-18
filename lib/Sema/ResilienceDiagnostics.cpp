@@ -15,17 +15,21 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "TypeCheckAvailability.h"
+#include "swift/AST/AccessScopeChecker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Initializer.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/Initializer.h"
+#include "swift/AST/ProtocolConformance.h"
 
 using namespace swift;
 using FragileFunctionKind = TypeChecker::FragileFunctionKind;
 
 std::pair<FragileFunctionKind, bool>
 TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
-  for (; DC->isLocalContext(); DC = DC->getParent()) {
+  for (DC = DC->getLocalContext(); DC && DC->isLocalContext();
+       DC = DC->getParent()) {
     if (isa<DefaultArgumentInitializer>(DC)) {
       // Default argument generators of public functions cannot reference
       // @usableFromInline declarations; all other fragile function kinds
@@ -98,16 +102,39 @@ enum class DowngradeToWarning: bool {
 };
 
 bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
+                                           ConcreteDeclRef declRef,
+                                           const DeclContext *DC,
+                                           FragileFunctionKind Kind,
+                                           bool TreatUsableFromInlineAsPublic) {
+  const ValueDecl *D = declRef.getDecl();
+  // Do some important fast-path checks that apply to all cases.
+
+  // Type parameters are OK.
+  if (isa<AbstractTypeParamDecl>(D))
+    return false;
+
+  // Check whether the declaration is accessible.
+  if (diagnoseInlinableDeclRefAccess(loc, D, DC, Kind,
+                                     TreatUsableFromInlineAsPublic))
+    return true;
+
+  // Check whether the declaration comes from a publically-imported module.
+  // Skip this check for accessors because the associated property or subscript
+  // will also be checked, and will provide a better error message.
+  if (!isa<AccessorDecl>(D))
+    if (diagnoseDeclRefExportability(loc, declRef, DC, Kind))
+      return true;
+
+  return false;
+}
+
+bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
                                            const ValueDecl *D,
                                            const DeclContext *DC,
                                            FragileFunctionKind Kind,
                                            bool TreatUsableFromInlineAsPublic) {
   // Local declarations are OK.
   if (D->getDeclContext()->isLocalContext())
-    return false;
-
-  // Type parameters are OK.
-  if (isa<AbstractTypeParamDecl>(D))
     return false;
 
   // Public declarations are OK.
@@ -119,8 +146,7 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
   // Do enforce the restriction even in pre-Swift-5 modes if the module we're
   // building is resilient, though.
   if (D->isObjCDynamic() && !Context.isSwiftVersionAtLeast(5) &&
-      DC->getParentModule()->getResilienceStrategy() !=
-        ResilienceStrategy::Resilient) {
+      !DC->getParentModule()->isResilient()) {
     return false;
   }
 
@@ -158,6 +184,11 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
     diagName = accessor->getStorage()->getFullName();
   }
 
+  // Swift 5.0 did not check the underlying types of local typealiases.
+  // FIXME: Conditionalize this once we have a new language mode.
+  if (isa<TypeAliasDecl>(DC))
+    downgradeToWarning = DowngradeToWarning::Yes;
+
   auto diagID = diag::resilience_decl_unavailable;
   if (downgradeToWarning == DowngradeToWarning::Yes)
     diagID = diag::resilience_decl_unavailable_warn;
@@ -179,3 +210,114 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
   return (downgradeToWarning == DowngradeToWarning::No);
 }
 
+static bool diagnoseDeclExportability(SourceLoc loc, const ValueDecl *D,
+                                      const SourceFile &userSF,
+                                      FragileFunctionKind fragileKind) {
+  auto definingModule = D->getModuleContext();
+  if (!userSF.isImportedImplementationOnly(definingModule))
+    return false;
+
+  // TODO: different diagnostics
+  ASTContext &ctx = definingModule->getASTContext();
+  ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_implementation_only,
+                     D->getDescriptiveKind(), D->getFullName(),
+                     static_cast<unsigned>(fragileKind),
+                     definingModule->getName());
+  return true;
+}
+
+static bool
+diagnoseGenericArgumentsExportability(SourceLoc loc,
+                                      const SubstitutionMap &subs,
+                                      const SourceFile &userSF) {
+  bool hadAnyIssues = false;
+  for (ProtocolConformanceRef conformance : subs.getConformances()) {
+    if (!conformance.isConcrete())
+      continue;
+    const ProtocolConformance *concreteConf = conformance.getConcrete();
+
+    SubstitutionMap subConformanceSubs =
+        concreteConf->getSubstitutions(userSF.getParentModule());
+    diagnoseGenericArgumentsExportability(loc, subConformanceSubs, userSF);
+
+    const RootProtocolConformance *rootConf =
+        concreteConf->getRootConformance();
+    ModuleDecl *M = rootConf->getDeclContext()->getParentModule();
+    if (!userSF.isImportedImplementationOnly(M))
+      continue;
+
+    ASTContext &ctx = M->getASTContext();
+    ctx.Diags.diagnose(loc, diag::conformance_from_implementation_only_module,
+                       rootConf->getType(),
+                       rootConf->getProtocol()->getFullName(), M->getName());
+    hadAnyIssues = true;
+  }
+  return hadAnyIssues;
+}
+
+void TypeChecker::diagnoseGenericTypeExportability(const TypeLoc &TL,
+                                                   const DeclContext *DC) {
+  class GenericTypeFinder : public TypeDeclFinder {
+    using Callback = llvm::function_ref<void(SubstitutionMap)>;
+
+    const SourceFile &SF;
+    Callback callback;
+  public:
+    GenericTypeFinder(const SourceFile &SF, Callback callback)
+        : SF(SF), callback(callback) {}
+
+    Action visitBoundGenericType(BoundGenericType *ty) override {
+      ModuleDecl *useModule = SF.getParentModule();
+      SubstitutionMap subs = ty->getContextSubstitutionMap(useModule,
+                                                           ty->getDecl());
+      callback(subs);
+      return Action::Continue;
+    }
+
+    Action visitTypeAliasType(TypeAliasType *ty) override {
+      callback(ty->getSubstitutionMap());
+      return Action::Continue;
+    }
+  };
+
+  assert(TL.getType() && "type not validated yet");
+
+  const SourceFile *SF = DC->getParentSourceFile();
+  if (!SF)
+    return;
+
+  TL.getType().walk(GenericTypeFinder(*SF, [&](SubstitutionMap subs) {
+    // FIXME: It would be nice to highlight just the part of the type that's
+    // problematic, but unfortunately the TypeRepr doesn't have the
+    // information we need and the Type doesn't easily map back to it.
+    (void)diagnoseGenericArgumentsExportability(TL.getLoc(), subs, *SF);
+  }));
+}
+
+bool
+TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
+                                          ConcreteDeclRef declRef,
+                                          const DeclContext *DC,
+                                          FragileFunctionKind fragileKind) {
+  // We're only interested in diagnosing uses from source files.
+  auto userSF = DC->getParentSourceFile();
+  if (!userSF)
+    return false;
+
+  // If the source file doesn't have any implementation-only imports,
+  // we can fast-path this.  In the current language design, we never
+  // need to consider the possibility of implementation-only imports
+  // from other source files in the module (or indirectly in other modules).
+  // TODO: maybe check whether D is from a bridging header?
+  if (!userSF->hasImplementationOnlyImports())
+    return false;
+
+  const ValueDecl *D = declRef.getDecl();
+  if (diagnoseDeclExportability(loc, D, *userSF, fragileKind))
+    return true;
+  if (diagnoseGenericArgumentsExportability(loc, declRef.getSubstitutions(),
+                                            *userSF)) {
+    return true;
+  }
+  return false;
+}

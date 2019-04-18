@@ -797,8 +797,6 @@ namespace {
 
     void visitVarDecl(VarDecl *VD) {
       printCommon(VD, "var_decl");
-      if (VD->isStatic())
-        PrintWithColorRAII(OS, DeclModifierColor) << " type";
       if (VD->isLet())
         PrintWithColorRAII(OS, DeclModifierColor) << " let";
       if (VD->hasNonPatternBindingInit())
@@ -811,6 +809,9 @@ namespace {
     }
 
     void printStorageImpl(AbstractStorageDecl *D) {
+      if (D->isStatic())
+        PrintWithColorRAII(OS, DeclModifierColor) << " type";
+
       auto impl = D->getImplInfo();
       PrintWithColorRAII(OS, DeclModifierColor)
         << " readImpl="
@@ -1621,13 +1622,13 @@ public:
     if (S->hasUnknownAttr())
       OS << " @unknown";
 
-    if (auto caseBodyVars = S->getCaseBodyVariables()) {
+    if (S->hasCaseBodyVariables()) {
       OS << '\n';
       OS.indent(Indent + 2);
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
       PrintWithColorRAII(OS, StmtColor) << "case_body_variables";
       OS << '\n';
-      for (auto *vd : *caseBodyVars) {
+      for (auto *vd : S->getCaseBodyVariables()) {
         OS.indent(2);
         // TODO: Printing a var decl does an Indent ... dump(vd) ... '\n'. We
         // should see if we can factor this dumping so that the caller of
@@ -2068,6 +2069,8 @@ public:
   }
   void visitArrayExpr(ArrayExpr *E) {
     printCommon(E, "array_expr");
+    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     for (auto elt : E->getElements()) {
       OS << '\n';
       printRec(elt);
@@ -2138,51 +2141,20 @@ public:
     printRec(E->getBase());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitTupleShuffleExpr(TupleShuffleExpr *E) {
-    printCommon(E, "tuple_shuffle_expr");
-    OS << " elements=[";
-    for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
-      if (i) OS << ", ";
-      OS << E->getElementMapping()[i];
+  void visitDestructureTupleExpr(DestructureTupleExpr *E) {
+    printCommon(E, "destructure_tuple_expr");
+    OS << " destructured=";
+    PrintWithColorRAII(OS, ParenthesisColor) << '(';
+    Indent += 2;
+    for (auto *elt : E->getDestructuredElements()) {
+      OS << "\n";
+      printRec(elt);
     }
-    OS << "]\n";
+    Indent -= 2;
+    PrintWithColorRAII(OS, ParenthesisColor) << ")\n";
     printRec(E->getSubExpr());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-  void visitArgumentShuffleExpr(ArgumentShuffleExpr *E) {
-    printCommon(E, "argument_shuffle_expr");
-    switch (E->getTypeImpact()) {
-    case ArgumentShuffleExpr::ScalarToTuple:
-      OS << " scalar_to_tuple";
-      break;
-    case ArgumentShuffleExpr::TupleToTuple:
-      OS << " tuple_to_tuple";
-      break;
-    case ArgumentShuffleExpr::TupleToScalar:
-      OS << " tuple_to_scalar";
-      break;
-    }
-    OS << " elements=[";
-    for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
-      if (i) OS << ", ";
-      OS << E->getElementMapping()[i];
-    }
-    OS << "]";
-    OS << " variadic_sources=[";
-    interleave(E->getVariadicArgs(),
-               [&](unsigned source) {
-                 OS << source;
-               },
-               [&] { OS << ", "; });
-    OS << "]";
-
-    if (auto defaultArgsOwner = E->getDefaultArgsOwner()) {
-      OS << " default_args_owner=";
-      defaultArgsOwner.dump(OS);
-    }
-
     OS << "\n";
-    printRec(E->getSubExpr());
+    printRec(E->getResultExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *E) {
@@ -2444,6 +2416,20 @@ public:
 
   void visitOpaqueValueExpr(OpaqueValueExpr *E) {
     printCommon(E, "opaque_value_expr") << " @ " << (void*)E;
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitDefaultArgumentExpr(DefaultArgumentExpr *E) {
+    printCommon(E, "default_argument_expr");
+    OS << " default_args_owner=";
+    E->getDefaultArgsOwner().dump(OS);
+    OS << " param=" << E->getParamIndex();
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *E) {
+    printCommon(E, "caller_default_argument_expr");
+    printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -3218,7 +3204,6 @@ namespace {
     void dumpParameterFlags(ParameterTypeFlags paramFlags) {
       printFlag(paramFlags.isVariadic(), "vararg");
       printFlag(paramFlags.isAutoClosure(), "autoclosure");
-      printFlag(paramFlags.isEscaping(), "escaping");
       switch (paramFlags.getValueOwnership()) {
       case ValueOwnership::Default: break;
       case ValueOwnership::Owned: printFlag("owned"); break;

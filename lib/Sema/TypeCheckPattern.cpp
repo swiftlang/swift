@@ -1588,28 +1588,13 @@ recur:
 
 /// Coerce the specified parameter list of a ClosureExpr to the specified
 /// contextual type.
-///
-/// \returns true if an error occurred, false otherwise.
-///
-/// TODO: These diagnostics should be a lot better now that we know this is
-/// all specific to closures.
-///
-bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
+void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
                                             AnyFunctionType *FN) {
-  llvm::SmallVector<AnyFunctionType::Param, 4> params;
-  params.reserve(FN->getNumParams());
-
-  bool hadError = false;
-  for (const auto &param : FN->getParams()) {
-    params.push_back(param);
-    hadError |= param.getPlainType()->hasError();
-  }
 
   // Local function to check if the given type is valid e.g. doesn't have
   // errors, type variables or unresolved types related to it.
   auto isValidType = [](Type type) -> bool {
-    return !(type.isNull() || type->hasError() || type->hasUnresolvedType() ||
-             type->hasTypeVariable());
+    return !(type->hasError() || type->hasUnresolvedType());
   };
 
   // Local function to check whether type of given parameter
@@ -1624,31 +1609,9 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     return true;
   };
 
-  // Sometimes a scalar type gets applied to a single-argument parameter list.
-  auto handleParameter = [&](ParamDecl *param, Type ty, bool forceMutable) -> bool {
-    bool hadError = false;
-    
-    // Check that the type, if explicitly spelled, is ok.
-    if (param->getTypeLoc().getTypeRepr()) {
-      hadError |= validateParameterType(param,
-                                        TypeResolution::forContextual(CE),
-                                        None, *this);
-      
-      // Now that we've type checked the explicit argument type, see if it
-      // agrees with the contextual type.
-      auto paramType = param->getTypeLoc().getType();
-      // Coerce explicitly specified argument type to contextual type
-      // only if both types are valid and do not match.
-      if (!hadError && isValidType(ty) && !ty->isEqual(paramType)) {
-        param->setType(ty);
-        param->setInterfaceType(ty->mapTypeOutOfContext());
-      }
-    }
-    
-    assert(ty->isMaterializable());
-    if (forceMutable) {
+  auto handleParameter = [&](ParamDecl *param, Type ty, bool forceMutable) {
+    if (forceMutable)
       param->setSpecifier(VarDecl::Specifier::InOut);
-    }
 
     // If contextual type is invalid and we have a valid argument type
     // trying to coerce argument to contextual type would mean erasing
@@ -1659,76 +1622,18 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     }
     
     checkTypeModifyingDeclAttributes(param);
-    return hadError;
   };
-
-  auto hasParenSugar = [](ArrayRef<AnyFunctionType::Param> params) -> bool {
-    if (params.size() == 1) {
-      const auto &param = params.front();
-      return (!param.hasLabel() &&
-              !param.isVariadic() &&
-              !param.isInOut());
-    }
-
-    return false;
-  };
-
-  auto getType = [](const AnyFunctionType::Param &param) -> Type {
-    return param.getParameterType();
-  };
-
-  // If the closure is called with a single argument of tuple type
-  // but the closure body expects multiple parameters, explode the
-  // tuple.
-  //
-  // FIXME: This looks like the wrong place for this; the constraint
-  // solver should have inserted an explicit conversion already.
-  //
-  // The only reason we can get away with this, I think, is that
-  // at the SIL level, recursive tuple expansion lowers
-  // ((T, U)) -> () and (T, U) -> () to the same function type,
-  // and SILGen doesn't enforce AST invariaints very strictly.
-  if (!hadError && hasParenSugar(params)) {
-    auto underlyingTy = params.front().getPlainType();
-    if (underlyingTy->is<TupleType>()) {
-      // If we're actually expecting a single parameter, handle it normally.
-      if (P->size() == 1)
-        return handleParameter(P->get(0), underlyingTy, /*mutable*/false);
-
-      // Otherwise, explode the tuple.
-      params.clear();
-      FunctionType::decomposeInput(underlyingTy, params);
-    }
-  }
-  
-  // The number of elements must match exactly.
-  // TODO: incomplete tuple patterns, with some syntax.
-  if (!hadError && params.size() != P->size()) {
-    auto fnType = FunctionType::get(params, FN->getResult());
-    diagnose(P->getStartLoc(), diag::closure_argument_list_tuple, fnType,
-             params.size(), P->size(), (P->size() == 1));
-    hadError = true;
-  }
 
   // Coerce each parameter to the respective type.
+  ArrayRef<AnyFunctionType::Param> params = FN->getParams();
   for (unsigned i = 0, e = P->size(); i != e; ++i) {
     auto &param = P->get(i);
-    
-    Type CoercionType;
-    bool isMutableParam = false;
-    if (hadError) {
-      CoercionType = ErrorType::get(Context);
-    } else {
-      CoercionType = getType(params[i]);
-      isMutableParam = params[i].isInOut();
-    }
-    
     assert(param->getArgumentName().empty() &&
            "Closures cannot have API names");
     
-    hadError |= handleParameter(param, CoercionType, isMutableParam);
+    handleParameter(param,
+                    params[i].getParameterType(),
+                    params[i].isInOut());
     assert(!param->isDefaultArgument() && "Closures cannot have default args");
   }
-  
-  return hadError;
 }

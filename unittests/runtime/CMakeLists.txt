@@ -20,8 +20,12 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
       set(CMAKE_C_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang")
     endif()
 
-    set(CMAKE_C_COMPILER_LAUNCHER "")
-    set(CMAKE_CXX_COMPILER_LAUNCHER "")
+    if(CMAKE_C_COMPILER_LAUNCHER MATCHES ".*distcc")
+      set(CMAKE_C_COMPILER_LAUNCHER "")
+    endif()
+    if(CMAKE_CXX_COMPILER_LAUNCHER MATCHES ".*distcc")
+      set(CMAKE_CXX_COMPILER_LAUNCHER "")
+    endif()
   endif()
 
   set(swift_runtime_test_extra_libraries)

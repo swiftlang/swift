@@ -1809,6 +1809,10 @@ NodePointer Demangler::demangleMetatype() {
       return createWithPoppedType(Node::Kind::MethodLookupFunction);
     case 'U':
       return createWithPoppedType(Node::Kind::ObjCMetadataUpdateFunction);
+    case 's':
+      return createWithPoppedType(Node::Kind::ObjCResilientClassStub);
+    case 't':
+      return createWithPoppedType(Node::Kind::FullObjCResilientClassStub);
     case 'B':
       return createWithChild(Node::Kind::ReflectionMetadataBuiltinDescriptor,
                              popNode(Node::Kind::Type));
@@ -2053,15 +2057,20 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       return createWithChild(Node::Kind::ProtocolSelfConformanceWitness,
                              popNode(isEntity));
     case 'R':
-    case 'r': {
-      NodePointer Thunk = createNode(c == 'R' ?
-                                        Node::Kind::ReabstractionThunkHelper :
-                                        Node::Kind::ReabstractionThunk);
+    case 'r':
+    case 'y': {
+      Node::Kind kind;
+      if (c == 'R') kind = Node::Kind::ReabstractionThunkHelper;
+      else if (c == 'y') kind = Node::Kind::ReabstractionThunkHelperWithSelf;
+      else kind = Node::Kind::ReabstractionThunk;
+      NodePointer Thunk = createNode(kind);
       if (NodePointer GenSig = popNode(Node::Kind::DependentGenericSignature))
         addChild(Thunk, GenSig);
-      NodePointer Ty2 = popNode(Node::Kind::Type);
-      Thunk = addChild(Thunk, popNode(Node::Kind::Type));
-      return addChild(Thunk, Ty2);
+      if (kind == Node::Kind::ReabstractionThunkHelperWithSelf)
+        addChild(Thunk, popNode(Node::Kind::Type));
+      addChild(Thunk, popNode(Node::Kind::Type));
+      addChild(Thunk, popNode(Node::Kind::Type));
+      return Thunk;
     }
     case 'g':
       return demangleGenericSpecialization(Node::Kind::GenericSpecialization);

@@ -296,6 +296,11 @@ namespace swift {
     /// set to true.
     bool ExperimentalDependenciesIncludeIntrafileOnes = false;
 
+    /// Enable experimental support for emitting Objective-C resilient class
+    /// stubs. This is a language option since it also determines if we admit
+    /// @objc members in extensions of classes with resilient ancestry.
+    bool EnableObjCResilientClassStubs = false;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///

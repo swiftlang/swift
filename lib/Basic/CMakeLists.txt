@@ -8,7 +8,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set(UUID_LIBRARIES "rpcrt4.lib")
 else()
   find_package(UUID REQUIRED)
-  set(UUID_INCLUDE "-I${UUID_INCLUDE_DIRS}")
+  set(UUID_INCLUDE "${UUID_INCLUDE_DIRS}")
 endif()
 
 # Figure out if we can track VC revisions.
@@ -105,8 +105,9 @@ add_swift_host_library(swiftBasic STATIC
   GYB_SOURCES
     UnicodeExtendedGraphemeClusters.cpp.gyb
 
-  C_COMPILE_FLAGS ${UUID_INCLUDE}
   LLVM_COMPONENT_DEPENDS support)
+target_include_directories(swiftBasic PRIVATE
+  ${UUID_INCLUDE})
 
 if(NOT SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
   target_link_libraries(swiftBasic PRIVATE

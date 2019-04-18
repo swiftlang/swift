@@ -1060,19 +1060,41 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   }
 }
 
-void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
-                                           DefaultArgumentKind kind,
-                                           DeclContext *initDC) {
-  switch (kind) {
+void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
+                                           ParamDecl *param) {
+  auto initDC = param->getDefaultArgumentInitContext();
+
+  switch (param->getDefaultArgumentKind()) {
   case DefaultArgumentKind::None:
     llvm_unreachable("No default argument here?");
 
-  case DefaultArgumentKind::Normal:
-    break;
+  case DefaultArgumentKind::Normal: {
+    auto arg = param->getDefaultValue();
+    emitOrDelayFunction(*this, constant,
+        [this,constant,arg,initDC](SILFunction *f) {
+      preEmitFunction(constant, arg, f, arg);
+      PrettyStackTraceSILFunction X("silgen emitDefaultArgGenerator ", f);
+      SILGenFunction SGF(*this, *f, initDC);
+      SGF.emitGeneratorFunction(constant, arg);
+      postEmitFunction(constant, f);
+    });
+    return;
+  }
+
+  case DefaultArgumentKind::StoredProperty: {
+    auto arg = param->getStoredProperty();
+    emitOrDelayFunction(*this, constant,
+        [this,constant,arg,initDC](SILFunction *f) {
+      preEmitFunction(constant, arg, f, arg);
+      PrettyStackTraceSILFunction X("silgen emitDefaultArgGenerator ", f);
+      SILGenFunction SGF(*this, *f, initDC);
+      SGF.emitGeneratorFunction(constant, arg);
+      postEmitFunction(constant, f);
+    });
+    return;
+  }
 
   case DefaultArgumentKind::Inherited:
-    return;
-
   case DefaultArgumentKind::Column:
   case DefaultArgumentKind::File:
   case DefaultArgumentKind::Line:
@@ -1081,18 +1103,8 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
   case DefaultArgumentKind::NilLiteral:
   case DefaultArgumentKind::EmptyArray:
   case DefaultArgumentKind::EmptyDictionary:
-  case DefaultArgumentKind::StoredProperty:
     return;
   }
-
-  emitOrDelayFunction(*this, constant,
-      [this,constant,arg,initDC](SILFunction *f) {
-    preEmitFunction(constant, arg, f, arg);
-    PrettyStackTraceSILFunction X("silgen emitDefaultArgGenerator ", f);
-    SILGenFunction SGF(*this, *f, initDC);
-    SGF.emitGeneratorFunction(constant, arg);
-    postEmitFunction(constant, f);
-  });
 }
 
 void SILGenModule::
@@ -1161,10 +1173,9 @@ void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
                                             ParameterList *paramList) {
   unsigned index = 0;
   for (auto param : *paramList) {
-    if (auto defaultArg = param->getDefaultValue())
+    if (param->isDefaultArgument())
       emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl, index),
-                              defaultArg, param->getDefaultArgumentKind(),
-                              param->getDefaultArgumentInitContext());
+                              param);
     ++index;
   }
 }
@@ -1368,8 +1379,7 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
   // stored) and doesn't have a setter with less-than-public visibility.
   auto expansion = ResilienceExpansion::Maximal;
 
-  switch (SGM.M.getSwiftModule()->getResilienceStrategy()) {
-  case ResilienceStrategy::Default: {
+  if (!SGM.M.getSwiftModule()->isResilient()) {
     if (SGM.canStorageUseStoredKeyPathComponent(decl, expansion)) {
       // External modules can't directly access storage, unless this is a
       // property in a fixed-layout type.
@@ -1387,18 +1397,15 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
 
     return false;
   }
-  case ResilienceStrategy::Resilient: {
-    // A resilient module needs to handle binaries compiled against its older
-    // versions. This means we have to be a bit more conservative, since in
-    // earlier versions, a settable property may have withheld the setter,
-    // or a fixed-layout type may not have been.
-    // Without availability information, only get-only computed properties
-    // can resiliently use trivial descriptors.
-    return !SGM.canStorageUseStoredKeyPathComponent(decl, expansion)
-      && decl->getSetter() == nullptr;
-  }
-  }
-  llvm_unreachable("unhandled strategy");
+
+  // A resilient module needs to handle binaries compiled against its older
+  // versions. This means we have to be a bit more conservative, since in
+  // earlier versions, a settable property may have withheld the setter,
+  // or a fixed-layout type may not have been.
+  // Without availability information, only get-only computed properties
+  // can resiliently use trivial descriptors.
+  return !SGM.canStorageUseStoredKeyPathComponent(decl, expansion)
+    && decl->getSetter() == nullptr;
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
@@ -1506,15 +1513,18 @@ void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
     return;
 
   auto conformance = conformanceRef.getConcrete();
-  auto root = conformance->getRootNormalConformance();
+  auto normal = dyn_cast<NormalProtocolConformance>(
+      conformance->getRootConformance());
+  if (normal == nullptr)
+    return;
 
   // If we already emitted this witness table, we don't need to track the fact
   // we need it.
-  if (emittedWitnessTables.count(root))
+  if (emittedWitnessTables.count(normal))
     return;
 
   // If we delayed emitting this witness table, force it.
-  auto foundDelayed = delayedConformances.find(root);
+  auto foundDelayed = delayedConformances.find(normal);
   if (foundDelayed != delayedConformances.end()) {
     forcedConformances.push_back(*foundDelayed);
     delayedConformances.erase(foundDelayed);
@@ -1522,7 +1532,7 @@ void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
   }
 
   // Otherwise, just remember the fact we used this conformance.
-  usedConformances.insert(root);
+  usedConformances.insert(normal);
 }
 
 void SILGenModule::useConformancesFromSubstitutions(

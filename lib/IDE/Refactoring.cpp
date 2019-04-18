@@ -27,6 +27,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Index/Index.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/ADT/StringSet.h"
@@ -2856,8 +2857,6 @@ static CallExpr *findTrailingClosureTarget(SourceManager &SM,
   if (!Args)
     return nullptr;
   Expr *LastArg;
-  if (auto *ASE = dyn_cast<ArgumentShuffleExpr>(Args))
-    Args = ASE->getSubExpr();
   if (auto *PE = dyn_cast<ParenExpr>(Args)) {
     LastArg = PE->getSubExpr();
   } else {
@@ -2885,33 +2884,24 @@ bool RefactoringActionTrailingClosure::performChange() {
   auto *CE = findTrailingClosureTarget(SM, CursorInfo);
   if (!CE)
     return true;
-  Expr *Args = CE->getArg();
-  if (auto *ASE = dyn_cast<ArgumentShuffleExpr>(Args))
-    Args = ASE->getSubExpr();
+  Expr *Arg = CE->getArg();
 
   Expr *ClosureArg = nullptr;
   Expr *PrevArg = nullptr;
-  SourceLoc LPLoc, RPLoc;
 
-  if (auto *PE = dyn_cast<ParenExpr>(Args)) {
-    ClosureArg = PE->getSubExpr();
-    LPLoc = PE->getLParenLoc();
-    RPLoc = PE->getRParenLoc();
-  } else {
-    auto *TE = cast<TupleExpr>(Args);
-    auto NumArgs = TE->getNumElements();
-    if (NumArgs == 0)
-      return true;
-    LPLoc = TE->getLParenLoc();
-    RPLoc = TE->getRParenLoc();
-    ClosureArg = TE->getElement(NumArgs - 1);
-    if (NumArgs > 1)
-      PrevArg = TE->getElement(NumArgs - 2);
-  }
+  OriginalArgumentList ArgList = getOriginalArgumentList(Arg);
+
+  auto NumArgs = ArgList.args.size();
+  if (NumArgs == 0)
+    return true;
+  ClosureArg = ArgList.args[NumArgs - 1];
+  if (NumArgs > 1)
+    PrevArg = ArgList.args[NumArgs - 2];
+
   if (auto *ICE = dyn_cast<ImplicitConversionExpr>(ClosureArg))
     ClosureArg = ICE->getSyntacticSubExpr();
 
-  if (LPLoc.isInvalid() || RPLoc.isInvalid())
+  if (ArgList.lParenLoc.isInvalid() || ArgList.rParenLoc.isInvalid())
     return true;
 
   // Replace:
@@ -2925,14 +2915,14 @@ bool RefactoringActionTrailingClosure::performChange() {
     EditConsumer.accept(SM, PreRange, ") ");
   } else {
     CharSourceRange PreRange(
-        SM, LPLoc, ClosureArg->getStartLoc());
+        SM, ArgList.lParenLoc, ClosureArg->getStartLoc());
     EditConsumer.accept(SM, PreRange, " ");
   }
   // Remove original closing paren.
   CharSourceRange PostRange(
       SM,
       Lexer::getLocForEndOfToken(SM, ClosureArg->getEndLoc()),
-      Lexer::getLocForEndOfToken(SM, RPLoc));
+      Lexer::getLocForEndOfToken(SM, ArgList.rParenLoc));
   EditConsumer.remove(SM, PostRange);
   return false;
 }

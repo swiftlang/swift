@@ -45,8 +45,9 @@ public func returnOptionalEscape() -> (() ->())?
 // CHECK:  retain_value [[V1]]
 // CHECK:  switch_enum [[V1]] : $Optional<{{.*}}>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
-// CHECK: [[SOME_BB]]([[V2:%.*]]: $@callee_guaranteed () -> ()):
-// CHECK:  [[CVT:%.*]] = convert_escape_to_noescape [[V2]]
+// CHECK: [[SOME_BB]]([[V2:%.*]] : $@callee_guaranteed () -> ()):
+// CHECK:  [[CVT_MARK_DEP:%.*]] = mark_dependence [[V2]] : $@callee_guaranteed () -> () on [[V1]]
+// CHECK:  [[CVT:%.*]] = convert_escape_to_noescape [[CVT_MARK_DEP]]
 // CHECK:  [[SOME:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt.1, [[CVT]]
 // CHECK:  strong_release [[V2]]
 // CHECK:  br [[NEXT_BB:bb[0-9]+]]([[SOME]] :
@@ -89,8 +90,8 @@ public func returnOptionalEscape() -> (() ->())?
 //
 // NOPEEPHOLE: [[SOME_BB]]([[V2:%.*]]: $@callee_guaranteed () -> ()):
 // NOPEEPHOLE-NEXT:  release_value [[NONE_2]]
-// NOPEEPHOLE-NEXT:  [[SOME:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt.1, [[V2]]
 // NOPEEPHOLE-NEXT:  [[CVT:%.*]] = convert_escape_to_noescape [[V2]]
+// NOPEEPHOLE-NEXT:  [[SOME:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt.1, [[V2]]
 // NOPEEPHOLE-NEXT:  [[NOESCAPE_SOME:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt.1, [[CVT]]
 // NOPEEPHOLE-NEXT:  br bb2([[NOESCAPE_SOME]] : $Optional<{{.*}}>, [[SOME]] :
 //

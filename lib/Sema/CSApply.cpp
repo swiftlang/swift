@@ -323,26 +323,17 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
 /// Form a type checked expression for the index of a @dynamicMemberLookup
 /// subscript index parameter.
 /// The index expression will have a tuple type of `(dynamicMember: T)`.
-static Expr *buildDynamicMemberLookupIndexExpr(StringRef name, Type ty,
-                                               SourceLoc loc, DeclContext *dc,
+static Expr *buildDynamicMemberLookupIndexExpr(StringRef name, SourceLoc loc,
+                                               DeclContext *dc,
                                                ConstraintSystem &cs) {
   auto &ctx = cs.TC.Context;
-  
   // Build and type check the string literal index value to the specific
   // string type expected by the subscript.
   Expr *nameExpr = new (ctx) StringLiteralExpr(name, loc, /*implicit*/true);
   (void)cs.TC.typeCheckExpression(nameExpr, dc);
   cs.cacheExprTypes(nameExpr);
-
-  // Build a tuple so that the argument has a label.
-  Expr *tuple = TupleExpr::create(ctx, loc, nameExpr, ctx.Id_dynamicMember,
-                                  loc, loc, /*hasTrailingClosure*/false,
-                                  /*implicit*/true);
-  cs.setType(tuple, ty);
-  tuple->setType(ty);
-  return tuple;
+  return nameExpr;
 }
-
 
 namespace {
 
@@ -380,14 +371,10 @@ namespace {
     ///
     /// \param sources The sources of each of the elements to be used in the
     /// resulting tuple, as provided by \c computeTupleShuffle.
-    ///
-    /// \param typeFromPattern Optionally, the caller can specify the pattern
-    /// from where the toType is derived, so that we can deliver better fixit.
     Expr *coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                              TupleType *toTuple,
                              ConstraintLocatorBuilder locator,
-                             SmallVectorImpl<unsigned> &sources,
-                             Optional<Pattern*> typeFromPattern = None);
+                             ArrayRef<unsigned> sources);
 
     /// Coerce a subclass, class-constrained archetype, class-constrained
     /// existential or to a superclass type.
@@ -564,18 +551,20 @@ namespace {
                               /*isDynamic=*/false);
       }
 
-      SubstitutionMap substitutions;
+      auto type = solution.simplifyType(openedType);
 
-      // Due to a SILGen quirk, unqualified property references do not
-      // need substitutions.
-      if (!isa<VarDecl>(decl)) {
-        substitutions =
+      if (isa<TypeDecl>(decl) && !isa<ModuleDecl>(decl)) {
+        auto typeExpr = TypeExpr::createImplicitHack(
+          loc.getBaseNameLoc(), type->getMetatypeInstanceType(),
+          ctx);
+        cs.cacheType(typeExpr);
+        return typeExpr;
+      }
+
+      auto substitutions =
           solution.computeSubstitutions(
             decl->getInnermostDeclContext()->getGenericSignatureOfContext(),
             locator);
-      }
-
-      auto type = solution.simplifyType(openedType);
       auto declRefExpr =
         new (ctx) DeclRefExpr(ConcreteDeclRef(decl, substitutions),
                               loc, implicit, semantics, type);
@@ -824,8 +813,10 @@ namespace {
       // Figure out the actual base type, and whether we have an instance of
       // that type or its metatype.
       bool baseIsInstance = true;
+      bool isExistentialMetatype = false;
       if (auto baseMeta = baseTy->getAs<AnyMetatypeType>()) {
         baseIsInstance = false;
+        isExistentialMetatype = baseMeta->is<ExistentialMetatypeType>();
         baseTy = baseMeta->getInstanceType();
       }
 
@@ -851,6 +842,20 @@ namespace {
         auto *DSBI = cs.cacheType(new (context) DotSyntaxBaseIgnoredExpr(
             base, dotLoc, ref, cs.getType(ref)));
         return forceUnwrapIfExpected(DSBI, choice, memberLocator);
+      }
+
+      // If we're referring to a member type, it's just a type
+      // reference.
+      if (isa<TypeDecl>(member)) {
+        Type refType = simplifyType(openedType);
+        auto ref =
+            TypeExpr::createImplicitHack(memberLoc.getBaseNameLoc(),
+                                         refType, context);
+        cs.setType(ref, refType);
+        auto *result = new (context) DotSyntaxBaseIgnoredExpr(
+            base, dotLoc, ref, refType);
+        cs.setType(result, refType);
+        return result;
       }
 
       // The formal type of the 'self' value for the member's declaration.
@@ -913,11 +918,15 @@ namespace {
                  base, selfParamTy, member, semantics,
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
-        // Convert the base to an rvalue of the appropriate metatype.
-        base = coerceToType(base,
-                            MetatypeType::get(isDynamic ? selfTy : containerTy),
-                            locator.withPathElement(
-                              ConstraintLocator::MemberRefBase));
+        if (!isExistentialMetatype || openedExistential) {
+          // Convert the base to an rvalue of the appropriate metatype.
+          base = coerceToType(base,
+                              MetatypeType::get(
+                                isDynamic ? selfTy : containerTy),
+                              locator.withPathElement(
+                                ConstraintLocator::MemberRefBase));
+        }
+
         if (!base)
           return nullptr;
 
@@ -990,8 +999,8 @@ namespace {
             member->getAttrs().hasAttribute<OptionalAttr>());
       }
 
-      // For types and properties, build member references.
-      if (isa<TypeDecl>(member) || isa<VarDecl>(member)) {
+      // For properties, build member references.
+      if (isa<VarDecl>(member)) {
         assert(!dynamicSelfFnType && "Converted type doesn't make sense here");
         if (!baseIsInstance && member->isInstanceMember()) {
           assert(memberLocator.getBaseLocator() && 
@@ -1273,6 +1282,11 @@ namespace {
             OverloadChoiceKind::DynamicMemberLookup)
           locatorKind = ConstraintLocator::Member;
 
+        if (selected->choice.getKind() ==
+                OverloadChoiceKind::KeyPathDynamicMemberLookup &&
+            !isa<SubscriptExpr>(locator.getAnchor()))
+          locatorKind = ConstraintLocator::Member;
+
         newSubscript =
             forceUnwrapIfExpected(newSubscript, selected->choice,
                                   locator.withPathElement(locatorKind));
@@ -1378,6 +1392,12 @@ namespace {
 
       auto &tc = cs.getTypeChecker();
       auto baseTy = cs.getType(base)->getRValueType();
+      
+      bool baseIsInstance = true;
+      if (auto baseMeta = baseTy->getAs<AnyMetatypeType>()) {
+        baseIsInstance = false;
+        baseTy = baseMeta->getInstanceType();
+      }
 
       // Check whether the base is 'super'.
       bool isSuper = base->isSuperExpr();
@@ -1386,7 +1406,13 @@ namespace {
       auto locatorKind = ConstraintLocator::SubscriptMember;
       if (choice.getKind() == OverloadChoiceKind::DynamicMemberLookup)
         locatorKind = ConstraintLocator::Member;
-      
+
+      if (choice.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+        locatorKind = isa<SubscriptExpr>(locator.getAnchor())
+                          ? ConstraintLocator::SubscriptMember
+                          : ConstraintLocator::Member;
+      }
+
       // If we opened up an existential when performing the subscript, open
       // the base accordingly.
       auto knownOpened = solution.OpenedExistentialTypes.find(
@@ -1399,7 +1425,8 @@ namespace {
  
       // Figure out the index and result types.
       Type resultTy;
-      if (choice.getKind() != OverloadChoiceKind::DynamicMemberLookup) {
+      if (choice.getKind() != OverloadChoiceKind::DynamicMemberLookup &&
+          choice.getKind() != OverloadChoiceKind::KeyPathDynamicMemberLookup) {
         auto subscriptTy = simplifyType(selected.openedType);
         auto *subscriptFnTy = subscriptTy->castTo<FunctionType>();
         resultTy = subscriptFnTy->getResult();
@@ -1419,7 +1446,7 @@ namespace {
         // the subscript.
         resultTy = simplifyType(selected.openedType);
       }
-      
+
       auto getType = [&](const Expr *E) -> Type {
         return cs.getType(E);
       };
@@ -1456,9 +1483,22 @@ namespace {
       auto openedBaseType =
           getBaseType(openedFullFnType, /*wantsRValue*/ false);
       auto containerTy = solution.simplifyType(openedBaseType);
-      base = coerceObjectArgumentToType(
-        base, containerTy, subscript, AccessSemantics::Ordinary,
-        locator.withPathElement(ConstraintLocator::MemberRefBase));
+      
+      if (baseIsInstance) {
+        base = coerceObjectArgumentToType(
+          base, containerTy, subscript, AccessSemantics::Ordinary,
+          locator.withPathElement(ConstraintLocator::MemberRefBase));
+      } else {
+        base = coerceToType(base,
+                            MetatypeType::get(containerTy),
+                            locator.withPathElement(
+                              ConstraintLocator::MemberRefBase));
+        
+        if (!base)
+          return nullptr;
+        
+        base = cs.coerceToRValue(base);
+      }
       if (!base)
         return nullptr;
 
@@ -1524,6 +1564,146 @@ namespace {
       }
 
       return ctorRef;
+    }
+
+    /// Build an implicit argument for keypath based dynamic lookup,
+    /// which consists of KeyPath expression and a single component.
+    ///
+    /// \param keyPathTy The type of the keypath argument.
+    /// \param dotLoc The location of the '.' preceding member name.
+    /// \param memberLoc The locator to be associated with new argument.
+    Expr *buildKeyPathDynamicMemberIndexExpr(BoundGenericType *keyPathTy,
+                                             SourceLoc dotLoc,
+                                             ConstraintLocator *memberLoc) {
+      auto &ctx = cs.getASTContext();
+      auto *anchor = memberLoc->getAnchor();
+
+      KeyPathExpr::Component component;
+
+      // Let's create a KeyPath expression and fill in "parsed path"
+      // after component is built.
+      auto *keyPath = new (ctx) KeyPathExpr(/*backslashLoc=*/dotLoc,
+                                            /*parsedRoot=*/nullptr,
+                                            /*parsedPath=*/anchor,
+                                            /*isImplicit=*/true);
+      // Type of the keypath expression we are forming is known
+      // in advance, so let's set it right away.
+      keyPath->setType(keyPathTy);
+      cs.cacheType(keyPath);
+
+      auto *componentLoc = cs.getConstraintLocator(
+          memberLoc,
+          LocatorPathElt::getKeyPathDynamicMember(keyPathTy->getAnyNominal()));
+      auto overload = solution.getOverloadChoice(componentLoc);
+
+      auto getKeyPathComponentIndex =
+          [](ConstraintLocator *locator) -> unsigned {
+        for (const auto &elt : locator->getPath()) {
+          if (elt.getKind() == ConstraintLocator::KeyPathComponent)
+            return elt.getValue();
+        }
+        llvm_unreachable("no keypath component node");
+      };
+
+      // Looks like there is a chain of implicit `subscript(dynamicMember:)`
+      // calls necessary to resolve a member reference.
+      if (overload.choice.getKind() ==
+          OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+        keyPath->resolveComponents(ctx,
+                                   buildKeyPathSubscriptComponent(
+                                       overload, dotLoc, /*indexExpr=*/nullptr,
+                                       ctx.Id_dynamicMember, componentLoc));
+        return keyPath;
+      }
+
+      // We can't reuse existing expression because type-check
+      // based diagnostics could hold the reference to original AST.
+      Expr *componentExpr = nullptr;
+      auto *dotExpr = new (ctx) KeyPathDotExpr(dotLoc);
+
+      // Determines whether this index is built to be used for
+      // one of the existing keypath components e.g. `\Lens<[Int]>.count`
+      // instead of a regular expression e.g. `lens[0]`.
+      bool forKeyPathComponent = false;
+      // Looks like keypath dynamic member lookup was used inside
+      // of a keypath expression e.g. `\Lens<[Int]>.count` where
+      // `count` is referenced using dynamic lookup.
+      if (auto *KPE = dyn_cast<KeyPathExpr>(anchor)) {
+        auto componentIdx = getKeyPathComponentIndex(memberLoc);
+        auto &origComponent = KPE->getComponents()[componentIdx];
+
+        using ComponentKind = KeyPathExpr::Component::Kind;
+        if (origComponent.getKind() == ComponentKind::UnresolvedProperty) {
+          anchor = new (ctx) UnresolvedDotExpr(
+              dotExpr, dotLoc, origComponent.getUnresolvedDeclName(),
+              DeclNameLoc(origComponent.getLoc()),
+              /*Implicit=*/true);
+        } else if (origComponent.getKind() ==
+                   ComponentKind::UnresolvedSubscript) {
+          anchor = SubscriptExpr::create(
+              ctx, dotExpr, origComponent.getIndexExpr(), ConcreteDeclRef(),
+              /*implicit=*/true, AccessSemantics::Ordinary,
+              [&](const Expr *expr) { return simplifyType(cs.getType(expr)); });
+        } else {
+          return nullptr;
+        }
+
+        anchor->setType(simplifyType(overload.openedType));
+        cs.cacheType(anchor);
+        forKeyPathComponent = true;
+      }
+
+      if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+        componentExpr =
+            forKeyPathComponent
+                ? UDE
+                : new (ctx) UnresolvedDotExpr(dotExpr, dotLoc, UDE->getName(),
+                                              UDE->getNameLoc(),
+                                              /*Implicit=*/true);
+
+        component = buildKeyPathPropertyComponent(overload, UDE->getLoc(),
+                                                  componentLoc);
+      } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
+        componentExpr = SE;
+        // If this is not for a keypath component, we have to copy
+        // original subscript expression because expression based
+        // diagnostics might have a reference to it, so it couldn't
+        // be modified.
+        if (!forKeyPathComponent) {
+          SmallVector<Expr *, 4> arguments;
+          if (auto *TE = dyn_cast<TupleExpr>(SE->getIndex())) {
+            auto args = TE->getElements();
+            arguments.append(args.begin(), args.end());
+          } else {
+            arguments.push_back(SE->getIndex()->getSemanticsProvidingExpr());
+          }
+
+          Expr *trailingClosure = nullptr;
+          if (SE->hasTrailingClosure())
+            trailingClosure = arguments.back();
+
+          componentExpr = SubscriptExpr::create(
+              ctx, dotExpr, SE->getStartLoc(), arguments,
+              SE->getArgumentLabels(), SE->getArgumentLabelLocs(),
+              SE->getEndLoc(), trailingClosure,
+              SE->hasDecl() ? SE->getDecl() : ConcreteDeclRef(),
+              /*implicit=*/true, SE->getAccessSemantics());
+        }
+
+        component = buildKeyPathSubscriptComponent(
+            overload, SE->getLoc(), SE->getIndex(), SE->getArgumentLabels(),
+            componentLoc);
+      } else {
+        return nullptr;
+      }
+
+      assert(componentExpr);
+      componentExpr->setType(simplifyType(cs.getType(anchor)));
+      cs.cacheType(componentExpr);
+
+      keyPath->setParsedPath(componentExpr);
+      keyPath->resolveComponents(ctx, {component});
+      return keyPath;
     }
 
     /// Bridge the given value (which is an error type) to NSError.
@@ -2667,43 +2847,76 @@ namespace {
 
       case OverloadChoiceKind::KeyPathApplication:
         llvm_unreachable("should only happen in a subscript");
-          
-      case OverloadChoiceKind::DynamicMemberLookup: {
-        // Application of a DynamicMemberLookup result turns a member access of
-        // x.foo into x[dynamicMember: "foo"].
-        auto &ctx = cs.getASTContext();
-        auto loc = nameLoc.getStartLoc();
-        
-        // Figure out the expected type of the string.  We know the
-        // openedFullType will be "xType -> indexType -> resultType".  Dig out
-        // its index type.
-        auto declTy = solution.simplifyType(selected.openedFullType);
-        auto subscriptTy = declTy->castTo<FunctionType>()->getResult();
-        auto refFnType = subscriptTy->castTo<FunctionType>();
-        assert(refFnType->getParams().size() == 1 &&
-               "subscript always has one arg");
-        auto stringType = refFnType->getParams()[0].getPlainType();
-        auto tupleTy = TupleType::get(TupleTypeElt(stringType,
-                                                   ctx.Id_dynamicMember), ctx);
 
-        // Build and type check the string literal index value to the specific
-        // string type expected by the subscript.
-        auto fieldName = selected.choice.getName().getBaseIdentifier().str();
-        auto index =
-          buildDynamicMemberLookupIndexExpr(fieldName, tupleTy, loc, dc, cs);
-
-        // Build and return a subscript that uses this string as the index.
-        return buildSubscript(base, index, ctx.Id_dynamicMember,
-                              /*trailingClosure*/false,
-                              cs.getConstraintLocator(expr),
-                              /*isImplicit*/false,
-                              AccessSemantics::Ordinary, selected);
+      case OverloadChoiceKind::DynamicMemberLookup:
+      case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
+        return buildDynamicMemberLookupRef(
+            expr, base, dotLoc, nameLoc.getStartLoc(), selected, memberLocator);
       }
       }
 
       llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
     }
-    
+
+    Expr *buildDynamicMemberLookupRef(Expr *expr, Expr *base, SourceLoc dotLoc,
+                                      SourceLoc nameLoc,
+                                      const SelectedOverload &overload,
+                                      ConstraintLocator *memberLocator) {
+      // Application of a DynamicMemberLookup result turns
+      // a member access of `x.foo` into x[dynamicMember: "foo"], or
+      // x[dynamicMember: KeyPath<T, U>]
+      auto &ctx = cs.getASTContext();
+
+      // Figure out the expected type of the lookup parameter. We know the
+      // openedFullType will be "xType -> indexType -> resultType".  Dig out
+      // its index type.
+      auto paramTy = getTypeOfDynamicMemberIndex(overload);
+
+      Expr *argExpr = nullptr;
+      if (overload.choice.getKind() ==
+          OverloadChoiceKind::DynamicMemberLookup) {
+        // Build and type check the string literal index value to the specific
+        // string type expected by the subscript.
+        auto fieldName = overload.choice.getName().getBaseIdentifier().str();
+        argExpr = buildDynamicMemberLookupIndexExpr(fieldName, nameLoc, dc, cs);
+      } else {
+        argExpr = buildKeyPathDynamicMemberIndexExpr(
+            paramTy->castTo<BoundGenericType>(), dotLoc, memberLocator);
+      }
+
+      if (!argExpr)
+        return nullptr;
+
+      // Build a tuple so that the argument has a label.
+      auto tupleTy =
+          TupleType::get(TupleTypeElt(paramTy, ctx.Id_dynamicMember), ctx);
+
+      Expr *index =
+          TupleExpr::createImplicit(ctx, argExpr, ctx.Id_dynamicMember);
+      index->setType(tupleTy);
+      cs.cacheType(index);
+
+      // Build and return a subscript that uses this string as the index.
+      return buildSubscript(
+          base, index, ctx.Id_dynamicMember,
+          /*trailingClosure*/ false, cs.getConstraintLocator(expr),
+          /*isImplicit*/ true, AccessSemantics::Ordinary, overload);
+    }
+
+    Type getTypeOfDynamicMemberIndex(const SelectedOverload &overload) {
+      assert(overload.choice.getKind() ==
+                 OverloadChoiceKind::DynamicMemberLookup ||
+             overload.choice.getKind() ==
+                 OverloadChoiceKind::KeyPathDynamicMemberLookup);
+
+      auto declTy = solution.simplifyType(overload.openedFullType);
+      auto subscriptTy = declTy->castTo<FunctionType>()->getResult();
+      auto refFnType = subscriptTy->castTo<FunctionType>();
+      assert(refFnType->getParams().size() == 1 &&
+             "subscript always has one arg");
+      return refFnType->getParams()[0].getPlainType();
+    }
+
   public:
     Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
       return applyMemberRefExpr(expr, expr->getBase(), expr->getDotLoc(),
@@ -2763,12 +2976,21 @@ namespace {
     }
 
     Expr *visitSubscriptExpr(SubscriptExpr *expr) {
-      return buildSubscript(expr->getBase(), expr->getIndex(),
-                            expr->getArgumentLabels(),
-                            expr->hasTrailingClosure(),
-                            cs.getConstraintLocator(expr),
-                            expr->isImplicit(),
-                            expr->getAccessSemantics());
+      auto *memberLocator =
+          cs.getConstraintLocator(expr, ConstraintLocator::SubscriptMember);
+      auto overload = solution.getOverloadChoiceIfAvailable(memberLocator);
+
+      if (overload && overload->choice.getKind() ==
+                          OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+        return buildDynamicMemberLookupRef(
+            expr, expr->getBase(), expr->getIndex()->getStartLoc(), SourceLoc(),
+            *overload, memberLocator);
+      }
+
+      return buildSubscript(
+          expr->getBase(), expr->getIndex(), expr->getArgumentLabels(),
+          expr->hasTrailingClosure(), cs.getConstraintLocator(expr),
+          expr->isImplicit(), expr->getAccessSemantics(), overload);
     }
 
     /// "Finish" an array expression by filling in the semantic expression.
@@ -2786,71 +3008,23 @@ namespace {
                               ConformanceCheckFlags::InExpression);
       assert(conformance && "Type does not conform to protocol?");
 
-      // Call the witness that builds the array literal.
-      // FIXME: callWitness() may end up re-doing some work we already did
-      // to convert the array literal elements to the element type. It would
-      // be nicer to re-use them.
-
-      // FIXME: This location info is bogus.
-      Expr *typeRef = TypeExpr::createImplicitHack(expr->getLoc(), arrayTy,
-                                                   tc.Context);
-      cs.cacheExprTypes(typeRef);
-
       DeclName name(tc.Context, DeclBaseName::createConstructor(),
                     { tc.Context.Id_arrayLiteral });
 
-      // Coerce the array elements to be rvalues, so that other type-checker
-      // code that attempts to peephole the AST doesn't have to re-load the
-      // elements (and break the invariant that lvalue nodes only get their
-      // access kind set once).
-      for (auto &element : expr->getElements()) {
-        element = cs.coerceToRValue(element);
-      }
-
-      // Restructure the argument to provide the appropriate labels in the
-      // tuple.
-      SmallVector<TupleTypeElt, 4> typeElements;
-      SmallVector<Identifier, 4> names;
-      bool first = true;
-      for (auto elt : expr->getElements()) {
-        if (first) {
-          typeElements.push_back(TupleTypeElt(cs.getType(elt),
-                                              tc.Context.Id_arrayLiteral));
-          names.push_back(tc.Context.Id_arrayLiteral);
-
-          first = false;
-          continue;
-        }
-
-        typeElements.push_back(cs.getType(elt));
-        names.push_back(Identifier());
-      }
-
-      Type argType = TupleType::get(typeElements, tc.Context);
-      assert(isa<TupleType>(argType.getPointer()));
-
-      Expr *arg =
-        TupleExpr::create(tc.Context, SourceLoc(),
-                          expr->getElements(),
-                          names,
-                          { },
-                          SourceLoc(), /*HasTrailingClosure=*/false,
-                          /*Implicit=*/true,
-                          argType);
-
-      cs.cacheExprTypes(arg);
-
-      cs.setExprTypes(typeRef);
-      cs.setExprTypes(arg);
-
-      Expr *result = tc.callWitness(typeRef, dc, arrayProto, *conformance,
-                                    name, arg, diag::array_protocol_broken);
-      if (!result)
+      ConcreteDeclRef witness =
+          findNamedWitnessImpl(tc, dc, arrayTy->getRValueType(), arrayProto,
+                               name, diag::array_protocol_broken, conformance);
+      if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
         return nullptr;
+      expr->setInitializer(witness);
 
-      cs.cacheExprTypes(result);
+      auto elementType = expr->getElementType();
 
-      expr->setSemanticExpr(result);
+      for (auto &element : expr->getElements()) {
+        element = coerceToType(element, elementType,
+                               cs.getConstraintLocator(element));
+      }
+
       return expr;
     }
 
@@ -2997,11 +3171,7 @@ namespace {
     Expr *visitVarargExpansionExpr(VarargExpansionExpr *expr) {
       simplifyExprType(expr);
 
-      auto elementTy = cs.getType(expr);
-      auto arrayTy =
-        cs.getTypeChecker().getArraySliceType(expr->getLoc(), elementTy);
-      if (!arrayTy) return expr;
-
+      auto arrayTy = cs.getType(expr);
       expr->setSubExpr(coerceToType(expr->getSubExpr(), arrayTy,
                                     cs.getConstraintLocator(expr)));
       return expr;
@@ -3016,6 +3186,14 @@ namespace {
     }
 
     Expr *visitOpaqueValueExpr(OpaqueValueExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
+    Expr *visitDefaultArgumentExpr(DefaultArgumentExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
+    Expr *visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
 
@@ -3843,7 +4021,7 @@ namespace {
       auto &tc = cs.getTypeChecker();
       auto &ctx = tc.Context;
       // Synthesize a call to _undefined() of appropriate type.
-      FuncDecl *undefinedDecl = ctx.getUndefinedDecl();
+      FuncDecl *undefinedDecl = ctx.getUndefined();
       if (!undefinedDecl) {
         tc.diagnose(E->getLoc(), diag::missing_undefined_runtime);
         return nullptr;
@@ -4146,12 +4324,7 @@ namespace {
       E->setMethod(method);
       return E;
     }
-    
-  private:
-    // Key path components we need to
-    SmallVector<std::pair<KeyPathExpr *, unsigned>, 4>
-      KeyPathSubscriptComponents;
-  public:
+
     Expr *visitKeyPathExpr(KeyPathExpr *E) {
       if (E->isObjC()) {
         cs.setType(E, cs.getType(E->getObjCStringLiteralExpr()));
@@ -4185,15 +4358,6 @@ namespace {
       Type baseTy = keyPathTy->getGenericArgs()[0];
       Type leafTy = keyPathTy->getGenericArgs()[1];
 
-      // We do not allow keypaths to go through AnyObject
-      if (baseTy->isAnyObject()) {
-        auto rootTyRepr = E->getRootType();
-        cs.TC.diagnose(rootTyRepr->getLoc(),
-                       diag::expr_swift_keypath_invalid_component)
-             .highlight(rootTyRepr->getSourceRange());
-        return nullptr;
-      }
-
       for (unsigned i : indices(E->getComponents())) {
         auto &origComponent = E->getMutableComponents()[i];
         
@@ -4225,25 +4389,30 @@ namespace {
         auto kind = origComponent.getKind();
         Optional<SelectedOverload> foundDecl;
 
-        auto locator =
-          cs.getConstraintLocator(E,
-                        ConstraintLocator::PathElement::getKeyPathComponent(i));
+        auto locator = cs.getConstraintLocator(
+            E, ConstraintLocator::PathElement::getKeyPathComponent(i));
         if (kind == KeyPathExpr::Component::Kind::UnresolvedSubscript) {
           locator =
             cs.getConstraintLocator(locator,
                                     ConstraintLocator::SubscriptMember);
         }
 
+        bool isDynamicMember = false;
         // If this is an unresolved link, make sure we resolved it.
         if (kind == KeyPathExpr::Component::Kind::UnresolvedProperty ||
             kind == KeyPathExpr::Component::Kind::UnresolvedSubscript) {
           foundDecl = solution.getOverloadChoiceIfAvailable(locator);
           // Leave the component unresolved if the overload was not resolved.
           if (foundDecl) {
+            isDynamicMember =
+                foundDecl->choice.getKind() ==
+                    OverloadChoiceKind::DynamicMemberLookup ||
+                foundDecl->choice.getKind() ==
+                    OverloadChoiceKind::KeyPathDynamicMemberLookup;
+
             // If this was a @dynamicMemberLookup property, then we actually
             // form a subscript reference, so switch the kind.
-            if (foundDecl->choice.getKind()
-                    == OverloadChoiceKind::DynamicMemberLookup) {
+            if (isDynamicMember) {
               kind = KeyPathExpr::Component::Kind::UnresolvedSubscript;
             }
           }
@@ -4258,59 +4427,8 @@ namespace {
             break;
           }
 
-          if (foundDecl->choice.isDecl()) {
-            auto property = foundDecl->choice.getDecl();
-              
-            // Key paths can only refer to properties currently.
-            if (!isa<VarDecl>(property)) {
-              cs.TC.diagnose(origComponent.getLoc(),
-                             diag::expr_keypath_not_property,
-                             property->getDescriptiveKind(),
-                             property->getFullName());
-            } else {
-              // Key paths don't work with mutating-get properties.
-              auto varDecl = cast<VarDecl>(property);
-              if (varDecl->isGetterMutating()) {
-                cs.TC.diagnose(origComponent.getLoc(),
-                               diag::expr_keypath_mutating_getter,
-                               property->getFullName());
-              }
-                  
-              // Key paths don't currently support static members.
-              if (varDecl->isStatic()) {
-                cs.TC.diagnose(origComponent.getLoc(),
-                               diag::expr_keypath_static_member,
-                               property->getFullName());
-              }
-            }
-              
-            cs.TC.requestMemberLayout(property);
-              
-            auto dc = property->getInnermostDeclContext();
-              
-            // Compute substitutions to refer to the member.
-            SubstitutionMap subs =
-            solution.computeSubstitutions(dc->getGenericSignatureOfContext(),
-                                          locator);
-              
-            auto resolvedTy = foundDecl->openedType;
-            resolvedTy = simplifyType(resolvedTy);
-              
-            auto ref = ConcreteDeclRef(property, subs);
-              
-            component = KeyPathExpr::Component::forProperty(ref,
-                                                            resolvedTy,
-                                                            origComponent.getLoc());
-          } else {
-            auto fieldIndex = foundDecl->choice.getTupleIndex();
-
-            auto resolvedTy = foundDecl->openedType;
-            resolvedTy = simplifyType(resolvedTy);
-
-            component = KeyPathExpr::Component::forTupleElement(fieldIndex,
-                                                                resolvedTy,
-                                                                origComponent.getLoc());
-          }
+          component = buildKeyPathPropertyComponent(
+              *foundDecl, origComponent.getLoc(), locator);
 
           baseTy = component.getComponentType();
           resolvedComponents.push_back(component);
@@ -4330,78 +4448,14 @@ namespace {
             component = origComponent;
             break;
           }
-          
-          auto subscript = cast<SubscriptDecl>(foundDecl->choice.getDecl());
-          if (subscript->isGetterMutating()) {
-            cs.TC.diagnose(origComponent.getLoc(),
-                           diag::expr_keypath_mutating_getter,
-                           subscript->getFullName());
-          }
 
-          cs.TC.requestMemberLayout(subscript);
+          ArrayRef<Identifier> subscriptLabels;
+          if (!isDynamicMember)
+            subscriptLabels = origComponent.getSubscriptLabels();
 
-          auto dc = subscript->getInnermostDeclContext();
-
-          auto indexType = AnyFunctionType::composeInput(
-            cs.TC.Context,
-            subscript->getInterfaceType()
-              ->castTo<AnyFunctionType>()
-              ->getParams(),
-            /*canonicalVararg=*/false);
-
-          SubstitutionMap subs;
-          if (auto sig = dc->getGenericSignatureOfContext()) {
-            // Compute substitutions to refer to the member.
-            subs = solution.computeSubstitutions(sig, locator);
-            indexType = indexType.subst(subs);
-          }
-
-          // If this is a @dynamicMemberLookup reference to resolve a property
-          // through the subscript(dynamicMember:) member, restore the
-          // openedType and origComponent to its full reference as if the user
-          // wrote out the subscript manually.
-          if (foundDecl->choice.getKind() ==
-              OverloadChoiceKind::DynamicMemberLookup) {
-            foundDecl->openedType = foundDecl->openedFullType
-                ->castTo<AnyFunctionType>()->getResult();
-
-            auto &ctx = cs.TC.Context;
-            auto loc = origComponent.getLoc();
-            auto fieldName =
-                foundDecl->choice.getName().getBaseIdentifier().str();
-
-            Expr *nameExpr = new (ctx) StringLiteralExpr(fieldName, loc,
-                                                         /*implicit*/true);
-            (void)cs.TC.typeCheckExpression(nameExpr, dc);
-            cs.cacheExprTypes(nameExpr);
-
-            origComponent = KeyPathExpr::Component::
-              forUnresolvedSubscript(ctx, loc,
-                                     {nameExpr}, {ctx.Id_dynamicMember}, {loc},
-                                     loc, /*trailingClosure*/nullptr);
-            cs.setType(origComponent.getIndexExpr(), indexType);
-          }
-
-          auto subscriptType =
-              simplifyType(foundDecl->openedType)->castTo<AnyFunctionType>();
-          auto resolvedTy = subscriptType->getResult();
-          auto ref = ConcreteDeclRef(subscript, subs);
-
-          // Coerce the indices to the type the subscript expects.
-          auto indexExpr = coerceCallArguments(
-              origComponent.getIndexExpr(), subscriptType,
-              /*applyExpr*/ nullptr, origComponent.getSubscriptLabels(),
-              /* hasTrailingClosure */ false, locator);
-
-          component = KeyPathExpr::Component
-            ::forSubscriptWithPrebuiltIndexExpr(ref, indexExpr,
-                                            origComponent.getSubscriptLabels(),
-                                            resolvedTy,
-                                            origComponent.getLoc(),
-                                            {});
-          // Save a reference to the component so we can do a post-pass to check
-          // the Hashable conformance of the indexes.
-          KeyPathSubscriptComponents.push_back({E, resolvedComponents.size()});
+          component = buildKeyPathSubscriptComponent(
+              *foundDecl, origComponent.getLoc(), origComponent.getIndexExpr(),
+              subscriptLabels, locator);
 
           baseTy = component.getComponentType();
           resolvedComponents.push_back(component);
@@ -4497,6 +4551,164 @@ namespace {
       return E;
     }
 
+    KeyPathExpr::Component
+    buildKeyPathPropertyComponent(const SelectedOverload &overload,
+                                  SourceLoc componentLoc,
+                                  ConstraintLocator *locator) {
+      if (overload.choice.isDecl()) {
+        auto property = overload.choice.getDecl();
+
+        // Key paths can only refer to properties currently.
+        if (!isa<VarDecl>(property)) {
+          cs.TC.diagnose(componentLoc, diag::expr_keypath_not_property,
+                         property->getDescriptiveKind(),
+                         property->getFullName());
+        } else {
+          // Key paths don't work with mutating-get properties.
+          auto varDecl = cast<VarDecl>(property);
+          if (varDecl->isGetterMutating()) {
+            cs.TC.diagnose(componentLoc, diag::expr_keypath_mutating_getter,
+                           property->getFullName());
+          }
+
+          // Key paths don't currently support static members.
+          // There is a fix which diagnoses such situation already.
+          assert(!varDecl->isStatic());
+        }
+
+        cs.TC.requestMemberLayout(property);
+
+        auto dc = property->getInnermostDeclContext();
+
+        // Compute substitutions to refer to the member.
+        SubstitutionMap subs = solution.computeSubstitutions(
+            dc->getGenericSignatureOfContext(), locator);
+
+        auto resolvedTy = overload.openedType;
+        resolvedTy = simplifyType(resolvedTy);
+
+        auto ref = ConcreteDeclRef(property, subs);
+
+        return KeyPathExpr::Component::forProperty(ref, resolvedTy,
+                                                   componentLoc);
+      }
+
+      auto fieldIndex = overload.choice.getTupleIndex();
+      auto resolvedTy = overload.openedType;
+      resolvedTy = simplifyType(resolvedTy);
+
+      return KeyPathExpr::Component::forTupleElement(fieldIndex, resolvedTy,
+                                                     componentLoc);
+    }
+
+    KeyPathExpr::Component buildKeyPathSubscriptComponent(
+        SelectedOverload &overload, SourceLoc componentLoc, Expr *indexExpr,
+        ArrayRef<Identifier> labels, ConstraintLocator *locator) {
+      auto subscript = cast<SubscriptDecl>(overload.choice.getDecl());
+      if (subscript->isGetterMutating()) {
+        cs.TC.diagnose(componentLoc, diag::expr_keypath_mutating_getter,
+                       subscript->getFullName());
+      }
+
+      cs.TC.requestMemberLayout(subscript);
+
+      auto dc = subscript->getInnermostDeclContext();
+
+      auto indexType = AnyFunctionType::composeInput(
+          cs.TC.Context,
+          subscript->getInterfaceType()->castTo<AnyFunctionType>()->getParams(),
+          /*canonicalVararg=*/false);
+
+      SubstitutionMap subs;
+      if (auto sig = dc->getGenericSignatureOfContext()) {
+        // Compute substitutions to refer to the member.
+        subs = solution.computeSubstitutions(sig, locator);
+        indexType = indexType.subst(subs);
+      }
+
+      // If this is a @dynamicMemberLookup reference to resolve a property
+      // through the subscript(dynamicMember:) member, restore the
+      // openedType and origComponent to its full reference as if the user
+      // wrote out the subscript manually.
+      bool forDynamicLookup =
+          overload.choice.getKind() ==
+              OverloadChoiceKind::DynamicMemberLookup ||
+          overload.choice.getKind() ==
+              OverloadChoiceKind::KeyPathDynamicMemberLookup;
+
+      if (forDynamicLookup) {
+        overload.openedType =
+            overload.openedFullType->castTo<AnyFunctionType>()->getResult();
+
+        labels = cs.getASTContext().Id_dynamicMember;
+
+        if (overload.choice.getKind() ==
+            OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+          auto indexType = getTypeOfDynamicMemberIndex(overload);
+          indexExpr = buildKeyPathDynamicMemberIndexExpr(
+              indexType->castTo<BoundGenericType>(), componentLoc, locator);
+        } else {
+          auto fieldName = overload.choice.getName().getBaseIdentifier().str();
+          indexExpr = buildDynamicMemberLookupIndexExpr(fieldName, componentLoc,
+                                                        dc, cs);
+        }
+      }
+
+      auto subscriptType =
+          simplifyType(overload.openedType)->castTo<AnyFunctionType>();
+      auto resolvedTy = subscriptType->getResult();
+      auto ref = ConcreteDeclRef(subscript, subs);
+
+      // Coerce the indices to the type the subscript expects.
+      auto *newIndexExpr =
+          coerceCallArguments(indexExpr, subscriptType,
+                              /*applyExpr*/ nullptr, labels,
+                              /*hasTrailingClosure*/ false, locator);
+
+      auto component = KeyPathExpr::Component::forSubscriptWithPrebuiltIndexExpr(
+          ref, newIndexExpr, labels, resolvedTy, componentLoc, {});
+
+      // We need to be able to hash the captured index values in order for
+      // KeyPath itself to be hashable, so check that all of the subscript
+      // index components are hashable and collect their conformances here.
+      SmallVector<ProtocolConformanceRef, 4> conformances;
+
+      auto hashable =
+          cs.getASTContext().getProtocol(KnownProtocolKind::Hashable);
+
+      auto equatable =
+          cs.getASTContext().getProtocol(KnownProtocolKind::Equatable);
+
+      auto &TC = cs.getTypeChecker();
+      auto fnType = overload.openedType->castTo<FunctionType>();
+      for (const auto &param : fnType->getParams()) {
+        auto indexType = simplifyType(param.getPlainType());
+        // Index type conformance to Hashable protocol has been
+        // verified by the solver, we just need to get it again
+        // with all of the generic parameters resolved.
+        auto hashableConformance =
+            TC.conformsToProtocol(indexType, hashable, cs.DC,
+                                  (ConformanceCheckFlags::Used |
+                                   ConformanceCheckFlags::InExpression));
+        assert(hashableConformance.hasValue());
+
+        // FIXME: Hashable implies Equatable, but we need to make sure the
+        // Equatable conformance is forced into existence during type
+        // checking so that it's available for SILGen.
+        auto eqConformance =
+            TC.conformsToProtocol(indexType, equatable, cs.DC,
+                                  (ConformanceCheckFlags::Used |
+                                   ConformanceCheckFlags::InExpression));
+        assert(eqConformance.hasValue());
+        (void)eqConformance;
+
+        conformances.push_back(*hashableConformance);
+      }
+
+      component.setSubscriptIndexHashableConformances(conformances);
+      return component;
+    }
+
     Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) {
       llvm_unreachable("found KeyPathDotExpr in CSApply");
     }
@@ -4563,61 +4775,6 @@ namespace {
           .fixItInsertAfter(cast->getEndLoc(), ")");
       }
       
-      // Look at key path subscript components to verify that they're hashable.
-      for (auto componentRef : KeyPathSubscriptComponents) {
-        auto &component = componentRef.first
-                                  ->getMutableComponents()[componentRef.second];
-        // We need to be able to hash the captured index values in order for
-        // KeyPath itself to be hashable, so check that all of the subscript
-        // index components are hashable and collect their conformances here.
-        SmallVector<ProtocolConformanceRef, 2> hashables;
-        bool allIndexesHashable = true;
-        ArrayRef<TupleTypeElt> indexTypes;
-        TupleTypeElt singleIndexTypeBuf;
-        if (auto tup = cs.getType(component.getIndexExpr())
-                                               ->getAs<TupleType>()) {
-          indexTypes = tup->getElements();
-        } else {
-          singleIndexTypeBuf = cs.getType(component.getIndexExpr());
-          indexTypes = singleIndexTypeBuf;
-        }
-      
-        auto hashable =
-          cs.getASTContext().getProtocol(KnownProtocolKind::Hashable);
-        auto equatable =
-          cs.getASTContext().getProtocol(KnownProtocolKind::Equatable);
-        for (auto indexType : indexTypes) {
-          auto conformance =
-            cs.TC.conformsToProtocol(indexType.getType(), hashable,
-                                     cs.DC,
-                                     (ConformanceCheckFlags::Used|
-                                      ConformanceCheckFlags::InExpression));
-          if (!conformance) {
-            cs.TC.diagnose(component.getIndexExpr()->getLoc(),
-                           diag::expr_keypath_subscript_index_not_hashable,
-                           indexType.getType());
-            allIndexesHashable = false;
-            continue;
-          }
-          hashables.push_back(*conformance);
-          
-          // FIXME: Hashable implies Equatable, but we need to make sure the
-          // Equatable conformance is forced into existence during type checking
-          // so that it's available for SILGen.
-          auto eqConformance =
-            cs.TC.conformsToProtocol(indexType.getType(), equatable,
-                                     cs.DC,
-                                     (ConformanceCheckFlags::Used|
-                                      ConformanceCheckFlags::InExpression));
-          assert(eqConformance.hasValue());
-          (void)eqConformance;
-        }
-
-        if (allIndexesHashable) {
-          component.setSubscriptIndexHashableConformances(hashables);
-        }
-      }
-
       // Set the final types on the expression.
       cs.setExprTypes(result);
     }
@@ -4841,56 +4998,6 @@ findCalleeDeclRef(ConstraintSystem &cs, const Solution &solution,
   return solution.resolveLocatorToDecl(locator);
 }
 
-static bool
-shouldApplyAddingLabelFixit(TuplePattern *tuplePattern, TupleType *fromTuple,
-                            TupleType *toTuple,
-                std::vector<std::pair<SourceLoc, std::string>> &locInsertPairs) {
-  std::vector<TuplePattern*> patternParts;
-  std::vector<TupleType*> fromParts;
-  std::vector<TupleType*> toParts;
-  patternParts.push_back(tuplePattern);
-  fromParts.push_back(fromTuple);
-  toParts.push_back(toTuple);
-  while (!patternParts.empty()) {
-    TuplePattern *curPattern = patternParts.back();
-    TupleType *curFrom = fromParts.back();
-    TupleType *curTo = toParts.back();
-    patternParts.pop_back();
-    fromParts.pop_back();
-    toParts.pop_back();
-    unsigned n = curPattern->getElements().size();
-    if (curFrom->getElements().size() != n ||
-        curTo->getElements().size() != n)
-      return false;
-    for (unsigned i = 0; i < n; i++) {
-      Pattern* subPat = curPattern->getElement(i).getPattern();
-      const TupleTypeElt &subFrom = curFrom->getElement(i);
-      const TupleTypeElt &subTo = curTo->getElement(i);
-      if ((subFrom.getType()->getKind() == TypeKind::Tuple) ^
-          (subTo.getType()->getKind() == TypeKind::Tuple))
-        return false;
-      auto addLabelFunc = [&]() {
-        if (subFrom.getName().empty() && !subTo.getName().empty()) {
-          llvm::SmallString<8> Name;
-          Name.append(subTo.getName().str());
-          Name.append(": ");
-          locInsertPairs.push_back({subPat->getStartLoc(), Name.str()});
-        }
-      };
-      if (auto subFromTuple = subFrom.getType()->getAs<TupleType>()) {
-        fromParts.push_back(subFromTuple);
-        toParts.push_back(subTo.getType()->getAs<TupleType>());
-        patternParts.push_back(static_cast<TuplePattern*>(subPat));
-        addLabelFunc();
-      } else if (subFrom.getType()->isEqual(subTo.getType())) {
-        addLabelFunc();
-      } else
-        return false;
-    }
-  }
-  return true;
-}
-
 /// Produce the caller-side default argument for this default argument, or
 /// null if the default argument will be provided by the callee.
 static std::pair<Expr *, DefaultArgumentKind>
@@ -4974,155 +5081,102 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
   return {init, param->getDefaultArgumentKind()};
 }
 
-static Expr *lookThroughIdentityExprs(Expr *expr) {
-  while (true) {
-    if (auto ident = dyn_cast<IdentityExpr>(expr)) {
-      expr = ident->getSubExpr();
-    } else if (auto anyTry = dyn_cast<AnyTryExpr>(expr)) {
-      if (isa<OptionalTryExpr>(anyTry))
-        return expr;
-      expr = anyTry->getSubExpr();
-    } else {
-      return expr;
-    }
+static bool canPeepholeTupleConversion(Expr *expr,
+                                       ArrayRef<unsigned> sources) {
+  if (!isa<TupleExpr>(expr))
+    return false;
+
+  for (unsigned i = 0, e = sources.size(); i != e; ++i) {
+    if (sources[i] != i)
+      return false;
   }
+
+  return true;
 }
 
-/// Rebuild the ParenTypes for the given expression, whose underlying expression
-/// should be set to the given type.  This has to apply to exactly the same
-/// levels of sugar that were stripped off by lookThroughIdentityExprs.
-static Type rebuildIdentityExprs(ConstraintSystem &cs, Expr *expr, Type type) {
-  ASTContext &ctx = cs.getASTContext();
-  if (auto paren = dyn_cast<ParenExpr>(expr)) {
-    type = rebuildIdentityExprs(cs, paren->getSubExpr(), type);
-    cs.setType(paren, ParenType::get(ctx, type->getInOutObjectType(),
-                                     ParameterTypeFlags().withInOut(type->is<InOutType>())));
-    return cs.getType(paren);
-  }
-
-  if (auto ident = dyn_cast<IdentityExpr>(expr)) {
-    type = rebuildIdentityExprs(cs, ident->getSubExpr(), type);
-    cs.setType(ident, type);
-    return cs.getType(ident);
-  }
-
-  if (auto ident = dyn_cast<AnyTryExpr>(expr)) {
-    if (isa<OptionalTryExpr>(ident))
-      return type;
-
-    type = rebuildIdentityExprs(cs, ident->getSubExpr(), type);
-    cs.setType(ident, type);
-    return cs.getType(ident);
-  }
-
-  return type;
-}
-
-Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
+Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
+                                       TupleType *fromTuple,
                                        TupleType *toTuple,
                                        ConstraintLocatorBuilder locator,
-                                       SmallVectorImpl<unsigned> &sources,
-                                       Optional<Pattern*> typeFromPattern){
+                                       ArrayRef<unsigned> sources) {
   auto &tc = cs.getTypeChecker();
 
-  // Capture the tuple expression, if there is one.
-  Expr *innerExpr = lookThroughIdentityExprs(expr);
-  auto *fromTupleExpr = dyn_cast<TupleExpr>(innerExpr);
+  // If the input expression is a tuple expression, we can convert it in-place.
+  if (canPeepholeTupleConversion(expr, sources)) {
+    auto *tupleExpr = cast<TupleExpr>(expr);
 
-  /// Check each of the tuple elements in the destination.
-  bool anythingShuffled = false;
-  SmallVector<TupleTypeElt, 4> toSugarFields;
-  SmallVector<TupleTypeElt, 4> fromTupleExprFields(
-                                 fromTuple->getElements().size());
+    for (unsigned i = 0, e = tupleExpr->getNumElements(); i != e; ++i) {
+      auto *fromElt = tupleExpr->getElement(i);
 
-  for (unsigned i = 0, n = toTuple->getNumElements(); i != n; ++i) {
-    const auto &toElt = toTuple->getElement(i);
-    auto toEltType = toElt.getType();
+      // Actually convert the source element.
+      auto toEltType = toTuple->getElementType(i);
 
-    // If the source and destination index are different, we'll be shuffling.
-    if (sources[i] != i) {
-      anythingShuffled = true;
+      auto *toElt
+        = coerceToType(fromElt, toEltType,
+                      locator.withPathElement(
+                        LocatorPathElt::getTupleElement(i)));
+      if (!toElt)
+        return nullptr;
+
+      tupleExpr->setElement(i, toElt);
     }
 
-    // We're matching one element to another. If the types already
-    // match, there's nothing to do.
-    const auto &fromElt = fromTuple->getElement(sources[i]);
-    auto fromEltType = fromElt.getType();
-    if (fromEltType->isEqual(toEltType)) {
-      // Get the sugared type directly from the tuple expression, if there
-      // is one.
-      if (fromTupleExpr)
-        fromEltType = cs.getType(fromTupleExpr->getElement(sources[i]));
+    tupleExpr->setType(toTuple);
+    cs.cacheType(tupleExpr);
 
-      toSugarFields.push_back(toElt.getWithType(fromEltType));
-      fromTupleExprFields[sources[i]] = fromElt;
-      continue;
-    }
+    return tupleExpr;
+  }
 
-    // We need to convert the source element to the destination type.
-    if (!fromTupleExpr) {
-      // FIXME: Lame! We can't express this in the AST.
-      auto anchorExpr = locator.getBaseLocator()->getAnchor();
-      InFlightDiagnostic diag = tc.diagnose(anchorExpr->getLoc(),
-                                        diag::tuple_conversion_not_expressible,
-                                            fromTuple, toTuple);
-      if (typeFromPattern) {
-        std::vector<std::pair<SourceLoc, std::string>> locInsertPairs;
-        auto *tupleP = dyn_cast<TuplePattern>(typeFromPattern.getValue());
-        if (tupleP && shouldApplyAddingLabelFixit(tupleP, toTuple, fromTuple,
-                                                  locInsertPairs)) {
-          for (auto &Pair : locInsertPairs) {
-            diag.fixItInsert(Pair.first, Pair.second);
-          }
-        }
-      }
-      return nullptr;
-    }
+  // Build a list of OpaqueValueExprs that matches the structure
+  // of expr's type.
+  //
+  // Each OpaqueValueExpr's type is equal to the type of the
+  // corresponding element of fromTuple.
+  SmallVector<OpaqueValueExpr *, 4> destructured;
+  for (unsigned i = 0, e = sources.size(); i != e; ++i) {
+    auto fromEltType = fromTuple->getElementType(i);
+    auto *opaqueElt = new (tc.Context) OpaqueValueExpr(expr->getLoc(),
+                                                       fromEltType);
+    cs.cacheType(opaqueElt);
+    destructured.push_back(opaqueElt);
+  }
+
+  // Convert each OpaqueValueExpr to the correct type.
+  SmallVector<Expr *, 4> converted;
+  SmallVector<Identifier, 4> labels;
+  SmallVector<TupleTypeElt, 4> convertedElts;
+
+  for (unsigned i = 0, e = sources.size(); i != e; ++i) {
+    unsigned source = sources[i];
+    auto *fromElt = destructured[source];
 
     // Actually convert the source element.
-    auto convertedElt
-      = coerceToType(fromTupleExpr->getElement(sources[i]), toEltType,
+    auto toEltType = toTuple->getElementType(i);
+    auto toLabel = toTuple->getElement(i).getName();
+
+    auto *toElt
+      = coerceToType(fromElt, toEltType,
                      locator.withPathElement(
-                       LocatorPathElt::getTupleElement(sources[i])));
-    if (!convertedElt)
+                       LocatorPathElt::getTupleElement(source)));
+    if (!toElt)
       return nullptr;
 
-    fromTupleExpr->setElement(sources[i], convertedElt);
-
-    // Record the sugared field name.
-    toSugarFields.push_back(toElt.getWithType(cs.getType(convertedElt)));
-    fromTupleExprFields[sources[i]] =
-      fromElt.getWithType(cs.getType(convertedElt));
+    converted.push_back(toElt);
+    labels.push_back(toLabel);
+    convertedElts.emplace_back(toEltType, toLabel, ParameterTypeFlags());
   }
 
-  // Compute the updated 'from' tuple type, since we may have
-  // performed some conversions in place.
-  Type fromTupleType = TupleType::get(fromTupleExprFields, tc.Context);
-  if (fromTupleExpr) {
-    cs.setType(fromTupleExpr, fromTupleType);
+  // Create the result tuple, written in terms of the destructured
+  // OpaqueValueExprs.
+  auto *result = TupleExpr::createImplicit(tc.Context, converted, labels);
+  result->setType(TupleType::get(convertedElts, tc.Context));
+  cs.cacheType(result);
 
-    // Update the types of parentheses around the tuple expression.
-    rebuildIdentityExprs(cs, expr, fromTupleType);
-  }
-
-  // Compute the re-sugared tuple type.
-  Type toSugarType = TupleType::get(toSugarFields, tc.Context);
-
-  // If we don't have to shuffle anything, we're done.
-  if (!anythingShuffled && fromTupleExpr) {
-    cs.setType(fromTupleExpr, toSugarType);
-
-    // Update the types of parentheses around the tuple expression.
-    rebuildIdentityExprs(cs, expr, toSugarType);
-
-    return expr;
-  }
-
-  // Create the tuple shuffle.
+  // Create the tuple conversion.
   return
-    cs.cacheType(TupleShuffleExpr::create(tc.Context,
-                                          expr, sources,
-                                          toSugarType));
+    cs.cacheType(DestructureTupleExpr::create(tc.Context,
+                                              destructured, expr, result,
+                                              toTuple));
 }
 
 static Type getMetatypeSuperclass(Type t, TypeChecker &tc) {
@@ -5259,13 +5313,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   // Load tuples with lvalue elements.
   if (auto tupleType = fromType->getAs<TupleType>()) {
     if (tupleType->hasLValueType()) {
-      auto toTuple = tupleType->getRValueType()->castTo<TupleType>();
-      SmallVector<unsigned, 4> sources;
-      bool failed = computeTupleShuffle(tupleType, toTuple, sources);
-      assert(!failed && "Couldn't convert tuple to tuple?");
-      (void)failed;
-
-      coerceTupleToTuple(expr, tupleType, toTuple, locator, sources);
+      expr = cs.coerceToRValue(expr);
     }
   }
 
@@ -5447,8 +5495,7 @@ Expr *ExprRewriter::coerceCallArguments(
     findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
 
   // Determine whether this application has curried self.
-  bool skipCurriedSelf = apply ? hasCurriedSelf(cs, callee, apply) : false;
-
+  bool skipCurriedSelf = apply ? hasCurriedSelf(cs, callee, apply) : true;
   // Determine the parameter bindings.
   SmallBitVector defaultMap
     = computeDefaultMap(params, callee.getDecl(), skipCurriedSelf);
@@ -5481,6 +5528,15 @@ Expr *ExprRewriter::coerceCallArguments(
   // FIXME: Eventually, we want to enforce that we have either argTuple or
   // argParen here.
 
+  SourceLoc lParenLoc, rParenLoc;
+  if (argTuple) {
+    lParenLoc = argTuple->getLParenLoc();
+    rParenLoc = argTuple->getRParenLoc();
+  } else if (argParen) {
+    lParenLoc = argParen->getLParenLoc();
+    rParenLoc = argParen->getRParenLoc();
+  }
+
   // Local function to extract the ith argument expression, which papers
   // over some of the weirdness with tuples vs. parentheses.
   auto getArg = [&](unsigned i) -> Expr * {
@@ -5494,97 +5550,118 @@ Expr *ExprRewriter::coerceCallArguments(
     return arg;
   };
 
-  // Local function to extract the ith argument label, which papers over some
-  // of the weirdness with tuples vs. parentheses.
-  auto getArgLabel = [&](unsigned i) -> Identifier {
+  auto getLabelLoc = [&](unsigned i) -> SourceLoc {
     if (argTuple)
-      return argTuple->getElementName(i);
+      return argTuple->getElementNameLoc(i);
 
     assert(i == 0 && "Scalar only has a single argument");
-    return Identifier();
+    return SourceLoc();
   };
 
-  SmallVector<TupleTypeElt, 4> toSugarFields;
-  SmallVector<TupleTypeElt, 4> fromTupleExprFields(
-                                 argTuple? argTuple->getNumElements() : 1);
-  SmallVector<Expr*, 4> fromTupleExpr(argTuple? argTuple->getNumElements() : 1);
-  SmallVector<unsigned, 4> variadicArgs;
-  SmallVector<Expr *, 2> callerDefaultArgs;
-  Type sliceType = nullptr;
-  SmallVector<int, 4> sources;
+  SmallVector<Expr *, 4> newArgs;
+  SmallVector<Identifier, 4> newLabels;
+  SmallVector<SourceLoc, 4> newLabelLocs;
+  SmallVector<AnyFunctionType::Param, 4> newParams;
+
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
        paramIdx != numParams; ++paramIdx) {
     // Extract the parameter.
     const auto &param = params[paramIdx];
+    newLabels.push_back(param.getLabel());
 
     // Handle variadic parameters.
     if (param.isVariadic()) {
-      // Find the appropriate injection function.
-      if (tc.requireArrayLiteralIntrinsics(arg->getStartLoc()))
-        return nullptr;
+      assert(!param.isInOut());
 
-      // Record this parameter.
-      auto paramBaseType = param.getOldType();
-      assert(sliceType.isNull() && "Multiple variadic parameters?");
-      sliceType = tc.getArraySliceType(arg->getLoc(), paramBaseType);
-      toSugarFields.push_back(
-          TupleTypeElt(sliceType, param.getLabel(), param.getParameterFlags()));
-      sources.push_back(ArgumentShuffleExpr::Variadic);
+      SmallVector<Expr *, 4> variadicArgs;
+
+      // The first argument of this vararg parameter may have had a label;
+      // save its location.
+      auto &varargIndices = parameterBindings[paramIdx];
+      if (!varargIndices.empty())
+        newLabelLocs.push_back(getLabelLoc(varargIndices[0]));
+      else
+        newLabelLocs.push_back(SourceLoc());
 
       // Convert the arguments.
-      for (auto argIdx : parameterBindings[paramIdx]) {
+      for (auto argIdx : varargIndices) {
         auto arg = getArg(argIdx);
         auto argType = cs.getType(arg);
-        variadicArgs.push_back(argIdx);
 
         // If the argument type exactly matches, this just works.
-        if (argType->isEqual(paramBaseType)) {
-          fromTupleExprFields[argIdx] = TupleTypeElt(argType,
-                                                     getArgLabel(argIdx));
-          fromTupleExpr[argIdx] = arg;
+        if (argType->isEqual(param.getPlainType())) {
+          variadicArgs.push_back(arg);
           continue;
         }
 
         // Convert the argument.
-        auto convertedArg = coerceToType(arg, paramBaseType,
+        auto convertedArg = coerceToType(arg, param.getPlainType(),
                                          getArgLocator(argIdx, paramIdx));
         if (!convertedArg)
           return nullptr;
 
         // Add the converted argument.
-        fromTupleExpr[argIdx] = convertedArg;
-        fromTupleExprFields[argIdx] = TupleTypeElt(cs.getType(convertedArg),
-                                                   getArgLabel(argIdx));
+        variadicArgs.push_back(convertedArg);
       }
 
+      SourceLoc start, end;
+      if (!variadicArgs.empty()) {
+        start = variadicArgs.front()->getStartLoc();
+        end = variadicArgs.back()->getEndLoc();
+      }
+
+      // Collect them into an ArrayExpr.
+      auto *arrayExpr = ArrayExpr::create(tc.Context,
+                                          start,
+                                          variadicArgs,
+                                          {}, end,
+                                          param.getParameterType());
+      arrayExpr->setImplicit();
+      cs.cacheType(arrayExpr);
+
+      // Wrap the ArrayExpr in a VarargExpansionExpr.
+      auto *varargExpansionExpr =
+        new (tc.Context) VarargExpansionExpr(arrayExpr,
+                                             /*implicit=*/true,
+                                             arrayExpr->getType());
+      cs.cacheType(varargExpansionExpr);
+
+      newArgs.push_back(varargExpansionExpr);
+      newParams.push_back(param);
       continue;
     }
 
-    // If we are using a default argument, handle it now.
+    // Handle default arguments.
     if (parameterBindings[paramIdx].empty()) {
-      // Create a caller-side default argument, if we need one.
       Expr *defArg;
       DefaultArgumentKind defArgKind;
       std::tie(defArg, defArgKind) = getCallerDefaultArg(cs, dc, arg->getLoc(),
                                                          callee, paramIdx);
 
-      // Note that we'll be doing a shuffle involving default arguments.
-      toSugarFields.push_back(TupleTypeElt(
-                                param.isVariadic()
-                                  ? tc.getArraySliceType(arg->getLoc(),
-                                                         param.getOldType())
-                                  : param.getOldType(),
-                                param.getLabel(),
-                                param.getParameterFlags()));
-
+      // If we have a caller-side default argument, just add the magic literal
+      // expression to our argument list.
       if (defArg) {
-        callerDefaultArgs.push_back(defArg);
-        sources.push_back(ArgumentShuffleExpr::CallerDefaultInitialize);
+        defArg =
+            new (tc.Context) CallerDefaultArgumentExpr(defArg,
+                                                       arg->getStartLoc(),
+                                                       param.getParameterType());
+
+      // Otherwise, create a call of the default argument generator.
       } else {
-        sources.push_back(ArgumentShuffleExpr::DefaultInitialize);
+        defArg =
+            new (tc.Context) DefaultArgumentExpr(callee, paramIdx,
+                                                 arg->getStartLoc(),
+                                                 param.getParameterType());
       }
+
+      cs.cacheType(defArg);
+      newArgs.push_back(defArg);
+      newParams.push_back(param);
+      newLabelLocs.push_back(SourceLoc());
       continue;
     }
+
+    // Otherwise, we have a plain old ordinary argument.
 
     // Extract the argument used to initialize this parameter.
     assert(parameterBindings[paramIdx].size() == 1);
@@ -5592,20 +5669,14 @@ Expr *ExprRewriter::coerceCallArguments(
     auto arg = getArg(argIdx);
     auto argType = cs.getType(arg);
 
-    // If the argument and parameter indices differ, or if the names differ,
-    // this is a shuffle.
-    sources.push_back(argIdx);
+    // Save the original label location.
+    newLabelLocs.push_back(getLabelLoc(argIdx));
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();
     if (argType->isEqual(paramType)) {
-      toSugarFields.push_back(
-          TupleTypeElt(param.getPlainType(), getArgLabel(argIdx),
-                       param.getParameterFlags()));
-      fromTupleExprFields[argIdx] =
-          TupleTypeElt(param.getPlainType(), getArgLabel(argIdx),
-                       param.getParameterFlags());
-      fromTupleExpr[argIdx] = arg;
+      newArgs.push_back(arg);
+      newParams.push_back(param);
       continue;
     }
 
@@ -5623,6 +5694,8 @@ Expr *ExprRewriter::coerceCallArguments(
     // a regular function coversion by `coerceToType`.
     if (param.isAutoClosure() && (!argType->is<FunctionType>() ||
                                   !isAutoClosureArg(arg))) {
+      assert(!param.isInOut());
+
       // If parameter is an autoclosure, we need to make sure that:
       //   - argument type is coerced to parameter result type
       //   - impilict autoclosure is created to wrap argument expression
@@ -5643,109 +5716,65 @@ Expr *ExprRewriter::coerceCallArguments(
     if (!convertedArg)
       return nullptr;
 
-    // Add the converted argument.
-    fromTupleExpr[argIdx] = convertedArg;
-    fromTupleExprFields[argIdx] = TupleTypeElt(
-        cs.getType(convertedArg)->getInOutObjectType(),
-        getArgLabel(argIdx), param.getParameterFlags());
-    toSugarFields.push_back(
-        TupleTypeElt(argType->getInOutObjectType(), param.getLabel(),
-                     param.getParameterFlags()));
+    newArgs.push_back(convertedArg);
+
+    // Make an effort to preserve the sugared type of the argument in the
+    // case where there was no conversion, instead of using the parameter
+    // type.
+    newParams.emplace_back(cs.getType(convertedArg)->getInOutObjectType(),
+                           param.getLabel(),
+                           param.getParameterFlags());
   }
 
-  Type argTupleType = TupleType::get(fromTupleExprFields, tc.Context);
+  assert(newArgs.size() == newParams.size());
+  assert(newArgs.size() == newLabels.size());
+  assert(newArgs.size() == newLabelLocs.size());
 
-  // Compute a new 'arg', from the bits we have.  We have three cases: the
-  // scalar case, the paren case, and the tuple literal case.
-  if (!argTuple && !argParen) {
-    assert(fromTupleExpr.size() == 1 && fromTupleExpr[0]);
-    arg = fromTupleExpr[0];
-  } else if (argParen) {
-    // If the element changed, rebuild a new ParenExpr.
-    assert(fromTupleExpr.size() == 1 && fromTupleExpr[0]);
-    if (fromTupleExpr[0] != argParen->getSubExpr()) {
-      bool argParenImplicit = argParen->isImplicit();
-      argParen =
-        cs.cacheType(new (tc.Context)
-                     ParenExpr(argParen->getLParenLoc(),
-                               fromTupleExpr[0],
-                               argParen->getRParenLoc(),
-                               argParen->hasTrailingClosure(),
-                               argTupleType));
-      if (argParenImplicit) {
-        argParen->setImplicit();
-      }
-      arg = argParen;
-    } else {
-      // coerceToType may have updated the element type of the ParenExpr in
-      // place.  If so, propagate the type out to the ParenExpr as well.
-      cs.setType(argParen, argTupleType);
-    }
-  } else {
-    assert(argTuple);
-
-    bool anyChanged = false;
-    for (unsigned i = 0, e = argTuple->getNumElements(); i != e; ++i)
-      if (fromTupleExpr[i] != argTuple->getElement(i)) {
-        anyChanged = true;
-        break;
-      }
-
-    // If anything about the TupleExpr changed, rebuild a new one.
-    Type argTupleType = TupleType::get(fromTupleExprFields, tc.Context);
-    assert(isa<TupleType>(argTupleType.getPointer()));
-
-    if (anyChanged || !cs.getType(argTuple)->isEqual(argTupleType)) {
-      auto EltNames = argTuple->getElementNames();
-      auto EltNameLocs = argTuple->getElementNameLocs();
-      argTuple =
-        cs.cacheType(TupleExpr::create(tc.Context, argTuple->getLParenLoc(),
-                                       fromTupleExpr, EltNames, EltNameLocs,
-                                       argTuple->getRParenLoc(),
-                                       argTuple->hasTrailingClosure(),
-                                       argTuple->isImplicit(),
-                                       argTupleType));
-      arg = argTuple;
-    }
+  // This is silly. SILGen gets confused if a 'self' parameter is wrapped
+  // in a ParenExpr sometimes.
+  if (!argTuple && !argParen &&
+      (params[0].getValueOwnership() == ValueOwnership::Default ||
+       params[0].getValueOwnership() == ValueOwnership::InOut)) {
+    assert(newArgs.size() == 1);
+    assert(!hasTrailingClosure);
+    return newArgs[0];
   }
 
-  // If we don't have to shuffle anything, we're done.
-  args.clear();
-  AnyFunctionType::decomposeInput(cs.getType(arg), args);
-  if (AnyFunctionType::equalParams(args, params))
-    return arg;
-
-  auto paramType = AnyFunctionType::composeInput(tc.Context, params,
+  // Rebuild the argument list, sharing as much structure as possible.
+  auto paramType = AnyFunctionType::composeInput(tc.Context, newParams,
                                                  /*canonicalVararg=*/false);
-
-  // If we came from a scalar, create a scalar-to-tuple conversion.
-  ArgumentShuffleExpr::TypeImpact typeImpact;
-  if (argTuple == nullptr) {
-    // Deal with a difference in only scalar ownership.
-    if (auto paramParenTy = dyn_cast<ParenType>(paramType.getPointer())) {
-      assert(paramParenTy->getUnderlyingType()
-              ->isEqual(cs.getType(arg)));
-      auto argParen = new (tc.Context) ParenExpr(arg->getStartLoc(),
-                                                 arg, arg->getEndLoc(), false,
-                                                 paramParenTy);
-      argParen->setImplicit();
-      return cs.cacheType(argParen);
+  if (isa<ParenType>(paramType.getPointer())) {
+    if (argParen) {
+      // We already had a ParenExpr, so replace it's sub-expression.
+      argParen->setSubExpr(newArgs[0]);
+    } else {
+      arg = new (tc.Context) ParenExpr(lParenLoc,
+                                       newArgs[0],
+                                       rParenLoc,
+                                       hasTrailingClosure);
+      arg->setImplicit();
     }
-
-    typeImpact = ArgumentShuffleExpr::ScalarToTuple;
-    assert(isa<TupleType>(paramType.getPointer()));
-  } else if (isa<TupleType>(paramType.getPointer())) {
-    typeImpact = ArgumentShuffleExpr::TupleToTuple;
   } else {
-    typeImpact = ArgumentShuffleExpr::TupleToScalar;
-    assert(isa<ParenType>(paramType.getPointer()));
+    assert(isa<TupleType>(paramType.getPointer()));
+
+    if (argTuple && newArgs.size() == argTuple->getNumElements()) {
+      // The existing TupleExpr has the right number of elements,
+      // replace them.
+      for (unsigned i = 0, e = newArgs.size(); i != e; ++i) {
+        argTuple->setElement(i, newArgs[i]);
+      }
+    } else {
+      // Build a new TupleExpr, re-using source location information.
+      arg = TupleExpr::create(tc.Context, lParenLoc,
+                              newArgs, newLabels, newLabelLocs,
+                              rParenLoc,
+                              hasTrailingClosure,
+                              /*implicit=*/true);
+    }
   }
 
-  // Create the argument shuffle.
-  return cs.cacheType(ArgumentShuffleExpr::create(tc.Context, arg, sources,
-                                                  typeImpact, callee, variadicArgs,
-                                                  sliceType, callerDefaultArgs,
-                                                  paramType));
+  arg->setType(paramType);
+  return cs.cacheType(arg);
 }
 
 static ClosureExpr *getClosureLiteralExpr(Expr *expr) {
@@ -6492,6 +6521,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto toTuple = toType->getAs<TupleType>();
     if (!toTuple)
       break;
+
+    if (fromTuple->hasLValueType() && !toTuple->hasLValueType())
+      return coerceToType(cs.coerceToRValue(expr), toType, locator);
+
     SmallVector<unsigned, 4> sources;
     if (!computeTupleShuffle(fromTuple, toTuple, sources)) {
       return coerceTupleToTuple(expr, fromTuple, toTuple,
@@ -7013,9 +7046,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
           return nullptr;
         }
 
-        if (auto shuffle = dyn_cast<ArgumentShuffleExpr>(arg))
-          arg = shuffle->getSubExpr();
-
         if (auto tuple = dyn_cast<TupleExpr>(arg))
           arg = tuple->getElements()[0];
 
@@ -7213,47 +7243,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
     // Try closing the existential, if there is one.
     closeExistential(result, locator);
-
-    // Extract all arguments.
-    auto *CEA = arg;
-    if (auto *ASE = dyn_cast<ArgumentShuffleExpr>(CEA))
-      CEA = ASE->getSubExpr();
-    // The argument is either a ParenExpr or TupleExpr.
-    ArrayRef<Expr *> arguments;
-
-    SmallVector<Expr *, 1> Scratch;
-    if (auto *TE = dyn_cast<TupleExpr>(CEA))
-      arguments = TE->getElements();
-    else if (auto *PE = dyn_cast<ParenExpr>(CEA)) {
-      Scratch.push_back(PE->getSubExpr());
-      arguments = makeArrayRef(Scratch);
-    }
-    else {
-      Scratch.push_back(apply->getArg());
-      arguments = makeArrayRef(Scratch);
-    }
-
-    for (auto arg: arguments) {
-      bool isNoEscape = false;
-      while (1) {
-        if (auto AFT = cs.getType(arg)->getAs<AnyFunctionType>()) {
-          isNoEscape = isNoEscape || AFT->isNoEscape();
-        }
-
-        if (auto conv = dyn_cast<ImplicitConversionExpr>(arg))
-          arg = conv->getSubExpr();
-        else if (auto *PE = dyn_cast<ParenExpr>(arg))
-          arg = PE->getSubExpr();
-        else
-          break;
-      }
-      if (!isNoEscape) {
-        if (auto DRE = dyn_cast<DeclRefExpr>(arg))
-          if (auto FD = dyn_cast<FuncDecl>(DRE->getDecl())) {
-            tc.addEscapingFunctionAsArgument(FD, apply);
-          }
-      }
-    }
 
     if (unwrapResult)
       return forceUnwrapResult(result);
@@ -7490,8 +7479,7 @@ namespace {
         // Coerce the pattern, in case we resolved something.
         auto fnType = cs.getType(closure)->castTo<FunctionType>();
         auto *params = closure->getParameters();
-        if (tc.coerceParameterListToType(params, closure, fnType))
-          return { false, nullptr };
+        tc.coerceParameterListToType(params, closure, fnType);
 
         // Require layout of dependent types that could be used to materialize
         // metadata types/conformances during IRGen.

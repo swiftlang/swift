@@ -100,3 +100,20 @@ class UsableFromInlineClass {
 class InternalType {}
 
 extension InternalType {}
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+public extension PSuper {
+  func futureFoo() {}
+}
+
+public class FutureContainer {
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  public func futureFoo() {}
+  @available(macOS 9999, *)
+  public func NotfutureFoo() {}
+}
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+extension FutureContainer: P1 {}
+
+extension FutureContainer: P2 {}

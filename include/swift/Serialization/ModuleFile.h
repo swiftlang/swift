@@ -135,27 +135,48 @@ public:
     const StringRef RawPath;
 
   private:
-    unsigned IsExported : 1;
+    using ImportFilterKind = ModuleDecl::ImportFilterKind;
+    const unsigned RawImportControl : 2;
     const unsigned IsHeader : 1;
     const unsigned IsScoped : 1;
 
-    Dependency(StringRef path, bool isHeader, bool exported, bool isScoped)
-      : RawPath(path), IsExported(exported), IsHeader(isHeader),
-        IsScoped(isScoped) {}
+    static unsigned rawControlFromKind(ImportFilterKind importKind) {
+      return llvm::countTrailingZeros(static_cast<unsigned>(importKind));
+    }
+    ImportFilterKind getImportControl() const {
+      return static_cast<ImportFilterKind>(1 << RawImportControl);
+    }
+
+    Dependency(StringRef path, bool isHeader, ImportFilterKind importControl,
+               bool isScoped)
+      : RawPath(path), RawImportControl(rawControlFromKind(importControl)),
+        IsHeader(isHeader), IsScoped(isScoped) {
+      assert(llvm::countPopulation(static_cast<unsigned>(importControl)) == 1 &&
+             "must be a particular filter option, not a bitset");
+      assert(getImportControl() == importControl && "not enough bits");
+    }
 
   public:
-    Dependency(StringRef path, bool exported, bool isScoped)
-      : Dependency(path, false, exported, isScoped) {}
+    Dependency(StringRef path, ImportFilterKind importControl, bool isScoped)
+      : Dependency(path, false, importControl, isScoped) {}
 
     static Dependency forHeader(StringRef headerPath, bool exported) {
-      return Dependency(headerPath, true, exported, false);
+      auto importControl = exported ? ImportFilterKind::Public
+                                    : ImportFilterKind::Private;
+      return Dependency(headerPath, true, importControl, false);
     }
 
     bool isLoaded() const {
       return Import.second != nullptr;
     }
 
-    bool isExported() const { return IsExported; }
+    bool isExported() const {
+      return getImportControl() == ImportFilterKind::Public;
+    }
+    bool isImplementationOnly() const {
+      return getImportControl() == ImportFilterKind::ImplementationOnly;
+    }
+
     bool isHeader() const { return IsHeader; }
     bool isScoped() const { return IsScoped; }
 
@@ -638,11 +659,26 @@ public:
   // Out of line to avoid instantiation OnDiskChainedHashTable here.
   ~ModuleFile();
 
-  /// Associates this module file with an AST module.
+  /// Associates this module file with the AST node representing it.
   ///
-  /// Returns any error that occurred during association, including validation
-  /// that the module file is compatible with the module it's being loaded as.
-  Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc);
+  /// Checks that the file is compatible with the AST module it's being loaded
+  /// into, loads any dependencies needed to understand the module, and updates
+  /// the ASTContext and ClangImporter with search paths and other information
+  /// from the module.
+  ///
+  /// \param file The FileUnit that represents this file's place in the AST.
+  /// \param diagLoc A location used for diagnostics that occur during loading.
+  /// This does not include diagnostics about \e this file failing to load,
+  /// but rather other things that might be imported as part of bringing the
+  /// file into the AST.
+  /// \param treatAsPartialModule If true, processes implementation-only
+  /// information instead of assuming the client won't need it and shouldn't
+  /// see it.
+  ///
+  /// \returns any error that occurred during association, such as being
+  /// compiled for a different OS.
+  Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
+                                  bool treatAsPartialModule);
 
   /// Checks whether this module can be used.
   Status getStatus() const {

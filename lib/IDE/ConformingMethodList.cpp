@@ -75,7 +75,6 @@ void ConformingMethodListCallbacks::doneParsing() {
 
   // Type check the expression if needed.
   if (!T || T->is<ErrorType>()) {
-    prepareForRetypechecking(ParsedExpr);
     ConcreteDeclRef ReferencedDecl = nullptr;
     auto optT = getTypeOfCompletionContextExpr(P.Context, CurDeclContext,
                                                CompletionTypeCheckKind::Normal,

@@ -70,7 +70,7 @@ namespace constraints {
 /// can be restored.
 class SavedTypeVariableBinding {
   /// The type variable and type variable options.
-  llvm::PointerIntPair<TypeVariableType *, 3> TypeVarAndOptions;
+  llvm::PointerIntPair<TypeVariableType *, 4> TypeVarAndOptions;
   
   /// The parent or fixed type.
   llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
@@ -164,9 +164,12 @@ enum TypeVariableOptions {
   /// Whether the type variable can be bound to an inout type or not.
   TVO_CanBindToInOut = 0x02,
 
+  /// Whether the type variable can be bound to a non-escaping type or not.
+  TVO_CanBindToNoEscape = 0x04,
+
   /// Whether a more specific deduction for this type variable implies a
   /// better solution to the constraint system.
-  TVO_PrefersSubtypeBinding = 0x04
+  TVO_PrefersSubtypeBinding = 0x08,
 };
 
 /// The implementation object for a type variable used within the
@@ -225,6 +228,9 @@ public:
 
   /// Whether this type variable can bind to an inout type.
   bool canBindToInOut() const { return getRawOptions() & TVO_CanBindToInOut; }
+
+  /// Whether this type variable can bind to an inout type.
+  bool canBindToNoEscape() const { return getRawOptions() & TVO_CanBindToNoEscape; }
 
   /// Whether this type variable prefers a subtype binding over a supertype
   /// binding.
@@ -350,6 +356,12 @@ public:
         recordBinding(*record);
       getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToInOut;
     }
+
+    if (canBindToNoEscape() && !otherRep->getImpl().canBindToNoEscape()) {
+      if (record)
+        recordBinding(*record);
+      getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToNoEscape;
+    }
   }
 
   /// Retrieve the fixed type that corresponds to this type variable,
@@ -381,14 +393,32 @@ public:
     rep->getImpl().ParentOrFixed = type.getPointer();
   }
 
-  void setCannotBindToLValue(constraints::SavedTypeVariableBindings *record) {
-    auto rep = getRepresentative(record);
-    if (rep->getImpl().canBindToLValue()) {
-      if (record)
-        rep->getImpl().recordBinding(*record);
-      rep->getImpl().getTypeVariable()->Bits.TypeVariableType.Options
-        &= ~TVO_CanBindToLValue;
-    }
+  void setCanBindToLValue(constraints::SavedTypeVariableBindings *record,
+                          bool enabled) {
+    auto &impl = getRepresentative(record)->getImpl();
+    if (record)
+      impl.recordBinding(*record);
+
+    if (enabled)
+      impl.getTypeVariable()->Bits.TypeVariableType.Options |=
+          TVO_CanBindToLValue;
+    else
+      impl.getTypeVariable()->Bits.TypeVariableType.Options &=
+          ~TVO_CanBindToLValue;
+  }
+
+  void setCanBindToNoEscape(constraints::SavedTypeVariableBindings *record,
+                            bool enabled) {
+    auto &impl = getRepresentative(record)->getImpl();
+    if (record)
+      impl.recordBinding(*record);
+
+    if (enabled)
+      impl.getTypeVariable()->Bits.TypeVariableType.Options |=
+          TVO_CanBindToNoEscape;
+    else
+      impl.getTypeVariable()->Bits.TypeVariableType.Options &=
+          ~TVO_CanBindToNoEscape;
   }
 
   /// Print the type variable to the given output stream.
@@ -851,27 +881,42 @@ struct MemberLookupResult {
   enum UnviableReason {
     /// Argument labels don't match.
     UR_LabelMismatch,
-    
+
     /// This uses a type like Self in its signature that cannot be used on an
     /// existential box.
     UR_UnavailableInExistential,
-    
+
     /// This is an instance member being accessed through something of metatype
     /// type.
     UR_InstanceMemberOnType,
-    
+
     /// This is a static/class member being accessed through an instance.
     UR_TypeMemberOnInstance,
-    
+
     /// This is a mutating member, being used on an rvalue.
     UR_MutatingMemberOnRValue,
-    
+
     /// The getter for this subscript or computed property is mutating and we
     /// only have an rvalue base.  This is more specific than the former one.
     UR_MutatingGetterOnRValue,
-    
+
     /// The member is inaccessible (e.g. a private member in another file).
     UR_Inaccessible,
+
+    /// This is a `WritableKeyPath` being used to look up read-only member,
+    /// used in situations involving dynamic member lookup via keypath,
+    /// because it's not known upfront what access capability would the
+    /// member have.
+    UR_WritableKeyPathOnReadOnlyMember,
+
+    /// This is a `ReferenceWritableKeyPath` being used to look up mutating
+    /// member, used in situations involving dynamic member lookup via keypath,
+    /// because it's not known upfront what access capability would the
+    /// member have.
+    UR_ReferenceWritableKeyPathOnMutatingMember,
+
+    /// This is a KeyPath whose root type is AnyObject
+    UR_KeyPathWithAnyObjectRootType
   };
 
   /// This is a list of considered (but rejected) candidates, along with a
@@ -1667,7 +1712,7 @@ public:
 
   /// Create a new type variable.
   TypeVariableType *createTypeVariable(ConstraintLocator *locator,
-                                       unsigned options = 0);
+                                       unsigned options);
 
   /// Retrieve the set of active type variables.
   ArrayRef<TypeVariableType *> getTypeVariables() const {
@@ -2748,7 +2793,7 @@ public:
                                          ConstraintLocator *memberLocator,
                                          bool includeInaccessibleMembers);
 
-private:  
+private:
   /// Attempt to simplify the given construction constraint.
   ///
   /// \param valueType The type being constructed.
@@ -3192,6 +3237,31 @@ private:
                                   bool restoreOnFail,
                                   llvm::function_ref<bool(Constraint *)> pred);
 
+  bool isReadOnlyKeyPathComponent(const AbstractStorageDecl *storage) {
+    // See whether key paths can store to this component. (Key paths don't
+    // get any special power from being formed in certain contexts, such
+    // as the ability to assign to `let`s in initialization contexts, so
+    // we pass null for the DC to `isSettable` here.)
+    if (!getASTContext().isSwiftVersionAtLeast(5)) {
+      // As a source-compatibility measure, continue to allow
+      // WritableKeyPaths to be formed in the same conditions we did
+      // in previous releases even if we should not be able to set
+      // the value in this context.
+      if (!storage->isSettable(DC)) {
+        // A non-settable component makes the key path read-only, unless
+        // a reference-writable component shows up later.
+        return true;
+      }
+    } else if (!storage->isSettable(nullptr) ||
+               !storage->isSetterAccessibleFrom(DC)) {
+      // A non-settable component makes the key path read-only, unless
+      // a reference-writable component shows up later.
+      return true;
+    }
+
+    return false;
+  }
+
 public:
   // Given a type variable, attempt to find the disjunction of
   // bind overloads associated with it. This may return null in cases where
@@ -3633,19 +3703,13 @@ bool areConservativelyCompatibleArgumentLabels(OverloadChoice choice,
 ///
 /// \param range Will be populated with an "interesting" range.
 ///
-/// \param targetLocator If non-null, will be set to a locator that describes
-/// the target of the input locator.
-///
 /// \return the simplified locator.
 ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
                                    ConstraintLocator *locator,
-                                   SourceRange &range,
-                                   ConstraintLocator **targetLocator = nullptr);
+                                   SourceRange &range);
 
 void simplifyLocator(Expr *&anchor,
                      ArrayRef<LocatorPathElt> &path,
-                     Expr *&targetAnchor,
-                     SmallVectorImpl<LocatorPathElt> &targetPath,
                      SourceRange &range);
 
 /// Simplify the given locator down to a specific anchor expression,

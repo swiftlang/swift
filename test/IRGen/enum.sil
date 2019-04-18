@@ -474,6 +474,24 @@ enum SinglePayloadNoXI2 {
   case u
 }
 
+// CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @select_enum([[WORD:i32]], i8)
+// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @select_enum([[WORD:i64]], i8)
+// CHECK: entry:
+// CHECK:   [[TAG:%.*]] = trunc i8 %1 to i1
+// CHECK:   [[PAYLOAD:%.*]] = icmp eq [[WORD]] %0, 1
+// CHECK:   [[MATCHES:%.*]] = and i1 [[TAG]], [[PAYLOAD]]
+// CHECK:   [[RES:%.*]] = select i1 [[MATCHES]], i1 false, i1 true
+// CHECK:   ret i1 [[RES]]
+// CHECK: }
+
+sil @select_enum : $@convention(method) (SinglePayloadNoXI2) -> Builtin.Int1 {
+bb0(%0 : $SinglePayloadNoXI2):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = select_enum %0 : $SinglePayloadNoXI2, case #SinglePayloadNoXI2.z!enumelt: %2, default %3 : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
 // CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_no_xi_switch([[WORD:i64]], i8) {{.*}} {
 // CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_no_xi_switch([[WORD:i32]], i8) {{.*}} {
 sil @single_payload_no_xi_switch : $@convention(thin) (SinglePayloadNoXI2) -> () {

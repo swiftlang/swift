@@ -6,3 +6,8 @@ module B {
 }
 module C { header "C.h" }
 module D { header "D.h" }
+
+module Secret_BAD { header "Secret_BAD.h" }
+
+module NotSoSecret { header "NotSoSecret.h" }
+module NotSoSecret2 { header "NotSoSecret2.h" }

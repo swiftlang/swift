@@ -458,12 +458,7 @@ bool NormalProtocolConformance::isResilient() const {
   if (!getType()->getAnyNominal()->isResilient())
     return false;
 
-  switch (getDeclContext()->getParentModule()->getResilienceStrategy()) {
-  case ResilienceStrategy::Resilient:
-    return true;
-  case ResilienceStrategy::Default:
-    return false;
-  }
+  return getDeclContext()->getParentModule()->isResilient();
 }
 
 Optional<ArrayRef<Requirement>>
@@ -1060,12 +1055,12 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
 
   // Local function to determine whether we will end up referring to a
   // tentative witness that may not be chosen.
-  auto normal = GenericConformance->getRootNormalConformance();
+  auto root = GenericConformance->getRootConformance();
   auto isTentativeWitness = [&] {
-    if (normal->getState() != ProtocolConformanceState::CheckingTypeWitnesses)
+    if (root->getState() != ProtocolConformanceState::CheckingTypeWitnesses)
       return false;
 
-    return !normal->hasTypeWitness(assocType, nullptr);
+    return !root->hasTypeWitness(assocType, nullptr);
   };
 
   auto genericWitnessAndDecl

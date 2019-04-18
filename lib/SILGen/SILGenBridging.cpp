@@ -577,7 +577,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   auto thunk = SGM.getOrCreateReabstractionThunk(invokeTy,
                                                  loweredFuncTy,
                                                  loweredBlockTy,
-                                                 F.isSerialized());
+                                                 /*dynamicSelfType=*/CanType());
 
   // Build it if necessary.
   if (thunk->empty()) {
@@ -703,11 +703,11 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
 
     FormalEvaluationScope scope(SGF);
 
-    auto openedExistential = SGF.emitOpenExistential(
-        loc, v, openedType, SGF.getLoweredType(openedType),
+    v = SGF.emitOpenExistential(
+        loc, v, SGF.getLoweredType(openedType),
         AccessKind::Read);
+    v = v.ensurePlusOne(SGF, loc);
 
-    v = SGF.manageOpaqueValue(openedExistential, loc, SGFContext());
     nativeType = openedType;
   }
 
@@ -937,7 +937,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
   auto thunk = SGM.getOrCreateReabstractionThunk(thunkTy,
                                                  loweredBlockTy,
                                                  loweredFuncTyWithoutNoEscape,
-                                                 F.isSerialized());
+                                                 /*dynamicSelfType=*/CanType());
 
   // Build it if necessary.
   if (thunk->empty()) {

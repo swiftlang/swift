@@ -282,7 +282,7 @@ DECL_NODES = [
          element='MemberDeclListItem'),
 
     # member-decl = decl ';'?
-    Node('MemberDeclListItem', kind='Syntax',
+    Node('MemberDeclListItem', kind='Syntax', omit_when_empty=True,
          description='''
          A member declaration of a type consisting of a declaration and an \
          optional semicolon;

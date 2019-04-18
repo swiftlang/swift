@@ -2064,17 +2064,6 @@ getActualSelfAccessKind(uint8_t raw) {
   return None;
 }
 
-static
-Optional<swift::ResilienceExpansion> getActualResilienceExpansion(uint8_t raw) {
-  switch (serialization::ResilienceExpansion(raw)) {
-  case serialization::ResilienceExpansion::Minimal:
-    return swift::ResilienceExpansion::Minimal;
-  case serialization::ResilienceExpansion::Maximal:
-    return swift::ResilienceExpansion::Maximal;
-  }
-  return None;
-}
-
 /// Translate from the serialization VarDeclSpecifier enumerators, which are
 /// guaranteed to be stable, to the AST ones.
 static Optional<swift::VarDecl::Specifier>
@@ -2512,7 +2501,6 @@ public:
     uint8_t storedInitKind, rawAccessLevel;
     DeclID overriddenID;
     bool needsNewVTableEntry, firstTimeRequired;
-    uint8_t rawDefaultArgumentResilienceExpansion;
     unsigned numArgNames;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
 
@@ -2524,7 +2512,6 @@ public:
                                                overriddenID,
                                                rawAccessLevel,
                                                needsNewVTableEntry,
-                                               rawDefaultArgumentResilienceExpansion,
                                                firstTimeRequired,
                                                numArgNames,
                                                argNameAndDependencyIDs);
@@ -2615,15 +2602,6 @@ public:
           !overridden->isRequired()) {
         AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
       }
-    }
-
-    if (auto defaultArgumentResilienceExpansion = getActualResilienceExpansion(
-            rawDefaultArgumentResilienceExpansion)) {
-      ctor->setDefaultArgumentResilienceExpansion(
-          *defaultArgumentResilienceExpansion);
-    } else {
-      MF.error();
-      return nullptr;
     }
 
     ctor->computeType();
@@ -2831,7 +2809,6 @@ public:
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
     bool needsNewVTableEntry;
-    uint8_t rawDefaultArgumentResilienceExpansion;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -2845,7 +2822,6 @@ public:
                                           numNameComponentsBiased,
                                           rawAccessLevel,
                                           needsNewVTableEntry,
-                                          rawDefaultArgumentResilienceExpansion,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -2859,7 +2835,6 @@ public:
                                           rawAccessorKind,
                                           rawAccessLevel,
                                           needsNewVTableEntry,
-                                          rawDefaultArgumentResilienceExpansion,
                                           nameAndDependencyIDs);
     }
 
@@ -3021,15 +2996,6 @@ public:
     fn->setForcedStaticDispatch(hasForcedStaticDispatch);
     fn->setNeedsNewVTableEntry(needsNewVTableEntry);
 
-    if (auto defaultArgumentResilienceExpansion = getActualResilienceExpansion(
-            rawDefaultArgumentResilienceExpansion)) {
-      fn->setDefaultArgumentResilienceExpansion(
-          *defaultArgumentResilienceExpansion);
-    } else {
-      MF.error();
-      return nullptr;
-    }
-    
     // Set the interface type.
     fn->computeType();
 
@@ -3451,7 +3417,6 @@ public:
     bool isImplicit; bool hasPayload; bool isNegative;
     unsigned rawValueKindID;
     IdentifierID rawValueData;
-    uint8_t rawResilienceExpansion;
     unsigned numArgNames;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
 
@@ -3459,7 +3424,6 @@ public:
                                                isImplicit, hasPayload,
                                                rawValueKindID, isNegative,
                                                rawValueData,
-                                               rawResilienceExpansion,
                                                numArgNames,
                                                argNameAndDependencyIDs);
 
@@ -3518,13 +3482,6 @@ public:
     elem->setAccess(std::max(cast<EnumDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
 
-    if (auto resilienceExpansion = getActualResilienceExpansion(
-                                       rawResilienceExpansion)) {
-      elem->setDefaultArgumentResilienceExpansion(*resilienceExpansion);
-    } else {
-      MF.error();
-      return nullptr;
-    }
     return elem;
   }
 
@@ -3536,7 +3493,7 @@ public:
     TypeID elemInterfaceTypeID;
     ModuleFile::AccessorRecord accessors;
     DeclID overriddenID;
-    uint8_t rawAccessLevel, rawSetterAccessLevel;
+    uint8_t rawAccessLevel, rawSetterAccessLevel, rawStaticSpelling;
     uint8_t opaqueReadOwnership, readImpl, writeImpl, readWriteImpl;
     unsigned numArgNames, numAccessors;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
@@ -3550,7 +3507,8 @@ public:
                                              genericEnvID,
                                              elemInterfaceTypeID,
                                              overriddenID, rawAccessLevel,
-                                             rawSetterAccessLevel, numArgNames,
+                                             rawSetterAccessLevel,
+                                             rawStaticSpelling, numArgNames,
                                              argNameAndDependencyIDs);
     // Resolve the name ids.
     SmallVector<Identifier, 2> argNames;
@@ -3586,8 +3544,16 @@ public:
     auto *genericParams = MF.maybeReadGenericParams(parent);
     if (declOrOffset.isComplete())
       return declOrOffset;
+    
+    auto staticSpelling = getActualStaticSpellingKind(rawStaticSpelling);
+    if (!staticSpelling.hasValue()) {
+      MF.error();
+      return nullptr;
+    }
 
-    auto subscript = MF.createDecl<SubscriptDecl>(name, SourceLoc(), nullptr,
+    auto subscript = MF.createDecl<SubscriptDecl>(name,
+                                                  SourceLoc(), *staticSpelling,
+                                                  SourceLoc(), nullptr,
                                                   SourceLoc(), TypeLoc(),
                                                   parent, genericParams);
     subscript->setIsGetterMutating(isGetterMutating);
@@ -3753,35 +3719,35 @@ public:
 
 Expected<Decl *>
 ModuleFile::getDeclChecked(DeclID DID) {
-  // Tag every deserialized ValueDecl coming out of getDeclChecked with its ID.
   if (DID == 0)
     return nullptr;
 
   assert(DID <= Decls.size() && "invalid decl ID");
   auto &declOrOffset = Decls[DID-1];
 
-  if (declOrOffset.isComplete())
-    return declOrOffset;
+  if (!declOrOffset.isComplete()) {
+    ++NumDeclsLoaded;
+    BCOffsetRAII restoreOffset(DeclTypeCursor);
+    DeclTypeCursor.JumpToBit(declOrOffset);
 
-  ++NumDeclsLoaded;
-  BCOffsetRAII restoreOffset(DeclTypeCursor);
-  DeclTypeCursor.JumpToBit(declOrOffset);
+    ModuleFile::DeserializingEntityRAII deserializingEntity(*this);
+    Expected<Decl *> deserialized =
+      DeclDeserializer(*this, declOrOffset).getDeclCheckedImpl();
+    if (!deserialized)
+      return deserialized;
+  }
 
-  SWIFT_DEFER {
-    if (!declOrOffset.isComplete())
-      return;
-    if (auto *IDC = dyn_cast_or_null<IterableDeclContext>(declOrOffset.get())) {
-      // Only set the DeclID on the returned Decl if it's one that was loaded
-      // and _wasn't_ one that had its DeclID set elsewhere (a followed XREF).
-      if (IDC->wasDeserialized() &&
-          static_cast<uint32_t>(IDC->getDeclID()) == 0) {
-        IDC->setDeclID(DID);
-      }
+  // Tag every deserialized ValueDecl coming out of getDeclChecked with its ID.
+  assert(declOrOffset.isComplete());
+  if (auto *IDC = dyn_cast_or_null<IterableDeclContext>(declOrOffset.get())) {
+    // Only set the DeclID on the returned Decl if it's one that was loaded
+    // and _wasn't_ one that had its DeclID set elsewhere (a followed XREF).
+    if (IDC->wasDeserialized() &&
+        static_cast<uint32_t>(IDC->getDeclID()) == 0) {
+      IDC->setDeclID(DID);
     }
-  };
-
-  ModuleFile::DeserializingEntityRAII deserializingEntity(*this);
-  return DeclDeserializer(*this, declOrOffset).getDeclCheckedImpl();
+  }
+  return declOrOffset;
 }
 
 llvm::Error DeclDeserializer::deserializeDeclAttributes() {
@@ -4008,6 +3974,24 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         Attr = DynamicReplacementAttr::create(
             ctx, DeclName(ctx, baseName, ArrayRef<Identifier>(pieces)),
             cast<AbstractFunctionDecl>(*replacedFunDecl));
+        break;
+      }
+
+      case decls_block::Custom_DECL_ATTR: {
+        bool isImplicit;
+        TypeID typeID;
+        serialization::decls_block::CustomDeclAttrLayout::readRecord(
+          scratch, isImplicit, typeID);
+
+        Expected<Type> deserialized = MF.getTypeChecked(typeID);
+        if (!deserialized) {
+          MF.fatal(deserialized.takeError());
+          break;
+        }
+
+        Attr = CustomAttr::create(ctx, SourceLoc(),
+                                  TypeLoc::withoutLoc(deserialized.get()),
+                                  isImplicit);
         break;
       }
 
@@ -4530,11 +4514,11 @@ public:
 
       IdentifierID labelID;
       TypeID typeID;
-      bool isVariadic, isAutoClosure, isEscaping;
+      bool isVariadic, isAutoClosure;
       unsigned rawOwnership;
       decls_block::FunctionParamLayout::readRecord(scratch, labelID, typeID,
                                                    isVariadic, isAutoClosure,
-                                                   isEscaping, rawOwnership);
+                                                   rawOwnership);
 
       auto ownership =
           getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
@@ -4550,7 +4534,7 @@ public:
       params.emplace_back(paramTy.get(),
                           MF.getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
-                                             isEscaping, *ownership));
+                                             *ownership));
     }
 
     if (!isGeneric) {

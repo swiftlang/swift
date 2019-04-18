@@ -647,6 +647,10 @@ private:
              isLoadedLValue(ifExpr->getElseExpr());
     return false;
   }
+
+  /// Retrive an member reference associated with given member
+  /// looking through dynamic member lookup on the way.
+  ValueDecl *getMemberRef(ConstraintLocator *locator) const;
 };
 
 /// Intended to diagnose any possible contextual failure
@@ -979,6 +983,74 @@ public:
   InaccessibleMemberFailure(Expr *root, ConstraintSystem &cs, ValueDecl *member,
                             ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), Member(member) {}
+
+  bool diagnoseAsError() override;
+};
+
+
+// Diagnose an attempt to use AnyObject as the root type of a KeyPath
+//
+// ```swift
+// let keyPath = \AnyObject.bar
+// ```
+class AnyObjectKeyPathRootFailure final : public FailureDiagnostic {
+
+public:
+  AnyObjectKeyPathRootFailure(Expr *root, ConstraintSystem &cs,
+                              ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator) {}
+  
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to reference subscript as a keypath component
+/// where at least one of the index arguments doesn't conform to Hashable e.g.
+///
+/// ```swift
+/// protocol P {}
+///
+/// struct S {
+///   subscript<T: P>(x: Int, _ y: T) -> Bool { return true }
+/// }
+///
+/// func foo<T: P>(_ x: Int, _ y: T) {
+///   _ = \S.[x, y]
+/// }
+/// ```
+class KeyPathSubscriptIndexHashableFailure final : public FailureDiagnostic {
+  Type NonConformingType;
+
+public:
+  KeyPathSubscriptIndexHashableFailure(Expr *root, ConstraintSystem &cs,
+                                       Type type, ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), NonConformingType(type) {
+    assert(locator->isResultOfKeyPathDynamicMemberLookup() ||
+           locator->isKeyPathSubscriptComponent());
+  }
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to reference a static member as a key path component
+/// e.g.
+///
+/// ```swift
+/// struct S {
+///   static var foo: Int = 42
+/// }
+///
+/// _ = \S.Type.foo
+/// ```
+class InvalidStaticMemberRefInKeyPath final : public FailureDiagnostic {
+  ValueDecl *Member;
+
+public:
+  InvalidStaticMemberRefInKeyPath(Expr *root, ConstraintSystem &cs,
+                                  ValueDecl *member, ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), Member(member) {
+    assert(member->hasName());
+    assert(locator->isForKeyPathComponent());
+  }
 
   bool diagnoseAsError() override;
 };

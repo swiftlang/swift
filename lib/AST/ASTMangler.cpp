@@ -344,6 +344,7 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
                                             CanSILFunctionType ThunkType,
                                             Type FromType,
                                             Type ToType,
+                                            Type SelfType,
                                             ModuleDecl *Module) {
   Mod = Module;
   GenericSignature *GenSig = ThunkType->getGenericSignature();
@@ -353,10 +354,17 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
   beginMangling();
   appendType(FromType);
   appendType(ToType);
+  if (SelfType)
+    appendType(SelfType);
+
   if (GenSig)
     appendGenericSignature(GenSig);
-  // TODO: mangle ThunkType->isPseudogeneric()
-  appendOperator("TR");
+
+  if (SelfType)
+    appendOperator("Ty");
+  else
+    appendOperator("TR");
+
   return finalize();
 }
 
@@ -1595,10 +1603,10 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
     return appendEntity(eed);
   }
 
-  case DeclContextKind::SubscriptDecl:
-    // FIXME: We may need to do something here if subscripts contain any symbols
-    // exposed with linkage names, or if/when they get generic parameters.
-    return appendContext(ctx->getParent());
+  case DeclContextKind::SubscriptDecl: {
+    auto sd = cast<SubscriptDecl>(ctx);
+    return appendEntity(sd);
+  }
       
   case DeclContextKind::Initializer:
     switch (cast<Initializer>(ctx)->getInitializerKind()) {
@@ -1905,11 +1913,9 @@ void ASTMangler::appendTypeList(Type listTy) {
       return appendOperator("y");
     bool firstField = true;
     for (auto &field : tuple->getElements()) {
-      // FIXME: We shouldn't put @escaping in non-parameter list tuples
-      auto flags = field.getParameterFlags().withEscaping(false);
-
-      assert(flags.isNone());
-      appendTypeListElement(field.getName(), field.getRawType(), flags);
+      assert(field.getParameterFlags().isNone());
+      appendTypeListElement(field.getName(), field.getRawType(),
+                            ParameterTypeFlags());
       appendListSeparator(firstField);
     }
   } else {

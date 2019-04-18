@@ -1304,8 +1304,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
       return std::make_pair(ParsedExpr->getType(), refDecl);
     }
 
-    prepareForRetypechecking(ParsedExpr);
-
     ConcreteDeclRef ReferencedDecl = nullptr;
     Expr *ModifiedExpr = ParsedExpr;
     if (auto T = getTypeOfCompletionContextExpr(P.Context, CurDeclContext,
@@ -1643,6 +1641,7 @@ public:
 
   void setExpectedTypes(ArrayRef<Type> Types, bool isSingleExpressionBody) {
     expectedTypeContext.isSingleExpressionBody = isSingleExpressionBody;
+    expectedTypeContext.possibleTypes.clear();
     expectedTypeContext.possibleTypes.reserve(Types.size());
     for (auto T : Types)
       if (T)
@@ -1707,17 +1706,23 @@ public:
   }
 
   void collectImportedModules(llvm::StringSet<> &ImportedModules) {
+    ModuleDecl::ImportFilter ImportFilter;
+    ImportFilter |= ModuleDecl::ImportFilterKind::Public;
+    ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+    ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+
     SmallVector<ModuleDecl::ImportedModule, 16> Imported;
     SmallVector<ModuleDecl::ImportedModule, 16> FurtherImported;
     CurrDeclContext->getParentSourceFile()->getImportedModules(Imported,
-      ModuleDecl::ImportFilter::All);
+                                                               ImportFilter);
     while (!Imported.empty()) {
       ModuleDecl *MD = Imported.back().second;
       Imported.pop_back();
       if (!ImportedModules.insert(MD->getNameStr()).second)
         continue;
       FurtherImported.clear();
-      MD->getImportedModules(FurtherImported, ModuleDecl::ImportFilter::Public);
+      MD->getImportedModules(FurtherImported,
+                             ModuleDecl::ImportFilterKind::Public);
       Imported.append(FurtherImported.begin(), FurtherImported.end());
       for (auto SubMod : FurtherImported) {
         Imported.push_back(SubMod);
@@ -2238,22 +2243,56 @@ public:
     Builder.addRightParen();
   }
 
+  SemanticContextKind getSemanticContextKind(const AbstractFunctionDecl *AFD) {
+    // FIXME: to get the corect semantic context we need to know how lookup
+    // would have found the declaration AFD. For now, just infer a reasonable
+    // semantics.
+
+    if (!AFD)
+      return SemanticContextKind::CurrentModule;
+
+    DeclContext *calleeDC = AFD->getDeclContext();
+    
+    if (calleeDC->isTypeContext())
+      // FIXME: We should distinguish CurrentNominal and Super. We need to
+      // propagate the base type to do that.
+      return SemanticContextKind::CurrentNominal;
+
+    if (calleeDC->isLocalContext())
+      return SemanticContextKind::Local;
+    if (calleeDC->getParentModule() == CurrDeclContext->getParentModule())
+      return SemanticContextKind::CurrentModule;
+
+    return SemanticContextKind::OtherModule;
+  }
+
   void addFunctionCallPattern(const AnyFunctionType *AFT,
                               const AbstractFunctionDecl *AFD = nullptr) {
+    if (AFD) {
+      auto genericSig =
+          AFD->getInnermostDeclContext()->getGenericSignatureOfContext();
+      AFT = eraseArchetypes(CurrDeclContext->getParentModule(),
+                            const_cast<AnyFunctionType *>(AFT), genericSig)
+                ->castTo<AnyFunctionType>();
+    }
 
     // Add the pattern, possibly including any default arguments.
     auto addPattern = [&](ArrayRef<const ParamDecl *> declParams = {},
                           bool includeDefaultArgs = true) {
-      // FIXME: to get the corect semantic context we need to know how lookup
-      // would have found the declaration AFD. For now, just choose a reasonable
-      // default, it's most likely to be CurrentModule or CurrentNominal.
+      CommandWordsPairs Pairs;
       CodeCompletionResultBuilder Builder(
-          Sink, CodeCompletionResult::ResultKind::Pattern,
-          SemanticContextKind::CurrentModule, expectedTypeContext);
+          Sink,
+          AFD ? CodeCompletionResult::ResultKind::Declaration
+              : CodeCompletionResult::ResultKind::Pattern,
+          getSemanticContextKind(AFD), expectedTypeContext);
       if (!HaveLParen)
         Builder.addLeftParen();
       else
         Builder.addAnnotatedLeftParen();
+      if (AFD) {
+        Builder.setAssociatedDecl(AFD);
+        setClangDeclKeywords(AFD, Pairs, Builder);
+      }
 
       addCallArgumentPatterns(Builder, AFT->getParams(), declParams,
                               includeDefaultArgs);
@@ -2415,8 +2454,9 @@ public:
       {
         llvm::raw_svector_ostream OS(TypeStr);
         if (IsImplicitlyCurriedInstanceMethod) {
-          ResultType->castTo<AnyFunctionType>()->printParams(OS);
-          ResultType = ResultType->castTo<AnyFunctionType>()->getResult();
+          auto *FnType = ResultType->castTo<AnyFunctionType>();
+          AnyFunctionType::printParams(FnType->getParams(), OS);
+          ResultType = FnType->getResult();
           OS << " -> ";
         }
 
@@ -3334,7 +3374,6 @@ public:
     if (expr->getType() && !expr->getType()->hasError())
       return expr;
 
-    prepareForRetypechecking(expr);
     if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext), expr))
       return expr;
     return LHS;
@@ -4213,13 +4252,12 @@ public:
       auto Proto = Conformance->getProtocol();
       if (!Proto->isAccessibleFrom(CurrDeclContext))
         continue;
-      auto NormalConformance = Conformance->getRootNormalConformance();
       for (auto Member : Proto->getMembers()) {
         auto *ATD = dyn_cast<AssociatedTypeDecl>(Member);
         if (!ATD)
           continue;
         // FIXME: Also exclude the type alias that has already been specified.
-        if (!NormalConformance->hasTypeWitness(ATD) ||
+        if (!Conformance->hasTypeWitness(ATD) ||
             !ATD->getDefaultDefinitionLoc().isNull())
           continue;
         addTypeAlias(ATD,
@@ -5063,14 +5101,17 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.setHaveLParen(true);
 
     ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
-    Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
-                            ContextInfo.isSingleExpressionBody());
+
     if (ShouldCompleteCallPatternAfterParen) {
-      if (ExprType) {
+      ExprContextInfo ParentContextInfo(CurDeclContext, ParsedExpr);
+      Lookup.setExpectedTypes(ParentContextInfo.getPossibleTypes(),
+                              ParentContextInfo.isSingleExpressionBody());
+      if (ExprType && ((*ExprType)->is<AnyFunctionType>() ||
+                       (*ExprType)->is<AnyMetatypeType>())) {
         Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
       } else {
         for (auto &typeAndDecl : ContextInfo.getPossibleCallees())
-          Lookup.getValueExprCompletions(typeAndDecl.first, typeAndDecl.second);
+          Lookup.tryFunctionCallCompletions(typeAndDecl.first, typeAndDecl.second);
       }
     } else {
       // Add argument labels, then fallthrough to get values.
@@ -5080,6 +5121,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (!Lookup.FoundFunctionCalls ||
         (Lookup.FoundFunctionCalls &&
          Lookup.FoundFunctionsWithoutFirstKeyword)) {
+      Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
+                              ContextInfo.isSingleExpressionBody());
       Lookup.setHaveLParen(false);
       DoPostfixExprBeginning();
     }
@@ -5331,9 +5374,13 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.getToplevelCompletions(Request.OnlyTypes);
 
       // Add results for all imported modules.
+      ModuleDecl::ImportFilter ImportFilter;
+      ImportFilter |= ModuleDecl::ImportFilterKind::Public;
+      ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+      ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
       SmallVector<ModuleDecl::ImportedModule, 4> Imports;
       auto *SF = CurDeclContext->getParentSourceFile();
-      SF->getImportedModules(Imports, ModuleDecl::ImportFilter::All);
+      SF->getImportedModules(Imports, ImportFilter);
 
       for (auto Imported : Imports) {
         ModuleDecl *TheModule = Imported.second;

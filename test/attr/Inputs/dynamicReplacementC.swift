@@ -11,4 +11,5 @@ public extension TheReplaceables {
 public class K {
   public init(i: Int) {}
   public convenience init(c : Int) { self.init(i : c) }
+  public final func finalFunction() {}
 }

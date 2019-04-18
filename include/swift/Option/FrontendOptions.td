@@ -59,13 +59,13 @@ def emit_fixits_path
   : Separate<["-"], "emit-fixits-path">, MetaVarName<"<path>">,
     HelpText<"Output compiler fixits as source edits to <path>">;
 
-// For transition purposes.
-def emit_interface_path
-  : Separate<["-"], "emit-interface-path">,
-    Alias<emit_parseable_module_interface_path>;
+def serialize_module_interface_dependency_hashes
+  : Flag<["-"], "serialize-module-interface-dependency-hashes">,
+    Flags<[HelpHidden]>;
 
 def serialize_parseable_module_interface_dependency_hashes
   : Flag<["-"], "serialize-parseable-module-interface-dependency-hashes">,
+    Alias<serialize_module_interface_dependency_hashes>,
     Flags<[HelpHidden]>;
 
 def tbd_install_name
@@ -153,8 +153,8 @@ def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
 class DebugCrashOpt : Group<debug_crash_Group>;
 
 
-// Flags that are saved into parseable interfaces
-let Flags = [FrontendOption, NoDriverOption, HelpHidden, ParseableInterfaceOption] in {
+// Flags that are saved into module interfaces
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] in {
 
 def enable_objc_interop :
   Flag<["-"], "enable-objc-interop">,
@@ -229,6 +229,10 @@ def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
 def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;
 
+def enable_ownership_stripping_after_serialization
+  : Flag<["-"], "enable-ownership-stripping-after-serialization">,
+  HelpText<"Strip ownership after serialization">;
+
 def disable_access_control : Flag<["-"], "disable-access-control">,
   HelpText<"Don't respect access control restrictions">;
 def enable_access_control : Flag<["-"], "enable-access-control">,
@@ -301,9 +305,6 @@ def pch_disable_validation : Flag<["-"], "pch-disable-validation">,
 
 def disable_sil_ownership_verifier : Flag<["-"], "disable-sil-ownership-verifier">,
   HelpText<"Do not verify ownership invariants during SIL Verification ">;
-
-def enable_mandatory_semantic_arc_opts : Flag<["-"], "enable-mandatory-semantic-arc-opts">,
-  HelpText<"Enable the mandatory semantic arc optimizer">;
 
 def suppress_static_exclusivity_swap : Flag<["-"], "suppress-static-exclusivity-swap">,
   HelpText<"Suppress static violations of exclusive access with swap()">;
@@ -435,6 +436,10 @@ def disable_playground_transform : Flag<["-"], "disable-playground-transform">,
 def pc_macro : Flag<["-"], "pc-macro">,
   HelpText<"Apply the 'program counter simulation' macro">;
 
+def no_clang_module_breadcrumbs : Flag<["-"], "no-clang-module-breadcrumbs">,
+  HelpText<"Don't emit DWARF skeleton CUs for imported Clang modules. "
+           "Use this when building a redistributable static archive.">;
+
 def use_jit : Flag<["-"], "use-jit">,
   HelpText<"Register Objective-C classes as if the JIT were in use">;
 
@@ -508,20 +513,25 @@ def dump_interface_hash : Flag<["-"], "dump-interface-hash">,
    HelpText<"Parse input file(s) and dump interface token hash(es)">,
    ModeOpt;
 
+def compile_module_from_interface :
+  Flag<["-"], "compile-module-from-interface">,
+  HelpText<"Treat the (single) input as a swiftinterface and produce a module">,
+  ModeOpt;
+
 def build_module_from_parseable_interface :
   Flag<["-"], "build-module-from-parseable-interface">,
-  HelpText<"Treat the (single) input as a swiftinterface and produce a module">,
+  Alias<compile_module_from_interface>,
   ModeOpt;
 
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,
-  HelpText<"Directory of prebuilt modules for loading parseable interfaces">;
+  HelpText<"Directory of prebuilt modules for loading module interfaces">;
 def prebuilt_module_cache_path_EQ :
   Joined<["-"], "prebuilt-module-cache-path=">,
   Alias<prebuilt_module_cache_path>;
 
-def enable_resilience_bypass : Flag<["-"], "enable-resilience-bypass">,
-   HelpText<"Completely bypass resilience when accessing types in resilient frameworks">;
+def force_public_linkage : Flag<["-"], "force-public-linkage">,
+   HelpText<"Force public linkage for private symbols. Used by LLDB.">;
 
 def dump_api_path : Separate<["-"], "dump-api-path">,
   HelpText<"The path to output swift interface files for the compiled source files">;
@@ -554,5 +564,9 @@ def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">
 def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,
   HelpText<"One of 'all', 'resilient' or 'fragile'">;
+
+def enable_objc_resilient_class_stubs : Flag<["-"], "enable-resilient-objc-class-stubs">,
+  HelpText<"Emit Objective-C resilient class stubs for classes with "
+           "resiliently-sized metadata">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

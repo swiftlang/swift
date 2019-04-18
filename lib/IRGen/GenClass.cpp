@@ -930,13 +930,16 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   auto &resilientLayout =
     classTI.getClassLayout(*this, selfType, /*forBackwardDeployment=*/false);
 
+  // As a matter of policy, class metadata is never emitted lazily for now.
+  assert(!IRGen.hasLazyMetadata(D));
+
   // Emit the class metadata.
   emitClassMetadata(*this, D, fragileLayout, resilientLayout);
+  emitFieldDescriptor(D);
 
   IRGen.addClassForEagerInitialization(D);
 
   emitNestedTypeDecls(D->getMembers());
-  emitFieldMetadataRecord(D);
 }
 
 namespace {
@@ -1207,7 +1210,9 @@ namespace {
       else {
         auto type = getSelfType(getClass()).getASTType();
         llvm::Constant *metadata =
-          tryEmitConstantHeapMetadataRef(IGM, type, /*allowUninit*/ true);
+          tryEmitConstantHeapMetadataRef(IGM, type,
+                                         /*allowUninit*/ true,
+                                         /*allowStub*/ true);
         assert(metadata &&
                "extended objc class doesn't have constant metadata?");
         fields.add(metadata);
@@ -2021,9 +2026,9 @@ namespace {
 } // end anonymous namespace
 
 static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
-                                                      ClassDecl *cls) {
+                                                      ClassDecl *D) {
   llvm::Function *f =
-    IGM.getAddrOfObjCMetadataUpdateFunction(cls, ForDefinition);
+    IGM.getAddrOfObjCMetadataUpdateFunction(D, ForDefinition);
   f->setAttributes(IGM.constructInitialAttributes());
 
   IRGenFunction IGF(IGM, f);
@@ -2037,7 +2042,7 @@ static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
 
   // Just directly call our metadata accessor. This should actually
   // return the same metadata; the Objective-C runtime enforces this.
-  auto type = cls->getDeclaredType()->getCanonicalType();
+  auto type = D->getDeclaredType()->getCanonicalType();
   auto *metadata = IGF.emitTypeMetadataRef(type,
                                            MetadataState::Complete)
     .getMetadata();
@@ -2046,6 +2051,48 @@ static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
                               IGM.ObjCClassPtrTy));
 
   return f;
+}
+
+/// We emit Objective-C class stubs for non-generic classes with resilient
+/// ancestry. This lets us attach categories to the class even though it
+/// does not have statically-emitted metadata.
+bool irgen::hasObjCResilientClassStub(IRGenModule &IGM, ClassDecl *D) {
+  assert(IGM.getClassMetadataStrategy(D) == ClassMetadataStrategy::Resilient);
+  return (!D->isGenericContext() &&
+          IGM.ObjCInterop &&
+          IGM.Context.LangOpts.EnableObjCResilientClassStubs);
+}
+
+void irgen::emitObjCResilientClassStub(IRGenModule &IGM, ClassDecl *D) {
+  assert(hasObjCResilientClassStub(IGM, D));
+
+  llvm::Constant *fields[] = {
+    llvm::ConstantInt::get(IGM.SizeTy, 0), // reserved
+    llvm::ConstantInt::get(IGM.SizeTy, 1), // isa
+    IGM.getAddrOfObjCMetadataUpdateFunction(D, NotForDefinition)
+  };
+  auto init = llvm::ConstantStruct::get(IGM.ObjCFullResilientClassStubTy,
+                                        makeArrayRef(fields));
+
+  // Define the full stub. This is a private symbol.
+  auto fullObjCStub = cast<llvm::GlobalVariable>(
+      IGM.getAddrOfObjCResilientClassStub(D, ForDefinition,
+                                          TypeMetadataAddress::FullMetadata));
+  fullObjCStub->setInitializer(init);
+
+  // Emit the metadata update function referenced above.
+  emitObjCMetadataUpdateFunction(IGM, D);
+
+  // Apply the offset.
+  auto *objcStub = llvm::ConstantExpr::getBitCast(fullObjCStub, IGM.Int8PtrTy);
+  objcStub = llvm::ConstantExpr::getInBoundsGetElementPtr(
+      IGM.Int8Ty, objcStub, IGM.getSize(IGM.getPointerSize()));
+  objcStub = llvm::ConstantExpr::getPointerCast(objcStub,
+      IGM.ObjCResilientClassStubTy->getPointerTo());
+
+  auto entity = LinkEntity::forObjCResilientClassStub(
+      D, TypeMetadataAddress::AddressPoint);
+  IGM.defineAlias(entity, objcStub);
 }
 
 /// Emit the private data (RO-data) associated with a class.

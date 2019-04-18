@@ -679,6 +679,12 @@ private:
   Classification classifyRethrowsArgument(Expr *arg, Type paramType) {
     arg = arg->getValueProvidingExpr();
 
+    if (isa<DefaultArgumentExpr>(arg) ||
+        isa<CallerDefaultArgumentExpr>(arg)) {
+      return classifyArgumentByType(arg->getType(),
+                                    PotentialReason::forDefaultArgument());
+    }
+
     // If this argument is `nil` literal or `.none`,
     // it doesn't cause the call to throw.
     if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(arg)) {
@@ -694,8 +700,6 @@ private:
     if (auto paramTupleType = dyn_cast<TupleType>(paramType.getPointer())) {
       if (auto tuple = dyn_cast<TupleExpr>(arg)) {
         return classifyTupleRethrowsArgument(tuple, paramTupleType);
-      } else if (auto shuffle = dyn_cast<ArgumentShuffleExpr>(arg)) {
-        return classifyShuffleRethrowsArgument(shuffle, paramTupleType);
       }
 
       if (paramTupleType->getNumElements() != 1) {
@@ -709,7 +713,7 @@ private:
 
       // FIXME: There's a case where we can end up with an ApplyExpr that
       // has a single-element-tuple argument type, but the argument is just
-      // a ClosureExpr and not a TupleExpr/ArgumentShuffleExpr.
+      // a ClosureExpr and not a TupleExpr.
       paramType = paramTupleType->getElementType(0);
     }
 
@@ -754,79 +758,6 @@ private:
                                             paramTupleType->getElementType(i)));
     }
     return result;
-  }
-
-  /// Classify an argument to a 'rethrows' function that's a tuple shuffle.
-  Classification classifyShuffleRethrowsArgument(ArgumentShuffleExpr *shuffle,
-                                                 TupleType *paramTupleType) {
-    auto reversedParamType =
-      reverseShuffleParamType(shuffle, paramTupleType);
-
-    // Classify the operand.
-    auto result = classifyRethrowsArgument(shuffle->getSubExpr(),
-                                           reversedParamType);
-
-    // Check for default arguments in the shuffle.
-    for (auto i : indices(shuffle->getElementMapping())) {
-      // If this element comes from the sub-expression, we've already
-      // analyzed it.  (Variadic arguments also end up here, which is
-      // correct for our purposes.)
-      auto elt = shuffle->getElementMapping()[i];
-      if (elt >= 0) {
-        // Ignore.
-
-      // Otherwise, it might come from a default argument.  It still
-      // might contribute to 'rethrows', but treat it as an opaque source.
-      } else if (elt == ArgumentShuffleExpr::DefaultInitialize ||
-                 elt == ArgumentShuffleExpr::CallerDefaultInitialize) {
-        result.merge(classifyArgumentByType(paramTupleType->getElementType(i),
-                                       PotentialReason::forDefaultArgument()));
-      }
-    }
-
-    return result;
-  }
-
-  /// Given a tuple shuffle and an original parameter type, construct
-  /// the type of the source of the tuple shuffle preserving as much
-  /// information as possible from the original parameter type.
-  Type reverseShuffleParamType(ArgumentShuffleExpr *shuffle,
-                               TupleType *origParamTupleType) {
-    SmallVector<TupleTypeElt, 4> origSrcElts;
-    if (shuffle->isSourceScalar()) {
-      origSrcElts.append(1, TupleTypeElt());
-    } else {
-      auto srcTupleType = shuffle->getSubExpr()->getType()->castTo<TupleType>();
-      origSrcElts.append(srcTupleType->getNumElements(), TupleTypeElt());
-    }
-
-    auto mapping = shuffle->getElementMapping();
-    for (unsigned destIndex = 0; destIndex != mapping.size(); ++destIndex) {
-      auto srcIndex = mapping[destIndex];
-      if (srcIndex >= 0) {
-        origSrcElts[srcIndex] = origParamTupleType->getElement(destIndex);
-      } else if (srcIndex == ArgumentShuffleExpr::DefaultInitialize ||
-                 srcIndex == ArgumentShuffleExpr::CallerDefaultInitialize) {
-        // Nothing interesting from the source expression.
-      } else if (srcIndex == ArgumentShuffleExpr::Variadic) {
-        // Variadic arguments never contribute to 'rethrows'.
-        // Assign the rest of the source elements parameter types that will
-        // cause the recursive walker to ignore them.
-        for (unsigned srcIndex : shuffle->getVariadicArgs()) {
-          assert(srcIndex >= 0 && "default-initialized variadic argument?");
-          origSrcElts[srcIndex] =
-            origParamTupleType->getASTContext().TheRawPointerType;
-        }
-      } else {
-        llvm_unreachable("bad source-element mapping!");
-      }
-    }
-
-    if (shuffle->isSourceScalar()) {
-      return origSrcElts[0].getType();
-    } else {
-      return TupleType::get(origSrcElts, origParamTupleType->getASTContext());
-    }
   }
 
   /// Given the type of an argument, try to determine if it contains

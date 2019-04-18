@@ -246,6 +246,7 @@ class C3 {
 
   func f6(obj: C3) {
     overloaded(#^OVERLOAD6^#
+    func sync() {}
     obj.overloaded(#^OVERLOAD7^#
   }
 }
@@ -279,15 +280,15 @@ class C3 {
 // NEGATIVE_OVERLOAD4-NOT: Decl[Class]{{.*}} C2
 
 // OVERLOAD5: Begin completions
-// OVERLOAD5-DAG: Pattern/CurrModule:                 ['(']{#(a): C1#}, {#b1: C2#}[')'][#Void#]; name=a: C1, b1: C2
-// OVERLOAD5-DAG: Pattern/CurrModule:                 ['(']{#(a): C2#}, {#b2: C1#}[')'][#Void#]; name=a: C2, b2: C1
+// OVERLOAD5-DAG: Decl[FreeFunction]/CurrModule:      ['(']{#(a): C1#}, {#b1: C2#}[')'][#Void#]; name=a: C1, b1: C2
+// OVERLOAD5-DAG: Decl[FreeFunction]/CurrModule:      ['(']{#(a): C2#}, {#b2: C1#}[')'][#Void#]; name=a: C2, b2: C1
 // OVERLOAD5-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C1I[#C1#]; name=C1I
 // OVERLOAD5-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C2I[#C2#]; name=C2I
 // OVERLOAD5: End completions
 
 // OVERLOAD6: Begin completions
-// OVERLOAD6-DAG: Pattern/CurrModule:                 ['(']{#(a1): C1#}, {#b1: C2#}[')'][#Void#]; name=a1: C1, b1: C2
-// OVERLOAD6-DAG: Pattern/CurrModule:                 ['(']{#a2: C2#}, {#b2: C1#}[')'][#Void#]; name=a2: C2, b2: C1
+// OVERLOAD6-DAG: Decl[InstanceMethod]/CurrNominal:   ['(']{#(a1): C1#}, {#b1: C2#}[')'][#Void#]; name=a1: C1, b1: C2
+// OVERLOAD6-DAG: Decl[InstanceMethod]/CurrNominal:   ['(']{#a2: C2#}, {#b2: C1#}[')'][#Void#]; name=a2: C2, b2: C1
 // OVERLOAD6-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C1I[#C1#]; name=C1I
 // OVERLOAD6-DAG: Decl[InstanceVar]/CurrNominal:      C2I[#C2#]; name=C2I
 // OVERLOAD6: End completions
@@ -304,7 +305,7 @@ extension C3 {
 }
 
 // HASERROR1: Begin completions
-// HASERROR1-DAG: Pattern/CurrModule:                 ['(']{#a1: C1#}, {#b1: <<error type>>#}[')'][#Int#];
+// HASERROR1-DAG: Decl[InstanceMethod]/CurrNominal: ['(']{#a1: C1#}, {#b1: <<error type>>#}[')'][#Int#];
 // HASERROR1: End completions
 
 // HASERROR2: Begin completions
@@ -442,7 +443,7 @@ func testArg2Name3() {
   firstArg(#^FIRST_ARG_NAME_3^#,
 }
 // FIRST_ARG_NAME_3: Keyword/ExprSpecific: arg1: [#Argument name#]
-// FIRST_ARG_NAME_4: Pattern/CurrModule: ['(']{#arg1: Int#}, {#arg2: Int#}[')'][#Void#];
+// FIRST_ARG_NAME_4: Decl[FreeFunction]/CurrModule: ['(']{#arg1: Int#}, {#arg2: Int#}[')'][#Void#];
 
 func takeArray<T>(_ x: [T]) {}
 struct TestBoundGeneric1 {
@@ -484,7 +485,7 @@ public func fopen() -> TestBoundGeneric1! { fatalError() }
 func other() {
   _ = fopen(#^CALLARG_IUO^#)
 // CALLARG_IUO: Begin completions, 1 items
-// CALLARG_IUO: Pattern/CurrModule: ['('][')'][#TestBoundGeneric1!#]; name=
+// CALLARG_IUO: Decl[FreeFunction]/CurrModule: ['('][')'][#TestBoundGeneric1!#]; name=
 // CALLARG_IUO: End completions
 }
 
@@ -601,12 +602,14 @@ class TestImplicitlyCurriedSelf {
 
   static func test() {
     foo(#^CURRIED_SELF_1^#
+    func sync();
     self.foo(#^CURRIED_SELF_2^#
+    func sync();
     TestImplicitlyCurriedSelf.foo(#^CURRIED_SELF_3^#
 
 // CURRIED_SELF_1: Begin completions, 2 items
-// CURRIED_SELF_1-DAG: Pattern/CurrModule: ['(']{#(self): TestImplicitlyCurriedSelf#}[')'][#(Int) -> ()#]{{; name=.+$}}
-// CURRIED_SELF_1-DAG: Pattern/CurrModule: ['(']{#(self): TestImplicitlyCurriedSelf#}[')'][#(Int, Int) -> ()#]{{; name=.+$}}
+// CURRIED_SELF_1-DAG: Decl[InstanceMethod]/CurrNominal: ['(']{#(self): TestImplicitlyCurriedSelf#}[')'][#(Int) -> ()#]{{; name=.+$}}
+// CURRIED_SELF_1-DAG: Decl[InstanceMethod]/CurrNominal: ['(']{#(self): TestImplicitlyCurriedSelf#}[')'][#(Int, Int) -> ()#]{{; name=.+$}}
 // CURRIED_SELF_1: End completions
   }
 }

@@ -7,6 +7,7 @@ silopt_register_sources(
   DIMemoryUseCollector.cpp
   DataflowDiagnostics.cpp
   DiagnoseInfiniteRecursion.cpp
+  DiagnoseInvalidEscapingCaptures.cpp
   DiagnoseStaticExclusivity.cpp
   DiagnoseUnreachable.cpp
   GuaranteedARCOpts.cpp

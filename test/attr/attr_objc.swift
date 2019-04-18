@@ -158,6 +158,8 @@ class subject_class1 { // no-error
 
   @objc
   func subject_instanceFunc() {} // no-error
+  
+  
 }
 
 @objc
@@ -193,9 +195,9 @@ extension subject_genericClass where T : Hashable {
 }
 
 extension subject_genericClass {
-  @objc var extProp: Int { return 0 } // expected-error{{members of extensions of generic classes cannot be declared @objc}}
+  @objc var extProp: Int { return 0 } // expected-error{{extensions of generic classes cannot contain '@objc' members}}
   
-  @objc func extFoo() {} // expected-error{{members of extensions of generic classes cannot be declared @objc}}
+  @objc func extFoo() {} // expected-error{{extensions of generic classes cannot contain '@objc' members}}
 }
 
 @objc
@@ -506,7 +508,12 @@ class subject_subscriptGeneric<T> {
   }
 }
 
-
+class subject_subscriptInvalid1 {
+  @objc class subscript(_ i: Int) -> AnyObject? {
+  // expected-error@-1 {{class subscript cannot be marked @objc}}
+    return nil
+  }
+}
 
 class subject_subscriptInvalid2 {
   @objc

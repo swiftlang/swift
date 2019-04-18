@@ -1266,10 +1266,6 @@ namespace {
 
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(FieldVectorOffset / IGM.getPointerSize());
-
-      // For any nominal type metadata required for reflection.
-      for (auto *prop : properties)
-        IGM.IRGen.noteUseOfTypeMetadata(prop->getValueInterfaceType());
     }
     
     uint16_t getKindSpecificFlags() {
@@ -1282,14 +1278,13 @@ namespace {
     void maybeAddResilientSuperclass() { }
 
     void addReflectionFieldDescriptor() {
-      // Structs are reflectable unless we emit them with opaque reflection
-      // metadata.
-      if (!IGM.IRGen.Opts.EnableReflectionMetadata
-          || IGM.shouldEmitOpaqueTypeMetadataRecord(getType())) {
+      if (!IGM.IRGen.Opts.EnableReflectionMetadata) {
         B.addInt32(0);
         return;
       }
     
+      IGM.IRGen.noteUseOfFieldDescriptor(getType());
+
       B.addRelativeAddress(IGM.getAddrOfReflectionFieldDescriptor(
         getType()->getDeclaredType()->getCanonicalType()));
     }
@@ -1340,10 +1335,6 @@ namespace {
 
       // uint32_t NumEmptyCases;
       B.addInt32(Strategy.getElementsWithNoPayload().size());
-
-      // For any nominal type metadata required for reflection.
-      for (auto elt : Strategy.getElementsWithPayload())
-        IGM.IRGen.noteUseOfTypeMetadata(elt.decl->getArgumentInterfaceType());
     }
     
     uint16_t getKindSpecificFlags() {
@@ -1356,15 +1347,21 @@ namespace {
     void maybeAddResilientSuperclass() { }
 
     void addReflectionFieldDescriptor() {
-      // Some enum layout strategies (viz. C compatible layout) aren't
-      // supported by reflection.
-      if (!IGM.IRGen.Opts.EnableReflectionMetadata
-          || IGM.shouldEmitOpaqueTypeMetadataRecord(getType())
-          || !Strategy.isReflectable()) {
+      if (!IGM.IRGen.Opts.EnableReflectionMetadata) {
         B.addInt32(0);
         return;
       }
-    
+
+      // Force the emission of the field descriptor or fixed descriptor.
+      IGM.IRGen.noteUseOfFieldDescriptor(getType());
+
+      // Some enum layout strategies (viz. C compatible layout) aren't
+      // supported by reflection.
+      if (!Strategy.isReflectable()) {
+        B.addInt32(0);
+        return;
+      }
+
       B.addRelativeAddress(IGM.getAddrOfReflectionFieldDescriptor(
         getType()->getDeclaredType()->getCanonicalType()));
     }
@@ -1477,9 +1474,8 @@ namespace {
     void addReflectionFieldDescriptor() {
       // Classes are always reflectable, unless reflection is disabled or this
       // is a foreign class.
-      if (!IGM.IRGen.Opts.EnableReflectionMetadata
-          || IGM.shouldEmitOpaqueTypeMetadataRecord(getType())
-          || getType()->isForeign()) {
+      if (!IGM.IRGen.Opts.EnableReflectionMetadata ||
+          getType()->isForeign()) {
         B.addInt32(0);
         return;
       }
@@ -1631,6 +1627,7 @@ namespace {
 
       // union {
       //   uint32_t MetadataPositiveSizeInWords;
+      //   ExtraClassContextFlags ExtraClassFlags;
       // };
       if (!MetadataLayout) {
         // FIXME: do something meaningful for foreign classes?
@@ -1639,7 +1636,10 @@ namespace {
         B.addInt32(MetadataLayout->getSize().getOffsetToEnd()
                      / IGM.getPointerSize());
       } else {
-        B.addInt32(0); // currently unused
+        ExtraClassDescriptorFlags flags;
+        if (hasObjCResilientClassStub(IGM, getType()))
+          flags.setObjCResilientClassStub(true);
+        B.addInt32(flags.getOpaqueValue());
       }
 
       // uint32_t NumImmediateMembers;
@@ -1652,10 +1652,6 @@ namespace {
 
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(getFieldVectorOffset() / IGM.getPointerSize());
-
-      // For any nominal type metadata required for reflection.
-      for (auto *prop : properties)
-        IGM.IRGen.noteUseOfTypeMetadata(prop->getValueInterfaceType());
     }
   };
 } // end anonymous namespace
@@ -1694,10 +1690,9 @@ void irgen::emitLazyTypeMetadata(IRGenModule &IGM, NominalTypeDecl *type) {
   eraseExistingTypeContextDescriptor(IGM, type);
 
   if (requiresForeignTypeMetadata(type)) {
-    (void)IGM.getAddrOfForeignTypeMetadataCandidate(
-        type->getDeclaredInterfaceType()->getCanonicalType());
+    emitForeignTypeMetadata(IGM, type);
   } else if (auto sd = dyn_cast<StructDecl>(type)) {
-    return emitStructMetadata(IGM, sd);
+    emitStructMetadata(IGM, sd);
   } else if (auto ed = dyn_cast<EnumDecl>(type)) {
     emitEnumMetadata(IGM, ed);
   } else if (auto pd = dyn_cast<ProtocolDecl>(type)) {
@@ -1705,7 +1700,6 @@ void irgen::emitLazyTypeMetadata(IRGenModule &IGM, NominalTypeDecl *type) {
   } else {
     llvm_unreachable("should not have enqueued a class decl here!");
   }
-
 }
 
 llvm::Constant *
@@ -2481,7 +2475,8 @@ namespace {
       case ClassMetadataStrategy::Update:
       case ClassMetadataStrategy::FixedOrUpdate:
       case ClassMetadataStrategy::Fixed: {
-        auto type = (Target->checkObjCAncestry() != ObjCClassKind::NonObjC
+        // FIXME: Should this check HasImported instead?
+        auto type = (Target->checkAncestry(AncestryFlags::ObjC)
                     ? IGM.Context.TheUnknownObjectType
                     : IGM.Context.TheNativeObjectType);
         auto wtable = IGM.getAddrOfValueWitnessTable(type);
@@ -2551,7 +2546,8 @@ namespace {
       Type type = Target->mapTypeIntoContext(Target->getSuperclass());
       auto *metadata = tryEmitConstantHeapMetadataRef(
           IGM, type->getCanonicalType(),
-          /*allowUninit*/ false);
+          /*allowUninit*/ false,
+          /*allowStub*/ false);
       assert(metadata != nullptr);
       B.add(metadata);
     }
@@ -3043,23 +3039,17 @@ namespace {
 /// references, we emit the symbol as a global asm block.
 static void emitObjCClassSymbol(IRGenModule &IGM,
                                 ClassDecl *classDecl,
-                                llvm::GlobalValue *metadata) {
-  llvm::SmallString<32> classSymbol;
-  LinkEntity::forObjCClass(classDecl).mangle(classSymbol);
-  
-  // Create the alias.
-  auto *metadataTy = cast<llvm::PointerType>(metadata->getType());
+                                llvm::Constant *metadata) {
+  auto entity = LinkEntity::forObjCClass(classDecl);
+  LinkInfo link = LinkInfo::get(IGM, entity, ForDefinition);
 
   // Create the alias.
-  auto *alias = llvm::GlobalAlias::create(metadataTy->getElementType(),
-                                          metadataTy->getAddressSpace(),
-                                          metadata->getLinkage(),
-                                          classSymbol.str(), metadata,
-                                          IGM.getModule());
-  alias->setVisibility(metadata->getVisibility());
-
-  if (IGM.useDllStorage())
-    alias->setDLLStorageClass(metadata->getDLLStorageClass());
+  auto *ptrTy = cast<llvm::PointerType>(metadata->getType());
+  auto *alias = llvm::GlobalAlias::create(
+      ptrTy->getElementType(), ptrTy->getAddressSpace(), link.getLinkage(),
+      link.getName(), metadata, &IGM.Module);
+  ApplyIRLinkage({link.getLinkage(), link.getVisibility(), link.getDLLStorage()})
+      .to(alias);
 }
 
 /// Emit the type metadata or metadata template for a class.
@@ -3142,6 +3132,26 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   if (IGM.ObjCInterop) {
     switch (strategy) {
     case ClassMetadataStrategy::Resilient:
+      // Even non-@objc classes can have Objective-C categories attached, so
+      // we always emit a resilient class stub as long as -enable-objc-interop
+      // is set.
+      if (hasObjCResilientClassStub(IGM, classDecl)) {
+        emitObjCResilientClassStub(IGM, classDecl);
+
+        if (classDecl->isObjC()) {
+          auto *stub = IGM.getAddrOfObjCResilientClassStub(
+              classDecl, NotForDefinition,
+              TypeMetadataAddress::AddressPoint);
+          emitObjCClassSymbol(IGM, classDecl, stub);
+
+          // @_objc_non_lazy_realization is only for use by the standard
+          // library, and we cannot support it with Objective-C class
+          // stubs (which there are none of in the standard library).
+          assert(!classDecl->getAttrs().hasAttribute<ObjCNonLazyRealizationAttr>());
+          IGM.addObjCClass(stub, /*eagerInitialization=*/false);
+        }
+      }
+      break;
     case ClassMetadataStrategy::Singleton:
       break;
     
@@ -3156,8 +3166,6 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
       break;
     }
   }
-
-  IGM.IRGen.noteUseOfAnyParentTypeMetadata(classDecl);
 }
 
 llvm::Value *IRGenFunction::emitInvariantLoad(Address address,
@@ -3523,18 +3531,6 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
 
   IGM.defineTypeMetadata(declaredType, isPattern, canBeConstant,
                          init.finishAndCreateFuture());
-
-  IGM.IRGen.noteUseOfAnyParentTypeMetadata(structDecl);
-}
-
-void IRGenerator::noteUseOfAnyParentTypeMetadata(NominalTypeDecl *type) {
-  // If this is a nested type we also potentially might need the outer types.
-  auto *declCtxt = type->getDeclContext();
-  auto *parentNominalDecl = declCtxt->getSelfNominalTypeDecl();
-  if (!parentNominalDecl)
-    return;
-
-  noteUseOfTypeMetadata(parentNominalDecl);
 }
 
 // Enums
@@ -3718,8 +3714,6 @@ void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
 
   IGM.defineTypeMetadata(declaredType, isPattern, canBeConstant,
                          init.finishAndCreateFuture());
-
-  IGM.IRGen.noteUseOfAnyParentTypeMetadata(theEnum);
 }
 
 llvm::Value *IRGenFunction::emitObjCSelectorRefLoad(StringRef selector) {
@@ -3788,7 +3782,7 @@ namespace {
                                               [&](IRGenFunction &IGF,
                                                   DynamicMetadataRequest request,
                                                 llvm::Constant *cacheVariable) {
-        auto candidate = IGF.IGM.getAddrOfForeignTypeMetadataCandidate(type);
+        auto candidate = IGF.IGM.getAddrOfTypeMetadata(type);
         auto call = IGF.Builder.CreateCall(IGF.IGM.getGetForeignTypeMetadataFn(),
                                            {request.get(IGF), candidate});
         call->addAttribute(llvm::AttributeList::FunctionIndex,
@@ -3996,98 +3990,47 @@ bool irgen::requiresForeignTypeMetadata(NominalTypeDecl *decl) {
     !isa<ProtocolDecl>(decl);
 }
 
-llvm::Constant *
-IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
-  // What we save in GlobalVars is actually the offsetted value.
-  auto entity = LinkEntity::forForeignTypeMetadataCandidate(type);
-  if (auto entry = GlobalVars[entity])
-    return entry;
+void irgen::emitForeignTypeMetadata(IRGenModule &IGM, NominalTypeDecl *decl) {
+  auto type = decl->getDeclaredType()->getCanonicalType();
 
   // Create a temporary base for relative references.
-  ConstantInitBuilder builder(*this);
+  ConstantInitBuilder builder(IGM);
   auto init = builder.beginStruct();
   init.setPacked(true);
 
-  // Local function to create the global variable for the foreign type
-  // metadata candidate.
-  bool canBeConstant;
-  Size addressPoint;
-  llvm::Constant *result = nullptr;
-  auto createCandidateVariable = [&] {
-    auto definition = init.finishAndCreateFuture();
-
-    // Create the global variable.
-    LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
-    auto var =
-        createVariable(*this, link, definition.getType(),
-                       getPointerAlignment());
-    definition.installInGlobal(var);
-    var->setConstant(canBeConstant);
-
-    // Apply the offset.
-    result = llvm::ConstantExpr::getBitCast(var, Int8PtrTy);
-    result = llvm::ConstantExpr::getInBoundsGetElementPtr(
-        Int8Ty, result, getSize(addressPoint));
-    result = llvm::ConstantExpr::getBitCast(result, TypeMetadataPtrTy);
-
-    // Only remember the offset.
-    GlobalVars[entity] = result;
-  };
-
-  // Compute the constant initializer and the offset of the type
-  // metadata candidate within it.
-  if (auto classType = dyn_cast<ClassType>(type)) {
-    assert(!classType.getParent());
-    auto classDecl = classType->getDecl();
+  if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
     assert(classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType);
 
-    ForeignClassMetadataBuilder builder(*this, classDecl, init);
+    ForeignClassMetadataBuilder builder(IGM, classDecl, init);
     builder.layout();
-    addressPoint = builder.getOffsetOfAddressPoint();
-    canBeConstant = builder.canBeConstant();
 
-    createCandidateVariable();
+    IGM.defineTypeMetadata(type, /*isPattern=*/false,
+                           builder.canBeConstant(),
+                           init.finishAndCreateFuture());
     builder.createMetadataAccessFunction();
-  } else if (auto structType = dyn_cast<StructType>(type)) {
-    auto structDecl = structType->getDecl();
+  } else if (auto structDecl = dyn_cast<StructDecl>(decl)) {
     assert(isa<ClangModuleUnit>(structDecl->getModuleScopeContext()));
 
-    ImportedStructs.insert(structDecl);
-
-    ForeignStructMetadataBuilder builder(*this, structDecl, init);
+    ForeignStructMetadataBuilder builder(IGM, structDecl, init);
     builder.layout();
-    addressPoint = builder.getOffsetOfAddressPoint();
-    canBeConstant = builder.canBeConstant();
 
-    createCandidateVariable();
+    IGM.defineTypeMetadata(type, /*isPattern=*/false,
+                           builder.canBeConstant(),
+                           init.finishAndCreateFuture());
     builder.createMetadataAccessFunction();
-  } else if (auto enumType = dyn_cast<EnumType>(type)) {
-    auto enumDecl = enumType->getDecl();
+  } else if (auto enumDecl = dyn_cast<EnumDecl>(decl)) {
     assert(enumDecl->hasClangNode());
     
-    ForeignEnumMetadataBuilder builder(*this, enumDecl, init);
+    ForeignEnumMetadataBuilder builder(IGM, enumDecl, init);
     builder.layout();
-    addressPoint = builder.getOffsetOfAddressPoint();
-    canBeConstant = builder.canBeConstant();
 
-    createCandidateVariable();
+    IGM.defineTypeMetadata(type, /*isPattern=*/false,
+                           builder.canBeConstant(),
+                           init.finishAndCreateFuture());
     builder.createMetadataAccessFunction();
   } else {
     llvm_unreachable("foreign metadata for unexpected type?!");
   }
-
-  // Keep type metadata around for all types.
-  addRuntimeResolvableType(type->getAnyNominal());
-  
-  // If the enclosing type is also an imported type, force its metadata too.
-  if (auto enclosing = type->getNominalParent()) {
-    auto canonicalEnclosing = enclosing->getCanonicalType();
-    if (requiresForeignTypeMetadata(canonicalEnclosing)) {
-      (void)getAddrOfForeignTypeMetadataCandidate(canonicalEnclosing);
-    }
-  }
-
-  return result;
 }
 
 // Protocols
@@ -4154,7 +4097,7 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   PrettyStackTraceDecl stackTraceRAII("emitting metadata for", protocol);
 
   // Emit remote reflection metadata for the protocol.
-  emitFieldMetadataRecord(protocol);
+  emitFieldDescriptor(protocol);
 
   // If the protocol is Objective-C-compatible, go through the path that
   // produces an ObjC-compatible protocol_t.

@@ -586,6 +586,8 @@ void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
 
 Optional<ProtocolConformanceRef>
 ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
+  ASTContext &ctx = getASTContext();
+
   assert(type->isExistentialType());
 
   // If the existential type cannot be represented or the protocol does not
@@ -606,7 +608,7 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
     if (protocol->requiresSelfConformanceWitnessTable() &&
         type->is<ProtocolType>() &&
         type->castTo<ProtocolType>()->getDecl() == protocol)
-      return ProtocolConformanceRef(protocol);
+      return ProtocolConformanceRef(ctx.getSelfConformance(protocol));
 
     return None;
   }
@@ -625,7 +627,7 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
     // If we found the protocol we're looking for, return an abstract
     // conformance to it.
     if (protoDecl == protocol)
-      return ProtocolConformanceRef(protocol);
+      return ProtocolConformanceRef(ctx.getSelfConformance(protocol));
 
     // If the protocol has a superclass constraint, we might conform
     // concretely.
@@ -636,7 +638,7 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
 
     // Now check refined protocols.
     if (protoDecl->inheritsFrom(protocol))
-      return ProtocolConformanceRef(protocol);
+      return ProtocolConformanceRef(ctx.getSelfConformance(protocol));
   }
 
   // We didn't find our protocol in the existential's list; it doesn't
@@ -715,7 +717,7 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
   // compiler.
   if (auto inherited = dyn_cast<InheritedProtocolConformance>(conformance)) {
     // Dig out the conforming nominal type.
-    auto rootConformance = inherited->getRootNormalConformance();
+    auto rootConformance = inherited->getRootConformance();
     auto conformingClass
       = rootConformance->getType()->getClassOrBoundGenericClass();
 
@@ -1020,21 +1022,18 @@ void
 SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modules,
                                ModuleDecl::ImportFilter filter) const {
   assert(ASTStage >= Parsed || Kind == SourceFileKind::SIL);
+  assert(filter && "no imports requested?");
   for (auto desc : Imports) {
-    switch (filter) {
-    case ModuleDecl::ImportFilter::All:
-      break;
-    case ModuleDecl::ImportFilter::Public:
-      if (!desc.importOptions.contains(ImportFlags::Exported))
-        continue;
-      break;
-    case ModuleDecl::ImportFilter::Private:
-      if (desc.importOptions.contains(ImportFlags::Exported))
-        continue;
-      break;
-    }
+    ModuleDecl::ImportFilterKind requiredKind;
+    if (desc.importOptions.contains(ImportFlags::Exported))
+      requiredKind = ModuleDecl::ImportFilterKind::Public;
+    else if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
+      requiredKind = ModuleDecl::ImportFilterKind::ImplementationOnly;
+    else
+      requiredKind = ModuleDecl::ImportFilterKind::Private;
 
-    modules.push_back(desc.module);
+    if (filter.contains(requiredKind))
+      modules.push_back(desc.module);
   }
 }
 
@@ -1277,9 +1276,14 @@ forAllImportedModules(ModuleDecl *topLevel, ModuleDecl::AccessPathTy thisPath,
   llvm::SmallSet<ImportedModule, 32, ModuleDecl::OrderImportedModules> visited;
   SmallVector<ImportedModule, 32> stack;
 
-  auto filter = respectVisibility ? ModuleDecl::ImportFilter::Public
-                                  : ModuleDecl::ImportFilter::All;
-  topLevel->getImportedModules(stack, filter);
+  ModuleDecl::ImportFilter filter = ModuleDecl::ImportFilterKind::Public;
+  if (!respectVisibility)
+    filter |= ModuleDecl::ImportFilterKind::Private;
+
+  ModuleDecl::ImportFilter topLevelFilter = filter;
+  if (!respectVisibility)
+    topLevelFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  topLevel->getImportedModules(stack, topLevelFilter);
 
   // Make sure the top-level module is first; we want pre-order-ish traversal.
   AccessPathTy overridingPath;
@@ -1330,9 +1334,11 @@ bool FileUnit::forAllVisibleModules(
 
   if (auto SF = dyn_cast<SourceFile>(this)) {
     // Handle privately visible modules as well.
-    // FIXME: Should this apply to all FileUnits?
+    ModuleDecl::ImportFilter importFilter;
+    importFilter |= ModuleDecl::ImportFilterKind::Private;
+    importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
     SmallVector<ModuleDecl::ImportedModule, 4> imports;
-    SF->getImportedModules(imports, ModuleDecl::ImportFilter::Private);
+    SF->getImportedModules(imports, importFilter);
     for (auto importPair : imports)
       if (!importPair.second->forAllVisibleModules(importPair.first, fn))
         return false;
@@ -1417,6 +1423,14 @@ void SourceFile::addImports(ArrayRef<ImportedModuleDesc> IM) {
   assert(iter == newBuf.end());
 
   Imports = newBuf;
+
+  // Update the HasImplementationOnlyImports flag.
+  if (!HasImplementationOnlyImports) {
+    for (auto &desc : IM) {
+      if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
+        HasImplementationOnlyImports = true;
+    }
+  }
 }
 
 bool SourceFile::hasTestableOrPrivateImport(
@@ -1479,6 +1493,43 @@ bool SourceFile::hasTestableOrPrivateImport(
                                   ImportFlags::PrivateImport) &&
                               desc.filename == filename;
                      });
+}
+
+bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
+  // Implementation-only imports are (currently) always source-file-specific,
+  // so if we don't have any, we know the search is complete.
+  if (!hasImplementationOnlyImports())
+    return false;
+
+  auto isImportedBy = [](const ModuleDecl *dest, const ModuleDecl *src) {
+    // Fast path.
+    if (dest == src) return true;
+
+    // Walk the transitive imports, respecting visibility.
+    // This return true if the search *didn't* short-circuit, and it short
+    // circuits if we found `dest`, so we need to invert the sense before
+    // returning.
+    return !const_cast<ModuleDecl*>(src)
+              ->forAllVisibleModules({}, [dest](ModuleDecl::ImportedModule im) {
+      // Continue searching as long as we haven't found `dest` yet.
+      return im.second != dest;
+    });
+  };
+
+  // Look at the imports of this source file.
+  for (auto &desc : Imports) {
+    // Ignore implementation-only imports.
+    if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
+      continue;
+
+    // If the module is imported this way, it's not imported
+    // implementation-only.
+    if (isImportedBy(module, desc.module.second))
+      return false;
+  }
+
+  // Now check this file's enclosing module in case there are re-exports.
+  return !isImportedBy(module, getParentModule());
 }
 
 void SourceFile::clearLookupCache() {

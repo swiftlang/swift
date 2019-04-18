@@ -2408,29 +2408,26 @@ namespace {
   };
 }
 
-SubstitutionMap
-SILGenModule::getNonMemberVarDeclSubstitutions(VarDecl *var) {
-  auto *dc = var->getDeclContext();
-  if (auto *genericEnv = dc->getGenericEnvironmentOfContext())
-    return genericEnv->getForwardingSubstitutionMap();
-
-  return SubstitutionMap();
-}
-
 static LValue emitLValueForNonMemberVarDecl(SILGenFunction &SGF,
-                                            SILLocation loc, VarDecl *var,
+                                            SILLocation loc,
+                                            ConcreteDeclRef declRef,
                                             CanType formalRValueType,
                                             SGFAccessKind accessKind,
                                             LValueOptions options,
                                             AccessSemantics semantics) {
   LValue lv;
 
+  auto *var = cast<VarDecl>(declRef.getDecl());
+  auto subs = declRef.getSubstitutions();
+  if (!subs)
+    subs = SGF.F.getForwardingSubstitutionMap();
+
   auto access = getFormalAccessKind(accessKind);
   auto strategy = var->getAccessStrategy(semantics, access,
                                          SGF.SGM.M.getSwiftModule(),
                                          SGF.F.getResilienceExpansion());
 
-  lv.addNonMemberVarComponent(SGF, loc, var, /*be lazy*/ None,
+  lv.addNonMemberVarComponent(SGF, loc, var, subs,
                               options, accessKind, strategy, formalRValueType);
 
   return lv;
@@ -2438,7 +2435,7 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &SGF,
 
 void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                                       VarDecl *var,
-                                      Optional<SubstitutionMap> subs,
+                                      SubstitutionMap subs,
                                       LValueOptions options,
                                       SGFAccessKind accessKind,
                                       AccessStrategy strategy,
@@ -2447,17 +2444,11 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
       AccessEmitter<NonMemberVarAccessEmitter, VarDecl> {
     LValue &LV;
     SILLocation Loc;
-    Optional<SubstitutionMap> Subs;
+    SubstitutionMap Subs;
     LValueOptions Options;
 
-    SubstitutionMap getSubs() {
-      if (Subs) return *Subs;
-      Subs = SGF.SGM.getNonMemberVarDeclSubstitutions(Storage);
-      return *Subs;
-    }
-
     NonMemberVarAccessEmitter(SILGenFunction &SGF, SILLocation loc,
-                              VarDecl *var, Optional<SubstitutionMap> subs,
+                              VarDecl *var, SubstitutionMap subs,
                               SGFAccessKind accessKind,
                               CanType formalRValueType,
                               LValueOptions options, LValue &lv)
@@ -2469,7 +2460,7 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
       SILType storageType =
         SGF.getLoweredType(Storage->getType()).getAddressType();
       LV.add<AddressorComponent>(Storage, addressor,
-                                 /*isSuper=*/false, isDirect, getSubs(),
+                                 /*isSuper=*/false, isDirect, Subs,
                                  CanType(), typeData, storageType, nullptr,
                                  PreparedArguments(),
                                  /* isOnSelfParameter */ false);
@@ -2479,7 +2470,7 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                                     LValueTypeData typeData) {
       LV.add<CoroutineAccessorComponent>(
           Storage, accessor,
-          /*isSuper*/ false, isDirect, getSubs(), CanType(), typeData, nullptr,
+          /*isSuper*/ false, isDirect, Subs, CanType(), typeData, nullptr,
           PreparedArguments(), /*isOnSelfParameter*/ false);
     }
 
@@ -2487,7 +2478,7 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                                LValueTypeData typeData) {
       LV.add<GetterSetterComponent>(
           Storage, accessor,
-          /*isSuper=*/false, isDirect, getSubs(), CanType(), typeData, nullptr,
+          /*isSuper=*/false, isDirect, Subs, CanType(), typeData, nullptr,
           PreparedArguments(), /* isOnSelfParameter */ false);
     }
 
@@ -2495,7 +2486,7 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                                   AccessStrategy writeStrategy,
                                   LValueTypeData typeData) {
       LV.add<MaterializeToTemporaryComponent>(
-          Storage, /*super*/ false, getSubs(), Options, readStrategy,
+          Storage, /*super*/ false, Subs, Options, readStrategy,
           writeStrategy,
           /*base type*/ CanType(), typeData, nullptr, PreparedArguments(),
           /* isOnSelfParameter */ false);
@@ -2574,13 +2565,14 @@ SILGenFunction::emitAddressOfLocalVarDecl(SILLocation loc, VarDecl *var,
 }
 
 RValue SILGenFunction::emitRValueForNonMemberVarDecl(SILLocation loc,
-                                                     VarDecl *var,
+                                                     ConcreteDeclRef declRef,
                                                      CanType formalRValueType,
                                                      AccessSemantics semantics,
                                                      SGFContext C) {
   // Any writebacks for this access are tightly scoped.
   FormalEvaluationScope scope(*this);
 
+  auto *var = cast<VarDecl>(declRef.getDecl());
   auto localValue = maybeEmitValueOfLocalVarDecl(var);
 
   // If this VarDecl is represented as an address, emit it as an lvalue, then
@@ -2678,7 +2670,8 @@ RValue SILGenFunction::emitRValueForNonMemberVarDecl(SILLocation loc,
                     ? Result : Result.copyUnmanaged(*this, loc));
   }
 
-  LValue lv = emitLValueForNonMemberVarDecl(*this, loc, var, formalRValueType,
+  LValue lv = emitLValueForNonMemberVarDecl(*this, loc, declRef,
+                                            formalRValueType,
                                             SGFAccessKind::OwnedObjectRead,
                                             LValueOptions(), semantics);
   return emitLoadOfLValue(loc, std::move(lv), C);
@@ -2703,8 +2696,7 @@ LValue SILGenLValue::visitDiscardAssignmentExpr(DiscardAssignmentExpr *e,
 
 LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e, SGFAccessKind accessKind,
                                       LValueOptions options) {
-  // The only non-member decl that can be an lvalue is VarDecl.
-  return emitLValueForNonMemberVarDecl(SGF, e, cast<VarDecl>(e->getDecl()),
+  return emitLValueForNonMemberVarDecl(SGF, e, e->getDeclRef(),
                                        getSubstFormalRValueType(e),
                                        accessKind, options,
                                        e->getAccessSemantics());
@@ -2731,14 +2723,11 @@ LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
   }
 
   assert(SGF.OpaqueValues.count(e) && "Didn't bind OpaqueValueExpr");
-
-  auto &entry = SGF.OpaqueValues.find(e)->second;
-  assert(!entry.HasBeenConsumed && "opaque value already consumed");
-  entry.HasBeenConsumed = true;
+  auto value = SGF.OpaqueValues[e];
 
   RegularLocation loc(e);
   LValue lv;
-  lv.add<ValueComponent>(entry.Value.formalAccessBorrow(SGF, loc), None,
+  lv.add<ValueComponent>(value.formalAccessBorrow(SGF, loc), None,
                          getValueTypeData(SGF, accessKind, e));
   return lv;
 }

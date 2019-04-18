@@ -183,11 +183,8 @@ Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
   Expr *anchor = getLocatorParts(pathBuffer);
   ArrayRef<LocatorPathElt> path = pathBuffer;
 
-  Expr *targetAnchor;
-  SmallVector<LocatorPathElt, 4> targetPathBuffer;
   SourceRange range;
-
-  simplifyLocator(anchor, path, targetAnchor, targetPathBuffer, range);
+  simplifyLocator(anchor, path, range);
   return (path.empty() ? anchor : nullptr);
 }
 
@@ -2118,7 +2115,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
     assert(!convertTo && "convertType and type check options conflict");
     auto *convertTypeLocator = cs.getConstraintLocator(
         cs.getConstraintLocator(expr), ConstraintLocator::ContextualType);
-    Type var = cs.createTypeVariable(convertTypeLocator);
+    Type var = cs.createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
     convertTo = getOptionalType(expr->getLoc(), var);
   }
 
@@ -2653,7 +2650,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         return true;
       }
 
-      SequenceType = cs.createTypeVariable(Locator);
+      SequenceType = cs.createTypeVariable(Locator, TVO_CanBindToNoEscape);
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        SequenceType, Locator);
       cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
@@ -2726,7 +2723,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       }
 
       if (elementType.isNull()) {
-        elementType = cs.createTypeVariable(elementLocator);
+        elementType = cs.createTypeVariable(elementLocator,
+                                            TVO_CanBindToNoEscape);
       }
 
       // Add a conversion constraint between the element type of the sequence
@@ -2970,7 +2968,8 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
           return Type();
         
         auto locator = cs.getConstraintLocator(nullptr);
-        auto replacement = cs.createTypeVariable(locator);
+        auto replacement = cs.createTypeVariable(locator,
+                                                 TVO_CanBindToNoEscape);
 
         if (auto superclass = archetypeType->getSuperclass()) {
           cs.addConstraint(ConstraintKind::Subtype, replacement,
@@ -2987,7 +2986,8 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
       // FIXME: Remove this case
       assert(cast<GenericTypeParamType>(origType));
       auto locator = cs.getConstraintLocator(nullptr);
-      auto replacement = cs.createTypeVariable(locator);
+      auto replacement = cs.createTypeVariable(locator,
+                                               TVO_CanBindToNoEscape);
       types[origType] = replacement;
       return replacement;
     },
@@ -3134,15 +3134,11 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
     return FVE;
   }
 
-  // Load lvalues.
-  if (exprTy->is<LValueType>())
-    return addImplicitLoadExpr(expr, getType, setType);
-
   // Walk into parenthesized expressions to update the subexpression.
   if (auto paren = dyn_cast<IdentityExpr>(expr)) {
     auto sub =  coerceToRValue(paren->getSubExpr(), getType, setType);
     paren->setSubExpr(sub);
-    setType(paren, getType(sub));
+    setType(paren, ParenType::get(Context, getType(sub)));
     return paren;
   }
 
@@ -3185,6 +3181,10 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
 
     return tuple;
   }
+
+  // Load lvalues.
+  if (exprTy->is<LValueType>())
+    return addImplicitLoadExpr(expr, getType, setType);
 
   // Nothing to do.
   return expr;
@@ -3311,6 +3311,7 @@ void Solution::dump(raw_ostream &out) const {
       break;
 
     case OverloadChoiceKind::DynamicMemberLookup:
+    case OverloadChoiceKind::KeyPathDynamicMemberLookup:
       out << "dynamic member lookup root "
           << choice.getBaseType()->getString()
           << " name='" << choice.getName() << "'\n";
@@ -3430,6 +3431,8 @@ void ConstraintSystem::print(raw_ostream &out) {
       out << " [lvalue allowed]";
     if (tv->getImpl().canBindToInOut())
       out << " [inout allowed]";
+    if (tv->getImpl().canBindToNoEscape())
+      out << " [noescape allowed]";
     auto rep = getRepresentative(tv);
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {
@@ -3504,6 +3507,7 @@ void ConstraintSystem::print(raw_ostream &out) {
         break;
 
       case OverloadChoiceKind::DynamicMemberLookup:
+      case OverloadChoiceKind::KeyPathDynamicMemberLookup:
         out << "dynamic member lookup:"
             << choice.getBaseType()->getString() << "  name="
             << choice.getName() << "\n";
