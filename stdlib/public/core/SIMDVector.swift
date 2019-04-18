@@ -345,6 +345,32 @@ extension SIMD where Scalar: Comparable {
   public func max() -> Scalar {
     return indices.reduce(into: self[0]) { $0 = Swift.max($0, self[$1]) }
   }
+  
+  /// The lanewise minimum of two vectors.
+  ///
+  /// Each element of the result is the minimum of the corresponding elements
+  /// of the inputs.
+  @_alwaysEmitIntoClient
+  public static func min(_ a: Self, _ b: Self) -> Self {
+    var result = Self()
+    for i in result.indices {
+      result[i] = Swift.min(a[i], b[i])
+    }
+    return result
+  }
+  
+  /// The lanewise maximum of two vectors.
+  ///
+  /// Each element of the result is the minimum of the corresponding elements
+  /// of the inputs.
+  @_alwaysEmitIntoClient
+  public static func max(_ a: Self, _ b: Self) -> Self {
+    var result = Self()
+    for i in result.indices {
+      result[i] = Swift.max(a[i], b[i])
+    }
+    return result
+  }
 }
 
 //  These operations should never need @_semantics; they should be trivial
@@ -467,7 +493,6 @@ extension SIMD where Scalar: Comparable {
     return lhs .> Self(repeating: rhs)
   }
   
-  /*  Temporarily removed pending plan for Swift.min / Swift.max
   @_alwaysEmitIntoClient
   public mutating func clamp(lowerBound: Self, upperBound: Self) {
     self = self.clamped(lowerBound: lowerBound, upperBound: upperBound)
@@ -475,9 +500,8 @@ extension SIMD where Scalar: Comparable {
 
   @_alwaysEmitIntoClient
   public func clamped(lowerBound: Self, upperBound: Self) -> Self {
-    return Swift.min(upperBound, Swift.max(lowerBound, self))
+    return Self.min(upperBound, Self.max(lowerBound, self))
   }
-  */
 }
 
 extension SIMD where Scalar: FixedWidthInteger {
@@ -549,6 +573,42 @@ extension SIMD where Scalar: FloatingPoint {
   @_alwaysEmitIntoClient
   public static var one: Self {
     return Self(repeating: 1)
+  }
+  
+  /// The lanewise minimum of two vectors.
+  ///
+  /// Each element of the result is the minimum of the corresponding elements
+  /// of the inputs.
+  @_alwaysEmitIntoClient
+  public static func min(_ a: Self, _ b: Self) -> Self {
+    var result = Self()
+    for i in result.indices {
+      result[i] = Scalar.minimum(a[i], b[i])
+    }
+    return result
+  }
+  
+  /// The lanewise maximum of two vectors.
+  ///
+  /// Each element of the result is the minimum of the corresponding elements
+  /// of the inputs.
+  @_alwaysEmitIntoClient
+  public static func max(_ a: Self, _ b: Self) -> Self {
+    var result = Self()
+    for i in result.indices {
+      result[i] = Scalar.maximum(a[i], b[i])
+    }
+    return result
+  }
+  
+  @_alwaysEmitIntoClient
+  public mutating func clamp(lowerBound: Self, upperBound: Self) {
+    self = self.clamped(lowerBound: lowerBound, upperBound: upperBound)
+  }
+
+  @_alwaysEmitIntoClient
+  public func clamped(lowerBound: Self, upperBound: Self) -> Self {
+    return Self.min(upperBound, Self.max(lowerBound, self))
   }
 }
 
@@ -1342,65 +1402,3 @@ public func any<Storage>(_ mask: SIMDMask<Storage>) -> Bool {
 public func all<Storage>(_ mask: SIMDMask<Storage>) -> Bool {
   return mask._storage.max() < 0
 }
-
-/*
-Temporarily removed while we investigate compile-time regressions caused by
-introducing these global functions.
- 
-/// The lanewise minimum of two vectors.
-///
-/// Each element of the result is the minimum of the corresponding elements
-/// of the inputs.
-@_alwaysEmitIntoClient
-public func min<V>(_ lhs: V, _ rhs: V) -> V
-where V: SIMD, V.Scalar: Comparable {
-  var result = V()
-  for i in result.indices {
-    result[i] = min(lhs[i], rhs[i])
-  }
-  return result
-}
-
-/// The lanewise maximum of two vectors.
-///
-/// Each element of the result is the maximum of the corresponding elements
-/// of the inputs.
-@_alwaysEmitIntoClient
-public func max<V>(_ lhs: V, _ rhs: V) -> V
-where V: SIMD, V.Scalar: Comparable {
-  var result = V()
-  for i in result.indices {
-    result[i] = max(lhs[i], rhs[i])
-  }
-  return result
-}
-
-
-/// The lanewise minimum of two vectors.
-///
-/// Each element of the result is the minimum of the corresponding elements
-/// of the inputs.
-@_alwaysEmitIntoClient
-public func min<V>(_ lhs: V, _ rhs: V) -> V
-where V: SIMD, V.Scalar: FloatingPoint {
-  var result = V()
-  for i in result.indices {
-    result[i] = V.Scalar.minimum(lhs[i], rhs[i])
-  }
-  return result
-}
-
-/// The lanewise maximum of two vectors.
-///
-/// Each element of the result is the maximum of the corresponding elements
-/// of the inputs.
-@_alwaysEmitIntoClient
-public func max<V>(_ lhs: V, _ rhs: V) -> V
-where V: SIMD, V.Scalar: FloatingPoint {
-  var result = V()
-  for i in result.indices {
-    result[i] = V.Scalar.maximum(lhs[i], rhs[i])
-  }
-  return result
-}
-*/
