@@ -144,8 +144,9 @@ enum class FixKind : uint8_t {
   /// of the index arguments to be Hashable.
   TreatKeyPathSubscriptIndexAsHashable,
 
-  /// Allow a reference to a static member as a key path component.
-  AllowStaticMemberRefInKeyPath,
+  /// Allow an invalid reference to a member declaration as part
+  /// of a key path component.
+  AllowInvalidRefInKeyPath,
 };
 
 class ConstraintFix {
@@ -783,23 +784,51 @@ public:
   create(ConstraintSystem &cs, Type type, ConstraintLocator *locator);
 };
 
-class AllowStaticMemberRefInKeyPath final : public ConstraintFix {
+class AllowInvalidRefInKeyPath final : public ConstraintFix {
+  enum RefKind {
+    // Allow a reference to a static member as a key path component.
+    StaticMember,
+    // Allow a reference to a declaration with mutating getter as
+    // a key path component.
+    MutatingGetter,
+  } Kind;
+
   ValueDecl *Member;
 
-  AllowStaticMemberRefInKeyPath(ConstraintSystem &cs, ValueDecl *member,
-                                ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AllowStaticMemberRefInKeyPath, locator),
-        Member(member) {}
+  AllowInvalidRefInKeyPath(ConstraintSystem &cs, RefKind kind,
+                           ValueDecl *member, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInvalidRefInKeyPath, locator),
+        Kind(kind), Member(member) {}
 
 public:
   std::string getName() const override {
-    return "allow reference to a static member as a key path component";
+    switch (Kind) {
+    case RefKind::StaticMember:
+      return "allow reference to a static member as a key path component";
+    case RefKind::MutatingGetter:
+      return "allow reference to a member with mutating getter as a key "
+             "path component";
+    }
   }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static AllowStaticMemberRefInKeyPath *
-  create(ConstraintSystem &cs, ValueDecl *member, ConstraintLocator *locator);
+  static AllowInvalidRefInKeyPath *forStaticMember(ConstraintSystem &cs,
+                                                   ValueDecl *member,
+                                                   ConstraintLocator *locator) {
+    return create(cs, RefKind::StaticMember, member, locator);
+  }
+
+  static AllowInvalidRefInKeyPath *
+  forMutatingGetter(ConstraintSystem &cs, ValueDecl *member,
+                    ConstraintLocator *locator) {
+    return create(cs, RefKind::MutatingGetter, member, locator);
+  }
+
+private:
+  static AllowInvalidRefInKeyPath *create(ConstraintSystem &cs, RefKind kind,
+                                          ValueDecl *member,
+                                          ConstraintLocator *locator);
 };
 
 } // end namespace constraints
