@@ -3022,6 +3022,15 @@ WARNING(optional_pattern_match_promotion,none,
         (Type, Type))
 WARNING(optional_to_any_coercion,none,
         "expression implicitly coerced from %0 to %1", (Type, Type))
+WARNING(iuo_to_any_coercion,none,
+        "coercion of implicitly unwrappable value of type %0 to %1 does not "
+        "unwrap optional", (Type, Type))
+NOTE(iuo_to_any_coercion_note,none,
+     "implicitly unwrapped %0 %1 declared here",
+     (DescriptiveDeclKind, DeclName))
+NOTE(iuo_to_any_coercion_note_func_result,none,
+     "%0 %1 with implicitly unwrapped result type is declared here",
+     (DescriptiveDeclKind, DeclName))
 NOTE(default_optional_to_any,none,
      "provide a default value to avoid this warning", ())
 NOTE(force_optional_to_any,none,
