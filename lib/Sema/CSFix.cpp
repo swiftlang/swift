@@ -423,15 +423,26 @@ TreatKeyPathSubscriptIndexAsHashable::create(ConstraintSystem &cs, Type type,
       TreatKeyPathSubscriptIndexAsHashable(cs, type, locator);
 }
 
-bool AllowStaticMemberRefInKeyPath::diagnose(Expr *root, bool asNote) const {
-  InvalidStaticMemberRefInKeyPath failure(root, getConstraintSystem(), Member,
-                                          getLocator());
-  return failure.diagnose(asNote);
+bool AllowInvalidRefInKeyPath::diagnose(Expr *root, bool asNote) const {
+  switch (Kind) {
+  case RefKind::StaticMember: {
+    InvalidStaticMemberRefInKeyPath failure(root, getConstraintSystem(), Member,
+                                            getLocator());
+    return failure.diagnose(asNote);
+  }
+
+  case RefKind::MutatingGetter: {
+    InvalidMemberWithMutatingGetterInKeyPath failure(
+        root, getConstraintSystem(), Member, getLocator());
+    return failure.diagnose(asNote);
+  }
+  }
 }
 
-AllowStaticMemberRefInKeyPath *
-AllowStaticMemberRefInKeyPath::create(ConstraintSystem &cs, ValueDecl *member,
-                                      ConstraintLocator *locator) {
+AllowInvalidRefInKeyPath *
+AllowInvalidRefInKeyPath::create(ConstraintSystem &cs, RefKind kind,
+                                 ValueDecl *member,
+                                 ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      AllowStaticMemberRefInKeyPath(cs, member, locator);
+      AllowInvalidRefInKeyPath(cs, kind, member, locator);
 }
