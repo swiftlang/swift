@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
 // Array-Oriented Arithmetic and Auxiliary Functions
 
 extension vForce {
@@ -833,7 +831,7 @@ extension vForce {
     /// - Returns: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func reciprocalSquareRoot<U>(_ vector: U)  -> [Float]
+    public static func rsqrt<U>(_ vector: U)  -> [Float]
         where
         U : _ContiguousCollection,
         U.Element == Float {
@@ -841,8 +839,8 @@ extension vForce {
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
                 buffer, initializedCount in
                 
-                reciprocalSquareRoot(vector,
-                                     result: &buffer)
+                rsqrt(vector,
+                      result: &buffer)
                 
                 initializedCount = vector.count
             }
@@ -856,8 +854,8 @@ extension vForce {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func reciprocalSquareRoot<U, V>(_ vector: U,
-                                                  result: inout V)
+    public static func rsqrt<U, V>(_ vector: U,
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -882,7 +880,7 @@ extension vForce {
     /// - Returns: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func reciprocalSquareRoot<U>(_ vector: U)  -> [Double]
+    public static func rsqrt<U>(_ vector: U)  -> [Double]
         where
         U : _ContiguousCollection,
         U.Element == Double {
@@ -890,8 +888,8 @@ extension vForce {
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
                 buffer, initializedCount in
                 
-                reciprocalSquareRoot(vector,
-                                     result: &buffer)
+                rsqrt(vector,
+                      result: &buffer)
                 
                 initializedCount = vector.count
             }
@@ -905,8 +903,8 @@ extension vForce {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func reciprocalSquareRoot<U, V>(_ vector: U,
-                                                  result: inout V)
+    public static func rsqrt<U, V>(_ vector: U,
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -933,7 +931,7 @@ extension vForce {
     /// - Returns: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func squareRoot<U>(_ vector: U)  -> [Float]
+    public static func sqrt<U>(_ vector: U)  -> [Float]
         where
         U : _ContiguousCollection,
         U.Element == Float {
@@ -941,8 +939,8 @@ extension vForce {
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
                 buffer, initializedCount in
                 
-                squareRoot(vector,
-                           result: &buffer)
+                sqrt(vector,
+                     result: &buffer)
                 
                 initializedCount = vector.count
             }
@@ -956,8 +954,8 @@ extension vForce {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func squareRoot<U, V>(_ vector: U,
-                                        result: inout V)
+    public static func sqrt<U, V>(_ vector: U,
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -983,7 +981,7 @@ extension vForce {
     /// - Returns: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func squareRoot<U>(_ vector: U)  -> [Double]
+    public static func sqrt<U>(_ vector: U)  -> [Double]
         where
         U : _ContiguousCollection,
         U.Element == Double {
@@ -991,8 +989,8 @@ extension vForce {
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
                 buffer, initializedCount in
                 
-                squareRoot(vector,
-                           result: &buffer)
+                sqrt(vector,
+                     result: &buffer)
                 
                 initializedCount = vector.count
             }
@@ -1006,8 +1004,8 @@ extension vForce {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func squareRoot<U, V>(_ vector: U,
-                                        result: inout V)
+    public static func sqrt<U, V>(_ vector: U,
+                                  result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -1973,7 +1971,7 @@ extension vForce {
     /// - Returns: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func sin<U>(piTimes vector: U)  -> [Float]
+    public static func sinPi<U>(_ vector: U)  -> [Float]
         where
         U : _ContiguousCollection,
         U.Element == Float {
@@ -1981,8 +1979,8 @@ extension vForce {
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
                 buffer, initializedCount in
                 
-                sin(piTimes: vector,
-                    result: &buffer)
+                sinPi(vector,
+                      result: &buffer)
                 
                 initializedCount = vector.count
             }
@@ -1996,8 +1994,8 @@ extension vForce {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func sin<U, V>(piTimes vector: U,
-                                 result: inout V)
+    public static func sinPi<U, V>(_ vector: U,
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -2022,7 +2020,7 @@ extension vForce {
     /// - Returns: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func sin<U>(piTimes vector: U)  -> [Double]
+    public static func sinPi<U>(_ vector: U)  -> [Double]
         where
         U : _ContiguousCollection,
         U.Element == Double {
@@ -2030,8 +2028,8 @@ extension vForce {
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
                 buffer, initializedCount in
                 
-                sin(piTimes: vector,
-                    result: &buffer)
+                sinPi(vector,
+                      result: &buffer)
                 
                 initializedCount = vector.count
             }
@@ -2045,8 +2043,8 @@ extension vForce {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func sin<U, V>(piTimes vector: U,
-                                 result: inout V)
+    public static func sinPi<U, V>(_ vector: U,
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -2171,7 +2169,7 @@ extension vForce {
     /// - Returns: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func cos<U>(piTimes vector: U)  -> [Float]
+    public static func cosPi<U>(_ vector: U)  -> [Float]
         where
         U : _ContiguousCollection,
         U.Element == Float {
@@ -2179,8 +2177,8 @@ extension vForce {
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
                 buffer, initializedCount in
                 
-                cos(piTimes: vector,
-                    result: &buffer)
+                cosPi(vector,
+                      result: &buffer)
                 
                 initializedCount = vector.count
             }
@@ -2194,8 +2192,8 @@ extension vForce {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func cos<U, V>(piTimes vector: U,
-                                 result: inout V)
+    public static func cosPi<U, V>(_ vector: U,
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -2220,7 +2218,7 @@ extension vForce {
     /// - Returns: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func cos<U>(piTimes vector: U)  -> [Double]
+    public static func cosPi<U>(_ vector: U)  -> [Double]
         where
         U : _ContiguousCollection,
         U.Element == Double {
@@ -2228,8 +2226,8 @@ extension vForce {
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
                 buffer, initializedCount in
                 
-                cos(piTimes: vector,
-                    result: &buffer)
+                cosPi(vector,
+                      result: &buffer)
                 
                 initializedCount = vector.count
             }
@@ -2243,8 +2241,8 @@ extension vForce {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func cos<U, V>(piTimes vector: U,
-                                 result: inout V)
+    public static func cosPi<U, V>(_ vector: U,
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -2436,7 +2434,7 @@ extension vForce {
     /// - Returns: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func tan<U>(piTimes vector: U)  -> [Float]
+    public static func tanPi<U>(_ vector: U)  -> [Float]
         where
         U : _ContiguousCollection,
         U.Element == Float {
@@ -2444,8 +2442,8 @@ extension vForce {
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
                 buffer, initializedCount in
                 
-                tan(piTimes: vector,
-                    result: &buffer)
+                tanPi(vector,
+                      result: &buffer)
                 
                 initializedCount = vector.count
             }
@@ -2459,8 +2457,8 @@ extension vForce {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func tan<U, V>(piTimes vector: U,
-                                 result: inout V)
+    public static func tanPi<U, V>(_ vector: U,
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,
@@ -2485,7 +2483,7 @@ extension vForce {
     /// - Returns: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func tan<U>(piTimes vector: U)  -> [Double]
+    public static func tanPi<U>(_ vector: U)  -> [Double]
         where
         U : _ContiguousCollection,
         U.Element == Double {
@@ -2493,8 +2491,8 @@ extension vForce {
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
                 buffer, initializedCount in
                 
-                tan(piTimes: vector,
-                    result: &buffer)
+                tanPi(vector,
+                      result: &buffer)
                 
                 initializedCount = vector.count
             }
@@ -2508,8 +2506,8 @@ extension vForce {
     /// - Parameter result: Output values.
     @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-    public static func tan<U, V>(piTimes vector: U,
-                                 result: inout V)
+    public static func tanPi<U, V>(_ vector: U,
+                                   result: inout V)
         where
         U : _ContiguousCollection,
         V : _MutableContiguousCollection,

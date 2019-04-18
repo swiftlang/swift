@@ -178,35 +178,35 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(returnedResult))
     }
     
-    Accelerate_vForceTests.test("vForce/SinglePrecisionReciprocalSquareRoot") {
+    Accelerate_vForceTests.test("vForce/SinglePrecisionrsqrt") {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vForce.reciprocalSquareRoot(x,
-                                    result: &result)
+        vForce.rsqrt(x,
+                     result: &result)
         
         vvrsqrtf(&legacyResult,
                  x,
                  &n)
         
-        let returnedResult = vForce.reciprocalSquareRoot(x)
+        let returnedResult = vForce.rsqrt(x)
         
         expectTrue(result.filter{!$0.isNaN}.elementsEqual(legacyResult.filter{!$0.isNaN}))
         expectTrue(result.filter{!$0.isNaN}.elementsEqual(returnedResult.filter{!$0.isNaN}))
     }
     
-    Accelerate_vForceTests.test("vForce/SinglePrecisionSquareRoot") {
+    Accelerate_vForceTests.test("vForce/SinglePrecisionsqrt") {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vForce.squareRoot(x,
-                          result: &result)
+        vForce.sqrt(x,
+                    result: &result)
         
         vvsqrtf(&legacyResult,
                 x,
                 &n)
         
-        let returnedResult = vForce.squareRoot(x)
+        let returnedResult = vForce.sqrt(x)
         
         expectTrue(result.filter{!$0.isNaN}.elementsEqual(legacyResult.filter{!$0.isNaN}))
         expectTrue(result.filter{!$0.isNaN}.elementsEqual(returnedResult.filter{!$0.isNaN}))
@@ -384,14 +384,14 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vForce.sin(piTimes: x,
-                   result: &result)
+        vForce.sinPi(x,
+                     result: &result)
         
         vvsinpif(&legacyResult,
                  x,
                  &n)
         
-        let returnedResult = vForce.sin(piTimes: x)
+        let returnedResult = vForce.sinPi(x)
         
         expectTrue(result.elementsEqual(legacyResult))
         expectTrue(result.elementsEqual(returnedResult))
@@ -418,14 +418,14 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vForce.cos(piTimes: x,
-                   result: &result)
+        vForce.cosPi(x,
+                     result: &result)
         
         vvcospif(&legacyResult,
                  x,
                  &n)
         
-        let returnedResult = vForce.cos(piTimes: x)
+        let returnedResult = vForce.cosPi(x)
         
         expectTrue(result.elementsEqual(legacyResult))
         expectTrue(result.elementsEqual(returnedResult))
@@ -472,14 +472,14 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Float](repeating: 0, count: count)
         legacyResult = [Float](repeating: -1, count: count)
         
-        vForce.tan(piTimes: x,
-                   result: &result)
+        vForce.tanPi(x,
+                     result: &result)
         
         vvtanpif(&legacyResult,
                  x,
                  &n)
         
-        let returnedResult = vForce.tan(piTimes: x)
+        let returnedResult = vForce.tanPi(x)
         
         expectTrue(result.elementsEqual(legacyResult))
         expectTrue(result.elementsEqual(returnedResult))
@@ -702,7 +702,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         let returnedResult = vForce.copysign(magnitudes: x,
                                              signs: y)
-            
+        
         
         expectTrue(result.elementsEqual(legacyResult))
         expectTrue(result.elementsEqual(returnedResult))
@@ -806,35 +806,35 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(returnedResult))
     }
     
-    Accelerate_vForceTests.test("vForce/DoublePrecisionReciprocalSquareRoot") {
+    Accelerate_vForceTests.test("vForce/DoublePrecisionrsqrt") {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vForce.reciprocalSquareRoot(x,
-                                    result: &result)
+        vForce.rsqrt(x,
+                     result: &result)
         
         vvrsqrt(&legacyResult,
                 x,
                 &n)
         
-        let returnedResult = vForce.reciprocalSquareRoot(x)
+        let returnedResult = vForce.rsqrt(x)
         
         expectTrue(result.filter{!$0.isNaN}.elementsEqual(legacyResult.filter{!$0.isNaN}))
         expectTrue(result.filter{!$0.isNaN}.elementsEqual(returnedResult.filter{!$0.isNaN}))
     }
     
-    Accelerate_vForceTests.test("vForce/DoublePrecisionSquareRoot") {
+    Accelerate_vForceTests.test("vForce/DoublePrecisionsqrt") {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vForce.squareRoot(x,
-                          result: &result)
+        vForce.sqrt(x,
+                    result: &result)
         
         vvsqrt(&legacyResult,
                x,
                &n)
         
-        let returnedResult = vForce.squareRoot(x)
+        let returnedResult = vForce.sqrt(x)
         
         expectTrue(result.filter{!$0.isNaN}.elementsEqual(legacyResult.filter{!$0.isNaN}))
         expectTrue(result.filter{!$0.isNaN}.elementsEqual(returnedResult.filter{!$0.isNaN}))
@@ -1012,14 +1012,14 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vForce.sin(piTimes: x,
-                   result: &result)
+        vForce.sinPi(x,
+                     result: &result)
         
         vvsinpi(&legacyResult,
                 x,
                 &n)
         
-        let returnedResult = vForce.sin(piTimes: x)
+        let returnedResult = vForce.sinPi(x)
         
         expectTrue(result.elementsEqual(legacyResult))
         expectTrue(result.elementsEqual(returnedResult))
@@ -1046,14 +1046,14 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vForce.cos(piTimes: x,
-                   result: &result)
+        vForce.cosPi(x,
+                     result: &result)
         
         vvcospi(&legacyResult,
                 x,
                 &n)
         
-        let returnedResult = vForce.cos(piTimes: x)
+        let returnedResult = vForce.cosPi(x)
         
         expectTrue(result.elementsEqual(legacyResult))
         expectTrue(result.elementsEqual(returnedResult))
@@ -1100,14 +1100,14 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         result = [Double](repeating: 0, count: count)
         legacyResult = [Double](repeating: -1, count: count)
         
-        vForce.tan(piTimes: x,
-                   result: &result)
+        vForce.tanPi(x,
+                     result: &result)
         
         vvtanpi(&legacyResult,
                 x,
                 &n)
         
-        let returnedResult = vForce.tan(piTimes: x)
+        let returnedResult = vForce.tanPi(x)
         
         expectTrue(result.elementsEqual(legacyResult))
         expectTrue(result.elementsEqual(returnedResult))
