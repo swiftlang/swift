@@ -776,9 +776,15 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
     // call to the getter.
     if (member->getEffectiveAccess() > AccessLevel::Internal &&
         !member->getAttrs().hasAttribute<DifferentiableAttr>()) {
+      ArrayRef<Requirement> requirements;
+      // If the parent declaration context is an extension, the nominal type may
+      // conditionally conform to `Differentiable`. Use the conditional
+      // conformance requirements in getter `@differentiable` attributes.
+      if (auto *extDecl = dyn_cast<ExtensionDecl>(parentDC->getAsDecl()))
+        requirements = extDecl->getGenericRequirements();
       auto *diffableAttr = DifferentiableAttr::create(
           C, /*implicit*/ true, SourceLoc(), SourceLoc(), {}, None,
-          None, nullptr);
+          None, requirements);
       member->getAttrs().add(diffableAttr);
       // If getter does not exist, trigger synthesis and compute type.
       if (!member->getGetter())
