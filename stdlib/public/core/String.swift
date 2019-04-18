@@ -969,101 +969,133 @@ internal func _fastWithNormalizedCodeUnitsImpl(
   }
 }
 
-/* Conforms String class to NSString functions, "integerValue", "doubleValue", "floatValue"
- * Allow for dot notation string to number conversion
- * Currently to transform a string to a number we must cast using Float(string) which returns an optional
- * In Obj-c the same conversoin would return 0.0, which may be much more convenient for a more swift development process
- */
+/// The following convenience methods allow for dot notation string to number conversion without dealing with optional values
 extension String {
     
-    // Returns an integer value of the string
-    //  If the value can not be an integer returns 0 instead
+    /// Returns an integer version of the string.
+    ///
+    /// The following example transforms a string to an integer:
+    ///
+    ///     let five = "5"
+    ///     print(five.intValue)
+    ///     // Prints "5"
+    ///
+    /// - Returns: An integer copy of the string.
     public var intValue: Int {
         get {
-            if let value = Int(self) {
-                return value;
-            }
-            else {
-                return 0;
-            }
+            return Int(self) ?? 0
         }
     }
     
-    // Returns a short value of the string
-    //  If the value can not be a short returns 0 instead
+    /// Returns an int8 (short) version of the string.
+    ///
+    /// The following example transforms a string to an integer:
+    ///
+    ///     let five = "5"
+    ///     print(five.int8Value)
+    ///     // Prints "5"
+    ///
+    /// - Returns: An int8 (short) copy of the string.
     public var int8Value: Int8 {
         get {
-            if let value = Int8(self) {
-                return value;
-            }
-            else {
-                return 0;
-            }
+            return Int8(self) ?? 0
         }
     }
     
-    // Returns a int16 value of the string
-    //  If the value can not be an int16 returns 0 instead
+    /// Returns an int16 version of the string.
+    ///
+    /// The following example transforms a string to an integer:
+    ///
+    ///     let five = "5"
+    ///     print(five.int16Value)
+    ///     // Prints "5"
+    ///
+    /// - Returns: An int16 copy of the string.
     public var int16Value: Int16 {
         get {
-            if let value = Int16(self) {
-                return value;
-            }
-            else {
-                return 0;
-            }
+            return Int16(self) ?? 0
         }
     }
     
-    // Returns a int32 value of the string
-    //  If the value can not be an int32 returns 0 instead
+    /// Returns an int32 version of the string.
+    ///
+    /// The following example transforms a string to an integer:
+    ///
+    ///     let five = "5"
+    ///     print(five.int32Value)
+    ///     // Prints "5"
+    ///
+    /// - Returns: An int32 copy of the string.
     public var int32Value: Int32 {
         get {
-            if let value = Int32(self) {
-                return value;
-            }
-            else {
-                return 0;
-            }
+            return Int32(self) ?? 0
         }
     }
     
-    // Returns a int64 value of the string
-    //  If the value can not be an int64 returns 0 instead
+        
+    /// Returns an int64 version of the string.
+    ///
+    /// The following example transforms a string to an integer:
+    ///
+    ///     let five = "5"
+    ///     print(five.int64Value)
+    ///     // Prints "5"
+    ///
+    /// - Returns: An int64 copy of the string.
     public var int64Value: Int64 {
         get {
-            if let value = Int64(self) {
-                return value;
-            }
-            else {
-                return 0;
-            }
+            return Int64(self) ?? 0
         }
     }
     
-    // Returns a Double value of the string
-    //  If the value can not be a Double returns 0 instead
+        
+    /// Returns an double version of the string.
+    ///
+    /// The following example transforms a string to an integer:
+    ///
+    ///     let five = "5"
+    ///     print(five.doubleValue)
+    ///     // Prints "5.0"
+    ///
+    /// - Returns: A double copy of the string.
     public var doubleValue: Double {
         get {
-            if let value = Double(self) {
-                return value;
-            }
-            else {
-                return 0.0;
-            }
+            return Double(self) ?? 0
         }
     }
     
-    // Returns a Float value of the string
-    //  If the value can not be a Float returns 0 instead
+        
+    /// Returns an float version of the string.
+    ///
+    /// The following example transforms a string to an integer:
+    ///
+    ///     let five = "5"
+    ///     print(five.floatValue)
+    ///     // Prints "5"
+    ///
+    /// - Returns: A float copy of the string.
     public var floatValue: Float {
         get {
-            if let float = Float(self) {
-                return float;
-            }
-            else {
-                return 0.0;
-            }
+            return Float(self) ?? 0
+        }
+    }
+    
+    /// Returns a bool version of the string.
+    ///
+    /// The following example transforms a string to an integer:
+    ///
+    ///     let five = "5"
+    ///     print(five.boolValue)
+    ///     // Prints "true"
+    ///
+    ///     let zero = "0"
+    ///     print(zero.boolValue)
+    ///     // Prints "false"
+    ///
+    /// - Returns: A float copy of the string.
+    public var boolValue: Bool {
+        get {
+            return NSString(string: self).boolValue
         }
     }
 }
