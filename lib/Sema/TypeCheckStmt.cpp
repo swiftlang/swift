@@ -1753,51 +1753,37 @@ checkInheritedDefaultValueRestrictions(TypeChecker &TC, ParamDecl *PD) {
 
   auto *DC = PD->getInnermostDeclContext();
   const SourceFile *SF = DC->getParentSourceFile();
-  if (!SF || SF->Kind != SourceFileKind::Interface)
-    return;
+  assert((SF && SF->Kind == SourceFileKind::Interface || PD->isImplicit()) &&
+         "explicit inherited default argument outside of a module interface?");
 
-  if (!isa<ConstructorDecl>(DC)) {
-    TC.diagnose(PD->getLoc(),
-                diag::inherited_default_value_not_on_constructor_param);
+  // The containing decl should be a designated initializer.
+  auto ctor = dyn_cast<ConstructorDecl>(DC);
+  if (!ctor || ctor->isConvenienceInit()) {
+    TC.diagnose(
+        PD->getLoc(),
+        diag::inherited_default_value_not_in_designated_constructor);
     return;
   }
 
-  // Check the matching parameter of an overriden decl has a default value
-  auto ctor = cast<ConstructorDecl>(DC);
+  // The decl it overrides should also be a designated initializer.
+  auto overridden = ctor->getOverriddenDecl();
+  if (!overridden || overridden->isConvenienceInit()) {
+    TC.diagnose(
+        PD->getLoc(),
+        diag::inherited_default_value_used_in_non_overriding_constructor);
+    if (overridden)
+      TC.diagnose(overridden->getLoc(), diag::overridden_here);
+    return;
+  }
+
+  // The corresponding parameter should have a default value.
   Optional<unsigned> idx = getParamIndex(ctor->getParameters(), PD);
-  bool foundOverriden = false;
   assert(idx && "containing decl does not contain param?");
-  for (auto overridden = ctor->getOverriddenDecl();
-       overridden != nullptr;
-       overridden = overridden->getOverriddenDecl()) {
-    foundOverriden = true;
-    auto equivalentParam = overridden->getParameters()->get(*idx);
-    assert(equivalentParam && "inherited decl mismatched arguments?");
-
-    // If the corresponding overridden param is also inherited, keep looking
-    if (equivalentParam->getDefaultArgumentKind() ==
-        DefaultArgumentKind::Inherited)
-      continue;
-
-    // If it doesn't have a default value, diagnose it
-    if (equivalentParam->getDefaultArgumentKind() == DefaultArgumentKind::None) {
-      TC.diagnose(PD->getLoc(),
-                  diag::corresponding_param_not_defaulted);
-    }
-    // We found a match: it's valid
-    return;
+  ParamDecl *equivalentParam = overridden->getParameters()->get(*idx);
+  if (equivalentParam->getDefaultArgumentKind() == DefaultArgumentKind::None) {
+    TC.diagnose(PD->getLoc(), diag::corresponding_param_not_defaulted);
+    TC.diagnose(equivalentParam->getLoc(), diag::inherited_default_param_here);
   }
-
-  // Used with a param of a non-overriding initializer, or one where the
-  // corresponding param in the overridden decl was also inherited but *it*
-  // didn't override anything. Diagnose the first case and ignore the second.
-  // The second will be diagnosed when checking the default args of the
-  // overridden declaration.
-  if (foundOverriden)
-    return;
-
-  TC.diagnose(PD->getLoc(),
-              diag::inherited_default_value_used_in_non_overriding_constructor);
 }
 
 /// Check the default arguments that occur within this pattern.

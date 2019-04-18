@@ -12,19 +12,24 @@
 // CHECK: class Base {
 public class Base {
   // CHECK: init(x: Int = 3)
-	public init(x: Int = 3) {}
-	// CHECK: foo(y: Int = 42)
-	public func foo(y: Int = 42) {}
+  public init(x: Int = 3) {}
+  public convenience init(convInit: Int) {
+    self.init(x: convInit)
+  }
+  // CHECK: foo(y: Int = 42)
+  public func foo(y: Int = 42) {}
 }
 
 // CHECK: class Derived : Base {
 public class Derived: Base {
-	// CHECK: init(y: Int)
-	public convenience init(y: Int) {
-		self.init()
-	}
+  // CHECK: init(y: Int)
+  public convenience init(y: Int) {
+    self.init()
+  }
 
-	// CHECK: override {{(public )?}}init(x: Int = super)
+  // CHECK-NOT: init(convInit: Int = super)
+  // CHECK: override {{(public )?}}init(x: Int = super)
+  // CHECK-NOT: init(convInit: Int = super)
 }
 
 public enum Enum {
