@@ -18,6 +18,7 @@
 #include "ConstraintSystem.h"
 #include "ConstraintGraph.h"
 #include "CSDiagnostics.h"
+#include "CSFix.h"
 #include "TypeCheckType.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
@@ -2776,8 +2777,7 @@ namespace {
 
   public:
     ReturnStmt *returnStmt = nullptr;
-    Stmt *controlFlowStmt = nullptr;
-    Decl *decl = nullptr;
+    SkipUnhandledConstructInFunctionBuilder::UnhandledNode unhandledNode;
 
   private:
     /// Produce a builder call to the given named function with the given arguments.
@@ -2819,8 +2819,8 @@ namespace {
 
 #define CONTROL_FLOW_STMT(StmtClass)                      \
     Expr *visit##StmtClass##Stmt(StmtClass##Stmt *stmt) { \
-      if (!controlFlowStmt)                               \
-        controlFlowStmt = stmt;                           \
+      if (!unhandledNode)                                 \
+        unhandledNode = stmt;                             \
                                                           \
       return nullptr;                                     \
     }
@@ -2836,8 +2836,8 @@ namespace {
         }
 
         if (auto decl = node.dyn_cast<Decl *>()) {
-          if (!this->decl)
-            this->decl = decl;
+          if (!unhandledNode)
+            unhandledNode = decl;
 
           continue;
         }
@@ -2858,7 +2858,8 @@ namespace {
 
     Expr *visitDoStmt(DoStmt *doStmt) {
       if (!builderSupports(ctx.Id_buildDo)) {
-        this->controlFlowStmt = doStmt;
+        if (!unhandledNode)
+          unhandledNode = doStmt;
         return nullptr;
       }
 
@@ -2883,7 +2884,8 @@ namespace {
       if (!builderSupports(ctx.Id_buildIf) ||
           ifStmt->getElseStmt() ||
           !getTrivialBooleanCondition(ifStmt->getCond())) {
-        this->controlFlowStmt = ifStmt;
+        if (!unhandledNode)
+          unhandledNode = ifStmt;
         return nullptr;
       }
 
@@ -2935,99 +2937,60 @@ namespace {
   };
 }
 
-BuilderClosureKind swift::classifyBuilderClosure(ASTContext &ctx,
-                                                 ClosureExpr *closure,
-                                                 Type builderType,
-                                                 bool diagnose) {
-  if (closure->hasSingleExpressionBody())
-    return BuilderClosureKind::SingleExpression;
-
-  BuilderClosureVisitor visitor(ctx, /*wantExpr=*/false, builderType);
-  (void)visitor.visit(closure->getBody());
-
-  // The presence of an explicit return makes this not a builder.
-  if (visitor.returnStmt) {
-    if (diagnose) {
-      ctx.Diags.diagnose(visitor.returnStmt->getReturnLoc(),
-                         diag::closure_builder_return_stmt);
-    }
-
-    return BuilderClosureKind::ExplicitReturn;
-  }
-
-  // The presence of control flow makes this not work with closure builders.
-  if (visitor.controlFlowStmt) {
-    if (diagnose) {
-      ctx.Diags.diagnose(visitor.controlFlowStmt->getStartLoc(),
-                         diag::closure_builder_control_flow);
-    }
-
-    return BuilderClosureKind::UnsupportedConstruct;
-  }
-
-  // The presence of any declaration makes this not work with closure builders.
-  if (visitor.decl) {
-    if (diagnose) {
-      visitor.decl->diagnose(diag::closure_builder_decl);
-    }
-
-    return BuilderClosureKind::UnsupportedConstruct;
-  }
-
-  return BuilderClosureKind::Supported;
-}
-
-
-void ConstraintSystem::applyFunctionBuilder(ClosureExpr *closure,
-                                            Type builderType,
-                                            ConstraintLocatorBuilder locator) {
+ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
+    ClosureExpr *closure, Type builderType, ConstraintLocatorBuilder locator) {
   auto builder = builderType->getAnyNominal();
   assert(builder && "Bad function builder type");
   assert(builder->getAttrs().hasAttribute<FunctionBuilderAttr>());
-  switch (classifyBuilderClosure(
-              getASTContext(), closure, builderType, /*diagnose=*/false)) {
-  case BuilderClosureKind::ExplicitReturn:
-  case BuilderClosureKind::UnsupportedConstruct:
-    return;
 
-  case BuilderClosureKind::SingleExpression:
-    // FIXME: We might be able to do this, but it's not clear.
-    return;
+  // Check the form of this closure to see if we can apply the function-builder
+  // translation at all.
+  {
+    // FIXME: Right now, single-expression closures suppress the function
+    // builder translation.
+    if (closure->hasSingleExpressionBody())
+      return getTypeMatchSuccess();
 
-  case BuilderClosureKind::Supported:
-    break;
-  }
+    // Check whether we can apply this function builder.
+    BuilderClosureVisitor visitor(
+        getASTContext(), /*wantExpr=*/false, builderType);
+    (void)visitor.visit(closure->getBody());
 
-  auto &appliedBuilders = TC.appliedFunctionBuilders[closure];
+    // The presence of an explicit return suppresses the function builder
+    // translation.
+    if (visitor.returnStmt) {
+      return getTypeMatchSuccess();
+    }
 
-  // Check whether we have already applied this function builder to
-  // this closure.
-  Expr *singleExpr = nullptr;
-  for (const auto &applied : appliedBuilders) {
-    if (applied.first->isEqual(builderType)) {
-      singleExpr = applied.second;
-      break;
+    // If we saw a control-flow statement or declaration that the builder
+    // cannot handle, we don't have a well-formed function builder application.
+    if (visitor.unhandledNode) {
+      // If we aren't supposed to attempt fixes, fail.
+      if (!shouldAttemptFixes()) {
+        return getTypeMatchFailure(locator);
+      }
+
+      // Record the first unhandled construct as a fix.
+      if (recordFix(
+              SkipUnhandledConstructInFunctionBuilder::create(
+                *this, visitor.unhandledNode, builder,
+                getConstraintLocator(locator)))) {
+        return getTypeMatchFailure(locator);
+      }
     }
   }
 
-  // If we didn't find anything yet, go build the expression.
-  if (!singleExpr) {
-    BuilderClosureVisitor visitor(
-        getASTContext(), /*wantExpr=*/true, builderType);
-    singleExpr = visitor.visit(closure->getBody());
+  BuilderClosureVisitor visitor(
+      getASTContext(), /*wantExpr=*/true, builderType);
+  Expr *singleExpr = visitor.visit(closure->getBody());
 
-    // FIXME: Failure mode.
-    (void)TC.preCheckExpression(singleExpr, closure);
-
-    // Record this expression for later.
-    TC.appliedFunctionBuilders[closure].push_back(
-        {builderType->getCanonicalType(), singleExpr});
-  }
-
+  if (TC.precheckedClosures.insert(closure).second &&
+      TC.preCheckExpression(singleExpr, closure))
+    return getTypeMatchFailure(locator);
 
   singleExpr = generateConstraints(singleExpr, closure);
   if (!singleExpr)
-    return;
+    return getTypeMatchFailure(locator);
 
   Type transformedType = getType(singleExpr);
   assert(transformedType && "Missing type");
@@ -3042,4 +3005,5 @@ void ConstraintSystem::applyFunctionBuilder(ClosureExpr *closure,
   auto fnType = closureType->castTo<FunctionType>();
   addConstraint(ConstraintKind::Equal, fnType->getResult(), transformedType,
                 locator);
+  return getTypeMatchSuccess();
 }

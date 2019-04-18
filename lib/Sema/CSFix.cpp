@@ -573,3 +573,36 @@ ExplicitlySpecifyGenericArguments *ExplicitlySpecifyGenericArguments::create(
       size, alignof(ExplicitlySpecifyGenericArguments));
   return new (mem) ExplicitlySpecifyGenericArguments(cs, params, locator);
 }
+
+SkipUnhandledConstructInFunctionBuilder *
+SkipUnhandledConstructInFunctionBuilder::create(ConstraintSystem &cs,
+                                                UnhandledNode unhandled,
+                                                NominalTypeDecl *builder,
+                                                ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+    SkipUnhandledConstructInFunctionBuilder(cs, unhandled, builder, locator);
+}
+
+bool SkipUnhandledConstructInFunctionBuilder::diagnose(Expr *root,
+                                                       bool asNote) const {
+  auto &diags = getConstraintSystem().getASTContext().Diags;
+  if (auto stmt = unhandled.dyn_cast<Stmt *>()) {
+    diags.diagnose(stmt->getStartLoc(),
+                   asNote ? diag::note_function_builder_control_flow
+                          : diag::function_builder_control_flow,
+                   builder->getFullName());
+  } else {
+    auto decl = unhandled.get<Decl *>();
+    decl->diagnose(asNote ? diag::note_function_builder_decl
+                          : diag::function_builder_decl,
+                   builder->getFullName());
+  }
+
+  if (!asNote) {
+    builder->diagnose(diag::kind_declname_declared_here,
+                      builder->getDescriptiveKind(),
+                      builder->getFullName());
+  }
+
+  return true;
+}

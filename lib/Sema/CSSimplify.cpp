@@ -1013,7 +1013,10 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
               = paramInfo.getFunctionBuilderType(paramIdx)) {
         Expr *arg = getArgumentExpr(locator.getAnchor(), argIdx);
         if (auto closure = dyn_cast_or_null<ClosureExpr>(arg)) {
-          cs.applyFunctionBuilder(closure, functionBuilderType, locator);
+          auto result =
+              cs.applyFunctionBuilder(closure, functionBuilderType, loc);
+          if (result.isFailure())
+            return result;
         }
       }
 
@@ -6652,7 +6655,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SkipSameTypeRequirement:
   case FixKind::SkipSuperclassRequirement:
   case FixKind::ContextualMismatch:
-  case FixKind::AddMissingArguments: {
+  case FixKind::AddMissingArguments:
+  case FixKind::SkipUnhandledConstructInFunctionBuilder: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
