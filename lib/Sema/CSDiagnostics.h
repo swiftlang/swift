@@ -1223,6 +1223,29 @@ private:
   getDiagnosticFor(ContextualTypePurpose purpose);
 };
 
+class SkipUnhandledConstructInFunctionBuilderFailure final
+    : public FailureDiagnostic {
+public:
+  using UnhandledNode = llvm::PointerUnion<Stmt *, Decl *>;
+
+  UnhandledNode unhandled;
+  NominalTypeDecl *builder;
+
+public:
+  SkipUnhandledConstructInFunctionBuilderFailure(Expr *root,
+                                                 ConstraintSystem &cs,
+                                                 UnhandledNode unhandled,
+                                                 NominalTypeDecl *builder,
+                                                 ConstraintLocator *locator)
+    : FailureDiagnostic(root, cs, locator),
+      unhandled(unhandled),
+      builder(builder) { }
+
+public:
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

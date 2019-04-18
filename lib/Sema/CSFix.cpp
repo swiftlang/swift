@@ -552,24 +552,7 @@ SkipUnhandledConstructInFunctionBuilder::create(ConstraintSystem &cs,
 
 bool SkipUnhandledConstructInFunctionBuilder::diagnose(Expr *root,
                                                        bool asNote) const {
-  auto &diags = getConstraintSystem().getASTContext().Diags;
-  if (auto stmt = unhandled.dyn_cast<Stmt *>()) {
-    diags.diagnose(stmt->getStartLoc(),
-                   asNote ? diag::note_function_builder_control_flow
-                          : diag::function_builder_control_flow,
-                   builder->getFullName());
-  } else {
-    auto decl = unhandled.get<Decl *>();
-    decl->diagnose(asNote ? diag::note_function_builder_decl
-                          : diag::function_builder_decl,
-                   builder->getFullName());
-  }
-
-  if (!asNote) {
-    builder->diagnose(diag::kind_declname_declared_here,
-                      builder->getDescriptiveKind(),
-                      builder->getFullName());
-  }
-
-  return true;
+  SkipUnhandledConstructInFunctionBuilderFailure failure(
+      root, getConstraintSystem(), unhandled, builder, getLocator());
+  return failure.diagnose(asNote);
 }
