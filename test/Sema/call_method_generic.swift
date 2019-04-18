@@ -1,22 +1,22 @@
 // RUN: %target-typecheck-verify-swift
 
 protocol P0 {
-  call func(x: Self)
+  func call(x: Self)
 }
 
 struct ConcreteType {
-  call func<T, U>(_ x: T, _ y: U) -> (T, U) {
+  func call<T, U>(_ x: T, _ y: U) -> (T, U) {
     return (x, y)
   }
 
-  call func<T, U>(_ fn: @escaping (T) -> U) -> (T) -> U {
+  func call<T, U>(_ fn: @escaping (T) -> U) -> (T) -> U {
     return fn
   }
 }
 
 let concrete = ConcreteType()
 _ = concrete(1, 3.0)
-_ = concrete(concrete, { concrete($0, $1) } as ([Int], Float) -> ([Int], Float))
+_ = concrete(concrete, concrete.call as ([Int], Float) -> ([Int], Float))
 
 func generic<T, U>(_ x: T, _ y: U) {
   _ = concrete(x, x)
@@ -25,14 +25,14 @@ func generic<T, U>(_ x: T, _ y: U) {
 
 struct GenericType<T : Collection> {
   let collection: T
-  call func<U>(_ x: U) -> Bool where U == T.Element, U : Equatable {
+  func call<U>(_ x: U) -> Bool where U == T.Element, U : Equatable {
     return collection.contains(x)
   }
 }
 
 // Test conditional conformance.
 extension GenericType where T.Element : Numeric {
-  call func(initialValue: T.Element) -> T.Element {
+  func call(initialValue: T.Element) -> T.Element {
     return collection.reduce(initialValue, +)
   }
 }

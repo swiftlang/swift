@@ -271,8 +271,6 @@ UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
     case CodeCompletionDeclKind::Constructor: return KindRefConstructor;
     case CodeCompletionDeclKind::Destructor: return KindRefDestructor;
     case CodeCompletionDeclKind::Subscript: return KindRefSubscript;
-    // SWIFT_ENABLE_TENSORFLOW
-    case CodeCompletionDeclKind::Call: return KindRefCall;
     case CodeCompletionDeclKind::StaticMethod: return KindRefMethodClass;
     case CodeCompletionDeclKind::InstanceMethod: return KindRefMethodInstance;
     case CodeCompletionDeclKind::PrefixOperatorFunction: return KindRefFunctionPrefixOperator;
@@ -300,8 +298,6 @@ UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
   case CodeCompletionDeclKind::Constructor: return KindDeclConstructor;
   case CodeCompletionDeclKind::Destructor: return KindDeclDestructor;
   case CodeCompletionDeclKind::Subscript: return KindDeclSubscript;
-  // SWIFT_ENABLE_TENSORFLOW
-  case CodeCompletionDeclKind::Call: return KindDeclCall;
   case CodeCompletionDeclKind::StaticMethod: return KindDeclMethodClass;
   case CodeCompletionDeclKind::InstanceMethod: return KindDeclMethodInstance;
   case CodeCompletionDeclKind::PrefixOperatorFunction: return KindDeclFunctionPrefixOperator;
@@ -404,9 +400,6 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
       return KindDeclTypeAlias;
     case SyntaxStructureKind::Subscript:
       return KindDeclSubscript;
-    // SWIFT_ENABLE_TENSORFLOW
-    case SyntaxStructureKind::Call:
-      return KindDeclCall;
     case SyntaxStructureKind::AssociatedType:
       return KindDeclAssociatedType;
     case SyntaxStructureKind::GenericTypeParam:

@@ -276,9 +276,6 @@ UID_KINDS = [
     KIND('RefPrecedenceGroup', 'source.lang.swift.ref.precedencegroup'),
     KIND('DeclSubscript', 'source.lang.swift.decl.function.subscript'),
     KIND('RefSubscript', 'source.lang.swift.ref.function.subscript'),
-    # SWIFT_ENABLE_TENSORFLOW
-    KIND('DeclCall', 'source.lang.swift.decl.function.call'),
-    KIND('RefCall', 'source.lang.swift.ref.function.call'),
     KIND('DeclVarGlobal', 'source.lang.swift.decl.var.global'),
     KIND('RefVarGlobal', 'source.lang.swift.ref.var.global'),
     KIND('DeclVarInstance', 'source.lang.swift.decl.var.instance'),

@@ -31,6 +31,8 @@ IDENTIFIER(Any)
 IDENTIFIER(ArrayLiteralElement)
 IDENTIFIER(atIndexedSubscript)
 IDENTIFIER_(bridgeToObjectiveC)
+// SWIFT_ENABLE_TENSORFLOW
+IDENTIFIER(call)
 IDENTIFIER_WITH_NAME(code_, "_code")
 IDENTIFIER(CodingKeys)
 IDENTIFIER(combine)

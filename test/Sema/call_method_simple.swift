@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 struct SimpleCallable {
-  call func(_ x: Float) -> Float {
+  func call(_ x: Float) -> Float {
     return x
   }
 }
@@ -14,9 +14,11 @@ _ = foo(foo(1))
 
 // Test direct `call` member references.
 
-_ = { foo(1) }()
-_ = [1, 2, 3].map { foo($0) }
-let _: (Float) -> Float = { foo($0) }
+_ = foo.call(1)
+_ = [1, 2, 3].map(foo.call)
+_ = foo.call(foo(1))
+_ = foo(foo.call(1))
+let _: (Float) -> Float = foo.call
 
 func callable() -> SimpleCallable {
   return SimpleCallable()
@@ -33,37 +35,42 @@ extension SimpleCallable {
 _ = foo.foo(1)
 _ = foo.bar()(1)
 _ = callable()(1)
+_ = [1, 2, 3].map(foo.foo.call)
+_ = [1, 2, 3].map(foo.bar().call)
+_ = [1, 2, 3].map(callable().call)
 
 struct MultipleArgsCallable {
-  call func(x: Int, y: Float) -> [Int] {
+  func call(x: Int, y: Float) -> [Int] {
     return [x]
   }
 }
 
 let bar = MultipleArgsCallable()
 _ = bar(x: 1, y: 1)
-_ = bar(x: bar(x: 1, y: 1)[0], y: 1)
+_ = bar.call(x: 1, y: 1)
+_ = bar(x: bar.call(x: 1, y: 1)[0], y: 1)
+_ = bar.call(x: bar(x: 1, y: 1)[0], y: 1)
 
 struct Extended {}
 extension Extended {
   @discardableResult
-  call func() -> Extended {
+  func call() -> Extended {
     return self
   }
 }
 var extended = Extended()
-extended()()()
+extended()().call()()
 
 struct OptionalCallable {
-  call func() -> OptionalCallable? {
+  func call() -> OptionalCallable? {
     return self
   }
 }
 var optional = OptionalCallable()
-_ = optional()?()?()
+_ = optional()?.call()?()
 
 struct VariadicCallable {
-  call func(_ args: Int...) -> [Int] {
+  func call(_ args: Int...) -> [Int] {
     return args
   }
 }
@@ -73,17 +80,19 @@ _ = variadic(1, 2, 3)
 
 struct Mutating {
   var x: Int
-  mutating call func() {
+  mutating func call() {
     x += 1
   }
 }
 func testMutating(_ x: Mutating, _ y: inout Mutating) {
   _ = x() // expected-error {{cannot use mutating member on immutable value: 'x' is a 'let' constant}}
+  _ = x.call() // expected-error {{cannot use mutating member on immutable value: 'x' is a 'let' constant}}
   _ = y()
+  _ = y.call()
 }
 
 struct Throwing {
-  call func() throws -> Throwing {
+  func call() throws -> Throwing {
     return self
   }
 }
@@ -94,7 +103,7 @@ enum BinaryOperation {
   case add, subtract, multiply, divide
 }
 extension BinaryOperation {
-  call func(_ lhs: Float, _ rhs: Float) -> Float {
+  func call(_ lhs: Float, _ rhs: Float) -> Float {
     switch self {
     case .add: return lhs + rhs
     case .subtract: return lhs - rhs
@@ -106,12 +115,12 @@ extension BinaryOperation {
 _ = BinaryOperation.add(1, 2)
 
 class BaseClass {
-  call func() -> Self {
+  func call() -> Self {
     return self
   }
 }
 class SubClass : BaseClass {
-  override call func() -> Self {
+  override func call() -> Self {
     return self
   }
 }
@@ -121,7 +130,7 @@ func testIUO(a: SimpleCallable!, b: MultipleArgsCallable!, c: Extended!,
   _ = a(1)
   _ = b(x: 1, y: 1)
   _ = c()
-  _ = d()?()?()
+  _ = d()?.call()?()
   _ = try? e()
 }
 

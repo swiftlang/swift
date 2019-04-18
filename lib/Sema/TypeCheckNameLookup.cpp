@@ -625,12 +625,6 @@ static bool isPlausibleTypo(DeclRefKind refKind, DeclName typedName,
   if (!candidate->hasName())
     return false;
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // Ignore `call` declarations. Otherwise, "did you mean '$call'" diagnostics
-  // will be produced.
-  if (isa<CallDecl>(candidate))
-    return false;
-
   // An operator / identifier mismatch is never a plausible typo.
   auto fn = dyn_cast<FuncDecl>(candidate);
   if (typedName.isOperator() != (fn && fn->isOperator()))

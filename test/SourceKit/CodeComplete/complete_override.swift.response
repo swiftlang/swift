@@ -11,15 +11,6 @@
     },
     {
       key.kind: source.lang.swift.keyword,
-      key.name: "call",
-      key.sourcetext: "call",
-      key.description: "call",
-      key.typename: "",
-      key.context: source.codecompletion.context.none,
-      key.num_bytes_to_erase: 0
-    },
-    {
-      key.kind: source.lang.swift.keyword,
       key.name: "class",
       key.sourcetext: "class",
       key.description: "class",

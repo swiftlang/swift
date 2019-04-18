@@ -85,3 +85,14 @@ struct GenericCotanMember<T : Differentiable> : Differentiable, AdditiveArithmet
 // CHECK-AST:           internal typealias TangentVector = GenericCotanMember<T>.CotangentVector
 // CHECK-AST:           internal typealias CotangentVector = GenericCotanMember<T>
 // CHECK-AST:           internal typealias AllDifferentiableVariables = GenericCotanMember<T>.CotangentVector
+
+public struct ConditionallyDifferentiable<T> {
+  public let x: T
+}
+extension ConditionallyDifferentiable : Differentiable where T : Differentiable {}
+
+// CHECK-AST-LABEL: @_fieldwiseDifferentiable public struct ConditionallyDifferentiable<T> {
+// CHECK-AST:         @differentiable(where T : Differentiable)
+// CHECK-AST:         public let x: T
+// CHECK-AST:         internal init(x: T)
+// CHECK-AST:       }

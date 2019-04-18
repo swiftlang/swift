@@ -591,9 +591,4 @@ func negateDerivative<FunctionSignature><ParameterClause>(<FunctionParameter>_ x
 func bazDerivative<FunctionSignature><ParameterClause>(<FunctionParameter>_ x: <SimpleTypeIdentifier>Float</SimpleTypeIdentifier>, </FunctionParameter><FunctionParameter>y: <SimpleTypeIdentifier>Float</SimpleTypeIdentifier></FunctionParameter>)</ParameterClause><ReturnClause>
     -> <TupleType>(<TupleTypeElement>value: <SimpleTypeIdentifier>Float</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement>pullback: <FunctionType>(<TupleTypeElement><SimpleTypeIdentifier>Float</SimpleTypeIdentifier></TupleTypeElement>) -> <TupleType>(<TupleTypeElement><SimpleTypeIdentifier>Float</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement><SimpleTypeIdentifier>Float</SimpleTypeIdentifier></TupleTypeElement>)</TupleType></FunctionType></TupleTypeElement>) </TupleType></ReturnClause></FunctionSignature><CodeBlock>{<ReturnStmt>
   return <TupleExpr>(<TupleElement><IdentifierExpr>x</IdentifierExpr>, </TupleElement><TupleElement><ClosureExpr>{ <ClosureSignature><ClosureParam>v </ClosureParam>in </ClosureSignature><IdentifierExpr>v </IdentifierExpr>}</ClosureExpr></TupleElement>)</TupleExpr></ReturnStmt>
-}</CodeBlock></FunctionDecl><ProtocolDecl>
-
-protocol Layer <TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Differentiable </SimpleTypeIdentifier></InheritedType></TypeInheritanceClause><MemberDeclBlock>{<MemberDeclListItem><CallDecl><Attribute>
-  @differentiable</Attribute>
-  call func<FunctionSignature><ParameterClause>(<FunctionParameter>_ input: <SimpleTypeIdentifier>Float</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Float</SimpleTypeIdentifier></ReturnClause></FunctionSignature></CallDecl></MemberDeclListItem>
-}</MemberDeclBlock></ProtocolDecl>
+}</CodeBlock></FunctionDecl>
