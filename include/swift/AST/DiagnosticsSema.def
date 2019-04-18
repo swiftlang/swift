@@ -4444,6 +4444,18 @@ ERROR(property_wrapper_type_not_usable_from_inline,none,
 //------------------------------------------------------------------------------
 // MARK: function builder diagnostics
 //------------------------------------------------------------------------------
+ERROR(function_builder_decl, none,
+      "closure containing a declaration cannot be used with function "
+      "builder %0", (DeclName))
+NOTE(note_function_builder_decl, none,
+      "closure containing a declaration cannot be used with function "
+      "builder %0", (DeclName))
+ERROR(function_builder_control_flow, none,
+      "closure containing control flow statement cannot be used with function "
+      "builder %0", (DeclName))
+NOTE(note_function_builder_control_flow, none,
+      "closure containing control flow statement cannot be used with function "
+      "builder %0", (DeclName))
 ERROR(function_builder_reserved_name, none,
       "function builder type name must start with an uppercase letter", ())
 ERROR(function_builder_attribute_not_on_parameter, none,
