@@ -5,32 +5,97 @@ import StdlibUnittest
 
 var SimpleModelTests = TestSuite("SimpleModel")
 
-protocol Layer : Differentiable, VectorNumeric {
-  @differentiable
-  call func(_ input: Float) -> Float
+struct DenseLayer : Equatable {
+  @differentiable(wrt: self, vjp: vjpW)
+  let w: Float
+  func vjpW() -> (Float, (Float) -> DenseLayer) {
+    return (w, { dw in DenseLayer(w: dw, b: 0) } )
+  }
+
+  @differentiable(wrt: self, vjp: vjpB)
+  let b: Float
+  func vjpB() -> (Float, (Float) -> DenseLayer) {
+    return (b, { db in DenseLayer(w: 0, b: db) } )
+  }
 }
 
-struct DenseLayer : Layer {
-  let w, b: Float
+extension DenseLayer : Differentiable, VectorNumeric {
+  typealias TangentVector = DenseLayer
+  typealias CotangentVector = DenseLayer
+  typealias Scalar = Float
+  static var zero: DenseLayer {
+    return DenseLayer(w: 0, b: 0)
+  }
+  static func + (lhs: DenseLayer, rhs: DenseLayer) -> DenseLayer {
+    return DenseLayer(w: lhs.w + rhs.w, b: lhs.b + rhs.b)
+  }
+  static func - (lhs: DenseLayer, rhs: DenseLayer) -> DenseLayer {
+    return DenseLayer(w: lhs.w - rhs.w, b: lhs.b - rhs.b)
+  }
+  static func * (lhs: DenseLayer, rhs: DenseLayer) -> DenseLayer {
+    return DenseLayer(w: lhs.w * rhs.w, b: lhs.b * rhs.b)
+  }
+  static func * (lhs: Float, rhs: DenseLayer) -> DenseLayer {
+    return DenseLayer(w: lhs * rhs.w, b: lhs * rhs.b)
+  }
+}
 
-  @differentiable
-  call func(_ input: Float) -> Float {
+extension DenseLayer {
+  func prediction(for input: Float) -> Float {
     return input * w + b
   }
 }
 
-struct Model : Layer {
-  let l1, l2, l3: DenseLayer
+struct Model : Equatable {
+  @differentiable(wrt: self, vjp: vjpL1)
+  let l1: DenseLayer
+  func vjpL1() -> (DenseLayer, (DenseLayer) -> Model) {
+    return (l1, { dl1 in Model(l1: dl1, l2: DenseLayer.zero, l3: DenseLayer.zero) } )
+  }
 
-  @differentiable
-  call func(_ input: Float) -> Float {
-    // This model is silly because it has no nonlinearities.
-    // But it is simple and good enough for testing purposes.
-    return l3(l2(l1(input)))
+  @differentiable(wrt: self, vjp: vjpL2)
+  let l2: DenseLayer
+  func vjpL2() -> (DenseLayer, (DenseLayer) -> Model) {
+    return (l2, { dl2 in Model(l1: DenseLayer.zero, l2: dl2, l3: DenseLayer.zero) } )
+  }
+
+  @differentiable(wrt: self, vjp: vjpL3)
+  let l3: DenseLayer
+  func vjpL3() -> (DenseLayer, (DenseLayer) -> Model) {
+    return (l3, { dl3 in Model(l1: DenseLayer.zero, l2: DenseLayer.zero, l3: dl3) } )
+  }
+}
+
+extension Model : Differentiable, VectorNumeric {
+  typealias TangentVector = Model
+  typealias CotangentVector = Model
+  typealias Scalar = Float
+  static var zero: Model {
+    return Model(l1: DenseLayer.zero, l2: DenseLayer.zero, l3: DenseLayer.zero)
+  }
+  static func + (lhs: Model, rhs: Model) -> Model {
+    return Model(l1: lhs.l1 + rhs.l1, l2: lhs.l2 + rhs.l2, l3: lhs.l3 + rhs.l3)
+  }
+  static func - (lhs: Model, rhs: Model) -> Model {
+    return Model(l1: lhs.l1 - rhs.l1, l2: lhs.l2 - rhs.l2, l3: lhs.l3 - rhs.l3)
+  }
+  static func * (lhs: Model, rhs: Model) -> Model {
+    return Model(l1: lhs.l1 * rhs.l1, l2: lhs.l2 * rhs.l2, l3: lhs.l3 * rhs.l3)
+  }
+  static func * (lhs: Float, rhs: Model) -> Model {
+    return Model(l1: lhs * rhs.l1, l2: lhs * rhs.l2, l3: lhs * rhs.l3)
   }
 }
 
 extension Model {
+  func prediction(for input: Float) -> Float {
+    // This "model" is silly because it doesn't have nonlinearities. But it's
+    // simple and good enough for testing purposes.
+    let activation1 = l1.prediction(for: input)
+    let activation2 = l2.prediction(for: activation1)
+    return l3.prediction(for: activation2)
+  }
+
   func loss(of prediction: Float, from label: Float) -> Float {
     return (prediction - label) * (prediction - label)
   }
@@ -42,8 +107,8 @@ SimpleModelTests.test("gradient") {
   let label: Float = 3
   let input: Float = 1
   let gradModel = model.gradient { model -> Float in
-    let prediction = model(input)
-    return model.loss(of: prediction, from: label)
+    let pred = model.prediction(for: input)
+    return model.loss(of: pred, from: label)
   }
   let expectedGrad = Model(l1: DenseLayer(w: -4, b: -4),
                            l2: DenseLayer(w: -4, b: -4),

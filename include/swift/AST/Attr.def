@@ -122,8 +122,7 @@ DECL_ATTR(available, Available,
   AllowMultipleAttributes | LongAttribute,
   1)
 CONTEXTUAL_SIMPLE_DECL_ATTR(final, Final,
-  // SWIFT_ENABLE_TENSORFLOW
-  OnClass | OnFunc | OnAccessor | OnCall | OnVar | OnSubscript |
+  OnClass | OnFunc | OnAccessor | OnVar | OnSubscript |
   DeclModifier,
   2)
 DECL_ATTR(objc, ObjC,
@@ -135,8 +134,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(required, Required,
   DeclModifier,
   4)
 CONTEXTUAL_SIMPLE_DECL_ATTR(optional, Optional,
-  // SWIFT_ENABLE_TENSORFLOW
-  OnConstructor | OnFunc | OnAccessor | OnCall | OnVar | OnSubscript |
+  OnConstructor | OnFunc | OnAccessor | OnVar | OnSubscript |
   DeclModifier,
   5)
 SIMPLE_DECL_ATTR(dynamicCallable, DynamicCallable,
@@ -192,8 +190,7 @@ DECL_ATTR(_semantics, Semantics,
   AllowMultipleAttributes | UserInaccessible,
   21)
 CONTEXTUAL_SIMPLE_DECL_ATTR(dynamic, Dynamic,
-  // SWIFT_ENABLE_TENSORFLOW
-  OnFunc | OnAccessor | OnCall | OnVar | OnSubscript | OnConstructor |
+  OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor |
   DeclModifier,
   22)
 CONTEXTUAL_SIMPLE_DECL_ATTR(infix, Infix,
@@ -209,16 +206,13 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(postfix, Postfix,
   DeclModifier,
   25)
 SIMPLE_DECL_ATTR(_transparent, Transparent,
-  // SWIFT_ENABLE_TENSORFLOW
-  OnFunc | OnAccessor | OnCall | OnConstructor | OnVar | UserInaccessible,
+  OnFunc | OnAccessor | OnConstructor | OnVar | UserInaccessible,
   26)
 SIMPLE_DECL_ATTR(requires_stored_property_inits, RequiresStoredPropertyInits,
   OnClass,
   27)
 SIMPLE_DECL_ATTR(nonobjc, NonObjC,
-  // SWIFT_ENABLE_TENSORFLOW
-  OnExtension | OnFunc | OnAccessor | OnCall | OnVar | OnSubscript |
-  OnConstructor,
+  OnExtension | OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor,
   30)
 SIMPLE_DECL_ATTR(_fixed_layout, FixedLayout,
   OnVar | OnClass | OnStruct |
@@ -228,27 +222,23 @@ SIMPLE_DECL_ATTR(inlinable, Inlinable,
   OnVar | OnSubscript | OnAbstractFunction,
   32)
 DECL_ATTR(_specialize, Specialize,
-  // SWIFT_ENABLE_TENSORFLOW
-  OnConstructor | OnFunc | OnAccessor | OnCall |
+  OnConstructor | OnFunc | OnAccessor |
   AllowMultipleAttributes | LongAttribute | UserInaccessible,
   33)
 SIMPLE_DECL_ATTR(objcMembers, ObjCMembers,
   OnClass,
   34)
 CONTEXTUAL_SIMPLE_DECL_ATTR(__consuming, Consuming,
-  // SWIFT_ENABLE_TENSORFLOW
-  OnFunc | OnAccessor | OnCall |
+  OnFunc | OnAccessor |
   DeclModifier |
   UserInaccessible |
   NotSerialized, 40)
 CONTEXTUAL_SIMPLE_DECL_ATTR(mutating, Mutating,
-  // SWIFT_ENABLE_TENSORFLOW
-  OnFunc | OnAccessor | OnCall |
+  OnFunc | OnAccessor |
   DeclModifier |
   NotSerialized, 41)
 CONTEXTUAL_SIMPLE_DECL_ATTR(nonmutating, NonMutating,
-  // SWIFT_ENABLE_TENSORFLOW
-  OnFunc | OnAccessor | OnCall |
+  OnFunc | OnAccessor |
   DeclModifier |
   NotSerialized, 42)
 CONTEXTUAL_SIMPLE_DECL_ATTR(convenience, Convenience,
@@ -256,9 +246,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(convenience, Convenience,
   DeclModifier |
   NotSerialized, 43)
 CONTEXTUAL_SIMPLE_DECL_ATTR(override, Override,
-  // SWIFT_ENABLE_TENSORFLOW
-  OnFunc | OnAccessor | OnCall | OnVar | OnSubscript | OnConstructor |
-  OnAssociatedType |
+  OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor | OnAssociatedType |
   DeclModifier |
   NotSerialized, 44)
 SIMPLE_DECL_ATTR(_hasStorage, HasStorage,
@@ -266,9 +254,8 @@ SIMPLE_DECL_ATTR(_hasStorage, HasStorage,
   UserInaccessible |
   NotSerialized, 45)
 DECL_ATTR(private, AccessControl,
-  // SWIFT_ENABLE_TENSORFLOW
-  OnFunc | OnAccessor | OnCall | OnExtension | OnGenericType | OnVar |
-  OnSubscript | OnConstructor |
+  OnFunc | OnAccessor | OnExtension | OnGenericType | OnVar | OnSubscript |
+  OnConstructor |
   DeclModifier |
   NotSerialized, 46)
 DECL_ATTR_ALIAS(fileprivate, AccessControl)
@@ -316,8 +303,7 @@ DECL_ATTR(_alignment, Alignment,
   UserInaccessible,
   56)
 SIMPLE_DECL_ATTR(rethrows, Rethrows,
-  // SWIFT_ENABLE_TENSORFLOW
-  OnFunc | OnAccessor | OnCall | OnConstructor |
+  OnFunc | OnAccessor | OnConstructor |
   RejectByParser,
   57)
 DECL_ATTR(_swift_native_objc_runtime_base, SwiftNativeObjCRuntimeBase,
@@ -344,16 +330,14 @@ SIMPLE_DECL_ATTR(usableFromInline, UsableFromInline,
   LongAttribute,
   64)
 SIMPLE_DECL_ATTR(discardableResult, DiscardableResult,
-  // SWIFT_ENABLE_TENSORFLOW
-  OnFunc | OnAccessor | OnCall | OnConstructor |
+  OnFunc | OnAccessor | OnConstructor |
   LongAttribute,
   65)
 SIMPLE_DECL_ATTR(GKInspectable, GKInspectable,
   OnVar,
   66)
 DECL_ATTR(_implements, Implements,
-  // SWIFT_ENABLE_TENSORFLOW
-  OnFunc | OnAccessor | OnCall | OnVar | OnSubscript | OnTypeAlias |
+  OnFunc | OnAccessor | OnVar | OnSubscript | OnTypeAlias |
   UserInaccessible |
   NotSerialized, 67)
 DECL_ATTR(_objcRuntimeName, ObjCRuntimeName,
@@ -369,8 +353,7 @@ DECL_ATTR(_restatedObjCConformance, RestatedObjCConformance,
   NotSerialized, 70)
 // NOTE: 71 is unused
 SIMPLE_DECL_ATTR(_implicitly_unwrapped_optional, ImplicitlyUnwrappedOptional,
-  // SWIFT_ENABLE_TENSORFLOW
-  OnFunc | OnAccessor | OnCall | OnVar | OnParam | OnSubscript | OnConstructor |
+  OnFunc | OnAccessor | OnVar | OnParam | OnSubscript | OnConstructor |
   RejectByParser,
   72)
 DECL_ATTR(_optimize, Optimize,
@@ -382,8 +365,7 @@ DECL_ATTR(_clangImporterSynthesizedType, ClangImporterSynthesizedType,
   LongAttribute | RejectByParser | UserInaccessible |
   NotSerialized, 74)
 SIMPLE_DECL_ATTR(_weakLinked, WeakLinked,
-  // SWIFT_ENABLE_TENSORFLOW
-  OnNominalType | OnAssociatedType | OnFunc | OnAccessor | OnCall | OnVar |
+  OnNominalType | OnAssociatedType | OnFunc | OnAccessor | OnVar |
   OnSubscript | OnConstructor | OnEnumElement | UserInaccessible,
   75)
 SIMPLE_DECL_ATTR(_frozen, Frozen,
@@ -399,9 +381,7 @@ SIMPLE_DECL_ATTR(_hasInitialValue, HasInitialValue,
   UserInaccessible,
   78)
 SIMPLE_DECL_ATTR(_nonoverride, NonOverride,
-  // SWIFT_ENABLE_TENSORFLOW
-  OnFunc | OnAccessor | OnCall | OnVar | OnSubscript | OnConstructor |
-  OnAssociatedType |
+  OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor | OnAssociatedType |
   UserInaccessible | NotSerialized,
   79)
 DECL_ATTR(_dynamicReplacement, DynamicReplacement,
@@ -417,8 +397,8 @@ DECL_ATTR(_private, PrivateImport,
 
 // SWIFT_ENABLE_TENSORFLOW
 DECL_ATTR(differentiable, Differentiable,
-  OnAccessor | OnConstructor | OnFunc | OnCall | OnVar | OnSubscript |
-  LongAttribute | AllowMultipleAttributes,
+  OnAccessor | OnConstructor | OnFunc | OnVar | OnSubscript | LongAttribute |
+  AllowMultipleAttributes,
   83)
 DECL_ATTR(differentiating, Differentiating,
   OnFunc | LongAttribute | AllowMultipleAttributes |

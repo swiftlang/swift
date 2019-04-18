@@ -380,8 +380,6 @@ DECL_NODES = [
                        'SpacedBinaryOperatorToken',
                        'PrefixOperatorToken',
                        'PostfixOperatorToken',
-                       # SWIFT_ENABLE_TENSORFLOW
-                       'CallToken',
                    ]),
              Child('GenericParameterClause', kind='GenericParameterClause',
                    is_optional=True),
@@ -449,24 +447,6 @@ DECL_NODES = [
                    node_choices=[
                       Child('Accessors', kind='AccessorBlock'),
                       Child('Getter', kind='CodeBlock')]),
-         ]),
-
-    # SWIFT_ENABLE_TENSORFLOW
-    Node('CallDecl', kind='Decl',
-         children=[
-             Child('Attributes', kind='AttributeList',
-                   is_optional=True),
-             Child('Modifiers', kind='ModifierList',
-                   is_optional=True),
-             Child('CallKeyword', kind='CallToken'),
-             Child('FuncKeyword', kind='FuncToken'),
-             Child('GenericParameterClause', kind='GenericParameterClause',
-                   is_optional=True),
-             Child('Signature', kind='FunctionSignature'),
-             Child('GenericWhereClause', kind='GenericWhereClause',
-                   is_optional=True),
-             # the body is not necessary inside a protocol definition
-             Child('Body', kind='CodeBlock', is_optional=True),
          ]),
 
     # access-level-modifier -> 'private' | 'private' '(' 'set' ')'

@@ -826,8 +826,7 @@ bool Parser::parseSpecificIdentifier(StringRef expected, SourceLoc &loc,
 /// its name in Result.  Otherwise, emit an error and return true.
 bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
                                 const Diagnostic &D) {
-  // SWIFT_ENABLE_TENSORFLOW
-  if (Tok.is(tok::identifier) || Tok.isAnyOperator() || Tok.is(tok::kw_call)) {
+  if (Tok.is(tok::identifier) || Tok.isAnyOperator()) {
     Result = Context.getIdentifier(Tok.getText());
     Loc = Tok.getLoc();
     consumeToken();

@@ -5328,18 +5328,9 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
 
     auto arg = callExpr->getArg();
-    // SWIFT_ENABLE_TENSORFLOW
-    auto isDynamicCallable =
-        CS.DynamicCallableCache[fnType->getCanonicalType()].isValid();
-
-    auto *nominal = fnType->getAnyNominal();
-    auto hasCallDecls = nominal &&
-        llvm::any_of(nominal->getMembers(), [](Decl *member) {
-          return isa<CallDecl>(member);
-        });
 
     // Diagnose @dynamicCallable errors.
-    if (isDynamicCallable) {
+    if (CS.DynamicCallableCache[fnType->getCanonicalType()].isValid()) {
       auto dynamicCallableMethods =
         CS.DynamicCallableCache[fnType->getCanonicalType()];
 
@@ -5393,9 +5384,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         }
       }
 
-    // SWIFT_ENABLE_TENSORFLOW
-    if (!isDynamicCallable && !hasCallDecls)
-      return true;
+    return true;
   }
   
   bool hasTrailingClosure = callArgHasTrailingClosure(callExpr->getArg());

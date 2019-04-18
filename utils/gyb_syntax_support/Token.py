@@ -335,7 +335,6 @@ SYNTAX_TOKENS = [
                        serialization_code=118,
                        description='TensorFlow operation',
                        protocol='ExpressibleByTensorFlowOp'),
-    DeclKeyword('Call', 'call', serialization_code=119),
 ]
 
 SYNTAX_TOKEN_MAP = {token.name + 'Token': token for token in SYNTAX_TOKENS}

@@ -42,8 +42,6 @@ NODE(BoundGenericOtherNominalType)
 NODE(BoundGenericTypeAlias)
 NODE(BoundGenericFunction)
 NODE(BuiltinTypeName)
-// SWIFT_ENABLE_TENSORFLOW
-CONTEXT_NODE(CallDeclaration)
 NODE(CFunctionPointer)
 CONTEXT_NODE(Class)
 NODE(ClassMetadataBaseOffset)

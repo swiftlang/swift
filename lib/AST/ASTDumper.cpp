@@ -1057,13 +1057,6 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
-    // SWIFT_ENABLE_TENSORFLOW
-    void visitCallDecl(CallDecl *CD) {
-      printCommonFD(CD, "call_decl");
-      printAbstractFunctionDecl(CD);
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
-    }
-
     void visitAccessorDecl(AccessorDecl *AD) {
       printCommonFD(AD, "accessor_decl");
       OS << " " << getAccessorKindString(AD->getAccessorKind());

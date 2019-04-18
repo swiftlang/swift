@@ -1717,10 +1717,6 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::Param:
     llvm_unreachable("there are no global function parameters");
 
-  // SWIFT_ENABLE_TENSORFLOW
-  case DeclKind::Call:
-    llvm_unreachable("there are no global call declarations");
-
   case DeclKind::Subscript:
     llvm_unreachable("there are no global subscript operations");
       
@@ -3671,8 +3667,6 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
       continue;
 
     case DeclKind::Var:
-    // SWIFT_ENABLE_TENSORFLOW
-    case DeclKind::Call:
     case DeclKind::Subscript:
     case DeclKind::PatternBinding:
     case DeclKind::Func:

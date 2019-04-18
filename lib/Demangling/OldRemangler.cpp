@@ -985,13 +985,6 @@ void Remangler::mangleFunction(Node *node, EntityContext &ctx) {
   mangleNamedAndTypedEntity(node, 'F', "", ctx);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-void Remangler::mangleCallDeclaration(Node *node, EntityContext &ctx) {
-  Out << 'f';
-  mangleEntityContext(node->getChild(0), ctx);
-  Out << 'F';
-}
-
 void Remangler::mangleVariable(Node *node, EntityContext &ctx) {
   mangleNamedAndTypedEntity(node, 'v', "", ctx);
 }
