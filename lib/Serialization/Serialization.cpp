@@ -4156,8 +4156,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<ParamLayout>();
   registerDeclTypeAbbr<FuncLayout>();
   registerDeclTypeAbbr<AccessorLayout>();
-  // SWIFT_ENABLE_TENSORFLOW
-  registerDeclTypeAbbr<CallLayout>();
   registerDeclTypeAbbr<PatternBindingLayout>();
   registerDeclTypeAbbr<ProtocolLayout>();
   registerDeclTypeAbbr<DefaultWitnessTableLayout>();
