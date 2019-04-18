@@ -169,4 +169,39 @@ ModelADTests.testAllBackends("WithRespectToModel") {
                                                     baz: Tensor(0.0)), d)
 }
 
+ModelADTests.testAllBackends("TF437") {
+  struct TF437Layer: Layer {
+    typealias Input = Tensor<Float>
+    typealias Output = Tensor<Float>
+
+    var weight: Tensor<Float>
+    var bias: Tensor<Float>
+
+    init(inputSize: Int, outputSize: Int) {
+      weight = Tensor<Float>(randomNormal: [inputSize, outputSize])
+      bias = Tensor<Float>(zeros: [outputSize])
+    }
+
+    @differentiable(wrt: (self, input))
+    func applied(to input: Tensor<Float>) -> Tensor<Float> {
+      let output = matmul(input, weight) + bias
+      return output
+    }
+  }
+
+  func tf437Step<Model: Layer>(_ model: inout Model,
+                               inputs: Model.Input) -> ()
+    where Model.AllDifferentiableVariables == Model.CotangentVector,
+          Model.Output == Tensor<Float> {
+    gradient(at: model) { model -> Model.Output in
+      let logits = model.applied(to: inputs)
+      return logits.mean()
+    }
+  }
+
+  var model = TF437Layer(inputSize: 1, outputSize: 1)
+  let inputs = Tensor<Float>(zeros: [1, 1])
+  tf437Step(&model, inputs: inputs)
+}
+
 runAllTests()
