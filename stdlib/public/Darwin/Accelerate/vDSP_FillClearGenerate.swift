@@ -67,7 +67,6 @@ extension vDSP {
     /// Fill vector with zeros, single-precision.
     ///
     /// - Parameter vector: The vector to fill.
-    /// - Parameter value: The fill value.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func clear<V>(_ vector: inout V)
@@ -85,7 +84,6 @@ extension vDSP {
     /// Fill vector with zeros, double-precision.
     ///
     /// - Parameter vector: The vector to fill.
-    /// - Parameter value: The fill value.
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func clear<V>(_ vector: inout V)
