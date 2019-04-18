@@ -206,8 +206,20 @@ public extension Tensor {
 public extension Tensor where Scalar : Numeric {
   /// Perform an element-wise conversion from another `Tensor`.
   @inlinable @inline(__always)
+  @differentiable(
+    vjp: _vjpCast where Scalar : TensorFlowFloatingPoint,
+                        OtherScalar: TensorFlowFloatingPoint)
   init<OtherScalar : Numeric>(_ other: Tensor<OtherScalar>) {
     self = Raw.cast(other)
+  }
+}
+
+internal extension Tensor where Scalar : TensorFlowFloatingPoint {
+  @inlinable
+  static func _vjpCast<OtherScalar : TensorFlowFloatingPoint>(
+    _ other: Tensor<OtherScalar>
+  ) -> (Tensor, (Tensor) -> Tensor<OtherScalar>) {
+    return (Tensor(other), { v in Tensor<OtherScalar>(v) })
   }
 }
 
