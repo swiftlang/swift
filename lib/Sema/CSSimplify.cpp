@@ -4591,8 +4591,8 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     auto &ctx = getASTContext();
     // Get all `call` methods of the nominal type.
     SmallVector<CallDecl *, 4> callDecls;
-    auto candidates = TC.lookupMember(
-        DC, desugar2, DeclName(ctx.getIdentifier("$call")));
+    auto candidates =
+        lookupMember(desugar2, DeclName(ctx.getIdentifier("$call")));
     for (auto entry : candidates) {
       auto callDecl = dyn_cast<CallDecl>(entry.getValueDecl());
       if (!callDecl)
@@ -4600,7 +4600,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       callDecls.push_back(callDecl);
     }
 
-     // Handle `call` methods calls.
+    // Handle `call` methods calls.
     if (!callDecls.empty()) {
       // Create a type variable for the `call` method.
       auto loc = getConstraintLocator(locator);
