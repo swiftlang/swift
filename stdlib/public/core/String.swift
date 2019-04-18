@@ -989,7 +989,7 @@ extension String {
     
     /// Returns an int8 (short) version of the string.
     ///
-    /// The following example transforms a string to an integer:
+    /// The following example transforms a string to an int8:
     ///
     ///     let five = "5"
     ///     print(five.int8Value)
@@ -1004,7 +1004,7 @@ extension String {
     
     /// Returns an int16 version of the string.
     ///
-    /// The following example transforms a string to an integer:
+    /// The following example transforms a string to an int16:
     ///
     ///     let five = "5"
     ///     print(five.int16Value)
@@ -1019,7 +1019,7 @@ extension String {
     
     /// Returns an int32 version of the string.
     ///
-    /// The following example transforms a string to an integer:
+    /// The following example transforms a string to an int32:
     ///
     ///     let five = "5"
     ///     print(five.int32Value)
@@ -1035,7 +1035,7 @@ extension String {
         
     /// Returns an int64 version of the string.
     ///
-    /// The following example transforms a string to an integer:
+    /// The following example transforms a string to an int64:
     ///
     ///     let five = "5"
     ///     print(five.int64Value)
@@ -1051,7 +1051,7 @@ extension String {
         
     /// Returns an double version of the string.
     ///
-    /// The following example transforms a string to an integer:
+    /// The following example transforms a string to an double:
     ///
     ///     let five = "5"
     ///     print(five.doubleValue)
@@ -1067,7 +1067,7 @@ extension String {
         
     /// Returns an float version of the string.
     ///
-    /// The following example transforms a string to an integer:
+    /// The following example transforms a string to an float:
     ///
     ///     let five = "5"
     ///     print(five.floatValue)
@@ -1082,7 +1082,7 @@ extension String {
     
     /// Returns a bool version of the string.
     ///
-    /// The following example transforms a string to an integer:
+    /// The following example transforms a string to an bool:
     ///
     ///     let five = "5"
     ///     print(five.boolValue)
