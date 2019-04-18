@@ -3508,36 +3508,39 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     }
 
     static bool hasImplicitlyUnwrappedResult(Expr *E) {
-      auto getDeclForExpr = [&](Expr *E) -> ValueDecl * {
-        if (auto *call = dyn_cast<CallExpr>(E))
-          E = call->getDirectCallee();
-
-        if (auto *subscript = dyn_cast<SubscriptExpr>(E)) {
-          if (subscript->hasDecl())
-            return subscript->getDecl().getDecl();
-
-          return nullptr;
-        }
-
-        if (auto *memberRef = dyn_cast<MemberRefExpr>(E))
-          return memberRef->getMember().getDecl();
-        if (auto *declRef = dyn_cast<DeclRefExpr>(E))
-          return declRef->getDecl();
-        if (auto *apply = dyn_cast<ApplyExpr>(E))
-          return apply->getCalledValue();
-
-        return nullptr;
-      };
-
-      // Look through implicit conversions like loads, derived-to-base
-      // conversion, etc.
-      if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E))
-        E = ICE->getSubExpr();
-
-      auto *decl = getDeclForExpr(E);
+      auto *decl = getDeclForImplicitlyUnwrappedExpr(E);
 
       return decl
         && decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    }
+
+    static ValueDecl *getDeclForImplicitlyUnwrappedExpr(Expr *E) {
+      E = E->getValueProvidingExpr();
+
+      // Look through implicit conversions like loads, derived-to-base
+      // conversion, etc.
+      if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E)) {
+        E = ICE->getSubExpr();
+      }
+
+      if (auto *subscript = dyn_cast<SubscriptExpr>(E)) {
+        if (subscript->hasDecl())
+          return subscript->getDecl().getDecl();
+        return nullptr;
+      }
+
+      if (auto *memberRef = dyn_cast<MemberRefExpr>(E))
+        return memberRef->getMember().getDecl();
+
+      if (auto *declRef = dyn_cast<DeclRefExpr>(E))
+        return declRef->getDecl();
+
+      if (auto *apply = dyn_cast<ApplyExpr>(E)) {
+        auto *decl = apply->getCalledValue();
+        if (decl && isa<AbstractFunctionDecl>(decl))
+          return decl;
+      }
+      return nullptr;
     }
 
     void visitErasureExpr(ErasureExpr *E, OptionalToAnyCoercion coercion) {
@@ -3568,15 +3571,32 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       size_t optionalityDifference = 0;
       if (!isOptionalToAnyCoercion(srcType, destType, optionalityDifference))
         return;
+      
+      // If we're implicitly unwrapping from IUO to Any then emit a custom
+      // diagnostic
+      if (hasImplicitlyUnwrappedResult(subExpr)) {
+        if (auto decl = getDeclForImplicitlyUnwrappedExpr(subExpr)) {
+          TC.diagnose(subExpr->getStartLoc(), diag::iuo_to_any_coercion,
+                      /* from */ srcType, /* to */ destType)
+              .highlight(subExpr->getSourceRange());
 
-      TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
-                  /* from */ srcType, /* to */ destType)
-        .highlight(subExpr->getSourceRange());
+          auto noteDiag = isa<FuncDecl>(decl)
+                              ? diag::iuo_to_any_coercion_note_func_result
+                              : diag::iuo_to_any_coercion_note;
 
+          TC.diagnose(decl->getLoc(), noteDiag, decl->getDescriptiveKind(),
+                      decl->getFullName());
+        }
+      } else {
+        TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
+                    /* from */ srcType, /* to */ destType)
+            .highlight(subExpr->getSourceRange());
+      }
+      
       if (optionalityDifference == 1) {
         TC.diagnose(subExpr->getLoc(), diag::default_optional_to_any)
-          .highlight(subExpr->getSourceRange())
-          .fixItInsertAfter(subExpr->getEndLoc(), " ?? <#default value#>");
+            .highlight(subExpr->getSourceRange())
+            .fixItInsertAfter(subExpr->getEndLoc(), " ?? <#default value#>");
       }
 
       SmallString<4> forceUnwrapString;
