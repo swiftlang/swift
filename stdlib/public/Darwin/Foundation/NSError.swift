@@ -417,7 +417,7 @@ extension _BridgedNSError where Self.RawValue: FixedWidthInteger {
 /// Describes a bridged error that stores the underlying NSError, so
 /// it can be queried.
 public protocol _BridgedStoredNSError :
-     _ObjectiveCBridgeableError, CustomNSError, Hashable {
+     _ObjectiveCBridgeableError, CustomNSError, Hashable, CustomStringConvertible {
   /// The type of an error code.
   associatedtype Code: _ErrorCodeProtocol, RawRepresentable
   where Code.RawValue: FixedWidthInteger
@@ -431,6 +431,12 @@ public protocol _BridgedStoredNSError :
   /// The \c error must have the appropriate domain for this error
   /// type.
   init(_nsError error: NSError)
+}
+
+public extension _BridgedStoredNSError {
+    var description: String {
+        return _nsError.description
+    }
 }
 
 /// Various helper implementations for _BridgedStoredNSError
