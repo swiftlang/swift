@@ -1788,9 +1788,8 @@ SourceFile::lookupOpaqueResultType(StringRef MangledName,
 void SourceFile::markDeclWithOpaqueResultTypeAsValidated(ValueDecl *vd) {
   UnvalidatedDeclsWithOpaqueReturnTypes.erase(vd);
   if (auto opaqueDecl = vd->getOpaqueResultTypeDecl()) {
-    Mangle::ASTMangler mangler;
-    auto name = mangler.mangleDeclAsUSR(vd, MANGLING_PREFIX_STR);
-    ValidatedOpaqueReturnTypes.insert({name, opaqueDecl});
+    ValidatedOpaqueReturnTypes.insert(
+              {opaqueDecl->getOpaqueReturnTypeIdentifier().str(), opaqueDecl});
   }
 }
 

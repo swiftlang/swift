@@ -1916,9 +1916,24 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     break;
 
   case DeclContextKind::GenericTypeDecl: {
+    auto generic = cast<GenericTypeDecl>(DC);
+
+    // Opaque return types are unnamed and need a special xref.
+    if (auto opaque = dyn_cast<OpaqueTypeDecl>(generic)) {
+      if (!opaque->hasName()) {
+        abbrCode = DeclTypeAbbrCodes[XRefOpaqueReturnTypePathPieceLayout::Code];
+        
+        XRefOpaqueReturnTypePathPieceLayout::emitRecord(Out, ScratchRecord,
+                  abbrCode,
+                  addDeclBaseNameRef(opaque->getOpaqueReturnTypeIdentifier()));
+        break;
+      }
+    }
+      
+    assert(generic->hasName());
+    
     writeCrossReference(DC->getParent(), pathLen + 1);
 
-    auto generic = cast<GenericTypeDecl>(DC);
     abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
 
     Identifier discriminator;
@@ -2073,6 +2088,14 @@ void Serializer::writeCrossReference(const Decl *D) {
 
   writeCrossReference(D->getDeclContext());
 
+  if (auto opaque = dyn_cast<OpaqueTypeDecl>(D)) {
+    abbrCode = DeclTypeAbbrCodes[XRefOpaqueReturnTypePathPieceLayout::Code];
+    XRefOpaqueReturnTypePathPieceLayout::emitRecord(Out, ScratchRecord,
+                   abbrCode,
+                   addDeclBaseNameRef(opaque->getOpaqueReturnTypeIdentifier()));
+    return;
+  }
+  
   if (auto genericParam = dyn_cast<GenericTypeParamDecl>(D)) {
     assert(!D->getDeclContext()->isModuleScopeContext() &&
            "Cannot cross reference a generic type decl at module scope.");
@@ -4252,6 +4275,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<TopLevelCodeDeclContextLayout>();
 
   registerDeclTypeAbbr<XRefTypePathPieceLayout>();
+  registerDeclTypeAbbr<XRefOpaqueReturnTypePathPieceLayout>();
   registerDeclTypeAbbr<XRefValuePathPieceLayout>();
   registerDeclTypeAbbr<XRefExtensionPathPieceLayout>();
   registerDeclTypeAbbr<XRefOperatorOrAccessorPathPieceLayout>();

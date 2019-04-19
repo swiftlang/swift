@@ -1416,6 +1416,11 @@ namespace decls_block {
     BCFixed<1>,        // restrict to protocol extension
     BCFixed<1>         // imported from Clang?
   >;
+  
+  using XRefOpaqueReturnTypePathPieceLayout = BCRecordLayout<
+    XREF_OPAQUE_RETURN_TYPE_PATH_PIECE,
+    IdentifierIDField // mangled name of defining decl
+  >;
 
   using XRefValuePathPieceLayout = BCRecordLayout<
     XREF_VALUE_PATH_PIECE,

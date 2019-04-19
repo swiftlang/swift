@@ -37,7 +37,6 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Config.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
@@ -4173,15 +4172,8 @@ public:
       // type.
       Printer << "@_opaqueReturnTypeOf(";
       
-      SmallString<64> mangleBuf;
-      {
-        llvm::raw_svector_ostream os(mangleBuf);
-        Mangle::ASTMangler mangler;
-        os << mangler.mangleDeclAsUSR(decl->getNamingDecl(),
-                                      MANGLING_PREFIX_STR);
-      }
-      
-      Printer.printEscapedStringLiteral(mangleBuf);
+      Printer.printEscapedStringLiteral(
+                                   decl->getOpaqueReturnTypeIdentifier().str());
       
       Printer << ", " << T->getInterfaceType()
                           ->castTo<GenericTypeParamType>()
