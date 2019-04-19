@@ -400,6 +400,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     // We've loaded the file. Now try to bring it into the AST.
     auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile,
                                                 extendedInfo.isSIB());
+    fileUnit->setParseableInterface(extendedInfo.getParseableInterface());
     M.addFile(*fileUnit);
     if (extendedInfo.isTestable())
       M.setTestingEnabled();

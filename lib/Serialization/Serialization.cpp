@@ -834,6 +834,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(input_block, MODULE_FLAGS);
   BLOCK_RECORD(input_block, SEARCH_PATH);
   BLOCK_RECORD(input_block, FILE_DEPENDENCY);
+  BLOCK_RECORD(input_block, PARSEABLE_INTERFACE_PATH);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
 #define RECORD(X) BLOCK_RECORD(decls_block, X);
@@ -1060,6 +1061,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   input_block::ImportedHeaderContentsLayout ImportedHeaderContents(Out);
   input_block::SearchPathLayout SearchPath(Out);
   input_block::FileDependencyLayout FileDependency(Out);
+  input_block::ParseableInterfaceLayout ParseableInterface(Out);
 
   if (options.SerializeOptionsForDebugging) {
     const SearchPathOptions &searchPathOpts = M->getASTContext().SearchPathOpts;
@@ -1080,6 +1082,9 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
                         dep.isSDKRelative(),
                         dep.getPath());
   }
+
+  if (!options.ParseableInterface.empty())
+    ParseableInterface.emit(ScratchRecord, options.ParseableInterface);
 
   ModuleDecl::ImportFilter allImportFilter;
   allImportFilter |= ModuleDecl::ImportFilterKind::Public;
