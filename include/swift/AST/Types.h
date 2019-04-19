@@ -4692,6 +4692,14 @@ public:
   
   /// Get the generic environment this archetype lives in.
   GenericEnvironment *getGenericEnvironment() const;
+  
+  /// Get the protocol/class existential type that most closely represents the
+  /// set of constraints on this archetype.
+  ///
+  /// Right now, this only considers constraints on the archetype itself, not
+  /// any of its associated types, since those are the only kind of existential
+  /// type we can represent.
+  Type getExistentialType() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
