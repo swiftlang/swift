@@ -1064,29 +1064,9 @@ static Type SelfAllowedBySE0068(TypeResolution resolution,
       (nominal = nominalDC->getSelfNominalTypeDecl())) {
     assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
 
-    bool insideClass = nominalDC->getSelfClassDecl() != nullptr;
-    AbstractFunctionDecl *methodDecl = dc->getInnermostMethodContext();
-    bool declaringMethod = methodDecl &&
-      methodDecl->getDeclContext() == dc->getParentForLookup();
-    bool isMutablePropertyOrSubscriptOfClass = insideClass &&
-      (options.is(TypeResolverContext::PatternBindingDecl) ||
-       options.is(TypeResolverContext::FunctionResult));
-    bool isTypeAliasInClass = insideClass &&
-      options.is(TypeResolverContext::TypeAliasDecl);
-
-    if (isMutablePropertyOrSubscriptOfClass) {
-      if (auto prop = dyn_cast_or_null<ValueDecl>
-          (dc->getInnermostDeclarationDeclContext()))
-        if (!prop->isSettable(dc))
-          isMutablePropertyOrSubscriptOfClass = false;
-    }
-
-    if (((!insideClass || !declaringMethod) &&
-         !isMutablePropertyOrSubscriptOfClass && !isTypeAliasInClass &&
-         !options.is(TypeResolverContext::GenericRequirement)) ||
-        options.is(TypeResolverContext::ExplicitCastExpr)) {
+    if (!options.is(TypeResolverContext::GenericRequirement)) {
       Type SelfType = nominal->getSelfInterfaceType();
-      if (insideClass)
+      if (nominalDC->getSelfClassDecl() != nullptr)
         SelfType = DynamicSelfType::get(SelfType, ctx);
       return resolution.mapTypeIntoContext(SelfType);
     }

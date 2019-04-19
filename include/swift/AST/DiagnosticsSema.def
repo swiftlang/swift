@@ -2579,6 +2579,14 @@ ERROR(dynamic_self_non_method,none,
 ERROR(self_in_nominal,none,
       "'Self' is only available in a protocol or as the result of a "
       "method in a class; did you mean '%0'?", (StringRef))
+ERROR(self_in_alias,none,
+      "'Self' is not available in a typealias", ())
+ERROR(self_in_mutable_property,none,
+      "'Self' is not available as the type of a mutable property", ())
+ERROR(self_in_mutable_subscript,none,
+      "'Self' is not available as the type of a mutable subscript", ())
+ERROR(self_in_parameter,none,
+      "'Self' cannot be the type of a (contravariant) function argument", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes
