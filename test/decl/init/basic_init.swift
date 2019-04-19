@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop -disable-objc-attr-requires-foundation-module
 
 class Foo {
   func bar(_: bar) {} // expected-error{{use of undeclared type 'bar'}}
