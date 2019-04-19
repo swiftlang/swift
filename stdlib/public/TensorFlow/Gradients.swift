@@ -596,17 +596,6 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   }
 
   @inlinable
-  func _vjpMean(squeezingAxes axes: [Int]) -> (Tensor, (Tensor) -> Tensor) {
-    let value = mean(squeezingAxes: axes)
-    return (value, { [shape = shapeTensor,
-                      count = axes.map { shape[$0] }.reduce(1, *)] in
-      var res = $0
-      for i in axes { res = res.expandingShape(at: Int(i)) }              
-      return res.broadcast(toShape: shape) / Tensor(Scalar(count))
-    })
-  }
-
-  @inlinable
   func _vjpMean(
     squeezingAxes axes: Tensor<Int32>
   ) -> (Tensor, (Tensor) -> Tensor) {
