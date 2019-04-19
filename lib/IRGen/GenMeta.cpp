@@ -1400,6 +1400,7 @@ namespace {
       super::layout();
       addVTable();
       addOverrideTable();
+      addObjCResilientClassStubInfo();
     }
 
     void addIncompleteMetadataOrRelocationFunction() {
@@ -1632,6 +1633,20 @@ namespace {
 
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(getFieldVectorOffset() / IGM.getPointerSize());
+    }
+
+    void addObjCResilientClassStubInfo() {
+      if (IGM.getClassMetadataStrategy(getType()) !=
+            ClassMetadataStrategy::Resilient)
+        return;
+
+      if (!hasObjCResilientClassStub(IGM, getType()))
+        return;
+
+      B.addRelativeAddress(
+        IGM.getAddrOfObjCResilientClassStub(
+          getType(), NotForDefinition,
+          TypeMetadataAddress::AddressPoint));
     }
   };
   
@@ -2635,8 +2650,7 @@ namespace {
       Type type = Target->mapTypeIntoContext(Target->getSuperclass());
       auto *metadata = tryEmitConstantHeapMetadataRef(
           IGM, type->getCanonicalType(),
-          /*allowUninit*/ false,
-          /*allowStub*/ false);
+          /*allowUninit*/ false);
       assert(metadata != nullptr);
       B.add(metadata);
     }
@@ -3232,12 +3246,6 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
               classDecl, NotForDefinition,
               TypeMetadataAddress::AddressPoint);
           emitObjCClassSymbol(IGM, classDecl, stub);
-
-          // @_objc_non_lazy_realization is only for use by the standard
-          // library, and we cannot support it with Objective-C class
-          // stubs (which there are none of in the standard library).
-          assert(!classDecl->getAttrs().hasAttribute<ObjCNonLazyRealizationAttr>());
-          IGM.addObjCClass(stub, /*eagerInitialization=*/false);
         }
       }
       break;
