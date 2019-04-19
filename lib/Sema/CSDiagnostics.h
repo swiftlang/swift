@@ -1031,6 +1031,26 @@ public:
   bool diagnoseAsError() override;
 };
 
+class InvalidMemberRefInKeyPath : public FailureDiagnostic {
+  ValueDecl *Member;
+
+public:
+  InvalidMemberRefInKeyPath(Expr *root, ConstraintSystem &cs, ValueDecl *member,
+                            ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), Member(member) {
+    assert(member->hasName());
+    assert(locator->isForKeyPathComponent());
+  }
+
+  DeclName getName() const { return Member->getFullName(); }
+
+  bool diagnoseAsError() override = 0;
+
+protected:
+  /// Compute location of the failure for diagnostic.
+  SourceLoc getLoc() const;
+};
+
 /// Diagnose an attempt to reference a static member as a key path component
 /// e.g.
 ///
@@ -1041,16 +1061,39 @@ public:
 ///
 /// _ = \S.Type.foo
 /// ```
-class InvalidStaticMemberRefInKeyPath final : public FailureDiagnostic {
-  ValueDecl *Member;
-
+class InvalidStaticMemberRefInKeyPath final : public InvalidMemberRefInKeyPath {
 public:
   InvalidStaticMemberRefInKeyPath(Expr *root, ConstraintSystem &cs,
                                   ValueDecl *member, ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), Member(member) {
-    assert(member->hasName());
-    assert(locator->isForKeyPathComponent());
-  }
+      : InvalidMemberRefInKeyPath(root, cs, member, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to reference a member which has a mutating getter as a
+/// key path component e.g.
+///
+/// ```swift
+/// struct S {
+///   var foo: Int {
+///     mutating get { return 42 }
+///   }
+///
+///   subscript(_: Int) -> Bool {
+///     mutating get { return false }
+///   }
+/// }
+///
+/// _ = \S.foo
+/// _ = \S.[42]
+/// ```
+class InvalidMemberWithMutatingGetterInKeyPath final
+    : public InvalidMemberRefInKeyPath {
+public:
+  InvalidMemberWithMutatingGetterInKeyPath(Expr *root, ConstraintSystem &cs,
+                                           ValueDecl *member,
+                                           ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(root, cs, member, locator) {}
 
   bool diagnoseAsError() override;
 };

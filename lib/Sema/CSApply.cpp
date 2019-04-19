@@ -4588,11 +4588,7 @@ namespace {
         } else {
           // Key paths don't work with mutating-get properties.
           auto varDecl = cast<VarDecl>(property);
-          if (varDecl->isGetterMutating()) {
-            cs.TC.diagnose(componentLoc, diag::expr_keypath_mutating_getter,
-                           property->getFullName());
-          }
-
+          assert(!varDecl->isGetterMutating());
           // Key paths don't currently support static members.
           // There is a fix which diagnoses such situation already.
           assert(!varDecl->isStatic());
@@ -4627,10 +4623,7 @@ namespace {
         SelectedOverload &overload, SourceLoc componentLoc, Expr *indexExpr,
         ArrayRef<Identifier> labels, ConstraintLocator *locator) {
       auto subscript = cast<SubscriptDecl>(overload.choice.getDecl());
-      if (subscript->isGetterMutating()) {
-        cs.TC.diagnose(componentLoc, diag::expr_keypath_mutating_getter,
-                       subscript->getFullName());
-      }
+      assert(!subscript->isGetterMutating());
 
       cs.TC.requestMemberLayout(subscript);
 
