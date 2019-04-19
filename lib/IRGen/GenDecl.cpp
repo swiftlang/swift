@@ -928,6 +928,12 @@ void IRGenModule::emitGlobalLists() {
                                       "regular,no_dead_strip"),
                    llvm::GlobalValue::InternalLinkage, Int8PtrTy, false);
 
+    // And categories on class stubs.
+    emitGlobalList(*this, ObjCCategoriesOnStubs, "objc_categories_stubs",
+                   GetObjCSectionName("__objc_catlist2",
+                                      "regular,no_dead_strip"),
+                   llvm::GlobalValue::InternalLinkage, Int8PtrTy, false);
+
     // Emit nonlazily realized class references in a second magic section to make
     // sure they are realized by the Objective-C runtime before any instances
     // are allocated.
@@ -3802,7 +3808,15 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
            "foreign types cannot have categories emitted");
     llvm::Constant *category = emitCategoryData(*this, ext);
     category = llvm::ConstantExpr::getBitCast(category, Int8PtrTy);
-    ObjCCategories.push_back(category);
+
+    auto *theClass = ext->getSelfClassDecl();
+
+    // Categories on class stubs are added to a separate list.
+    if (theClass->checkAncestry(AncestryFlags::ResilientOther))
+      ObjCCategoriesOnStubs.push_back(category);
+    else
+      ObjCCategories.push_back(category);
+
     ObjCCategoryDecls.push_back(ext);
   }
 }
