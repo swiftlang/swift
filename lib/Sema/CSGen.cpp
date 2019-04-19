@@ -1060,7 +1060,7 @@ namespace {
 
       // Add the member constraint for a subscript declaration.
       // FIXME: weak name!
-      auto memberTy = CS.createTypeVariable(resultLocator, TVO_CanBindToNoEscape);
+      auto memberTy = CS.createTypeVariable(memberLocator, TVO_CanBindToNoEscape);
 
       // FIXME: synthesizeMaterializeForSet() wants to statically dispatch to
       // a known subscript here. This might be cleaner if we split off a new
