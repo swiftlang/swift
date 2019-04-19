@@ -247,7 +247,9 @@ _findExtendedTypeContextDescriptor(const ExtensionContextDescriptor *extension,
       return nullptr;
     node = node->getChild(0);
   }
-  node = Demangle::getUnspecialized(node, demangler);
+  if (Demangle::isSpecialized(node)) {
+    node = Demangle::getUnspecialized(node, demangler);
+  }
 
   return _findNominalTypeDescriptor(node, demangler);
 }
@@ -823,15 +825,17 @@ bool swift::_gatherGenericParameterCounts(
                                  const ContextDescriptor *descriptor,
                                  SmallVectorImpl<unsigned> &genericParamCounts,
                                  Demangler &BorrowFrom) {
-  // If we have an extension descriptor, extract the extended type and use
-  // that.
   DemanglerForRuntimeTypeResolution<> demangler;
   demangler.providePreallocatedMemory(BorrowFrom);
 
   if (auto extension = dyn_cast<ExtensionContextDescriptor>(descriptor)) {
+    // If we have an nominal type extension descriptor, extract the extended type
+    // and use that. If the extension is not nominal, then we can use the
+    // extension's own signature.
     if (auto extendedType =
-            _findExtendedTypeContextDescriptor(extension, demangler))
+          _findExtendedTypeContextDescriptor(extension, demangler)) {
       descriptor = extendedType;
+    }
   }
 
   // Once we hit a non-generic descriptor, we're done.
