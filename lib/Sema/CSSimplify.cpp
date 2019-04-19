@@ -4627,7 +4627,8 @@ ConstraintSystem::simplifyApplicableFnConstraint(
             locator.withPathElement(LocatorPathElt::getTupleElement(i));
         addConstraint(ConstraintKind::ArgumentConversion, paramType,
                       tvParam, locatorBuilder);
-        tvParams.push_back(AnyFunctionType::Param(tvParam));
+        tvParams.push_back(AnyFunctionType::Param(
+            tvParam, Identifier(), param.getParameterFlags()));
       }
       // Create target function type and an applicable function constraint.
       AnyFunctionType *funcType =
