@@ -52,7 +52,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -101,7 +101,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -152,7 +152,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -201,7 +201,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -230,7 +230,7 @@ extension vForce {
                                       signs: V) -> [Float]
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(magnitudes.count == signs.count)
@@ -261,7 +261,7 @@ extension vForce {
         where
         T: AccelerateBuffer,
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             precondition(magnitudes.count == signs.count && signs.count == result.count)
@@ -291,7 +291,7 @@ extension vForce {
                                       signs: V) -> [Double]
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(magnitudes.count == signs.count)
@@ -322,7 +322,7 @@ extension vForce {
         where
         T: AccelerateBuffer,
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             precondition(magnitudes.count == signs.count && signs.count == result.count)
@@ -361,7 +361,7 @@ extension vForce {
                                                  divisors: V) -> [Float]
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(dividends.count == divisors.count)
@@ -397,7 +397,7 @@ extension vForce {
         where
         T: AccelerateBuffer,
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             precondition(dividends.count == divisors.count && divisors.count == result.count)
@@ -431,7 +431,7 @@ extension vForce {
                                                  divisors: V) -> [Double]
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(dividends.count == divisors.count)
@@ -467,7 +467,7 @@ extension vForce {
         where
         T: AccelerateBuffer,
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             precondition(dividends.count == divisors.count && divisors.count == result.count)
@@ -503,7 +503,7 @@ extension vForce {
                                        divisors: V) -> [Float]
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(dividends.count == divisors.count)
@@ -538,7 +538,7 @@ extension vForce {
         where
         T: AccelerateBuffer,
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             precondition(dividends.count == divisors.count && divisors.count == result.count)
@@ -572,7 +572,7 @@ extension vForce {
                                        divisors: V) -> [Double]
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(dividends.count == divisors.count)
@@ -607,7 +607,7 @@ extension vForce {
         where
         T: AccelerateBuffer,
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             precondition(dividends.count == divisors.count && divisors.count == result.count)
@@ -661,7 +661,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -710,7 +710,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -761,7 +761,7 @@ extension vForce {
                                             result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -810,7 +810,7 @@ extension vForce {
                                             result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -861,7 +861,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -910,7 +910,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -961,7 +961,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -1011,7 +1011,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -1062,7 +1062,7 @@ extension vForce {
                                         result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -1111,7 +1111,7 @@ extension vForce {
                                         result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -1167,7 +1167,7 @@ extension vForce {
                                  result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -1183,7 +1183,7 @@ extension vForce {
             }
     }
     
-    /// Returns e raised to the power of each element minus one in in `vector`, single-precision.
+    /// Returns e raised to the power of each element minus one in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -1216,7 +1216,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -1265,7 +1265,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -1314,7 +1314,7 @@ extension vForce {
                                  result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -1330,7 +1330,7 @@ extension vForce {
             }
     }
     
-    /// Returns e raised to the power of each element minus one in in `vector`, double-precision.
+    /// Returns e raised to the power of each element minus one in `vector`, double-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -1363,7 +1363,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -1412,7 +1412,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -1463,7 +1463,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -1512,7 +1512,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -1561,7 +1561,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -1610,7 +1610,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -1663,7 +1663,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -1714,7 +1714,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -1748,7 +1748,7 @@ extension vForce {
                                  exponents: V) -> [Float]
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(bases.count == exponents.count)
@@ -1779,7 +1779,7 @@ extension vForce {
         where
         T: AccelerateBuffer,
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             precondition(bases.count == exponents.count && exponents.count == result.count)
@@ -1809,7 +1809,7 @@ extension vForce {
                                  exponents: V) -> [Double]
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(bases.count == exponents.count)
@@ -1840,7 +1840,7 @@ extension vForce {
         where
         T: AccelerateBuffer,
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double,
         U.Element == Double,
         V.Element == Double {
@@ -1870,7 +1870,7 @@ extension vForce {
     
     // MARK: Sine
     
-    /// Returns the sine of each element in in `vector`, single-precision.
+    /// Returns the sine of each element in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -1903,7 +1903,7 @@ extension vForce {
                                  result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -1919,7 +1919,7 @@ extension vForce {
             }
     }
     
-    /// Returns the sine of each element in in `vector`, double-precision.
+    /// Returns the sine of each element in `vector`, double-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -1952,7 +1952,7 @@ extension vForce {
                                  result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -1968,7 +1968,7 @@ extension vForce {
             }
     }
     
-    /// Returns the sine of pi multiplied of each element in in `vector`, single-precision.
+    /// Returns the sine of pi multiplied of each element in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -2001,7 +2001,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2017,7 +2017,7 @@ extension vForce {
             }
     }
     
-    /// Returns the sine of pi multiplied of each element in in `vector`, double-precision.
+    /// Returns the sine of pi multiplied of each element in `vector`, double-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -2050,7 +2050,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -2068,7 +2068,7 @@ extension vForce {
     
     // MARK: Cosine
     
-    /// Returns the cosine of each element in in `vector`, single-precision.
+    /// Returns the cosine of each element in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -2101,7 +2101,7 @@ extension vForce {
                                  result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2117,7 +2117,7 @@ extension vForce {
             }
     }
     
-    /// Returns the cosine of each element in in `vector`, double-precision.
+    /// Returns the cosine of each element in `vector`, double-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -2150,7 +2150,7 @@ extension vForce {
                                  result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -2166,7 +2166,7 @@ extension vForce {
             }
     }
     
-    /// Returns the cosine of pi multiplied of each element in in `vector`, single-precision.
+    /// Returns the cosine of pi multiplied of each element in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -2199,7 +2199,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2215,7 +2215,7 @@ extension vForce {
             }
     }
     
-    /// Returns the cosine of pi multiplied of each element in in `vector`, single-precision.
+    /// Returns the cosine of pi multiplied of each element in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -2248,7 +2248,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -2278,8 +2278,8 @@ extension vForce {
                                        cosResult: inout V)
         where
         T: AccelerateBuffer,
-        U: MutableAccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        U: AccelerateMutableBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             precondition(vector.count == sinResult.count && sinResult.count == cosResult.count)
@@ -2310,8 +2310,8 @@ extension vForce {
                                        cosResult: inout V)
         where
         T: AccelerateBuffer,
-        U: MutableAccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        U: AccelerateMutableBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             precondition(vector.count == sinResult.count && sinResult.count == cosResult.count)
@@ -2332,7 +2332,7 @@ extension vForce {
     
     // MARK: Tan
     
-    /// Returns the tangent of each element in in `vector`, single-precision.
+    /// Returns the tangent of each element in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -2365,7 +2365,7 @@ extension vForce {
                                  result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2381,7 +2381,7 @@ extension vForce {
             }
     }
     
-    /// Returns the tangent of each element in in `vector`, single-precision.
+    /// Returns the tangent of each element in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -2415,7 +2415,7 @@ extension vForce {
                                  result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -2431,7 +2431,7 @@ extension vForce {
             }
     }
     
-    /// Returns the tangent of pi multiplied of each element in in `vector`, single-precision.
+    /// Returns the tangent of pi multiplied of each element in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -2464,7 +2464,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2480,7 +2480,7 @@ extension vForce {
             }
     }
     
-    /// Returns the tangent of pi multiplied of each element in in `vector`, single-precision.
+    /// Returns the tangent of pi multiplied of each element in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -2513,7 +2513,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -2531,7 +2531,7 @@ extension vForce {
     
     // MARK: Arcsine
     
-    /// Returns the arcsine of each element in in `vector`, single-precision.
+    /// Returns the arcsine of each element in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -2564,7 +2564,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2580,7 +2580,7 @@ extension vForce {
             }
     }
     
-    /// Returns the arcsine of each element in in `vector`, double-precision.
+    /// Returns the arcsine of each element in `vector`, double-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -2613,7 +2613,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -2631,7 +2631,7 @@ extension vForce {
     
     // MARK: Arccosine
     
-    /// Returns the arccosine of each element in in `vector`, single-precision.
+    /// Returns the arccosine of each element in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -2664,7 +2664,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2680,7 +2680,7 @@ extension vForce {
             }
     }
     
-    /// Returns the arccosine of each element in in `vector`, double-precision.
+    /// Returns the arccosine of each element in `vector`, double-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -2713,7 +2713,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -2731,7 +2731,7 @@ extension vForce {
     
     // MARK: Arctangent
     
-    /// Returns the arctangent of each element in in `vector`, single-precision.
+    /// Returns the arctangent of each element in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -2764,7 +2764,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2780,7 +2780,7 @@ extension vForce {
             }
     }
     
-    /// Returns the arctangent of each element in in `vector`, single-precision.
+    /// Returns the arctangent of each element in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -2813,7 +2813,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -2836,7 +2836,7 @@ extension vForce {
     
     // MARK: Hyperbolic Sine
     
-    /// Returns the hyperbolic sine of each element in in `vector`, single-precision.
+    /// Returns the hyperbolic sine of each element in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -2869,7 +2869,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2885,7 +2885,7 @@ extension vForce {
             }
     }
     
-    /// Returns the hyperbolic sine of each element in in `vector`, double-precision.
+    /// Returns the hyperbolic sine of each element in `vector`, double-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -2918,7 +2918,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -2936,7 +2936,7 @@ extension vForce {
     
     // MARK: Hyperbolic Cosine
     
-    /// Returns the hyperbolic cosine of each element in in `vector`, single-precision.
+    /// Returns the hyperbolic cosine of each element in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -2969,7 +2969,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2985,7 +2985,7 @@ extension vForce {
             }
     }
     
-    /// Returns the hyperbolic cosine of each element in in `vector`, double-precision.
+    /// Returns the hyperbolic cosine of each element in `vector`, double-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -3018,7 +3018,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -3036,7 +3036,7 @@ extension vForce {
     
     // MARK: Hyperbolic Tangent
     
-    /// Returns the hyperbolic tangent of each element in in `vector`, single-precision.
+    /// Returns the hyperbolic tangent of each element in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -3069,7 +3069,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -3085,7 +3085,7 @@ extension vForce {
             }
     }
     
-    /// Returns the hyperbolic tangent of each element in in `vector`, double-precision.
+    /// Returns the hyperbolic tangent of each element in `vector`, double-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -3118,7 +3118,7 @@ extension vForce {
                                   result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -3136,7 +3136,7 @@ extension vForce {
     
     // MARK: Inverse Hyperbolic Sine
     
-    /// Returns the inverse hyperbolic sine of each element in in `vector`, single-precision.
+    /// Returns the inverse hyperbolic sine of each element in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -3169,7 +3169,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -3185,7 +3185,7 @@ extension vForce {
             }
     }
     
-    /// Returns the inverse hyperbolic sine of each element in in `vector`, double-precision.
+    /// Returns the inverse hyperbolic sine of each element in `vector`, double-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -3218,7 +3218,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -3236,7 +3236,7 @@ extension vForce {
     
     // MARK: Inverse Hyperbolic Cosine
     
-    /// Returns the inverse hyperbolic cosine of each element in in `vector`, single-precision.
+    /// Returns the inverse hyperbolic cosine of each element in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -3269,7 +3269,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -3285,7 +3285,7 @@ extension vForce {
             }
     }
     
-    /// Returns the inverse hyperbolic cosine of each element in in `vector`, double-precision.
+    /// Returns the inverse hyperbolic cosine of each element in `vector`, double-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -3318,7 +3318,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -3336,7 +3336,7 @@ extension vForce {
     
     // MARK: Inverse Hyperbolic Tangent
     
-    /// Returns the inverse hyperbolic tangent of each element in in `vector`, single-precision.
+    /// Returns the inverse hyperbolic tangent of each element in `vector`, single-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -3369,7 +3369,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -3385,7 +3385,7 @@ extension vForce {
             }
     }
     
-    /// Returns the inverse hyperbolic tangent of each element in in `vector`, double-precision.
+    /// Returns the inverse hyperbolic tangent of each element in `vector`, double-precision.
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
@@ -3418,7 +3418,7 @@ extension vForce {
                                    result: inout V)
         where
         U: AccelerateBuffer,
-        V: MutableAccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
