@@ -972,6 +972,20 @@ void PrintAST::printAttributes(const Decl *D) {
 
   D->getAttrs().print(Printer, Options, D);
 
+  // Print the implicit 'final' attribute.
+  if (auto VD = dyn_cast<ValueDecl>(D)) {
+    auto VarD = dyn_cast<VarDecl>(D);
+    if (VD->isFinal() &&
+        !VD->getAttrs().hasAttribute<FinalAttr>() &&
+        // Don't print a redundant 'final' if printing a 'let' or 'static' decl.
+        !(VarD && VarD->isLet()) &&
+        getCorrectStaticSpelling(D) != StaticSpellingKind::KeywordStatic &&
+        VD->getKind() != DeclKind::Accessor) {
+      Printer.printAttrName("final");
+      Printer << " ";
+    }
+  }
+
   // Explicitly print 'mutating' and 'nonmutating' before getters and setters
   // for which that is true.
   if (auto accessor = dyn_cast<AccessorDecl>(D)) {

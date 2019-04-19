@@ -2751,6 +2751,11 @@ void Serializer::writeDecl(const Decl *D) {
       writeDeclAttribute(Attr);
   }
 
+  if (auto VD = dyn_cast<ValueDecl>(D)) {
+    if (VD->isFinal() && !D->getAttrs().hasAttribute<FinalAttr>())
+      writeDeclAttribute(new (D->getASTContext()) FinalAttr(/*Implicit=*/false));
+  }
+
   if (auto *value = dyn_cast<ValueDecl>(D)) {
     auto *storage = dyn_cast<AbstractStorageDecl>(value);
     auto access = value->getFormalAccess();
