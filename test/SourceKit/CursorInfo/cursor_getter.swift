@@ -7,18 +7,18 @@ struct S1 {
 }
 
 // Checks that we don't crash.
-// RUN: not %sourcekitd-test -req=cursor -pos=1:15 %s -- %s 2>&1 | %FileCheck %s
-// RUN: not %sourcekitd-test -req=cursor -pos=1:17 %s -- %s 2>&1 | %FileCheck %s
-// RUN: not %sourcekitd-test -req=cursor -pos=2:15 %s -- %s 2>&1 | %FileCheck %s
-// RUN: not %sourcekitd-test -req=cursor -pos=2:17 %s -- %s 2>&1 | %FileCheck %s
-// RUN: not %sourcekitd-test -req=cursor -pos=2:21 %s -- %s 2>&1 | %FileCheck %s
-// RUN: not %sourcekitd-test -req=cursor -pos=2:23 %s -- %s 2>&1 | %FileCheck %s
-// RUN: not %sourcekitd-test -req=cursor -pos=3:15 %s -- %s 2>&1 | %FileCheck %s
-// RUN: not %sourcekitd-test -req=cursor -pos=3:17 %s -- %s 2>&1 | %FileCheck %s
-// RUN: not %sourcekitd-test -req=cursor -pos=3:21 %s -- %s 2>&1 | %FileCheck %s
-// RUN: not %sourcekitd-test -req=cursor -pos=3:23 %s -- %s 2>&1 | %FileCheck %s
-// RUN: not %sourcekitd-test -req=cursor -pos=3:37 %s -- %s 2>&1 | %FileCheck %s
-// RUN: not %sourcekitd-test -req=cursor -pos=3:41 %s -- %s 2>&1 | %FileCheck %s
-// RUN: not %sourcekitd-test -req=cursor -pos=6:29 %s -- %s 2>&1 | %FileCheck %s
-// RUN: not %sourcekitd-test -req=cursor -pos=6:31 %s -- %s 2>&1 | %FileCheck %s
-// CHECK: (Request Failed): Unable to resolve cursor info
+// RUN: %sourcekitd-test -req=cursor -pos=1:15 %s -- %s | %FileCheck %s
+// RUN: %sourcekitd-test -req=cursor -pos=1:17 %s -- %s | %FileCheck %s
+// RUN: %sourcekitd-test -req=cursor -pos=2:15 %s -- %s | %FileCheck %s
+// RUN: %sourcekitd-test -req=cursor -pos=2:17 %s -- %s | %FileCheck %s
+// RUN: %sourcekitd-test -req=cursor -pos=2:21 %s -- %s | %FileCheck %s
+// RUN: %sourcekitd-test -req=cursor -pos=2:23 %s -- %s | %FileCheck %s
+// RUN: %sourcekitd-test -req=cursor -pos=3:15 %s -- %s | %FileCheck %s
+// RUN: %sourcekitd-test -req=cursor -pos=3:17 %s -- %s | %FileCheck %s
+// RUN: %sourcekitd-test -req=cursor -pos=3:21 %s -- %s | %FileCheck %s
+// RUN: %sourcekitd-test -req=cursor -pos=3:23 %s -- %s | %FileCheck %s
+// RUN: %sourcekitd-test -req=cursor -pos=3:37 %s -- %s | %FileCheck %s
+// RUN: %sourcekitd-test -req=cursor -pos=3:41 %s -- %s | %FileCheck %s
+// RUN: %sourcekitd-test -req=cursor -pos=6:29 %s -- %s | %FileCheck %s
+// RUN: %sourcekitd-test -req=cursor -pos=6:31 %s -- %s | %FileCheck %s
+// CHECK: <diagnostic "Unable to resolve cursor info.">

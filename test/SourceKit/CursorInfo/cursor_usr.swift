@@ -25,14 +25,14 @@ func foo(x: FooStruct1) -> S1 {}
 // CHECK_SANITY1-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S1</decl.name></decl.struct>
 
 // Bogus USR.
-// RUN: not %sourcekitd-test -req=cursor -usr "s:blahblahblah" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s 2>&1 | %FileCheck %s -check-prefix=RESOLVE
+// RUN: %sourcekitd-test -req=cursor -usr "s:blahblahblah" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck %s -check-prefix=RESOLVE
 // Missing s: prefix.
-// RUN: not %sourcekitd-test -req=cursor -usr "10cursor_usr6globalSivp" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s 2>&1 | %FileCheck %s -check-prefix=RESOLVE
-// RESOLVE: (Request Failed): Unable to resolve type from USR.
+// RUN: %sourcekitd-test -req=cursor -usr "10cursor_usr6globalSivp" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck %s -check-prefix=RESOLVE
+// RESOLVE: <diagnostic "Unable to resolve type from USR.">
 
 // FIXME: no support for clang USRs.
-// RUN: not %sourcekitd-test -req=cursor -usr "c:@S@FooStruct1" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s 2>&1 | %FileCheck %s -check-prefix=CSUPPORT
-// CSUPPORT: (Request Failed): Lookup for C/C++/ObjC USRs not implemented.
+// RUN: %sourcekitd-test -req=cursor -usr "c:@S@FooStruct1" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck %s -check-prefix=CSUPPORT
+// CSUPPORT: <diagnostic "Lookup for C/C++/ObjC USRs not implemented.">
 
 // RUN: %sourcekitd-test -req=cursor -usr "s:10cursor_usr2S1V" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck %s -check-prefix=CHECK1
 // CHECK1: source.lang.swift.decl.struct (5:8-5:10)
