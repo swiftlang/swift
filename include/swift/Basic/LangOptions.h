@@ -104,6 +104,10 @@ namespace swift {
     /// Enable features useful for running in the debugger.
     bool DebuggerSupport = false;
 
+    /// Enable the MemoryBufferSerializedModuleImporter.
+    /// Only used by lldb-moduleimport-test.
+    bool EnableMemoryBufferImporter = false;
+
     /// Enable the DWARFImporter. Only used by lldb-moduleimport-test.
     bool EnableDWARFImporter = false;
     

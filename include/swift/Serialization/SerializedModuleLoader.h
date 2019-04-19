@@ -39,7 +39,6 @@ class SerializedModuleLoaderBase : public ModuleLoader {
   SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 2> OrphanedMemoryBuffers;
 
 protected:
-  llvm::StringMap<std::unique_ptr<llvm::MemoryBuffer>> MemoryBuffers;
   ASTContext &Ctx;
   ModuleLoadingMode LoadMode;
   SerializedModuleLoaderBase(ASTContext &ctx, DependencyTracker *tracker,
@@ -170,16 +169,6 @@ class SerializedModuleLoader : public SerializedModuleLoaderBase {
 public:
   virtual ~SerializedModuleLoader();
 
-  /// Register a memory buffer that contains the serialized
-  /// module for the given access path. This API is intended to be
-  /// used by LLDB to add swiftmodules discovered in the __apple_ast
-  /// section of a Mach-O file to the search path.
-  /// FIXME: make this an actual access *path* once submodules are designed.
-  void registerMemoryBuffer(StringRef AccessPath,
-                            std::unique_ptr<llvm::MemoryBuffer> input) {
-    MemoryBuffers[AccessPath] = std::move(input);
-  }
-
   /// Create a new importer that can load serialized Swift modules
   /// into the given ASTContext.
   static std::unique_ptr<SerializedModuleLoader>
@@ -190,6 +179,57 @@ public:
     };
   }
 };
+
+/// Imports serialized Swift modules from a MemoryBuffer into an ASTContext.
+/// This interface is primarily used by LLDB.
+class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
+  llvm::StringMap<std::unique_ptr<llvm::MemoryBuffer>> MemoryBuffers;
+
+  MemoryBufferSerializedModuleLoader(ASTContext &ctx,
+                                     DependencyTracker *tracker,
+                                     ModuleLoadingMode loadMode)
+      : SerializedModuleLoaderBase(ctx, tracker, loadMode) {}
+
+  std::error_code findModuleFilesInDirectory(
+      AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
+      StringRef ModuleDocFilename,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) override;
+
+  bool maybeDiagnoseTargetMismatch(SourceLoc sourceLocation,
+                                   StringRef moduleName,
+                                   StringRef archName,
+                                   StringRef directoryPath) override;
+
+public:
+  virtual ~MemoryBufferSerializedModuleLoader();
+
+  bool canImportModule(std::pair<Identifier, SourceLoc> named) override;
+  ModuleDecl *
+  loadModule(SourceLoc importLoc,
+             ArrayRef<std::pair<Identifier, SourceLoc>> path) override;
+
+  /// Register a memory buffer that contains the serialized module for the given
+  /// access path. This API is intended to be used by LLDB to add swiftmodules
+  /// discovered in the __swift_ast section of a Mach-O file (or the .swift_ast
+  /// section of an ELF file) to the search path.
+  ///
+  /// FIXME: make this an actual access *path* once submodules are designed.
+  void registerMemoryBuffer(StringRef AccessPath,
+                            std::unique_ptr<llvm::MemoryBuffer> input) {
+    MemoryBuffers[AccessPath] = std::move(input);
+  }
+
+  /// Create a new importer that can load serialized Swift modules
+  /// into the given ASTContext.
+  static std::unique_ptr<MemoryBufferSerializedModuleLoader>
+  create(ASTContext &ctx, DependencyTracker *tracker = nullptr,
+         ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized) {
+    return std::unique_ptr<MemoryBufferSerializedModuleLoader>{
+        new MemoryBufferSerializedModuleLoader(ctx, tracker, loadMode)};
+  }
+};
+
 
 /// A file-unit loaded from a serialized AST file.
 class SerializedASTFile final : public LoadedFile {
