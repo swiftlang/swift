@@ -570,6 +570,9 @@ struct Score {
 
 };
 
+/// An AST node that can gain type information while solving.
+using TypedNode = llvm::PointerUnion3<Expr *, TypeLoc *, ParamDecl *>;
+
 /// Display a score.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &out, const Score &score);
 
@@ -641,6 +644,9 @@ public:
 
   /// The locators of \c Defaultable constraints whose defaults were used.
   llvm::SmallPtrSet<ConstraintLocator *, 2> DefaultedConstraints;
+
+  /// The node -> type mappings introduced by this solution.
+  llvm::SmallVector<std::pair<TypedNode, Type>, 8> addedNodeTypes;
 
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       Conformances;
@@ -1105,6 +1111,9 @@ private:
   /// used for the 'self' of an existential type.
   SmallVector<std::pair<ConstraintLocator *, OpenedArchetypeType *>, 4>
     OpenedExistentialTypes;
+
+  /// The node -> type mappings introduced by generating constraints.
+  llvm::SmallVector<std::pair<TypedNode, Type>, 8> addedNodeTypes;
 
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       CheckedConformances;
@@ -1586,6 +1595,8 @@ public:
     /// The length of \c DefaultedConstraints.
     unsigned numDefaultedConstraints;
 
+    unsigned numAddedNodeTypes;
+
     unsigned numCheckedConformances;
 
     unsigned numMissingMembers;
@@ -1736,33 +1747,56 @@ public:
     this->FavoredTypes[E] = T;
   }
 
+  /// Set the type in our type map for the given node.
+  ///
+  /// The side tables are used through the expression type checker to avoid mutating nodes until
+  /// we know we have successfully type-checked them.
+  void setType(TypedNode node, Type type) {
+    assert(!node.isNull() && "Cannot set type information on null node");
+    assert(type && "Expected non-null type");
+
+    // Record the type.
+    if (auto expr = node.dyn_cast<Expr *>()) {
+      ExprTypes[expr] = type.getPointer();
+    } else if (auto typeLoc = node.dyn_cast<TypeLoc *>()) {
+      TypeLocTypes[typeLoc] = type.getPointer();
+    } else {
+      auto param = node.get<ParamDecl *>();
+      ParamTypes[param] = type.getPointer();
+    }
+
+    // Record the fact that we ascribed a type to this node.
+    if (solverState && solverState->depth > 0) {
+      addedNodeTypes.push_back({node, type});
+    }
+  }
+
   /// Set the type in our type map for a given expression. The side
   /// map is used throughout the expression type checker in order to
   /// avoid mutating expressions until we know we have successfully
   /// type-checked them.
   void setType(Expr *E, Type T) {
-    assert(E != nullptr && "Expected non-null expression!");
-    assert(T && "Expected non-null type!");
-
-    // FIXME: We sometimes set the type and then later set it to a
-    //        value that is slightly different, e.g. not an lvalue.
-    // assert((ExprTypes.find(E) == ExprTypes.end() ||
-    //         ExprTypes.find(E)->second->isEqual(T) ||
-    //         ExprTypes.find(E)->second->hasTypeVariable()) &&
-    //        "Expected type to be invariant!");
-
-    ExprTypes[E] = T.getPointer();
+    setType(TypedNode(E), T);
   }
 
   void setType(TypeLoc &L, Type T) {
-    assert(T && "Expected non-null type!");
-    TypeLocTypes[&L] = T.getPointer();
+    setType(TypedNode(&L), T);
   }
 
   void setType(ParamDecl *P, Type T) {
-    assert(P && "Expected non-null parameter!");
-    assert(T && "Expected non-null type!");
-    ParamTypes[P] = T.getPointer();
+    setType(TypedNode(P), T);
+  }
+
+  /// Erase the type for the given node.
+  void eraseType(TypedNode node) {
+    if (auto expr = node.dyn_cast<Expr *>()) {
+      ExprTypes.erase(expr);
+    } else if (auto typeLoc = node.dyn_cast<TypeLoc *>()) {
+      TypeLocTypes.erase(typeLoc);
+    } else {
+      auto param = node.get<ParamDecl *>();
+      ParamTypes.erase(param);
+    }
   }
 
   void setType(KeyPathExpr *KP, unsigned I, Type T) {
