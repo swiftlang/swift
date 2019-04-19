@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
 
 import Foundation
 
