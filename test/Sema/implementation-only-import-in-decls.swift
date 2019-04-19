@@ -7,93 +7,93 @@
 import NormalLibrary
 @_implementationOnly import BADLibrary
 
-public struct TestConformance: BadProto {} // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+public struct TestConformance: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 
-@usableFromInline struct TestConformanceUFI: BadProto {} // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+@usableFromInline struct TestConformanceUFI: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 
 struct TestConformanceOkay: BadProto {} // ok
 
-public class TestConformanceClass: BadProto {} // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-public enum TestConformanceEnum: BadProto {} // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+public class TestConformanceClass: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
+public enum TestConformanceEnum: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 
 
-public struct TestGenericParams<T: BadProto> {} // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+public struct TestGenericParams<T: BadProto> {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 
-public struct TestGenericParamsWhereClause<T> where T: BadProto {} // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+public struct TestGenericParamsWhereClause<T> where T: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 
 public enum TestCase {
-  case x(BadStruct) // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-  case y(Int, BadStruct) // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  case x(BadStruct) // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  case y(Int, BadStruct) // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
-public func testGenericParams<T: BadProto>(_: T) {} // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-public func testGenericParamsWhereClause<T>(_: T) where T: BadProto {} // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+public func testGenericParams<T: BadProto>(_: T) {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
+public func testGenericParamsWhereClause<T>(_: T) where T: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 public func testParams(_: BadStruct, _: BadProto) {}
-// expected-error@-1 {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-// expected-error@-2 {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-public func testResult() -> BadStruct? { return nil } // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+// expected-error@-1 {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+// expected-error@-2 {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
+public func testResult() -> BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 
 public struct TestSubscript {
-  public subscript<T: BadProto>(_: T) -> Int { return 0 } // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-  public subscript<T>(where _: T) -> Int where T: BadProto { return 0 } // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-  public subscript(_: BadStruct) -> Int { return 0 } // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-  public subscript(_: Int) -> BadStruct? { return nil } // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  public subscript<T: BadProto>(_: T) -> Int { return 0 } // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
+  public subscript<T>(where _: T) -> Int where T: BadProto { return 0 } // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
+  public subscript(_: BadStruct) -> Int { return 0 } // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  public subscript(_: Int) -> BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
 public struct TestInit {
-  public init(_: BadStruct) {} // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-  public init<T: BadProto>(_: T) {} // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-  public init<T>(where _: T) where T: BadProto {} // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  public init(_: BadStruct) {} // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  public init<T: BadProto>(_: T) {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
+  public init<T>(where _: T) where T: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
-public protocol TestInherited: BadProto {} // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+public protocol TestInherited: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 
 public protocol TestConstraintBase {
   associatedtype Assoc
 }
-public protocol TestConstraint: TestConstraintBase where Assoc: BadProto {} // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-public protocol TestConstraintEq: TestConstraintBase where Assoc == BadStruct {} // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+public protocol TestConstraint: TestConstraintBase where Assoc: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
+public protocol TestConstraintEq: TestConstraintBase where Assoc == BadStruct {} // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 
 public protocol TestAssocType {
-  associatedtype Assoc: BadProto // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  associatedtype Assoc: BadProto // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
 public protocol TestAssocTypeWhereClause {
-  associatedtype Assoc: Collection where Assoc.Element: BadProto // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  associatedtype Assoc: Collection where Assoc.Element: BadProto // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
-public enum TestRawType: IntLike { // expected-error {{cannot use 'IntLike' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+public enum TestRawType: IntLike { // expected-error {{cannot use struct 'IntLike' here; 'BADLibrary' has been imported as implementation-only}}
   case x = 1
-  // FIXME: expected-error@-1 {{cannot use conformance of 'IntLike' to 'Equatable' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  // FIXME: expected-error@-1 {{cannot use conformance of 'IntLike' to 'Equatable' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
-public class TestSubclass: BadClass { // expected-error {{cannot use 'BadClass' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+public class TestSubclass: BadClass { // expected-error {{cannot use class 'BadClass' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
-public typealias TestUnderlying = BadStruct // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-public typealias TestGenericParamsAliasWhereClause<T> = T where T: BadProto // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+public typealias TestUnderlying = BadStruct // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+public typealias TestGenericParamsAliasWhereClause<T> = T where T: BadProto // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 
-public typealias TestGenericParamsAlias<T: BadProto> = T // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+public typealias TestGenericParamsAlias<T: BadProto> = T // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 
-public var testBadType: BadStruct? = nil // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-public var testBadTypeInferred = Optional<BadStruct>.none // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-public var testBadTypePartiallyInferred: Optional = Optional<BadStruct>.none // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+public var testBadType: BadStruct? = nil // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+public var testBadTypeInferred = Optional<BadStruct>.none // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+public var testBadTypePartiallyInferred: Optional = Optional<BadStruct>.none // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 public var (testBadTypeTuple1, testBadTypeTuple2): (BadStruct?, BadClass?) = (nil, nil)
-// expected-error@-1 {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-// expected-error@-2 {{cannot use 'BadClass' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-public var (testBadTypeTuplePartlyInferred1, testBadTypeTuplePartlyInferred2): (Optional, Optional) = (Optional<Int>.none, Optional<BadStruct>.none) // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-public var (testBadTypeTuplePartlyInferred3, testBadTypeTuplePartlyInferred4): (Optional, Optional) = (Optional<BadStruct>.none, Optional<Int>.none) // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-public var testMultipleBindings1: Int? = nil, testMultipleBindings2: BadStruct? = nil // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-public var testMultipleBindings3: BadStruct? = nil, testMultipleBindings4: Int? = nil // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+// expected-error@-1 {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+// expected-error@-2 {{cannot use class 'BadClass' here; 'BADLibrary' has been imported as implementation-only}}
+public var (testBadTypeTuplePartlyInferred1, testBadTypeTuplePartlyInferred2): (Optional, Optional) = (Optional<Int>.none, Optional<BadStruct>.none) // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+public var (testBadTypeTuplePartlyInferred3, testBadTypeTuplePartlyInferred4): (Optional, Optional) = (Optional<BadStruct>.none, Optional<Int>.none) // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+public var testMultipleBindings1: Int? = nil, testMultipleBindings2: BadStruct? = nil // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+public var testMultipleBindings3: BadStruct? = nil, testMultipleBindings4: Int? = nil // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 
-extension BadStruct { // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+extension BadStruct { // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
   public func testExtensionOfBadType() {} // FIXME: Should complain here instead of at the extension decl.
 }
 extension BadStruct {
   func testExtensionOfOkayType() {}
 }
 
-extension Array where Element == BadStruct { // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+extension Array where Element == BadStruct { // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
   public func testExtensionWithBadRequirement() {} // FIXME: Should complain here instead of at the extension decl.
 }
 
@@ -101,71 +101,71 @@ extension Array where Element == BadStruct {
   func testExtensionWithOkayRequirement() {} // okay
 }
 
-extension Int: BadProto {} // expected-error {{cannot use 'BadProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+extension Int: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 struct TestExtensionConformanceOkay {}
 extension TestExtensionConformanceOkay: BadProto {} // okay
 
 public protocol TestConstrainedExtensionProto {}
-extension Array: TestConstrainedExtensionProto where Element == BadStruct { // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+extension Array: TestConstrainedExtensionProto where Element == BadStruct { // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
 
-infix operator !!!!!!: BadPrecedence // expected-error {{cannot use 'BadPrecedence' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+infix operator !!!!!!: BadPrecedence // expected-error {{cannot use precedence group 'BadPrecedence' here; 'BADLibrary' has been imported as implementation-only}}
 
 precedencegroup TestLowerThan {
-  lowerThan: BadPrecedence // expected-error {{cannot use 'BadPrecedence' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  lowerThan: BadPrecedence // expected-error {{cannot use precedence group 'BadPrecedence' here; 'BADLibrary' has been imported as implementation-only}}
 }
 precedencegroup TestHigherThan {
-  higherThan: BadPrecedence // expected-error {{cannot use 'BadPrecedence' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  higherThan: BadPrecedence // expected-error {{cannot use precedence group 'BadPrecedence' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
 public struct PublicStructStoredProperties {
-  public var publiclyBad: BadStruct? // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-  internal var internallyBad: BadStruct? // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-  private var privatelyBad: BadStruct? // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
-  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
 @usableFromInline internal struct UFIStructStoredProperties {
-  @usableFromInline var publiclyBad: BadStruct? // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-  internal var internallyBad: BadStruct? // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-  private var privatelyBad: BadStruct? // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  @usableFromInline var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
-  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
 public class PublicClassStoredProperties {
-  public var publiclyBad: BadStruct? // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-  internal var internallyBad: BadStruct? // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-  private var privatelyBad: BadStruct? // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
-  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use 'BadStruct' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
 public typealias NormalProtoAssoc<T: NormalProto> = T.Assoc
-public func testConformanceInTypealias(_: NormalProtoAssoc<NormalStruct>) {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+public func testConformanceInTypealias(_: NormalProtoAssoc<NormalStruct>) {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
 
 public struct NormalProtoAssocHolder<T: NormalProto> {
   public var value: T.Assoc
 }
-public func testConformanceInBoundGeneric(_: NormalProtoAssocHolder<NormalStruct>) {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+public func testConformanceInBoundGeneric(_: NormalProtoAssocHolder<NormalStruct>) {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
 
 public class SubclassOfNormalClass: NormalClass {}
 
-public func testInheritedConformance(_: NormalProtoAssocHolder<SubclassOfNormalClass>) {} // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
-public func testSpecializedConformance(_: NormalProtoAssocHolder<GenericStruct<Int>>) {} // expected-error {{cannot use conformance of 'GenericStruct<T>' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+public func testInheritedConformance(_: NormalProtoAssocHolder<SubclassOfNormalClass>) {} // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
+public func testSpecializedConformance(_: NormalProtoAssocHolder<GenericStruct<Int>>) {} // expected-error {{cannot use conformance of 'GenericStruct<T>' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
 
-extension Array where Element == NormalProtoAssocHolder<NormalStruct> { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+extension Array where Element == NormalProtoAssocHolder<NormalStruct> { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
   public func testConstrainedExtensionUsingBadConformance() {}
 }
 
@@ -173,17 +173,17 @@ public struct ConditionalGenericStruct<T> {}
 extension ConditionalGenericStruct: NormalProto where T: NormalProto {
   public typealias Assoc = Int
 }
-public func testConditionalGeneric(_: NormalProtoAssocHolder<ConditionalGenericStruct<NormalStruct>>) {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+public func testConditionalGeneric(_: NormalProtoAssocHolder<ConditionalGenericStruct<NormalStruct>>) {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
 
-public protocol PublicInferredAssociatedType {
+public protocol PublicAssociatedTypeProto {
   associatedtype Assoc: NormalProto
   func takesAssoc(_: Assoc)
 }
-@usableFromInline protocol UFIInferredAssociatedType {
+@usableFromInline protocol UFIAssociatedTypeProto {
   associatedtype Assoc: NormalProto
   func takesAssoc(_: Assoc)
 }
-protocol InternalInferredAssociatedType {
+protocol InternalAssociatedTypeProto {
   associatedtype Assoc: NormalProto
   func takesAssoc(_: Assoc)
 }
@@ -191,23 +191,31 @@ protocol InternalInferredAssociatedType {
 public struct PublicInferredAssociatedTypeImpl {
   public func takesAssoc(_: NormalStruct) {}
 }
-extension PublicInferredAssociatedTypeImpl: PublicInferredAssociatedType {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as '@_implementationOnly'}}
-extension PublicInferredAssociatedTypeImpl: UFIInferredAssociatedType {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as '@_implementationOnly'}}
-extension PublicInferredAssociatedTypeImpl: InternalInferredAssociatedType {} // okay
+extension PublicInferredAssociatedTypeImpl: PublicAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as implementation-only}}
+extension PublicInferredAssociatedTypeImpl: UFIAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as implementation-only}}
+extension PublicInferredAssociatedTypeImpl: InternalAssociatedTypeProto {} // okay
 
 @usableFromInline struct UFIInferredAssociatedTypeImpl {
   public func takesAssoc(_: NormalStruct) {}
 }
-extension UFIInferredAssociatedTypeImpl: PublicInferredAssociatedType {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as '@_implementationOnly'}}
-extension UFIInferredAssociatedTypeImpl: UFIInferredAssociatedType {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as '@_implementationOnly'}}
-extension UFIInferredAssociatedTypeImpl: InternalInferredAssociatedType {} // okay
+extension UFIInferredAssociatedTypeImpl: PublicAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as implementation-only}}
+extension UFIInferredAssociatedTypeImpl: UFIAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as implementation-only}}
+extension UFIInferredAssociatedTypeImpl: InternalAssociatedTypeProto {} // okay
 
 struct InternalInferredAssociatedTypeImpl {
   public func takesAssoc(_: NormalStruct) {}
 }
-extension InternalInferredAssociatedTypeImpl: PublicInferredAssociatedType {} // okay
-extension InternalInferredAssociatedTypeImpl: UFIInferredAssociatedType {} // okay
-extension InternalInferredAssociatedTypeImpl: InternalInferredAssociatedType {} // okay
+extension InternalInferredAssociatedTypeImpl: PublicAssociatedTypeProto {} // okay
+extension InternalInferredAssociatedTypeImpl: UFIAssociatedTypeProto {} // okay
+extension InternalInferredAssociatedTypeImpl: InternalAssociatedTypeProto {} // okay
+
+public struct PublicExplicitAssociatedTypeImpl {
+  public typealias Assoc = NormalStruct
+  public func takesAssoc(_: NormalStruct) {}
+}
+extension PublicExplicitAssociatedTypeImpl: PublicAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as implementation-only}}
+extension PublicExplicitAssociatedTypeImpl: UFIAssociatedTypeProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as implementation-only}}
+extension PublicExplicitAssociatedTypeImpl: InternalAssociatedTypeProto {} // okay
 
 
 public protocol BaseProtoWithNoRequirement {
@@ -217,33 +225,33 @@ public protocol BaseProtoWithNoRequirement {
 public protocol RefinedProto: BaseProtoWithNoRequirement where Assoc: NormalProto {
 }
 
-public struct RefinedProtoImpl: RefinedProto { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as '@_implementationOnly'}}
+public struct RefinedProtoImpl: RefinedProto { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as implementation-only}}
   public func takesAssoc(_: NormalStruct) {}
 }
 
 public protocol RefinedSelfProto where Self: NormalProto {}
-extension NormalStruct: RefinedSelfProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+extension NormalStruct: RefinedSelfProto {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
 
 public protocol RefinedSelfProtoInheritance: NormalProto {}
-extension NormalStruct: RefinedSelfProtoInheritance {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as '@_implementationOnly'}}
+extension NormalStruct: RefinedSelfProtoInheritance {} // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
 
 
 public protocol SlightlyMoreComplicatedRequirement {
   associatedtype Assoc: Collection where Assoc.Element: NormalProto
   func takesAssoc(_: Assoc)
 }
-public struct SlightlyMoreComplicatedRequirementImpl: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc.Element' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as '@_implementationOnly'}}
+public struct SlightlyMoreComplicatedRequirementImpl: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc.Element' (inferred as 'NormalStruct'); 'BADLibrary' has been imported as implementation-only}}
   public func takesAssoc(_: [NormalStruct]) {}
 }
-public struct RequirementsHandleSubclassesToo: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' in associated type 'Self.Assoc.Element' (inferred as 'SubclassOfNormalClass'); 'BADLibrary' has been imported as '@_implementationOnly'}}
+public struct RequirementsHandleSubclassesToo: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' in associated type 'Self.Assoc.Element' (inferred as 'SubclassOfNormalClass'); 'BADLibrary' has been imported as implementation-only}}
   public func takesAssoc(_: [SubclassOfNormalClass]) {}
 }
 
-public struct RequirementsHandleSpecializationsToo: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc.Element' (inferred as 'ConditionalGenericStruct<NormalStruct>'); 'BADLibrary' has been imported as '@_implementationOnly'}}
+public struct RequirementsHandleSpecializationsToo: SlightlyMoreComplicatedRequirement { // expected-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' in associated type 'Self.Assoc.Element' (inferred as 'ConditionalGenericStruct<NormalStruct>'); 'BADLibrary' has been imported as implementation-only}}
   public func takesAssoc(_: [ConditionalGenericStruct<NormalStruct>]) {}
 }
 
-public struct ClassConstrainedGenericArg<T: NormalClass>: PublicInferredAssociatedType { // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'T'); 'BADLibrary' has been imported as '@_implementationOnly'}}
+public struct ClassConstrainedGenericArg<T: NormalClass>: PublicAssociatedTypeProto { // expected-error {{cannot use conformance of 'NormalClass' to 'NormalProto' in associated type 'Self.Assoc' (inferred as 'T'); 'BADLibrary' has been imported as implementation-only}}
   public func takesAssoc(_: T) {}
 }
 

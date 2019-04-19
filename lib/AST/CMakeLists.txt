@@ -37,7 +37,6 @@ else()
 endif()
 
 add_swift_host_library(swiftAST STATIC
-  AccessScopeChecker.cpp
   AccessRequests.cpp
   ASTContext.cpp
   ASTDemangler.cpp
@@ -91,6 +90,7 @@ add_swift_host_library(swiftAST STATIC
   SwiftNameTranslation.cpp
   Type.cpp
   TypeCheckRequests.cpp
+  TypeDeclFinder.cpp
   TypeJoinMeet.cpp
   TypeRefinementContext.cpp
   TypeRepr.cpp

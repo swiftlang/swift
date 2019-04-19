@@ -1,52 +1,27 @@
-//===--- AccessScopeChecker.h - Access calculation helpers -----*- C++ -*-===//
+//===--- TypeDeclFinder.h - Finds TypeDecls in Types/TypeReprs --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-//  This file defines helpers for access-control calculation.
-//
-//===----------------------------------------------------------------------===//
-#ifndef SWIFT_ACCESS_SCOPE_CHECKER_H
-#define SWIFT_ACCESS_SCOPE_CHECKER_H
+#ifndef SWIFT_AST_TYPEDECLFINDER_H
+#define SWIFT_AST_TYPEDECLFINDER_H
 
-#include "swift/AST/AccessScope.h"
-#include "swift/AST/AttrKind.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/TypeWalker.h"
+#include "llvm/ADT/STLExtras.h"
 
 namespace swift {
 
 class BoundGenericType;
 class ComponentIdentTypeRepr;
 class NominalType;
-class SourceFile;
 class TypeAliasType;
-
-class AccessScopeChecker {
-  const SourceFile *File;
-  bool TreatUsableFromInlineAsPublic;
-
-  Optional<AccessScope> Scope = AccessScope::getPublic();
-
-  AccessScopeChecker(const DeclContext *useDC,
-                     bool treatUsableFromInlineAsPublic);
-  bool visitDecl(const ValueDecl *VD);
-
-public:
-  static Optional<AccessScope>
-  getAccessScope(TypeRepr *TR, const DeclContext *useDC,
-                 bool treatUsableFromInlineAsPublic = false);
-  static Optional<AccessScope>
-  getAccessScope(Type T, const DeclContext *useDC,
-                 bool treatUsableFromInlineAsPublic = false);
-};
 
 /// Walks a Type to find all NominalTypes, BoundGenericTypes, and
 /// TypeAliasTypes.

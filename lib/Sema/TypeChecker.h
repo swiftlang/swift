@@ -1895,7 +1895,8 @@ private:
   /// exposes it in the interface of the current module, diagnose if it cannot
   /// reasonably be shared.
   bool diagnoseDeclRefExportability(SourceLoc loc, ConcreteDeclRef declRef,
-                                    const DeclContext *DC);
+                                    const DeclContext *DC,
+                                    FragileFunctionKind fragileKind);
 
 public:
   /// Given that a type is used from a particular context which
