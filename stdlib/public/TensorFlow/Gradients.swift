@@ -457,16 +457,6 @@ func _vjpRsqrt<T : TensorFlowFloatingPoint>(
   return (value, { v in -v / 2 * value })
 }
 
-@inlinable
-func _vjpLogSoftmax<T : TensorFlowFloatingPoint>(
-  _ x: Tensor<T>
-) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
-  let value = logSoftmax(x)
-  return (value, { v in
-    v - v.sum(alongAxes: -1) * exp(value)
-  })
-}
-
 extension Tensor where Scalar : TensorFlowFloatingPoint {
   @inlinable
   func _vjpSquared() -> (Tensor, (Tensor) -> Tensor) {
