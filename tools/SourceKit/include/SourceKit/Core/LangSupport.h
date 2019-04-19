@@ -310,6 +310,11 @@ struct RefactoringInfo {
 
 struct CursorInfoData {
   bool IsCancelled = false;
+  // If nonempty, a proper Info could not be resolved (and the rest of the Info
+  // will be empty). Clients can potentially use this to show a diagnostic
+  // message to the user in lieu of using the empty response.
+  StringRef InternalDiagnostic;
+
   UIdent Kind;
   StringRef Name;
   StringRef USR;
@@ -358,6 +363,11 @@ struct RangeInfo {
 
 struct NameTranslatingInfo {
   bool IsCancelled = false;
+  // If nonempty, a proper Info could not be resolved (and the rest of the Info
+  // will be empty). Clients can potentially use this to show a diagnostic
+  // message to the user in lieu of using the empty response.
+  StringRef InternalDiagnostic;
+
   UIdent NameKind;
   StringRef BaseName;
   std::vector<StringRef> ArgNames;
