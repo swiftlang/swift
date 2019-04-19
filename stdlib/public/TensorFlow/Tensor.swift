@@ -240,13 +240,6 @@ internal extension Tensor where Scalar : TensorFlowFloatingPoint {
 }
 
 public extension Tensor {
-  /// Creates a tensor from an array of tensors (which may themselves be
-  /// scalars).
-  @inlinable @inline(__always)
-  init(_ elements: [Tensor]) {
-    self = Raw.pack(elements)
-  }
-
   /// Creates a 1D tensor from contiguous scalars.
   ///
   /// - Parameters:

@@ -666,14 +666,6 @@ public extension Tensor {
 }
 
 public extension Tensor {
-  /// Returns a concatenated tensor of the given tensors.
-  /// - Precondition: The tensors must have the same dimensions, except for the
-  ///   specified axis.
-  /// - Precondition: The axis must be in the range `-rank..<rank`.
-  init(concatenating tensors: [Tensor<Scalar>], alongAxis axis: Int = 0) {
-    self = Raw.concatV2(tensors, axis: Tensor<Int32>(Int32(axis)))
-  }
-
   /// Concatenates tensors along the specified axis.
   /// - Precondition: The tensors must have the same dimensions, except for the
   ///   specified axis.
