@@ -149,6 +149,7 @@ struct _S {
 // ON_PROPERTY-DAG: Keyword/None:                       GKInspectable[#Var Attribute#]; name=GKInspectable
 // ON_PROPERTY-NOT: Keyword
 // ON_PROPERTY: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
+// ON_PROPERTY-NOT: Decl[PrecedenceGroup]
 // ON_PROPERTY: End completions
 
   @#^ON_METHOD^#
@@ -192,6 +193,7 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       _propertyWrapper[#Declaration Attribute#]; name=_propertyWrapper
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
+// ON_MEMBER_LAST-NOT: Decl[PrecedenceGroup]
 // ON_MEMBER_LAST: End completions
 }
 

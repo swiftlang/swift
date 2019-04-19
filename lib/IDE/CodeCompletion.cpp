@@ -5701,7 +5701,6 @@ void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
       if (R->getKind() != CodeCompletionResult::Declaration)
         return false;
       switch(R->getAssociatedDeclKind()) {
-      case CodeCompletionDeclKind::PrecedenceGroup:
       case CodeCompletionDeclKind::Module:
       case CodeCompletionDeclKind::Class:
       case CodeCompletionDeclKind::Struct:
@@ -5711,6 +5710,7 @@ void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
       case CodeCompletionDeclKind::AssociatedType:
       case CodeCompletionDeclKind::GenericTypeParam:
         return true;
+      case CodeCompletionDeclKind::PrecedenceGroup:
       case CodeCompletionDeclKind::EnumElement:
       case CodeCompletionDeclKind::Constructor:
       case CodeCompletionDeclKind::Destructor:
