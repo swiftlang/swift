@@ -27,7 +27,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func ceil<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -51,8 +51,8 @@ extension vForce {
     public static func ceil<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -76,7 +76,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func ceil<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -100,8 +100,8 @@ extension vForce {
     public static func ceil<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -127,7 +127,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func floor<U>(_ vector: U) -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -151,8 +151,8 @@ extension vForce {
     public static func floor<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -176,7 +176,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func floor<U>(_ vector: U) -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -200,8 +200,8 @@ extension vForce {
     public static func floor<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -229,8 +229,8 @@ extension vForce {
     public static func copysign<U, V>(magnitudes: U,
                                       signs: V) -> [Float]
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(magnitudes.count == signs.count)
@@ -259,9 +259,9 @@ extension vForce {
                                          signs: U,
                                          result: inout V)
         where
-        T : _ContiguousCollection,
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             precondition(magnitudes.count == signs.count && signs.count == result.count)
@@ -290,8 +290,8 @@ extension vForce {
     public static func copysign<U, V>(magnitudes: U,
                                       signs: V) -> [Double]
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(magnitudes.count == signs.count)
@@ -320,9 +320,9 @@ extension vForce {
                                          signs: U,
                                          result: inout V)
         where
-        T : _ContiguousCollection,
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             precondition(magnitudes.count == signs.count && signs.count == result.count)
@@ -360,8 +360,8 @@ extension vForce {
     public static func truncatingRemainder<U, V>(dividends: U,
                                                  divisors: V) -> [Float]
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(dividends.count == divisors.count)
@@ -395,9 +395,9 @@ extension vForce {
                                                     divisors: U,
                                                     result: inout V)
         where
-        T : _ContiguousCollection,
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             precondition(dividends.count == divisors.count && divisors.count == result.count)
@@ -430,8 +430,8 @@ extension vForce {
     public static func truncatingRemainder<U, V>(dividends: U,
                                                  divisors: V) -> [Double]
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(dividends.count == divisors.count)
@@ -465,9 +465,9 @@ extension vForce {
                                                     divisors: U,
                                                     result: inout V)
         where
-        T : _ContiguousCollection,
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             precondition(dividends.count == divisors.count && divisors.count == result.count)
@@ -502,8 +502,8 @@ extension vForce {
     public static func remainder<U, V>(dividends: U,
                                        divisors: V) -> [Float]
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(dividends.count == divisors.count)
@@ -536,9 +536,9 @@ extension vForce {
                                           divisors: U,
                                           result: inout V)
         where
-        T : _ContiguousCollection,
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             precondition(dividends.count == divisors.count && divisors.count == result.count)
@@ -571,8 +571,8 @@ extension vForce {
     public static func remainder<U, V>(dividends: U,
                                        divisors: V) -> [Double]
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(dividends.count == divisors.count)
@@ -605,9 +605,9 @@ extension vForce {
                                           divisors: U,
                                           result: inout V)
         where
-        T : _ContiguousCollection,
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             precondition(dividends.count == divisors.count && divisors.count == result.count)
@@ -636,7 +636,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func trunc<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -660,8 +660,8 @@ extension vForce {
     public static func trunc<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -685,7 +685,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func trunc<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -709,8 +709,8 @@ extension vForce {
     public static func trunc<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -736,7 +736,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func nearestInteger<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -760,8 +760,8 @@ extension vForce {
     public static func nearestInteger<U, V>(_ vector: U,
                                             result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -785,7 +785,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func nearestInteger<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -809,8 +809,8 @@ extension vForce {
     public static func nearestInteger<U, V>(_ vector: U,
                                             result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -836,7 +836,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func rsqrt<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -860,8 +860,8 @@ extension vForce {
     public static func rsqrt<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -885,7 +885,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func rsqrt<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -909,8 +909,8 @@ extension vForce {
     public static func rsqrt<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -936,7 +936,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sqrt<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -960,8 +960,8 @@ extension vForce {
     public static func sqrt<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -986,7 +986,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sqrt<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -1010,8 +1010,8 @@ extension vForce {
     public static func sqrt<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -1037,7 +1037,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func reciprocal<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -1061,8 +1061,8 @@ extension vForce {
     public static func reciprocal<U, V>(_ vector: U,
                                         result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -1086,7 +1086,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func reciprocal<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -1110,8 +1110,8 @@ extension vForce {
     public static func reciprocal<U, V>(_ vector: U,
                                         result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -1142,7 +1142,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func exp<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -1166,8 +1166,8 @@ extension vForce {
     public static func exp<U, V>(_ vector: U,
                                  result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -1191,7 +1191,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func expm1<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -1215,8 +1215,8 @@ extension vForce {
     public static func expm1<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -1240,7 +1240,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func exp2<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -1264,8 +1264,8 @@ extension vForce {
     public static func exp2<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -1289,7 +1289,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func exp<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -1313,8 +1313,8 @@ extension vForce {
     public static func exp<U, V>(_ vector: U,
                                  result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -1338,7 +1338,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func expm1<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -1362,8 +1362,8 @@ extension vForce {
     public static func expm1<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -1387,7 +1387,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func exp2<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -1411,8 +1411,8 @@ extension vForce {
     public static func exp2<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -1438,7 +1438,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func log2<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -1462,8 +1462,8 @@ extension vForce {
     public static func log2<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -1487,7 +1487,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func log10<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -1511,8 +1511,8 @@ extension vForce {
     public static func log10<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -1536,7 +1536,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func log2<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -1560,8 +1560,8 @@ extension vForce {
     public static func log2<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -1585,7 +1585,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func log10<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -1609,8 +1609,8 @@ extension vForce {
     public static func log10<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -1636,7 +1636,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func logb<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -1662,8 +1662,8 @@ extension vForce {
     public static func logb<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -1687,7 +1687,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func logb<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -1713,8 +1713,8 @@ extension vForce {
     public static func logb<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -1747,8 +1747,8 @@ extension vForce {
     public static func pow<U, V>(bases: U,
                                  exponents: V) -> [Float]
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(bases.count == exponents.count)
@@ -1777,9 +1777,9 @@ extension vForce {
                                     exponents: U,
                                     result: inout V)
         where
-        T : _ContiguousCollection,
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             precondition(bases.count == exponents.count && exponents.count == result.count)
@@ -1808,8 +1808,8 @@ extension vForce {
     public static func pow<U, V>(bases: U,
                                  exponents: V) -> [Double]
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(bases.count == exponents.count)
@@ -1838,9 +1838,9 @@ extension vForce {
                                     exponents: U,
                                     result: inout V)
         where
-        T : _ContiguousCollection,
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         T.Element == Double,
         U.Element == Double,
         V.Element == Double {
@@ -1878,7 +1878,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sin<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -1902,8 +1902,8 @@ extension vForce {
     public static func sin<U, V>(_ vector: U,
                                  result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -1927,7 +1927,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sin<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -1951,8 +1951,8 @@ extension vForce {
     public static func sin<U, V>(_ vector: U,
                                  result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -1976,7 +1976,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinPi<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -2000,8 +2000,8 @@ extension vForce {
     public static func sinPi<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2025,7 +2025,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinPi<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -2049,8 +2049,8 @@ extension vForce {
     public static func sinPi<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -2076,7 +2076,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cos<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -2100,8 +2100,8 @@ extension vForce {
     public static func cos<U, V>(_ vector: U,
                                  result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2125,7 +2125,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cos<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -2149,8 +2149,8 @@ extension vForce {
     public static func cos<U, V>(_ vector: U,
                                  result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -2174,7 +2174,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cosPi<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -2198,8 +2198,8 @@ extension vForce {
     public static func cosPi<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2223,7 +2223,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cosPi<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -2247,8 +2247,8 @@ extension vForce {
     public static func cosPi<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -2277,9 +2277,9 @@ extension vForce {
                                        sinResult: inout U,
                                        cosResult: inout V)
         where
-        T : _ContiguousCollection,
-        U : _MutableContiguousCollection,
-        V : _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: MutableAccelerateBuffer,
+        V: MutableAccelerateBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             precondition(vector.count == sinResult.count && sinResult.count == cosResult.count)
@@ -2309,9 +2309,9 @@ extension vForce {
                                        sinResult: inout U,
                                        cosResult: inout V)
         where
-        T : _ContiguousCollection,
-        U : _MutableContiguousCollection,
-        V : _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: MutableAccelerateBuffer,
+        V: MutableAccelerateBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             precondition(vector.count == sinResult.count && sinResult.count == cosResult.count)
@@ -2340,7 +2340,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tan<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -2364,8 +2364,8 @@ extension vForce {
     public static func tan<U, V>(_ vector: U,
                                  result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2389,7 +2389,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tan<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -2414,8 +2414,8 @@ extension vForce {
     public static func tan<U, V>(_ vector: U,
                                  result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -2439,7 +2439,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tanPi<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -2463,8 +2463,8 @@ extension vForce {
     public static func tanPi<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2488,7 +2488,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tanPi<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -2512,8 +2512,8 @@ extension vForce {
     public static func tanPi<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -2539,7 +2539,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func asin<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -2563,8 +2563,8 @@ extension vForce {
     public static func asin<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2588,7 +2588,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func asin<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -2612,8 +2612,8 @@ extension vForce {
     public static func asin<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -2639,7 +2639,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func acos<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -2663,8 +2663,8 @@ extension vForce {
     public static func acos<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2688,7 +2688,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func acos<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -2712,8 +2712,8 @@ extension vForce {
     public static func acos<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -2739,7 +2739,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func atan<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -2763,8 +2763,8 @@ extension vForce {
     public static func atan<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2788,7 +2788,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func atan<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -2812,8 +2812,8 @@ extension vForce {
     public static func atan<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -2844,7 +2844,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinh<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -2868,8 +2868,8 @@ extension vForce {
     public static func sinh<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2893,7 +2893,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinh<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -2917,8 +2917,8 @@ extension vForce {
     public static func sinh<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -2944,7 +2944,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cosh<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -2968,8 +2968,8 @@ extension vForce {
     public static func cosh<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -2993,7 +2993,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cosh<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -3017,8 +3017,8 @@ extension vForce {
     public static func cosh<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -3044,7 +3044,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tanh<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -3068,8 +3068,8 @@ extension vForce {
     public static func tanh<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -3093,7 +3093,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tanh<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -3117,8 +3117,8 @@ extension vForce {
     public static func tanh<U, V>(_ vector: U,
                                   result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -3144,7 +3144,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func asinh<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -3168,8 +3168,8 @@ extension vForce {
     public static func asinh<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -3193,7 +3193,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func asinh<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -3217,8 +3217,8 @@ extension vForce {
     public static func asinh<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -3244,7 +3244,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func acosh<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -3268,8 +3268,8 @@ extension vForce {
     public static func acosh<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -3293,7 +3293,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func acosh<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -3317,8 +3317,8 @@ extension vForce {
     public static func acosh<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -3344,7 +3344,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func atanh<U>(_ vector: U)  -> [Float]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -3368,8 +3368,8 @@ extension vForce {
     public static func atanh<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -3393,7 +3393,7 @@ extension vForce {
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func atanh<U>(_ vector: U)  -> [Double]
         where
-        U : _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -3417,8 +3417,8 @@ extension vForce {
     public static func atanh<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: MutableAccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)

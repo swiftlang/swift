@@ -10,30 +10,30 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A collection that supports access to its underlying contiguous storage.
+/// An object composed of count elements that are stored contiguously in memory.
+///
+/// In practice, most types conforming to this protocol will be Collections,
+/// but they need not be--they need only have an Element type and count, and
+/// provide the withUnsafeBufferPointer function.
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-public protocol _ContiguousCollection: Collection
-where SubSequence: _ContiguousCollection {
-    /// Calls a closure with a pointer to the array's contiguous storage.
+public protocol AccelerateBuffer {
+    /// The buffer's element type.
+    associatedtype Element
+    /// The number of elements in the buffer.
+    var count: Int { get }
+    /// Calls a closure with a pointer to the object's contiguous storage.
     func withUnsafeBufferPointer<R>(
         _ body: (UnsafeBufferPointer<Element>) throws -> R
         ) rethrows -> R
 }
 
+/// A mutable object composed of count elements that are stored contiguously
+/// in memory.
+///
+/// In practice, most types conforming to this protocol will be
+/// MutableCollections, but they need not be.
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-public extension _ContiguousCollection {
-    func withUnsafeBufferPointer<R>(
-        _ body: (UnsafeBufferPointer<Element>) throws -> R
-        ) rethrows -> R {
-        return try withContiguousStorageIfAvailable(body)!
-    }
-}
-
-/// A collection that supports mutable access to its underlying contiguous
-/// storage.
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-public protocol _MutableContiguousCollection: _ContiguousCollection, MutableCollection
-where SubSequence: _MutableContiguousCollection {
+public protocol MutableAccelerateBuffer: AccelerateBuffer {
     /// Calls the given closure with a pointer to the array's mutable contiguous
     /// storage.
     mutating func withUnsafeMutableBufferPointer<R>(
@@ -42,7 +42,16 @@ where SubSequence: _MutableContiguousCollection {
 }
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-extension _MutableContiguousCollection {
+public extension AccelerateBuffer where Self: Collection {
+    func withUnsafeBufferPointer<R>(
+        _ body: (UnsafeBufferPointer<Element>) throws -> R
+        ) rethrows -> R {
+        return try withContiguousStorageIfAvailable(body)!
+    }
+}
+
+@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+extension MutableAccelerateBuffer where Self: MutableCollection {
     public mutating func withUnsafeMutableBufferPointer<R>(
         _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
         ) rethrows -> R {
@@ -51,22 +60,22 @@ extension _MutableContiguousCollection {
 }
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-extension Array: _MutableContiguousCollection { }
+extension Array: MutableAccelerateBuffer { }
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-extension ContiguousArray: _MutableContiguousCollection { }
+extension ContiguousArray: MutableAccelerateBuffer { }
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-extension ArraySlice: _MutableContiguousCollection { }
+extension ArraySlice: MutableAccelerateBuffer { }
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-extension UnsafeBufferPointer: _ContiguousCollection { }
+extension UnsafeBufferPointer: AccelerateBuffer { }
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-extension UnsafeMutableBufferPointer: _MutableContiguousCollection { }
+extension UnsafeMutableBufferPointer: MutableAccelerateBuffer { }
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-extension Slice: _ContiguousCollection where Base: _ContiguousCollection { }
+extension Slice: AccelerateBuffer where Base: Collection { }
 
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-extension Slice: _MutableContiguousCollection where Base: _MutableContiguousCollection { }
+extension Slice: MutableAccelerateBuffer where Base: MutableCollection { }
