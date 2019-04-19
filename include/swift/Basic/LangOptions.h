@@ -166,6 +166,10 @@ namespace swift {
     /// solver should be debugged.
     unsigned DebugConstraintSolverAttempt = 0;
 
+    /// Line numbers to activate the constraint solver debugger.
+    /// Should be stored sorted.
+    llvm::SmallVector<unsigned, 4> DebugConstraintSolverOnLines;
+
     /// Enable named lazy member loading.
     bool NamedLazyMemberLoading = true;
 

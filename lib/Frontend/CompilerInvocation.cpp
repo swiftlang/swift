@@ -339,6 +339,17 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
     Opts.DebugConstraintSolverAttempt = attempt;
   }
+
+  for (const Arg *A : Args.filtered(OPT_debug_constraints_on_line)) {
+    unsigned line;
+    if (StringRef(A->getValue()).getAsInteger(10, line)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return true;
+    }
+    Opts.DebugConstraintSolverOnLines.push_back(line);
+  }
+  llvm::sort(Opts.DebugConstraintSolverOnLines);
   
   if (const Arg *A = Args.getLastArg(OPT_debug_forbid_typecheck_prefix)) {
     Opts.DebugForbidTypecheckPrefix = A->getValue();
