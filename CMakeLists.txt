@@ -998,17 +998,17 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
   else()
     set(SOURCEKIT_RUNTIME_DIR lib)
   endif()
-  swift_install_in_component(sourcekit-inproc
-                             FILES
+  swift_install_in_component(FILES
                                $<TARGET_FILE:dispatch>
                                $<TARGET_FILE:BlocksRuntime>
-                             DESTINATION ${SOURCEKIT_RUNTIME_DIR})
+                             DESTINATION ${SOURCEKIT_RUNTIME_DIR}
+                             COMPONENT sourcekit-inproc)
   if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
-    swift_install_in_component(sourcekit-inproc
-                               FILES
+    swift_install_in_component(FILES
                                  $<TARGET_LINKER_FILE:dispatch>
                                  $<TARGET_LINKER_FILE:BlocksRuntime>
-                               DESTINATION lib)
+                               DESTINATION lib
+                               COMPONENT sourcekit-inproc)
   endif()
 
 
@@ -1083,9 +1083,9 @@ endif()
 
 add_subdirectory(cmake/modules)
 
-swift_install_in_component(license
-  FILES "LICENSE.txt"
-  DESTINATION "share/swift")
+swift_install_in_component(FILES "LICENSE.txt"
+                           DESTINATION "share/swift"
+                           COMPONENT license)
 
 # Add a documentation target so that documentation shows up in the
 # Xcode project.
