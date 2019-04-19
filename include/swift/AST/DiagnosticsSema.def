@@ -658,6 +658,9 @@ ERROR(reserved_member_name,none,
       " 'foo.%1' expression", (DeclName, StringRef))
 
 ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
+ERROR(invalid_redecl_init,none,
+      "invalid redeclaration of synthesized %select{|memberwise }1%0",
+      (DeclName, bool))
 WARNING(invalid_redecl_swift5_warning,none,
         "redeclaration of %0 is deprecated and will be an error in Swift 5",
         (DeclName))
