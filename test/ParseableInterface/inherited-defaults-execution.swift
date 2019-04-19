@@ -31,7 +31,7 @@
 //
 // RUN: %target-build-swift -I%t -L%t -lInherited -o %t/main %target-rpath(%t) %t/main.swift -swift-version 5
 // RUN: %target-codesign %t/main %t/%target-library-name(Inherited)
-// RUN: %target-run %t/main | %FileCheck --check-prefix=OUTPUT %s
+// RUN: %target-run %t/main %t/%target-library-name(Inherited) | %FileCheck --check-prefix=OUTPUT %s
 //
 // OUTPUT: 45
 // OUTPUT-NEXT: 98
