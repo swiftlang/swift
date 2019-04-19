@@ -104,11 +104,14 @@ import resilient_objc_class
 // -- The category list
 
 // CHECK-LABEL: @objc_categories = internal global
+// CHECK-SAME: @"_CATEGORY__TtC15resilient_class22ResilientOutsideParent_$_class_update_callback_with_stub"
+// CHECK-SAME: , section "__DATA,__objc_catlist,regular,no_dead_strip"
+
+// CHECK-LABEL: @objc_categories_stubs = internal global
 // CHECK-SAME: @"_CATEGORY__TtC31class_update_callback_with_stub17ResilientSubclass_$_class_update_callback_with_stub"
 // CHECK-SAME: @"_CATEGORY__TtC31class_update_callback_with_stub25ResilientNSObjectSubclass_$_class_update_callback_with_stub"
 // CHECK-SAME: @"_CATEGORY__TtC31class_update_callback_with_stub27FixedLayoutNSObjectSubclass_$_class_update_callback_with_stub"
-// CHECK-SAME: @"_CATEGORY__TtC15resilient_class22ResilientOutsideParent_$_class_update_callback_with_stub"
-// CHECK-SAME: , section "__DATA,__objc_catlist,regular,no_dead_strip"
+// CHECK-SAME: , section "__DATA,__objc_catlist2,regular,no_dead_strip"
 
 
 // -- Address point for class stubs
