@@ -2092,6 +2092,10 @@ bool swift::conflicting(const OverloadSignature& sig1,
              (sig2.IsVariable && !sig1.Name.getArgumentNames().empty()));
   }
   
+  // Note that we intentionally ignore the HasOpaqueReturnType bit here.
+  // For declarations that can't be overloaded by type, we want them to be
+  // considered conflicting independent of their type.
+  
   return sig1.Name == sig2.Name;
 }
 
@@ -2156,6 +2160,9 @@ bool swift::conflicting(ASTContext &ctx,
   }
 
   // Otherwise, the declarations conflict if the overload types are the same.
+  if (sig1.HasOpaqueReturnType != sig2.HasOpaqueReturnType)
+    return false;
+  
   if (sig1Type != sig2Type)
     return false;
 
@@ -2246,6 +2253,12 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
         type = objectType;
       }
     }
+    
+    // Functions and subscripts cannot overload differing only in opaque return
+    // types. Replace the opaque type with `Any`.
+    if (auto opaque = type->getAs<OpaqueTypeArchetypeType>()) {
+      type = opaque->getExistentialType();
+    }
 
     return mapSignatureParamType(ctx, type);
   }
@@ -2295,6 +2308,8 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.IsEnumElement = isa<EnumElementDecl>(this);
   signature.IsNominal = isa<NominalTypeDecl>(this);
   signature.IsTypeAlias = isa<TypeAliasDecl>(this);
+  signature.HasOpaqueReturnType =
+                       !signature.IsVariable && (bool)getOpaqueResultTypeDecl();
 
   // Unary operators also include prefix/postfix.
   if (auto func = dyn_cast<FuncDecl>(this)) {
