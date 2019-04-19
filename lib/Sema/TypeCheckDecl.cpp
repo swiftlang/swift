@@ -3135,6 +3135,15 @@ public:
     }
 
     TC.checkParameterAttributes(FD->getParameters());
+
+    for (auto *Param : *FD->getParameters()) {
+      auto TL = Param->getTypeLoc();
+      auto Loc = TL.hasLocation() ? TL.getLoc() : Param->getLoc();
+      if (Param->getInterfaceType()->hasDynamicSelfType())
+        TC.diagnose(Loc, diag::self_in_parameter);
+      else
+        diagnoseSelfTypedParameters(Param->getInterfaceType(), Loc);
+    }
   }
 
   void visitModuleDecl(ModuleDecl *) { }
