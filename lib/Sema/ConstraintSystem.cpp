@@ -3262,6 +3262,12 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
   assert(transformedType && "Missing type");
 
   // Record the transformation.
+  assert(std::find_if(builderTransformedClosures.begin(),
+                      builderTransformedClosures.end(),
+                      [&](const std::tuple<ClosureExpr *, Type, Expr *> &elt) {
+                        return std::get<0>(elt) == closure;
+                      }) == builderTransformedClosures.end() &&
+         "already transformed this closure along this path!?!");
   builderTransformedClosures.push_back(
     std::make_tuple(closure, builderType, singleExpr));
 

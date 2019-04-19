@@ -114,13 +114,8 @@ func testOverloading(name: String) {
 
   let _: A = a1
 
-#if false
-  // FIXME: Using the overloads causes a crash, which is likely related
-  // to us generating the constraints from the child expressions multiple
-  // times.
-  let b1 = overloadedTuplify(true) { b in
+  _ = overloadedTuplify(true) { b in
     b ? "Hello, \(name)" : "Goodbye"
     42
   }
-#endif
 }
