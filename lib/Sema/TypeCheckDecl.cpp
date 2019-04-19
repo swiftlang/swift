@@ -2225,6 +2225,18 @@ public:
     }
   }
 
+  /// diagnoseSelfTypedParameters()
+  /// Diagnose instances of (Dynamic)Self as the type of a function arugument.
+  void diagnoseSelfTypedParameters(Type Ty, SourceLoc Loc) {
+    if (auto func = dyn_cast<FunctionType>(Ty->getCanonicalType()))
+      for (auto &param : func->getParams()) {
+        if (param.getParameterType()->hasDynamicSelfType()) {
+          TC.diagnose(Loc, diag::self_in_parameter);
+          diagnoseSelfTypedParameters(param.getParameterType(), Loc);
+        }
+      }
+  }
+
   //===--------------------------------------------------------------------===//
   // Visit Methods.
   //===--------------------------------------------------------------------===//
@@ -2581,6 +2593,13 @@ public:
 
     TC.checkParameterAttributes(SD->getIndices());
     TC.checkDefaultArguments(SD->getIndices(), SD);
+
+    if (SD->isSettable() &&
+        SD->getElementInterfaceType()->hasDynamicSelfType())
+      TC.diagnose(SD->getLoc(), diag::self_in_mutable_subscript);
+
+    diagnoseSelfTypedParameters(SD->getElementInterfaceType(),
+                                SD->getElementTypeLoc().getLoc());
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -2590,6 +2609,12 @@ public:
     TC.checkDeclAttributes(TAD);
 
     checkAccessControl(TC, TAD);
+
+    TypeLoc &TL = TAD->getUnderlyingTypeLoc();
+    if (TL.getType()->hasDynamicSelfType())
+      TC.diagnose(TL.getLoc(), diag::self_in_alias);
+
+    diagnoseSelfTypedParameters(TL.getType(), TL.getLoc());
   }
   
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
@@ -3025,6 +3050,13 @@ public:
   void visitVarDecl(VarDecl *VD) {
     // Delay type-checking on VarDecls until we see the corresponding
     // PatternBindingDecl.
+
+    if (VD->isSettable(nullptr) &&
+        VD->getValueInterfaceType()->hasDynamicSelfType())
+      TC.diagnose(VD->getLoc(), diag::self_in_mutable_property);
+
+    diagnoseSelfTypedParameters(VD->getValueInterfaceType(),
+                                VD->getTypeLoc().getLoc());
   }
 
   /// Determine whether the given declaration requires a definition.
