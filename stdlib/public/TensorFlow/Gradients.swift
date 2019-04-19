@@ -579,10 +579,10 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
     squeezingAxes axes: Tensor<Int32>
   ) -> (Tensor, (Tensor) -> Tensor) {
     let value = sum(squeezingAxes: axes)
-    return (value, { [shape = shapeTensor] in 
-      var res = $0 
+    return (value, { [shape = shapeTensor] in
+      var res = $0
       for i in axes.array.scalars { res = res.expandingShape(at: Int(i)) }
-      return res.broadcast(toShape: shape) 
+      return res.broadcast(toShape: shape)
     })
   }
 
@@ -603,7 +603,7 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
     let count = Raw.gather(params: shapeTensor, indices: axes).product()
     return (value, { [shape = shapeTensor] in
       var res = $0
-      for i in axes.array.scalars { res = res.expandingShape(at: Int(i)) }              
+      for i in axes.array.scalars { res = res.expandingShape(at: Int(i)) }
       return res.broadcast(toShape: shape) / Tensor(count)
     })
   }
