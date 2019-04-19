@@ -36,6 +36,9 @@ ENABLE_LANGUAGE(C)
 include(SwiftUtils)
 include(CheckSymbolExists)
 
+# WebAssembly: hack: use llvm-ar for creating static libraries; Ubuntu's GNU ar doesn't work with wasm-ld
+set(CMAKE_AR "${SWIFT_WASM_WASI_SDK_PATH}/bin/llvm-ar")
+
 #
 # User-configurable options that control the inclusion and default build
 # behavior for components which may not strictly be necessary (tools, examples,
