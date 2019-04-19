@@ -611,33 +611,3 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
     })
   }
 }
-
-//===----------------------------------------------------------------------===//
-// Composite math
-//===----------------------------------------------------------------------===//
-
-@inlinable
-func _vjpSigmoid<T : TensorFlowFloatingPoint>(
-  _ x: Tensor<T>
-) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
-  let value = sigmoid(x)
-  return (value, { v in Raw.sigmoidGrad(value, dy: v) })
-}
-
-@inlinable
-func _vjpSoftmax<T : TensorFlowFloatingPoint>(
-  _ x: Tensor<T>
-) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
-  let value = softmax(x)
-  return (value, { v in
-    let sumChannels = (v * value).sum(alongAxes: -1)
-    return (v - sumChannels) * value
-  })
-}
-
-@inlinable
-func _vjpRelu<T : TensorFlowFloatingPoint>(
-  _ x: Tensor<T>
-) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
-  return (relu(x), { v in Tensor(x .> 0) * v })
-}

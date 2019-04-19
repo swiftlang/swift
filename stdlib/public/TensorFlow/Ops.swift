@@ -960,13 +960,6 @@ public extension Tensor where Scalar : Numeric {
   }
 }
 
-/// Computes the log-softmax of the specified tensor element-wise.
-@inlinable @inline(__always)
-@differentiable(vjp: _vjpLogSoftmax(_:) where T : TensorFlowFloatingPoint)
-public func logSoftmax<T : FloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
-  return Raw.logSoftmax(logits: x)
-}
-
 //===----------------------------------------------------------------------===//
 // Selection
 //===----------------------------------------------------------------------===//
