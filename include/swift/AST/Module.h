@@ -843,6 +843,10 @@ public:
     return getParentModule()->getName().str();
   }
 
+  /// If this is a module imported from a parseable interface, return the path
+  /// to the interface file, otherwise an empty StringRef.
+  virtual StringRef getParseableInterface() const { return {}; }
+
   /// Traverse the decls within this file.
   ///
   /// \returns true if traversal was aborted, false if it completed
