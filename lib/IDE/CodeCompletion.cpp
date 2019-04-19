@@ -4168,7 +4168,7 @@ public:
     if (D->shouldHideFromEditor())
       return;
 
-    if (D->getAttrs().hasAttribute<FinalAttr>() ||
+    if (D->isFinal() ||
         // A 'class' member with an initial value cannot be overriden either.
         (D->isStatic() && D->getAttrs().hasAttribute<HasInitialValueAttr>()))
       return;

@@ -66,7 +66,6 @@ if #available(iOS 10.0, OSX 10.12, tvOS 10.0, watchOS 4.0, *) {
         expectTrue(id.alpha.isNaN)
         expectTrue(id.beta.isNaN)
     }
-    
 }
 
 runAllTests()

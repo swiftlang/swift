@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
 // MARK: Quadrature
 
 @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)

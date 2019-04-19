@@ -776,7 +776,8 @@ namespace {
         }
       }
 
-      if (VD->isFinal())
+      auto VarD = dyn_cast<VarDecl>(VD);
+      if (VD->isFinal() && !(VarD && VarD->isLet()))
         OS << " final";
       if (VD->isObjC())
         OS << " @objc";
