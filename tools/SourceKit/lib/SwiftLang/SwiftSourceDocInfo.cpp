@@ -697,7 +697,7 @@ getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
   return SM.getLocOffsetInBuffer(Loc, SM.findBufferContainingLoc(Loc));
 }
 
-/// Returns a non-empty StringRef on error.
+/// Returns a non-empty StringRef on error, representing an internal diagnostic.
 static StringRef passCursorInfoForDecl(SourceFile* SF,
                                        const ValueDecl *VD,
                                        const ModuleDecl *MainModule,
@@ -1035,7 +1035,7 @@ static DeclName getSwiftDeclName(const ValueDecl *VD,
   return DeclName(Ctx, BaseName, llvm::makeArrayRef(Args));
 }
 
-/// Returns a non-empty StringRef on error.
+/// Returns a non-empty StringRef on error, representing an internal diagnostic.
 static StringRef passNameInfoForDecl(ResolvedCursorInfo CursorInfo,
                                      NameTranslatingInfo &Info,
                     std::function<void(const NameTranslatingInfo &,
@@ -1283,7 +1283,9 @@ static void resolveCursor(SwiftLangSupport &Lang,
       CursorInfoResolver Resolver(AstUnit->getPrimarySourceFile());
       ResolvedCursorInfo CursorInfo = Resolver.resolve(Loc);
       if (CursorInfo.isInvalid()) {
-        Receiver(CursorInfoData(), "Unable to resolve cursor info.");
+        CursorInfoData Info;
+        Info.InternalDiagnostic = "Unable to resolve cursor info.";
+        Receiver(Info, "");
         return;
       }
       CompilerInvocation CompInvok;
@@ -1303,25 +1305,27 @@ static void resolveCursor(SwiftLangSupport &Lang,
           VD = CursorInfo.CtorTyRef;
           ContainerType = Type();
         }
-        StringRef Error = passCursorInfoForDecl(&AstUnit->getPrimarySourceFile(),
-                                                VD, MainModule,
-                                                ContainerType,
-                                                CursorInfo.IsRef,
-                                                Actionables,
-                                                CursorInfo,
-                                                BufferID, Loc,
-                                                AvailableRefactorings,
-                                                Lang, CompInvok,
-                                                getPreviousASTSnaps(),
-                                                Receiver);
-        if (!Error.empty()) {
+        StringRef Diag = passCursorInfoForDecl(&AstUnit->getPrimarySourceFile(),
+                                               VD, MainModule,
+                                               ContainerType,
+                                               CursorInfo.IsRef,
+                                               Actionables,
+                                               CursorInfo,
+                                               BufferID, Loc,
+                                               AvailableRefactorings,
+                                               Lang, CompInvok,
+                                               getPreviousASTSnaps(),
+                                               Receiver);
+        if (!Diag.empty()) {
           if (!getPreviousASTSnaps().empty()) {
             // Attempt again using the up-to-date AST.
             resolveCursor(Lang, InputFile, Offset, Length, Actionables, ASTInvok,
                           /*TryExistingAST=*/false, CancelOnSubsequentRequest,
                           Receiver);
           } else {
-            Receiver(CursorInfoData(), Error);
+            CursorInfoData Info;
+            Info.InternalDiagnostic = Diag;
+            Receiver(Info, "");
           }
         }
         return;
@@ -1351,8 +1355,10 @@ static void resolveCursor(SwiftLangSupport &Lang,
           }
         }
 
-        Receiver(CursorInfoData(),
-                 "Resolved to incomplete expression or statement.");
+        CursorInfoData Info;
+        Info.InternalDiagnostic =
+            "Resolved to incomplete expression or statement.";
+        Receiver(Info, "");
         return;
       }
       case CursorInfoKind::Invalid: {
@@ -1424,7 +1430,9 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
       CursorInfoResolver Resolver(AstUnit->getPrimarySourceFile());
       ResolvedCursorInfo CursorInfo = Resolver.resolve(Loc);
       if (CursorInfo.isInvalid()) {
-        Receiver({}, "Unable to resolve cursor info.");
+        NameTranslatingInfo Info;
+        Info.InternalDiagnostic = "Unable to resolve cursor info.";
+        Receiver(Info, "");
         return;
       }
 
@@ -1436,21 +1444,26 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
         return;
 
       case CursorInfoKind::ValueRef: {
-        StringRef Error = passNameInfoForDecl(CursorInfo, Input, Receiver);
-        if (!Error.empty()) {
+        StringRef Diagnostic = passNameInfoForDecl(CursorInfo, Input, Receiver);
+        if (!Diagnostic.empty()) {
           if (!getPreviousASTSnaps().empty()) {
             // Attempt again using the up-to-date AST.
             resolveName(Lang, InputFile, Offset, ASTInvok,
                         /*TryExistingAST=*/false, Input, Receiver);
           } else {
-            Receiver({}, Error);
+            NameTranslatingInfo Info;
+            Info.InternalDiagnostic = Diagnostic;
+            Receiver(Info, "");
           }
         }
         return;
       }
       case CursorInfoKind::ExprStart:
       case CursorInfoKind::StmtStart: {
-        Receiver({}, "Resolved to incomplete expression or statement.");
+        NameTranslatingInfo Info;
+        Info.InternalDiagnostic =
+            "Resolved to incomplete expression or statement.";
+        Receiver(Info, "");
         return;
       }
       case CursorInfoKind::Invalid:
@@ -1591,8 +1604,10 @@ void SwiftLangSupport::getCursorInfo(
               {}, *this, Invok, {}, Receiver);
         }
       } else {
-        Receiver(CursorInfoData(),
-                 "Unable to resolve entity from generated interface.");
+        CursorInfoData Info;
+        Info.InternalDiagnostic =
+            "Unable to resolve entity from generated interface.";
+        Receiver(Info, "");
       }
     });
     return;
@@ -1654,7 +1669,10 @@ getNameInfo(StringRef InputFile, unsigned Offset, NameTranslatingInfo &Input,
           // it's not necessary.
         }
       } else {
-        Receiver({}, "Unable to resolve entity from generated interface.");
+        NameTranslatingInfo Info;
+        Info.InternalDiagnostic =
+            "Unable to resolve entity from generated interface.";
+        Receiver(Info, "");
       }
     });
     return;
@@ -1726,7 +1744,9 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
 
       if (USR.startswith("c:")) {
         LOG_WARN_FUNC("lookup for C/C++/ObjC USRs not implemented");
-        Receiver(CursorInfoData(), "Lookup for C/C++/ObjC USRs not implemented.");
+        CursorInfoData Info;
+        Info.InternalDiagnostic = "Lookup for C/C++/ObjC USRs not implemented.";
+        Receiver(Info, "");
         return;
       }
 
@@ -1734,7 +1754,9 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
       TypeDecl *D = Demangle::getTypeDeclForUSR(context, USR);
 
       if (!D) {
-        Receiver(CursorInfoData(), "Unable to resolve type from USR.");
+        CursorInfoData Info;
+        Info.InternalDiagnostic = "Unable to resolve type from USR.";
+        Receiver(Info, "");
         return;
       }
 
@@ -1751,19 +1773,21 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
           selfTy = DC->getSelfInterfaceType();
           selfTy = D->getInnermostDeclContext()->mapTypeIntoContext(selfTy);
         }
-        StringRef Error =
+        StringRef Diagnostic =
             passCursorInfoForDecl(/*SourceFile*/nullptr, D, MainModule, selfTy,
                                   /*IsRef=*/false, false, ResolvedCursorInfo(),
                                   BufferID, SourceLoc(), {}, Lang, CompInvok,
                                   PreviousASTSnaps, Receiver);
-        if (!Error.empty()) {
+        if (!Diagnostic.empty()) {
           if (!PreviousASTSnaps.empty()) {
             // Attempt again using the up-to-date AST.
             resolveCursorFromUSR(Lang, InputFile, USR, ASTInvok,
                                  /*TryExistingAST=*/false,
                                  CancelOnSubsequentRequest, Receiver);
           } else {
-            Receiver(CursorInfoData(), Error);
+            CursorInfoData Info;
+            Info.InternalDiagnostic = Diagnostic;
+            Receiver(Info, "");
           }
         }
       }
@@ -1797,7 +1821,9 @@ void SwiftLangSupport::getCursorInfoFromUSR(
     std::function<void(const CursorInfoData &, StringRef Error)> receiver) {
   if (auto IFaceGenRef = IFaceGenContexts.get(filename)) {
     LOG_WARN_FUNC("Info from usr for generated interface not implemented yet.");
-    receiver(CursorInfoData(), "Info for generated interfaces not implemented.");
+    CursorInfoData Info;
+    Info.InternalDiagnostic = "Info for generated interfaces not implemented.";
+    receiver(Info, "");
     return;
   }
 

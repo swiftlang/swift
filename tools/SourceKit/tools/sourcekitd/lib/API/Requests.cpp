@@ -1625,6 +1625,11 @@ static void reportCursorInfo(const CursorInfoData &Info, ResponseReceiver Rec,
     return Rec(createErrorRequestFailed(Error.str().c_str()));
 
   ResponseBuilder RespBuilder;
+  if (!Info.InternalDiagnostic.empty()) {
+    auto Elem = RespBuilder.getDictionary();
+    Elem.set(KeyInternalDiagnostic, Info.InternalDiagnostic);
+    return Rec(RespBuilder.createResponse());
+  }
   if (Info.Kind.isInvalid())
     return Rec(RespBuilder.createResponse());
 
@@ -1732,6 +1737,11 @@ static void reportNameInfo(const NameTranslatingInfo &Info,
     return Rec(createErrorRequestFailed(Error.str().c_str()));
 
   ResponseBuilder RespBuilder;
+  if (!Info.InternalDiagnostic.empty()) {
+    auto Elem = RespBuilder.getDictionary();
+    Elem.set(KeyInternalDiagnostic, Info.InternalDiagnostic);
+    return Rec(RespBuilder.createResponse());
+  }
   if (Info.NameKind.isInvalid())
     return Rec(RespBuilder.createResponse());
   if (Info.BaseName.empty() && Info.ArgNames.empty())
