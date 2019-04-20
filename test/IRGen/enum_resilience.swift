@@ -79,7 +79,7 @@ enum InternalEither {
   case Right(Reference)
 }
 
-@_fixed_layout public struct ReferenceFast {
+@frozen public struct ReferenceFast {
   public var n: Class
 }
 

@@ -390,7 +390,7 @@ extension Optional: Hashable where Wrapped: Hashable {
 
 // Enable pattern matching against the nil literal, even if the element type
 // isn't equatable.
-@_fixed_layout
+@frozen
 public struct _OptionalNilComparisonType : ExpressibleByNilLiteral {
   /// Create an instance initialized with `nil`.
   @_transparent

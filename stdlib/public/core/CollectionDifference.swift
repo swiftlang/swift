@@ -227,7 +227,7 @@ extension CollectionDifference: Collection {
   public typealias Element = Change
 
   /// The position of a collection difference.
-  @_fixed_layout
+  @frozen
   public struct Index {
     // Opaque index type is isomorphic to Int
     @usableFromInline

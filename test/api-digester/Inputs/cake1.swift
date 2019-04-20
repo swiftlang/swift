@@ -48,7 +48,7 @@ public extension P1 where Self: P2 {
   func P1Constraint() {}
 }
 
-@_fixed_layout
+@frozen
 public struct fixedLayoutStruct {
   public var b = 2
   public func foo() {}
@@ -56,7 +56,7 @@ public struct fixedLayoutStruct {
 }
 
 @usableFromInline
-@_fixed_layout
+@frozen
 struct fixedLayoutStruct2 {
   public private(set) var NoLongerWithFixedBinaryOrder = 1
   public var BecomeFixedBinaryOrder: Int { return 1 }

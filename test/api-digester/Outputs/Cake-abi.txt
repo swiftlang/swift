@@ -51,7 +51,7 @@ cake1: Func HasMutatingMethodClone.foo() has self access kind changing from Muta
 cake1: Func S1.foo1() has self access kind changing from NonMutating to Mutating
 cake1: Func S1.foo3() is now static
 cake1: Func _NoResilientClass.NoLongerFinalFunc() is now without final
-cake1: Struct C6 is now with @_fixed_layout
+cake1: Struct C6 is now with @frozen
 cake1: Var C1.CIIns1 changes from weak to strong
 cake1: Var C1.CIIns2 changes from strong to weak
 cake1: Var GlobalLetChangedToVar changes from let to var

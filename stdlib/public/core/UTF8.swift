@@ -161,7 +161,7 @@ extension Unicode.UTF8 : _UnicodeEncoding {
     return encode(FromEncoding.decode(content))
   }
 
-  @_fixed_layout
+  @frozen
   public struct ForwardParser {
     public typealias _Buffer = _UIntBuffer<UInt8>
     @inline(__always)
@@ -170,7 +170,7 @@ extension Unicode.UTF8 : _UnicodeEncoding {
     public var _buffer: _Buffer
   }
   
-  @_fixed_layout
+  @frozen
   public struct ReverseParser {
     public typealias _Buffer = _UIntBuffer<UInt8>
     @inline(__always)

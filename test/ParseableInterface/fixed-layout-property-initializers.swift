@@ -12,8 +12,8 @@
 // RUN: %target-swift-frontend -emit-module -o %t/TestResilient.swiftmodule -enable-library-evolution %t-resilient.swiftinterface -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/TestResilient.swiftmodule -module-name TestResilient -enable-library-evolution -emit-parseable-module-interface-path - | %FileCheck %s --check-prefix FROMMODULE --check-prefix RESILIENT --check-prefix COMMON
 
-// COMMON: @_fixed_layout public struct MyStruct {
-@_fixed_layout
+// COMMON: @frozen public struct MyStruct {
+@frozen
 public struct MyStruct {
   // COMMON: public var publicVar: [[BOOL:(Swift\.)?Bool]] = false
   public var publicVar: Bool = false

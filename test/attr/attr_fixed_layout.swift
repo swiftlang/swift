@@ -4,7 +4,7 @@
 // RUN: not %target-swift-frontend -typecheck -swift-version 4.2 -dump-ast %s -enable-testing | %FileCheck --check-prefix=RESILIENCE-OFF %s
 
 //
-// Public types with @_fixed_layout are always fixed layout
+// Public types with @frozen are always fixed layout
 //
 
 // RESILIENCE-ON: struct_decl{{.*}}"Point" interface type='Point.Type' access=public non-resilient

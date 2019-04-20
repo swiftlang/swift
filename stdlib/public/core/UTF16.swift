@@ -369,7 +369,7 @@ extension Unicode.UTF16 : Unicode.Encoding {
     return encode(FromEncoding.decode(content))
   }
   
-  @_fixed_layout
+  @frozen
   public struct ForwardParser {
     public typealias _Buffer = _UIntBuffer<UInt16>
     @inlinable
@@ -377,7 +377,7 @@ extension Unicode.UTF16 : Unicode.Encoding {
     public var _buffer: _Buffer
   }
   
-  @_fixed_layout
+  @frozen
   public struct ReverseParser {
     public typealias _Buffer = _UIntBuffer<UInt16>
     @inlinable
