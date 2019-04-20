@@ -35,11 +35,12 @@ using namespace swift::syntax;
 %       if child_node and child_node.is_syntax_collection():
 %         child_elt = child_node.collection_element_name
 %         child_elt_type = child_node.collection_element_type
+%         child_elt_name = child.name + 'Member'
 %       end
 Parsed${node.name}Builder &
 Parsed${node.name}Builder::use${child.name}(Parsed${child.type_name} ${child.name}) {
 %       if child_elt:
-  assert(${child_elt}Nodes.empty() && "use either 'use' function or 'add', not both");
+  assert(${child_elt_name}s.empty() && "use either 'use' function or 'add', not both");
 %       end
   Layout[cursorIndex(${node.name}::Cursor::${child.name})] =
     ${child.name}.getRaw();
@@ -47,9 +48,9 @@ Parsed${node.name}Builder::use${child.name}(Parsed${child.type_name} ${child.nam
 }
 %       if child_elt:
 Parsed${node.name}Builder &
-Parsed${node.name}Builder::add${child_elt}(Parsed${child_elt_type} ${child_elt}) {
+Parsed${node.name}Builder::add${child_elt_name}(Parsed${child_elt_type} ${child_elt}) {
   assert(Layout[cursorIndex(${node.name}::Cursor::${child.name})].isNull() && "use either 'use' function or 'add', not both");
-  ${child_elt}Nodes.push_back(std::move(${child_elt}.getRaw()));
+  ${child_elt_name}s.push_back(std::move(${child_elt}.getRaw()));
   return *this;
 }
 %       end
@@ -88,12 +89,12 @@ void Parsed${node.name}Builder::finishLayout(bool deferred) {
 %     if child_node and child_node.is_syntax_collection():
 %       child_elt = child_node.collection_element_name
 %     if child_elt:
-  if (!${child_elt}Nodes.empty()) {
+  if (!${child_elt_name}s.empty()) {
     if (deferred) {
       Layout[${idx}] = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${child_node.syntax_kind},
-                          ${child_elt}Nodes, SPCtx);
+                          ${child_elt_name}s, SPCtx);
     } else {
-      Layout[${idx}] = Rec.recordRawSyntax(SyntaxKind::${child_node.syntax_kind}, ${child_elt}Nodes);
+      Layout[${idx}] = Rec.recordRawSyntax(SyntaxKind::${child_node.syntax_kind}, ${child_elt_name}s);
     }
   }
 %     end
