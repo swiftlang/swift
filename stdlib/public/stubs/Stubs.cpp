@@ -503,6 +503,8 @@ const char *swift::_swift_stdlib_strtof_clocale(
 void swift::_swift_stdlib_flockfile_stdout() {
 #if defined(_WIN32)
   _lock_file(stdout);
+#elif defined(__wasi__)
+  // WebAssembly/WASI doesn't support file locking yet
 #else
   flockfile(stdout);
 #endif
@@ -511,6 +513,8 @@ void swift::_swift_stdlib_flockfile_stdout() {
 void swift::_swift_stdlib_funlockfile_stdout() {
 #if defined(_WIN32)
   _unlock_file(stdout);
+#elif defined(__wasi__)
+  // WebAssembly/WASI doesn't support file locking yet
 #else
   funlockfile(stdout);
 #endif
