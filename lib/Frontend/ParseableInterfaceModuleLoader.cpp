@@ -582,6 +582,12 @@ public:
       std::string OutPathStr = OutPath;
       SerializationOpts.OutputPath = OutPathStr.c_str();
       SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
+
+      // Record any non-SDK parseable interface files for the debug info.
+      StringRef SDKPath = SubInstance.getASTContext().SearchPathOpts.SDKPath;
+      if (!getRelativeDepPath(InPath, SDKPath))
+        SerializationOpts.ParseableInterface = InPath;
+
       SmallVector<FileDependency, 16> Deps;
       if (collectDepsForSerialization(SubInstance, Deps,
             FEOpts.SerializeModuleInterfaceDependencyHashes)) {

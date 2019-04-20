@@ -1136,6 +1136,10 @@ StringRef ModuleDecl::getModuleFilename() const {
   // per-file names. Modules can consist of more than one file.
   StringRef Result;
   for (auto F : getFiles()) {
+    Result = F->getParseableInterface();
+    if (!Result.empty())
+      return Result;
+
     if (auto SF = dyn_cast<SourceFile>(F)) {
       if (!Result.empty())
         return StringRef();
