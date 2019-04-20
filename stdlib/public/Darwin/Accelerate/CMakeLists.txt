@@ -23,6 +23,7 @@ add_swift_target_library(swiftAccelerate ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   vDSP_FillClearGenerate.swift
   vDSP_Integration.swift
   vDSP_Conversion.swift
+  vDSP_SingleVectorOperations.swift
 
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
 
