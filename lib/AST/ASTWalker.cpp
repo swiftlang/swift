@@ -376,14 +376,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   bool visitGenericParamList(GenericParamList *GPL) {
     // Visit generic params
     for (auto &P : GPL->getParams()) {
-      switch (P.getKind()) {
-        case GenericParam::ParamKind::TypeParam: {
-          if (doIt(P.getTypeParam()))
-            return true;
-          continue;
-        }
-      }
-      llvm_unreachable("Unhandled GenericParam::getKind()");
+      if (doIt(P))
+        return true;
     }
 
     // Visit param conformance

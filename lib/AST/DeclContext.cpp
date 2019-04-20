@@ -98,8 +98,7 @@ GenericTypeParamType *DeclContext::getProtocolSelfType() const {
   if (genericParams == nullptr)
     return nullptr;
 
-  // Self must always be the first generic parameter
-  return genericParams->getParams().front().getTypeParam()
+  return genericParams->getParams().front()
       ->getDeclaredInterfaceType()
       ->castTo<GenericTypeParamType>();
 }

@@ -1400,17 +1400,12 @@ SourceRange ASTScope::getSourceRangeImpl() const {
                          protoDecl->getEndLoc());
     }
 
-    auto GP = genericParams.params->getParams()[genericParams.index];
-      
-    switch (GP.getKind()) {
-      case GenericParam::ParamKind::TypeParam:
-        // Explicitly-written generic parameters are in scope following their
-        // definition.
-        return SourceRange(GP.getTypeParam()->getEndLoc(),
-                           genericParams.decl->getEndLoc());
-    }
-    llvm_unreachable("Unhandled GenericParam::getKind()");
-  
+    // Explicitly-written generic parameters are in scope following their
+    // definition.
+    return SourceRange(genericParams.params->getParams()[genericParams.index]
+                         ->getEndLoc(),
+                       genericParams.decl->getEndLoc());
+
   case ASTScopeKind::AbstractFunctionDecl: {
     // For an accessor, all of the parameters are implicit, so start them at
     // the start location of the accessor.
