@@ -19,6 +19,7 @@ add_swift_target_library(swiftAccelerate ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   vDSP_DecibelConversion.swift
   vDSP_ComplexConversion.swift
   vDSP_PolynomialEvaluation.swift
+  vDSP_ClippingLimitThreshold.swift
 
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
 
