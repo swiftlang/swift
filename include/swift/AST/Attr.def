@@ -365,7 +365,7 @@ SIMPLE_DECL_ATTR(_weakLinked, WeakLinked,
   OnSubscript | OnConstructor | OnEnumElement | OnExtension | UserInaccessible,
   75)
 SIMPLE_DECL_ATTR(frozen, Frozen,
-  OnEnum |
+  OnEnum | OnStruct |
   UserInaccessible,
   76)
 DECL_ATTR_ALIAS(_frozen, Frozen)
