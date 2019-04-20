@@ -219,7 +219,7 @@ public extension Raw {
     let _ = _TFCOpAddInputFromTensorGroup(op, value, s)
     TFE_OpSetAttrInt(op, "num", num)
     TFE_OpSetAttrType(op, "T", T.tensorFlowDataType._cDataType)
-    TFE_OpSetAttrType(op, "axis", axis)
+    TFE_OpSetAttrInt(op, "axis", axis)
     var count: Int32 = Int32(num)
     let buffer: UnsafeMutablePointer<CTensorHandle> =
       UnsafeMutablePointer.allocate(capacity: Int(count))
