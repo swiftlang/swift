@@ -1726,6 +1726,10 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
 
   auto impl = ASD->getImplInfo();
 
+  // AbstractAccessors is suppressed by FunctionDefinitions.
+  bool PrintAbstract =
+    Options.AbstractAccessors && !Options.FunctionDefinitions;
+
   // Don't print accessors for trivially stored properties...
   if (impl.isSimpleStored()) {
     // ...unless we're printing for SIL, which expects a { get set? } on
@@ -1736,22 +1740,23 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     // ...or you're private/internal(set), at which point we'll print
     //    @_hasStorage var x: T { get }
     else if (ASD->isSettable(nullptr) && hasLessAccessibleSetter(ASD)) {
-      Printer << " {";
-      {
-        IndentRAII indentMore(*this);
+      if (PrintAbstract) {
+        Printer << " { get }";
+      } else {
+        Printer << " {";
+        {
+          IndentRAII indentMore(*this);
+          indent();
+          Printer.printNewline();
+          Printer << "get";
+        }
         indent();
         Printer.printNewline();
-        Printer << "get";
-        Printer.printNewline();
+        Printer << "}";
       }
-      Printer << "}";
     }
     return;
   }
-
-  // AbstractAccessors is suppressed by FunctionDefinitions.
-  bool PrintAbstract =
-    Options.AbstractAccessors && !Options.FunctionDefinitions;
 
   // We sometimes want to print the accessors abstractly
   // instead of listing out how they're actually implemented.
