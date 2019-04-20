@@ -196,4 +196,43 @@ public extension Raw {
     }
     return out
   }
+
+  /// Unpacks a tensor into `numSplit` tensors along one dimension.
+  ///
+  /// - Parameters:
+  ///   - value: The tensor to unpack.
+  ///   - num: The number of tensors to unpack.
+  ///   - axis: The dimension along which to unpack. Must be in the range
+  ///     `[-rank(value), rank(value))`.
+  ///
+  /// - Returns: Tensors whose shape matches that of `value` without the `axis` dimension.
+  @inlinable @inline(__always)
+  static func unpack<T: TensorFlowScalar>(
+    value: Tensor<T>,
+    num: Int64,
+    axis: Int64
+  ) -> [Tensor<T>] {
+    let s: CTFStatus = TF_NewStatus()
+    defer { TF_DeleteStatus(s) }
+    let op: CTFEOp = TFE_NewOp(_ExecutionContext.global.eagerContext, "Unpack", s)
+    defer { TFE_DeleteOp(op) }
+    let _ = _TFCOpAddInputFromTensorGroup(op, value, s)
+    TFE_OpSetAttrInt(op, "num", num)
+    TFE_OpSetAttrType(op, "T", T.tensorFlowDataType._cDataType)
+    TFE_OpSetAttrType(op, "axis", axis)
+    var count: Int32 = Int32(num)
+    let buffer: UnsafeMutablePointer<CTensorHandle> =
+      UnsafeMutablePointer.allocate(capacity: Int(count))
+    defer { buffer.deallocate() }
+    _TFCEagerExecute(op, UnsafeMutablePointer<CTensorHandle?>(buffer), &count, s)
+    checkOk(s)
+
+    var out: [Tensor<T>] = []
+    var cursor = buffer
+    for _ in 0..<numSplit {
+      out.append(Tensor<T>(handle: TensorHandle(_owning: cursor.pointee)))
+      cursor = cursor.advanced(by: 1)
+    }
+    return out
+  }
 }
