@@ -2586,7 +2586,7 @@ ERROR(self_in_mutable_property,none,
 ERROR(self_in_mutable_subscript,none,
       "'Self' is not available as the type of a mutable subscript", ())
 ERROR(self_in_parameter,none,
-      "'Self' cannot be the type of a (contravariant) function argument", ())
+      "'Self' cannot be the type of a function argument in a class", ())
 ERROR(self_in_nested_return,none,
       "'Self' cannot be the type of a nested return value", ())
 

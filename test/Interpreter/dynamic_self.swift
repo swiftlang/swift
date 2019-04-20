@@ -237,7 +237,6 @@ print(B1(i: 100).copied.i)
 class A0<T, S> {
   var i = "Base"
   required init() {}
-  var foo: (Self) -> () { return { (a: Self) in } }
 
   func copy() -> Self {
     let copy = Self.init()
