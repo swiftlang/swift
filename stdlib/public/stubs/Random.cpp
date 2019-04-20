@@ -42,6 +42,10 @@
 #include "swift/Runtime/Mutex.h"
 #include "../SwiftShims/Random.h"
 
+#ifdef __wasi__
+#include <algorithm> // std::min
+#endif
+
 #if defined(__APPLE__)
 
 SWIFT_RUNTIME_STDLIB_API
@@ -88,7 +92,7 @@ void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
     if (getrandom_available) {
       actual_nbytes = WHILE_EINTR(syscall(__NR_getrandom, buf, nbytes, 0));
     }
-#elif __has_include(<sys/random.h>) && (defined(__CYGWIN__) || defined(__Fuchsia__))
+#elif __has_include(<sys/random.h>) && (defined(__CYGWIN__) || defined(__Fuchsia__) || defined(__wasi__))
     __swift_size_t getentropy_nbytes = std::min(nbytes, __swift_size_t{256});
     
     if (0 == getentropy(buf, getentropy_nbytes)) {
