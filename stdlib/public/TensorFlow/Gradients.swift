@@ -28,16 +28,7 @@
 // automatic differentiation pass identifies these VJPs and chains them
 // together to produce arbitrary differentiable programs.
 //
-// NOTE:
-// - Currently, we do not want to expose VJP functions to users. The name of
-//   each VJP function should start with an underscore.
-//
-// TODO:
-// - Fix VJPs for broadcasting ops (need to perform reduction).
-//
 //===----------------------------------------------------------------------===//
-
-infix operator .== : ComparisonPrecedence
 
 //===----------------------------------------------------------------------===//
 // Method-style differential operators
@@ -196,79 +187,4 @@ public func gradient<T, U, V, R>(
   where T : Differentiable, U : Differentiable, V : Differentiable,
         R : TensorFlowFloatingPoint {
   return { x, y, z in gradient(at: x, y, z, in: f) }
-}
-
-//===----------------------------------------------------------------------===//
-// Linear algebra
-//===----------------------------------------------------------------------===//
-
-@inlinable
-func _vjpMatmul<Scalar : TensorFlowFloatingPoint>(
-  _ lhs: Tensor<Scalar>, _ rhs: Tensor<Scalar>
-) -> (Tensor<Scalar>, (Tensor<Scalar>) -> (Tensor<Scalar>, Tensor<Scalar>)) {
-  let value = matmul(lhs, rhs)
-  return (value, { v in 
-    return (matmul(v, rhs.transposed()), matmul(lhs.transposed(), v))
-  })
-}
-
-// TODO: We have to define a custom VJP on • because AD can't yet
-// differentiate generic methods. After AD can differentiate generic methods,
-// remove the custom VJP.
-extension Tensor where Scalar : TensorFlowFloatingPoint {
-  @inlinable
-  static func _vjpMatmulOperator(
-    lhs: Tensor, rhs: Tensor
-  ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
-    return _vjpMatmul(lhs, rhs)
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// Reduction
-//===----------------------------------------------------------------------===//
-
-extension Tensor where Scalar : TensorFlowFloatingPoint {
-  @inlinable
-  func _vjpSum(alongAxes axes: Tensor<Int32>) -> (Tensor, (Tensor) -> Tensor) {
-    let value = sum(alongAxes: axes)
-    return (value, { [shape = shapeTensor] in $0.broadcast(toShape: shape) })
-  }
-
-  @inlinable
-  func _vjpSum(
-    squeezingAxes axes: Tensor<Int32>
-  ) -> (Tensor, (Tensor) -> Tensor) {
-    let value = sum(squeezingAxes: axes)
-    return (value, { [shape = shapeTensor] in $0.broadcast(toShape: shape) })
-  }
-
-  @inlinable
-  func _vjpMean(alongAxes axes: Tensor<Int32>) -> (Tensor, (Tensor) -> Tensor) {
-    let value = mean(alongAxes: axes)
-    let count = Raw.gather(params: shapeTensor, indices: axes).product()
-    return (value, { [shape = shapeTensor] in
-      $0.broadcast(toShape: shape) / Tensor(count)
-    })
-  }
-
-  @inlinable
-  func _vjpMean(squeezingAxes axes: [Int]) -> (Tensor, (Tensor) -> Tensor) {
-    let value = mean(squeezingAxes: axes)
-    return (value, { [shape = shapeTensor,
-                      count = axes.map { shape[$0] }.reduce(1, *)] in
-      $0.broadcast(toShape: shape) / Tensor(Scalar(count))
-    })
-  }
-
-  @inlinable
-  func _vjpMean(
-    squeezingAxes axes: Tensor<Int32>
-  ) -> (Tensor, (Tensor) -> Tensor) {
-    let value = mean(squeezingAxes: axes)
-    let count = Raw.gather(params: shapeTensor, indices: axes).product()
-    return (value, { [shape = shapeTensor] in
-      $0.broadcast(toShape: shape) / Tensor(count)
-    })
-  }
 }
