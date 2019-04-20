@@ -161,7 +161,7 @@ internal func _float${bits}ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt, _ value: Float${bits},
   _ debug: Bool
-) -> UInt
+) -> UInt64
 
 internal func _float${bits}ToString(
   _ value: Float${bits}, debug: Bool
@@ -185,7 +185,7 @@ internal func _int64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt, _ value: Int64,
   _ radix: Int64, _ uppercase: Bool
-) -> UInt
+) -> UInt64
 
 internal func _int64ToString(
   _ value: Int64, radix: Int64 = 10, uppercase: Bool = false
@@ -213,7 +213,7 @@ internal func _int64ToString(
 internal func _uint64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt, _ value: UInt64, _ radix: Int64, _ uppercase: Bool
-) -> UInt
+) -> UInt64
 
 public // @testable
 func _uint64ToString(
