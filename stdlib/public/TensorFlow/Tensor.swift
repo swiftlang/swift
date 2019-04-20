@@ -45,7 +45,7 @@ public struct Tensor<Scalar : TensorFlowScalar> : TensorProtocol {
 }
 
 //===----------------------------------------------------------------------===//
-// Compiler intrinsics
+// Compiler Intrinsics
 //===----------------------------------------------------------------------===//
 //
 // By default, when a `Tensor` value is implicitly passed between host and
@@ -149,7 +149,7 @@ func _TFHoistable<Scalar>(_ fn: () -> TensorHandle<Scalar>)
 }
 
 //===----------------------------------------------------------------------===//
-// Memory transfer markers
+// Memory Transfer Markers
 //===----------------------------------------------------------------------===//
 
 public extension Tensor {
@@ -322,7 +322,7 @@ public extension Tensor {
 }
 
 //===----------------------------------------------------------------------===//
-// Initialization syntax
+// Initialization Syntax
 //===----------------------------------------------------------------------===//
 
 // Background story on `TensorElementLiteral` and why it's necessary:
@@ -485,94 +485,10 @@ public extension Tensor {
 }
 
 //===----------------------------------------------------------------------===//
-// Shape transformations
+// Shape Transformations
 //===----------------------------------------------------------------------===//
 
-public extension TensorFlowScalar {
-  /// Convert to a tensor with the specified rank, with all dimensions equal to
-  /// 1.
-  @inlinable @inline(__always)
-  func makeTensor(rank: Int) -> Tensor<Self> {
-    return Tensor(repeating: self, shape: TensorShape(rank))
-  }
-}
-
 public extension Tensor {
-  /// Reshape to the shape of the specified `Tensor`.
-  /// - Precondition: The number of scalars matches the new shape.
-  @inlinable @inline(__always)
-  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
-  func reshaped<T>(like other: Tensor<T>) -> Tensor {
-    return reshaped(toShape: other.shapeTensor)
-  }
-
-  /// Reshape to the specified shape.
-  /// - Precondition: The number of scalars matches the new shape.
-  @inlinable @inline(__always)
-  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
-  func reshaped(to newShape: TensorShape) -> Tensor {
-    // TODO(TF-433): Remove workaround for differentiating `map`.
-    return reshaped(toShape: Tensor<Int32>({newShape.dimensions.map(Int32.init)}()))
-  }
-
-  /// Reshape to the specified `Tensor` representing a shape.
-  /// - Precondition: The number of scalars matches the new shape.
-  @inlinable @inline(__always)
-  @differentiable(
-    wrt: self, vjp: _vjpReshaped(toShape:)
-    where Scalar : TensorFlowFloatingPoint
-  )
-  func reshaped(toShape newShape: Tensor<Int32>) -> Tensor {
-    return Raw.reshape(self, shape: newShape)
-  }
-
-  /// Return a copy of the tensor collapsed into a 1-D `Tensor`, in row-major
-  /// order.
-  @inlinable @inline(__always)
-  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
-  func flattened() -> Tensor {
-    return reshaped(to: [-1])
-  }
-
-  /// Returns a rank-lifted `Tensor` with a leading dimension of 1.
-  @inlinable @inline(__always)
-  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
-  func rankLifted() -> Tensor {
-    return expandingShape(at: 0)
-  }
-
-  /// Returns a shape-expanded `Tensor`, with a dimension of 1 inserted at the
-  /// specified shape index.
-  @inlinable @inline(__always)
-  @differentiable(
-    wrt: self, vjp: _vjpExpandingShape(at:)
-    where Scalar : TensorFlowFloatingPoint
-  )
-  func expandingShape(at shapeIndex: Int) -> Tensor {
-    return Raw.expandDims(self, dim: Tensor<Int32>(Int32(shapeIndex)))
-  }
-
-  /// Remove the specified dimensions of size 1 from the shape of a tensor. If
-  /// no dimensions are specified, then all dimensions of size 1 will be
-  /// removed.
-  @inlinable @inline(__always)
-  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
-  func squeezingShape(at axes: Int...) -> Tensor {
-    return squeezingShape(at: axes)
-  }
-
-  /// Remove the specified dimensions of size 1 from the shape of a tensor. If
-  /// no dimensions are specified, then all dimensions of size 1 will be
-  /// removed.
-  @inlinable @inline(__always)
-  @differentiable(
-    wrt: self, vjp: _vjpSqueezingShape(at:)
-    where Scalar : TensorFlowFloatingPoint
-  )
-  func squeezingShape(at axes: [Int]) -> Tensor {
-    return Raw.squeeze(self, squeezeDims: axes.map(Int32.init))
-  }
-
   /// Reshape to scalar.
   /// - Precondition: The tensor has exactly one scalar.
   @inlinable
@@ -626,79 +542,7 @@ public extension TensorFlowScalar {
 }
 
 //===----------------------------------------------------------------------===//
-// Equality
-//===----------------------------------------------------------------------===//
-
-extension Tensor : Equatable where Scalar : Equatable {
-  @inlinable @inline(__always)
-  public static func == (lhs: Tensor, rhs: Tensor) -> Bool {
-    return (lhs .== rhs).all()
-  }
-
-  @inlinable @inline(__always)
-  public static func != (lhs: Tensor, rhs: Tensor) -> Bool {
-    return (lhs .== rhs).any()
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// Description and visualization
-//===----------------------------------------------------------------------===//
-
-// String conversion.
-extension Tensor : CustomStringConvertible {
-  /// A textual representation of the tensor.
-  ///
-  /// - Note: use `fullDescription` for a non-pretty-printed description showing
-  ///   all scalars.
-  public var description: String {
-    return array.description
-  }
-}
-
-public extension Tensor {
-  /// A textual representation of the tensor. Returns a summarized description
-  /// if `summarize` is true and the element count exceeds twice the
-  /// `edgeElementCount`.
-  ///
-  /// - Parameters:
-  ///   - lineWidth: The max line width for printing. Used to determine number
-  ///     of scalars to print per line.
-  ///   - edgeElementCount: The maximum number of elements to print before and
-  ///     after summarization via ellipses (`...`).
-  ///   - summarizing: If true, summarize description if element count exceeds
-  ///     twice `edgeElementCount`.
-  func description(
-    lineWidth: Int = 80, edgeElementCount: Int = 3, summarizing: Bool = false
-  ) -> String {
-    return array.description(
-      lineWidth: lineWidth, edgeElementCount: edgeElementCount,
-      summarizing: summarizing)
-  }
-
-  /// A full, non-pretty-printed textual representation of the tensor, showing
-  /// all scalars.
-  var fullDescription: String {
-    return array.fullDescription
-  }
-}
-
-// Xcode Playground display conversion.
-extension Tensor : CustomPlaygroundDisplayConvertible {
-  public var playgroundDescription: Any {
-    return description
-  }
-}
-
-// Mirror representation, used by debugger/REPL.
-extension Tensor : CustomReflectable {
-  public var customMirror: Mirror {
-    return Mirror(self, children: [], displayStyle: .struct)
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// Array conversion
+// Array Conversion
 //===----------------------------------------------------------------------===//
 
 public extension Tensor {
@@ -718,24 +562,5 @@ public extension Tensor {
   @inlinable
   var scalars: [Scalar] {
     return array.scalars
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// Codable conformance
-//===----------------------------------------------------------------------===//
-
-extension Tensor : Codable where Scalar : Codable {
-  @inlinable
-  public func encode(to encoder: Encoder) throws {
-    var container = encoder.singleValueContainer()
-    try container.encode(array)
-  }
-
-  @inlinable
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.singleValueContainer()
-    let array = try container.decode(ShapedArray<Scalar>.self)
-    self.init(array)
   }
 }

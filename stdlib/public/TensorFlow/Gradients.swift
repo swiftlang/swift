@@ -519,40 +519,6 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
 }
 
 //===----------------------------------------------------------------------===//
-// Shape transformations
-//===----------------------------------------------------------------------===//
-
-extension Tensor where Scalar : TensorFlowFloatingPoint {
-  @inlinable
-  func _vjpReshaped(
-    toShape newShape: Tensor<Int32>
-  ) -> (Tensor, (Tensor) -> Tensor) {
-    let value = reshaped(toShape: newShape)
-    return (value, { [shape = shapeTensor] v in
-      v.reshaped(toShape: shape)
-    })
-  }
-
-  @inlinable
-  func _vjpSqueezingShape(at axes: [Int]) -> (Tensor, (Tensor) -> Tensor) {
-    let value = squeezingShape(at: axes)
-    return (value, { [shape = shapeTensor] v in
-      v.reshaped(toShape: shape)
-    })
-  }
-
-  @inlinable
-  func _vjpExpandingShape(
-    at shapeIndex: Int
-  ) -> (Tensor, (Tensor) -> Tensor) {
-    let value = expandingShape(at: shapeIndex)
-    return (value, { v in
-      v.squeezingShape(at: shapeIndex)
-    })
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // Reduction
 //===----------------------------------------------------------------------===//
 
