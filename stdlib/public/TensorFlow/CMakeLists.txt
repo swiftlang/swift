@@ -47,9 +47,7 @@ set(SOURCES
   Utilities.swift
   ArrayOps.swift
   Threading.swift
-  ExecuteOp.swift.gyb
-  # NumPy bridging for `ShapedArray` and `Tensor`.
-  PythonConversion.swift)
+  ExecuteOp.swift.gyb)
 
 # Copy TensorFlow bindings file, if it exists.
 if (TENSORFLOW_SWIFT_BINDINGS)
