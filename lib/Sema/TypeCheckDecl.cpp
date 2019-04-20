@@ -2229,6 +2229,10 @@ public:
     return Ty->lookThroughAllOptionalTypes()->hasDynamicSelfType();
   }
 
+  bool isDeclaredInClass(Decl *decl) {
+    return decl->getDeclContext()->getSelfClassDecl() != nullptr;
+  }
+
   /// diagnoseSelfTypedParameters()
   /// Diagnose instances of (Dynamic)Self as the type of a function arugument.
   void diagnoseSelfTypedParameters(Type Ty, SourceLoc Loc, int level = 0) {
@@ -3057,11 +3061,13 @@ public:
     // Delay type-checking on VarDecls until we see the corresponding
     // PatternBindingDecl.
 
-    if (VD->isSettable(nullptr) && isDynamicSelf(VD->getValueInterfaceType()))
-      TC.diagnose(VD->getLoc(), diag::self_in_mutable_property);
-
-    diagnoseSelfTypedParameters(VD->getValueInterfaceType(),
-                                VD->getTypeLoc().getLoc());
+    if (isDeclaredInClass(VD)) {
+      if (VD->isSettable(nullptr) && isDynamicSelf(VD->getValueInterfaceType()))
+        TC.diagnose(VD->getLoc(), diag::self_in_mutable_property);
+      else
+        diagnoseSelfTypedParameters(VD->getValueInterfaceType(),
+                                    VD->getTypeLoc().getLoc());
+    }
   }
 
   /// Determine whether the given declaration requires a definition.
@@ -3141,13 +3147,15 @@ public:
 
     TC.checkParameterAttributes(FD->getParameters());
 
-    for (auto *Param : *FD->getParameters()) {
-      auto TyLoc = Param->getTypeLoc();
-      auto Loc = TyLoc.hasLocation() ? TyLoc.getLoc() : Param->getLoc();
-      if (isDynamicSelf(Param->getInterfaceType()))
-        TC.diagnose(Loc, diag::self_in_parameter);
-      else
-        diagnoseSelfTypedParameters(Param->getInterfaceType(), Loc, 1);
+    if (isDeclaredInClass(FD)) {
+      for (auto *Param : *FD->getParameters()) {
+        auto TyLoc = Param->getTypeLoc();
+        auto Loc = TyLoc.hasLocation() ? TyLoc.getLoc() : Param->getLoc();
+        if (isDynamicSelf(Param->getInterfaceType()))
+          TC.diagnose(Loc, diag::self_in_parameter);
+        else
+          diagnoseSelfTypedParameters(Param->getInterfaceType(), Loc, 1);
+      }
     }
   }
 

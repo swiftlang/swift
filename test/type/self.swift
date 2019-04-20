@@ -5,7 +5,7 @@ struct S0<T> {
 }
 
 class C0<T> {
-  func foo(_ other: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}{{21-25=C0}}
+  func foo(_ other: Self) { } // expected-error{{'Self' cannot be the type of a function argument in a class}}
 }
 
 enum E0<T> {
@@ -47,7 +47,7 @@ final class FinalMario : Mario {
 
 class A<T> {
   typealias _Self = Self
-  // expected-error@-1 {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'A'?}}
+  // expected-error@-1 {{'Self' is not available in a typealias}}
   let b: Int
   required init(a: Int) {
     print("\(Self.self).\(#function)")
@@ -55,7 +55,7 @@ class A<T> {
     b = a
   }
   static func z(n: Self? = nil) {
-    // expected-error@-1 {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'A'?}}
+    // expected-error@-1 {{'Self' cannot be the type of a function argument in a class}}
     print("\(Self.self).\(#function)")
   }
   class func y() {
@@ -67,7 +67,6 @@ class A<T> {
     Self.y()
     Self.z()
     let _: Self = Self.init(a: 66)
-    // expected-error@-1 {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'A'?}}
     return Self.init(a: 77) as? Self as? A
     // expected-warning@-1 {{conditional cast from 'Self' to 'Self' always succeeds}}
     // expected-warning@-2 {{conditional downcast from 'Self?' to 'A<T>' is equivalent to an implicit conversion to an optional 'A<T>'}}
@@ -81,11 +80,12 @@ class A<T> {
     let copy = Self.init(a: 11)
     return copy
   }
-  subscript (i: Int) -> Self { // expected-error {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'A'?}}
+  subscript (i: Int) -> Self { // expected-error {{'Self' is not available as the type of a mutable subscript}}
     get {
       return Self.init(a: i)
     }
     set(newValue) {
+      // expected-error@-1 {{'Self' cannot be the type of a function argument in a class}}
     }
   }
 }
