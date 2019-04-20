@@ -53,18 +53,6 @@ infix operator .=
 //   scalarization and rank getter are implemented.
 
 //===----------------------------------------------------------------------===//
-// Scalar type cast
-//===----------------------------------------------------------------------===//
-
-public extension Tensor where Scalar : Numeric {
-  /// Perform an element-wise type conversion from a `Bool` tensor.
-  @inlinable @inline(__always)
-  init(_ other: Tensor<Bool>) {
-    self = Raw.cast(other)
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // Additive group
 //===----------------------------------------------------------------------===//
 

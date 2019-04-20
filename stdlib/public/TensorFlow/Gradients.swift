@@ -38,7 +38,6 @@
 //===----------------------------------------------------------------------===//
 
 infix operator .== : ComparisonPrecedence
-infix operator .> : ComparisonPrecedence
 
 //===----------------------------------------------------------------------===//
 // Method-style differential operators
