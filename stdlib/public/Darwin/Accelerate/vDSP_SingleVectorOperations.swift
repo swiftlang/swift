@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
 //===----------------------------------------------------------------------===//
 //
 //  vDSP Extrema
@@ -32,7 +30,7 @@ extension vDSP {
     public static func minimum<U>(_ vectorA: U,
                                   _ vectorB: U) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             precondition(vectorA.count == vectorB.count)
             
@@ -60,8 +58,8 @@ extension vDSP {
                                      _ vectorB: U,
                                      result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             let n = vDSP_Length(min(vectorA.count,
@@ -90,7 +88,7 @@ extension vDSP {
     public static func minimum<U>(_ vectorA: U,
                                   _ vectorB: U) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             precondition(vectorA.count == vectorB.count)
             
@@ -118,8 +116,8 @@ extension vDSP {
                                      _ vectorB: U,
                                      result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             let n = vDSP_Length(min(vectorA.count,
@@ -150,7 +148,7 @@ extension vDSP {
     public static func maximum<U>(_ vectorA: U,
                                   _ vectorB: U) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             precondition(vectorA.count == vectorB.count)
             
@@ -178,8 +176,8 @@ extension vDSP {
                                      _ vectorB: U,
                                      result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             let n = vDSP_Length(min(vectorA.count,
@@ -208,7 +206,7 @@ extension vDSP {
     public static func maximum<U>(_ vectorA: U,
                                   _ vectorB: U) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             precondition(vectorA.count == vectorB.count)
             
@@ -236,8 +234,8 @@ extension vDSP {
                                      _ vectorB: U,
                                      result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             let n = vDSP_Length(min(vectorA.count,
@@ -274,7 +272,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func absolute<U>(_ vector: U) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -299,8 +297,8 @@ extension vDSP {
     public static func absolute<U, V>(_ vector: U,
                                       result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -324,7 +322,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func absolute<U>(_ vector: U) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -349,8 +347,8 @@ extension vDSP {
     public static func absolute<U, V>(_ vector: U,
                                       result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -373,7 +371,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func negativeAbsolute<U>(_ vector: U) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -398,8 +396,8 @@ extension vDSP {
     public static func negativeAbsolute<U, V>(_ vector: U,
                                               result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -422,7 +420,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func negativeAbsolute<U>(_ vector: U) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -447,8 +445,8 @@ extension vDSP {
     public static func negativeAbsolute<U, V>(_ vector: U,
                                               result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -471,7 +469,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func negative<U>(_ vector: U) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -496,8 +494,8 @@ extension vDSP {
     public static func negative<U, V>(_ vector: U,
                                       result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -520,7 +518,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func negative<U>(_ vector: U) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -545,8 +543,8 @@ extension vDSP {
     public static func negative<U, V>(_ vector: U,
                                       result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -556,56 +554,6 @@ extension vDSP {
                     vDSP_vnegD(v.baseAddress!, 1,
                                r.baseAddress!, 1,
                                vDSP_Length(n))
-                }
-            }
-    }
-    
-    // MARK: Complex
-    
-    /// Populates `result` with the absolute values of `vector`,
-    /// single-precision.
-    ///
-    /// - Parameter vector: The input vector.
-    /// - Parameter result: The output vector.
-    @inline(__always)
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func absolute<V>(_ vector: DSPSplitComplex,
-                                   result: inout V)
-        where
-        V: _MutableContiguousCollection,
-        V.Element == Float {
-            
-            let n = result.count
-            
-            result.withUnsafeMutableBufferPointer { r in
-                withUnsafePointer(to: vector) { v in
-                    vDSP_zvabs(v, 1,
-                               r.baseAddress!, 1,
-                               vDSP_Length(n))
-                }
-            }
-    }
-    
-    /// Populates `result` with the absolute values of `vector`,
-    /// double-precision.
-    ///
-    /// - Parameter vector: The input vector.
-    /// - Parameter result: The output vector.
-    @inline(__always)
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func absolute<V>(_ vector: DSPDoubleSplitComplex,
-                                   result: inout V)
-        where
-        V: _MutableContiguousCollection,
-        V.Element == Double {
-            
-            let n = result.count
-            
-            result.withUnsafeMutableBufferPointer { r in
-                withUnsafePointer(to: vector) { v in
-                    vDSP_zvabsD(v, 1,
-                                r.baseAddress!, 1,
-                                vDSP_Length(n))
                 }
             }
     }
@@ -628,7 +576,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func reverse<V>(_ vector: inout V)
         where
-        V: _MutableContiguousCollection,
+        V: AccelerateMutableBuffer,
         V.Element == Float {
             
             let n = vDSP_Length(vector.count)
@@ -646,7 +594,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func reverse<V>(_ vector: inout V)
         where
-        V: _MutableContiguousCollection,
+        V: AccelerateMutableBuffer,
         V.Element == Double {
             
             let n = vDSP_Length(vector.count)
@@ -673,7 +621,7 @@ extension vDSP {
     public static func sort<V>(_ vector: inout V,
                                sortOrder: SortOrder)
         where
-        V: _MutableContiguousCollection,
+        V: AccelerateMutableBuffer,
         V.Element == Float {
             
             let n = vDSP_Length(vector.count)
@@ -694,7 +642,7 @@ extension vDSP {
     public static func sort<V>(_ vector: inout V,
                                sortOrder: SortOrder)
         where
-        V: _MutableContiguousCollection,
+        V: AccelerateMutableBuffer,
         V.Element == Double {
             
             let n = vDSP_Length(vector.count)
@@ -726,7 +674,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func square<U>(_ vector: U) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -750,8 +698,8 @@ extension vDSP {
     public static func square<U, V>(_ vector: U,
                                     result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U : AccelerateBuffer,
+        V : AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -776,7 +724,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func square<U>(_ vector: U) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -800,8 +748,8 @@ extension vDSP {
     public static func square<U, V>(_ vector: U,
                                     result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U : AccelerateBuffer,
+        V : AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -828,7 +776,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func signedSquare<U>(_ vector: U) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -852,8 +800,8 @@ extension vDSP {
     public static func signedSquare<U, V>(_ vector: U,
                                           result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U : AccelerateBuffer,
+        V : AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -878,7 +826,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func signedSquare<U>(_ vector: U) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -902,8 +850,8 @@ extension vDSP {
     public static func signedSquare<U, V>(_ vector: U,
                                           result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U : AccelerateBuffer,
+        V : AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -930,7 +878,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func trunc<U>(_ vector: U) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -954,8 +902,8 @@ extension vDSP {
     public static func trunc<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U : AccelerateBuffer,
+        V : AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -980,7 +928,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func trunc<U>(_ vector: U) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -1004,8 +952,8 @@ extension vDSP {
     public static func trunc<U, V>(_ vector: U,
                                    result: inout V)
         where
-        U : _ContiguousCollection,
-        V : _MutableContiguousCollection,
+        U : AccelerateBuffer,
+        V : AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -1031,7 +979,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func countZeroCrossings<U>(_ vector: U) -> UInt
         where
-        U : _ContiguousCollection,
+        U : AccelerateBuffer,
         U.Element == Float {
             
             let n = vDSP_Length(vector.count)
@@ -1057,7 +1005,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func countZeroCrossings<U>(_ vector: U) -> UInt
         where
-        U : _ContiguousCollection,
+        U : AccelerateBuffer,
         U.Element == Double {
             
             let n = vDSP_Length(vector.count)
@@ -1073,53 +1021,5 @@ extension vDSP {
             }
             
             return crossingCount
-    }
-    
-    // MARK: Signed Magnitudes
-    
-    /// Calculates the signed magnitude of each element in `vector`, writing the result to `result`; single-precision.
-    ///
-    /// - Parameter _ vector: Input values.
-    /// - Parameter result: Output values.
-    @inline(__always)
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    public static func squareMagnitudes<V>(_ splitComplex: DSPSplitComplex,
-                                           result: inout V)
-        where
-        V : _MutableContiguousCollection,
-        V.Element == Float {
-            
-            let n = vDSP_Length(result.count)
-            
-            result.withUnsafeMutableBufferPointer { dest in
-                withUnsafePointer(to: splitComplex) { src in
-                    vDSP_zvmags(src, 1,
-                                dest.baseAddress!, 1,
-                                n)
-                }
-            }
-    }
-    
-    @inline(__always)
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    /// Calculates the signed magnitude of each element in `vector`, writing the result to `result`; double-precision.
-    ///
-    /// - Parameter _ vector: Input values.
-    /// - Parameter result: Output values.
-    public static func squareMagnitudes<V>(_ splitComplex: DSPDoubleSplitComplex,
-                                           result: inout V)
-        where
-        V : _MutableContiguousCollection,
-        V.Element == Double {
-            
-            let n = vDSP_Length(result.count)
-            
-            result.withUnsafeMutableBufferPointer { dest in
-                withUnsafePointer(to: splitComplex) { src in
-                    vDSP_zvmagsD(src, 1,
-                                 dest.baseAddress!, 1,
-                                 n)
-                }
-            }
     }
 }

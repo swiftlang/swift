@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
 extension vDSP {
     
     // MARK: One-dimensional convolution
@@ -26,8 +24,8 @@ extension vDSP {
     public static func convolve<T, U>(_ vector: T,
                                       withKernel kernel: U) -> [Float]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Float, U.Element == Float {
             
             let n = vector.count - kernel.count
@@ -57,9 +55,9 @@ extension vDSP {
                                          withKernel kernel: U,
                                          result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -89,8 +87,8 @@ extension vDSP {
     public static func convolve<T, U>(_ vector: T,
                                       withKernel kernel: U) -> [Double]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Double, U.Element == Double {
             
             let n = vector.count - kernel.count
@@ -120,9 +118,9 @@ extension vDSP {
                                          withKernel kernel: U,
                                          result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -154,8 +152,8 @@ extension vDSP {
     public static func correlate<T, U>(_ vector: T,
                                        withKernel kernel: U) -> [Float]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Float, U.Element == Float {
             
             let n = vector.count - kernel.count
@@ -185,9 +183,9 @@ extension vDSP {
                                           withKernel kernel: U,
                                           result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -217,8 +215,8 @@ extension vDSP {
     public static func correlate<T, U>(_ vector: T,
                                        withKernel kernel: U) -> [Double]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Double, U.Element == Double {
             
             let n = vector.count - kernel.count
@@ -248,9 +246,9 @@ extension vDSP {
                                           withKernel kernel: U,
                                           result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -290,8 +288,8 @@ extension vDSP {
                                       rowCount: Int, columnCount: Int,
                                       with3x3Kernel kernel: U) -> [Float]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Float, U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -323,9 +321,9 @@ extension vDSP {
                                          with3x3Kernel kernel: U,
                                          result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             precondition(rowCount >= 3,
@@ -365,8 +363,8 @@ extension vDSP {
                                       rowCount: Int, columnCount: Int,
                                       with3x3Kernel kernel: U) -> [Double]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Double, U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -398,9 +396,9 @@ extension vDSP {
                                          with3x3Kernel kernel: U,
                                          result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             precondition(rowCount >= 3,
@@ -440,8 +438,8 @@ extension vDSP {
                                       rowCount: Int, columnCount: Int,
                                       with5x5Kernel kernel: U) -> [Float]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Float, U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -473,9 +471,9 @@ extension vDSP {
                                          with5x5Kernel kernel: U,
                                          result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             precondition(rowCount >= 3,
@@ -515,8 +513,8 @@ extension vDSP {
                                       rowCount: Int, columnCount: Int,
                                       with5x5Kernel kernel: U) -> [Double]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Double, U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -548,9 +546,9 @@ extension vDSP {
                                          with5x5Kernel kernel: U,
                                          result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             precondition(rowCount >= 3,
@@ -593,8 +591,8 @@ extension vDSP {
                                       withKernel kernel: U,
                                       kernelRowCount: Int, kernelColumnCount: Int) -> [Float]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Float, U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -629,9 +627,9 @@ extension vDSP {
                                          kernelRowCount: Int, kernelColumnCount: Int,
                                          result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             precondition(rowCount >= 3,
@@ -678,8 +676,8 @@ extension vDSP {
                                       withKernel kernel: U,
                                       kernelRowCount: Int, kernelColumnCount: Int) -> [Double]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Double, U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -715,9 +713,9 @@ extension vDSP {
                                          kernelRowCount: Int, kernelColumnCount: Int,
                                          result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             precondition(rowCount >= 3,

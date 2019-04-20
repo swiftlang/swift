@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
 extension vDSP {
     
     /// Evaluates a polynomial using specified coefficients and independent variables. Single-precision.
@@ -31,7 +29,7 @@ extension vDSP {
     public static func evaluatePolynomial<U>(usingCoefficients coefficients: [Float],
                                              withVariables variables: U) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: variables.count) {
@@ -65,8 +63,8 @@ extension vDSP {
                                                 withVariables variables: U,
                                                 result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             let n = vDSP_Length(min(variables.count,
@@ -102,7 +100,7 @@ extension vDSP {
     public static func evaluatePolynomial<U>(usingCoefficients coefficients: [Double],
                                              withVariables variables: U) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: variables.count) {
@@ -136,8 +134,8 @@ extension vDSP {
                                                 withVariables variables: U,
                                                 result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             let n = vDSP_Length(min(variables.count,

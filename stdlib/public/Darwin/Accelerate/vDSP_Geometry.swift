@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
 extension vDSP {
     
     // MARK Dot product
@@ -26,7 +24,7 @@ extension vDSP {
     public static func dot<U>(_ vectorA: U,
                               _ vectorB: U) -> Float
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             precondition(vectorA.count == vectorB.count)
@@ -57,7 +55,7 @@ extension vDSP {
     public static func dot<U>(_ vectorA: U,
                               _ vectorB: U) -> Double
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             precondition(vectorA.count == vectorB.count)
@@ -91,8 +89,8 @@ extension vDSP {
     public static func hypot<U, V>(_ x: U,
                                    _ y: V) -> [Float]
         where
-        U: _ContiguousCollection,
-        V: _ContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(x.count == y.count)
@@ -121,9 +119,9 @@ extension vDSP {
                                       _ y: U,
                                       result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             precondition(x.count == y.count && y.count == result.count)
@@ -152,8 +150,8 @@ extension vDSP {
     public static func hypot<U, V>(_ x: U,
                                    _ y: V) -> [Double]
         where
-        U: _ContiguousCollection,
-        V: _ContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(x.count == y.count)
@@ -182,9 +180,9 @@ extension vDSP {
                                       _ y: U,
                                       result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             precondition(x.count == y.count && y.count == result.count)
@@ -217,10 +215,10 @@ extension vDSP {
     public static func hypot<R, S, T, U>(x0: R, x1: S,
                                             y0: T, y1: U) -> [Float]
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         R.Element == Float, S.Element == Float,
         T.Element == Float, U.Element == Float {
             
@@ -255,11 +253,11 @@ extension vDSP {
                                             y0: T, y1: U,
                                             result: inout V)
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         R.Element == Float, S.Element == Float,
         T.Element == Float, U.Element == Float,
         V.Element == Float {
@@ -300,10 +298,10 @@ extension vDSP {
     public static func hypot<R, S, T, U>(x0: R, x1: S,
                                             y0: T, y1: U) -> [Double]
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         R.Element == Double, S.Element == Double,
         T.Element == Double, U.Element == Double {
             
@@ -338,11 +336,11 @@ extension vDSP {
                                             y0: T, y1: U,
                                             result: inout V)
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         R.Element == Double, S.Element == Double,
         T.Element == Double, U.Element == Double,
         V.Element == Double {
@@ -382,8 +380,8 @@ extension vDSP {
     public static func distanceSquared<U, V>(_ pointA: U,
                                              _ pointB: V) -> Float
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(pointA.count == pointB.count)
@@ -413,8 +411,8 @@ extension vDSP {
     public static func distanceSquared<U, V>(_ pointA: U,
                                              _ pointB: V) -> Double
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(pointA.count == pointB.count)

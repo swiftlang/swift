@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
 extension vDSP {
     
     /// Vector sliding window sum; single-precision.
@@ -24,7 +22,7 @@ extension vDSP {
     public static func slidingWindowSum<U>(_ vector: U,
                                            usingWindowLength windowLength: Int) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let n = vector.count - windowLength + 1
@@ -53,8 +51,8 @@ extension vDSP {
                                               usingWindowLength windowLength: Int,
                                               result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float,
         V.Element == Float {
             
@@ -82,7 +80,7 @@ extension vDSP {
     public static func slidingWindowSum<U>(_ vector: U,
                                            usingWindowLength windowLength: Int) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let n = vector.count - windowLength + 1
@@ -111,8 +109,8 @@ extension vDSP {
                                               usingWindowLength windowLength: Int,
                                               result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double,
         V.Element == Double {
             

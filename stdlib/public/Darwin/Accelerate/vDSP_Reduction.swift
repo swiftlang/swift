@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
 extension vDSP {
     
     // MARK: Maximum
@@ -24,7 +22,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func maximum<U>(_ vector: U) -> Float
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let n = vDSP_Length(vector.count)
@@ -47,7 +45,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func maximum<U>(_ vector: U) -> Double
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let n = vDSP_Length(vector.count)
@@ -72,7 +70,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func maximumMagnitude<U>(_ vector: U) -> Float
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let n = vDSP_Length(vector.count)
@@ -95,7 +93,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func maximumMagnitude<U>(_ vector: U) -> Double
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let n = vDSP_Length(vector.count)
@@ -120,7 +118,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func minimum<U>(_ vector: U) -> Float
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let n = vDSP_Length(vector.count)
@@ -143,7 +141,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func minimum<U>(_ vector: U) -> Double
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let n = vDSP_Length(vector.count)
@@ -168,7 +166,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func sum<U>(_ vector: U) -> Float
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let n = vDSP_Length(vector.count)
@@ -191,7 +189,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func sum<U>(_ vector: U) -> Double
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let n = vDSP_Length(vector.count)
@@ -214,7 +212,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func sumOfSquares<U>(_ vector: U) -> Float
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let n = vDSP_Length(vector.count)
@@ -237,7 +235,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func sumOfSquares<U>(_ vector: U) -> Double
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let n = vDSP_Length(vector.count)
@@ -260,7 +258,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func sumAndSumOfSquares<U>(_ vector: U) -> (elementsSum: Float, squaresSum: Float)
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let n = vDSP_Length(vector.count)
@@ -285,7 +283,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func sumAndSumOfSquares<U>(_ vector: U) -> (elementsSum: Double, squaresSum: Double)
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let n = vDSP_Length(vector.count)
@@ -310,7 +308,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func sumOfMagnitudes<U>(_ vector: U) -> Float
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let n = vDSP_Length(vector.count)
@@ -333,7 +331,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func sumOfMagnitudes<U>(_ vector: U) -> Double
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let n = vDSP_Length(vector.count)
@@ -361,7 +359,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func indexOfMaximum<U>(_ vector: U) -> (UInt, Float)
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let n = vDSP_Length(vector.count)
@@ -386,7 +384,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func indexOfMaximum<U>(_ vector: U) -> (UInt, Double)
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let n = vDSP_Length(vector.count)
@@ -413,7 +411,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func indexOfMaximumMagnitude<U>(_ vector: U) -> (UInt, Float)
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let n = vDSP_Length(vector.count)
@@ -438,7 +436,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func indexOfMaximumMagnitude<U>(_ vector: U) -> (UInt, Double)
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let n = vDSP_Length(vector.count)
@@ -465,7 +463,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func indexOfMinimum<U>(_ vector: U) -> (UInt, Float)
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let n = vDSP_Length(vector.count)
@@ -490,7 +488,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func indexOfMinimum<U>(_ vector: U) -> (UInt, Double)
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let n = vDSP_Length(vector.count)
@@ -519,7 +517,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func meanSquare<U>(_ vector: U) -> Float
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let n = vDSP_Length(vector.count)
@@ -541,7 +539,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func meanSquare<U>(_ vector: U) -> Double
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let n = vDSP_Length(vector.count)
@@ -565,7 +563,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func meanMagnitude<U>(_ vector: U) -> Float
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let n = vDSP_Length(vector.count)
@@ -587,7 +585,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func meanMagnitude<U>(_ vector: U) -> Double
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let n = vDSP_Length(vector.count)
@@ -612,7 +610,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func mean<U>(_ vector: U) -> Float
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let n = vDSP_Length(vector.count)
@@ -634,7 +632,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func mean<U>(_ vector: U) -> Double
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let n = vDSP_Length(vector.count)
@@ -658,7 +656,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func rootMeanSquare<U>(_ vector: U) -> Float
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let n = vDSP_Length(vector.count)
@@ -680,7 +678,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func rootMeanSquare<U>(_ vector: U) -> Double
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let n = vDSP_Length(vector.count)

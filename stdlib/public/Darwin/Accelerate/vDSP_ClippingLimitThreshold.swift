@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
 extension vDSP {
     
     // MARK: Clip
@@ -26,7 +24,7 @@ extension vDSP {
     public static func clip<U>(_ vector: U,
                                to bounds: ClosedRange<Float>) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -53,8 +51,8 @@ extension vDSP {
                                   to bounds: ClosedRange<Float>,
                                   result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -85,7 +83,7 @@ extension vDSP {
     public static func clip<U>(_ vector: U,
                                to bounds: ClosedRange<Double>) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -112,8 +110,8 @@ extension vDSP {
                                   to bounds: ClosedRange<Double>,
                                   result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -159,7 +157,7 @@ extension vDSP {
     public static func invertedClip<U>(_ vector: U,
                                        to bounds: ClosedRange<Float>) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -199,8 +197,8 @@ extension vDSP {
                                           to bounds: ClosedRange<Float>,
                                           result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -244,7 +242,7 @@ extension vDSP {
     public static func invertedClip<U>(_ vector: U,
                                        to bounds: ClosedRange<Double>) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -284,8 +282,8 @@ extension vDSP {
                                           to bounds: ClosedRange<Double>,
                                           result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -328,7 +326,7 @@ extension vDSP {
                                     to lowerBound: Float,
                                     with rule: ThresholdRule<Float>) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -364,8 +362,8 @@ extension vDSP {
                                        with rule: ThresholdRule<Float>,
                                        result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -409,7 +407,7 @@ extension vDSP {
                                     to lowerBound: Double,
                                     with rule: ThresholdRule<Double>) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -445,8 +443,8 @@ extension vDSP {
                                        with rule: ThresholdRule<Double>,
                                        result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -495,7 +493,7 @@ extension vDSP {
                                 limit: Float,
                                 withOutputConstant outputConstant: Float) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -527,8 +525,8 @@ extension vDSP {
                                    withOutputConstant outputConstant: Float,
                                    result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -563,7 +561,7 @@ extension vDSP {
                                 limit: Double,
                                 withOutputConstant outputConstant: Double) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -595,8 +593,8 @@ extension vDSP {
                                    withOutputConstant outputConstant: Double,
                                    result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             let n = result.count

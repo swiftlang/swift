@@ -23,8 +23,8 @@ extension vDSP {
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == UInt8,
         V.Element == Float {
             
@@ -50,8 +50,8 @@ extension vDSP {
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == UInt8,
         V.Element == Double {
             
@@ -77,8 +77,8 @@ extension vDSP {
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == UInt16,
         V.Element == Float {
             
@@ -104,8 +104,8 @@ extension vDSP {
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == UInt16,
         V.Element == Double {
             
@@ -131,8 +131,8 @@ extension vDSP {
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == UInt32,
         V.Element == Float {
             
@@ -158,8 +158,8 @@ extension vDSP {
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == UInt32,
         V.Element == Double {
             
@@ -185,8 +185,8 @@ extension vDSP {
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Int8,
         V.Element == Float {
             
@@ -212,8 +212,8 @@ extension vDSP {
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Int8,
         V.Element == Double {
             
@@ -239,8 +239,8 @@ extension vDSP {
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Int16,
         V.Element == Float {
             
@@ -266,8 +266,8 @@ extension vDSP {
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Int16,
         V.Element == Double {
             
@@ -293,8 +293,8 @@ extension vDSP {
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Int32,
         V.Element == Float {
             
@@ -320,8 +320,8 @@ extension vDSP {
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Int32,
         V.Element == Double {
             
@@ -355,8 +355,8 @@ extension vDSP {
                                              to destination: inout V,
                                              rounding: RoundingMode)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float,
         V.Element == Int32 {
             let n = vDSP_Length(min(source.count,
@@ -388,8 +388,8 @@ extension vDSP {
                                              to destination: inout V,
                                              rounding: RoundingMode)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double,
         V.Element == Int32 {
             let n = vDSP_Length(min(source.count,
@@ -421,8 +421,8 @@ extension vDSP {
                                              to destination: inout V,
                                              rounding: RoundingMode)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float,
         V.Element == UInt16 {
             let n = vDSP_Length(min(source.count,
@@ -454,8 +454,8 @@ extension vDSP {
                                              to destination: inout V,
                                              rounding: RoundingMode)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double,
         V.Element == UInt16 {
             let n = vDSP_Length(min(source.count,
@@ -487,8 +487,8 @@ extension vDSP {
                                              to destination: inout V,
                                              rounding: RoundingMode)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float,
         V.Element == UInt32 {
             let n = vDSP_Length(min(source.count,
@@ -520,8 +520,8 @@ extension vDSP {
                                              to destination: inout V,
                                              rounding: RoundingMode)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double,
         V.Element == UInt32 {
             let n = vDSP_Length(min(source.count,
@@ -554,8 +554,8 @@ extension vDSP {
                                              to destination: inout V,
                                              rounding: RoundingMode)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float,
         V.Element == Int16 {
             let n = vDSP_Length(min(source.count,
@@ -587,8 +587,8 @@ extension vDSP {
                                              to destination: inout V,
                                              rounding: RoundingMode)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double,
         V.Element == Int16 {
             let n = vDSP_Length(min(source.count,
@@ -620,8 +620,8 @@ extension vDSP {
                                              to destination: inout V,
                                              rounding: RoundingMode)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float,
         V.Element == Int8 {
             let n = vDSP_Length(min(source.count,
@@ -653,8 +653,8 @@ extension vDSP {
                                              to destination: inout V,
                                              rounding: RoundingMode)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double,
         V.Element == Int8 {
             let n = vDSP_Length(min(source.count,
@@ -686,8 +686,8 @@ extension vDSP {
                                              to destination: inout V,
                                              rounding: RoundingMode)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float,
         V.Element == UInt8 {
             let n = vDSP_Length(min(source.count,
@@ -719,8 +719,8 @@ extension vDSP {
                                              to destination: inout V,
                                              rounding: RoundingMode)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double,
         V.Element == UInt8 {
             let n = vDSP_Length(min(source.count,
@@ -751,8 +751,8 @@ extension vDSP {
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float,
         V.Element == Double {
             let n = vDSP_Length(min(source.count,
@@ -776,8 +776,8 @@ extension vDSP {
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double,
         V.Element == Float {
             let n = vDSP_Length(min(source.count,
@@ -826,7 +826,7 @@ extension vDSP {
     public static func integerToFloatingPoint<T, U>(_ vector: T,
                                                     floatingPointType: U.Type) -> [U]
         where
-        T: _ContiguousCollection,
+        T: AccelerateBuffer,
         T.Element == UInt8,
         U: vDSP_FloatingPointConvertable {
             
@@ -868,7 +868,7 @@ extension vDSP {
     public static func integerToFloatingPoint<T, U>(_ vector: T,
                                                     floatingPointType: U.Type) -> [U]
         where
-        T: _ContiguousCollection,
+        T: AccelerateBuffer,
         T.Element == UInt16,
         U: vDSP_FloatingPointConvertable {
             
@@ -910,7 +910,7 @@ extension vDSP {
     public static func integerToFloatingPoint<T, U>(_ vector: T,
                                                     floatingPointType: U.Type) -> [U]
         where
-        T: _ContiguousCollection,
+        T: AccelerateBuffer,
         T.Element == UInt32,
         U: vDSP_FloatingPointConvertable {
             
@@ -952,7 +952,7 @@ extension vDSP {
     public static func integerToFloatingPoint<T, U>(_ vector: T,
                                                     floatingPointType: U.Type) -> [U]
         where
-        T: _ContiguousCollection,
+        T: AccelerateBuffer,
         T.Element == Int8,
         U: vDSP_FloatingPointConvertable {
             
@@ -994,7 +994,7 @@ extension vDSP {
     public static func integerToFloatingPoint<T, U>(_ vector: T,
                                                     floatingPointType: U.Type) -> [U]
         where
-        T: _ContiguousCollection,
+        T: AccelerateBuffer,
         T.Element == Int16,
         U: vDSP_FloatingPointConvertable {
             
@@ -1036,7 +1036,7 @@ extension vDSP {
     public static func integerToFloatingPoint<T, U>(_ vector: T,
                                                     floatingPointType: U.Type) -> [U]
         where
-        T: _ContiguousCollection,
+        T: AccelerateBuffer,
         T.Element == Int32,
         U: vDSP_FloatingPointConvertable {
             
@@ -1081,7 +1081,7 @@ extension vDSP {
                                                     integerType: U.Type,
                                                     rounding: RoundingMode) -> [U]
         where
-        T: _ContiguousCollection,
+        T: AccelerateBuffer,
         T.Element == Float,
         U: vDSP_IntegerConvertable {
             
@@ -1173,7 +1173,7 @@ extension vDSP {
                                                     integerType: U.Type,
                                                     rounding: RoundingMode) -> [U]
         where
-        T: _ContiguousCollection,
+        T: AccelerateBuffer,
         T.Element == Double,
         U: vDSP_IntegerConvertable {
             
@@ -1265,7 +1265,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func floatToDouble<U>(_ source: U) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             let result = Array<Double>(unsafeUninitializedCapacity: source.count) {
                 buffer, initializedCount in
@@ -1287,7 +1287,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func doubleToFloat<U>(_ source: U) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             let result = Array<Float>(unsafeUninitializedCapacity: source.count) {
                 buffer, initializedCount in

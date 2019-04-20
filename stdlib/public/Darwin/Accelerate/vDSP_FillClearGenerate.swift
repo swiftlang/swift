@@ -9,7 +9,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-import Accelerate
 
 /// Types that support vectorized window generation.
 @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
@@ -28,7 +27,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func fill<V>(_ vector: inout V,
                                with value: Float)
-        where V: _MutableContiguousCollection,
+        where V: AccelerateMutableBuffer,
         V.Element == Float {
             
             let n = vDSP_Length(vector.count)
@@ -50,7 +49,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func fill<V>(_ vector: inout V,
                                with value: Double)
-        where V: _MutableContiguousCollection,
+        where V: AccelerateMutableBuffer,
         V.Element == Double {
             
             let n = vDSP_Length(vector.count)
@@ -70,7 +69,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func clear<V>(_ vector: inout V)
-        where V: _MutableContiguousCollection,
+        where V: AccelerateMutableBuffer,
         V.Element == Float {
             
             let n = vDSP_Length(vector.count)
@@ -87,7 +86,7 @@ extension vDSP {
     @inline(__always)
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func clear<V>(_ vector: inout V)
-        where V: _MutableContiguousCollection,
+        where V: AccelerateMutableBuffer,
         V.Element == Double {
             
             let n = vDSP_Length(vector.count)
@@ -170,7 +169,7 @@ extension vDSP {
     public static func formWindow<V>(usingSequence sequence: WindowSequence,
                                      result: inout V,
                                      isHalfWindow: Bool)
-        where V: _MutableContiguousCollection,
+        where V: AccelerateMutableBuffer,
         V.Element == Float {
             
             let n = vDSP_Length(result.count)
@@ -209,7 +208,7 @@ extension vDSP {
     public static func formWindow<V>(usingSequence sequence: WindowSequence,
                                      result: inout V,
                                      isHalfWindow: Bool)
-        where V: _MutableContiguousCollection,
+        where V: AccelerateMutableBuffer,
         V.Element == Double {
             
             let n = vDSP_Length(result.count)
@@ -281,7 +280,7 @@ extension vDSP {
     public static func formRamp<V>(withInitialValue initialValue: Float,
                                    increment: Float,
                                    result: inout V)
-        where V: _MutableContiguousCollection,
+        where V: AccelerateMutableBuffer,
         V.Element == Float {
             
             let n = vDSP_Length(result.count)
@@ -335,7 +334,7 @@ extension vDSP {
     public static func formRamp<V>(withInitialValue initialValue: Double,
                                    increment: Double,
                                    result: inout V)
-        where V: _MutableContiguousCollection,
+        where V: AccelerateMutableBuffer,
         V.Element == Double {
             
             let n = vDSP_Length(result.count)
@@ -388,7 +387,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func formRamp<V>(in range: ClosedRange<Float>,
                                    result: inout V)
-        where V: _MutableContiguousCollection,
+        where V: AccelerateMutableBuffer,
         V.Element == Float {
             
             let n = vDSP_Length(result.count)
@@ -437,7 +436,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func formRamp<V>(in range: ClosedRange<Double>,
                                    result: inout V)
-        where V: _MutableContiguousCollection,
+        where V: AccelerateMutableBuffer,
         V.Element == Double {
             
             let n = vDSP_Length(result.count)
@@ -471,7 +470,7 @@ extension vDSP {
                                multiplyingBy vector: U,
                                increment: Float) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -501,8 +500,8 @@ extension vDSP {
                                      increment: Float,
                                      result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(vector.count == result.count)
@@ -534,7 +533,7 @@ extension vDSP {
                                multiplyingBy vector: U,
                                increment: Double) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -564,8 +563,8 @@ extension vDSP {
                                      increment: Double,
                                      result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(vector.count == result.count)
@@ -601,7 +600,7 @@ extension vDSP {
                                      multiplyingBy multiplierOne: U, _ multiplierTwo: U,
                                      increment: Float) -> (firstOutput:[Float], secondOutput: [Float])
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let n = multiplierOne.count
@@ -644,8 +643,8 @@ extension vDSP {
                                            increment: Float,
                                            results resultOne: inout V, _ resultTwo: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             precondition(multiplierOne.count == multiplierTwo.count)
@@ -685,7 +684,7 @@ extension vDSP {
                                      multiplyingBy multiplierOne: U, _ multiplierTwo: U,
                                      increment: Double) -> (firstOutput:[Double], secondOutput: [Double])
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let n = multiplierOne.count
@@ -728,8 +727,8 @@ extension vDSP {
                                            increment: Double,
                                            results resultOne: inout V, _ resultTwo: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             precondition(multiplierOne.count == multiplierTwo.count)

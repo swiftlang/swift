@@ -10,9 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
-
 extension vDSP {
     
     /// Rectangular to polar conversion, single-precision.
@@ -23,7 +20,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func rectangularToPolar<U>(_ rectangularCoordinates: U) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: rectangularCoordinates.count) {
@@ -47,8 +44,8 @@ extension vDSP {
     public static func convert<U, V>(rectangularCoordinates: U,
                                      toPolarCoordinates polarCoordinates: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float,
         V.Element == Float {
             
@@ -72,7 +69,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func rectangularToPolar<U>(_ rectangularCoordinates: U) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: rectangularCoordinates.count) {
@@ -96,8 +93,8 @@ extension vDSP {
     public static func convert<U, V>(rectangularCoordinates: U,
                                      toPolarCoordinates polarCoordinates: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double,
         V.Element == Double {
             
@@ -121,7 +118,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func polarToRectangular<U>(_ polarCoordinates: U) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: polarCoordinates.count) {
@@ -145,8 +142,8 @@ extension vDSP {
     public static func convert<U, V>(polarCoordinates: U,
                                      toRectangularCoordinates rectangularCoordinates: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float,
         V.Element == Float {
             
@@ -170,7 +167,7 @@ extension vDSP {
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public static func polarToRectangular<U>(_ polarCoordinates: U) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: polarCoordinates.count) {
@@ -194,8 +191,8 @@ extension vDSP {
     public static func convert<U, V>(polarCoordinates: U,
                                      toRectangularCoordinates rectangularCoordinates: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double,
         V.Element == Double {
             

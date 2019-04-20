@@ -38,6 +38,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    n / 2)
         
         let returnedResult = vDSP.rectangularToPolar(source)
+        
+        expectTrue(returnedResult.elementsEqual(legacyResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/SinglePrecisionPolarToRect") {
@@ -61,6 +63,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                   n / 2)
         
         let returnedResult = vDSP.polarToRectangular(source)
+        
+        expectTrue(returnedResult.elementsEqual(legacyResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/DoublePrecisionRectToPolar") {
@@ -84,6 +88,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                     n / 2)
         
         let returnedResult = vDSP.rectangularToPolar(source)
+        
+        expectTrue(returnedResult.elementsEqual(legacyResult))
     }
     
     AccelerateTests_vDSPConversion.test("vDSP/DoublePrecisionRectToPolar") {
@@ -107,6 +113,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                    n / 2)
         
         let returnedResult = vDSP.polarToRectangular(source)
+        
+        expectTrue(returnedResult.elementsEqual(legacyResult))
     }
 }
 
@@ -270,42 +278,7 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(result.elementsEqual(legacyResult))
         expectTrue(result.elementsEqual(returnedResult))
     }
-}
-
-//===----------------------------------------------------------------------===//
-//
-//  vDSP decibel conversion
-//
-//===----------------------------------------------------------------------===//
-
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     
-    AccelerateTests_vDSPConversion.test("vDSP/PowerToDecibelsSinglePrecision") {
-        let source: [Float] = [1, 10, 100, 2, 4, 8, 16, 101,
-                               27, 13, 11, 44, 0.5, 99, 0.125]
-        let zeroReference = Float(7)
-        let n = source.count
-        
-        var result = [Float](repeating: 0,
-                             count: n)
-        
-        vDSP.convert(power: source,
-                     toDecibels: &result,
-                     zeroReference: zeroReference)
-        
-        var legacyResult = [Float](repeating: -1,
-                                   count: n)
-        
-        vDSP_vdbcon(source, 1,
-                    [zeroReference],
-                    &legacyResult, 1,
-                    vDSP_Length(n),
-                    0)
-        
-        let returnedResult = vDSP.powerToDecibels(source,
-                                                  zeroReference: zeroReference)
-    }
-
     AccelerateTests_vDSPConversion.test("vDSP/Int8_to_Float") {
         let source = signedIntValues.map{ return Int8($0) }
         var result = [Float](repeating: 0, count: source.count)
@@ -337,37 +310,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         let returnedResult = vDSP.integerToFloatingPoint(source,
                                                          floatingPointType: Double.self)
-
+        
         expectTrue(result.elementsEqual(legacyResult))
         expectTrue(result.elementsEqual(returnedResult))
     }
     
-    AccelerateTests_vDSPConversion.test("vDSP/AmplitudeToDecibelsSinglePrecision") {
-        let source: [Float] = [1, 10, 100, 2, 4, 8, 16, 101,
-                               27, 13, 11, 44, 0.5, 99, 0.125]
-        let zeroReference = Float(7)
-        let n = source.count
-        
-        var result = [Float](repeating: 0,
-                             count: n)
-        
-        vDSP.convert(amplitude: source,
-                     toDecibels: &result,
-                     zeroReference: zeroReference)
-        
-        var legacyResult = [Float](repeating: -1,
-                                   count: n)
-        
-        vDSP_vdbcon(source, 1,
-                    [zeroReference],
-                    &legacyResult, 1,
-                    vDSP_Length(n),
-                    1)
-        
-        let returnedResult = vDSP.amplitudeToDecibels(source,
-                                                      zeroReference: zeroReference)
-    }
-
     AccelerateTests_vDSPConversion.test("vDSP/Int16_to_Float") {
         let source = signedIntValues.map{ return Int16($0) }
         var result = [Float](repeating: 0, count: source.count)
@@ -417,37 +364,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         let returnedResult = vDSP.integerToFloatingPoint(source,
                                                          floatingPointType: Float.self)
-
+        
         expectTrue(result.elementsEqual(legacyResult))
         expectTrue(result.elementsEqual(returnedResult))
     }
     
-    AccelerateTests_vDSPConversion.test("vDSP/PowerToDecibelsDoublePrecision") {
-        let source: [Double] = [1, 10, 100, 2, 4, 8, 16, 101,
-                                27, 13, 11, 44, 0.5, 99, 0.125]
-        let zeroReference = Double(7)
-        let n = source.count
-        
-        var result = [Double](repeating: 0,
-                              count: n)
-        
-        vDSP.convert(power: source,
-                     toDecibels: &result,
-                     zeroReference: zeroReference)
-        
-        var legacyResult = [Double](repeating: -1,
-                                    count: n)
-        
-        vDSP_vdbconD(source, 1,
-                     [zeroReference],
-                     &legacyResult, 1,
-                     vDSP_Length(n),
-                     0)
-        
-        let returnedResult = vDSP.powerToDecibels(source,
-                                                  zeroReference: zeroReference)
-    }
-
     AccelerateTests_vDSPConversion.test("vDSP/Int32_to_Double") {
         let source = signedIntValues.map{ return Int32($0) }
         var result = [Double](repeating: 0, count: source.count)
@@ -499,37 +420,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.floatingPointToInteger(source,
                                                          integerType: Int32.self,
                                                          rounding: .towardNearestInteger)
-
+        
         expectTrue(result.elementsEqual(legacyResult))
         expectTrue(result.elementsEqual(returnedResult))
     }
     
-    AccelerateTests_vDSPConversion.test("vDSP/AmplitudeToDecibelsDoublePrecision") {
-        let source: [Double] = [1, 10, 100, 2, 4, 8, 16, 101,
-                                27, 13, 11, 44, 0.5, 99, 0.125]
-        let zeroReference = Double(7)
-        let n = source.count
-        
-        var result = [Double](repeating: 0,
-                              count: n)
-        
-        vDSP.convert(amplitude: source,
-                     toDecibels: &result,
-                     zeroReference: zeroReference)
-        
-        var legacyResult = [Double](repeating: -1,
-                                    count: n)
-        
-        vDSP_vdbconD(source, 1,
-                     [zeroReference],
-                     &legacyResult, 1,
-                     vDSP_Length(n),
-                     1)
-        
-        let returnedResult = vDSP.amplitudeToDecibels(source,
-                                                      zeroReference: zeroReference)
-    }
-
     AccelerateTests_vDSPConversion.test("vDSP/DoubleToInt32towardZero") {
         let source = floatingPointValuesD
         var result = [Int32](repeating: 0, count: source.count)
@@ -582,68 +477,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.floatingPointToInteger(source,
                                                          integerType: UInt16.self,
                                                          rounding: .towardZero)
-
+        
         expectTrue(result.elementsEqual(legacyResult))
         expectTrue(result.elementsEqual(returnedResult))
     }
-}
-
-//===----------------------------------------------------------------------===//
-//
-//  vDSP complex format conversion
-//
-//===----------------------------------------------------------------------===//
-
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     
-    AccelerateTests_vDSPConversion.test("vDSP/ComplexFormatConversionSinglePrecision") {
-        var real: [Float] = [4, 5, 6]
-        var imag: [Float] = [1, 2, 3]
-        let src = DSPSplitComplex(realp: &real,
-                                  imagp: &imag)
-        
-        var dest = [DSPComplex](repeating: DSPComplex(),
-                                count: 3)
-        
-        vDSP.convert(splitComplexVector: src,
-                     toInterleavedComplexVector: &dest)
-        
-        var realResult: [Float] = [0, 0, 0]
-        var imagResult: [Float] = [0, 0, 0]
-        var result = DSPSplitComplex(realp: &realResult,
-                                     imagp: &imagResult)
-        
-        vDSP.convert(interleavedComplexVector: dest,
-                     toSplitComplexVector: &result)
-        
-        expectTrue(real.elementsEqual(realResult))
-        expectTrue(imag.elementsEqual(imagResult))
-    }
-    
-    AccelerateTests_vDSPConversion.test("vDSP/ComplexFormatConversionDoublePrecision") {
-        var real: [Double] = [4, 5, 6]
-        var imag: [Double] = [1, 2, 3]
-        let src = DSPDoubleSplitComplex(realp: &real,
-                                        imagp: &imag)
-        
-        var dest = [DSPDoubleComplex](repeating: DSPDoubleComplex(),
-                                      count: 3)
-        
-        vDSP.convert(splitComplexVector: src,
-                     toInterleavedComplexVector: &dest)
-        
-        var realResult: [Double] = [0, 0, 0]
-        var imagResult: [Double] = [0, 0, 0]
-        var result = DSPDoubleSplitComplex(realp: &realResult,
-                                           imagp: &imagResult)
-        
-        vDSP.convert(interleavedComplexVector: dest,
-                     toSplitComplexVector: &result)
-        
-        expectTrue(real.elementsEqual(realResult))
-        expectTrue(imag.elementsEqual(imagResult))
-    }    
-
     AccelerateTests_vDSPConversion.test("vDSP/FloatToUInt16towardNearest") {
         let source = floatingPointValues
         var result = [UInt16](repeating: 0, count: source.count)
@@ -1003,6 +841,176 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         expectTrue(result.elementsEqual(legacyResult))
         expectTrue(result.elementsEqual(returnedResult))
+    }
+}
+
+//===----------------------------------------------------------------------===//
+//
+//  vDSP decibel conversion
+//
+//===----------------------------------------------------------------------===//
+
+if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+    
+    AccelerateTests_vDSPConversion.test("vDSP/PowerToDecibelsSinglePrecision") {
+        let source: [Float] = [1, 10, 100, 2, 4, 8, 16, 101,
+                               27, 13, 11, 44, 0.5, 99, 0.125]
+        let zeroReference = Float(7)
+        let n = source.count
+        
+        var result = [Float](repeating: 0,
+                             count: n)
+        
+        vDSP.convert(power: source,
+                     toDecibels: &result,
+                     zeroReference: zeroReference)
+        
+        var legacyResult = [Float](repeating: -1,
+                                   count: n)
+        
+        vDSP_vdbcon(source, 1,
+                    [zeroReference],
+                    &legacyResult, 1,
+                    vDSP_Length(n),
+                    0)
+        
+        let returnedResult = vDSP.powerToDecibels(source,
+                                                  zeroReference: zeroReference)
+    }
+
+    AccelerateTests_vDSPConversion.test("vDSP/AmplitudeToDecibelsSinglePrecision") {
+        let source: [Float] = [1, 10, 100, 2, 4, 8, 16, 101,
+                               27, 13, 11, 44, 0.5, 99, 0.125]
+        let zeroReference = Float(7)
+        let n = source.count
+        
+        var result = [Float](repeating: 0,
+                             count: n)
+        
+        vDSP.convert(amplitude: source,
+                     toDecibels: &result,
+                     zeroReference: zeroReference)
+        
+        var legacyResult = [Float](repeating: -1,
+                                   count: n)
+        
+        vDSP_vdbcon(source, 1,
+                    [zeroReference],
+                    &legacyResult, 1,
+                    vDSP_Length(n),
+                    1)
+        
+        let returnedResult = vDSP.amplitudeToDecibels(source,
+                                                      zeroReference: zeroReference)
+    }
+
+    AccelerateTests_vDSPConversion.test("vDSP/PowerToDecibelsDoublePrecision") {
+        let source: [Double] = [1, 10, 100, 2, 4, 8, 16, 101,
+                                27, 13, 11, 44, 0.5, 99, 0.125]
+        let zeroReference = Double(7)
+        let n = source.count
+        
+        var result = [Double](repeating: 0,
+                              count: n)
+        
+        vDSP.convert(power: source,
+                     toDecibels: &result,
+                     zeroReference: zeroReference)
+        
+        var legacyResult = [Double](repeating: -1,
+                                    count: n)
+        
+        vDSP_vdbconD(source, 1,
+                     [zeroReference],
+                     &legacyResult, 1,
+                     vDSP_Length(n),
+                     0)
+        
+        let returnedResult = vDSP.powerToDecibels(source,
+                                                  zeroReference: zeroReference)
+    }
+
+    AccelerateTests_vDSPConversion.test("vDSP/AmplitudeToDecibelsDoublePrecision") {
+        let source: [Double] = [1, 10, 100, 2, 4, 8, 16, 101,
+                                27, 13, 11, 44, 0.5, 99, 0.125]
+        let zeroReference = Double(7)
+        let n = source.count
+        
+        var result = [Double](repeating: 0,
+                              count: n)
+        
+        vDSP.convert(amplitude: source,
+                     toDecibels: &result,
+                     zeroReference: zeroReference)
+        
+        var legacyResult = [Double](repeating: -1,
+                                    count: n)
+        
+        vDSP_vdbconD(source, 1,
+                     [zeroReference],
+                     &legacyResult, 1,
+                     vDSP_Length(n),
+                     1)
+        
+        let returnedResult = vDSP.amplitudeToDecibels(source,
+                                                      zeroReference: zeroReference)
+    }
+}
+
+//===----------------------------------------------------------------------===//
+//
+//  vDSP complex format conversion
+//
+//===----------------------------------------------------------------------===//
+
+if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+    
+    AccelerateTests_vDSPConversion.test("vDSP/ComplexFormatConversionSinglePrecision") {
+        var real: [Float] = [4, 5, 6]
+        var imag: [Float] = [1, 2, 3]
+        let src = DSPSplitComplex(realp: &real,
+                                  imagp: &imag)
+        
+        var dest = [DSPComplex](repeating: DSPComplex(),
+                                count: 3)
+        
+        vDSP.convert(splitComplexVector: src,
+                     toInterleavedComplexVector: &dest)
+        
+        var realResult: [Float] = [0, 0, 0]
+        var imagResult: [Float] = [0, 0, 0]
+        var result = DSPSplitComplex(realp: &realResult,
+                                     imagp: &imagResult)
+        
+        vDSP.convert(interleavedComplexVector: dest,
+                     toSplitComplexVector: &result)
+        
+        expectTrue(real.elementsEqual(realResult))
+        expectTrue(imag.elementsEqual(imagResult))
+    }
+    
+    AccelerateTests_vDSPConversion.test("vDSP/ComplexFormatConversionDoublePrecision") {
+        var real: [Double] = [4, 5, 6]
+        var imag: [Double] = [1, 2, 3]
+        let src = DSPDoubleSplitComplex(realp: &real,
+                                        imagp: &imag)
+        
+        var dest = [DSPDoubleComplex](repeating: DSPDoubleComplex(),
+                                      count: 3)
+        
+        vDSP.convert(splitComplexVector: src,
+                     toInterleavedComplexVector: &dest)
+        
+        var realResult: [Double] = [0, 0, 0]
+        var imagResult: [Double] = [0, 0, 0]
+        var result = DSPDoubleSplitComplex(realp: &realResult,
+                                           imagp: &imagResult)
+        
+        vDSP.convert(interleavedComplexVector: dest,
+                     toSplitComplexVector: &result)
+        
+        expectTrue(real.elementsEqual(realResult))
+        expectTrue(imag.elementsEqual(imagResult))
     }
 }
 

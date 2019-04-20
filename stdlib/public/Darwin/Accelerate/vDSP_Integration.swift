@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
 extension vDSP {
     public enum IntegrationRule {
         case runningSum
@@ -31,7 +29,7 @@ extension vDSP {
                                     using rule: IntegrationRule,
                                     stepSize: Float = 1) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -60,8 +58,8 @@ extension vDSP {
                                        stepSize: Float = 1,
                                        result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             let n = vDSP_Length(min(vector.count,
@@ -102,7 +100,7 @@ extension vDSP {
                                     using rule: IntegrationRule,
                                     stepSize: Double = 1) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -131,8 +129,8 @@ extension vDSP {
                                        stepSize: Double = 1,
                                        result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             let n = vDSP_Length(min(vector.count,

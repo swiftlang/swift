@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
 extension vDSP {
     
     /// Converts power to decibels, single-precision.
@@ -24,7 +22,7 @@ extension vDSP {
     public static func powerToDecibels<U>(_ power: U,
                                           zeroReference: Float) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: power.count) {
@@ -51,8 +49,8 @@ extension vDSP {
                                      toDecibels decibels: inout V,
                                      zeroReference: Float)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             let n = decibels.count
@@ -81,7 +79,7 @@ extension vDSP {
     public static func powerToDecibels<U>(_ power: U,
                                           zeroReference: Double) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: power.count) {
@@ -108,8 +106,8 @@ extension vDSP {
                                      toDecibels decibels: inout V,
                                      zeroReference: Double)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             let n = decibels.count
@@ -138,7 +136,7 @@ extension vDSP {
     public static func amplitudeToDecibels<U>(_ amplitude: U,
                                               zeroReference: Float) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: amplitude.count) {
@@ -165,8 +163,8 @@ extension vDSP {
                                      toDecibels decibels: inout V,
                                      zeroReference: Float)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             let n = decibels.count
@@ -195,7 +193,7 @@ extension vDSP {
     public static func amplitudeToDecibels<U>(_ amplitude: U,
                                               zeroReference: Double) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: amplitude.count) {
@@ -222,8 +220,8 @@ extension vDSP {
                                      toDecibels decibels: inout V,
                                      zeroReference: Double)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             let n = decibels.count

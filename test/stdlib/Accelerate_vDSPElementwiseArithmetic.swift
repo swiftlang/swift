@@ -9,71 +9,15 @@ import Accelerate
 
 var Accelerate_vDSPElementwiseArithmeticTests = TestSuite("Accelerate_vDSPElementwiseArithmetic")
 
-if #available(iOS 10.0, OSX 10.12, tvOS 10.0, watchOS 4.0, *) {
-  
-  Accelerate_vDSPElementwiseArithmeticTests.test("BNNS/ImageStackDescriptor") {
-    var succeed = BNNSImageStackDescriptor(width: 0, height: 0, channels: 0,
-                                           row_stride: 0, image_stride: 0,
-                                           data_type: .int8)
-    expectEqual(succeed.data_scale, 1)
-    expectEqual(succeed.data_bias, 0)
-    succeed = BNNSImageStackDescriptor(width: 0, height: 0, channels: 0,
-                                       row_stride: 0, image_stride: 0,
-                                       data_type: .int16,
-                                       data_scale: 0.5, data_bias: 0.5)
-    expectEqual(succeed.data_scale, 0.5)
-    expectEqual(succeed.data_bias, 0.5)
-    expectCrashLater()
-    //  indexed8 is not allowed as an imageStack data type.
-    let _ = BNNSImageStackDescriptor(width: 0, height: 0, channels: 0,
-                                     row_stride: 0, image_stride: 0,
-                                     data_type: .indexed8)
-  }
-  
-  Accelerate_vDSPElementwiseArithmeticTests.test("BNNS/VectorDescriptor") {
-    var succeed = BNNSVectorDescriptor(size: 0, data_type: .int8)
-    expectEqual(succeed.data_scale, 1)
-    expectEqual(succeed.data_bias, 0)
-    succeed = BNNSVectorDescriptor(size: 0, data_type: .int8,
-                                   data_scale: 0.5, data_bias: 0.5)
-    expectEqual(succeed.data_scale, 0.5)
-    expectEqual(succeed.data_bias, 0.5)
-    expectCrashLater()
-    //  indexed8 is not allowed as a vector data type.
-    let _ = BNNSVectorDescriptor(size: 0, data_type: .indexed8)
-  }
-  
-  Accelerate_vDSPElementwiseArithmeticTests.test("BNNS/LayerData") {
-    //  The zero layer should have data == nil.
-    expectEqual(BNNSLayerData.zero.data, nil)
-    var succeed = BNNSLayerData(data: nil, data_type: .int8)
-    expectEqual(succeed.data_scale, 1)
-    expectEqual(succeed.data_bias, 0)
-    succeed = BNNSLayerData(data: nil, data_type: .int8, data_scale: 0.5,
-                            data_bias: 0.5, data_table: nil)
-    expectEqual(succeed.data_scale, 0.5)
-    expectEqual(succeed.data_bias, 0.5)
-    var table: [Float] = [1.0]
-    succeed = BNNSLayerData.indexed8(data: nil, data_table: &table)
-    expectCrashLater()
-    // indexed8 requires a non-nil data table.
-    let _ = BNNSLayerData(data: nil, data_type: .indexed8)
-  }
-  
-  Accelerate_vDSPElementwiseArithmeticTests.test("BNNS/Activation") {
-    expectEqual(BNNSActivation.identity.function, .identity)
-    let id = BNNSActivation(function: .identity)
-    expectTrue(id.alpha.isNaN)
-    expectTrue(id.beta.isNaN)
-  }
-  
-}
-
 //===----------------------------------------------------------------------===//
 //
 //  vDSP Single Precision Arithmetic
 //
 //===----------------------------------------------------------------------===//
+
+func lround(_ x: Float) -> Int {
+    return lround(Double(x))
+}
 
 if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     
@@ -98,8 +42,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.add(scalarA,
                                       vectorB)
         
-        expectEqual(Int(result.first!), 600)
-        expectEqual(Int(returnedResult.first!), 600)
+        expectEqual(lround(result.first!), 600)
+        expectEqual(lround(returnedResult.first!), 600)
     }
     
     // c[i] = a[i] + b[i]
@@ -114,8 +58,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.add(vectorA,
                                       vectorB)
         
-        expectEqual(Int(result.first!), 1000)
-        expectEqual(Int(returnedResult.first!), 1000)
+        expectEqual(lround(result.first!), 1000)
+        expectEqual(lround(returnedResult.first!), 1000)
     }
     
     // c[i] = a[i] - b[i]
@@ -130,8 +74,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.subtract(vectorA,
                                            vectorB)
         
-        expectEqual(Int(result.first!), -25)
-        expectEqual(Int(returnedResult.first!), -25)
+        expectEqual(lround(result.first!), -25)
+        expectEqual(lround(returnedResult.first!), -25)
     }
     
     // c[i] = a[i] * b
@@ -146,8 +90,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.multiply(scalarA,
                                            vectorB)
         
-        expectEqual(Int(result.first!), 300)
-        expectEqual(Int(returnedResult.first!), 300)
+        expectEqual(lround(result.first!), 300)
+        expectEqual(lround(returnedResult.first!), 300)
     }
     
     // a[i] * b[i]
@@ -162,8 +106,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.multiply(vectorA,
                                            vectorB)
         
-        expectEqual(Int(result.first!), 60)
-        expectEqual(Int(returnedResult.first!), 60)
+        expectEqual(lround(result.first!), 60)
+        expectEqual(lround(returnedResult.first!), 60)
     }
     
     // c[i] = a[i] / b
@@ -178,8 +122,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.divide(vectorB,
                                          scalarA)
         
-        expectEqual(Int(result.first!), 25)
-        expectEqual(Int(returnedResult.first!), 25)
+        expectEqual(lround(result.first!), 25)
+        expectEqual(lround(returnedResult.first!), 25)
     }
     
     // c[i] = a / b[i]
@@ -194,8 +138,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.divide(scalarA,
                                          vectorB)
         
-        expectEqual(Int(result.first!), 50)
-        expectEqual(Int(returnedResult.first!), 50)
+        expectEqual(lround(result.first!), 50)
+        expectEqual(lround(returnedResult.first!), 50)
     }
     
     // c[i] = a[i] / b[i]
@@ -210,8 +154,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.divide(vectorA,
                                          vectorB)
         
-        expectEqual(Int(result.first!), 200)
-        expectEqual(Int(returnedResult.first!), 200)
+        expectEqual(lround(result.first!), 200)
+        expectEqual(lround(returnedResult.first!), 200)
     }
     
     // o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]
@@ -225,8 +169,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                          addResult: &result,
                          subtractResult: &subtractResult)
         
-        expectEqual(Int(result.first!), 20)
-        expectEqual(Int(subtractResult.first!), 12)
+        expectEqual(lround(result.first!), 20)
+        expectEqual(lround(subtractResult.first!), 12)
         
     }
     
@@ -243,8 +187,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.multiply(addition: (vectorA, vectorB),
                                            scalarA)
         
-        expectEqual(Int(result.first!), 80)
-        expectEqual(Int(returnedResult.first!), 80)
+        expectEqual(lround(result.first!), 80)
+        expectEqual(lround(returnedResult.first!), 80)
     }
     
     // d[i] = (a[i] + b[i]) * c[i]
@@ -260,8 +204,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.multiply(addition: (vectorA, vectorB),
                                            vectorC)
         
-        expectEqual(Int(result.first!), 100)
-        expectEqual(Int(returnedResult.first!), 100)
+        expectEqual(lround(result.first!), 100)
+        expectEqual(lround(returnedResult.first!), 100)
     }
     
     // d[i] = (a[i] - b[i]) * c
@@ -277,8 +221,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.multiply(subtraction: (vectorA, vectorB),
                                            scalarA)
         
-        expectEqual(Int(result.first!), 30)
-        expectEqual(Int(returnedResult.first!), 30)
+        expectEqual(lround(result.first!), 30)
+        expectEqual(lround(returnedResult.first!), 30)
     }
     
     // d[i] = (a[i] - b[i]) * c[i]
@@ -294,8 +238,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.multiply(subtraction: (vectorA, vectorB),
                                            vectorC)
         
-        expectEqual(Int(result.first!), 30)
-        expectEqual(Int(returnedResult.first!), 30)
+        expectEqual(lround(result.first!), 30)
+        expectEqual(lround(returnedResult.first!), 30)
     }
     
     // a[i]*b[i] + c
@@ -311,8 +255,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.add(multiplication: (vectorA, vectorB),
                                       scalarA)
         
-        expectEqual(Int(result.first!), 200)
-        expectEqual(Int(returnedResult.first!), 200)
+        expectEqual(lround(result.first!), 200)
+        expectEqual(lround(returnedResult.first!), 200)
     }
     
     // (a[i] * b) + c[i]
@@ -328,8 +272,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.add(multiplication: (vectorA, scalarB),
                                       vectorC)
         
-        expectEqual(Int(result.first!), 300)
-        expectEqual(Int(returnedResult.first!), 300)
+        expectEqual(lround(result.first!), 300)
+        expectEqual(lround(returnedResult.first!), 300)
     }
     
     // d[i] = (a[i] * b[i]) + c[i]
@@ -345,8 +289,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.add(multiplication: (vectorA, vectorB),
                                       vectorC)
         
-        expectEqual(Int(result.first!), 106)
-        expectEqual(Int(returnedResult.first!), 106)
+        expectEqual(lround(result.first!), 106)
+        expectEqual(lround(returnedResult.first!), 106)
     }
     
     // d[i] = (a[i] * b[i]) - c[i]
@@ -362,8 +306,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.subtract(multiplication: (vectorB, vectorC),
                                            vectorA)
         
-        expectEqual(Int(result.first!), 75)
-        expectEqual(Int(returnedResult.first!), 75)
+        expectEqual(lround(result.first!), 75)
+        expectEqual(lround(returnedResult.first!), 75)
     }
     
     // e[i] = (a[i] * b) + (c[i] * d)
@@ -380,8 +324,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.add(multiplication: (vectorA, scalarA),
                                       multiplication: (vectorB, scalarB))
         
-        expectEqual(Int(result.first!), 700)
-        expectEqual(Int(returnedResult.first!), 700)
+        expectEqual(lround(result.first!), 700)
+        expectEqual(lround(returnedResult.first!), 700)
     }
     
     // E[n] = A[n]*B[n] + C[n]*D[n]
@@ -398,8 +342,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.add(multiplication: (vectorA, vectorB),
                                       multiplication: (vectorC, vectorD))
         
-        expectEqual(Int(result.first!), 80)
-        expectEqual(Int(returnedResult.first!), 80)
+        expectEqual(lround(result.first!), 80)
+        expectEqual(lround(returnedResult.first!), 80)
     }
     
     // e[i] = (a[i] + b[i]) * (c[i] + d[i])
@@ -416,8 +360,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.multiply(addition: (vectorA, vectorB),
                                            addition: (vectorC, vectorD))
         
-        expectEqual(Int(result.first!), 200)
-        expectEqual(Int(returnedResult.first!), 200)
+        expectEqual(lround(result.first!), 200)
+        expectEqual(lround(returnedResult.first!), 200)
     }
     
     // e[i] = (a[i] * b[i]) - (c[i] * d[i])
@@ -434,8 +378,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.subtract(multiplication: (vectorA, vectorB),
                                            multiplication: (vectorC, vectorD))
         
-        expectEqual(Int(result.first!), -69)
-        expectEqual(Int(returnedResult.first!), -69)
+        expectEqual(lround(result.first!), -69)
+        expectEqual(lround(returnedResult.first!), -69)
     }
     
     // e[i] = (a[i] - b[i]) * (c[i] - d[i])
@@ -452,8 +396,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.multiply(subtraction: (vectorA, vectorB),
                                            subtraction: (vectorC, vectorD))
         
-        expectEqual(Int(result.first!), 170)
-        expectEqual(Int(returnedResult.first!), 170)
+        expectEqual(lround(result.first!), 170)
+        expectEqual(lround(returnedResult.first!), 170)
     }
     
     // e[i] = (a[i] + b[i]) * (c[i] - d[i])
@@ -470,8 +414,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.multiply(addition: (vectorA, vectorB),
                                            subtraction: (vectorC, vectorD))
         
-        expectEqual(Int(result.first!), 2000)
-        expectEqual(Int(returnedResult.first!), 2000)
+        expectEqual(lround(result.first!), 2000)
+        expectEqual(lround(returnedResult.first!), 2000)
     }
     
     // d[n] = a[n]*b + c
@@ -487,8 +431,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.add(multiplication: (vectorA, scalarA),
                                       scalarB)
         
-        expectEqual(Int(result.first!), 30)
-        expectEqual(Int(returnedResult.first!), 30)
+        expectEqual(lround(result.first!), 30)
+        expectEqual(lround(returnedResult.first!), 30)
     }
     
     // D[n] = A[n]*B - C[n];
@@ -504,8 +448,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.subtract(multiplication: (vectorA, scalarB),
                                            vectorC)
         
-        expectEqual(Int(result.first!), 25)
-        expectEqual(Int(returnedResult.first!), 25)
+        expectEqual(lround(result.first!), 25)
+        expectEqual(lround(returnedResult.first!), 25)
     }
 }
 
@@ -539,8 +483,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.add(scalarA,
                                       vectorB)
         
-        expectEqual(Int(result.first!), 600)
-        expectEqual(Int(returnedResult.first!), 600)
+        expectEqual(lround(result.first!), 600)
+        expectEqual(lround(returnedResult.first!), 600)
     }
     
     // c[i] = a[i] + b[i]
@@ -555,8 +499,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.add(vectorA,
                                       vectorB)
         
-        expectEqual(Int(result.first!), 1000)
-        expectEqual(Int(returnedResult.first!), 1000)
+        expectEqual(lround(result.first!), 1000)
+        expectEqual(lround(returnedResult.first!), 1000)
     }
     
     // c[i] = a[i] - b[i]
@@ -571,8 +515,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.subtract(vectorA,
                                             vectorB)
         
-        expectEqual(Int(result.first!), -25)
-        expectEqual(Int(returnedResult.first!), -25)
+        expectEqual(lround(result.first!), -25)
+        expectEqual(lround(returnedResult.first!), -25)
     }
     
     // c[i] = a[i] * b
@@ -587,8 +531,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.multiply(scalarA,
                                            vectorB)
         
-        expectEqual(Int(result.first!), 300)
-        expectEqual(Int(returnedResult.first!), 300)
+        expectEqual(lround(result.first!), 300)
+        expectEqual(lround(returnedResult.first!), 300)
     }
     
     // a[i] * b[i]
@@ -603,8 +547,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.multiply(vectorA,
                                            vectorB)
         
-        expectEqual(Int(result.first!), 60)
-        expectEqual(Int(returnedResult.first!), 60)
+        expectEqual(lround(result.first!), 60)
+        expectEqual(lround(returnedResult.first!), 60)
     }
     
     // c[i] = a[i] / b
@@ -619,8 +563,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.divide(vectorB,
                                          scalarA)
         
-        expectEqual(Int(result.first!), 25)
-        expectEqual(Int(returnedResult.first!), 25)
+        expectEqual(lround(result.first!), 25)
+        expectEqual(lround(returnedResult.first!), 25)
     }
     
     // c[i] = a / b[i]
@@ -635,8 +579,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.divide(scalarA,
                                          vectorB)
         
-        expectEqual(Int(result.first!), 50)
-        expectEqual(Int(returnedResult.first!), 50)
+        expectEqual(lround(result.first!), 50)
+        expectEqual(lround(returnedResult.first!), 50)
     }
     
     // c[i] = a[i] / b[i]
@@ -651,8 +595,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.divide(vectorA,
                                          vectorB)
         
-        expectEqual(Int(result.first!), 200)
-        expectEqual(Int(returnedResult.first!), 200)
+        expectEqual(lround(result.first!), 200)
+        expectEqual(lround(returnedResult.first!), 200)
     }
     
     // o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]
@@ -666,8 +610,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                          addResult: &result,
                          subtractResult: &subtractResult)
         
-        expectEqual(Int(result.first!), 20)
-        expectEqual(Int(subtractResult.first!), 12)
+        expectEqual(lround(result.first!), 20)
+        expectEqual(lround(subtractResult.first!), 12)
     }
     
     // d[i] = (a[i] + b[i]) * c
@@ -683,8 +627,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.multiply(addition: (vectorA, vectorB),
                                            scalarA)
         
-        expectEqual(Int(result.first!), 80)
-        expectEqual(Int(returnedResult.first!), 80)
+        expectEqual(lround(result.first!), 80)
+        expectEqual(lround(returnedResult.first!), 80)
     }
     
     // d[i] = (a[i] + b[i]) * c[i]
@@ -700,8 +644,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.multiply(addition: (vectorA, vectorB),
                                            vectorC)
         
-        expectEqual(Int(result.first!), 100)
-        expectEqual(Int(returnedResult.first!), 100)
+        expectEqual(lround(result.first!), 100)
+        expectEqual(lround(returnedResult.first!), 100)
     }
     
     // d[i] = (a[i] - b[i]) * c
@@ -717,8 +661,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.multiply(subtraction: (vectorA, vectorB),
                                            scalarA)
         
-        expectEqual(Int(result.first!), 30)
-        expectEqual(Int(returnedResult.first!), 30)
+        expectEqual(lround(result.first!), 30)
+        expectEqual(lround(returnedResult.first!), 30)
     }
     
     // d[i] = (a[i] - b[i]) * c[i]
@@ -734,8 +678,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.multiply(subtraction: (vectorA, vectorB),
                                            vectorC)
         
-        expectEqual(Int(result.first!), 30)
-        expectEqual(Int(returnedResult.first!), 30)
+        expectEqual(lround(result.first!), 30)
+        expectEqual(lround(returnedResult.first!), 30)
     }
     
     // a[i]*b[i] + c
@@ -751,8 +695,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.add(multiplication: (vectorA, vectorB),
                                       scalarA)
         
-        expectEqual(Int(result.first!), 200)
-        expectEqual(Int(returnedResult.first!), 200)
+        expectEqual(lround(result.first!), 200)
+        expectEqual(lround(returnedResult.first!), 200)
     }
     
     // (a[i] * b) + c[i]
@@ -768,8 +712,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.add(multiplication: (vectorA, scalarB),
                                       vectorC)
         
-        expectEqual(Int(result.first!), 300)
-        expectEqual(Int(returnedResult.first!), 300)
+        expectEqual(lround(result.first!), 300)
+        expectEqual(lround(returnedResult.first!), 300)
     }
     
     // d[i] = (a[i] * b[i]) + c[i]
@@ -785,8 +729,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.add(multiplication: (vectorA, vectorB),
                                       vectorC)
         
-        expectEqual(Int(result.first!), 106)
-        expectEqual(Int(returnedResult.first!), 106)
+        expectEqual(lround(result.first!), 106)
+        expectEqual(lround(returnedResult.first!), 106)
     }
     
     // d[i] = (a[i] * b[i]) - c[i]
@@ -802,8 +746,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.subtract(multiplication: (vectorB, vectorC),
                                            vectorA)
         
-        expectEqual(Int(result.first!), 75)
-        expectEqual(Int(returnedResult.first!), 75)
+        expectEqual(lround(result.first!), 75)
+        expectEqual(lround(returnedResult.first!), 75)
     }
     
     // e[i] = (a[i] * b) + (c[i] * d)
@@ -820,8 +764,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.add(multiplication: (vectorA, scalarA),
                                       multiplication: (vectorB, scalarB))
         
-        expectEqual(Int(result.first!), 700)
-        expectEqual(Int(returnedResult.first!), 700)
+        expectEqual(lround(result.first!), 700)
+        expectEqual(lround(returnedResult.first!), 700)
     }
     
     // E[n] = A[n]*B[n] + C[n]*D[n]
@@ -838,8 +782,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.add(multiplication: (vectorA, vectorB),
                                       multiplication: (vectorC, vectorD))
         
-        expectEqual(Int(result.first!), 80)
-        expectEqual(Int(returnedResult.first!), 80)
+        expectEqual(lround(result.first!), 80)
+        expectEqual(lround(returnedResult.first!), 80)
     }
     
     // e[i] = (a[i] + b[i]) * (c[i] + d[i])
@@ -856,8 +800,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.multiply(addition: (vectorA, vectorB),
                                            addition: (vectorC, vectorD))
         
-        expectEqual(Int(result.first!), 200)
-        expectEqual(Int(returnedResult.first!), 200)
+        expectEqual(lround(result.first!), 200)
+        expectEqual(lround(returnedResult.first!), 200)
     }
     
     // e[i] = (a[i] * b[i]) - (c[i] * d[i])
@@ -874,8 +818,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.subtract(multiplication: (vectorA, vectorB),
                                            multiplication: (vectorC, vectorD))
         
-        expectEqual(Int(result.first!), -69)
-        expectEqual(Int(returnedResult.first!), -69)
+        expectEqual(lround(result.first!), -69)
+        expectEqual(lround(returnedResult.first!), -69)
     }
     
     // e[i] = (a[i] - b[i]) * (c[i] - d[i])
@@ -892,8 +836,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.multiply(subtraction: (vectorA, vectorB),
                                            subtraction: (vectorC, vectorD))
         
-        expectEqual(Int(result.first!), 170)
-        expectEqual(Int(returnedResult.first!), 170)
+        expectEqual(lround(result.first!), 170)
+        expectEqual(lround(returnedResult.first!), 170)
     }
     
     // e[i] = (a[i] + b[i]) * (c[i] - d[i])
@@ -910,8 +854,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.multiply(addition: (vectorA, vectorB),
                                            subtraction: (vectorC, vectorD))
         
-        expectEqual(Int(result.first!), 2000)
-        expectEqual(Int(returnedResult.first!), 2000)
+        expectEqual(lround(result.first!), 2000)
+        expectEqual(lround(returnedResult.first!), 2000)
     }
     
     // d[n] = a[n]*b + c
@@ -927,8 +871,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.add(multiplication: (vectorA, scalarA),
                                       scalarB)
         
-        expectEqual(Int(result.first!), 30)
-        expectEqual(Int(returnedResult.first!), 30)
+        expectEqual(lround(result.first!), 30)
+        expectEqual(lround(returnedResult.first!), 30)
     }
     
     // D[n] = A[n]*B - C[n];
@@ -944,8 +888,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let returnedResult = vDSP.subtract(multiplication: (vectorA, scalarB),
                                            vectorC)
         
-        expectEqual(Int(result.first!), 25)
-        expectEqual(Int(returnedResult.first!), 25)
+        expectEqual(lround(result.first!), 25)
+        expectEqual(lround(returnedResult.first!), 25)
     }
 }
 

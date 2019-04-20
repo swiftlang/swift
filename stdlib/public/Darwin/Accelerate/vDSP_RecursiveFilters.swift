@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
 extension vDSP {
 
     /// Performs two-pole two-zero recursive filtering; single-precision.
@@ -37,7 +35,7 @@ extension vDSP {
     public static func twoPoleTwoZeroFilter<U>(_ source: U,
                                                   coefficients: (Float, Float, Float, Float, Float)) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: source.count) {
@@ -80,8 +78,8 @@ extension vDSP {
                                                   coefficients: (Float, Float, Float, Float, Float),
                                                   result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float,
         V.Element == Float {
             
@@ -124,7 +122,7 @@ extension vDSP {
     public static func twoPoleTwoZeroFilter<U>(_ source: U,
                                                   coefficients: (Double, Double, Double, Double, Double)) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: source.count) {
@@ -167,8 +165,8 @@ extension vDSP {
                                                   coefficients: (Double, Double, Double, Double, Double),
                                                   result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double,
         V.Element == Double {
             

@@ -27,7 +27,7 @@ extension vDSP {
     public static func phase<V>(_ splitComplex: DSPSplitComplex,
                                 result: inout V)
         where
-        V: _MutableContiguousCollection,
+        V: AccelerateMutableBuffer,
         V.Element == Float {
             
             let n = vDSP_Length(result.count)
@@ -50,7 +50,7 @@ extension vDSP {
     public static func phase<V>(_ splitComplex: DSPDoubleSplitComplex,
                                 result: inout V)
         where
-        V: _MutableContiguousCollection,
+        V: AccelerateMutableBuffer,
         V.Element == Double {
             
             let n = vDSP_Length(result.count)
@@ -166,7 +166,7 @@ extension vDSP {
                                  by vector: U,
                                  result: inout DSPSplitComplex)
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             withUnsafePointer(to: splitComplex) { a in
@@ -191,7 +191,7 @@ extension vDSP {
                                  by vector: U,
                                  result: inout DSPDoubleSplitComplex)
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             withUnsafePointer(to: splitComplex) { a in
@@ -216,7 +216,7 @@ extension vDSP {
                                    by vector: U,
                                    result: inout DSPSplitComplex)
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             withUnsafePointer(to: splitComplex) { a in
@@ -241,7 +241,7 @@ extension vDSP {
                                    by vector: U,
                                    result: inout DSPDoubleSplitComplex)
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             withUnsafePointer(to: splitComplex) { a in
@@ -472,7 +472,7 @@ extension vDSP {
     public static func absolute<V>(_ vector: DSPSplitComplex,
                                    result: inout V)
         where
-        V: _MutableContiguousCollection,
+        V: AccelerateMutableBuffer,
         V.Element == Float {
             
             let n = result.count
@@ -496,7 +496,7 @@ extension vDSP {
     public static func absolute<V>(_ vector: DSPDoubleSplitComplex,
                                    result: inout V)
         where
-        V: _MutableContiguousCollection,
+        V: AccelerateMutableBuffer,
         V.Element == Double {
             
             let n = result.count
@@ -525,7 +525,7 @@ extension vDSP {
     public static func squareMagnitudes<V>(_ splitComplex: DSPSplitComplex,
                                            result: inout V)
         where
-        V : _MutableContiguousCollection,
+        V : AccelerateMutableBuffer,
         V.Element == Float {
             
             let n = vDSP_Length(result.count)
@@ -548,7 +548,7 @@ extension vDSP {
     public static func squareMagnitudes<V>(_ splitComplex: DSPDoubleSplitComplex,
                                            result: inout V)
         where
-        V : _MutableContiguousCollection,
+        V : AccelerateMutableBuffer,
         V.Element == Double {
             
             let n = vDSP_Length(result.count)

@@ -10,9 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
-
 extension vDSP {
     
     /// Converts split complex to interleaved complex; single-precision.

@@ -67,14 +67,14 @@ ResilientClassTestSuite.test("category on other class")
   blackHole(ResilientNSObjectSubclass())
 }
 
-if loadClassrefMissing {
-  ResilientClassTestSuite.test("RealizeResilientClass")
-    .crashOutputMatches("class ResilientNSObjectSubclass requires missing Objective-C runtime feature")
-    .code {
-      expectCrashLater()
-      print("About to crash...")
-      forceMetadata()
-    }
-}
+//if loadClassrefMissing {
+//  ResilientClassTestSuite.test("RealizeResilientClass")
+//    .crashOutputMatches("class ResilientNSObjectSubclass requires missing Objective-C runtime feature")
+//    .code {
+//      expectCrashLater()
+//      print("About to crash...")
+//      forceMetadata()
+//    }
+//}
 
 runAllTests()

@@ -1,4 +1,14 @@
-import Accelerate
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
 
 extension vDSP {
     
@@ -14,8 +24,8 @@ extension vDSP {
                                         decimationFactor: Int,
                                         filter: T) -> [Float]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Float,
         U.Element == Float {
             
@@ -48,9 +58,9 @@ extension vDSP {
                                            filter: T,
                                            result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float,
         U.Element == Float,
         V.Element == Float {
@@ -87,8 +97,8 @@ extension vDSP {
                                         decimationFactor: Int,
                                         filter: T) -> [Double]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Double,
         U.Element == Double {
             let n = (source.count - filter.count) / decimationFactor + 1
@@ -120,9 +130,9 @@ extension vDSP {
                                            filter: T,
                                            result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double,
         U.Element == Double,
         V.Element == Double {

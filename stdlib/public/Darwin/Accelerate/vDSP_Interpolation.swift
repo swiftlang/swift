@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
 extension vDSP {
     
     /// Vector linear interpolation between vectors; single-precision.
@@ -26,8 +24,8 @@ extension vDSP {
                                                _ vectorB: U,
                                                using interpolationConstant: Float) -> [Float]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Float, U.Element == Float{
             
             let result = Array<Float>(unsafeUninitializedCapacity: vectorA.count) {
@@ -57,9 +55,9 @@ extension vDSP {
                                                   using interpolationConstant: Float,
                                                   result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             precondition(vectorA.count == result.count)
@@ -92,8 +90,8 @@ extension vDSP {
                                                _ vectorB: U,
                                                using interpolationConstant: Double) -> [Double]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Double, U.Element == Double{
             
             let result = Array<Double>(unsafeUninitializedCapacity: vectorA.count) {
@@ -123,9 +121,9 @@ extension vDSP {
                                                   using interpolationConstant: Double,
                                                   result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             precondition(vectorA.count == result.count)
@@ -167,8 +165,8 @@ extension vDSP {
     public static func linearInterpolate<T, U>(elementsOf vector: T,
                                                using controlVector: U) -> [Float]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Float, U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: controlVector.count) {
@@ -206,9 +204,9 @@ extension vDSP {
                                                   using controlVector: U,
                                                   result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             precondition(controlVector.count == result.count)
@@ -249,8 +247,8 @@ extension vDSP {
     public static func linearInterpolate<T, U>(elementsOf vector: T,
                                                using controlVector: U) -> [Double]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Double, U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: controlVector.count) {
@@ -288,9 +286,9 @@ extension vDSP {
                                                   using controlVector: U,
                                                   result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             precondition(controlVector.count == result.count)

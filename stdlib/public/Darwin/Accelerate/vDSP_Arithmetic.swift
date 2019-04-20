@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
 // Vector-vector and vector-scalar arithmetic
 
 extension vDSP {
@@ -29,7 +27,7 @@ extension vDSP {
     public static func add<U>(_ scalar: Float,
                               _ vector: U) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -57,8 +55,8 @@ extension vDSP {
                                  _ vector: U,
                                  result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -86,7 +84,7 @@ extension vDSP {
     public static func add<U>(_ scalar: Double,
                               _ vector: U) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -114,8 +112,8 @@ extension vDSP {
                                  _ vector: U,
                                  result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -145,8 +143,8 @@ extension vDSP {
     public static func add<T, U>(_ vectorA: T,
                                  _ vectorB: U) -> [Float]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Float, U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vectorA.count) {
@@ -174,9 +172,9 @@ extension vDSP {
                                     _ vectorB: U,
                                     result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -205,8 +203,8 @@ extension vDSP {
     public static func add<T, U>(_ vectorA: T,
                                  _ vectorB: U) -> [Double]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Double, U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vectorA.count) {
@@ -234,9 +232,9 @@ extension vDSP {
                                     _ vectorB: U,
                                     result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -267,8 +265,8 @@ extension vDSP {
     public static func subtract<T, U>(_ vectorA: U,
                                       _ vectorB: T) -> [Float]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Float, U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vectorA.count) {
@@ -296,9 +294,9 @@ extension vDSP {
                                          _ vectorB: T,
                                          result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -327,8 +325,8 @@ extension vDSP {
     public static func subtract<T, U>(_ vectorA: U,
                                       _ vectorB: T) -> [Double]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Double, U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vectorA.count) {
@@ -356,9 +354,9 @@ extension vDSP {
                                          _ vectorB: T,
                                          result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -389,7 +387,7 @@ extension vDSP {
     public static func multiply<U>(_ scalar: Float,
                                    _ vector: U) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -417,8 +415,8 @@ extension vDSP {
                                       _ vector: U,
                                       result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -446,7 +444,7 @@ extension vDSP {
     public static func multiply<U>(_ scalar: Double,
                                    _ vector: U) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -474,8 +472,8 @@ extension vDSP {
                                       _ vector: U,
                                       result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -505,8 +503,8 @@ extension vDSP {
     public static func multiply<T, U>(_ vectorA: T,
                                       _ vectorB: U) -> [Float]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Float, U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vectorA.count) {
@@ -534,9 +532,9 @@ extension vDSP {
                                          _ vectorB: U,
                                          result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -564,8 +562,8 @@ extension vDSP {
     public static func multiply<T, U>(_ vectorA: T,
                                       _ vectorB: U) -> [Double]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Double, U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vectorA.count) {
@@ -593,9 +591,9 @@ extension vDSP {
                                          _ vectorB: U,
                                          result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -625,7 +623,7 @@ extension vDSP {
     public static func divide<U>(_ vector: U,
                                  _ scalar: Float) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -653,8 +651,8 @@ extension vDSP {
                                     _ scalar: Float,
                                     result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -682,7 +680,7 @@ extension vDSP {
     public static func divide<U>(_ vector: U,
                                  _ scalar: Double) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -710,8 +708,8 @@ extension vDSP {
                                     _ scalar: Double,
                                     result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -741,7 +739,7 @@ extension vDSP {
     public static func divide<U>(_ scalar: Float,
                                  _ vector: U) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -769,8 +767,8 @@ extension vDSP {
                                     _ vector: U,
                                     result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -798,7 +796,7 @@ extension vDSP {
     public static func divide<U>(_ scalar: Double,
                                  _ vector: U) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -826,8 +824,8 @@ extension vDSP {
                                     _ vector: U,
                                     result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -857,8 +855,8 @@ extension vDSP {
     public static func divide<T, U>(_ vectorA: T,
                                     _ vectorB: U) -> [Float]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Float, U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vectorA.count) {
@@ -886,9 +884,9 @@ extension vDSP {
                                        _ vectorB: U,
                                        result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -916,8 +914,8 @@ extension vDSP {
     public static func divide<T, U>(_ vectorA: T,
                                     _ vectorB: U) -> [Double]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Double, U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vectorA.count) {
@@ -945,9 +943,9 @@ extension vDSP {
                                        _ vectorB: U,
                                        result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -980,10 +978,10 @@ extension vDSP {
                                                addResult: inout U,
                                                subtractResult: inout V)
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _MutableContiguousCollection,
-        V: _MutableContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateMutableBuffer,
+        V: AccelerateMutableBuffer,
         S.Element == Float, T.Element == Float,
         U.Element == Float, V.Element == Float {
             
@@ -1021,10 +1019,10 @@ extension vDSP {
                                                addResult: inout U,
                                                subtractResult: inout V)
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _MutableContiguousCollection,
-        V: _MutableContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateMutableBuffer,
+        V: AccelerateMutableBuffer,
         S.Element == Double, T.Element == Double,
         U.Element == Double, V.Element == Double {
             
@@ -1061,8 +1059,8 @@ extension vDSP {
     public static func multiply<T, U>(addition: (a: T, b: U),
                                       _ scalar: Float) -> [Float]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Float, U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: addition.a.count) {
@@ -1090,9 +1088,9 @@ extension vDSP {
                                          _ scalar: Float,
                                          result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -1125,8 +1123,8 @@ extension vDSP {
     public static func multiply<T, U>(addition: (a: T, b: U),
                                       _ scalar: Double) -> [Double]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Double, U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: addition.a.count) {
@@ -1154,9 +1152,9 @@ extension vDSP {
                                          _ scalar: Double,
                                          result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -1191,9 +1189,9 @@ extension vDSP {
     public static func multiply<S, T, U>(addition: (a: S, b: T),
                                          _ vector: U) -> [Float]
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         S.Element == Float, T.Element == Float,
         U.Element == Float {
             
@@ -1222,10 +1220,10 @@ extension vDSP {
                                             _ vector: U,
                                             result: inout V)
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         S.Element == Float, T.Element == Float,
         U.Element == Float, V.Element == Float {
             
@@ -1259,9 +1257,9 @@ extension vDSP {
     public static func multiply<S, T, U>(addition: (a: S, b: T),
                                          _ vector: U) -> [Double]
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         S.Element == Double, T.Element == Double,
         U.Element == Double {
             
@@ -1290,10 +1288,10 @@ extension vDSP {
                                             _ vector: U,
                                             result: inout V)
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         S.Element == Double, T.Element == Double,
         U.Element == Double, V.Element == Double {
             
@@ -1329,8 +1327,8 @@ extension vDSP {
     public static func multiply<T, U>(subtraction: (a: T, b: U),
                                       _ scalar: Float) -> [Float]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Float, U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: subtraction.a.count) {
@@ -1358,9 +1356,9 @@ extension vDSP {
                                          _ scalar: Float,
                                          result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -1393,8 +1391,8 @@ extension vDSP {
     public static func multiply<T, U>(subtraction: (a: T, b: U),
                                       _ scalar: Double) -> [Double]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Double, U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: subtraction.a.count) {
@@ -1422,9 +1420,9 @@ extension vDSP {
                                          _ scalar: Double,
                                          result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -1459,9 +1457,9 @@ extension vDSP {
     public static func multiply<S, T, U>(subtraction: (a: S, b: T),
                                          _ vector: U) -> [Float]
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         S.Element == Float, T.Element == Float,
         U.Element == Float {
             
@@ -1490,10 +1488,10 @@ extension vDSP {
                                             _ vector: U,
                                             result: inout V)
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         S.Element == Float, T.Element == Float,
         U.Element == Float, V.Element == Float {
             
@@ -1527,9 +1525,9 @@ extension vDSP {
     public static func multiply<S, T, U>(subtraction: (a: S, b: T),
                                          _ vector: U) -> [Double]
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         S.Element == Double, T.Element == Double,
         U.Element == Double {
             
@@ -1558,10 +1556,10 @@ extension vDSP {
                                             _ vector: U,
                                             result: inout V)
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         S.Element == Double, T.Element == Double,
         U.Element == Double, V.Element == Double {
             
@@ -1598,8 +1596,8 @@ extension vDSP {
     public static func add<T, U>(multiplication: (a: T, b: U),
                                  _ scalar: Float) -> [Float]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Float, U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: multiplication.a.count) {
@@ -1628,9 +1626,9 @@ extension vDSP {
                                     _ scalar: Float,
                                     result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -1664,8 +1662,8 @@ extension vDSP {
     public static func add<T, U>(multiplication: (a: T, b: U),
                                  _ scalar: Double) -> [Double]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Double, U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: multiplication.a.count) {
@@ -1694,9 +1692,9 @@ extension vDSP {
                                     _ scalar: Double,
                                     result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -1732,8 +1730,8 @@ extension vDSP {
     public static func add<T, U>(multiplication: (a: T, b: Float),
                                  _ vector: U) -> [Float]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Float, U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -1762,9 +1760,9 @@ extension vDSP {
                                     _ vector: U,
                                     result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -1797,8 +1795,8 @@ extension vDSP {
     public static func add<T, U>(multiplication: (a: T, b: Double),
                                  _ vector: U) -> [Double]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Double, U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: vector.count) {
@@ -1827,9 +1825,9 @@ extension vDSP {
                                     _ vector: U,
                                     result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -1864,9 +1862,9 @@ extension vDSP {
     public static func add<S, T, U>(multiplication: (a: S, b: T),
                                     _ vector: U) -> [Float]
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         S.Element == Float, T.Element == Float,
         U.Element == Float {
             
@@ -1896,10 +1894,10 @@ extension vDSP {
                                        _ vector: U,
                                        result: inout V)
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         S.Element == Float, T.Element == Float,
         U.Element == Float, V.Element == Float {
             
@@ -1934,9 +1932,9 @@ extension vDSP {
     public static func add<S, T, U>(multiplication: (a: S, b: T),
                                     _ vector: U) -> [Double]
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         S.Element == Double, T.Element == Double,
         U.Element == Double {
             
@@ -1966,10 +1964,10 @@ extension vDSP {
                                        _ vector: U,
                                        result: inout V)
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         S.Element == Double, T.Element == Double,
         U.Element == Double, V.Element == Double {
             
@@ -2006,9 +2004,9 @@ extension vDSP {
     public static func subtract<S, T, U>(multiplication: (a: T, b: U),
                                          _ vector: S) -> [Float]
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         S.Element == Float, T.Element == Float,
         U.Element == Float {
             
@@ -2038,10 +2036,10 @@ extension vDSP {
                                             _ vector: S,
                                             result: inout V)
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         S.Element == Float, T.Element == Float,
         U.Element == Float, V.Element == Float {
             
@@ -2076,9 +2074,9 @@ extension vDSP {
     public static func subtract<S, T, U>(multiplication: (a: T, b: U),
                                          _ vector: S) -> [Double]
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         S.Element == Double, T.Element == Double,
         U.Element == Double {
             
@@ -2108,10 +2106,10 @@ extension vDSP {
                                             _ vector: S,
                                             result: inout V)
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         S.Element == Double, T.Element == Double,
         U.Element == Double, V.Element == Double {
             
@@ -2147,8 +2145,8 @@ extension vDSP {
     public static func add<T, U>(multiplication multiplicationAB: (a: T, b: Float),
                                  multiplication multiplicationCD: (c: U, d: Float)) -> [Float]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Float, U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: multiplicationAB.a.count) {
@@ -2176,9 +2174,9 @@ extension vDSP {
                                     multiplication multiplicationCD: (c: U, d: Float),
                                     result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float, U.Element == Float, V.Element == Float {
             
             let n = result.count
@@ -2214,8 +2212,8 @@ extension vDSP {
     public static func add<T, U>(multiplication multiplicationAB: (a: T, b: Double),
                                  multiplication multiplicationCD: (c: U, d: Double)) -> [Double]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Double, U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: multiplicationAB.a.count) {
@@ -2243,9 +2241,9 @@ extension vDSP {
                                     multiplication multiplicationCD: (c: U, d: Double),
                                     result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double, U.Element == Double, V.Element == Double {
             
             let n = result.count
@@ -2283,10 +2281,10 @@ extension vDSP {
     public static func add<R, S, T, U>(multiplication multiplicationAB: (a: R, b: S),
                                        multiplication multiplicationCD: (c: T, d: U)) -> [Float]
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         R.Element == Float,
         S.Element == Float, T.Element == Float,
         U.Element == Float {
@@ -2316,11 +2314,11 @@ extension vDSP {
                                           multiplication multiplicationCD: (c: T, d: U),
                                           result: inout V)
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         R.Element == Float,
         S.Element == Float, T.Element == Float,
         U.Element == Float, V.Element == Float {
@@ -2360,10 +2358,10 @@ extension vDSP {
     public static func add<R, S, T, U>(multiplication multiplicationAB: (a: R, b: S),
                                        multiplication multiplicationCD: (c: T, d: U)) -> [Double]
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         R.Element == Double,
         S.Element == Double, T.Element == Double,
         U.Element == Double {
@@ -2393,11 +2391,11 @@ extension vDSP {
                                           multiplication multiplicationCD: (c: T, d: U),
                                           result: inout V)
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         R.Element == Double,
         S.Element == Double, T.Element == Double,
         U.Element == Double, V.Element == Double {
@@ -2439,9 +2437,9 @@ extension vDSP {
     public static func multiply<S, T, U>(addition additionAB: (a: S, b: T),
                                          addition additionCD: (c: U, d: U)) -> [Float]
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         S.Element == Float, T.Element == Float,
         U.Element == Float {
             
@@ -2470,10 +2468,10 @@ extension vDSP {
                                             addition additionCD: (c: U, d: U),
                                             result: inout V)
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         S.Element == Float, T.Element == Float,
         U.Element == Float, V.Element == Float {
             
@@ -2512,9 +2510,9 @@ extension vDSP {
     public static func multiply<S, T, U>(addition additionAB: (a: S, b: T),
                                          addition additionCD: (c: U, d: U)) -> [Double]
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         S.Element == Double, T.Element == Double,
         U.Element == Double {
             
@@ -2543,10 +2541,10 @@ extension vDSP {
                                             addition additionCD: (c: U, d: U),
                                             result: inout V)
         where
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         S.Element == Double, T.Element == Double,
         U.Element == Double, V.Element == Double {
             
@@ -2587,10 +2585,10 @@ extension vDSP {
     public static func subtract<R, S, T, U>(multiplication multiplicationAB: (a: T, b: U),
                                             multiplication multiplicationCD: (c: R, d: S)) -> [Float]
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         R.Element == Float,
         S.Element == Float, T.Element == Float,
         U.Element == Float {
@@ -2620,11 +2618,11 @@ extension vDSP {
                                                multiplication multiplicationCD: (c: R, d: S),
                                                result: inout V)
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         R.Element == Float,
         S.Element == Float, T.Element == Float,
         U.Element == Float, V.Element == Float {
@@ -2664,10 +2662,10 @@ extension vDSP {
     public static func subtract<R, S, T, U>(multiplication multiplicationAB: (a: T, b: U),
                                             multiplication multiplicationCD: (c: R, d: S)) -> [Double]
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         R.Element == Double,
         S.Element == Double, T.Element == Double,
         U.Element == Double {
@@ -2697,11 +2695,11 @@ extension vDSP {
                                                multiplication multiplicationCD: (c: R, d: S),
                                                result: inout V)
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         R.Element == Double,
         S.Element == Double, T.Element == Double,
         U.Element == Double, V.Element == Double {
@@ -2743,10 +2741,10 @@ extension vDSP {
     public static func multiply<R, S, T, U>(subtraction subtractionAB: (a: R, b: S),
                                             subtraction subtractionCD: (c: T, d: U)) -> [Float]
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         R.Element == Float,
         S.Element == Float, T.Element == Float,
         U.Element == Float {
@@ -2776,11 +2774,11 @@ extension vDSP {
                                                subtraction subtractionCD: (c: T, d: U),
                                                result: inout V)
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         R.Element == Float,
         S.Element == Float, T.Element == Float,
         U.Element == Float, V.Element == Float {
@@ -2820,10 +2818,10 @@ extension vDSP {
     public static func multiply<R, S, T, U>(subtraction subtractionAB: (a: R, b: S),
                                             subtraction subtractionCD: (c: T, d: U)) -> [Double]
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         R.Element == Double,
         S.Element == Double, T.Element == Double,
         U.Element == Double {
@@ -2853,11 +2851,11 @@ extension vDSP {
                                                subtraction subtractionCD: (c: T, d: U),
                                                result: inout V)
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         R.Element == Double,
         S.Element == Double, T.Element == Double,
         U.Element == Double, V.Element == Double {
@@ -2899,10 +2897,10 @@ extension vDSP {
     public static func multiply<R, S, T, U>(addition: (a: R, b: S),
                                             subtraction: (c: T, d: U)) -> [Float]
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         R.Element == Float,
         S.Element == Float, T.Element == Float,
         U.Element == Float {
@@ -2932,11 +2930,11 @@ extension vDSP {
                                                subtraction: (c: T, d: U),
                                                result: inout V)
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         R.Element == Float,
         S.Element == Float, T.Element == Float,
         U.Element == Float, V.Element == Float {
@@ -2976,10 +2974,10 @@ extension vDSP {
     public static func multiply<R, S, T, U>(addition: (a: R, b: S),
                                             subtraction: (c: T, d: U)) -> [Double]
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         R.Element == Double,
         S.Element == Double, T.Element == Double,
         U.Element == Double {
@@ -3009,11 +3007,11 @@ extension vDSP {
                                                subtraction: (c: T, d: U),
                                                result: inout V)
         where
-        R: _ContiguousCollection,
-        S: _ContiguousCollection,
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        R: AccelerateBuffer,
+        S: AccelerateBuffer,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         R.Element == Double,
         S.Element == Double, T.Element == Double,
         U.Element == Double, V.Element == Double {
@@ -3055,7 +3053,7 @@ extension vDSP {
     public static func add<U>(multiplication: (a: U, b: Float),
                               _ scalar: Float) -> [Float]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Float {
             
             let result = Array<Float>(unsafeUninitializedCapacity: multiplication.a.count) {
@@ -3083,8 +3081,8 @@ extension vDSP {
                                  _ scalar: Float,
                                  result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             let n = result.count
             precondition(multiplication.a.count == n)
@@ -3115,7 +3113,7 @@ extension vDSP {
     public static func add<U>(multiplication: (a: U, b: Double),
                               _ scalar: Double) -> [Double]
         where
-        U: _ContiguousCollection,
+        U: AccelerateBuffer,
         U.Element == Double {
             
             let result = Array<Double>(unsafeUninitializedCapacity: multiplication.a.count) {
@@ -3143,8 +3141,8 @@ extension vDSP {
                                  _ scalar: Double,
                                  result: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             let n = result.count
             precondition(multiplication.a.count == n)
@@ -3178,8 +3176,8 @@ extension vDSP {
     public static func subtract<T, U>(multiplication: (a: U, b: Float),
                                       _ vector: T) -> [Float]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Float,
         U.Element == Float {
             
@@ -3209,9 +3207,9 @@ extension vDSP {
                                          _ vector: T,
                                          result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Float,
         U.Element == Float, V.Element == Float {
             
@@ -3246,8 +3244,8 @@ extension vDSP {
     public static func subtract<T, U>(multiplication: (a: U, b: Double),
                                       _ vector: T) -> [Double]
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
         T.Element == Double,
         U.Element == Double {
             
@@ -3277,9 +3275,9 @@ extension vDSP {
                                          _ vector: T,
                                          result: inout V)
         where
-        T: _ContiguousCollection,
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        T: AccelerateBuffer,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         T.Element == Double,
         U.Element == Double, V.Element == Double {
             
