@@ -96,7 +96,7 @@ public:
   ///                  `${child.name}` collection.
   /// - returns: A copy of the receiver with the provided `${child_elt}`
   ///            appended to its `${child.name}` collection.
-  ${node.name} add${child_elt}(${child_elt_type} ${child_elt});
+  ${node.name} add${child.name}Member(${child_elt_type} ${child_elt});
 %       end
 
   /// Returns a copy of the receiver with its `${child.name}` replaced.
