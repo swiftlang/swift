@@ -36,7 +36,6 @@ set(SOURCES
   Dataset.swift
   DataTypes.swift
   Execution.swift
-  Gradients.swift
   ShapedArray.swift
   StringOps.swift
   StringTensor.swift
