@@ -109,4 +109,149 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
 
 }
 
+//===----------------------------------------------------------------------===//
+//
+//  Linear interpolation
+//
+//===----------------------------------------------------------------------===//
+
+if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+    
+    let n = 1024
+    
+    AccelerateTests.test("vDSP/SinglePrecisionInterpolateBetweenVectors") {
+        var result = [Float](repeating: 0, count: n)
+        var legacyResult = [Float](repeating: -1, count: n)
+        
+        let a: [Float] = (0 ..< n).map{ i in
+            return sin(Float(i) * 0.025)
+        }
+        
+        let b: [Float] =  (0 ..< n).map{ i in
+            return sin(Float(i) * 0.05)
+        }
+        
+        let interpolationConstant: Float = 0.5
+        
+        vDSP.linearInterpolate(a, b,
+                               using: interpolationConstant,
+                               result: &result)
+        
+        vDSP_vintb(a, 1,
+                   b, 1,
+                   [interpolationConstant],
+                   &legacyResult, 1,
+                   vDSP_Length(n))
+        
+        let returnedResult = vDSP.linearInterpolate(a, b,
+                                                    using: interpolationConstant)
+        
+        expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
+    }
+    
+    AccelerateTests.test("vDSP/SinglePrecisionInterpolateBetweenNeighbours") {
+        var result = [Float](repeating: 0, count: n)
+        var legacyResult = [Float](repeating: -1, count: n)
+        
+        let shortSignal: [Float] = (0 ... 10).map{ i in
+            return sin(Float(i) * 0.1 * .pi * 4)
+        }
+        
+        let controlVector: [Float] = {
+            var controlVector = [Float](repeating: 0, count: 1024)
+            
+            vDSP_vgen([0],
+                      [Float(shortSignal.count)],
+                      &controlVector, 1,
+                      vDSP_Length(n))
+            
+            return controlVector
+        }()
+        
+        vDSP.linearInterpolate(elementsOf: shortSignal,
+                               using: controlVector,
+                               result: &result)
+        
+        vDSP_vlint(shortSignal,
+                   controlVector, 1,
+                   &legacyResult, 1,
+                   vDSP_Length(n),
+                   vDSP_Length(shortSignal.count))
+        
+        let returnedResult = vDSP.linearInterpolate(elementsOf: shortSignal,
+                                                    using: controlVector)
+        
+        expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
+    }
+    
+    AccelerateTests.test("vDSP/DoublePrecisionInterpolateBetweenVectors") {
+        var result = [Double](repeating: 0, count: n)
+        var legacyResult = [Double](repeating: -1, count: n)
+        
+        let a: [Double] = (0 ..< n).map{ i in
+            return sin(Double(i) * 0.025)
+        }
+        
+        let b: [Double] =  (0 ..< n).map{ i in
+            return sin(Double(i) * 0.05)
+        }
+        
+        let interpolationConstant: Double = 0.5
+        
+        vDSP.linearInterpolate(a, b,
+                               using: interpolationConstant,
+                               result: &result)
+        
+        vDSP_vintbD(a, 1,
+                    b, 1,
+                    [interpolationConstant],
+                    &legacyResult, 1,
+                    vDSP_Length(n))
+        
+        let returnedResult = vDSP.linearInterpolate(a, b,
+                                                    using: interpolationConstant)
+        
+        expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
+    }
+    
+    AccelerateTests.test("vDSP/DoublePrecisionInterpolateBetweenNeighbours") {
+        var result = [Double](repeating: 0, count: n)
+        var legacyResult = [Double](repeating: -1, count: n)
+        
+        let shortSignal: [Double] = (0 ... 10).map{ i in
+            return sin(Double(i) * 0.1 * .pi * 4)
+        }
+        
+        let controlVector: [Double] = {
+            var controlVector = [Double](repeating: 0, count: 1024)
+            
+            vDSP_vgenD([0],
+                       [Double(shortSignal.count)],
+                       &controlVector, 1,
+                       vDSP_Length(n))
+            
+            return controlVector
+        }()
+        
+        vDSP.linearInterpolate(elementsOf: shortSignal,
+                               using: controlVector,
+                               result: &result)
+        
+        vDSP_vlintD(shortSignal,
+                    controlVector, 1,
+                    &legacyResult, 1,
+                    vDSP_Length(n),
+                    vDSP_Length(shortSignal.count))
+        
+        let returnedResult = vDSP.linearInterpolate(elementsOf: shortSignal,
+                                                    using: controlVector)
+        
+        expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
+    }
+}
+
 runAllTests()
