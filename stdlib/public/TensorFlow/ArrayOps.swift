@@ -229,7 +229,7 @@ public extension Raw {
 
     var out: [Tensor<T>] = []
     var cursor = buffer
-    for _ in 0..<numSplit {
+    for _ in 0..<num {
       out.append(Tensor<T>(handle: TensorHandle(_owning: cursor.pointee)))
       cursor = cursor.advanced(by: 1)
     }
