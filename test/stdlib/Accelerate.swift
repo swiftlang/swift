@@ -427,4 +427,62 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
     }
 }
 
+//===----------------------------------------------------------------------===//
+//
+//  vDSP polynomial evaluation.
+//
+//===----------------------------------------------------------------------===//
+
+if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+    
+    AccelerateTests.test("vDSP/PolynomialEvaluationSinglePrecision") {
+        let coefficients: [Float] = [2, 3, 4, 5, 6, 7, 8, 9, 10]
+        let variables = (0 ... 100).map { return Float($0) }
+        var result = [Float](repeating: 0, count: variables.count)
+        
+        vDSP.evaluatePolynomial(usingCoefficients: coefficients,
+                                withVariables: variables,
+                                result: &result)
+        
+        var legacyResult = [Float](repeating: -1, count: variables.count)
+        
+        vDSP_vpoly(coefficients, 1,
+                   variables, 1,
+                   &legacyResult, 1,
+                   vDSP_Length(legacyResult.count),
+                   vDSP_Length(coefficients.count - 1))
+        
+        let returnedResult = vDSP.evaluatePolynomial(usingCoefficients: coefficients,
+                                                     withVariables: variables)
+        
+        expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
+    }
+    
+    AccelerateTests.test("vDSP/PolynomialEvaluationDoublePrecision") {
+        let coefficients: [Double] = [2, 3, 4, 5, 6, 7, 8, 9, 10]
+        let variables = (0 ... 100).map { return Double($0) }
+        var result = [Double](repeating: 0, count: variables.count)
+        
+        vDSP.evaluatePolynomial(usingCoefficients: coefficients,
+                                withVariables: variables,
+                                result: &result)
+        
+        var legacyResult = [Double](repeating: -1, count: variables.count)
+        
+        vDSP_vpolyD(coefficients, 1,
+                    variables, 1,
+                    &legacyResult, 1,
+                    vDSP_Length(legacyResult.count),
+                    vDSP_Length(coefficients.count - 1))
+        
+        let returnedResult = vDSP.evaluatePolynomial(usingCoefficients: coefficients,
+                                                     withVariables: variables)
+        
+        expectTrue(result.elementsEqual(legacyResult))
+        expectTrue(result.elementsEqual(returnedResult))
+    }
+}
+
 runAllTests()
+
