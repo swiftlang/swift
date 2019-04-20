@@ -45,6 +45,7 @@ func expectEqualWithTolerance<T>(_ expected: TestLiteralType, _ actual: T,
 
 %from SwiftMathFunctions import *
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 internal extension ElementaryFunctions where Self: BinaryFloatingPoint {
   static func elementaryFunctionTests() {
     /* Default tolerance is 3 ulps unless specified otherwise. It's OK to relax
@@ -78,6 +79,7 @@ internal extension ElementaryFunctions where Self: BinaryFloatingPoint {
   }
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 internal extension Real where Self: BinaryFloatingPoint {
   static func realFunctionTests() {
     expectEqualWithTolerance(0.54041950027058415544357836460859991, Self.atan2(y: 0.375, x: 0.625))
@@ -102,8 +104,10 @@ internal extension Real where Self: BinaryFloatingPoint {
 % end
 
 MathTests.test("${T}") {
-  ${T}.elementaryFunctionTests()
-  ${T}.realFunctionTests()
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    ${T}.elementaryFunctionTests()
+    ${T}.realFunctionTests()
+  }
 }
 
 % if T in ['CGFloat', 'Float80']:
