@@ -68,4 +68,45 @@ if #available(iOS 10.0, OSX 10.12, tvOS 10.0, watchOS 4.0, *) {
     }
 }
 
+//===----------------------------------------------------------------------===//
+//
+//  Sliding window summation
+//
+//===----------------------------------------------------------------------===//
+
+if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+    
+    AccelerateTests.test("vDSP/SinglePrecisionSlidingWindowSum") {
+        let source: [Float] = [1, 10, 12, 9, 3, 7, 2, 6]
+        var destination = [Float](repeating: .nan, count: 6)
+        
+        vDSP.slidingWindowSum(source,
+                              usingWindowLength: 3,
+                              result: &destination)
+        
+        let returnedResult = vDSP.slidingWindowSum(source,
+                                                   usingWindowLength: 3)
+        
+        expectTrue(destination.elementsEqual(returnedResult))
+        expectTrue(destination.map{ Int($0) }.elementsEqual([23, 31, 24, 19, 12, 15]))
+    }
+    
+    AccelerateTests.test("vDSP/DoublePrecisionSlidingWindowSum") {
+        let source: [Double] = [1, 10, 12, 9, 3, 7, 2, 6]
+        var destination = [Double](repeating: .nan, count: 6)
+        
+        vDSP.slidingWindowSum(source,
+                              usingWindowLength: 3,
+                              result: &destination)
+        
+        let returnedResult = vDSP.slidingWindowSum(source,
+                                                   usingWindowLength: 3)
+        
+        expectTrue(destination.elementsEqual(returnedResult))
+        
+        expectTrue(destination.map{ Int($0) }.elementsEqual([23, 31, 24, 19, 12, 15]))
+    }
+
+}
+
 runAllTests()
