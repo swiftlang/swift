@@ -442,7 +442,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
           .useArguments(Arguments)
           .useRightParen(RightParen);
       } else {
-        Builder.addTupleTypeElement(ParsedSyntaxRecorder::makeTupleTypeElement(
+        Builder.addArgumentsMember(ParsedSyntaxRecorder::makeTupleTypeElement(
             InputNode, /*TrailingComma=*/None, *SyntaxContext));
       }
       SyntaxContext->addSyntax(Builder.build());
