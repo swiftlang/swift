@@ -1270,12 +1270,52 @@ public:
   void print(raw_ostream &OS) const;
   void print(ASTPrinter &Printer) const;
 };
+
+class GenericParam {
+public:
+  enum class ParamKind {
+    TypeParam
+  };
+    
+private:
+  ParamKind Kind;
+
+  GenericTypeParamDecl *TypeParam;
+
+public:  
+  GenericParam(GenericTypeParamDecl *GTPD)
+    : Kind(ParamKind::TypeParam), TypeParam(GTPD)
+    {}
+    
+  ParamKind getKind() const { return Kind; }
+    
+  GenericTypeParamDecl *getTypeParam() const {
+    assert(getKind() == ParamKind::TypeParam
+           && "GenericParam::getTypeParam(): not a TypeParam");
+    
+    return TypeParam;
+  }
+
+  void setDepth(unsigned depth) const;
+    
+  Identifier getName() const;
   
+  ArrayRef<TypeLoc> getInherited() const;
+
+  void setDeclContext(DeclContext *DC) const;
+
+  void setInherited(MutableArrayRef<TypeLoc> i) const;
+
+  bool operator ==(GenericTypeParamDecl const * const GTPD) const {
+    return getKind() == ParamKind::TypeParam && getTypeParam() == GTPD;
+  }
+};
+    
 /// GenericParamList - A list of generic parameters that is part of a generic
 /// function or type, along with extra requirements placed on those generic
 /// parameters and types derived from them.
 class GenericParamList final :
-    private llvm::TrailingObjects<GenericParamList, GenericTypeParamDecl *> {
+    private llvm::TrailingObjects<GenericParamList, GenericParam> {
   friend TrailingObjects;
 
   SourceRange Brackets;
@@ -1289,7 +1329,7 @@ class GenericParamList final :
   unsigned FirstTrailingWhereArg;
 
   GenericParamList(SourceLoc LAngleLoc,
-                   ArrayRef<GenericTypeParamDecl *> Params,
+                   ArrayRef<GenericParam> Params,
                    SourceLoc WhereLoc,
                    MutableArrayRef<RequirementRepr> Requirements,
                    SourceLoc RAngleLoc);
@@ -1309,7 +1349,7 @@ public:
   /// \param RAngleLoc The location of the closing angle bracket ('>')
   static GenericParamList *create(ASTContext &Context,
                                   SourceLoc LAngleLoc,
-                                  ArrayRef<GenericTypeParamDecl *> Params,
+                                  ArrayRef<GenericParam> Params,
                                   SourceLoc RAngleLoc);
 
   /// create - Create a new generic parameter list and "where" clause within
@@ -1326,21 +1366,21 @@ public:
   /// \param RAngleLoc The location of the closing angle bracket ('>')
   static GenericParamList *create(const ASTContext &Context,
                                   SourceLoc LAngleLoc,
-                                  ArrayRef<GenericTypeParamDecl *> Params,
+                                  ArrayRef<GenericParam> Params,
                                   SourceLoc WhereLoc,
                                   ArrayRef<RequirementRepr> Requirements,
                                   SourceLoc RAngleLoc);
 
-  MutableArrayRef<GenericTypeParamDecl *> getParams() {
-    return {getTrailingObjects<GenericTypeParamDecl *>(), NumParams};
+  MutableArrayRef<GenericParam> getParams() {
+    return {getTrailingObjects<GenericParam>(), NumParams};
   }
 
-  ArrayRef<GenericTypeParamDecl *> getParams() const {
-    return {getTrailingObjects<GenericTypeParamDecl *>(), NumParams};
+  ArrayRef<GenericParam> getParams() const {
+    return {getTrailingObjects<GenericParam>(), NumParams};
   }
 
-  using iterator = GenericTypeParamDecl **;
-  using const_iterator = const GenericTypeParamDecl * const *;
+  using iterator = GenericParam *;
+  using const_iterator = const GenericParam * const;
 
   unsigned size() const { return NumParams; }
   iterator begin() { return getParams().begin(); }

@@ -164,11 +164,11 @@ void RequirementRepr::print(ASTPrinter &out) const {
 void GenericParamList::print(llvm::raw_ostream &OS) {
   OS << '<';
   interleave(*this,
-             [&](const GenericTypeParamDecl *P) {
-               OS << P->getName();
-               if (!P->getInherited().empty()) {
+             [&](const GenericParam P) {
+               OS << P.getName();
+               if (!P.getInherited().empty()) {
                  OS << " : ";
-                 P->getInherited()[0].getType().print(OS);
+                 P.getInherited()[0].getType().print(OS);
                }
              },
              [&] { OS << ", "; });

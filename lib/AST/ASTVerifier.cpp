@@ -2794,8 +2794,16 @@ public:
       }
       assert(paramList && "this is guaranteed by the parameter list's depth");
 
-      if (paramList->size() <= GTPD->getIndex() ||
-          paramList->getParams()[GTPD->getIndex()] != GTPD) {
+      bool hasError = paramList->size() <= GTPD->getIndex();
+
+      if (!hasError) {
+        auto param = paramList->getParams()[GTPD->getIndex()];
+
+        hasError = param.getKind() != GenericParam::ParamKind::TypeParam ||
+                   param.getTypeParam() != GTPD;
+      }
+        
+      if (hasError) {
         if (llvm::is_contained(paramList->getParams(), GTPD))
           Out << "GenericTypeParamDecl has incorrect index\n";
         else

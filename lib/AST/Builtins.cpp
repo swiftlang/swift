@@ -441,11 +441,18 @@ static GenericParamList *getGenericParams(ASTContext &ctx,
                        SmallVectorImpl<GenericTypeParamDecl*> &genericParams) {
   assert(numParameters <= llvm::array_lengthof(GenericParamNames));
   assert(genericParams.empty());
+    
+  // TODO: [GENERICS] This is a temporary hack until generics refactoring is finished
+  SmallVector<GenericParam, 2> genericParamsForParamList;
+    
+  for (unsigned i = 0; i != numParameters; ++i) {
+    auto GTPD = createGenericParam(ctx, GenericParamNames[i], i);
+    genericParams.push_back(GTPD);
+    genericParamsForParamList.push_back(GenericParam(GTPD));
+  }
 
-  for (unsigned i = 0; i != numParameters; ++i)
-    genericParams.push_back(createGenericParam(ctx, GenericParamNames[i], i));
-
-  auto paramList = GenericParamList::create(ctx, SourceLoc(), genericParams,
+  auto paramList = GenericParamList::create(ctx, SourceLoc(),
+                                            genericParamsForParamList,
                                             SourceLoc());
   return paramList;
 }
