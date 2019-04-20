@@ -101,6 +101,28 @@ void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
   addInitialGroup(InstrsForSILCombineWorklist);
 }
 
+static void eraseSingleInstFromFunction(SILInstruction &I,
+                                        SILCombineWorklist &Worklist,
+                                        bool AddOperandsToWorklist) {
+  LLVM_DEBUG(llvm::dbgs() << "SC: ERASE " << I << '\n');
+
+  assert(!I.hasUsesOfAnyResult() && "Cannot erase instruction that is used!");
+
+  // Make sure that we reprocess all operands now that we reduced their
+  // use counts.
+  if (I.getNumOperands() < 8 && AddOperandsToWorklist) {
+    for (auto &OpI : I.getAllOperands()) {
+      if (auto *Op = OpI.get()->getDefiningInstruction()) {
+        LLVM_DEBUG(llvm::dbgs() << "SC: add op " << *Op
+                                << " from erased inst to worklist\n");
+        Worklist.add(Op);
+      }
+    }
+  }
+  Worklist.remove(&I);
+  I.eraseFromParent();
+}
+
 //===----------------------------------------------------------------------===//
 //                               Implementation
 //===----------------------------------------------------------------------===//
@@ -334,34 +356,28 @@ void SILCombiner::replaceInstUsesPairwiseWith(SILInstruction *oldI,
 // instruction, visit methods should use this method to delete the given
 // instruction and upon completion of their peephole return the value returned
 // by this method.
-SILInstruction *SILCombiner::eraseInstFromFunction(SILInstruction &I,
-                                            SILBasicBlock::iterator &InstIter,
-                                            bool AddOperandsToWorklist) {
-  LLVM_DEBUG(llvm::dbgs() << "SC: ERASE " << I << '\n');
-
-  assert(onlyHaveDebugUsesOfAllResults(&I) &&
-         "Cannot erase instruction that is used!");
-
-  // Make sure that we reprocess all operands now that we reduced their
-  // use counts.
-  if (I.getNumOperands() < 8 && AddOperandsToWorklist) {
-    for (auto &OpI : I.getAllOperands()) {
-      if (auto *Op = OpI.get()->getDefiningInstruction()) {
-        LLVM_DEBUG(llvm::dbgs() << "SC: add op " << *Op
-                                << " from erased inst to worklist\n");
-        Worklist.add(Op);
-      }
+SILInstruction *
+SILCombiner::eraseInstFromFunction(SILInstruction &I,
+                                   SILBasicBlock::iterator &InstIter,
+                                   bool AddOperandsToWorklist) {
+  // Delete any debug users first.
+  for (auto result : I.getResults()) {
+    while (!result->use_empty()) {
+      auto *user = result->use_begin()->getUser();
+      assert(user->isDebugInstruction());
+      if (InstIter == user->getIterator())
+        ++InstIter;
+      Worklist.remove(user);
+      user->eraseFromParent();
     }
   }
+  if (InstIter == I.getIterator())
+    ++InstIter;
 
-  for (auto result : I.getResults())
-    for (Operand *DU : getDebugUses(result))
-      Worklist.remove(DU->getUser());
-
-  Worklist.remove(&I);
-  eraseFromParentWithDebugInsts(&I, InstIter);
+  eraseSingleInstFromFunction(I, Worklist, AddOperandsToWorklist);
   MadeChange = true;
-  return nullptr;  // Don't do anything with I
+  // Dummy return, so the caller doesn't need to explicitly return nullptr.
+  return nullptr;
 }
 
 //===----------------------------------------------------------------------===//

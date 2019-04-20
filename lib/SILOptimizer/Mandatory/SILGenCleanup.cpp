@@ -85,6 +85,9 @@ struct SILGenCleanup : SILModuleTransform {
 void SILGenCleanup::run() {
   auto &module = *getModule();
   for (auto &function : module) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "\nRunning SILGenCleanup on " << function.getName() << "\n");
+
     SILGenCanonicalize sgCanonicalize;
 
     // Iterate over all blocks even if they aren't reachable. No phi-less

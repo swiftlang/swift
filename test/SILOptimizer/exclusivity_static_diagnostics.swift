@@ -614,3 +614,26 @@ func nestedConflict(x: inout Int) {
   // expected-error@-1 2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@-2 2{{conflicting access is here}}
 }
+
+// Avoid diagnosing a conflict on disjoint struct properies when one is a `let`.
+// This requires an address projection before loading the `let` property.
+//
+// <rdar://problem/35561050> [SR-10145][Exclusivity] SILGen loads entire struct when reading captured 'let' stored property
+struct DisjointLetMember {
+  mutating func get(makeValue: ()->Int) -> Int {
+    return makeValue()
+  }
+}
+
+struct DisjointLet {
+  let a = 2
+  var cache = DisjointLetMember()
+
+  mutating func testDisjointLet() -> Int {
+    // Access to inout `self` for member .cache`.
+    return cache.get {
+      // Access to captured `self` for member .cache`.
+      a
+    }
+  }
+}
