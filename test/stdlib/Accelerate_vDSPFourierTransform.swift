@@ -9,6 +9,7 @@ import Accelerate
 
 var Accelerate_vDSPFourierTransformTests = TestSuite("Accelerate_vDSPFourierTransform")
 
+
 //===----------------------------------------------------------------------===//
 //
 //  vDSP discrete Fourier transform tests; single-precision
@@ -300,7 +301,6 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(outputReal.elementsEqual(returnedResult.real))
         expectTrue(outputImag.elementsEqual(returnedResult.imaginary))
     }
-}
     
     Accelerate_vDSPFourierTransformTests.test("vDSP/DoublePrecisionForwardComplexReal") {
         let fwdDFT = vDSP.DFT(count: n,
@@ -378,7 +378,17 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         expectTrue(outputReal.elementsEqual(returnedResult.real))
         expectTrue(outputImag.elementsEqual(returnedResult.imaginary))
+    }
+}
 
+//===----------------------------------------------------------------------===//
+//
+//  vDSP Fast Fourier Transform Tests
+//
+//===----------------------------------------------------------------------===//
+
+if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+    
     Accelerate_vDSPFourierTransformTests.test("vDSP/SinglePrecisionComplexConversions") {
         func convert(splitComplexVector: DSPSplitComplex,
                      toInterleavedComplexVector interleavedComplexVector: inout [DSPComplex]) {

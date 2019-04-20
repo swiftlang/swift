@@ -65,7 +65,7 @@ extension vDSP {
         @inline(__always)
         public func transform<U>(_ vector: U) -> [Float]
             where
-            U: _ContiguousCollection,
+            U: AccelerateBuffer,
             U.Element == Float {
                 
                 let result = Array<Float>(unsafeUninitializedCapacity: vector.count) {
@@ -88,8 +88,8 @@ extension vDSP {
         @inline(__always)
         public func transform<U, V>(_ vector: U, result: inout V)
             where
-            U: _ContiguousCollection,
-            V: _MutableContiguousCollection,
+            U: AccelerateBuffer,
+            V: AccelerateMutableBuffer,
             U.Element == Float, V.Element == Float {
                 
                 vDSP.VectorizableFloat.transform(dctSetup: dctSetup,
@@ -127,8 +127,8 @@ fileprivate protocol vDSP_DCTFunctions {
                                 source: U,
                                 destination: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Scalar, V.Element == Scalar
 }
 
@@ -151,8 +151,8 @@ extension vDSP.VectorizableFloat: vDSP_DCTFunctions {
                                        source: U,
                                        destination: inout V)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float,
         V.Element == Float {
             

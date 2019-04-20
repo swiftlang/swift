@@ -53,7 +53,7 @@ extension vDSP {
         /// Applies a single- or double-precision single or multichannel biquad IIR filter, returning the filtered signal.
         public mutating func apply<U>(input: U) -> [T]
             where
-            U: _ContiguousCollection,
+            U: AccelerateBuffer,
             U.Element == T {
                 
                 let result = Array<T>(unsafeUninitializedCapacity: input.count) {
@@ -71,8 +71,8 @@ extension vDSP {
         /// Applies a single- or double-precision single or multichannel biquad IIR filter, overwriting the supplied output.
         public mutating func apply<U, V>(input: U, output: inout V)
             where
-            U: _ContiguousCollection,
-            V: _MutableContiguousCollection,
+            U: AccelerateBuffer,
+            V: AccelerateMutableBuffer,
             U.Element == T, V.Element == T {
                 
                 // `apply(input:output:)` mutates `delays` and `setup`.
@@ -134,8 +134,8 @@ extension vDSP {
         /// Applies a single- or double-precision single or multichannel biquad IIR filter, overwriting the supplied output.
         func apply<U, V>(input: U, output: inout V)
             where
-            U: _ContiguousCollection,
-            V: _MutableContiguousCollection,
+            U: AccelerateBuffer,
+            V: AccelerateMutableBuffer,
             U.Element == T, V.Element == T {
                 
                 let n = vDSP_Length(min(input.count, output.count))
@@ -175,8 +175,8 @@ extension vDSP {
                                                     count: UInt)
             where
             Scalar: vDSP_FloatingPointBiquadFilterable,
-            U: _ContiguousCollection,
-            V: _MutableContiguousCollection,
+            U: AccelerateBuffer,
+            V: AccelerateMutableBuffer,
             U.Element == Scalar,
             V.Element == Scalar {
                 
@@ -196,8 +196,8 @@ extension vDSP {
                                            channelCount: UInt,
                                            count: UInt)
             where
-            U: _ContiguousCollection,
-            V: _MutableContiguousCollection,
+            U: AccelerateBuffer,
+            V: AccelerateMutableBuffer,
             U.Element: vDSP_FloatingPointBiquadFilterable,
             V.Element: vDSP_FloatingPointBiquadFilterable {
                 
@@ -264,8 +264,8 @@ public protocol vDSP_BiquadFunctions {
                                   sectionCount: vDSP_Length,
                                   count: vDSP_Length)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Scalar, V.Element == Scalar
     
     /// Applies a multichannel biquad IIR filter.
@@ -312,8 +312,8 @@ extension vDSP.VectorizableFloat: vDSP_BiquadFunctions {
                                          sectionCount: vDSP_Length,
                                          count: vDSP_Length)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Float, V.Element == Float {
             
             destination.withUnsafeMutableBufferPointer { dest in
@@ -378,8 +378,8 @@ extension vDSP.VectorizableDouble: vDSP_BiquadFunctions {
                                          sectionCount: vDSP_Length,
                                          count: vDSP_Length)
         where
-        U: _ContiguousCollection,
-        V: _MutableContiguousCollection,
+        U: AccelerateBuffer,
+        V: AccelerateMutableBuffer,
         U.Element == Double, V.Element == Double {
             
             destination.withUnsafeMutableBufferPointer { dest in
