@@ -22,6 +22,10 @@ add_swift_target_library(swiftAccelerate ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   vDSP_ClippingLimitThreshold.swift
   vDSP_FillClearGenerate.swift
 
+  Accelerate.swift
+  ContiguousCollection.swift
+  vDSP_Integration.swift
+
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
 
   GYB_SOURCES
