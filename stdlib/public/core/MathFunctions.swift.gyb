@@ -178,6 +178,19 @@ extension ${Self}: Real {
   public static func logGamma(_ x: ${Self}) -> ${Self} {
     return _swift_stdlib_lgamma${type.cFuncSuffix}(x)
   }
+
+  // We get this for free from the extension above, but we also need it here
+  // to facilitate back-deployment to standard library versions from before it
+  // was introduced.
+  @_alwaysEmitIntoClient
+  public static func signGamma(_ x: ${Self}) -> FloatingPointSign {
+    if x >= 0 { return .plus }
+    let trunc = x.rounded(.towardZero)
+    if x == trunc { return .plus }
+    let halfTrunc = trunc/2
+    if halfTrunc == halfTrunc.rounded(.towardZero) { return .minus }
+    return .plus
+  }
 #endif
 }
 % if type.bits == 80:

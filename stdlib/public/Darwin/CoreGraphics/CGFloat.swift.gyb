@@ -553,12 +553,22 @@ extension CGFloat: Real {
     return CGFloat(NativeType.atan2(y: y.native, x: x.native))
   }
 
-#if !os(Windows)
   @_alwaysEmitIntoClient
   public static func logGamma(_ x: CGFloat) -> CGFloat {
     return CGFloat(NativeType.logGamma(x.native))
   }
-#endif
+
+  // We get this for free from an extension defined on Real, but we need it
+  // on the concrete type as well for back-deployment to older stdlib versions.
+  @_alwaysEmitIntoClient
+  public static func signGamma(_ x: CGFloat) -> FloatingPointSign {
+    if x >= 0 { return .plus }
+    let trunc = x.rounded(.towardZero)
+    if x == trunc { return .plus }
+    let halfTrunc = trunc/2
+    if halfTrunc == halfTrunc.rounded(.towardZero) { return .minus }
+    return .plus
+  }
 }
 
 //===----------------------------------------------------------------------===//
