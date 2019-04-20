@@ -11,6 +11,8 @@ add_swift_target_library(swiftAccelerate ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   vDSP_ComplexOperations.swift
   vDSP_Convolution.swift
   vDSP_Geometry.swift
+  vDSP_RecursiveFilters.swift
+  vDSP_FIR.swift
 
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
 
