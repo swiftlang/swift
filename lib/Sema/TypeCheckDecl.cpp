@@ -2224,16 +2224,23 @@ public:
     }
   }
 
+  bool isDynamicSelf(Type Ty) {
+    return Ty->lookThroughAllOptionalTypes()->hasDynamicSelfType();
+  }
+
   /// diagnoseSelfTypedParameters()
   /// Diagnose instances of (Dynamic)Self as the type of a function arugument.
-  void diagnoseSelfTypedParameters(Type Ty, SourceLoc Loc) {
-    if (auto func = dyn_cast<FunctionType>(Ty->getCanonicalType()))
+  void diagnoseSelfTypedParameters(Type Ty, SourceLoc Loc, int level = 0) {
+    if (auto func = dyn_cast<FunctionType>(Ty->getCanonicalType())) {
+      if (level > 0 && isDynamicSelf(func->getResult()))
+        TC.diagnose(Loc, diag::self_in_nested_return);
       for (auto &param : func->getParams()) {
-        if (param.getParameterType()->hasDynamicSelfType()) {
+        if (isDynamicSelf(param.getParameterType())) {
           TC.diagnose(Loc, diag::self_in_parameter);
-          diagnoseSelfTypedParameters(param.getParameterType(), Loc);
+          diagnoseSelfTypedParameters(param.getParameterType(), Loc, level + 1);
         }
       }
+    }
   }
 
   //===--------------------------------------------------------------------===//
@@ -2611,8 +2618,7 @@ public:
     TC.checkParameterAttributes(SD->getIndices());
     TC.checkDefaultArguments(SD->getIndices(), SD);
 
-    if (SD->isSettable() &&
-        SD->getElementInterfaceType()->hasDynamicSelfType())
+    if (SD->isSettable() && isDynamicSelf(SD->getElementInterfaceType()))
       TC.diagnose(SD->getLoc(), diag::self_in_mutable_subscript);
 
     diagnoseSelfTypedParameters(SD->getElementInterfaceType(),
@@ -2627,11 +2633,11 @@ public:
 
     checkAccessControl(TC, TAD);
 
-    TypeLoc &TL = TAD->getUnderlyingTypeLoc();
-    if (TL.getType()->hasDynamicSelfType())
-      TC.diagnose(TL.getLoc(), diag::self_in_alias);
+    TypeLoc &TyLoc = TAD->getUnderlyingTypeLoc();
+    if (isDynamicSelf(TyLoc.getType()))
+      TC.diagnose(TyLoc.getLoc(), diag::self_in_alias);
 
-    diagnoseSelfTypedParameters(TL.getType(), TL.getLoc());
+    diagnoseSelfTypedParameters(TyLoc.getType(), TyLoc.getLoc());
   }
   
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
@@ -3094,8 +3100,7 @@ public:
     // Delay type-checking on VarDecls until we see the corresponding
     // PatternBindingDecl.
 
-    if (VD->isSettable(nullptr) &&
-        VD->getValueInterfaceType()->hasDynamicSelfType())
+    if (VD->isSettable(nullptr) && isDynamicSelf(VD->getValueInterfaceType()))
       TC.diagnose(VD->getLoc(), diag::self_in_mutable_property);
 
     diagnoseSelfTypedParameters(VD->getValueInterfaceType(),
@@ -3182,12 +3187,12 @@ public:
     checkExplicitAvailability(FD);
 =
     for (auto *Param : *FD->getParameters()) {
-      auto TL = Param->getTypeLoc();
-      auto Loc = TL.hasLocation() ? TL.getLoc() : Param->getLoc();
-      if (Param->getInterfaceType()->hasDynamicSelfType())
+      auto TyLoc = Param->getTypeLoc();
+      auto Loc = TyLoc.hasLocation() ? TyLoc.getLoc() : Param->getLoc();
+      if (isDynamicSelf(Param->getInterfaceType()))
         TC.diagnose(Loc, diag::self_in_parameter);
       else
-        diagnoseSelfTypedParameters(Param->getInterfaceType(), Loc);
+        diagnoseSelfTypedParameters(Param->getInterfaceType(), Loc, 1);
     }
   }
 
