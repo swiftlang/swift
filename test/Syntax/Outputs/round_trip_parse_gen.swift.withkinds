@@ -549,9 +549,9 @@ struct ReadModify <MemberDeclBlock>{<MemberDeclListItem><VariableDecl>
   var <PatternBinding><IdentifierPattern>rm1</IdentifierPattern><TypeAnnotation>: <TupleType>(<TupleTypeElement><SimpleTypeIdentifier>String</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement><SimpleTypeIdentifier>String</SimpleTypeIdentifier></TupleTypeElement>) </TupleType></TypeAnnotation><AccessorBlock>{<AccessorDecl>
     _read <CodeBlock>{ <YieldStmt>yield <YieldList>(<IdentifierExpr>st0</IdentifierExpr>) </YieldList></YieldStmt>}</CodeBlock></AccessorDecl>
   }</AccessorBlock></PatternBinding></VariableDecl></MemberDeclListItem>
-}</MemberDeclBlock></StructDecl><StructDecl><Attribute>
+}</MemberDeclBlock></StructDecl><StructDecl><CustomAttribute>
 
-@_alignment(16) </Attribute><DeclModifier>public </DeclModifier>struct float3 <MemberDeclBlock>{ <MemberDeclListItem><VariableDecl><DeclModifier>public </DeclModifier>var <PatternBinding><IdentifierPattern>x</IdentifierPattern>, </PatternBinding><PatternBinding><IdentifierPattern>y</IdentifierPattern>, </PatternBinding><PatternBinding><IdentifierPattern>z</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Float </SimpleTypeIdentifier></TypeAnnotation></PatternBinding></VariableDecl></MemberDeclListItem>}</MemberDeclBlock></StructDecl><PoundSourceLocation>
+@<SimpleTypeIdentifier>custom </SimpleTypeIdentifier></CustomAttribute><Attribute>@_alignment(16) </Attribute><DeclModifier>public </DeclModifier>struct float3 <MemberDeclBlock>{ <MemberDeclListItem><VariableDecl><DeclModifier>public </DeclModifier>var <PatternBinding><IdentifierPattern>x</IdentifierPattern>, </PatternBinding><PatternBinding><IdentifierPattern>y</IdentifierPattern>, </PatternBinding><PatternBinding><IdentifierPattern>z</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Float </SimpleTypeIdentifier></TypeAnnotation></PatternBinding></VariableDecl></MemberDeclListItem>}</MemberDeclBlock></StructDecl><PoundSourceLocation>
 
 #sourceLocation(<PoundSourceLocationArgs>file: "otherFile.swift", line: 5</PoundSourceLocationArgs>)</PoundSourceLocation><FunctionDecl>
 
@@ -574,4 +574,11 @@ func zlop<FunctionSignature><ParameterClause>() </ParameterClause><ReturnClause>
 #"<StringSegment>abc</StringSegment>"#</StringLiteralExpr><StringLiteralExpr>
 #"<StringSegment>abc </StringSegment><ExpressionSegment>\#(<FunctionCallArgument><IdentifierExpr>foo</IdentifierExpr></FunctionCallArgument>)</ExpressionSegment><StringSegment></StringSegment>"#</StringLiteralExpr><StringLiteralExpr>
 ##"<StringSegment>abc</StringSegment>"##</StringLiteralExpr><StringLiteralExpr>
-##"<StringSegment>abc </StringSegment><ExpressionSegment>\##(<FunctionCallArgument><IdentifierExpr>foo</IdentifierExpr></FunctionCallArgument>)</ExpressionSegment><StringSegment></StringSegment>"##</StringLiteralExpr>
+##"<StringSegment>abc </StringSegment><ExpressionSegment>\##(<FunctionCallArgument><IdentifierExpr>foo</IdentifierExpr></FunctionCallArgument>)</ExpressionSegment><StringSegment></StringSegment>"##</StringLiteralExpr><FunctionDecl><CustomAttribute>
+
+@<SimpleTypeIdentifier>custom</SimpleTypeIdentifier>(<FunctionCallArgument><IdentifierExpr>a</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>b</IdentifierExpr>,</FunctionCallArgument><FunctionCallArgument><IdentifierExpr>c</IdentifierExpr></FunctionCallArgument>)</CustomAttribute>
+func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><FunctionDecl><CustomAttribute>
+
+@<SimpleTypeIdentifier>custom_attr</SimpleTypeIdentifier></CustomAttribute><CustomAttribute>
+@<SimpleTypeIdentifier>custom</SimpleTypeIdentifier>(<FunctionCallArgument>A: <IdentifierExpr>a</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument>B: <IdentifierExpr>b</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument>C:<IdentifierExpr>c</IdentifierExpr></FunctionCallArgument>)</CustomAttribute>
+func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl>
