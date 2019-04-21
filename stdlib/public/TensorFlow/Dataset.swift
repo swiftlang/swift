@@ -154,6 +154,15 @@ public extension Dataset {
       )
     )
   }
+
+  @inlinable @inline(__always)
+  func repeated(count: Int? = nil) -> Dataset {
+    return Dataset(
+      _handle: #tfop(
+        "RepeatDataset", _handle, Tensor(Int64(count ?? -1)),
+        output_types$dtype: Element._typeList,
+        output_shapes: Element._unknownShapeList))
+  }
 }
 
 /// The type that allows iteration over a dataset's elements.
