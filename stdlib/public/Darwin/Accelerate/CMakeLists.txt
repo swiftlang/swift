@@ -3,27 +3,27 @@ include("../../../../cmake/modules/StandaloneOverlay.cmake")
 
 add_swift_target_library(swiftAccelerate ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   Accelerate.swift
-  Quadrature.swift
-  ContiguousCollection.swift
-  vForce_Operations.swift
-  vDSP_SlidingWindow.swift
-  vDSP_Interpolation.swift
-  vDSP_ComplexOperations.swift
-  vDSP_Convolution.swift
-  vDSP_Geometry.swift
-  vDSP_RecursiveFilters.swift
-  vDSP_FIR.swift
-  vDSP_Reduction.swift
+  AccelerateBuffer.swift
   vDSP_Arithmetic.swift
-  vDSP_PolarRectangularConversion.swift
-  vDSP_DecibelConversion.swift
-  vDSP_ComplexConversion.swift
-  vDSP_PolynomialEvaluation.swift
   vDSP_ClippingLimitThreshold.swift
-  vDSP_FillClearGenerate.swift
-  vDSP_Integration.swift
+  vDSP_ComplexConversion.swift
+  vDSP_ComplexOperations.swift
   vDSP_Conversion.swift
+  vDSP_Convolution.swift
+  vDSP_DecibelConversion.swift
+  vDSP_FIR.swift
+  vDSP_FillClearGenerate.swift
+  vDSP_Geometry.swift
+  vDSP_Integration.swift
+  vDSP_Interpolation.swift
+  vDSP_PolarRectangularConversion.swift
+  vDSP_PolynomialEvaluation.swift
+  vDSP_RecursiveFilters.swift
+  vDSP_Reduction.swift
   vDSP_SingleVectorOperations.swift
+  vDSP_SlidingWindow.swift
+  vForce_Operations.swift
+  Quadrature.swift
 
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
 
