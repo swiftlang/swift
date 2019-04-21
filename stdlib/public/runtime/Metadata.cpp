@@ -2673,10 +2673,17 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     setUpObjCRuntimeGetImageNameFromClass();
   }, nullptr);
 
+#ifndef OBJC_REALIZECLASSFROMSWIFT_DEFINED
   // Temporary workaround until _objc_realizeClassFromSwift is in the SDK.
   static auto _objc_realizeClassFromSwift =
-    (Class (*)(Class _Nullable, const void *_Nullable))
+    (Class (*)(Class _Nullable, void *_Nullable))
     dlsym(RTLD_NEXT, "_objc_realizeClassFromSwift");
+#endif
+
+  // Temporary workaround until objc_loadClassref is in the SDK.
+  static auto objc_loadClassref =
+    (Class (*)(void *))
+    dlsym(RTLD_NEXT, "objc_loadClassref");
 #endif
 
   // Copy field offsets, generic arguments and (if necessary) vtable entries
@@ -2705,12 +2712,13 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     // however we should not be using it for anything in a non-generic
     // class.
     if (auto *stub = description->getObjCResilientClassStub()) {
-      if (_objc_realizeClassFromSwift == nullptr) {
+      if (_objc_realizeClassFromSwift == nullptr ||
+          objc_loadClassref == nullptr) {
         fatalError(0, "class %s requires missing Objective-C runtime feature; "
                   "the deployment target was newer than this OS\n",
                   self->getDescription()->Name.get());
       }
-      _objc_realizeClassFromSwift((Class) self, stub);
+      _objc_realizeClassFromSwift((Class) self, const_cast<void *>(stub));
     } else
       swift_instantiateObjCClass(self);
   }
@@ -2762,7 +2770,7 @@ _swift_updateClassMetadataImpl(ClassMetadata *self,
 #ifndef OBJC_REALIZECLASSFROMSWIFT_DEFINED
   // Temporary workaround until _objc_realizeClassFromSwift is in the SDK.
   static auto _objc_realizeClassFromSwift =
-    (Class (*)(Class _Nullable, const void *_Nullable))
+    (Class (*)(Class _Nullable, void *_Nullable))
     dlsym(RTLD_NEXT, "_objc_realizeClassFromSwift");
 #endif
 

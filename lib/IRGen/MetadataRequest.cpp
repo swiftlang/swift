@@ -511,19 +511,12 @@ irgen::getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
 llvm::Constant *
 irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
                                       CanType type,
-                                      bool allowDynamicUninitialized,
-                                      bool allowStub) {
+                                      bool allowDynamicUninitialized) {
   auto theDecl = type->getClassOrBoundGenericClass();
   assert(theDecl && "emitting constant heap metadata ref for non-class type?");
 
   switch (IGM.getClassMetadataStrategy(theDecl)) {
   case ClassMetadataStrategy::Resilient:
-    if (allowStub && IGM.Context.LangOpts.EnableObjCResilientClassStubs) {
-      return IGM.getAddrOfObjCResilientClassStub(theDecl, NotForDefinition,
-                                            TypeMetadataAddress::AddressPoint);
-    }
-    return nullptr;
-
   case ClassMetadataStrategy::Singleton:
     if (!allowDynamicUninitialized)
       return nullptr;
