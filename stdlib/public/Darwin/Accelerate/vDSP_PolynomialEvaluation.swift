@@ -58,7 +58,7 @@ extension vDSP {
     ///
     /// `result[1] = (10 * 5²) + (20 * 5¹) + (30 * 5⁰) // 380`
     @inline(__always)
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func evaluatePolynomial<U, V>(usingCoefficients coefficients: [Float],
                                                 withVariables variables: U,
                                                 result: inout V)
@@ -129,7 +129,7 @@ extension vDSP {
     ///
     /// `result[1] = (10 * 5²) + (20 * 5¹) + (30 * 5⁰) // 380`
     @inline(__always)
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func evaluatePolynomial<U, V>(usingCoefficients coefficients: [Double],
                                                 withVariables variables: U,
                                                 result: inout V)
