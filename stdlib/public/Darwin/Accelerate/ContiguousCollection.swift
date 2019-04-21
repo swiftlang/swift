@@ -15,7 +15,7 @@
 /// In practice, most types conforming to this protocol will be Collections,
 /// but they need not be--they need only have an Element type and count, and
 /// provide the withUnsafeBufferPointer function.
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 public protocol AccelerateBuffer {
   /// The buffer's element type.
   associatedtype Element
@@ -34,7 +34,7 @@ public protocol AccelerateBuffer {
 ///
 /// In practice, most types conforming to this protocol will be
 /// MutableCollections, but they need not be.
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 public protocol AccelerateMutableBuffer: AccelerateBuffer {
   /// Calls the given closure with a pointer to the object's mutable
   /// contiguous storage.
@@ -43,7 +43,7 @@ public protocol AccelerateMutableBuffer: AccelerateBuffer {
   ) rethrows -> R
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 public extension AccelerateBuffer where Self: Collection {
   func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
@@ -52,7 +52,7 @@ public extension AccelerateBuffer where Self: Collection {
   }
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 extension AccelerateMutableBuffer where Self: MutableCollection {
   public mutating func withUnsafeMutableBufferPointer<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
@@ -61,23 +61,23 @@ extension AccelerateMutableBuffer where Self: MutableCollection {
   }
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 extension Array: AccelerateMutableBuffer { }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 extension ContiguousArray: AccelerateMutableBuffer { }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 extension ArraySlice: AccelerateMutableBuffer { }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 extension UnsafeBufferPointer: AccelerateBuffer { }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 extension UnsafeMutableBufferPointer: AccelerateMutableBuffer { }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 extension Slice: AccelerateBuffer where Base: Collection { }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 extension Slice: AccelerateMutableBuffer where Base: MutableCollection { }
