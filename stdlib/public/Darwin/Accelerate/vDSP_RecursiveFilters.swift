@@ -31,7 +31,7 @@ extension vDSP {
     /// Where `A` is the input vector, `B` is the filter coefficients, and `C`
     /// is the output vector. Note that outputs start with C[2].
     @inline(__always)
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func twoPoleTwoZeroFilter<U>(_ source: U,
                                                   coefficients: (Float, Float, Float, Float, Float)) -> [Float]
         where
@@ -73,7 +73,7 @@ extension vDSP {
     /// Where `A` is the input vector, `B` is the filter coefficients, and `C`
     /// is the output vector. Note that outputs start with C[2].
     @inline(__always)
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func twoPoleTwoZeroFilter<U, V>(_ source: U,
                                                   coefficients: (Float, Float, Float, Float, Float),
                                                   result: inout V)
@@ -118,7 +118,7 @@ extension vDSP {
     /// Where `A` is the input vector, `B` is the filter coefficients, and `C`
     /// is the output vector. Note that outputs start with C[2].
     @inline(__always)
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func twoPoleTwoZeroFilter<U>(_ source: U,
                                                   coefficients: (Double, Double, Double, Double, Double)) -> [Double]
         where
@@ -160,7 +160,7 @@ extension vDSP {
     /// Where `A` is the input vector, `B` is the filter coefficients, and `C`
     /// is the output vector. Note that outputs start with C[2].
     @inline(__always)
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func twoPoleTwoZeroFilter<U, V>(_ source: U,
                                                   coefficients: (Double, Double, Double, Double, Double),
                                                   result: inout V)

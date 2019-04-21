@@ -19,7 +19,7 @@ extension vDSP {
     /// - Parameter filter: Filter to use during the downsampling operation.
     /// - Returns: Single-precision output vector.
     @inline(__always)
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func downsample<T, U>(_ source: U,
                                         decimationFactor: Int,
                                         filter: T) -> [Float]
@@ -52,7 +52,7 @@ extension vDSP {
     /// - Parameter filter: Filter to use during the downsampling operation.
     /// - Parameter result: Single-precision output vector.
     @inline(__always)
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func downsample<T, U, V>(_ source: U,
                                            decimationFactor: Int,
                                            filter: T,
@@ -75,7 +75,7 @@ extension vDSP {
                     filter.withUnsafeBufferPointer { f in
                         
                         vDSP_desamp(src.baseAddress!,
-                                    decimationFactor,
+                                    vDSP_Stride(decimationFactor),
                                     f.baseAddress!,
                                     dest.baseAddress!,
                                     vDSP_Length(n),
@@ -92,7 +92,7 @@ extension vDSP {
     /// - Parameter filter: Filter to use during the downsampling operation.
     /// - Returns: Double-precision output vector.
     @inline(__always)
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func downsample<T, U>(_ source: U,
                                         decimationFactor: Int,
                                         filter: T) -> [Double]
@@ -124,7 +124,7 @@ extension vDSP {
     /// - Parameter filter: Filter to use during the downsampling operation.
     /// - Parameter result: Double-precision output vector.
     @inline(__always)
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func downsample<T, U, V>(_ source: U,
                                            decimationFactor: Int,
                                            filter: T,
@@ -147,7 +147,7 @@ extension vDSP {
                     filter.withUnsafeBufferPointer { f in
                         
                         vDSP_desampD(src.baseAddress!,
-                                     decimationFactor,
+                                     vDSP_Stride(decimationFactor),
                                      f.baseAddress!,
                                      dest.baseAddress!,
                                      vDSP_Length(n),
