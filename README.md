@@ -39,10 +39,9 @@ You will also need [CMake](https://cmake.org), [Ninja](https://ninja-build.org),
 ```shell
 brew install cmake ninja
 brew cask install caskroom/versions/java8 # required for Bazel
-brew install bazel # required for TensorFlow support
 ```
 
-Instructions for installing CMake, Ninja, and Bazel directly can be found [below](#build-dependencies).
+Additionally, [Bazel](https://www.bazel.build) v0.22.0 is required to build with TensorFlow support. Instructions to download Bazel directly can be found [below](###bazel). You can find instructions for installing CMake, and Ninja directly [below](#build-dependencies) as well.
 
 #### Linux
 
@@ -50,7 +49,7 @@ For Ubuntu, you'll need the following development dependencies:
 
     sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-openssl-dev systemtap-sdt-dev tzdata rsync
 
-Additionally, [Bazel](https://www.bazel.build) is required to build with TensorFlow support. Ubuntu installation instructions are [here](https://docs.bazel.build/versions/master/install-ubuntu.html).
+Additionally, [Bazel](https://www.bazel.build) v0.22.0 is required to build with TensorFlow support. Ubuntu installation instructions can be found [below](###bazel).
 
 **Note:** LLDB currently requires at least `swig-1.3.40` but will successfully build
 with version 2 shipped with Ubuntu.
@@ -341,3 +340,4 @@ next to the other projects and it will be bootstrapped automatically:
 The Bazel website has detailed installation instructions for
 [macOS](https://docs.bazel.build/versions/master/install-os-x.html) and
 [Ubuntu](https://docs.bazel.build/versions/master/install-ubuntu.html).
+When picking the version to download in step 2, select v0.22.0 which can be found in the release notes [here](https://github.com/bazelbuild/bazel/releases/tag/0.22.0).
