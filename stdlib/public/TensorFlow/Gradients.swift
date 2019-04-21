@@ -553,12 +553,10 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   }
 
   @inlinable
-  func _vjpExpandingShape(
-    at shapeIndex: Int
-  ) -> (Tensor, (Tensor) -> Tensor) {
-    let value = expandingShape(at: shapeIndex)
+  func _vjpExpandingShape(at axes: [Int]) -> (Tensor, (Tensor) -> Tensor) {
+    let value = self.expandingShape(at: axes)
     return (value, { v in
-      v.squeezingShape(at: shapeIndex)
+      v.squeezingShape(at: axes)
     })
   }
 }
