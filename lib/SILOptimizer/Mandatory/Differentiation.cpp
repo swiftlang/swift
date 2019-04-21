@@ -2293,7 +2293,6 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
       auto indRes = *fromIndResultsIter++;
       auto *load = builder.createLoad(loc, indRes,
           getBufferLOQ(indRes->getType().getASTType(), *thunk));
-      builder.createRetainValue(loc, load, builder.getDefaultAtomicity());
       results.push_back(load);
       continue;
     }

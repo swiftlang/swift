@@ -674,6 +674,20 @@ TensorTests.testAllBackends("MLPClassifierStruct") {
   expectPointwiseNearlyEqual([0.816997], prediction.scalars)
 }
 
+TensorTests.testAllBackends("ExpandingShape") {
+  // 2 x 3 -> 1 x 2 x 1 x 3 x 1
+  let matrix = Tensor<Int32>([[0, 1, 2], [3, 4, 5]])
+  let reshaped = matrix.expandingShape(at: 0,2,4)
+
+  expectEqual([1, 2, 1, 3, 1], reshaped.shape)
+  expectEqual(Array(0..<6), reshaped.scalars)
+  
+  // 1 x 2 x 1 x 3 x 1 -> 2 x 3
+  let rereshaped = reshaped.squeezingShape(at: 0,2,4)
+  expectEqual([2, 3], rereshaped.shape)
+  expectEqual(Array(0..<6), rereshaped.scalars)
+}
+
 TensorTests.testAllBackends("Reshape") {
   // 2 x 3 -> 1 x 3 x 1 x 2 x 1
   let matrix = Tensor<Int32>([[0, 1, 2], [3, 4, 5]])
