@@ -75,7 +75,7 @@ extension vDSP {
                     filter.withUnsafeBufferPointer { f in
                         
                         vDSP_desamp(src.baseAddress!,
-                                    decimationFactor,
+                                    vDSP_Stride(decimationFactor),
                                     f.baseAddress!,
                                     dest.baseAddress!,
                                     vDSP_Length(n),
@@ -147,7 +147,7 @@ extension vDSP {
                     filter.withUnsafeBufferPointer { f in
                         
                         vDSP_desampD(src.baseAddress!,
-                                     decimationFactor,
+                                     vDSP_Stride(decimationFactor),
                                      f.baseAddress!,
                                      dest.baseAddress!,
                                      vDSP_Length(n),
