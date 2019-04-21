@@ -4009,16 +4009,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
     }
 
-    // If we have generic parameters, check the generic signature now.
-    if (FD->getGenericParams() || !isa<AccessorDecl>(FD)) {
-      validateGenericFuncSignature(FD);
-    } else {
-      // We've inherited all of the type information already.
-      FD->setGenericEnvironment(
-        FD->getDeclContext()->getGenericEnvironmentOfContext());
-
-      FD->computeType();
-    }
+    validateGenericFuncOrSubscriptSignature(FD, FD, FD);
     
     if (!isa<AccessorDecl>(FD) || cast<AccessorDecl>(FD)->isGetter()) {
       auto *TyR = getTypeLocForFunctionResult(FD).getTypeRepr();
@@ -4132,7 +4123,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
     }
 
-    validateGenericFuncSignature(CD);
+    validateGenericFuncOrSubscriptSignature(CD, CD, CD);
 
     // We want the constructor to be available for name lookup as soon
     // as it has a valid interface type.
@@ -4156,7 +4147,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     checkDeclAttributesEarly(DD);
 
-    validateGenericFuncSignature(DD);
+    validateGenericFuncOrSubscriptSignature(DD, DD, DD);
 
     DD->setSignatureIsValidated();
 
@@ -4169,7 +4160,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(SD);
 
-    validateGenericSubscriptSignature(SD);
+    validateGenericFuncOrSubscriptSignature(SD, SD, SD);
 
     SD->setSignatureIsValidated();
 
