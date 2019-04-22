@@ -24,7 +24,7 @@ extension Int: P {
   }
 }
 // Opaque result type descriptor accessor for bar.
-// CHECK-LABEL: define swiftcc %swift.type_descriptor* @"$s1A3baryQrSiFQOMg"()
+// CHECK-LABEL: define{{.*}} swiftcc %swift.type_descriptor* @"$s1A3baryQrSiFQOMg"()
 // CHECK: entry:
 // CHECK:   %0 = load i8*, i8** getelementptr inbounds (%swift.dyn_repl_link_entry, %swift.dyn_repl_link_entry* @"$s1A3baryQrSiFQOMk", i32 0, i32 0)
 // CHECK:   %1 = bitcast i8* %0 to %swift.type_descriptor* ()*
@@ -33,7 +33,7 @@ extension Int: P {
 // CHECK: }
 
 // Opaque result type descriptor accessor impl.
-// CHECK-LABEL: define swiftcc %swift.type_descriptor* @"$s1A3baryQrSiFQOMh"()
+// CHECK-LABEL: define{{.*}} swiftcc %swift.type_descriptor* @"$s1A3baryQrSiFQOMh"()
 // CHECK: entry:
 // CHECK:   ret %swift.type_descriptor* bitcast ({{.*}}* @"$s1A3baryQrSiFQOMQ" to %swift.type_descriptor*)
 // CHECK: }
@@ -50,7 +50,7 @@ struct Pair : P {
   }
 }
 // Opaque result type descriptor accessor for _replacement_bar.
-// CHECK: define swiftcc %swift.type_descriptor* @"$s1A16_replacement_bar1yQrSi_tFQOMg"()
+// CHECK: define{{.*}} swiftcc %swift.type_descriptor* @"$s1A16_replacement_bar1yQrSi_tFQOMg"()
 // CHECK: entry:
 // CHECK:   ret %swift.type_descriptor* bitcast ({{.*}} @"$s1A16_replacement_bar1yQrSi_tFQOMQ" to %swift.type_descriptor*)
 // CHECK: }
@@ -67,14 +67,14 @@ struct Container {
   }
 }
 
-// CHECK: define hidden swiftcc %swift.type_descriptor* @"$s1A9ContainerV4propQrvpQOMg"()
+// CHECK: define{{.*}} hidden swiftcc %swift.type_descriptor* @"$s1A9ContainerV4propQrvpQOMg"()
 // CHECK: entry:
 // CHECK:   %0 = load i8*, i8** getelementptr inbounds (%swift.dyn_repl_link_entry, %swift.dyn_repl_link_entry* @"$s1A9ContainerV4propQrvpQOMk", i32 0, i32 0)
 // CHECK:   %1 = bitcast i8* %0 to %swift.type_descriptor* ()*
 // CHECK:   %2 = tail call swiftcc %swift.type_descriptor* %1()
 // CHECK:   ret %swift.type_descriptor* %2
 
-// CHECK: define hidden swiftcc %swift.type_descriptor* @"$s1A9ContainerV4propQrvpQOMh"()
+// CHECK: define{{.*}} hidden swiftcc %swift.type_descriptor* @"$s1A9ContainerV4propQrvpQOMh"()
 // CHECK: entry:
 // CHECK:   ret %swift.type_descriptor* bitcast ({{.*}} @"$s1A9ContainerV4propQrvpQOMQ" to %swift.type_descriptor*)
 
@@ -87,7 +87,7 @@ extension Container {
   }
 }
 
-// CHECK: define hidden swiftcc %swift.type_descriptor* @"$s1A9ContainerV7_r_propQrvpQOMg"()
+// CHECK: define{{.*}} hidden swiftcc %swift.type_descriptor* @"$s1A9ContainerV7_r_propQrvpQOMg"()
 // CHECK: entry:
 // CHECK:  ret %swift.type_descriptor* bitcast ({{.*}} @"$s1A9ContainerV7_r_propQrvpQOMQ" to %swift.type_descriptor*)
 
