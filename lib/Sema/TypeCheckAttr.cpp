@@ -2092,94 +2092,6 @@ static Type getDynamicComparisonType(ValueDecl *value) {
   return interfaceType->removeArgumentLabels(numArgumentLabels);
 }
 
-static OpaqueTypeArchetypeType *getOpaqueResulType(const AbstractFunctionDecl *func) {
-  auto funTy =
-      (func->getDeclContext()->isTypeContext() ? func->getMethodInterfaceType()
-                                               : func->getInterfaceType())
-          ->getCanonicalType()
-          ->getAs<AnyFunctionType>();
-  auto resultTy = funTy->getResult()->getCanonicalType()->getAs<OpaqueTypeArchetypeType>();
-  return resultTy;
-}
-
-static AnyFunctionType::CanParamArrayRef getParameters(const AbstractFunctionDecl *func) {
-  auto funTy =
-      (func->getDeclContext()->isTypeContext() ? func->getMethodInterfaceType()
-                                               : func->getInterfaceType())
-          ->getCanonicalType()
-          ->getAs<AnyFunctionType>();
-  assert(funTy);
-  return funTy->getParams();
-}
-
-static bool
-matchFunctionWithOpaqueResultType(const AbstractFunctionDecl *replacement,
-                                  AbstractFunctionDecl *replaced) {
-  if (!replaced)
-    return false;
-
-  auto resultTy = getOpaqueResulType(replacement);
-  if (!resultTy)
-    return false;
-  auto replacedResultTy = getOpaqueResulType(replaced);
-  if (!replacedResultTy)
-    return false;
-
-  if (resultTy->getBoundSignature() != replacedResultTy->getBoundSignature() ||
-      !resultTy->getInterfaceType()->getCanonicalType()->matches(
-          replacedResultTy->getInterfaceType()->getCanonicalType(),
-          TypeMatchFlags::AllowABICompatible))
-    return false;
-
-  auto params = getParameters(replacement);
-  auto replacedParams = getParameters(replaced);
-  if (params.size() != replacedParams.size())
-    return false;
-  for (auto i : indices(params)) {
-    if (!params[i].getOldType()->matchesParameter(
-            replacedParams[i].getOldType(), TypeMatchFlags::AllowABICompatible))
-      return false;
-  }
-
-  return true;
-}
-
-static bool matchOpaqueResultType(Type replacement, Type replaced) {
-  if (replacement->isEqual(replaced))
-    return true;
-
-  if (auto fn1 = dyn_cast<AnyFunctionType>(replacement->getCanonicalType())) {
-    auto fn2 = dyn_cast<AnyFunctionType>(replaced->getCanonicalType());
-    if (!fn2)
-      return false;
-    auto fn2Params = fn2.getParams();
-    auto fn1Params = fn1.getParams();
-    if (fn2Params.size() != fn1Params.size()) {
-      return false;
-    }
-    for (auto i : indices(fn2Params)) {
-      if (!matchOpaqueResultType(fn2Params[i].getOldType(),
-                                 fn1Params[i].getOldType()))
-        return false;
-    }
-    return matchOpaqueResultType(fn1.getResult(), fn2.getResult());
-  }
-
-  auto resultTy = replacement->getAs<OpaqueTypeArchetypeType>();
-  if (!resultTy)
-    return false;
-  auto replacedResultTy = replaced->getAs<OpaqueTypeArchetypeType>();
-  if (!replacedResultTy)
-    return false;
-
-  if (resultTy->getBoundSignature() != replacedResultTy->getBoundSignature() ||
-      !resultTy->getInterfaceType()->getCanonicalType()->matches(
-          replacedResultTy->getInterfaceType()->getCanonicalType(),
-          TypeMatchFlags::AllowABICompatible))
-    return false;
-  return true;
-}
-
 static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
                                       AccessorDecl *replacement,
                                       DynamicReplacementAttr *attr,
@@ -2204,7 +2116,9 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
           TC.validateDecl(result);
           auto resultType = getDynamicComparisonType(result);
           if (!resultType->isEqual(replacementStorageType) &&
-              !matchOpaqueResultType(resultType, replacementStorageType)) {
+              !resultType->matches(
+                  replacementStorageType,
+                  TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes)) {
             return true;
           }
 
@@ -2280,11 +2194,10 @@ findReplacedFunction(DeclName replacedFunctionName,
       continue;
     if (TC)
       TC->validateDecl(result);
-    if (matchFunctionWithOpaqueResultType(
-            replacement, dyn_cast<AbstractFunctionDecl>(result)) ||
-        result->getInterfaceType()->getCanonicalType()->matches(
-            replacement->getInterfaceType()->getCanonicalType(),
-            TypeMatchFlags::AllowABICompatible)) {
+    TypeMatchOptions matchMode = TypeMatchFlags::AllowABICompatible;
+    matchMode |= TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
+    if (result->getInterfaceType()->getCanonicalType()->matches(
+            replacement->getInterfaceType()->getCanonicalType(), matchMode)) {
       if (!result->isDynamic()) {
         if (TC) {
           TC->diagnose(attr->getLocation(),
