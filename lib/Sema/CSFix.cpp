@@ -438,7 +438,9 @@ bool AllowInvalidRefInKeyPath::diagnose(Expr *root, bool asNote) const {
   }
 
   case RefKind::Method: {
-    return false;
+    InvalidMethodRefInKeyPath failure(root, getConstraintSystem(), Member,
+                                      getLocator());
+    return failure.diagnose(asNote);
   }
   }
 }
