@@ -931,46 +931,34 @@ namespace {
           auto typeArgs = type->getObjectType()->getTypeArgs();
           assert(typeArgs.empty() || typeArgs.size() == typeParamCount);
           llvm::SmallVector<Type, 2> importedTypeArgs;
-            
           for (unsigned i = 0; i < typeParamCount; i++) {
             Type importedTypeArg;
             auto typeParam = imported->getGenericParams()->getParams()[i];
-              
             if (!typeArgs.empty()) {
               auto subresult = Visit(typeArgs[i]);
               if (!subresult) {
                 return nullptr;
               }
               importedTypeArg = subresult.AbstractType;
+            } else if (typeParam->getSuperclass() &&
+                       typeParam->getConformingProtocols().empty()) {
+              importedTypeArg = typeParam->getSuperclass();
             } else {
-              switch (typeParam.getKind()) {
-              case GenericParam::ParamKind::TypeParam: {
-                auto GTPD = typeParam.getTypeParam();
-                  
-                if (GTPD->getSuperclass() &&
-                    GTPD->getConformingProtocols().empty()) {
-                  importedTypeArg = GTPD->getSuperclass();
-                } else {
-                  SmallVector<Type, 4> memberTypes;
-                    
-                  if (auto superclassType = GTPD->getSuperclass())
-                    memberTypes.push_back(superclassType);
-                    
-                  for (auto protocolDecl : GTPD->getConformingProtocols())
-                    memberTypes.push_back(protocolDecl->getDeclaredType());
-                    
-                  bool hasExplicitAnyObject = false;
-                  if (memberTypes.empty())
-                    hasExplicitAnyObject = true;
-                    
-                  importedTypeArg = ProtocolCompositionType::get(
-                      Impl.SwiftContext, memberTypes,
-                      hasExplicitAnyObject);
-                }
-                      
-                break;
-              }
-              }
+              SmallVector<Type, 4> memberTypes;
+
+              if (auto superclassType = typeParam->getSuperclass())
+                memberTypes.push_back(superclassType);
+
+              for (auto protocolDecl : typeParam->getConformingProtocols())
+                memberTypes.push_back(protocolDecl->getDeclaredType());
+
+              bool hasExplicitAnyObject = false;
+              if (memberTypes.empty())
+                hasExplicitAnyObject = true;
+
+              importedTypeArg = ProtocolCompositionType::get(
+                  Impl.SwiftContext, memberTypes,
+                  hasExplicitAnyObject);
             }
             importedTypeArgs.push_back(importedTypeArg);
           }

@@ -1403,7 +1403,7 @@ SourceRange ASTScope::getSourceRangeImpl() const {
     // Explicitly-written generic parameters are in scope following their
     // definition.
     return SourceRange(genericParams.params->getParams()[genericParams.index]
-                         .getEndLoc(),
+                         ->getEndLoc(),
                        genericParams.decl->getEndLoc());
 
   case ASTScopeKind::AbstractFunctionDecl: {
@@ -1765,27 +1765,16 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     for (auto genericParams = extension->getGenericParams();
          genericParams;
          genericParams = genericParams->getOuterParameters()) {
-      for (auto param : genericParams->getParams()) {
-        switch (param.getKind()) {
-          case GenericParam::ParamKind::TypeParam:
-            result.push_back(param.getTypeParam());
-            break;
-        }
-      }
+      for (auto param : genericParams->getParams())
+        result.push_back(param);
     }
     break;
   }
 
-  case ASTScopeKind::GenericParams: {
-    auto param = genericParams.params->getParams()[genericParams.index];
-    switch (param.getKind()) {
-      case GenericParam::ParamKind::TypeParam:
-        result.push_back(param.getTypeParam());
-        break;
-    }
+  case ASTScopeKind::GenericParams:
+    result.push_back(genericParams.params->getParams()[genericParams.index]);
     break;
-  }
-      
+
   case ASTScopeKind::AbstractFunctionParams:
     result.push_back(
       getParameter(abstractFunctionParams.decl,

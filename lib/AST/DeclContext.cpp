@@ -98,12 +98,7 @@ GenericTypeParamType *DeclContext::getProtocolSelfType() const {
   if (genericParams == nullptr)
     return nullptr;
 
-  auto SelfParam = genericParams->getParams().front();
-
-  assert(SelfParam.is(GenericParam::ParamKind::TypeParam)
-         && "Self was not declared as a GenericTypeParamDecl");
-    
-  return SelfParam.getTypeParam()
+  return genericParams->getParams().front()
       ->getDeclaredInterfaceType()
       ->castTo<GenericTypeParamType>();
 }

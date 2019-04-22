@@ -4396,7 +4396,7 @@ namespace {
       result->computeType();
 
       // FIXME: Kind of awkward that we have to do this here
-      result->getGenericParams()->getParams()[0].setDepth(0);
+      result->getGenericParams()->getParams()[0]->setDepth(0);
 
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
 
@@ -6719,7 +6719,7 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
     return nullptr;
   }
   assert(typeParamList->size() > 0);
-  SmallVector<GenericParam, 4> genericParams;
+  SmallVector<GenericTypeParamDecl *, 4> genericParams;
   for (auto *objcGenericParam : *typeParamList) {
     auto genericParamDecl = Impl.createDeclWithClangNode<GenericTypeParamDecl>(
         objcGenericParam, AccessLevel::Public, dc,

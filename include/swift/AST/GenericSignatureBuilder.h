@@ -560,13 +560,13 @@ public:
   TypeArrayView<GenericTypeParamType> getGenericParams() const;
 
   /// Add a new generic parameter for which there may be requirements.
-  void addGenericParameter(GenericParam param);
+  void addGenericParameter(GenericTypeParamDecl *GenericParam);
 
   /// Add the requirements placed on the given abstract type parameter
   /// to the given potential archetype.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool addGenericParameterRequirements(GenericParam param);
+  bool addGenericParameterRequirements(GenericTypeParamDecl *GenericParam);
 
   /// Add a new generic parameter for which there may be requirements.
   void addGenericParameter(GenericTypeParamType *GenericParam);

@@ -1455,7 +1455,7 @@ public:
   ParserResult<GenericParamList> parseGenericParameters();
   ParserResult<GenericParamList> parseGenericParameters(SourceLoc LAngleLoc);
   ParserStatus parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
-                        SmallVectorImpl<GenericParam> &GenericParams);
+                        SmallVectorImpl<GenericTypeParamDecl *> &GenericParams);
   ParserResult<GenericParamList> maybeParseGenericParams();
   void
   diagnoseWhereClauseInGenericParamList(const GenericParamList *GenericParams);

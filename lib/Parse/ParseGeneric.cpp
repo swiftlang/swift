@@ -46,7 +46,7 @@ ParserResult<GenericParamList> Parser::parseGenericParameters() {
 
 ParserStatus
 Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
-                        SmallVectorImpl<GenericParam> &GenericParams) {
+                        SmallVectorImpl<GenericTypeParamDecl *> &GenericParams) {
   ParserStatus Result;
   SyntaxParsingContext GPSContext(SyntaxContext, SyntaxKind::GenericParameterList);
   bool HasNextParam;
@@ -129,7 +129,7 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
 ParserResult<GenericParamList>
 Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   // Parse the generic parameter list.
-  SmallVector<GenericParam, 4> GenericParams;
+  SmallVector<GenericTypeParamDecl *, 4> GenericParams;
   auto Result = parseGenericParametersBeforeWhere(LAngleLoc, GenericParams);
 
   // Return early if there was code completion token.
@@ -206,7 +206,7 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
   // as written all the way to the right angle bracket (">")
   auto LastGenericParam = GenericParams->getParams().back();
   auto EndOfLastGenericParam =
-      Lexer::getLocForEndOfToken(SourceMgr, LastGenericParam.getEndLoc());
+      Lexer::getLocForEndOfToken(SourceMgr, LastGenericParam->getEndLoc());
 
   CharSourceRange RemoveWhereRange { SourceMgr,
     EndOfLastGenericParam,
@@ -380,15 +380,9 @@ parseFreestandingGenericWhereClause(GenericParamList *&genericParams,
   // find them.
   Scope S(this, ScopeKind::Generics);
   
-  if (genericParams) {
-    for (auto pd : genericParams->getParams()) {
-      switch (pd.getKind()) {
-        case GenericParam::ParamKind::TypeParam:
-          addToScope(pd.getTypeParam());
-          break;
-      }
-    }
-  }
+  if (genericParams)
+    for (auto pd : genericParams->getParams())
+      addToScope(pd);
   
   SmallVector<RequirementRepr, 4> Requirements;
   SourceLoc WhereLoc;
