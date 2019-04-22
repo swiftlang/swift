@@ -417,3 +417,9 @@ let closure = { [weak x=bindtox, unowned y=bindtoy, unowned(unsafe) z=bindtoz] i
 protocol FakeClassRestrictedProtocol : `class` {}
 // CHECK: <kw>protocol</kw> FakeClassRestrictedProtocol : <type>`class`</type> {}
 // FIXME: rdar://42801404: OLD and NEW should be the same '<type>`class`</type>'.
+
+// CHECK: <kw>func</kw> foo() -> <kw>some</kw> <type>P</type> {}
+func foo() -> some P {}
+
+// CHECK: <kw>func</kw> foo() -> <kw>some</kw> <type>P</type> & <type>Q</type> {}
+func foo() -> some P & Q {}
