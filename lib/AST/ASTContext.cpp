@@ -386,11 +386,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// unsatisfied, which might conflict with other Objective-C methods.
   std::vector<ObjCUnsatisfiedOptReq> ObjCUnsatisfiedOptReqs;
 
-  /// List of Objective-C methods created by the type checker (and not
-  /// by the Clang importer or deserialized), which is used for
-  /// checking unintended Objective-C overrides.
-  std::vector<AbstractFunctionDecl *> ObjCMethods;
-
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
   llvm::DenseMap<NominalTypeDecl *, ForeignRepresentationInfo>
@@ -2330,14 +2325,6 @@ void ASTContext::diagnoseAttrsRequiringFoundation(SourceFile &SF) {
   }
 }
 
-void ASTContext::recordObjCMethod(AbstractFunctionDecl *func) {
-  // If this method comes from Objective-C, ignore it.
-  if (func->hasClangNode())
-    return;
-
-  getImpl().ObjCMethods.push_back(func);
-}
-
 /// Lookup for an Objective-C method with the given selector in the
 /// given class or any of its superclasses.
 static AbstractFunctionDecl *lookupObjCMethodInClass(
@@ -2411,20 +2398,7 @@ AbstractFunctionDecl::getForeignErrorConvention() const {
 }
 
 bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
-  // Capture the methods in this source file.
-  llvm::SmallVector<AbstractFunctionDecl *, 4> methods;
-  auto captureMethodInSourceFile = [&](AbstractFunctionDecl *method) -> bool {
-    if (method->getDeclContext()->getParentSourceFile() == &sf) {
-      methods.push_back(method);
-      return true;
-    }
-
-    return false;
-  };
-  getImpl().ObjCMethods.erase(std::remove_if(getImpl().ObjCMethods.begin(),
-                                        getImpl().ObjCMethods.end(),
-                                        captureMethodInSourceFile),
-                         getImpl().ObjCMethods.end());
+  auto &methods = sf.ObjCMethodList;
 
   // If no Objective-C methods were defined in this file, we're done.
   if (methods.empty())

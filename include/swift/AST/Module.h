@@ -1028,6 +1028,10 @@ public:
   llvm::DenseMap<ObjCSelector, llvm::TinyPtrVector<AbstractFunctionDecl *>>
     ObjCMethods;
 
+  /// List of Objective-C methods, which is used for checking unintended
+  /// Objective-C overrides.
+  std::vector<AbstractFunctionDecl *> ObjCMethodList;
+
   template <typename T>
   using OperatorMap = llvm::DenseMap<Identifier,llvm::PointerIntPair<T,1,bool>>;
 

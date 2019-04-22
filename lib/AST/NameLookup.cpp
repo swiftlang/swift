@@ -1270,8 +1270,8 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method,
                                                isInstanceMethod);
     }
   } else {
-    // Record the first method that has this selector.
-    getASTContext().recordObjCMethod(method);
+    if (auto *sf = method->getParentSourceFile())
+      sf->ObjCMethodList.push_back(method);
   }
 
   vec.push_back(method);

@@ -842,9 +842,6 @@ public:
   /// Complain if @objc or dynamic is used without importing Foundation.
   void diagnoseAttrsRequiringFoundation(SourceFile &SF);
 
-  /// Note that the given method produces an Objective-C method.
-  void recordObjCMethod(AbstractFunctionDecl *method);
-
   /// Diagnose any Objective-C method overrides that aren't reflected
   /// as overrides in Swift.
   bool diagnoseUnintendedObjCMethodOverrides(SourceFile &sf);
