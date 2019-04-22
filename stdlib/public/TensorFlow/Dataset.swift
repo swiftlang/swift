@@ -131,6 +131,17 @@ public extension Dataset {
 
 public extension Dataset {
   @inlinable @inline(__always)
+  func prefetched(count: Int) -> Dataset {
+    return Dataset(
+      _handle: #tfop(
+        "PrefetchDataset", _handle, Tensor(Int64(count)),
+        output_types$dtype: Element._typeList,
+        output_shapes: Element._unknownShapeList
+      )
+    )
+  }
+
+  @inlinable @inline(__always)
   func shuffled(
     sampleCount: Int, randomSeed: Int64
   ) -> Dataset {
