@@ -111,8 +111,7 @@ void OpaqueSpecializerCloner::insertOpaqueToConcreteAddressCasts(
     auto argIdx = apply.getCalleeArgIndex(opd);
     auto argType = substConv.getSILArgumentType(argIdx);
     if (argConv.isIndirectConvention() &&
-        argType.getASTType()->hasOpaqueArchetype() &&
-        !opd.get()->getType().getASTType()->hasOpaqueArchetype()) {
+        argType.getASTType() != opd.get()->getType().getASTType()) {
       auto cast = getBuilder().createUncheckedAddrCast(apply.getLoc(),
                                                        opd.get(), argType);
       opd.set(cast);
@@ -131,7 +130,7 @@ class OpaqueArchetypeSpecializer : public SILFunctionTransform {
       for (auto &inst : BB) {
         auto *allocStack = dyn_cast<AllocStackInst>(&inst);
         if (!allocStack ||
-            !allocStack->getElementType().is<OpaqueTypeArchetypeType>())
+            !allocStack->getElementType().getASTType()->hasOpaqueArchetype())
           continue;
         foundOpaqueArchetype = true;
         break;
