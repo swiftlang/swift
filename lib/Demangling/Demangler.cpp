@@ -690,7 +690,8 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind,
     return nullptr;
   
   // Types register as substitutions even when symbolically referenced.
-  if (kind == SymbolicReferenceKind::Context)
+  if (kind == SymbolicReferenceKind::Context &&
+      resolved->getKind() != Node::Kind::OpaqueTypeDescriptorSymbolicReference)
     addSubstitution(resolved);
   return resolved;
 }
