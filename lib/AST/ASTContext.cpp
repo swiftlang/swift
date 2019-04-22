@@ -90,10 +90,6 @@ llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
 namespace {
   typedef std::tuple<ClassDecl *, ObjCSelector, bool> ObjCMethodConflict;
 
-  /// An unsatisfied, optional @objc requirement in a protocol conformance.
-  typedef std::pair<DeclContext *, AbstractFunctionDecl *>
-    ObjCUnsatisfiedOptReq;
-
   enum class SearchPathKind : uint8_t {
     Import = 1 << 0,
     Framework = 1 << 1
@@ -381,10 +377,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 
   /// List of Objective-C member conflicts we have found during type checking.
   std::vector<ObjCMethodConflict> ObjCMethodConflicts;
-
-  /// List of optional @objc protocol requirements that have gone
-  /// unsatisfied, which might conflict with other Objective-C methods.
-  std::vector<ObjCUnsatisfiedOptReq> ObjCUnsatisfiedOptReqs;
 
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
@@ -2664,11 +2656,6 @@ bool ASTContext::diagnoseObjCMethodConflicts(SourceFile &sf) {
   return anyConflicts;
 }
 
-void ASTContext::recordObjCUnsatisfiedOptReq(DeclContext *dc,
-                                             AbstractFunctionDecl *req) {
-  getImpl().ObjCUnsatisfiedOptReqs.push_back(ObjCUnsatisfiedOptReq(dc, req));
-}
-
 /// Retrieve the source location associated with this declaration
 /// context.
 static SourceLoc getDeclContextLoc(DeclContext *dc) {
@@ -2680,28 +2667,12 @@ static SourceLoc getDeclContextLoc(DeclContext *dc) {
 
 bool ASTContext::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
   // If there are no unsatisfied, optional @objc requirements, we're done.
-  if (getImpl().ObjCUnsatisfiedOptReqs.empty())
-    return false;
-
-  // Partition the set of unsatisfied requirements to put the
-  // conflicts that involve this source file at the end.
-  auto firstLocalReq
-    = std::partition(getImpl().ObjCUnsatisfiedOptReqs.begin(),
-                     getImpl().ObjCUnsatisfiedOptReqs.end(),
-                     [&](const ObjCUnsatisfiedOptReq &unsatisfied) -> bool {
-                       return &sf != unsatisfied.first->getParentSourceFile();
-                     });
-
-  // If there were no local unsatisfied requirements, we're done.
-  unsigned numLocalReqs
-    = getImpl().ObjCUnsatisfiedOptReqs.end() - firstLocalReq;
-  if (numLocalReqs == 0)
+  if (sf->ObjCUnsatisfiedOptReqs.empty())
     return false;
 
   // Sort the set of local unsatisfied requirements, so we get a
   // deterministic order for diagnostics.
-  MutableArrayRef<ObjCUnsatisfiedOptReq> localReqs(&*firstLocalReq,
-                                                   numLocalReqs);
+  auto &localReqs = sf->ObjCUnsatisfiedOptReqs;
   std::sort(localReqs.begin(), localReqs.end(),
             [&](const ObjCUnsatisfiedOptReq &lhs,
                 const ObjCUnsatisfiedOptReq &rhs) -> bool {
@@ -2785,10 +2756,6 @@ bool ASTContext::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
 
     anyDiagnosed = true;
   }
-
-  // Erase the local unsatisfied requirements from the list.
-  getImpl().ObjCUnsatisfiedOptReqs.erase(firstLocalReq,
-                                    getImpl().ObjCUnsatisfiedOptReqs.end());
 
   return anyDiagnosed;
 }

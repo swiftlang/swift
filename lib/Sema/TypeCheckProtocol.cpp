@@ -5290,25 +5290,27 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
       }
     }
 
-    // For any unsatisfied optional @objc requirements that remain
-    // unsatisfied, note them in the AST for @objc selector collision
-    // checking.
-    for (auto req : unsatisfiedReqs) {
-      // Skip non-@objc requirements.
-      if (!req->isObjC()) continue;
+    if (auto *sf = dc->getParentSourceFile()) {
+      // For any unsatisfied optional @objc requirements that remain
+      // unsatisfied, note them in the AST for @objc selector collision
+      // checking.
+      for (auto req : unsatisfiedReqs) {
+        // Skip non-@objc requirements.
+        if (!req->isObjC()) continue;
 
-      // Skip unavailable requirements.
-      if (req->getAttrs().isUnavailable(Context)) continue;
+        // Skip unavailable requirements.
+        if (req->getAttrs().isUnavailable(Context)) continue;
 
-      // Record this requirement.
-      if (auto funcReq = dyn_cast<AbstractFunctionDecl>(req)) {
-        Context.recordObjCUnsatisfiedOptReq(dc, funcReq);
-      } else {
-        auto storageReq = cast<AbstractStorageDecl>(req);
-        if (auto getter = storageReq->getGetter())
-          Context.recordObjCUnsatisfiedOptReq(dc, getter);
-        if (auto setter = storageReq->getSetter())
-          Context.recordObjCUnsatisfiedOptReq(dc, setter);
+        // Record this requirement.
+        if (auto funcReq = dyn_cast<AbstractFunctionDecl>(req)) {
+          sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, funcReq);
+        } else {
+          auto storageReq = cast<AbstractStorageDecl>(req);
+          if (auto getter = storageReq->getGetter())
+            sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, getter);
+          if (auto setter = storageReq->getSetter())
+            sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, setter);
+        }
       }
     }
   }
