@@ -1341,30 +1341,25 @@ void IRGenerator::emitDynamicReplacements() {
   // Collect all the type metadata accessor replacements.
   SmallVector<OpaqueTypeArchetypeType *, 8> newFuncTypes;
   SmallVector<OpaqueTypeArchetypeType *, 8> origFuncTypes;
+  llvm::SmallSet<OpaqueTypeArchetypeType *, 8> newUniqueOpaqueTypes;
+  llvm::SmallSet<OpaqueTypeArchetypeType *, 8> origUniqueOpaqueTypes;
   for (auto *newFunc : DynamicReplacements) {
     if (!newFunc->getLoweredFunctionType()->hasOpaqueArchetype())
       continue;
+    CanType(newFunc->getLoweredFunctionType()).visit([&](CanType ty) {
+      if (auto opaque = ty->getAs<OpaqueTypeArchetypeType>())
+        if (newUniqueOpaqueTypes.insert(opaque).second)
+          newFuncTypes.push_back(opaque);
+    });
     auto *origFunc = newFunc->getDynamicallyReplacedFunction();
     assert(origFunc);
     assert(origFunc->getLoweredFunctionType()->hasOpaqueArchetype());
-    auto conv = newFunc->getConventions();
-    // Storage setters don't have indirect results.
-    if (!conv.hasIndirectSILResults())
-      continue;
-    for (auto res : conv.getIndirectSILResultTypes()) {
-      if (!res.getASTType()->hasOpaqueArchetype())
-        continue;
-      newFuncTypes.push_back(
-          res.getASTType()->getAs<OpaqueTypeArchetypeType>());
-    }
-    conv = origFunc->getConventions();
-    assert(conv.hasIndirectSILResults());
-    for (auto res : conv.getIndirectSILResultTypes()) {
-      if (!res.getASTType()->hasOpaqueArchetype())
-        continue;
-      origFuncTypes.push_back(
-          res.getASTType()->getAs<OpaqueTypeArchetypeType>());
-    }
+    CanType(origFunc->getLoweredFunctionType()).visit([&](CanType ty) {
+      if (auto opaque = ty->getAs<OpaqueTypeArchetypeType>())
+        if (origUniqueOpaqueTypes.insert(opaque).second)
+          origFuncTypes.push_back(opaque);
+    });
+
     assert(origFuncTypes.size() == newFuncTypes.size());
   }
 
