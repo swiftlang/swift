@@ -38,12 +38,20 @@ func test() {
   print(MemoryLayout.size(ofValue: Container().bar(5)))
   print(bar(5).myValue())
   print(Container().bar(5).myValue())
+  print(MemoryLayout.size(ofValue:Container().computedProperty))
+  print(Container().computedProperty.myValue())
+  print(MemoryLayout.size(ofValue:Container()[0]))
+  print(Container()[0].myValue())
 }
 
 // CHECK: 8
 // CHECK: 8
 // CHECK: 5
 // CHECK: 5
+// CHECK: 8
+// CHECK: 2
+// CHECK: 8
+// CHECK: 2
 test()
 
 var executablePath = CommandLine.arguments[0]
@@ -60,5 +68,9 @@ executablePath.removeLast(4)
 // CHECK: 16
 // CHECK: 16
 // CHECK: 1
+// CHECK: 1
+// CHECK: 16
+// CHECK: 1
+// CHECK: 16
 // CHECK: 1
 test()
