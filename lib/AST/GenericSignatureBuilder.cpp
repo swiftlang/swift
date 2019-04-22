@@ -4013,14 +4013,19 @@ GenericSignatureBuilder::getGenericParams() const {
   return TypeArrayView<GenericTypeParamType>(Impl->GenericParams);
 }
 
-void GenericSignatureBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
-  addGenericParameter(
-     GenericParam->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
+void GenericSignatureBuilder::addGenericParameter(GenericParam param) {
+  switch (param.getKind()) {
+    case GenericParam::ParamKind::TypeParam:
+      addGenericParameter(param.getTypeParam()
+                            ->getDeclaredInterfaceType()
+                            ->castTo<GenericTypeParamType>());
+      break;
+  }
 }
 
 bool GenericSignatureBuilder::addGenericParameterRequirements(
-                                           GenericTypeParamDecl *GenericParam) {
-  GenericParamKey Key(GenericParam);
+                                                          GenericParam param) {
+  GenericParamKey Key(param);
   auto PA = Impl->PotentialArchetypes[Key.findIndexIn(getGenericParams())];
   
   // Add the requirements from the declaration.
@@ -7466,9 +7471,14 @@ GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
 
   // Add all of the generic parameters.
   proto->createGenericParamsIfMissing();
-  for (auto gp : *proto->getGenericParams())
-    builder.addGenericParameter(gp);
-
+  for (auto gp : *proto->getGenericParams()) {
+    switch (gp.getKind()) {
+      case GenericParam::ParamKind::TypeParam:
+        builder.addGenericParameter(gp.getTypeParam());
+        break;
+    }
+  }
+  
   // Add the conformance of 'self' to the protocol.
   auto selfType =
     proto->getSelfInterfaceType()->castTo<GenericTypeParamType>();

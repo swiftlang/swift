@@ -597,8 +597,48 @@ bool Decl::isWeakImported(ModuleDecl *fromModule,
   return false;
 }
 
+SourceLoc GenericParam::getEndLoc() const {
+  switch (Kind) {
+    case ParamKind::TypeParam:
+      return GTPD->getEndLoc();
+  }
+  llvm_unreachable("Unhandled GenericParam::getKind()");
+}
+
+ArrayRef<TypeLoc> GenericParam::getInherited() const {
+  switch (Kind) {
+    case ParamKind::TypeParam:
+      return GTPD->getInherited();
+  }
+  llvm_unreachable("Unhandled GenericParam::getKind()");
+}
+
+Identifier GenericParam::getName() const {
+    switch (Kind) {
+        case ParamKind::TypeParam:
+        return GTPD->getName();
+    }
+    llvm_unreachable("Unhandled GenericParam::getKind()");
+}
+
+void GenericParam::setDeclContext(DeclContext *DC) const {
+  switch (Kind) {
+    case ParamKind::TypeParam:
+      GTPD->setDeclContext(DC);
+      break;
+  }
+}
+
+void GenericParam::setDepth(unsigned depth) const {
+  switch (Kind) {
+    case ParamKind::TypeParam:
+      GTPD->setDepth(depth);
+      break;
+  }
+}
+
 GenericParamList::GenericParamList(SourceLoc LAngleLoc,
-                                   ArrayRef<GenericTypeParamDecl *> Params,
+                                   ArrayRef<GenericParam> Params,
                                    SourceLoc WhereLoc,
                                    MutableArrayRef<RequirementRepr> Requirements,
                                    SourceLoc RAngleLoc)
@@ -608,15 +648,15 @@ GenericParamList::GenericParamList(SourceLoc LAngleLoc,
     FirstTrailingWhereArg(Requirements.size())
 {
   std::uninitialized_copy(Params.begin(), Params.end(),
-                          getTrailingObjects<GenericTypeParamDecl *>());
+                          getTrailingObjects<GenericParam>());
 }
 
 GenericParamList *
 GenericParamList::create(ASTContext &Context,
                          SourceLoc LAngleLoc,
-                         ArrayRef<GenericTypeParamDecl *> Params,
+                         ArrayRef<GenericParam> Params,
                          SourceLoc RAngleLoc) {
-  unsigned Size = totalSizeToAlloc<GenericTypeParamDecl *>(Params.size());
+  unsigned Size = totalSizeToAlloc<GenericParam>(Params.size());
   void *Mem = Context.Allocate(Size, alignof(GenericParamList));
   return new (Mem) GenericParamList(LAngleLoc, Params, SourceLoc(),
                                     MutableArrayRef<RequirementRepr>(),
@@ -626,11 +666,11 @@ GenericParamList::create(ASTContext &Context,
 GenericParamList *
 GenericParamList::create(const ASTContext &Context,
                          SourceLoc LAngleLoc,
-                         ArrayRef<GenericTypeParamDecl *> Params,
+                         ArrayRef<GenericParam> Params,
                          SourceLoc WhereLoc,
                          ArrayRef<RequirementRepr> Requirements,
                          SourceLoc RAngleLoc) {
-  unsigned Size = totalSizeToAlloc<GenericTypeParamDecl *>(Params.size());
+  unsigned Size = totalSizeToAlloc<GenericParam>(Params.size());
   void *Mem = Context.Allocate(Size, alignof(GenericParamList));
   return new (Mem) GenericParamList(LAngleLoc, Params,
                                     WhereLoc,
@@ -641,18 +681,26 @@ GenericParamList::create(const ASTContext &Context,
 GenericParamList *
 GenericParamList::clone(DeclContext *dc) const {
   auto &ctx = dc->getASTContext();
-  SmallVector<GenericTypeParamDecl *, 2> params;
+  SmallVector<GenericParam, 2> params;
+    
   for (auto param : getParams()) {
-    auto *newParam = new (ctx) GenericTypeParamDecl(
-      dc, param->getName(), param->getNameLoc(),
-      GenericTypeParamDecl::InvalidDepth,
-      param->getIndex());
-    params.push_back(newParam);
-
-    SmallVector<TypeLoc, 2> inherited;
-    for (auto loc : param->getInherited())
-      inherited.push_back(loc.clone(ctx));
-    newParam->setInherited(ctx.AllocateCopy(inherited));
+    switch (param.getKind()) {
+      case GenericParam::ParamKind::TypeParam: {
+        auto GTPD = param.getTypeParam();
+        auto *newParam = new (ctx) GenericTypeParamDecl(
+          dc, GTPD->getName(), GTPD->getNameLoc(),
+          GenericTypeParamDecl::InvalidDepth,
+          GTPD->getIndex());
+        params.push_back(newParam);
+          
+        SmallVector<TypeLoc, 2> inherited;
+        for (auto loc : GTPD->getInherited())
+          inherited.push_back(loc.clone(ctx));
+        newParam->setInherited(ctx.AllocateCopy(inherited));
+          
+        break;
+      }
+    }
   }
 
   SmallVector<RequirementRepr, 2> requirements;
@@ -721,7 +769,7 @@ void GenericParamList::addTrailingWhereClause(
 
 void GenericParamList::setDepth(unsigned depth) {
   for (auto param : *this)
-    param->setDepth(depth);
+    param.setDepth(depth);
 }
 
 TrailingWhereClause::TrailingWhereClause(
@@ -764,7 +812,7 @@ void GenericContext::setGenericParams(GenericParamList *params) {
 
   if (GenericParams) {
     for (auto param : *GenericParams)
-      param->setDeclContext(this);
+      param.setDeclContext(this);
   }
 }
 
@@ -1094,17 +1142,22 @@ static GenericParamList *cloneGenericParams(ASTContext &ctx,
                                             ExtensionDecl *ext,
                                             GenericParamList *fromParams) {
   // Clone generic parameters.
-  SmallVector<GenericTypeParamDecl *, 2> toGenericParams;
-  for (auto fromGP : *fromParams) {
-    // Create the new generic parameter.
-    auto toGP = new (ctx) GenericTypeParamDecl(ext, fromGP->getName(),
-                                               SourceLoc(),
-                                               fromGP->getDepth(),
-                                               fromGP->getIndex());
-    toGP->setImplicit(true);
-
-    // Record new generic parameter.
-    toGenericParams.push_back(toGP);
+  SmallVector<GenericParam, 2> toGenericParams;
+  for (auto param : *fromParams) {
+    switch (param.getKind()) {
+      case GenericParam::ParamKind::TypeParam: {
+        auto fromGP = param.getTypeParam();
+        auto toGP = new (ctx) GenericTypeParamDecl(ext, fromGP->getName(),
+                                                   SourceLoc(),
+                                                   fromGP->getDepth(),
+                                                   fromGP->getIndex());
+          
+        toGP->setImplicit(true);
+        toGenericParams.push_back(toGP);
+          
+        break;
+      }
+    }
   }
 
   return GenericParamList::create(ctx, SourceLoc(), toGenericParams,
@@ -1156,8 +1209,14 @@ void ExtensionDecl::createGenericParamsIfMissing(NominalTypeDecl *nominal) {
   if (auto *proto = dyn_cast<ProtocolDecl>(nominal)) {
     auto protoType = proto->getDeclaredType();
     TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
-    genericParams->getParams().front()->setInherited(
-      ctx.AllocateCopy(selfInherited));
+    
+    auto param = genericParams->getParams().front();
+
+    switch (param.getKind()) {
+      case GenericParam::ParamKind::TypeParam:
+        param.getTypeParam()->setInherited(ctx.AllocateCopy(selfInherited));
+        break;
+    }
   }
 
   // Set the depth of every generic parameter.
@@ -3157,8 +3216,13 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
       // the generic parameter list directly instead of looking
       // at the signature.
       SmallVector<Type, 4> args;
-      for (auto param : decl->getGenericParams()->getParams())
-        args.push_back(param->getDeclaredInterfaceType());
+      for (auto param : decl->getGenericParams()->getParams()) {
+        switch (param.getKind()) {
+          case GenericParam::ParamKind::TypeParam:
+            args.push_back(param.getTypeParam()->getDeclaredInterfaceType());
+            break;
+        }
+      }
 
       return BoundGenericType::get(decl, Ty, args);
     }
@@ -4416,10 +4480,10 @@ void ProtocolDecl::createGenericParamsIfMissing() {
   TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
   selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
   selfDecl->setImplicit();
-
+    
   // The generic parameter list itself.
-  auto result = GenericParamList::create(ctx, SourceLoc(), selfDecl,
-                                         SourceLoc());
+  auto result = GenericParamList::create(ctx, SourceLoc(),
+                                         GenericParam(selfDecl), SourceLoc());
   setGenericParams(result);
 }
 
