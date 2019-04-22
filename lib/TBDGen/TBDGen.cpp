@@ -267,6 +267,7 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   // ...and the opaque result decl if it has one.
   if (auto opaqueResult = ASD->getOpaqueResultTypeDecl()) {
     addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));
+    addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
   }
 
   // Explicitly look at each accessor here: see visitAccessorDecl.
