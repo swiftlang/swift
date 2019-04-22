@@ -3805,14 +3805,9 @@ PotentialArchetype *GenericSignatureBuilder::realizePotentialArchetype(
   return pa;
 }
 
-static Type getStructuralType(TypeDecl *typeDecl, LazyResolver *resolver) {
-  if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
-    // Resolve the underlying type, if we haven't done so yet.
-    if (!typealias->hasInterfaceType())
-      resolver->resolveDeclSignature(typealias);
-
-    return typealias->getUnderlyingTypeLoc().getType();
-  }
+static Type getStructuralType(TypeDecl *typeDecl) {
+  if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl))
+    return typealias->getStructuralType();
 
   return typeDecl->getDeclaredInterfaceType();
 }
@@ -3826,7 +3821,7 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
 
   // Form an unsubstituted type referring to the given type declaration,
   // for use in an inferred same-type requirement.
-  auto type = getStructuralType(concreteDecl, builder.getLazyResolver());
+  auto type = getStructuralType(concreteDecl);
   if (!type)
     return Type();
 
@@ -4228,10 +4223,10 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
   // An inferred same-type requirement between the two type declarations
   // within this protocol or a protocol it inherits.
   auto addInferredSameTypeReq = [&](TypeDecl *first, TypeDecl *second) {
-    Type firstType = getStructuralType(first, getLazyResolver());
+    Type firstType = getStructuralType(first);
     if (!firstType) return;
 
-    Type secondType = getStructuralType(second, getLazyResolver());
+    Type secondType = getStructuralType(second);
     if (!secondType) return;
 
     auto inferredSameTypeSource =
