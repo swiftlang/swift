@@ -83,6 +83,8 @@ def call(command, stderr=None, env=None, dry_run=None, echo=True):
         _env = dict(os.environ)
         _env.update(env)
     try:
+        # Ensure all items in the command array are strings, not unicode not byte
+        command = [c.encode('ascii') for c in command]
         subprocess.check_call(command, env=_env, stderr=stderr)
     except subprocess.CalledProcessError as e:
         diagnostics.fatal(
