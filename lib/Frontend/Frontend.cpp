@@ -314,6 +314,13 @@ bool CompilerInstance::setUpModuleLoaders() {
     }
   }
 
+  if (Invocation.getLangOptions().EnableMemoryBufferImporter) {
+    auto MemoryBufferLoader = MemoryBufferSerializedModuleLoader::create(
+        *Context, getDependencyTracker());
+    this->MemoryBufferLoader = MemoryBufferLoader.get();
+    Context->addModuleLoader(std::move(MemoryBufferLoader));
+  }
+
   std::unique_ptr<SerializedModuleLoader> SML =
     SerializedModuleLoader::create(*Context, getDependencyTracker(), MLM);
   this->SML = SML.get();
@@ -1066,6 +1073,7 @@ void CompilerInstance::freeASTContext() {
   Context.reset();
   MainModule = nullptr;
   SML = nullptr;
+  MemoryBufferLoader = nullptr;
   PrimaryBufferIDs.clear();
   PrimarySourceFiles.clear();
 }

@@ -24,7 +24,8 @@
 
 using namespace swift;
 
-bool swift::parseASTSection(SerializedModuleLoader *SML, StringRef buf,
+bool swift::parseASTSection(MemoryBufferSerializedModuleLoader &Loader,
+                            StringRef buf,
                             SmallVectorImpl<std::string> &foundModules) {
   if (!serialization::isSerializedAST(buf))
     return false;
@@ -44,7 +45,7 @@ bool swift::parseASTSection(SerializedModuleLoader *SML, StringRef buf,
           llvm::MemoryBuffer::getMemBuffer(moduleData, info.name, false));
 
         // Register the memory buffer.
-        SML->registerMemoryBuffer(info.name, std::move(bitstream));
+        Loader.registerMemoryBuffer(info.name, std::move(bitstream));
         foundModules.push_back(info.name);
       }
     } else {
