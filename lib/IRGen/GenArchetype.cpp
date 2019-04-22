@@ -450,6 +450,25 @@ withOpaqueTypeGenericArgs(IRGenFunction &IGF,
   }
 }
 
+bool shouldUseOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
+  auto *namingDecl = opaque->getNamingDecl();
+  auto *abstractStorage = dyn_cast<AbstractStorageDecl>(namingDecl);
+
+  // Don't emit accessors for abstract storage that is not dynamic or a dynamic
+  // replacement.
+  if (abstractStorage) {
+    return abstractStorage->hasAnyNativeDynamicAccessors() ||
+           abstractStorage->hasAnyDynamicReplacementAccessors();
+  }
+
+  // Don't emit accessors for functions that are not dynamic or dynamic
+  // replacements.
+  return opaque->getNamingDecl()->isNativeDynamic() ||
+         opaque->getNamingDecl()
+             ->getAttrs()
+             .hasAttribute<DynamicReplacementAttr>();
+}
+
 static llvm::Value *
 getAddressOfOpaqueTypeDescriptor(IRGenFunction &IGF,
                                  OpaqueTypeDecl *opaqueDecl) {
@@ -457,7 +476,8 @@ getAddressOfOpaqueTypeDescriptor(IRGenFunction &IGF,
 
   // Support dynamically replacing the return type as part of dynamic function
   // replacement.
-  if (!IGM.getOptions().shouldOptimize()) {
+  if (!IGM.getOptions().shouldOptimize() &&
+      shouldUseOpaqueTypeDescriptorAccessor(opaqueDecl)) {
     auto descriptorAccessor = IGM.getAddrOfOpaqueTypeDescriptorAccessFunction(
         opaqueDecl, NotForDefinition, false);
     auto desc = IGF.Builder.CreateCall(descriptorAccessor, {});

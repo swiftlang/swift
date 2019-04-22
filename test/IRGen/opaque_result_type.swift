@@ -151,16 +151,13 @@ public func useFoo(x: String, y: C) {
 }
 
 // CHECK-LABEL: define {{.*}} @"$s18opaque_result_type6useFoo1x1yySS_AA1CCtF"
-// CHECK: [[DESCRIPTOR_ADDR:%.*]] = call swiftcc %swift.type_descriptor* @"$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOMg"()
-// CHECK: [[CONFORMANCE:%.*]] = call swiftcc i8** @swift_getOpaqueTypeConformance(i8* {{.*}}, %swift.type_descriptor* [[DESCRIPTOR_ADDR]], [[WORD:i32|i64]] 2)
-// CHECK: [[DESCRIPTOR_ADDR:%.*]] = call swiftcc %swift.type_descriptor* @"$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOMg"()
-// CHECK: [[MD:%.*]] = call swiftcc %swift.metadata_response @swift_getOpaqueTypeMetadata([[WORD]] 255, i8* {{.*}}, %swift.type_descriptor* [[DESCRIPTOR_ADDR]]{{.*}})
+// CHECK: [[CONFORMANCE:%.*]] = call swiftcc i8** @swift_getOpaqueTypeConformance(i8* {{.*}}, %swift.type_descriptor* {{.*}}s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOMQ{{.*}}, [[WORD:i32|i64]] 2)
+// CHECK: [[MD:%.*]] = call swiftcc %swift.metadata_response @swift_getOpaqueTypeMetadata([[WORD]] 255, i8* {{.*}}, %swift.type_descriptor* {{.*}}s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOMQ{{.*}})
 // CHECK: [[TYPE:%.*]] = extractvalue %swift.metadata_response [[MD]], 0
 // CHECK: call swiftcc %swift.metadata_response @swift_getAssociatedTypeWitness([[WORD]] 0, i8** [[CONFORMANCE]], %swift.type* [[TYPE]]
 
 // CHECK-LABEL: define {{.*}} @"$sSS18opaque_result_type1PAA1AAaBP_AA1OPWT"
-// CHECK: [[DESCRIPTOR_ADDR:%.*]] = call swiftcc %swift.type_descriptor* @"$sSS18opaque_result_typeE3pooQryFQOMg"()
-// CHECK: call swiftcc i8** @swift_getOpaqueTypeConformance(i8* {{.*}}, %swift.type_descriptor* [[DESCRIPTOR_ADDR]], [[WORD]] 1)
+// CHECK: call swiftcc i8** @swift_getOpaqueTypeConformance(i8* {{.*}}, %swift.type_descriptor* {{.*}}sSS18opaque_result_typeE3pooQryFQOMQ{{.*}}, [[WORD]] 1)
 
 // rdar://problem/49585457
 protocol R {
