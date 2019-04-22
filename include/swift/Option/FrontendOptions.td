@@ -186,6 +186,12 @@ def debug_constraints : Flag<["-"], "debug-constraints">,
 def debug_constraints_attempt : Separate<["-"], "debug-constraints-attempt">,
   HelpText<"Debug the constraint solver at a given attempt">;
 
+def debug_constraints_on_line : Separate<["-"], "debug-constraints-on-line">,
+  HelpText<"Debug the constraint solver for expressions on <line>">,
+  MetaVarName<"<line>">;
+def debug_constraints_on_line_EQ : Joined<["-"], "debug-constraints-on-line=">,
+  Alias<debug_constraints_on_line>;
+
 def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-loading">,
   HelpText<"Disable per-name lazy member loading">;
 
