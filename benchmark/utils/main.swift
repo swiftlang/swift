@@ -31,6 +31,7 @@ import BinaryFloatingPointConversionFromBinaryInteger
 import BinaryFloatingPointProperties
 import BitCount
 import Breadcrumbs
+import BucketSort
 import ByteSwap
 import COWTree
 import COWArrayGuaranteedParameterOverhead
@@ -198,6 +199,7 @@ registerBenchmark(BinaryFloatingPointPropertiesNextUp)
 registerBenchmark(BinaryFloatingPointPropertiesUlp)
 registerBenchmark(BitCount)
 registerBenchmark(Breadcrumbs)
+registerBenchmark(BucketSort)
 registerBenchmark(ByteSwap)
 registerBenchmark(COWTree)
 registerBenchmark(COWArrayGuaranteedParameterOverhead)
