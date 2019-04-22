@@ -2130,28 +2130,26 @@ static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
   implFn->addFnAttr(llvm::Attribute::NoInline);
 
   // Load the function and dispatch to it forwarding our arguments.
-  llvm::BasicBlock *entryBB =
-      llvm::BasicBlock::Create(IGM.getLLVMContext(), "entry", dispatchFn);
-  IRBuilder B(IGM.getLLVMContext(), false);
-  B.SetInsertPoint(entryBB);
+  IRGenFunction IGF(IGM, dispatchFn);
   if (IGM.DebugInfo)
-    IGM.DebugInfo->emitArtificialFunction(B, dispatchFn);
+    IGM.DebugInfo->emitArtificialFunction(IGF, dispatchFn);
   llvm::Constant *indices[] = {llvm::ConstantInt::get(IGM.Int32Ty, 0),
                                llvm::ConstantInt::get(IGM.Int32Ty, 0)};
-  auto *fnPtr = B.CreateLoad(
+  auto *fnPtr = IGF.Builder.CreateLoad(
       llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, linkEntry, indices),
       IGM.getPointerAlignment());
-  auto *typeFnPtr = B.CreateBitOrPointerCast(fnPtr, implFn->getType());
+  auto *typeFnPtr =
+      IGF.Builder.CreateBitOrPointerCast(fnPtr, implFn->getType());
   SmallVector<llvm::Value *, 16> forwardedArgs;
   for (auto &arg : dispatchFn->args())
     forwardedArgs.push_back(&arg);
-  auto *Res =
-      B.CreateCall(FunctionPointer(typeFnPtr, signature), forwardedArgs);
+  auto *Res = IGF.Builder.CreateCall(FunctionPointer(typeFnPtr, signature),
+                                     forwardedArgs);
   Res->setTailCall();
   if (implFn->getReturnType()->isVoidTy())
-    B.CreateRetVoid();
+    IGF.Builder.CreateRetVoid();
   else
-    B.CreateRet(Res);
+    IGF.Builder.CreateRet(Res);
 }
 
 void IRGenModule::emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
@@ -2227,34 +2225,35 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
                      f->getOptimizationMode());
   implFn->addFnAttr(llvm::Attribute::NoInline);
 
+  IRGenFunction IGF(*this, implFn);
+  if (DebugInfo)
+    DebugInfo->emitArtificialFunction(IGF, implFn);
+
   LinkEntity varEntity =
       LinkEntity::forDynamicallyReplaceableFunctionVariable(f);
   auto linkEntry = getChainEntryForDynamicReplacement(*this, varEntity, nullptr,
                                                       NotForDefinition);
 
   // Load the function and dispatch to it forwarding our arguments.
-  llvm::BasicBlock *entryBB =
-      llvm::BasicBlock::Create(getLLVMContext(), "entry", implFn);
-  IRBuilder B(getLLVMContext(), false);
-  B.SetInsertPoint(entryBB);
   llvm::Constant *indices[] = {llvm::ConstantInt::get(Int32Ty, 0),
                                llvm::ConstantInt::get(Int32Ty, 0)};
 
-  auto *fnPtr = B.CreateLoad(
+  auto *fnPtr = IGF.Builder.CreateLoad(
       llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, linkEntry, indices),
       getPointerAlignment());
-  auto *typeFnPtr = B.CreateBitOrPointerCast(fnPtr, implFn->getType());
+  auto *typeFnPtr =
+      IGF.Builder.CreateBitOrPointerCast(fnPtr, implFn->getType());
 
   SmallVector<llvm::Value *, 16> forwardedArgs;
   for (auto &arg : implFn->args())
     forwardedArgs.push_back(&arg);
-  auto *Res =
-      B.CreateCall(FunctionPointer(typeFnPtr, signature), forwardedArgs);
+  auto *Res = IGF.Builder.CreateCall(FunctionPointer(typeFnPtr, signature),
+                                     forwardedArgs);
 
   if (implFn->getReturnType()->isVoidTy())
-    B.CreateRetVoid();
+    IGF.Builder.CreateRetVoid();
   else
-    B.CreateRet(Res);
+    IGF.Builder.CreateRet(Res);
 }
 
 /// Find the entry point for a SIL function.
