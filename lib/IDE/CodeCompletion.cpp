@@ -1329,8 +1329,6 @@ public:
   void completeForEachSequenceBeginning(CodeCompletionExpr *E) override;
   void completePostfixExpr(Expr *E, bool hasSpace) override;
   void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) override;
-  void completeExprSuper(SuperRefExpr *SRE) override;
-  void completeExprSuperDot(SuperRefExpr *SRE) override;
   void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) override;
 
   void completeTypeDeclResultBeginning() override;
@@ -3256,6 +3254,9 @@ public:
   }
 
   void getPostfixKeywordCompletions(Type ExprType, Expr *ParsedExpr) {
+    if (IsSuperRefExpr)
+      return;
+
     if (!ExprType->getAs<ModuleType>()) {
       addKeyword(getTokenText(tok::kw_self), ExprType->getRValueType(),
                  SemanticContextKind::CurrentNominal,
@@ -3508,6 +3509,9 @@ public:
   }
 
   void getOperatorCompletions(Expr *LHS, ArrayRef<Expr *> leadingSequence) {
+    if (IsSuperRefExpr)
+      return;
+
     Expr *foldedExpr = typeCheckLeadingSequence(LHS, leadingSequence);
 
     std::vector<OperatorDecl *> operators = collectOperators();
@@ -4558,36 +4562,6 @@ void CodeCompletionCallbacksImpl::completePostfixExprParen(Expr *E,
   }
 }
 
-void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
-  // Don't produce any results in an enum element.
-  if (InEnumElementRawValue)
-    return;
-
-  Kind = CompletionKind::SuperExpr;
-  if (ParseExprSelectorContext != ObjCSelectorContext::None) {
-    PreferFunctionReferencesToCalls = true;
-    CompleteExprSelectorContext = ParseExprSelectorContext;
-  }
-
-  ParsedExpr = SRE;
-  CurDeclContext = P.CurDeclContext;
-}
-
-void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
-  // Don't produce any results in an enum element.
-  if (InEnumElementRawValue)
-    return;
-
-  Kind = CompletionKind::SuperExprDot;
-  if (ParseExprSelectorContext != ObjCSelectorContext::None) {
-    PreferFunctionReferencesToCalls = true;
-    CompleteExprSelectorContext = ParseExprSelectorContext;
-  }
-
-  ParsedExpr = SRE;
-  CurDeclContext = P.CurDeclContext;
-}
-
 void CodeCompletionCallbacksImpl::completeExprKeyPath(KeyPathExpr *KPE,
                                                       SourceLoc DotLoc) {
   Kind = (!KPE || KPE->isObjC()) ? CompletionKind::KeyPathExprObjC
@@ -4948,8 +4922,6 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
 
   case CompletionKind::PostfixExpr:
   case CompletionKind::PostfixExprParen:
-  case CompletionKind::SuperExpr:
-  case CompletionKind::SuperExprDot:
   case CompletionKind::CaseStmtBeginning:
   case CompletionKind::TypeIdentifierWithDot:
   case CompletionKind::TypeIdentifierWithoutDot:
@@ -5172,6 +5144,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
   if (auto *DRE = dyn_cast_or_null<DeclRefExpr>(ParsedExpr)) {
     Lookup.setIsSelfRefExpr(DRE->getDecl()->getFullName() == Context.Id_self);
+  } else if (auto *SRE = dyn_cast_or_null<SuperRefExpr>(ParsedExpr)) {
+    Lookup.setIsSuperRefExpr();
   }
 
   if (isInsideObjCSelector())
@@ -5296,19 +5270,6 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.setHaveLParen(false);
       DoPostfixExprBeginning();
     }
-    break;
-  }
-
-  case CompletionKind::SuperExpr: {
-    Lookup.setIsSuperRefExpr();
-    Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
-    break;
-  }
-
-  case CompletionKind::SuperExprDot: {
-    Lookup.setIsSuperRefExpr();
-    Lookup.setHaveDot(SourceLoc());
-    Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
     break;
   }
 

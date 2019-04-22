@@ -143,13 +143,6 @@ public:
   /// left parenthesis.
   virtual void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) {};
 
-  /// Complete expr-super after we have consumed the 'super' keyword.
-  virtual void completeExprSuper(SuperRefExpr *SRE) {};
-
-  /// Complete expr-super after we have consumed the 'super' keyword and
-  /// a dot.
-  virtual void completeExprSuperDot(SuperRefExpr *SRE) {};
-
   /// Complete the argument to an Objective-C #keyPath
   /// expression.
   ///
