@@ -188,6 +188,10 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     return;
   }
 
+  if (auto opaqueDecl = AFD->getOpaqueResultTypeDecl()) {
+    addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueDecl));
+  }
+
   addSymbol(SILDeclRef(AFD));
 
   // Add the global function pointer for a dynamically replaceable function.
@@ -199,6 +203,12 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
         LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD, useAllocator));
     addSymbol(
         LinkEntity::forDynamicallyReplaceableFunctionKey(AFD, useAllocator));
+
+    if (auto opaqueDecl = AFD->getOpaqueResultTypeDecl()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorImpl(opaqueDecl));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueDecl));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueDecl));
+    }
   }
   if (AFD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
     bool useAllocator = shouldUseAllocatorMangling(AFD);
@@ -206,6 +216,9 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
         AFD, useAllocator));
     addSymbol(
         LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD, useAllocator));
+    if (auto opaqueDecl = AFD->getOpaqueResultTypeDecl()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueDecl));
+    }
   }
 
   if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {
