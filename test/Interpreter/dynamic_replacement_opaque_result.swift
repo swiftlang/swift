@@ -8,6 +8,8 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize_none
 
+// REQUIRES: CPU=arm64 || CPU=x86_64
+
 @_private(sourceFile: "TestOpaque1.swift") import TestOpaque1
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
