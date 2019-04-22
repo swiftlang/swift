@@ -124,3 +124,11 @@ struct AssocViaExtension {
 extension AssocViaExtension: WithAssocType {} // CHECK: [[@LINE]]:11 | struct/Swift | T | [[AssocViaExtensionT_USR]] | Impl,RelOver,RelCont | rel: 2
   // CHECK-NEXT: RelOver | type-alias/associated-type/Swift | T | [[WithAssocT_USR]]
   // CHECK-NEXT: RelCont | extension/ext-struct/Swift | AssocViaExtension
+
+func returnOpaqueResultType() -> some BaseConfFromBase & P1 & WithAssocType {} // CHECK: [[@LINE]]:6 | function/Swift | returnOpaqueResultType() | s:14swift_ide_test22returnOpaqueResultTypeQryF | Def | rel: 0
+// CHECK: [[@LINE-1]]:39 | class/Swift | BaseConfFromBase | s:14swift_ide_test012BaseConfFromD0C | Ref,RelCont | rel: 1
+// CHECK-NEXT:   RelCont | function/Swift | returnOpaqueResultType() | s:14swift_ide_test22returnOpaqueResultTypeQryF
+// CHECK: [[@LINE-3]]:58 | protocol/Swift | P1 | s:14swift_ide_test2P1P | Ref,RelCont | rel: 1
+// CHECK-NEXT:   RelCont | function/Swift | returnOpaqueResultType() | s:14swift_ide_test22returnOpaqueResultTypeQryF
+// CHECK: [[@LINE-5]]:63 | protocol/Swift | WithAssocType | s:14swift_ide_test13WithAssocTypeP | Ref,RelCont | rel: 1
+// CHECK-NEXT:   RelCont | function/Swift | returnOpaqueResultType() | s:14swift_ide_test22returnOpaqueResultTypeQryF
