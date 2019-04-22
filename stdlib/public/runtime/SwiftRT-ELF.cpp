@@ -46,9 +46,16 @@ static swift::MetadataSections sections{};
 
 __attribute__((__constructor__))
 static void swift_image_constructor() {
+#ifndef __wasm__
 #define SWIFT_SECTION_RANGE(name)                                              \
   { reinterpret_cast<uintptr_t>(&__start_##name),                              \
     static_cast<uintptr_t>(&__stop_##name - &__start_##name) }
+#else
+// WebAssembly hack: ok this should really go in its own file
+#define SWIFT_SECTION_RANGE(name)                                              \
+  { reinterpret_cast<uintptr_t>(&__start_##name) + sizeof(void*),                              \
+    static_cast<uintptr_t>(&__stop_##name - &__start_##name) }
+#endif
 
   sections = {
       swift::CurrentSectionMetadataVersion,
