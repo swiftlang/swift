@@ -436,7 +436,36 @@ bool AllowInvalidRefInKeyPath::diagnose(Expr *root, bool asNote) const {
         root, getConstraintSystem(), Member, getLocator());
     return failure.diagnose(asNote);
   }
+
+  case RefKind::Method: {
+    return false;
   }
+  }
+}
+
+AllowInvalidRefInKeyPath *
+AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, ValueDecl *member,
+                                 ConstraintLocator *locator) {
+  // Referencing (instance or static) methods in key path is
+  // not currently allowed.
+  if (isa<FuncDecl>(member))
+    return AllowInvalidRefInKeyPath::create(cs, RefKind::Method, member,
+                                            locator);
+
+  // Referencing static members in key path is not currently allowed.
+  if (member->isStatic())
+    return AllowInvalidRefInKeyPath::create(cs, RefKind::StaticMember, member,
+                                            locator);
+
+  if (auto *storage = dyn_cast<AbstractStorageDecl>(member)) {
+    // Referencing members with mutating getters in key path is not
+    // currently allowed.
+    if (storage->isGetterMutating())
+      return AllowInvalidRefInKeyPath::create(cs, RefKind::MutatingGetter,
+                                              member, locator);
+  }
+
+  return nullptr;
 }
 
 AllowInvalidRefInKeyPath *
