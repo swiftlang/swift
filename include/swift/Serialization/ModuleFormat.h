@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 486; // Last change: Opaque result types
+const uint16_t SWIFTMODULE_VERSION_MINOR = 487; // Last change: Opaque result types generic params
 
 using DeclIDField = BCFixed<31>;
 
@@ -1103,6 +1103,7 @@ namespace decls_block {
     TypeIDField, // interface type for opaque type
     GenericEnvironmentIDField, // generic environment
     SubstitutionMapIDField // optional substitution map for underlying type
+    // trailed by generic parameters
   >;
 
   // TODO: remove the unnecessary FuncDecl components here
