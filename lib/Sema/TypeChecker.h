@@ -1087,12 +1087,11 @@ public:
   void inferDefaultWitnesses(ProtocolDecl *proto);
 
   /// Compute the generic signature, generic environment and interface type
-  /// of a generic function.
-  void validateGenericFuncSignature(AbstractFunctionDecl *func);
-
-  /// Compute the generic signature, generic environment and interface type
-  /// of a generic subscript.
-  void validateGenericSubscriptSignature(SubscriptDecl *subscript);
+  /// of a generic function or subscript.
+  void validateGenericFuncOrSubscriptSignature(
+              PointerUnion<AbstractFunctionDecl *, SubscriptDecl *>
+                  funcOrSubscript,
+              ValueDecl *decl, GenericContext *genCtx);
 
   /// For a generic requirement in a protocol, make sure that the requirement
   /// set didn't add any requirements to Self or its associated types.

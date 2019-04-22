@@ -1028,6 +1028,8 @@ public:
   ParserResult<PrecedenceGroupDecl>
   parseDeclPrecedenceGroup(ParseDeclOptions flags, DeclAttributes &attributes);
 
+  ParserResult<TypeRepr> parseDeclResultType(Diag<> MessageID);
+
   //===--------------------------------------------------------------------===//
   // Type Parsing
   

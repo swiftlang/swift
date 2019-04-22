@@ -76,6 +76,9 @@ public let TOOLBARW_CLASSW: [WCHAR] = Array<WCHAR>("ToolbarWindow32".utf16)
 public let TRACKBAR_CLASSW: [WCHAR] = Array<WCHAR>("msctls_trackbar32".utf16)
 public let UPDOWN_CLASSW: [WCHAR] = Array<WCHAR>("msctls_updown32".utf16)
 
+// consoleapi.h
+public let PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE: DWORD_PTR = 0x00020016
+
 // Swift Convenience
 public extension FILETIME {
   var time_t: time_t {

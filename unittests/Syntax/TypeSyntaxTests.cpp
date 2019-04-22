@@ -202,9 +202,9 @@ TEST(TypeSyntaxTests, TupleBuilderAPIs) {
     auto StringId = SyntaxFactory::makeIdentifier("String", {}, {});
     auto StringType = SyntaxFactory::makeSimpleTypeIdentifier(StringId, None);
     auto String = SyntaxFactory::makeTupleTypeElement(StringType, Comma);
-    Builder.addTupleTypeElement(IntWithComma);
-    Builder.addTupleTypeElement(String);
-    Builder.addTupleTypeElement(Int);
+    Builder.addElementsMember(IntWithComma);
+    Builder.addElementsMember(String);
+    Builder.addElementsMember(Int);
     Builder.useRightParen(SyntaxFactory::makeRightParenToken({}, {}));
 
     auto TupleType = Builder.build();
@@ -229,8 +229,8 @@ TEST(TypeSyntaxTests, TupleBuilderAPIs) {
     auto yTypeElt = SyntaxFactory::makeTupleTypeElement(yLabel, Colon,
                                                         Int)
       .withInOut(inout);
-    Builder.addTupleTypeElement(xTypeElt);
-    Builder.addTupleTypeElement(yTypeElt);
+    Builder.addElementsMember(xTypeElt);
+    Builder.addElementsMember(yTypeElt);
     Builder.useRightParen(SyntaxFactory::makeRightParenToken({}, {}));
 
     auto TupleType = Builder.build();
@@ -628,8 +628,8 @@ TEST(TypeSyntaxTests, FunctionTypeBuilderAPIs) {
 
     Builder.useLeftParen(LeftParen)
       .useRightParen(RightParen)
-      .addTupleTypeElement(xArg)
-      .addTupleTypeElement(yArg)
+      .addArgumentsMember(xArg)
+      .addArgumentsMember(yArg)
       .useThrowsOrRethrowsKeyword(Throws)
       .useArrow(Arrow)
       .useReturnType(Int);
@@ -646,8 +646,8 @@ TEST(TypeSyntaxTests, FunctionTypeBuilderAPIs) {
                                                       Int, None, None, None);
     Builder.useLeftParen(LeftParen)
       .useRightParen(RightParen)
-      .addTupleTypeElement(IntArg.withTrailingComma(Comma))
-      .addTupleTypeElement(IntArg)
+      .addArgumentsMember(IntArg.withTrailingComma(Comma))
+      .addArgumentsMember(IntArg)
       .useThrowsOrRethrowsKeyword(Rethrows)
       .useArrow(Arrow)
       .useReturnType(Int);
