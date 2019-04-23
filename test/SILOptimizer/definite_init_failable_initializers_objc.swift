@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
 
 // REQUIRES: objc_interop
-// REQUIRES: rdar49942212
 
 import ObjectiveC
 
@@ -98,25 +97,19 @@ class Cat : FakeNSObject {
     // CHECK-NEXT: cond_br [[COND]], bb1, bb2
   
   // CHECK: bb1:
-    // CHECK-NEXT: br bb8
-    
-  // CHECK: bb3:
-    // CHECK: br bb5
-  
-  // CHECK: bb4:
-    // CHECK: br bb5
-  
-  // CHECK: bb5
+    // CHECK-NEXT: br [[ERROR_BRANCH:bb[0-9]+]]
+      
+  // CHECK: bb{{[0-9]+}}:
     // CHECK: [[SELF_INIT:%.+]] = objc_method %2 : $Cat, #Cat.init!initializer.1.foreign : (Cat.Type) -> (Int, Bool) -> Cat?
-    // CHECK: [[NEW_OPT_SELF:%.+]] = apply [[SELF_INIT]]({{%.+}}, {{%.+}}, %2) : $@convention(objc_method) (Int, ObjCBool, @owned Cat) -> @owned Optional<Cat>
+    // CHECK: [[NEW_OPT_SELF:%.+]] = apply [[SELF_INIT]]({{%.+}}, {{%.+}}, {{%.+}}) : $@convention(objc_method) (Int, ObjCBool, @owned Cat) -> @owned Optional<Cat>
     // CHECK: [[COND:%.+]] = select_enum [[NEW_OPT_SELF]] : $Optional<Cat>
-    // CHECK-NEXT: cond_br [[COND]], bb7, bb6
+    // CHECK-NEXT: cond_br [[COND]], [[SUCCESS_BRANCH:bb[0-9]+]], [[RELEASE_THEN_ERROR_BRANCH:bb[0-9]+]]
 
-  // CHECK: bb6:
+  // CHECK: [[RELEASE_THEN_ERROR_BRANCH]]:
     // CHECK-NEXT: release_value [[NEW_OPT_SELF]]
-    // CHECK-NEXT: br bb8
+    // CHECK-NEXT: br [[ERROR_BRANCH]]
 
-  // CHECK: bb7:
+  // CHECK: [[SUCCESS_BRANCH]]:
     // CHECK-NEXT: [[NEW_SELF:%.+]] = unchecked_enum_data [[NEW_OPT_SELF]] : $Optional<Cat>, #Optional.some!enumelt.1
     // CHECK-NEXT: store [[NEW_SELF]] to [[SELF_BOX]] : $*Cat
     // TODO: Once we re-enable arbitrary take promotion, this retain and the associated destroy_addr will go away.
@@ -124,26 +117,26 @@ class Cat : FakeNSObject {
     // CHECK-NEXT: [[RESULT:%.+]] = enum $Optional<Cat>, #Optional.some!enumelt.1, [[NEW_SELF]] : $Cat
     // CHECK-NEXT: destroy_addr [[SELF_BOX]]
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]] : $*Cat
-    // CHECK-NEXT: br bb12([[RESULT]] : $Optional<Cat>)
+    // CHECK-NEXT: br [[RESULT_BRANCH:bb[0-9]+]]([[RESULT]] : $Optional<Cat>)
 
-  // CHECK: bb8:
+  // CHECK: [[ERROR_BRANCH]]:
     // CHECK-NEXT: [[COND:%.+]] = load [[HAS_RUN_INIT_BOX]] : $*Builtin.Int1
-    // CHECK-NEXT: cond_br [[COND]], bb9, bb10
+    // CHECK-NEXT: cond_br [[COND]], [[ERROR_WITHOUT_DESTROY_BRANCH:bb[0-9]+]], [[ERROR_WITH_DESTROY_BRANCH:bb[0-9]+]]
 
-  // CHECK: bb9:
-    // CHECK-NEXT: br bb11
+  // CHECK: [[ERROR_WITHOUT_DESTROY_BRANCH]]:
+    // CHECK-NEXT: br [[ERROR_CLEANUP_BRANCH:bb[0-9]+]]
 
-  // CHECK: bb10:
+  // CHECK: [[ERROR_WITH_DESTROY_BRANCH]]:
     // CHECK-NEXT: [[MOST_DERIVED_TYPE:%.+]] = value_metatype $@thick Cat.Type, %2 : $Cat
     // CHECK-NEXT: dealloc_partial_ref %2 : $Cat, [[MOST_DERIVED_TYPE]] : $@thick Cat.Type
-    // CHECK-NEXT: br bb11
+    // CHECK-NEXT: br [[ERROR_CLEANUP_BRANCH]]
 
-  // CHECK: bb11:
+  // CHECK: [[ERROR_CLEANUP_BRANCH]]:
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]] : $*Cat
     // CHECK-NEXT: [[NIL_RESULT:%.+]] = enum $Optional<Cat>, #Optional.none!enumelt
-    // CHECK-NEXT: br bb12([[NIL_RESULT]] : $Optional<Cat>)
+    // CHECK-NEXT: br [[RESULT_BRANCH]]([[NIL_RESULT]] : $Optional<Cat>)
 
-  // CHECK: bb12([[RESULT:%.+]] : $Optional<Cat>):
+  // CHECK: [[RESULT_BRANCH]]([[RESULT:%.+]] : $Optional<Cat>):
     // CHECK-NEXT: dealloc_stack [[HAS_RUN_INIT_BOX]] : $*Builtin.Int1
     // CHECK-NEXT: return [[RESULT]] : $Optional<Cat>
 
