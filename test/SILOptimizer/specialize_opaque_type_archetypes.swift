@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -module-name A -enforce-exclusivity=checked -Osize -emit-sil  %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name A -enforce-exclusivity=checked -Osize -emit-sil -Xllvm -enable-opaque-archetype-specializer %s | %FileCheck %s
+
 public protocol P {
   func myValue() -> Int64
 }
