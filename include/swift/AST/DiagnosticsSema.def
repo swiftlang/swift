@@ -4497,9 +4497,6 @@ NOTE(previous_function_builder_here, none,
      "previous function builder specified here", ())
 ERROR(function_builder_arguments, none,
       "function builder attributes cannot have arguments", ())
-ERROR(function_builder_type_contextual, none,
-      "function builder type %0 cannot depend on the current generic context",
-      (Type))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

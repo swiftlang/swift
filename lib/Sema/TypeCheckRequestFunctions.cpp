@@ -187,13 +187,6 @@ FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
                                     CustomAttrTypeKind::NonGeneric);
   if (!type) return Type();
 
-  // The type must not be contextually-dependent.
-  if (type->hasArchetype()) {
-    ctx.Diags.diagnose(attr->getLocation(),
-                       diag::function_builder_type_contextual, type);
-    return Type();
-  }
-
   auto nominal = type->getAnyNominal();
   if (!nominal) {
     assert(ctx.Diags.hadAnyError());
@@ -222,7 +215,7 @@ FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
     return Type();
   }
 
-  return type;
+  return type->mapTypeOutOfContext();
 }
 
 // Define request evaluation functions for each of the type checker requests.

@@ -3018,6 +3018,7 @@ public:
 
   /// Apply the given function builder to the closure expression.
   TypeMatchResult applyFunctionBuilder(ClosureExpr *closure, Type builderType,
+                                       ConstraintLocator *calleeLocator,
                                        ConstraintLocatorBuilder locator);
 
 private:
