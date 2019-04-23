@@ -340,6 +340,13 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       if (argumentNames[0] == ctx.getIdentifier("_owning")) {
         return getRequirement(KnownProtocolKind::TensorGroup);
       }
+    } else if (argumentNames.size() == 2) {
+      // SWIFT_ENABLE_TENSORFLOW
+      // TensorArrayProtocol.init(_owning:count)
+      if (argumentNames[0] == ctx.getIdentifier("_owning") && 
+          argumentNames[0] == ctx.getIdentifier("count")) {
+        return getRequirement(KnownProtocolKind::TensorArrayProtocol);
+      }
     }
 
     return nullptr;

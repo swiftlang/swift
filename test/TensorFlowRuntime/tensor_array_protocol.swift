@@ -11,9 +11,9 @@ import StdlibUnittest
 
 var TensorArrayProtocolTests = TestSuite("TensorArrayProtocol")
 
-struct Empty : TensorArrayProtocol {}
+struct Empty : TensorGroup {}
 
-struct Simple : TensorArrayProtocol {
+struct Simple : TensorGroup {
   var w, b: Tensor<Float>
 }
 
@@ -32,7 +32,7 @@ struct Nested : TensorArrayProtocol {
   var mixed: Mixed
 }
 
-struct Generic<T: TensorArrayProtocol, U: TensorArrayProtocol> : TensorArrayProtocol {
+struct Generic<T: TensorGroup, U: TensorGroup> : TensorArrayProtocol {
   var t: T
   var u: U
 }
