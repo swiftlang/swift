@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_2.swift -module-name External -emit-module -emit-module-path %t/External.swiftmodule
 // RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_3.swift -enable-library-evolution -module-name External2 -emit-module -emit-module-path %t/External2.swiftmodule
-// RUN: %target-swift-frontend -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil  %s | %FileCheck %s
+// RUN: %target-swift-frontend -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil  -sil-verify-all %s | %FileCheck %s
 import External
 import External2
 
@@ -176,6 +176,10 @@ struct Container5 {
   mutating func blah(_ x: S.T2, _ y: S.T) { member = (x,y) }
 }
 
+struct Pair<T, V> {
+  var first: T
+  var second: V
+}
 // CHECK-LABEL: sil @$s1A10storedPropyyF
 // CHECK-NOT: apply
 // CHECK: store
@@ -195,4 +199,10 @@ public func storedProp() {
   var s = S()
   var c4 = Container5(member: (s.g(), s.f()))
   c4.blah(s.g(), s.f())
+}
+
+public func usePair() {
+  var x = Pair(first: bar(1), second: returnC())
+  useP(x.first.myValue())
+  useP(x.second.myValue())
 }

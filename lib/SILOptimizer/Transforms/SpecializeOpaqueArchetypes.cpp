@@ -58,47 +58,49 @@ protected:
         getBuilder().createReturn(getOpLocation(Inst->getLoc()), clonedResult));
   }
 
-  /// Projections should not change the type.
+  /// Projections should not change the type if the type is not specialized.
   void visitStructElementAddrInst(StructElementAddrInst *Inst) {
     getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-    recordClonedInstruction(Inst, getBuilder().createStructElementAddr(
-                                      getOpLocation(Inst->getLoc()),
-                                      getOpValue(Inst->getOperand()),
-                                      Inst->getField(), Inst->getType()));
+    auto opd = getOpValue(Inst->getOperand());
+    recordClonedInstruction(
+        Inst, getBuilder().createStructElementAddr(
+                  getOpLocation(Inst->getLoc()), opd, Inst->getField()));
   }
-  /// Projections should not change the type.
+
+  /// Projections should not change the type if the type is not specialized.
   void visitStructExtractInst(StructExtractInst *Inst) {
     getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+    auto opd = getOpValue(Inst->getOperand());
     recordClonedInstruction(
-        Inst, getBuilder().createStructExtract(
-                  getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                  Inst->getField(), Inst->getType()));
+        Inst, getBuilder().createStructExtract(getOpLocation(Inst->getLoc()),
+                                               opd, Inst->getField()));
   }
-  /// Projections should not change the type.
+  /// Projections should not change the type if the type is not specialized.
   void visitTupleElementAddrInst(TupleElementAddrInst *Inst) {
+    auto opd = getOpValue(Inst->getOperand());
     getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
     recordClonedInstruction(Inst, getBuilder().createTupleElementAddr(
-                                      getOpLocation(Inst->getLoc()),
-                                      getOpValue(Inst->getOperand()),
-                                      Inst->getFieldNo(), Inst->getType()));
+                                      getOpLocation(Inst->getLoc()), opd,
+                                      Inst->getFieldNo()));
   }
-  /// Projections should not change the type.
+  /// Projections should not change the type if the type is not specialized.
   void visitTupleExtractInst(TupleExtractInst *Inst) {
     getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
     recordClonedInstruction(
-        Inst, getBuilder().createTupleExtract(
-                  getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                  Inst->getFieldNo(), Inst->getType()));
+        Inst, getBuilder().createTupleExtract(getOpLocation(Inst->getLoc()),
+                                              getOpValue(Inst->getOperand()),
+                                              Inst->getFieldNo()));
   }
-  /// Projections should not change the type.
+  /// Projections should not change the type if the type is not specialized.
   void visitRefElementAddrInst(RefElementAddrInst *Inst) {
     getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
     recordClonedInstruction(
         Inst, getBuilder().createRefElementAddr(
                   getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                  Inst->getField(), Inst->getType()));
+                  Inst->getField()));
   }
-  /// Projections should not change the type.
+
+  /// Projections should not change the type if the type is not specialized.
   void visitRefTailAddrInst(RefTailAddrInst *Inst) {
     getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
     recordClonedInstruction(
@@ -166,7 +168,7 @@ protected:
       if (srcType.getASTType()->hasOpaqueArchetype()) {
         assert(!srcType.isAddress());
         src = getBuilder().createUncheckedRefCast(
-            getOpLocation(Inst->getLoc()), src, destType);
+            getOpLocation(Inst->getLoc()), src, destType.getObjectType());
       } else if (destType.getASTType()->hasOpaqueArchetype()) {
         dst = getBuilder().createUncheckedAddrCast(
             getOpLocation(Inst->getLoc()), dst, srcType.getAddressType());
