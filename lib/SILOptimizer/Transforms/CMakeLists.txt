@@ -32,7 +32,6 @@ silopt_register_sources(
   SILSROA.cpp
   SimplifyCFG.cpp
   Sink.cpp
-  SpecializeOpaqueArchetypes.cpp
   SpeculativeDevirtualizer.cpp
   StackPromotion.cpp
   UnsafeGuaranteedPeephole.cpp

@@ -2274,21 +2274,17 @@ class SILTypeSubstituter :
   // context signature.
   CanGenericSignature Sig;
 
-  bool shouldSubstituteOpaqueArchetypes;
-
   ASTContext &getASTContext() { return TheSILModule.getASTContext(); }
 
 public:
   SILTypeSubstituter(SILModule &silModule,
                      TypeSubstitutionFn Subst,
                      LookupConformanceFn Conformances,
-                     CanGenericSignature Sig,
-                     bool shouldSubstituteOpaqueArchetypes)
+                     CanGenericSignature Sig)
     : TheSILModule(silModule),
       Subst(Subst),
       Conformances(Conformances),
-      Sig(Sig),
-      shouldSubstituteOpaqueArchetypes(shouldSubstituteOpaqueArchetypes)
+      Sig(Sig)
   {}
 
   // SIL type lowering only does special things to tuples and functions.
@@ -2409,13 +2405,7 @@ public:
   CanType visitType(CanType origType) {
     assert(!isa<AnyFunctionType>(origType));
     assert(!isa<LValueType>(origType) && !isa<InOutType>(origType));
-
-    SubstOptions substOptions(None);
-    if (shouldSubstituteOpaqueArchetypes)
-      substOptions = SubstFlags::SubstituteOpaqueArchetypes |
-                     SubstFlags::AllowLoweredTypes;
-    auto substType =
-        origType.subst(Subst, Conformances, substOptions)->getCanonicalType();
+    auto substType = origType.subst(Subst, Conformances)->getCanonicalType();
 
     // If the substitution didn't change anything, we know that the
     // original type was a lowered type, so we're good.
@@ -2430,24 +2420,23 @@ public:
 
 } // end anonymous namespace
 
-SILType SILType::subst(SILModule &silModule, TypeSubstitutionFn subs,
+SILType SILType::subst(SILModule &silModule,
+                       TypeSubstitutionFn subs,
                        LookupConformanceFn conformances,
-                       CanGenericSignature genericSig,
-                       bool shouldSubstituteOpaqueArchetypes) const {
-  if (!hasArchetype() && !hasTypeParameter() &&
-      (!shouldSubstituteOpaqueArchetypes ||
-       !getASTType()->hasOpaqueArchetype()))
+                       CanGenericSignature genericSig) const {
+  if (!hasArchetype() && !hasTypeParameter())
     return *this;
 
   if (!genericSig)
     genericSig = silModule.Types.getCurGenericContext();
   SILTypeSubstituter STST(silModule, subs, conformances,
-                          genericSig, shouldSubstituteOpaqueArchetypes);
+                          genericSig);
   return STST.subst(*this);
 }
 
 SILType SILType::subst(SILModule &silModule, SubstitutionMap subs) const{
-  return subst(silModule, QuerySubstitutionMap{subs},
+  return subst(silModule,
+               QuerySubstitutionMap{subs},
                LookUpConformanceInSubstitutionMap(subs));
 }
 
@@ -2476,7 +2465,7 @@ SILFunctionType::substGenericArgs(SILModule &silModule,
                                   LookupConformanceFn conformances) {
   if (!isPolymorphic()) return CanSILFunctionType(this);
   SILTypeSubstituter substituter(silModule, subs, conformances,
-                                 getGenericSignature(), false);
+                                 getGenericSignature());
   return substituter.substSILFunctionType(CanSILFunctionType(this));
 }
 
