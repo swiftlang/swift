@@ -1,4 +1,10 @@
-// RUN: %target-swift-frontend -module-name A -enforce-exclusivity=checked -Osize -emit-sil  %s | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_2.swift -module-name External -emit-module -emit-module-path %t/External.swiftmodule
+// RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_3.swift -enable-library-evolution -module-name External2 -emit-module -emit-module-path %t/External2.swiftmodule
+// RUN: %target-swift-frontend -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil  %s | %FileCheck %s
+import External
+import External2
+
 public protocol P {
   func myValue() -> Int64
 }
@@ -71,4 +77,66 @@ public func testAddressOnlyFoobar() {
   let y = x
   useP(x.myValue())
   useP(y.myValue())
+}
+
+public protocol CP : class {
+  func myValue() -> Int64
+}
+
+class C : CP {
+  func myValue() -> Int64 {
+    return 0
+  }
+}
+
+public func returnC() -> some CP {
+  return C()
+}
+
+// CHECK-LABEL: sil @$s1A4useCyyF
+// CHECK: [[INT:%.*]] = struct $Int64 (
+// CHECK:  // function_ref specialized useP<A>(_:)
+// CHECK: [[FUN:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5
+// CHECK:  = apply [[FUN]]([[INT]])
+public func useC() {
+   let c = returnC()
+   useP(c.myValue())
+}
+
+// CHECK-LABEL: sil @$s1A11useExternalyyF
+// CHECK:  // function_ref Int64.myValue2()
+// CHECK:  [[FUN:%.*]] = function_ref @$ss5Int64V8ExternalE8myValue2AByF
+// CHECK:  apply [[FUN]]
+public func useExternal() {
+  let e = external()
+  useP(e.myValue2())
+}
+
+// This should change once opaque types support resilience.
+
+// CHECK-LABEL: sil @$s1A20useExternalResilientyyF
+// CHECK:  // function_ref Int64.myValue3()
+// CHECK:  [[FUN:%.*]] = function_ref @$ss5Int64V9External2E8myValue3AByF
+// CHECK:  apply [[FUN]]
+public func useExternalResilient() {
+  let e = externalResilient()
+  useP(e.myValue3())
+}
+
+struct Container {
+  var x : some P {
+    get {
+      return Int64(1)
+    }
+  }
+}
+
+// CHECK-LABEL: sil @$s1A11usePropertyyyF
+// CHECK:  [[VAL:%.*]] = struct $Int64
+// CHECK:  // function_ref specialized useP<A>(_:)
+// CHECK:  [[FUN:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5
+// CHECK:  apply [[FUN]]([[VAL]])
+public func useProperty() {
+   let p = Container().x
+   useP(p.myValue())
 }
