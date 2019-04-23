@@ -134,12 +134,22 @@ extension vImageCVImageFormat {
         #if os(OSX)
         return String(UTCreateStringForOSType(formatCode).takeRetainedValue())
         #else
-        let chars: [UInt8] = [UInt8(formatCode >> 24 & 0xFF),
-                              UInt8(formatCode >> 16 & 0xFF),
-                              UInt8(formatCode >> 8 & 0xFF),
-                              UInt8(formatCode >> 0 & 0xFF)]
+        let chars: [UnicodeScalar?] = [UnicodeScalar(formatCode >> 24 & 0xFF),
+                                       UnicodeScalar(formatCode >> 16 & 0xFF),
+                                       UnicodeScalar(formatCode >> 8 & 0xFF),
+                                       UnicodeScalar(formatCode >> 0 & 0xFF)]
         
-        return String(bytes: chars, encoding: .utf8) ?? ""
+        var returnString: String = ""
+        
+        chars.compactMap {
+            $0
+            }.compactMap{
+                String($0)
+            }.forEach {
+                returnString.append($0)
+        }
+        
+        return returnString
         #endif
     }
     
