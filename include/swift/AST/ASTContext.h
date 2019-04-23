@@ -839,25 +839,6 @@ public:
   /// Returns memory used exclusively by constraint solver.
   size_t getSolverMemory() const;
 
-  /// Complain if @objc or dynamic is used without importing Foundation.
-  void diagnoseAttrsRequiringFoundation(SourceFile &SF);
-
-  /// Diagnose any Objective-C method overrides that aren't reflected
-  /// as overrides in Swift.
-  bool diagnoseUnintendedObjCMethodOverrides(SourceFile &sf);
-
-  /// Diagnose all conflicts between members that have the same
-  /// Objective-C selector in the same class.
-  ///
-  /// \param sf The source file for which we are diagnosing conflicts.
-  ///
-  /// \returns true if there were any conflicts diagnosed.
-  bool diagnoseObjCMethodConflicts(SourceFile &sf);
-
-  /// Diagnose any unsatisfied @objc optional requirements of
-  /// protocols that conflict with methods.
-  bool diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf);
-
   /// Retrieve the Swift name for the given Foundation entity, where
   /// "NS" prefix stripping will apply under omit-needless-words.
   StringRef getSwiftName(KnownFoundationEntity kind);
@@ -935,31 +916,6 @@ private:
   friend SILLayout;
   friend SILBoxType;
 };
-
-/// Retrieve information about the given Objective-C method for
-/// diagnostic purposes, to be used with OBJC_DIAG_SELECT in
-/// DiagnosticsSema.def.
-std::pair<unsigned, DeclName> getObjCMethodDiagInfo(
-                                AbstractFunctionDecl *method);
-
-/// Attach Fix-Its to the given diagnostic that updates the name of the
-/// given declaration to the desired target name.
-///
-/// \returns false if the name could not be fixed.
-bool fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
-                        DeclName targetName);
-
-/// Fix the Objective-C name of the given declaration to match the provided
-/// Objective-C selector.
-///
-/// \param ignoreImpliedName When true, ignore the implied name of the
-/// given declaration, because it no longer applies.
-///
-/// For properties, the selector should be a zero-parameter selector of the
-/// given property's name.
-bool fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
-                            Optional<ObjCSelector> targetNameOpt,
-                            bool ignoreImpliedName = false);
 
 } // end namespace swift
 
