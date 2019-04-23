@@ -131,7 +131,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       if (doIt(mutableCustomAttr->getTypeLoc()))
         return true;
 
-      if (auto arg = customAttr->getArg()) {
+      if (auto semanticInit = customAttr->getSemanticInit()) {
+        if (auto newSemanticInit = doIt(semanticInit))
+          mutableCustomAttr->setSemanticInit(newSemanticInit);
+        else
+          return true;
+      } else if (auto arg = customAttr->getArg()) {
         if (auto newArg = doIt(arg))
           mutableCustomAttr->setArg(newArg);
         else

@@ -2557,6 +2557,9 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         var->getParentPatternBinding()->setInitializerSubsumed(0);
         tc.Context.setSideCachedPropertyDelegateBackingPropertyType(
             var, initType->mapTypeOutOfContext());
+
+        // Record the semantic initializer.
+        var->getAttachedPropertyDelegate()->setSemanticInit(expr);
       }
 
       initializer = expr;
