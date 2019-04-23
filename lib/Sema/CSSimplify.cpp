@@ -1932,15 +1932,29 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
   }
 }
 
-static void
+/// Attempt to repair typing failures and record fixes if needed.
+/// \return true if at least some of the failures has been repaired
+/// successfully, which allows type matcher to continue.
+static bool
 repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
                SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
                ConstraintLocatorBuilder locator) {
   SmallVector<LocatorPathElt, 4> path;
   auto *anchor = locator.getLocatorParts(path);
 
-  if (path.empty())
-    return;
+  if (path.empty()) {
+    // If method reference forms a value type of the key path,
+    // there is going to be a constraint to match result of the
+    // member lookup to the generic parameter `V` of *KeyPath<R, V>
+    // type associated with key path expression, which we need to
+    // fix-up here.
+    if (anchor && isa<KeyPathExpr>(anchor)) {
+      auto *fnType = lhs->getAs<FunctionType>();
+      if (fnType && fnType->getResult()->isEqual(rhs))
+        return true;
+    }
+    return false;
+  }
 
   auto &elt = path.back();
   switch (elt.getKind()) {
@@ -1964,7 +1978,7 @@ repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
     if (path.empty() ||
         !(path.back().getKind() == ConstraintLocator::ApplyArgToParam ||
           path.back().getKind() == ConstraintLocator::ContextualType))
-      return;
+      return false;
 
     auto arg = llvm::find_if(cs.getTypeVariables(),
                              [&argLoc](const TypeVariableType *typeVar) {
@@ -2015,13 +2029,14 @@ repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
                                              cs.getConstraintLocator(locator));
       conversionsOrFixes.push_back(fix);
     }
-
     break;
   }
 
   default:
-    return;
+    break;
   }
+
+  return !conversionsOrFixes.empty();
 }
 
 ConstraintSystem::TypeMatchResult
@@ -2806,8 +2821,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   }
 
   // Attempt to repair any failures identifiable at this point.
-  if (attemptFixes)
-    repairFailures(*this, type1, type2, conversionsOrFixes, locator);
+  if (attemptFixes) {
+    if (repairFailures(*this, type1, type2, conversionsOrFixes, locator)) {
+      if (conversionsOrFixes.empty())
+        return getTypeMatchSuccess();
+    }
+  }
 
   if (conversionsOrFixes.empty())
     return getTypeMatchFailure(locator);
@@ -4298,7 +4317,7 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
       break;
     case MemberLookupResult::UR_KeyPathWithAnyObjectRootType:
       return AllowAnyObjectKeyPathRoot::create(cs, locator);
-    }
+   }
   }
 
   return nullptr;
@@ -5018,30 +5037,24 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       }
 
       auto storage = dyn_cast<AbstractStorageDecl>(choices[i].getDecl());
-      if (!storage) {
-        return SolutionKind::Error;
-      }
 
-      // Referencing static members in key path is not currently allowed.
-      if (storage->isStatic() || storage->isGetterMutating()) {
-        if (!shouldAttemptFixes())
+      auto *componentLoc = getConstraintLocator(
+          locator.withPathElement(LocatorPathElt::getKeyPathComponent(i)));
+
+      if (auto *fix = AllowInvalidRefInKeyPath::forRef(
+              *this, choices[i].getDecl(), componentLoc)) {
+        if (!shouldAttemptFixes() || recordFix(fix))
           return SolutionKind::Error;
 
-        auto *componentLoc = getConstraintLocator(
-            locator.withPathElement(LocatorPathElt::getKeyPathComponent(i)));
-
-        ConstraintFix *fix = nullptr;
-        if (storage->isStatic()) {
-          fix = AllowInvalidRefInKeyPath::forStaticMember(
-              *this, choices[i].getDecl(), componentLoc);
-        } else {
-          fix = AllowInvalidRefInKeyPath::forMutatingGetter(
-              *this, choices[i].getDecl(), componentLoc);
+        // If this was a method reference let's mark it as read-only.
+        if (!storage) {
+          capability = ReadOnly;
+          continue;
         }
-
-        if (recordFix(fix))
-          return SolutionKind::Error;
       }
+
+      if (!storage)
+        return SolutionKind::Error;
 
       if (isReadOnlyKeyPathComponent(storage)) {
         capability = ReadOnly;

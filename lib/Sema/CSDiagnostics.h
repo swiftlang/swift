@@ -1042,6 +1042,8 @@ public:
     assert(locator->isForKeyPathComponent());
   }
 
+  DescriptiveDeclKind getKind() const { return Member->getDescriptiveKind(); }
+
   DeclName getName() const { return Member->getFullName(); }
 
   bool diagnoseAsError() override = 0;
@@ -1094,6 +1096,29 @@ public:
                                            ValueDecl *member,
                                            ConstraintLocator *locator)
       : InvalidMemberRefInKeyPath(root, cs, member, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to reference a method as a key path component
+/// e.g.
+///
+/// ```swift
+/// struct S {
+///   func foo() -> Int { return 42 }
+///   static func bar() -> Int { return 0 }
+/// }
+///
+/// _ = \S.foo
+/// _ = \S.Type.bar
+/// ```
+class InvalidMethodRefInKeyPath final : public InvalidMemberRefInKeyPath {
+public:
+  InvalidMethodRefInKeyPath(Expr *root, ConstraintSystem &cs, ValueDecl *method,
+                            ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(root, cs, method, locator) {
+    assert(isa<FuncDecl>(method));
+  }
 
   bool diagnoseAsError() override;
 };

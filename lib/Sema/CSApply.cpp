@@ -4579,20 +4579,13 @@ namespace {
                                   ConstraintLocator *locator) {
       if (overload.choice.isDecl()) {
         auto property = overload.choice.getDecl();
-
         // Key paths can only refer to properties currently.
-        if (!isa<VarDecl>(property)) {
-          cs.TC.diagnose(componentLoc, diag::expr_keypath_not_property,
-                         property->getDescriptiveKind(),
-                         property->getFullName());
-        } else {
-          // Key paths don't work with mutating-get properties.
-          auto varDecl = cast<VarDecl>(property);
-          assert(!varDecl->isGetterMutating());
-          // Key paths don't currently support static members.
-          // There is a fix which diagnoses such situation already.
-          assert(!varDecl->isStatic());
-        }
+        auto varDecl = cast<VarDecl>(property);
+        // Key paths don't work with mutating-get properties.
+        assert(!varDecl->isGetterMutating());
+        // Key paths don't currently support static members.
+        // There is a fix which diagnoses such situation already.
+        assert(!varDecl->isStatic());
 
         cs.TC.requestMemberLayout(property);
 
