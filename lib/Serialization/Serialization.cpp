@@ -3437,6 +3437,7 @@ void Serializer::writeDecl(const Decl *D) {
                                  contextID, namingDeclID, interfaceSigID,
                                  interfaceTypeID, genericEnvID,
                                  underlyingTypeID);
+    writeGenericParams(opaqueDecl->getGenericParams());
     break;
   }
 

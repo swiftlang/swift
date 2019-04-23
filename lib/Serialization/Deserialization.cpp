@@ -3099,6 +3099,9 @@ public:
                                sig, interfaceType);
     declOrOffset = opaqueDecl;
 
+    if (auto genericParams = MF.maybeReadGenericParams(opaqueDecl))
+      opaqueDecl->setGenericParams(genericParams);
+
     auto genericEnv = MF.getGenericEnvironment(genericEnvID);
     opaqueDecl->setGenericEnvironment(genericEnv);
     if (underlyingTypeID)

@@ -985,7 +985,7 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
       // Use the fully elaborated explicit mangling.
       appendOpaqueDeclName(opaqueDecl);
       bool isFirstArgList = true;
-      appendBoundGenericArgs(opaqueDecl->getInnermostDeclContext(),
+      appendBoundGenericArgs(opaqueDecl,
                              opaqueType->getSubstitutions(),
                              isFirstArgList);
       appendRetroactiveConformances(opaqueType->getSubstitutions(),
@@ -1168,7 +1168,9 @@ unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
   auto decl = dc->getInnermostDeclarationDeclContext();
   if (!decl) return 0;
 
-  // For an extension declaration, use the nominal type declaration instead.
+  // For a non-protocol extension declaration, use the nominal type declaration
+  // instead.
+  //
   // This is important when extending a nested type, because the generic
   // parameters will line up with the (semantic) nesting of the nominal type.
   if (auto ext = dyn_cast<ExtensionDecl>(decl))
