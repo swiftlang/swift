@@ -37,23 +37,37 @@ bool DerivedConformance::canDeriveTensorArrayProtocol(NominalTypeDecl *nominal,
   auto *structDecl = dyn_cast<StructDecl>(nominal);
   if (!structDecl)
     return false;
-  // All stored properties must conform to `TensorArrayProtocol`.
+  // All stored properties must conform to `TensorGroup`.
   auto &C = nominal->getASTContext();
-  auto *tensorArrayProto = 
-      C.getProtocol(KnownProtocolKind::TensorArrayProtocol);
+  auto *tensorGroupProto = 
+      C.getProtocol(KnownProtocolKind::TensorGroup);
   return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
     if (!v->hasInterfaceType())
       C.getLazyResolver()->resolveDeclSignature(v);
     if (!v->hasInterfaceType())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
-    return (bool)TypeChecker::conformsToProtocol(varType, tensorArrayProto, DC,
+    return (bool)TypeChecker::conformsToProtocol(varType, tensorGroupProto, DC,
                                                  ConformanceCheckFlags::Used);
   });
 }
 
 // Return the protocol requirement with the specified name.
 static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
+  auto lookup = proto->lookupDirect(name);
+  lookup.erase(std::remove_if(lookup.begin(), lookup.end(),
+                              [](ValueDecl *v) {
+                                return !isa<ProtocolDecl>(
+                                           v->getDeclContext()) ||
+                                       !v->isProtocolRequirement();
+                              }),
+               lookup.end());
+  assert(lookup.size() == 1 && "Ambiguous protocol requirement");
+  return lookup.front();
+}
+
+// Return the protocol requirement with the specified name.
+static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, DeclName name) {
   auto lookup = proto->lookupDirect(name);
   lookup.erase(std::remove_if(lookup.begin(), lookup.end(),
                               [](ValueDecl *v) {
@@ -349,12 +363,246 @@ static ValueDecl *deriveTensorArrayProtocol_tensorHandleCount(
   return tensorHandleCountDecl;
 }
 
+// Synthesize body for `init(_owning:count:)`.
+static void 
+deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl) {
+  auto *parentDC = funcDecl->getParent();
+  auto *nominal = parentDC->getSelfNominalTypeDecl();
+  auto &C = nominal->getASTContext();
+
+  // Obtain the address type.
+  auto cTensorHandleType = C.getOpaquePointerDecl()->getDeclaredType();
+  auto baseAddressType = BoundGenericType::get(
+      C.getUnsafePointerDecl(), Type(), {cTensorHandleType});
+  auto addressType = BoundGenericType::get(
+      C.getOptionalDecl(), Type(), {baseAddressType});
+  auto *addressTE = TypeExpr::createImplicit(addressType, C);
+
+  // Get references to `self` and parameter declarations.
+  auto *selfDecl = funcDecl->getImplicitSelfDecl();
+  auto *selfDRE = new (C) 
+      DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
+  auto *paramDecl = funcDecl->getParameters()->get(0);
+  auto *paramDRE = new (C) 
+      DeclRefExpr(paramDecl, DeclNameLoc(), /*Implicit*/ true);
+
+  // Create an `if var` statement for the current address.
+  VarDecl *currAddressDecl = new (C) VarDecl(
+      /*IsStatic*/ false, VarDecl::Specifier::Var, /*IsCaptureList*/ false, 
+      SourceLoc(), C.getIdentifier("currentAddress"), funcDecl);
+  currAddressDecl->setImplicit();
+  currAddressDecl->setHasNonPatternBindingInit(true);
+  currAddressDecl->setInterfaceType(baseAddressType);
+  currAddressDecl->setValidationToChecked();
+
+  Pattern *currAddressPat = new (C) 
+      NamedPattern(currAddressDecl, /*implicit*/ true);
+  currAddressPat = new (C) 
+      VarPattern(SourceLoc(), /*isLet*/ false, currAddressPat, 
+                 /*implicit*/ true);
+  currAddressPat = new (C)
+      OptionalSomePattern(currAddressPat, currAddressPat->getEndLoc(), 
+                          /*implicit*/ true);
+  StmtConditionElement cond[] = {
+      StmtConditionElement(SourceLoc(), currAddressPat, /*Init*/ paramDRE)};
+
+  // Get the necessary protocol requirements.
+  auto *tensorGroupProto = C.getProtocol(KnownProtocolKind::TensorGroup);
+  auto *tensorArrayProto = C.getProtocol(
+      KnownProtocolKind::TensorArrayProtocol);
+  auto initName = DeclName(
+      C, DeclBaseName::createConstructor(),
+      {C.getIdentifier("_owning"), C.getIdentifier("count")});
+  auto *initReq = getProtocolRequirement(tensorArrayProto, initName);
+  auto *tensorHandleCountReq = getProtocolRequirement(
+      tensorArrayProto, C.Id_tensorHandleCount);
+
+  Type intType = C.getIntDecl()->getDeclaredType();
+  TypeExpr *intTE = TypeExpr::createImplicit(intType, C);
+
+  // Goes through the member TensorGroups and call 
+  // `self.t = T(_owning:count:)`.
+  llvm::SmallVector<ASTNode, 2> thenMemberExprs;
+  llvm::SmallVector<ASTNode, 2> elseMemberExprs;
+  for (auto member : nominal->getStoredProperties()) {
+    auto memberType = parentDC->mapTypeIntoContext(
+        member->getValueInterfaceType());
+    auto *memberTypeExpr = TypeExpr::createImplicit(memberType, C);
+    auto module = nominal->getModuleContext();
+    auto confRef = module->lookupConformance(
+        memberType, tensorGroupProto);
+    assert(confRef && "Member does not conform to `TensorGroup`");
+
+    // Get member type's constructor, e.g. `MemberType.init(_owning:)`.
+    // Use protocol requirement declaration for the method by default: this
+    // will be dynamically dispatched.
+    ValueDecl *memberInitDecl = initReq;
+    // If conformance reference is concrete, then use concrete witness
+    // declaration for the constructor.
+    if (confRef->isConcrete())
+      memberInitDecl = confRef->getConcrete()->getWitnessDecl(
+          initReq, C.getLazyResolver());
+    assert(memberInitDecl && "Member constructor declaration must exist");
+    auto memberInitDRE = new (C) DeclRefExpr(
+        memberInitDecl, DeclNameLoc(), /*implicit*/ true);
+    memberInitDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
+
+    // Create reference to member constructor: `MemberType.init(_owning:)`.
+    auto *memberInitExpr = new (C) ConstructorRefCallExpr(
+        memberInitDRE, memberTypeExpr);
+
+    auto *addressDRE = new (C) DeclRefExpr(
+        currAddressDecl, DeclNameLoc(), /*implicit*/ true);
+    auto *loadExpr = new (C) LoadExpr(addressDRE, baseAddressType);
+    
+    // Initialize the member using its TensorGroup constructor.
+    // Note that, initialization is dependent on the branch of the 
+    // if-statement taken.
+    auto *thenInitExpr = new (C) InjectIntoOptionalExpr(loadExpr, addressType);
+    auto *thenInitCallExpr = CallExpr::createImplicit(
+        C, memberInitExpr, {thenInitExpr}, {C.getIdentifier("_owning")});
+    
+    // Create a nil expression with type UnsafePointer<CTensorHandle>? for the 
+    // `else` branch.
+    auto *nilDecl = C.getOptionalNoneDecl();
+    auto *nilDRE = new (C) DeclRefExpr(
+        nilDecl, DeclNameLoc(), /*implicit*/ true);
+    auto *elseInitExpr = new (C) DotSyntaxCallExpr(
+        nilDRE, SourceLoc(), addressTE);
+    auto *elseInitCallExpr = CallExpr::createImplicit(
+        C, memberInitExpr, {elseInitExpr}, {C.getIdentifier("_owning")});
+    
+    // Assign the current member to the result of the initializer call.
+    auto *memberDRE = new (C) MemberRefExpr(
+        selfDRE, SourceLoc(), member, DeclNameLoc(), /*Implicit*/ true);
+
+    auto *thenAssignMemberExpr = new (C) AssignExpr(
+        memberDRE, SourceLoc(), thenInitCallExpr, /*Implicit*/ true);
+    auto *elseAssignMemberExpr = new (C) AssignExpr(
+        memberDRE, SourceLoc(), elseInitCallExpr, /*Implicit*/ true);
+    
+    thenMemberExprs.push_back(thenAssignMemberExpr);
+    elseMemberExprs.push_back(elseAssignMemberExpr);
+    
+    // Advance the current address.
+    DeclName advancedName(C, C.getIdentifier("advanced"), 
+                          {C.getIdentifier("by")});
+    auto *advancedMethodExpr = 
+        new (C) UnresolvedDotExpr(addressDRE, SourceLoc(),
+                                  advancedName, DeclNameLoc(), 
+                                  /*Implicit*/ true);
+    
+    // Obtain `MemberType._tensorHandleCount`.
+    auto *memberCountMRE = new (C) MemberRefExpr(
+        memberDRE, SourceLoc(), tensorHandleCountReq, DeclNameLoc(),
+        /*Implicit*/ true);
+    
+    // Cast the tensor handle count to Int.
+    auto intInitName = DeclName(C, DeclBaseName::createConstructor(), 
+                                {Identifier()});
+    auto *intInitExpr = 
+        new (C) UnresolvedDotExpr(intTE, SourceLoc(), intInitName, 
+                                  DeclNameLoc(), /*Implicit*/ true);
+    auto *intInitCallExpr = CallExpr::createImplicit(
+        C, intInitExpr, {memberCountMRE}, {Identifier()});
+    
+    // Assign the new address.
+    auto *assignAddrCallExpr = CallExpr::createImplicit(
+        C, advancedMethodExpr, {intInitCallExpr}, {C.getIdentifier("by")});
+    auto *assignAddrExpr = new (C) AssignExpr(addressDRE, SourceLoc(), 
+                                              assignAddrCallExpr, 
+                                              /*Implicit*/ true);
+
+    thenMemberExprs.push_back(assignAddrExpr);
+  }
+
+  auto *thenBody = BraceStmt::create(
+    C, SourceLoc(), C.AllocateCopy(thenMemberExprs), SourceLoc(), 
+    /*implicit*/ true);
+
+  auto *elseBody = BraceStmt::create(
+    C, SourceLoc(), C.AllocateCopy(elseMemberExprs), SourceLoc(), 
+    /*implicit*/ true);
+
+  auto *ifStmt = new (C)
+      IfStmt(LabeledStmtInfo(), /*IfLoc*/ SourceLoc(), 
+             /*Cond*/ C.AllocateCopy(cond), /*Then*/ thenBody, 
+             /*ElseLoc*/ SourceLoc(), /*Else*/ elseBody, /*implicit*/ true);
+  
+  funcDecl->setBody(BraceStmt::create(C, SourceLoc(), {ifStmt}, SourceLoc(),
+                                      /*implicit*/ true));
+}
+
+// Synthesize a constructor declaration for a `TensorArrayProtocol` 
+// method requirement.
+static ValueDecl *deriveTensorArrayProtocol_constructor(
+    DerivedConformance &derived, Identifier argument1Name, 
+    Identifier parameter1Name, Type parameter1Type,
+    Identifier parameter2Name, Type parameter2Type, Type returnType,
+    AbstractFunctionDecl::BodySynthesizer bodySynthesizer) {
+  auto nominal = derived.Nominal;
+  auto &C = derived.TC.Context;
+  auto parentDC = derived.getConformanceContext();
+
+  auto *param1 =
+      new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                        argument1Name, SourceLoc(), parameter1Name, parentDC);
+  param1->setInterfaceType(parameter1Type);
+  auto *param2 =
+      new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                        parameter2Name, SourceLoc(), parameter2Name, parentDC);
+  param2->setInterfaceType(parameter2Type);
+  ParameterList *params = ParameterList::create(C, {param1, param2});
+
+  DeclName name(C, DeclBaseName::createConstructor(), params);
+  auto *initDecl =
+      new (C) ConstructorDecl(name, SourceLoc(), OTK_None, SourceLoc(),
+                              /*Throws*/ false, SourceLoc(), params,
+                              /*GenericParams*/ nullptr, parentDC);
+  initDecl->setImplicit();
+  initDecl->setSynthesized();
+  initDecl->setBodySynthesizer(bodySynthesizer);
+
+  if (auto env = parentDC->getGenericEnvironmentOfContext())
+    initDecl->setGenericEnvironment(env);
+  initDecl->computeType(AnyFunctionType::ExtInfo().withThrows(false));
+  initDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
+  initDecl->setValidationToChecked();
+
+  derived.addMembersToConformanceContext({initDecl});
+  C.addSynthesizedDecl(initDecl);
+
+  return initDecl;
+}
+
+// Synthesize the `init(_owning:count:)` function declaration.
+static ValueDecl
+*deriveTensorArrayProtocol_init(DerivedConformance &derived) {
+  auto &C = derived.TC.Context;
+
+  // Obtain the address type.
+  auto cTensorHandleType = C.getOpaquePointerDecl()->getDeclaredType();
+  Type baseAddressType = BoundGenericType::get(
+      C.getUnsafePointerDecl(), Type(), {cTensorHandleType});
+  Type addressType = BoundGenericType::get(
+      C.getOptionalDecl(), Type(), {baseAddressType});
+  Type intType = C.getIntDecl()->getDeclaredType();
+  Type voidType = C.getVoidDecl()->getDeclaredInterfaceType();
+
+  return deriveTensorArrayProtocol_constructor(
+      derived, C.getIdentifier("_owning"), C.getIdentifier("tensorHandles"),
+      addressType, C.getIdentifier("count"), intType, voidType,
+      deriveBodyTensorArrayProtocol_init);
+}
+
 ValueDecl *DerivedConformance::deriveTensorArrayProtocol(
     ValueDecl *requirement) {
   if (requirement->getBaseName() == TC.Context.Id_unpackTensorHandles)
     return deriveTensorArrayProtocol_unpackTensorHandles(*this);
   if (requirement->getBaseName() == TC.Context.Id_tensorHandleCount)
     return deriveTensorArrayProtocol_tensorHandleCount(*this);
+  if (requirement->getBaseName() == DeclBaseName::createConstructor())
+    return deriveTensorArrayProtocol_init(*this);
   TC.diagnose(requirement->getLoc(), 
               diag::broken_tensor_array_protocol_requirement);
   return nullptr;
