@@ -88,8 +88,6 @@ llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
 }
 
 namespace {
-  typedef std::tuple<ClassDecl *, ObjCSelector, bool> ObjCMethodConflict;
-
   enum class SearchPathKind : uint8_t {
     Import = 1 << 0,
     Framework = 1 << 1
@@ -374,9 +372,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   llvm::FoldingSet<GenericSignature> GenericSignatures;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, OpenedArchetypeType *> OpenedExistentialArchetypes;
-
-  /// List of Objective-C member conflicts we have found during type checking.
-  std::vector<ObjCMethodConflict> ObjCMethodConflicts;
 
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
@@ -2070,40 +2065,6 @@ namespace {
       return lhs->getFullName() < rhs->getFullName();
     }
   };
-
-  /// Produce a deterministic ordering of the given declarations with
-  /// a bias that favors declarations in the given source file and
-  /// members of a class.
-  class OrderDeclarationsWithSourceFileAndClassBias {
-    SourceManager &SrcMgr;
-    SourceFile &SF;
-
-  public:
-    OrderDeclarationsWithSourceFileAndClassBias(SourceManager &srcMgr, 
-                                                SourceFile &sf)
-      : SrcMgr(srcMgr), SF(sf) { }
-
-    bool operator()(ValueDecl *lhs, ValueDecl *rhs) const {
-      // Check whether the declarations are in a class.
-      bool lhsInClass = isa<ClassDecl>(lhs->getDeclContext());
-      bool rhsInClass = isa<ClassDecl>(rhs->getDeclContext());
-      if (lhsInClass != rhsInClass)
-        return lhsInClass;
-
-      // If the two declarations are in different source files, and one of those
-      // source files is the source file we're biasing toward, prefer that
-      // declaration.
-      SourceFile *lhsSF = lhs->getDeclContext()->getParentSourceFile();
-      SourceFile *rhsSF = rhs->getDeclContext()->getParentSourceFile();
-      if (lhsSF != rhsSF) {
-        if (lhsSF == &SF) return true;
-        if (rhsSF == &SF) return false;
-      }
-
-      // Fall back to the normal deterministic ordering.
-      return OrderDeclarations(SrcMgr)(lhs, rhs);
-    }
-  };
 } // end anonymous namespace
 
 /// Compute the information used to describe an Objective-C redeclaration.
@@ -2478,16 +2439,9 @@ bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
   return diagnosedAny;
 }
 
-void ASTContext::recordObjCMethodConflict(ClassDecl *classDecl,
-                                          ObjCSelector selector,
-                                          bool isInstance) {
-  getImpl().ObjCMethodConflicts.push_back(std::make_tuple(classDecl, selector,
-                                                          isInstance));
-}
-
 /// Retrieve the source file for the given Objective-C member conflict.
 static MutableArrayRef<AbstractFunctionDecl *>
-getObjCMethodConflictDecls(const ObjCMethodConflict &conflict) {
+getObjCMethodConflictDecls(const SourceFile::ObjCMethodConflict &conflict) {
   ClassDecl *classDecl = std::get<0>(conflict);
   ObjCSelector selector = std::get<1>(conflict);
   bool isInstanceMethod = std::get<2>(conflict);
@@ -2526,80 +2480,27 @@ static void removeValidObjCConflictingMethods(
   methods = methods.slice(0, newEnd - methods.begin());
 }
 
-/// Determine whether we should associate a conflict among the given
-/// set of methods with the specified source file.
-static bool shouldAssociateConflictWithSourceFile(
-              SourceFile &sf, 
-              ArrayRef<AbstractFunctionDecl *> methods) {
-  bool anyInSourceFile = false;
-  bool anyInOtherSourceFile = false;
-  bool anyClassMethodsInSourceFile = false;
-  for (auto method : methods) {
-    // Skip methods in the class itself; we want to only diagnose
-    // those if there is a conflict within that file.
-    if (isa<ClassDecl>(method->getDeclContext())) {
-      if (method->getParentSourceFile() == &sf)
-        anyClassMethodsInSourceFile = true;
-      continue;
-    }
-
-    if (method->getParentSourceFile() == &sf)
-      anyInSourceFile = true;
-    else
-      anyInOtherSourceFile = true;
-  }
-
-  return anyInSourceFile || 
-    (!anyInOtherSourceFile && anyClassMethodsInSourceFile);
-}
-
 bool ASTContext::diagnoseObjCMethodConflicts(SourceFile &sf) {
   // If there were no conflicts, we're done.
-  if (getImpl().ObjCMethodConflicts.empty())
+  if (sf.ObjCMethodConflicts.empty())
     return false;
 
-  // Partition the set of conflicts to put the conflicts that involve
-  // this source file at the end.
-  auto firstLocalConflict
-    = std::partition(getImpl().ObjCMethodConflicts.begin(),
-                     getImpl().ObjCMethodConflicts.end(),
-                     [&](const ObjCMethodConflict &conflict) -> bool {
-                       auto decls = getObjCMethodConflictDecls(conflict);
-                       if (shouldAssociateConflictWithSourceFile(sf, decls)) {
-                         // It's in this source file. Sort the conflict
-                         // declarations. We'll use this later.
-                         std::sort(
-                           decls.begin(), decls.end(),
-                           OrderDeclarationsWithSourceFileAndClassBias(
-                             SourceMgr, sf));
-
-                         return false;
-                       }
-
-                       return true;
-                     });
-
-  // If there were no local conflicts, we're done.
-  unsigned numLocalConflicts
-    = getImpl().ObjCMethodConflicts.end() - firstLocalConflict;
-  if (numLocalConflicts == 0)
-    return false;
+  OrderDeclarations ordering(SourceMgr);
 
   // Sort the set of conflicts so we get a deterministic order for
   // diagnostics. We use the first conflicting declaration in each set to
   // perform the sort.
-  MutableArrayRef<ObjCMethodConflict> localConflicts(&*firstLocalConflict,
-                                                     numLocalConflicts);
+  auto localConflicts = sf.ObjCMethodConflicts;
   std::sort(localConflicts.begin(), localConflicts.end(),
-            [&](const ObjCMethodConflict &lhs, const ObjCMethodConflict &rhs) {
-              OrderDeclarations ordering(SourceMgr);
+            [&](const SourceFile::ObjCMethodConflict &lhs,
+                const SourceFile::ObjCMethodConflict &rhs) {
               return ordering(getObjCMethodConflictDecls(lhs)[1],
                               getObjCMethodConflictDecls(rhs)[1]);
             });
 
   // Diagnose each conflict.
   bool anyConflicts = false;
-  for (const ObjCMethodConflict &conflict : localConflicts) {
+  for (const auto &conflict : localConflicts) {
     ObjCSelector selector = std::get<1>(conflict);
 
     auto methods = getObjCMethodConflictDecls(conflict);
@@ -2612,12 +2513,21 @@ bool ASTContext::diagnoseObjCMethodConflicts(SourceFile &sf) {
     // Diagnose the conflict.
     anyConflicts = true;
 
-    // If the first method has a valid source location but the first conflicting
-    // declaration does not, swap them so the primary diagnostic has a useful
-    // source location.
-    if (methods[1]->getLoc().isInvalid() && methods[0]->getLoc().isValid()) {
+    // If the first method is in an extension and the second is not, swap them
+    // so the primary diagnostic is on the extension method.
+    if (isa<ExtensionDecl>(methods[0]->getDeclContext()) &&
+        !isa<ExtensionDecl>(methods[1]->getDeclContext())) {
+      std::swap(methods[0], methods[1]);
+
+    // Within a source file, use our canonical ordering.
+    } else if (methods[0]->getParentSourceFile() ==
+               methods[1]->getParentSourceFile() &&
+              !ordering(methods[0], methods[1])) {
       std::swap(methods[0], methods[1]);
     }
+
+    // Otherwise, fall back to the order in which the declarations were type
+    // checked.
 
     auto originalMethod = methods.front();
     auto conflictingMethods = methods.slice(1);
@@ -2649,10 +2559,6 @@ bool ASTContext::diagnoseObjCMethodConflicts(SourceFile &sf) {
     }
   }
 
-  // Erase the local conflicts from the list of conflicts.
-  getImpl().ObjCMethodConflicts.erase(firstLocalConflict,
-                                 getImpl().ObjCMethodConflicts.end());
-
   return anyConflicts;
 }
 
@@ -2667,15 +2573,15 @@ static SourceLoc getDeclContextLoc(DeclContext *dc) {
 
 bool ASTContext::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
   // If there are no unsatisfied, optional @objc requirements, we're done.
-  if (sf->ObjCUnsatisfiedOptReqs.empty())
+  if (sf.ObjCUnsatisfiedOptReqs.empty())
     return false;
 
   // Sort the set of local unsatisfied requirements, so we get a
   // deterministic order for diagnostics.
-  auto &localReqs = sf->ObjCUnsatisfiedOptReqs;
+  auto &localReqs = sf.ObjCUnsatisfiedOptReqs;
   std::sort(localReqs.begin(), localReqs.end(),
-            [&](const ObjCUnsatisfiedOptReq &lhs,
-                const ObjCUnsatisfiedOptReq &rhs) -> bool {
+            [&](const SourceFile::ObjCUnsatisfiedOptReq &lhs,
+                const SourceFile::ObjCUnsatisfiedOptReq &rhs) -> bool {
               return SourceMgr.isBeforeInBuffer(getDeclContextLoc(lhs.first),
                                                 getDeclContextLoc(rhs.first));
             });

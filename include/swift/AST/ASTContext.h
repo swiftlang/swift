@@ -846,11 +846,6 @@ public:
   /// as overrides in Swift.
   bool diagnoseUnintendedObjCMethodOverrides(SourceFile &sf);
 
-  /// Note that there is a conflict between different definitions that
-  /// produce the same Objective-C method.
-  void recordObjCMethodConflict(ClassDecl *classDecl, ObjCSelector selector,
-                                bool isInstance);
-
   /// Diagnose all conflicts between members that have the same
   /// Objective-C selector in the same class.
   ///
