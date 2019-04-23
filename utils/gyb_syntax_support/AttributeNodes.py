@@ -56,7 +56,8 @@ ATTRIBUTE_NODES = [
                    '''),
              # TokenList to gather remaining tokens of invalid attributes
              # FIXME: Remove this recovery option entirely
-             Child('TokenList', kind='TokenList', is_optional=True),
+             Child('TokenList', kind='TokenList',
+                   collection_element_name='Token', is_optional=True),
          ]),
 
     # attribute-list -> attribute attribute-list?
@@ -72,7 +73,7 @@ ATTRIBUTE_NODES = [
          description='''
          A collection of arguments for the `@_specialize` attribute
          ''',
-         element='Syntax',
+         element='Syntax', element_name='SpecializeAttribute',
          element_choices=[
              'LabeledSpecializeEntry',
              'GenericWhereClause',

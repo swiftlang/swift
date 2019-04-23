@@ -202,9 +202,9 @@ TEST(TypeSyntaxTests, TupleBuilderAPIs) {
     auto StringId = SyntaxFactory::makeIdentifier("String", {}, {});
     auto StringType = SyntaxFactory::makeSimpleTypeIdentifier(StringId, None);
     auto String = SyntaxFactory::makeTupleTypeElement(StringType, Comma);
-    Builder.addElementsMember(IntWithComma);
-    Builder.addElementsMember(String);
-    Builder.addElementsMember(Int);
+    Builder.addElement(IntWithComma);
+    Builder.addElement(String);
+    Builder.addElement(Int);
     Builder.useRightParen(SyntaxFactory::makeRightParenToken({}, {}));
 
     auto TupleType = Builder.build();
@@ -229,8 +229,8 @@ TEST(TypeSyntaxTests, TupleBuilderAPIs) {
     auto yTypeElt = SyntaxFactory::makeTupleTypeElement(yLabel, Colon,
                                                         Int)
       .withInOut(inout);
-    Builder.addElementsMember(xTypeElt);
-    Builder.addElementsMember(yTypeElt);
+    Builder.addElement(xTypeElt);
+    Builder.addElement(yTypeElt);
     Builder.useRightParen(SyntaxFactory::makeRightParenToken({}, {}));
 
     auto TupleType = Builder.build();
@@ -562,8 +562,8 @@ TEST(TypeSyntaxTests, FunctionTypeWithAPIs) {
 
     SyntaxFactory::makeBlankFunctionType()
       .withLeftParen(LeftParen)
-      .addArgumentsMember(xArg)
-      .addArgumentsMember(yArg)
+      .addArgument(xArg)
+      .addArgument(yArg)
       .withRightParen(RightParen)
       .withThrowsOrRethrowsKeyword(Throws)
       .withArrow(Arrow)
@@ -580,8 +580,8 @@ TEST(TypeSyntaxTests, FunctionTypeWithAPIs) {
     SyntaxFactory::makeBlankFunctionType()
       .withLeftParen(LeftParen)
       .withRightParen(RightParen)
-      .addArgumentsMember(IntArg.withTrailingComma(Comma))
-      .addArgumentsMember(IntArg)
+      .addArgument(IntArg.withTrailingComma(Comma))
+      .addArgument(IntArg)
       .withThrowsOrRethrowsKeyword(Rethrows)
       .withArrow(Arrow)
       .withReturnType(Int)
@@ -628,8 +628,8 @@ TEST(TypeSyntaxTests, FunctionTypeBuilderAPIs) {
 
     Builder.useLeftParen(LeftParen)
       .useRightParen(RightParen)
-      .addArgumentsMember(xArg)
-      .addArgumentsMember(yArg)
+      .addArgument(xArg)
+      .addArgument(yArg)
       .useThrowsOrRethrowsKeyword(Throws)
       .useArrow(Arrow)
       .useReturnType(Int);
@@ -646,8 +646,8 @@ TEST(TypeSyntaxTests, FunctionTypeBuilderAPIs) {
                                                       Int, None, None, None);
     Builder.useLeftParen(LeftParen)
       .useRightParen(RightParen)
-      .addArgumentsMember(IntArg.withTrailingComma(Comma))
-      .addArgumentsMember(IntArg)
+      .addArgument(IntArg.withTrailingComma(Comma))
+      .addArgument(IntArg)
       .useThrowsOrRethrowsKeyword(Rethrows)
       .useArrow(Arrow)
       .useReturnType(Int);
