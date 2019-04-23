@@ -330,7 +330,9 @@ static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
                             diagInfo.first, diagInfo.second,
                             witnessFunc->getObjCSelector(),
                             reqFunc->getObjCSelector());
-    fixDeclarationObjCName(diag, witnessFunc, reqFunc->getObjCSelector());
+    fixDeclarationObjCName(diag, witnessFunc,
+                           witnessFunc->getObjCSelector(),
+                           reqFunc->getObjCSelector());
 
     return true;
   }
@@ -2112,7 +2114,9 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
 
     // Also fix the Objective-C name, if needed.
     if (!match.Witness->canInferObjCFromRequirement(req))
-      fixDeclarationObjCName(diag, match.Witness, req->getObjCRuntimeName());
+      fixDeclarationObjCName(diag, match.Witness,
+                             match.Witness->getObjCRuntimeName(),
+                             req->getObjCRuntimeName());
     break;
   }
 
@@ -3830,7 +3834,8 @@ void ConformanceChecker::resolveValueWitnesses() {
             if (!witness->canInferObjCFromRequirement(requirement)) {
               fixDeclarationObjCName(
                   fixItDiag.getValue(), witness,
-                  cast<AbstractFunctionDecl>(requirement)->getObjCSelector());
+                  witness->getObjCRuntimeName(),
+                  requirement->getObjCRuntimeName());
             }
           } else if (isa<VarDecl>(witness)) {
             Optional<InFlightDiagnostic> fixItDiag =
@@ -3850,10 +3855,9 @@ void ConformanceChecker::resolveValueWitnesses() {
             }
             if (!witness->canInferObjCFromRequirement(requirement)) {
               fixDeclarationObjCName(
-                 fixItDiag.getValue(), witness,
-                 ObjCSelector(requirement->getASTContext(), 0,
-                              cast<VarDecl>(requirement)
-                                ->getObjCPropertyName()));
+                  fixItDiag.getValue(), witness,
+                  witness->getObjCRuntimeName(),
+                  requirement->getObjCRuntimeName());
             }
           } else if (isa<SubscriptDecl>(witness)) {
             Optional<InFlightDiagnostic> fixItDiag =
@@ -4799,7 +4803,9 @@ static void diagnosePotentialWitness(TypeChecker &tc,
     auto diag = tc.diagnose(witness,
                             diag::optional_req_nonobjc_near_match_add_objc);
     if (!witness->canInferObjCFromRequirement(req))
-      fixDeclarationObjCName(diag, witness, req->getObjCRuntimeName());
+      fixDeclarationObjCName(diag, witness,
+                             witness->getObjCRuntimeName(),
+                             req->getObjCRuntimeName());
   } else {
     diagnoseMatch(conformance->getDeclContext()->getParentModule(),
                   conformance, req, match);

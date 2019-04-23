@@ -2228,6 +2228,7 @@ bool fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
 /// For properties, the selector should be a zero-parameter selector of the
 /// given property's name.
 bool fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
+                            Optional<ObjCSelector> nameOpt,
                             Optional<ObjCSelector> targetNameOpt,
                             bool ignoreImpliedName = false);
 
