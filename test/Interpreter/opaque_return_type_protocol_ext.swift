@@ -6,9 +6,16 @@ protocol P {
   func foo() -> AT
 }
 
+struct Adapter<T: P>: P {
+  var inner: T
+  func foo() -> some P {
+    return inner
+  }
+}
+
 extension P {
   func foo() -> some P {
-    return self
+    return Adapter(inner: self)
   }
 }
 
@@ -18,5 +25,5 @@ func getPAT<T: P>(_: T.Type) -> Any.Type {
 
 extension Int: P { }
 
-// CHECK: Int
+// CHECK: Adapter<Int>
 print(getPAT(Int.self))
