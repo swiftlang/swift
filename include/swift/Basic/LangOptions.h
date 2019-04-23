@@ -19,7 +19,6 @@
 #define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/Config.h"
-#include "swift/Basic/CycleDiagnosticKind.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -185,9 +184,8 @@ namespace swift {
     /// This is for testing purposes.
     std::string DebugForbidTypecheckPrefix;
 
-    /// How to diagnose cycles encountered
-    CycleDiagnosticKind EvaluatorCycleDiagnostics =
-        CycleDiagnosticKind::NoDiagnose;
+    /// Whether to dump debug info for request evaluator cycles.
+    bool DebugDumpCycles = false;
 
     /// The path to which we should emit GraphViz output for the complete
     /// request-evaluator graph.
