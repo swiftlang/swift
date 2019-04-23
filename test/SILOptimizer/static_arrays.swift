@@ -50,6 +50,22 @@
 // CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems] {{[^,]*}}, {{[^,]*}})
 // CHECK-NEXT:  }
 
+// CHECK-LABEL: outlined variable #0 of returnDictionary()
+// CHECK-NEXT:  sil_global private @{{.*}}returnDictionary{{.*}} = {
+// CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 5
+// CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 4
+// CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 2
+// CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 1
+// CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 6
+// CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 3
+// CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems]
+// CHECK-NEXT:  }
+
+// CHECK-LABEL: outlined variable #0 of returnStringDictionary()
+// CHECK-NEXT:  sil_global private @{{.*}}returnStringDictionary{{.*}} = {
+// CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems]
+// CHECK-NEXT:  }
+
 // CHECK-LABEL: sil_global private @{{.*}}main{{.*}} = {
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 100
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 101
@@ -121,6 +137,22 @@ func arrayWithEmptyElements() -> [Empty] {
   return [Empty()]
 }
 
+// CHECK-LABEL: sil {{.*}}returnDictionary{{.*}} : $@convention(thin) () -> @owned Dictionary<Int, Int> {
+// CHECK:   global_value @{{.*}}returnDictionary{{.*}}
+// CHECK:   return
+@inline(never)
+public func returnDictionary() -> [Int:Int] {
+  return [1:2, 3:4, 5:6]
+}
+
+// CHECK-LABEL: sil {{.*}}returnStringDictionary{{.*}} : $@convention(thin) () -> @owned Dictionary<String, String> {
+// CHECK:   global_value @{{.*}}returnStringDictionary{{.*}}
+// CHECK:   return
+@inline(never)
+public func returnStringDictionary() -> [String:String] {
+  return ["1":"2", "3":"4", "5":"6"]
+}
+
 // CHECK-OUTPUT:      [100, 101, 102]
 print(globalVariable)
 // CHECK-OUTPUT-NEXT: 11
@@ -136,9 +168,13 @@ storeArray()
 // CHECK-OUTPUT-NEXT: [227, 228]
 print(gg!)
 
+let dict = returnDictionary()
+// CHECK-OUTPUT-NEXT: dict 3: 2, 4, 6
+print("dict \(dict.count): \(dict[1]!), \(dict[3]!), \(dict[5]!)")
 
-
-
+let sdict = returnStringDictionary()
+// CHECK-OUTPUT-NEXT: sdict 3: 2, 4, 6
+print("sdict \(sdict.count): \(sdict["1"]!), \(sdict["3"]!), \(sdict["5"]!)")
 
 
 public class SwiftClass {}
