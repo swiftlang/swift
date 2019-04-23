@@ -18,3 +18,13 @@ public enum vDSP {}
 
 /// An enum that acts as a namespace for Swift overlays to vForce based functions.
 public enum vForce {}
+
+extension vDSP {
+    public struct VectorizableFloat {
+        public typealias Scalar = Float
+    }
+    
+    public struct VectorizableDouble {
+        public typealias Scalar = Double
+    }
+}

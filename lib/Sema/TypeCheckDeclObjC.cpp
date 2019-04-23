@@ -1500,7 +1500,8 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
                             attr->AtLoc,
                             diag::objc_override_method_selector_mismatch,
                             *attr->getName(), overriddenSelector);
-              fixDeclarationObjCName(diag, decl, overriddenSelector);
+              fixDeclarationObjCName(diag, decl, attr->getName(),
+                                     overriddenSelector);
             }
 
             overriddenFunc->diagnose(diag::overridden_here);
@@ -1581,7 +1582,9 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
                                    req->getFullName(),
                                    proto->getFullName(),
                                    *req->getObjCRuntimeName());
-        fixDeclarationObjCName(diag, decl, req->getObjCRuntimeName());
+        fixDeclarationObjCName(diag, decl,
+                               decl->getObjCRuntimeName(/*skipIsObjC=*/true),
+                               req->getObjCRuntimeName());
       };
       diagnoseCandidate(firstReq);
       diagnoseCandidate(req);
@@ -1874,6 +1877,7 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
 }
 
 bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
+                                   Optional<ObjCSelector> nameOpt,
                                    Optional<ObjCSelector> targetNameOpt,
                                    bool ignoreImpliedName) {
   if (decl->isImplicit())
@@ -1886,8 +1890,7 @@ bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
     return false;
   }
 
-  // Determine the Objective-C name of the declaration.
-  ObjCSelector name = *decl->getObjCRuntimeName();
+  auto name = *nameOpt;
   auto targetName = *targetNameOpt;
 
   // Dig out the existing '@objc' attribute on the witness. We don't care
@@ -2336,7 +2339,9 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
 
       // Fix the '@objc' attribute, if needed.
       if (!conflicts[0]->canInferObjCFromRequirement(req))
-        fixDeclarationObjCName(diag, conflicts[0], req->getObjCRuntimeName(),
+        fixDeclarationObjCName(diag, conflicts[0],
+                               conflicts[0]->getObjCRuntimeName(),
+                               req->getObjCRuntimeName(),
                                /*ignoreImpliedName=*/true);
     }
 

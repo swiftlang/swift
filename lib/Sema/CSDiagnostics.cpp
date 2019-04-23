@@ -1516,6 +1516,13 @@ bool MissingCallFailure::diagnoseAsError() {
   if (auto *FVE = dyn_cast<ForceValueExpr>(baseExpr))
     baseExpr = FVE->getSubExpr();
 
+  // Calls are not yet supported by key path, but it
+  // is useful to record this fix to diagnose chaining
+  // where one of the key path components is a method
+  // reference.
+  if (isa<KeyPathExpr>(baseExpr))
+    return false;
+
   if (auto *DRE = dyn_cast<DeclRefExpr>(baseExpr)) {
     emitDiagnostic(baseExpr->getLoc(), diag::did_not_call_function,
                    DRE->getDecl()->getBaseName().getIdentifier())
@@ -2477,5 +2484,11 @@ bool InvalidStaticMemberRefInKeyPath::diagnoseAsError() {
 
 bool InvalidMemberWithMutatingGetterInKeyPath::diagnoseAsError() {
   emitDiagnostic(getLoc(), diag::expr_keypath_mutating_getter, getName());
+  return true;
+}
+
+bool InvalidMethodRefInKeyPath::diagnoseAsError() {
+  emitDiagnostic(getLoc(), diag::expr_keypath_not_property, getKind(),
+                 getName());
   return true;
 }

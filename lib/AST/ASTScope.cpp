@@ -877,8 +877,14 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
 
     // If we already have a scope of the (possible) generic parameters,
     // add the body.
-    if (parent->getKind() == ASTScopeKind::ExtensionGenericParams)
+    if (parent->getKind() == ASTScopeKind::ExtensionGenericParams) {
+      // If there is no body because we have an invalid extension written
+      // without braces in the source, just return.
+      if (ext->getBraces().Start == ext->getBraces().End)
+        return nullptr;
+
       return new (ctx) ASTScope(parent, cast<IterableDeclContext>(ext));
+    }
 
     // Otherwise, form the extension's generic parameters scope.
     return new (ctx) ASTScope(parent, ext);

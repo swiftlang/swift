@@ -19,3 +19,9 @@ public struct Subscript {
     return FooImpl()
   }
 }
+
+extension Foo {
+  public func identity<T>(_: T) -> some Foo {
+    return self
+  }
+}
