@@ -14,7 +14,7 @@
 
 #define SWIFT_CLASS_IS_SWIFT_MASK swift_reflection_classIsSwiftMask
 extern "C" {
-SWIFT_REMOTE_MIRROR_LINKAGE
+SWIFT_REMOTE_MIRROR_LINKAGE __attribute__((__weak_import__))
 unsigned long long swift_reflection_classIsSwiftMask = 2;
 }
 
