@@ -117,6 +117,7 @@ public:
   UID_FOR(Constructor)
   UID_FOR(Destructor)
   UID_FOR(Subscript)
+  UID_FOR(OpaqueType)
 #undef UID_FOR
 };
 

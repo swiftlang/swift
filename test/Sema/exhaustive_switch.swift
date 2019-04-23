@@ -1135,3 +1135,43 @@ extension Result where T == NoError {
     }
   }
 }
+
+enum SR10301<T,E> {
+  case value(T)
+  case error(E)
+}
+enum SR10301Error: Error {
+  case bad
+}
+
+func sr10301(_ foo: SR10301<String,(Int,Error)>) {
+  switch foo {
+  case .value: return
+  case .error((_, SR10301Error.bad)): return
+  case .error((_, let err)):
+    _ = err
+    return
+  }
+}
+
+func sr10301_is(_ foo: SR10301<String,(Int,Error)>) {
+  switch foo {
+  case .value: return
+  case .error((_, is SR10301Error)): return
+  case .error((_, let err)):
+    _ = err
+    return
+  }
+}
+
+func sr10301_as(_ foo: SR10301<String,(Int,Error)>) {
+  switch foo {
+  case .value: return
+  case .error((_, let err as SR10301Error)):
+    _ = err
+    return
+  case .error((_, let err)):
+    _ = err
+    return
+  }
+}

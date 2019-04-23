@@ -36,6 +36,7 @@
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/InlineBitfield.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
@@ -138,6 +139,8 @@ enum class DescriptiveDeclKind : uint8_t {
   GenericClass,
   GenericType,
   Subscript,
+  StaticSubscript,
+  ClassSubscript,
   Constructor,
   Destructor,
   LocalFunction,
@@ -158,6 +161,7 @@ enum class DescriptiveDeclKind : uint8_t {
   Module,
   MissingMember,
   Requirement,
+  OpaqueType,
 };
 
 /// Keeps track of stage of circularity checking for the given protocol.
@@ -334,7 +338,7 @@ protected:
     IsUserAccessible : 1
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1+2+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1+2+1+1+1,
     /// Whether the getter is mutating.
     IsGetterMutating : 1,
 
@@ -353,14 +357,14 @@ protected:
     /// Whether a keypath component can directly reference this storage,
     /// or if it must use the overridden declaration instead.
     HasComputedValidKeyPathComponent : 1,
-    ValidKeyPathComponent : 1
-  );
-
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+4+1+1+1+1,
+    ValidKeyPathComponent : 1,
+    
     /// Whether this property is a type property (currently unfortunately
     /// called 'static').
-    IsStatic : 1,
+    IsStatic : 1
+  );
 
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 4+1+1+1+1,
     /// The specifier associated with this variable or parameter.  This
     /// determines the storage semantics of the value e.g. mutability.
     Specifier : 4,
@@ -394,11 +398,10 @@ protected:
     defaultArgumentKind : NumDefaultArgumentKindBits
   );
 
-  SWIFT_INLINE_BITFIELD(EnumElementDecl, ValueDecl, 1,
-    /// The ResilienceExpansion to use for default arguments.
-    DefaultArgumentResilienceExpansion : 1
+  SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
+    StaticSpelling : 2
   );
-  
+
   SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
@@ -420,9 +423,6 @@ protected:
 
     /// Whether NeedsNewVTableEntry is valid.
     HasComputedNeedsNewVTableEntry : 1,
-
-    /// The ResilienceExpansion to use for default arguments.
-    DefaultArgumentResilienceExpansion : 1,
 
     /// Whether this member was synthesized as part of a derived
     /// protocol conformance.
@@ -2307,6 +2307,8 @@ public:
     return D->getKind() == DeclKind::PoundDiagnostic;
   }
 };
+  
+class OpaqueTypeDecl;
 
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have a type, etc.
@@ -2337,10 +2339,18 @@ class ValueDecl : public Decl {
     /// the declaration will go through an extra level of indirection that
     /// allows the entity to be replaced at runtime.
     unsigned isDynamic : 1;
-  } LazySemanticInfo;
+
+    /// Whether the "isFinal" bit has been computed yet.
+    unsigned isFinalComputed : 1;
+
+    /// Whether this declaration is 'final'. A final class can't be subclassed,
+    /// a final class member can't be overriden.
+    unsigned isFinal : 1;
+  } LazySemanticInfo = { };
 
   friend class OverriddenDeclsRequest;
   friend class IsObjCRequest;
+  friend class IsFinalRequest;
   friend class IsDynamicRequest;
 
 protected:
@@ -2351,12 +2361,6 @@ protected:
     Bits.ValueDecl.AlreadyInLookupTable = false;
     Bits.ValueDecl.CheckedRedeclaration = false;
     Bits.ValueDecl.IsUserAccessible = true;
-    LazySemanticInfo.isObjCComputed = false;
-    LazySemanticInfo.isObjC = false;
-    LazySemanticInfo.hasOverriddenComputed = false;
-    LazySemanticInfo.hasOverridden = false;
-    LazySemanticInfo.isDynamicComputed = false;
-    LazySemanticInfo.isDynamic = false;
   }
 
   // MemberLookupTable borrows a bit from this type
@@ -2597,10 +2601,8 @@ public:
   /// Note whether this declaration is known to be exposed to Objective-C.
   void setIsObjC(bool Value);
 
-  /// Is this declaration marked with 'final'?
-  bool isFinal() const {
-    return getAttrs().hasAttribute<FinalAttr>();
-  }
+  /// Is this declaration 'final'?
+  bool isFinal() const;
 
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
@@ -2667,6 +2669,15 @@ public:
   /// True if this is a C function that was imported as a member of a type in
   /// Swift.
   bool isImportAsMember() const;
+  
+  /// Get the decl for this value's opaque result type, if it has one.
+  OpaqueTypeDecl *getOpaqueResultTypeDecl() const;
+  
+  /// Set the opaque return type decl for this decl.
+  ///
+  /// `this` must be of a decl type that supports opaque return types, and
+  /// must not have previously had an opaque result type set.
+  void setOpaqueResultTypeDecl(OpaqueTypeDecl *D);
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -2717,7 +2728,7 @@ public:
   }
 };
 
-/// A type declaration that can have generic parameters attached to it.  Because
+/// A type declaration that can have generic parameters attached to it. Because
 /// it has these generic parameters, it is always a DeclContext.
 class GenericTypeDecl : public GenericContext, public TypeDecl {
 public:
@@ -2742,7 +2753,87 @@ public:
   }
 };
 
-
+/// OpaqueTypeDecl - This is a declaration of an opaque type. The opaque type
+/// is formally equivalent to its underlying type, but abstracts it away from
+/// clients of the opaque type, only exposing the type as something conforming
+/// to a given set of constraints.
+///
+/// Currently, opaque types do not normally have an explicit spelling in source
+/// code. One is formed implicitly when a declaration is written with an opaque
+/// result type, as in:
+///
+/// func foo() -> opaque SignedInteger { return 1 }
+///
+/// The declared type is a special kind of ArchetypeType representing the
+/// abstracted underlying type.
+class OpaqueTypeDecl : public GenericTypeDecl {
+  /// The original declaration that "names" the opaque type. Although a specific
+  /// opaque type cannot be explicitly named, oapque types can propagate
+  /// arbitrarily through expressions, so we need to know *which* opaque type is
+  /// propagated.
+  ValueDecl *NamingDecl;
+  
+  /// The generic signature of the opaque interface to the type. This is the
+  /// outer generic signature with an added generic parameter representing the
+  /// underlying type.
+  GenericSignature *OpaqueInterfaceGenericSignature;
+  
+  /// The generic parameter that represents the underlying type.
+  GenericTypeParamType *UnderlyingInterfaceType;
+  
+  /// If known, the underlying type and conformances of the opaque type,
+  /// expressed as a SubstitutionMap for the opaque interface generic signature.
+  /// This maps types in the interface generic signature to the outer generic
+  /// signature of the original declaration.
+  Optional<SubstitutionMap> UnderlyingTypeSubstitutions;
+  
+  mutable Identifier OpaqueReturnTypeIdentifier;
+  
+public:
+  OpaqueTypeDecl(ValueDecl *NamingDecl,
+                 GenericParamList *GenericParams,
+                 DeclContext *DC,
+                 GenericSignature *OpaqueInterfaceGenericSignature,
+                 GenericTypeParamType *UnderlyingInterfaceType);
+  
+  ValueDecl *getNamingDecl() const { return NamingDecl; }
+  
+  GenericSignature *getOpaqueInterfaceGenericSignature() const {
+    return OpaqueInterfaceGenericSignature;
+  }
+  
+  GenericTypeParamType *getUnderlyingInterfaceType() const {
+    return UnderlyingInterfaceType;
+  }
+  
+  Optional<SubstitutionMap> getUnderlyingTypeSubstitutions() const {
+    return UnderlyingTypeSubstitutions;
+  }
+  
+  void setUnderlyingTypeSubstitutions(SubstitutionMap subs) {
+    assert(!UnderlyingTypeSubstitutions.hasValue() && "resetting underlying type?!");
+    UnderlyingTypeSubstitutions = subs;
+  }
+  
+  // Opaque type decls are currently always implicit
+  SourceRange getSourceRange() const { return SourceRange(); }
+  
+  // Get the identifier string that can be used to cross-reference unnamed
+  // opaque return types across files.
+  Identifier getOpaqueReturnTypeIdentifier() const;
+  
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::OpaqueType;
+  }
+  static bool classof(const GenericTypeDecl *D) {
+    return D->getKind() == DeclKind::OpaqueType;
+  }
+  static bool classof(const DeclContext *C) {
+    if (auto D = C->getAsDecl())
+      return classof(D);
+    return false;
+  }
+};
 
 /// TypeAliasDecl - This is a declaration of a typealias, for example:
 ///
@@ -4283,8 +4374,9 @@ private:
   }
 
 protected:
-  AbstractStorageDecl(DeclKind Kind, DeclContext *DC, DeclName Name,
-                      SourceLoc NameLoc, StorageIsMutable_t supportsMutation)
+  AbstractStorageDecl(DeclKind Kind, bool IsStatic, DeclContext *DC,
+                      DeclName Name, SourceLoc NameLoc,
+                      StorageIsMutable_t supportsMutation)
     : ValueDecl(Kind, DC, Name, NameLoc) {
     Bits.AbstractStorageDecl.HasStorage = true;
     Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
@@ -4292,6 +4384,7 @@ protected:
     Bits.AbstractStorageDecl.IsSetterMutating = true;
     Bits.AbstractStorageDecl.OpaqueReadOwnership =
       unsigned(OpaqueReadOwnership::Owned);
+    Bits.AbstractStorageDecl.IsStatic = IsStatic;
   }
 
   void setSupportsMutationIfStillStored(StorageIsMutable_t supportsMutation) {
@@ -4305,6 +4398,8 @@ protected:
   }
 
   void computeIsValidKeyPathComponent();
+  
+  OpaqueTypeDecl *OpaqueReturn = nullptr;
 
 public:
 
@@ -4312,9 +4407,16 @@ public:
   /// attribute.
   bool isTransparent() const;
 
-  /// Determine whether this storage is a static member, if it
-  /// is a member.  Currently only variables can be static.
-  inline bool isStatic() const; // defined in this header
+  /// Is this a type ('static') variable?
+  bool isStatic() const {
+    return Bits.AbstractStorageDecl.IsStatic;
+  }
+  void setStatic(bool IsStatic) {
+    Bits.AbstractStorageDecl.IsStatic = IsStatic;
+  }
+
+  /// \returns the way 'static'/'class' should be spelled for this declaration.
+  StaticSpellingKind getCorrectStaticSpelling() const;
 
   /// Return the interface type of the stored value.
   Type getValueInterfaceType() const;
@@ -4583,6 +4685,14 @@ public:
 
   bool hasDidSetOrWillSetDynamicReplacement() const;
 
+  OpaqueTypeDecl *getOpaqueResultTypeDecl() const {
+    return OpaqueReturn;
+  }
+  void setOpaqueResultTypeDecl(OpaqueTypeDecl *decl) {
+    assert(!OpaqueReturn && "already has opaque type decl");
+    OpaqueReturn = decl;
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractStorageDecl &&
@@ -4612,10 +4722,9 @@ protected:
 
   VarDecl(DeclKind Kind, bool IsStatic, Specifier Sp, bool IsCaptureList,
           SourceLoc NameLoc, Identifier Name, DeclContext *DC)
-    : AbstractStorageDecl(Kind, DC, Name, NameLoc,
+    : AbstractStorageDecl(Kind, IsStatic, DC, Name, NameLoc,
                           StorageIsMutable_t(!isImmutableSpecifier(Sp)))
   {
-    Bits.VarDecl.IsStatic = IsStatic;
     Bits.VarDecl.Specifier = static_cast<unsigned>(Sp);
     Bits.VarDecl.IsCaptureList = IsCaptureList;
     Bits.VarDecl.IsDebuggerVar = false;
@@ -4743,7 +4852,31 @@ public:
   /// return this. Otherwise, this VarDecl must belong to a CaseStmt's
   /// CaseLabelItem. In that case, return the first case label item of the first
   /// case stmt in a sequence of case stmts that fallthrough into each other.
+  ///
+  /// NOTE: During type checking, we emit an error if we have a single case
+  /// label item with a pattern that has multiple var decls of the same
+  /// name. This means that during type checking and before type checking, we
+  /// may have a _malformed_ switch stmt var decl linked list since var decls in
+  /// the same case label item that have the same name will point at the same
+  /// canonical var decl, namely the first var decl with the name in the
+  /// canonical case label item's var decl list. This is ok, since we are going
+  /// to emit the error, but it requires us to be more careful/cautious before
+  /// type checking has been complete when relying on canonical var decls
+  /// matching up.
   VarDecl *getCanonicalVarDecl() const;
+
+  /// If this is a case stmt var decl, return the var decl that corresponds to
+  /// this var decl in the first case label item of the case stmt. Returns
+  /// nullptr if this isn't a VarDecl that is part of a case stmt.
+  NullablePtr<VarDecl> getCorrespondingFirstCaseLabelItemVarDecl() const;
+
+  /// If this is a case stmt var decl, return the case body var decl that this
+  /// var decl maps to.
+  NullablePtr<VarDecl> getCorrespondingCaseBodyVariable() const;
+
+  /// Return true if this var decl is an implicit var decl belonging to a case
+  /// stmt's body.
+  bool isCaseBodyVariable() const;
 
   /// True if the global stored property requires lazy initialization.
   bool isLazilyInitializedGlobal() const;
@@ -4794,14 +4927,6 @@ public:
     return getSpecifier() == Specifier::InOut;
   }
   
-  
-  /// Is this a type ('static') variable?
-  bool isStatic() const { return Bits.VarDecl.IsStatic; }
-  void setStatic(bool IsStatic) { Bits.VarDecl.IsStatic = IsStatic; }
-
-  /// \returns the way 'static'/'class' should be spelled for this declaration.
-  StaticSpellingKind getCorrectStaticSpelling() const;
-
   bool isImmutable() const {
     return isImmutableSpecifier(getSpecifier());
   }
@@ -5110,24 +5235,40 @@ enum class ObjCSubscriptKind {
 /// signatures (indices and element type) are distinct.
 ///
 class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
+  SourceLoc StaticLoc;
   SourceLoc ArrowLoc;
   ParameterList *Indices;
   TypeLoc ElementTy;
 
 public:
-  SubscriptDecl(DeclName Name, SourceLoc SubscriptLoc, ParameterList *Indices,
+  SubscriptDecl(DeclName Name,
+                SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
+                SourceLoc SubscriptLoc, ParameterList *Indices,
                 SourceLoc ArrowLoc, TypeLoc ElementTy, DeclContext *Parent,
                 GenericParamList *GenericParams)
     : GenericContext(DeclContextKind::SubscriptDecl, Parent),
-      AbstractStorageDecl(DeclKind::Subscript, Parent, Name, SubscriptLoc,
+      AbstractStorageDecl(DeclKind::Subscript,
+                          StaticSpelling != StaticSpellingKind::None,
+                          Parent, Name, SubscriptLoc,
                           /*will be overwritten*/ StorageIsNotMutable),
-      ArrowLoc(ArrowLoc), Indices(nullptr), ElementTy(ElementTy) {
+      StaticLoc(StaticLoc), ArrowLoc(ArrowLoc),
+      Indices(nullptr), ElementTy(ElementTy) {
+    Bits.SubscriptDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     setIndices(Indices);
     setGenericParams(GenericParams);
   }
   
+  /// \returns the way 'static'/'class' was spelled in the source.
+  StaticSpellingKind getStaticSpelling() const {
+    return static_cast<StaticSpellingKind>(Bits.SubscriptDecl.StaticSpelling);
+  }
+  
+  SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getSubscriptLoc() const { return getNameLoc(); }
-  SourceLoc getStartLoc() const { return getSubscriptLoc(); }
+  
+  SourceLoc getStartLoc() const {
+    return getStaticLoc().isValid() ? getStaticLoc() : getSubscriptLoc();
+  }
   SourceRange getSourceRange() const;
   SourceRange getSignatureSourceRange() const;
 
@@ -5287,8 +5428,6 @@ protected:
     Bits.AbstractFunctionDecl.Throws = Throws;
     Bits.AbstractFunctionDecl.NeedsNewVTableEntry = false;
     Bits.AbstractFunctionDecl.HasComputedNeedsNewVTableEntry = false;
-    Bits.AbstractFunctionDecl.DefaultArgumentResilienceExpansion =
-        unsigned(ResilienceExpansion::Maximal);
     Bits.AbstractFunctionDecl.Synthesized = false;
   }
 
@@ -5536,21 +5675,6 @@ public:
   /// Resolved during type checking
   void setIsOverridden() { Bits.AbstractFunctionDecl.Overridden = true; }
 
-  /// The ResilienceExpansion for default arguments.
-  ///
-  /// In Swift 4 mode, default argument expressions are serialized, and must
-  /// obey the restrictions imposed upon inlinable function bodies.
-  ResilienceExpansion getDefaultArgumentResilienceExpansion() const {
-    return ResilienceExpansion(
-        Bits.AbstractFunctionDecl.DefaultArgumentResilienceExpansion);
-  }
-
-  /// Set the ResilienceExpansion for default arguments.
-  void setDefaultArgumentResilienceExpansion(ResilienceExpansion expansion) {
-    Bits.AbstractFunctionDecl.DefaultArgumentResilienceExpansion =
-        unsigned(expansion);
-  }
-
   /// Set information about the foreign error convention used by this
   /// declaration.
   void setForeignErrorConvention(const ForeignErrorConvention &convention);
@@ -5608,6 +5732,7 @@ class FuncDecl : public AbstractFunctionDecl {
   TypeLoc FnRetType;
 
   OperatorDecl *Operator = nullptr;
+  OpaqueTypeDecl *OpaqueReturn = nullptr;
 
 protected:
   FuncDecl(DeclKind Kind,
@@ -5759,6 +5884,14 @@ public:
   void setOperatorDecl(OperatorDecl *o) {
     assert(isOperator() && "can't set an OperatorDecl for a non-operator");
     Operator = o;
+  }
+  
+  OpaqueTypeDecl *getOpaqueResultTypeDecl() const {
+    return OpaqueReturn;
+  }
+  void setOpaqueResultTypeDecl(OpaqueTypeDecl *decl) {
+    assert(!OpaqueReturn && "already has opaque type decl");
+    OpaqueReturn = decl;
   }
   
   /// Returns true if the function is forced to be statically dispatched.
@@ -6005,10 +6138,7 @@ public:
     Params(Params),
     EqualsLoc(EqualsLoc),
     RawValueExpr(RawValueExpr)
-  {
-    Bits.EnumElementDecl.DefaultArgumentResilienceExpansion =
-        static_cast<unsigned>(ResilienceExpansion::Maximal);
-  }
+  {}
 
   Identifier getName() const { return getFullName().getBaseIdentifier(); }
 
@@ -6037,21 +6167,6 @@ public:
     TypeCheckedRawValueExpr = e;
   }
 
-  /// The ResilienceExpansion for default arguments.
-  ///
-  /// In Swift 4 mode, default argument expressions are serialized, and must
-  /// obey the restrictions imposed upon inlinable function bodies.
-  ResilienceExpansion getDefaultArgumentResilienceExpansion() const {
-    return ResilienceExpansion(
-        Bits.EnumElementDecl.DefaultArgumentResilienceExpansion);
-  }
-
-  /// Set the ResilienceExpansion for default arguments.
-  void setDefaultArgumentResilienceExpansion(ResilienceExpansion expansion) {
-    Bits.EnumElementDecl.DefaultArgumentResilienceExpansion =
-        unsigned(expansion);
-  }
-  
   /// Return the containing EnumDecl.
   EnumDecl *getParentEnum() const {
     return cast<EnumDecl>(getDeclContext());
@@ -6823,15 +6938,6 @@ AbstractStorageDecl::overwriteSetterAccess(AccessLevel accessLevel) {
     modify->overwriteAccess(accessLevel);
   if (auto mutableAddressor = getMutableAddressor())
     mutableAddressor->overwriteAccess(accessLevel);
-}
-
-inline bool AbstractStorageDecl::isStatic() const {
-  if (auto var = dyn_cast<VarDecl>(this)) {
-    return var->isStatic();
-  }
-
-  // Currently, subscripts are never static.
-  return false;
 }
 
 /// Constructors and destructors always have a 'self' parameter,

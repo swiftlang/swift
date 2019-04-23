@@ -271,6 +271,13 @@ enum class TypeCheckExprFlags {
   /// as part of the expression diagnostics, which is attempting to narrow
   /// down failure location.
   SubExpressionDiagnostics = 0x400,
+  
+  /// If set, the 'convertType' specified to typeCheckExpression is the opaque
+  /// return type of the declaration being checked. The archetype should be
+  /// opened into a type variable to provide context to the expression, and
+  /// the resulting type will be a candidate for binding the underlying
+  /// type.
+  ConvertTypeIsOpaqueReturnType = 0x800,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -606,60 +613,8 @@ public:
   llvm::DenseMap<AnyFunctionRef, std::vector<Expr*>> LocalCFunctionPointers;
 
 private:
-  /// Return statements with functions as return values.
-  llvm::DenseMap<AbstractFunctionDecl *, llvm::DenseSet<ReturnStmt *>>
-    FunctionAsReturnValue;
-
-  /// Function apply expressions with a certain function as an argument.
-  llvm::DenseMap<AbstractFunctionDecl *, llvm::DenseSet<ApplyExpr *>>
-    FunctionAsEscapingArg;
-
   /// The # of times we have performed typo correction.
   unsigned NumTypoCorrections = 0;
-
-public:
-  /// Record an occurrence of a function that captures inout values as an
-  /// argument.
-  ///
-  /// \param decl the function that occurs as an argument.
-  ///
-  /// \param apply the expression in which the function appears.
-  void addEscapingFunctionAsArgument(AbstractFunctionDecl *decl,
-                                     ApplyExpr *apply) {
-    FunctionAsEscapingArg[decl].insert(apply);
-  }
-
-  /// Find occurrences of a function that captures inout values as arguments.
-  ///
-  /// \param decl the function that occurs as an argument.
-  ///
-  /// \returns Expressions in which the function appears as arguments.
-  llvm::DenseSet<ApplyExpr *> &
-  getEscapingFunctionAsArgument(AbstractFunctionDecl *decl) {
-    return FunctionAsEscapingArg[decl];
-  }
-
-  /// Record an occurrence of a function that captures inout values as a return
-  /// value
-  ///
-  /// \param decl the function that occurs as a return value.
-  ///
-  /// \param stmt the expression in which the function appears.
-  void addEscapingFunctionAsReturnValue(AbstractFunctionDecl *decl,
-                                        ReturnStmt *stmt) {
-    FunctionAsReturnValue[decl].insert(stmt);
-  }
-
-  /// Find occurrences of a function that captures inout values as return
-  /// values.
-  ///
-  /// \param decl the function that occurs as a return value.
-  ///
-  /// \returns Expressions in which the function appears as arguments.
-  llvm::DenseSet<ReturnStmt *> &
-  getEscapingFunctionAsReturnValue(AbstractFunctionDecl *decl) {
-    return FunctionAsReturnValue[decl];
-  }
 
 private:
   Type MaxIntegerType;
@@ -1098,6 +1053,7 @@ public:
   void checkDeclAttributesEarly(Decl *D);
   static void addImplicitDynamicAttribute(Decl *D);
   void checkDeclAttributes(Decl *D);
+  void checkParameterAttributes(ParameterList *params);
   void checkDynamicReplacementAttribute(ValueDecl *D);
   static ValueDecl *findReplacedDynamicFunction(const ValueDecl *d);
   void checkTypeModifyingDeclAttributes(VarDecl *var);
@@ -1131,12 +1087,11 @@ public:
   void inferDefaultWitnesses(ProtocolDecl *proto);
 
   /// Compute the generic signature, generic environment and interface type
-  /// of a generic function.
-  void validateGenericFuncSignature(AbstractFunctionDecl *func);
-
-  /// Compute the generic signature, generic environment and interface type
-  /// of a generic subscript.
-  void validateGenericSubscriptSignature(SubscriptDecl *subscript);
+  /// of a generic function or subscript.
+  void validateGenericFuncOrSubscriptSignature(
+              PointerUnion<AbstractFunctionDecl *, SubscriptDecl *>
+                  funcOrSubscript,
+              ValueDecl *decl, GenericContext *genCtx);
 
   /// For a generic requirement in a protocol, make sure that the requirement
   /// set didn't add any requirements to Self or its associated types.
@@ -1501,10 +1456,7 @@ public:
 
   /// Coerce the specified parameter list of a ClosureExpr to the specified
   /// contextual type.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  bool coerceParameterListToType(ParameterList *P, ClosureExpr *CE, AnyFunctionType *FN);
-
+  void coerceParameterListToType(ParameterList *P, ClosureExpr *CE, AnyFunctionType *FN);
   
   /// Type-check an initialized variable pattern declaration.
   bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
@@ -1931,10 +1883,34 @@ public:
     PropertyInitializer
   };
 
-  bool diagnoseInlinableDeclRef(SourceLoc loc, const ValueDecl *D,
+  bool diagnoseInlinableDeclRef(SourceLoc loc, ConcreteDeclRef declRef,
                                 const DeclContext *DC,
                                 FragileFunctionKind Kind,
                                 bool TreatUsableFromInlineAsPublic);
+
+private:
+  bool diagnoseInlinableDeclRefAccess(SourceLoc loc, const ValueDecl *D,
+                                      const DeclContext *DC,
+                                      FragileFunctionKind Kind,
+                                      bool TreatUsableFromInlineAsPublic);
+
+  /// Given that a declaration is used from a particular context which
+  /// exposes it in the interface of the current module, diagnose if it cannot
+  /// reasonably be shared.
+  bool diagnoseDeclRefExportability(SourceLoc loc, ConcreteDeclRef declRef,
+                                    const DeclContext *DC,
+                                    FragileFunctionKind fragileKind);
+
+public:
+  /// Given that a type is used from a particular context which
+  /// exposes it in the interface of the current module, diagnose if its
+  /// generic arguments require the use of conformances that cannot reasonably
+  /// be shared.
+  ///
+  /// This method \e only checks how generic arguments are used; it is assumed
+  /// that the declarations involved have already been checked elsewhere.
+  void diagnoseGenericTypeExportability(const TypeLoc &TL,
+                                        const DeclContext *DC);
 
   /// Given that \p DC is within a fragile context for some reason, describe
   /// why.
@@ -2133,6 +2109,10 @@ public:
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.
   DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
+  
+  Type getOrCreateOpaqueResultType(TypeResolution resolution,
+                                   ValueDecl *originatingDecl,
+                                   OpaqueReturnTypeRepr *repr);
 };
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic
@@ -2164,6 +2144,21 @@ bool isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
 bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
                                          TypeChecker &TC);
 
+/// Returns true if the given subscript method is an valid implementation of
+/// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
+/// The method is given to be defined as `subscript(dynamicMember:)` which
+/// takes a single non-variadic parameter that conforms to
+/// `ExpressibleByStringLiteral` protocol.
+bool isValidStringDynamicMemberLookup(SubscriptDecl *decl, DeclContext *DC,
+                                      TypeChecker &TC);
+
+/// Returns true if the given subscript method is an valid implementation of
+/// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
+/// @dynamicMemberLookup.
+/// The method is given to be defined as `subscript(dynamicMember:)` which
+/// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
+bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl, TypeChecker &TC);
+
 /// Whether an overriding declaration requires the 'override' keyword.
 enum class OverrideRequiresKeyword {
   /// The keyword is never required.
@@ -2191,6 +2186,50 @@ bool isOverrideBasedOnType(ValueDecl *decl, Type declTy,
 /// protocol. If \p type is not null, check specifically whether \p decl
 /// could fulfill a protocol requirement for it.
 bool isMemberOperator(FuncDecl *decl, Type type);
+
+/// Complain if @objc or dynamic is used without importing Foundation.
+void diagnoseAttrsRequiringFoundation(SourceFile &SF);
+
+/// Diagnose any Objective-C method overrides that aren't reflected
+/// as overrides in Swift.
+bool diagnoseUnintendedObjCMethodOverrides(SourceFile &sf);
+
+/// Diagnose all conflicts between members that have the same
+/// Objective-C selector in the same class.
+///
+/// \param sf The source file for which we are diagnosing conflicts.
+///
+/// \returns true if there were any conflicts diagnosed.
+bool diagnoseObjCMethodConflicts(SourceFile &sf);
+
+/// Diagnose any unsatisfied @objc optional requirements of
+/// protocols that conflict with methods.
+bool diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf);
+
+/// Retrieve information about the given Objective-C method for
+/// diagnostic purposes, to be used with OBJC_DIAG_SELECT in
+/// DiagnosticsSema.def.
+std::pair<unsigned, DeclName> getObjCMethodDiagInfo(
+                                AbstractFunctionDecl *method);
+
+/// Attach Fix-Its to the given diagnostic that updates the name of the
+/// given declaration to the desired target name.
+///
+/// \returns false if the name could not be fixed.
+bool fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
+                        DeclName targetName);
+
+/// Fix the Objective-C name of the given declaration to match the provided
+/// Objective-C selector.
+///
+/// \param ignoreImpliedName When true, ignore the implied name of the
+/// given declaration, because it no longer applies.
+///
+/// For properties, the selector should be a zero-parameter selector of the
+/// given property's name.
+bool fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
+                            Optional<ObjCSelector> targetNameOpt,
+                            bool ignoreImpliedName = false);
 
 } // end namespace swift
 

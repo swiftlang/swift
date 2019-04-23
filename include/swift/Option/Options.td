@@ -47,9 +47,9 @@ def DoesNotAffectIncrementalBuild : OptionFlag;
 // current working directory.
 def ArgumentIsPath : OptionFlag;
 
-// The option should be written into a .swiftinterface parseable interface file,
+// The option should be written into a .swiftinterface module interface file,
 // and read/parsed from there when reconstituting a .swiftmodule from it.
-def ParseableInterfaceOption : OptionFlag;
+def ModuleInterfaceOption : OptionFlag;
 
 /////////
 // Options
@@ -183,12 +183,12 @@ def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
 def sdk : Separate<["-"], "sdk">, Flags<[FrontendOption, ArgumentIsPath]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
 
-def swift_version : Separate<["-"], "swift-version">, Flags<[FrontendOption, ParseableInterfaceOption]>,
+def swift_version : Separate<["-"], "swift-version">, Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Interpret input according to a specific Swift language version number">,
   MetaVarName<"<vers>">;
 
 def package_description_version: Separate<["-"], "package-description-version">,
-  Flags<[FrontendOption, HelpHidden, ParseableInterfaceOption]>,
+  Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"The version number to be applied on the input for the PackageDescription availability kind">,
   MetaVarName<"<vers>">;
 
@@ -300,23 +300,26 @@ def serialize_diagnostics_path : Separate<["-"], "serialize-diagnostics-path">,
 def serialize_diagnostics_path_EQ: Joined<["-"], "serialize-diagnostics-path=">,
   Flags<[FrontendOption, NoBatchOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   Alias<serialize_diagnostics_path>;
+def color_diagnostics : Flag<["-"], "color-diagnostics">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Print diagnostics in color">;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Specifies the Clang module cache path">;
 
 def enable_library_evolution : Flag<["-"], "enable-library-evolution">,
-  Flags<[FrontendOption, ParseableInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Build the module to allow binary-compatible library evolution">;
 
 def module_name : Separate<["-"], "module-name">,
-  Flags<[FrontendOption, ParseableInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Name of the module to build">;
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
 
 def module_link_name : Separate<["-"], "module-link-name">,
-  Flags<[FrontendOption, ParseableInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Library to link against when using this module">;
 def module_link_name_EQ : Joined<["-"], "module-link-name=">,
   Flags<[FrontendOption]>, Alias<module_link_name>;
@@ -337,15 +340,25 @@ def emit_module_path_EQ : Joined<["-"], "emit-module-path=">,
          ArgumentIsPath]>,
   Alias<emit_module_path>;
 
-def emit_parseable_module_interface :
-  Flag<["-"], "emit-parseable-module-interface">,
+def emit_module_interface :
+  Flag<["-"], "emit-module-interface">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Output parseable interface file">;
-def emit_parseable_module_interface_path :
-  Separate<["-"], "emit-parseable-module-interface-path">,
+  HelpText<"Output module interface file">;
+def emit_module_interface_path :
+  Separate<["-"], "emit-module-interface-path">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
          ArgumentIsPath]>,
-  MetaVarName<"<path>">, HelpText<"Output parseable interface file to <path>">;
+  MetaVarName<"<path>">, HelpText<"Output module interface file to <path>">;
+
+def emit_parseable_module_interface :
+  Flag<["-"], "emit-parseable-module-interface">,
+  Alias<emit_module_interface>,
+  Flags<[NoInteractiveOption, HelpHidden, DoesNotAffectIncrementalBuild]>;
+def emit_parseable_module_interface_path :
+  Separate<["-"], "emit-parseable-module-interface-path">,
+  Alias<emit_module_interface_path>,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         HelpHidden, ArgumentIsPath]>;
 
 def emit_objc_header : Flag<["-"], "emit-objc-header">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -492,19 +505,19 @@ def Xlinker : Separate<["-"], "Xlinker">,
 def O_Group : OptionGroup<"<optimization level options>">;
 
 def Onone : Flag<["-"], "Onone">, Group<O_Group>,
-  Flags<[FrontendOption, ParseableInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Compile without any optimization">;
 def O : Flag<["-"], "O">, Group<O_Group>,
-  Flags<[FrontendOption, ParseableInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Compile with optimizations">;
 def Osize : Flag<["-"], "Osize">, Group<O_Group>,
-  Flags<[FrontendOption, ParseableInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Compile with optimizations and target small code size">;
 def Ounchecked : Flag<["-"], "Ounchecked">, Group<O_Group>,
-  Flags<[FrontendOption, ParseableInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Compile with optimizations and remove runtime safety checks">;
 def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
-  Flags<[HelpHidden, FrontendOption, ParseableInterfaceOption]>,
+  Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
 def RemoveRuntimeAsserts : Flag<["-"], "remove-runtime-asserts">,
@@ -650,7 +663,7 @@ def parse_sil : Flag<["-"], "parse-sil">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Parse the input file as SIL code, not Swift source">;
 def parse_stdlib : Flag<["-"], "parse-stdlib">,
-  Flags<[FrontendOption, HelpHidden, ParseableInterfaceOption]>,
+  Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"Parse the input file(s) as the Swift standard library">;
 
 def modes_Group : OptionGroup<"<mode options>">, HelpText<"MODES">;
@@ -791,12 +804,12 @@ def resource_dir : Separate<["-"], "resource-dir">,
   HelpText<"The directory that holds the compiler resource files">;
 
 def target : Separate<["-"], "target">,
-  Flags<[FrontendOption, ModuleWrapOption, ParseableInterfaceOption]>,
+  Flags<[FrontendOption, ModuleWrapOption, ModuleInterfaceOption]>,
   HelpText<"Generate code for the given target">;
 def target_legacy_spelling : Joined<["--"], "target=">,
   Flags<[FrontendOption]>, Alias<target>;
 
-def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption, ParseableInterfaceOption]>,
+def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Generate code for a particular CPU variant">;
 
 def profile_generate : Flag<["-"], "profile-generate">,
@@ -855,7 +868,7 @@ def index_ignore_system_modules : Flag<["-"], "index-ignore-system-modules">,
   HelpText<"Avoid indexing system modules">;
 
 def enforce_exclusivity_EQ : Joined<["-"], "enforce-exclusivity=">,
-  Flags<[FrontendOption, ParseableInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   MetaVarName<"<enforcement>">,
   HelpText<"Enforce law of exclusivity">;
 

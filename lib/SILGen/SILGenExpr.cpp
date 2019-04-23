@@ -439,6 +439,7 @@ namespace {
                                            SGFContext C);
     RValue visitIsExpr(IsExpr *E, SGFContext C);
     RValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
+    RValue visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E, SGFContext C);
     RValue visitTupleExpr(TupleExpr *E, SGFContext C);
     RValue visitMemberRefExpr(MemberRefExpr *E, SGFContext C);
     RValue visitDynamicMemberRefExpr(DynamicMemberRefExpr *E, SGFContext C);
@@ -866,23 +867,12 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
     return emitUndefRValue(loc, refType);
   }
 
-  // If this is a reference to a type, produce a metatype.
-  if (isa<TypeDecl>(decl)) {
-    assert(refType->is<MetatypeType>() &&
-           "type declref does not have metatype type?!");
-    return RValue(*this, loc, refType,
-                  ManagedValue::forUnmanaged(
-                    B.createMetatype(loc, getLoweredType(refType))));
-  }
-  
   // If this is a reference to a var, emit it as an l-value and then load.
-  if (auto *var = dyn_cast<VarDecl>(decl)) {
-    assert(!declRef.isSpecialized() &&
-           "Cannot handle specialized variable references");
+  if (auto *var = dyn_cast<VarDecl>(decl))
+    return emitRValueForNonMemberVarDecl(loc, declRef, refType, semantics, C);
 
-    return emitRValueForNonMemberVarDecl(loc, var, refType, semantics, C);
-  }
-  
+  assert(!isa<TypeDecl>(decl));
+
   // If the referenced decl isn't a VarDecl, it should be a constant of some
   // sort.
   SILDeclRef silDeclRef(decl);
@@ -1911,6 +1901,66 @@ RValue RValueEmitter::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
   return visit(E->getSubExpr(), C);
 }
 
+RValue RValueEmitter::visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E,
+                                                  SGFContext C) {
+  // The opaque type has the layout of the underlying type, abstracted as
+  // a type parameter.
+  auto &opaqueTL = SGF.getTypeLowering(E->getType());
+  auto &underlyingTL = SGF.getTypeLowering(AbstractionPattern::getOpaque(),
+                                           E->getSubExpr()->getType());
+  
+  auto &underlyingSubstTL = SGF.getTypeLowering(E->getSubExpr()->getType());
+  
+  // If the opaque type is address only, initialize in place.
+  if (opaqueTL.getLoweredType().isAddress()) {
+    auto opaqueAddr = SGF.getBufferForExprResult(
+                                               E, opaqueTL.getLoweredType(), C);
+    // Initialize the buffer as the underlying type.
+    auto underlyingAddr = SGF.B.createUncheckedAddrCast(E,
+                                opaqueAddr,
+                                underlyingTL.getLoweredType().getAddressType());
+    
+    auto underlyingInit = SGF.useBufferAsTemporary(underlyingAddr, underlyingTL);
+
+    // Try to emit directly into the buffer if no reabstraction is necessary.
+    ManagedValue underlying;
+    if (underlyingSubstTL.getLoweredType() == underlyingTL.getLoweredType()) {
+      underlying = SGF.emitRValueAsSingleValue(E->getSubExpr(),
+                                              SGFContext(underlyingInit.get()));
+    } else {
+      // Otherwise, emit the underlying value then bring it to the right
+      // abstraction level.
+      underlying = SGF.emitRValueAsSingleValue(E->getSubExpr());
+      underlying = SGF.emitSubstToOrigValue(E, underlying,
+                                AbstractionPattern::getOpaque(),
+                                E->getSubExpr()->getType()->getCanonicalType());
+    }
+    if (!underlying.isInContext()) {
+      underlyingInit->copyOrInitValueInto(SGF, E, underlying, /*init*/ true);
+      underlyingInit->finishInitialization(SGF);
+    }
+    // Kill the cleanup on the underlying value, and hand off the opaque buffer
+    // as the result.
+    underlyingInit->getManagedAddress().forward(SGF);
+    
+    auto opaque = SGF.manageBufferForExprResult(opaqueAddr, opaqueTL, C);
+    return RValue(SGF, E, opaque);
+  }
+  
+  // If the opaque type is loadable, emit the subexpression and bitcast it.
+  auto value = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  if (underlyingSubstTL.getLoweredType() == underlyingTL.getLoweredType()) {
+    value = SGF.emitSubstToOrigValue(E, value, AbstractionPattern::getOpaque(),
+                                E->getSubExpr()->getType()->getCanonicalType());
+  }
+  
+  auto cast = SGF.B.createUncheckedBitCast(E, value.forward(SGF),
+                                       opaqueTL.getLoweredType());
+  value = SGF.emitManagedRValueWithCleanup(cast);
+  
+  return RValue(SGF, E, value);
+}
+
 VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
                                        CanType baseTy, CanType arrayTy,
                                        unsigned numElements) {
@@ -2016,14 +2066,7 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *e,
                                          SGFContext resultCtx) {
   assert(!e->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
-
-  if (isa<TypeDecl>(e->getMember().getDecl())) {
-    // Emit the metatype for the associated type.
-    visit(e->getBase());
-    SILValue mt =
-        SGF.B.createMetatype(e, SGF.getLoweredLoadableType(e->getType()));
-    return RValue(SGF, e, ManagedValue::forUnmanaged(mt));
-  }
+  assert(isa<VarDecl>(e->getMember().getDecl()));
 
   // Everything else should use the l-value logic.
 
@@ -3217,8 +3260,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                                 bool forPropertyDescriptor) {
   /// Returns true if a key path component for the given property or
   /// subscript should be externally referenced.
-  auto shouldUseExternalKeyPathComponent =
-    [&]() -> bool {
+  auto shouldUseExternalKeyPathComponent = [&]() -> bool {
     return (!forPropertyDescriptor &&
             (storage->getModuleContext() != SwiftModule ||
              storage->isResilient(SwiftModule, expansion)) &&
@@ -3227,11 +3269,15 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
             // Properties that only dispatch via ObjC lookup do not have nor
             // need property descriptors, since the selector identifies the
             // storage.
+            // Properties that are not public don't need property descriptors
+            // either.
             (!storage->hasAnyAccessors() ||
-             !getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage))
-             .isForeign));
-    };
-  
+             (!getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage))
+                   .isForeign &&
+              getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage))
+                      .getLinkage(ForDefinition) <= SILLinkage::PublicNonABI)));
+  };
+
   auto strategy = storage->getAccessStrategy(AccessSemantics::Ordinary,
                                              storage->supportsMutation()
                                                ? AccessKind::ReadWrite

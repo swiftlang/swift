@@ -383,6 +383,8 @@ public:
   static bool classof(const SILInstruction *inst) {
     return bool(ApplySiteKind::fromNodeKind(inst->getKind()));
   }
+
+  void dump() const LLVM_ATTRIBUTE_USED { getInstruction()->dump(); }
 };
 
 //===----------------------------------------------------------------------===//

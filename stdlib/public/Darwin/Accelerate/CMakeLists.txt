@@ -9,6 +9,27 @@ add_swift_target_library(swiftAccelerate ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   vImage_CVImageFormat.swift
   vImage_CGImageFormat.swift
   vImage_Converter.swift
+  AccelerateBuffer.swift
+  vDSP_Arithmetic.swift
+  vDSP_ClippingLimitThreshold.swift
+  vDSP_ComplexConversion.swift
+  vDSP_ComplexOperations.swift
+  vDSP_Conversion.swift
+  vDSP_Convolution.swift
+  vDSP_DecibelConversion.swift
+  vDSP_FIR.swift
+  vDSP_FillClearGenerate.swift
+  vDSP_Geometry.swift
+  vDSP_Integration.swift
+  vDSP_Interpolation.swift
+  vDSP_PolarRectangularConversion.swift
+  vDSP_PolynomialEvaluation.swift
+  vDSP_RecursiveFilters.swift
+  vDSP_Reduction.swift
+  vDSP_SingleVectorOperations.swift
+  vDSP_SlidingWindow.swift
+  vForce_Operations.swift
+  Quadrature.swift
 
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
 

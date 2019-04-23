@@ -18,12 +18,12 @@
 #include "ConstraintSystem.h"
 #include "DerivedConformances.h"
 #include "MiscDiagnostics.h"
+#include "TypeAccessScopeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/AccessScopeChecker.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -38,6 +38,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ReferencedNameTracker.h"
+#include "swift/AST/TypeDeclFinder.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
@@ -490,12 +491,10 @@ swift::matchWitness(
   } else if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness)) {
     auto *reqASD = cast<AbstractStorageDecl>(req);
     
-    // If this is a property requirement, check that the static-ness matches.
-    if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
-      if (cast<VarDecl>(req)->isStatic() != vdWitness->isStatic())
-        return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
-    }
-    
+    // Check that the static-ness matches.
+    if (reqASD->isStatic() != witnessASD->isStatic())
+      return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
+
     // If the requirement is settable and the witness is not, reject it.
     if (req->isSettable(req->getDeclContext()) &&
         !witness->isSettable(witness->getDeclContext()))
@@ -3602,15 +3601,16 @@ void ConformanceChecker::addUsedConformances(
   if (!visited.insert(conformance).second)
     return;
 
-  auto normalConf = conformance->getRootNormalConformance();
+  if (auto normalConf = dyn_cast<NormalProtocolConformance>(
+        conformance->getRootConformance())) {;
+    if (normalConf->isIncomplete())
+      TC.UsedConformances.insert(normalConf);
 
-  if (normalConf->isIncomplete())
-    TC.UsedConformances.insert(normalConf);
-
-  // Mark each conformance in the signature as used.
-  for (auto sigConformance : normalConf->getSignatureConformances()) {
-    if (sigConformance.isConcrete())
-      addUsedConformances(sigConformance.getConcrete(), visited);
+    // Mark each conformance in the signature as used.
+    for (auto sigConformance : normalConf->getSignatureConformances()) {
+      if (sigConformance.isConcrete())
+        addUsedConformances(sigConformance.getConcrete(), visited);
+    }
   }
 }
 
@@ -3645,23 +3645,69 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
   std::function<void(ProtocolConformanceRef)> writer
     = Conformance->populateSignatureConformances();
 
+  SourceFile *fileForCheckingExportability = nullptr;
+  if (getRequiredAccessScope().isPublic() || isUsableFromInlineRequired())
+    fileForCheckingExportability = DC->getParentSourceFile();
+
   class GatherConformancesListener : public GenericRequirementsCheckListener {
-    NormalProtocolConformance *conformance;
+    NormalProtocolConformance *conformanceBeingChecked;
+    SourceFile *SF;
     std::function<void(ProtocolConformanceRef)> &writer;
+
+    void checkExportability(Type depTy, Type replacementTy,
+                            const ProtocolConformance *conformance) {
+      if (!SF)
+        return;
+
+      SubstitutionMap subs =
+          conformance->getSubstitutions(SF->getParentModule());
+      for (auto &subConformance : subs.getConformances()) {
+        if (!subConformance.isConcrete())
+          continue;
+        checkExportability(depTy, replacementTy, subConformance.getConcrete());
+      }
+
+      const RootProtocolConformance *rootConformance =
+          conformance->getRootConformance();
+      ModuleDecl *M = rootConformance->getDeclContext()->getParentModule();
+      if (!SF->isImportedImplementationOnly(M))
+        return;
+
+      ASTContext &ctx = M->getASTContext();
+
+      Type selfTy = rootConformance->getProtocol()->getProtocolSelfType();
+      if (depTy->isEqual(selfTy)) {
+        ctx.Diags.diagnose(
+            conformanceBeingChecked->getLoc(),
+            diag::conformance_from_implementation_only_module,
+            rootConformance->getType(),
+            rootConformance->getProtocol()->getName(), M->getName());
+      } else {
+        ctx.Diags.diagnose(
+            conformanceBeingChecked->getLoc(),
+            diag::assoc_conformance_from_implementation_only_module,
+            rootConformance->getType(),
+            rootConformance->getProtocol()->getName(), M->getName(),
+            depTy, replacementTy->getCanonicalType());
+      }
+    }
+
   public:
     GatherConformancesListener(
         NormalProtocolConformance *conformance,
-        std::function<void(ProtocolConformanceRef)> &writer)
-      : conformance(conformance), writer(writer) { }
+        std::function<void(ProtocolConformanceRef)> &writer,
+        SourceFile *fileForCheckingExportability)
+      : conformanceBeingChecked(conformance),
+        SF(fileForCheckingExportability), writer(writer) { }
 
     void satisfiedConformance(Type depTy, Type replacementTy,
                               ProtocolConformanceRef conformance) override {
       // The conformance will use contextual types, but we want the
       // interface type equivalent.
-      if (conformance.isConcrete() &&
-          conformance.getConcrete()->getType()->hasArchetype()) {
+      if (conformance.isConcrete()) {
         auto concreteConformance = conformance.getConcrete();
 
+        if (conformance.getConcrete()->getType()->hasArchetype()) {
         // Map the conformance.
         concreteConformance = concreteConformance->subst(
             [](SubstitutableType *type) -> Type {
@@ -3671,7 +3717,11 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
             },
             MakeAbstractConformanceForGenericType());
 
-        conformance = ProtocolConformanceRef(concreteConformance);
+
+          conformance = ProtocolConformanceRef(concreteConformance);
+        }
+
+        checkExportability(depTy, replacementTy, concreteConformance);
       }
 
       writer(conformance);
@@ -3681,13 +3731,13 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
                       const Requirement &req, Type first, Type second,
                       ArrayRef<ParentConditionalConformance> parents) override {
       // Invalidate the conformance to suppress further diagnostics.
-      if (conformance->getLoc().isValid()) {
-        conformance->setInvalid();
+      if (conformanceBeingChecked->getLoc().isValid()) {
+        conformanceBeingChecked->setInvalid();
       }
 
       return false;
     }
-  } listener(Conformance, writer);
+  } listener(Conformance, writer, fileForCheckingExportability);
 
   auto result = TC.checkGenericArguments(
       DC, Loc, Loc,
@@ -4226,17 +4276,18 @@ void TypeChecker::markConformanceUsed(ProtocolConformanceRef conformance,
                                       DeclContext *dc) {
   if (conformance.isAbstract()) return;
 
-  auto normalConformance =
-    conformance.getConcrete()->getRootNormalConformance();
+  if (auto normalConformance =
+        dyn_cast<NormalProtocolConformance>(
+          conformance.getConcrete()->getRootConformance())) {;
+    // Make sure that the type checker completes this conformance.
+    if (normalConformance->isIncomplete())
+      UsedConformances.insert(normalConformance);
 
-  // Make sure that the type checker completes this conformance.
-  if (normalConformance->isIncomplete())
-    UsedConformances.insert(normalConformance);
-
-  // Record the usage of this conformance in the enclosing source
-  // file.
-  if (auto sf = dc->getParentSourceFile()) {
-    sf->addUsedConformance(normalConformance);
+    // Record the usage of this conformance in the enclosing source
+    // file.
+    if (auto sf = dc->getParentSourceFile()) {
+      sf->addUsedConformance(normalConformance);
+    }
   }
 }
 
@@ -5239,25 +5290,27 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
       }
     }
 
-    // For any unsatisfied optional @objc requirements that remain
-    // unsatisfied, note them in the AST for @objc selector collision
-    // checking.
-    for (auto req : unsatisfiedReqs) {
-      // Skip non-@objc requirements.
-      if (!req->isObjC()) continue;
+    if (auto *sf = dc->getParentSourceFile()) {
+      // For any unsatisfied optional @objc requirements that remain
+      // unsatisfied, note them in the AST for @objc selector collision
+      // checking.
+      for (auto req : unsatisfiedReqs) {
+        // Skip non-@objc requirements.
+        if (!req->isObjC()) continue;
 
-      // Skip unavailable requirements.
-      if (req->getAttrs().isUnavailable(Context)) continue;
+        // Skip unavailable requirements.
+        if (req->getAttrs().isUnavailable(Context)) continue;
 
-      // Record this requirement.
-      if (auto funcReq = dyn_cast<AbstractFunctionDecl>(req)) {
-        Context.recordObjCUnsatisfiedOptReq(dc, funcReq);
-      } else {
-        auto storageReq = cast<AbstractStorageDecl>(req);
-        if (auto getter = storageReq->getGetter())
-          Context.recordObjCUnsatisfiedOptReq(dc, getter);
-        if (auto setter = storageReq->getSetter())
-          Context.recordObjCUnsatisfiedOptReq(dc, setter);
+        // Record this requirement.
+        if (auto funcReq = dyn_cast<AbstractFunctionDecl>(req)) {
+          sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, funcReq);
+        } else {
+          auto storageReq = cast<AbstractStorageDecl>(req);
+          if (auto getter = storageReq->getGetter())
+            sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, getter);
+          if (auto setter = storageReq->getSetter())
+            sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, setter);
+        }
       }
     }
   }

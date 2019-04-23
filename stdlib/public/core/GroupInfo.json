@@ -158,7 +158,7 @@
   ],
   "Math": [
     "SetAlgebra.swift",
-    "BuiltinMath.swift",
+    "MathFunctions.swift",
     {
     "Integers": [
       "Integers.swift",
@@ -223,6 +223,7 @@
     "Equatable.swift",
     "Comparable.swift",
     "Codable.swift",
+    "LegacyABI.swift",
     "MigrationSupport.swift"
   ],
   "Result": [

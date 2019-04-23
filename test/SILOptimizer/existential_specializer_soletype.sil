@@ -139,3 +139,46 @@ sil_vtable RC {
 sil_witness_table hidden RC: RP module simple {
   method #RP.getThres!1: <Self where Self : RP> (Self) -> () -> Int32 : @$s6simple2RCCAA2RPA2aDP8getThress5Int32VyFTW	
 }
+
+
+// <rdar://problem/49336444> SILCombine infinite loop.
+//
+// Test a apply argument from an init_existential with a sole
+// conforming type. We currently bail on rewriting the apply because
+// it returns the same substituted type. Avoid infinitely iterating in
+// SILCombine due to repeatedly creating an destroying the same cast.
+public protocol BaseProtocol {
+    func testProtocolMethod() -> Self
+}
+extension BaseProtocol {
+    func testProtocolMethod() -> Self {
+        return self
+    }
+}
+
+protocol SubProtocol : BaseProtocol {}
+
+final class ClassImpl : SubProtocol {}
+
+extension ClassImpl {
+  final func testProtocolMethod() -> ClassImpl
+}
+
+sil @testProtocolMethod : $@convention(method) <τ_0_0 where τ_0_0 : BaseProtocol> (@in_guaranteed τ_0_0) -> @out τ_0_0
+
+// Verify that the optimization was not performance and that we don't hang as a result.
+// CHECK-LABEL: sil hidden @testConcreteInitExistential : $@convention(method) (@in SubProtocol) -> () {
+// CHECK: [[E:%.*]] = init_existential_addr %{{.*}} : $*SubProtocol, $@opened("{{.*}}") SubProtocol
+// CHECK: apply %{{.*}}<@opened("{{.*}}") SubProtocol>([[E]], %{{.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : BaseProtocol> (@in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK-LABEL: } // end sil function 'testConcreteInitExistential'
+sil hidden @testConcreteInitExistential : $@convention(method) (@in SubProtocol) -> () {
+bb0(%0 : $*SubProtocol):
+  %10 = open_existential_addr immutable_access %0 : $*SubProtocol to $*@opened("CA90348E-5376-11E9-8C51-ACDE48001122") SubProtocol
+  %11 = alloc_stack $SubProtocol
+  %15 = function_ref @testProtocolMethod : $@convention(method) <τ_0_0 where τ_0_0 : BaseProtocol> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  %16 = init_existential_addr %11 : $*SubProtocol, $@opened("CA90348E-5376-11E9-8C51-ACDE48001122") SubProtocol
+  %17 = apply %15<@opened("CA90348E-5376-11E9-8C51-ACDE48001122") SubProtocol>(%16, %10) : $@convention(method) <τ_0_0 where τ_0_0 : BaseProtocol> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  dealloc_stack %11 : $*SubProtocol
+  %80 = tuple ()
+  return %80 : $()
+}

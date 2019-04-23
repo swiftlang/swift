@@ -35,11 +35,12 @@ public:
   PrintingDiagnosticConsumer(llvm::raw_ostream &stream = llvm::errs()) :
     Stream(stream) { }
 
-  virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                                DiagnosticKind Kind,
-                                StringRef FormatString,
-                                ArrayRef<DiagnosticArgument> FormatArgs,
-                                const DiagnosticInfo &Info) override;
+  virtual void
+  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+                   StringRef FormatString,
+                   ArrayRef<DiagnosticArgument> FormatArgs,
+                   const DiagnosticInfo &Info,
+                   SourceLoc bufferIndirectlyCausingDiagnostic) override;
 
   void forceColors() {
     ForceColors = true;

@@ -14,3 +14,9 @@ let strings: [Strin[g]?
 // Function body without closing brace token.
 func foo() {
   var a = 2
+
+class C {
+struct S {
+enum E {
+protocol P {
+extension P {

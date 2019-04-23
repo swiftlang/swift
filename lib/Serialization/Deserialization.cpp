@@ -1314,6 +1314,20 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                  importedFromClang, isStatic, None, values);
     break;
   }
+      
+  case XREF_OPAQUE_RETURN_TYPE_PATH_PIECE: {
+    IdentifierID DefiningDeclNameID;
+    
+    XRefOpaqueReturnTypePathPieceLayout::readRecord(scratch, DefiningDeclNameID);
+    
+    auto name = getIdentifier(DefiningDeclNameID);
+    pathTrace.addOpaqueReturnType(name);
+    
+    if (auto opaque = baseModule->lookupOpaqueResultType(name.str(), nullptr)) {
+      values.push_back(opaque);
+    }
+    break;
+  }
 
   case XREF_EXTENSION_PATH_PIECE:
     llvm_unreachable("can only extend a nominal");
@@ -1375,6 +1389,22 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         XRefValuePathPieceLayout::readRecord(scratch, None, IID, None, None,
                                              None);
         result = getIdentifier(IID);
+        break;
+      }
+      case XREF_OPAQUE_RETURN_TYPE_PATH_PIECE: {
+        IdentifierID IID;
+        XRefOpaqueReturnTypePathPieceLayout::readRecord(scratch, IID);
+        auto mangledName = getIdentifier(IID);
+        
+        SmallString<64> buf;
+        {
+          llvm::raw_svector_ostream os(buf);
+          os << "<<opaque return type of ";
+          os << mangledName.str();
+          os << ">>";
+        }
+        
+        result = getContext().getIdentifier(buf);
         break;
       }
       case XREF_INITIALIZER_PATH_PIECE:
@@ -1681,6 +1711,22 @@ giveUpFastPath:
             pathTrace, getXRefDeclNameForError());
       }
 
+      break;
+    }
+        
+    case XREF_OPAQUE_RETURN_TYPE_PATH_PIECE: {
+      values.clear();
+      IdentifierID DefiningDeclNameID;
+      
+      XRefOpaqueReturnTypePathPieceLayout::readRecord(scratch, DefiningDeclNameID);
+      
+      auto name = getIdentifier(DefiningDeclNameID);
+      pathTrace.addOpaqueReturnType(name);
+      
+      if (auto opaqueTy = baseModule->lookupOpaqueResultType(name.str(),
+                                                             nullptr)) {
+        values.push_back(opaqueTy);
+      }
       break;
     }
 
@@ -2060,17 +2106,6 @@ getActualSelfAccessKind(uint8_t raw) {
     return swift::SelfAccessKind::Mutating;
   case serialization::SelfAccessKind::__Consuming:
     return swift::SelfAccessKind::__Consuming;
-  }
-  return None;
-}
-
-static
-Optional<swift::ResilienceExpansion> getActualResilienceExpansion(uint8_t raw) {
-  switch (serialization::ResilienceExpansion(raw)) {
-  case serialization::ResilienceExpansion::Minimal:
-    return swift::ResilienceExpansion::Minimal;
-  case serialization::ResilienceExpansion::Maximal:
-    return swift::ResilienceExpansion::Maximal;
   }
   return None;
 }
@@ -2512,7 +2547,6 @@ public:
     uint8_t storedInitKind, rawAccessLevel;
     DeclID overriddenID;
     bool needsNewVTableEntry, firstTimeRequired;
-    uint8_t rawDefaultArgumentResilienceExpansion;
     unsigned numArgNames;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
 
@@ -2524,7 +2558,6 @@ public:
                                                overriddenID,
                                                rawAccessLevel,
                                                needsNewVTableEntry,
-                                               rawDefaultArgumentResilienceExpansion,
                                                firstTimeRequired,
                                                numArgNames,
                                                argNameAndDependencyIDs);
@@ -2617,15 +2650,6 @@ public:
       }
     }
 
-    if (auto defaultArgumentResilienceExpansion = getActualResilienceExpansion(
-            rawDefaultArgumentResilienceExpansion)) {
-      ctor->setDefaultArgumentResilienceExpansion(
-          *defaultArgumentResilienceExpansion);
-    } else {
-      MF.error();
-      return nullptr;
-    }
-
     ctor->computeType();
 
     return ctor;
@@ -2642,7 +2666,7 @@ public:
     uint8_t rawAccessLevel, rawSetterAccessLevel;
     TypeID interfaceTypeID;
     ModuleFile::AccessorRecord accessors;
-    DeclID overriddenID;
+    DeclID overriddenID, opaqueReturnTypeID;
     ArrayRef<uint64_t> accessorAndDependencyIDs;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
@@ -2655,6 +2679,7 @@ public:
                                        interfaceTypeID,
                                        overriddenID,
                                        rawAccessLevel, rawSetterAccessLevel,
+                                       opaqueReturnTypeID,
                                        accessorAndDependencyIDs);
 
     Identifier name = MF.getIdentifier(nameID);
@@ -2755,6 +2780,11 @@ public:
     if (var->hasStorage())
       AddAttribute(new (ctx) HasStorageAttr(/*isImplicit:*/true));
 
+    if (opaqueReturnTypeID) {
+      var->setOpaqueResultTypeDecl(
+                         cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
+    }
+    
     return var;
   }
 
@@ -2831,7 +2861,7 @@ public:
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
     bool needsNewVTableEntry;
-    uint8_t rawDefaultArgumentResilienceExpansion;
+    DeclID opaqueResultTypeDeclID;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -2845,7 +2875,7 @@ public:
                                           numNameComponentsBiased,
                                           rawAccessLevel,
                                           needsNewVTableEntry,
-                                          rawDefaultArgumentResilienceExpansion,
+                                          opaqueResultTypeDeclID,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -2859,7 +2889,6 @@ public:
                                           rawAccessorKind,
                                           rawAccessLevel,
                                           needsNewVTableEntry,
-                                          rawDefaultArgumentResilienceExpansion,
                                           nameAndDependencyIDs);
     }
 
@@ -3021,15 +3050,10 @@ public:
     fn->setForcedStaticDispatch(hasForcedStaticDispatch);
     fn->setNeedsNewVTableEntry(needsNewVTableEntry);
 
-    if (auto defaultArgumentResilienceExpansion = getActualResilienceExpansion(
-            rawDefaultArgumentResilienceExpansion)) {
-      fn->setDefaultArgumentResilienceExpansion(
-          *defaultArgumentResilienceExpansion);
-    } else {
-      MF.error();
-      return nullptr;
-    }
-    
+    if (opaqueResultTypeDeclID)
+      fn->setOpaqueResultTypeDecl(
+                     cast<OpaqueTypeDecl>(MF.getDecl(opaqueResultTypeDeclID)));
+
     // Set the interface type.
     fn->computeType();
 
@@ -3043,6 +3067,51 @@ public:
   Expected<Decl *> deserializeAccessor(ArrayRef<uint64_t> scratch,
                                        StringRef blobData) {
     return deserializeAnyFunc(scratch, blobData, /*isAccessor*/true);
+  }
+      
+  Expected<Decl *> deserializeOpaqueType(ArrayRef<uint64_t> scratch,
+                                         StringRef blobData) {
+    DeclID namingDeclID;
+    DeclContextID contextID;
+    GenericSignatureID interfaceSigID;
+    TypeID interfaceTypeID;
+    GenericEnvironmentID genericEnvID;
+    SubstitutionMapID underlyingTypeID;
+    
+    decls_block::OpaqueTypeLayout::readRecord(scratch, contextID,
+                                              namingDeclID, interfaceSigID,
+                                              interfaceTypeID, genericEnvID,
+                                              underlyingTypeID);
+    
+    auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));
+    auto declContext = MF.getDeclContext(contextID);
+    auto sig = MF.getGenericSignature(interfaceSigID);
+    auto interfaceType = MF.getType(interfaceTypeID)
+                            ->castTo<GenericTypeParamType>();
+    
+    // Check for reentrancy.
+    if (declOrOffset.isComplete())
+      return cast<OpaqueTypeDecl>(declOrOffset.get());
+      
+    // Create the decl.
+    auto opaqueDecl =
+      new (ctx) OpaqueTypeDecl(namingDecl, nullptr, declContext,
+                               sig, interfaceType);
+    declOrOffset = opaqueDecl;
+
+    auto genericEnv = MF.getGenericEnvironment(genericEnvID);
+    opaqueDecl->setGenericEnvironment(genericEnv);
+    if (underlyingTypeID)
+      opaqueDecl->setUnderlyingTypeSubstitutions(
+                                       MF.getSubstitutionMap(underlyingTypeID));
+    SubstitutionMap subs;
+    if (genericEnv) {
+      subs = genericEnv->getGenericSignature()->getIdentitySubstitutionMap();
+    }
+    auto opaqueTy = OpaqueTypeArchetypeType::get(opaqueDecl, subs);
+    auto metatype = MetatypeType::get(opaqueTy);
+    opaqueDecl->setInterfaceType(metatype);
+    return opaqueDecl;
   }
 
   Expected<Decl *> deserializePatternBinding(ArrayRef<uint64_t> scratch,
@@ -3451,7 +3520,6 @@ public:
     bool isImplicit; bool hasPayload; bool isNegative;
     unsigned rawValueKindID;
     IdentifierID rawValueData;
-    uint8_t rawResilienceExpansion;
     unsigned numArgNames;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
 
@@ -3459,7 +3527,6 @@ public:
                                                isImplicit, hasPayload,
                                                rawValueKindID, isNegative,
                                                rawValueData,
-                                               rawResilienceExpansion,
                                                numArgNames,
                                                argNameAndDependencyIDs);
 
@@ -3518,13 +3585,6 @@ public:
     elem->setAccess(std::max(cast<EnumDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
 
-    if (auto resilienceExpansion = getActualResilienceExpansion(
-                                       rawResilienceExpansion)) {
-      elem->setDefaultArgumentResilienceExpansion(*resilienceExpansion);
-    } else {
-      MF.error();
-      return nullptr;
-    }
     return elem;
   }
 
@@ -3535,8 +3595,8 @@ public:
     GenericEnvironmentID genericEnvID;
     TypeID elemInterfaceTypeID;
     ModuleFile::AccessorRecord accessors;
-    DeclID overriddenID;
-    uint8_t rawAccessLevel, rawSetterAccessLevel;
+    DeclID overriddenID, opaqueReturnTypeID;
+    uint8_t rawAccessLevel, rawSetterAccessLevel, rawStaticSpelling;
     uint8_t opaqueReadOwnership, readImpl, writeImpl, readWriteImpl;
     unsigned numArgNames, numAccessors;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
@@ -3550,7 +3610,9 @@ public:
                                              genericEnvID,
                                              elemInterfaceTypeID,
                                              overriddenID, rawAccessLevel,
-                                             rawSetterAccessLevel, numArgNames,
+                                             rawSetterAccessLevel,
+                                             rawStaticSpelling, numArgNames,
+                                             opaqueReturnTypeID,
                                              argNameAndDependencyIDs);
     // Resolve the name ids.
     SmallVector<Identifier, 2> argNames;
@@ -3586,8 +3648,16 @@ public:
     auto *genericParams = MF.maybeReadGenericParams(parent);
     if (declOrOffset.isComplete())
       return declOrOffset;
+    
+    auto staticSpelling = getActualStaticSpellingKind(rawStaticSpelling);
+    if (!staticSpelling.hasValue()) {
+      MF.error();
+      return nullptr;
+    }
 
-    auto subscript = MF.createDecl<SubscriptDecl>(name, SourceLoc(), nullptr,
+    auto subscript = MF.createDecl<SubscriptDecl>(name,
+                                                  SourceLoc(), *staticSpelling,
+                                                  SourceLoc(), nullptr,
                                                   SourceLoc(), TypeLoc(),
                                                   parent, genericParams);
     subscript->setIsGetterMutating(isGetterMutating);
@@ -3627,6 +3697,12 @@ public:
     subscript->setOverriddenDecl(cast_or_null<SubscriptDecl>(overridden.get()));
     if (subscript->getOverriddenDecl())
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
+    
+    if (opaqueReturnTypeID) {
+      subscript->setOpaqueResultTypeDecl(
+                         cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
+    }
+    
     return subscript;
   }
 
@@ -4117,6 +4193,7 @@ DeclDeserializer::getDeclCheckedImpl() {
   CASE(Var)
   CASE(Param)
   CASE(Func)
+  CASE(OpaqueType)
   CASE(Accessor)
   CASE(PatternBinding)
   CASE(Protocol)
@@ -4548,11 +4625,11 @@ public:
 
       IdentifierID labelID;
       TypeID typeID;
-      bool isVariadic, isAutoClosure, isEscaping;
+      bool isVariadic, isAutoClosure;
       unsigned rawOwnership;
       decls_block::FunctionParamLayout::readRecord(scratch, labelID, typeID,
                                                    isVariadic, isAutoClosure,
-                                                   isEscaping, rawOwnership);
+                                                   rawOwnership);
 
       auto ownership =
           getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
@@ -4568,7 +4645,7 @@ public:
       params.emplace_back(paramTy.get(),
                           MF.getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
-                                             isEscaping, *ownership));
+                                             *ownership));
     }
 
     if (!isGeneric) {
@@ -4705,6 +4782,19 @@ public:
                                                        existentialID);
 
     return OpenedArchetypeType::get(MF.getType(existentialID));
+  }
+      
+  Expected<Type> deserializeOpaqueArchetypeType(ArrayRef<uint64_t> scratch,
+                                                StringRef blobData) {
+    DeclID opaqueDeclID;
+    SubstitutionMapID subsID;
+    decls_block::OpaqueArchetypeTypeLayout::readRecord(scratch,
+                                                       opaqueDeclID, subsID);
+
+    auto opaqueDecl = cast<OpaqueTypeDecl>(MF.getDecl(opaqueDeclID));
+    auto subs = MF.getSubstitutionMap(subsID);
+
+    return OpaqueTypeArchetypeType::get(opaqueDecl, subs);
   }
       
   Expected<Type> deserializeNestedArchetypeType(ArrayRef<uint64_t> scratch,
@@ -5137,6 +5227,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
   CASE(DynamicSelf)
   CASE(ReferenceStorage)
   CASE(PrimaryArchetype)
+  CASE(OpaqueArchetype)
   CASE(OpenedArchetype)
   CASE(NestedArchetype)
   CASE(GenericTypeParam)

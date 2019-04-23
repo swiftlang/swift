@@ -554,6 +554,11 @@ public:
     // be in a different scope.
   }
 
+  std::unique_ptr<Initialization>
+  prepareIndirectResultInit(CanType formalResultType,
+                            SmallVectorImpl<SILValue> &directResultsBuffer,
+                            SmallVectorImpl<CleanupHandle> &cleanups);
+
   //===--------------------------------------------------------------------===//
   // Entry points for codegen
   //===--------------------------------------------------------------------===//
@@ -623,6 +628,10 @@ public:
   
   /// Generate a nullary function that returns the given value.
   void emitGeneratorFunction(SILDeclRef function, Expr *value);
+
+  /// Generate a nullary function that returns the value of the given variable's
+  /// expression initializer.
+  void emitGeneratorFunction(SILDeclRef function, VarDecl *var);
 
   /// Generate an ObjC-compatible destructor (-dealloc).
   void emitObjCDestructor(SILDeclRef dtor);
@@ -1865,7 +1874,8 @@ public:
   LValue emitLValue(Expr *E, SGFAccessKind accessKind,
                     LValueOptions options = LValueOptions());
 
-  RValue emitRValueForNonMemberVarDecl(SILLocation loc, VarDecl *var,
+  RValue emitRValueForNonMemberVarDecl(SILLocation loc,
+                                       ConcreteDeclRef declRef,
                                        CanType formalRValueType,
                                        AccessSemantics semantics,
                                        SGFContext C);

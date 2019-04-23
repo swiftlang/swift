@@ -35,13 +35,14 @@ namespace {
 } // end unnamed namespace
 
 // Defined out-of-line so that we can see ~ModuleFile.
-SerializedModuleLoaderBase::SerializedModuleLoaderBase(ASTContext &ctx,
-                                                       DependencyTracker *tracker,
-                                                       ModuleLoadingMode loadMode)
-  : ModuleLoader(tracker), Ctx(ctx), LoadMode(loadMode) {}
-SerializedModuleLoaderBase::~SerializedModuleLoaderBase() = default;
+SerializedModuleLoaderBase::SerializedModuleLoaderBase(
+    ASTContext &ctx, DependencyTracker *tracker, ModuleLoadingMode loadMode)
+    : ModuleLoader(tracker), Ctx(ctx), LoadMode(loadMode) {}
 
+SerializedModuleLoaderBase::~SerializedModuleLoaderBase() = default;
 SerializedModuleLoader::~SerializedModuleLoader() = default;
+MemoryBufferSerializedModuleLoader::~MemoryBufferSerializedModuleLoader() =
+    default;
 
 std::error_code SerializedModuleLoaderBase::openModuleDocFile(
   AccessPathElem ModuleID, StringRef ModuleDocPath,
@@ -218,6 +219,8 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
                         moduleBuffer, moduleDocBuffer);
       if (!result) {
         return true;
+      } else if (result == std::errc::not_supported) {
+        return false;
       } else if (result != std::errc::no_such_file_or_directory) {
         return None;
       }
@@ -251,6 +254,8 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
                                                moduleBuffer, moduleDocBuffer);
       if (!result)
         return true;
+      else if (result == std::errc::not_supported)
+        return false;
     }
   }
 
@@ -320,6 +325,8 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
                                                moduleBuffer, moduleDocBuffer);
       if (!result)
         return true;
+      else if (result == std::errc::not_supported)
+        return false;
     }
   }
 
@@ -394,6 +401,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     // We've loaded the file. Now try to bring it into the AST.
     auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile,
                                                 extendedInfo.isSIB());
+    fileUnit->setParseableInterface(extendedInfo.getParseableInterface());
     M.addFile(*fileUnit);
     if (extendedInfo.isTestable())
       M.setTestingEnabled();
@@ -601,23 +609,22 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
   }
 }
 
-bool
-SerializedModuleLoaderBase::canImportModule(std::pair<Identifier, SourceLoc> mID) {
-  // First see if we find it in the registered memory buffers.
-  if (!MemoryBuffers.empty()) {
-    auto bufIter = MemoryBuffers.find(mID.first.str());
-    if (bufIter != MemoryBuffers.end()) {
-      return true;
-    }
-  }
-
-  // Otherwise look on disk.
+bool SerializedModuleLoaderBase::canImportModule(
+    std::pair<Identifier, SourceLoc> mID) {
+  // Look on disk.
   bool isFramework = false;
   return findModule(mID, nullptr, nullptr, isFramework);
 }
 
-ModuleDecl *SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
-                                                   ModuleDecl::AccessPathTy path) {
+bool MemoryBufferSerializedModuleLoader::canImportModule(
+    std::pair<Identifier, SourceLoc> mID) {
+  // See if we find it in the registered memory buffers.
+  return MemoryBuffers.count(mID.first.str());
+}
+
+ModuleDecl *
+SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
+                                       ModuleDecl::AccessPathTy path) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
@@ -627,27 +634,18 @@ ModuleDecl *SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
 
   std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer;
   std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer;
-  // First see if we find it in the registered memory buffers.
-  if (!MemoryBuffers.empty()) {
-    // FIXME: Right now this works only with access paths of length 1.
-    // Once submodules are designed, this needs to support suffix
-    // matching and a search path.
-    auto bufIter = MemoryBuffers.find(moduleID.first.str());
-    if (bufIter != MemoryBuffers.end()) {
-      moduleInputBuffer = std::move(bufIter->second);
-      MemoryBuffers.erase(bufIter);
-    }
-  }
 
-  // Otherwise look on disk.
-  if (!moduleInputBuffer) {
-    if (!findModule(moduleID, &moduleInputBuffer, &moduleDocInputBuffer,
-                    isFramework)) {
-      return nullptr;
+  // Look on disk.
+  if (!findModule(moduleID, &moduleInputBuffer, &moduleDocInputBuffer,
+                  isFramework)) {
+    return nullptr;
+  }
+  if (dependencyTracker) {
+    // Don't record cached artifacts as dependencies.
+    StringRef DepPath = moduleInputBuffer->getBufferIdentifier();
+    if (!isCached(DepPath)) {
+      dependencyTracker->addDependency(DepPath, /*isSystem=*/false);
     }
-    if (dependencyTracker)
-      dependencyTracker->addDependency(moduleInputBuffer->getBufferIdentifier(),
-                                       /*isSystem=*/false);
   }
 
   assert(moduleInputBuffer);
@@ -662,6 +660,43 @@ ModuleDecl *SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
     M->setFailedToLoad();
   }
 
+  return M;
+}
+
+ModuleDecl *
+MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
+                                               ModuleDecl::AccessPathTy path) {
+  // FIXME: Swift submodules?
+  if (path.size() > 1)
+    return nullptr;
+
+  auto moduleID = path[0];
+
+  // See if we find it in the registered memory buffers.
+
+  // FIXME: Right now this works only with access paths of length 1.
+  // Once submodules are designed, this needs to support suffix
+  // matching and a search path.
+  auto bufIter = MemoryBuffers.find(moduleID.first.str());
+  if (bufIter == MemoryBuffers.end())
+    return nullptr;
+
+  bool isFramework = false;
+  bool treatAsPartialModule = false;
+  std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer;
+  moduleInputBuffer = std::move(bufIter->second);
+  MemoryBuffers.erase(bufIter);
+  assert(moduleInputBuffer);
+
+  auto *M = ModuleDecl::create(moduleID.first, Ctx);
+  SWIFT_DEFER { M->setHasResolvedImports(); };
+
+  if (!loadAST(*M, moduleID.second, std::move(moduleInputBuffer), {},
+               isFramework, treatAsPartialModule)) {
+    return nullptr;
+  }
+
+  Ctx.LoadedModules[moduleID.first] = M;
   return M;
 }
 
@@ -686,6 +721,24 @@ void SerializedModuleLoaderBase::loadObjCMethods(
     modulePair.first->loadObjCMethods(classDecl, selector, isInstanceMethod,
                                       methods);
   }
+}
+
+std::error_code MemoryBufferSerializedModuleLoader::findModuleFilesInDirectory(
+    AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
+    StringRef ModuleDocFilename,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) {
+  // This is a soft error instead of an llvm_unreachable because this API is
+  // primarily used by LLDB which makes it more likely that unwitting changes to
+  // the Swift compiler accidentally break the contract.
+  assert(false && "not supported");
+  return std::make_error_code(std::errc::not_supported);
+}
+
+bool MemoryBufferSerializedModuleLoader::maybeDiagnoseTargetMismatch(
+    SourceLoc sourceLocation, StringRef moduleName, StringRef archName,
+    StringRef directoryPath) {
+  return false;
 }
 
 void SerializedModuleLoaderBase::verifyAllModules() {
@@ -745,6 +798,12 @@ void SerializedASTFile::lookupValue(ModuleDecl::AccessPathTy accessPath,
 
 TypeDecl *SerializedASTFile::lookupLocalType(llvm::StringRef MangledName) const{
   return File.lookupLocalType(MangledName);
+}
+
+OpaqueTypeDecl *
+SerializedASTFile::lookupOpaqueResultType(StringRef MangledName,
+                                          LazyResolver *resolver) {
+  return File.lookupOpaqueResultType(MangledName);
 }
 
 TypeDecl *
@@ -833,7 +892,14 @@ SerializedASTFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &results) const{
   File.getLocalTypeDecls(results);
 }
 
-void SerializedASTFile::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
+void
+SerializedASTFile::getOpaqueReturnTypeDecls(
+                              SmallVectorImpl<OpaqueTypeDecl*> &results) const {
+  File.getOpaqueReturnTypeDecls(results);
+}
+
+void
+SerializedASTFile::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
   File.getDisplayDecls(results);
 }
 

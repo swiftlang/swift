@@ -869,3 +869,13 @@ public extension ObjCSub {
     set {}
   }
 }
+
+public struct TestGenericSubscripts {
+  // We'd like these to be errors in a future version of Swift, but they weren't
+  // in Swift 5.0.
+  public subscript<T: PrivateProto>(_: T) -> Int { return 0 } // expected-warning {{subscript should not be declared public because its generic parameter uses a private type}} {{none}}
+  public subscript<T>(where _: T) -> Int where T: PrivateProto { return 0 } // expected-warning {{subscript should not be declared public because its generic requirement uses a private type}} {{none}}
+}
+
+public typealias TestGenericAlias<T: PrivateProto> = T // expected-warning {{type alias should not be declared public because its generic parameter uses a private type}}
+public typealias TestGenericAliasWhereClause<T> = T where T: PrivateProto // expected-warning {{type alias should not be declared public because its generic requirement uses a private type}}

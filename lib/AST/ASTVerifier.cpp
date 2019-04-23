@@ -629,12 +629,17 @@ public:
 
       bool foundError = type->getCanonicalType().findIf([&](Type type) -> bool {
         if (auto archetype = type->getAs<ArchetypeType>()) {
+          auto root = archetype->getRoot();
+          
+          // Opaque archetypes are globally available. We don't need to check
+          // them here.
+          if (isa<OpaqueTypeArchetypeType>(root))
+            return false;
+          
           // Only visit each archetype once.
           if (!visitedArchetypes.insert(archetype).second)
             return false;
           
-          auto root = archetype->getRoot();
-
           // We should know about archetypes corresponding to opened
           // existential archetypes.
           if (auto opened = dyn_cast<OpenedArchetypeType>(root)) {
@@ -761,6 +766,7 @@ public:
     FUNCTION_LIKE(DestructorDecl)
     FUNCTION_LIKE(FuncDecl)
     FUNCTION_LIKE(EnumElementDecl)
+    FUNCTION_LIKE(SubscriptDecl)
     SCOPE_LIKE(NominalTypeDecl)
     SCOPE_LIKE(ExtensionDecl)
 
@@ -1777,7 +1783,7 @@ public:
                "\nArgument type: ";
         InputExprTy.print(Out);
         Out << "\nParameter types: ";
-        FT->printParams(Out);
+        AnyFunctionType::printParams(FT->getParams(), Out);
         Out << "\n";
         E->dump(Out);
         Out << "\n";
@@ -1818,7 +1824,7 @@ public:
       
       // The base of a member reference cannot be an existential type.
       if (E->getBase()->getType()->getWithoutSpecifierType()
-            ->isAnyExistentialType()) {
+            ->isExistentialType()) {
         Out << "Member reference into an unopened existential type\n";
         E->dump(Out);
         Out << "\n";
@@ -2495,6 +2501,20 @@ public:
         if (!varTy->getOptionalObjectType()) {
           Out << "implicitly unwrapped optional attribute should only be set on VarDecl "
                  "with optional type\n";
+          abort();
+        }
+      }
+
+      if (auto *caseStmt =
+	    dyn_cast_or_null<CaseStmt>(var->getRecursiveParentPatternStmt())) {
+        // In a type checked AST, a case stmt that is a recursive parent pattern
+        // stmt of a var decl, must have bound decls. This is because we
+        // guarantee that all case label items bind corresponding patterns and
+        // the case body var decls of a case stmt are created from the var decls
+        // of the first case label items.
+        if (!caseStmt->hasBoundDecls()) {
+          Out << "parent CaseStmt of VarDecl does not have any case body "
+                 "decls?!\n";
           abort();
         }
       }

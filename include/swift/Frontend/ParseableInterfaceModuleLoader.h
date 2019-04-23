@@ -139,6 +139,8 @@ class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) override;
 
+  bool isCached(StringRef DepPath) override;
+
 public:
   static std::unique_ptr<ParseableInterfaceModuleLoader>
   create(ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
@@ -156,7 +158,7 @@ public:
   static bool buildSwiftModuleFromSwiftInterface(
     ASTContext &Ctx, StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
-    bool SerializeDependencyHashes);
+    bool SerializeDependencyHashes, bool TrackSystemDependencies);
 };
 
 /// Extract the specified-or-defaulted -module-cache-path that winds up in

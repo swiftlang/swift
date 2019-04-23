@@ -418,6 +418,10 @@ ShortestPathAnalysis::Weight ShortestPathAnalysis::
 getWeight(SILBasicBlock *BB, Weight CallerWeight) {
   assert(BB->getParent() == F);
 
+  // Return a conservative default if the analysis was not done due to a high number of blocks.
+  if (BlockInfos.empty())
+    return Weight(CallerWeight.ScopeLength + ColdBlockLength, CallerWeight.LoopWeight);
+
   SILLoop *Loop = LI->getLoopFor(BB);
   if (!Loop) {
     // We are not in a loop. So just account the length of our function scope

@@ -2267,6 +2267,10 @@ public:
         = TC.getFragileFunctionKind(DC);
   }
 
+  bool shouldWalkIntoNonSingleExpressionClosure() override {
+    return false;
+  }
+
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     ExprStack.push_back(E);
 
@@ -2289,7 +2293,7 @@ public:
         // DerivedConformanceRawRepresentable will do the right thing.
         flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailable;
 
-      diagAvailability(DR->getDecl(), DR->getSourceRange(),
+      diagAvailability(DR->getDeclRef(), DR->getSourceRange(),
                        getEnclosingApplyExpr(), flags);
       maybeDiagStorageAccess(DR->getDecl(), DR->getSourceRange(), DC);
     }
@@ -2298,18 +2302,18 @@ public:
       return skipChildren();
     }
     if (auto OCDR = dyn_cast<OtherConstructorDeclRefExpr>(E))
-      diagAvailability(OCDR->getDecl(),
+      diagAvailability(OCDR->getDeclRef(),
                        OCDR->getConstructorLoc().getSourceRange(),
                        getEnclosingApplyExpr());
     if (auto DMR = dyn_cast<DynamicMemberRefExpr>(E))
-      diagAvailability(DMR->getMember().getDecl(),
+      diagAvailability(DMR->getMember(),
                        DMR->getNameLoc().getSourceRange(),
                        getEnclosingApplyExpr());
     if (auto DS = dyn_cast<DynamicSubscriptExpr>(E))
-      diagAvailability(DS->getMember().getDecl(), DS->getSourceRange());
+      diagAvailability(DS->getMember(), DS->getSourceRange());
     if (auto S = dyn_cast<SubscriptExpr>(E)) {
       if (S->hasDecl()) {
-        diagAvailability(S->getDecl().getDecl(), S->getSourceRange());
+        diagAvailability(S->getDecl(), S->getSourceRange());
         maybeDiagStorageAccess(S->getDecl().getDecl(), S->getSourceRange(), DC);
       }
     }
@@ -2324,7 +2328,7 @@ public:
       walkInOutExpr(IO);
       return skipChildren();
     }
-    
+
     return visitChildren();
   }
 
@@ -2335,16 +2339,16 @@ public:
     return E;
   }
 
-  bool diagAvailability(const ValueDecl *D, SourceRange R,
+  bool diagAvailability(ConcreteDeclRef declRef, SourceRange R,
                         const ApplyExpr *call = nullptr,
-                        DeclAvailabilityFlags flags = None);
+                        DeclAvailabilityFlags flags = None) const;
 
 private:
   bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
-                             const AvailableAttr *Attr);
+                             const AvailableAttr *Attr) const;
   bool diagnoseMemoryLayoutMigration(const ValueDecl *D, SourceRange R,
                                      const AvailableAttr *Attr,
-                                     const ApplyExpr *call);
+                                     const ApplyExpr *call) const;
 
   /// Walks up from a potential callee to the enclosing ApplyExpr.
   const ApplyExpr *getEnclosingApplyExpr() const {
@@ -2498,10 +2502,7 @@ private:
                                 DeclAvailabilityFlags Flags) const {
     Flags &= DeclAvailabilityFlag::ForInout;
     Flags |= DeclAvailabilityFlag::ContinueOnPotentialUnavailability;
-    if (diagnoseDeclAvailability(D, TC,
-                                 const_cast<DeclContext*>(ReferenceDC),
-                                 ReferenceRange,
-                                 Flags))
+    if (diagAvailability(D, ReferenceRange, /*call*/nullptr, Flags))
       return;
   }
 };
@@ -2510,11 +2511,12 @@ private:
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool
-AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
+AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
                                      const ApplyExpr *call,
-                                     DeclAvailabilityFlags Flags) {
-  if (!D)
+                                     DeclAvailabilityFlags Flags) const {
+  if (!declRef)
     return false;
+  const ValueDecl *D = declRef.getDecl();
 
   if (auto *attr = AvailableAttr::isUnavailable(D)) {
     if (diagnoseIncDecRemoval(D, R, attr))
@@ -2535,7 +2537,7 @@ AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
 
   if (FragileKind)
     if (R.isValid())
-      if (TC.diagnoseInlinableDeclRef(R.Start, D, DC, *FragileKind,
+      if (TC.diagnoseInlinableDeclRef(R.Start, declRef, DC, *FragileKind,
                                       TreatUsableFromInlineAsPublic))
         return true;
 
@@ -2598,9 +2600,9 @@ static bool isIntegerOrFloatingPointType(Type ty, DeclContext *DC,
 
 /// If this is a call to an unavailable ++ / -- operator, try to diagnose it
 /// with a fixit hint and return true.  If not, or if we fail, return false.
-bool AvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D,
-                                               SourceRange R,
-                                               const AvailableAttr *Attr) {
+bool
+AvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
+                                          const AvailableAttr *Attr) const {
   // We can only produce a fixit if we're talking about ++ or --.
   bool isInc = D->getBaseName() == "++";
   if (!isInc && D->getBaseName() != "--")
@@ -2660,10 +2662,11 @@ bool AvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D,
 
 /// If this is a call to an unavailable sizeof family function, diagnose it
 /// with a fixit hint and return true. If not, or if we fail, return false.
-bool AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
-                                                       SourceRange R,
-                                                       const AvailableAttr *Attr,
-                                                       const ApplyExpr *call) {
+bool
+AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
+                                                  SourceRange R,
+                                                  const AvailableAttr *Attr,
+                                                  const ApplyExpr *call) const {
 
   if (!D->getModuleContext()->isStdlibModule())
     return false;
@@ -2746,5 +2749,5 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
                                      DeclAvailabilityFlags Flags)
 {
   AvailabilityWalker AW(TC, DC);
-  return AW.diagAvailability(Decl, R, nullptr, Flags);
+  return AW.diagAvailability(const_cast<ValueDecl *>(Decl), R, nullptr, Flags);
 }

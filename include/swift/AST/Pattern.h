@@ -168,6 +168,13 @@ public:
   /// pattern.
   void forEachVariable(llvm::function_ref<void(VarDecl *)> f) const;
 
+  /// Returns true if \p vd is in the pattern.
+  bool containsVarDecl(const VarDecl *inputVD) const {
+    bool result = false;
+    forEachVariable([&](VarDecl *vd) { result |= inputVD == vd; });
+    return result;
+  }
+
   /// apply the specified function to all pattern nodes recursively in
   /// this pattern.  This is a pre-order traversal.
   void forEachNode(llvm::function_ref<void(Pattern *)> f);
@@ -214,7 +221,9 @@ public:
   
   void print(llvm::raw_ostream &OS,
              const PrintOptions &Options = PrintOptions()) const;
-  void dump() const;
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump() const LLVM_ATTRIBUTE_USED,
+      "only for use within the debugger");
   
   /// walk - This recursively walks the AST rooted at this pattern.
   Pattern *walk(ASTWalker &walker);

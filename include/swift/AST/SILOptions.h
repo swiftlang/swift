@@ -133,8 +133,8 @@ public:
   bool EnableLargeLoadableTypes = true;
 
   /// Should the default pass pipelines strip ownership during the diagnostic
-  /// pipeline.
-  bool StripOwnershipDuringDiagnosticsPipeline = true;
+  /// pipeline or after serialization.
+  bool StripOwnershipAfterSerialization = false;
 
   /// The name of the file to which the backend should save YAML optimization
   /// records.

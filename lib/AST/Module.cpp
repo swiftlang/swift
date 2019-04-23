@@ -17,6 +17,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTWalker.h"
@@ -36,6 +37,7 @@
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Token.h"
 #include "swift/Strings.h"
 #include "swift/Syntax/SyntaxNodes.h"
@@ -410,6 +412,17 @@ TypeDecl * ModuleDecl::lookupLocalType(StringRef MangledName) const {
   return nullptr;
 }
 
+OpaqueTypeDecl *
+ModuleDecl::lookupOpaqueResultType(StringRef MangledName,
+                                   LazyResolver *resolver) {
+  for (auto file : getFiles()) {
+    auto OTD = file->lookupOpaqueResultType(MangledName, resolver);
+    if (OTD)
+      return OTD;
+  }
+  return nullptr;
+}
+
 void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
                               DeclContext *container, DeclName name,
                               Identifier privateDiscriminator) const {
@@ -445,7 +458,7 @@ void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   // one...unless we're already in a private context, in which case everything
   // is private and a discriminator is unnecessary.
   if (alreadyInPrivateContext) {
-    assert(privateDiscriminator.empty() && "unnecessary private-discriminator");
+    assert(privateDiscriminator.empty() && "unnecessary private discriminator");
     // Don't remove anything; everything here is private anyway.
 
   } else if (privateDiscriminator.empty()) {
@@ -566,6 +579,14 @@ void SourceFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
   Results.append(LocalTypeDecls.begin(), LocalTypeDecls.end());
 }
 
+void
+SourceFile::getOpaqueReturnTypeDecls(SmallVectorImpl<OpaqueTypeDecl*> &Results)
+const {
+  for (auto &member : ValidatedOpaqueReturnTypes) {
+    Results.push_back(member.second);
+  }
+}
+
 TypeDecl *SourceFile::lookupLocalType(llvm::StringRef mangledName) const {
   ASTContext &ctx = getASTContext();
   for (auto typeDecl : LocalTypeDecls) {
@@ -586,6 +607,8 @@ void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
 
 Optional<ProtocolConformanceRef>
 ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
+  ASTContext &ctx = getASTContext();
+
   assert(type->isExistentialType());
 
   // If the existential type cannot be represented or the protocol does not
@@ -606,7 +629,7 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
     if (protocol->requiresSelfConformanceWitnessTable() &&
         type->is<ProtocolType>() &&
         type->castTo<ProtocolType>()->getDecl() == protocol)
-      return ProtocolConformanceRef(protocol);
+      return ProtocolConformanceRef(ctx.getSelfConformance(protocol));
 
     return None;
   }
@@ -625,7 +648,7 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
     // If we found the protocol we're looking for, return an abstract
     // conformance to it.
     if (protoDecl == protocol)
-      return ProtocolConformanceRef(protocol);
+      return ProtocolConformanceRef(ctx.getSelfConformance(protocol));
 
     // If the protocol has a superclass constraint, we might conform
     // concretely.
@@ -636,7 +659,7 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
 
     // Now check refined protocols.
     if (protoDecl->inheritsFrom(protocol))
-      return ProtocolConformanceRef(protocol);
+      return ProtocolConformanceRef(ctx.getSelfConformance(protocol));
   }
 
   // We didn't find our protocol in the existential's list; it doesn't
@@ -715,7 +738,7 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
   // compiler.
   if (auto inherited = dyn_cast<InheritedProtocolConformance>(conformance)) {
     // Dig out the conforming nominal type.
-    auto rootConformance = inherited->getRootNormalConformance();
+    auto rootConformance = inherited->getRootConformance();
     auto conformingClass
       = rootConformance->getType()->getClassOrBoundGenericClass();
 
@@ -1134,6 +1157,10 @@ StringRef ModuleDecl::getModuleFilename() const {
   // per-file names. Modules can consist of more than one file.
   StringRef Result;
   for (auto F : getFiles()) {
+    Result = F->getParseableInterface();
+    if (!Result.empty())
+      return Result;
+
     if (auto SF = dyn_cast<SourceFile>(F)) {
       if (!Result.empty())
         return StringRef();
@@ -1421,6 +1448,14 @@ void SourceFile::addImports(ArrayRef<ImportedModuleDesc> IM) {
   assert(iter == newBuf.end());
 
   Imports = newBuf;
+
+  // Update the HasImplementationOnlyImports flag.
+  if (!HasImplementationOnlyImports) {
+    for (auto &desc : IM) {
+      if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
+        HasImplementationOnlyImports = true;
+    }
+  }
 }
 
 bool SourceFile::hasTestableOrPrivateImport(
@@ -1483,6 +1518,43 @@ bool SourceFile::hasTestableOrPrivateImport(
                                   ImportFlags::PrivateImport) &&
                               desc.filename == filename;
                      });
+}
+
+bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
+  // Implementation-only imports are (currently) always source-file-specific,
+  // so if we don't have any, we know the search is complete.
+  if (!hasImplementationOnlyImports())
+    return false;
+
+  auto isImportedBy = [](const ModuleDecl *dest, const ModuleDecl *src) {
+    // Fast path.
+    if (dest == src) return true;
+
+    // Walk the transitive imports, respecting visibility.
+    // This return true if the search *didn't* short-circuit, and it short
+    // circuits if we found `dest`, so we need to invert the sense before
+    // returning.
+    return !const_cast<ModuleDecl*>(src)
+              ->forAllVisibleModules({}, [dest](ModuleDecl::ImportedModule im) {
+      // Continue searching as long as we haven't found `dest` yet.
+      return im.second != dest;
+    });
+  };
+
+  // Look at the imports of this source file.
+  for (auto &desc : Imports) {
+    // Ignore implementation-only imports.
+    if (desc.importOptions.contains(ImportFlags::ImplementationOnly))
+      continue;
+
+    // If the module is imported this way, it's not imported
+    // implementation-only.
+    if (isImportedBy(module, desc.module.second))
+      return false;
+  }
+
+  // Now check this file's enclosing module in case there are re-exports.
+  return !isImportedBy(module, getParentModule());
 }
 
 void SourceFile::clearLookupCache() {
@@ -1689,6 +1761,40 @@ void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
 void SourceFile::createReferencedNameTracker() {
   assert(!ReferencedNames && "This file already has a name tracker.");
   ReferencedNames.emplace(ReferencedNameTracker());
+}
+
+OpaqueTypeDecl *
+SourceFile::lookupOpaqueResultType(StringRef MangledName,
+                                   LazyResolver *resolver) {
+  // Check already-validated decls.
+  auto found = ValidatedOpaqueReturnTypes.find(MangledName);
+  if (found != ValidatedOpaqueReturnTypes.end())
+    return found->second;
+  
+  // If there are unvalidated decls with opaque types, go through and validate
+  // them now.
+  if (resolver && !UnvalidatedDeclsWithOpaqueReturnTypes.empty()) {
+    while (!UnvalidatedDeclsWithOpaqueReturnTypes.empty()) {
+      ValueDecl *decl = *UnvalidatedDeclsWithOpaqueReturnTypes.begin();
+      UnvalidatedDeclsWithOpaqueReturnTypes.erase(decl);
+      resolver->resolveDeclSignature(decl);
+    }
+    
+    found = ValidatedOpaqueReturnTypes.find(MangledName);
+    if (found != ValidatedOpaqueReturnTypes.end())
+      return found->second;
+  }
+  
+  // Otherwise, we don't have a matching opaque decl.
+  return nullptr;
+}
+
+void SourceFile::markDeclWithOpaqueResultTypeAsValidated(ValueDecl *vd) {
+  UnvalidatedDeclsWithOpaqueReturnTypes.erase(vd);
+  if (auto opaqueDecl = vd->getOpaqueResultTypeDecl()) {
+    ValidatedOpaqueReturnTypes.insert(
+              {opaqueDecl->getOpaqueReturnTypeIdentifier().str(), opaqueDecl});
+  }
 }
 
 //===----------------------------------------------------------------------===//

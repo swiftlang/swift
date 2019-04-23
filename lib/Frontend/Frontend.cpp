@@ -124,9 +124,8 @@ CompilerInvocation::getParseableInterfaceOutputPathForWholeModule() const {
       .SupplementaryOutputs.ParseableInterfaceOutputPath;
 }
 
-SerializationOptions
-CompilerInvocation::computeSerializationOptions(const SupplementaryOutputPaths &outs,
-                                                bool moduleIsPublic) {
+SerializationOptions CompilerInvocation::computeSerializationOptions(
+    const SupplementaryOutputPaths &outs, bool moduleIsPublic) {
   const FrontendOptions &opts = getFrontendOptions();
 
   SerializationOptions serializationOpts;
@@ -297,11 +296,13 @@ bool CompilerInstance::setUpModuleLoaders() {
   auto MLM = ModuleLoadingMode::PreferSerialized;
   if (auto forceModuleLoadingMode =
       llvm::sys::Process::GetEnv("SWIFT_FORCE_MODULE_LOADING")) {
-    if (*forceModuleLoadingMode == "prefer-parseable")
+    if (*forceModuleLoadingMode == "prefer-interface" ||
+        *forceModuleLoadingMode == "prefer-parseable")
       MLM = ModuleLoadingMode::PreferParseable;
     else if (*forceModuleLoadingMode == "prefer-serialized")
       MLM = ModuleLoadingMode::PreferSerialized;
-    else if (*forceModuleLoadingMode == "only-parseable")
+    else if (*forceModuleLoadingMode == "only-interface" ||
+             *forceModuleLoadingMode == "only-parseable")
       MLM = ModuleLoadingMode::OnlyParseable;
     else if (*forceModuleLoadingMode == "only-serialized")
       MLM = ModuleLoadingMode::OnlySerialized;
@@ -311,6 +312,13 @@ bool CompilerInstance::setUpModuleLoaders() {
                            *forceModuleLoadingMode);
       return true;
     }
+  }
+
+  if (Invocation.getLangOptions().EnableMemoryBufferImporter) {
+    auto MemoryBufferLoader = MemoryBufferSerializedModuleLoader::create(
+        *Context, getDependencyTracker());
+    this->MemoryBufferLoader = MemoryBufferLoader.get();
+    Context->addModuleLoader(std::move(MemoryBufferLoader));
   }
 
   std::unique_ptr<SerializedModuleLoader> SML =
@@ -1065,6 +1073,7 @@ void CompilerInstance::freeASTContext() {
   Context.reset();
   MainModule = nullptr;
   SML = nullptr;
+  MemoryBufferLoader = nullptr;
   PrimaryBufferIDs.clear();
   PrimarySourceFiles.clear();
 }
@@ -1112,9 +1121,12 @@ static void performSILOptimizations(CompilerInvocation &Invocation,
   } else {
     runSILOptimizationPasses(*SM);
   }
-  if (Invocation.getFrontendOptions().CheckOnoneSupportCompleteness &&
-      // TODO: handle non-ObjC based stdlib builds, e.g. on linux.
-      Invocation.getLangOptions().EnableObjCInterop) {
+  // When building SwiftOnoneSupport.o verify all expected ABI symbols.
+  if (Invocation.getFrontendOptions().CheckOnoneSupportCompleteness
+       // TODO: handle non-ObjC based stdlib builds, e.g. on linux.
+      && Invocation.getLangOptions().EnableObjCInterop
+      && Invocation.getFrontendOptions().RequestedAction
+             == FrontendOptions::ActionType::EmitObject) {
     checkCompletenessOfPrespecializations(*SM);
   }
 }

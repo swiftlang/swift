@@ -208,8 +208,10 @@ func testFunctionPointers() {
   var anotherFP: @convention(c) (CInt, CLong, UnsafeMutableRawPointer?) -> Void
     = getFunctionPointer2()
 
+  var sizedFP: (@convention(c) (CInt, CInt, UnsafeMutableRawPointer?) -> Void)?
+
   useFunctionPointer2(anotherFP)
-  anotherFP = fp // expected-error {{cannot assign value of type 'fptr?' (aka 'Optional<@convention(c) (Int32) -> Int32>') to type '@convention(c) (CInt, CLong, UnsafeMutableRawPointer?) -> Void' (aka '@convention(c) (Int32, Int, Optional<UnsafeMutableRawPointer>) -> ()')}}
+  sizedFP = fp // expected-error {{cannot assign value of type 'fptr?' (aka 'Optional<@convention(c) (Int32) -> Int32>') to type '(@convention(c) (CInt, CInt, UnsafeMutableRawPointer?) -> Void)?'}}
 }
 
 func testStructDefaultInit() {

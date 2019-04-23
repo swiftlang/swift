@@ -224,10 +224,18 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   // call site.
   auto index = 0;
   for (auto *param : *AFD->getParameters()) {
-    if (param->getDefaultValue())
+    if (param->isDefaultArgument())
       addSymbol(SILDeclRef::getDefaultArgGenerator(AFD, index));
     index++;
   }
+}
+
+void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
+  // If there's an opaque return type, its descriptor is exported.
+  if (auto opaqueResult = FD->getOpaqueResultTypeDecl()) {
+    addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));
+  }
+  visitAbstractFunctionDecl(FD);
 }
 
 void TBDGenVisitor::visitAccessorDecl(AccessorDecl *AD) {
@@ -241,6 +249,11 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   // Add the property descriptor if the decl needs it.
   if (ASD->exportsPropertyDescriptor()) {
     addSymbol(LinkEntity::forPropertyDescriptor(ASD));
+  }
+  
+  // ...and the opaque result decl if it has one.
+  if (auto opaqueResult = ASD->getOpaqueResultTypeDecl()) {
+    addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));
   }
 
   // Explicitly look at each accessor here: see visitAccessorDecl.
@@ -464,6 +477,7 @@ static bool isValidProtocolMemberForTBDGen(const Decl *D) {
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
     return true;
+  case DeclKind::OpaqueType:
   case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class:

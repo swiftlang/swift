@@ -56,6 +56,38 @@ struct X4 {
   }
 }
 
+struct X5 {
+  static var stored : Int = 1
+  
+  static subscript (i : Int) -> Int {
+    get {
+      return stored + i
+    }
+    set {
+      stored = newValue - i
+    }
+  }
+}
+
+class X6 {
+  static var stored : Int = 1
+  
+  class subscript (i : Int) -> Int {
+    get {
+      return stored + i
+    }
+    set {
+      stored = newValue - i
+    }
+  }
+}
+
+protocol XP1 {
+  subscript (i : Int) -> Int { get set }
+  static subscript (i : Int) -> Int { get set }
+}
+
+
 // Semantic errors
 struct Y1 {
   var x : X
@@ -80,6 +112,24 @@ struct Y2 {
 class Y3 {
   subscript(idx: Int) -> TypoType { // expected-error {{use of undeclared type 'TypoType'}}
     get { repeat {} while true }
+    set {}
+  }
+}
+
+class Y4 {
+  var x = X()
+  
+  static subscript(idx: Int) -> X {
+    get { return x } // expected-error {{instance member 'x' cannot be used on type 'Y4'}}
+    set {}
+  }
+}
+
+class Y5 {
+  static var x = X()
+  
+  subscript(idx: Int) -> X {
+    get { return x } // expected-error {{static member 'x' cannot be used on instance of type 'Y5'}}
     set {}
   }
 }
@@ -199,6 +249,27 @@ func test_subscript(_ x2: inout X2, i: Int, j: Int, value: inout Int, no: NoSubs
 
   value = ret[i]
   ret[i] = value
+  
+  X5[i] = value
+  value = X5[i]
+}
+
+func test_proto_static<XP1Type: XP1>(
+                                     i: Int, value: inout Int,
+                                     existential: inout XP1,
+                                     generic: inout XP1Type
+                                     ) {
+  existential[i] = value
+  value = existential[i]
+  
+  type(of: existential)[i] = value
+  value = type(of: existential)[i]
+
+  generic[i] = value
+  value = generic[i]
+  
+  XP1Type[i] = value
+  value = XP1Type[i]
 }
 
 func subscript_rvalue_materialize(_ i: inout Int) {
@@ -353,15 +424,6 @@ protocol r23952125 {
   subscript(index: Int) -> ItemType  // expected-error {{subscript in protocol must have explicit { get } or { get set } specifier}} {{36-36= { get <#set#> \}}}
 
   var c : Int // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-14= { get <#set#> \}}}
-}
-
-// <rdar://problem/16812341> QoI: Poor error message when providing a default value for a subscript parameter
-struct S4 {
-  subscript(subs: Int = 0) -> Int {  // expected-error {{default arguments are not allowed in subscripts}}
-    get {
-      return 1
-    }
-  }
 }
 
 // SR-2575

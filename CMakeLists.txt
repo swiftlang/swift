@@ -477,12 +477,6 @@ if(NOT SWIFT_LIPO)
   find_toolchain_tool(SWIFT_LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
 endif()
 
-if("${SWIFT_NATIVE_LLVM_TOOLS_PATH}" STREQUAL "")
-  set(SWIFT_CROSS_COMPILING FALSE)
-else()
-  set(SWIFT_CROSS_COMPILING TRUE)
-endif()
-
 # Reset CMAKE_SYSTEM_PROCESSOR if not cross-compiling.
 # CMake refuses to use `uname -m` on OS X
 # http://public.kitware.com/Bug/view.php?id=10326
@@ -503,7 +497,7 @@ else()
   swift_common_unified_build_config(SWIFT)
 endif()
 
-set(SWIFT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+get_filename_component(SWIFT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR} REALPATH)
 set(SWIFT_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 set(SWIFT_CMAKE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 set(SWIFT_MAIN_INCLUDE_DIR "${SWIFT_SOURCE_DIR}/include")
@@ -578,6 +572,8 @@ else()
     set(SWIFT_HOST_VARIANT_SDK_default "WINDOWS")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Haiku")
     set(SWIFT_HOST_VARIANT_SDK_default "HAIKU")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Android")
+    set(SWIFT_HOST_VARIANT_SDK_default "ANDROID")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     set(SWIFT_HOST_VARIANT_SDK_default "OSX")
   else()
@@ -702,6 +698,15 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "HAIKU")
   set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
 
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ANDROID")
+
+  set(SWIFT_HOST_VARIANT "android" CACHE STRING
+      "Deployment OS for Swift host tools (the compiler) [android].")
+
+  configure_sdk_unix("Android" "${SWIFT_HOST_VARIANT_ARCH}")
+  set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
+  set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
+
 elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
 
   set(SWIFT_HOST_VARIANT "macosx" CACHE STRING
@@ -746,7 +751,10 @@ endif()
 
 # Should we cross-compile the standard library for Android?
 is_sdk_requested(ANDROID swift_build_android)
-if(swift_build_android AND NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+if(swift_build_android AND NOT "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ANDROID")
+  if ("${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+    message(FATAL_ERROR "You must set SWIFT_ANDROID_NDK_PATH to cross-compile the Swift runtime for Android")
+  endif()
   if (NOT ("${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Darwin" OR "${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Linux"))
     message(FATAL_ERROR "A Darwin or Linux host is required to build the Swift runtime for Android")
   endif()

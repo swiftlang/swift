@@ -1020,11 +1020,48 @@ void ConstraintSystem::shrink(Expr *expr) {
   }
 }
 
+static bool debugConstraintSolverForExpr(ASTContext &C, Expr *expr) {
+  if (C.LangOpts.DebugConstraintSolver)
+    return true;
+
+  if (C.LangOpts.DebugConstraintSolverOnLines.empty())
+    // No need to compute the line number to find out it's not present.
+    return false;
+
+  // Get the lines on which the expression starts and ends.
+  unsigned startLine = 0, endLine = 0;
+  if (expr->getSourceRange().isValid()) {
+    auto range =
+      Lexer::getCharSourceRangeFromSourceRange(C.SourceMgr,
+                                               expr->getSourceRange());
+    startLine = C.SourceMgr.getLineNumber(range.getStart());
+    endLine = C.SourceMgr.getLineNumber(range.getEnd());
+  }
+
+  assert(startLine <= endLine && "expr ends before it starts?");
+
+  auto &lines = C.LangOpts.DebugConstraintSolverOnLines;
+  assert(std::is_sorted(lines.begin(), lines.end()) &&
+         "DebugConstraintSolverOnLines sorting invariant violated");
+
+  // Check if `lines` contains at least one line `L` where
+  // `startLine <= L <= endLine`. If it does, `lower_bound(startLine)` and
+  // `upper_bound(endLine)` will be different.
+  auto startBound = llvm::lower_bound(lines, startLine);
+  auto endBound = std::upper_bound(startBound, lines.end(), endLine);
+
+  return startBound != endBound;
+}
+
 bool ConstraintSystem::solve(Expr *&expr,
                              Type convertType,
                              ExprTypeCheckListener *listener,
                              SmallVectorImpl<Solution> &solutions,
                              FreeTypeVariableBinding allowFreeTypeVariables) {
+  llvm::SaveAndRestore<bool>
+    debugForExpr(TC.getLangOpts().DebugConstraintSolver,
+                 debugConstraintSolverForExpr(TC.Context, expr));
+
   // Attempt to solve the constraint system.
   auto solution = solveImpl(expr,
                             convertType,
@@ -1118,6 +1155,11 @@ ConstraintSystem::solveImpl(Expr *&expr,
   // constraint.
   if (convertType) {
     auto constraintKind = ConstraintKind::Conversion;
+    
+    if (getContextualTypePurpose() == CTP_ReturnStmt
+        && Options.contains(ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType))
+      constraintKind = ConstraintKind::OpaqueUnderlyingType;
+    
     if (getContextualTypePurpose() == CTP_CallArgument)
       constraintKind = ConstraintKind::ArgumentConversion;
 
@@ -1132,7 +1174,7 @@ ConstraintSystem::solveImpl(Expr *&expr,
     if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
       convertType = convertType.transform([&](Type type) -> Type {
         if (type->is<UnresolvedType>())
-          return createTypeVariable(convertTypeLocator);
+          return createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
         return type;
       });
     }
@@ -1147,21 +1189,9 @@ ConstraintSystem::solveImpl(Expr *&expr,
   }
 
   if (TC.getLangOpts().DebugConstraintSolver) {
-    auto getTypeOfExpr = [&](const Expr *E) -> Type {
-      if (hasType(E))
-        return getType(E);
-      return Type();
-    };
-    auto getTypeOfTypeLoc = [&](const TypeLoc &TL) -> Type {
-      if (hasType(TL))
-        return getType(TL);
-      return Type();
-    };
-
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
-
-    expr->dump(log, getTypeOfExpr, getTypeOfTypeLoc);
+    print(log, expr);
     log << "\n";
     print(log);
   }
@@ -1344,13 +1374,36 @@ ConstraintSystem::filterDisjunction(
   case 1: {
     // Only a single constraint remains. Retire the disjunction and make
     // the remaining constraint active.
+    auto choice = disjunction->getNestedConstraints()[choiceIdx];
+
+    // This can only happen when subscript syntax is used to lookup
+    // something which doesn't exist in type marked with
+    // `@dynamicMemberLookup`.
+    // Since filtering currently runs as part of the `applicable function`
+    // constraint processing, "keypath dynamic member lookup" choice can't
+    // be attempted in-place because that would also try to operate on that
+    // constraint, so instead let's keep the disjunction, but disable all
+    // unviable choices.
+    if (choice->getOverloadChoice().getKind() ==
+        OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+      // Early simplification of the "keypath dynamic member lookup" choice
+      // is impossible because it requires constraints associated with
+      // subscript index expression to be present.
+      if (!solverState)
+        return SolutionKind::Unsolved;
+
+      for (auto *currentChoice : disjunction->getNestedConstraints()) {
+        if (currentChoice != choice)
+          solverState->disableContraint(currentChoice);
+      }
+      return SolutionKind::Solved;
+    }
 
     // Retire the disjunction. It's been solved.
     retireConstraint(disjunction);
 
     // Note the choice we made and simplify it. This introduces the
     // new constraint into the system.
-    auto choice = disjunction->getNestedConstraints()[choiceIdx];
     if (disjunction->shouldRememberChoice()) {
       recordDisjunctionChoice(disjunction->getLocator(), choiceIdx);
     }
@@ -1502,7 +1555,8 @@ void ConstraintSystem::ArgumentInfoCollector::walk(Type argType) {
       case ConstraintKind::ArgumentConversion:
       case ConstraintKind::Conversion:
       case ConstraintKind::BridgingConversion:
-      case ConstraintKind::BindParam: {
+      case ConstraintKind::BindParam:
+      case ConstraintKind::OpaqueUnderlyingType: {
         auto secondTy = constraint->getSecondType();
         if (secondTy->is<TypeVariableType>()) {
           auto otherRep =

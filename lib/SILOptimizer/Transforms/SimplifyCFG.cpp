@@ -81,6 +81,10 @@ namespace {
 
     ConstantFolder ConstFolder;
 
+    // True if the function has a large amount of blocks. In this case we turn off some expensive
+    // optimizations.
+    bool isVeryLargeFunction = false;
+
     void constFoldingCallback(SILInstruction *I) {
       // If a terminal instruction gets constant folded (like cond_br), it
       // enables further simplify-CFG optimizations.
@@ -1226,11 +1230,13 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
       if (DestBB->getArgument(i) != BI->getArg(i)) {
         SILValue Val = BI->getArg(i);
         DestBB->getArgument(i)->replaceAllUsesWith(Val);
-        if (auto *I = dyn_cast<SingleValueInstruction>(Val)) {
-          // Replacing operands may trigger constant folding which then could
-          // trigger other simplify-CFG optimizations.
-          ConstFolder.addToWorklist(I);
-          ConstFolder.processWorkList();
+        if (!isVeryLargeFunction) {
+          if (auto *I = dyn_cast<SingleValueInstruction>(Val)) {
+            // Replacing operands may trigger constant folding which then could
+            // trigger other simplify-CFG optimizations.
+            ConstFolder.addToWorklist(I);
+            ConstFolder.processWorkList();
+          }
         }
       } else {
         // We must be processing an unreachable part of the cfg with a cycle.
@@ -1290,7 +1296,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   // If this unconditional branch has BBArgs, check to see if duplicating the
   // destination would allow it to be simplified.  This is a simple form of jump
   // threading.
-  if (!BI->getArgs().empty() &&
+  if (!isVeryLargeFunction && !BI->getArgs().empty() &&
       tryJumpThreading(BI))
     return true;
 
@@ -2143,23 +2149,23 @@ bool SimplifyCFG::simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI) {
   bool MadeChange = false;
   CastOptimizer CastOpt(
       FuncBuilder, nullptr /*SILBuilderContext*/,
-      /* ReplaceValueUsesAction */
+      /* replaceValueUsesAction */
       [&MadeChange](SILValue oldValue, SILValue newValue) {
         MadeChange = true;
       },
-      /* ReplaceInstUsesAction */
+      /* replaceInstUsesAction */
       [&MadeChange](SILInstruction *I, ValueBase *V) { MadeChange = true; },
-      /* EraseInstAction */
+      /* eraseInstAction */
       [&MadeChange](SILInstruction *I) {
         MadeChange = true;
         I->eraseFromParent();
       },
-      /* WillSucceedAction */
+      /* willSucceedAction */
       [&]() {
         MadeChange |= removeIfDead(FailureBB);
         addToWorklist(ThisBB);
       },
-      /* WillFailAction */
+      /* willFailAction */
       [&]() {
         MadeChange |= removeIfDead(SuccessBB);
         addToWorklist(ThisBB);
@@ -2178,23 +2184,23 @@ bool SimplifyCFG::simplifyCheckedCastValueBranchBlock(
   bool MadeChange = false;
   CastOptimizer CastOpt(
       FuncBuilder, nullptr /*SILBuilderContext*/,
-      /* ReplaceValueUsesAction */
+      /* replaceValueUsesAction */
       [&MadeChange](SILValue oldValue, SILValue newValue) {
         MadeChange = true;
       },
-      /* ReplaceInstUsesAction */
+      /* replaceInstUsesAction */
       [&MadeChange](SILInstruction *I, ValueBase *V) { MadeChange = true; },
-      /* EraseInstAction */
+      /* eraseInstAction */
       [&MadeChange](SILInstruction *I) {
         MadeChange = true;
         I->eraseFromParent();
       },
-      /* WillSucceedAction */
+      /* willSucceedAction */
       [&]() {
         MadeChange |= removeIfDead(FailureBB);
         addToWorklist(ThisBB);
       },
-      /* WillFailAction */
+      /* willFailAction */
       [&]() {
         MadeChange |= removeIfDead(SuccessBB);
         addToWorklist(ThisBB);
@@ -2214,21 +2220,21 @@ simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI) {
   bool MadeChange = false;
   CastOptimizer CastOpt(
       FuncBuilder, nullptr /*SILBuilderContext*/,
-      /* ReplaceValueUsesAction */
+      /* replaceValueUsesAction */
       [&MadeChange](SILValue, SILValue) { MadeChange = true; },
-      /* ReplaceInstUsesAction */
+      /* replaceInstUsesAction */
       [&MadeChange](SILInstruction *I, ValueBase *V) { MadeChange = true; },
-      /* EraseInstAction */
+      /* eraseInstAction */
       [&MadeChange](SILInstruction *I) {
         MadeChange = true;
         I->eraseFromParent();
       },
-      /* WillSucceedAction */
+      /* willSucceedAction */
       [&]() {
         MadeChange |= removeIfDead(FailureBB);
         addToWorklist(ThisBB);
       },
-      /* WillFailAction */
+      /* willFailAction */
       [&]() {
         MadeChange |= removeIfDead(SuccessBB);
         addToWorklist(ThisBB);
@@ -3066,6 +3072,9 @@ static bool splitBBArguments(SILFunction &Fn) {
 bool SimplifyCFG::run() {
 
   LLVM_DEBUG(llvm::dbgs() << "### Run SimplifyCFG on " << Fn.getName() << '\n');
+
+  // Disable some expensive optimizations if the function is huge.
+  isVeryLargeFunction = (Fn.size() > 10000);
 
   // First remove any block not reachable from the entry.
   bool Changed = removeUnreachableBlocks(Fn);

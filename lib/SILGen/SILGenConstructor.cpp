@@ -152,9 +152,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       if (!field->isStatic() && field->isLet() &&
           field->getParentInitializer()) {
 #ifndef NDEBUG
-        auto fieldTy = decl->getDeclContext()->mapTypeIntoContext(
-            field->getInterfaceType());
-        assert(fieldTy->isEqual(field->getParentInitializer()->getType())
+        assert(field->getType()->isEqual(field->getParentInitializer()->getType())
                && "Checked by sema");
 #endif
 

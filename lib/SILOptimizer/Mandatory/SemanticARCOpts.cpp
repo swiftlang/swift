@@ -89,6 +89,8 @@ static bool isConsumed(
                         })) {
         forwardingInsts.get()->push_back(user);
         for (SILValue v : user->getResults()) {
+          if (v.getOwnershipKind() != ValueOwnershipKind::Owned)
+            continue;
           copy(v->getUses(), std::back_inserter(worklist));
         }
         continue;

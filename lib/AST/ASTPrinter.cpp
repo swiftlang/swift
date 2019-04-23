@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
@@ -106,6 +107,8 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
   result.FunctionDefinitions = true;
   result.CollapseSingleGetterProperty = false;
   result.VarInitializers = true;
+  result.OpaqueReturnTypePrinting =
+      OpaqueReturnTypePrintingMode::StableReference;
 
   // We should print __consuming, __owned, etc for the module interface file.
   result.SkipUnderscoredKeywords = false;
@@ -893,8 +896,8 @@ public:
 } // unnamed namespace
 
 static StaticSpellingKind getCorrectStaticSpelling(const Decl *D) {
-  if (auto *VD = dyn_cast<VarDecl>(D)) {
-    return VD->getCorrectStaticSpelling();
+  if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
+    return ASD->getCorrectStaticSpelling();
   } else if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
     return PBD->getCorrectStaticSpelling();
   } else if (auto *FD = dyn_cast<FuncDecl>(D)) {
@@ -970,6 +973,20 @@ void PrintAST::printAttributes(const Decl *D) {
 
   D->getAttrs().print(Printer, Options, D);
 
+  // Print the implicit 'final' attribute.
+  if (auto VD = dyn_cast<ValueDecl>(D)) {
+    auto VarD = dyn_cast<VarDecl>(D);
+    if (VD->isFinal() &&
+        !VD->getAttrs().hasAttribute<FinalAttr>() &&
+        // Don't print a redundant 'final' if printing a 'let' or 'static' decl.
+        !(VarD && VarD->isLet()) &&
+        getCorrectStaticSpelling(D) != StaticSpellingKind::KeywordStatic &&
+        VD->getKind() != DeclKind::Accessor) {
+      Printer.printAttrName("final");
+      Printer << " ";
+    }
+  }
+
   // Explicitly print 'mutating' and 'nonmutating' before getters and setters
   // for which that is true.
   if (auto accessor = dyn_cast<AccessorDecl>(D)) {
@@ -985,6 +1002,33 @@ void PrintAST::printTypedPattern(const TypedPattern *TP) {
   printTypeLoc(TP->getTypeLoc());
 }
 
+/// Determines if we are required to print the name of a property declaration,
+/// or if we can elide it by printing a '_' instead.
+static bool mustPrintPropertyName(VarDecl *decl, PrintOptions opts) {
+  // If we're not allowed to omit the name, we must print it.
+  if (!opts.OmitNameOfInaccessibleProperties) return true;
+
+  // If it contributes to the parent's storage, we must print it because clients
+  // need to be able to directly access the storage.
+  // FIXME: We might be able to avoid printing names for some of these
+  //        if we serialized references to them using field indices.
+  if (contributesToParentTypeStorage(decl)) return true;
+
+  // If it's public or @usableFromInline, we must print the name because it's a
+  // visible entry-point.
+  if (isPublicOrUsableFromInline(decl)) return true;
+
+  // If it has an initial value, we must print the name because it's used in
+  // the mangled name of the initializer expression generator function.
+  // FIXME: We _could_ figure out a way to generate an entry point
+  //        for the initializer expression without revealing the name. We just
+  //        don't have a mangling for it.
+  if (decl->hasInitialValue()) return true;
+
+  // If none of those are true, we can elide the name of the variable.
+  return false;
+}
+
 void PrintAST::printPattern(const Pattern *pattern) {
   switch (pattern->getKind()) {
   case PatternKind::Any:
@@ -995,16 +1039,13 @@ void PrintAST::printPattern(const Pattern *pattern) {
     auto named = cast<NamedPattern>(pattern);
     auto decl = named->getDecl();
     recordDeclLoc(decl, [&]{
-      if (Options.OmitNameOfInaccessibleProperties &&
-          contributesToParentTypeStorage(decl) &&
-          !isPublicOrUsableFromInline(decl) &&
-          // FIXME: We need to figure out a way to generate an entry point
-          //        for the initializer expression without revealing the name.
-          !decl->hasInitialValue())
-        Printer << "_";
-      else
+      // FIXME: This always returns true now, because of the FIXMEs listed in
+      //        mustPrintPropertyName.
+      if (mustPrintPropertyName(decl, Options))
         Printer.printName(named->getBoundName());
-      });
+      else
+        Printer << "_";
+    });
     break;
   }
 
@@ -1673,6 +1714,8 @@ void PrintAST::printMutatingModifiersIfNeeded(const AccessorDecl *accessor) {
 void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   if (isa<VarDecl>(ASD) && !Options.PrintPropertyAccessors)
     return;
+  if (isa<SubscriptDecl>(ASD) && !Options.PrintSubscriptAccessors)
+    return;
 
   auto impl = ASD->getImplInfo();
 
@@ -2198,6 +2241,11 @@ void PrintAST::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
   Printer << "(\"" << PDD->getMessage()->getValue() << "\")";
 }
 
+void PrintAST::visitOpaqueTypeDecl(OpaqueTypeDecl *decl) {
+  // TODO: If we introduce explicit opaque type decls, print them.
+  assert(decl->getName().empty());
+}
+
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
@@ -2220,6 +2268,16 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
 
   if (ShouldPrint) {
     Printer << " = ";
+    // FIXME: An inferred associated type witness type alias may reference
+    // an opaque type, but OpaqueTypeArchetypes are always canonicalized
+    // so lose type sugar for generic params. Bind the generic environment so
+    // we can map params back into the generic environment and print them
+    // correctly.
+    //
+    // Remove this when we have a way to represent non-canonical archetypes
+    // preserving sugar.
+    llvm::SaveAndRestore<GenericEnvironment*> setGenericEnv(Options.GenericEnv,
+                                                decl->getGenericEnvironment());
     printTypeLoc(decl->getUnderlyingTypeLoc());
     printGenericDeclGenericRequirements(decl);
   }
@@ -2400,12 +2458,22 @@ static bool isStructOrClassContext(DeclContext *dc) {
   return isa<ClassDecl>(nominal) || isa<StructDecl>(nominal);
 }
 
+static bool isEscaping(Type type) {
+  if (auto *funcType = type->getAs<AnyFunctionType>()) {
+    if (funcType->getExtInfo().getRepresentation() ==
+          FunctionTypeRepresentation::CFunctionPointer)
+      return false;
+
+    return !funcType->getExtInfo().isNoEscape();
+  }
+
+  return false;
+}
+
 static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
-                                ParameterTypeFlags flags) {
+                                ParameterTypeFlags flags, bool escaping) {
   if (!options.excludeAttrKind(TAK_autoclosure) && flags.isAutoClosure())
     printer << "@autoclosure ";
-  if (!options.excludeAttrKind(TAK_escaping) && flags.isEscaping())
-    printer << "@escaping ";
 
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:
@@ -2421,6 +2489,9 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
     printer.printKeyword("__owned", options, " ");
     break;
   }
+
+  if (!options.excludeAttrKind(TAK_escaping) && escaping)
+    printer << "@escaping ";
 }
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
@@ -2465,6 +2536,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     if (!tyLoc.getTypeRepr())
       tyLoc = TypeLoc::withoutLoc(decl->getInterfaceType());
 
+    Printer.printDeclResultTypePre(decl, tyLoc);
     if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
       printTypeLocForImplicitlyUnwrappedOptional(tyLoc);
     else
@@ -2537,29 +2609,17 @@ void PrintAST::printOneParameter(const ParamDecl *param,
       TheTypeLoc.setType(BGT->getGenericArgs()[0]);
   }
 
-  // Special case, if we're not going to use the type repr printing, peek
-  // through the paren types so that we don't print excessive @escapings.
-  unsigned numParens = 0;
-  if (!willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
+  if (!param->isVariadic() &&
+      !willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
     auto type = TheTypeLoc.getType();
-
-    printParameterFlags(Printer, Options, paramFlags);
-    while (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
-      ++numParens;
-      type = parenTy->getUnderlyingType();
-    }
-
-    TheTypeLoc = TypeLoc::withoutLoc(type);
+    printParameterFlags(Printer, Options, paramFlags,
+                        isEscaping(type));
   }
 
-  for (unsigned i = 0; i < numParens; ++i)
-    Printer << "(";
   if (param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
     printTypeLocForImplicitlyUnwrappedOptional(TheTypeLoc);
   else
     printTypeLoc(TheTypeLoc);
-  for (unsigned i = 0; i < numParens; ++i)
-    Printer << ")";
 
   if (param->isVariadic())
     Printer << "...";
@@ -2747,6 +2807,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
           ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
       }
       Printer << " -> ";
+
+      Printer.printDeclResultTypePre(decl, ResultTyLoc);
       Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
       if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
         printTypeLocForImplicitlyUnwrappedOptional(ResultTyLoc);
@@ -2758,6 +2820,12 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
   }
 
   printBodyIfNecessary(decl);
+  
+  // If the function has an opaque result type, print the opaque type decl.
+  if (auto opaqueResult = decl->getOpaqueResultTypeDecl()) {
+    Printer.printNewline();
+    visit(opaqueResult);
+  }
 }
 
 void PrintAST::printEnumElement(EnumElementDecl *elt) {
@@ -2850,6 +2918,9 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccess(decl);
+  if (!Options.SkipIntroducerKeywords && decl->isStatic() &&
+      Options.PrintStaticKeyword)
+    printStaticKeyword(decl->getCorrectStaticSpelling());
   printContextIfNeeded(decl);
   recordDeclLoc(decl, [&]{
     Printer << "subscript";
@@ -2865,8 +2936,9 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   });
   Printer << " -> ";
 
-  Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
   TypeLoc elementTy = decl->getElementTypeLoc();
+  Printer.printDeclResultTypePre(decl, elementTy);
+  Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
   if (!elementTy.getTypeRepr())
     elementTy = TypeLoc::withoutLoc(decl->getElementInterfaceType());
   if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
@@ -3337,7 +3409,27 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       return;
     }
 
-    if (T->hasSimpleTypeRepr()) {
+    bool isSimple = T->hasSimpleTypeRepr();
+    if (isSimple && T->is<OpaqueTypeArchetypeType>()) {
+      auto opaqueTy = T->castTo<OpaqueTypeArchetypeType>();
+      auto opaqueDecl = opaqueTy->getDecl();
+      if (!opaqueDecl->hasName()) {
+        switch (Options.OpaqueReturnTypePrinting) {
+        case PrintOptions::OpaqueReturnTypePrintingMode::StableReference:
+        case PrintOptions::OpaqueReturnTypePrintingMode::Description:
+          isSimple = true;
+          break;
+        case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
+          isSimple = false;
+          break;
+        case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword: {
+          isSimple = opaqueTy->getConformsTo().size() < 2;
+        }
+        }
+      }
+    }
+
+    if (isSimple) {
       visit(T);
     } else {
       Printer << "(";
@@ -3526,7 +3618,8 @@ public:
 
   void visitParenType(ParenType *T) {
     Printer << "(";
-    printParameterFlags(Printer, Options, T->getParameterFlags());
+    printParameterFlags(Printer, Options, T->getParameterFlags(),
+                        /*escaping*/ false);
     visit(T->getUnderlyingType()->getInOutObjectType());
     Printer << ")";
   }
@@ -3557,7 +3650,8 @@ public:
         visit(TD.getVarargBaseTy());
         Printer << "...";
       } else {
-        printParameterFlags(Printer, Options, TD.getParameterFlags());
+        printParameterFlags(Printer, Options, TD.getParameterFlags(),
+                            /*escaping*/ false);
         visit(EltType);
       }
     }
@@ -3814,10 +3908,15 @@ public:
         Printer << ": ";
       }
 
-      printParameterFlags(Printer, Options, Param.getParameterFlags());
-      visit(Param.getPlainType());
-      if (Param.isVariadic())
+      auto type = Param.getPlainType();
+      if (Param.isVariadic()) {
+        visit(type);
         Printer << "...";
+      } else {
+        printParameterFlags(Printer, Options, Param.getParameterFlags(),
+                            isEscaping(type));
+        visit(type);
+      }
     }
 
     Printer << ")";
@@ -4093,13 +4192,67 @@ public:
   }
   
   void visitNestedArchetypeType(NestedArchetypeType *T) {
-    visit(T->getParent());
+    printWithParensIfNotSimple(T->getParent());
     Printer << ".";
     printArchetypeCommon(T);
   }
   
   void visitPrimaryArchetypeType(PrimaryArchetypeType *T) {
     printArchetypeCommon(T);
+  }
+  
+  void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
+    switch (Options.OpaqueReturnTypePrinting) {
+    case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
+      Printer << "some ";
+      LLVM_FALLTHROUGH;
+    case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword: {
+      SmallVector<Type, 2> types;
+      for (auto proto : T->getConformsTo())
+        types.push_back(proto->TypeDecl::getDeclaredInterfaceType());
+
+      // Create and visit temporary ProtocolCompositionType.
+      auto composition =
+          ProtocolCompositionType::get(T->getASTContext(), types, false);
+      visit(composition);
+      return;
+    }
+    case PrintOptions::OpaqueReturnTypePrintingMode::StableReference: {
+      // Print the source of the opaque return type as a mangled name.
+      // We'll use type reconstruction while parsing the attribute to
+      // turn this back into a reference to the naming decl for the opaque
+      // type.
+      Printer << "@_opaqueReturnTypeOf(";
+      OpaqueTypeDecl *decl = T->getDecl();
+      
+      Printer.printEscapedStringLiteral(
+                                   decl->getOpaqueReturnTypeIdentifier().str());
+      
+      Printer << ", " << T->getInterfaceType()
+                          ->castTo<GenericTypeParamType>()
+                          ->getIndex();
+      
+      Printer << u8") \U0001F9B8";
+      printGenericArgs(T->getSubstitutions().getReplacementTypes());
+      return;
+    }
+    case PrintOptions::OpaqueReturnTypePrintingMode::Description: {
+      // TODO(opaque): present opaque types with user-facing syntax. we should
+      // probably print this as `some P` and record the fact that we printed that
+      // so that diagnostics can add followup notes.
+      Printer << "(return type of " << T->getDecl()->getNamingDecl()->printRef();
+      Printer << ')';
+      if (!T->getSubstitutions().empty()) {
+        Printer << '<';
+        auto replacements = T->getSubstitutions().getReplacementTypes();
+        interleave(replacements.begin(), replacements.end(),
+                   [&](Type t) { visit(t); },
+                   [&] { Printer << ", "; });
+        Printer << '>';
+      }
+      return;
+    }
+    }
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {
@@ -4177,15 +4330,26 @@ void Type::print(ASTPrinter &Printer, const PrintOptions &PO) const {
   TypePrinter(Printer, PO).visit(*this);
 }
 
-void AnyFunctionType::printParams(raw_ostream &OS, const
-                                  PrintOptions &PO) const {
+void AnyFunctionType::printParams(ArrayRef<AnyFunctionType::Param> Params,
+                                  raw_ostream &OS,
+                                  const PrintOptions &PO) {
   StreamPrinter Printer(OS);
-  printParams(Printer, PO);
+  printParams(Params, Printer, PO);
 }
-void AnyFunctionType::printParams(ASTPrinter &Printer,
-                                  const PrintOptions &PO) const {
-  TypePrinter(Printer, PO).visitAnyFunctionTypeParams(getParams(),
+void AnyFunctionType::printParams(ArrayRef<AnyFunctionType::Param> Params,
+                                  ASTPrinter &Printer,
+                                  const PrintOptions &PO) {
+  TypePrinter(Printer, PO).visitAnyFunctionTypeParams(Params,
                                                       /*printLabels*/true);
+}
+
+std::string
+AnyFunctionType::getParamListAsString(ArrayRef<AnyFunctionType::Param> Params,
+                                      const PrintOptions &PO) {
+  SmallString<16> Scratch;
+  llvm::raw_svector_ostream OS(Scratch);
+  AnyFunctionType::printParams(Params, OS);
+  return OS.str();
 }
 
 void LayoutConstraintInfo::print(raw_ostream &OS,

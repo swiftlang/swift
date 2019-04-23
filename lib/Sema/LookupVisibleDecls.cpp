@@ -142,6 +142,17 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
     // Otherwise, either call a function or curry it.
     return true;
   }
+  if (auto *SD = dyn_cast<SubscriptDecl>(Member)) {
+    // Cannot use static subscripts on non-metatypes.
+    if (!LS.isOnMetatype() && SD->isStatic())
+      return false;
+
+    // Cannot use instance subscript on metatypes.
+    if (LS.isOnMetatype() && !SD->isStatic() && !LS.isIncludingInstanceMembers())
+      return false;
+
+    return true;
+  }
   if (auto *VD = dyn_cast<VarDecl>(Member)) {
     // Cannot use static properties on non-metatypes.
     if (!(LS.isQualified() && LS.isOnMetatype()) && VD->isStatic())
@@ -296,6 +307,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       case DeclKind::Class:
       case DeclKind::Struct:
       case DeclKind::Protocol:
+      case DeclKind::OpaqueType:
         return;
 
       // Initializers cannot be found by dynamic lookup.
@@ -407,32 +419,34 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
     else
       ReasonForThisProtocol = getReasonForSuper(Reason);
 
-    auto NormalConformance = Conformance->getRootNormalConformance();
-    for (auto Member : Proto->getMembers()) {
-      if (auto *ATD = dyn_cast<AssociatedTypeDecl>(Member)) {
-        // Skip type decls if they aren't visible, or any type that has a
-        // witness. This cuts down on duplicates.
-        if (areTypeDeclsVisibleInLookupMode(LS) &&
-            !NormalConformance->hasTypeWitness(ATD)) {
-          Consumer.foundDecl(ATD, ReasonForThisProtocol);
+    if (auto NormalConformance = dyn_cast<NormalProtocolConformance>(
+          Conformance->getRootConformance())) {
+      for (auto Member : Proto->getMembers()) {
+        if (auto *ATD = dyn_cast<AssociatedTypeDecl>(Member)) {
+          // Skip type decls if they aren't visible, or any type that has a
+          // witness. This cuts down on duplicates.
+          if (areTypeDeclsVisibleInLookupMode(LS) &&
+              !Conformance->hasTypeWitness(ATD)) {
+            Consumer.foundDecl(ATD, ReasonForThisProtocol);
+          }
+          continue;
         }
-        continue;
-      }
-      if (auto *VD = dyn_cast<ValueDecl>(Member)) {
-        if (TypeResolver) {
-          TypeResolver->resolveDeclSignature(VD);
-          if (!NormalConformance->hasWitness(VD) &&
-              (Conformance->getDeclContext()->getParentSourceFile() !=
-              FromContext->getParentSourceFile()))
-            TypeResolver->resolveWitness(NormalConformance, VD);
-        }
-        // Skip value requirements that have corresponding witnesses. This cuts
-        // down on duplicates.
-        if (!NormalConformance->hasWitness(VD) ||
-            !NormalConformance->getWitness(VD, nullptr) ||
-            NormalConformance->getWitness(VD, nullptr).getDecl()->getFullName()
-              != VD->getFullName()) {
-          Consumer.foundDecl(VD, ReasonForThisProtocol);
+        if (auto *VD = dyn_cast<ValueDecl>(Member)) {
+          if (TypeResolver) {
+            TypeResolver->resolveDeclSignature(VD);
+            if (!NormalConformance->hasWitness(VD) &&
+                (Conformance->getDeclContext()->getParentSourceFile() !=
+                FromContext->getParentSourceFile()))
+              TypeResolver->resolveWitness(NormalConformance, VD);
+          }
+          // Skip value requirements that have corresponding witnesses. This cuts
+          // down on duplicates.
+          if (!NormalConformance->hasWitness(VD) ||
+              !NormalConformance->getWitness(VD, nullptr) ||
+              NormalConformance->getWitness(VD, nullptr).getDecl()->getFullName()
+                != VD->getFullName()) {
+            Consumer.foundDecl(VD, ReasonForThisProtocol);
+          }
         }
       }
     }
@@ -619,6 +633,42 @@ static void lookupVisibleMemberDeclsImpl(
     }
     Ancestors.insert(CurClass);
   } while (1);
+}
+
+static void lookupVisibleDynamicMemberLookupDecls(
+    Type baseType, VisibleDeclConsumer &consumer, const DeclContext *dc,
+    LookupState LS, DeclVisibilityKind reason, LazyResolver *typeResolver,
+    GenericSignatureBuilder *GSB, VisitedSet &visited) {
+
+  assert(hasDynamicMemberLookupAttribute(baseType));
+  auto &ctx = dc->getASTContext();
+
+  // Lookup the `subscript(dynamicMember:)` methods in this type.
+  auto subscriptName =
+      DeclName(ctx, DeclBaseName::createSubscript(), ctx.Id_dynamicMember);
+
+  SmallVector<ValueDecl *, 2> subscripts;
+  dc->lookupQualified(baseType, subscriptName, NL_QualifiedDefault,
+                      typeResolver, subscripts);
+
+  for (ValueDecl *VD : subscripts) {
+    auto *subscript = dyn_cast<SubscriptDecl>(VD);
+    if (!subscript)
+      continue;
+
+    auto rootType = getRootTypeOfKeypathDynamicMember(subscript, dc);
+    if (!rootType)
+      continue;
+
+    auto subs =
+        baseType->getMemberSubstitutionMap(dc->getParentModule(), subscript);
+    auto memberType = rootType->subst(subs);
+    if (!memberType || !memberType->mayHaveMembers())
+      continue;
+
+    lookupVisibleMemberDeclsImpl(memberType, consumer, dc, LS, reason,
+                                 typeResolver, GSB, visited);
+  }
 }
 
 namespace {
@@ -822,6 +872,18 @@ public:
     DeclsToReport.insert(FoundDeclTy(VD, Reason));
   }
 };
+
+struct ShadowedKeyPathMembers : public VisibleDeclConsumer {
+  VisibleDeclConsumer &consumer;
+  llvm::DenseSet<DeclBaseName> &seen;
+  ShadowedKeyPathMembers(VisibleDeclConsumer &consumer, llvm::DenseSet<DeclBaseName> &knownMembers) : consumer(consumer), seen(knownMembers) {}
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind reason) override {
+    // Dynamic lookup members are only visible if they are not shadowed by
+    // non-dynamic members.
+    if (seen.count(VD->getBaseName()) == 0)
+      consumer.foundDecl(VD, reason);
+  }
+};  
 } // end anonymous namespace
 
 /// Enumerate all members in \c BaseTy (including members of extensions,
@@ -838,6 +900,16 @@ static void lookupVisibleMemberDecls(
   VisitedSet Visited;
   lookupVisibleMemberDeclsImpl(BaseTy, overrideConsumer, CurrDC, LS, Reason,
                                TypeResolver, GSB, Visited);
+
+  if (hasDynamicMemberLookupAttribute(BaseTy)) {
+    llvm::DenseSet<DeclBaseName> knownMembers;
+    for (auto &kv : overrideConsumer.FoundDecls) {
+      knownMembers.insert(kv.first);
+    }
+    ShadowedKeyPathMembers dynamicConsumer(overrideConsumer, knownMembers);
+    lookupVisibleDynamicMemberLookupDecls(BaseTy, dynamicConsumer, CurrDC, LS,
+                                          Reason, TypeResolver, GSB, Visited);
+  }
 
   // Report the declarations we found to the real consumer.
   for (const auto &DeclAndReason : overrideConsumer.DeclsToReport)

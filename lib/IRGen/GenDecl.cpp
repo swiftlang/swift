@@ -75,50 +75,6 @@
 using namespace swift;
 using namespace irgen;
 
-bool IRGenerator::tryEnableLazyTypeMetadata(NominalTypeDecl *Nominal) {
-  // When compiling with -Onone keep all metadata for the debugger. Even if it
-  // is not used by the program itself.
-  if (!Opts.shouldOptimize())
-    return false;
-  if (Opts.UseJIT)
-    return false;
-
-  switch (Nominal->getKind()) {
-    case DeclKind::Enum:
-    case DeclKind::Struct:
-      break;
-    default:
-      // Keep all metadata for classes, because a class can be instantiated by
-      // using the library function _typeByName or NSClassFromString.
-      return false;
-  }
-
-  switch (getDeclLinkage(Nominal)) {
-    case FormalLinkage::PublicUnique:
-    case FormalLinkage::PublicNonUnique:
-      // We can't remove metadata for externally visible types.
-      return false;
-    case FormalLinkage::HiddenUnique:
-      // In non-whole-module mode, also internal types are visible externally.
-      if (!SIL.isWholeModule())
-        return false;
-      break;
-    case FormalLinkage::Private:
-      break;
-  }
-
-  auto insertResult = LazyTypeGlobals.try_emplace(Nominal);
-  auto &entry = insertResult.first->second;
-  assert(!entry.IsLazy);
-  entry.IsLazy = true;
-  if (entry.IsMetadataUsed)
-    LazyTypeMetadata.push_back(Nominal);
-  if (entry.IsDescriptorUsed)
-    LazyTypeContextDescriptors.push_back(Nominal);
-
-  return true;
-}
-
 namespace {
   
 /// Add methods, properties, and protocol conformances from a JITed extension
@@ -731,7 +687,85 @@ void IRGenModule::emitRuntimeRegistration() {
 }
 
 /// Return the address of the context descriptor representing the given
-/// decl context.
+/// decl context, used as a parent reference for another decl.
+///
+/// For a nominal type context, this returns the address of the nominal type
+/// descriptor.
+/// For an extension context, this returns the address of the extension
+/// context descriptor.
+/// For a module or file unit context, this returns the address of the module
+/// context descriptor.
+/// For any other kind of context, this returns an anonymous context descriptor
+/// for the context.
+ConstantReference
+IRGenModule::getAddrOfContextDescriptorForParent(DeclContext *parent,
+                                                 DeclContext *ofChild,
+                                                 bool fromAnonymousContext) {
+  switch (parent->getContextKind()) {
+  case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
+  case DeclContextKind::EnumElementDecl:
+  case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::Initializer:
+  case DeclContextKind::SerializedLocal:
+    return {getAddrOfAnonymousContextDescriptor(
+              fromAnonymousContext ? parent : ofChild),
+            ConstantReference::Direct};
+
+  case DeclContextKind::GenericTypeDecl:
+    if (auto nomTy = dyn_cast<NominalTypeDecl>(parent)) {
+      return {getAddrOfTypeContextDescriptor(nomTy, DontRequireMetadata),
+              ConstantReference::Direct};
+    }
+    return {getAddrOfAnonymousContextDescriptor(
+              fromAnonymousContext ? parent : ofChild),
+            ConstantReference::Direct};
+
+  case DeclContextKind::ExtensionDecl: {
+    auto ext = cast<ExtensionDecl>(parent);
+    // If the extension is equivalent to its extended context (that is, it's
+    // in the same module as the original non-protocol type and
+    // has no constraints), then we can use the original nominal type context
+    // (assuming there is one).
+    if (ext->isEquivalentToExtendedContext()) {
+      auto nominal = ext->getExtendedNominal();
+      // If the extended type is an ObjC class, it won't have a nominal type
+      // descriptor, so we'll just emit an extension context.
+      auto clas = dyn_cast<ClassDecl>(nominal);
+      if (!clas || clas->isForeign() || hasKnownSwiftMetadata(*this, clas)) {
+        // Some targets don't support relative references to undefined symbols.
+        // If the extension is in a different file from the original type
+        // declaration, it may not get emitted in this TU. Use an indirect
+        // reference to work around the object format limitation.
+        auto shouldBeIndirect =
+            parent->getModuleScopeContext() != ofChild->getModuleScopeContext()
+          ? ConstantReference::Indirect
+          : ConstantReference::Direct;
+        
+        IRGen.noteUseOfTypeContextDescriptor(nominal, DontRequireMetadata);
+        return getAddrOfLLVMVariableOrGOTEquivalent(
+                                LinkEntity::forNominalTypeDescriptor(nominal),
+                                shouldBeIndirect);
+      }
+    }
+    return {getAddrOfExtensionContextDescriptor(ext),
+            ConstantReference::Direct};
+  }
+      
+  case DeclContextKind::FileUnit:
+    parent = parent->getParentModule();
+    LLVM_FALLTHROUGH;
+      
+  case DeclContextKind::Module:
+    return {getAddrOfModuleContextDescriptor(cast<ModuleDecl>(parent)),
+            ConstantReference::Direct};
+  }
+  llvm_unreachable("unhandled kind");
+}
+
+/// Return the address of the context descriptor representing the parent of
+/// the given decl context.
 ///
 /// For a nominal type context, this returns the address of the nominal type
 /// descriptor.
@@ -767,69 +801,8 @@ IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from,
               ConstantReference::Direct};
   }
   
-  auto parent = from->getParent();
-  
-  switch (parent->getContextKind()) {
-  case DeclContextKind::AbstractClosureExpr:
-  case DeclContextKind::AbstractFunctionDecl:
-  case DeclContextKind::SubscriptDecl:
-  case DeclContextKind::EnumElementDecl:
-  case DeclContextKind::TopLevelCodeDecl:
-  case DeclContextKind::Initializer:
-  case DeclContextKind::SerializedLocal:
-    return {getAddrOfAnonymousContextDescriptor(
-              fromAnonymousContext ? parent : from),
-            ConstantReference::Direct};
-
-  case DeclContextKind::GenericTypeDecl:
-    if (auto nomTy = dyn_cast<NominalTypeDecl>(parent)) {
-      return {getAddrOfTypeContextDescriptor(nomTy, DontRequireMetadata),
-              ConstantReference::Direct};
-    }
-    return {getAddrOfAnonymousContextDescriptor(
-              fromAnonymousContext ? parent : from),
-            ConstantReference::Direct};
-
-  case DeclContextKind::ExtensionDecl: {
-    auto ext = cast<ExtensionDecl>(parent);
-    // If the extension is equivalent to its extended context (that is, it's
-    // in the same module as the original non-protocol type and
-    // has no constraints), then we can use the original nominal type context
-    // (assuming there is one).
-    if (ext->isEquivalentToExtendedContext()) {
-      auto nominal = ext->getExtendedNominal();
-      // If the extended type is an ObjC class, it won't have a nominal type
-      // descriptor, so we'll just emit an extension context.
-      auto clas = dyn_cast<ClassDecl>(nominal);
-      if (!clas || clas->isForeign() || hasKnownSwiftMetadata(*this, clas)) {
-        // Some targets don't support relative references to undefined symbols.
-        // If the extension is in a different file from the original type
-        // declaration, it may not get emitted in this TU. Use an indirect
-        // reference to work around the object format limitation.
-        auto shouldBeIndirect =
-            parent->getModuleScopeContext() != from->getModuleScopeContext()
-          ? ConstantReference::Indirect
-          : ConstantReference::Direct;
-        
-        IRGen.noteUseOfTypeContextDescriptor(nominal, DontRequireMetadata);
-        return getAddrOfLLVMVariableOrGOTEquivalent(
-                                LinkEntity::forNominalTypeDescriptor(nominal),
-                                shouldBeIndirect);
-      }
-    }
-    return {getAddrOfExtensionContextDescriptor(ext),
-            ConstantReference::Direct};
-  }
-      
-  case DeclContextKind::FileUnit:
-    parent = parent->getParentModule();
-    LLVM_FALLTHROUGH;
-      
-  case DeclContextKind::Module:
-    return {getAddrOfModuleContextDescriptor(cast<ModuleDecl>(parent)),
-            ConstantReference::Direct};
-  }
-  llvm_unreachable("unhandled kind");
+  return getAddrOfContextDescriptorForParent(from->getParent(), from,
+                                             fromAnonymousContext);
 }
 
 /// Add the given global value to @llvm.used.
@@ -952,6 +925,12 @@ void IRGenModule::emitGlobalLists() {
     // So do categories.
     emitGlobalList(*this, ObjCCategories, "objc_categories",
                    GetObjCSectionName("__objc_catlist",
+                                      "regular,no_dead_strip"),
+                   llvm::GlobalValue::InternalLinkage, Int8PtrTy, false);
+
+    // And categories on class stubs.
+    emitGlobalList(*this, ObjCCategoriesOnStubs, "objc_categories_stubs",
+                   GetObjCSectionName("__objc_catlist2",
                                       "regular,no_dead_strip"),
                    llvm::GlobalValue::InternalLinkage, Int8PtrTy, false);
 
@@ -1103,6 +1082,7 @@ void IRGenerator::emitTypeMetadataRecords() {
 void IRGenerator::emitLazyDefinitions() {
   while (!LazyTypeMetadata.empty() ||
          !LazyTypeContextDescriptors.empty() ||
+         !LazyFieldDescriptors.empty() ||
          !LazyFunctionDefinitions.empty() ||
          !LazyWitnessTables.empty()) {
 
@@ -1110,7 +1090,8 @@ void IRGenerator::emitLazyDefinitions() {
     while (!LazyTypeMetadata.empty()) {
       NominalTypeDecl *type = LazyTypeMetadata.pop_back_val();
       auto &entry = LazyTypeGlobals.find(type)->second;
-      assert(entry.IsLazy && entry.IsMetadataUsed && !entry.IsMetadataEmitted);
+      assert(hasLazyMetadata(type));
+      assert(entry.IsMetadataUsed && !entry.IsMetadataEmitted);
       entry.IsMetadataEmitted = true;
       CurrentIGMPtr IGM = getGenModule(type->getDeclContext());
       emitLazyTypeMetadata(*IGM.get(), type);
@@ -1118,12 +1099,17 @@ void IRGenerator::emitLazyDefinitions() {
     while (!LazyTypeContextDescriptors.empty()) {
       NominalTypeDecl *type = LazyTypeContextDescriptors.pop_back_val();
       auto &entry = LazyTypeGlobals.find(type)->second;
-      assert(entry.IsLazy && entry.IsDescriptorUsed &&
-             !entry.IsDescriptorEmitted);
+      assert(hasLazyMetadata(type));
+      assert(entry.IsDescriptorUsed && !entry.IsDescriptorEmitted);
       entry.IsDescriptorEmitted = true;
       CurrentIGMPtr IGM = getGenModule(type->getDeclContext());
       emitLazyTypeContextDescriptor(*IGM.get(), type,
                                     RequireMetadata_t(entry.IsMetadataUsed));
+    }
+    while (!LazyFieldDescriptors.empty()) {
+      NominalTypeDecl *type = LazyFieldDescriptors.pop_back_val();
+      CurrentIGMPtr IGM = getGenModule(type->getDeclContext());
+      IGM->emitFieldDescriptor(type);
     }
     while (!LazyWitnessTables.empty()) {
       SILWitnessTable *wt = LazyWitnessTables.pop_back_val();
@@ -1140,6 +1126,8 @@ void IRGenerator::emitLazyDefinitions() {
       IGM->emitSILFunction(f);
     }
   }
+
+  FinishedEmittingLazyDefinitions = true;
 }
 
 void IRGenerator::addLazyFunction(SILFunction *f) {
@@ -1147,6 +1135,7 @@ void IRGenerator::addLazyFunction(SILFunction *f) {
   if (!LazilyEmittedFunctions.insert(f).second)
     return;
 
+  assert(!FinishedEmittingLazyDefinitions);
   LazyFunctionDefinitions.push_back(f);
 
   if (auto *dc = f->getDeclContext())
@@ -1160,20 +1149,64 @@ void IRGenerator::addLazyFunction(SILFunction *f) {
   DefaultIGMForFunction.insert(std::make_pair(f, CurrentIGM));
 }
 
+bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
+  auto found = HasLazyMetadata.find(type);
+  if (found != HasLazyMetadata.end())
+    return found->second;
+
+  auto canBeLazy = [&]() -> bool {
+    if (isa<ClangModuleUnit>(type->getInnermostDeclContext()
+                                 ->getModuleScopeContext())) {
+      if (auto nominal = dyn_cast<NominalTypeDecl>(type)) {
+        return requiresForeignTypeMetadata(nominal);
+      }
+    } else if (type->getInnermostDeclContext()->getParentModule()
+                                                     == SIL.getSwiftModule()) {
+      // When compiling with -Onone keep all metadata for the debugger. Even if
+      // it is not used by the program itself.
+      if (!Opts.shouldOptimize())
+        return false;
+      if (Opts.UseJIT)
+        return false;
+
+      if (isa<ClassDecl>(type) || isa<ProtocolDecl>(type))
+        return false;
+
+      switch (type->getEffectiveAccess()) {
+      case AccessLevel::Open:
+      case AccessLevel::Public:
+        // We can't remove metadata for externally visible types.
+        return false;
+      case AccessLevel::Internal:
+        // In non-whole-module mode, internal types are also visible externally.
+        return SIL.isWholeModule();
+      case AccessLevel::FilePrivate:
+      case AccessLevel::Private:
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  bool isLazy = canBeLazy();
+  HasLazyMetadata[type] = isLazy;
+
+  return isLazy;
+}
+
 void IRGenerator::noteUseOfTypeGlobals(NominalTypeDecl *type,
                                        bool isUseOfMetadata,
                                        RequireMetadata_t requireMetadata) {
   if (!type)
     return;
-  
+
+  if (!hasLazyMetadata(type))
+    return;
+
   // Try to create a new record of the fact that we used this type.
   auto insertResult = LazyTypeGlobals.try_emplace(type);
   auto &entry = insertResult.first->second;
-
-  // Imported structs and enums types are known to be lazy.
-  if (insertResult.second) {
-    entry.IsLazy = requiresForeignTypeMetadata(type);
-  }
 
   bool metadataWasUsed = entry.IsMetadataUsed;
   bool descriptorWasUsed = entry.IsDescriptorUsed;
@@ -1197,22 +1230,54 @@ void IRGenerator::noteUseOfTypeGlobals(NominalTypeDecl *type,
     isNovelUseOfDescriptor = true;
   }
 
-  // If the type isn't known to be lazy, don't mess around with the queues.
-  if (!entry.IsLazy)
-    return;
-
   // Enqueue metadata emission if we have a novel use of it.
-  if (isNovelUseOfMetadata)
+  if (isNovelUseOfMetadata) {
+    assert(!FinishedEmittingLazyDefinitions);
     LazyTypeMetadata.push_back(type);
+  }
 
   // Enqueue descriptor emission if we have a novel use of it or if we
   // need to re-emit it because we're suddenly using metadata for it.
   if (isNovelUseOfDescriptor ||
       (isNovelUseOfMetadata && entry.IsDescriptorEmitted)) {
     entry.IsDescriptorEmitted = false; // clear this in case it was true
+    assert(!FinishedEmittingLazyDefinitions);
     LazyTypeContextDescriptors.push_back(type);
   }
 }
+
+void IRGenerator::noteUseOfFieldDescriptor(NominalTypeDecl *type) {
+  if (!hasLazyMetadata(type))
+    return;
+
+  // Imported classes and protocols do not need field descriptors.
+  if (type->hasClangNode() &&
+      (isa<ClassDecl>(type) ||
+       isa<ProtocolDecl>(type)))
+    return;
+
+  if (!LazilyEmittedFieldMetadata.insert(type).second)
+    return;
+
+  assert(!FinishedEmittingLazyDefinitions);
+  LazyFieldDescriptors.push_back(type);
+}
+
+void IRGenerator::noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque) {
+  if (!opaque)
+    return;
+  
+  auto insertResult = LazyOpaqueTypes.try_emplace(opaque);
+  auto &entry = insertResult.first->second;
+
+  bool isNovelUseOfDescriptor = !entry.IsDescriptorUsed;
+  entry.IsDescriptorUsed = true;
+  
+  if (isNovelUseOfDescriptor) {
+    LazyOpaqueTypeDescriptors.push_back(opaque);
+  }
+}
+
 static std::string getDynamicReplacementSection(IRGenModule &IGM) {
   std::string sectionName;
   switch (IGM.TargetInfo.OutputObjectFormat) {
@@ -1758,15 +1823,19 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
       DebugInfo->emitImport(cast<ImportDecl>(D));
     return;
 
-  // We emit these as part of the PatternBindingDecl.
   case DeclKind::Var:
+    emitAbstractStorageDecl(cast<AbstractStorageDecl>(D));
     return;
 
-  case DeclKind::Func:
   case DeclKind::Accessor:
     // Handled in SIL.
     return;
 
+  case DeclKind::Func:
+    // The function body itself is lowered to SIL, but there may be associated
+    // decls to emit.
+    return emitFuncDecl(cast<FuncDecl>(D));
+  
   case DeclKind::TopLevelCode:
     // All the top-level code will be lowered separately.
     return;
@@ -1779,6 +1848,11 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
     return;
 
   case DeclKind::Module:
+    return;
+      
+  case DeclKind::OpaqueType:
+    // TODO: Eventually we'll need to emit descriptors to access the opaque
+    // type's metadata.
     return;
   }
 
@@ -2434,13 +2508,7 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
   }
   
   // Ensure the variable is at least forward-declared.
-  if (entity.isForeignTypeMetadataCandidate()) {
-    auto foreignCandidate
-      = getAddrOfForeignTypeMetadataCandidate(entity.getType());
-    (void)foreignCandidate;
-  } else {
-    getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
-  }
+  getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
 
   // Guess whether a global entry is a definition from this TU. This isn't
   // bulletproof, but at the point we emit conformance tables, we're far enough
@@ -2485,11 +2553,20 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
   // indirect references in this mode.
   if (IRGen.Opts.IntegratedREPL)
     return indirect();
-  
+
+  // Nominal type descriptors are only emitted once and can only be
+  // referenced directly from the same TU.
+  if (entity.isNominalTypeDescriptor()) {
+    auto *dc = entity.getDecl()->getDeclContext();
+    if (isa<ClangModuleUnit>(dc->getModuleScopeContext()) &&
+        this != IRGen.getGenModule(dc))
+      return indirect();
+  }
+
   // If the variable has already been defined in this TU,
   // then it definitely doesn't need a GOT entry, and we can
   // relative-reference it directly.
-  if ((!entity.isAvailableExternally(*this) || isDefinition(entry))) {
+  if (!entity.isAvailableExternally(*this) || isDefinition(entry)) {
     return direct();
   }
 
@@ -3134,7 +3211,13 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   TypeMetadataAddress addrKind;
   unsigned adjustmentIndex;
 
-  if (concreteType->getClassOrBoundGenericClass()) {
+  auto nominal = concreteType->getAnyNominal();
+
+  // Native Swift class metadata has a destructor before the address point.
+  // Foreign class metadata candidates do not, and neither does value type
+  // metadata.
+  if (nominal && isa<ClassDecl>(nominal) &&
+      !requiresForeignTypeMetadata(nominal)) {
     addrKind = TypeMetadataAddress::FullMetadata;
     adjustmentIndex = MetadataAdjustmentIndex::Class;
   } else {
@@ -3161,8 +3244,12 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
     addUsedGlobal(var);
 
   // Keep type metadata around for all types.
-  if (auto nominal = concreteType->getAnyNominal())
+  if (nominal)
     addRuntimeResolvableType(nominal);
+
+  // Don't define the alias for foreign type metadata, since it's not ABI.
+  if (nominal && requiresForeignTypeMetadata(nominal))
+    return var;
 
   // For concrete metadata, declare the alias to its address point.
   auto directEntity = LinkEntity::forTypeMetadata(concreteType,
@@ -3182,21 +3269,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   return defineAlias(directEntity, addr);
 }
 
-/// Fetch the declaration of the metadata (or metadata template) for a
-/// type.
-///
-/// If the definition type is specified, the result will always be a
-/// GlobalValue of the given type, which may not be at the
-/// canonical address point for a type metadata.
-///
-/// If the definition type is not specified, then:
-///   - if the metadata is indirect, then the result will not be adjusted
-///     and it will have the type pointer-to-T, where T is the type
-///     of a direct metadata;
-///   - if the metadata is a pattern, then the result will not be
-///     adjusted and it will have FullTypeMetadataPtrTy;
-///   - otherwise it will be adjusted to the canonical address point
-///     for a type metadata and it will have type TypeMetadataPtrTy.
+/// Fetch the declaration of the (possibly uninitialized) metadata for a type.
 llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType) {
   return getAddrOfTypeMetadata(concreteType,
                                SymbolReferenceKind::Absolute).getDirectValue();
@@ -3206,32 +3279,20 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
                                                SymbolReferenceKind refKind) {
   assert(!isa<UnboundGenericType>(concreteType));
 
+  auto nominal = concreteType->getAnyNominal();
+
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;
-
-  ClassDecl *ObjCClass = nullptr;
   
-  // Objective-C classes use the ObjC class object.
-  if (isa<ClassType>(concreteType) &&
-      !hasKnownSwiftMetadata(*this, cast<ClassType>(concreteType)->getDecl())) {
-    defaultVarTy = TypeMetadataStructTy;
-    adjustmentIndex = 0;
-    ObjCClass = cast<ClassType>(concreteType)->getDecl();
+  // Foreign classes reference the full metadata with a GEP.
+  if (nominal && requiresForeignTypeMetadata(nominal)) {
+    defaultVarTy = FullTypeMetadataStructTy;
+    adjustmentIndex = MetadataAdjustmentIndex::ValueType;
   // The symbol for other nominal type metadata is generated at the address
   // point.
-  } else if (isa<ClassType>(concreteType) ||
-             isa<BoundGenericClassType>(concreteType)) {
-    assert(!concreteType->getClassOrBoundGenericClass()->isForeign()
-           && "metadata for foreign classes should be emitted as "
-              "foreign candidate");
-    defaultVarTy = TypeMetadataStructTy;
-    adjustmentIndex = 0;
-  } else if (auto nom = concreteType->getAnyNominal()) {
-    assert(!isa<ClangModuleUnit>(nom->getModuleScopeContext())
-           && "metadata for foreign type should be emitted as "
-              "foreign candidate");
-    (void)nom;
-    
+  } else if (nominal) {
+    assert(!nominal->hasClangNode());
+
     defaultVarTy = TypeMetadataStructTy;
     adjustmentIndex = 0;
   } else {
@@ -3249,20 +3310,24 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     IRGen.noteUseOfTypeMetadata(nominal);
   }
 
-  LinkEntity entity
-    = ObjCClass ? LinkEntity::forObjCClass(ObjCClass)
-                : LinkEntity::forTypeMetadata(concreteType,
-                                     TypeMetadataAddress::AddressPoint);
+  Optional<LinkEntity> entity;
+  DebugTypeInfo DbgTy;
 
-  auto DbgTy =
-      ObjCClass
-          ? DebugTypeInfo::getObjCClass(ObjCClass, ObjCClassPtrTy,
-                                        getPointerSize(), getPointerAlignment())
-          : DebugTypeInfo::getMetadata(MetatypeType::get(concreteType),
+  if (nominal && requiresForeignTypeMetadata(nominal)) {
+    entity = LinkEntity::forTypeMetadata(concreteType,
+                                         TypeMetadataAddress::FullMetadata);
+    DbgTy = DebugTypeInfo::getMetadata(MetatypeType::get(concreteType),
                                        defaultVarTy->getPointerTo(), Size(0),
-                                       Alignment(1));
+                                       Alignment(1));;
+  } else {
+    entity = LinkEntity::forTypeMetadata(concreteType,
+                                         TypeMetadataAddress::AddressPoint);
+    DbgTy = DebugTypeInfo::getMetadata(MetatypeType::get(concreteType),
+                                       defaultVarTy->getPointerTo(), Size(0),
+                                       Alignment(1));;
+  }
 
-  auto addr = getAddrOfLLVMVariable(entity, ConstantInit(), DbgTy, refKind,
+  auto addr = getAddrOfLLVMVariable(*entity, ConstantInit(), DbgTy, refKind,
                                     defaultVarTy);
 
   // FIXME: MC breaks when emitting alias references on some platforms
@@ -3411,6 +3476,16 @@ llvm::Constant *IRGenModule::getAddrOfTypeContextDescriptor(NominalTypeDecl *D,
   IRGen.noteUseOfTypeContextDescriptor(D, requireMetadata);
 
   auto entity = LinkEntity::forNominalTypeDescriptor(D);
+  return getAddrOfLLVMVariable(entity,
+                               definition,
+                               DebugTypeInfo());
+}
+
+llvm::Constant *IRGenModule::getAddrOfOpaqueTypeDescriptor(
+                                               OpaqueTypeDecl *opaqueType,
+                                               ConstantInit definition) {
+  IRGen.noteUseOfOpaqueTypeDescriptor(opaqueType);
+  auto entity = LinkEntity::forOpaqueTypeDescriptor(opaqueType);
   return getAddrOfLLVMVariable(entity,
                                definition,
                                DebugTypeInfo());
@@ -3649,10 +3724,16 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::PoundDiagnostic:
       continue;
 
+    case DeclKind::Func:
+      emitFuncDecl(cast<FuncDecl>(member));
+      continue;
+
     case DeclKind::Var:
     case DeclKind::Subscript:
+      emitAbstractStorageDecl(cast<AbstractStorageDecl>(member));
+      continue;
+        
     case DeclKind::PatternBinding:
-    case DeclKind::Func:
     case DeclKind::Accessor:
     case DeclKind::Constructor:
     case DeclKind::Destructor:
@@ -3668,6 +3749,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
       continue;
 
     case DeclKind::TypeAlias:
+    case DeclKind::OpaqueType:
       // Do nothing.
       continue;
 
@@ -3726,7 +3808,15 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
            "foreign types cannot have categories emitted");
     llvm::Constant *category = emitCategoryData(*this, ext);
     category = llvm::ConstantExpr::getBitCast(category, Int8PtrTy);
-    ObjCCategories.push_back(category);
+
+    auto *theClass = ext->getSelfClassDecl();
+
+    // Categories on class stubs are added to a separate list.
+    if (theClass->checkAncestry(AncestryFlags::ResilientOther))
+      ObjCCategoriesOnStubs.push_back(category);
+    else
+      ObjCCategories.push_back(category);
+
     ObjCCategoryDecls.push_back(ext);
   }
 }

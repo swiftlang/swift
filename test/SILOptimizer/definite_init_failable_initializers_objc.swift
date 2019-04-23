@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
 
 // REQUIRES: objc_interop
+// REQUIRES: rdar49942212
 
 import ObjectiveC
 
@@ -95,21 +96,27 @@ class Cat : FakeNSObject {
     // CHECK:      store %2 to [[SELF_BOX]] : $*Cat
     // CHECK-NEXT: [[COND:%.+]] = struct_extract %0 : $Bool, #Bool._value
     // CHECK-NEXT: cond_br [[COND]], bb1, bb2
-
+  
   // CHECK: bb1:
-    // CHECK-NEXT: br bb5
-
-  // CHECK: bb2:
+    // CHECK-NEXT: br bb8
+    
+  // CHECK: bb3:
+    // CHECK: br bb5
+  
+  // CHECK: bb4:
+    // CHECK: br bb5
+  
+  // CHECK: bb5
     // CHECK: [[SELF_INIT:%.+]] = objc_method %2 : $Cat, #Cat.init!initializer.1.foreign : (Cat.Type) -> (Int, Bool) -> Cat?
     // CHECK: [[NEW_OPT_SELF:%.+]] = apply [[SELF_INIT]]({{%.+}}, {{%.+}}, %2) : $@convention(objc_method) (Int, ObjCBool, @owned Cat) -> @owned Optional<Cat>
     // CHECK: [[COND:%.+]] = select_enum [[NEW_OPT_SELF]] : $Optional<Cat>
-    // CHECK-NEXT: cond_br [[COND]], bb4, bb3
+    // CHECK-NEXT: cond_br [[COND]], bb7, bb6
 
-  // CHECK: bb3:
+  // CHECK: bb6:
     // CHECK-NEXT: release_value [[NEW_OPT_SELF]]
-    // CHECK-NEXT: br bb5
+    // CHECK-NEXT: br bb8
 
-  // CHECK: bb4:
+  // CHECK: bb7:
     // CHECK-NEXT: [[NEW_SELF:%.+]] = unchecked_enum_data [[NEW_OPT_SELF]] : $Optional<Cat>, #Optional.some!enumelt.1
     // CHECK-NEXT: store [[NEW_SELF]] to [[SELF_BOX]] : $*Cat
     // TODO: Once we re-enable arbitrary take promotion, this retain and the associated destroy_addr will go away.
@@ -117,26 +124,26 @@ class Cat : FakeNSObject {
     // CHECK-NEXT: [[RESULT:%.+]] = enum $Optional<Cat>, #Optional.some!enumelt.1, [[NEW_SELF]] : $Cat
     // CHECK-NEXT: destroy_addr [[SELF_BOX]]
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]] : $*Cat
-    // CHECK-NEXT: br bb9([[RESULT]] : $Optional<Cat>)
-
-  // CHECK: bb5:
-    // CHECK-NEXT: [[COND:%.+]] = load [[HAS_RUN_INIT_BOX]] : $*Builtin.Int1
-    // CHECK-NEXT: cond_br [[COND]], bb6, bb7
-
-  // CHECK: bb6:
-    // CHECK-NEXT: br bb8
-
-  // CHECK: bb7:
-    // CHECK-NEXT: [[MOST_DERIVED_TYPE:%.+]] = value_metatype $@thick Cat.Type, %2 : $Cat
-    // CHECK-NEXT: dealloc_partial_ref %2 : $Cat, [[MOST_DERIVED_TYPE]] : $@thick Cat.Type
-    // CHECK-NEXT: br bb8
+    // CHECK-NEXT: br bb12([[RESULT]] : $Optional<Cat>)
 
   // CHECK: bb8:
+    // CHECK-NEXT: [[COND:%.+]] = load [[HAS_RUN_INIT_BOX]] : $*Builtin.Int1
+    // CHECK-NEXT: cond_br [[COND]], bb9, bb10
+
+  // CHECK: bb9:
+    // CHECK-NEXT: br bb11
+
+  // CHECK: bb10:
+    // CHECK-NEXT: [[MOST_DERIVED_TYPE:%.+]] = value_metatype $@thick Cat.Type, %2 : $Cat
+    // CHECK-NEXT: dealloc_partial_ref %2 : $Cat, [[MOST_DERIVED_TYPE]] : $@thick Cat.Type
+    // CHECK-NEXT: br bb11
+
+  // CHECK: bb11:
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]] : $*Cat
     // CHECK-NEXT: [[NIL_RESULT:%.+]] = enum $Optional<Cat>, #Optional.none!enumelt
-    // CHECK-NEXT: br bb9([[NIL_RESULT]] : $Optional<Cat>)
+    // CHECK-NEXT: br bb12([[NIL_RESULT]] : $Optional<Cat>)
 
-  // CHECK: bb9([[RESULT:%.+]] : $Optional<Cat>):
+  // CHECK: bb12([[RESULT:%.+]] : $Optional<Cat>):
     // CHECK-NEXT: dealloc_stack [[HAS_RUN_INIT_BOX]] : $*Builtin.Int1
     // CHECK-NEXT: return [[RESULT]] : $Optional<Cat>
 

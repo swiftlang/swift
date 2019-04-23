@@ -316,7 +316,6 @@ class GenericSubscriptDerived : GenericSubscriptBase {
 
 
 // @escaping
-
 class CallbackBase {
   func perform(handler: @escaping () -> Void) {} // expected-note * {{here}}
   func perform(optHandler: (() -> Void)?) {} // expected-note * {{here}}
@@ -337,6 +336,31 @@ class CallbackSubC : CallbackBase {
   override func perform(handler: @escaping () -> Void) {}
   override func perform(optHandler: @escaping () -> Void) {} // expected-error {{cannot override instance method parameter of type '(() -> Void)?' with non-optional type '() -> Void'}}
   override func perform(nonescapingHandler: @escaping () -> Void) {} // expected-error {{method does not override any method from its superclass}}
+}
+
+// inout, varargs
+class HasFlagsBase {
+  func modify(x: inout B) {} // expected-note 2{{potential overridden instance method 'modify(x:)' here}}
+  func tweak(x: inout A) {} // expected-note 2{{potential overridden instance method 'tweak(x:)' here}}
+  func collect(x: B...) {} // expected-note 2{{potential overridden instance method 'collect(x:)' here}}
+}
+
+class HasFlagsDerivedGood : HasFlagsBase {
+  override func modify(x: inout B) {}
+  override func tweak(x: inout A) {}
+  override func collect(x: B...) {}
+}
+
+class HasFlagsDerivedBad1 : HasFlagsBase {
+  override func modify(x: inout A) {} // expected-error {{method does not override any method from its superclass}}
+  override func tweak(x: inout B) {} // expected-error {{method does not override any method from its superclass}}
+  override func collect(x: A...) {} // expected-error {{method does not override any method from its superclass}}
+}
+
+class HasFlagsDerivedBad2 : HasFlagsBase {
+  override func modify(x: B) {} // expected-error {{method does not override any method from its superclass}}
+  override func tweak(x: A) {} // expected-error {{method does not override any method from its superclass}}
+  override func collect(x: [B]) {} // expected-error {{method does not override any method from its superclass}}
 }
 
 // Issues with overrides of internal(set) and fileprivate(set) members

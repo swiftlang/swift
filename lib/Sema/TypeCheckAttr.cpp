@@ -14,20 +14,21 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckType.h"
-#include "swift/AST/GenericSignatureBuilder.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -323,10 +324,6 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
 }
 
 void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
-  // Members cannot be both dynamic and final.
-  if (D->getAttrs().hasAttribute<FinalAttr>())
-    diagnoseAndRemoveAttr(attr, diag::dynamic_with_final);
-
   // Members cannot be both dynamic and @nonobjc.
   if (D->getAttrs().hasAttribute<NonObjCAttr>())
     diagnoseAndRemoveAttr(attr, diag::dynamic_with_nonobjc);
@@ -975,23 +972,84 @@ visitDynamicCallableAttr(DynamicCallableAttr *attr) {
   }
 }
 
+static bool hasSingleNonVariadicParam(SubscriptDecl *decl,
+                                      Identifier expectedLabel) {
+  auto *indices = decl->getIndices();
+  if (decl->isInvalid() || indices->size() != 1)
+    return false;
+
+  auto *index = indices->get(0);
+  if (index->isVariadic() || !index->hasValidSignature())
+    return false;
+
+  return index->getArgumentName() == expectedLabel;
+}
+
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
 /// The method is given to be defined as `subscript(dynamicMember:)`.
 bool swift::isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
                                                 DeclContext *DC,
                                                 TypeChecker &TC) {
+  // It could be
+  // - `subscript(dynamicMember: {Writable}KeyPath<...>)`; or
+  // - `subscript(dynamicMember: String*)`
+  return isValidKeyPathDynamicMemberLookup(decl, TC) ||
+         isValidStringDynamicMemberLookup(decl, DC, TC);
+
+}
+
+bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
+                                             DeclContext *DC,
+                                             TypeChecker &TC) {
   // There are two requirements:
   // - The subscript method has exactly one, non-variadic parameter.
   // - The parameter type conforms to `ExpressibleByStringLiteral`.
-  auto indices = decl->getIndices();
+  if (!hasSingleNonVariadicParam(decl, TC.Context.Id_dynamicMember))
+    return false;
+
+  const auto *param = decl->getIndices()->get(0);
+  auto paramType = param->getType();
 
   auto stringLitProto =
     TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
-  
-  return indices->size() == 1 && !indices->get(0)->isVariadic() &&
-    TC.conformsToProtocol(indices->get(0)->getType(),
-                          stringLitProto, DC, ConformanceCheckOptions());
+
+  // If this is `subscript(dynamicMember: String*)`
+  return bool(TC.conformsToProtocol(paramType, stringLitProto, DC,
+                                    ConformanceCheckOptions()));
+}
+
+bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
+                                              TypeChecker &TC) {
+  if (!hasSingleNonVariadicParam(decl, TC.Context.Id_dynamicMember))
+    return false;
+
+  const auto *param = decl->getIndices()->get(0);
+  if (auto NTD = param->getType()->getAnyNominal()) {
+    return NTD == TC.Context.getKeyPathDecl() ||
+           NTD == TC.Context.getWritableKeyPathDecl() ||
+           NTD == TC.Context.getReferenceWritableKeyPathDecl();
+  }
+  return false;
+}
+
+Optional<Type>
+swift::getRootTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
+                                         const DeclContext *DC) {
+  auto &TC = TypeChecker::createForContext(DC->getASTContext());
+
+  if (!isValidKeyPathDynamicMemberLookup(subscript, TC))
+    return None;
+
+  const auto *param = subscript->getIndices()->get(0);
+  auto keyPathType = param->getType()->getAs<BoundGenericType>();
+  if (!keyPathType)
+    return None;
+
+  assert(!keyPathType->getGenericArgs().empty() &&
+         "invalid keypath dynamic member");
+  auto rootType = keyPathType->getGenericArgs()[0];
+  return rootType;
 }
 
 /// The @dynamicMemberLookup attribute is only allowed on types that have at
@@ -2433,6 +2491,12 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   attr->setInvalid();
 }
 
+void TypeChecker::checkParameterAttributes(ParameterList *params) {
+  for (auto param: *params) {
+    checkDeclAttributes(param);
+  }
+}
+
 void TypeChecker::checkDeclAttributes(Decl *D) {
   AttributeChecker Checker(*this, D);
 
@@ -2590,8 +2654,7 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
       isa<AccessorDecl>(D))
     return;
 
-  if (D->getAttrs().hasAttribute<FinalAttr>() ||
-      D->getAttrs().hasAttribute<NonObjCAttr>() ||
+  if (D->getAttrs().hasAttribute<NonObjCAttr>() ||
       D->getAttrs().hasAttribute<TransparentAttr>() ||
       D->getAttrs().hasAttribute<InlinableAttr>())
     return;

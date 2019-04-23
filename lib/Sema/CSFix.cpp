@@ -396,3 +396,53 @@ AllowInaccessibleMember::create(ConstraintSystem &cs, ValueDecl *member,
                                 ConstraintLocator *locator) {
   return new (cs.getAllocator()) AllowInaccessibleMember(cs, member, locator);
 }
+
+bool AllowAnyObjectKeyPathRoot::diagnose(Expr *root, bool asNote) const {
+  AnyObjectKeyPathRootFailure failure(root, getConstraintSystem(),
+                                      getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowAnyObjectKeyPathRoot *
+AllowAnyObjectKeyPathRoot::create(ConstraintSystem &cs,
+                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowAnyObjectKeyPathRoot(cs, locator);
+}
+
+bool TreatKeyPathSubscriptIndexAsHashable::diagnose(Expr *root,
+                                                    bool asNote) const {
+  KeyPathSubscriptIndexHashableFailure failure(root, getConstraintSystem(),
+                                               NonConformingType, getLocator());
+  return failure.diagnose(asNote);
+}
+
+TreatKeyPathSubscriptIndexAsHashable *
+TreatKeyPathSubscriptIndexAsHashable::create(ConstraintSystem &cs, Type type,
+                                             ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      TreatKeyPathSubscriptIndexAsHashable(cs, type, locator);
+}
+
+bool AllowInvalidRefInKeyPath::diagnose(Expr *root, bool asNote) const {
+  switch (Kind) {
+  case RefKind::StaticMember: {
+    InvalidStaticMemberRefInKeyPath failure(root, getConstraintSystem(), Member,
+                                            getLocator());
+    return failure.diagnose(asNote);
+  }
+
+  case RefKind::MutatingGetter: {
+    InvalidMemberWithMutatingGetterInKeyPath failure(
+        root, getConstraintSystem(), Member, getLocator());
+    return failure.diagnose(asNote);
+  }
+  }
+}
+
+AllowInvalidRefInKeyPath *
+AllowInvalidRefInKeyPath::create(ConstraintSystem &cs, RefKind kind,
+                                 ValueDecl *member,
+                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInvalidRefInKeyPath(cs, kind, member, locator);
+}

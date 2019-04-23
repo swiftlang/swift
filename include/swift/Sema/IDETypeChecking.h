@@ -65,10 +65,16 @@ namespace swift {
 
   struct ResolvedMemberResult {
     struct Implementation;
-    Implementation &Impl;
+    Implementation *Impl;
 
     ResolvedMemberResult();
     ~ResolvedMemberResult();
+    ResolvedMemberResult(const ResolvedMemberResult &) = delete;
+    ResolvedMemberResult & operator=(ResolvedMemberResult &) = delete;
+    ResolvedMemberResult(ResolvedMemberResult &&other) {
+      Impl = other.Impl;
+      other.Impl = nullptr;
+    }
     operator bool() const;
     bool hasBestOverload() const;
     ValueDecl* getBestOverload() const;
@@ -221,6 +227,18 @@ namespace swift {
   /// Sometimes for diagnostics we want to work on the original argument list as
   /// written by the user; this performs the reverse transformation.
   OriginalArgumentList getOriginalArgumentList(Expr *expr);
+
+  /// Return true if the specified type or a super-class/super-protocol has the
+  /// @dynamicMemberLookup attribute on it.
+  bool hasDynamicMemberLookupAttribute(Type type);
+
+  /// Returns the root type of the keypath type in a keypath dynamic member
+  /// lookup subscript, or \c None if it cannot be determined.
+  ///
+  /// \param subscript The potential keypath dynamic member lookup subscript.
+  /// \param DC The DeclContext from which the subscript is being referenced.
+  Optional<Type> getRootTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
+                                                   const DeclContext *DC);
 }
 
 #endif

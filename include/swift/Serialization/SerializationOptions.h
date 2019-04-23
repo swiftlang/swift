@@ -33,16 +33,20 @@ namespace swift {
     StringRef GroupInfoPath;
     StringRef ImportedHeader;
     StringRef ModuleLinkName;
+    StringRef ParseableInterface;
     ArrayRef<std::string> ExtraClangOptions;
 
     /// Describes a single-file dependency for this module, along with the
     /// appropriate strategy for how to verify if it's up-to-date.
     class FileDependency {
       /// The size of the file on disk, in bytes.
-      uint64_t Size : 63;
+      uint64_t Size : 62;
 
       /// A dependency can be either hash-based or modification-time-based.
       bool IsHashBased : 1;
+
+      /// The dependency path can be absolute or relative to the SDK
+      bool IsSDKRelative : 1;
 
       union {
         /// The last modification time of the file.
@@ -56,22 +60,22 @@ namespace swift {
       std::string Path;
 
       FileDependency(uint64_t size, bool isHash, uint64_t hashOrModTime,
-                     StringRef path):
-        Size(size), IsHashBased(isHash), ModificationTime(hashOrModTime),
-        Path(path) {}
+                     StringRef path, bool isSDKRelative):
+        Size(size), IsHashBased(isHash), IsSDKRelative(isSDKRelative),
+        ModificationTime(hashOrModTime), Path(path) {}
     public:
       FileDependency() = delete;
 
       /// Creates a new hash-based file dependency.
       static FileDependency
-      hashBased(StringRef path, uint64_t size, uint64_t hash) {
-        return FileDependency(size, /*isHash*/true, hash, path);
+      hashBased(StringRef path, bool isSDKRelative, uint64_t size, uint64_t hash) {
+        return FileDependency(size, /*isHash*/true, hash, path, isSDKRelative);
       }
 
       /// Creates a new modification time-based file dependency.
       static FileDependency
-      modTimeBased(StringRef path, uint64_t size, uint64_t mtime) {
-        return FileDependency(size, /*isHash*/false, mtime, path);
+      modTimeBased(StringRef path, bool isSDKRelative, uint64_t size, uint64_t mtime) {
+        return FileDependency(size, /*isHash*/false, mtime, path, isSDKRelative);
       }
 
       /// Updates the last-modified time of this dependency.
@@ -93,6 +97,9 @@ namespace swift {
       /// Determines if this dependency is hash-based and should be validated
       /// based on content hash.
       bool isHashBased() const { return IsHashBased; }
+
+      /// Determines if this dependency is absolute or relative to the SDK.
+      bool isSDKRelative() const { return IsSDKRelative; }
 
       /// Determines if this dependency is hash-based and should be validated
       /// based on modification time.

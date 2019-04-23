@@ -104,6 +104,10 @@ namespace swift {
     /// Enable features useful for running in the debugger.
     bool DebuggerSupport = false;
 
+    /// Enable the MemoryBufferSerializedModuleImporter.
+    /// Only used by lldb-moduleimport-test.
+    bool EnableMemoryBufferImporter = false;
+
     /// Enable the DWARFImporter. Only used by lldb-moduleimport-test.
     bool EnableDWARFImporter = false;
     
@@ -165,6 +169,10 @@ namespace swift {
     /// Specific solution attempt for which the constraint
     /// solver should be debugged.
     unsigned DebugConstraintSolverAttempt = 0;
+
+    /// Line numbers to activate the constraint solver debugger.
+    /// Should be stored sorted.
+    llvm::SmallVector<unsigned, 4> DebugConstraintSolverOnLines;
 
     /// Enable named lazy member loading.
     bool NamedLazyMemberLoading = true;
@@ -290,6 +298,9 @@ namespace swift {
     /// Scaffolding to permit experimentation with finer-grained dependencies
     /// and faster rebuilds.
     bool EnableExperimentalDependencies = false;
+    
+    /// Enable the experimental opaque result types feature.
+    bool EnableOpaqueResultTypes = true;
 
     /// To mimic existing system, set to false.
     /// To experiment with including file-private and private dependency info,

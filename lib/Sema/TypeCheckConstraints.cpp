@@ -183,11 +183,8 @@ Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
   Expr *anchor = getLocatorParts(pathBuffer);
   ArrayRef<LocatorPathElt> path = pathBuffer;
 
-  Expr *targetAnchor;
-  SmallVector<LocatorPathElt, 4> targetPathBuffer;
   SourceRange range;
-
-  simplifyLocator(anchor, path, targetAnchor, targetPathBuffer, range);
+  simplifyLocator(anchor, path, range);
   return (path.empty() ? anchor : nullptr);
 }
 
@@ -2078,6 +2075,9 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
     csOptions |= ConstraintSystemFlags::AllowUnresolvedTypeVariables;
 
+  if (options.contains(TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType))
+    csOptions |= ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType;
+
   ConstraintSystem cs(*this, dc, csOptions, expr);
   cs.baseCS = baseCS;
 
@@ -2118,7 +2118,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
     assert(!convertTo && "convertType and type check options conflict");
     auto *convertTypeLocator = cs.getConstraintLocator(
         cs.getConstraintLocator(expr), ConstraintLocator::ContextualType);
-    Type var = cs.createTypeVariable(convertTypeLocator);
+    Type var = cs.createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
     convertTo = getOptionalType(expr->getLoc(), var);
   }
 
@@ -2653,7 +2653,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         return true;
       }
 
-      SequenceType = cs.createTypeVariable(Locator);
+      SequenceType = cs.createTypeVariable(Locator, TVO_CanBindToNoEscape);
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        SequenceType, Locator);
       cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
@@ -2726,7 +2726,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       }
 
       if (elementType.isNull()) {
-        elementType = cs.createTypeVariable(elementLocator);
+        elementType = cs.createTypeVariable(elementLocator,
+                                            TVO_CanBindToNoEscape);
       }
 
       // Add a conversion constraint between the element type of the sequence
@@ -2964,13 +2965,18 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
 
       if (auto archetypeType = dyn_cast<ArchetypeType>(origType)) {
         auto root = archetypeType->getRoot();
+        // We leave opaque types and their nested associated types alone here.
+        // They're globally available.
+        if (isa<OpaqueTypeArchetypeType>(root))
+          return origType;
         // For other nested types, fail here so the default logic in subst()
         // for nested types applies.
-        if (root != archetypeType)
+        else if (root != archetypeType)
           return Type();
         
         auto locator = cs.getConstraintLocator(nullptr);
-        auto replacement = cs.createTypeVariable(locator);
+        auto replacement = cs.createTypeVariable(locator,
+                                                 TVO_CanBindToNoEscape);
 
         if (auto superclass = archetypeType->getSuperclass()) {
           cs.addConstraint(ConstraintKind::Subtype, replacement,
@@ -2987,7 +2993,8 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
       // FIXME: Remove this case
       assert(cast<GenericTypeParamType>(origType));
       auto locator = cs.getConstraintLocator(nullptr);
-      auto replacement = cs.createTypeVariable(locator);
+      auto replacement = cs.createTypeVariable(locator,
+                                               TVO_CanBindToNoEscape);
       types[origType] = replacement;
       return replacement;
     },
@@ -3311,6 +3318,7 @@ void Solution::dump(raw_ostream &out) const {
       break;
 
     case OverloadChoiceKind::DynamicMemberLookup:
+    case OverloadChoiceKind::KeyPathDynamicMemberLookup:
       out << "dynamic member lookup root "
           << choice.getBaseType()->getString()
           << " name='" << choice.getName() << "'\n";
@@ -3392,6 +3400,10 @@ void ConstraintSystem::dump() {
 }
 
 void ConstraintSystem::dump(Expr *E) {
+  print(llvm::errs(), E);
+}
+
+void ConstraintSystem::print(raw_ostream &out, Expr *E) {
   auto getTypeOfExpr = [&](const Expr *E) -> Type {
     if (hasType(E))
       return getType(E);
@@ -3402,8 +3414,14 @@ void ConstraintSystem::dump(Expr *E) {
       return getType(TL);
     return Type();
   };
+  auto getTypeOfKeyPathComponent =
+      [&](const KeyPathExpr *KP, unsigned I) -> Type {
+    if (hasType(KP, I))
+      return getType(KP, I);
+    return Type();
+  };
 
-  E->dump(llvm::errs(), getTypeOfExpr, getTypeOfTypeLoc);
+  E->dump(out, getTypeOfExpr, getTypeOfTypeLoc, getTypeOfKeyPathComponent);
 }
 
 void ConstraintSystem::print(raw_ostream &out) {
@@ -3430,6 +3448,8 @@ void ConstraintSystem::print(raw_ostream &out) {
       out << " [lvalue allowed]";
     if (tv->getImpl().canBindToInOut())
       out << " [inout allowed]";
+    if (tv->getImpl().canBindToNoEscape())
+      out << " [noescape allowed]";
     auto rep = getRepresentative(tv);
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {
@@ -3504,6 +3524,7 @@ void ConstraintSystem::print(raw_ostream &out) {
         break;
 
       case OverloadChoiceKind::DynamicMemberLookup:
+      case OverloadChoiceKind::KeyPathDynamicMemberLookup:
         out << "dynamic member lookup:"
             << choice.getBaseType()->getString() << "  name="
             << choice.getName() << "\n";

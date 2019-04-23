@@ -172,6 +172,13 @@ struct d0100_FooStruct {
     }
   }
 // PASS_COMMON-NEXT: {{^}}  subscript(i: Int, j: Int) -> Double { get }{{$}}
+  
+  static subscript(i: Int) -> Double {
+    get {
+      return Double(i)
+    }
+  }
+// PASS_COMMON-NEXT: {{^}}  static subscript(i: Int) -> Double { get }{{$}}
 
   func bodyNameVoidFunc1(a: Int, b x: Float) {}
 // PASS_COMMON-NEXT: {{^}}  func bodyNameVoidFunc1(a: Int, b x: Float){{$}}
@@ -1375,5 +1382,5 @@ public typealias MyPairI<B> = MyPair<Int, B>
 // PASS_PRINT_AST: public typealias MyPairI<B> = MyPair<Int, B>
 public typealias MyPairAlias<T, U> = MyPair<T, U>
 // PASS_PRINT_AST: public typealias MyPairAlias<T, U> = MyPair<T, U>
-public typealias MyPairAlias2<T: FooProtocol, U> = MyPair<T, U> where U: BarProtocol
-// PASS_PRINT_AST: public typealias MyPairAlias2<T, U> = MyPair<T, U> where T : FooProtocol, U : BarProtocol
+typealias MyPairAlias2<T: FooProtocol, U> = MyPair<T, U> where U: BarProtocol
+// PASS_PRINT_AST: typealias MyPairAlias2<T, U> = MyPair<T, U> where T : FooProtocol, U : BarProtocol

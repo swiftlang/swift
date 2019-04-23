@@ -3186,40 +3186,11 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
                                           const DefaultArgumentStorage &info,
                                           SmallVectorImpl<ManagedValue> &args,
                                           size_t &argIndex) {
-  RValue value;  
-  bool isStoredPropertyDefaultArg = false;
-
-  // Check if this is a synthesized memberwise constructor for stored property
-  // default values
-  if (auto ctor = dyn_cast<ConstructorDecl>(info.defaultArgsOwner.getDecl())) {
-    if (ctor->isMemberwiseInitializer() && ctor->isImplicit()) {
-      auto param = ctor->getParameters()->get(info.destIndex);
-      
-      if (auto var = param->getStoredProperty()) {
-        // This is a stored property default arg. Do not emit a call to the
-        // default arg generator, but rather the variable initializer expression
-        isStoredPropertyDefaultArg = true;
-
-        auto pbd = var->getParentPatternBinding();
-        auto entry = pbd->getPatternEntryForVarDecl(var);
-        auto subs = info.defaultArgsOwner.getSubstitutions();
-
-        value = SGF.emitApplyOfStoredPropertyInitializer(info.loc,
-                                                         entry, subs,
-                                                         info.resultType,
-                                                         info.origResultType,
-                                                         SGFContext());
-      }
-    }
-  }
-
-  if (!isStoredPropertyDefaultArg) {
-    value = SGF.emitApplyOfDefaultArgGenerator(info.loc,
-                                               info.defaultArgsOwner,
-                                               info.destIndex,
-                                               info.resultType,
-                                               info.origResultType);
-  }
+  auto value = SGF.emitApplyOfDefaultArgGenerator(info.loc,
+                                                  info.defaultArgsOwner,
+                                                  info.destIndex,
+                                                  info.resultType,
+                                                  info.origResultType);
 
   SmallVector<ManagedValue, 4> loweredArgs;
   SmallVector<DelayedArgument, 4> delayedArgs;

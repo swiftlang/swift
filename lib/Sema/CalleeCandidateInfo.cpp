@@ -936,19 +936,31 @@ operator=(const CalleeCandidateInfo &CCI) {
 void CalleeCandidateInfo::
 suggestPotentialOverloads(SourceLoc loc, bool isResult) {
   std::set<std::string> sorted;
-  
-  // FIXME2: For (T,T) & (Self, Self), emit this as two candidates, one using
-  // the LHS and one using the RHS type for T's.
-  for (auto cand : candidates) {
-    auto type = isResult ? cand.getResultType()
-                         : cand.getArgumentType(CS.getASTContext());
-    if (type.isNull())
-      continue;
-    
-    // If we've already seen this (e.g. decls overridden on the result type),
-    // ignore this one.
-    auto name = isResult ? type->getString() : getTypeListString(type);
-    sorted.insert(name);
+
+  if (isResult) {
+    for (auto cand : candidates) {
+      auto type = cand.getResultType();
+      if (type.isNull())
+        continue;
+      
+      // If we've already seen this (e.g. decls overridden on the result type),
+      // ignore this one.
+      auto name = type->getString();
+      sorted.insert(name);
+    }
+  } else {
+    // FIXME2: For (T,T) & (Self, Self), emit this as two candidates, one using
+    // the LHS and one using the RHS type for T's.
+    for (auto cand : candidates) {
+      auto type = cand.getFunctionType();
+      if (type == nullptr)
+        continue;
+      
+      // If we've already seen this (e.g. decls overridden on the result type),
+      // ignore this one.
+      auto name = AnyFunctionType::getParamListAsString(type->getParams());
+      sorted.insert(name);
+    }
   }
 
   if (sorted.empty())

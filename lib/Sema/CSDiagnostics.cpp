@@ -401,17 +401,21 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
     return true;
   }
 
+  GenericTypeParamType *paramTy = nullptr;
+
   auto path = getLocator()->getPath();
-  if (path.empty())
-    return false;
+  if (!path.empty()) {
+    auto &last = path.back();
+    if (last.getKind() == ConstraintLocator::GenericParameter)
+      paramTy = last.getGenericParameter();
+  }
 
-  auto &last = path.back();
-  if (last.getKind() != ConstraintLocator::GenericParameter)
-    return false;
-
-  auto *paramTy = last.getGenericParameter();
-  emitDiagnostic(anchor->getLoc(), diag::converting_noescape_to_type,
-                 paramTy);
+  if (paramTy) {
+    emitDiagnostic(anchor->getLoc(), diag::converting_noescape_to_type,
+                  paramTy);
+  } else {
+    emitDiagnostic(anchor->getLoc(), diag::unknown_escaping_use_of_noescape);
+  }
   return true;
 }
 
@@ -776,7 +780,7 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
 bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   Diag<StringRef> subElementDiagID;
   Diag<Type> rvalueDiagID = diag::assignment_lhs_not_lvalue;
-  Expr *diagExpr = getLocator()->getAnchor();
+  Expr *diagExpr = getRawAnchor();
   SourceLoc loc = diagExpr->getLoc();
 
   if (auto assignExpr = dyn_cast<AssignExpr>(diagExpr)) {
@@ -854,10 +858,18 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
       }
     }
 
-    if (auto resolvedOverload = getResolvedOverload(getLocator()))
+    if (auto resolvedOverload = getResolvedOverload(getLocator())) {
       if (resolvedOverload->Choice.getKind() ==
           OverloadChoiceKind::DynamicMemberLookup)
         subElementDiagID = diag::assignment_dynamic_property_has_immutable_base;
+
+      if (resolvedOverload->Choice.getKind() ==
+          OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+        if (!getType(member->getBase())->hasLValueType())
+          subElementDiagID =
+              diag::assignment_dynamic_property_has_immutable_base;
+      }
+    }
   } else if (auto sub = dyn_cast<SubscriptExpr>(diagExpr)) {
       subElementDiagID = diag::assignment_subscript_has_immutable_base;
   } else {
@@ -1202,7 +1214,7 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
     if (!member) {
       auto loc =
           cs.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
-      member = dyn_cast_or_null<SubscriptDecl>(cs.findResolvedMemberRef(loc));
+      member = dyn_cast_or_null<SubscriptDecl>(getMemberRef(loc));
     }
 
     // If it isn't settable, return it.
@@ -1231,9 +1243,10 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
     // If we found a decl for the UDE, check it.
     auto loc = cs.getConstraintLocator(UDE, ConstraintLocator::Member);
 
+    auto *member = getMemberRef(loc);
     // If we can resolve a member, we can determine whether it is settable in
     // this context.
-    if (auto *member = cs.findResolvedMemberRef(loc)) {
+    if (member) {
       auto *memberVD = dyn_cast<VarDecl>(member);
 
       // If the member isn't a vardecl (e.g. its a funcdecl), or it isn't
@@ -1279,6 +1292,43 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
     return resolveImmutableBase(SAE->getFn());
 
   return {expr, nullptr};
+}
+
+ValueDecl *AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
+  auto member = getOverloadChoiceIfAvailable(locator);
+  if (!member || !member->choice.isDecl())
+    return nullptr;
+
+  auto *DC = getDC();
+  auto &TC = getTypeChecker();
+
+  auto *decl = member->choice.getDecl();
+  if (isa<SubscriptDecl>(decl) &&
+      isValidDynamicMemberLookupSubscript(cast<SubscriptDecl>(decl), DC, TC)) {
+    auto *subscript = cast<SubscriptDecl>(decl);
+    // If this is a keypath dynamic member lookup, we have to
+    // adjust the locator to find member referred by it.
+    if (isValidKeyPathDynamicMemberLookup(subscript, TC)) {
+      auto &cs = getConstraintSystem();
+      // Type has a following format:
+      // `(Self) -> (dynamicMember: {Writable}KeyPath<T, U>) -> U`
+      auto *fullType = member->openedFullType->castTo<FunctionType>();
+      auto *fnType = fullType->getResult()->castTo<FunctionType>();
+
+      auto paramTy = fnType->getParams()[0].getPlainType();
+      auto keyPath = paramTy->getAnyNominal();
+      auto memberLoc = cs.getConstraintLocator(
+          locator, LocatorPathElt::getKeyPathDynamicMember(keyPath));
+
+      auto memberRef = getOverloadChoiceIfAvailable(memberLoc);
+      return memberRef ? memberRef->choice.getDecl() : nullptr;
+    }
+
+    // If this is a string based dynamic lookup, there is no member declaration.
+    return nullptr;
+  }
+
+  return decl;
 }
 
 Diag<StringRef> AssignmentFailure::findDeclDiagonstic(ASTContext &ctx,
@@ -1702,12 +1752,16 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
 
   Expr *expr = getParentExpr();
   SourceRange baseRange = expr ? expr->getSourceRange() : SourceRange();
-  auto resolvedOverloadChoice = getResolvedOverload(locator)->Choice;
+
+  auto overload = getOverloadChoiceIfAvailable(locator);
+  if (!overload)
+    return false;
 
   ValueDecl *decl = nullptr;
 
-  if (!resolvedOverloadChoice.isDecl()) {
-    if (auto MT = resolvedOverloadChoice.getBaseType()->getAs<MetatypeType>()) {
+  if (!overload->choice.isDecl()) {
+    auto baseTy = overload->choice.getBaseType();
+    if (auto MT = baseTy->getAs<MetatypeType>()) {
       if (auto VD = dyn_cast<ValueDecl>(
               MT->getMetatypeInstanceType()->getAnyNominal()->getAsDecl())) {
         decl = VD;
@@ -1717,7 +1771,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
   }
 
-  auto member = decl ? decl : resolvedOverloadChoice.getDecl();
+  auto member = decl ? decl : overload->choice.getDecl();
 
   // If the base is an implicit self type reference, and we're in a
   // an initializer, then the user wrote something like:
@@ -1887,16 +1941,24 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
       
       return true;
     }
-    
+
+    // If this is a reference to a static member by one of the key path
+    // components, let's provide a tailored diagnostic and return because
+    // that is unsupported so there is no fix-it.
+    if (locator->isForKeyPathComponent()) {
+      InvalidStaticMemberRefInKeyPath failure(expr, getConstraintSystem(),
+                                              member, locator);
+      return failure.diagnoseAsError();
+    }
+
     if (isa<EnumElementDecl>(member)) {
-      Diag.emplace(emitDiagnostic(loc, diag::could_not_use_enum_element_on_instance,
-                                  Name));
+      Diag.emplace(emitDiagnostic(
+          loc, diag::could_not_use_enum_element_on_instance, Name));
+    } else {
+      Diag.emplace(emitDiagnostic(
+          loc, diag::could_not_use_type_member_on_instance, baseObjTy, Name));
     }
-    else {
-      Diag.emplace(emitDiagnostic(loc, diag::could_not_use_type_member_on_instance,
-                                  baseObjTy, Name));
-    }
-    
+
     Diag->highlight(getAnchor()->getSourceRange());
 
     if (Name.isSimpleName(DeclBaseName::createConstructor()) &&
@@ -1956,7 +2018,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         }
       }
     }
-    
+
     // Fall back to a fix-it with a full type qualifier
     auto nominal = member->getDeclContext()->getSelfNominalTypeDecl();
     SmallString<32> typeName;
@@ -2350,5 +2412,70 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
   }
 
   emitDiagnostic(Member, diag::decl_declared_here, Member->getFullName());
+  return true;
+}
+
+bool AnyObjectKeyPathRootFailure::diagnoseAsError() {
+  // Diagnose use of AnyObject as root for a keypath
+
+  auto anchor = getAnchor();
+  auto loc = anchor->getLoc();
+  auto range = anchor->getSourceRange();
+
+  if (auto KPE = dyn_cast<KeyPathExpr>(anchor)) {
+    if (auto rootTyRepr = KPE->getRootType()) {
+      loc = rootTyRepr->getLoc();
+      range = rootTyRepr->getSourceRange();
+    }
+  }
+
+  emitDiagnostic(loc, diag::expr_swift_keypath_anyobject_root).highlight(range);
+  return true;
+}
+
+bool KeyPathSubscriptIndexHashableFailure::diagnoseAsError() {
+  auto *anchor = getRawAnchor();
+  auto *locator = getLocator();
+
+  auto loc = anchor->getLoc();
+  if (locator->isKeyPathSubscriptComponent()) {
+    auto *KPE = cast<KeyPathExpr>(anchor);
+    for (auto &elt : locator->getPath()) {
+      if (elt.isKeyPathComponent()) {
+        loc = KPE->getComponents()[elt.getValue()].getLoc();
+        break;
+      }
+    }
+  }
+
+  emitDiagnostic(loc, diag::expr_keypath_subscript_index_not_hashable,
+                 resolveType(NonConformingType));
+  return true;
+}
+
+SourceLoc InvalidMemberRefInKeyPath::getLoc() const {
+  auto *anchor = getRawAnchor();
+
+  if (auto *KPE = dyn_cast<KeyPathExpr>(anchor)) {
+    auto *locator = getLocator();
+    auto component =
+        llvm::find_if(locator->getPath(), [](const LocatorPathElt &elt) {
+          return elt.isKeyPathComponent();
+        });
+
+    assert(component != locator->getPath().end());
+    return KPE->getComponents()[component->getValue()].getLoc();
+  }
+
+  return anchor->getLoc();
+}
+
+bool InvalidStaticMemberRefInKeyPath::diagnoseAsError() {
+  emitDiagnostic(getLoc(), diag::expr_keypath_static_member, getName());
+  return true;
+}
+
+bool InvalidMemberWithMutatingGetterInKeyPath::diagnoseAsError() {
+  emitDiagnostic(getLoc(), diag::expr_keypath_mutating_getter, getName());
   return true;
 }

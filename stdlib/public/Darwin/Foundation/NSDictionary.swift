@@ -238,7 +238,7 @@ extension Dictionary : _ObjectiveCBridgeable {
       let handleDuplicates = (Key.self == String.self)
       
       result = Dictionary(_unsafeUninitializedCapacity: numElems,
-        allowingDuplicates: handleDuplicates) { (keys, vals, outCount) in
+        allowingDuplicates: handleDuplicates) { keys, vals in
         
         let objectKeys = UnsafeMutableRawPointer(mutating:
           keys.baseAddress!).assumingMemoryBound(to: AnyObject.self)
@@ -253,7 +253,7 @@ extension Dictionary : _ObjectiveCBridgeable {
         _forceBridge(objectKeys, count: numElems, to: Key.self)
         _forceBridge(objectVals, count: numElems, to: Value.self)
         
-        outCount = numElems
+        return numElems
       }
     }
   }
@@ -293,7 +293,7 @@ extension Dictionary : _ObjectiveCBridgeable {
     let handleDuplicates = (Key.self == String.self)
     
     let tmpResult = Dictionary(_unsafeUninitializedCapacity: numElems,
-      allowingDuplicates: handleDuplicates) { (keys, vals, outCount) in
+      allowingDuplicates: handleDuplicates) { keys, vals in
       
       let objectKeys = UnsafeMutableRawPointer(mutating:
         keys.baseAddress!).assumingMemoryBound(to: AnyObject.self)
@@ -314,7 +314,7 @@ extension Dictionary : _ObjectiveCBridgeable {
             Key.self)).deinitialize(count: numElems)
         }
       }
-      outCount = success ? numElems : 0
+      return success ? numElems : 0
     }
     
     result = success ? tmpResult : nil
