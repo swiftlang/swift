@@ -200,6 +200,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           DiagnosticEngine &Diags,
                           const FrontendOptions &FrontendOpts) {
   using namespace options;
+  bool HadError = false;
 
   if (auto A = Args.getLastArg(OPT_swift_version)) {
     auto vers = version::Version::parseVersionString(
@@ -277,10 +278,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       if (StringRef(A->getValue()).getAsInteger(10, limit)) {
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        A->getAsString(Args), A->getValue());
-        return true;
+        HadError = true;
+      } else {
+        Opts.TypoCorrectionLimit = limit;
       }
-
-      Opts.TypoCorrectionLimit = limit;
     }
   }
 
@@ -337,11 +338,23 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (StringRef(A->getValue()).getAsInteger(10, attempt)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
-      return true;
+      HadError = true;
+    } else {
+      Opts.DebugConstraintSolverAttempt = attempt;
     }
-
-    Opts.DebugConstraintSolverAttempt = attempt;
   }
+
+  for (const Arg *A : Args.filtered(OPT_debug_constraints_on_line)) {
+    unsigned line;
+    if (StringRef(A->getValue()).getAsInteger(10, line)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.DebugConstraintSolverOnLines.push_back(line);
+    }
+  }
+  llvm::sort(Opts.DebugConstraintSolverOnLines);
   
   if (const Arg *A = Args.getLastArg(OPT_debug_forbid_typecheck_prefix)) {
     Opts.DebugForbidTypecheckPrefix = A->getValue();
@@ -360,10 +373,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
-      return true;
+      HadError = true;
+    } else {
+      Opts.SolverMemoryThreshold = threshold;
     }
-    
-    Opts.SolverMemoryThreshold = threshold;
   }
 
   if (const Arg *A = Args.getLastArg(OPT_solver_shrink_unsolved_threshold)) {
@@ -371,10 +384,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
-      return true;
+      HadError = true;
+    } else {
+      Opts.SolverShrinkUnsolvedThreshold = threshold;
     }
-
-    Opts.SolverShrinkUnsolvedThreshold = threshold;
   }
 
   if (Args.getLastArg(OPT_solver_disable_shrink))
@@ -385,10 +398,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
-      return true;
+      HadError = true;
+    } else {
+      Opts.MaxCircularityDepth = threshold;
     }
-
-    Opts.MaxCircularityDepth = threshold;
   }
   
   for (const Arg *A : Args.filtered(OPT_D)) {
@@ -474,7 +487,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Diags.diagnose(SourceLoc(), diag::error_unsupported_target_os, TargetArgOS);
   }
 
-  return UnsupportedOS || UnsupportedArch;
+  return HadError || UnsupportedOS || UnsupportedArch;
 }
 
 static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
