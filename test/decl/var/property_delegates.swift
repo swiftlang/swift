@@ -28,6 +28,10 @@ struct WrapperAcceptingAutoclosure<T> {
   init(initialValue fn: @autoclosure @escaping () -> T) {
     self.fn = fn
   }
+
+  init(body fn: @escaping () -> T) {
+    self.fn = fn
+  }
 }
 
 @propertyDelegate
@@ -651,4 +655,15 @@ struct BrokenLazy { }
 struct S {
   @BrokenLazy // expected-error{{struct 'BrokenLazy' cannot be used as an attribute}}
   var value: Int
+}
+
+// ---------------------------------------------------------------------------
+// Closures in initializers
+// ---------------------------------------------------------------------------
+struct UsesExplicitClosures {
+  @WrapperAcceptingAutoclosure(body: { 42 })
+  var x: Int
+
+  @WrapperAcceptingAutoclosure(body: { return 42 })
+  var y: Int
 }
