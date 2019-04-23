@@ -415,8 +415,13 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
     diagnoseAndRemoveAttr(attr, diag::invalid_iboutlet);
 
-  if (!VD->isSettable(nullptr))
-    diagnoseAndRemoveAttr(attr, diag::iboutlet_only_mutable);
+  if (!VD->isSettable(nullptr)) {
+    // Allow non-mutable IBOutlet properties in module interfaces,
+    // as they may have been private(set)
+    SourceFile *Parent = VD->getDeclContext()->getParentSourceFile();
+    if (!Parent || Parent->Kind != SourceFileKind::Interface)
+      diagnoseAndRemoveAttr(attr, diag::iboutlet_only_mutable);
+  }
 
   // Verify that the field type is valid as an outlet.
   auto type = VD->getType();
