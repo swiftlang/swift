@@ -416,12 +416,7 @@ extension _TensorElementLiteral : ExpressibleByArrayLiteral {
   public typealias ArrayLiteralElement = _TensorElementLiteral<Scalar>
   @inlinable @inline(__always)
   public init(arrayLiteral elements: _TensorElementLiteral<Scalar>...) {
-    // Attr T (non-optional in the op definition) need not be specified when we
-    // run the op as part of a graph function, but need to be specified when we
-    // run it via eager C API.
-    let handle: TensorHandle<Scalar> = #tfop("Pack", elements,
-                                             T$dtype: Scalar.tensorFlowDataType)
-    tensor = Tensor(handle: handle)
+    tensor = Raw.pack(elements.map { $0.tensor })
   }
 }
 
@@ -436,8 +431,7 @@ extension Tensor : ExpressibleByArrayLiteral {
   internal init(
     _tensorElementLiterals elements: [_TensorElementLiteral<Scalar>]
   ) {
-    self.init(handle: #tfop("Pack", elements,
-                            T$dtype: Scalar.tensorFlowDataType))
+    self = Raw.pack(elements.map { $0.tensor })
   }
 
   /// Creates a tensor initialized with the given elements.

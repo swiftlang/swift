@@ -23,7 +23,6 @@ public extension StringTensor {
   /// - Note: `elementsEqual` supports broadcasting.
   @inlinable @inline(__always)
   func elementsEqual(_ other: StringTensor) -> Tensor<Bool> {
-    return #tfop("Equal", self.handle, other.handle,
-                 T$dtype: String.tensorFlowDataType)
+    return Raw.equal(self, other)
   }
 }

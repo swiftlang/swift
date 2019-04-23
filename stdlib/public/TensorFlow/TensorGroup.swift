@@ -29,6 +29,8 @@ public protocol TensorArrayProtocol {
   func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?)
 
   var _tensorHandleCount: Int32 { get }
+
+  init(_owning tensorHandles: UnsafePointer<CTensorHandle>?, count: Int)
 }
 
 /// A protocol representing types that can be mapped to and from
@@ -66,6 +68,11 @@ public extension TensorGroup {
   /// The `nil` represents unknown shape.
   static var _unknownShapeList: [TensorShape?] {
     return Array(repeating: nil, count: _typeList.count)
+  }
+
+  init(_owning tensorHandles: UnsafePointer<CTensorHandle>?, count: Int) {
+    precondition(count == Self._typeList.count)
+    self.init(_owning: tensorHandles)
   }
 }
 
@@ -199,7 +206,7 @@ extension StringTensor : TensorGroup {
   }
 }
 
-extension Array : TensorArrayProtocol where Element : TensorArrayProtocol {
+extension Array : TensorArrayProtocol where Element : TensorGroup {
   public func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?) {
     var ptr = address
     for elem in self {
@@ -212,5 +219,12 @@ extension Array : TensorArrayProtocol where Element : TensorArrayProtocol {
     var count: Int32 = 0
     for elem in self { count += elem._tensorHandleCount }
     return count
+  }
+
+  public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?, count: Int) {
+    let size = count / Int(Element._tensorHandleCount)
+    self = Array((0..<size).map { Element.init(
+      _owning: tensorHandles?.advanced(by: $0 * Int(Element._tensorHandleCount)))
+    })
   }
 }
