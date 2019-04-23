@@ -17,16 +17,16 @@
 /// provide the withUnsafeBufferPointer function.
 @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 public protocol AccelerateBuffer {
-  /// The buffer's element type.
-  associatedtype Element
-  
-  /// The number of elements in the buffer.
-  var count: Int { get }
-  
-  /// Calls a closure with a pointer to the object's contiguous storage.
-  func withUnsafeBufferPointer<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R
+    /// The buffer's element type.
+    associatedtype Element
+    
+    /// The number of elements in the buffer.
+    var count: Int { get }
+    
+    /// Calls a closure with a pointer to the object's contiguous storage.
+    func withUnsafeBufferPointer<R>(
+        _ body: (UnsafeBufferPointer<Element>) throws -> R
+        ) rethrows -> R
 }
 
 /// A mutable object composed of count elements that are stored contiguously
@@ -36,29 +36,29 @@ public protocol AccelerateBuffer {
 /// MutableCollections, but they need not be.
 @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 public protocol AccelerateMutableBuffer: AccelerateBuffer {
-  /// Calls the given closure with a pointer to the object's mutable
-  /// contiguous storage.
-  mutating func withUnsafeMutableBufferPointer<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R
+    /// Calls the given closure with a pointer to the object's mutable
+    /// contiguous storage.
+    mutating func withUnsafeMutableBufferPointer<R>(
+        _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+        ) rethrows -> R
 }
 
 @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 public extension AccelerateBuffer where Self: Collection {
-  func withUnsafeBufferPointer<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R {
-    return try withContiguousStorageIfAvailable(body)!
-  }
+    func withUnsafeBufferPointer<R>(
+        _ body: (UnsafeBufferPointer<Element>) throws -> R
+        ) rethrows -> R {
+        return try withContiguousStorageIfAvailable(body)!
+    }
 }
 
 @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 extension AccelerateMutableBuffer where Self: MutableCollection {
-  public mutating func withUnsafeMutableBufferPointer<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R {
-    return try withContiguousMutableStorageIfAvailable(body)!
-  }
+    public mutating func withUnsafeMutableBufferPointer<R>(
+        _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+        ) rethrows -> R {
+        return try withContiguousMutableStorageIfAvailable(body)!
+    }
 }
 
 @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
