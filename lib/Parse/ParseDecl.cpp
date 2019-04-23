@@ -1711,6 +1711,18 @@ bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
   return false;
 }
 
+/// Check whether the attributes have already established an initializer
+/// context within the given set of attributes.
+static PatternBindingInitializer *findAttributeInitContent(
+    DeclAttributes &Attributes) {
+  for (auto custom : Attributes.getAttributes<CustomAttr>()) {
+    if (auto initContext = custom->getInitContext())
+      return initContext;
+  }
+
+  return nullptr;
+}
+
 /// \verbatim
 ///   attribute:
 ///     '_silgen_name' '(' identifier ')'
@@ -1853,7 +1865,10 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
       // DeclContexts for any closures that may live inside of initializers.
       Optional<ParseFunctionBody> initParser;
       if (!CurDeclContext->isLocalContext()) {
-        initContext = new (Context) PatternBindingInitializer(CurDeclContext);
+        initContext = findAttributeInitContent(Attributes);
+        if (!initContext)
+          initContext = new (Context) PatternBindingInitializer(CurDeclContext);
+
         initParser.emplace(*this, initContext);
       }
 
@@ -5242,10 +5257,14 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       }
     });
 
+    // Check whether we have already established an initializer context.
+    PatternBindingInitializer *initContext =
+      findAttributeInitContent(Attributes);
+
     // Remember this pattern/init pair for our ultimate PatternBindingDecl. The
     // Initializer will be added later when/if it is parsed.
     PBDEntries.push_back({pattern, /*EqualLoc*/ SourceLoc(), /*Init*/ nullptr,
-                          /*InitContext*/ nullptr});
+                          initContext});
 
     Expr *PatternInit = nullptr;
     
@@ -5255,7 +5274,6 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       // If we're not in a local context, we'll need a context to parse initializers
       // into (should we have one).  This happens for properties and global
       // variables in libraries.
-      PatternBindingInitializer *initContext = nullptr;
 
       // Record the variables that we're trying to initialize.  This allows us
       // to cleanly reject "var x = x" when "x" isn't bound to an enclosing
