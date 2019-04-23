@@ -68,7 +68,16 @@ func makeParamNestedBound(@GenericContainer<Int>.Maker
                           fn: () -> ()) {}
 
 
+protocol P { }
+
+@_functionBuilder
+struct ConstrainedGenericMaker<T: P> {}
+
+
 struct WithinGeneric<U> {
-  func makeParamBoundInContext(@GenericMaker<U>  // expected-error {{function builder type 'GenericMaker<U>' cannot depend on the current generic context}}
-                               fn: () -> ()) {}
+  func makeParamBoundInContext(@GenericMaker<U> fn: () -> ()) {}
+
+  // expected-error@+1{{type 'U' does not conform to protocol 'P'}}
+  func makeParamBoundInContextBad(@ConstrainedGenericMaker<U>
+    fn: () -> ()) {}
 }

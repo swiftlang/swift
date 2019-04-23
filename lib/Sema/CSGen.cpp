@@ -1395,7 +1395,9 @@ namespace {
       Type type;
       // If this is an implicit TypeExpr, don't validate its contents.
       auto &typeLoc = E->getTypeLoc();
-      if (typeLoc.wasValidated()) {
+      if (E->isImplicit() && CS.hasType(E)) {
+        type = CS.getType(E);
+      } else if (typeLoc.wasValidated()) {
         type = typeLoc.getType();
       } else if (typeLoc.hasLocation()) {
         type = resolveTypeReferenceInExpression(typeLoc);

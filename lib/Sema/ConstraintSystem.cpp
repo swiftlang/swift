@@ -2770,6 +2770,7 @@ namespace {
   /// Visitor to classify the contents of the given closure.
   class BuilderClosureVisitor
       : public StmtVisitor<BuilderClosureVisitor, Expr *> {
+    ConstraintSystem &cs;
     ASTContext &ctx;
     bool wantExpr;
     Type builderType;
@@ -2786,7 +2787,9 @@ namespace {
       if (!wantExpr)
         return nullptr;
 
-      auto typeExpr = TypeExpr::createImplicit(builderType, ctx);
+      auto typeExpr = new (ctx) TypeExpr(TypeLoc());
+      cs.setType(typeExpr, builderType);
+      typeExpr->setImplicit();
       auto memberRef = new (ctx) UnresolvedDotExpr(
           typeExpr, SourceLoc(), fnName, DeclNameLoc(), /*implicit=*/true);
       return CallExpr::createImplicit(ctx, memberRef, args, { });
@@ -2813,8 +2816,9 @@ namespace {
     }
 
   public:
-    BuilderClosureVisitor(ASTContext &ctx, bool wantExpr, Type builderType)
-        : ctx(ctx), wantExpr(wantExpr), builderType(builderType) {
+    BuilderClosureVisitor(ConstraintSystem &cs, bool wantExpr, Type builderType)
+        : cs(cs), ctx(cs.getASTContext()), wantExpr(wantExpr),
+          builderType(builderType) {
       builder = builderType->getAnyNominal();
     }
 
@@ -2939,7 +2943,8 @@ namespace {
 }
 
 ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
-    ClosureExpr *closure, Type builderType, ConstraintLocatorBuilder locator) {
+    ClosureExpr *closure, Type builderType, ConstraintLocator *calleeLocator,
+    ConstraintLocatorBuilder locator) {
   auto builder = builderType->getAnyNominal();
   assert(builder && "Bad function builder type");
   assert(builder->getAttrs().hasAttribute<FunctionBuilderAttr>());
@@ -2953,8 +2958,7 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
       return getTypeMatchSuccess();
 
     // Check whether we can apply this function builder.
-    BuilderClosureVisitor visitor(
-        getASTContext(), /*wantExpr=*/false, builderType);
+    BuilderClosureVisitor visitor(*this, /*wantExpr=*/false, builderType);
     (void)visitor.visit(closure->getBody());
 
     // The presence of an explicit return suppresses the function builder
@@ -2981,8 +2985,23 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
     }
   }
 
-  BuilderClosureVisitor visitor(
-      getASTContext(), /*wantExpr=*/true, builderType);
+  // If the builder type has a type parameter, substitute in the type
+  // variables.
+  if (builderType->hasTypeParameter()) {
+    // Find the opened type for this callee and substitute in the type
+    // parametes.
+    for (const auto &opened : OpenedTypes) {
+      if (opened.first == calleeLocator) {
+        OpenedTypeMap replacements(opened.second.begin(),
+                                   opened.second.end());
+        builderType = openType(builderType, replacements);
+        break;
+      }
+    }
+    assert(!builderType->hasTypeParameter());
+  }
+
+  BuilderClosureVisitor visitor(*this, /*wantExpr=*/true, builderType);
   Expr *singleExpr = visitor.visit(closure->getBody());
 
   if (TC.precheckedClosures.insert(closure).second &&

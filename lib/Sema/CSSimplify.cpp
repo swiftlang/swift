@@ -696,7 +696,8 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 
 /// Find the callee declaration and uncurry level for a given call
 /// locator.
-static std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool>
+static std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool,
+                  ConstraintLocator *>
 getCalleeDeclAndArgs(ConstraintSystem &cs,
                      ConstraintLocatorBuilder callLocator,
                      SmallVectorImpl<Identifier> &argLabelsScratch) {
@@ -708,14 +709,14 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
   auto callExpr = callLocator.getLocatorParts(path);
   if (!callExpr)
     return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                           hasTrailingClosure);
+                           hasTrailingClosure, nullptr);
 
   // Our remaining path can only be 'ApplyArgument'.
   if (!path.empty() &&
       !(path.size() <= 2 &&
         path.back().getKind() == ConstraintLocator::ApplyArgument))
     return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                           hasTrailingClosure);
+                           hasTrailingClosure, nullptr);
 
   // Dig out the callee.
   ConstraintLocator *targetLocator;
@@ -740,12 +741,12 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
         path[0].getKind() != ConstraintLocator::KeyPathComponent ||
         path[1].getKind() != ConstraintLocator::ApplyArgument)
       return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                             hasTrailingClosure);
+                             hasTrailingClosure, nullptr);
 
     auto componentIndex = path[0].getValue();
     if (componentIndex >= keyPath->getComponents().size())
       return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                             hasTrailingClosure);
+                             hasTrailingClosure, nullptr);
 
     auto &component = keyPath->getComponents()[componentIndex];
     switch (component.getKind()) {
@@ -765,7 +766,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
     case KeyPathExpr::Component::Kind::Identity:
     case KeyPathExpr::Component::Kind::TupleElement:
       return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                             hasTrailingClosure);
+                             hasTrailingClosure, nullptr);
     }
 
   } else {
@@ -777,13 +778,14 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
       hasTrailingClosure = objectLiteral->hasTrailingClosure();
     }
     return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                           hasTrailingClosure);
+                           hasTrailingClosure, nullptr);
   }
 
   // Find the overload choice corresponding to the callee locator.
   // FIXME: This linearly walks the list of resolved overloads, which is
   // potentially very expensive.
   Optional<OverloadChoice> choice;
+  ConstraintLocator *calleeLocator = nullptr;
   for (auto resolved = cs.getResolvedOverloadSets(); resolved;
        resolved = resolved->Previous) {
     // FIXME: Workaround null locators.
@@ -810,6 +812,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
     resolvedLocator = simplifyLocator(cs, resolvedLocator, range);
 
     if (resolvedLocator == targetLocator) {
+      calleeLocator = resolved->Locator;
       choice = resolved->Choice;
       break;
     }
@@ -818,7 +821,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
   // If we didn't find any matching overloads, we're done.
   if (!choice)
     return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                           hasTrailingClosure);
+                           hasTrailingClosure, nullptr);
 
   // If there's a declaration, return it.
   if (choice->isDecl()) {
@@ -842,11 +845,12 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
       }
     }
 
-    return std::make_tuple(decl, hasCurriedSelf, argLabels, hasTrailingClosure);
+    return std::make_tuple(decl, hasCurriedSelf, argLabels, hasTrailingClosure,
+                           calleeLocator);
   }
 
   return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                         hasTrailingClosure);
+                         hasTrailingClosure, calleeLocator);
 }
 
 class ArgumentFailureTracker : public MatchCallArgumentListener {
@@ -907,7 +911,9 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   ArrayRef<Identifier> argLabels;
   SmallVector<Identifier, 2> argLabelsScratch;
   bool hasTrailingClosure = false;
-  std::tie(callee, hasCurriedSelf, argLabels, hasTrailingClosure) =
+  ConstraintLocator *calleeLocator;
+  std::tie(callee, hasCurriedSelf, argLabels, hasTrailingClosure,
+           calleeLocator) =
     getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
 
   ParameterListInfo paramInfo(params, callee, hasCurriedSelf);
@@ -986,7 +992,8 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
         Expr *arg = getArgumentExpr(locator.getAnchor(), argIdx);
         if (auto closure = dyn_cast_or_null<ClosureExpr>(arg)) {
           auto result =
-              cs.applyFunctionBuilder(closure, functionBuilderType, loc);
+              cs.applyFunctionBuilder(closure, functionBuilderType,
+                                      calleeLocator, loc);
           if (result.isFailure())
             return result;
         }
