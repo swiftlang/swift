@@ -4,13 +4,19 @@ include("../../../../cmake/modules/StandaloneOverlay.cmake")
 add_swift_target_library(swiftAccelerate ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   Accelerate.swift
   AccelerateBuffer.swift
+  Quadrature.swift
   vDSP_Arithmetic.swift
+  vDSP_Biquad.swift
   vDSP_ClippingLimitThreshold.swift
   vDSP_ComplexConversion.swift
   vDSP_ComplexOperations.swift
   vDSP_Conversion.swift
   vDSP_Convolution.swift
+  vDSP_DCT.swift
+  vDSP_DFT.swift
   vDSP_DecibelConversion.swift
+  vDSP_FFT.swift
+  vDSP_FFT_DFT_Common.swift
   vDSP_FIR.swift
   vDSP_FillClearGenerate.swift
   vDSP_Geometry.swift
@@ -23,7 +29,6 @@ add_swift_target_library(swiftAccelerate ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   vDSP_SingleVectorOperations.swift
   vDSP_SlidingWindow.swift
   vForce_Operations.swift
-  Quadrature.swift
 
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
 
