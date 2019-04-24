@@ -419,8 +419,7 @@ deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl) {
   Type intType = C.getIntDecl()->getDeclaredType();
   TypeExpr *intTE = TypeExpr::createImplicit(intType, C);
 
-  // Goes through the member TensorGroups and call 
-  // `self.t = T(_owning:count:)`.
+  // Iterate over members and call `self.t = T(_owning:)`.
   llvm::SmallVector<ASTNode, 2> thenMemberExprs;
   llvm::SmallVector<ASTNode, 2> elseMemberExprs;
   for (auto member : nominal->getStoredProperties()) {
@@ -532,48 +531,6 @@ deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl) {
                                       /*implicit*/ true));
 }
 
-// Synthesize a constructor declaration for a `TensorArrayProtocol` 
-// method requirement.
-static ValueDecl *deriveTensorArrayProtocol_constructor(
-    DerivedConformance &derived, Identifier argument1Name, 
-    Identifier parameter1Name, Type parameter1Type,
-    Identifier parameter2Name, Type parameter2Type, Type returnType,
-    AbstractFunctionDecl::BodySynthesizer bodySynthesizer) {
-  auto nominal = derived.Nominal;
-  auto &C = derived.TC.Context;
-  auto parentDC = derived.getConformanceContext();
-
-  auto *param1 =
-      new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                        argument1Name, SourceLoc(), parameter1Name, parentDC);
-  param1->setInterfaceType(parameter1Type);
-  auto *param2 =
-      new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                        parameter2Name, SourceLoc(), parameter2Name, parentDC);
-  param2->setInterfaceType(parameter2Type);
-  ParameterList *params = ParameterList::create(C, {param1, param2});
-
-  DeclName name(C, DeclBaseName::createConstructor(), params);
-  auto *initDecl =
-      new (C) ConstructorDecl(name, SourceLoc(), OTK_None, SourceLoc(),
-                              /*Throws*/ false, SourceLoc(), params,
-                              /*GenericParams*/ nullptr, parentDC);
-  initDecl->setImplicit();
-  initDecl->setSynthesized();
-  initDecl->setBodySynthesizer(bodySynthesizer);
-
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    initDecl->setGenericEnvironment(env);
-  initDecl->computeType(AnyFunctionType::ExtInfo().withThrows(false));
-  initDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  initDecl->setValidationToChecked();
-
-  derived.addMembersToConformanceContext({initDecl});
-  C.addSynthesizedDecl(initDecl);
-
-  return initDecl;
-}
-
 // Synthesize the `init(_owning:count:)` function declaration.
 static ValueDecl
 *deriveTensorArrayProtocol_init(DerivedConformance &derived) {
@@ -586,12 +543,41 @@ static ValueDecl
   Type addressType = BoundGenericType::get(
       C.getOptionalDecl(), Type(), {baseAddressType});
   Type intType = C.getIntDecl()->getDeclaredType();
-  Type voidType = C.getVoidDecl()->getDeclaredInterfaceType();
 
-  return deriveTensorArrayProtocol_constructor(
-      derived, C.getIdentifier("_owning"), C.getIdentifier("tensorHandles"),
-      addressType, C.getIdentifier("count"), intType, voidType,
-      deriveBodyTensorArrayProtocol_init);
+  auto nominal = derived.Nominal;
+  auto &C = derived.TC.Context;
+  auto parentDC = derived.getConformanceContext();
+
+  auto *param1 = new (C) ParamDecl(
+    VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+    C.getIdentifier("_owning"), SourceLoc(), C.getIdentifier("tensorHandles"),
+    parentDC);
+  param1->setInterfaceType(addressType);
+  auto *param2 = new (C) ParamDecl(
+    VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+    C.getIdentifier("count"), SourceLoc(), C.getIdentifier("count"), parentDC);
+  param2->setInterfaceType(intType);
+  ParameterList *params = ParameterList::create(C, {param1, param2});
+
+  DeclName name(C, DeclBaseName::createConstructor(), params);
+  auto *initDecl =
+      new (C) ConstructorDecl(name, SourceLoc(), OTK_None, SourceLoc(),
+                              /*Throws*/ false, SourceLoc(), params,
+                              /*GenericParams*/ nullptr, parentDC);
+  initDecl->setImplicit();
+  initDecl->setSynthesized();
+  initDecl->setBodySynthesizer(deriveBodyTensorArrayProtocol_init);
+
+  if (auto env = parentDC->getGenericEnvironmentOfContext())
+    initDecl->setGenericEnvironment(env);
+  initDecl->computeType(AnyFunctionType::ExtInfo().withThrows(false));
+  initDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
+  initDecl->setValidationToChecked();
+
+  derived.addMembersToConformanceContext({initDecl});
+  C.addSynthesizedDecl(initDecl);
+
+  return initDecl;
 }
 
 ValueDecl *DerivedConformance::deriveTensorArrayProtocol(
