@@ -25,6 +25,7 @@ class OpaqueSpecializerCloner
 
   SILBasicBlock *entryBlock;
   SILBasicBlock *cloneFromBlock;
+  ModuleDecl *currentModule;
 
 public:
   friend class SILCloner<OpaqueSpecializerCloner>;
@@ -35,6 +36,7 @@ public:
                 true /*ReplacingOpaqueArchetypes*/) {
     entryBlock = fun.getEntryBlock();
     cloneFromBlock = entryBlock->split(entryBlock->begin());
+    currentModule = fun.getModule().getSwiftModule();
   }
 
   void clone();
@@ -213,21 +215,23 @@ protected:
   }
 
 protected:
+
   SILType remapType(SILType Ty) {
     SILType &Sty = TypeCache[Ty];
-    if (!Sty) {
-      // Apply the opaque types substitution.
-      ReplaceOpaqueTypesWithUnderlyingTypes replacer;
-      Sty = Ty.subst(Original.getModule(), SubsMap)
-                .subst(Original.getModule(), replacer, replacer,
-                       CanGenericSignature(), true);
-    }
+    if (Sty)
+      return Sty;
+
+   // Apply the opaque types substitution.
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(currentModule);
+    Sty = Ty.subst(Original.getModule(), SubsMap)
+              .subst(Original.getModule(), replacer, replacer,
+                     CanGenericSignature(), true);
     return Sty;
   }
 
   CanType remapASTType(CanType ty) {
     // Apply the opaque types substitution.
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer;
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(currentModule);
     return SuperTy::remapASTType(ty)
         .subst(replacer, replacer,
                SubstFlags::SubstituteOpaqueArchetypes |
@@ -238,7 +242,7 @@ protected:
   ProtocolConformanceRef remapConformance(Type type,
                                           ProtocolConformanceRef conf) {
     // Apply the opaque types substitution.
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer;
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(currentModule);
     return SuperTy::remapConformance(type, conf)
         .subst(type, replacer, replacer,
                SubstFlags::SubstituteOpaqueArchetypes |
@@ -247,7 +251,7 @@ protected:
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
     // Apply the opaque types substitution.
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer;
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(currentModule);
     return SuperTy::remapSubstitutionMap(Subs).subst(
         replacer, replacer,
         SubstFlags::SubstituteOpaqueArchetypes | SubstFlags::AllowLoweredTypes);
@@ -303,12 +307,24 @@ class OpaqueArchetypeSpecializer : public SILFunctionTransform {
     if (!EnableOpaqueArchetypeSpecializer)
       return;
 
+    auto *currentModule = getFunction()->getModule().getSwiftModule();
+
+    auto opaqueArchetypeWouldChange = [=](CanType ty) -> bool {
+      if (!ty->hasOpaqueArchetype())
+        return false;
+      ReplaceOpaqueTypesWithUnderlyingTypes replacer(currentModule);
+      return ty.subst(replacer, replacer,
+                      SubstFlags::SubstituteOpaqueArchetypes |
+                          SubstFlags::AllowLoweredTypes)
+                 ->getCanonicalType() != ty;
+    };
+
     // Look for opaque type archetypes.
     bool foundOpaqueArchetype = false;
     for (auto &BB : *getFunction()) {
       for (auto &inst : BB) {
         for (auto &opd : inst.getAllOperands()) {
-          if (!opd.get()->getType().getASTType()->hasOpaqueArchetype())
+          if (!opaqueArchetypeWouldChange(opd.get()->getType().getASTType()))
             continue;
           foundOpaqueArchetype = true;
           break;
@@ -316,8 +332,8 @@ class OpaqueArchetypeSpecializer : public SILFunctionTransform {
         if (foundOpaqueArchetype)
           break;
         auto *allocStack = dyn_cast<AllocStackInst>(&inst);
-        if (!allocStack ||
-            !allocStack->getElementType().getASTType()->hasOpaqueArchetype())
+        if (!allocStack || !opaqueArchetypeWouldChange(
+                               allocStack->getElementType().getASTType()))
           continue;
         foundOpaqueArchetype = true;
         break;
@@ -329,10 +345,8 @@ class OpaqueArchetypeSpecializer : public SILFunctionTransform {
       OpaqueSpecializerCloner s(subsMap, *getFunction());
       s.clone();
       removeUnreachableBlocks(*getFunction());
-    }
-
-    if (foundOpaqueArchetype)
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+    }
   }
 };
 } // end anonymous namespace
