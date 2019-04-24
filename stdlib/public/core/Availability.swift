@@ -45,3 +45,39 @@ public func _stdlib_isOSVersionAtLeast(
   return false._value
 #endif
 }
+
+
+/// Returns the version number for the Swift Standard Library that the code
+/// calling this was originally compiled with.
+///
+/// The version number is an arbitrary `Double` value that is monotonically
+/// increasing between toolchain releases. It does not correlate with toolchain
+/// or OS version numbers, and it is not a semantic version number.
+@_alwaysEmitIntoClient @_transparent
+public var _stdlibStaticVersion: Double {
+  return 1001.0
+}
+
+/// Returns the version number for the Swift Standard Library that is currently
+/// loaded.
+///
+/// The version number is an arbitrary `Double` value that is monotonically
+/// increasing between toolchain releases. It does not correlate with toolchain
+/// or OS version numbers, and it is not a semantic version number.
+@_alwaysEmitIntoClient // Introduced in 5.1
+public var _stdlibDynamicVersion: Double {
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    return _stdlibOpaqueVersion
+  }
+  else {
+    // When linked with the 5.0 stdlib, we return this default value.
+    return 1000.0
+  }
+}
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@usableFromInline
+internal var _stdlibOpaqueVersion: Double {
+  return _stdlibStaticVersion
+}
+
