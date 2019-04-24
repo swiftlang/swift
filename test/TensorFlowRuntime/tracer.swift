@@ -191,6 +191,10 @@ TracerTests.testAllBackends("Advanced") {
       return model._tensorHandleCount + optimizer._tensorHandleCount
     }
 
+    public var _typeList: [TensorDataType] {
+      return model._typeList + optimizer._typeList
+    }
+
     func _makeInstance<C: Collection>(owning inputs: C) -> State
       where C.Element == CTensorHandle {
       assert(inputs.count == 4)
