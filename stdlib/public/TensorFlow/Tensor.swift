@@ -706,14 +706,24 @@ public extension Tensor {
   }
 
   /// Returns a shape-expanded `Tensor`, with a dimension of 1 inserted at the
-  /// specified shape index.
+  /// specified shape indices.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  func expandingShape(at axes: Int...) -> Tensor {
+    return expandingShape(at: axes)
+  }
+   
+  /// Returns a shape-expanded `Tensor`, with a dimension of 1 inserted at the
+  /// specified shape indices.
   @inlinable @inline(__always)
   @differentiable(
     wrt: self, vjp: _vjpExpandingShape(at:)
     where Scalar : TensorFlowFloatingPoint
   )
-  func expandingShape(at shapeIndex: Int) -> Tensor {
-    return Raw.expandDims(self, dim: Tensor<Int32>(Int32(shapeIndex)))
+  func expandingShape(at axes: [Int]) -> Tensor {
+    var res = self
+    for i in axes { res = Raw.expandDims(res, dim: Tensor<Int32>(Int32(i))) }
+    return res
   }
 
   /// Remove the specified dimensions of size 1 from the shape of a tensor. If
