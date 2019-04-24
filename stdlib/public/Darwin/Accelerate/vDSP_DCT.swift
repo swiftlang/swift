@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Accelerate
-
 extension vDSP {
     
     /// An enum that specifies which DCT variant to perform.
@@ -132,6 +130,7 @@ fileprivate protocol vDSP_DCTFunctions {
         U.Element == Scalar, V.Element == Scalar
 }
 
+@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension vDSP.VectorizableFloat: vDSP_DCTFunctions {
     
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)

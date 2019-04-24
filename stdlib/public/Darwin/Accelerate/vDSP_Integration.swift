@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 extension vDSP {
+  
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public enum IntegrationRule {
         case runningSum
         case simpson
