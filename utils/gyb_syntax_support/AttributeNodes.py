@@ -22,7 +22,7 @@ ATTRIBUTE_NODES = [
              Child('LeftParen', kind='LeftParenToken',
                    is_optional=True),
              Child('ArgumentList', kind='FunctionCallArgumentList',
-                   is_optional=True),
+                   collection_element_name='Argument', is_optional=True),
              Child('RightParen', kind='RightParenToken',
                    is_optional=True),
          ]),
@@ -79,7 +79,7 @@ ATTRIBUTE_NODES = [
 
     # attribute-list -> attribute attribute-list?
     Node('AttributeList', kind='SyntaxCollection',
-         element='Syntax',
+         element='Syntax', element_name='Attribute',
          element_choices=[
              'Attribute',
              'CustomAttribute',
