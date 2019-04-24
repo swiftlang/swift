@@ -510,9 +510,9 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                      width: width,
                                      height: height)!
         
-        let format = vImage_CGImageFormat(cgImage: image)!
+        var format = vImage_CGImageFormat(cgImage: image)!
         
-        let legacyFormat = vImage_CGImageFormat(bitsPerComponent: 8,
+        var legacyFormat = vImage_CGImageFormat(bitsPerComponent: 8,
                                                 bitsPerPixel: 8,
                                                 colorSpace: Unmanaged.passRetained(CGColorSpaceCreateDeviceGray()),
                                                 bitmapInfo: CGBitmapInfo(rawValue: 0),
@@ -520,7 +520,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                                 decode: nil,
                                                 renderingIntent: .defaultIntent)
         
-        expectTrue(format == legacyFormat)
+        expectTrue(vImageCGImageFormat_IsEqual(&format, &legacyFormat))
     }
     
     Accelerate_vImageTests.test("vImage/CGImageFormatLightweightInit") {
@@ -528,12 +528,12 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         let renderingIntent = CGColorRenderingIntent.defaultIntent
         let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue)
         
-        let format = vImage_CGImageFormat(bitsPerComponent: 8,
+        var format = vImage_CGImageFormat(bitsPerComponent: 8,
                                           bitsPerPixel: 32,
                                           colorSpace: colorspace,
                                           bitmapInfo: bitmapInfo)!
         
-        let legacyFormat = vImage_CGImageFormat(bitsPerComponent: 8,
+        var legacyFormat = vImage_CGImageFormat(bitsPerComponent: 8,
                                                 bitsPerPixel: 32,
                                                 colorSpace: Unmanaged.passRetained(colorspace),
                                                 bitmapInfo: bitmapInfo,
@@ -541,7 +541,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                                 decode: nil,
                                                 renderingIntent: renderingIntent)
         
-        expectTrue(format == legacyFormat)
+        expectTrue(vImageCGImageFormat_IsEqual(&format, &legacyFormat))
         expectTrue(format.componentCount == 4)
     }
     

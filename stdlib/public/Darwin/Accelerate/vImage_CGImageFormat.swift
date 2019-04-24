@@ -77,13 +77,5 @@ extension vImage_CGImageFormat {
         var mutableSelf = self
         return Int(vImageCGImageFormat_GetComponentCount(&mutableSelf))
     }
-    
-    /// Test to see if two vImage_CGImageFormats are equivalent.
-    public static func == (lhs: vImage_CGImageFormat, rhs: vImage_CGImageFormat) -> Bool {
-        var mutableLhs = lhs
-        var mutableRhs = rhs
-        
-        return vImageCGImageFormat_IsEqual(&mutableLhs, &mutableRhs)
-    }
 }
 
