@@ -3003,7 +3003,11 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   }
 }
 
-DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll")
+  .skip(
+    .stdlibOlderThan(.custom(1001.0),
+      reason: "https://github.com/apple/swift/pull/22527"))
+  .code {
   do {
     var d = getBridgedNonverbatimDictionary([:])
     assert(isNativeDictionary(d))
@@ -3297,7 +3301,11 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
   assert(identity2 == d2._rawIdentifier())
 }
 
-DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
+DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty")
+  .skip(
+    .stdlibOlderThan(.custom(1001.0),
+      reason: "https://github.com/apple/swift/pull/22527"))
+  .code {
   let d1 = getBridgedNonverbatimEquatableDictionary([:])
   let identity1 = d1._rawIdentifier()
   assert(isNativeDictionary(d1))

@@ -1918,7 +1918,11 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Remove")
   }
 }
 
-SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
+SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll")
+  .skip(
+    .stdlibOlderThan(.custom(1001.0),
+      reason: "https://github.com/apple/swift/pull/22527"))
+  .code {
   do {
     var s = getBridgedVerbatimSet([])
     expectTrue(isCocoaSet(s))
@@ -2173,7 +2177,11 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
   expectNotEqual(s1, s2)
 }
 
-SetTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
+SetTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty")
+  .skip(
+    .stdlibOlderThan(.custom(1001.0),
+      reason: "https://github.com/apple/swift/pull/22527"))
+  .code {
   let s1 = getBridgedNonverbatimSet([])
   let identity1 = s1._rawIdentifier()
   expectTrue(isNativeSet(s1))
@@ -4618,6 +4626,9 @@ SetTestSuite.test("IndexValidation.RemoveAt.AfterGrow") {
 
 #if _runtime(_ObjC)
 SetTestSuite.test("ForcedNonverbatimBridge.Trap.String")
+  .skip(
+    .stdlibOlderThan(.custom(1001.0),
+      reason: "https://github.com/apple/swift/pull/23174"))
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
@@ -4639,6 +4650,9 @@ SetTestSuite.test("ForcedNonverbatimBridge.Trap.String")
 
 #if _runtime(_ObjC)
 SetTestSuite.test("ForcedNonverbatimBridge.Trap.Int")
+  .skip(
+    .stdlibOlderThan(.custom(1001.0),
+      reason: "https://github.com/apple/swift/pull/23174"))
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
@@ -4769,6 +4783,9 @@ SetTestSuite.test("ForcedVerbatimDowncast.Trap.Int")
 
 #if _runtime(_ObjC)
 SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.String")
+  .skip(
+    .stdlibOlderThan(.custom(1001.0),
+      reason: "https://github.com/apple/swift/pull/23174"))
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
@@ -4790,6 +4807,9 @@ SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.String")
 
 #if _runtime(_ObjC)
 SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.Int")
+  .skip(
+    .stdlibOlderThan(.custom(1001.0),
+      reason: "https://github.com/apple/swift/pull/23174"))
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
@@ -4811,7 +4831,11 @@ SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.Int")
 #endif
 
 #if _runtime(_ObjC)
-SetTestSuite.test("Upcast.StringEqualityMismatch") {
+SetTestSuite.test("Upcast.StringEqualityMismatch")
+  .skip(
+    .stdlibOlderThan(.custom(1001.0),
+      reason: "https://github.com/apple/swift/pull/23683"))
+  .code {
   // Upcasting from NSString to String keys changes their concept of equality,
   // resulting in two equal keys, one of which should be discarded by the
   // downcast. (Along with its associated value.)
