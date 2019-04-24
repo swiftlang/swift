@@ -9,6 +9,7 @@ silopt_register_sources(
   CallerAnalysisPrinter.cpp
   ComputeDominanceInfo.cpp
   ComputeLoopInfo.cpp
+  ConstantEvaluatorTester.cpp
   EpilogueARCMatcherDumper.cpp
   EpilogueRetainReleaseMatcherDumper.cpp
   EscapeAnalysisDumper.cpp
