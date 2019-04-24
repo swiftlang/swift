@@ -339,7 +339,7 @@ extension vDSP {
     }
     
     // MARK: Floating-point to integer conversion
-    
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public enum RoundingMode {
         case towardZero
         case towardNearestInteger

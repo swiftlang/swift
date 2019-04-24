@@ -606,7 +606,7 @@ extension vDSP {
     }
     
     // MARK: Sorting
-    
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public enum SortOrder: Int32 {
         case ascending = 1
         case descending = -1

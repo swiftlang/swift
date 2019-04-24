@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 extension vDSP {
-    
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public enum FourierTransformDirection {
         case forward
         case inverse

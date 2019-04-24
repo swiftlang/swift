@@ -20,6 +20,8 @@ extension vDSP {
     
     /// An enumeration that specifies whether to perform complex-to-complex or
     /// complex-to-real discrete Fourier transform.
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+    // TODO: Should probably be @_frozen; check with Accelerate.
     public enum DFTTransformType {
         /// Specifies complex-to-complex discrete Fourier transform, forward
         /// or inverse
