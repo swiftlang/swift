@@ -794,8 +794,8 @@ enum IntFormat {
 }
 
 // getIntegerFormatSpecifier(IntFormat:isPrivate:bitWidth:isSigned:)
-sil @getIntegerFormatSpecifier : $@convention(thin) (IntFormat, Bool, Int, Bool) -> @owned String {
-bb0(%0 : $IntFormat, %1 : $Bool, %2 : $Int, %3 : $Bool):
+sil @getIntegerFormatSpecifier : $@convention(thin) (IntFormat, Bool, Int64, Bool) -> @owned String {
+bb0(%0 : $IntFormat, %1 : $Bool, %2 : $Int64, %3 : $Bool):
   %10 = alloc_stack $String, var, name "formatSpecifier"
   %11 = struct_extract %1 : $Bool, #Bool._value
   cond_br %11, bb1, bb2
@@ -821,7 +821,7 @@ bb2:
 bb3(%27 : $String):
   store %27 to %10 : $*String
   %29 = integer_literal $Builtin.Int64, 64
-  %30 = struct_extract %2 : $Int, #Int._value
+  %30 = struct_extract %2 : $Int64, #Int64._value
   %31 = builtin "cmp_eq_Int64"(%30 : $Builtin.Int64, %29 : $Builtin.Int64) : $Builtin.Int1
   %32 = struct $Bool (%31 : $Builtin.Int1)
   %33 = struct_extract %32 : $Bool, #Bool._value
@@ -927,11 +927,11 @@ bb0:
   %4 = integer_literal $Builtin.Int1, -1
   %5 = struct $Bool (%4 : $Builtin.Int1)
   %6 = integer_literal $Builtin.Int64, 64
-  %7 = struct $Int (%6 : $Builtin.Int64)
+  %7 = struct $Int64 (%6 : $Builtin.Int64)
   %8 = integer_literal $Builtin.Int1, -1
   %9 = struct $Bool (%8 : $Builtin.Int1)
-  %10 = function_ref @getIntegerFormatSpecifier : $@convention(thin) (IntFormat, Bool, Int, Bool) -> @owned String
-  %11 = apply %10(%3, %5, %7, %9) : $@convention(thin) (IntFormat, Bool, Int, Bool) -> @owned String
+  %10 = function_ref @getIntegerFormatSpecifier : $@convention(thin) (IntFormat, Bool, Int64, Bool) -> @owned String
+  %11 = apply %10(%3, %5, %7, %9) : $@convention(thin) (IntFormat, Bool, Int64, Bool) -> @owned String
   return %11 : $String
 } // CHECK: Returns string: "%{private}lld"
 
@@ -943,11 +943,11 @@ bb0:
   %4 = integer_literal $Builtin.Int1, -1
   %5 = struct $Bool (%4 : $Builtin.Int1)
   %6 = integer_literal $Builtin.Int64, 64
-  %7 = struct $Int (%6 : $Builtin.Int64)
+  %7 = struct $Int64 (%6 : $Builtin.Int64)
   %8 = integer_literal $Builtin.Int1, -1
   %9 = struct $Bool (%8 : $Builtin.Int1)
-  %10 = function_ref @getIntegerFormatSpecifier : $@convention(thin) (IntFormat, Bool, Int, Bool) -> @owned String
-  %11 = apply %10(%3, %5, %7, %9) : $@convention(thin) (IntFormat, Bool, Int, Bool) -> @owned String
+  %10 = function_ref @getIntegerFormatSpecifier : $@convention(thin) (IntFormat, Bool, Int64, Bool) -> @owned String
+  %11 = apply %10(%3, %5, %7, %9) : $@convention(thin) (IntFormat, Bool, Int64, Bool) -> @owned String
   return %11 : $String
 } // CHECK: Returns string: "%{private}llx"
 
@@ -959,11 +959,11 @@ bb0:
   %4 = integer_literal $Builtin.Int1, 0
   %5 = struct $Bool (%4 : $Builtin.Int1)
   %6 = integer_literal $Builtin.Int64, 32
-  %7 = struct $Int (%6 : $Builtin.Int64)
+  %7 = struct $Int64 (%6 : $Builtin.Int64)
   %8 = integer_literal $Builtin.Int1, -1
   %9 = struct $Bool (%8 : $Builtin.Int1)
-  %10 = function_ref @getIntegerFormatSpecifier : $@convention(thin) (IntFormat, Bool, Int, Bool) -> @owned String
-  %11 = apply %10(%3, %5, %7, %9) : $@convention(thin) (IntFormat, Bool, Int, Bool) -> @owned String
+  %10 = function_ref @getIntegerFormatSpecifier : $@convention(thin) (IntFormat, Bool, Int64, Bool) -> @owned String
+  %11 = apply %10(%3, %5, %7, %9) : $@convention(thin) (IntFormat, Bool, Int64, Bool) -> @owned String
   return %11 : $String
 } // CHECK: Returns string: "%{public}o"
 
@@ -975,10 +975,10 @@ bb0:
   %4 = integer_literal $Builtin.Int1, 0
   %5 = struct $Bool (%4 : $Builtin.Int1)
   %6 = integer_literal $Builtin.Int64, 64
-  %7 = struct $Int (%6 : $Builtin.Int64)
+  %7 = struct $Int64 (%6 : $Builtin.Int64)
   %8 = integer_literal $Builtin.Int1, 0
   %9 = struct $Bool (%8 : $Builtin.Int1)
-  %10 = function_ref @getIntegerFormatSpecifier : $@convention(thin) (IntFormat, Bool, Int, Bool) -> @owned String
-  %11 = apply %10(%3, %5, %7, %9) : $@convention(thin) (IntFormat, Bool, Int, Bool) -> @owned String
+  %10 = function_ref @getIntegerFormatSpecifier : $@convention(thin) (IntFormat, Bool, Int64, Bool) -> @owned String
+  %11 = apply %10(%3, %5, %7, %9) : $@convention(thin) (IntFormat, Bool, Int64, Bool) -> @owned String
   return %11 : $String
 } // CHECK: Returns string: "%{public}llu"
