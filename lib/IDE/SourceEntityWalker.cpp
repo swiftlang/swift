@@ -70,8 +70,7 @@ private:
   bool passReference(ModuleEntity Mod, std::pair<Identifier, SourceLoc> IdLoc);
 
   bool passSubscriptReference(ValueDecl *D, SourceLoc Loc,
-                              Optional<AccessKind> AccKind,
-                              bool IsOpenBracket);
+                              ReferenceMetaData Data, bool IsOpenBracket);
 
   bool passCallArgNames(Expr *Fn, TupleExpr *TupleE);
 
@@ -265,6 +264,8 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       !isa<MakeTemporarilyEscapableExpr>(E) &&
       !isa<CollectionUpcastConversionExpr>(E) &&
       !isa<OpaqueValueExpr>(E) &&
+      !isa<SubscriptExpr>(E) &&
+      !isa<KeyPathExpr>(E) &&
       E->isImplicit())
     return { true, E };
 
@@ -326,8 +327,11 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     if (SE->hasDecl())
       SubscrD = SE->getDecl().getDecl();
 
+    ReferenceMetaData data(SemaReferenceKind::SubscriptRef, OpAccess,
+                           SE->isImplicit());
+
     if (SubscrD) {
-      if (!passSubscriptReference(SubscrD, E->getLoc(), OpAccess, true))
+      if (!passSubscriptReference(SubscrD, E->getLoc(), data, true))
         return { false, nullptr };
     }
 
@@ -335,7 +339,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return { false, nullptr };
 
     if (SubscrD) {
-      if (!passSubscriptReference(SubscrD, E->getEndLoc(), OpAccess, false))
+      if (!passSubscriptReference(SubscrD, E->getEndLoc(), data, false))
         return { false, nullptr };
     }
 
@@ -577,14 +581,14 @@ bool SemaAnnotator::passModulePathElements(
 }
 
 bool SemaAnnotator::passSubscriptReference(ValueDecl *D, SourceLoc Loc,
-                                           Optional<AccessKind> AccKind,
+                                           ReferenceMetaData Data,
                                            bool IsOpenBracket) {
   CharSourceRange Range = Loc.isValid()
                         ? CharSourceRange(Loc, 1)
                         : CharSourceRange();
 
-  bool Continue = SEWalker.visitSubscriptReference(D, Range, AccKind,
-                                                   IsOpenBracket);
+  bool Continue =
+      SEWalker.visitSubscriptReference(D, Range, Data, IsOpenBracket);
   if (!Continue)
     Cancelled = true;
   return Continue;
@@ -727,13 +731,14 @@ bool SourceEntityWalker::visitDeclReference(ValueDecl *D, CharSourceRange Range,
 
 bool SourceEntityWalker::visitSubscriptReference(ValueDecl *D,
                                                  CharSourceRange Range,
-                                                 Optional<AccessKind> AccKind,
+                                                 ReferenceMetaData Data,
                                                  bool IsOpenBracket) {
   // Most of the clients treat subscript reference the same way as a
   // regular reference when called on the open bracket and
   // ignore the closing one.
-  return IsOpenBracket ? visitDeclReference(D, Range, nullptr, nullptr, Type(),
-    ReferenceMetaData(SemaReferenceKind::SubscriptRef, AccKind)) : true;
+  return IsOpenBracket
+             ? visitDeclReference(D, Range, nullptr, nullptr, Type(), Data)
+             : true;
 }
 
 bool SourceEntityWalker::visitCallArgName(Identifier Name,

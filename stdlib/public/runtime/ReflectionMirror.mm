@@ -338,6 +338,7 @@ getFieldAt(const Metadata *base, unsigned index) {
   SubstGenericParametersFromMetadata substitutions(base);
   auto typeInfo = swift_getTypeByMangledName(MetadataState::Complete,
    typeName,
+   substitutions.getGenericArgs(),
    [&substitutions](unsigned depth, unsigned index) {
      return substitutions.getMetadata(depth, index);
    },

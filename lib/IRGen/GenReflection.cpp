@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -25,12 +26,15 @@
 #include "swift/SIL/SILModule.h"
 
 #include "ConstantBuilder.h"
+#include "Explosion.h"
 #include "GenClass.h"
 #include "GenDecl.h"
 #include "GenEnum.h"
 #include "GenHeap.h"
 #include "GenProto.h"
 #include "GenType.h"
+#include "IRGenDebugInfo.h"
+#include "IRGenFunction.h"
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
@@ -168,15 +172,16 @@ llvm::Constant *IRGenModule::getTypeRef(CanType type, MangledTypeRefRole role) {
   switch (role) {
   case MangledTypeRefRole::DefaultAssociatedTypeWitness:
   case MangledTypeRefRole::Metadata:
-    // Note that we're using all of the nominal types referenced by this type.
-    type.findIf([&](CanType type) -> bool {
-      if (auto nominal = type.getAnyNominal())
-        this->IRGen.noteUseOfTypeMetadata(nominal);
-      return false;
-    });
+    // Note that we're using all of the nominal types referenced by this type,
+    // ensuring that we can always reconstruct type metadata from a mangled name
+    // in-process.
+    IRGen.noteUseOfTypeMetadata(type);
     break;
 
   case MangledTypeRefRole::Reflection:
+    // For reflection records only used for out-of-process reflection, we do not
+    // need to force emission of runtime type metadata.
+    IRGen.noteUseOfFieldDescriptors(type);
     break;
   }
 
@@ -184,6 +189,86 @@ llvm::Constant *IRGenModule::getTypeRef(CanType type, MangledTypeRefRole role) {
   auto SymbolicName = Mangler.mangleTypeForReflection(*this, type);
   return getAddrOfStringForTypeRef(SymbolicName, role);
 }
+
+/// Emit a mangled string referencing a specific protocol conformance, so that
+/// the runtime can fetch its witness table.
+///
+/// TODO: Currently this uses a stub mangling that just refers to an accessor
+/// function. We need to fully develop the mangling with the ability to refer
+/// to dependent conformances to be able to use mangled strings.
+llvm::Constant *
+IRGenModule::emitWitnessTableRefString(CanType type,
+                                      ProtocolConformanceRef conformance,
+                                      GenericSignature *origGenericSig,
+                                      bool shouldSetLowBit) {
+  auto origType = type;
+  CanGenericSignature genericSig;
+  SmallVector<GenericRequirement, 4> requirements;
+  GenericEnvironment *genericEnv = nullptr;
+
+  if (origGenericSig) {
+    genericSig = origGenericSig->getCanonicalSignature();
+    enumerateGenericSignatureRequirements(genericSig,
+                [&](GenericRequirement reqt) { requirements.push_back(reqt); });
+    genericEnv = genericSig->createGenericEnvironment();
+  }
+
+  IRGenMangler mangler;
+  std::string symbolName =
+    mangler.mangleSymbolNameForKeyPathMetadata(
+      "get_witness_table", genericSig, type, conformance);
+
+  return getAddrOfStringForMetadataRef(symbolName, /*alignment=*/2,
+      shouldSetLowBit,
+      [&](ConstantInitBuilder &B) {
+        // Build a stub that loads the necessary bindings from the key path's
+        // argument buffer then fetches the metadata.
+        auto fnTy = llvm::FunctionType::get(WitnessTablePtrTy,
+                                            {Int8PtrTy}, /*vararg*/ false);
+        auto accessorThunk =
+          llvm::Function::Create(fnTy, llvm::GlobalValue::PrivateLinkage,
+                                 symbolName, getModule());
+        accessorThunk->setAttributes(constructInitialAttributes());
+        
+        {
+          IRGenFunction IGF(*this, accessorThunk);
+          if (DebugInfo)
+            DebugInfo->emitArtificialFunction(IGF, accessorThunk);
+
+          if (type->hasTypeParameter()) {
+            auto bindingsBufPtr = IGF.collectParameters().claimNext();
+
+            bindFromGenericRequirementsBuffer(IGF, requirements,
+                Address(bindingsBufPtr, getPointerAlignment()),
+                MetadataState::Complete,
+                [&](CanType t) {
+                  return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
+                });
+
+            type = genericEnv->mapTypeIntoContext(type)->getCanonicalType();
+          }
+          if (origType->hasTypeParameter())
+            conformance = conformance.subst(origType,
+              QueryInterfaceTypeSubstitutions(genericEnv),
+              LookUpConformanceInSignature(*genericEnv->getGenericSignature()));
+          auto ret = emitWitnessTableRef(IGF, type, conformance);
+          IGF.Builder.CreateRet(ret);
+        }
+
+        // Form the mangled name with its relative reference.
+        auto S = B.beginStruct();
+        S.setPacked(true);
+        S.add(llvm::ConstantInt::get(Int8Ty, 255));
+        S.add(llvm::ConstantInt::get(Int8Ty, 9));
+        S.addRelativeAddress(accessorThunk);
+
+        // And a null terminator!
+        S.addInt(Int8Ty, 0);
+
+        return S.finishAndCreateFuture();
+      });
+}
+
 
 llvm::Constant *IRGenModule::getMangledAssociatedConformance(
                                   const NormalProtocolConformance *conformance,
@@ -264,46 +349,46 @@ protected:
   
   // Collect any builtin types referenced from this type.
   void addBuiltinTypeRefs(CanType type) {
-    type.visit([&](CanType t) {
-      if (IGM.getSwiftModule()->isStdlibModule() && isa<BuiltinType>(t))
-        IGM.BuiltinTypes.insert(t);
-
-      // We need size/alignment information for imported structs and
-      // enums, so emit builtin descriptors for them.
-      //
-      // In effect they're treated like an opaque blob, which is OK
-      // for now, at least until we want to import C++ types or
-      // something like that.
-      if (auto Nominal = t->getAnyNominal())
-        if (Nominal->hasClangNode()) {
-          if (isa<StructDecl>(Nominal) ||
-              isa<EnumDecl>(Nominal))
-            IGM.OpaqueTypes.insert(Nominal);
-        }
-    });
+    if (IGM.getSwiftModule()->isStdlibModule()) {
+      type.visit([&](CanType t) {
+        if (isa<BuiltinType>(t))
+          IGM.BuiltinTypes.insert(t);
+      });
+    }
   }
 
   /// Add a 32-bit relative offset to a mangled typeref string
   /// in the typeref reflection section.
-  void addTypeRef(CanType type) {
-    B.addRelativeAddress(IGM.getTypeRef(type, MangledTypeRefRole::Reflection));
+  ///
+  /// By default, we use MangledTypeRefRole::Reflection, which does not
+  /// force emission of any type metadata referenced from the typeref.
+  ///
+  /// For reflection records which are demangled to produce type metadata
+  /// in-process, pass MangledTypeRefRole::Metadata instead.
+  void addTypeRef(CanType type,
+                  MangledTypeRefRole role =
+                      MangledTypeRefRole::Reflection) {
+    B.addRelativeAddress(IGM.getTypeRef(type, role));
+    addBuiltinTypeRefs(type);
   }
 
   /// Add a 32-bit relative offset to a mangled nominal type string
   /// in the typeref reflection section.
-  void addNominalRef(const NominalTypeDecl *nominal) {
+  ///
+  /// See above comment about 'role'.
+  void addNominalRef(const NominalTypeDecl *nominal,
+                     MangledTypeRefRole role =
+                      MangledTypeRefRole::Reflection) {
     if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
       IRGenMangler mangler;
       SymbolicMangling mangledStr;
       mangledStr.String = mangler.mangleBareProtocol(proto);
       auto mangledName =
-        IGM.getAddrOfStringForTypeRef(mangledStr,
-                                      MangledTypeRefRole::Reflection);
+        IGM.getAddrOfStringForTypeRef(mangledStr, role);
       B.addRelativeAddress(mangledName);
     } else {
       CanType type = nominal->getDeclaredType()->getCanonicalType();
-      B.addRelativeAddress(
-        IGM.getTypeRef(type, MangledTypeRefRole::Reflection));
+      addTypeRef(type, role);
     }
   }
 
@@ -372,7 +457,7 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
     PrettyStackTraceDecl DebugStack("emitting associated type metadata",
                                     Nominal);
 
-    addTypeRef(Nominal->getDeclaredType()->getCanonicalType());
+    addNominalRef(Nominal);
     addNominalRef(Conformance->getProtocol());
 
     B.addInt32(AssociatedTypes.size());
@@ -381,7 +466,6 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
     for (auto AssocTy : AssociatedTypes) {
       auto NameGlobal = IGM.getAddrOfFieldName(AssocTy.first);
       B.addRelativeAddress(NameGlobal);
-      addBuiltinTypeRefs(AssocTy.second);
       addTypeRef(AssocTy.second);
     }
   }
@@ -419,8 +503,10 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     if (!type) {
       B.addInt32(0);
     } else {
-      addTypeRef(type);
-      addBuiltinTypeRefs(type);
+      // The standard library's Mirror demangles metadata from field
+      // descriptors, so use MangledTypeRefRole::Metadata to ensure
+      // runtime metadata is available.
+      addTypeRef(type, MangledTypeRefRole::Metadata);
     }
 
     if (IGM.IRGen.Opts.EnableReflectionNames) {
@@ -463,13 +549,9 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
 
     auto kind = FieldDescriptorKind::Enum;
 
-    // If this is a fixed-size multi-payload enum, we have to emit a descriptor
-    // with the size and alignment of the type, because the reflection library
-    // cannot derive this information at runtime.
     if (strategy.getElementsWithPayload().size() > 1 &&
         !strategy.needsPayloadSizeInMetadata()) {
       kind = FieldDescriptorKind::MultiPayloadEnum;
-      IGM.OpaqueTypes.insert(enumDecl);
     }
 
     B.addInt16(uint16_t(kind));
@@ -610,22 +692,6 @@ void IRGenModule::emitBuiltinTypeMetadataRecord(CanType builtinType) {
   builder.emit();
 }
 
-void IRGenModule::emitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDecl) {
-  FixedTypeMetadataBuilder builder(*this, nominalDecl);
-  builder.emit();
-}
-
-bool IRGenModule::shouldEmitOpaqueTypeMetadataRecord(
-    const NominalTypeDecl *nominalDecl) {
-  if (nominalDecl->getAttrs().hasAttribute<AlignmentAttr>()) {
-    auto &ti = getTypeInfoForUnlowered(nominalDecl->getDeclaredTypeInContext());
-    if (isa<FixedTypeInfo>(ti))
-      return true;
-  }
-
-  return false;
-}
-
 /// Builds a constant LLVM struct describing the layout of a fixed-size
 /// SIL @box. These look like closure contexts, but without any necessary
 /// bindings or metadata sources, and only a single captured value.
@@ -641,7 +707,6 @@ public:
     B.addInt32(0); // Number of generic bindings
 
     addTypeRef(BoxedType);
-    addBuiltinTypeRefs(BoxedType);
   }
 
   llvm::GlobalVariable *emit() {
@@ -653,6 +718,11 @@ public:
 /// Builds a constant LLVM struct describing the layout of a heap closure,
 /// the types of its captures, and the sources of metadata if any of the
 /// captures are generic.
+///
+/// For now capture descriptors are only used by out-of-process reflection.
+///
+/// If the standard library's Mirror type ever gains the ability to reflect
+/// closure contexts, we should use MangledTypeRefRole::Metadata below.
 class CaptureDescriptorBuilder : public ReflectionMetadataBuilder {
   swift::reflection::MetadataSourceBuilder SourceBuilder;
   CanSILFunctionType OrigCalleeType;
@@ -684,7 +754,7 @@ public:
       Encoder.visit(Source);
 
       auto EncodedSource =
-        IGM.getAddrOfStringForTypeRef(OS.str(), MangledTypeRefRole::Metadata);
+        IGM.getAddrOfStringForTypeRef(OS.str(), MangledTypeRefRole::Reflection);
       B.addRelativeAddress(EncodedSource);
     }
   }
@@ -1009,14 +1079,8 @@ void IRGenModule::emitBuiltinReflectionMetadata() {
     BuiltinTypes.insert(anyMetatype);
   }
 
-  for (auto SD : ImportedStructs)
-    emitFieldMetadataRecord(SD);
-
   for (auto builtinType : BuiltinTypes)
     emitBuiltinTypeMetadataRecord(builtinType);
-
-  for (auto nominalDecl : OpaqueTypes)
-    emitOpaqueTypeMetadataRecord(nominalDecl);
 }
 
 void IRGenerator::emitBuiltinReflectionMetadata() {
@@ -1025,20 +1089,61 @@ void IRGenerator::emitBuiltinReflectionMetadata() {
   }
 }
 
-void IRGenModule::emitFieldMetadataRecord(const NominalTypeDecl *Decl) {
+void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
   if (!IRGen.Opts.EnableReflectionMetadata)
     return;
 
-  // @objc enums never have generic parameters or payloads,
-  // and lower as their raw type.
-  if (auto *ED = dyn_cast<EnumDecl>(Decl))
-    if (ED->isObjC()) {
-      emitOpaqueTypeMetadataRecord(ED);
-      return;
+  auto T = D->getDeclaredTypeInContext()->getCanonicalType();
+
+  bool needsOpaqueDescriptor = false;
+  bool needsFieldDescriptor = true;
+
+  if (auto *ED = dyn_cast<EnumDecl>(D)) {
+    auto &strategy = getEnumImplStrategy(*this, T);
+
+    // @objc enums never have generic parameters or payloads,
+    // and lower as their raw type.
+    if (!strategy.isReflectable()) {
+      needsOpaqueDescriptor = true;
+      needsFieldDescriptor = false;
     }
 
-  FieldTypeMetadataBuilder builder(*this, Decl);
-  FieldDescriptors.push_back(builder.emit());
+    // If this is a fixed-size multi-payload enum, we have to emit a descriptor
+    // with the size and alignment of the type, because the reflection library
+    // cannot derive this information at runtime.
+    if (strategy.getElementsWithPayload().size() > 1 &&
+        !strategy.needsPayloadSizeInMetadata()) {
+      needsOpaqueDescriptor = true;
+    }
+  }
+
+  if (auto *SD = dyn_cast<StructDecl>(D)) {
+    if (SD->hasClangNode())
+      needsOpaqueDescriptor = true;
+  }
+
+  // If the type has custom @_alignment, emit a fixed record with the
+  // alignment since remote mirrors will need to treat the type as opaque.
+  //
+  // Note that we go on to also emit a field descriptor in this case,
+  // since in-process reflection only cares about the types of the fields
+  // and does not independently re-derive the layout.
+  if (D->getAttrs().hasAttribute<AlignmentAttr>()) {
+    auto &TI = getTypeInfoForUnlowered(T);
+    if (isa<FixedTypeInfo>(TI)) {
+      needsOpaqueDescriptor = true;
+    }
+  }
+
+  if (needsOpaqueDescriptor) {
+    FixedTypeMetadataBuilder builder(*this, D);
+    builder.emit();
+  }
+
+  if (needsFieldDescriptor) {
+    FieldTypeMetadataBuilder builder(*this, D);
+    FieldDescriptors.push_back(builder.emit());
+  }
 }
 
 void IRGenModule::emitReflectionMetadataVersion() {

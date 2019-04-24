@@ -61,6 +61,25 @@ public:
                                SourceLoc Loc, bool IsTypeLookup,
                                ResultVector &RV) = 0;
 
+  /// The following functions allow the debugger to modify the results of a
+  /// qualfied lookup as needed. These methods may add, remove or modify the
+  /// entries in `decls`. See the corresponding DeclContext::lookupInXYZ
+  /// functions defined in NameLookup.cpp for more context.
+  ///
+
+  virtual void finishLookupInNominals(const DeclContext *dc,
+                                      ArrayRef<NominalTypeDecl *> types,
+                                      DeclName member, NLOptions options,
+                                      SmallVectorImpl<ValueDecl *> &decls) {}
+
+  virtual void finishLookupInModule(const DeclContext *dc, ModuleDecl *module,
+                                    DeclName member, NLOptions options,
+                                    SmallVectorImpl<ValueDecl *> &decls) {}
+
+  virtual void finishLookupInAnyObject(const DeclContext *dc, DeclName member,
+                                       NLOptions options,
+                                       SmallVectorImpl<ValueDecl *> &decls) {}
+
   /// When evaluating an expression in the context of an existing source file,
   /// we may want to prefer declarations from that source file.
   /// The DebuggerClient can return a private-discriminator to tell lookup to

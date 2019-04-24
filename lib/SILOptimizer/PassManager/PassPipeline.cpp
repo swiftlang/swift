@@ -81,6 +81,7 @@ static void addDefiniteInitialization(SILPassPipelinePlan &P) {
 
 static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Guaranteed Passes");
+  P.addDiagnoseInvalidEscapingCaptures();
   P.addDiagnoseStaticExclusivity();
   P.addCapturePromotion();
 
@@ -103,7 +104,7 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   if (Options.shouldOptimize()) {
     P.addSemanticARCOpts();
   }
-  if (Options.StripOwnershipDuringDiagnosticsPipeline)
+  if (!Options.StripOwnershipAfterSerialization)
     P.addOwnershipModelEliminator();
   P.addMandatoryInlining();
   P.addMandatorySILLinker();
@@ -298,7 +299,7 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
     P.addSerializeSILPass();
 
     // Now strip any transparent functions that still have ownership.
-    if (!P.getOptions().StripOwnershipDuringDiagnosticsPipeline)
+    if (P.getOptions().StripOwnershipAfterSerialization)
       P.addOwnershipModelEliminator();
 
     if (P.getOptions().StopOptimizationAfterSerialization)
@@ -379,7 +380,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   P.addDeadFunctionElimination();
 
   // Strip ownership from non-transparent functions.
-  if (!P.getOptions().StripOwnershipDuringDiagnosticsPipeline)
+  if (P.getOptions().StripOwnershipAfterSerialization)
     P.addNonTransparentFunctionOwnershipModelEliminator();
 
   // Start by cloning functions from stdlib.
@@ -644,7 +645,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   P.addSerializeSILPass();
 
   // And then strip ownership...
-  if (!Options.StripOwnershipDuringDiagnosticsPipeline)
+  if (Options.StripOwnershipAfterSerialization)
     P.addOwnershipModelEliminator();
 
   // Finally perform some small transforms.

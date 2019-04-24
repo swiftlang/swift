@@ -43,12 +43,36 @@ constants.""")
         dest="file_check_path",
         default="FileCheck")
 
+    parser.add_argument(
+        "--enable-windows-compatibility",
+        help="Enable Windows path compatibility, which checks against both "
+             "forward slashes and backward slashes.",
+        action="store_true")
+
+    parser.add_argument(
+        "--enable-yaml-compatibility",
+        help="Enable YAML path compatibility. Since YAML double escapes "
+             "backward slashes, we need to check for them escaped. Only "
+             "available if Windows compatibility is enabled.",
+        action="store_true")
+
     args, unknown_args = parser.parse_known_args()
+
+    if args.enable_windows_compatibility:
+        if args.enable_yaml_compatibility:
+            slashes_re = r'(/|\\\\|\\\\\\\\)'
+        else:
+            slashes_re = r'(/|\\\\)'
+    else:
+        slashes_re = r'/'
 
     stdin = sys.stdin.read()
     for s in args.sanitize_strings:
         replacement, pattern = s.split('=', 1)
-        stdin = re.sub(re.sub(r'/', r'[/\\\\]', pattern), replacement, stdin)
+        # We are replacing the Unix path separators in the paths passed as
+        # arguments with a broader pattern to also allow forward slashes and
+        # double escaped slashes in the result that we are checking. Sigh.
+        stdin = re.sub(re.sub(r'/', slashes_re, pattern), replacement, stdin)
 
     p = subprocess.Popen(
         [args.file_check_path] + unknown_args, stdin=subprocess.PIPE)

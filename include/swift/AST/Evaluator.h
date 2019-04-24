@@ -20,7 +20,6 @@
 
 #include "swift/AST/AnyRequest.h"
 #include "swift/Basic/AnyValue.h"
-#include "swift/Basic/CycleDiagnosticKind.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/DenseMap.h"
@@ -184,8 +183,8 @@ class Evaluator {
   /// diagnostics will be emitted.
   DiagnosticEngine &diags;
 
-  /// Whether to diagnose cycles or ignore them completely.
-  CycleDiagnosticKind shouldDiagnoseCycles;
+  /// Whether to dump detailed debug info for cycles.
+  bool debugDumpCycles;
 
   /// Used to report statistics about which requests were evaluated, if
   /// non-null.
@@ -237,7 +236,7 @@ class Evaluator {
 public:
   /// Construct a new evaluator that can emit cyclic-dependency
   /// diagnostics through the given diagnostics engine.
-  Evaluator(DiagnosticEngine &diags, CycleDiagnosticKind shouldDiagnoseCycles);
+  Evaluator(DiagnosticEngine &diags, bool debugDumpCycles=false);
 
   /// Emit GraphViz output visualizing the request graph.
   void emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath);

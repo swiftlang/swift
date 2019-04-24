@@ -392,8 +392,6 @@ ERROR(expected_lbrace_subscript_protocol,PointsToFirstBadToken,
       "{ get set } specifier", ())
 ERROR(subscript_without_get,none,
       "subscript declarations must have a getter", ())
-ERROR(subscript_static,none,
-      "subscript cannot be marked %0", (StaticSpellingKind))
 
 // initializer
 ERROR(invalid_nested_init,none,
@@ -785,6 +783,10 @@ ERROR(sil_box_expected_r_brace,none,
       "expected '}' to complete SIL box field type list", ())
 ERROR(sil_box_expected_r_angle,none,
       "expected '>' to complete SIL box generic argument list", ())
+
+// Opaque types
+ERROR(opaque_mid_composition,none,
+      "'some' should appear at the beginning of a composition", ())
 
 //------------------------------------------------------------------------------
 // MARK: Layout constraint diagnostics
@@ -1377,21 +1379,6 @@ WARNING(attr_availability_nonspecific_platform_unexpected_version,none,
       "unexpected version number in '%0' attribute for non-specific platform "
       "'*'", (StringRef))
 
-// autoclosure
-ERROR(attr_autoclosure_expected_r_paren,PointsToFirstBadToken,
-      "expected ')' in @autoclosure", ())
-ERROR(attr_noescape_conflicts_escaping_autoclosure,none,
-      "@noescape conflicts with @autoclosure(escaping)", ())
-ERROR(attr_noescape_implied_by_autoclosure,none,
-      "@noescape is implied by @autoclosure and should not be "
-      "redundantly specified", ())
-ERROR(attr_autoclosure_escaping_deprecated,none,
-      "@autoclosure(escaping) has been removed; use @autoclosure @escaping instead",
-      ())
-ERROR(attr_noescape_deprecated,none,
-      "@noescape is the default and has been removed",
-      ())
-
 // convention
 ERROR(convention_attribute_expected_lparen,none,
       "expected '(' after 'convention' attribute", ())
@@ -1411,11 +1398,6 @@ ERROR(attr_objc_expected_rparen,none,
       "expected ')' after name for @objc", ())
 ERROR(attr_objc_empty_name,none,
       "expected name within parentheses of @objc attribute", ())
-ERROR(attr_nskeyedarchiverclassname_removed, none,
-      "@NSKeyedArchiverClassName has been removed; use @objc instead", ())
-ERROR(attr_nskeyedarchiverencodenongenericsubclassesonly_removed, none,
-      "@NSKeyedArchiverEncodeNonGenericSubclassesOnly is no longer necessary",
-      ())
 
 ERROR(attr_dynamic_replacement_expected_rparen,none,
       "expected ')' after function name for @_dynamicReplacement", ())

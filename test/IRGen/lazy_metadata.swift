@@ -10,14 +10,14 @@
 // CHECK-DAG: @"$s4test7StructAVMF" =
 // CHECK-DAG: @"$s4test7StructBVMF" =
 // CHECK-DAG: @"$s4test7StructCVMF" =
-// CHECK-DAG: @"$s4test7StructDVMF" =
+// CHECK-DEAD-NOT: @"$s4test7StructDVMF" =
 // CHECK-DAG: @"$s4test7StructEVMF" =
 
 // nominal type descriptors
 // CHECK-DAG: @"$s4test7StructAVMn" =
 // CHECK-DAG: @"$s4test7StructBVMn" =
 // CHECK-DAG: @"$s4test7StructCVMn" =
-// CHECK-DAG: @"$s4test7StructDVMn"
+// CHECK-DEAD-NOT: @"$s4test7StructDVMn"
 // CHECK-DAG: @"$s4test7StructEVMn" =
 
 // full type metadata

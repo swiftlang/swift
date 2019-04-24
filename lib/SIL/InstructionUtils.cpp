@@ -352,7 +352,10 @@ bool swift::isSanitizerInstrumentation(SILInstruction *Instruction) {
 }
 
 SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
-  if (PAI->getNumArguments() != 1)
+  // A partial_apply of a reabstraction thunk either has a single capture
+  // (a function) or two captures (function and dynamic Self type).
+  if (PAI->getNumArguments() != 1 &&
+      PAI->getNumArguments() != 2)
     return SILValue();
 
   auto *Fun = PAI->getReferencedFunction();

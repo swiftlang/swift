@@ -129,6 +129,12 @@ public:
     SynthesizedArgument,
     /// The member looked up via keypath based dynamic lookup.
     KeyPathDynamicMember,
+    /// The root of a keypath
+    KeyPathRoot,
+    /// The value of a keypath
+    KeyPathValue,
+    /// The result type of a key path component. Not used for subscripts.
+    KeyPathComponentResult,
   };
 
   /// Determine the number of numeric values used for the given path
@@ -159,6 +165,9 @@ public:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
     case ContextualType:
+    case KeyPathRoot:
+    case KeyPathValue:
+    case KeyPathComponentResult:
       return 0;
 
     case OpenedGeneric:
@@ -225,6 +234,9 @@ public:
     case ContextualType:
     case SynthesizedArgument:
     case KeyPathDynamicMember:
+    case KeyPathRoot:
+    case KeyPathValue:
+    case KeyPathComponentResult:
       return 0;
 
     case FunctionArgument:
@@ -486,6 +498,10 @@ public:
     bool isKeyPathDynamicMember() const {
       return getKind() == PathElementKind::KeyPathDynamicMember;
     }
+
+    bool isKeyPathComponent() const {
+      return getKind() == PathElementKind::KeyPathComponent;
+    }
   };
 
   /// Return the summary flags for an entire path.
@@ -517,6 +533,24 @@ public:
   /// Determine whether given locator points to the subscript reference
   /// e.g. `foo[0]` or `\Foo.[0]`
   bool isSubscriptMemberRef() const;
+
+  /// Determine whether given locator points to the keypath root
+  bool isKeyPathRoot() const;
+
+  /// Determine whether given locator points to the keypath value
+  bool isKeyPathValue() const;
+  
+  /// Determine whether given locator points to the choice picked as
+  /// as result of the key path dynamic member lookup operation.
+  bool isResultOfKeyPathDynamicMemberLookup() const;
+
+  /// Determine whether this locator points to a subscript component
+  /// of the key path at some index.
+  bool isKeyPathSubscriptComponent() const;
+
+  /// Determine whether this locator points to one of the key path
+  /// components.
+  bool isForKeyPathComponent() const;
 
   /// Produce a profile of this locator, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id, Expr *anchor,

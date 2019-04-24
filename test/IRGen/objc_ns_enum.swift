@@ -1,6 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir > %t/out.txt
+// RUN: %FileCheck %s -DINT=i%target-ptrsize < %t/out.txt
+// RUN: %FileCheck %s --check-prefix=NEGATIVE < %t/out.txt
+
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -9,10 +12,11 @@ import Foundation
 import gizmo
 
 // CHECK: @"$sSo16NSRuncingOptionsVMn" = linkonce_odr hidden constant
-// CHECK: @"$sSo16NSRuncingOptionsVN" = linkonce_odr hidden constant
+// CHECK: @"$sSo16NSRuncingOptionsVMf" = linkonce_odr hidden constant
 //   CHECK-SAME: @"$sBi{{[0-9]+}}_WV"
 // CHECK: @"$sSo16NSRuncingOptionsVSQSCMc" = linkonce_odr hidden constant
-// CHECK-NOT: @"$sSo28NeverActuallyMentionedByNameVSQSCWp" = linkonce_odr hidden constant
+
+// NEGATIVE-NOT: @"$sSo28NeverActuallyMentionedByNameVSQSCWp" = linkonce_odr hidden constant
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} i32 @main
 // CHECK:         call swiftcc %swift.metadata_response @"$sSo16NSRuncingOptionsVMa"(i64 0)
@@ -87,7 +91,9 @@ func use_metadata<T: Equatable>(_ t:T){}
 use_metadata(NSRuncingOptions.mince)
 
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sSo16NSRuncingOptionsVMa"(i64)
-// CHECK:         call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata([[INT]] %0, {{.*}} @"$sSo16NSRuncingOptionsVN" {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
+// CHECK:         call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata([[INT]] %0,
+// CHECK-SAME:    @"$sSo16NSRuncingOptionsVMf"
+// CHECK-SAME:    [[NOUNWIND_READNONE:#[0-9]+]]
 
 @objc enum ExportedToObjC: Int {
   case Foo = -1, Bar, Bas

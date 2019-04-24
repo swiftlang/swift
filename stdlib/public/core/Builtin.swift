@@ -301,17 +301,6 @@ func _uncheckedUnsafeAssume(_ condition: Bool) {
   _ = Builtin.assume_Int1(condition._value)
 }
 
-// This function is no longer used but must be kept for ABI compatibility
-// because references to it may have been inlined.
-@usableFromInline
-internal func _branchHint(_ actual: Bool, expected: Bool) -> Bool {
-  // The LLVM intrinsic underlying int_expect_Int1 now requires an immediate
-  // argument for the expected value so we cannot call it here. This should
-  // never be called in cases where performance matters, so just return the
-  // value without any branch hint.
-  return actual
-}
-
 //===--- Runtime shim wrappers --------------------------------------------===//
 
 /// Returns `true` iff the class indicated by `theClass` uses native
@@ -323,6 +312,11 @@ internal func _branchHint(_ actual: Bool, expected: Bool) -> Bool {
 @usableFromInline
 @_silgen_name("_swift_objcClassUsesNativeSwiftReferenceCounting")
 internal func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool
+
+/// Returns the class of a non-tagged-pointer Objective-C object
+@_effects(readonly)
+@_silgen_name("_swift_classOfObjCHeapObject")
+internal func _swift_classOfObjCHeapObject(_ object: AnyObject) -> AnyClass
 #else
 @inlinable
 @inline(__always)

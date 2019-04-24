@@ -122,6 +122,13 @@ public:
   std::string mangleNominalTypeDescriptor(const NominalTypeDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Mn");
   }
+  
+  std::string mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl) {
+    beginMangling();
+    appendOpaqueDeclName(decl);
+    appendOperator("MQ");
+    return finalize();
+  }
 
   std::string mangleTypeMetadataInstantiationCache(const NominalTypeDecl *Decl){
     return mangleNominalTypeSymbol(Decl, "MI");

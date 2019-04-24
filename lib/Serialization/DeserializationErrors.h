@@ -38,6 +38,7 @@ class XRefTracePath {
       Extension,
       GenericParam,
       PrivateDiscriminator,
+      OpaqueReturnType,
       Unknown
     };
 
@@ -61,6 +62,7 @@ class XRefTracePath {
       case Kind::Value:
       case Kind::Operator:
       case Kind::PrivateDiscriminator:
+      case Kind::OpaqueReturnType:
         return getDataAs<DeclBaseName>();
       case Kind::Type:
       case Kind::OperatorFilter:
@@ -146,6 +148,9 @@ class XRefTracePath {
       case Kind::PrivateDiscriminator:
         os << "(in " << getDataAs<Identifier>() << ")";
         break;
+      case Kind::OpaqueReturnType:
+        os << "opaque return type of " << getDataAs<DeclBaseName>();
+        break;
       case Kind::Unknown:
         os << "unknown xref kind " << getDataAs<uintptr_t>();
         break;
@@ -195,6 +200,10 @@ public:
 
   void addUnknown(uintptr_t kind) {
     path.push_back({ PathPiece::Kind::Unknown, kind });
+  }
+  
+  void addOpaqueReturnType(Identifier name) {
+    path.push_back({ PathPiece::Kind::OpaqueReturnType, name });
   }
 
   DeclBaseName getLastName() const {

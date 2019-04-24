@@ -148,14 +148,11 @@ extension Substring: StringProtocol {
   public typealias Index = String.Index
   public typealias SubSequence = Substring
 
-  @inlinable
-  public var startIndex: Index {
-    @inline(__always) get { return _slice.startIndex }
-  }
-  @inlinable
-  public var endIndex: Index {
-    @inline(__always) get { return _slice.endIndex }
-  }
+  @inlinable @inline(__always)
+  public var startIndex: Index { return _slice.startIndex }
+
+  @inlinable @inline(__always)
+  public var endIndex: Index { return _slice.endIndex }
 
   @inlinable @inline(__always)
   public func index(after i: Index) -> Index {
@@ -309,10 +306,8 @@ extension Substring : CustomReflectable {
 }
 
 extension Substring : CustomStringConvertible {
-  @inlinable
-  public var description: String {
-    @inline(__always) get { return String(self) }
-  }
+  @inlinable @inline(__always)
+  public var description: String { return String(self) }
 }
 
 extension Substring : CustomDebugStringConvertible {

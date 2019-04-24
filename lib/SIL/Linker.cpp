@@ -192,7 +192,7 @@ static bool mustDeserializeProtocolConformance(SILModule &M,
                                                ProtocolConformanceRef c) {
   if (!c.isConcrete())
     return false;
-  auto conformance = c.getConcrete()->getRootNormalConformance();
+  auto conformance = c.getConcrete()->getRootConformance();
   return M.Types.protocolRequiresWitnessTable(conformance->getProtocol())
     && isa<ClangModuleUnit>(conformance->getDeclContext()
                                        ->getModuleScopeContext());

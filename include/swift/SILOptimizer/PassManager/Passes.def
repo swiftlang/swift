@@ -134,6 +134,8 @@ PASS(Devirtualizer, "devirtualizer",
      "Indirect Call Devirtualization")
 PASS(DiagnoseInfiniteRecursion, "diagnose-infinite-recursion",
      "Diagnose Infinitely-Recursive Code")
+PASS(DiagnoseInvalidEscapingCaptures, "diagnose-invalid-escaping-captures",
+     "Diagnose Invalid Escaping Captures")
 PASS(DiagnoseStaticExclusivity, "diagnose-static-exclusivity",
      "Static Enforcement of Law of Exclusivity")
 PASS(DiagnoseUnreachable, "diagnose-unreachable",

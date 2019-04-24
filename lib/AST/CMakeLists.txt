@@ -4,31 +4,8 @@ if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
 endif()
 
 if(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
-  set(SWIFTAST_INTERFACE_LINK_LIBRARIES)
   set(SWIFTAST_LLVM_COMPONENT_DEPENDS)
 else()
-  set(SWIFTAST_INTERFACE_LINK_LIBRARIES
-    # Clang dependencies.
-    # FIXME: Clang should really export these in some reasonable manner.
-    clangCodeGen
-    clangIndex
-    clangFormat
-    clangToolingCore
-    clangFrontendTool
-    clangFrontend
-    clangDriver
-    clangSerialization
-    clangParse
-    clangSema
-    clangAnalysis
-    clangEdit
-    clangRewriteFrontend
-    clangRewrite
-    clangAST
-    clangLex
-    clangAPINotes
-    clangBasic
-  )
   set(SWIFTAST_LLVM_COMPONENT_DEPENDS
     bitreader bitwriter coroutines coverage irreader debuginfoDWARF
     profiledata instrumentation object objcarcopts mc mcparser
@@ -37,7 +14,6 @@ else()
 endif()
 
 add_swift_host_library(swiftAST STATIC
-  AccessScopeChecker.cpp
   AccessRequests.cpp
   ASTContext.cpp
   ASTDemangler.cpp
@@ -91,6 +67,7 @@ add_swift_host_library(swiftAST STATIC
   SwiftNameTranslation.cpp
   Type.cpp
   TypeCheckRequests.cpp
+  TypeDeclFinder.cpp
   TypeJoinMeet.cpp
   TypeRefinementContext.cpp
   TypeRepr.cpp
@@ -98,14 +75,32 @@ add_swift_host_library(swiftAST STATIC
   UnqualifiedLookup.cpp
   USRGeneration.cpp
 
-  INTERFACE_LINK_LIBRARIES
-    ${SWIFTAST_INTERFACE_LINK_LIBRARIES}
-
   LLVM_COMPONENT_DEPENDS
     ${SWIFTAST_LLVM_COMPONENT_DEPENDS}
 
   ${EXTRA_AST_FLAGS}
   )
+if(NOT SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
+  target_link_libraries(swiftAST INTERFACE
+    clangCodeGen
+    clangIndex
+    clangFormat
+    clangToolingCore
+    clangFrontendTool
+    clangFrontend
+    clangDriver
+    clangSerialization
+    clangParse
+    clangSema
+    clangAnalysis
+    clangEdit
+    clangRewriteFrontend
+    clangRewrite
+    clangAST
+    clangLex
+    clangAPINotes
+    clangBasic)
+endif()
 
 if(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
   # Add clangBasic as a single direct dependency to avoid bringing along some
@@ -141,6 +136,6 @@ else()
   set(swift_ast_verifier_flag " -DSWIFT_DISABLE_AST_VERIFIER=1")
 endif()
 
-set_property(SOURCE Verifier.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
+set_property(SOURCE ASTVerifier.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
   "${swift_ast_verifier_flag}")
 

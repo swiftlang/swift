@@ -300,6 +300,8 @@ class TypeResolution {
   GenericSignatureBuilder *getGenericSignatureBuilder() const;
 
 public:
+  LazyResolver *Resolver = nullptr;
+  
   /// Form a type resolution for the structure of a type, which does not
   /// attempt to resolve member types of type parameters to a particular
   /// associated type.
@@ -307,12 +309,14 @@ public:
 
   /// Form a type resolution for an interface type, which is a complete
   /// description of the type using generic parameters.
-  static TypeResolution forInterface(DeclContext *dc);
+  static TypeResolution forInterface(DeclContext *dc,
+                                     LazyResolver *resolver = nullptr);
 
   /// Form a type resolution for an interface type, which is a complete
   /// description of the type using generic parameters.
   static TypeResolution forInterface(DeclContext *dc,
-                                     GenericSignature *genericSig);
+                                     GenericSignature *genericSig,
+                                     LazyResolver *resolver = nullptr);
 
   /// Form a type resolution for a contextual type, which is a complete
   /// description of the type using the archetypes of the given declaration

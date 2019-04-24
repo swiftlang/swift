@@ -80,6 +80,10 @@ static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
   auto root = dyn_cast<PrimaryArchetypeType>(A->getRoot());
   if (!root)
     return true;
+  if (isa<OpenedArchetypeType>(A->getRoot()))
+    return true;
+  if (isa<OpaqueTypeArchetypeType>(A->getRoot()))
+    return true;
 
   // Ok, we have a primary archetype, make sure it is in the nested generic
   // environment of our caller.

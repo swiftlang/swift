@@ -143,7 +143,7 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
 /// Clone this SymbolicValue into the specified ASTContext and return the new
 /// version.  This only works for valid constants.
 SymbolicValue
-SymbolicValue::cloneInto(ASTContext &astContext) const {
+SymbolicValue::cloneInto(SymbolicValueAllocator &allocator) const {
   auto thisRK = representationKind;
   switch (thisRK) {
   case RK_UninitMemory:
@@ -156,26 +156,26 @@ SymbolicValue::cloneInto(ASTContext &astContext) const {
     return *this;
   case RK_IntegerInline:
   case RK_Integer:
-    return SymbolicValue::getInteger(getIntegerValue(), astContext);
+    return SymbolicValue::getInteger(getIntegerValue(), allocator);
   case RK_String:
-    return SymbolicValue::getString(getStringValue(), astContext);
+    return SymbolicValue::getString(getStringValue(), allocator);
   case RK_Aggregate: {
     auto elts = getAggregateValue();
     SmallVector<SymbolicValue, 4> results;
     results.reserve(elts.size());
     for (auto elt : elts)
-      results.push_back(elt.cloneInto(astContext));
-    return getAggregate(results, astContext);
+      results.push_back(elt.cloneInto(allocator));
+    return getAggregate(results, allocator);
   }
   case RK_EnumWithPayload:
-    return getEnumWithPayload(getEnumValue(), getEnumPayloadValue(), astContext);
+    return getEnumWithPayload(getEnumValue(), getEnumPayloadValue(), allocator);
   case RK_DirectAddress:
   case RK_DerivedAddress: {
     SmallVector<unsigned, 4> accessPath;
     auto *memObject = getAddressValue(accessPath);
     auto *newMemObject = SymbolicValueMemoryObject::create(
-        memObject->getType(), memObject->getValue(), astContext);
-    return getAddress(newMemObject, accessPath, astContext);
+        memObject->getType(), memObject->getValue(), allocator);
+    return getAddress(newMemObject, accessPath, allocator);
   }
   }
 }
@@ -186,9 +186,9 @@ SymbolicValue::cloneInto(ASTContext &astContext) const {
 
 SymbolicValueMemoryObject *
 SymbolicValueMemoryObject::create(Type type, SymbolicValue value,
-                                  ASTContext &astContext) {
-  auto *result = astContext.Allocate(sizeof(SymbolicValueMemoryObject),
-                                     alignof(SymbolicValueMemoryObject));
+                                  SymbolicValueAllocator &allocator) {
+  auto *result = allocator.allocate(sizeof(SymbolicValueMemoryObject),
+                                    alignof(SymbolicValueMemoryObject));
   new (result) SymbolicValueMemoryObject(type, value);
   return (SymbolicValueMemoryObject *)result;
 }
@@ -206,14 +206,14 @@ SymbolicValue SymbolicValue::getInteger(int64_t value, unsigned bitWidth) {
 }
 
 SymbolicValue SymbolicValue::getInteger(const APInt &value,
-                                        ASTContext &astContext) {
+                                        SymbolicValueAllocator &allocator) {
   // In the common case, we can form an inline representation.
   unsigned numWords = value.getNumWords();
   if (numWords == 1)
     return getInteger(value.getRawData()[0], value.getBitWidth());
 
-  // Copy the integers from the APInt into the bump pointer.
-  auto *words = astContext.Allocate<uint64_t>(numWords).data();
+  // Copy the integers from the APInt into the allocator.
+  auto *words = allocator.allocate<uint64_t>(numWords);
   std::uninitialized_copy(value.getRawData(), value.getRawData() + numWords,
                           words);
 
@@ -251,11 +251,11 @@ unsigned SymbolicValue::getIntegerValueBitWidth() const {
 
 // Returns a SymbolicValue representing a UTF-8 encoded string.
 SymbolicValue SymbolicValue::getString(StringRef string,
-                                       ASTContext &astContext) {
+                                       SymbolicValueAllocator &allocator) {
   // TODO: Could have an inline representation for strings if thre was demand,
   // just store a char[8] as the storage.
 
-  auto *resultPtr = astContext.Allocate<char>(string.size()).data();
+  auto *resultPtr = allocator.allocate<char>(string.size());
   std::uninitialized_copy(string.begin(), string.end(), resultPtr);
 
   SymbolicValue result;
@@ -280,10 +280,9 @@ StringRef SymbolicValue::getStringValue() const {
 /// This returns a constant Symbolic value with the specified elements in it.
 /// This assumes that the elements lifetime has been managed for this.
 SymbolicValue SymbolicValue::getAggregate(ArrayRef<SymbolicValue> elements,
-                                          ASTContext &astContext) {
+                                          SymbolicValueAllocator &allocator) {
   // Copy the elements into the bump pointer.
-  auto *resultElts =
-      astContext.Allocate<SymbolicValue>(elements.size()).data();
+  auto *resultElts = allocator.allocate<SymbolicValue>(elements.size());
   std::uninitialized_copy(elements.begin(), elements.end(), resultElts);
 
   SymbolicValue result;
@@ -320,10 +319,10 @@ struct alignas(SourceLoc) UnknownSymbolicValue final
 
   static UnknownSymbolicValue *create(SILNode *node, UnknownReason reason,
                                       ArrayRef<SourceLoc> elements,
-                                      ASTContext &astContext) {
+                                      SymbolicValueAllocator &allocator) {
     auto byteSize =
         UnknownSymbolicValue::totalSizeToAlloc<SourceLoc>(elements.size());
-    auto *rawMem = astContext.Allocate(byteSize, alignof(UnknownSymbolicValue));
+    auto *rawMem = allocator.allocate(byteSize, alignof(UnknownSymbolicValue));
 
     // Placement-new the value inside the memory we just allocated.
     auto value = ::new (rawMem) UnknownSymbolicValue(
@@ -353,12 +352,12 @@ private:
 
 SymbolicValue SymbolicValue::getUnknown(SILNode *node, UnknownReason reason,
                                         llvm::ArrayRef<SourceLoc> callStack,
-                                        ASTContext &astContext) {
+                                        SymbolicValueAllocator &allocator) {
   assert(node && "node must be present");
   SymbolicValue result;
   result.representationKind = RK_Unknown;
   result.value.unknown =
-      UnknownSymbolicValue::create(node, reason, callStack, astContext);
+      UnknownSymbolicValue::create(node, reason, callStack, allocator);
   return result;
 }
 
@@ -402,10 +401,10 @@ private:
 /// payload.
 SymbolicValue
 SymbolicValue::getEnumWithPayload(EnumElementDecl *decl, SymbolicValue payload,
-                                  ASTContext &astContext) {
+                                  SymbolicValueAllocator &allocator) {
   assert(decl && payload.isConstant());
-  auto rawMem = astContext.Allocate(sizeof(EnumWithPayloadSymbolicValue),
-                                    alignof(EnumWithPayloadSymbolicValue));
+  auto rawMem = allocator.allocate(sizeof(EnumWithPayloadSymbolicValue),
+                                   alignof(EnumWithPayloadSymbolicValue));
   auto enumVal = ::new (rawMem) EnumWithPayloadSymbolicValue(decl, payload);
 
   SymbolicValue result;
@@ -446,10 +445,10 @@ struct DerivedAddressValue final
 
   static DerivedAddressValue *create(SymbolicValueMemoryObject *memoryObject,
                                      ArrayRef<unsigned> elements,
-                                     ASTContext &astContext) {
+                                     SymbolicValueAllocator &allocator) {
     auto byteSize =
         DerivedAddressValue::totalSizeToAlloc<unsigned>(elements.size());
-    auto *rawMem = astContext.Allocate(byteSize, alignof(DerivedAddressValue));
+    auto *rawMem = allocator.allocate(byteSize, alignof(DerivedAddressValue));
 
     //  Placement initialize the object.
     auto dav =
@@ -483,11 +482,11 @@ private:
 /// indexed by a path.
 SymbolicValue SymbolicValue::getAddress(SymbolicValueMemoryObject *memoryObject,
                                         ArrayRef<unsigned> indices,
-                                        ASTContext &astContext) {
+                                        SymbolicValueAllocator &allocator) {
   if (indices.empty())
     return getAddress(memoryObject);
 
-  auto dav = DerivedAddressValue::create(memoryObject, indices, astContext);
+  auto dav = DerivedAddressValue::create(memoryObject, indices, allocator);
   SymbolicValue result;
   result.representationKind = RK_DerivedAddress;
   result.value.derivedAddress = dav;
@@ -694,7 +693,7 @@ SymbolicValueMemoryObject::getIndexedElement(ArrayRef<unsigned> accessPath) {
 static SymbolicValue setIndexedElement(SymbolicValue aggregate,
                                        ArrayRef<unsigned> accessPath,
                                        SymbolicValue newElement, Type type,
-                                       ASTContext &astCtx) {
+                                       SymbolicValueAllocator &allocator) {
   // We're done if we've run out of access path.
   if (accessPath.empty())
     return newElement;
@@ -715,7 +714,7 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
 
     SmallVector<SymbolicValue, 4> newElts(numMembers,
                                           SymbolicValue::getUninitMemory());
-    aggregate = SymbolicValue::getAggregate(newElts, astCtx);
+    aggregate = SymbolicValue::getAggregate(newElts, allocator);
   }
 
   assert(aggregate.getKind() == SymbolicValue::Aggregate &&
@@ -738,12 +737,11 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
 
   // Update the indexed element of the aggregate.
   SmallVector<SymbolicValue, 4> newElts(oldElts.begin(), oldElts.end());
-  newElts[elementNo] = setIndexedElement(newElts[elementNo],
-                                         accessPath.drop_front(), newElement,
-                                         eltType, astCtx);
+  newElts[elementNo] =
+      setIndexedElement(newElts[elementNo], accessPath.drop_front(), newElement,
+                        eltType, allocator);
 
-  aggregate = SymbolicValue::getAggregate(newElts, astCtx);
-
+  aggregate = SymbolicValue::getAggregate(newElts, allocator);
   return aggregate;
 }
 
@@ -755,6 +753,6 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
 /// Precondition: The access path must be valid for this memory object's type.
 void SymbolicValueMemoryObject::setIndexedElement(
     ArrayRef<unsigned> accessPath, SymbolicValue newElement,
-    ASTContext &astCtx) {
-  value = ::setIndexedElement(value, accessPath, newElement, type, astCtx);
+    SymbolicValueAllocator &allocator) {
+  value = ::setIndexedElement(value, accessPath, newElement, type, allocator);
 }

@@ -221,7 +221,9 @@ public:
   
   void print(llvm::raw_ostream &OS,
              const PrintOptions &Options = PrintOptions()) const;
-  void dump() const;
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump() const LLVM_ATTRIBUTE_USED,
+      "only for use within the debugger");
   
   /// walk - This recursively walks the AST rooted at this pattern.
   Pattern *walk(ASTWalker &walker);

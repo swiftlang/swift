@@ -50,7 +50,7 @@ static void diagnoseScopedImports(DiagnosticEngine &diags,
     if (importPair.first.empty())
       continue;
     diags.diagnose(importPair.first.front().second,
-                   diag::parseable_interface_scoped_import_unsupported);
+                   diag::module_interface_scoped_import_unsupported);
   }
 }
 

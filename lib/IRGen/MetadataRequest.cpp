@@ -359,6 +359,12 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
       }
       // \1 - direct reference, \2 - indirect reference
       baseKind = 1;
+    } else if (auto copaque = symbolic.first.dyn_cast<const OpaqueTypeDecl*>()){
+      auto opaque = const_cast<OpaqueTypeDecl*>(copaque);
+      IRGen.noteUseOfOpaqueTypeDescriptor(opaque);
+      ref = getAddrOfLLVMVariableOrGOTEquivalent(
+                                   LinkEntity::forOpaqueTypeDescriptor(opaque));
+      baseKind = 1;
     } else {
       llvm_unreachable("unhandled symbolic referent");
     }
@@ -511,19 +517,12 @@ irgen::getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
 llvm::Constant *
 irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
                                       CanType type,
-                                      bool allowDynamicUninitialized,
-                                      bool allowStub) {
+                                      bool allowDynamicUninitialized) {
   auto theDecl = type->getClassOrBoundGenericClass();
   assert(theDecl && "emitting constant heap metadata ref for non-class type?");
 
   switch (IGM.getClassMetadataStrategy(theDecl)) {
   case ClassMetadataStrategy::Resilient:
-    if (allowStub && IGM.Context.LangOpts.EnableObjCResilientClassStubs) {
-      return IGM.getAddrOfObjCResilientClassStub(theDecl, NotForDefinition,
-                                            TypeMetadataAddress::AddressPoint);
-    }
-    return nullptr;
-
   case ClassMetadataStrategy::Singleton:
     if (!allowDynamicUninitialized)
       return nullptr;
@@ -1946,9 +1945,6 @@ llvm::Function *irgen::getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,
 
   switch (getTypeMetadataAccessStrategy(type)) {
   case MetadataAccessStrategy::ForeignAccessor:
-    // Force the foreign candidate to exist.
-    (void) IGM.getAddrOfForeignTypeMetadataCandidate(type);
-    LLVM_FALLTHROUGH;
   case MetadataAccessStrategy::PublicUniqueAccessor:
   case MetadataAccessStrategy::HiddenUniqueAccessor:
   case MetadataAccessStrategy::PrivateAccessor:

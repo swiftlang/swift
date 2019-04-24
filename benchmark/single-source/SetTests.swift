@@ -99,6 +99,47 @@ public let SetTests = [
     setUpFunction: { blackHole([setP, setQ]) }),
 
   BenchmarkInfo(
+    name: "Set.isStrictSubset.Empty.Int",
+    runFunction: { n in run_SetIsStrictSubsetInt(setE, setAB, true, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setE, setAB]) }),
+  BenchmarkInfo(
+    name: "Set.isStrictSubset.Int.Empty",
+    runFunction: { n in run_SetIsStrictSubsetInt(setAB, setE, false, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setE]) }),
+  BenchmarkInfo(
+    name: "Set.isStrictSubset.Int0",
+    runFunction: { n in run_SetIsStrictSubsetInt(setAB, setCD, false, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setCD]) }),
+  BenchmarkInfo(
+    name: "Set.isStrictSubset.Box0",
+    runFunction: { n in run_SetIsStrictSubsetBox(setOAB, setOCD, false, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOCD]) }),
+  BenchmarkInfo(
+    name: "Set.isStrictSubset.Int25",
+    runFunction: { n in run_SetIsStrictSubsetInt(setB, setAB, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setB, setAB]) }),
+  BenchmarkInfo(
+    name: "Set.isStrictSubset.Box25",
+    runFunction: { n in run_SetIsStrictSubsetBox(setOB, setOAB, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOB, setOAB]) }),
+  BenchmarkInfo(
+    name: "Set.isStrictSubset.Int50",
+    runFunction: { n in run_SetIsStrictSubsetInt(setY, setXY, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setY, setXY]) }),
+  BenchmarkInfo(
+    name: "Set.isStrictSubset.Int100",
+    runFunction: { n in run_SetIsStrictSubsetInt(setP, setQ, false, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setP, setQ]) }),
+
+  BenchmarkInfo(
     name: "Set.isDisjoint.Empty.Int",
     runFunction: { n in run_SetIsDisjointInt(setE, setAB, true, 5000 * n) },
     tags: [.validation, .api, .Set],
@@ -334,6 +375,18 @@ public func run_SetIsSubsetInt(
 }
 
 @inline(never)
+public func run_SetIsStrictSubsetInt(
+  _ a: Set<Int>,
+  _ b: Set<Int>,
+  _ r: Bool,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    let isStrictSubset = a.isStrictSubset(of: identity(b))
+    CheckResults(isStrictSubset == r)
+  }
+}
+
+@inline(never)
 public func run_SetSymmetricDifferenceInt(
   _ a: Set<Int>,
   _ b: Set<Int>,
@@ -418,6 +471,18 @@ func run_SetIsSubsetBox(
   for _ in 0 ..< n {
     let isSubset = a.isSubset(of: identity(b))
     CheckResults(isSubset == r)
+  }
+}
+
+@inline(never)
+func run_SetIsStrictSubsetBox(
+  _ a: Set<Box<Int>>,
+  _ b: Set<Box<Int>>,
+  _ r: Bool,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    let isStrictSubset = a.isStrictSubset(of: identity(b))
+    CheckResults(isStrictSubset == r)
   }
 }
 

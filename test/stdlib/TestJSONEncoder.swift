@@ -256,7 +256,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
             /// our precision requests in every case. This bug effects Darwin, FreeBSD, and Linux currently
             /// causing this test (which uses the current time) to fail occasionally.
             let evalEdgeCase: (Date, Date) -> () = { decodedDate, expectedDate in
-                if formattedLength(of: decodedDate.timeIntervalSinceReferenceDate) > DBL_DECIMAL_DIG + 2 {
+                if formattedLength(of: decodedDate.timeIntervalSinceReferenceDate) > DBL_DECIMAL_DIG {
                     let adjustedTimeIntervalSinceReferenceDate: (Date) -> Double = {
                         let adjustment = pow(10, Double(DBL_DECIMAL_DIG))
                         return Double(floor(adjustment * $0.timeIntervalSinceReferenceDate) / adjustment)
@@ -286,9 +286,15 @@ class TestJSONEncoder : TestJSONEncoderSuper {
         }
     }
 
-    // Test the above `snprintf` edge case evaluation with a known triggering case
-    let knownBadDate = Date(timeIntervalSinceReferenceDate: 0.0021413276231263384)
-    localTestRoundTrip(of: TopLevelWrapper(knownBadDate))
+    // Test the above `snprintf` edge case evaluation with known triggering cases
+
+    // Tests the two precision digits larger case
+    let knownBadDateTwoExtraDigits = Date(timeIntervalSinceReferenceDate: 0.0021413276231263384)
+    localTestRoundTrip(of: TopLevelWrapper(knownBadDateTwoExtraDigits))
+
+    // Tests the one precision digit larger case
+    let knownBadDateOneExtraDigit = Date(timeIntervalSinceReferenceDate: 576487829.7193049)
+    localTestRoundTrip(of: TopLevelWrapper(knownBadDateOneExtraDigit))
 
     // We can't encode a top-level Date, so it'll be wrapped in a dictionary.
     localTestRoundTrip(of: TopLevelWrapper(Date()))

@@ -1257,21 +1257,19 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method,
   bool isInstanceMethod = method->isObjCInstanceMethod();
   auto &vec = (*ObjCMethodLookup)[{selector, isInstanceMethod}].Methods;
 
-  // In a non-empty vector, we could have duplicates or conflicts.
-  if (!vec.empty()) {
-    // Check whether we have a duplicate. This only checks more than one
-    // element in ill-formed code, so the linear search is acceptable.
-    if (std::find(vec.begin(), vec.end(), method) != vec.end())
-      return;
+  // Check whether we have a duplicate. This only checks more than one
+  // element in ill-formed code, so the linear search is acceptable.
+  if (std::find(vec.begin(), vec.end(), method) != vec.end())
+    return;
 
+  if (auto *sf = method->getParentSourceFile()) {
     if (vec.size() == 1) {
       // We have a conflict.
-      getASTContext().recordObjCMethodConflict(this, selector,
-                                               isInstanceMethod);
+      sf->ObjCMethodConflicts.push_back(std::make_tuple(this, selector,
+                                                        isInstanceMethod));
+    } if (vec.empty()) {
+      sf->ObjCMethodList.push_back(method);
     }
-  } else {
-    // Record the first method that has this selector.
-    getASTContext().recordObjCMethod(method);
   }
 
   vec.push_back(method);
@@ -1356,8 +1354,8 @@ static bool isAcceptableLookupResult(const DeclContext *dc,
   return true;
 }
 
-bool namelookup::finishLookup(const DeclContext *dc, NLOptions options,
-                              SmallVectorImpl<ValueDecl *> &decls) {
+void namelookup::pruneLookupResultSet(const DeclContext *dc, NLOptions options,
+                                      SmallVectorImpl<ValueDecl *> &decls) {
   // If we're supposed to remove overridden declarations, do so now.
   if (options & NL_RemoveOverridden)
     removeOverriddenDecls(decls);
@@ -1368,9 +1366,6 @@ bool namelookup::finishLookup(const DeclContext *dc, NLOptions options,
     removeShadowedDecls(decls, M);
 
   filterForDiscriminator(decls, M->getDebugClient());
-
-  // We're done. Report success/failure.
-  return !decls.empty();
 }
 
 /// Inspect the given type to determine which nominal type declarations it
@@ -1574,7 +1569,13 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
     }
   }
 
-  return finishLookup(this, options, decls);
+  pruneLookupResultSet(this, options, decls);
+  if (auto *debugClient = this->getParentModule()->getDebugClient()) {
+    debugClient->finishLookupInNominals(this, typeDecls, member, options,
+                                        decls);
+  }
+  // We're done. Report success/failure.
+  return !decls.empty();
 }
 
 bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
@@ -1626,7 +1627,13 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
     return !knownDecls.insert(vd).second;
   }), decls.end());
 
-  return finishLookup(this, options, decls);
+  pruneLookupResultSet(this, options, decls);
+
+  if (auto *debugClient = this->getParentModule()->getDebugClient()) {
+    debugClient->finishLookupInModule(this, module, member, options, decls);
+  }
+  // We're done. Report success/failure.
+  return !decls.empty();
 }
 
 bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
@@ -1681,7 +1688,12 @@ bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
       decls.push_back(decl);
   }
 
-  return finishLookup(this, options, decls);
+  pruneLookupResultSet(this, options, decls);
+  if (auto *debugClient = this->getParentModule()->getDebugClient()) {
+    debugClient->finishLookupInAnyObject(this, member, options, decls);
+  }
+  // We're done. Report success/failure.
+  return !decls.empty();
 }
 
 void DeclContext::lookupAllObjCMethods(
@@ -1940,6 +1952,9 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Protocol:
   case TypeReprKind::Shared:
   case TypeReprKind::SILBox:
+    return { };
+      
+  case TypeReprKind::OpaqueReturn:
     return { };
 
   case TypeReprKind::Fixed:

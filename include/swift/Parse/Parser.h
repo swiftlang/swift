@@ -1006,7 +1006,8 @@ public:
                                                DeclAttributes &Attributes);
 
   ParserResult<SubscriptDecl>
-  parseDeclSubscript(ParseDeclOptions Flags, DeclAttributes &Attributes,
+  parseDeclSubscript(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
+                     ParseDeclOptions Flags, DeclAttributes &Attributes,
                      SmallVectorImpl<Decl *> &Decls);
 
   ParserResult<ConstructorDecl>
@@ -1026,6 +1027,8 @@ public:
 
   ParserResult<PrecedenceGroupDecl>
   parseDeclPrecedenceGroup(ParseDeclOptions flags, DeclAttributes &attributes);
+
+  ParserResult<TypeRepr> parseDeclResultType(Diag<> MessageID);
 
   //===--------------------------------------------------------------------===//
   // Type Parsing
@@ -1143,6 +1146,9 @@ public:
 
     /// The default argument for this parameter.
     Expr *DefaultArg = nullptr;
+
+    /// True if this parameter inherits a default argument via '= super'
+    bool hasInheritedDefaultArg = false;
     
     /// True if we emitted a parse error about this parameter.
     bool isInvalid = false;

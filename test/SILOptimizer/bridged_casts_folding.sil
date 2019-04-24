@@ -41,7 +41,7 @@ bb1:
 
 bb2:
   br bb3(%1 : $NSObjectSubclass)
-  
+
 bb3(%8 : @owned $NSObjectSubclass):
   dealloc_stack %2 : $*NSObjectSubclass
   return %8 : $NSObjectSubclass
@@ -66,7 +66,7 @@ bb1:
 bb2:
   destroy_addr %0 : $*AnyHashable
   br bb3(%1 : $NSObjectSubclass)
-  
+
 bb3(%8 : @owned $NSObjectSubclass):
   dealloc_stack %2 : $*NSObjectSubclass
   return %8 : $NSObjectSubclass
@@ -94,7 +94,7 @@ bb1:
 
 bb2:
   br bb3(%1 : $NSObjectSubclass)
-  
+
 bb3(%8 : @owned $NSObjectSubclass):
   dealloc_stack %2 : $*NSObjectSubclass
   return %8 : $NSObjectSubclass

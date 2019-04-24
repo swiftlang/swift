@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -I %S/Inputs/abi %s -emit-ir | %FileCheck %s --check-prefix=CHECK-%target-cpu -check-prefix CHECK-%target-abi-%target-cpu
+// RUN: %target-swift-frontend -I %S/Inputs/abi %s -emit-ir | %FileCheck %s --check-prefix=CHECK-%target-cpu -check-prefix CHECK-%target-abi-%target-cpu -check-prefix CHECK-%target-sdk-name-%target-cpu
 
 sil_stage canonical
 import c_layout
@@ -173,21 +173,33 @@ bb0:
 // CHECK-i386-LABEL: declare{{( dllimport)?}} i32 @ints(i32)
 // CHECK-i386-LABEL: declare{{( dllimport)?}} i32 @unsigneds(i32)
 
-// CHECK-armv7-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testIntegerExtension
-// CHECK-armv7:         call signext i8 @chareth(i8 signext
-// CHECK-armv7:         call signext i8 @signedChareth(i8 signext
-// CHECK-armv7:         call zeroext i8 @unsignedChareth(i8 zeroext
-// CHECK-armv7:         call signext i16 @eatMyShorts(i16 signext
-// CHECK-armv7:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
-// CHECK-armv7:         call i32 @ints(i32 %5)
-// CHECK-armv7:         call i32 @unsigneds(i32 %6)
-// CHECK-armv7-LABEL: declare{{( dllimport)?}} signext i8 @chareth(i8 signext)
-// CHECK-armv7-LABEL: declare{{( dllimport)?}} signext i8 @signedChareth(i8 signext)
-// CHECK-armv7-LABEL: declare{{( dllimport)?}} zeroext i8 @unsignedChareth(i8 zeroext)
-// CHECK-armv7-LABEL: declare{{( dllimport)?}} signext i16 @eatMyShorts(i16 signext)
-// CHECK-armv7-LABEL: declare{{( dllimport)?}} zeroext i16 @eatMyUnsignedShorts(i16 zeroext)
-// CHECK-armv7-LABEL: declare{{( dllimport)?}} i32 @ints(i32)
-// CHECK-armv7-LABEL: declare{{( dllimport)?}} i32 @unsigneds(i32)
+// CHECK-armv7-LABEL:         define{{( dllexport)?}}{{( protected)?}} swiftcc void @testIntegerExtension
+// CHECK-ios-armv7:             call signext i8 @chareth(i8 signext
+// CHECK-ios-armv7:             call signext i8 @signedChareth(i8 signext
+// CHECK-android-armv7:         call zeroext i8 @chareth(i8 zeroext
+// CHECK-android-armv7:         call zeroext i8 @signedChareth(i8 zeroext
+// CHECK-linux-armv7:           call zeroext i8 @chareth(i8 zeroext
+// CHECK-linux-armv7:           call zeroext i8 @signedChareth(i8 zeroext
+// CHECK-windows-armv7:         call zeroext i8 @chareth(i8 zeroext
+// CHECK-windows-armv7:         call zeroext i8 @signedChareth(i8 zeroext
+// CHECK-armv7:                 call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-armv7:                 call signext i16 @eatMyShorts(i16 signext
+// CHECK-armv7:                 call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
+// CHECK-armv7:                 call i32 @ints(i32 %5)
+// CHECK-armv7:                 call i32 @unsigneds(i32 %6)
+// CHECK-ios-armv7-LABEL:     declare{{( dllimport)?}} signext i8 @chareth(i8 signext)
+// CHECK-ios-armv7-LABEL:     declare{{( dllimport)?}} signext i8 @signedChareth(i8 signext)
+// CHECK-android-armv7-LABEL: declare{{( dllimport)?}} zeroext i8 @chareth(i8 zeroext)
+// CHECK-android-armv7-LABEL: declare{{( dllimport)?}} zeroext i8 @signedChareth(i8 zeroext)
+// CHECK-linux-armv7-LABEL:   declare{{( dllimport)?}} zeroext i8 @chareth(i8 zeroext)
+// CHECK-linux-armv7-LABEL:   declare{{( dllimport)?}} zeroext i8 @signedChareth(i8 zeroext)
+// CHECK-windows-armv7-LABEL: declare{{( dllimport)?}} zeroext i8 @chareth(i8 zeroext)
+// CHECK-windows-armv7-LABEL: declare{{( dllimport)?}} zeroext i8 @signedChareth(i8 zeroext)
+// CHECK-armv7-LABEL:         declare{{( dllimport)?}} zeroext i8 @unsignedChareth(i8 zeroext)
+// CHECK-armv7-LABEL:         declare{{( dllimport)?}} signext i16 @eatMyShorts(i16 signext)
+// CHECK-armv7-LABEL:         declare{{( dllimport)?}} zeroext i16 @eatMyUnsignedShorts(i16 zeroext)
+// CHECK-armv7-LABEL:         declare{{( dllimport)?}} i32 @ints(i32)
+// CHECK-armv7-LABEL:         declare{{( dllimport)?}} i32 @unsigneds(i32)
 
 // CHECK-armv7s-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testIntegerExtension
 // CHECK-armv7s:         call signext i8 @chareth(i8 signext
