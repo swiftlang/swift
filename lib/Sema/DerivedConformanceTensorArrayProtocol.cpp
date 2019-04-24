@@ -411,9 +411,8 @@ deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl) {
   auto *tensorArrayProto = C.getProtocol(
       KnownProtocolKind::TensorArrayProtocol);
   auto initName = DeclName(
-      C, DeclBaseName::createConstructor(),
-      {C.getIdentifier("_owning"), C.getIdentifier("count")});
-  auto *initReq = getProtocolRequirement(tensorArrayProto, initName);
+      C, DeclBaseName::createConstructor(), {C.getIdentifier("_owning")});
+  auto *initReq = getProtocolRequirement(tensorGroupProto, initName);
   auto *tensorHandleCountReq = getProtocolRequirement(
       tensorArrayProto, C.Id_tensorHandleCount);
 

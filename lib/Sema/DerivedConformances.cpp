@@ -344,7 +344,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       // SWIFT_ENABLE_TENSORFLOW
       // TensorArrayProtocol.init(_owning:count)
       if (argumentNames[0] == ctx.getIdentifier("_owning") && 
-          argumentNames[0] == ctx.getIdentifier("count")) {
+          argumentNames[1] == ctx.getIdentifier("count")) {
         return getRequirement(KnownProtocolKind::TensorArrayProtocol);
       }
     }
