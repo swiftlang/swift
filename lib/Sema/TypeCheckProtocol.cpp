@@ -424,7 +424,6 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witnessStorage,
 
 RequirementMatch
 swift::matchWitness(
-             TypeChecker &tc,
              DeclContext *dc, ValueDecl *req, ValueDecl *witness,
              llvm::function_ref<
                      std::tuple<Optional<RequirementMatch>, Type, Type>(void)> 
@@ -440,10 +439,17 @@ swift::matchWitness(
   if (req->getKind() != witness->getKind())
     return RequirementMatch(witness, MatchKind::KindConflict);
 
+  // If the witness has not been validated yet, do so now.
+  if (!witness->hasValidSignature()) {
+    auto &ctx = dc->getASTContext();
+    ctx.getLazyResolver()->resolveDeclSignature(witness);
+  }
+
   // If the witness is invalid, record that and stop now.
   if (witness->isInvalid())
     return RequirementMatch(witness, MatchKind::WitnessInvalid);
 
+  // If we're currently validating the witness, bail out.
   if (!witness->hasValidSignature())
     return RequirementMatch(witness, MatchKind::Circularity);
 
@@ -946,7 +952,7 @@ swift::matchWitness(TypeChecker &tc,
     return result;
   };
 
-  return matchWitness(tc, dc, req, witness, setup, matchTypes, finalize);
+  return matchWitness(dc, req, witness, setup, matchTypes, finalize);
 }
 
 static bool
@@ -1148,9 +1154,6 @@ bool WitnessChecker::findBestWitness(
       if (isa<ProtocolDecl>(witness->getDeclContext())) {
         continue;
       }
-
-      if (!witness->hasValidSignature())
-        TC.validateDecl(witness);
 
       auto match = matchWitness(TC, ReqEnvironmentCache, Proto, conformance, DC,
                                 requirement, witness);

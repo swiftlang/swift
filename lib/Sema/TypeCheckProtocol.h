@@ -897,7 +897,6 @@ public:
 ///
 /// \returns the result of performing the match.
 RequirementMatch matchWitness(
-             TypeChecker &tc,
              DeclContext *dc, ValueDecl *req, ValueDecl *witness,
              llvm::function_ref<
                      std::tuple<Optional<RequirementMatch>, Type, Type>(void)>
