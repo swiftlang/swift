@@ -206,3 +206,25 @@ public func usePair() {
   useP(x.first.myValue())
   useP(x.second.myValue())
 }
+
+public protocol P3 {
+  associatedtype AT
+  func foo() -> AT
+}
+
+public struct Adapter<T: P3>: P3 {
+  var inner: T
+  public func foo() -> some P3 {
+    return inner
+  }
+}
+
+// Don't assert.
+// CHECK-LABEL: sil {{.*}} @$s1A7AdapterVyxGAA2P3A2aEP3foo2ATQzyFTW
+// CHECK:  [[F:%.*]] = function_ref @$s1A7AdapterV3fooQryF
+// CHECK:  apply [[F]]<τ_0_0>(%0, %1) : $@convention(method) <τ_0_0 where τ_0_0 : P3> (@in_guaranteed Adapter<τ_0_0>) -> @out @_opaqueReturnTypeOf("$s1A7AdapterV3fooQryF", 0)
+extension P3 {
+  public func foo() -> some P3 {
+    return Adapter(inner: self)
+  }
+}
