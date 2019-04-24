@@ -98,6 +98,7 @@ extension vDSP {
     }
     
     /// Enum specifying window sequence.
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public enum WindowSequence {
         /// Creates a normalized Hanning window.
         case hanningNormalized

@@ -305,7 +305,8 @@ extension vDSP {
     }
     
     // MARK: Vector threshold.
-    
+  
+    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public enum ThresholdRule<T: BinaryFloatingPoint> {
         /// Returns threshold if input is less than threshold; otherwise input value.
         case clampToThreshold

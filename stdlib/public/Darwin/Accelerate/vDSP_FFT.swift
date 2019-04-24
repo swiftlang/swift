@@ -22,6 +22,7 @@ import Accelerate
 extension vDSP {
     
     /// An enumeration that defines the size of the FFT decomposition.
+    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public enum Radix {
         case radix2
         case radix3
