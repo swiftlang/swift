@@ -257,7 +257,9 @@ enum class TypeMatchFlags {
   ///
   /// This is necessary because Objective-C allows optional function paramaters
   /// to be non-escaping, but Swift currently does not.
-  IgnoreNonEscapingForOptionalFunctionParam = 1 << 4
+  IgnoreNonEscapingForOptionalFunctionParam = 1 << 4,
+  /// Allow compatible opaque archetypes.
+  AllowCompatibleOpaqueTypeArchetypes = 1 << 5
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
