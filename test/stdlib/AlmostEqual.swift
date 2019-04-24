@@ -3,7 +3,7 @@
 
 import StdlibUnittest
 
-var simdTestSuite = TestSuite("AlmostEqual")
+var approximateTestSuite = TestSuite("AlmostEqual")
 
 extension BinaryFloatingPoint
 where RawSignificand: FixedWidthInteger, Exponent: FixedWidthInteger {
@@ -77,7 +77,7 @@ where RawSignificand: FixedWidthInteger, Exponent: FixedWidthInteger {
   }
 }
 
-simdTestSuite.test("AlmostEqual") {
+approximateTestSuite.test("AlmostEqual") {
   Float.testAlmostEqual()
   Double.testAlmostEqual()
   Float.testAlmostZero()
