@@ -1916,12 +1916,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       refType = fnType->getResult();
 
       auto *keyPathDecl = keyPathTy->getAnyNominal();
-      assert(
-          keyPathDecl &&
-          (keyPathDecl == getASTContext().getKeyPathDecl() ||
-           keyPathDecl == getASTContext().getWritableKeyPathDecl() ||
-           keyPathDecl == getASTContext().getReferenceWritableKeyPathDecl()) &&
-          "parameter is supposed to be a keypath");
+      assert(isKnownKeyPathDecl(getASTContext(), keyPathDecl) &&
+             "parameter is supposed to be a keypath");
 
       auto *keyPathLoc = getConstraintLocator(
           locator, LocatorPathElt::getKeyPathDynamicMember(keyPathDecl));
@@ -2709,4 +2705,10 @@ void ConstraintSystem::generateConstraints(
 
     recordChoice(constraints, index, choices[index]);
   }
+}
+
+bool constraints::isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl) {
+  return decl == ctx.getKeyPathDecl() || decl == ctx.getWritableKeyPathDecl() ||
+         decl == ctx.getReferenceWritableKeyPathDecl() ||
+         decl == ctx.getPartialKeyPathDecl() || decl == ctx.getAnyKeyPathDecl();
 }
