@@ -152,7 +152,7 @@ EXPECTED_DEFAULTS = {
     'llbuild_assertions': True,
     'lldb_assertions': True,
     'lldb_build_variant': 'Debug',
-    'lldb_build_with_xcode': '0',
+    'lldb_build_with_xcode': '1',
     'llvm_assertions': True,
     'llvm_build_variant': 'Debug',
     'llvm_max_parallel_lto_link_jobs':
