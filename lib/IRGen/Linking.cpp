@@ -200,7 +200,23 @@ std::string LinkEntity::mangleAsString() const {
 
   case Kind::OpaqueTypeDescriptor:
     return mangler.mangleOpaqueTypeDescriptor(cast<OpaqueTypeDecl>(getDecl()));
-      
+
+  case Kind::OpaqueTypeDescriptorAccessor:
+    return mangler.mangleOpaqueTypeDescriptorAccessor(
+        cast<OpaqueTypeDecl>(getDecl()));
+
+  case Kind::OpaqueTypeDescriptorAccessorImpl:
+    return mangler.mangleOpaqueTypeDescriptorAccessorImpl(
+        cast<OpaqueTypeDecl>(getDecl()));
+
+  case Kind::OpaqueTypeDescriptorAccessorKey:
+    return mangler.mangleOpaqueTypeDescriptorAccessorKey(
+        cast<OpaqueTypeDecl>(getDecl()));
+
+  case Kind::OpaqueTypeDescriptorAccessorVar:
+    return mangler.mangleOpaqueTypeDescriptorAccessorVar(
+        cast<OpaqueTypeDecl>(getDecl()));
+
   case Kind::PropertyDescriptor:
     return mangler.manglePropertyDescriptor(
                                         cast<AbstractStorageDecl>(getDecl()));
@@ -576,6 +592,10 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ProtocolRequirementsBaseDescriptor:
   case Kind::MethodLookupFunction:
   case Kind::OpaqueTypeDescriptor:
+  case Kind::OpaqueTypeDescriptorAccessor:
+  case Kind::OpaqueTypeDescriptorAccessorImpl:
+  case Kind::OpaqueTypeDescriptorAccessorKey:
+  case Kind::OpaqueTypeDescriptorAccessorVar:
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
 
   case Kind::AssociatedTypeDescriptor:
@@ -724,6 +744,10 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::ProtocolRequirementsBaseDescriptor:
   case Kind::MethodLookupFunction:
   case Kind::OpaqueTypeDescriptor:
+  case Kind::OpaqueTypeDescriptorAccessor:
+  case Kind::OpaqueTypeDescriptorAccessorImpl:
+  case Kind::OpaqueTypeDescriptorAccessorKey:
+  case Kind::OpaqueTypeDescriptorAccessorVar:
     return ::isAvailableExternally(IGM, getDecl());
 
   case Kind::AssociatedTypeDescriptor:
@@ -867,8 +891,10 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::MethodDescriptorAllocator:
     return IGM.MethodDescriptorStructTy;
   case Kind::DynamicallyReplaceableFunctionKey:
+  case Kind::OpaqueTypeDescriptorAccessorKey:
     return IGM.DynamicReplacementKeyTy;
   case Kind::DynamicallyReplaceableFunctionVariable:
+  case Kind::OpaqueTypeDescriptorAccessorVar:
     return IGM.DynamicReplacementLinkEntryTy;
   case Kind::ObjCMetadataUpdateFunction:
     return IGM.ObjCUpdateCallbackTy;
@@ -924,6 +950,8 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::SwiftMetaclassStub:
   case Kind::DynamicallyReplaceableFunctionVariable:
   case Kind::DynamicallyReplaceableFunctionKey:
+  case Kind::OpaqueTypeDescriptorAccessorKey:
+  case Kind::OpaqueTypeDescriptorAccessorVar:
   case Kind::ObjCResilientClassStub:
     return IGM.getPointerAlignment();
   case Kind::SILFunction:
@@ -1000,6 +1028,10 @@ bool LinkEntity::isWeakImported(ModuleDecl *module,
   case Kind::DynamicallyReplaceableFunctionVariableAST:
   case Kind::DynamicallyReplaceableFunctionImpl:
   case Kind::OpaqueTypeDescriptor:
+  case Kind::OpaqueTypeDescriptorAccessor:
+  case Kind::OpaqueTypeDescriptorAccessorImpl:
+  case Kind::OpaqueTypeDescriptorAccessorKey:
+  case Kind::OpaqueTypeDescriptorAccessorVar:
     return getDecl()->isWeakImported(module, context);
 
   case Kind::ProtocolWitnessTable:
@@ -1082,6 +1114,10 @@ const SourceFile *LinkEntity::getSourceFileForEmission() const {
   case Kind::DynamicallyReplaceableFunctionKeyAST:
   case Kind::DynamicallyReplaceableFunctionImpl:
   case Kind::OpaqueTypeDescriptor:
+  case Kind::OpaqueTypeDescriptorAccessor:
+  case Kind::OpaqueTypeDescriptorAccessorImpl:
+  case Kind::OpaqueTypeDescriptorAccessorKey:
+  case Kind::OpaqueTypeDescriptorAccessorVar:
     sf = getSourceFileForDeclContext(getDecl()->getDeclContext());
     if (!sf)
       return nullptr;
