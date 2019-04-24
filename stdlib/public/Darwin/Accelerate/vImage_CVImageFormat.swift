@@ -128,29 +128,8 @@ extension vImageCVImageFormat {
     }
     
     /// The format code of a Core Video image format.
-    public var formatCode: String {
-        let formatCode = vImageCVImageFormat_GetFormatCode(cvConstImageFormat)
-        
-        #if os(OSX)
-        return String(UTCreateStringForOSType(formatCode).takeRetainedValue())
-        #else
-        let chars: [UnicodeScalar?] = [UnicodeScalar(formatCode >> 24 & 0xFF),
-                                       UnicodeScalar(formatCode >> 16 & 0xFF),
-                                       UnicodeScalar(formatCode >> 8 & 0xFF),
-                                       UnicodeScalar(formatCode >> 0 & 0xFF)]
-        
-        var returnString: String = ""
-        
-        chars.compactMap {
-            $0
-            }.compactMap{
-                String($0)
-            }.forEach {
-                returnString.append($0)
-        }
-        
-        return returnString
-        #endif
+    public var formatCode: UInt32 {
+        return vImageCVImageFormat_GetFormatCode(cvConstImageFormat)
     }
     
     /// Utility to return immuatable copy of self for use in getters.

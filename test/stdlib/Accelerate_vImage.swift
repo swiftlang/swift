@@ -472,13 +472,13 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         
         // test formatCode
         
-        expectEqual(format.formatCode, "y420")
+        expectEqual(format.formatCode, kCVPixelFormatType_420YpCbCr8Planar)
         
         // test channelCount
         
         expectEqual(format.channelCount, 3)
     }
-    
+
     //===----------------------------------------------------------------------===//
     //
     //  MARK: CGImageFormat
