@@ -5958,6 +5958,9 @@ public:
   bool isConsuming() const {
     return getSelfAccessKind() == SelfAccessKind::__Consuming;
   }
+  bool isCallable() const {
+    return getName().str() == "call" && isInstanceMember();
+  }
 
   SelfAccessKind getSelfAccessKind() const {
     return static_cast<SelfAccessKind>(Bits.FuncDecl.SelfAccess);
