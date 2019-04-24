@@ -798,11 +798,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     if (SILValue V = simplifyInstruction(Inst)) {
       LLVM_DEBUG(llvm::dbgs() << "SILCSE SIMPLIFY: " << *Inst << "  to: " << *V
                               << '\n');
-      replaceAllSimplifiedUsesAndErase(Inst, V,
-                                       [&nextI](SILInstruction *deleteI) {
-                                         if (nextI == deleteI->getIterator())
-                                           ++nextI;
-                                       });
+      nextI = replaceAllSimplifiedUsesAndErase(Inst, V);
       Changed = true;
       ++NumSimplify;
       continue;
