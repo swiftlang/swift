@@ -77,7 +77,7 @@ def _apply_default_arguments(args):
         args.lldb_build_variant = args.build_variant
 
     if args.lldb_build_with_xcode is None:
-        args.lldb_build_with_xcode = '0'
+        args.lldb_build_with_xcode = '1'
 
     if args.foundation_build_variant is None:
         args.foundation_build_variant = args.build_variant

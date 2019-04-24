@@ -74,7 +74,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
     swift-stdlib-use-nonatomic-rc "0"            "build the Swift stdlib and overlays with nonatomic reference count operations enabled"
     lldb-build-type             "Debug"          "the CMake build variant for LLDB"
-    lldb-build-with-xcode       "0"              "Use xcodebuild to build LLDB, instead of CMake"
+    lldb-build-with-xcode       "1"              "Use xcodebuild to build LLDB, instead of CMake"
     llbuild-build-type          "Debug"          "the CMake build variant for llbuild"
     foundation-build-type       "Debug"          "the build variant for Foundation"
     libdispatch-build-type      "Debug"          "the build variant for libdispatch"
