@@ -268,6 +268,14 @@ static ManagedValue emitBridgeBoolToDarwinBoolean(SILGenFunction &SGF,
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
+static ManagedValue emitBridgeBoolToWindowsBool(SILGenFunction &SGF,
+                                                SILLocation L, ManagedValue b) {
+  // func _convertToWindowsBool(Bool) -> WindowsBool
+  SILValue F = SGF.emitGlobalFunctionRef(L, SGF.SGM.getBoolToWindowsBoolFn());
+  SILValue R = SGF.B.createApply(L, F, {}, b.forward(SGF), false);
+  return SGF.emitManagedRValueWithCleanup(R);
+}
+
 static ManagedValue emitBridgeForeignBoolToBool(SILGenFunction &SGF,
                                                 SILLocation loc,
                                                 ManagedValue foreignBool,
@@ -1002,7 +1010,7 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
     return SGF.emitOptionalToOptional(loc, v, loweredNativeTy, helper, C);
   }
 
-  // Bridge Bool to ObjCBool or DarwinBoolean when requested.
+  // Bridge ObjCBool, DarwinBoolean, WindowsBool to Bool when requested.
   if (nativeType == SGF.SGM.Types.getBoolType()) {
     if (bridgedType == SGF.SGM.Types.getObjCBoolType()) {
       return emitBridgeForeignBoolToBool(SGF, loc, v,
@@ -1011,6 +1019,10 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
     if (bridgedType == SGF.SGM.Types.getDarwinBooleanType()) {
       return emitBridgeForeignBoolToBool(SGF, loc, v,
                                          SGF.SGM.getDarwinBooleanToBoolFn());
+    }
+    if (bridgedType == SGF.SGM.Types.getWindowsBoolType()) {
+      return emitBridgeForeignBoolToBool(SGF, loc, v,
+                                         SGF.SGM.getWindowsBoolToBoolFn());
     }
   }
 

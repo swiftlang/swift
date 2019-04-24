@@ -226,6 +226,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
   StringRef SwiftTypeName;
   bool CanBeMissing;
 
+
   do {
 #define MAP_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,        \
                  SWIFT_MODULE_NAME, SWIFT_TYPE_NAME,               \
@@ -233,12 +234,8 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     if (Name.str() == C_TYPE_NAME) {                               \
       CTypeKind = MappedCTypeKind::C_TYPE_KIND;                    \
       Bitwidth = C_TYPE_BITWIDTH;                                  \
-      if (StringRef(SWIFT_MODULE_NAME) == StringRef(STDLIB_NAME))  \
-        IsSwiftModule = true;                                      \
-      else {                                                       \
-        IsSwiftModule = false;                                     \
-        SwiftModuleName = SWIFT_MODULE_NAME;                       \
-      }                                                            \
+      SwiftModuleName = SWIFT_MODULE_NAME;                         \
+      IsSwiftModule = SwiftModuleName == STDLIB_NAME;              \
       SwiftTypeName = SWIFT_TYPE_NAME;                             \
       CanBeMissing = CAN_BE_MISSING;                               \
       NameMapping = MappedTypeNameKind::C_NAME_MAPPING;            \
@@ -248,6 +245,58 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
       break;                                                       \
     }
 #include "MappedTypes.def"
+
+    // We handle `BOOL` as a special case because the selection here is more
+    // complicated as the type alias exists on multiple platforms as different
+    // types.  It appears in an Objective-C context where it is a `signed char`
+    // and appears in Windows as an `int`.  Furthermore, you can actually have
+    // the two interoperate, which requires a further bit of logic to
+    // disambiguate the type aliasing behaviour.  To complicate things, the two
+    // aliases bridge to different types - `ObjCBool` for Objective-C and
+    // `WindowsBool` for Windows's `BOOL` type.
+    if (Name.str() == "BOOL") {
+      auto &CASTContext = Impl.getClangASTContext();
+      auto &SwiftASTContext = Impl.SwiftContext;
+
+      // Default to Objective-C `BOOL`
+      CTypeKind = MappedCTypeKind::ObjCBool;
+      if (CASTContext.getTargetInfo().getTriple().isOSWindows()) {
+        // On Windows fall back to Windows `BOOL`
+        CTypeKind = MappedCTypeKind::SignedInt;
+        // If Objective-C interop is enabled, and we match the Objective-C
+        // `BOOL` type, then switch back to `ObjCBool`.
+        if (SwiftASTContext.LangOpts.EnableObjCInterop &&
+            CASTContext.hasSameType(D->getUnderlyingType(),
+                                    CASTContext.ObjCBuiltinBoolTy))
+          CTypeKind = MappedCTypeKind::ObjCBool;
+      }
+
+      if (CTypeKind == MappedCTypeKind::ObjCBool) {
+        Bitwidth = 8;
+        SwiftModuleName = StringRef("ObjectiveC");
+        IsSwiftModule = false;
+        SwiftTypeName = "ObjCBool";
+        NameMapping = MappedTypeNameKind::DoNothing;
+        CanBeMissing = false;
+        assert(verifyNameMapping(MappedTypeNameKind::DoNothing,
+                                 "BOOL", "ObjCBool") &&
+               "MappedTypes.def: Identical names must use DoNothing");
+      } else {
+        assert(CTypeKind == MappedCTypeKind::SignedInt &&
+               "expected Windows `BOOL` desugared to `int`");
+        Bitwidth = 32;
+        SwiftModuleName = StringRef("WinSDK");
+        IsSwiftModule = false;
+        SwiftTypeName = "WindowsBool";
+        NameMapping = MappedTypeNameKind::DoNothing;
+        CanBeMissing = true;
+        assert(verifyNameMapping(MappedTypeNameKind::DoNothing,
+                                 "BOOL", "WindowsBool") &&
+               "MappedTypes.def: Identical names must use DoNothing");
+      }
+
+      break;
+    }
 
     // We did not find this type, thus it is not mapped.
     return std::make_pair(Type(), "");

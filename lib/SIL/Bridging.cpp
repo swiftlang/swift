@@ -140,6 +140,8 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
         return t;
       if (builtinTy->getKind() == clang::BuiltinType::UChar)
         return getDarwinBooleanType();
+      if (builtinTy->getKind() == clang::BuiltinType::Int)
+        return getWindowsBoolType();
       assert(builtinTy->getKind() == clang::BuiltinType::SChar);
       return getObjCBoolType();
     }

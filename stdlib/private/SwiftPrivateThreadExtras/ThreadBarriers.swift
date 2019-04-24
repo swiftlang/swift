@@ -122,8 +122,8 @@ public func _stdlib_thread_barrier_wait(
   if barrier.pointee.numThreadsWaiting < barrier.pointee.count {
     // Put the thread to sleep.
 #if os(Windows)
-    if SleepConditionVariableSRW(barrier.pointee.cond!, barrier.pointee.mutex!,
-                                 INFINITE, 0) == 0 {
+    if !SleepConditionVariableSRW(barrier.pointee.cond!, barrier.pointee.mutex!,
+                                  INFINITE, 0) {
       return -1
     }
     ReleaseSRWLockExclusive(barrier.pointee.mutex!)
