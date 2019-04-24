@@ -4827,8 +4827,11 @@ END_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
 /// to their underlying types.
 class ReplaceOpaqueTypesWithUnderlyingTypes {
 public:
-  ReplaceOpaqueTypesWithUnderlyingTypes() {}
-  
+  ModuleDecl *modulePerformingSubstitution;
+  ReplaceOpaqueTypesWithUnderlyingTypes(
+      ModuleDecl *modulePerformingSubstitution)
+      : modulePerformingSubstitution(modulePerformingSubstitution) {}
+
   /// TypeSubstitutionFn
   Type operator()(SubstitutableType *maybeOpaqueType) const;
   

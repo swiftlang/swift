@@ -318,7 +318,8 @@ public:
   
   /// Replace opaque types with their underlying types when visible at the given
   /// resilience expansion.
-  Type substOpaqueTypesWithUnderlyingTypes() const;
+  Type substOpaqueTypesWithUnderlyingTypes(
+      ModuleDecl *modulePerformingSubstitution) const;
 
   bool isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic = true) const;
 

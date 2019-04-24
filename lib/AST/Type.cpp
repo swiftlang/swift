@@ -2477,9 +2477,17 @@ Type ReplaceOpaqueTypesWithUnderlyingTypes::operator()(
   auto archetypeAndRoot = getArchetypeAndRootOpaqueArchetype(maybeOpaqueType);
   if (!archetypeAndRoot)
     return maybeOpaqueType;
-  
+
   auto archetype = archetypeAndRoot->first;
   auto opaqueRoot = archetypeAndRoot->second;
+
+  // Don't replace opaque types from resilient modules.
+  auto namingDecl = opaqueRoot->getDecl()->getNamingDecl();
+  auto module = namingDecl->getModuleContext();
+  if (module->isResilient() && module != modulePerformingSubstitution) {
+    return maybeOpaqueType;
+  }
+
   auto subs = opaqueRoot->getDecl()->getUnderlyingTypeSubstitutions();
   // TODO: Check the resilience expansion, and handle opaque types with
   // unknown underlying types. For now, all opaque types are always
@@ -2496,7 +2504,8 @@ Type ReplaceOpaqueTypesWithUnderlyingTypes::operator()(
   
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
-    return substTy.substOpaqueTypesWithUnderlyingTypes();
+    return substTy.substOpaqueTypesWithUnderlyingTypes(
+        modulePerformingSubstitution);
   }
   return substTy;
 }
@@ -2516,6 +2525,14 @@ ReplaceOpaqueTypesWithUnderlyingTypes::operator()(CanType maybeOpaqueType,
   
   auto archetype = archetypeAndRoot->first;
   auto opaqueRoot = archetypeAndRoot->second;
+
+  // Don't replace opaque types from resilient modules.
+  auto namingDecl = opaqueRoot->getDecl()->getNamingDecl();
+  auto module = namingDecl->getModuleContext();
+  if (module->isResilient() && module != modulePerformingSubstitution) {
+    return abstractRef;
+  }
+
   auto subs = opaqueRoot->getDecl()->getUnderlyingTypeSubstitutions();
   assert(subs.hasValue());
 
@@ -2534,13 +2551,15 @@ ReplaceOpaqueTypesWithUnderlyingTypes::operator()(CanType maybeOpaqueType,
   
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
-    return substRef.substOpaqueTypesWithUnderlyingTypes(substTy);
+    return substRef.substOpaqueTypesWithUnderlyingTypes(
+        substTy, modulePerformingSubstitution);
   }
   return substRef;
 }
 
-Type Type::substOpaqueTypesWithUnderlyingTypes() const {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer;
+Type Type::substOpaqueTypesWithUnderlyingTypes(
+    ModuleDecl *modulePerformingSubstitution) const {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(modulePerformingSubstitution);
   return subst(replacer, replacer,
                SubstFlags::SubstituteOpaqueArchetypes
                // TODO(opaque): Currently lowered types always get opaque types

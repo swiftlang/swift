@@ -177,7 +177,8 @@ public:
   
   /// Replace opaque types in the replacement types in the map with their
   /// underlying types. Does not change keys.
-  SubstitutionMap substOpaqueTypesWithUnderlyingTypes() const;
+  SubstitutionMap substOpaqueTypesWithUnderlyingTypes(
+      ModuleDecl *modulePerformingSubstitution) const;
 
   /// Create a substitution map for a protocol conformance.
   static SubstitutionMap

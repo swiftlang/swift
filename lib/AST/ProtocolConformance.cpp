@@ -142,8 +142,9 @@ ProtocolConformanceRef::subst(Type origType,
 }
 
 ProtocolConformanceRef
-ProtocolConformanceRef::substOpaqueTypesWithUnderlyingTypes(Type origType) const {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer;
+ProtocolConformanceRef::substOpaqueTypesWithUnderlyingTypes(
+    Type origType, ModuleDecl *modulePerformingSubstitution) const {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(modulePerformingSubstitution);
   return subst(origType, replacer, replacer,
                SubstFlags::SubstituteOpaqueArchetypes);
 }

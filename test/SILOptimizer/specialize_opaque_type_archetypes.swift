@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_2.swift -module-name External -emit-module -emit-module-path %t/External.swiftmodule
 // RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_3.swift -enable-library-evolution -module-name External2 -emit-module -emit-module-path %t/External2.swiftmodule
 // RUN: %target-swift-frontend -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil  -sil-verify-all %s | %FileCheck %s
+// RUN: %target-swift-frontend -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -emit-sil  -sil-verify-all %s | %FileCheck %s
 import External
 import External2
 
@@ -112,12 +113,14 @@ public func useExternal() {
   useP(e.myValue2())
 }
 
-// This should change once opaque types support resilience.
+// Call to a resilient function should not be specialized.
 
 // CHECK-LABEL: sil @$s1A20useExternalResilientyyF
-// CHECK:  // function_ref Int64.myValue3()
-// CHECK:  [[FUN:%.*]] = function_ref @$ss5Int64V9External2E8myValue3AByF
-// CHECK:  apply [[FUN]]
+// CHECK:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
+// CHECK:  [[FUN:%.*]] = function_ref @$s9External217externalResilientQryF : $@convention(thin) () -> @out @_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
+// CHECK:  apply [[FUN]]([[RES]])
+// CHECK:  witness_method
+// CHECK:  return
 public func useExternalResilient() {
   let e = externalResilient()
   useP(e.myValue3())
@@ -205,6 +208,35 @@ public func usePair() {
   var x = Pair(first: bar(1), second: returnC())
   useP(x.first.myValue())
   useP(x.second.myValue())
+}
+
+
+struct MyInt64 : ExternalP2 {
+  var x = Int64(0)
+  public func myValue3() -> Int64 {
+    return  x + 3
+  }
+}
+
+func nonResilient() -> some ExternalP2 {
+  return MyInt64()
+}
+
+// CHECK-LABEL: sil @$s1A019usePairResilientNonC0yyF : $@convention(thin) () -> ()
+// CHECK: alloc_stack $Pair<MyInt64, @_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
+// CHECK: cond_fail
+// CHECK: [[FIRST_MYVALUE3:%.*]] = struct $Int64
+// CHECK: [[USEP:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5
+// CHECK: apply [[USEP]]([[FIRST_MYVALUE3]])
+// CHECK:  [[MYVALUE_WITNESS:%.*]] = witness_method $@_opaqueReturnTypeOf("$s9External217externalResilientQryF"
+// CHECK:  [[SECOND_MYVALUE3:%.*]] = apply [[MYVALUE_WITNESS]]
+// CHECK:  apply [[USEP]]([[SECOND_MYVALUE3]])
+// CHECK: return
+
+public func usePairResilientNonResilient() {
+  var x = Pair(first: nonResilient(), second: externalResilient())
+  useP(x.first.myValue3())
+  useP(x.second.myValue3())
 }
 
 public protocol P3 {
