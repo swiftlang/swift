@@ -13,7 +13,6 @@ func testInferredElementResult() -> TensorHandle<Int32> {
   _ = #tfop("bar") as TensorHandle<Int32>
 }
 
-// expected-note @+1 2 {{value used here}}
 class ClassTest {
   // expected-warning @+2 {{value implicitly copied to the host}}
   // expected-warning @+1 {{'Tensor<Float>' implicitly copied to the accelerator}}
