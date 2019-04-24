@@ -879,6 +879,22 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
   emitNestedTypeDecls(st->getMembers());
 }
 
+void IRGenModule::emitFuncDecl(FuncDecl *fd) {
+  // If there's an opaque return type for this function, emit its descriptor.
+  if (auto opaque = fd->getOpaqueResultTypeDecl()) {
+    if (!IRGen.hasLazyMetadata(opaque))
+      emitOpaqueTypeDecl(opaque);
+  }
+}
+
+void IRGenModule::emitAbstractStorageDecl(AbstractStorageDecl *fd) {
+  // If there's an opaque return type for this function, emit its descriptor.
+  if (auto opaque = fd->getOpaqueResultTypeDecl()) {
+    if (!IRGen.hasLazyMetadata(opaque))
+      emitOpaqueTypeDecl(opaque);
+  }
+}
+
 namespace {
   /// A type implementation for resilient struct types. This is not a
   /// StructTypeInfoBase at all, since we don't know anything about

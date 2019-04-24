@@ -58,7 +58,7 @@ public:
   /// Mapping from SILDeclRefs to emitted SILFunctions.
   llvm::DenseMap<SILDeclRef, SILFunction*> emittedFunctions;
   /// Mapping from ProtocolConformances to emitted SILWitnessTables.
-  llvm::DenseMap<ProtocolConformance*, SILWitnessTable*> emittedWitnessTables;
+  llvm::DenseMap<NormalProtocolConformance*, SILWitnessTable*> emittedWitnessTables;
 
   struct DelayedFunction {
     /// Insert the entity after the given function when it's emitted.
@@ -78,7 +78,7 @@ public:
   SILDeclRef lastEmittedFunction;
 
   /// Set of used conformances for which witness tables need to be emitted.
-  llvm::DenseSet<NormalProtocolConformance *> usedConformances;
+  llvm::DenseSet<RootProtocolConformance *> usedConformances;
 
   struct DelayedWitnessTable {
     NormalProtocolConformance *insertAfter;
@@ -196,6 +196,7 @@ public:
   void visitOperatorDecl(OperatorDecl *d) {}
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *d) {}
   void visitTypeAliasDecl(TypeAliasDecl *d) {}
+  void visitOpaqueTypeDecl(OpaqueTypeDecl *d) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *d) {}
   void visitSubscriptDecl(SubscriptDecl *d) {}
   void visitConstructorDecl(ConstructorDecl *d) {}
@@ -272,7 +273,7 @@ public:
   void emitExternalDefinition(Decl *d);
 
   /// Emit SIL related to a Clang-imported declaration.
-  void emitExternalWitnessTable(ProtocolConformance *d);
+  void emitExternalWitnessTable(NormalProtocolConformance *d);
 
   /// Emit the ObjC-compatible entry point for a method.
   void emitObjCMethodThunk(FuncDecl *method);
@@ -287,7 +288,7 @@ public:
   void emitObjCDestructorThunk(DestructorDecl *destructor);
 
   /// Get or emit the witness table for a protocol conformance.
-  SILWitnessTable *getWitnessTable(ProtocolConformance *conformance);
+  SILWitnessTable *getWitnessTable(NormalProtocolConformance *conformance);
 
   /// Emit a protocol witness entry point.
   SILFunction *

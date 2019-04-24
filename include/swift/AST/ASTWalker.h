@@ -41,8 +41,10 @@ enum class SemaReferenceKind : uint8_t {
 struct ReferenceMetaData {
   SemaReferenceKind Kind;
   llvm::Optional<AccessKind> AccKind;
-  ReferenceMetaData(SemaReferenceKind Kind, llvm::Optional<AccessKind> AccKind) :
-    Kind(Kind), AccKind(AccKind) {}
+  bool isImplicit = false;
+  ReferenceMetaData(SemaReferenceKind Kind, llvm::Optional<AccessKind> AccKind,
+                    bool isImplicit = false)
+      : Kind(Kind), AccKind(AccKind), isImplicit(isImplicit) {}
 };
 
 /// An abstract class used to traverse an AST.

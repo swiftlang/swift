@@ -582,6 +582,12 @@ public:
       std::string OutPathStr = OutPath;
       SerializationOpts.OutputPath = OutPathStr.c_str();
       SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
+
+      // Record any non-SDK parseable interface files for the debug info.
+      StringRef SDKPath = SubInstance.getASTContext().SearchPathOpts.SDKPath;
+      if (!getRelativeDepPath(InPath, SDKPath))
+        SerializationOpts.ParseableInterface = InPath;
+
       SmallVector<FileDependency, 16> Deps;
       if (collectDepsForSerialization(SubInstance, Deps,
             FEOpts.SerializeModuleInterfaceDependencyHashes)) {
@@ -839,6 +845,12 @@ class ParseableInterfaceModuleLoaderImpl {
     return scratch.str();
   }
 
+  bool isInResourceDir(StringRef path) {
+    StringRef resourceDir = ctx.SearchPathOpts.RuntimeLibraryPath;
+    if (resourceDir.empty()) return false;
+    return path.startswith(resourceDir);
+  }
+
   /// Finds the most appropriate .swiftmodule, whose dependencies are up to
   /// date, that we can load for the provided .swiftinterface file.
   llvm::ErrorOr<DiscoveredModule> discoverUpToDateModuleForInterface(
@@ -943,6 +955,21 @@ class ParseableInterfaceModuleLoaderImpl {
         LLVM_DEBUG(llvm::dbgs() << "Found up-to-date module at "
                                 << modulePath
                                 << "; deferring to serialized module loader\n");
+        return std::make_error_code(std::errc::not_supported);
+      } else if (isInResourceDir(modulePath) &&
+                 loadMode == ModuleLoadingMode::PreferSerialized) {
+        // Special-case here: If we're loading a .swiftmodule from the resource
+        // dir adjacent to the compiler, defer to the serialized loader instead
+        // of falling back. This is mainly to support development of Swift,
+        // where one might change the module format version but forget to
+        // recompile the standard library. If that happens, don't fall back
+        // and silently recompile the standard library -- instead, error like
+        // we used to.
+        LLVM_DEBUG(llvm::dbgs() << "Found out-of-date module in the "
+                                   "resource-dir at "
+                                << modulePath
+                                << "; deferring to serialized module loader "
+                                   "to diagnose\n");
         return std::make_error_code(std::errc::not_supported);
       } else {
         LLVM_DEBUG(llvm::dbgs() << "Found out-of-date module at "

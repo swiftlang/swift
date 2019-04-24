@@ -70,7 +70,7 @@ namespace constraints {
 /// can be restored.
 class SavedTypeVariableBinding {
   /// The type variable and type variable options.
-  llvm::PointerIntPair<TypeVariableType *, 3> TypeVarAndOptions;
+  llvm::PointerIntPair<TypeVariableType *, 4> TypeVarAndOptions;
   
   /// The parent or fixed type.
   llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
@@ -164,9 +164,12 @@ enum TypeVariableOptions {
   /// Whether the type variable can be bound to an inout type or not.
   TVO_CanBindToInOut = 0x02,
 
+  /// Whether the type variable can be bound to a non-escaping type or not.
+  TVO_CanBindToNoEscape = 0x04,
+
   /// Whether a more specific deduction for this type variable implies a
   /// better solution to the constraint system.
-  TVO_PrefersSubtypeBinding = 0x04
+  TVO_PrefersSubtypeBinding = 0x08,
 };
 
 /// The implementation object for a type variable used within the
@@ -225,6 +228,9 @@ public:
 
   /// Whether this type variable can bind to an inout type.
   bool canBindToInOut() const { return getRawOptions() & TVO_CanBindToInOut; }
+
+  /// Whether this type variable can bind to an inout type.
+  bool canBindToNoEscape() const { return getRawOptions() & TVO_CanBindToNoEscape; }
 
   /// Whether this type variable prefers a subtype binding over a supertype
   /// binding.
@@ -350,6 +356,12 @@ public:
         recordBinding(*record);
       getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToInOut;
     }
+
+    if (canBindToNoEscape() && !otherRep->getImpl().canBindToNoEscape()) {
+      if (record)
+        recordBinding(*record);
+      getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToNoEscape;
+    }
   }
 
   /// Retrieve the fixed type that corresponds to this type variable,
@@ -393,6 +405,20 @@ public:
     else
       impl.getTypeVariable()->Bits.TypeVariableType.Options &=
           ~TVO_CanBindToLValue;
+  }
+
+  void setCanBindToNoEscape(constraints::SavedTypeVariableBindings *record,
+                            bool enabled) {
+    auto &impl = getRepresentative(record)->getImpl();
+    if (record)
+      impl.recordBinding(*record);
+
+    if (enabled)
+      impl.getTypeVariable()->Bits.TypeVariableType.Options |=
+          TVO_CanBindToNoEscape;
+    else
+      impl.getTypeVariable()->Bits.TypeVariableType.Options &=
+          ~TVO_CanBindToNoEscape;
   }
 
   /// Print the type variable to the given output stream.
@@ -820,6 +846,10 @@ enum class ConstraintSystemFlags {
   /// If set, constraint system always reuses type of pre-typechecked
   /// expression, and doesn't dig into its subexpressions.
   ReusePrecheckedType = 0x20,
+  
+  /// If set, the top-level expression may be able to provide an underlying
+  /// type for the contextual opaque archetype.
+  UnderlyingTypeForOpaqueReturnType = 0x40,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -1039,6 +1069,8 @@ private:
   llvm::DenseMap<const Expr *, TypeBase *> ExprTypes;
   llvm::DenseMap<const TypeLoc *, TypeBase *> TypeLocTypes;
   llvm::DenseMap<const ParamDecl *, TypeBase *> ParamTypes;
+  llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
+      KeyPathComponentTypes;
 
   /// Maps closure parameters to type variables.
   llvm::DenseMap<const ParamDecl *, TypeVariableType *>
@@ -1420,6 +1452,11 @@ private:
       if (expr->getType())
         CS.cacheType(expr);
 
+      if (auto kp = dyn_cast<KeyPathExpr>(expr))
+        for (auto i : indices(kp->getComponents()))
+          if (kp->getComponents()[i].getComponentType())
+            CS.cacheType(kp, i);
+
       return expr;
     }
 
@@ -1450,6 +1487,15 @@ private:
       assert(!CS.getType(expr)->hasTypeVariable() &&
              "Should not write type variable into expression!");
       expr->setType(CS.getType(expr));
+
+      if (auto kp = dyn_cast<KeyPathExpr>(expr)) {
+        for (auto i : indices(kp->getComponents())) {
+          Type componentType;
+          if (CS.hasType(kp, i))
+            componentType = CS.getType(kp, i);
+          kp->getMutableComponents()[i].setComponentType(componentType);
+        }
+      }
 
       return expr;
     }
@@ -1686,7 +1732,7 @@ public:
 
   /// Create a new type variable.
   TypeVariableType *createTypeVariable(ConstraintLocator *locator,
-                                       unsigned options = 0);
+                                       unsigned options);
 
   /// Retrieve the set of active type variables.
   ArrayRef<TypeVariableType *> getTypeVariables() const {
@@ -1731,6 +1777,12 @@ public:
     ParamTypes[P] = T.getPointer();
   }
 
+  void setType(KeyPathExpr *KP, unsigned I, Type T) {
+    assert(KP && "Expected non-null key path parameter!");
+    assert(T && "Expected non-null type!");
+    KeyPathComponentTypes[std::make_pair(KP, I)] = T.getPointer();
+  }
+
   /// Check to see if we have a type for an expression.
   bool hasType(const Expr *E) const {
     assert(E != nullptr && "Expected non-null expression!");
@@ -1744,6 +1796,12 @@ public:
   bool hasType(const ParamDecl *P) const {
     assert(P != nullptr && "Expected non-null parameter!");
     return ParamTypes.find(P) != ParamTypes.end();
+  }
+
+  bool hasType(const KeyPathExpr *KP, unsigned I) const {
+    assert(KP && "Expected non-null key path parameter!");
+    return KeyPathComponentTypes.find(std::make_pair(KP, I))
+              != KeyPathComponentTypes.end();
   }
 
   /// Get the type for an expression.
@@ -1774,12 +1832,26 @@ public:
     return wantInterfaceType ? D->getInterfaceType() : D->getType();
   }
 
+  Type getType(const KeyPathExpr *KP, unsigned I) const {
+    assert(hasType(KP, I) && "Expected type to have been set!");
+    return KeyPathComponentTypes.find(std::make_pair(KP, I))->second;
+  }
+
   /// Cache the type of the expression argument and return that same
   /// argument.
   template <typename T>
   T *cacheType(T *E) {
     assert(E->getType() && "Expected a type!");
     setType(E, E->getType());
+    return E;
+  }
+
+  /// Cache the type of the expression argument and return that same
+  /// argument.
+  KeyPathExpr *cacheType(KeyPathExpr *E, unsigned I) {
+    auto componentTy = E->getComponents()[I].getComponentType();
+    assert(componentTy && "Expected a type!");
+    setType(E, I, componentTy);
     return E;
   }
 
@@ -2840,6 +2912,12 @@ private:
                                           TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator);
 
+  /// Attempt to simplify an OpaqueUnderlyingType constraint.
+  SolutionKind simplifyOpaqueUnderlyingTypeConstraint(Type type1,
+                                              Type type2,
+                                              TypeMatchOptions flags,
+                                              ConstraintLocatorBuilder locator);
+  
   /// Attempt to simplify the BridgingConversion constraint.
   SolutionKind simplifyBridgingConstraint(Type type1,
                                          Type type2,
@@ -3531,6 +3609,7 @@ public:
                             "only for use within the debugger");
 
   void print(raw_ostream &out);
+  void print(raw_ostream &out, Expr *);
 };
 
 /// Compute the shuffle required to map from a given tuple type to

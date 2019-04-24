@@ -133,6 +133,8 @@ public:
     KeyPathRoot,
     /// The value of a keypath
     KeyPathValue,
+    /// The result type of a key path component. Not used for subscripts.
+    KeyPathComponentResult,
   };
 
   /// Determine the number of numeric values used for the given path
@@ -165,6 +167,7 @@ public:
     case ContextualType:
     case KeyPathRoot:
     case KeyPathValue:
+    case KeyPathComponentResult:
       return 0;
 
     case OpenedGeneric:
@@ -233,6 +236,7 @@ public:
     case KeyPathDynamicMember:
     case KeyPathRoot:
     case KeyPathValue:
+    case KeyPathComponentResult:
       return 0;
 
     case FunctionArgument:
@@ -540,9 +544,13 @@ public:
   /// as result of the key path dynamic member lookup operation.
   bool isResultOfKeyPathDynamicMemberLookup() const;
 
-  /// Determine whether given locator points to a subscript component
+  /// Determine whether this locator points to a subscript component
   /// of the key path at some index.
   bool isKeyPathSubscriptComponent() const;
+
+  /// Determine whether this locator points to one of the key path
+  /// components.
+  bool isForKeyPathComponent() const;
 
   /// Produce a profile of this locator, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id, Expr *anchor,

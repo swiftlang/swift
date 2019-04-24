@@ -268,6 +268,7 @@ public:
 static void collectPossibleCalleesByQualifiedLookup(
     DeclContext &DC, Type baseTy, DeclBaseName name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
+  bool isOnMetaType = baseTy->is<AnyMetatypeType>();
 
   SmallVector<ValueDecl *, 2> decls;
   auto resolver = DC.getASTContext().getLazyResolver();
@@ -287,16 +288,18 @@ static void collectPossibleCalleesByQualifiedLookup(
       continue;
     Type declaredMemberType = VD->getInterfaceType();
     if (VD->getDeclContext()->isTypeContext()) {
-      if (auto *FD = dyn_cast<FuncDecl>(VD)) {
-        if (!baseTy->is<AnyMetatypeType>())
+      if (isa<FuncDecl>(VD)) {
+        if (!isOnMetaType)
           declaredMemberType =
               declaredMemberType->castTo<AnyFunctionType>()->getResult();
-      }
-      if (auto *CD = dyn_cast<ConstructorDecl>(VD)) {
-        if (!baseTy->is<AnyMetatypeType>())
+      } else if (isa<ConstructorDecl>(VD)) {
+        if (!isOnMetaType)
           continue;
         declaredMemberType =
             declaredMemberType->castTo<AnyFunctionType>()->getResult();
+      } else if (isa<SubscriptDecl>(VD)) {
+        if (isOnMetaType != VD->isStatic())
+          continue;
       }
     }
 

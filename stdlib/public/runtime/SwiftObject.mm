@@ -178,6 +178,11 @@ static SwiftObject *_allocHelper(Class cls) {
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+Class _swift_classOfObjCHeapObject(OpaqueValue *value) {
+  return _swift_getObjCClassOfAllocated(value);
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 NSString *swift_stdlib_getDescription(OpaqueValue *value,
                                       const Metadata *type);
 

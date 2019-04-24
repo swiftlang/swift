@@ -53,8 +53,10 @@ namespace swift {
   class GenericTypeParamType;
   class GenericParamList;
   class GenericSignature;
+  class GenericSignatureBuilder;
   class Identifier;
   class InOutType;
+  class OpaqueTypeDecl;
   class OpenedArchetypeType;
   enum class ReferenceCounting : uint8_t;
   enum class ResilienceExpansion : unsigned;
@@ -98,7 +100,8 @@ public:
     /// This type expression contains a TypeVariableType.
     HasTypeVariable      = 0x01,
 
-    /// This type expression contains an ArchetypeType.
+    /// This type expression contains a context-dependent archetype, either a
+    /// PrimaryArchetypeType or OpenedArchetypeType.
     HasArchetype         = 0x02,
 
     /// This type expression contains a GenericTypeParamType.
@@ -125,8 +128,11 @@ public:
 
     /// This type contains a DependentMemberType.
     HasDependentMember   = 0x200,
+    
+    /// This type contains an OpaqueTypeArchetype.
+    HasOpaqueArchetype   = 0x400,
 
-    Last_Property = HasDependentMember
+    Last_Property = HasOpaqueArchetype
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -145,10 +151,14 @@ public:
   /// variable?
   bool hasTypeVariable() const { return Bits & HasTypeVariable; }
 
-  /// Does a type with these properties structurally contain an
-  /// archetype?
+  /// Does a type with these properties structurally contain a
+  /// context-dependent archetype (that is, a Primary- or OpenedArchetype)?
   bool hasArchetype() const { return Bits & HasArchetype; }
 
+  /// Does a type with these properties structurally contain an
+  /// archetype from an opaque type declaration?
+  bool hasOpaqueArchetype() const { return Bits & HasOpaqueArchetype; }
+  
   /// Does a type with these properties have a type parameter somewhere in it?
   bool hasTypeParameter() const { return Bits & HasTypeParameter; }
 
@@ -329,11 +339,11 @@ protected:
     ID : 32 - NumTypeBaseBits,
 
     /// Type variable options.
-    Options : 3,
+    Options : 4,
 
     ///  Index into the list of type variables, as used by the
     ///  constraint graph.
-    GraphIndex : 29
+    GraphIndex : 28
   );
 
   SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+3+1+2,
@@ -537,11 +547,11 @@ public:
     return getRecursiveProperties().hasUnresolvedType();
   }
   
-  /// Determine whether the type involves an archetype.
+  /// Determine whether the type involves a context-dependent archetype.
   bool hasArchetype() const {
     return getRecursiveProperties().hasArchetype();
   }
-
+  
   /// Determine whether the type involves an opened existential archetype.
   bool hasOpenedExistential() const {
     return getRecursiveProperties().hasOpenedExistential();
@@ -551,6 +561,11 @@ public:
   /// archetype.
   bool hasOpenedExistential(OpenedArchetypeType *opened);
 
+  /// Determine whether the type involves an opaque type.
+  bool hasOpaqueArchetype() const {
+    return getRecursiveProperties().hasOpaqueArchetype();
+  }
+  
   /// Determine whether the type is an opened existential type.
   ///
   /// To determine whether there is an opened existential type
@@ -4542,6 +4557,7 @@ using ArchetypeTrailingObjects = llvm::TrailingObjects<Base,
   ProtocolDecl *, Type, LayoutConstraint, AdditionalTrailingObjects...>;
 
 class PrimaryArchetypeType;
+class OpaqueTypeArchetypeType;
   
 /// An archetype is a type that represents a runtime type that is
 /// known to conform to some set of requirements.
@@ -4728,6 +4744,90 @@ private:
 BEGIN_CAN_TYPE_WRAPPER(PrimaryArchetypeType, ArchetypeType)
 END_CAN_TYPE_WRAPPER(PrimaryArchetypeType, ArchetypeType)
 
+/// An archetype that represents an opaque type.
+class OpaqueTypeArchetypeType final : public ArchetypeType,
+    public llvm::FoldingSetNode,
+    private ArchetypeTrailingObjects<OpaqueTypeArchetypeType>
+{
+  friend TrailingObjects;
+  friend ArchetypeType;
+  friend GenericSignatureBuilder;
+
+  /// The declaration that defines the opaque type.
+  OpaqueTypeDecl *OpaqueDecl;
+  /// The substitutions into the interface signature of the opaque type.
+  SubstitutionMap Substitutions;
+  
+  /// A GenericEnvironment with this opaque archetype bound to the interface
+  /// type of the output type from the OpaqueDecl.
+  GenericEnvironment *Environment;
+  
+public:
+  /// Get 
+  
+  /// Get an opaque archetype representing the underlying type of the given
+  /// opaque type decl.
+  static OpaqueTypeArchetypeType *get(OpaqueTypeDecl *Decl,
+                                      SubstitutionMap Substitutions);
+  
+  OpaqueTypeDecl *getDecl() const {
+    return OpaqueDecl;
+  }
+  SubstitutionMap getSubstitutions() const {
+    return Substitutions;
+  }
+  
+  /// Get the generic signature used to build out this archetype. This is
+  /// equivalent to the OpaqueTypeDecl's interface generic signature, with
+  /// all of the generic parameters aside from the opaque type's interface
+  /// type same-type-constrained to their substitutions for this type.
+  GenericSignature *getBoundSignature() const;
+  
+  /// Get a generic environment that has this opaque archetype bound within it.
+  GenericEnvironment *getGenericEnvironment() const {
+    return Environment;
+  }
+  
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::OpaqueTypeArchetype;
+  }
+  
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      OpaqueTypeDecl *OpaqueDecl,
+                      SubstitutionMap Substitutions);
+  
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getDecl(), getSubstitutions());
+  };
+  
+private:
+  OpaqueTypeArchetypeType(OpaqueTypeDecl *OpaqueDecl,
+                          SubstitutionMap Substitutions,
+                          RecursiveTypeProperties Props,
+                          Type InterfaceType,
+                          ArrayRef<ProtocolDecl*> ConformsTo,
+                          Type Superclass, LayoutConstraint Layout);
+};
+BEGIN_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
+END_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
+
+/// A function object that can be used as a \c TypeSubstitutionFn and
+/// \c LookupConformanceFn for \c Type::subst style APIs to map opaque
+/// archetypes with underlying types visible at a given resilience expansion
+/// to their underlying types.
+class ReplaceOpaqueTypesWithUnderlyingTypes {
+public:
+  ReplaceOpaqueTypesWithUnderlyingTypes() {}
+  
+  /// TypeSubstitutionFn
+  Type operator()(SubstitutableType *maybeOpaqueType) const;
+  
+  /// LookupConformanceFn
+  Optional<ProtocolConformanceRef> operator()(CanType maybeOpaqueType,
+                                              Type replacementType,
+                                              ProtocolDecl *protocol) const;
+};
+  
 /// An archetype that represents the dynamic type of an opened existential.
 class OpenedArchetypeType final : public ArchetypeType,
     private ArchetypeTrailingObjects<OpenedArchetypeType>
@@ -4833,6 +4933,9 @@ template<typename Type>
 const Type *ArchetypeType::getSubclassTrailingObjects() const {
   if (auto contextTy = dyn_cast<PrimaryArchetypeType>(this)) {
     return contextTy->getTrailingObjects<Type>();
+  }
+  if (auto opaqueTy = dyn_cast<OpaqueTypeArchetypeType>(this)) {
+    return opaqueTy->getTrailingObjects<Type>();
   }
   if (auto openedTy = dyn_cast<OpenedArchetypeType>(this)) {
     return openedTy->getTrailingObjects<Type>();
@@ -4977,7 +5080,6 @@ BEGIN_CAN_TYPE_WRAPPER(DependentMemberType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getBase)
 END_CAN_TYPE_WRAPPER(DependentMemberType, Type)
 
-
 /// The storage type of a variable with non-strong reference
 /// ownership semantics.
 ///
@@ -5060,13 +5162,15 @@ END_CAN_TYPE_WRAPPER(Name##StorageType, ReferenceStorageType)
 #undef REF_STORAGE_HELPER
 
 /// A type variable used during type checking.
-class TypeVariableType : public TypeBase {
+class alignas(1 << TypeVariableAlignInBits)
+TypeVariableType : public TypeBase {
   // Note: We can't use llvm::TrailingObjects here because the trailing object
   // type is opaque.
 
   TypeVariableType(const ASTContext &C, unsigned ID)
     : TypeBase(TypeKind::TypeVariable, &C,
                RecursiveTypeProperties::HasTypeVariable) {
+    // Note: the ID may overflow, but its only used for printing.
     Bits.TypeVariableType.ID = ID;
   }
 
@@ -5103,6 +5207,8 @@ public:
     return reinterpret_cast<Implementation *>(this + 1);
   }
 
+  /// Type variable IDs are not globally unique and are only meant as a visual
+  /// aid when dumping AST.
   unsigned getID() const { return Bits.TypeVariableType.ID; }
 
   // Implement isa/cast/dyncast/etc.

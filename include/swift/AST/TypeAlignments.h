@@ -58,6 +58,7 @@ namespace swift {
   constexpr size_t TypeAlignInBits = 3;
   constexpr size_t PatternAlignInBits = 3;
   constexpr size_t SILFunctionAlignInBits = 2;
+  constexpr size_t TypeVariableAlignInBits = 4;
 }
 
 namespace llvm {
@@ -95,7 +96,7 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::ExtensionDecl, swift::DeclAlignInBits)
 
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::TypeBase, swift::TypeAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ArchetypeType, swift::TypeAlignInBits)
-LLVM_DECLARE_TYPE_ALIGNMENT(swift::TypeVariableType, swift::TypeAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::TypeVariableType, swift::TypeVariableAlignInBits)
 
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::Stmt, swift::StmtAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::BraceStmt, swift::StmtAlignInBits)

@@ -1698,8 +1698,11 @@ namespace {
       }
 
       assert(componentExpr);
-      componentExpr->setType(simplifyType(cs.getType(anchor)));
+      Type ty = simplifyType(cs.getType(anchor));
+      componentExpr->setType(ty);
       cs.cacheType(componentExpr);
+
+      cs.setType(keyPath, 0, ty);
 
       keyPath->setParsedPath(componentExpr);
       keyPath->resolveComponents(ctx, {component});
@@ -4021,7 +4024,7 @@ namespace {
       auto &tc = cs.getTypeChecker();
       auto &ctx = tc.Context;
       // Synthesize a call to _undefined() of appropriate type.
-      FuncDecl *undefinedDecl = ctx.getUndefinedDecl();
+      FuncDecl *undefinedDecl = ctx.getUndefined();
       if (!undefinedDecl) {
         tc.diagnose(E->getLoc(), diag::missing_undefined_runtime);
         return nullptr;
@@ -4358,6 +4361,13 @@ namespace {
       Type baseTy = keyPathTy->getGenericArgs()[0];
       Type leafTy = keyPathTy->getGenericArgs()[1];
 
+      // Updates the constraint system with the type of the last resolved
+      // component. We do it this way because we sometimes insert new
+      // components.
+      auto updateCSWithResolvedComponent = [&]() {
+        cs.setType(E, resolvedComponents.size() - 1, baseTy);
+      };
+
       for (unsigned i : indices(E->getComponents())) {
         auto &origComponent = E->getMutableComponents()[i];
         
@@ -4434,6 +4444,7 @@ namespace {
           resolvedComponents.push_back(component);
 
           if (shouldForceUnwrapResult(foundDecl->choice, locator)) {
+            updateCSWithResolvedComponent();
             auto objectTy = getObjectType(baseTy);
             auto loc = origComponent.getLoc();
             component = KeyPathExpr::Component::forOptionalForce(objectTy, loc);
@@ -4461,6 +4472,7 @@ namespace {
           resolvedComponents.push_back(component);
 
           if (shouldForceUnwrapResult(foundDecl->choice, locator)) {
+            updateCSWithResolvedComponent();
             auto objectTy = getObjectType(baseTy);
             auto loc = origComponent.getLoc();
             component = KeyPathExpr::Component::forOptionalForce(objectTy, loc);
@@ -4512,6 +4524,9 @@ namespace {
         case KeyPathExpr::Component::Kind::TupleElement:
           llvm_unreachable("already resolved");
         }
+
+        // By now, "baseTy" is the result type of this component.
+        updateCSWithResolvedComponent();
       }
       
       // Wrap a non-optional result if there was chaining involved.
@@ -4524,6 +4539,7 @@ namespace {
         auto component = KeyPathExpr::Component::forOptionalWrap(leafTy);
         resolvedComponents.push_back(component);
         baseTy = leafTy;
+        updateCSWithResolvedComponent();
       }
       E->resolveComponents(cs.getASTContext(), resolvedComponents);
       
@@ -4557,26 +4573,13 @@ namespace {
                                   ConstraintLocator *locator) {
       if (overload.choice.isDecl()) {
         auto property = overload.choice.getDecl();
-
         // Key paths can only refer to properties currently.
-        if (!isa<VarDecl>(property)) {
-          cs.TC.diagnose(componentLoc, diag::expr_keypath_not_property,
-                         property->getDescriptiveKind(),
-                         property->getFullName());
-        } else {
-          // Key paths don't work with mutating-get properties.
-          auto varDecl = cast<VarDecl>(property);
-          if (varDecl->isGetterMutating()) {
-            cs.TC.diagnose(componentLoc, diag::expr_keypath_mutating_getter,
-                           property->getFullName());
-          }
-
-          // Key paths don't currently support static members.
-          if (varDecl->isStatic()) {
-            cs.TC.diagnose(componentLoc, diag::expr_keypath_static_member,
-                           property->getFullName());
-          }
-        }
+        auto varDecl = cast<VarDecl>(property);
+        // Key paths don't work with mutating-get properties.
+        assert(!varDecl->isGetterMutating());
+        // Key paths don't currently support static members.
+        // There is a fix which diagnoses such situation already.
+        assert(!varDecl->isStatic());
 
         cs.TC.requestMemberLayout(property);
 
@@ -4607,10 +4610,7 @@ namespace {
         SelectedOverload &overload, SourceLoc componentLoc, Expr *indexExpr,
         ArrayRef<Identifier> labels, ConstraintLocator *locator) {
       auto subscript = cast<SubscriptDecl>(overload.choice.getDecl());
-      if (subscript->isGetterMutating()) {
-        cs.TC.diagnose(componentLoc, diag::expr_keypath_mutating_getter,
-                       subscript->getFullName());
-      }
+      assert(!subscript->isGetterMutating());
 
       cs.TC.requestMemberLayout(subscript);
 
@@ -6538,6 +6538,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
   case TypeKind::NestedArchetype:
+  case TypeKind::OpaqueTypeArchetype:
     if (!cast<ArchetypeType>(desugaredFromType)->requiresClass())
       break;
     LLVM_FALLTHROUGH;
@@ -6731,6 +6732,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
   case TypeKind::NestedArchetype:
+  case TypeKind::OpaqueTypeArchetype:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
   case TypeKind::Function:
@@ -6745,6 +6747,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return cs.cacheType(new (tc.Context)
                             UnresolvedTypeConversionExpr(expr, toType));
 
+  // Use an opaque type to abstract a value of the underlying concrete type.
+  if (toType->getAs<OpaqueTypeArchetypeType>()) {
+    return cs.cacheType(new (tc.Context)
+                        UnderlyingToOpaqueExpr(expr, toType));
+  }
+  
   llvm_unreachable("Unhandled coercion");
 }
 

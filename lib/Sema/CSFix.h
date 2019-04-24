@@ -139,10 +139,14 @@ enum class FixKind : uint8_t {
 
   /// Allow KeyPaths to use AnyObject as root type
   AllowAnyObjectKeyPathRoot,
-  
+
   /// Using subscript references in the keypath requires that each
   /// of the index arguments to be Hashable.
   TreatKeyPathSubscriptIndexAsHashable,
+
+  /// Allow an invalid reference to a member declaration as part
+  /// of a key path component.
+  AllowInvalidRefInKeyPath,
 };
 
 class ConstraintFix {
@@ -778,6 +782,50 @@ public:
 
   static TreatKeyPathSubscriptIndexAsHashable *
   create(ConstraintSystem &cs, Type type, ConstraintLocator *locator);
+};
+
+class AllowInvalidRefInKeyPath final : public ConstraintFix {
+  enum RefKind {
+    // Allow a reference to a static member as a key path component.
+    StaticMember,
+    // Allow a reference to a declaration with mutating getter as
+    // a key path component.
+    MutatingGetter,
+    // Allow a reference to a method (instance or static) as
+    // a key path component.
+    Method,
+  } Kind;
+
+  ValueDecl *Member;
+
+  AllowInvalidRefInKeyPath(ConstraintSystem &cs, RefKind kind,
+                           ValueDecl *member, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInvalidRefInKeyPath, locator),
+        Kind(kind), Member(member) {}
+
+public:
+  std::string getName() const override {
+    switch (Kind) {
+    case RefKind::StaticMember:
+      return "allow reference to a static member as a key path component";
+    case RefKind::MutatingGetter:
+      return "allow reference to a member with mutating getter as a key "
+             "path component";
+    case RefKind::Method:
+      return "allow reference to a method as a key path component";
+    }
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  /// Determine whether give reference requires a fix and produce one.
+  static AllowInvalidRefInKeyPath *
+  forRef(ConstraintSystem &cs, ValueDecl *member, ConstraintLocator *locator);
+
+private:
+  static AllowInvalidRefInKeyPath *create(ConstraintSystem &cs, RefKind kind,
+                                          ValueDecl *member,
+                                          ConstraintLocator *locator);
 };
 
 } // end namespace constraints

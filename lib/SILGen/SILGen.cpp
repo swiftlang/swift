@@ -1513,15 +1513,18 @@ void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
     return;
 
   auto conformance = conformanceRef.getConcrete();
-  auto root = conformance->getRootNormalConformance();
+  auto normal = dyn_cast<NormalProtocolConformance>(
+      conformance->getRootConformance());
+  if (normal == nullptr)
+    return;
 
   // If we already emitted this witness table, we don't need to track the fact
   // we need it.
-  if (emittedWitnessTables.count(root))
+  if (emittedWitnessTables.count(normal))
     return;
 
   // If we delayed emitting this witness table, force it.
-  auto foundDelayed = delayedConformances.find(root);
+  auto foundDelayed = delayedConformances.find(normal);
   if (foundDelayed != delayedConformances.end()) {
     forcedConformances.push_back(*foundDelayed);
     delayedConformances.erase(foundDelayed);
@@ -1529,7 +1532,7 @@ void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
   }
 
   // Otherwise, just remember the fact we used this conformance.
-  usedConformances.insert(root);
+  usedConformances.insert(normal);
 }
 
 void SILGenModule::useConformancesFromSubstitutions(

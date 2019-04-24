@@ -362,6 +362,9 @@ public:
     bool isBridged = false;
 
     auto Meta = readMetadata(*MetadataAddress);
+    if (!Meta)
+      return None;
+
     if (auto ClassMeta = dyn_cast<TargetClassMetadata<Runtime>>(Meta)) {
       if (ClassMeta->isPureObjC()) {
         // If we can determine the Objective-C class name, this is probably an
@@ -1650,6 +1653,11 @@ private:
           remoteAddress, innerDemangler);
 
         return cloneDemangleNode(result, dem);
+      }
+      case Demangle::SymbolicReferenceKind::AccessorFunctionReference: {
+        // The symbolic reference points at a resolver function, but we can't
+        // execute code in the target process to resolve it from here.
+        return nullptr;
       }
       }
 

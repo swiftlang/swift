@@ -563,3 +563,7 @@ func foo() {}
 #assert(true)
 #assert(false)
 #assert(true, "hello world")
+
+public func anyFoo() -> some Foo {}
+public func qoo() -> some O & O2 {}
+func zlop() -> some C & AnyObject & P {}

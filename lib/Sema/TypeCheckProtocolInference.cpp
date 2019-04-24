@@ -974,7 +974,7 @@ Type AssociatedTypeInference::substCurrentTypeWitnesses(Type type) {
                           baseTy, assocType->getProtocol(), dc,
                           ConformanceCheckFlags::SkipConditionalRequirements);
       if (!localConformance || localConformance->isAbstract() ||
-          (localConformance->getConcrete()->getRootNormalConformance()
+          (localConformance->getConcrete()->getRootConformance()
              != conformance)) {
         return nullptr;
       }

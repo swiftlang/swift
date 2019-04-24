@@ -14,20 +14,21 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckType.h"
-#include "swift/AST/GenericSignatureBuilder.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -1030,6 +1031,25 @@ bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
            NTD == TC.Context.getReferenceWritableKeyPathDecl();
   }
   return false;
+}
+
+Optional<Type>
+swift::getRootTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
+                                         const DeclContext *DC) {
+  auto &TC = TypeChecker::createForContext(DC->getASTContext());
+
+  if (!isValidKeyPathDynamicMemberLookup(subscript, TC))
+    return None;
+
+  const auto *param = subscript->getIndices()->get(0);
+  auto keyPathType = param->getType()->getAs<BoundGenericType>();
+  if (!keyPathType)
+    return None;
+
+  assert(!keyPathType->getGenericArgs().empty() &&
+         "invalid keypath dynamic member");
+  auto rootType = keyPathType->getGenericArgs()[0];
+  return rootType;
 }
 
 /// The @dynamicMemberLookup attribute is only allowed on types that have at
@@ -2469,6 +2489,12 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
               nominal->getDescriptiveKind(), nominal->getFullName());
   nominal->diagnose(diag::decl_declared_here, nominal->getFullName());
   attr->setInvalid();
+}
+
+void TypeChecker::checkParameterAttributes(ParameterList *params) {
+  for (auto param: *params) {
+    checkDeclAttributes(param);
+  }
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {
