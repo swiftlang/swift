@@ -38,23 +38,33 @@ class TestNotification : TestNotificationSuper {
         let o2 = NSObject()
         let values: [Notification] = [
             /* 0 */ Notification(name: .init("a"), object: o1, userInfo: nil),
-            /* 1 */ Notification(name: .init("b"), object: o1, userInfo: nil),
-            /* 2 */ Notification(name: .init("a"), object: o2, userInfo: nil),
-            /* 3 */ Notification(name: .init("a"), object: o1, userInfo: ["Foo": 1]),
-            /* 4 */ Notification(name: .init("a"), object: o1, userInfo: ["Foo": 2]),
-            /* 5 */ Notification(name: .init("a"), object: o1, userInfo: ["Bar": 1]),
-            /* 6 */ Notification(name: .init("a"), object: o1, userInfo: ["Foo": 1, "Bar": 2]),
+            /* 1 */ Notification(name: .init("a"), object: o2, userInfo: nil),
+            /* 2 */ Notification(name: .init("b"), object: o1, userInfo: nil),
+            /* 3 */ Notification(name: .init("b"), object: o2, userInfo: nil),
+            /* 4 */ Notification(name: .init("a"), object: o1, userInfo: ["Foo": 1]),
+            /* 5 */ Notification(name: .init("a"), object: o1, userInfo: ["Foo": 2]),
+            /* 6 */ Notification(name: .init("a"), object: o1, userInfo: ["Bar": 1]),
+            /* 7 */ Notification(name: .init("a"), object: o1, userInfo: ["Foo": 1, "Bar": 2]),
         ]
 
-        let hashException: Set<Int> = [3, 4]
+        let hashGroups: [Int: Int] = [
+            0: 0,
+            1: 0,
+            2: 1,
+            3: 1,
+            4: 2,
+            5: 2,
+            6: 3,
+            7: 4
+        ]
 
         checkHashable(
             values,
             equalityOracle: { $0 == $1 },
             hashEqualityOracle: {
-                // FIXME: Unfortunately cases 3 and 4 above currently hash the
-                // same way, even though they compare different.
-                $0 == $1 || (hashException.contains($0) && hashException.contains($1))
+                // FIXME: Unfortunately while we have 8 different notifications,
+                // three pairs of them have colliding hash encodings.
+                hashGroups[$0] == hashGroups[$1]
             })
     }
 }
@@ -87,7 +97,7 @@ NotificationTests.test("test_reflexivity_violation")
         Notification(name: name, object: nil, userInfo: ["foo": a]),
         Notification(name: name, object: nil, userInfo: ["foo": b]),
     ]
-    checkHashable(values)
+    checkHashable(values, equalityOracle: { $0 == $1 })
 }
 
 
