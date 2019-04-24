@@ -515,12 +515,12 @@ deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl) {
   }
 
   auto *thenBody = BraceStmt::create(
-    C, SourceLoc(), C.AllocateCopy(thenMemberExprs), SourceLoc(), 
-    /*implicit*/ true);
+      C, SourceLoc(), C.AllocateCopy(thenMemberExprs), SourceLoc(), 
+      /*implicit*/ true);
 
   auto *elseBody = BraceStmt::create(
-    C, SourceLoc(), C.AllocateCopy(elseMemberExprs), SourceLoc(), 
-    /*implicit*/ true);
+      C, SourceLoc(), C.AllocateCopy(elseMemberExprs), SourceLoc(), 
+      /*implicit*/ true);
 
   auto *ifStmt = new (C)
       IfStmt(LabeledStmtInfo(), /*IfLoc*/ SourceLoc(), 
@@ -547,13 +547,13 @@ static ValueDecl
   Type intType = C.getIntDecl()->getDeclaredType();
 
   auto *param1 = new (C) ParamDecl(
-    VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-    C.getIdentifier("_owning"), SourceLoc(), C.getIdentifier("tensorHandles"),
-    parentDC);
+      VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      C.getIdentifier("_owning"), SourceLoc(), C.getIdentifier("tensorHandles"),
+      parentDC);
   param1->setInterfaceType(addressType);
   auto *param2 = new (C) ParamDecl(
-    VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-    C.getIdentifier("count"), SourceLoc(), C.getIdentifier("count"), parentDC);
+      VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      C.getIdentifier("count"), SourceLoc(), C.getIdentifier("count"), parentDC);
   param2->setInterfaceType(intType);
   ParameterList *params = ParameterList::create(C, {param1, param2});
 
