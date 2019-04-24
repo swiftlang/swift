@@ -11,10 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SwiftRemoteMirror/Platform.h"
+#include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
 
 #define SWIFT_CLASS_IS_SWIFT_MASK swift_reflection_classIsSwiftMask
 extern "C" {
-SWIFT_REMOTE_MIRROR_LINKAGE __attribute__((__weak_import__))
+SWIFT_REMOTE_MIRROR_LINKAGE
 unsigned long long swift_reflection_classIsSwiftMask = 2;
 }
 
@@ -22,7 +23,6 @@ unsigned long long swift_reflection_classIsSwiftMask = 2;
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Remote/CMemoryReader.h"
 #include "swift/Runtime/Unreachable.h"
-#include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
 
 using namespace swift;
 using namespace swift::reflection;
