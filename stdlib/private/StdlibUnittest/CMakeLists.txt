@@ -26,6 +26,7 @@ add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   RaceTest.swift
   Statistics.swift
   StdlibCoreExtras.swift
+  StdlibVersion.swift
   StringConvertible.swift
   TestHelpers.swift
   TypeIndexed.swift

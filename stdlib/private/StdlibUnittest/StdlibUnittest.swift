@@ -1899,6 +1899,8 @@ public enum TestRunPredicate : CustomStringConvertible {
   case objCRuntime(/*reason:*/ String)
   case nativeRuntime(/*reason:*/ String)
 
+  case stdlibOlderThan(StdlibVersion, reason: String)
+
   public var description: String {
     switch self {
     case .custom(_, let reason):
@@ -1995,6 +1997,9 @@ public enum TestRunPredicate : CustomStringConvertible {
       return "Objective-C runtime, reason: \(reason))"
     case .nativeRuntime(let reason):
       return "Native runtime (no ObjC), reason: \(reason))"
+
+    case .stdlibOlderThan(let version, reason: let reason):
+      return "stdlibOlderThan(\(version), reason: \(reason))"
     }
   }
 
@@ -2295,6 +2300,9 @@ public enum TestRunPredicate : CustomStringConvertible {
 #else
       return true
 #endif
+
+    case .stdlibOlderThan(let version, reason: _):
+      return StdlibVersion.currentlyRunning < version
     }
   }
 }
