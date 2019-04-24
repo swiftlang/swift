@@ -19,16 +19,17 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-combine"
-#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "SILCombiner.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/DebugUtils.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -36,7 +37,6 @@
 
 using namespace swift;
 
-STATISTIC(NumSimplified, "Number of instructions simplified");
 STATISTIC(NumCombined, "Number of instructions combined");
 STATISTIC(NumDeadInst, "Number of dead insts eliminated");
 
@@ -113,6 +113,41 @@ void SILCombineWorklist::add(SILInstruction *I) {
   Worklist.push_back(I);
 }
 
+// Define a CanonicalizeInstruction subclass for use in SILCombine.
+class SILCombineCanonicalize final : CanonicalizeInstruction {
+  SILCombineWorklist &Worklist;
+  bool changed = false;
+
+public:
+  SILCombineCanonicalize(SILCombineWorklist &Worklist)
+      : CanonicalizeInstruction(DEBUG_TYPE), Worklist(Worklist) {}
+
+  void notifyNewInstruction(SILInstruction *inst) override {
+    Worklist.add(inst);
+    Worklist.addUsersOfAllResultsToWorklist(inst);
+    changed = true;
+  }
+
+  // Just delete the given 'inst' and record its operands. The callback isn't
+  // allowed to mutate any other instructions.
+  void killInstruction(SILInstruction *inst) override {
+    eraseSingleInstFromFunction(*inst, Worklist,
+                                /*AddOperandsToWorklist*/ true);
+    changed = true;
+  }
+
+  void notifyHasNewUsers(SILValue value) override {
+    Worklist.addUsersToWorklist(value);
+    changed = true;
+  }
+
+  bool tryCanonicalize(SILInstruction *inst) {
+    changed = false;
+    canonicalize(inst);
+    return changed;
+  }
+};
+
 bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   MadeChange = false;
 
@@ -121,6 +156,8 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
   // Add reachable instructions to our worklist.
   addReachableCodeToWorklist(&*F.begin());
+
+  SILCombineCanonicalize scCanonicalize(Worklist);
 
   // Process until we run out of items in our worklist.
   while (!Worklist.isEmpty()) {
@@ -143,23 +180,8 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
       continue;
     }
 
-    // Check to see if we can instsimplify the instruction.
-    if (SILValue Result = simplifyInstruction(I)) {
-      ++NumSimplified;
-
-      LLVM_DEBUG(llvm::dbgs() << "SC: Simplify Old = " << *I << '\n'
-                              << "    New = " << *Result << '\n');
-
-      // Erase the simplified instruction and any instructions that end its
-      // scope. Nothing needs to be added to the worklist except for Result,
-      // because the instruction and all non-replaced users will be deleted.
-      replaceAllSimplifiedUsesAndErase(
-          I, Result,
-          [this](SILInstruction *Deleted) { Worklist.remove(Deleted); });
-
-      // Push the new instruction and any users onto the worklist.
-      Worklist.addUsersToWorklist(Result);
-
+    // Canonicalize the instruction.
+    if (scCanonicalize.tryCanonicalize(I)) {
       MadeChange = true;
       continue;
     }
