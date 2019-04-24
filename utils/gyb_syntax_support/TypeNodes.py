@@ -101,7 +101,8 @@ TYPE_NODES = [
     # composition-type -> composition-type-element-list
     Node('CompositionType', kind='Type',
          children=[
-             Child('Elements', kind='CompositionTypeElementList'),
+             Child('Elements', kind='CompositionTypeElementList',
+                   collection_element_name='Element'),
          ]),
 
     # tuple-type-element -> identifier? ':'? type-annotation ','?
@@ -142,7 +143,8 @@ TYPE_NODES = [
          traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
-             Child('Elements', kind='TupleTypeElementList'),
+             Child('Elements', kind='TupleTypeElementList',
+                   collection_element_name='Element'),
              Child('RightParen', kind='RightParenToken'),
          ]),
 
@@ -153,7 +155,8 @@ TYPE_NODES = [
          traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
-             Child('Arguments', kind='TupleTypeElementList'),
+             Child('Arguments', kind='TupleTypeElementList',
+                   collection_element_name='Argument'),
              Child('RightParen', kind='RightParenToken'),
              Child('ThrowsOrRethrowsKeyword', kind='Token',
                    is_optional=True,
@@ -174,7 +177,7 @@ TYPE_NODES = [
                    text_choices=['inout', '__shared', '__owned'],
                    is_optional=True),
              Child('Attributes', kind='AttributeList',
-                   is_optional=True),
+                   collection_element_name='Attribute', is_optional=True),
              Child('BaseType', kind='Type'),
          ]),
 
@@ -197,7 +200,8 @@ TYPE_NODES = [
     Node('GenericArgumentClause', kind='Syntax',
          children=[
              Child('LeftAngleBracket', kind='LeftAngleToken'),
-             Child('Arguments', kind='GenericArgumentList'),
+             Child('Arguments', kind='GenericArgumentList',
+                   collection_element_name='Argument'),
              Child('RightAngleBracket', kind='RightAngleToken'),
          ]),
 ]

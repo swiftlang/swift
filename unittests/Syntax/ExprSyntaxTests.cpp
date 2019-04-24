@@ -68,7 +68,7 @@ TEST(ExprSyntaxTests, SymbolicReferenceExprGetAPIs) {
     ArgBuilder
       .useLeftAngleBracket(SyntaxFactory::makeLeftAngleToken({}, {}))
       .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-      .addArgumentsMember(GenericArg);
+      .addArgument(GenericArg);
 
     auto GenericArgs = ArgBuilder.build();
 
@@ -98,7 +98,7 @@ TEST(ExprSyntaxTests, SymbolicReferenceExprMakeAPIs) {
   ArgBuilder
     .useLeftAngleBracket(SyntaxFactory::makeLeftAngleToken({}, {}))
     .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-    .addArgumentsMember(GenericArg);
+    .addArgument(GenericArg);
   auto GenericArgs = ArgBuilder.build();
 
   {
@@ -135,7 +135,7 @@ TEST(ExprSyntaxTests, SymbolicReferenceExprWithAPIs) {
   ArgBuilder
     .useLeftAngleBracket(SyntaxFactory::makeLeftAngleToken({}, {}))
     .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-    .addArgumentsMember(GenericArg);
+    .addArgument(GenericArg);
   auto GenericArgs = ArgBuilder.build();
 
   {
@@ -528,7 +528,7 @@ TEST(ExprSyntaxTests, FunctionCallExprBuilderAPIs) {
   {
     llvm::SmallString<64> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    CallBuilder.addArgumentListMember(OneArg);
+    CallBuilder.addArgument(OneArg);
     CallBuilder.build().print(OS);
     ASSERT_EQ(OS.str().str(), "foo(1, )");
   }
@@ -536,7 +536,7 @@ TEST(ExprSyntaxTests, FunctionCallExprBuilderAPIs) {
   {
     llvm::SmallString<64> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    CallBuilder.addArgumentListMember(OneArg.withTrailingComma(NoComma));
+    CallBuilder.addArgument(OneArg.withTrailingComma(NoComma));
     CallBuilder.build().print(OS);
     ASSERT_EQ(OS.str().str(), "foo(1, 1)");
   }
