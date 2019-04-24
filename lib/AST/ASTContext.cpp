@@ -2412,6 +2412,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     isStatic = FD->isStatic();
     selfAccess = FD->getSelfAccessKind();
 
+    // `self`s type for subscripts and properties
     if (auto *AD = dyn_cast<AccessorDecl>(AFD)) {
       if (wantDynamicSelf && AD->getStorage()
           ->getValueInterfaceType()->hasDynamicSelfType())
