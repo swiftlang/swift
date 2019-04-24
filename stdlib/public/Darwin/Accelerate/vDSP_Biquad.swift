@@ -10,9 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-
-import Accelerate
-
 //===----------------------------------------------------------------------===//
 //
 //  Biquad Structure
@@ -240,9 +237,12 @@ public protocol vDSP_FloatingPointBiquadFilterable: BinaryFloatingPoint {
     associatedtype BiquadFunctions: vDSP_BiquadFunctions where BiquadFunctions.Scalar == Self
 }
 
+@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension Float: vDSP_FloatingPointBiquadFilterable {
     public typealias BiquadFunctions = vDSP.VectorizableFloat
 }
+
+@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
 extension Double: vDSP_FloatingPointBiquadFilterable {
     public typealias BiquadFunctions = vDSP.VectorizableDouble
 }
