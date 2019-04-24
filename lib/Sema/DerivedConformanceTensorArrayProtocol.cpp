@@ -535,6 +535,8 @@ deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl) {
 static ValueDecl
 *deriveTensorArrayProtocol_init(DerivedConformance &derived) {
   auto &C = derived.TC.Context;
+  auto nominal = derived.Nominal;
+  auto parentDC = derived.getConformanceContext();
 
   // Obtain the address type.
   auto cTensorHandleType = C.getOpaquePointerDecl()->getDeclaredType();
@@ -543,10 +545,6 @@ static ValueDecl
   Type addressType = BoundGenericType::get(
       C.getOptionalDecl(), Type(), {baseAddressType});
   Type intType = C.getIntDecl()->getDeclaredType();
-
-  auto nominal = derived.Nominal;
-  auto &C = derived.TC.Context;
-  auto parentDC = derived.getConformanceContext();
 
   auto *param1 = new (C) ParamDecl(
     VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
