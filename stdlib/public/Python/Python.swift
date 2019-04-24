@@ -146,7 +146,7 @@ extension PythonObject : CustomReflectable {
 // `PythonConvertible` protocol
 //===----------------------------------------------------------------------===//
 
-/// A type that can be converted to a `PythonObject`.
+/// A type whose values can be converted to a `PythonObject`.
 public protocol PythonConvertible {
   /// A `PythonObject` instance representing this value.
   var pythonObject: PythonObject { get }
