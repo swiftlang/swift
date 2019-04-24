@@ -2616,7 +2616,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     }
   }
   if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
-    if (!MissingTypeWitness->getDefaultDefinitionLoc().isNull()) {
+    if (MissingTypeWitness->hasDefaultDefinitionType()) {
       // For type witnesses with default definitions, we don't print the stub.
       return false;
     }
