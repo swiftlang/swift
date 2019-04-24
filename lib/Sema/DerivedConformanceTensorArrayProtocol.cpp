@@ -363,6 +363,89 @@ static ValueDecl *deriveTensorArrayProtocol_tensorHandleCount(
   return tensorHandleCountDecl;
 }
 
+
+/// Derive the body for the '_typeList' getter.
+static void
+deriveBodyTensorArrayProtocol_typeList(AbstractFunctionDecl *funcDecl) {
+  auto *parentDC = funcDecl->getParent();
+  auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
+  auto &C = nominal->getASTContext();
+
+  auto *tensorGroupProto = C.getProtocol(KnownProtocolKind::TensorGroup);
+  auto *typeListReq = getProtocolRequirement(tensorGroupProto, C.Id_typeList);
+
+  // Concatenate all member `_typeList` arrays.
+  Type arrayType = BoundGenericType::get(
+    C.getArrayDecl(), Type(), 
+    {C.getTensorDataTypeDecl()->getDeclaredInterfaceType()});
+  auto *arrayTypeExpr = TypeExpr::createImplicit(arrayType, C);
+  auto plusOpLookup = C.getArrayDecl()->lookupDirect(C.getIdentifier("+"));
+  assert(plusOpLookup.size() == 1 && "Ambiguous 'Array.+' operator.");
+  ValueDecl *plusOpDecl = plusOpLookup.front();
+  auto plusOpDRE = new (C) 
+      DeclRefExpr(plusOpDecl, DeclNameLoc(), /*Implicit*/ true);
+  auto plusOpExpr = new (C)
+      DotSyntaxCallExpr(plusOpDRE, SourceLoc(), arrayTypeExpr);
+  Expr *typeListExpr = ArrayExpr::create(C, SourceLoc(), {}, {}, SourceLoc());
+  for (auto member : nominal->getStoredProperties()) {
+    auto memberType =
+        parentDC->mapTypeIntoContext(member->getValueInterfaceType());
+    auto *memberTypeExpr = TypeExpr::createImplicit(memberType, C);
+    auto *memberTypeListExpr = new (C) 
+        MemberRefExpr(memberTypeExpr, SourceLoc(), typeListReq,
+                      DeclNameLoc(), /*Implicit*/ true);
+    // Create expression `lhsArg + rhsArg`.
+    auto *plusOpArgs =
+        TupleExpr::create(C, SourceLoc(), {typeListExpr, memberTypeListExpr}, 
+                          {}, {}, SourceLoc(), /*HasTrailingClosure*/ false,
+                          /*Implicit*/ true);
+    typeListExpr = new (C) BinaryExpr(plusOpExpr, plusOpArgs, 
+                                      /*Implicit*/ true);
+  }
+
+  // Return the resulting data types array.
+  auto *returnStmt = new (C) ReturnStmt(SourceLoc(), typeListExpr);
+  auto *body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
+                                 /*Implicit*/ true);
+  funcDecl->setBody(BraceStmt::create(C, SourceLoc(), {body}, SourceLoc(),
+                                      /*Implicit*/ true));
+}
+
+/// Derive a '_typeList' implementation.
+static ValueDecl *deriveTensorArrayProtocol_typeList(
+    DerivedConformance &derived) {
+  auto nominal = derived.Nominal;
+  auto &TC = derived.TC;
+  ASTContext &C = TC.Context;
+
+  auto parentDC = derived.getConformanceContext();
+  Type dataTypeArrayType = BoundGenericType::get(
+    C.getArrayDecl(), Type(), 
+    {C.getTensorDataTypeDecl()->getDeclaredInterfaceType()});
+  auto returnType = parentDC->mapTypeIntoContext(dataTypeArrayType);
+
+  // Create `_typeList` property declaration.
+  VarDecl *typeListDecl;
+  PatternBindingDecl *patDecl;
+  std::tie(typeListDecl, patDecl) = derived.declareDerivedProperty(
+      C.Id_typeList, returnType, returnType, /*isStatic*/ false,
+      /*isFinal*/ false);
+
+  // Add `@inlinable` to the `_typeList` declaration.
+  if (nominal->getEffectiveAccess() > AccessLevel::Internal)
+    typeListDecl->getAttrs().add(new (C) InlinableAttr(/*implicit*/ true));
+
+  // Create `_typeList` getter.
+  auto *getterDecl = derived.declareDerivedPropertyGetter(
+      TC, typeListDecl, returnType);
+  getterDecl->setBodySynthesizer(deriveBodyTensorArrayProtocol_typeList);
+  typeListDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
+                             SourceLoc(), {getterDecl}, SourceLoc());
+  derived.addMembersToConformanceContext({getterDecl, typeListDecl, patDecl});
+
+  return typeListDecl;
+}
+
 // Synthesize body for `init(_owning:count:)`.
 static void 
 deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl) {
@@ -584,6 +667,8 @@ ValueDecl *DerivedConformance::deriveTensorArrayProtocol(
     return deriveTensorArrayProtocol_unpackTensorHandles(*this);
   if (requirement->getBaseName() == TC.Context.Id_tensorHandleCount)
     return deriveTensorArrayProtocol_tensorHandleCount(*this);
+  if (requirement->getBaseName() == TC.Context.Id_typeList)
+    return deriveTensorArrayProtocol_typeList(*this);
   if (requirement->getBaseName() == DeclBaseName::createConstructor())
     return deriveTensorArrayProtocol_init(*this);
   TC.diagnose(requirement->getLoc(), 

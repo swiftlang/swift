@@ -230,6 +230,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     // TensorArrayProtocol._tensorHandleCount
     if (name.isSimpleName(ctx.Id_tensorHandleCount))
       return getRequirement(KnownProtocolKind::TensorArrayProtocol);
+    
+    // SWIFT_ENABLE_TENSORFLOW
+    // TensorArrayProtocol._typeList
+    if (name.isSimpleName(ctx.Id_typeList) && !requirement->isStatic())
+      return getRequirement(KnownProtocolKind::TensorArrayProtocol);
 
     // SWIFT_ENABLE_TENSORFLOW
     // TensorGroup._typeList
