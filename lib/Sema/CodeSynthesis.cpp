@@ -1535,7 +1535,7 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   ASTContext &ctx = var->getASTContext();
   SmallString<64> nameBuf;
   if (delegateInfo.delegateValueVar)
-    nameBuf = "$__delegate_storage_$_";
+    nameBuf = "$$";
   else
     nameBuf = "$";
   nameBuf += var->getName().str();
@@ -1596,14 +1596,19 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   if (dc->getSelfClassDecl())
     makeFinal(ctx, backingVar);
 
+  // When there is a `delegateValue`, lower the access of the
+  AccessLevel defaultAccess =
+      delegateInfo.delegateValueVar ? AccessLevel::Private
+                                    : AccessLevel::Internal;
+
   // Determine the access level for the backing property.
   AccessLevel access =
-      std::min(AccessLevel::Internal, var->getFormalAccess());
+      std::min(defaultAccess, var->getFormalAccess());
   backingVar->overwriteAccess(access);
 
   // Determine setter access.
   AccessLevel setterAccess =
-      std::min(AccessLevel::Internal, var->getSetterFormalAccess());
+      std::min(defaultAccess, var->getSetterFormalAccess());
   backingVar->overwriteSetterAccess(setterAccess);
 
   // If there is a storage delegate property (delegateVar) in the delegate,
