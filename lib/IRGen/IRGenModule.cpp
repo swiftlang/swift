@@ -981,7 +981,7 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
     encodeForceLoadSymbolName(buf, linkLib.getName());
     auto ForceImportThunk =
         Module.getOrInsertFunction(buf, llvm::FunctionType::get(VoidTy, false));
-    ApplyIRLinkage(IRLinkage::ExternalImport)
+    ApplyIRLinkage(IRLinkage::ExternalWeakImport)
         .to(cast<llvm::GlobalValue>(ForceImportThunk));
 
     buf += "_$";

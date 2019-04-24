@@ -49,5 +49,5 @@ import someModule
 // FORCE-LOAD-CLIENT: @llvm.used = appending global [{{[0-9]+}} x i8*] [
 // FORCE-LOAD-CLIENT: i8* bitcast (void ()** @"_swift_FORCE_LOAD_$_module_$_autolinking" to i8*)
 // FORCE-LOAD-CLIENT: ], section "llvm.metadata"
-// FORCE-LOAD-CLIENT: declare {{(dllimport )?}}void @"_swift_FORCE_LOAD_$_module"()
+// FORCE-LOAD-CLIENT: declare extern_weak {{(dllimport )?}}void @"_swift_FORCE_LOAD_$_module"()
 
