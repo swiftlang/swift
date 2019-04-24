@@ -159,3 +159,10 @@ extension TensorShape : Codable {
     self.init(dimensions)
   }
 }
+
+extension TensorShape : CustomStringConvertible {
+  @inlinable
+  public var description: String {
+    return "TensorShape(\(dimensions))"
+    }
+}
