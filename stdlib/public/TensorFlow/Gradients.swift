@@ -578,7 +578,7 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   ) -> (Tensor, (Tensor) -> Tensor) {
     let value = sum(squeezingAxes: axes)
     return (value, { [shape = shapeTensor] v in
-      let unsqueezed = v.expandingShape(at: axes.scalars.map{ Int($0) })
+      let unsqueezed = v.expandingShape(at: axes.scalars.map { Int($0) })
       return unsqueezed.broadcast(toShape: shape)
     })
   }
