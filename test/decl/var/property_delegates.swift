@@ -627,7 +627,11 @@ extension Wrapper {
 }
 
 struct TestStorageRef {
-  @WrapperWithStorageRef var x: Int
+  @WrapperWithStorageRef var x: Int // expected-note{{'$$x' declared here}}
+
+  init(x: Int) {
+    self.$$x = WrapperWithStorageRef(value: x)
+  }
 
   mutating func test() {
     let _: Wrapper = $x
@@ -642,6 +646,7 @@ struct TestStorageRef {
 
 func testStorageRef(tsr: TestStorageRef) {
   let _: Wrapper = tsr.$x
+  _ = tsr.$$x // expected-error{{'$$x' is inaccessible due to 'private' protection level}}
 }
 
 // ---------------------------------------------------------------------------
