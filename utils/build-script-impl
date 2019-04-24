@@ -3099,7 +3099,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 call mkdir -p "${results_dir}"
 
                 if [[ "$using_xcodebuild" == "TRUE" ]] ; then
-                    LLDB_DOTEST_CC_OPTS="${LLDB_DOTEST_CC_OPTS} --filecheck $(build_directory $LOCAL_HOST llvm)/bin/FileCheck"
+                    LLDB_DOTEST_CC_OPTS="${LLDB_DOTEST_CC_OPTS} --filecheck $(build_directory $LOCAL_HOST llvm)/bin/FileCheck --dsymutil $(build_directory $LOCAL_HOST llvm)/bin/dsymutil"
                 fi
 
                 # Prefer to use lldb-dotest, as building it guarantees that we build all
