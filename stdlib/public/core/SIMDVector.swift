@@ -345,32 +345,6 @@ extension SIMD where Scalar: Comparable {
   public func max() -> Scalar {
     return indices.reduce(into: self[0]) { $0 = Swift.max($0, self[$1]) }
   }
-  
-  /// The lanewise minimum of two vectors.
-  ///
-  /// Each element of the result is the minimum of the corresponding elements
-  /// of the inputs.
-  @_alwaysEmitIntoClient
-  public static func min(_ a: Self, _ b: Self) -> Self {
-    var result = Self()
-    for i in result.indices {
-      result[i] = Swift.min(a[i], b[i])
-    }
-    return result
-  }
-  
-  /// The lanewise maximum of two vectors.
-  ///
-  /// Each element of the result is the minimum of the corresponding elements
-  /// of the inputs.
-  @_alwaysEmitIntoClient
-  public static func max(_ a: Self, _ b: Self) -> Self {
-    var result = Self()
-    for i in result.indices {
-      result[i] = Swift.max(a[i], b[i])
-    }
-    return result
-  }
 }
 
 //  These operations should never need @_semantics; they should be trivial
@@ -500,7 +474,7 @@ extension SIMD where Scalar: Comparable {
 
   @_alwaysEmitIntoClient
   public func clamped(lowerBound: Self, upperBound: Self) -> Self {
-    return Self.min(upperBound, Self.max(lowerBound, self))
+    return pointwiseMin(upperBound, pointwiseMax(lowerBound, self))
   }
 }
 
@@ -608,7 +582,7 @@ extension SIMD where Scalar: FloatingPoint {
 
   @_alwaysEmitIntoClient
   public func clamped(lowerBound: Self, upperBound: Self) -> Self {
-    return Self.min(upperBound, Self.max(lowerBound, self))
+    return pointwiseMin(upperBound, pointwiseMax(lowerBound, self))
   }
 }
 
@@ -1401,4 +1375,61 @@ public func any<Storage>(_ mask: SIMDMask<Storage>) -> Bool {
 @_alwaysEmitIntoClient
 public func all<Storage>(_ mask: SIMDMask<Storage>) -> Bool {
   return mask._storage.max() < 0
+}
+
+/// The lanewise minimum of two vectors.
+///
+/// Each element of the result is the minimum of the corresponding elements
+/// of the inputs.
+@_alwaysEmitIntoClient
+public func pointwiseMin<T>(_ a: T, _ b: T) -> T
+where T: SIMD, T.Scalar: Comparable {
+  var result = T()
+  for i in result.indices {
+    result[i] = min(a[i], b[i])
+  }
+  return result
+}
+
+/// The lanewise maximum of two vectors.
+///
+/// Each element of the result is the minimum of the corresponding elements
+/// of the inputs.
+@_alwaysEmitIntoClient
+public func pointwiseMax<T>(_ a: T, _ b: T) -> T
+where T: SIMD, T.Scalar: Comparable {
+  var result = T()
+  for i in result.indices {
+    result[i] = max(a[i], b[i])
+  }
+  return result
+}
+
+
+/// The lanewise minimum of two vectors.
+///
+/// Each element of the result is the minimum of the corresponding elements
+/// of the inputs.
+@_alwaysEmitIntoClient
+public func pointwiseMin<T>(_ a: T, _ b: T) -> T
+where T: SIMD, T.Scalar: FloatingPoint {
+  var result = T()
+  for i in result.indices {
+    result[i] = T.Scalar.minimum(a[i], b[i])
+  }
+  return result
+}
+
+/// The lanewise maximum of two vectors.
+///
+/// Each element of the result is the minimum of the corresponding elements
+/// of the inputs.
+@_alwaysEmitIntoClient
+public func pointwiseMax<T>(_ a: T, _ b: T) -> T
+where T: SIMD, T.Scalar: FloatingPoint {
+  var result = T()
+  for i in result.indices {
+    result[i] = T.Scalar.maximum(a[i], b[i])
+  }
+  return result
 }
