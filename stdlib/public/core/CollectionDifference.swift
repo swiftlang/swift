@@ -10,19 +10,26 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type that represents the difference between two ordered collection states.
+/// A collection of insertions and removals that describe the difference 
+/// between two ordered collection states.
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
 public struct CollectionDifference<ChangeElement> {
-  /// A type that represents a single change to a collection.
-  ///
-  /// The `offset` of each `insert` refers to the offset of its `element` in
-  /// the final state after the difference is fully applied. The `offset` of
-  /// each `remove` refers to the offset of its `element` in the original
-  /// state. Non-`nil` values of `associatedWith` refer to the offset of the
-  /// complementary change.
+  /// A single change to a collection.
   @_frozen
   public enum Change {
+    /// An insertion.
+    ///
+    /// The `offset` value is the offset of the inserted element in the final
+    /// state of the collection after the difference is fully applied.
+    /// A non-`nil` `associatedWith` value is the offset of the complementary 
+    /// change.
     case insert(offset: Int, element: ChangeElement, associatedWith: Int?)
+    
+    /// A removal.
+    ///
+    /// The `offset` value is the offset of the element to be removed in the
+    /// original state of the collection. A non-`nil` `associatedWith` value is 
+    /// the offset of the complementary change.
     case remove(offset: Int, element: ChangeElement, associatedWith: Int?)
 
     // Internal common field accessors
@@ -58,10 +65,11 @@ public struct CollectionDifference<ChangeElement> {
     }
   }
 
-  /// The `.insert` changes contained by this difference, from lowest offset to highest
+  /// The insertions contained by this difference, from lowest offset to 
+  /// highest.
   public let insertions: [Change]
   
-  /// The `.remove` changes contained by this difference, from lowest offset to highest
+  /// The removals contained by this difference, from lowest offset to highest.
   public let removals: [Change]
 
   /// The public initializer calls this function to ensure that its parameter
@@ -117,20 +125,20 @@ public struct CollectionDifference<ChangeElement> {
     return removeOffsetToAssoc == insertAssocToOffset
   }
 
-  /// Creates an instance from a collection of changes.
+  /// Creates a new collection difference from a collection of changes.
   ///
-  /// For clients interested in the difference between two collections, see
-  /// `BidirectionalCollection.difference(from:)`.
+  /// To find the difference between two collections, use the 
+  /// `difference(from:)` method declared on the `BidirectionalCollection`
+  /// protocol.
   ///
-  /// To guarantee that instances are unambiguous and safe for compatible base
-  /// states, this initializer will fail unless its parameter meets to the
-  /// following requirements:
+  /// The collection of changes passed as `changes` must meet these 
+  /// requirements:
   ///
-  /// 1. All insertion offsets are unique
-  /// 2. All removal offsets are unique
-  /// 3. All associations between insertions and removals are symmetric
+  /// - All insertion offsets are unique
+  /// - All removal offsets are unique
+  /// - All associations between insertions and removals are symmetric
   ///
-  /// - Parameter c: A collection of changes that represent a transition
+  /// - Parameter changes: A collection of changes that represent a transition
   ///   between two states.
   ///
   /// - Complexity: O(*n* * log(*n*)), where *n* is the length of the
