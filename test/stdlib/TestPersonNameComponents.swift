@@ -31,7 +31,11 @@ class TestPersonNameComponents : TestPersonNameComponentsSuper {
     }
 
     func test_Hashing() {
-        guard #available(macOS 10.11, iOS 9.0, *) else { return }
+        guard #available(macOS 10.13, iOS 11.0, *) else {
+            // PersonNameComponents was available in earlier versions, but its
+            // hashing did not match its definition for equality.
+            return
+        }
 
         let values: [[PersonNameComponents]] = [
             [
