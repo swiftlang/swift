@@ -75,7 +75,7 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var) {
                             SILDeclRef(var, SILDeclRef::Kind::GlobalAccessor),
                                                   NotForDefinition);
     SILValue accessor = B.createFunctionRefFor(loc, accessorFn);
-    SILValue addr = B.createApply(loc, accessor, {}, {}, false);
+    SILValue addr = B.createApply(loc, accessor, SubstitutionMap{}, {}, false);
     // FIXME: It'd be nice if the result of the accessor was natively an
     // address.
     addr = B.createPointerToAddress(

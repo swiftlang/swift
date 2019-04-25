@@ -556,7 +556,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     SILValue args[] = {argc, managedArgv.getValue(), nilValue,
                        optName.getValue()};
 
-    B.createApply(mainClass, UIApplicationMain, {}, args, false);
+    B.createApply(mainClass, UIApplicationMain, SubstitutionMap{}, args, false);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, ctx), 0);
     auto rType = F.getConventions().getSingleSILResultType();
@@ -601,7 +601,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     auto NSApplicationMain = B.createFunctionRef(mainClass, NSApplicationMainFn);
     SILValue args[] = { argc, argv };
 
-    B.createApply(mainClass, NSApplicationMain, {}, args, false);
+    B.createApply(mainClass, NSApplicationMain, SubstitutionMap{}, args, false);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, getASTContext()), 0);
     auto rType = F.getConventions().getSingleSILResultType();
