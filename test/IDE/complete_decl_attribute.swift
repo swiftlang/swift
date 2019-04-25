@@ -9,6 +9,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_INIT | %FileCheck %s -check-prefix=ON_INIT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_PROPERTY | %FileCheck %s -check-prefix=ON_PROPERTY
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_METHOD | %FileCheck %s -check-prefix=ON_METHOD
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_PARAM | %FileCheck %s -check-prefix=ON_PARAM
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_MEMBER_LAST | %FileCheck %s -check-prefix=ON_MEMBER_LAST
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_LAST | %FileCheck %s -check-prefix=KEYWORD_LAST
 
@@ -171,6 +172,13 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       discardableResult[#Func Attribute#]; name=discardableResult
 // ON_METHOD-DAG: Keyword/None:                       IBSegueAction[#Func Attribute#]; name=IBSegueAction
 // ON_METHOD: End completions
+
+  func bar(@#^ON_PARAM^#)
+// ON_PARAM: Begin completions
+// ON_PARAM-NOT: Keyword
+// ON_PARAM: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
+// ON_PARAM-NOT: Keyword
+// ON_PARAM: End completions
 
   @#^ON_MEMBER_LAST^#
 // ON_MEMBER_LAST: Begin completions
