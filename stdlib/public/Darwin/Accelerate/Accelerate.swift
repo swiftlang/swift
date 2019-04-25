@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// An enum that acts as a namespace for Swift overlays to vImage option sets and enums..
+public enum vImage {}
+
 /// An enum that acts as a namespace for Swift overlays to vDSP based functions.
 public enum vDSP {}
 
