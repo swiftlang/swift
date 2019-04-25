@@ -950,6 +950,9 @@ void PrintAST::printAttributes(const Decl *D) {
 #define CONTEXTUAL_SIMPLE_DECL_ATTR(X, Class, Y, Z) EXCLUDE_ATTR(Class)
 #define CONTEXTUAL_DECL_ATTR_ALIAS(X, Class) EXCLUDE_ATTR(Class)
 #include "swift/AST/Attr.def"
+    } else if (isa<FuncDecl>(D)) {
+      Options.ExcludeAttrList.push_back(DAK_Mutating);
+      Options.ExcludeAttrList.push_back(DAK_NonMutating);
     }
 
     // If the declaration is implicitly @objc, print the attribute now.
@@ -976,12 +979,6 @@ void PrintAST::printAttributes(const Decl *D) {
       Printer.printAttrName("final");
       Printer << " ";
     }
-  }
-
-  // Explicitly print 'mutating' and 'nonmutating' before getters and setters
-  // for which that is true.
-  if (auto accessor = dyn_cast<AccessorDecl>(D)) {
-    printMutatingModifiersIfNeeded(accessor);
   }
 
   Options.ExcludeAttrList.resize(originalExcludeAttrCount);
@@ -1706,9 +1703,11 @@ void PrintAST::printBodyIfNecessary(const AbstractFunctionDecl *decl) {
 }
 
 void PrintAST::printMutatingModifiersIfNeeded(const AccessorDecl *accessor) {
-  if (accessor->isAssumedNonMutating() && accessor->isMutating()) {
+  if (accessor->isAssumedNonMutating() && accessor->isMutating() &&
+      !Options.excludeAttrKind(DAK_Mutating)) {
     Printer.printKeyword("mutating", Options, " ");
-  } else if (accessor->isExplicitNonMutating()) {
+  } else if (accessor->isExplicitNonMutating() &&
+             !Options.excludeAttrKind(DAK_NonMutating)) {
     Printer.printKeyword("nonmutating", Options, " ");
   }
 }
@@ -2717,6 +2716,10 @@ bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
 void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
+
+  // Explicitly print 'mutating' and 'nonmutating' before getters and setters
+  // for which that is true.
+  printMutatingModifiersIfNeeded(decl);
   switch (auto kind = decl->getAccessorKind()) {
   case AccessorKind::Get:
   case AccessorKind::Address:
@@ -2773,7 +2776,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     if (!Options.SkipIntroducerKeywords) {
       if (decl->isStatic() && Options.PrintStaticKeyword)
         printStaticKeyword(decl->getCorrectStaticSpelling());
-      if (decl->isMutating() && !decl->getAttrs().hasAttribute<MutatingAttr>()) {
+      if (decl->isMutating() && !Options.excludeAttrKind(DAK_Mutating)) {
         Printer.printKeyword("mutating", Options, " ");
       } else if (decl->isConsuming() && !decl->getAttrs().hasAttribute<ConsumingAttr>()) {
         Printer.printKeyword("__consuming", Options, " ");
