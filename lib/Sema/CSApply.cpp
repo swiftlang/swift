@@ -4736,11 +4736,6 @@ namespace {
     Expr *walkToExprPost(Expr *expr) {
       Expr *result = visit(expr);
 
-      // Mark any _ObjectiveCBridgeable conformances as 'used'.
-      if (result) {
-        useObjectiveCBridgeableConformances(cs.DC, cs.getType(result));
-      }
-
       assert(expr == ExprStack.back());
       ExprStack.pop_back();
 
