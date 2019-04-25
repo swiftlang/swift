@@ -64,3 +64,72 @@ public func inlinableExternalResilientCallsInlinableExternalResilient() -> some 
   preventInlining()
   return inlinableExternalResilient()
 }
+
+public struct ResilientContainer2 {
+  @usableFromInline
+  var r = ResilientContainer()
+
+  public init() {}
+
+  public var computedProperty : some ExternalP2 {
+    return r.computedProperty
+  }
+
+  @inlinable
+  public var inlineableProperty : some ExternalP2 {
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    return r.computedProperty
+  }
+
+  @inlinable
+  public var inlineablePropertyCallsResilientInlineable : some ExternalP2 {
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    return r.inlineableProperty
+  }
+}

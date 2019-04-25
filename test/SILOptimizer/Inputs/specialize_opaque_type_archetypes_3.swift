@@ -44,3 +44,43 @@ public func inlinableExternalResilient() -> some ExternalP2 {
   preventInlining()
   return Int64(6)
 }
+
+public struct ResilientContainer {
+  @usableFromInline
+  var x = Int64(0)
+
+  public init() {}
+
+  public var computedProperty : some ExternalP2 {
+    return x
+  }
+
+  @inlinable
+  public var inlineableProperty : some ExternalP2 {
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    preventInlining()
+    return x
+  }
+}
