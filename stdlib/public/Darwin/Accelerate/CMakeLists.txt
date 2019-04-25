@@ -3,6 +3,8 @@ include("../../../../cmake/modules/StandaloneOverlay.cmake")
 
 add_swift_target_library(swiftAccelerate ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   Accelerate.swift
+  BNNS.swift.gyb
+
   vImage_Error.swift
   vImage_Options.swift
   vImage_Buffer.swift
@@ -35,9 +37,6 @@ add_swift_target_library(swiftAccelerate ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   vDSP_SingleVectorOperations.swift
   vDSP_SlidingWindow.swift
   vForce_Operations.swift
-
-  GYB_SOURCES
-    BNNS.swift.gyb
 
   SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
