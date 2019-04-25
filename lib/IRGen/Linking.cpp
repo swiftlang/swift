@@ -57,6 +57,12 @@ const IRLinkage IRLinkage::ExternalImport = {
   llvm::GlobalValue::DLLImportStorageClass,
 };
 
+const IRLinkage IRLinkage::ExternalWeakImport = {
+  llvm::GlobalValue::ExternalWeakLinkage,
+  llvm::GlobalValue::DefaultVisibility,
+  llvm::GlobalValue::DLLImportStorageClass,
+};
+
 const IRLinkage IRLinkage::ExternalExport = {
   llvm::GlobalValue::ExternalLinkage,
   llvm::GlobalValue::DefaultVisibility,
