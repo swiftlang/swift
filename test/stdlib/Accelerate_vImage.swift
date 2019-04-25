@@ -73,7 +73,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         expectEqual(coreVideoToCoreGraphics.sourceBuffers(colorSpace: colorSpace),
                     coreGraphicsToCoreVideo.destinationBuffers(colorSpace: colorSpace))
     }
-    
+  
+    /* Disabled due to <rdar://problem/50209312>
     Accelerate_vImageTests.test("vImage/BufferOrder") {
         let sourceFormat = vImage_CGImageFormat(bitsPerComponent: 8,
                                                 bitsPerPixel: 32,
@@ -96,6 +97,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         expectEqual(sBuffers, [.coreGraphics])
         expectEqual(dBuffers, [.coreGraphics])
     }
+    */
     
     Accelerate_vImageTests.test("vImage/AnyToAnyError") {
         var error = kvImageNoError
