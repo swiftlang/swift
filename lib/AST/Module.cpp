@@ -17,6 +17,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTWalker.h"
@@ -36,6 +37,7 @@
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Token.h"
 #include "swift/Strings.h"
 #include "swift/Syntax/SyntaxNodes.h"
@@ -410,6 +412,17 @@ TypeDecl * ModuleDecl::lookupLocalType(StringRef MangledName) const {
   return nullptr;
 }
 
+OpaqueTypeDecl *
+ModuleDecl::lookupOpaqueResultType(StringRef MangledName,
+                                   LazyResolver *resolver) {
+  for (auto file : getFiles()) {
+    auto OTD = file->lookupOpaqueResultType(MangledName, resolver);
+    if (OTD)
+      return OTD;
+  }
+  return nullptr;
+}
+
 void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
                               DeclContext *container, DeclName name,
                               Identifier privateDiscriminator) const {
@@ -445,7 +458,7 @@ void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   // one...unless we're already in a private context, in which case everything
   // is private and a discriminator is unnecessary.
   if (alreadyInPrivateContext) {
-    assert(privateDiscriminator.empty() && "unnecessary private-discriminator");
+    assert(privateDiscriminator.empty() && "unnecessary private discriminator");
     // Don't remove anything; everything here is private anyway.
 
   } else if (privateDiscriminator.empty()) {
@@ -564,6 +577,14 @@ void SourceFile::getPrecedenceGroups(
 
 void SourceFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
   Results.append(LocalTypeDecls.begin(), LocalTypeDecls.end());
+}
+
+void
+SourceFile::getOpaqueReturnTypeDecls(SmallVectorImpl<OpaqueTypeDecl*> &Results)
+const {
+  for (auto &member : ValidatedOpaqueReturnTypes) {
+    Results.push_back(member.second);
+  }
 }
 
 TypeDecl *SourceFile::lookupLocalType(llvm::StringRef mangledName) const {
@@ -1136,6 +1157,10 @@ StringRef ModuleDecl::getModuleFilename() const {
   // per-file names. Modules can consist of more than one file.
   StringRef Result;
   for (auto F : getFiles()) {
+    Result = F->getParseableInterface();
+    if (!Result.empty())
+      return Result;
+
     if (auto SF = dyn_cast<SourceFile>(F)) {
       if (!Result.empty())
         return StringRef();
@@ -1736,6 +1761,40 @@ void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
 void SourceFile::createReferencedNameTracker() {
   assert(!ReferencedNames && "This file already has a name tracker.");
   ReferencedNames.emplace(ReferencedNameTracker());
+}
+
+OpaqueTypeDecl *
+SourceFile::lookupOpaqueResultType(StringRef MangledName,
+                                   LazyResolver *resolver) {
+  // Check already-validated decls.
+  auto found = ValidatedOpaqueReturnTypes.find(MangledName);
+  if (found != ValidatedOpaqueReturnTypes.end())
+    return found->second;
+  
+  // If there are unvalidated decls with opaque types, go through and validate
+  // them now.
+  if (resolver && !UnvalidatedDeclsWithOpaqueReturnTypes.empty()) {
+    while (!UnvalidatedDeclsWithOpaqueReturnTypes.empty()) {
+      ValueDecl *decl = *UnvalidatedDeclsWithOpaqueReturnTypes.begin();
+      UnvalidatedDeclsWithOpaqueReturnTypes.erase(decl);
+      resolver->resolveDeclSignature(decl);
+    }
+    
+    found = ValidatedOpaqueReturnTypes.find(MangledName);
+    if (found != ValidatedOpaqueReturnTypes.end())
+      return found->second;
+  }
+  
+  // Otherwise, we don't have a matching opaque decl.
+  return nullptr;
+}
+
+void SourceFile::markDeclWithOpaqueResultTypeAsValidated(ValueDecl *vd) {
+  UnvalidatedDeclsWithOpaqueReturnTypes.erase(vd);
+  if (auto opaqueDecl = vd->getOpaqueResultTypeDecl()) {
+    ValidatedOpaqueReturnTypes.insert(
+              {opaqueDecl->getOpaqueReturnTypeIdentifier().str(), opaqueDecl});
+  }
 }
 
 //===----------------------------------------------------------------------===//

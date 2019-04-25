@@ -260,5 +260,18 @@ NODE(SugaredOptional)
 NODE(SugaredArray)
 NODE(SugaredDictionary)
 NODE(SugaredParen)
+
+// Added in Swift 5.1
+NODE(AccessorFunctionReference)
+NODE(OpaqueType)
+NODE(OpaqueTypeDescriptorSymbolicReference)
+NODE(OpaqueTypeDescriptor)
+NODE(OpaqueTypeDescriptorAccessor)
+NODE(OpaqueTypeDescriptorAccessorImpl)
+NODE(OpaqueTypeDescriptorAccessorKey)
+NODE(OpaqueTypeDescriptorAccessorVar)
+NODE(OpaqueReturnType)
+CONTEXT_NODE(OpaqueReturnTypeOf)
+
 #undef CONTEXT_NODE
 #undef NODE

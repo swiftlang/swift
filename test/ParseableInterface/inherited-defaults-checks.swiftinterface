@@ -1,0 +1,65 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name InheritedDefaults
+
+// RUN: %empty-directory(%t)
+// RUN: %target-typecheck-verify-swift
+
+import Swift
+
+public class Bar {
+  // note associated with the expected error in (F) below
+  public init(x: Int = 24, y: Int, z: Int = 42) // expected-note {{corresponding parameter declared here}}
+
+  public init(a: Int, b: Int = 99)
+  public convenience init(convInit: Int = 45) {}
+
+  // note associated with the expected error in (D) below
+  public convenience init(first: Int, second: Int = 88, third: Int, fourth: Int) // expected-note {{overridden declaration is here}}
+}
+
+public class Foo: Bar {
+
+  // A) designated overriding designated - valid
+  public override init(x: Int = super, y: Int, z: Int = super)
+
+  // B) convenience shadowing convenience
+  public convenience init(convInit: Int = super) // expected-error {{default value inheritance via 'super' is only valid on the parameters of designated initializers}}
+
+  // C) convenience overriding designated
+  public override convenience init(a: Int, b: Int = super) // expected-error {{default value inheritance via 'super' is only valid on the parameters of designated initializers}}
+
+  // D) designated shadowing convenience
+  public init(first: Int, second: Int = super, third: Int, fourth: Int) // expected-error {{default value inheritance via 'super' can only be used when overriding a designated initializer}}
+
+  // E) not in initializer
+  public subscript(k: Int = super) -> Int { get } // expected-error {{default value inheritance via 'super' is only valid on the parameters of designated initializers}}
+  public func foo(z: Int = super) // expected-error {{default value inheritance via 'super' is only valid on the parameters of designated initializers}}
+}
+
+public class Baz: Bar {
+
+  // F) Matching param not defaulted
+  public override init(x: Int = super, y: Int = super, z: Int = super) // expected-error {{default value inheritance via 'super' requires that the corresponding parameter of the overridden designated initializer has a default value}}
+}
+
+public class Direct: Bar {
+  public override init(x: Int = super, y: Int, z: Int = super)
+
+  // G) Doesn't override anything
+  public override init(other: Int = super, value: Int) // expected-error {{argument labels for initializer 'init(other:value:)' do not match those of overridden initializer 'init(a:b:)'}}
+  // expected-error@-1 {{default value inheritance via 'super' can only be used when overriding a designated initializer}}
+}
+
+public class Indirect: Direct {
+
+  // H) Chain of inherited defaults - valid all the way down
+  public override init(x: Int = super, y: Int, z: Int = super)
+
+  // I) Chain of inherited defaults - invalid further down (and diagnosed there)
+  public override init(other: Int = super, value: Int)
+}
+
+public enum Bob {
+  case bar(p: Int)
+  public init(foo: String = super /*comment*/) // expected-error {{default value inheritance via 'super' can only be used when overriding a designated initializer}}
+}

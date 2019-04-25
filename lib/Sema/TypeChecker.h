@@ -271,6 +271,13 @@ enum class TypeCheckExprFlags {
   /// as part of the expression diagnostics, which is attempting to narrow
   /// down failure location.
   SubExpressionDiagnostics = 0x400,
+  
+  /// If set, the 'convertType' specified to typeCheckExpression is the opaque
+  /// return type of the declaration being checked. The archetype should be
+  /// opened into a type variable to provide context to the expression, and
+  /// the resulting type will be a candidate for binding the underlying
+  /// type.
+  ConvertTypeIsOpaqueReturnType = 0x800,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -1080,12 +1087,11 @@ public:
   void inferDefaultWitnesses(ProtocolDecl *proto);
 
   /// Compute the generic signature, generic environment and interface type
-  /// of a generic function.
-  void validateGenericFuncSignature(AbstractFunctionDecl *func);
-
-  /// Compute the generic signature, generic environment and interface type
-  /// of a generic subscript.
-  void validateGenericSubscriptSignature(SubscriptDecl *subscript);
+  /// of a generic function or subscript.
+  void validateGenericFuncOrSubscriptSignature(
+              PointerUnion<AbstractFunctionDecl *, SubscriptDecl *>
+                  funcOrSubscript,
+              ValueDecl *decl, GenericContext *genCtx);
 
   /// For a generic requirement in a protocol, make sure that the requirement
   /// set didn't add any requirements to Self or its associated types.
@@ -2103,6 +2109,10 @@ public:
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.
   DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
+  
+  Type getOrCreateOpaqueResultType(TypeResolution resolution,
+                                   ValueDecl *originatingDecl,
+                                   OpaqueReturnTypeRepr *repr);
 };
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic
@@ -2176,6 +2186,51 @@ bool isOverrideBasedOnType(ValueDecl *decl, Type declTy,
 /// protocol. If \p type is not null, check specifically whether \p decl
 /// could fulfill a protocol requirement for it.
 bool isMemberOperator(FuncDecl *decl, Type type);
+
+/// Complain if @objc or dynamic is used without importing Foundation.
+void diagnoseAttrsRequiringFoundation(SourceFile &SF);
+
+/// Diagnose any Objective-C method overrides that aren't reflected
+/// as overrides in Swift.
+bool diagnoseUnintendedObjCMethodOverrides(SourceFile &sf);
+
+/// Diagnose all conflicts between members that have the same
+/// Objective-C selector in the same class.
+///
+/// \param sf The source file for which we are diagnosing conflicts.
+///
+/// \returns true if there were any conflicts diagnosed.
+bool diagnoseObjCMethodConflicts(SourceFile &sf);
+
+/// Diagnose any unsatisfied @objc optional requirements of
+/// protocols that conflict with methods.
+bool diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf);
+
+/// Retrieve information about the given Objective-C method for
+/// diagnostic purposes, to be used with OBJC_DIAG_SELECT in
+/// DiagnosticsSema.def.
+std::pair<unsigned, DeclName> getObjCMethodDiagInfo(
+                                AbstractFunctionDecl *method);
+
+/// Attach Fix-Its to the given diagnostic that updates the name of the
+/// given declaration to the desired target name.
+///
+/// \returns false if the name could not be fixed.
+bool fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
+                        DeclName targetName);
+
+/// Fix the Objective-C name of the given declaration to match the provided
+/// Objective-C selector.
+///
+/// \param ignoreImpliedName When true, ignore the implied name of the
+/// given declaration, because it no longer applies.
+///
+/// For properties, the selector should be a zero-parameter selector of the
+/// given property's name.
+bool fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
+                            Optional<ObjCSelector> nameOpt,
+                            Optional<ObjCSelector> targetNameOpt,
+                            bool ignoreImpliedName = false);
 
 } // end namespace swift
 

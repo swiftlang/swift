@@ -84,6 +84,7 @@ namespace swift {
   class ModuleLoader;
   class NominalTypeDecl;
   class NormalProtocolConformance;
+  class OpaqueTypeDecl;
   class InheritedProtocolConformance;
   class SelfProtocolConformance;
   class SpecializedProtocolConformance;
@@ -838,40 +839,6 @@ public:
   /// Returns memory used exclusively by constraint solver.
   size_t getSolverMemory() const;
 
-  /// Complain if @objc or dynamic is used without importing Foundation.
-  void diagnoseAttrsRequiringFoundation(SourceFile &SF);
-
-  /// Note that the given method produces an Objective-C method.
-  void recordObjCMethod(AbstractFunctionDecl *method);
-
-  /// Diagnose any Objective-C method overrides that aren't reflected
-  /// as overrides in Swift.
-  bool diagnoseUnintendedObjCMethodOverrides(SourceFile &sf);
-
-  /// Note that there is a conflict between different definitions that
-  /// produce the same Objective-C method.
-  void recordObjCMethodConflict(ClassDecl *classDecl, ObjCSelector selector,
-                                bool isInstance);
-
-  /// Diagnose all conflicts between members that have the same
-  /// Objective-C selector in the same class.
-  ///
-  /// \param sf The source file for which we are diagnosing conflicts.
-  ///
-  /// \returns true if there were any conflicts diagnosed.
-  bool diagnoseObjCMethodConflicts(SourceFile &sf);
-
-  /// Note that an optional @objc requirement has gone unsatisfied by
-  /// a conformance to its protocol.
-  ///
-  /// \param dc The declaration context in which the conformance occurs.
-  /// \param req The optional requirement.
-  void recordObjCUnsatisfiedOptReq(DeclContext *dc, AbstractFunctionDecl *req);
-
-  /// Diagnose any unsatisfied @objc optional requirements of
-  /// protocols that conflict with methods.
-  bool diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf);
-
   /// Retrieve the Swift name for the given Foundation entity, where
   /// "NS" prefix stripping will apply under omit-needless-words.
   StringRef getSwiftName(KnownFoundationEntity kind);
@@ -943,36 +910,12 @@ private:
 
   friend TypeBase;
   friend ArchetypeType;
+  friend OpaqueTypeDecl;
 
   /// Provide context-level uniquing for SIL lowered type layouts and boxes.
   friend SILLayout;
   friend SILBoxType;
 };
-
-/// Retrieve information about the given Objective-C method for
-/// diagnostic purposes, to be used with OBJC_DIAG_SELECT in
-/// DiagnosticsSema.def.
-std::pair<unsigned, DeclName> getObjCMethodDiagInfo(
-                                AbstractFunctionDecl *method);
-
-/// Attach Fix-Its to the given diagnostic that updates the name of the
-/// given declaration to the desired target name.
-///
-/// \returns false if the name could not be fixed.
-bool fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
-                        DeclName targetName);
-
-/// Fix the Objective-C name of the given declaration to match the provided
-/// Objective-C selector.
-///
-/// \param ignoreImpliedName When true, ignore the implied name of the
-/// given declaration, because it no longer applies.
-///
-/// For properties, the selector should be a zero-parameter selector of the
-/// given property's name.
-bool fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
-                            Optional<ObjCSelector> targetNameOpt,
-                            bool ignoreImpliedName = false);
 
 } // end namespace swift
 

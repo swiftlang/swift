@@ -142,6 +142,17 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
     // Otherwise, either call a function or curry it.
     return true;
   }
+  if (auto *SD = dyn_cast<SubscriptDecl>(Member)) {
+    // Cannot use static subscripts on non-metatypes.
+    if (!LS.isOnMetatype() && SD->isStatic())
+      return false;
+
+    // Cannot use instance subscript on metatypes.
+    if (LS.isOnMetatype() && !SD->isStatic() && !LS.isIncludingInstanceMembers())
+      return false;
+
+    return true;
+  }
   if (auto *VD = dyn_cast<VarDecl>(Member)) {
     // Cannot use static properties on non-metatypes.
     if (!(LS.isQualified() && LS.isOnMetatype()) && VD->isStatic())
@@ -296,6 +307,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       case DeclKind::Class:
       case DeclKind::Struct:
       case DeclKind::Protocol:
+      case DeclKind::OpaqueType:
         return;
 
       // Initializers cannot be found by dynamic lookup.

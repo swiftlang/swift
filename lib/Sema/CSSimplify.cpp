@@ -1082,6 +1082,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     subKind = ConstraintKind::Conversion;
     break;
 
+  case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::Bind:
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
@@ -1144,6 +1145,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::Equal:
     return rep1 != rep2;
 
+  case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::BridgingConversion:
@@ -1313,6 +1315,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
+  case ConstraintKind::OpaqueUnderlyingType:
     subKind = ConstraintKind::Subtype;
     break;
 
@@ -1566,11 +1569,49 @@ ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
   return getTypeMatchFailure(locator);
 }
 
+static ConstraintSystem::TypeMatchResult
+matchDeepTypeArguments(ConstraintSystem &cs,
+                       ConstraintSystem::TypeMatchOptions subflags,
+                       ArrayRef<Type> args1,
+                       ArrayRef<Type> args2,
+                       ConstraintLocatorBuilder locator) {
+  if (args1.size() != args2.size()) {
+    return cs.getTypeMatchFailure(locator);
+  }
+  for (unsigned i = 0, n = args1.size(); i != n; ++i) {
+    auto result = cs.matchTypes(args1[i], args2[i], ConstraintKind::Bind,
+                                subflags, locator.withPathElement(
+                                        LocatorPathElt::getGenericArgument(i)));
+
+    if (result.isFailure())
+      return result;
+  }
+
+  return cs.getTypeMatchSuccess();
+}
+
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
                                          ConstraintLocatorBuilder locator) {
   TypeMatchOptions subflags = TMF_GenerateConstraints;
 
+  // Handle opaque archetypes.
+  if (auto arch1 = type1->getAs<ArchetypeType>()) {
+    auto arch2 = type2->castTo<ArchetypeType>();
+    auto opaque1 = cast<OpaqueTypeArchetypeType>(arch1->getRoot());
+    auto opaque2 = cast<OpaqueTypeArchetypeType>(arch2->getRoot());
+    assert(arch1->getInterfaceType()->getCanonicalType(
+                      opaque1->getGenericEnvironment()->getGenericSignature())
+        == arch2->getInterfaceType()->getCanonicalType(
+                      opaque2->getGenericEnvironment()->getGenericSignature()));
+    assert(opaque1->getDecl() == opaque2->getDecl());
+    
+    auto args1 = opaque1->getSubstitutions().getReplacementTypes();
+    auto args2 = opaque2->getSubstitutions().getReplacementTypes();
+    // Match up the replacement types of the respective substitution maps.
+    return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
+  }
+  
   // Handle nominal types that are not directly generic.
   if (auto nominal1 = type1->getAs<NominalType>()) {
     auto nominal2 = type2->castTo<NominalType>();
@@ -1605,19 +1646,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   // Match up the generic arguments, exactly.
   auto args1 = bound1->getGenericArgs();
   auto args2 = bound2->getGenericArgs();
-  if (args1.size() != args2.size()) {
-    return getTypeMatchFailure(locator);
-  }
-  for (unsigned i = 0, n = args1.size(); i != n; ++i) {
-    auto result = matchTypes(args1[i], args2[i], ConstraintKind::Bind,
-                             subflags, locator.withPathElement(
-                                        LocatorPathElt::getGenericArgument(i)));
-
-    if (result.isFailure())
-      return result;
-  }
-
-  return getTypeMatchSuccess();
+  return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
 }
 
 ConstraintSystem::TypeMatchResult
@@ -1946,15 +1975,29 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
   }
 }
 
-static void
+/// Attempt to repair typing failures and record fixes if needed.
+/// \return true if at least some of the failures has been repaired
+/// successfully, which allows type matcher to continue.
+static bool
 repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
                SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
                ConstraintLocatorBuilder locator) {
   SmallVector<LocatorPathElt, 4> path;
   auto *anchor = locator.getLocatorParts(path);
 
-  if (path.empty())
-    return;
+  if (path.empty()) {
+    // If method reference forms a value type of the key path,
+    // there is going to be a constraint to match result of the
+    // member lookup to the generic parameter `V` of *KeyPath<R, V>
+    // type associated with key path expression, which we need to
+    // fix-up here.
+    if (anchor && isa<KeyPathExpr>(anchor)) {
+      auto *fnType = lhs->getAs<FunctionType>();
+      if (fnType && fnType->getResult()->isEqual(rhs))
+        return true;
+    }
+    return false;
+  }
 
   auto &elt = path.back();
   switch (elt.getKind()) {
@@ -1978,7 +2021,7 @@ repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
     if (path.empty() ||
         !(path.back().getKind() == ConstraintLocator::ApplyArgToParam ||
           path.back().getKind() == ConstraintLocator::ContextualType))
-      return;
+      return false;
 
     auto arg = llvm::find_if(cs.getTypeVariables(),
                              [&argLoc](const TypeVariableType *typeVar) {
@@ -2029,13 +2072,14 @@ repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
                                              cs.getConstraintLocator(locator));
       conversionsOrFixes.push_back(fix);
     }
-
     break;
   }
 
   default:
-    return;
+    break;
   }
+
+  return !conversionsOrFixes.empty();
 }
 
 ConstraintSystem::TypeMatchResult
@@ -2184,6 +2228,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::OperatorArgumentConversion:
       return formUnsolvedResult();
 
+    case ConstraintKind::OpaqueUnderlyingType:
     case ConstraintKind::ApplicableFunction:
     case ConstraintKind::DynamicCallableApplicableFunction:
     case ConstraintKind::BindOverload:
@@ -2253,7 +2298,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Module:
     case TypeKind::PrimaryArchetype:
     case TypeKind::OpenedArchetype:
-    case TypeKind::NestedArchetype:
       // If two module types or archetypes were not already equal, there's
       // nothing more we can do.
       return getTypeMatchFailure(locator);
@@ -2382,6 +2426,48 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       if (bound1->getDecl() == bound2->getDecl())
         conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
       break;
+    }
+
+    // Opaque archetypes are globally bound, so we can match them for deep
+    // equality.
+    case TypeKind::OpaqueTypeArchetype: {
+      auto opaque1 = cast<OpaqueTypeArchetypeType>(desugar1);
+      auto opaque2 = cast<OpaqueTypeArchetypeType>(desugar2);
+      
+      assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
+      if (!type1->is<LValueType>()
+          && opaque1->getDecl() == opaque2->getDecl()) {
+        conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
+      }
+      break;
+    }
+    
+    // Same for nested archetypes rooted in opaque types.
+    case TypeKind::NestedArchetype: {
+      auto nested1 = cast<NestedArchetypeType>(desugar1);
+      auto nested2 = cast<NestedArchetypeType>(desugar2);
+      
+      auto rootOpaque1 = dyn_cast<OpaqueTypeArchetypeType>(nested1->getRoot());
+      auto rootOpaque2 = dyn_cast<OpaqueTypeArchetypeType>(nested2->getRoot());
+      if (rootOpaque1 && rootOpaque2) {
+        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
+        auto interfaceTy1 = nested1->getInterfaceType()
+          ->getCanonicalType(rootOpaque1->getGenericEnvironment()
+                                        ->getGenericSignature());
+        auto interfaceTy2 = nested2->getInterfaceType()
+          ->getCanonicalType(rootOpaque2->getGenericEnvironment()
+                                        ->getGenericSignature());
+        if (!type1->is<LValueType>()
+            && interfaceTy1 == interfaceTy2
+            && rootOpaque1->getDecl() == rootOpaque2->getDecl()) {
+          conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
+          break;
+        }
+      }
+
+      // If the archetypes aren't rooted in an opaque type, or are rooted in
+      // completely different decls, then there's nothing else we can do.
+      return getTypeMatchFailure(locator);
     }
     }
   }
@@ -2802,8 +2888,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   }
 
   // Attempt to repair any failures identifiable at this point.
-  if (attemptFixes)
-    repairFailures(*this, type1, type2, conversionsOrFixes, locator);
+  if (attemptFixes) {
+    if (repairFailures(*this, type1, type2, conversionsOrFixes, locator)) {
+      if (conversionsOrFixes.empty())
+        return getTypeMatchSuccess();
+    }
+  }
 
   if (conversionsOrFixes.empty())
     return getTypeMatchFailure(locator);
@@ -2942,6 +3032,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
   case TypeKind::NestedArchetype:
+  case TypeKind::OpaqueTypeArchetype:
   case TypeKind::DynamicSelf:
   case TypeKind::ProtocolComposition:
   case TypeKind::Protocol:
@@ -4296,7 +4387,7 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
       break;
     case MemberLookupResult::UR_KeyPathWithAnyObjectRootType:
       return AllowAnyObjectKeyPathRoot::create(cs, locator);
-    }
+   }
   }
 
   return nullptr;
@@ -4602,6 +4693,40 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(
   // It's definitely not either kind of metatype, so we can
   // report failure right away.
   return SolutionKind::Error;
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyOpaqueUnderlyingTypeConstraint(Type type1, Type type2,
+                                             TypeMatchOptions flags,
+                                             ConstraintLocatorBuilder locator) {
+  // Open the second type, which must be an opaque archetype, to try to
+  // infer the first type using its constraints.
+  auto opaque2 = type2->castTo<OpaqueTypeArchetypeType>();
+
+  // Open the generic signature of the opaque decl, and bind the "outer" generic
+  // params to our context. The remaining axes of freedom on the type variable
+  // corresponding to the underlying type should be the constraints on the
+  // underlying return type.
+  OpenedTypeMap replacements;
+  openGeneric(nullptr, DC, opaque2->getBoundSignature(),
+              /*skip self*/ false,
+              locator, replacements);
+  
+  auto underlyingTyVar = openType(opaque2->getInterfaceType(),
+                                  replacements);
+  assert(underlyingTyVar);
+  
+  if (auto dcSig = DC->getGenericSignatureOfContext()) {
+    for (auto param : dcSig->getGenericParams()) {
+      addConstraint(ConstraintKind::Bind,
+                    openType(param, replacements),
+                    DC->mapTypeIntoContext(param),
+                    locator);
+    }
+  }
+
+  addConstraint(ConstraintKind::Equal, type1, underlyingTyVar, locator);
+  return getTypeMatchSuccess();
 }
 
 ConstraintSystem::SolutionKind
@@ -5018,23 +5143,24 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       }
 
       auto storage = dyn_cast<AbstractStorageDecl>(choices[i].getDecl());
-      if (!storage) {
+
+      auto *componentLoc = getConstraintLocator(
+          locator.withPathElement(LocatorPathElt::getKeyPathComponent(i)));
+
+      if (auto *fix = AllowInvalidRefInKeyPath::forRef(
+              *this, choices[i].getDecl(), componentLoc)) {
+        if (!shouldAttemptFixes() || recordFix(fix))
+          return SolutionKind::Error;
+
+        // If this was a method reference let's mark it as read-only.
+        if (!storage) {
+          capability = ReadOnly;
+          continue;
+        }
+      }
+
+      if (!storage)
         return SolutionKind::Error;
-      }
-
-      // Referencing static members in key path is not currently allowed.
-      if (storage->isStatic()) {
-        if (!shouldAttemptFixes())
-          return SolutionKind::Error;
-
-        auto componentLoc =
-            locator.withPathElement(LocatorPathElt::getKeyPathComponent(i));
-        auto *fix = AllowStaticMemberRefInKeyPath::create(
-            *this, choices[i].getDecl(), getConstraintLocator(componentLoc));
-
-        if (recordFix(fix))
-          return SolutionKind::Error;
-      }
 
       if (isReadOnlyKeyPathComponent(storage)) {
         capability = ReadOnly;
@@ -6334,7 +6460,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowInaccessibleMember:
   case FixKind::AllowAnyObjectKeyPathRoot:
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
-  case FixKind::AllowStaticMemberRefInKeyPath:
+  case FixKind::AllowInvalidRefInKeyPath:
     llvm_unreachable("handled elsewhere");
   }
 
@@ -6360,6 +6486,10 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
     return matchTypes(first, second, kind, subflags, locator);
+
+  case ConstraintKind::OpaqueUnderlyingType:
+    return simplifyOpaqueUnderlyingTypeConstraint(first, second,
+                                                  subflags, locator);
 
   case ConstraintKind::BridgingConversion:
     return simplifyBridgingConstraint(first, second, subflags, locator);
@@ -6613,7 +6743,8 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
-  case ConstraintKind::OperatorArgumentConversion: {
+  case ConstraintKind::OperatorArgumentConversion:
+  case ConstraintKind::OpaqueUnderlyingType: {
     // Relational constraints.
     auto matchKind = constraint.getKind();
 

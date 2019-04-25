@@ -124,9 +124,8 @@ CompilerInvocation::getParseableInterfaceOutputPathForWholeModule() const {
       .SupplementaryOutputs.ParseableInterfaceOutputPath;
 }
 
-SerializationOptions
-CompilerInvocation::computeSerializationOptions(const SupplementaryOutputPaths &outs,
-                                                bool moduleIsPublic) {
+SerializationOptions CompilerInvocation::computeSerializationOptions(
+    const SupplementaryOutputPaths &outs, bool moduleIsPublic) {
   const FrontendOptions &opts = getFrontendOptions();
 
   SerializationOptions serializationOpts;
@@ -313,6 +312,13 @@ bool CompilerInstance::setUpModuleLoaders() {
                            *forceModuleLoadingMode);
       return true;
     }
+  }
+
+  if (Invocation.getLangOptions().EnableMemoryBufferImporter) {
+    auto MemoryBufferLoader = MemoryBufferSerializedModuleLoader::create(
+        *Context, getDependencyTracker());
+    this->MemoryBufferLoader = MemoryBufferLoader.get();
+    Context->addModuleLoader(std::move(MemoryBufferLoader));
   }
 
   std::unique_ptr<SerializedModuleLoader> SML =
@@ -1067,6 +1073,7 @@ void CompilerInstance::freeASTContext() {
   Context.reset();
   MainModule = nullptr;
   SML = nullptr;
+  MemoryBufferLoader = nullptr;
   PrimaryBufferIDs.clear();
   PrimarySourceFiles.clear();
 }

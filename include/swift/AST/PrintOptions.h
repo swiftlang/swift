@@ -135,6 +135,9 @@ struct PrintOptions {
   /// Whether to print *any* accessors on properties.
   bool PrintPropertyAccessors = true;
 
+  /// Whether to print *any* accessors on subscript.
+  bool PrintSubscriptAccessors = true;
+
   /// Whether to print the accessors of a property abstractly,
   /// i.e. always as:
   /// ```
@@ -259,6 +262,21 @@ struct PrintOptions {
 
   /// Whether to skip keywords with a prefix of underscore such as __consuming.
   bool SkipUnderscoredKeywords = false;
+
+  /// How to print opaque return types.
+  enum class OpaqueReturnTypePrintingMode {
+    /// 'some P1 & P2'.
+    WithOpaqueKeyword,
+    /// 'P1 & P2'.
+    WithoutOpaqueKeyword,
+    /// Stable parsable internal syntax.
+    StableReference,
+    /// Description suitable for debugging.
+    Description
+  };
+
+  OpaqueReturnTypePrintingMode OpaqueReturnTypePrinting =
+      OpaqueReturnTypePrintingMode::WithOpaqueKeyword;
 
   /// Whether to print decl attributes that are only used internally,
   /// such as _silgen_name, transparent, etc.
@@ -517,6 +535,8 @@ struct PrintOptions {
     result.PrintInSILBody = true;
     result.PreferTypeRepr = false;
     result.PrintIfConfig = false;
+    result.OpaqueReturnTypePrinting =
+        OpaqueReturnTypePrintingMode::StableReference;
     return result;
   }
 
@@ -554,6 +574,7 @@ struct PrintOptions {
     PO.ExplodeEnumCaseDecls = true;
     PO.ShouldQualifyNestedDeclarations = QualifyNestedDeclarations::TypesOnly;
     PO.PrintParameterSpecifiers = true;
+    PO.SkipImplicit = true;
     return PO;
   }
 };

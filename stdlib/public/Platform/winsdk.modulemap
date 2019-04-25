@@ -23,6 +23,11 @@ module WinSDK [system] [extern_c] {
       export *
     }
 
+    module console {
+      header "consoleapi.h"
+      export *
+    }
+
     // api-ms-win-core-errhandling-l1-1-0.dll
     module errhandling {
       header "errhandlingapi.h"

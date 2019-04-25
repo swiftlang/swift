@@ -423,15 +423,57 @@ TreatKeyPathSubscriptIndexAsHashable::create(ConstraintSystem &cs, Type type,
       TreatKeyPathSubscriptIndexAsHashable(cs, type, locator);
 }
 
-bool AllowStaticMemberRefInKeyPath::diagnose(Expr *root, bool asNote) const {
-  InvalidStaticMemberRefInKeyPath failure(root, getConstraintSystem(), Member,
-                                          getLocator());
-  return failure.diagnose(asNote);
+bool AllowInvalidRefInKeyPath::diagnose(Expr *root, bool asNote) const {
+  switch (Kind) {
+  case RefKind::StaticMember: {
+    InvalidStaticMemberRefInKeyPath failure(root, getConstraintSystem(), Member,
+                                            getLocator());
+    return failure.diagnose(asNote);
+  }
+
+  case RefKind::MutatingGetter: {
+    InvalidMemberWithMutatingGetterInKeyPath failure(
+        root, getConstraintSystem(), Member, getLocator());
+    return failure.diagnose(asNote);
+  }
+
+  case RefKind::Method: {
+    InvalidMethodRefInKeyPath failure(root, getConstraintSystem(), Member,
+                                      getLocator());
+    return failure.diagnose(asNote);
+  }
+  }
 }
 
-AllowStaticMemberRefInKeyPath *
-AllowStaticMemberRefInKeyPath::create(ConstraintSystem &cs, ValueDecl *member,
-                                      ConstraintLocator *locator) {
+AllowInvalidRefInKeyPath *
+AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, ValueDecl *member,
+                                 ConstraintLocator *locator) {
+  // Referencing (instance or static) methods in key path is
+  // not currently allowed.
+  if (isa<FuncDecl>(member))
+    return AllowInvalidRefInKeyPath::create(cs, RefKind::Method, member,
+                                            locator);
+
+  // Referencing static members in key path is not currently allowed.
+  if (member->isStatic())
+    return AllowInvalidRefInKeyPath::create(cs, RefKind::StaticMember, member,
+                                            locator);
+
+  if (auto *storage = dyn_cast<AbstractStorageDecl>(member)) {
+    // Referencing members with mutating getters in key path is not
+    // currently allowed.
+    if (storage->isGetterMutating())
+      return AllowInvalidRefInKeyPath::create(cs, RefKind::MutatingGetter,
+                                              member, locator);
+  }
+
+  return nullptr;
+}
+
+AllowInvalidRefInKeyPath *
+AllowInvalidRefInKeyPath::create(ConstraintSystem &cs, RefKind kind,
+                                 ValueDecl *member,
+                                 ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      AllowStaticMemberRefInKeyPath(cs, member, locator);
+      AllowInvalidRefInKeyPath(cs, kind, member, locator);
 }

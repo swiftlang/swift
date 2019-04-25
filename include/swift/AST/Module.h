@@ -59,6 +59,7 @@ namespace swift {
   class FileUnit;
   class FuncDecl;
   class InfixOperatorDecl;
+  class LazyResolver;
   class LinkLibrary;
   class LookupCache;
   class ModuleLoader;
@@ -341,6 +342,11 @@ public:
   /// This does a simple local lookup, not recursively looking through imports.
   TypeDecl *lookupLocalType(StringRef MangledName) const;
 
+  /// Look up an opaque return type by the mangled name of the declaration
+  /// that defines it.
+  OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName,
+                                         LazyResolver *resolver);
+  
   /// Find ValueDecls in the module and pass them to the given consumer object.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
@@ -642,6 +648,13 @@ public:
   virtual TypeDecl *lookupLocalType(StringRef MangledName) const {
     return nullptr;
   }
+  
+  /// Look up an opaque return type by the mangled name of the declaration
+  /// that defines it.
+  virtual OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName,
+                                                 LazyResolver *resolver) {
+    return nullptr;
+  }
 
   /// Directly look for a nested type declared within this module inside the
   /// given nominal type (including any extensions).
@@ -740,6 +753,9 @@ public:
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
   virtual void getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &results) const {}
+  
+  virtual void
+  getOpaqueReturnTypeDecls(SmallVectorImpl<OpaqueTypeDecl*> &results) const {}
 
   /// Adds all top-level decls to the given vector.
   ///
@@ -826,6 +842,10 @@ public:
   virtual StringRef getExportedModuleName() const {
     return getParentModule()->getName().str();
   }
+
+  /// If this is a module imported from a parseable interface, return the path
+  /// to the interface file, otherwise an empty StringRef.
+  virtual StringRef getParseableInterface() const { return {}; }
 
   /// Traverse the decls within this file.
   ///
@@ -982,6 +1002,12 @@ public:
 
   /// The list of local type declarations in the source file.
   llvm::SetVector<TypeDecl *> LocalTypeDecls;
+  
+  /// The set of validated opaque return type decls in the source file.
+  llvm::StringMap<OpaqueTypeDecl *> ValidatedOpaqueReturnTypes;
+  /// The set of parsed decls with opaque return types that have not yet
+  /// been validated.
+  llvm::DenseSet<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
 
   /// A set of special declaration attributes which require the
   /// Foundation module to be imported to work. If the foundation
@@ -1001,6 +1027,22 @@ public:
   /// those selectors.
   llvm::DenseMap<ObjCSelector, llvm::TinyPtrVector<AbstractFunctionDecl *>>
     ObjCMethods;
+
+  /// List of Objective-C methods, which is used for checking unintended
+  /// Objective-C overrides.
+  std::vector<AbstractFunctionDecl *> ObjCMethodList;
+
+  /// An unsatisfied, optional @objc requirement in a protocol conformance.
+  using ObjCUnsatisfiedOptReq = std::pair<DeclContext *, AbstractFunctionDecl *>;
+
+  /// List of optional @objc protocol requirements that have gone
+  /// unsatisfied, which might conflict with other Objective-C methods.
+  std::vector<ObjCUnsatisfiedOptReq> ObjCUnsatisfiedOptReqs;
+
+  using ObjCMethodConflict = std::tuple<ClassDecl *, ObjCSelector, bool>;
+
+  /// List of Objective-C member conflicts we have found during type checking.
+  std::vector<ObjCMethodConflict> ObjCMethodConflicts;
 
   template <typename T>
   using OperatorMap = llvm::DenseMap<Identifier,llvm::PointerIntPair<T,1,bool>>;
@@ -1089,6 +1131,8 @@ public:
 
   virtual void
   getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &results) const override;
+  virtual void
+  getOpaqueReturnTypeDecls(SmallVectorImpl<OpaqueTypeDecl*> &results) const override;
 
   virtual void
   getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
@@ -1262,6 +1306,15 @@ public:
   void setSyntaxRoot(syntax::SourceFileSyntax &&Root);
   bool hasSyntaxRoot() const;
 
+  OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName,
+                                         LazyResolver *resolver) override;
+  
+  void addUnvalidatedDeclWithOpaqueResultType(ValueDecl *vd) {
+    UnvalidatedDeclsWithOpaqueReturnTypes.insert(vd);
+  }
+  
+  void markDeclWithOpaqueResultTypeAsValidated(ValueDecl *vd);
+  
 private:
 
   /// If not None, the underlying vector should contain tokens of this source file.
@@ -1300,7 +1353,7 @@ public:
   getDiscriminatorForPrivateValue(const ValueDecl *D) const override {
     llvm_unreachable("no private values in the Builtin module");
   }
-
+  
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::Builtin;
   }
