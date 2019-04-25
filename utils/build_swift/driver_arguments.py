@@ -620,11 +620,11 @@ def create_argument_parser():
            help='build the Debug variant of LLDB')
 
     option('--lldb-build-with-xcode', store('lldb_build_with_xcode'),
-           const='0',
+           const='1',
            help='build LLDB using xcodebuild, if possible')
 
     option('--lldb-build-with-cmake', store('lldb_build_with_xcode'),
-           const='1',
+           const='0',
            help='build LLDB using CMake')
 
     option('--debug-cmark', store('cmark_build_variant'),
