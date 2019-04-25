@@ -19,7 +19,7 @@ if(NOT SWIFT_ENABLE_TENSORFLOW)
 endif()
 
 find_package(TensorFlow REQUIRED)
-message(STATUS "Building TensorFlow.")
+message(STATUS "Building TensorFlowCore.")
 
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
@@ -32,30 +32,33 @@ list(APPEND swift_stdlib_compile_flags "-force-single-frontend-invocation")
 list(APPEND swift_stdlib_compile_flags "-Onone")
 list(APPEND swift_stdlib_compile_flags "-DCOMPILING_TENSORFLOW_MODULE")
 
-set(SOURCES "")
+set(SOURCES
+  CompilerRuntime.swift
+  DataTypes.swift
+  Execution.swift
+  ShapedArray.swift
+  StringTensor.swift
+  Tensor.swift
+  TensorGroup.swift
+  TensorHandle.swift
+  TensorProtocol.swift
+  TensorShape.swift
+  Utilities.swift
+  Threading.swift)
 
-# Copy TensorFlow high-level API sources, if they exist.
-if (TENSORFLOW_SWIFT_APIS)
-  file(GLOB_RECURSE TENSORFLOW_SWIFT_API_SOURCES
-    "${TENSORFLOW_SWIFT_APIS}/Sources/*.swift")
-  message(STATUS "Using TensorFlow high-level APIs library.")
-  list(APPEND SOURCES "${TENSORFLOW_SWIFT_API_SOURCES}")
+# Copy TensorFlow bindings file, if it exists.
+if (TENSORFLOW_SWIFT_BINDINGS)
+  file(GLOB_RECURSE TENSORFLOW_SWIFT_BINDINGS_SOURCES
+    "${TENSORFLOW_SWIFT_BINDINGS}/*.swift")
+  list(APPEND SOURCES "${TENSORFLOW_SWIFT_BINDINGS_SOURCES}")
 endif()
 
-# When Python exists, PythonConversion.swift imports it, so it must be
-# available at link time.
-set(TENSORFLOW_DEPENDS_PYTHON)
-if (SWIFT_PYTHON_EXISTS)
-  list(APPEND TENSORFLOW_DEPENDS_PYTHON SWIFT_MODULE_DEPENDS Python)
-endif()
-
-add_swift_target_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+add_swift_target_library(swiftTensorFlowCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   "${SOURCES}"
 
   INCORPORATE_OBJECT_LIBRARIES swiftCTensorFlow
   TARGET_SDKS OSX LINUX
   PRIVATE_LINK_LIBRARIES "${TF_LIBRARIES}"
-  SWIFT_MODULE_DEPENDS TensorFlowCore
   SWIFT_MODULE_DEPENDS SwiftOnoneSupport
   SWIFT_MODULE_DEPENDS_IOS Darwin
   SWIFT_MODULE_DEPENDS_OSX Darwin

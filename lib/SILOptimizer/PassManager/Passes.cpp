@@ -144,7 +144,6 @@ void swift::runSILTFPartitionPass(SILModule &Module) {
   // Verify the module, if required.
   if (Module.getOptions().VerifyAll)
     Module.verify();
-
 }
 
 void swift::runSILOptimizationPassesWithFileSpecification(SILModule &M,

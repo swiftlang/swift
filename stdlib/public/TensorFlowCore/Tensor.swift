@@ -56,7 +56,7 @@ public struct Tensor<Scalar : TensorFlowScalar> : TensorProtocol {
 
 @usableFromInline @inline(never)
 @_silgen_name("__tf_to_accel")
-func _TFToAcclerator<Scalar>(_ handle: TensorHandle<Scalar>) -> TensorHandle<Scalar> {
+func _TFToAccelerator<Scalar>(_ handle: TensorHandle<Scalar>) -> TensorHandle<Scalar> {
   return handle
 }
 
@@ -172,7 +172,7 @@ public extension Tensor {
   /// Mark memory transfer to accelerator.
   @inlinable @inline(__always)
   func toAccelerator() -> Tensor {
-    return Tensor(handle: _TFToAcclerator(handle))
+    return Tensor(handle: _TFToAccelerator(handle))
   }
 
   /// Mark memory transfer to host.
@@ -416,7 +416,10 @@ extension _TensorElementLiteral : ExpressibleByArrayLiteral {
   public typealias ArrayLiteralElement = _TensorElementLiteral<Scalar>
   @inlinable @inline(__always)
   public init(arrayLiteral elements: _TensorElementLiteral<Scalar>...) {
-    tensor = Raw.pack(elements.map { $0.tensor })
+    // FIXME: We cannot use Raw.pack here because _TensorElementLiteral does not
+    // conform to tensor group and if we do, several partitioning tests fail.
+    tensor = Tensor(handle: #tfop(
+      "Pack", elements, T$dtype: Scalar.tensorFlowDataType))
   }
 }
 
@@ -431,7 +434,10 @@ extension Tensor : ExpressibleByArrayLiteral {
   internal init(
     _tensorElementLiterals elements: [_TensorElementLiteral<Scalar>]
   ) {
-    self = Raw.pack(elements.map { $0.tensor })
+    // FIXME: We cannot use Raw.pack here because _TensorElementLiteral does not
+    // conform to tensor group and if we do, several partitioning tests fail.
+    self.init(handle: #tfop(
+      "Pack", elements, T$dtype: Scalar.tensorFlowDataType))
   }
 
   /// Creates a tensor initialized with the given elements.
@@ -442,64 +448,7 @@ extension Tensor : ExpressibleByArrayLiteral {
 }
 
 //===----------------------------------------------------------------------===//
-// Properties
-//===----------------------------------------------------------------------===//
-
-public extension Tensor {
-  /// The number of dimensions of the `Tensor`.
-  @inlinable
-  var rank: Int {
-    @inline(__always)
-    @_semantics("autodiff.nonvarying")
-    get {
-      return Int(_TFGetScalarOrDie(rankTensor.handle))
-    }
-  }
-
-  /// The dimensions of the `Tensor`.
-  @inlinable
-  var shape: TensorShape {
-    @inline(__always)
-    @_semantics("autodiff.nonvarying")
-    get {
-      return TensorShape(shapeTensor.scalars.map(Int.init))
-    }
-  }
-
-  /// The number of scalars in the `Tensor`.
-  @inlinable
-  var scalarCount: Int {
-    @inline(__always)
-    get {
-      return Int(_TFGetScalarOrDie(scalarCountTensor.handle))
-    }
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// Shape Transformations
-//===----------------------------------------------------------------------===//
-
-public extension Tensor {
-  /// Reshape to scalar.
-  /// - Precondition: The tensor has exactly one scalar.
-  @inlinable
-  @differentiable(wrt: self,
-                  vjp: _vjpScalarized where Scalar : TensorFlowFloatingPoint)
-  func scalarized() -> Scalar {
-    return _TFGetScalarOrDie(reshaped(to: []).handle)
-  }
-}
-
-extension Tensor where Scalar : TensorFlowFloatingPoint {
-  @inlinable
-  func _vjpScalarized() -> (Scalar, (Scalar) -> Tensor) {
-    return (scalarized(), { v in Tensor(v) })
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// Scalar conversion
+// Scalar Conversion
 //===----------------------------------------------------------------------===//
 
 public extension Tensor {
@@ -520,6 +469,24 @@ public extension Tensor {
     get {
       return Scalar(self)
     }
+  }
+
+  /// Reshape to scalar.
+  /// - Precondition: The tensor has exactly one scalar.
+  @inlinable
+  @differentiable(
+    wrt: self,
+    vjp: _vjpScalarized where Scalar : TensorFlowFloatingPoint)
+  func scalarized() -> Scalar {
+    return _TFGetScalarOrDie(Raw.reshape(
+      self, shape: Tensor<Int32>(handle: _TFTensorFromScalars1D([]))).handle)
+  }
+}
+
+internal extension Tensor where Scalar : TensorFlowFloatingPoint {
+  @inlinable
+  func _vjpScalarized() -> (Scalar, (Scalar) -> Tensor) {
+    return (scalarized(), { v in Tensor(v) })
   }
 }
 
@@ -555,4 +522,188 @@ public extension Tensor {
   var scalars: [Scalar] {
     return array.scalars
   }
+}
+
+//===----------------------------------------------------------------------===//
+// Tensor Properties
+//===----------------------------------------------------------------------===//
+
+public extension Tensor {
+  /// The number of dimensions of the `Tensor`.
+  @inlinable
+  var rank: Int {
+    @inline(__always)
+    @_semantics("autodiff.nonvarying")
+    get {
+      return Int(_TFGetScalarOrDie(rankTensor.handle))
+    }
+  }
+
+  /// The dimensions of the `Tensor`.
+  @inlinable
+  var shape: TensorShape {
+    @inline(__always)
+    @_semantics("autodiff.nonvarying")
+    get {
+      return TensorShape(shapeTensor.scalars.map(Int.init))
+    }
+  }
+
+  /// The number of scalars in the `Tensor`.
+  @inlinable
+  var scalarCount: Int {
+    @inline(__always)
+    get {
+      return Int(_TFGetScalarOrDie(scalarCountTensor.handle))
+    }
+  }
+
+  /// The rank of the tensor, represented as a `Tensor<Int32>`.
+  @inlinable
+  var rankTensor: Tensor<Int32> {
+    @_semantics("autodiff.nonvarying")
+    get {
+        return Raw.rank(self)
+    }
+  }
+
+  /// The dimensions of the tensor, represented as a `Tensor<Int32>`.
+  @inlinable
+  var shapeTensor: Tensor<Int32> {
+    @_semantics("autodiff.nonvarying")
+    get {
+        return Raw.shape(self)
+    }
+  }
+
+  /// The number of scalars in the tensor, represented as a `Tensor<Int32>`.
+  @inlinable
+  var scalarCountTensor: Tensor<Int32> {
+    @_semantics("autodiff.nonvarying")
+    get {
+        return Raw.size(self)
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Equatable
+//===----------------------------------------------------------------------===//
+
+extension Tensor : Equatable where Scalar : Equatable {
+  @inlinable
+  public static func == (lhs: Tensor, rhs: Tensor) -> Bool {
+    let equal = Raw.equal(lhs, rhs)
+    let axes = Raw.range(
+      start: Tensor<Int32>(0),
+      limit: Tensor<Int32>(Int32(equal.rank)),
+      delta: Tensor<Int32>(1))
+    return Raw.all(equal, reductionIndices: axes).scalarized()
+  }
+
+  @inlinable
+  public static func != (lhs: Tensor, rhs: Tensor) -> Bool {
+    let equal = Raw.equal(lhs, rhs)
+    let axes = Raw.range(
+      start: Tensor<Int32>(0),
+      limit: Tensor<Int32>(Int32(equal.rank)),
+      delta: Tensor<Int32>(1))
+    return Raw.any(equal, reductionIndices: axes).scalarized()
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Broadcasting
+//===----------------------------------------------------------------------===//
+
+// The following operators are placed in `TensorFlowCore` instead of
+// `TensorFlow` in order to allow `Tensor` to conform to `AdditiveArithmetic` 
+// and `Differentiable`.
+
+internal extension Tensor where Scalar : Numeric {
+  @inlinable
+  func unbroadcast(toShape otherShape: Tensor<Int32>) -> Tensor<Scalar> {
+    let rankDiff = Raw.expandDims(
+      rankTensor - otherShape.scalarCountTensor, dim: Tensor<Int32>(0))
+    let ones = Raw.fill(dims: rankDiff, value: Tensor<Int32>(1))
+    let paddedShape = Raw.concatV2([ones, otherShape], axis: Tensor<Int32>(0))
+    let broadcastIndices = Raw.where_(Raw.notEqual(paddedShape, shapeTensor))
+    let reductionIndices = Raw.reshape(
+      broadcastIndices, shape: Tensor<Int32>([-1]))
+    let unbroadcasted = Raw.sum(
+      self, reductionIndices: reductionIndices, keepDims: false)
+    return Raw.reshape(unbroadcasted, shape: otherShape)
+  }  
+}
+
+//===----------------------------------------------------------------------===//
+// Additive Group
+//===----------------------------------------------------------------------===//
+
+extension Tensor : AdditiveArithmetic where Scalar : Numeric {
+  /// A scalar zero tensor.
+  @inlinable
+  public static var zero: Tensor {
+    return Tensor(0)
+  }
+
+  /// Adds two tensors and produces their sum.
+  /// - Note: `+` supports broadcasting.
+  @inlinable @inline(__always)
+  @differentiable(
+    vjp: _vjpAdd(lhs:rhs:) where Scalar : TensorFlowFloatingPoint)
+  public static func + (lhs: Tensor, rhs: Tensor) -> Tensor {
+    return Raw.add(lhs, rhs)
+  }
+
+  /// Subtracts one tensor from another and produces their difference.
+  /// - Note: `-` supports broadcasting.
+  @inlinable @inline(__always)
+  @differentiable(
+    vjp: _vjpSubtract(lhs:rhs:) where Scalar : TensorFlowFloatingPoint)
+  public static func - (lhs: Tensor, rhs: Tensor) -> Tensor {
+    return Raw.sub(lhs, rhs)
+  }
+}
+
+internal extension Tensor where Scalar : TensorFlowFloatingPoint {
+  @inlinable
+  static func _vjpAdd(
+    lhs: Tensor,
+    rhs: Tensor
+  ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
+    return (lhs + rhs, {
+      [lhsShape = lhs.shapeTensor, rhsShape = rhs.shapeTensor] v in
+      (v.unbroadcast(toShape: lhsShape), v.unbroadcast(toShape: rhsShape))
+    })
+  }
+
+  @inlinable
+  static func _vjpSubtract(
+    lhs: Tensor,
+    rhs: Tensor
+  ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
+    return (lhs - rhs, {
+      [lhsShape = lhs.shapeTensor, rhsShape = rhs.shapeTensor] v in
+      (v.unbroadcast(toShape: lhsShape),
+        Raw.neg(v).unbroadcast(toShape: rhsShape))
+    })
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Differentiable
+//===----------------------------------------------------------------------===//
+
+extension Tensor : Differentiable where Scalar : TensorFlowFloatingPoint {
+    public typealias TangentVector = Tensor
+    public typealias CotangentVector = Tensor
+    public typealias AllDifferentiableVariables = Tensor
+
+    @inlinable
+    public func tangentVector(
+      from cotangent: CotangentVector
+    ) -> TangentVector {
+        return cotangent
+    }
 }

@@ -17,7 +17,7 @@ func add_constant(_ a: Tensor<Float>) -> Tensor<Float> {
 }
 
 // CHECK-LABEL: @{{.*}}accelerator_only14matmul_and_add{{.*}}
-// CHECK: graph_op "s16accelerator_only14matmul_and_addy10TensorFlow0F0VySfGAF_AFtF.tf_only{{.*}}
+// CHECK: graph_op "s16accelerator_only14matmul_and_addy14TensorFlowCore0F0VySfGAF_AFtF.tf_only{{.*}}
 // CHECK: end sil function {{.*}}accelerator_only14matmul_and_add{{.*}}
 @TensorFlowGraph
 @inline(never)

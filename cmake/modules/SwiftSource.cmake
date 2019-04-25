@@ -240,7 +240,8 @@ function(_compile_swift_files
     # Also, disable it for DifferentiationUnittest because resilience changes
     # the AD code # that gets generated (leading to additional leaks)
     # (see: TF-328)
-    if(NOT "${SWIFTFILE_MODULE_NAME}" STREQUAL "TensorFlow" AND
+    if(NOT "${SWIFTFILE_MODULE_NAME}" STREQUAL "TensorFlowCore" AND
+       NOT "${SWIFTFILE_MODULE_NAME}" STREQUAL "TensorFlow" AND
        NOT "${SWIFTFILE_MODULE_NAME}" STREQUAL "DifferentiationUnittest")
       list(APPEND swift_flags "-Xfrontend" "-enable-resilience")
     endif()

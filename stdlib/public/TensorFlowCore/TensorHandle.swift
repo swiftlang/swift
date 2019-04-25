@@ -111,10 +111,10 @@ extension TensorHandle where Scalar : TensorFlowScalar {
   ) {
     let contiguousSize = shape.reduce(1, *)
     let byteCount = contiguousSize * MemoryLayout<Scalar>.stride
-    self.init(shape: shape, byteCount: byteCount) { buffer in
-      scalarsInitializer(buffer.bindMemory(to: Scalar.self,
-                                           capacity: contiguousSize))
-    }
+    self.init(shape: shape, byteCount: byteCount, bufferInitializer: { buffer in
+      let pointer = buffer.bindMemory(to: Scalar.self, capacity: contiguousSize)
+      scalarsInitializer(pointer)
+    })
   }
 }
 

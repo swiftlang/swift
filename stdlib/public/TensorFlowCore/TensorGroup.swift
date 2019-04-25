@@ -36,6 +36,7 @@ public protocol TensorArrayProtocol {
   func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?)
 
   var _tensorHandleCount: Int32 { get }
+  var _typeList: [TensorDataType] { get }
 
   init(_owning tensorHandles: UnsafePointer<CTensorHandle>?, count: Int)
 }
@@ -69,13 +70,16 @@ public protocol TensorGroup : TensorArrayProtocol {
 public extension TensorGroup {
   /// The number of tensor fields in this type.
   static var _tensorHandleCount: Int32 { return Int32(Self._typeList.count) }
-  var _tensorHandleCount: Int32 { return Int32(Self._typeList.count) }
 
   /// An array of `nil`s with the same number of elements as `_outputTypeList`.
   /// The `nil` represents unknown shape.
   static var _unknownShapeList: [TensorShape?] {
     return Array(repeating: nil, count: _typeList.count)
   }
+  
+  // The following instance properties are from `TensorArrayProtocol`.
+  var _tensorHandleCount: Int32 { return Int32(Self._typeList.count) }
+  var _typeList: [TensorDataType] { return Self._typeList }
 
   init(_owning tensorHandles: UnsafePointer<CTensorHandle>?, count: Int) {
     precondition(count == Self._typeList.count)
@@ -223,9 +227,13 @@ extension Array : TensorArrayProtocol where Element : TensorGroup {
   }
 
   public var _tensorHandleCount: Int32 {
-    var count: Int32 = 0
-    for elem in self { count += elem._tensorHandleCount }
-    return count
+    return Element._tensorHandleCount * Int32(count)
+  }
+
+  public var _typeList: [TensorDataType] {
+    return Array<TensorDataType>([[TensorDataType]](
+      repeating: Element._typeList,
+      count: Int(Element._tensorHandleCount)).joined())
   }
 
   public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?, count: Int) {

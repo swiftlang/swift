@@ -481,16 +481,16 @@ public:
   CanType getAnyObjectType() const;
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Retrieve the decl for TensorFlow.TensorHandle iff the TensorFlow module
-  /// has been imported.  Otherwise, this returns null.
+  /// Retrieve the decl for TensorFlowCore.TensorHandle iff the TensorFlowCore 
+  /// module has been imported.  Otherwise, this returns null.
   ClassDecl *getTensorHandleDecl() const;
 
-  /// Retrieve the decl for TensorFlow.TensorShape iff the TensorFlow module
-  /// has been imported.  Otherwise, this returns null.
+  /// Retrieve the decl for TensorFlowCore.TensorShape iff the TensorFlowCore 
+  /// module has been imported.  Otherwise, this returns null.
   StructDecl *getTensorShapeDecl() const;
 
-  /// Retrieve the decl for TensorFlow.TensorDataType iff the TensorFlow module
-  /// has been imported.  Otherwise, this returns null.
+  /// Retrieve the decl for TensorFlowCore.TensorDataType iff the TensorFlowCore
+  /// module has been imported.  Otherwise, this returns null.
   StructDecl *getTensorDataTypeDecl() const;
 
   /// Retrieve the type for Swift._AutoDiffTape.

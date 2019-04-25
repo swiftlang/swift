@@ -436,16 +436,6 @@ public extension _ShapedArrayProtocol
   }
 }
 
-fileprivate extension _ShapedArrayProtocol where Scalar : Equatable {
-  func _isEqual(to other: Self) -> Bool {
-    return shape == other.shape && withUnsafeBufferPointer { selfBuf in
-      other.withUnsafeBufferPointer { otherBuf in
-        selfBuf.elementsEqual(otherBuf)
-      }
-    }
-  }
-}
-
 //===----------------------------------------------------------------------===//
 // ShapedArray
 //===----------------------------------------------------------------------===//
@@ -796,7 +786,7 @@ extension ShapedArray : CustomReflectable {
 }
 
 // Codable conformance.
-extension ShapedArray : Codable where Scalar : Codable {
+extension ShapedArray : Codable where Scalar: Codable {
   private enum CodingKeys: String, CodingKey {
     case shape
     case scalars
@@ -1181,7 +1171,7 @@ extension ShapedArraySlice : CustomReflectable {
 
 // Codable conformance.
 extension ShapedArraySlice : Codable where Scalar : Codable {
-  private enum CodingKeys : String, CodingKey {
+  private enum CodingKeys: String, CodingKey {
     case shape
     case scalars
   }
@@ -1197,5 +1187,15 @@ extension ShapedArraySlice : Codable where Scalar : Codable {
     let shape = try container.decode([Int].self, forKey: .shape)
     let scalars = try container.decode([Scalar].self, forKey: .scalars)
     self.init(shape: shape, scalars: scalars)
+  }
+}
+
+fileprivate extension _ShapedArrayProtocol where Scalar : Equatable {
+  func _isEqual(to other: Self) -> Bool {
+    return shape == other.shape && withUnsafeBufferPointer { selfBuf in
+      other.withUnsafeBufferPointer { otherBuf in
+        selfBuf.elementsEqual(otherBuf)
+      }
+    }
   }
 }

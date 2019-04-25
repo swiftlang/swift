@@ -2007,7 +2007,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   tf::GraphOperationInfo opInfo(i);
 
   // TODO: As an optimization, do this lookup once per CurSILFn
-  auto tfModule = astCtx.getLoadedModule(astCtx.Id_TensorFlow);
+  auto tfModule = astCtx.getLoadedModule(astCtx.Id_TensorFlowCore);
   assert(tfModule && "could not find TensorFlow module");
   auto inputTensorGroupProto =
       astCtx.getProtocol(KnownProtocolKind::TensorArrayProtocol);

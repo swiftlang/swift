@@ -821,14 +821,14 @@ CanType ASTContext::getAnyObjectType() const {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-/// Retrieve the decl for TensorFlow.TensorHandle iff the TensorFlow module has
-/// been imported.  Otherwise, this returns null.
+/// Retrieve the decl for TensorFlowCore.TensorHandle iff the TensorFlow module 
+/// has been imported.  Otherwise, this returns null.
 ClassDecl *ASTContext::getTensorHandleDecl() const {
   if (getImpl().TensorHandleDecl)
     return getImpl().TensorHandleDecl;
 
   // See if the TensorFlow module was imported.  If not, return null.
-  auto tfModule = getLoadedModule(Id_TensorFlow);
+  auto tfModule = getLoadedModule(Id_TensorFlowCore);
   if (!tfModule)
     return nullptr;
 
@@ -842,14 +842,14 @@ ClassDecl *ASTContext::getTensorHandleDecl() const {
   return nullptr;
 }
 
-/// Retrieve the decl for TensorFlow.TensorShape iff the TensorFlow module has
-/// been imported.  Otherwise, this returns null.
+/// Retrieve the decl for TensorFlowCore.TensorShape iff the TensorFlow module 
+/// has been imported.  Otherwise, this returns null.
 StructDecl *ASTContext::getTensorShapeDecl() const {
   if (getImpl().TensorShapeDecl)
     return getImpl().TensorShapeDecl;
 
   // See if the TensorFlow module was imported.  If not, return null.
-  auto tfModule = getLoadedModule(Id_TensorFlow);
+  auto tfModule = getLoadedModule(Id_TensorFlowCore);
   if (!tfModule)
     return nullptr;
 
@@ -863,14 +863,14 @@ StructDecl *ASTContext::getTensorShapeDecl() const {
   return nullptr;
 }
 
-/// Retrieve the decl for TensorFlow.TensorDataType iff the TensorFlow module has
-/// been imported.  Otherwise, this returns null.
+/// Retrieve the decl for TensorFlowCore.TensorDataType iff the TensorFlow 
+/// module has been imported.  Otherwise, this returns null.
 StructDecl *ASTContext::getTensorDataTypeDecl() const {
   if (getImpl().TensorDataTypeDecl)
     return getImpl().TensorDataTypeDecl;
 
   // See if the TensorFlow module was imported.  If not, return null.
-  auto tfModule = getLoadedModule(Id_TensorFlow);
+  auto tfModule = getLoadedModule(Id_TensorFlowCore);
   if (!tfModule)
     return nullptr;
 
@@ -987,7 +987,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::TensorFlowDataTypeCompatible:
   case KnownProtocolKind::TensorSendableReceivable:
   case KnownProtocolKind::TensorProtocol:
-    M = getLoadedModule(Id_TensorFlow);
+    M = getLoadedModule(Id_TensorFlowCore);
     break;
   default:
     M = getStdlibModule();
@@ -1886,7 +1886,7 @@ ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
           (ModulePath[0].first == StdlibModuleName ||
            ModulePath[0].first == Id_Foundation ||
            // SWIFT_ENABLE_TENSORFLOW
-           ModulePath[0].first == Id_TensorFlow))
+           ModulePath[0].first == Id_TensorFlowCore))
         recordKnownProtocols(M);
       return M;
     }

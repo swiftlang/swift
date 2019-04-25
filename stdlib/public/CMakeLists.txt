@@ -69,6 +69,7 @@ endif()
 if(SWIFT_BUILD_STDLIB AND SWIFT_ENABLE_TENSORFLOW)
   # TODO: Add TensorFlow support for iOS/Raspberry Pi.
   add_subdirectory(CTensorFlow)
+  add_subdirectory(TensorFlowCore)
   add_subdirectory(TensorFlow)
 endif()
 

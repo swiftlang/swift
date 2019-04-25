@@ -42,8 +42,8 @@ public func constexprCall(a: Tensor<Float>, idx: Tensor<Int32>) -> Tensor<Float>
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}constexprCall
  CHECK: [[A:%.*]] = graph_op "Const"() {dtype$dtype: i32 3, value$tensor: i32 0
  CHECK: [[B:%.*]] = graph_op "Const"
- CHECK: [[C:%.*]] = graph_op "Const"
- CHECK: [[RESULT:%.*]] = graph_op "OneHot"(%0 : $TensorHandle<Int32>, [[A]] : $TensorHandle<Int32>, [[B]] : $TensorHandle<Float>, [[C]] : $TensorHandle<Float>) {T$dtype: i32 1, TI$dtype: i32 3, axis: i64 1, __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
+ CHECK: [[C:%.*]] = graph_op "Const"() {dtype$dtype: i32 1, value$tensor: f32 0x0 /* 0 */, __device: "ALL_DEVICES"} : $TensorHandle<Float> // user: %4
+ CHECK: [[RESULT:%.*]] = graph_op "OneHot"(%0 : $TensorHandle<Int32>, [[A]] : $TensorHandle<Int32>, [[B]] : $TensorHandle<Float>, [[C]] : $TensorHandle<Float>) {axis: i64 1, T$dtype: i32 1, TI$dtype: i32 3, __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
   CHECK: return [[RESULT]]
 */
 

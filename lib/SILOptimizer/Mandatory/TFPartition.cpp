@@ -4478,7 +4478,7 @@ void TFPartition::run() {
   // If the TensorFlow module hasn't been imported by the program, don't do
   // anything.  This avoids impacting compile time for non-TensorFlow using
   // Swift programs by doing extraneous analysis.
-  tfModule = ctx.getLoadedModule(ctx.Id_TensorFlow);
+  tfModule = ctx.getLoadedModule(ctx.Id_TensorFlowCore);
   if (!tfModule)
     return;
 

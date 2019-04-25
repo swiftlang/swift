@@ -2424,8 +2424,8 @@ namespace {
       // The result type must conform to TensorGroup or be a tuple of types that
       // conform to TensorGroup.
 
-      auto tfModule = ctx.getLoadedModule(ctx.Id_TensorFlow);
-      assert(tfModule && "could not find TensorFlow module");
+      auto tfModule = ctx.getLoadedModule(ctx.Id_TensorFlowCore);
+      assert(tfModule && "could not find TensorFlowCore module");
       auto tensorGroupProto = ctx.getProtocol(KnownProtocolKind::TensorGroup);
       assert(tensorGroupProto && "could not find TensorGroup protocol");
 
