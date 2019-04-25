@@ -1628,10 +1628,6 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
     attr->setInvalid();
   }
 
-  if (!isa<TypeDecl>(D) && !D->hasInterfaceType()) {
-    ctx.getLazyResolver()->resolveDeclSignature(D);
-  }
-
   if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
     // Determine the foreign error convention.
     if (auto baseMethod = method->getOverriddenDecl()) {
