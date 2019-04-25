@@ -441,7 +441,7 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
   }
 
   // Attributes on VarDecl syntactically belong to PatternBindingDecl.
-  if (isa<VarDecl>(this))
+  if (isa<VarDecl>(this) && !isa<ParamDecl>(this))
     return Range;
 
   // Attributes on PatternBindingDecls are attached to VarDecls in AST.
