@@ -46,6 +46,12 @@ public func _stdlib_isOSVersionAtLeast(
 #endif
 }
 
+@inlinable
+internal var _stdlibCurrentVersion: (Int, Int) {
+  // On the master branch, increment the first number.
+  // On release branches, increment the second number.
+  return (1001, 0)
+}
 
 /// Returns the version number for the Swift Standard Library that the code
 /// calling this was originally compiled with.
@@ -58,11 +64,11 @@ public func _stdlib_isOSVersionAtLeast(
 /// The two integer components are not intended to correspond to major or minor
 /// versions in a semantic versioning scheme. Neither do they correlate with
 /// toolchain or OS version numbers.
-@_alwaysEmitIntoClient
 public var _stdlibStaticVersion: (Int, Int) {
-  // On the master branch, increment the first number.
-  // On release branches, increment the second number.
-  return (1001, 0)
+  @_alwaysEmitIntoClient
+  get {
+    return _stdlibCurrentVersion
+  }
 }
 
 /// Returns the version number for the Swift Standard Library that is currently
@@ -90,6 +96,6 @@ public var _stdlibDynamicVersion: (Int, Int) {
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 @usableFromInline
 internal var _stdlibOpaqueVersion: (Int, Int) {
-  return _stdlibStaticVersion
+  return _stdlibCurrentVersion
 }
 
