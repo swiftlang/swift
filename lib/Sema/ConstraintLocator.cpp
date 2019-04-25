@@ -79,6 +79,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case DynamicLookupResult:
     case ContextualType:
     case SynthesizedArgument:
+    case KeyPathType:
     case KeyPathRoot:
     case KeyPathValue:
       if (unsigned numValues = numNumericValuesInPathElement(elt.getKind())) {
@@ -101,6 +102,15 @@ bool ConstraintLocator::isSubscriptMemberRef() const {
     return false;
 
   return path.back().getKind() == ConstraintLocator::SubscriptMember;
+}
+
+bool ConstraintLocator::isKeyPathType() const {
+  auto *anchor = getAnchor();
+  auto path = getPath();
+  // The format of locator should be `<keypath expr> -> key path type`
+  if (!anchor || !isa<KeyPathExpr>(anchor) || path.size() != 1)
+    return false;
+  return path.back().getKind() == ConstraintLocator::KeyPathType;
 }
 
 bool ConstraintLocator::isKeyPathRoot() const {
@@ -337,6 +347,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case KeyPathDynamicMember:
       out << " keypath dynamic member lookup";
+      break;
+
+    case KeyPathType:
+      out << "key path type";
       break;
 
     case KeyPathRoot:

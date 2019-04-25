@@ -801,6 +801,31 @@ func test_keypath_with_method_refs() {
   let _ = \A.Type.faz.bar // expected-error {{key path cannot refer to static method 'faz()'}}
 }
 
+// SR-10467 - Argument type 'KeyPath<String, Int>' does not conform to expected type 'Any'
+func test_keypath_in_any_context() {
+  func foo(_: Any) {}
+  _ = foo(\String.count) // Ok
+}
+
+protocol PWithTypeAlias {
+  typealias Key = WritableKeyPath<Self, Int?>
+  static var fooKey: Key? { get }
+  static var barKey: Key! { get }
+  static var fazKey: Key?? { get }
+  static var bazKey: Key?! { get }
+}
+
+func test_keypath_inference_with_optionals() {
+  final class S : PWithTypeAlias {
+    static var fooKey: Key? { return \.foo }
+    static var barKey: Key! { return \.foo }
+    static var fazKey: Key?? { return \.foo }
+    static var bazKey: Key?! { return \.foo }
+
+    var foo: Int? = nil
+  }
+}
+
 func testSyntaxErrors() { // expected-note{{}}
   _ = \.  ; // expected-error{{expected member name following '.'}}
   _ = \.a ;

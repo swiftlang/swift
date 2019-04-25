@@ -3025,7 +3025,9 @@ namespace {
       } else {
         // The type of key path depends on the overloads chosen for the key
         // path components.
-        kpTy = CS.createTypeVariable(CS.getConstraintLocator(E));
+        auto typeLoc =
+            CS.getConstraintLocator(E, ConstraintLocator::KeyPathType);
+        kpTy = CS.createTypeVariable(typeLoc);
         CS.addKeyPathConstraint(kpTy, root, rvalueBase,
                                 CS.getConstraintLocator(E));
       }
