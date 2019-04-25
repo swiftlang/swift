@@ -161,8 +161,7 @@ extension TensorShape : Codable {
 }
 
 extension TensorShape : CustomStringConvertible {
-  @inlinable
   public var description: String {
-    return "TensorShape(\(dimensions))"
-    }
+    return dimensions.description
+  }
 }
