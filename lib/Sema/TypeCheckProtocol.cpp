@@ -4289,12 +4289,6 @@ void TypeChecker::markConformanceUsed(ProtocolConformanceRef conformance,
     // Make sure that the type checker completes this conformance.
     if (normalConformance->isIncomplete())
       UsedConformances.insert(normalConformance);
-
-    // Record the usage of this conformance in the enclosing source
-    // file.
-    if (auto sf = dc->getParentSourceFile()) {
-      sf->addUsedConformance(normalConformance);
-    }
   }
 }
 
