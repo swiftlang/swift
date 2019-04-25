@@ -1306,3 +1306,8 @@ class SR_9267_C {
 class SR_9267_C2 {
   let SR_9267_prop_3: Int = { return 0 } // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} // expected-note {{Remove '=' to make 'SR_9267_prop_3' a computed property}}{{3-6=var}}{{27-29=}}
 }
+
+class LazyPropInClass {
+  lazy var foo: Int = { return 0 } // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}}
+  // expected-note@-1 {{Remove '=' to make 'foo' a computed property}}{{21-23=}}{{3-8=}}
+}
