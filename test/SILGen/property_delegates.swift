@@ -1,12 +1,12 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-silgen | %FileCheck %s
 // FIXME: switch to %target-swift-emit-silgen once we have syntax tree support
 
-@propertyDelegate
+@_propertyDelegate
 struct Wrapper<T> {
   var value: T
 }
 
-@propertyDelegate
+@_propertyDelegate
 struct WrapperWithInitialValue<T> {
   var value: T
 
@@ -111,7 +111,7 @@ func forceHasMemberwiseInit() {
 // CHECK: [[DELEGATE_VALUE:%.*]] = load [take] [[STACK_SLOT]] : $*HasNested<T>.PrivateDelegate<Array<T>>
 // CHECK: struct $HasNested<T> ([[DELEGATE_VALUE]] : $HasNested<T>.PrivateDelegate<Array<T>>)
 struct HasNested<T> {
-  @propertyDelegate
+  @_propertyDelegate
   private struct PrivateDelegate<U> {
     var value: U
     init(initialValue: U) {
@@ -189,7 +189,7 @@ struct DelegateWithDidSetWillSet {
   }
 }
 
-@propertyDelegate
+@_propertyDelegate
 struct WrapperWithStorageValue<T> {
   var value: T
 
@@ -206,7 +206,7 @@ struct UseWrapperWithStorageValue {
   @WrapperWithStorageValue(value: 17) var x: Int
 }
 
-@propertyDelegate
+@_propertyDelegate
 enum Lazy<Value> {
   case uninitialized(() -> Value)
   case initialized(Value)

@@ -4,7 +4,7 @@
 
 // REQUIRES: executable_test
 
-@propertyDelegate
+@_propertyDelegate
 struct Wrapper<T> {
   var value: T {
     didSet {

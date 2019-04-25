@@ -3,12 +3,12 @@
 // ---------------------------------------------------------------------------
 // Property delegate type definitions
 // ---------------------------------------------------------------------------
-@propertyDelegate
+@_propertyDelegate
 struct Wrapper<T> {
   var value: T
 }
 
-@propertyDelegate
+@_propertyDelegate
 struct WrapperWithInitialValue<T> {
   var value: T
 
@@ -17,7 +17,7 @@ struct WrapperWithInitialValue<T> {
   }
 }
 
-@propertyDelegate
+@_propertyDelegate
 struct WrapperAcceptingAutoclosure<T> {
   private let fn: () -> T
 
@@ -34,30 +34,30 @@ struct WrapperAcceptingAutoclosure<T> {
   }
 }
 
-@propertyDelegate
+@_propertyDelegate
 struct MissingValue<T> { }
 // expected-error@-1{{property delegate type 'MissingValue' does not contain a non-static property named 'value'}}
 
-@propertyDelegate
+@_propertyDelegate
 struct StaticValue {
   static var value: Int = 17
 }
 // expected-error@-3{{property delegate type 'StaticValue' does not contain a non-static property named 'value'}}
 
 
-// expected-error@+1{{'@propertyDelegate' attribute cannot be applied to this declaration}}
-@propertyDelegate
+// expected-error@+1{{'@_propertyDelegate' attribute cannot be applied to this declaration}}
+@_propertyDelegate
 protocol CannotBeADelegate {
   associatedtype Value
   var value: Value { get set }
 }
 
-@propertyDelegate
+@_propertyDelegate
 struct NonVisibleValueDelegate<Value> {
   private var value: Value // expected-error{{private property 'value' cannot have more restrictive access than its enclosing property delegate type 'NonVisibleValueDelegate' (which is internal)}}
 }
 
-@propertyDelegate
+@_propertyDelegate
 struct NonVisibleInitDelegate<Value> {
   var value: Value
 
@@ -66,7 +66,7 @@ struct NonVisibleInitDelegate<Value> {
   }
 }
 
-@propertyDelegate
+@_propertyDelegate
 struct InitialValueTypeMismatch<Value> {
   var value: Value // expected-note{{'value' declared here}}
 
@@ -75,7 +75,7 @@ struct InitialValueTypeMismatch<Value> {
   }
 }
 
-@propertyDelegate
+@_propertyDelegate
 struct MultipleInitialValues<Value> { // expected-error{{property delegate type 'MultipleInitialValues' has multiple initial-value initializers}}
   var value: Value? = nil
 
@@ -86,7 +86,7 @@ struct MultipleInitialValues<Value> { // expected-error{{property delegate type 
   }
 }
 
-@propertyDelegate
+@_propertyDelegate
 struct InitialValueFailable<Value> {
   var value: Value
 
@@ -95,7 +95,7 @@ struct InitialValueFailable<Value> {
   }
 }
 
-@propertyDelegate
+@_propertyDelegate
 struct InitialValueFailableIUO<Value> {
   var value: Value
 
@@ -107,12 +107,12 @@ struct InitialValueFailableIUO<Value> {
 // ---------------------------------------------------------------------------
 // Property delegate type definitions
 // ---------------------------------------------------------------------------
-@propertyDelegate
+@_propertyDelegate
 struct _lowercaseDelegate<T> { // expected-error{{property delegate type name must start with an uppercase letter}}
   var value: T
 }
 
-@propertyDelegate
+@_propertyDelegate
 struct _UppercaseDelegate<T> {
   var value: T
 }
@@ -228,17 +228,17 @@ struct Initialization {
 // ---------------------------------------------------------------------------
 // Delegate type formation
 // ---------------------------------------------------------------------------
-@propertyDelegate
+@_propertyDelegate
 struct IntWrapper {
   var value: Int
 }
 
-@propertyDelegate
+@_propertyDelegate
 struct WrapperForHashable<T: Hashable> {
   var value: T
 }
 
-@propertyDelegate
+@_propertyDelegate
 struct WrapperWithTwoParams<T, U> {
   var value: (T, U)
 }
@@ -270,7 +270,7 @@ struct UseWrappersWithDifferentForm {
 // Nested delegates
 // ---------------------------------------------------------------------------
 struct HasNestedDelegate<T> {
-  @propertyDelegate
+  @_propertyDelegate
   struct NestedDelegate<U> {
     var value: U
     init(initialValue: U) {
@@ -367,7 +367,7 @@ struct UseWillSetDidSet {
 // ---------------------------------------------------------------------------
 // Mutating/nonmutating
 // ---------------------------------------------------------------------------
-@propertyDelegate
+@_propertyDelegate
 struct DelegateWithNonMutatingSetter<Value> {
   class Box {
     var value: Value
@@ -388,7 +388,7 @@ struct DelegateWithNonMutatingSetter<Value> {
   }
 }
 
-@propertyDelegate
+@_propertyDelegate
 struct DelegateWithMutatingGetter<Value> {
   var readCount = 0
   var writeCount = 0
@@ -410,7 +410,7 @@ struct DelegateWithMutatingGetter<Value> {
   }
 }
 
-@propertyDelegate
+@_propertyDelegate
 class ClassDelegate<Value> {
   var value: Value
 
@@ -469,7 +469,7 @@ func testMutatingness() {
 // Access control
 // ---------------------------------------------------------------------------
 struct HasPrivateDelegate<T> {
-  @propertyDelegate
+  @_propertyDelegate
   private struct PrivateDelegate<U> { // expected-note{{type declared here}}
     var value: U
     init(initialValue: U) {
@@ -487,7 +487,7 @@ struct HasPrivateDelegate<T> {
 }
 
 public struct HasUsableFromInlineDelegate<T> {
-  @propertyDelegate
+  @_propertyDelegate
   struct InternalDelegate<U> { // expected-note{{type declared here}}
     var value: U
     init(initialValue: U) {
@@ -501,7 +501,7 @@ public struct HasUsableFromInlineDelegate<T> {
   // expected-error@-1{{property delegate type referenced from a '@usableFromInline' property must be '@usableFromInline' or public}}
 }
 
-@propertyDelegate
+@_propertyDelegate
 class Box<Value> {
   private(set) var value: Value
 
@@ -613,7 +613,7 @@ func testDefaultInitializers() {
 // ---------------------------------------------------------------------------
 // Storage references
 // ---------------------------------------------------------------------------
-@propertyDelegate
+@_propertyDelegate
 struct WrapperWithStorageRef<T> {
   var value: T
 
@@ -652,7 +652,7 @@ func testStorageRef(tsr: TestStorageRef) {
 // ---------------------------------------------------------------------------
 // Misc. semantic issues
 // ---------------------------------------------------------------------------
-@propertyDelegate
+@_propertyDelegate
 struct BrokenLazy { }
 // expected-error@-1{{property delegate type 'BrokenLazy' does not contain a non-static property named 'value'}}
 // expected-note@-2{{'BrokenLazy' declared here}}

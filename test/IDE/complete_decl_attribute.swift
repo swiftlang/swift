@@ -66,7 +66,7 @@ class C {}
 // KEYWORD3-NEXT:             Keyword/None:                       objcMembers[#Class Attribute#]; name=objcMembers{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       NSApplicationMain[#Class Attribute#]; name=NSApplicationMain{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       usableFromInline[#Class Attribute#]; name=usableFromInline
-// KEYWORD3-NEXT:             Keyword/None:                       propertyDelegate[#Class Attribute#]; name=propertyDelegate
+// KEYWORD3-NEXT:             Keyword/None:                       _propertyDelegate[#Class Attribute#]; name=_propertyDelegate
 // KEYWORD3-NEXT:             End completions
 
 @#^KEYWORD3_2^#IB
@@ -81,7 +81,7 @@ enum E {}
 // KEYWORD4-NEXT:             Keyword/None:                       dynamicCallable[#Enum Attribute#]; name=dynamicCallable
 // KEYWORD4-NEXT:             Keyword/None:                       dynamicMemberLookup[#Enum Attribute#]; name=dynamicMemberLookup
 // KEYWORD4-NEXT:             Keyword/None:                       usableFromInline[#Enum Attribute#]; name=usableFromInline
-// KEYWORD4-NEXT:             Keyword/None:                       propertyDelegate[#Enum Attribute#]; name=propertyDelegate
+// KEYWORD4-NEXT:             Keyword/None:                       _propertyDelegate[#Enum Attribute#]; name=_propertyDelegate
 // KEYWORD4-NEXT:             End completions
 
 
@@ -92,7 +92,7 @@ struct S{}
 // KEYWORD5-NEXT:             Keyword/None:                       dynamicCallable[#Struct Attribute#]; name=dynamicCallable
 // KEYWORD5-NEXT:             Keyword/None:                       dynamicMemberLookup[#Struct Attribute#]; name=dynamicMemberLookup
 // KEYWORD5-NEXT:             Keyword/None:                       usableFromInline[#Struct Attribute#]; name=usableFromInline
-// KEYWORD5-NEXT:             Keyword/None:                       propertyDelegate[#Struct Attribute#]; name=propertyDelegate
+// KEYWORD5-NEXT:             Keyword/None:                       _propertyDelegate[#Struct Attribute#]; name=_propertyDelegate
 // KEYWORD5-NEXT:             End completions
 
 
@@ -120,5 +120,5 @@ struct S{}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       usableFromInline[#Declaration Attribute#]; name=usableFromInline{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       discardableResult[#Declaration Attribute#]; name=discardableResult
 // KEYWORD_LAST-NEXT:             Keyword/None:                       GKInspectable[#Declaration Attribute#]; name=GKInspectable{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       propertyDelegate[#Declaration Attribute#]; name=propertyDelegate
+// KEYWORD_LAST-NEXT:             Keyword/None:                       _propertyDelegate[#Declaration Attribute#]; name=_propertyDelegate
 // KEYWORD_LAST-NEXT:             End completions

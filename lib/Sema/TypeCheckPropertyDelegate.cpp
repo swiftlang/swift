@@ -170,7 +170,7 @@ static ConstructorDecl *findInitialValueInit(ASTContext &ctx,
 llvm::Expected<PropertyDelegateTypeInfo>
 PropertyDelegateTypeInfoRequest::evaluate(
     Evaluator &eval, NominalTypeDecl *nominal) const {
-  // We must have the @propertyDelegate attribute to continue.
+  // We must have the @_propertyDelegate attribute to continue.
   if (!nominal->getAttrs().hasAttribute<PropertyDelegateAttr>()) {
     return PropertyDelegateTypeInfo();
   }
@@ -203,7 +203,7 @@ AttachedPropertyDelegateRequest::evaluate(Evaluator &evaluator,
     auto nominal = evaluateOrDefault(
       ctx.evaluator, CustomAttrNominalRequest{mutableAttr, dc}, nullptr);
 
-    // If we didn't find a nominal type with a @propertyDelegate attribute,
+    // If we didn't find a nominal type with a @_propertyDelegate attribute,
     // skip this custom attribute.
     if (!nominal || !nominal->getAttrs().hasAttribute<PropertyDelegateAttr>())
       continue;
