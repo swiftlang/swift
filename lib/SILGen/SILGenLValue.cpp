@@ -1422,10 +1422,6 @@ namespace {
         SILValue setterFRef = SGF.emitGlobalFunctionRef(loc, setter, setterInfo);
         auto setterSubs = SGF.getFunction().getForwardingSubstitutionMap();
 
-        SILType closureTy = SILGenBuilder::getPartialApplyResultType(
-            setterFRef->getType(), 1, SGF.SGM.M, setterSubs,
-            ParameterConvention::Direct_Guaranteed);
-
         CanSILFunctionType setterTy = setterFRef->getType().castTo<SILFunctionType>();
         SILFunctionConventions setterConv(setterTy, SGF.SGM.M);
 
@@ -1438,8 +1434,9 @@ namespace {
         }
 
         PartialApplyInst *setterPAI =
-          SGF.B.createPartialApply(loc, setterFRef, setterFRef->getType(),
-                                   setterSubs, { capturedBase }, closureTy);
+          SGF.B.createPartialApply(loc, setterFRef,
+                                   setterSubs, { capturedBase },
+                                   ParameterConvention::Direct_Guaranteed);
         ManagedValue setterFn = SGF.emitManagedRValueWithCleanup(setterPAI);
 
         // Create the assign_by_delegate with the allocator and setter.

@@ -142,6 +142,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
     .emitVTableThunk(derived, implFn, basePattern,
                      overrideInfo.LoweredType,
                      derivedInfo.LoweredType);
+  emitLazyConformancesForFunction(thunk);
 
   return SILVTable::Entry(base, thunk, implKind, implLinkage);
 }
@@ -453,11 +454,7 @@ public:
     });
 
     // Emit the witness table for the base conformance if it is shared.
-    auto *normal = conformance->getRootNormalConformance();
-
-    if (getLinkageForProtocolConformance(normal, NotForDefinition)
-          == SILLinkage::Shared)
-      SGM.getWitnessTable(normal);
+    SGM.useConformance(ProtocolConformanceRef(conformance));
   }
 
   Witness getWitness(ValueDecl *decl) {
@@ -710,6 +707,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
                           requirement, reqtSubMap, witnessRef,
                           witnessSubs, isFree, /*isSelfConformance*/ false);
 
+  emitLazyConformancesForFunction(f);
   return f;
 }
 
@@ -778,6 +776,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, reqtSubs, requirement,
                           witnessSubs, isFree, /*isSelfConformance*/ true);
+
+  SGM.emitLazyConformancesForFunction(f);
 
   return f;
 }

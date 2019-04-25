@@ -1781,12 +1781,11 @@ static void emitRawApply(SILGenFunction &SGF,
   }
 
   auto resultType = substFnConv.getSILResultType();
-  auto calleeType = SILType::getPrimitiveObjectType(substFnType);
 
   // If the function is a coroutine, we need to use 'begin_apply'.
   if (substFnType->isCoroutine()) {
     assert(!substFnType->hasErrorResult());
-    auto apply = SGF.B.createBeginApply(loc, fnValue, subs, argValues);
+    auto apply = SGF.B.createBeginApply(loc, fnValue, subs, argValues, false);
     for (auto result : apply->getAllResults())
       rawResults.push_back(result);
     return;
@@ -1794,8 +1793,7 @@ static void emitRawApply(SILGenFunction &SGF,
 
   // If we don't have an error result, we can make a simple 'apply'.
   if (!substFnType->hasErrorResult()) {
-    auto result = SGF.B.createApply(loc, fnValue, calleeType,
-                                    resultType, subs, argValues);
+    auto result = SGF.B.createApply(loc, fnValue, subs, argValues, false);
     rawResults.push_back(result);
 
   // Otherwise, we need to create a try_apply.
@@ -1809,7 +1807,7 @@ static void emitRawApply(SILGenFunction &SGF,
       SGF.getTryApplyErrorDest(loc, substFnType->getErrorResult(),
                                options & ApplyOptions::DoesNotThrow);
 
-    SGF.B.createTryApply(loc, fnValue, calleeType, subs, argValues,
+    SGF.B.createTryApply(loc, fnValue, subs, argValues,
                          normalBB, errorBB);
     SGF.B.emitBlock(normalBB);
   }
@@ -4007,19 +4005,10 @@ CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
     S.pop();
   }
   auto calleeConvention = ParameterConvention::Direct_Guaranteed;
-  auto closureTy = SILGenBuilder::getPartialApplyResultType(
-      constantInfo.getSILType(), 1, SGF.B.getModule(), subs, calleeConvention);
 
-  auto &module = SGF.getFunction().getModule();
-
-  auto partialApplyTy = functionTy;
-  if (constantInfo.SILFnType->isPolymorphic() && !subs.empty())
-    partialApplyTy = partialApplyTy.substGenericArgs(module, subs);
-
-  ManagedValue pa = SGF.B.createPartialApply(loc, superMethod, partialApplyTy,
+  ManagedValue pa = SGF.B.createPartialApply(loc, superMethod,
                                              subs, {upcastedSelf},
-                                             closureTy);
-  assert(!closureTy.castTo<SILFunctionType>()->isNoEscape());
+                                             calleeConvention);
   firstLevelResult.value = RValue(SGF, loc, formalApplyType.getResult(), pa);
   return firstLevelResult;
 }
@@ -4544,12 +4533,12 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   SILType resultType = fnConv.getSILResultType();
 
   if (!silFnType->hasErrorResult()) {
-    return B.createApply(loc, fn, substFnType, resultType, subs, args);
+    return B.createApply(loc, fn, subs, args, false);
   }
 
   SILBasicBlock *errorBB = createBasicBlock();
   SILBasicBlock *normalBB = createBasicBlock();
-  B.createTryApply(loc, fn, substFnType, subs, args, normalBB, errorBB);
+  B.createTryApply(loc, fn, subs, args, normalBB, errorBB);
 
   // Emit the rethrow logic.
   {
@@ -4578,7 +4567,7 @@ SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
   // TODO: adjust this to create try_begin_apply when appropriate.
   assert(!substFnType.castTo<SILFunctionType>()->hasErrorResult());
 
-  auto beginApply = B.createBeginApply(loc, fn, subs, args);
+  auto beginApply = B.createBeginApply(loc, fn, subs, args, false);
 
   auto yieldResults = beginApply->getYieldedValues();
   yields.append(yieldResults.begin(), yieldResults.end());
@@ -5728,26 +5717,20 @@ static ManagedValue emitDynamicPartialApply(SILGenFunction &SGF,
                                          CanAnyFunctionType nativeFormalType) {
   auto calleeConvention = ParameterConvention::Direct_Guaranteed;
 
-  auto partialApplyTy =
-      SILBuilder::getPartialApplyResultType(method->getType(),
-                                            /*argCount*/ 1, SGF.SGM.M,
-                                            /*subs*/ {}, calleeConvention);
-
   // Retain 'self' because the partial apply will take ownership.
   // We can't simply forward 'self' because the partial apply is conditional.
   if (!self->getType().isAddress())
     self = SGF.B.emitCopyValueOperation(loc, self);
 
   SILValue resultValue =
-    SGF.B.createPartialApply(loc, method, method->getType(), {},
-                             self, partialApplyTy);
+    SGF.B.createPartialApply(loc, method, {}, self, calleeConvention);
   ManagedValue result = SGF.emitManagedRValueWithCleanup(resultValue);
 
   // If necessary, thunk to the native ownership conventions and bridged types.
   auto nativeTy =
     SGF.getLoweredLoadableType(nativeFormalType).castTo<SILFunctionType>();
 
-  if (nativeTy != partialApplyTy.getASTType()) {
+  if (nativeTy != resultValue->getType().getASTType()) {
     result = SGF.emitBlockToFunc(loc, result, foreignFormalType,
                                  nativeFormalType, nativeTy);
   }
