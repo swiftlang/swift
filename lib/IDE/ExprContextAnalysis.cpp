@@ -633,6 +633,12 @@ class ExprContextAnalyzer {
       break;
     }
     default:
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+        assert(isSingleExpressionBodyForCodeCompletion(AFD->getBody()));
+        singleExpressionBody = true;
+        recordPossibleType(getReturnTypeFromContext(AFD));
+        break;
+      }
       llvm_unreachable("Unhandled decl kind.");
     }
   }
@@ -653,6 +659,14 @@ class ExprContextAnalyzer {
     }
   }
 
+  /// Whether the given \c BraceStmt, which must be the body of a function or
+  /// closure, should be treated as a single-expression return for the purposes
+  /// of code-completion.
+  ///
+  /// We cannot use hasSingleExpressionBody, because we explicitly do not use
+  /// the single-expression-body when there is code-completion in the expression
+  /// in order to avoid a base expression affecting the type. However, now that
+  /// we've typechecked, we will take the context type into account.
   static bool isSingleExpressionBodyForCodeCompletion(BraceStmt *body) {
     return body->getNumElements() == 1 && body->getElements()[0].is<Expr *>();
   }
@@ -698,15 +712,9 @@ public:
                  (!isa<CallExpr>(ParentE) && !isa<SubscriptExpr>(ParentE) &&
                   !isa<BinaryExpr>(ParentE));
         }
-        case ExprKind::Closure: {
-          // Note: we cannot use hasSingleExpressionBody, because we explicitly
-          // do not use the single-expression-body when there is code-completion
-          // in the expression in order to avoid a base expression affecting
-          // the type. However, now that we've typechecked, we will take the
-          // context type into account.
+        case ExprKind::Closure:
           return isSingleExpressionBodyForCodeCompletion(
               cast<ClosureExpr>(E)->getBody());
-        }
         default:
           return false;
         }
@@ -727,6 +735,9 @@ public:
         case DeclKind::PatternBinding:
           return true;
         default:
+          if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
+            if (auto *body = AFD->getBody())
+              return isSingleExpressionBodyForCodeCompletion(body);
           return false;
         }
       } else if (auto P = Node.getAsPattern()) {

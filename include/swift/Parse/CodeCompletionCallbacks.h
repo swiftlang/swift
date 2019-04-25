@@ -183,7 +183,7 @@ public:
       SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) {};
 
   /// Complete at the beginning of accessor in a accessor block.
-  virtual void completeAccessorBeginning() {};
+  virtual void completeAccessorBeginning(CodeCompletionExpr *E) {};
 
   /// Complete the keyword in attribute, for instance, @available.
   virtual void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) {};
