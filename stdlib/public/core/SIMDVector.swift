@@ -1422,7 +1422,7 @@ where T: SIMD, T.Scalar: FloatingPoint {
 
 /// The lanewise maximum of two vectors.
 ///
-/// Each element of the result is the minimum of the corresponding elements
+/// Each element of the result is the maximum of the corresponding elements
 /// of the inputs.
 @_alwaysEmitIntoClient
 public func pointwiseMax<T>(_ a: T, _ b: T) -> T
