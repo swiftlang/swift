@@ -551,7 +551,7 @@ public:
 /// Retrieve the structural type of an alias type.
 class StructuralTypeRequest :
     public SimpleRequest<StructuralTypeRequest,
-                         CacheKind::SeparatelyCached,
+                         CacheKind::Cached,
                          Type,
                          TypeAliasDecl*> {
 public:
@@ -568,12 +568,9 @@ public:
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
-  // Separate caching.
-  bool isCached() const { return true; };
-  Optional<Type> getCachedResult() const;
-  void cacheResult(Type value) const;
+  // Caching.
+  bool isCached() const { return true; }
 };
-
 
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
