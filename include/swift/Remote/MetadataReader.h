@@ -1654,6 +1654,11 @@ private:
 
         return cloneDemangleNode(result, dem);
       }
+      case Demangle::SymbolicReferenceKind::AccessorFunctionReference: {
+        // The symbolic reference points at a resolver function, but we can't
+        // execute code in the target process to resolve it from here.
+        return nullptr;
+      }
       }
 
       return nullptr;

@@ -359,6 +359,12 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
       }
       // \1 - direct reference, \2 - indirect reference
       baseKind = 1;
+    } else if (auto copaque = symbolic.first.dyn_cast<const OpaqueTypeDecl*>()){
+      auto opaque = const_cast<OpaqueTypeDecl*>(copaque);
+      IRGen.noteUseOfOpaqueTypeDescriptor(opaque);
+      ref = getAddrOfLLVMVariableOrGOTEquivalent(
+                                   LinkEntity::forOpaqueTypeDescriptor(opaque));
+      baseKind = 1;
     } else {
       llvm_unreachable("unhandled symbolic referent");
     }

@@ -2006,6 +2006,10 @@ void Remangler::mangleProtocolSymbolicReference(Node *node, EntityContext&) {
   unreachable("unsupported");
 }
 
+void Remangler::mangleOpaqueTypeDescriptorSymbolicReference(Node *node) {
+  unreachable("unsupported");
+}
+
 void Remangler::mangleSugaredOptional(Node *node) {
   unreachable("unsupported");
 }
@@ -2020,6 +2024,22 @@ void Remangler::mangleSugaredDictionary(Node *node) {
 
 void Remangler::mangleSugaredParen(Node *node) {
   unreachable("unsupported");
+}
+
+void Remangler::mangleOpaqueReturnType(Node *node) {
+  unreachable("unsupported");
+}
+void Remangler::mangleOpaqueReturnTypeOf(Node *node, EntityContext &ctx) {
+  unreachable("unsupported");
+}
+void Remangler::mangleOpaqueType(Node *node) {
+  unreachable("unsupported");
+}
+void Remangler::mangleOpaqueTypeDescriptor(Node *node) {
+  unreachable("unsupported");
+}
+void Remangler::mangleAccessorFunctionReference(Node *node) {
+  unreachable("can't remangle");
 }
 
 /// The top-level interface to the remangler.

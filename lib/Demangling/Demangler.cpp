@@ -651,7 +651,7 @@ NodePointer Demangler::demangleTypeMangling() {
   TypeMangling = addChild(TypeMangling, Type);
   return TypeMangling;
 }
-  
+
 NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind,
                                                  const void *at) {
   // The symbolic reference is a 4-byte machine integer encoded in the following
@@ -672,6 +672,10 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind,
     kind = SymbolicReferenceKind::Context;
     direct = Directness::Indirect;
     break;
+  case 9:
+    kind = SymbolicReferenceKind::AccessorFunctionReference;
+    direct = Directness::Direct;
+    break;
   default:
     return nullptr;
   }
@@ -686,17 +690,22 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind,
     return nullptr;
   
   // Types register as substitutions even when symbolically referenced.
-  if (kind == SymbolicReferenceKind::Context)
+  if (kind == SymbolicReferenceKind::Context &&
+      resolved->getKind() != Node::Kind::OpaqueTypeDescriptorSymbolicReference)
     addSubstitution(resolved);
   return resolved;
 }
 
 NodePointer Demangler::demangleOperator() {
-  switch (char c = nextChar()) {
-    case '\1':
-    case '\2':
-    case '\3':
-    case '\4':
+recur:
+  switch (unsigned char c = nextChar()) {
+    case 0xFF:
+      // A 0xFF byte is used as alignment padding for symbolic references
+      // when the platform toolchain has alignment restrictions for the
+      // relocations that form the reference value. It can be skipped.
+      goto recur;
+    case 1: case 2:   case 3:   case 4:   case 5: case 6: case 7: case 8:
+    case 9: case 0xA: case 0xB: case 0xC:
       return demangleSymbolicReference((unsigned char)c, Text.data() + Pos);
     case 'A': return demangleMultiSubstitutions();
     case 'B': return demangleBuiltinType();
@@ -1513,8 +1522,9 @@ NodePointer Demangler::demangleRetroactiveConformance() {
   return createWithChildren(Node::Kind::RetroactiveConformance, index, conformance);
 }
 
-NodePointer Demangler::demangleBoundGenericType() {
-  NodePointer RetroactiveConformances = nullptr;
+bool Demangler::demangleBoundGenerics(Vector<NodePointer> &TypeListList,
+                                      NodePointer &RetroactiveConformances) {
+  RetroactiveConformances = nullptr;
   while (auto RetroactiveConformance =
          popNode(Node::Kind::RetroactiveConformance)) {
     if (!RetroactiveConformances)
@@ -1523,8 +1533,7 @@ NodePointer Demangler::demangleBoundGenericType() {
   }
   if (RetroactiveConformances)
     RetroactiveConformances->reverseChildren();
-
-  Vector<NodePointer> TypeListList(*this, 4);
+  
   for (;;) {
     NodePointer TList = createNode(Node::Kind::TypeList);
     TypeListList.push_back(TList, *this);
@@ -1532,14 +1541,28 @@ NodePointer Demangler::demangleBoundGenericType() {
       TList->addChild(Ty, *this);
     }
     TList->reverseChildren();
-
+    
     if (popNode(Node::Kind::EmptyList))
       break;
     if (!popNode(Node::Kind::FirstElementMarker))
-      return nullptr;
+      return false;
   }
+  return true;
+}
+
+NodePointer Demangler::demangleBoundGenericType() {
+  NodePointer RetroactiveConformances;
+  Vector<NodePointer> TypeListList(*this, 4);
+  
+  if (!demangleBoundGenerics(TypeListList, RetroactiveConformances))
+    return nullptr;
+
   NodePointer Nominal = popTypeAndGetAnyGeneric();
+  if (!Nominal)
+    return nullptr;
   NodePointer BoundNode = demangleBoundGenericArgs(Nominal, TypeListList, 0);
+  if (!BoundNode)
+    return nullptr;
   addChild(BoundNode, RetroactiveConformances);
   NodePointer NTy = createType(BoundNode);
   addSubstitution(NTy);
@@ -1802,6 +1825,8 @@ NodePointer Demangler::demangleMetatype() {
       return createWithPoppedType(Node::Kind::ClassMetadataBaseOffset);
     case 'p':
       return createWithChild(Node::Kind::ProtocolDescriptor, popProtocol());
+    case 'Q':
+      return createWithChild(Node::Kind::OpaqueTypeDescriptor, popNode());
     case 'S':
       return createWithChild(Node::Kind::ProtocolSelfConformanceDescriptor,
                              popProtocol());
@@ -1897,23 +1922,53 @@ NodePointer Demangler::demangleArchetype() {
       addSubstitution(AssocTy);
       return AssocTy;
     }
+    case 'O': {
+      auto definingContext = popContext();
+      return createWithChild(Node::Kind::OpaqueReturnTypeOf, definingContext);
+    }
+    case 'o': {
+      auto index = demangleIndex();
+      Vector<NodePointer> boundGenericArgs;
+      NodePointer retroactiveConformances;
+      if (!demangleBoundGenerics(boundGenericArgs, retroactiveConformances))
+        return nullptr;
+      auto Name = popNode();
+      auto opaque = createWithChildren(Node::Kind::OpaqueType, Name,
+                                     createNode(Node::Kind::Index, index));
+      auto boundGenerics = createNode(Node::Kind::TypeList);
+      for (unsigned i = boundGenericArgs.size(); i-- > 0;)
+        boundGenerics->addChild(boundGenericArgs[i], *this);
+      opaque->addChild(boundGenerics, *this);
+      if (retroactiveConformances)
+        opaque->addChild(retroactiveConformances, *this);
+      
+      auto opaqueTy = createType(opaque);
+      addSubstitution(opaqueTy);
+      return opaqueTy;
+    }
+    case 'r': {
+      return createType(createNode(Node::Kind::OpaqueReturnType));
+    }
     case 'y': {
       NodePointer T = demangleAssociatedTypeSimple(demangleGenericParamIndex());
       addSubstitution(T);
       return T;
     }
     case 'z': {
-      NodePointer T = demangleAssociatedTypeSimple(getDependentGenericParamType(0, 0));
+      NodePointer T = demangleAssociatedTypeSimple(
+                                            getDependentGenericParamType(0, 0));
       addSubstitution(T);
       return T;
     }
     case 'Y': {
-      NodePointer T = demangleAssociatedTypeCompound(demangleGenericParamIndex());
+      NodePointer T = demangleAssociatedTypeCompound(
+                                                   demangleGenericParamIndex());
       addSubstitution(T);
       return T;
     }
     case 'Z': {
-      NodePointer T = demangleAssociatedTypeCompound(getDependentGenericParamType(0, 0));
+      NodePointer T = demangleAssociatedTypeCompound(
+                                            getDependentGenericParamType(0, 0));
       addSubstitution(T);
       return T;
     }

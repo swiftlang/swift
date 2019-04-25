@@ -60,7 +60,7 @@ struct OverrideSection {
 #include "../../stdlib/public/runtime/CompatibilityOverride.def"
 };
 
-OverrideSection Overrides __attribute__((section("__DATA,__swift_hooks"))) = {
+OverrideSection Overrides __attribute__((section("__DATA,__swift51_hooks"))) = {
   0,
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   name ## Override,
@@ -176,13 +176,13 @@ TEST_F(CompatibilityOverrideTest, test_swift_conformsToSwiftProtocol) {
 TEST_F(CompatibilityOverrideTest, test_swift_getTypeByMangledNode) {
   Demangler demangler;
   auto Result = swift_getTypeByMangledNode(MetadataState::Abstract,
-                                           demangler, nullptr, nullptr,nullptr);
+                                           demangler, nullptr, nullptr, nullptr,nullptr);
   ASSERT_EQ(Result.getMetadata(), nullptr);
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_getTypeByMangledName) {
   auto Result = swift_getTypeByMangledName(MetadataState::Abstract,
-                                           "", nullptr, nullptr);
+                                           "", nullptr, nullptr, nullptr);
   ASSERT_EQ(Result.getMetadata(), nullptr);
 }
 
