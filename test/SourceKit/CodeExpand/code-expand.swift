@@ -93,3 +93,13 @@ if true {
 
 foo(.foo(<#T##block: () -> Void##() -> Void#>))
 // CHECK: foo(.foo({
+
+braced1(x: {<#T##() -> Void#>})
+// CHECK:   braced1 {
+// CHECK-NEXT:  <#code#>
+// CHECK-NEXT:  }
+
+braced2(x: {<#T##() -> Void#>}, y: Int)
+// CHECK:   braced2(x: {
+// CHECK-NEXT:  <#code#>
+// CHECK-NEXT:  }, y: Int)
