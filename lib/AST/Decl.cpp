@@ -2706,9 +2706,9 @@ bool ValueDecl::shouldHideFromEditor() const {
   if (getBaseName().isEditorPlaceholder())
     return true;
 
-  // '$_' names are reserved by compiler internal.
+  // '$__' names are reserved by compiler internal.
   if (!getBaseName().isSpecial() &&
-      getBaseName().getIdentifier().str().startswith("$_"))
+      getBaseName().getIdentifier().str().startswith("$__"))
     return true;
 
   return false;
