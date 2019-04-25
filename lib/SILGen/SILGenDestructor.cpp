@@ -69,7 +69,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
       = emitSiblingMethodRef(cleanupLoc, baseSelf, dtorConstant, subMap);
 
     resultSelfValue = B.createApply(cleanupLoc, dtorValue.forward(*this),
-                                    dtorTy, objectPtrTy, subMap, baseSelf);
+                                    subMap, baseSelf, false);
   } else {
     resultSelfValue = selfValue;
   }
@@ -128,10 +128,8 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
   {
     FullExpr CleanupScope(Cleanups, CleanupLocation::get(loc));
     ManagedValue borrowedSelf = emitManagedBeginBorrow(loc, initialSelfValue);
-    SILType objectPtrTy = SILType::getNativeObjectType(F.getASTContext());
-    selfForDealloc = B.createApply(loc, dtorValue.forward(*this),
-                                   dtorTy, objectPtrTy, subMap,
-                                   borrowedSelf.getUnmanagedValue());
+    selfForDealloc = B.createApply(loc, dtorValue.forward(*this), subMap,
+                                   borrowedSelf.getUnmanagedValue(), false);
   }
 
   // Balance out the +1 from the self argument using end_lifetime.
@@ -248,15 +246,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
     = superclassTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
                                               superclass);
 
-  auto substDtorType = superclassDtorType.substGenericArgs(SGM.M, subMap);
-  CanSILFunctionType substFnType = substDtorType.castTo<SILFunctionType>();
-  SILFunctionConventions dtorConv(substFnType, SGM.M);
-  assert(substFnType->getSelfParameter().getConvention() ==
-             ParameterConvention::Direct_Unowned &&
-         "Objective C deinitializing destructor takes self as unowned");
-
-  B.createApply(cleanupLoc, superclassDtorValue, substDtorType,
-                dtorConv.getSILResultType(), subMap, superSelf);
+  B.createApply(cleanupLoc, superclassDtorValue, subMap, superSelf, false);
 
   // We know that the givne value came in at +1, but we pass the relevant value
   // as unowned to the destructor. Create a fake balance for the verifier to be

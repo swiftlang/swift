@@ -382,13 +382,9 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 
   auto calleeConvention = ParameterConvention::Direct_Guaranteed;
 
-  SILType closureTy = SILGenBuilder::getPartialApplyResultType(
-      functionRef->getType(), capturedArgs.size(), SGM.M, subs,
-      calleeConvention);
-
   auto toClosure =
-    B.createPartialApply(loc, functionRef, functionTy,
-                         subs, forwardedArgs, closureTy);
+    B.createPartialApply(loc, functionRef, subs, forwardedArgs,
+                         calleeConvention);
   auto result = emitManagedRValueWithCleanup(toClosure);
 
   // Get the lowered AST types:
@@ -520,8 +516,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                           SILType::getPrimitiveObjectType(anyObjectMetaTy),
                           {});
     SILValue optNameValue = B.createApply(
-        mainClass, NSStringFromClass, NSStringFromClass->getType(),
-        SILType::getPrimitiveObjectType(OptNSStringTy), {}, metaTy);
+        mainClass, NSStringFromClass, {}, metaTy, false);
     ManagedValue optName = emitManagedRValueWithCleanup(optNameValue);
 
     // Fix up the string parameters to have the right type.
@@ -561,9 +556,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     SILValue args[] = {argc, managedArgv.getValue(), nilValue,
                        optName.getValue()};
 
-    B.createApply(mainClass, UIApplicationMain,
-                  UIApplicationMain->getType(),
-                  argc->getType(), {}, args);
+    B.createApply(mainClass, UIApplicationMain, {}, args, false);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, ctx), 0);
     auto rType = F.getConventions().getSingleSILResultType();
@@ -608,9 +601,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     auto NSApplicationMain = B.createFunctionRef(mainClass, NSApplicationMainFn);
     SILValue args[] = { argc, argv };
 
-    B.createApply(mainClass, NSApplicationMain,
-                  NSApplicationMain->getType(),
-                  argc->getType(), {}, args);
+    B.createApply(mainClass, NSApplicationMain, {}, args, false);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, getASTContext()), 0);
     auto rType = F.getConventions().getSingleSILResultType();
