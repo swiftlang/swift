@@ -80,6 +80,11 @@ public:
   /// Set of used conformances for which witness tables need to be emitted.
   llvm::DenseSet<RootProtocolConformance *> usedConformances;
 
+  /// Bookkeeping to ensure that useConformancesFrom{ObjectiveC,}Type() is
+  /// only called once for each unique type, as an optimization.
+  llvm::DenseSet<TypeBase *> usedConformancesFromTypes;
+  llvm::DenseSet<TypeBase *> usedConformancesFromObjectiveCTypes;
+
   struct DelayedWitnessTable {
     NormalProtocolConformance *insertAfter;
   };
@@ -444,6 +449,10 @@ public:
 
   /// Mark protocol conformances from the given set of substitutions as used.
   void useConformancesFromSubstitutions(SubstitutionMap subs);
+
+  /// Mark _ObjectiveCBridgeable conformances as used for any imported types
+  /// mentioned by the given type.
+  void useConformancesFromObjectiveCType(CanType type);
 
   /// Emit a `mark_function_escape` instruction for top-level code when a
   /// function or closure at top level refers to script globals.

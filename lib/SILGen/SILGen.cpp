@@ -1647,6 +1647,7 @@ public:
       LLVM_DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
                  toplevel->print(llvm::dbgs()));
       toplevel->verify();
+      sgm.emitLazyConformancesForFunction(toplevel);
     }
 
     // If the source file contains an artificial main, emit the implicit

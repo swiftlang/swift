@@ -13,6 +13,7 @@
 #include "SILGen.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"
 
@@ -25,9 +26,26 @@ void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
     return;
 
   auto conformance = conformanceRef.getConcrete();
+
+  // Always look through inherited conformances.
+  if (auto *inherited = dyn_cast<InheritedProtocolConformance>(conformance))
+    conformance = inherited->getInheritedConformance();
+
+  // Get the normal conformance. If we don't have one, this is a self
+  // conformance, which we can ignore.
   auto normal = dyn_cast<NormalProtocolConformance>(
       conformance->getRootConformance());
   if (normal == nullptr)
+    return;
+
+  // Emit any conformances implied by conditional requirements.
+  if (auto *specialized = dyn_cast<SpecializedProtocolConformance>(conformance))
+    useConformancesFromSubstitutions(specialized->getSubstitutionMap());
+
+  // If this conformance was not synthesized by the ClangImporter, we're not
+  // going to be emitting it lazily either, so we can avoid doing anything
+  // below.
+  if (!isa<ClangModuleUnit>(normal->getDeclContext()->getModuleScopeContext()))
     return;
 
   // If we already emitted this witness table, we don't need to track the fact
@@ -54,21 +72,60 @@ void SILGenModule::useConformancesFromSubstitutions(
 }
 
 void SILGenModule::useConformancesFromType(CanType type) {
-  type.findIf([&](Type t) -> bool {
+  if (!usedConformancesFromTypes.insert(type.getPointer()).second)
+    return;
+
+  type.visit([&](Type t) {
     auto *decl = t->getAnyNominal();
     if (!decl)
-      return false;
+      return;
 
     if (isa<ProtocolDecl>(decl))
-      return false;
+      return;
 
     auto *genericSig = decl->getGenericSignature();
     if (!genericSig)
-      return false;
+      return;
 
     auto subMap = t->getContextSubstitutionMap(SwiftModule, decl);
     useConformancesFromSubstitutions(subMap);
-    return false;
+    return;
+  });
+}
+
+void SILGenModule::useConformancesFromObjectiveCType(CanType type) {
+  if (!usedConformancesFromObjectiveCTypes.insert(type.getPointer()).second)
+    return;
+
+  auto &ctx = getASTContext();
+  auto objectiveCBridgeable = ctx.getProtocol(
+      KnownProtocolKind::ObjectiveCBridgeable);
+  auto bridgedStoredNSError = ctx.getProtocol(
+      KnownProtocolKind::BridgedStoredNSError);
+  if (!objectiveCBridgeable && !bridgedStoredNSError)
+    return;
+
+  type.visit([&](Type t) {
+    auto *decl = t->getAnyNominal();
+    if (!decl)
+      return;
+
+    if (!isa<ClangModuleUnit>(decl->getModuleScopeContext()))
+      return;
+
+    if (objectiveCBridgeable) {
+      auto subConformance = SwiftModule->lookupConformance(
+          t, objectiveCBridgeable);
+      if (subConformance)
+        useConformance(*subConformance);
+    }
+
+    if (bridgedStoredNSError) {
+      auto subConformance = SwiftModule->lookupConformance(
+          t, bridgedStoredNSError);
+      if (subConformance)
+        useConformance(*subConformance);
+    }
   });
 }
 
@@ -87,6 +144,7 @@ public:
 
   void visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
     SGM.useConformancesFromType(AEBI->getFormalConcreteType());
+    SGM.useConformancesFromObjectiveCType(AEBI->getFormalConcreteType());
     for (auto conformance : AEBI->getConformances())
       SGM.useConformance(conformance);
   }
@@ -109,10 +167,12 @@ public:
   }
 
   void visitApplyInst(ApplyInst *AI) {
+    SGM.useConformancesFromObjectiveCType(AI->getSubstCalleeType());
     SGM.useConformancesFromSubstitutions(AI->getSubstitutionMap());
   }
 
   void visitBeginApplyInst(BeginApplyInst *BAI) {
+    SGM.useConformancesFromObjectiveCType(BAI->getSubstCalleeType());
     SGM.useConformancesFromSubstitutions(BAI->getSubstitutionMap());
   }
 
@@ -123,16 +183,22 @@ public:
   void visitCheckedCastBranchInst(CheckedCastBranchInst *CCBI) {
     SGM.useConformancesFromType(CCBI->getSourceType());
     SGM.useConformancesFromType(CCBI->getTargetType());
+    SGM.useConformancesFromObjectiveCType(CCBI->getSourceType());
+    SGM.useConformancesFromObjectiveCType(CCBI->getTargetType());
   }
 
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
     SGM.useConformancesFromType(CCABI->getSourceType());
     SGM.useConformancesFromType(CCABI->getTargetType());
+    SGM.useConformancesFromObjectiveCType(CCABI->getSourceType());
+    SGM.useConformancesFromObjectiveCType(CCABI->getTargetType());
   }
 
   void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *CCVBI) {
     SGM.useConformancesFromType(CCVBI->getSourceType());
     SGM.useConformancesFromType(CCVBI->getTargetType());
+    SGM.useConformancesFromObjectiveCType(CCVBI->getSourceType());
+    SGM.useConformancesFromObjectiveCType(CCVBI->getTargetType());
   }
 
   void visitCopyAddrInst(CopyAddrInst *CAI) {
@@ -177,6 +243,7 @@ public:
 
   void visitInitExistentialAddrInst(InitExistentialAddrInst *IEAI) {
     SGM.useConformancesFromType(IEAI->getFormalConcreteType());
+    SGM.useConformancesFromObjectiveCType(IEAI->getFormalConcreteType());
     for (auto conformance : IEAI->getConformances())
       SGM.useConformance(conformance);
   }
@@ -189,12 +256,14 @@ public:
 
   void visitInitExistentialRefInst(InitExistentialRefInst *IERI) {
     SGM.useConformancesFromType(IERI->getFormalConcreteType());
+    SGM.useConformancesFromObjectiveCType(IERI->getFormalConcreteType());
     for (auto conformance : IERI->getConformances())
       SGM.useConformance(conformance);
   }
 
   void visitInitExistentialValueInst(InitExistentialValueInst *IEVI) {
     SGM.useConformancesFromType(IEVI->getFormalConcreteType());
+    SGM.useConformancesFromObjectiveCType(IEVI->getFormalConcreteType());
     for (auto conformance : IEVI->getConformances())
       SGM.useConformance(conformance);
   }
@@ -204,6 +273,7 @@ public:
   }
 
   void visitPartialApplyInst(PartialApplyInst *PAI) {
+    SGM.useConformancesFromObjectiveCType(PAI->getSubstCalleeType());
     SGM.useConformancesFromSubstitutions(PAI->getSubstitutionMap());
   }
 
@@ -217,6 +287,7 @@ public:
   }
 
   void visitTryApplyInst(TryApplyInst *TAI) {
+    SGM.useConformancesFromObjectiveCType(TAI->getSubstCalleeType());
     SGM.useConformancesFromSubstitutions(TAI->getSubstitutionMap());
   }
 
@@ -227,14 +298,20 @@ public:
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
     SGM.useConformancesFromType(UCCI->getSourceType());
     SGM.useConformancesFromType(UCCI->getTargetType());
+    SGM.useConformancesFromObjectiveCType(UCCI->getSourceType());
+    SGM.useConformancesFromObjectiveCType(UCCI->getTargetType());
   }
 
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI) {
     SGM.useConformancesFromType(UCCAI->getSourceType());
     SGM.useConformancesFromType(UCCAI->getTargetType());
+    SGM.useConformancesFromObjectiveCType(UCCAI->getSourceType());
+    SGM.useConformancesFromObjectiveCType(UCCAI->getTargetType());
   }
 
-  void visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UTEDAI) {}
+  void visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UTEDAI) {
+    SGM.useConformancesFromType(UTEDAI->getOperand()->getType().getASTType());
+  }
 
   void visitWitnessMethodInst(WitnessMethodInst *WMI) {
     SGM.useConformance(WMI->getConformance());
