@@ -37,8 +37,9 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
                                        VarDecl::Specifier specifier,
                                        SourceLoc specifierLoc) {
   // Apply those attributes that do apply.
-  if (!attrs.empty())
+  if (!attrs.empty()) {
     ty = new (Context) AttributedTypeRepr(attrs, ty);
+  }
 
   // Apply 'inout' or '__shared' or '__owned'
   if (specifierLoc.isValid()) {
@@ -357,8 +358,7 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
 ///     attribute-list type-function
 ///
 ///   type-function:
-///     type-composition '->' type
-///     type-composition 'throws' '->' type
+///     type-composition 'throws'? '->' type
 ///
 ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                          bool HandleCodeCompletion,
@@ -670,19 +670,40 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
 /// parseTypeSimpleOrComposition
 ///
 ///   type-composition:
-///     type-simple
+///     'some'? type-simple
 ///     type-composition '&' type-simple
 ParserResult<TypeRepr>
 Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
                                      bool HandleCodeCompletion) {
+  // Check for the opaque modifier.
+  // This is only semantically allowed in certain contexts, but we parse it
+  // generally for diagnostics and recovery.
+  SourceLoc opaqueLoc;
+  if (Context.LangOpts.EnableOpaqueResultTypes
+      && Tok.is(tok::identifier)
+      && Tok.getRawText() == "some") {
+    opaqueLoc = consumeToken();
+  }
+  
+  auto applyOpaque = [&](TypeRepr *type) -> TypeRepr* {
+    if (opaqueLoc.isValid()) {
+      type = new (Context) OpaqueReturnTypeRepr(opaqueLoc, type);
+    }
+    return type;
+  };
+  
   SyntaxParsingContext CompositionContext(SyntaxContext, SyntaxContextKind::Type);
   // Parse the first type
   ParserResult<TypeRepr> FirstType = parseTypeSimple(MessageID,
                                                      HandleCodeCompletion);
   if (FirstType.hasCodeCompletion())
     return makeParserCodeCompletionResult<TypeRepr>();
-  if (FirstType.isNull() || !Tok.isContextualPunctuator("&"))
+  if (FirstType.isNull())
     return FirstType;
+  if (!Tok.isContextualPunctuator("&")) {
+    return makeParserResult(ParserStatus(FirstType),
+                            applyOpaque(FirstType.get()));
+  }
 
   SmallVector<TypeRepr *, 4> Types;
   ParserStatus Status(FirstType);
@@ -719,6 +740,19 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     } else {
       consumeToken(); // consume '&'
     }
+    
+    // Diagnose invalid `some` after an ampersand.
+    if (Context.LangOpts.EnableOpaqueResultTypes
+        && Tok.is(tok::identifier)
+        && Tok.getRawText() == "some") {
+      auto badLoc = consumeToken();
+      
+      // TODO: Fixit to move to beginning of composition.
+      diagnose(badLoc, diag::opaque_mid_composition);
+      
+      if (opaqueLoc.isInvalid())
+        opaqueLoc = badLoc;
+    }
 
     // Parse next type.
     ParserResult<TypeRepr> ty =
@@ -738,8 +772,8 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
   }
   SyntaxContext->collectNodesInPlace(SyntaxKind::CompositionTypeElementList);
   
-  return makeParserResult(Status, CompositionTypeRepr::create(
-    Context, Types, FirstTypeLoc, {FirstAmpersandLoc, PreviousLoc}));
+  return makeParserResult(Status, applyOpaque(CompositionTypeRepr::create(
+    Context, Types, FirstTypeLoc, {FirstAmpersandLoc, PreviousLoc})));
 }
 
 ParserResult<CompositionTypeRepr>
@@ -860,7 +894,7 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
 ///   type-tuple-body:
 ///     type-tuple-element (',' type-tuple-element)* '...'?
 ///   type-tuple-element:
-///     identifier ':' type
+///     identifier? identifier ':' type
 ///     type
 ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   SyntaxParsingContext TypeContext(SyntaxContext, SyntaxKind::TupleType);
@@ -894,16 +928,20 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
       Backtracking.emplace(*this);
       ObsoletedInOutLoc = consumeToken(tok::kw_inout);
     }
+                                    
+    // If the label is "some", this could end up being an opaque type
+    // description if there's `some <identifier>` without a following colon,
+    // so we may need to backtrack as well.
+    if (Tok.getText().equals("some")) {
+      Backtracking.emplace(*this);
+    }
 
     // If the tuple element starts with a potential argument label followed by a
     // ':' or another potential argument label, then the identifier is an
     // element tag, and it is followed by a type annotation.
-    if (Tok.canBeArgumentLabel() &&
-        (peekToken().is(tok::colon) || peekToken().canBeArgumentLabel())) {
-      if (Backtracking)
-        // Found obsoleted 'inout' use.
-        Backtracking->cancelBacktrack();
-
+    if (Tok.canBeArgumentLabel()
+        && (peekToken().is(tok::colon)
+            || peekToken().canBeArgumentLabel())) {
       // Consume a name.
       element.NameLoc = consumeArgumentLabel(element.Name);
 
@@ -912,8 +950,19 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         element.SecondNameLoc = consumeArgumentLabel(element.SecondName);
 
       // Consume the ':'.
-      if (!consumeIf(tok::colon, element.ColonLoc))
-        diagnose(Tok, diag::expected_parameter_colon);
+      if (consumeIf(tok::colon, element.ColonLoc)) {
+        // If we succeed, then we successfully parsed a label.
+        if (Backtracking)
+          Backtracking->cancelBacktrack();
+      // Otherwise, if we can't backtrack to parse this as a type,
+      // this is a syntax error.
+      } else {
+        if (!Backtracking) {
+          diagnose(Tok, diag::expected_parameter_colon);
+        }
+        element.NameLoc = SourceLoc();
+        element.SecondNameLoc = SourceLoc();
+      }
 
     } else if (Backtracking) {
       // If we don't have labels, 'inout' is not a obsoleted use.

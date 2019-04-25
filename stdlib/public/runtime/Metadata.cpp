@@ -2609,6 +2609,7 @@ getSuperclassMetadata(ClassMetadata *self, bool allowDependency) {
                             /*non-blocking*/ allowDependency);
     MetadataResponse response =
       swift_getTypeByMangledName(request, superclassName,
+        substitutions.getGenericArgs(),
         [&substitutions](unsigned depth, unsigned index) {
           return substitutions.getMetadata(depth, index);
         },
@@ -4324,7 +4325,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
     // The protocol's Self is the only generic parameter that can occur in the
     // type.
     response =
-      swift_getTypeByMangledName(request, mangledName,
+      swift_getTypeByMangledName(request, mangledName, nullptr,
         [conformingType](unsigned depth, unsigned index) -> const Metadata * {
           if (depth == 0 && index == 0)
             return conformingType;
@@ -4352,6 +4353,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
                                                            conformance);
     SubstGenericParametersFromMetadata substitutions(originalConformingType);
     response = swift_getTypeByMangledName(request, mangledName,
+      substitutions.getGenericArgs(),
       [&substitutions](unsigned depth, unsigned index) {
         return substitutions.getMetadata(depth, index);
       },
@@ -5121,6 +5123,7 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   auto result =
     swift_getTypeByMangledName(MetadataState::Abstract,
                           mangledName,
+                          nullptr,
                           [](unsigned, unsigned){ return nullptr; },
                           [](const Metadata *, unsigned) { return nullptr; })
       .getMetadata();

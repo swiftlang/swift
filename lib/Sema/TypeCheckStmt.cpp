@@ -437,7 +437,7 @@ public:
     // In an initializer, the only expression allowed is "nil", which indicates
     // failure from a failable initializer.
     if (auto ctor = dyn_cast_or_null<ConstructorDecl>(
-                      TheFunc->getAbstractFunctionDecl())) {
+                                          TheFunc->getAbstractFunctionDecl())) {
       // The only valid return expression in an initializer is the literal
       // 'nil'.
       auto nilExpr = dyn_cast<NilLiteralExpr>(E->getSemanticsProvidingExpr());
@@ -463,9 +463,38 @@ public:
       return new (TC.Context) FailStmt(RS->getReturnLoc(), nilExpr->getLoc(),
                                        RS->isImplicit());
     }
+    
+    TypeCheckExprOptions options = {};
+    
+    // If the result type is an opaque type, this is an opportunity to resolve
+    // the underlying type.
+    auto isOpaqueReturnTypeOfCurrentFunc = [&](OpaqueTypeDecl *opaque) -> bool {
+      // Closures currently don't support having opaque types.
+      auto funcDecl = TheFunc->getAbstractFunctionDecl();
+      if (!funcDecl)
+        return false;
+      // Either the function is declared with its own opaque return type...
+      if (opaque->getNamingDecl() == funcDecl)
+        return true;
+      // ...or the function is a getter for a property or subscript with an
+      // opaque return type.
+      if (auto accessor = dyn_cast<AccessorDecl>(funcDecl)) {
+        return accessor->isGetter()
+          && opaque->getNamingDecl() == accessor->getStorage();
+      }
+      return false;
+    };
+    
+    if (auto opaque = ResultTy->getAs<OpaqueTypeArchetypeType>()) {
+      if (isOpaqueReturnTypeOfCurrentFunc(opaque->getDecl())) {
+        options |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
+      }
+    }
 
     auto exprTy = TC.typeCheckExpression(E, DC, TypeLoc::withoutLoc(ResultTy),
-                                         CTP_ReturnStmt);
+                                         CTP_ReturnStmt,
+                                         options);
+    
     RS->setResult(E);
 
     if (!exprTy) {
