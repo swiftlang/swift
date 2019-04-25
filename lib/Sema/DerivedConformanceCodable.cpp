@@ -1039,7 +1039,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   initDecl->setBodySynthesizer(&deriveBodyDecodable_init);
 
   // This constructor should be marked as `required` for non-final classes.
-  if (classDecl && !classDecl->isFinal()) {
+  if (classDecl && !classDecl->getAttrs().hasAttribute<FinalAttr>()) {
     auto *reqAttr = new (C) RequiredAttr(/*IsImplicit=*/true);
     initDecl->getAttrs().add(reqAttr);
   }

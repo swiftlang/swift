@@ -2356,18 +2356,10 @@ class ValueDecl : public Decl {
     /// the declaration will go through an extra level of indirection that
     /// allows the entity to be replaced at runtime.
     unsigned isDynamic : 1;
-
-    /// Whether the "isFinal" bit has been computed yet.
-    unsigned isFinalComputed : 1;
-
-    /// Whether this declaration is 'final'. A final class can't be subclassed,
-    /// a final class member can't be overriden.
-    unsigned isFinal : 1;
-  } LazySemanticInfo = { };
+  } LazySemanticInfo;
 
   friend class OverriddenDeclsRequest;
   friend class IsObjCRequest;
-  friend class IsFinalRequest;
   friend class IsDynamicRequest;
 
 protected:
@@ -2378,6 +2370,12 @@ protected:
     Bits.ValueDecl.AlreadyInLookupTable = false;
     Bits.ValueDecl.CheckedRedeclaration = false;
     Bits.ValueDecl.IsUserAccessible = true;
+    LazySemanticInfo.isObjCComputed = false;
+    LazySemanticInfo.isObjC = false;
+    LazySemanticInfo.hasOverriddenComputed = false;
+    LazySemanticInfo.hasOverridden = false;
+    LazySemanticInfo.isDynamicComputed = false;
+    LazySemanticInfo.isDynamic = false;
   }
 
   // MemberLookupTable borrows a bit from this type
@@ -2618,8 +2616,10 @@ public:
   /// Note whether this declaration is known to be exposed to Objective-C.
   void setIsObjC(bool Value);
 
-  /// Is this declaration 'final'?
-  bool isFinal() const;
+  /// Is this declaration marked with 'final'?
+  bool isFinal() const {
+    return getAttrs().hasAttribute<FinalAttr>();
+  }
 
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
