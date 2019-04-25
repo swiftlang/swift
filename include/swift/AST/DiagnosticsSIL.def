@@ -248,6 +248,10 @@ NOTE(designated_init_c_struct_fix,none,
 ERROR(missing_return,none,
       "missing return in a %select{function|closure}1 expected to return %0",
       (Type, unsigned))
+ERROR(missing_return_last_expr,none,
+      "missing return in a %select{function|closure}1 expected to return %0; "
+      "did you mean to return the last expression?",
+      (Type, unsigned))
 ERROR(missing_never_call,none,
       "%select{function|closure}1 with uninhabited return type %0 is missing "
       "call to another never-returning function on all paths",
