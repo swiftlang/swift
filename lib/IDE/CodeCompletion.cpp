@@ -1348,12 +1348,7 @@ public:
         Consumer(Consumer) {
   }
 
-  void setAttrTargetDecl(Decl *D) override {
-    if (D == nullptr) {
-      AttTargetDK = None;
-      return;
-    }
-    auto DK = D->getKind();
+  void setAttrTargetDeclKind(Optional<DeclKind> DK) override {
     if (DK == DeclKind::PatternBinding)
       DK = DeclKind::Var;
     AttTargetDK = DK;
@@ -5381,7 +5376,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.getAttributeDeclCompletions(IsInSil, AttTargetDK);
 
     // Provide any type name for property delegate.
-    if (!AttTargetDK || *AttTargetDK == DeclKind::Var)
+    if (!AttTargetDK || *AttTargetDK == DeclKind::Var ||
+        *AttTargetDK == DeclKind::Param)
       Lookup.getTypeCompletionsInDeclContext(
           P.Context.SourceMgr.getCodeCompletionLoc());
     break;
