@@ -949,6 +949,8 @@ public:
 
   /// Emit SIL functions for all the members of the type.
   void emitType() {
+    SGM.emitLazyConformancesForType(theType);
+
     for (Decl *member : theType->getMembers())
       visit(member);
 

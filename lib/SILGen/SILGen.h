@@ -431,6 +431,10 @@ public:
   /// Emit all lazy conformances referenced from this function body.
   void emitLazyConformancesForFunction(SILFunction *F);
 
+  /// Emit all lazy conformances referenced from this type's signature and
+  /// stored properties (or in the case of enums, associated values).
+  void emitLazyConformancesForType(NominalTypeDecl *NTD);
+
   /// Mark a protocol conformance as used, so we know we need to emit it if
   /// it's in our TU.
   void useConformance(ProtocolConformanceRef conformance);

@@ -250,3 +250,41 @@ void SILGenModule::emitLazyConformancesForFunction(SILFunction *F) {
     for (auto &I : BB)
       emitter.visit(&I);
 }
+
+void SILGenModule::emitLazyConformancesForType(NominalTypeDecl *NTD) {
+  auto *genericSig = NTD->getGenericSignature();
+
+  if (genericSig) {
+    for (auto reqt : genericSig->getRequirements()) {
+      if (reqt.getKind() != RequirementKind::Layout)
+        useConformancesFromType(reqt.getSecondType()->getCanonicalType());
+    }
+  }
+
+  if (auto *ED = dyn_cast<EnumDecl>(NTD)) {
+    for (auto *EED : ED->getAllElements()) {
+      if (EED->hasAssociatedValues()) {
+        useConformancesFromType(EED->getArgumentInterfaceType()
+                                   ->getCanonicalType(genericSig));
+      }
+    }
+  }
+
+  if (isa<StructDecl>(NTD) || isa<ClassDecl>(NTD)) {
+    for (auto *VD : NTD->getStoredProperties()) {
+      useConformancesFromType(VD->getValueInterfaceType()
+                                ->getCanonicalType(genericSig));
+    }
+  }
+
+  if (auto *CD = dyn_cast<ClassDecl>(NTD))
+    if (auto superclass = CD->getSuperclass())
+      useConformancesFromType(superclass->getCanonicalType(genericSig));
+
+  if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
+    for (auto reqt : PD->getRequirementSignature()) {
+      if (reqt.getKind() != RequirementKind::Layout)
+        useConformancesFromType(reqt.getSecondType()->getCanonicalType());
+    }
+  }
+}
