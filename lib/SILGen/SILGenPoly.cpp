@@ -3209,6 +3209,7 @@ static ManagedValue createThunk(SILGenFunction &SGF,
                    outputOrigType,
                    outputSubstType,
                    dynamicSelfType);
+    SGF.SGM.emitLazyConformancesForFunction(thunk);
   }
 
   auto thunkedFn =
@@ -3314,6 +3315,7 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
     thunk->setGenericEnvironment(genericEnv);
     SILGenFunction thunkSGF(SGM, *thunk, FunctionDC);
     buildWithoutActuallyEscapingThunkBody(thunkSGF, dynamicSelfType);
+    SGM.emitLazyConformancesForFunction(thunk);
   }
   assert(thunk->isWithoutActuallyEscapingThunk());
 

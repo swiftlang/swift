@@ -757,6 +757,8 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
 
 void SILGenModule::postEmitFunction(SILDeclRef constant,
                                     SILFunction *F) {
+  emitLazyConformancesForFunction(F);
+
   assert(!F->isExternalDeclaration() && "did not emit any function body?!");
   LLVM_DEBUG(llvm::dbgs() << "lowered sil:\n";
              F->print(llvm::dbgs()));
@@ -1161,6 +1163,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding), f));
   auto dc = binding->getDeclContext();
   SILGenFunction(*this, *f, dc).emitLazyGlobalInitializer(binding, pbdEntry);
+  emitLazyConformancesForFunction(f);
   f->verify();
 
   return f;
@@ -1516,40 +1519,6 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
       TopLevelSGF->visit(ESD.get<Decl*>());
     }
   }
-}
-
-void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
-  // We don't need to emit dependent conformances.
-  if (conformanceRef.isAbstract()) 
-    return;
-
-  auto conformance = conformanceRef.getConcrete();
-  auto normal = dyn_cast<NormalProtocolConformance>(
-      conformance->getRootConformance());
-  if (normal == nullptr)
-    return;
-
-  // If we already emitted this witness table, we don't need to track the fact
-  // we need it.
-  if (emittedWitnessTables.count(normal))
-    return;
-
-  // If we delayed emitting this witness table, force it.
-  auto foundDelayed = delayedConformances.find(normal);
-  if (foundDelayed != delayedConformances.end()) {
-    forcedConformances.push_back(*foundDelayed);
-    delayedConformances.erase(foundDelayed);
-    return;
-  }
-
-  // Otherwise, just remember the fact we used this conformance.
-  usedConformances.insert(normal);
-}
-
-void SILGenModule::useConformancesFromSubstitutions(
-                                                const SubstitutionMap subs) {
-  for (auto conf : subs.getConformances())
-    useConformance(conf);
 }
 
 namespace {

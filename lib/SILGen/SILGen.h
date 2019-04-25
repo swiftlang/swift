@@ -428,9 +428,15 @@ public:
   SILGlobalVariable *getSILGlobalVariable(VarDecl *gDecl,
                                           ForDefinition_t forDef);
 
+  /// Emit all lazy conformances referenced from this function body.
+  void emitLazyConformancesForFunction(SILFunction *F);
+
   /// Mark a protocol conformance as used, so we know we need to emit it if
   /// it's in our TU.
   void useConformance(ProtocolConformanceRef conformance);
+
+  /// Mark protocol conformances from the given type as used.
+  void useConformancesFromType(CanType type);
 
   /// Mark protocol conformances from the given set of substitutions as used.
   void useConformancesFromSubstitutions(SubstitutionMap subs);

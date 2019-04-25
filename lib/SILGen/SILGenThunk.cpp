@@ -63,6 +63,7 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
     // runtime-hookable mechanism.
     SILGenFunction SGF(*this, *F, SwiftModule);
     SGF.emitForeignToNativeThunk(constant);
+    emitLazyConformancesForFunction(F);
   }
 
   return F;

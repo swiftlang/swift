@@ -142,6 +142,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
     .emitVTableThunk(derived, implFn, basePattern,
                      overrideInfo.LoweredType,
                      derivedInfo.LoweredType);
+  emitLazyConformancesForFunction(thunk);
 
   return SILVTable::Entry(base, thunk, implKind, implLinkage);
 }
@@ -710,6 +711,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
                           requirement, reqtSubMap, witnessRef,
                           witnessSubs, isFree, /*isSelfConformance*/ false);
 
+  emitLazyConformancesForFunction(f);
   return f;
 }
 
@@ -778,6 +780,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, reqtSubs, requirement,
                           witnessSubs, isFree, /*isSelfConformance*/ true);
+
+  SGM.emitLazyConformancesForFunction(f);
 
   return f;
 }

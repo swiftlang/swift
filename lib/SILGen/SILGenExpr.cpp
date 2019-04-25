@@ -2620,7 +2620,8 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   scope.pop();
   
   subSGF.B.createReturn(loc, subSGF.emitEmptyTuple(loc));
-  
+
+  SGM.emitLazyConformancesForFunction(thunk);
   return thunk;
 }
 
@@ -2794,6 +2795,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   
   subSGF.B.createReturn(loc, subSGF.emitEmptyTuple(loc));
   
+  SGM.emitLazyConformancesForFunction(thunk);
   return thunk;
 }
 
@@ -3015,6 +3017,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     auto returnBoolVal = subSGF.B.createStruct(loc,
       SILType::getPrimitiveObjectType(boolTy), returnVal);
     subSGF.B.createReturn(loc, returnBoolVal);
+
+    SGM.emitLazyConformancesForFunction(equals);
   }();
 
   // Get or create the hash witness
@@ -3112,6 +3116,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     }
 
     subSGF.B.createReturn(loc, hashCode);
+    SGM.emitLazyConformancesForFunction(hash);
   }();
   
   return;
