@@ -228,6 +228,13 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     SizeTy  // extra inhabitant flags (optional)
   });
 
+  TypeLayoutTy = createStructType(*this, "swift.type_layout", {
+    SizeTy, // size
+    SizeTy, // stride
+    Int32Ty, // flags
+    Int32Ty // extra inhabitant count
+  });
+
   // A protocol descriptor describes a protocol. It is not type metadata in
   // and of itself, but is referenced in the structure of existential type
   // metadata records.
