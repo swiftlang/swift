@@ -1474,6 +1474,10 @@ void ContextualFailure::tryComputedPropertyFixIts(Expr *expr) const {
         if (VD->isLet()) {
           diag.fixItReplace(PBD->getStartLoc(), getTokenText(tok::kw_var));
         }
+
+        if (auto lazyAttr = VD->getAttrs().getAttribute<LazyAttr>()) {
+          diag.fixItRemove(lazyAttr->getRange());
+        }
       }
     }
   }
