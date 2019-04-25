@@ -298,3 +298,71 @@ public func useExternalResilient4() {
   let e = inlinableExternalResilientCallsInlinableExternalResilient()
   useP(e.myValue3())
 }
+
+// CHECK-LABEL: sil @$s1A18testStoredPropertyyyF
+// CHECK:   [[CONTAINER_INIT_FUN:%.*]] = function_ref @$s8External0A9ContainerVACycfC
+// CHECK:   [[CONTAINER:%.*]] = apply [[CONTAINER_INIT_FUN]]
+// CHECK:   [[RES:%.*]] = alloc_stack $Int64
+// CHECK:   [[COMPUTED_PROP:%.*]] = function_ref @$s8External0A9ContainerV16computedPropertyQrvg
+// CHECK:   [[RES2:%.*]] = unchecked_addr_cast [[RES]] : $*Int64 to $*@_opaqueReturnTypeOf("$s8External0A9ContainerV16computedPropertyQrvp", 0)
+// CHECK:   apply [[COMPUTED_PROP]]([[RES2]], [[CONTAINER]])
+// CHECK:   [[MYVALUE:%.*]] = function_ref @$ss5Int64V8ExternalE8myValue2AByF : $@convention(method) (Int64) -> Int64
+// CHECK:   apply [[MYVALUE]]
+public func testStoredProperty() {
+  let c = ExternalContainer()
+  useP(c.computedProperty.myValue2())
+}
+
+// CHECK-LABEL: sil @$s1A21testResilientPropertyyyF
+// CHECK:   [[CONTAINER:%.*]] = alloc_stack $ResilientContainer
+// CHECK:   [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External218ResilientContainerV16computedPropertyQrvp", 0)
+// CHECK:   [[FUN:%.*]] = function_ref @$s9External218ResilientContainerV16computedPropertyQrvg
+// CHECK:   apply [[FUN]]([[RES]], [[CONTAINER]])
+public func testResilientProperty() {
+  let r = ResilientContainer()
+  useP(r.computedProperty.myValue3())
+}
+
+// CHECK-LABEL: sil @$s1A30testResilientInlinablePropertyyyF
+// CHECK:  [[CONTAINER:%.*]] = alloc_stack $ResilientContainer
+// CHECK:  [[RES:%.*]] = alloc_stack $Int64
+// CHECK:  [[FUN:%.*]] = function_ref @$s9External218ResilientContainerV18inlineablePropertyQrvg
+// CHECK:  [[RES2:%.*]] = unchecked_addr_cast [[RES]] : $*Int64 to $*@_opaqueReturnTypeOf("$s9External218ResilientContainerV18inlineablePropertyQrvp", 0)
+// CHECK:  apply [[FUN]]([[RES2]], [[CONTAINER]])
+public func testResilientInlinableProperty() {
+  let r = ResilientContainer()
+  useP(r.inlineableProperty.myValue3())
+}
+
+// CHECK-LABEL: sil @$s1A22testResilientProperty2yyF
+// CHECK:  [[CONTAINER:%.*]] = alloc_stack $ResilientContainer2
+// CHECK:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External319ResilientContainer2V16computedPropertyQrvp", 0)
+// CHECK:  [[FUN:%.*]] = function_ref @$s9External319ResilientContainer2V16computedPropertyQrvg
+// CHECK:  apply [[FUN]]([[RES]], [[CONTAINER]])
+public func testResilientProperty2() {
+  let r = ResilientContainer2()
+  useP(r.computedProperty.myValue3())
+}
+
+// The inlinable property recursively calls an resilient property 'peel' one layer of opaque archetypes.
+// CHECK-LABEL: sil @$s1A31testResilientInlinableProperty2yyF
+// CHECK:  [[CONTAINER:%.*]] = alloc_stack $ResilientContainer2
+// CHECK:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External218ResilientContainerV16computedPropertyQrvp", 0)
+// CHECK:  [[FUN:%.*]] = function_ref @$s9External319ResilientContainer2V18inlineablePropertyQrvg
+// CHECK:  [[RES2:%.*]] = unchecked_addr_cast [[RES]] : $*@_opaqueReturnTypeOf("$s9External218ResilientContainerV16computedPropertyQrvp", 0){{.*}}to $*@_opaqueReturnTypeOf("$s9External319ResilientContainer2V18inlineablePropertyQrvp", 0)
+// CHECK:  apply [[FUN]]([[RES2]], [[CONTAINER]])
+public func testResilientInlinableProperty2() {
+  let r = ResilientContainer2()
+  useP(r.inlineableProperty.myValue3())
+}
+
+// CHECK-LABEL: sil @$s1A035testResilientInlinablePropertyCallsbC0yyF : $@convention(thin) () -> () {
+// CHECK:   [[CONTAINTER:%.*]] = alloc_stack $ResilientContainer2
+// CHECK:   [[RES:%.*]] = alloc_stack $Int64
+// CHECK:   [[FUN:%.*]] = function_ref @$s9External319ResilientContainer2V023inlineablePropertyCallsB10InlineableQrvg
+// CHECK:   [[RES2:%.*]] = unchecked_addr_cast [[RES]] : $*Int64 to $*@_opaqueReturnTypeOf("$s9External319ResilientContainer2V023inlineablePropertyCallsB10InlineableQrvp", 0)
+// CHECK:  apply [[FUN]]([[RES2]], [[CONTAINTER]])
+public func testResilientInlinablePropertyCallsResilientInlinable() {
+  let r = ResilientContainer2()
+  useP(r.inlineablePropertyCallsResilientInlineable.myValue3())
+}

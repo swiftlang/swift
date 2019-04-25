@@ -11,3 +11,13 @@ extension Int64 : ExternalP {
 public func external() -> some ExternalP {
   return Int64(5)
 }
+
+public struct ExternalContainer {
+  var x = Int64(0)
+
+  public init() {}
+
+  public var computedProperty : some ExternalP {
+    return x
+  }
+}
