@@ -454,11 +454,7 @@ public:
     });
 
     // Emit the witness table for the base conformance if it is shared.
-    auto *normal = conformance->getRootNormalConformance();
-
-    if (getLinkageForProtocolConformance(normal, NotForDefinition)
-          == SILLinkage::Shared)
-      SGM.getWitnessTable(normal);
+    SGM.useConformance(ProtocolConformanceRef(conformance));
   }
 
   Witness getWitness(ValueDecl *decl) {
