@@ -1,10 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_2.swift -module-name External -emit-module -emit-module-path %t/External.swiftmodule
 // RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_3.swift -enable-library-evolution -module-name External2 -emit-module -emit-module-path %t/External2.swiftmodule
+// RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_4.swift -I %t -enable-library-evolution -module-name External3 -emit-module -emit-module-path %t/External3.swiftmodule
 // RUN: %target-swift-frontend -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil  -sil-verify-all %s | %FileCheck %s
 // RUN: %target-swift-frontend -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -emit-sil  -sil-verify-all %s | %FileCheck %s
 import External
 import External2
+import External3
 
 public protocol P {
   func myValue() -> Int64
@@ -259,4 +261,40 @@ extension P3 {
   public func foo() -> some P3 {
     return Adapter(inner: self)
   }
+}
+
+// We should specialize the opaque type because the resilient function is
+// inlineable.
+
+// CHECK-LABEL: sil @$s1A21useExternalResilient2yyF : $@convention(thin) () -> ()
+// CHECK:   [[RES:%.*]] = alloc_stack $Int64
+// CHECK:   [[FUN:%.*]] = function_ref @$s9External226inlinableExternalResilientQryF : $@convention(thin) () -> @out @_opaqueReturnTypeOf("$s9External226inlinableExternalResilientQryF", 0)
+// CHECK:   [[RES2:%.*]] = unchecked_addr_cast [[RES]] : $*Int64 to $*@_opaqueReturnTypeOf("$s9External226inlinableExternalResilientQryF", 0)
+// CHECK:   apply [[FUN]]([[RES2]])
+// CHECK:   return
+public func useExternalResilient2() {
+  let e = inlinableExternalResilient()
+  useP(e.myValue3())
+}
+
+// In this case we should only 'peel' one layer of opaque archetypes.
+// CHECK-LABEL: sil @$s1A21useExternalResilient3yyF
+// CHECK:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
+// CHECK:  [[FUN:%.*]] = function_ref @$s9External3031inlinableExternalResilientCallsD0QryF : $@convention(thin) () -> @out @_opaqueReturnTypeOf("$s9External3031inlinableExternalResilientCallsD0QryF", 0)
+// CHECK:  [[RES2:%.*]] = unchecked_addr_cast [[RES]] : $*@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0){{.*}}to $*@_opaqueReturnTypeOf("$s9External3031inlinableExternalResilientCallsD0QryF", 0)
+// CHECK:  apply [[FUN]]([[RES2]])
+public func useExternalResilient3() {
+  let e = inlinableExternalResilientCallsResilient()
+  useP(e.myValue3())
+}
+
+// Check that we can look throught two layers of inlinable resilient functions.
+// CHECK-LABEL: sil @$s1A21useExternalResilient4yyF
+// CHECK:   [[RES:%.*]] = alloc_stack $Int64
+// CHECK:   [[FUN:%.*]] = function_ref @$s9External3040inlinableExternalResilientCallsInlinablecD0QryF : $@convention(thin) () -> @out @_opaqueReturnTypeOf("$s9External3040inlinableExternalResilientCallsInlinablecD0QryF", 0)
+// CHECK:   [[RES2:%.*]] = unchecked_addr_cast [[RES]] : $*Int64 to $*@_opaqueReturnTypeOf("$s9External3040inlinableExternalResilientCallsInlinablecD0QryF", 0)
+// CHECK:   apply [[FUN]]([[RES2]])
+public func useExternalResilient4() {
+  let e = inlinableExternalResilientCallsInlinableExternalResilient()
+  useP(e.myValue3())
 }

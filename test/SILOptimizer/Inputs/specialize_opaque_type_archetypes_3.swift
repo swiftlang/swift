@@ -11,3 +11,36 @@ extension Int64 : ExternalP2 {
 public func externalResilient() -> some ExternalP2 {
   return Int64(6)
 }
+
+@usableFromInline
+@inline(never)
+func preventInlining() {}
+
+@inlinable
+public func inlinableExternalResilient() -> some ExternalP2 {
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  preventInlining()
+  return Int64(6)
+}
