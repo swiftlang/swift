@@ -10,19 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_fixed_layout
 public struct StdlibVersion: RawRepresentable {
-  public let rawValue: Double
+  public let rawValue: (Int, Int)
 
-  @inlinable
-  public init(rawValue: Double) {
+  public init(rawValue: (Int, Int)) {
     self.rawValue = rawValue
   }
 }
 
 extension StdlibVersion {
-  public static func custom(_ version: Double) -> StdlibVersion {
-    return StdlibVersion(rawValue: version)
+  public static func custom(_ version1: Int, _ version2: Int) -> StdlibVersion {
+    return StdlibVersion(rawValue: (version1, version2))
   }
 
   public static var currentlyRunning: StdlibVersion {
@@ -31,9 +29,8 @@ extension StdlibVersion {
 
   // Shipped in macOS 10.14.2, iOS 12.2, watchOS 5.2, tvOS 13.2
   public static var swift5_0: StdlibVersion {
-    return StdlibVersion(rawValue: 1000.0)
+    return StdlibVersion(rawValue: (1000, 0))
   }
-
 }
 
 extension StdlibVersion: CustomStringConvertible {
@@ -42,8 +39,18 @@ extension StdlibVersion: CustomStringConvertible {
   }
 }
 
-extension StdlibVersion: Equatable {}
-extension StdlibVersion: Hashable {}
+extension StdlibVersion: Equatable {
+  public static func == (left: StdlibVersion, right: StdlibVersion) -> Bool {
+    return left.rawValue == right.rawValue
+  }
+}
+
+extension StdlibVersion: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(rawValue.0)
+    hasher.combine(rawValue.1)
+  }
+}
 
 extension StdlibVersion: Comparable {
   public static func < (left: StdlibVersion, right: StdlibVersion) -> Bool {
