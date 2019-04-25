@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 487; // Last change: Opaque result types generic params
+const uint16_t SWIFTMODULE_VERSION_MINOR = 488; // assign_by_delegate
 
 using DeclIDField = BCFixed<31>;
 

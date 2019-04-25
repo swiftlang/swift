@@ -1325,6 +1325,7 @@ namespace  {
     UNINTERESTING_ATTR(HasInitialValue)
     UNINTERESTING_ATTR(ImplementationOnly)
     UNINTERESTING_ATTR(Custom)
+    UNINTERESTING_ATTR(PropertyDelegate)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

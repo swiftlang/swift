@@ -25,10 +25,12 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyDelegates.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/Basic/CharInfo.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -127,6 +129,7 @@ public:
   IGNORED_ATTR(DynamicReplacement)
   IGNORED_ATTR(PrivateImport)
   IGNORED_ATTR(Custom)
+  IGNORED_ATTR(PropertyDelegate)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -721,6 +724,25 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
   }
 }
 
+/// Determine whether the given string is an attribute name that is
+/// reserved for the implementation.
+static bool isReservedAttributeName(StringRef name) {
+  for (unsigned i : indices(name)) {
+    if (name[i] == '_')
+      continue;
+
+    // First character is lowercase; reserved.
+    if (clang::isLowercase(name[i]))
+      return true;
+
+    // Everything else is reserved.
+    return false;
+  }
+
+  // All underscores is reserved.
+  return true;
+}
+
 namespace {
 class AttributeChecker : public AttributeVisitor<AttributeChecker> {
   TypeChecker &TC;
@@ -841,6 +863,7 @@ public:
 
   void visitNonOverrideAttr(NonOverrideAttr *attr);
   void visitCustomAttr(CustomAttr *attr);
+  void visitPropertyDelegateAttr(PropertyDelegateAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2485,15 +2508,57 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     return;
   }
 
+  // If the nominal type is a property delegate type, we can be delegating
+  // through a property.
+  if (nominal->getPropertyDelegateTypeInfo()) {
+    // Property delegates can only be applied to variables
+    if (!isa<VarDecl>(D) || isa<ParamDecl>(D)) {
+      TC.diagnose(attr->getLocation(),
+                  diag::property_delegate_attribute_not_on_property,
+                  nominal->getFullName());
+      attr->setInvalid();
+      return;
+    }
+
+    // If this attribute isn't the one that attached a property delegate to
+    // this property, complain.
+    auto var = cast<VarDecl>(D);
+    if (auto attached = var->getAttachedPropertyDelegate()) {
+      if (attached != attr) {
+        TC.diagnose(attr->getLocation(), diag::property_delegate_multiple);
+        TC.diagnose(attached->getLocation(),
+                    diag::previous_property_delegate_here);
+        return;
+      }
+    }
+
+    return;
+  }
+
   TC.diagnose(attr->getLocation(), diag::nominal_type_not_attribute,
               nominal->getDescriptiveKind(), nominal->getFullName());
   nominal->diagnose(diag::decl_declared_here, nominal->getFullName());
   attr->setInvalid();
 }
 
+
 void TypeChecker::checkParameterAttributes(ParameterList *params) {
   for (auto param: *params) {
     checkDeclAttributes(param);
+  }
+}
+
+void AttributeChecker::visitPropertyDelegateAttr(PropertyDelegateAttr *attr) {
+  auto nominal = dyn_cast<NominalTypeDecl>(D);
+  if (!nominal)
+    return;
+
+  // Force checking of the property delegate type.
+  (void)nominal->getPropertyDelegateTypeInfo();
+
+  // Make sure the name isn't reserved.
+  if (isReservedAttributeName(nominal->getName().str())) {
+    nominal->diagnose(diag::property_delegate_reserved_name);
   }
 }
 

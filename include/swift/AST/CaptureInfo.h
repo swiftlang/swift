@@ -17,6 +17,7 @@
 #include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/ADT/PointerUnion.h"
 #include <vector>
 
 namespace swift {
@@ -31,13 +32,20 @@ template <> struct DenseMapInfo<swift::CapturedValue>;
 namespace swift {
 class ValueDecl;
 class FuncDecl;
+class OpaqueValueExpr;
 
 /// CapturedValue includes both the declaration being captured, along with flags
 /// that indicate how it is captured.
 class CapturedValue {
-  llvm::PointerIntPair<ValueDecl*, 2, unsigned> Value;
+public:
+  using Storage =
+      llvm::PointerIntPair<llvm::PointerUnion<ValueDecl*, OpaqueValueExpr*>, 2,
+                           unsigned>;
 
-  explicit CapturedValue(llvm::PointerIntPair<ValueDecl*, 2, unsigned> V) : Value(V) {}
+private:
+  Storage Value;
+
+  explicit CapturedValue(Storage V) : Value(V) {}
 
 public:
   friend struct llvm::DenseMapInfo<CapturedValue>;
@@ -53,16 +61,21 @@ public:
     IsNoEscape = 1 << 1
   };
 
-  CapturedValue(ValueDecl *D, unsigned Flags) : Value(D, Flags) {}
+  CapturedValue(llvm::PointerUnion<ValueDecl*, OpaqueValueExpr*> Ptr,
+                unsigned Flags)
+      : Value(Ptr, Flags) {}
 
   static CapturedValue getDynamicSelfMetadata() {
-    return CapturedValue(nullptr, 0);
+    return CapturedValue((ValueDecl *)nullptr, 0);
   }
 
   bool isDirect() const { return Value.getInt() & IsDirect; }
   bool isNoEscape() const { return Value.getInt() & IsNoEscape; }
 
   bool isDynamicSelfMetadata() const { return !Value.getPointer(); }
+  bool isOpaqueValue() const {
+    return Value.getPointer().is<OpaqueValueExpr *>();
+  }
 
   CapturedValue mergeFlags(CapturedValue cv) {
     assert(Value.getPointer() == cv.Value.getPointer() &&
@@ -73,7 +86,13 @@ public:
   ValueDecl *getDecl() const {
     assert(Value.getPointer() && "dynamic Self metadata capture does not "
            "have a value");
-    return Value.getPointer();
+    return Value.getPointer().dyn_cast<ValueDecl *>();
+  }
+
+  OpaqueValueExpr *getOpaqueValue() const {
+    assert(Value.getPointer() && "dynamic Self metadata capture does not "
+           "have a value");
+    return Value.getPointer().dyn_cast<OpaqueValueExpr *>();
   }
 
   unsigned getFlags() const { return Value.getInt(); }
@@ -98,8 +117,7 @@ namespace llvm {
 template <> struct DenseMapInfo<swift::CapturedValue> {
   using CapturedValue = swift::CapturedValue;
 
-  using PtrIntPairDenseMapInfo =
-      DenseMapInfo<llvm::PointerIntPair<swift::ValueDecl *, 2, unsigned>>;
+  using PtrIntPairDenseMapInfo = DenseMapInfo<CapturedValue::Storage>;
 
   static inline swift::CapturedValue getEmptyKey() {
     return CapturedValue{PtrIntPairDenseMapInfo::getEmptyKey()};
@@ -128,19 +146,20 @@ class DynamicSelfType;
 class CaptureInfo {
   const CapturedValue *Captures;
   DynamicSelfType *DynamicSelf;
+  OpaqueValueExpr *OpaqueValue;
   unsigned Count = 0;
   bool GenericParamCaptures : 1;
   bool Computed : 1;
 
 public:
   CaptureInfo()
-    : Captures(nullptr), DynamicSelf(nullptr), Count(0),
+    : Captures(nullptr), DynamicSelf(nullptr), OpaqueValue(nullptr), Count(0),
       GenericParamCaptures(0), Computed(0) { }
 
   bool hasBeenComputed() { return Computed; }
 
   bool isTrivial() {
-    return Count == 0 && !GenericParamCaptures && !DynamicSelf;
+    return Count == 0 && !GenericParamCaptures && !DynamicSelf && !OpaqueValue;
   }
 
   ArrayRef<CapturedValue> getCaptures() const {
@@ -182,6 +201,18 @@ public:
 
   void setDynamicSelfType(DynamicSelfType *dynamicSelf) {
     DynamicSelf = dynamicSelf;
+  }
+
+  bool hasOpaqueValueCapture() const {
+    return OpaqueValue != nullptr;
+  }
+
+  OpaqueValueExpr *getOpaqueValue() const {
+    return OpaqueValue;
+  }
+
+  void setOpaqueValue(OpaqueValueExpr *OVE) {
+    OpaqueValue = OVE;
   }
 
   void dump() const;

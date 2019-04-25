@@ -35,12 +35,14 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PropertyDelegates.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/Parse/Lexer.h"
 #include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -1339,6 +1341,22 @@ SourceRange PatternBindingEntry::getOrigInitRange() const {
   return Init ? Init->getSourceRange() : SourceRange();
 }
 
+bool PatternBindingEntry::isInitialized() const {
+  // Directly initialized.
+  if (getInit())
+    return true;
+
+  // Initialized via a property delegate.
+  if (auto var = getPattern()->getSingleVar()) {
+    if (auto customAttr = var->getAttachedPropertyDelegate()) {
+      if (customAttr->getArg() != nullptr)
+        return true;
+    }
+  }
+
+  return false;
+}
+
 void PatternBindingEntry::setInit(Expr *E) {
   auto F = PatternAndFlags.getInt();
   if (E) {
@@ -1519,7 +1537,7 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
   const auto entry = getPatternList()[i];
 
   // If it has an initializer expression, this is trivially true.
-  if (entry.getInit())
+  if (entry.isInitialized())
     return true;
 
   if (entry.getPattern()->isNeverDefaultInitializable())
@@ -3300,6 +3318,14 @@ Optional<KeyPathTypeKind> NominalTypeDecl::getKeyPathTypeKind() const {
   return None;
 }
 
+PropertyDelegateTypeInfo NominalTypeDecl::getPropertyDelegateTypeInfo() const {
+  ASTContext &ctx = getASTContext();
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           PropertyDelegateTypeInfoRequest{mutableThis},
+                           PropertyDelegateTypeInfo());
+}
+
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
                                  MutableArrayRef<TypeLoc> inherited,
@@ -4912,7 +4938,7 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
 
   // If the decl has an explicitly written initializer with a pattern binding,
   // then it isn't settable.
-  if (getParentInitializer() != nullptr)
+  if (isParentInitialized())
     return false;
 
   // Normal lets (e.g. globals) are only mutable in the context of the
@@ -5206,6 +5232,88 @@ StaticSpellingKind AbstractStorageDecl::getCorrectStaticSpelling() const {
   return getCorrectStaticSpellingForDecl(this);
 }
 
+CustomAttr *VarDecl::getAttachedPropertyDelegate() const {
+  auto &ctx = getASTContext();
+  if (!ctx.getLazyResolver())
+    return nullptr;
+
+  auto mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           AttachedPropertyDelegateRequest{mutableThis},
+                           nullptr);
+}
+
+PropertyDelegateTypeInfo VarDecl::getAttachedPropertyDelegateTypeInfo() const {
+  auto attr = getAttachedPropertyDelegate();
+  if (!attr)
+    return PropertyDelegateTypeInfo();
+
+  auto dc = getDeclContext();
+  ASTContext &ctx = getASTContext();
+  auto nominal = evaluateOrDefault(
+      ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+  if (!nominal)
+    return PropertyDelegateTypeInfo();
+
+  return nominal->getPropertyDelegateTypeInfo();
+}
+
+Type VarDecl::getAttachedPropertyDelegateType() const {
+  auto &ctx = getASTContext();
+  if (!ctx.getLazyResolver())
+    return nullptr;
+
+  auto mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           AttachedPropertyDelegateTypeRequest{mutableThis},
+                           Type());
+}
+
+Type VarDecl::getPropertyDelegateBackingPropertyType() const {
+  ASTContext &ctx = getASTContext();
+  if (!ctx.getLazyResolver())
+    return nullptr;
+
+  auto mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, PropertyDelegateBackingPropertyTypeRequest{mutableThis},
+      Type());
+}
+
+PropertyDelegateBackingPropertyInfo
+VarDecl::getPropertyDelegateBackingPropertyInfo() const {
+  auto &ctx = getASTContext();
+  if (!ctx.getLazyResolver())
+    return PropertyDelegateBackingPropertyInfo();
+
+  auto mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      PropertyDelegateBackingPropertyInfoRequest{mutableThis},
+      PropertyDelegateBackingPropertyInfo());
+}
+
+VarDecl *VarDecl::getPropertyDelegateBackingProperty() const {
+  return getPropertyDelegateBackingPropertyInfo().backingVar;
+}
+
+bool VarDecl::isPropertyDelegateInitializedWithInitialValue() const {
+  auto &ctx = getASTContext();
+  if (!ctx.getLazyResolver())
+    return false;
+
+  // If there is no initializer, the initialization form depends on
+  // whether the property delegate type has an init(initialValue:).
+  if (!isParentInitialized()) {
+    auto delegateTypeInfo = getAttachedPropertyDelegateTypeInfo();
+    return delegateTypeInfo.initialValueInit != nullptr;
+  }
+
+  // Otherwise, check whether the '=' initialization form was used.
+  return getPropertyDelegateBackingPropertyInfo().originalInitialValue
+      != nullptr;
+}
+
 Identifier VarDecl::getObjCPropertyName() const {
   if (auto attr = getAttrs().getAttribute<ObjCAttr>()) {
     if (auto name = attr->getName())
@@ -5430,6 +5538,31 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   DefaultValueAndFlags.getPointer()->InitContext = initContext;
 }
 
+Expr *swift::findOriginalPropertyDelegateInitialValue(VarDecl *var,
+                                                      Expr *init) {
+  auto attr = var->getAttachedPropertyDelegate();
+  assert(attr && "No attached property delegate?");
+
+  // Direct initialization implies no original initial value.
+  if (attr->getArg())
+    return nullptr;
+
+  // Look through any expressions wrapping the initializer.
+  init = init->getSemanticsProvidingExpr();
+  auto initCall = dyn_cast<CallExpr>(init);
+  if (!initCall)
+    return nullptr;
+
+  auto initArg = cast<TupleExpr>(initCall->getArg())->getElement(0);
+  initArg = initArg->getSemanticsProvidingExpr();
+  if (auto autoclosure = dyn_cast<AutoClosureExpr>(initArg)) {
+    initArg =
+        autoclosure->getSingleExpressionBody()->getSemanticsProvidingExpr();
+  }
+
+  return initArg;
+}
+
 StringRef
 ParamDecl::getDefaultValueStringRepresentation(
   SmallVectorImpl<char> &scratch) const {
@@ -5460,6 +5593,23 @@ ParamDecl::getDefaultValueStringRepresentation(
     if (!existing.empty())
       return existing;
     auto var = getStoredProperty();
+
+    if (auto original = var->getOriginalDelegatedProperty()) {
+      if (auto attr = original->getAttachedPropertyDelegate()) {
+        if (auto arg = attr->getArg()) {
+          SourceRange fullRange(attr->getTypeLoc().getSourceRange().Start,
+                                arg->getEndLoc());
+          auto charRange = Lexer::getCharSourceRangeFromSourceRange(
+              getASTContext().SourceMgr, fullRange);
+          return getASTContext().SourceMgr.extractText(charRange);
+        }
+
+        auto init = findOriginalPropertyDelegateInitialValue(
+            original, original->getParentInitializer());
+        return extractInlinableText(getASTContext().SourceMgr, init, scratch);
+      }
+    }
+
     return extractInlinableText(getASTContext().SourceMgr,
                                 var->getParentInitializer(),
                                 scratch);

@@ -121,7 +121,32 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   bool visit(ParameterList *PL) {
     return inherited::visit(PL);
   }
-  
+
+  //===--------------------------------------------------------------------===//
+  //                               Attributes
+  //===--------------------------------------------------------------------===//
+  bool visitCustomAttributes(Decl *D) {
+    for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr>()) {
+      CustomAttr *mutableCustomAttr = const_cast<CustomAttr *>(customAttr);
+      if (doIt(mutableCustomAttr->getTypeLoc()))
+        return true;
+
+      if (auto semanticInit = customAttr->getSemanticInit()) {
+        if (auto newSemanticInit = doIt(semanticInit))
+          mutableCustomAttr->setSemanticInit(newSemanticInit);
+        else
+          return true;
+      } else if (auto arg = customAttr->getArg()) {
+        if (auto newArg = doIt(arg))
+          mutableCustomAttr->setArg(newArg);
+        else
+          return true;
+      }
+    }
+
+    return false;
+  }
+
   //===--------------------------------------------------------------------===//
   //                                 Decls
   //===--------------------------------------------------------------------===//
@@ -151,6 +176,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitPatternBindingDecl(PatternBindingDecl *PBD) {
+    // If there is a single variable, walk it's attributes.
+    bool isPropertyDelegateBackingProperty = false;
+    if (auto singleVar = PBD->getSingleVar()) {
+      if (visitCustomAttributes(singleVar))
+        return true;
+
+      isPropertyDelegateBackingProperty =
+        singleVar->getOriginalDelegatedProperty() != nullptr;
+    }
+
     unsigned idx = 0U-1;
     for (auto entry : PBD->getPatternList()) {
       ++idx;
@@ -159,7 +194,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       else
         return true;
       if (entry.getInit() &&
-          (!entry.isInitializerLazy() ||
+          !isPropertyDelegateBackingProperty &&
+          (!entry.isInitializerSubsumed() ||
            Walker.shouldWalkIntoLazyInitializers())) {
 #ifndef NDEBUG
         PrettyStackTraceDecl debugStack("walking into initializer for", PBD);

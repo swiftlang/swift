@@ -223,7 +223,7 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
           continue;
       }
 
-      if (varDecl->getParentInitializer())
+      if (varDecl->isParentInitialized())
         continue;
 
       // The var was not default initializable, and did not have an explicit
@@ -870,7 +870,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
           lookupVarDeclForCodingKeysCase(conformanceDC, elt, targetDecl);
 
       // Don't output a decode statement for a var let with a default value.
-      if (varDecl->isLet() && varDecl->getParentInitializer() != nullptr)
+      if (varDecl->isLet() && varDecl->isParentInitialized())
         continue;
 
       auto methodName =
