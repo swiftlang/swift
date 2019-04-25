@@ -1920,7 +1920,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Remove")
 
 SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll")
   .skip(
-    .stdlibOlderThan(.custom(1001.0),
+    .stdlibOlderThan(.custom(1001, 0),
       reason: "https://github.com/apple/swift/pull/22527"))
   .code {
   do {
@@ -2179,7 +2179,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty")
   .skip(
-    .stdlibOlderThan(.custom(1001.0),
+    .stdlibOlderThan(.custom(1001, 0),
       reason: "https://github.com/apple/swift/pull/22527"))
   .code {
   let s1 = getBridgedNonverbatimSet([])
@@ -4627,7 +4627,7 @@ SetTestSuite.test("IndexValidation.RemoveAt.AfterGrow") {
 #if _runtime(_ObjC)
 SetTestSuite.test("ForcedNonverbatimBridge.Trap.String")
   .skip(
-    .stdlibOlderThan(.custom(1001.0),
+    .stdlibOlderThan(.custom(1001, 0),
       reason: "https://github.com/apple/swift/pull/23174"))
   .skip(.custom(
     { _isFastAssertConfiguration() },
@@ -4651,7 +4651,7 @@ SetTestSuite.test("ForcedNonverbatimBridge.Trap.String")
 #if _runtime(_ObjC)
 SetTestSuite.test("ForcedNonverbatimBridge.Trap.Int")
   .skip(
-    .stdlibOlderThan(.custom(1001.0),
+    .stdlibOlderThan(.custom(1001, 0),
       reason: "https://github.com/apple/swift/pull/23174"))
   .skip(.custom(
     { _isFastAssertConfiguration() },
@@ -4784,7 +4784,7 @@ SetTestSuite.test("ForcedVerbatimDowncast.Trap.Int")
 #if _runtime(_ObjC)
 SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.String")
   .skip(
-    .stdlibOlderThan(.custom(1001.0),
+    .stdlibOlderThan(.custom(1001, 0),
       reason: "https://github.com/apple/swift/pull/23174"))
   .skip(.custom(
     { _isFastAssertConfiguration() },
@@ -4808,7 +4808,7 @@ SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.String")
 #if _runtime(_ObjC)
 SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.Int")
   .skip(
-    .stdlibOlderThan(.custom(1001.0),
+    .stdlibOlderThan(.custom(1001, 0),
       reason: "https://github.com/apple/swift/pull/23174"))
   .skip(.custom(
     { _isFastAssertConfiguration() },
@@ -4833,7 +4833,7 @@ SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.Int")
 #if _runtime(_ObjC)
 SetTestSuite.test("Upcast.StringEqualityMismatch")
   .skip(
-    .stdlibOlderThan(.custom(1001.0),
+    .stdlibOlderThan(.custom(1001, 0),
       reason: "https://github.com/apple/swift/pull/23683"))
   .code {
   // Upcasting from NSString to String keys changes their concept of equality,
