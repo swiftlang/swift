@@ -623,6 +623,11 @@ TensorTests.testAllBackends("SimpleCond") {
   expectEqual(0, selectValue(true).scalar)
 }
 
+TensorTests.testAllBackends("TensorShapeDescription") {
+  expectEqual("[2, 2]", Tensor<Int32>(ones: [2, 2]).shape.description)
+  expectEqual("[]", Tensor(1).shape.description)
+}
+
 @inline(never)
 func testXORInference() {
   func xor(_ x: Float, _ y: Float) -> Float {
