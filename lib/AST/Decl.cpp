@@ -3437,6 +3437,8 @@ UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
 }
 
 Type TypeAliasDecl::getStructuralType() const {
+  assert(!getGenericParams());
+  
   auto &context = getASTContext();
   return evaluateOrDefault(context.evaluator,
                            StructuralTypeRequest { const_cast<TypeAliasDecl *>(this) },

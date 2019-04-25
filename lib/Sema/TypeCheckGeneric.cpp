@@ -1012,7 +1012,13 @@ RequirementRequest::evaluate(Evaluator &evaluator,
 llvm::Expected<Type>
 swift::StructuralTypeRequest::evaluate(Evaluator &evaluator,
                                        TypeAliasDecl *D) const {
+  TypeResolutionOptions options(TypeResolverContext::TypeAliasDecl);
+  if (!D->getDeclContext()->isCascadingContextForLookup(
+        /*functionsAreNonCascading*/true)) {
+    options |= TypeResolutionFlags::KnownNonCascadingDependency;
+  }
+
   auto typeRepr = D->getUnderlyingTypeLoc().getTypeRepr();
   auto resolution = TypeResolution::forStructural(D);
-  return resolution.resolveType(typeRepr, None);
+  return resolution.resolveType(typeRepr, options);
 }
