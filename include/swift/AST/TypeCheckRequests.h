@@ -33,6 +33,7 @@ class GenericParamList;
 struct PropertyDelegateBackingPropertyInfo;
 class RequirementRepr;
 class SpecializeAttr;
+class TypeAliasDecl;
 struct TypeLoc;
 
 /// Display a nominal type or extension thereof.
@@ -546,6 +547,33 @@ public:
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
+
+/// Retrieve the structural type of an alias type.
+class StructuralTypeRequest :
+    public SimpleRequest<StructuralTypeRequest,
+                         CacheKind::SeparatelyCached,
+                         Type,
+                         TypeAliasDecl*> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type> evaluate(Evaluator &eval, TypeAliasDecl *d) const;
+
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; };
+  Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
 
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.

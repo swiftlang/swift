@@ -1008,3 +1008,11 @@ RequirementRequest::evaluate(Evaluator &evaluator,
   }
   llvm_unreachable("unhandled kind");
 }
+
+llvm::Expected<Type>
+swift::StructuralTypeRequest::evaluate(Evaluator &evaluator,
+                                       TypeAliasDecl *D) const {
+  auto typeRepr = D->getUnderlyingTypeLoc().getTypeRepr();
+  auto resolution = TypeResolution::forStructural(D);
+  return resolution.resolveType(typeRepr, None);
+}

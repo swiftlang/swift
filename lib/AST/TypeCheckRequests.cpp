@@ -660,3 +660,27 @@ void swift::simple_display(llvm::raw_ostream &out, const Type &type) {
   else
     out << "null";
 }
+
+//----------------------------------------------------------------------------//
+// StructuralTypeRequest.
+//----------------------------------------------------------------------------//
+
+void StructuralTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  diags.diagnose(SourceLoc(), diag::circular_reference);
+}
+
+void StructuralTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  diags.diagnose(SourceLoc(), diag::circular_reference_through);
+}
+
+Optional<Type> StructuralTypeRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  if (decl->getUnderlyingTypeLoc().getType())
+    return decl->getUnderlyingTypeLoc().getType();
+  return None;
+}
+
+void StructuralTypeRequest::cacheResult(Type value) const {
+  auto decl = std::get<0>(getStorage());
+  decl->getUnderlyingTypeLoc().setType(value);
+}
