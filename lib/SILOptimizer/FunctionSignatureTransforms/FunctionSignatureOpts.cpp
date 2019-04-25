@@ -598,7 +598,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     Builder.createThrow(Loc, ErrorArg);
     Builder.setInsertionPoint(NormalBlock);
   } else {
-    ReturnValue = Builder.createApply(Loc, FRI, Subs, ThunkArgs, false);
+    ReturnValue = Builder.createApply(Loc, FRI, Subs, ThunkArgs);
   }
 
   // Set up the return results.

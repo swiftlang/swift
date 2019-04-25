@@ -156,7 +156,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   // Call the witness.
   SILValue bridgedValue =
       SGF.B.createApply(loc, witnessRef, typeSubMap,
-                        swiftValue.borrow(SGF, loc).getValue(), false);
+                        swiftValue.borrow(SGF, loc).getValue());
 
   auto bridgedMV = SGF.emitManagedRValueWithCleanup(bridgedValue);
   bridgedMV = scope.popPreservingValue(bridgedMV);
@@ -252,7 +252,7 @@ static ManagedValue emitBridgeBoolToObjCBool(SILGenFunction &SGF,
     = SGF.emitGlobalFunctionRef(loc, SGF.SGM.getBoolToObjCBoolFn());
 
   SILValue result = SGF.B.createApply(loc, boolToObjCBoolFn,
-                                      {}, swiftBool.forward(SGF), false);
+                                      {}, swiftBool.forward(SGF));
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
@@ -264,7 +264,7 @@ static ManagedValue emitBridgeBoolToDarwinBoolean(SILGenFunction &SGF,
     = SGF.emitGlobalFunctionRef(loc, SGF.SGM.getBoolToDarwinBooleanFn());
 
   SILValue result = SGF.B.createApply(loc, boolToDarwinBooleanFn,
-                                      {}, swiftBool.forward(SGF), false);
+                                      {}, swiftBool.forward(SGF));
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
@@ -276,7 +276,7 @@ static ManagedValue emitBridgeForeignBoolToBool(SILGenFunction &SGF,
   SILValue bridgingFn = SGF.emitGlobalFunctionRef(loc, bridgingFnRef);
 
   SILValue result = SGF.B.createApply(loc, bridgingFn, {},
-                                      foreignBool.forward(SGF), false);
+                                      foreignBool.forward(SGF));
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
@@ -1142,7 +1142,7 @@ ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
 
   SILValue arg = bridgedError.getValue();
 
-  SILValue nativeError = B.createApply(loc, bridgeFn, {}, arg, false);
+  SILValue nativeError = B.createApply(loc, bridgeFn, {}, arg);
   return emitManagedRValueWithCleanup(nativeError);
 }
 
@@ -1188,7 +1188,7 @@ ManagedValue SILGenFunction::emitNativeToBridgedError(SILLocation loc,
 
   SILValue arg = nativeError.getValue();
 
-  SILValue bridgedError = B.createApply(loc, bridgeFn, {}, arg, false);
+  SILValue bridgedError = B.createApply(loc, bridgeFn, {}, arg);
   return emitManagedRValueWithCleanup(bridgedError);
 }
 
@@ -1490,7 +1490,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   assert(foreignError.hasValue() == substTy->hasErrorResult());
   if (!substTy->hasErrorResult()) {
     // Create the apply.
-    result = B.createApply(loc, nativeFn, subs, args, false);
+    result = B.createApply(loc, nativeFn, subs, args);
 
     if (substConv.hasIndirectSILResults()) {
       assert(substTy->getNumResults() == 1);

@@ -111,10 +111,11 @@ static void lowerAssignByDelegateInstruction(SILBuilderWithScope &b,
       CanSILFunctionType fTy = initFn->getType().castTo<SILFunctionType>();
       SILFunctionConventions convention(fTy, inst->getModule());
       if (convention.hasIndirectSILResults()) {
-        b.createApply(loc, initFn, { dest, src }, false);
+        b.createApply(loc, initFn, SubstitutionMap(), { dest, src });
         srcConvention = convention.getSILArgumentConvention(1);
       } else {
-        SILValue wrappedSrc = b.createApply(loc, initFn, { src }, false);
+        SILValue wrappedSrc = b.createApply(loc, initFn, SubstitutionMap(),
+                                            { src });
         b.createTrivialStoreOr(loc, wrappedSrc, dest, StoreOwnershipQualifier::Init);
         srcConvention = convention.getSILArgumentConvention(0);
       }
@@ -129,7 +130,7 @@ static void lowerAssignByDelegateInstruction(SILBuilderWithScope &b,
       SILFunctionConventions convention(fTy, inst->getModule());
       assert(!convention.hasIndirectSILResults());
       srcConvention = convention.getSILArgumentConvention(0);
-      b.createApply(loc, setterFn, { src }, false);
+      b.createApply(loc, setterFn, SubstitutionMap(), { src });
 
       // The destination address is not used. Remove it if it is a dead access
       // marker. This is important, because also the setter function contains

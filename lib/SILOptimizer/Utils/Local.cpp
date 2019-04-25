@@ -928,8 +928,7 @@ SingleValueInstruction *StringConcatenationOptimizer::optimize() {
   Arguments.push_back(FuncResultType);
 
   return Builder.createApply(AI->getLoc(), FRIConvertFromBuiltin,
-                             SubstitutionMap(), Arguments,
-                             false);
+                             SubstitutionMap(), Arguments);
 }
 
 /// Top level entry point
