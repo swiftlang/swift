@@ -4396,7 +4396,7 @@ namespace {
       result->computeType();
 
       // FIXME: Kind of awkward that we have to do this here
-      result->getGenericParams()->getParams()[0]->setDepth(0);
+      result->getGenericParams()->getParams()[0].setDepth(0);
 
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
 
@@ -6719,7 +6719,7 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
     return nullptr;
   }
   assert(typeParamList->size() > 0);
-  SmallVector<GenericTypeParamDecl *, 4> genericParams;
+  SmallVector<GenericParam, 4> genericParams;
   for (auto *objcGenericParam : *typeParamList) {
     auto genericParamDecl = Impl.createDeclWithClangNode<GenericTypeParamDecl>(
         objcGenericParam, AccessLevel::Public, dc,
@@ -7923,14 +7923,24 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
 
 GenericSignature *ClangImporter::Implementation::buildGenericSignature(
     GenericParamList *genericParams, DeclContext *dc) {
+  // TODO: [GENERICS] Make GenericSignatureBuilder accept GenericParam
   GenericSignatureBuilder builder(SwiftContext);
   for (auto param : *genericParams) {
-    builder.addGenericParameter(param);
+    switch (param.getKind()) {
+      case GenericParam::ParamKind::TypeParam:
+        builder.addGenericParameter(param.getTypeParam());
+        break;
+    }
   }
   for (auto param : *genericParams) {
-    bool result = builder.addGenericParameterRequirements(param);
-    assert(!result);
-    (void) result;
+    switch (param.getKind()) {
+      case GenericParam::ParamKind::TypeParam:
+        bool result = builder.addGenericParameterRequirements(
+                                                        param.getTypeParam());
+        assert(!result);
+        (void) result;
+        break;
+    }
   }
 
   return std::move(builder).computeGenericSignature(SourceLoc());

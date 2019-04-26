@@ -350,11 +350,11 @@ void AccessControlCheckerBase::checkGenericParamAccess(
   auto *DC = owner->getDeclContext();
 
   for (auto param : *params) {
-    if (param->getInherited().empty())
+    if (param.getInherited().empty())
       continue;
-    assert(param->getInherited().size() == 1);
-    checkTypeAccessImpl(param->getInherited().front().getType(),
-                        param->getInherited().front().getTypeRepr(),
+    assert(param.getInherited().size() == 1);
+    checkTypeAccessImpl(param.getInherited().front().getType(),
+                        param.getInherited().front().getTypeRepr(),
                         accessScope, DC, /*mayBeInferred*/false, callback);
   }
   callbackACEK = ACEK::Requirement;
@@ -1532,10 +1532,10 @@ class ImplementationOnlyImportChecker
       return;
 
     for (auto param : *params) {
-      if (param->getInherited().empty())
+      if (param.getInherited().empty())
         continue;
-      assert(param->getInherited().size() == 1);
-      checkType(param->getInherited().front(), owner,
+      assert(param.getInherited().size() == 1);
+      checkType(param.getInherited().front(), owner,
                 getDiagnoseCallback(owner), getDiagnoseCallback(owner));
     }
 

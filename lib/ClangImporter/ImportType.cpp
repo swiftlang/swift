@@ -940,16 +940,16 @@ namespace {
                 return nullptr;
               }
               importedTypeArg = subresult.AbstractType;
-            } else if (typeParam->getSuperclass() &&
-                       typeParam->getConformingProtocols().empty()) {
-              importedTypeArg = typeParam->getSuperclass();
+            } else if (typeParam.getSuperclass() &&
+                       typeParam.getConformingProtocols().empty()) {
+              importedTypeArg = typeParam.getSuperclass();
             } else {
               SmallVector<Type, 4> memberTypes;
 
-              if (auto superclassType = typeParam->getSuperclass())
+              if (auto superclassType = typeParam.getSuperclass())
                 memberTypes.push_back(superclassType);
 
-              for (auto protocolDecl : typeParam->getConformingProtocols())
+              for (auto protocolDecl : typeParam.getConformingProtocols())
                 memberTypes.push_back(protocolDecl->getDeclaredType());
 
               bool hasExplicitAnyObject = false;

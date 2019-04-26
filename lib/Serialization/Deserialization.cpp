@@ -672,7 +672,7 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
     return nullptr;
   lastRecordOffset.reset();
 
-  SmallVector<GenericTypeParamDecl *, 8> params;
+  SmallVector<GenericParam, 8> params;
 
   ArrayRef<uint64_t> paramIDs;
   GenericParamListLayout::readRecord(scratch, paramIDs);

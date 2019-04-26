@@ -752,10 +752,15 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   if (AllMemberRefs) {
     Expr *BaseExpr;
     if (auto PD = dyn_cast<ProtocolDecl>(Base)) {
-      BaseExpr = TypeExpr::createForDecl(Loc,
-                                         PD->getGenericParams()->getParams().front(),
-                                         /*DC*/nullptr,
-                                         /*isImplicit=*/true);
+      auto GP = PD->getGenericParams()->getParams().front();
+
+      switch (GP.getKind()) {
+        case GenericParam::ParamKind::TypeParam:
+          BaseExpr = TypeExpr::createForDecl(Loc, GP.getTypeParam(),
+                                             /*DC*/nullptr,
+                                             /*isImplicit=*/true);
+          break;
+      }
     } else if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
       BaseExpr = TypeExpr::createForDecl(Loc, NTD, BaseDC, /*isImplicit=*/true);
     } else {

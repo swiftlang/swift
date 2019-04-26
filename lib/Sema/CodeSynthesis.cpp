@@ -1848,7 +1848,7 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
   // Inheriting initializers that have their own generic parameters
   auto *genericParams = superclassCtor->getGenericParams();
   if (genericParams) {
-    SmallVector<GenericTypeParamDecl *, 4> newParams;
+    SmallVector<GenericParam, 4> newParams;
 
     // First, clone the superclass constructor's generic parameter list,
     // but change the depth of the generic parameters to be one greater
@@ -1857,13 +1857,19 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
     if (auto *genericSig = classDecl->getGenericSignature())
       depth = genericSig->getGenericParams().back()->getDepth() + 1;
 
-    for (auto *param : genericParams->getParams()) {
-      auto *newParam = new (ctx) GenericTypeParamDecl(classDecl,
-                                                      param->getName(),
-                                                      SourceLoc(),
-                                                      depth,
-                                                      param->getIndex());
-      newParams.push_back(newParam);
+    for (auto param : genericParams->getParams()) {
+      switch (param.getKind()) {
+        case GenericParam::ParamKind::TypeParam: {
+          auto *GTPD = param.getTypeParam();
+          auto *newParam = new (ctx) GenericTypeParamDecl(classDecl,
+                                                          GTPD->getName(),
+                                                          SourceLoc(),
+                                                          depth,
+                                                          GTPD->getIndex());
+          newParams.push_back(newParam);
+          break;
+        }
+      }
     }
 
     // We don't have to clone the requirements, because they're not
@@ -1880,8 +1886,14 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
     builder.addGenericSignature(classDecl->getGenericSignature());
 
     // Add the generic parameters.
-    for (auto *newParam : newParams)
-      builder.addGenericParameter(newParam);
+    for (auto newParam : newParams) {
+      // TODO: [GENERICS] Get GenericSignatureBuilder to accept GenericParam
+      switch (newParam.getKind()) {
+        case GenericParam::ParamKind::TypeParam:
+          builder.addGenericParameter(newParam.getTypeParam());
+          break;
+      }
+    }
 
     auto source =
       GenericSignatureBuilder::FloatingRequirementSource::forAbstract();

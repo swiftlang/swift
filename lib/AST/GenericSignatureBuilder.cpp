@@ -7466,8 +7466,14 @@ GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
 
   // Add all of the generic parameters.
   proto->createGenericParamsIfMissing();
-  for (auto gp : *proto->getGenericParams())
-    builder.addGenericParameter(gp);
+  for (auto gp : *proto->getGenericParams()) {
+    // TODO: [GENERICS] Make GenericSignatureBuilder accept GenericParam
+    switch (gp.getKind()) {
+      case GenericParam::ParamKind::TypeParam:
+        builder.addGenericParameter(gp.getTypeParam());
+        break;
+    }
+  }
 
   // Add the conformance of 'self' to the protocol.
   auto selfType =

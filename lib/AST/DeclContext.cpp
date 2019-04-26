@@ -99,7 +99,7 @@ GenericTypeParamType *DeclContext::getProtocolSelfType() const {
     return nullptr;
 
   return genericParams->getParams().front()
-      ->getDeclaredInterfaceType()
+      .getDeclaredInterfaceType()
       ->castTo<GenericTypeParamType>();
 }
 

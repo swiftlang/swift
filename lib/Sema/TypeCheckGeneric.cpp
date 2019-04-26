@@ -46,19 +46,31 @@ static void checkGenericParamList(TypeChecker &tc,
          "Parsed an empty generic parameter list?");
 
   // Determine where and how to perform name lookup.
-  DeclContext *lookupDC = genericParams->begin()[0]->getDeclContext();
+  DeclContext *lookupDC = genericParams->begin()[0].getDeclContext();
   assert(lookupDC == resolution.getDeclContext());
 
   // First, add the generic parameters to the generic signature builder.
   // Do this before checking the inheritance clause, since it may
   // itself be dependent on one of these parameters.
-  for (auto param : *genericParams)
-    builder->addGenericParameter(param);
+  for (auto param : *genericParams) {
+    // TODO: [GENERICS] Update GenericSignatureBuilder to accept GenericParam
+    switch (param.getKind()) {
+      case GenericParam::ParamKind::TypeParam:
+        builder->addGenericParameter(param.getTypeParam());
+        break;
+    }
+  }
 
   // Add the requirements for each of the generic parameters to the builder.
   // Now, check the inheritance clauses of each parameter.
-  for (auto param : *genericParams)
-    builder->addGenericParameterRequirements(param);
+  for (auto param : *genericParams) {
+    // TODO: [GENERICS] Update GenericSignatureBuilder to accept GenericParam
+    switch (param.getKind()) {
+      case GenericParam::ParamKind::TypeParam:
+        builder->addGenericParameterRequirements(param.getTypeParam());
+        break;
+    }
+  }
 
   // Add the requirements clause to the builder.
 
@@ -149,7 +161,7 @@ static void addGenericParamTypes(GenericParamList *gpList,
                                  SmallVectorImpl<GenericTypeParamType *> &params) {
   for (auto gpDecl : *gpList) {
     params.push_back(
-            gpDecl->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
+            gpDecl.getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
   }
 }
 
@@ -420,7 +432,7 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
   };
 
   // Find the depth of the function's own generic parameters.
-  unsigned fnGenericParamsDepth = genericParams->getParams().front()->getDepth();
+  unsigned fnGenericParamsDepth = genericParams->getParams().front().getDepth();
 
   // Check that every generic parameter type from the signature is
   // among referencedGenericParams.
@@ -685,7 +697,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
   GenericSignature *sig;
   if (!ext || mustInferRequirements || ext->getTrailingWhereClause() ||
       getExtendedTypeGenericDepth(ext) !=
-      genericParams->getParams().back()->getDepth()) {
+      genericParams->getParams().back().getDepth()) {
     // Collect the generic parameters.
     SmallVector<GenericTypeParamType *, 4> allGenericParams;
     if (recursivelyVisitGenericParams) {
@@ -710,14 +722,14 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
     if (recursivelyVisitGenericParams) {
       visitOuterToInner(genericParams,
                         [&](GenericParamList *gpList) {
-        auto genericParamsDC = gpList->begin()[0]->getDeclContext();
+        auto genericParamsDC = gpList->begin()[0].getDeclContext();
         TypeResolution structuralResolution =
           TypeResolution::forStructural(genericParamsDC);
           checkGenericParamList(*this, &builder, gpList, nullptr,
                                 structuralResolution);
       });
     } else {
-      auto genericParamsDC = genericParams->begin()[0]->getDeclContext();
+      auto genericParamsDC = genericParams->begin()[0].getDeclContext();
       TypeResolution structuralResolution =
         TypeResolution::forStructural(genericParamsDC);
       checkGenericParamList(*this, &builder, genericParams, parentSig,

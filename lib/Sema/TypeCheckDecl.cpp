@@ -478,8 +478,13 @@ static void checkGenericParams(GenericParamList *genericParams,
     return;
 
   for (auto gp : *genericParams) {
-    tc.checkDeclAttributesEarly(gp);
-    checkInheritanceClause(gp);
+    switch (gp.getKind()) {
+      case GenericParam::ParamKind::TypeParam:
+        auto *GTPD = gp.getTypeParam();
+        tc.checkDeclAttributesEarly(GTPD);
+        checkInheritanceClause(GTPD);
+        break;
+    }
   }
 
   // Force visitation of each of the requirements here.
@@ -4524,7 +4529,7 @@ static Type formExtensionInterfaceType(
     for (auto gp : *genericParams) {
       SWIFT_DEFER { ++gpIndex; };
 
-      auto gpType = gp->getDeclaredInterfaceType();
+      auto gpType = gp.getDeclaredInterfaceType();
       genericArgs.push_back(gpType);
 
       if (currentBoundType) {

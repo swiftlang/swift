@@ -1399,8 +1399,13 @@ void Serializer::writeGenericParams(const GenericParamList *genericParams) {
     return;
 
   SmallVector<DeclID, 4> paramIDs;
-  for (auto next : genericParams->getParams())
-    paramIDs.push_back(addDeclRef(next));
+  for (auto next : genericParams->getParams()) {
+    switch (next.getKind()) {
+      case GenericParam::ParamKind::TypeParam:
+        paramIDs.push_back(addDeclRef(next.getTypeParam()));
+        break;
+    }
+  }
 
   unsigned abbrCode = DeclTypeAbbrCodes[GenericParamListLayout::Code];
   GenericParamListLayout::emitRecord(Out, ScratchRecord, abbrCode, paramIDs);

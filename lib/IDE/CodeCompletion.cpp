@@ -5299,8 +5299,12 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (auto GT = ParsedTypeLoc.getType()->getAnyGeneric()) {
       if (auto Params = GT->getGenericParams()) {
         for (auto GP : Params->getParams()) {
-          Lookup.addGenericTypeParamRef(GP,
+          switch (GP.getKind()) {
+            case GenericParam::ParamKind::TypeParam:
+              Lookup.addGenericTypeParamRef(GP.getTypeParam(),
                                         DeclVisibilityKind::GenericParameter);
+              break;
+          }
         }
       }
     }
