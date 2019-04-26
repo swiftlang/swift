@@ -2052,6 +2052,14 @@ repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
   }
 
   case ConstraintLocator::ContextualType: {
+    // If both types are key path, the only differences
+    // between them are mutability and/or root, value type mismatch.
+    if (isKnownKeyPathType(lhs) && isKnownKeyPathType(rhs)) {
+      auto *fix = KeyPathContextualMismatch::create(
+          cs, lhs, rhs, cs.getConstraintLocator(locator));
+      conversionsOrFixes.push_back(fix);
+    }
+
     if (lhs->is<FunctionType>() && !rhs->is<AnyFunctionType>() &&
         isa<ClosureExpr>(anchor)) {
       auto *fix = ContextualMismatch::create(cs, lhs, rhs,
@@ -5228,8 +5236,10 @@ done:
   
   auto resolvedKPTy = BoundGenericType::get(kpDecl, nullptr,
                                             {rootTy, valueTy});
-  return matchTypes(resolvedKPTy, keyPathTy, ConstraintKind::Bind,
-                    subflags, locator);
+  // Let's check whether deduced key path type would match
+  // expected contextual one.
+  return matchTypes(resolvedKPTy, keyPathTy, ConstraintKind::Bind, subflags,
+                    locator.withPathElement(ConstraintLocator::ContextualType));
 }
 
 ConstraintSystem::SolutionKind
