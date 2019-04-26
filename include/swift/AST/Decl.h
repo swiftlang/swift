@@ -234,11 +234,14 @@ struct OverloadSignature {
   /// Whether this signature is of a member defined in an extension of a generic
   /// type.
   unsigned InExtensionOfGenericType : 1;
+  
+  /// Whether this declaration has an opaque return type.
+  unsigned HasOpaqueReturnType : 1;
 
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
         IsVariable(false), IsFunction(false), InProtocolExtension(false),
-        InExtensionOfGenericType(false) {}
+        InExtensionOfGenericType(false), HasOpaqueReturnType(false) {}
 };
 
 /// Determine whether two overload signatures conflict.
