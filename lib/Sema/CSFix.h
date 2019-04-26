@@ -458,6 +458,31 @@ public:
                                     ConstraintLocator *locator);
 };
 
+/// Detect situations where key path doesn't have capability required
+/// by the context e.g. read-only vs. writable, or either root or value
+/// types are incorrect e.g.
+///
+/// ```swift
+/// struct S { let foo: Int }
+/// let _: WritableKeyPath<S, Int> = \.foo
+/// ```
+///
+/// Here context requires a writable key path but `foo` property is
+/// read-only.
+class KeyPathContextualMismatch final : public ContextualMismatch {
+  KeyPathContextualMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
+                            ConstraintLocator *locator)
+      : ContextualMismatch(cs, lhs, rhs, locator) {}
+
+public:
+  std::string getName() const override {
+    return "fix key path contextual mismatch";
+  }
+
+  static KeyPathContextualMismatch *
+  create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
+};
+
 /// Detect situations when argument of the @autoclosure parameter is itself
 /// marked as @autoclosure and is not applied. Form a fix which suggests a
 /// proper way to forward such arguments, e.g.:
