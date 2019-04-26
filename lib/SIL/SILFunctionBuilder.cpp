@@ -87,6 +87,8 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
         vjpName = SILDeclRef(vjpFn).mangle();
       // Get lowered argument indices.
       auto paramIndices = A->getParameterIndices();
+      if (paramIndices == nullptr)
+        continue;
       auto loweredParamIndices = paramIndices->getLowered(
           decl->getInterfaceType()->castTo<AnyFunctionType>());
       SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);

@@ -420,8 +420,8 @@ static ValueDecl *deriveTensorArrayProtocol_typeList(
 
   auto parentDC = derived.getConformanceContext();
   Type dataTypeArrayType = BoundGenericType::get(
-    C.getArrayDecl(), Type(), 
-    {C.getTensorDataTypeDecl()->getDeclaredInterfaceType()});
+      C.getArrayDecl(), Type(), 
+      {C.getTensorDataTypeDecl()->getDeclaredInterfaceType()});
   auto returnType = parentDC->mapTypeIntoContext(dataTypeArrayType);
 
   // Create `_typeList` property declaration.
