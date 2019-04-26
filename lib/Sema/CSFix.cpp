@@ -477,3 +477,10 @@ AllowInvalidRefInKeyPath::create(ConstraintSystem &cs, RefKind kind,
   return new (cs.getAllocator())
       AllowInvalidRefInKeyPath(cs, kind, member, locator);
 }
+
+KeyPathContextualMismatch *
+KeyPathContextualMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      KeyPathContextualMismatch(cs, lhs, rhs, locator);
+}
