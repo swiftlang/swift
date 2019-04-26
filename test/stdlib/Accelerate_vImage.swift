@@ -11,10 +11,10 @@ import Accelerate
 var Accelerate_vImageTests = TestSuite("Accelerate_vImage")
 
 if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
-    let width = UInt(48)
-    let height = UInt(12)
-    let widthi = 48
-    let heighti = 12
+    let width = UInt(64)
+    let height = UInt(128)
+    let widthi = 64
+    let heighti = 128
     
     //===----------------------------------------------------------------------===//
     //
