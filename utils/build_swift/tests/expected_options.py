@@ -157,6 +157,7 @@ EXPECTED_DEFAULTS = {
     'llvm_max_parallel_lto_link_jobs':
         host.max_lto_link_job_counts()['llvm'],
     'llvm_targets_to_build': 'X86;ARM;AArch64;PowerPC;SystemZ;Mips',
+    'tsan_libdispatch_test': False,
     'long_test': False,
     'lto_type': None,
     'show_sdks': False,
@@ -450,6 +451,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--libicu', dest='build_libicu'),
     EnableOption('--indexstore-db', dest='build_indexstoredb'),
     EnableOption('--sourcekit-lsp', dest='build_sourcekitlsp'),
+    EnableOption('--tsan-libdispatch-test'),
     EnableOption('--long-test'),
     EnableOption('--show-sdks'),
     EnableOption('--stress-test'),

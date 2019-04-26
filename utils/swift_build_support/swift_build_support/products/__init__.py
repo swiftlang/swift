@@ -26,6 +26,7 @@ from .swift import Swift
 from .swiftevolve import SwiftEvolve
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
+from .tsan_libdispatch import TSanLibDispatch
 from .xctest import XCTest
 
 __all__ = [
@@ -47,4 +48,5 @@ __all__ = [
     'SwiftEvolve',
     'IndexStoreDB',
     'SourceKitLSP',
+    'TSanLibDispatch',
 ]
