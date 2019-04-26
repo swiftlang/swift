@@ -3426,20 +3426,18 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     bool isSimple = T->hasSimpleTypeRepr();
     if (isSimple && T->is<OpaqueTypeArchetypeType>()) {
       auto opaqueTy = T->castTo<OpaqueTypeArchetypeType>();
-      auto opaqueDecl = opaqueTy->getDecl();
-      if (!opaqueDecl->hasName()) {
-        switch (Options.OpaqueReturnTypePrinting) {
-        case PrintOptions::OpaqueReturnTypePrintingMode::StableReference:
-        case PrintOptions::OpaqueReturnTypePrintingMode::Description:
-          isSimple = true;
-          break;
-        case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
-          isSimple = false;
-          break;
-        case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword: {
-          isSimple = opaqueTy->getConformsTo().size() < 2;
-        }
-        }
+      switch (Options.OpaqueReturnTypePrinting) {
+      case PrintOptions::OpaqueReturnTypePrintingMode::StableReference:
+      case PrintOptions::OpaqueReturnTypePrintingMode::Description:
+        isSimple = true;
+        break;
+      case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
+        isSimple = false;
+        break;
+      case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword: {
+        isSimple = opaqueTy->getExistentialType()->hasSimpleTypeRepr();
+        break;
+      }
       }
     }
 
@@ -4221,14 +4219,7 @@ public:
       Printer << "some ";
       LLVM_FALLTHROUGH;
     case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword: {
-      SmallVector<Type, 2> types;
-      for (auto proto : T->getConformsTo())
-        types.push_back(proto->TypeDecl::getDeclaredInterfaceType());
-
-      // Create and visit temporary ProtocolCompositionType.
-      auto composition =
-          ProtocolCompositionType::get(T->getASTContext(), types, false);
-      visit(composition);
+      visit(T->getExistentialType());
       return;
     }
     case PrintOptions::OpaqueReturnTypePrintingMode::StableReference: {
