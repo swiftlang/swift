@@ -622,7 +622,7 @@ extension Tensor : Equatable where Scalar : Equatable {
 
 internal extension Tensor where Scalar : Numeric {
   @inlinable
-  func unbroadcast(toShape otherShape: Tensor<Int32>) -> Tensor<Scalar> {
+  func unbroadcasted(toShape otherShape: Tensor<Int32>) -> Tensor<Scalar> {
     let rankDiff = Raw.expandDims(
       rankTensor - otherShape.scalarCountTensor, dim: Tensor<Int32>(0))
     let ones = Raw.fill(dims: rankDiff, value: Tensor<Int32>(1))
@@ -674,7 +674,7 @@ internal extension Tensor where Scalar : TensorFlowFloatingPoint {
   ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
     return (lhs + rhs, {
       [lhsShape = lhs.shapeTensor, rhsShape = rhs.shapeTensor] v in
-      (v.unbroadcast(toShape: lhsShape), v.unbroadcast(toShape: rhsShape))
+      (v.unbroadcasted(toShape: lhsShape), v.unbroadcasted(toShape: rhsShape))
     })
   }
 
@@ -685,8 +685,8 @@ internal extension Tensor where Scalar : TensorFlowFloatingPoint {
   ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
     return (lhs - rhs, {
       [lhsShape = lhs.shapeTensor, rhsShape = rhs.shapeTensor] v in
-      (v.unbroadcast(toShape: lhsShape),
-        Raw.neg(v).unbroadcast(toShape: rhsShape))
+      (v.unbroadcasted(toShape: lhsShape),
+        Raw.neg(v).unbroadcasted(toShape: rhsShape))
     })
   }
 }
