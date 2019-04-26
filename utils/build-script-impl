@@ -3116,7 +3116,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
 		if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
-		    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --filter=swift"
+		    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --filter=[sS]wift"
 		fi
 
                 # Record the times test took and report the slowest.
