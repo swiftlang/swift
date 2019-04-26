@@ -174,7 +174,8 @@ func recursion(x: Int) -> some P {
   return recursion(x: x - 1)
 }
 
-func noReturnStmts() -> some P { fatalError() } // expected-error{{no return statements}}
+// FIXME: We need to emit a better diagnostic than the failure to convert Never to opaque.
+func noReturnStmts() -> some P { fatalError() } // expected-error{{cannot convert return expression of type 'Never' to return type 'some P'}} expected-error{{no return statements}}
 
 func mismatchedReturnTypes(_ x: Bool, _ y: Int, _ z: String) -> some P { // expected-error{{do not have matching underlying types}}
   if x {
