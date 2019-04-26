@@ -515,7 +515,7 @@ public func %=(lhs: inout CGFloat, rhs: CGFloat) {
 
 %from SwiftMathFunctions import *
 
-extension CGFloat: Real {
+extension CGFloat: ElementaryFunctions {
 % for func in ElementaryFunctions + RealFunctions:
 
   @_alwaysEmitIntoClient
@@ -558,8 +558,6 @@ extension CGFloat: Real {
     return CGFloat(NativeType.logGamma(x.native))
   }
 
-  // We get this for free from an extension defined on Real, but we need it
-  // on the concrete type as well for back-deployment to older stdlib versions.
   @_alwaysEmitIntoClient
   public static func signGamma(_ x: CGFloat) -> FloatingPointSign {
     if x >= 0 { return .plus }
