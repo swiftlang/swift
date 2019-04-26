@@ -403,7 +403,6 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
   SILValue Dest = dynamicCast.getDest();
   CanType BridgedTargetTy = dynamicCast.getBridgedTargetType();
   SILBasicBlock *SuccessBB = dynamicCast.getSuccessBlock();
-  SILBasicBlock *FailureBB = dynamicCast.getFailureBlock();
   auto &M = Inst->getModule();
   auto Loc = Inst->getLoc();
 
@@ -546,10 +545,11 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
 
   // Pop the temporary stack slot for a copied temporary.
   if (needStackAllocatedTemporary) {
+    SILBasicBlock *FailureBB = dynamicCast.getFailureBlock();
     assert((bool)SuccessBB == (bool)FailureBB);
     if (SuccessBB) {
       SuccBuilder->createDeallocStack(Loc, Src);
-      SILBuilder FailBuilder(FailureBB->begin());
+      SILBuilderWithScope FailBuilder(&*FailureBB->begin(), Builder);
       FailBuilder.createDeallocStack(Loc, Src);
     } else {
       Builder.createDeallocStack(Loc, Src);
@@ -573,6 +573,12 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
     } else if (ConvTy.isExactSuperclassOf(DestTy)) {
       // The downcast from a base class to derived class may fail.
       if (isConditional) {
+        auto *FailureBB = dynamicCast.getFailureBlock();
+        {
+          SILBuilderWithScope innerBuilder(&*FailureBB->begin(), Builder);
+          innerBuilder.emitDestroyValueOperation(Loc, NewAI);
+        }
+
         // In case of a conditional cast, we should handle it gracefully.
         auto CondBrSuccessBB =
             NewAI->getFunction()->createBasicBlockAfter(NewAI->getParent());
