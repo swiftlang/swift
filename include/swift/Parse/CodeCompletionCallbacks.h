@@ -155,6 +155,9 @@ public:
   /// #keyPath argument have been parsed yet.
   virtual void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) {};
 
+  /// Complete the beginning of the type of result of func/var/let/subscript.
+  virtual void completeTypeDeclResultBeginning() {};
+
   /// Complete the beginning of type-simple -- no tokens provided
   /// by user.
   virtual void completeTypeSimpleBeginning() {};

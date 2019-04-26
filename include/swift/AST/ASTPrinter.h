@@ -120,6 +120,10 @@ public:
   /// Callers should use callPrintDeclPost().
   virtual void printDeclPost(const Decl *D, Optional<BracketOptions> Bracket) {}
 
+  /// Called before printing the result type of the declaration. Printer can
+  /// replace \p TL to customize the input.
+  virtual void printDeclResultTypePre(ValueDecl *VD, TypeLoc &TL) {}
+
   /// Called before printing a type.
   virtual void printTypePre(const TypeLoc &TL) {}
   /// Called after printing a type.

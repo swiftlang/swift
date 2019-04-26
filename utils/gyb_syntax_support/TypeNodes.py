@@ -77,6 +77,15 @@ TYPE_NODES = [
              Child('QuestionMark', kind='PostfixQuestionMarkToken'),
          ]),
 
+    # some type -> some 'type'
+    Node('SomeType', kind='Type',
+         children=[
+             Child('SomeSpecifier', kind='IdentifierToken',
+                   classification='Keyword',
+                   text_choices=['some']),
+             Child('BaseType', kind='Type'),
+         ]),
+
     # implicitly-unwrapped-optional-type -> type '!'
     Node('ImplicitlyUnwrappedOptionalType', kind='Type',
          children=[

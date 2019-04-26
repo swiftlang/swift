@@ -506,6 +506,16 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                                specifierLoc));
 }
 
+ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
+  if (Tok.is(tok::code_complete)) {
+    if (CodeCompletion)
+      CodeCompletion->completeTypeDeclResultBeginning();
+    consumeToken(tok::code_complete);
+    return makeParserCodeCompletionStatus();
+  }
+  return parseType(MessageID);
+}
+
 ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
                                            SourceLoc &LAngleLoc,
                                            SourceLoc &RAngleLoc) {
@@ -675,6 +685,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
 ParserResult<TypeRepr>
 Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
                                      bool HandleCodeCompletion) {
+  SyntaxParsingContext SomeTypeContext(SyntaxContext, SyntaxKind::SomeType);
   // Check for the opaque modifier.
   // This is only semantically allowed in certain contexts, but we parse it
   // generally for diagnostics and recovery.
@@ -682,7 +693,12 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
   if (Context.LangOpts.EnableOpaqueResultTypes
       && Tok.is(tok::identifier)
       && Tok.getRawText() == "some") {
+    // Treat some as a keyword.
+    TokReceiver->registerTokenKindChange(Tok.getLoc(), tok::contextual_keyword);
     opaqueLoc = consumeToken();
+  } else {
+    // This isn't a some type.
+    SomeTypeContext.setTransparent();
   }
   
   auto applyOpaque = [&](TypeRepr *type) -> TypeRepr* {
