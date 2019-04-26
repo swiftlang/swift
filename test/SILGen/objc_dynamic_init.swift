@@ -45,7 +45,16 @@ final class Bobamathing: Thingamabob {
     }
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s17objc_dynamic_init8callInityyF : $@convention(thin) () -> ()
+// CHECK: [[METATYPE:%.*]] = metatype $@thick Gadget.Type
+// CHECK: [[CTOR:%.*]] = function_ref @$s17objc_dynamic_init6GadgetCACycfC
+// CHECK: [[INSTANCE:%.*]] = apply [[CTOR]]([[METATYPE]])
+// CHECK: destroy_value [[INSTANCE]]
 
+func callInit() {
+    let metatype = Gadget.self
+    _ = metatype.init()
+}
 
 // CHECK-LABEL: sil_vtable Gadget {
 // CHECK-NOT:     #Gadget.init!allocator.1
