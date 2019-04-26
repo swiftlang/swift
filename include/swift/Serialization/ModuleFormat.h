@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 484; // SDK-relative dependencies flag
+const uint16_t SWIFTMODULE_VERSION_MINOR = 488; // assign_by_delegate
 
 using DeclIDField = BCFixed<31>;
 
@@ -643,7 +643,8 @@ namespace input_block {
     IMPORTED_HEADER_CONTENTS,
     MODULE_FLAGS, // [unused]
     SEARCH_PATH,
-    FILE_DEPENDENCY
+    FILE_DEPENDENCY,
+    PARSEABLE_INTERFACE_PATH
   };
 
   using ImportedModuleLayout = BCRecordLayout<
@@ -690,6 +691,12 @@ namespace input_block {
     BCFixed<1>,                    // SDK-relative?
     BCBlob                         // path
   >;
+
+  using ParseableInterfaceLayout = BCRecordLayout<
+    PARSEABLE_INTERFACE_PATH,
+    BCBlob // file path
+  >;
+
 }
 
 /// The record types within the "decls-and-types" block.
@@ -765,7 +772,6 @@ namespace decls_block {
     TypeIDField,        // type
     BCFixed<1>,         // vararg?
     BCFixed<1>,         // autoclosure?
-    BCFixed<1>,         // escaping?
     ValueOwnershipField // inout, shared or owned?
   >;
 
@@ -791,6 +797,12 @@ namespace decls_block {
   using OpenedArchetypeTypeLayout = BCRecordLayout<
     OPENED_ARCHETYPE_TYPE,
     TypeIDField         // the existential type
+  >;
+  
+  using OpaqueArchetypeTypeLayout = BCRecordLayout<
+    OPAQUE_ARCHETYPE_TYPE,
+    DeclIDField,           // the opaque type decl
+    SubstitutionMapIDField // the arguments
   >;
   
   using NestedArchetypeTypeLayout = BCRecordLayout<
@@ -1034,6 +1046,7 @@ namespace decls_block {
     DeclIDField,  // overridden decl
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
+    DeclIDField, // opaque return type decl
     BCArray<TypeIDField> // accessors and dependencies
   >;
 
@@ -1069,6 +1082,7 @@ namespace decls_block {
                   // components plus one
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
+    DeclIDField,  // opaque result type decl
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:
@@ -1079,6 +1093,17 @@ namespace decls_block {
     // - inlinable body text, if any
   >;
   
+  using OpaqueTypeLayout = BCRecordLayout<
+    OPAQUE_TYPE_DECL,
+    DeclContextIDField, // decl context
+    DeclIDField, // naming decl
+    GenericSignatureIDField, // interface generic signature
+    TypeIDField, // interface type for opaque type
+    GenericEnvironmentIDField, // generic environment
+    SubstitutionMapIDField // optional substitution map for underlying type
+    // trailed by generic parameters
+  >;
+
   // TODO: remove the unnecessary FuncDecl components here
   using AccessorLayout = BCRecordLayout<
     ACCESSOR_DECL,
@@ -1182,6 +1207,7 @@ namespace decls_block {
     AccessLevelField, // setter access, if applicable
     StaticSpellingKindField,    // is subscript static?
     BCVBR<5>,    // number of parameter name components
+    DeclIDField, // opaque return type decl
     BCArray<IdentifierIDField> // name components,
                                // followed by DeclID accessors,
                                // followed by TypeID dependencies
@@ -1397,6 +1423,11 @@ namespace decls_block {
     IdentifierIDField, // private discriminator
     BCFixed<1>,        // restrict to protocol extension
     BCFixed<1>         // imported from Clang?
+  >;
+  
+  using XRefOpaqueReturnTypePathPieceLayout = BCRecordLayout<
+    XREF_OPAQUE_RETURN_TYPE_PATH_PIECE,
+    IdentifierIDField // mangled name of defining decl
   >;
 
   using XRefValuePathPieceLayout = BCRecordLayout<
@@ -1688,6 +1719,7 @@ namespace index_block {
     LOCAL_DECL_CONTEXT_OFFSETS,
     DECL_CONTEXT_OFFSETS,
     LOCAL_TYPE_DECLS,
+    OPAQUE_RETURN_TYPE_DECLS,
     GENERIC_ENVIRONMENT_OFFSETS,
     NORMAL_CONFORMANCE_OFFSETS,
     SIL_LAYOUT_OFFSETS,

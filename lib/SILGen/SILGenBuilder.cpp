@@ -33,35 +33,30 @@ SILGenModule &SILGenBuilder::getSILGenModule() const { return SGF.SGM; }
 //===----------------------------------------------------------------------===//
 
 SILGenBuilder::SILGenBuilder(SILGenFunction &SGF)
-    : SILGenSILBuilder(SGF), SGF(SGF) {}
+    : SILBuilder(SGF.F), SGF(SGF) {}
 
 SILGenBuilder::SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                              SmallVectorImpl<SILInstruction *> *insertedInsts)
-    : SILGenSILBuilder(SGF, insertBB, insertedInsts), SGF(SGF) {}
+    : SILBuilder(insertBB, insertedInsts), SGF(SGF) {}
 
 SILGenBuilder::SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                              SILBasicBlock::iterator insertInst)
-    : SILGenSILBuilder(SGF, insertBB, insertInst), SGF(SGF) {}
+    : SILBuilder(insertBB, insertInst), SGF(SGF) {}
 
 //===----------------------------------------------------------------------===//
 //                             Managed Value APIs
 //===----------------------------------------------------------------------===//
-//
-// *NOTE* Please use SILGenBuilder SILValue APIs below. Otherwise, we
-// potentially do not get all of the conformances that we need.
-//
 
 ManagedValue SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
-                                               SILType substFnTy,
                                                SubstitutionMap subs,
                                                ArrayRef<ManagedValue> args,
-                                               SILType closureTy) {
+                                               ParameterConvention calleeConvention) {
   llvm::SmallVector<SILValue, 8> values;
   transform(args, std::back_inserter(values), [&](ManagedValue mv) -> SILValue {
     return mv.forward(getSILGenFunction());
   });
   SILValue result =
-      createPartialApply(loc, fn, substFnTy, subs, values, closureTy);
+      createPartialApply(loc, fn, subs, values, calleeConvention);
   // Partial apply instructions create a box, so we need to put on a cleanup.
   return getSILGenFunction().emitManagedRValueWithCleanup(result);
 }

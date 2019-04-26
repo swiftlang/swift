@@ -16,12 +16,12 @@
 
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
-#include "swift/AST/AccessScopeChecker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeDeclFinder.h"
 
 using namespace swift;
 using FragileFunctionKind = TypeChecker::FragileFunctionKind;

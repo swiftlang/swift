@@ -79,8 +79,11 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case DynamicLookupResult:
     case ContextualType:
     case SynthesizedArgument:
+    case KeyPathType:
     case KeyPathRoot:
     case KeyPathValue:
+    case KeyPathComponentResult:
+    case SingleExprFuncResultType:
       if (unsigned numValues = numNumericValuesInPathElement(elt.getKind())) {
         id.AddInteger(elt.getValue());
         if (numValues > 1)
@@ -101,6 +104,15 @@ bool ConstraintLocator::isSubscriptMemberRef() const {
     return false;
 
   return path.back().getKind() == ConstraintLocator::SubscriptMember;
+}
+
+bool ConstraintLocator::isKeyPathType() const {
+  auto *anchor = getAnchor();
+  auto path = getPath();
+  // The format of locator should be `<keypath expr> -> key path type`
+  if (!anchor || !isa<KeyPathExpr>(anchor) || path.size() != 1)
+    return false;
+  return path.back().getKind() == ConstraintLocator::KeyPathType;
 }
 
 bool ConstraintLocator::isKeyPathRoot() const {
@@ -144,6 +156,12 @@ bool ConstraintLocator::isKeyPathSubscriptComponent() const {
     auto &component = KPE->getComponents()[index];
     return component.getKind() == ComponentKind::Subscript ||
            component.getKind() == ComponentKind::UnresolvedSubscript;
+  });
+}
+
+bool ConstraintLocator::isForKeyPathComponent() const {
+  return llvm::any_of(getPath(), [&](const LocatorPathElt &elt) {
+    return elt.isKeyPathComponent();
   });
 }
 
@@ -326,22 +344,32 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       break;
 
     case SynthesizedArgument:
-      out << " synthesized argument #" << llvm::utostr(elt.getValue());
+      out << "synthesized argument #" << llvm::utostr(elt.getValue());
       break;
 
     case KeyPathDynamicMember:
-      out << " keypath dynamic member lookup";
+      out << "key path dynamic member lookup";
+      break;
+
+    case KeyPathType:
+      out << "key path type";
       break;
 
     case KeyPathRoot:
-      out << " keypath root";
+      out << "key path root";
       break;
 
     case KeyPathValue:
-      out << " keypath value";
+      out << "key path value";
+      break;
+
+    case KeyPathComponentResult:
+      out << "key path component result";
+      break;
+    case SingleExprFuncResultType:
+      out << " expected result type of the function with a single expression";
       break;
     }
   }
-
   out << ']';
 }

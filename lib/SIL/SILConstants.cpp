@@ -14,6 +14,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/SILBuilder.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/TrailingObjects.h"
 using namespace swift;
 
@@ -567,74 +568,116 @@ SymbolicValue SymbolicValue::lookThroughSingleElementAggregates() const {
   }
 }
 
-/// Emits an explanatory note if there is useful information to note or if there
-/// is an interesting SourceLoc to point at.
-/// Returns true if a diagnostic was emitted.
-static bool emitNoteDiagnostic(SILInstruction *badInst, UnknownReason reason,
-                               SILLocation fallbackLoc) {
-  auto loc = skipInternalLocations(badInst->getDebugLocation()).getLocation();
-  if (loc.isNull()) {
-    // If we have important clarifying information, make sure to emit it.
-    if (reason == UnknownReason::Default || fallbackLoc.isNull())
-      return false;
-    loc = fallbackLoc;
-  }
-
-  auto &ctx = badInst->getModule().getASTContext();
-  auto sourceLoc = loc.getSourceLoc();
-  switch (reason) {
-  case UnknownReason::Default:
-    diagnose(ctx, sourceLoc, diag::constexpr_unknown_reason_default)
-        .highlight(loc.getSourceRange());
-    break;
-  case UnknownReason::TooManyInstructions:
-    // TODO: Should pop up a level of the stack trace.
-    diagnose(ctx, sourceLoc, diag::constexpr_too_many_instructions,
-             ConstExprLimit)
-        .highlight(loc.getSourceRange());
-    break;
-  case UnknownReason::Loop:
-    diagnose(ctx, sourceLoc, diag::constexpr_loop)
-        .highlight(loc.getSourceRange());
-    break;
-  case UnknownReason::Overflow:
-    diagnose(ctx, sourceLoc, diag::constexpr_overflow)
-        .highlight(loc.getSourceRange());
-    break;
-  case UnknownReason::Trap:
-    diagnose(ctx, sourceLoc, diag::constexpr_trap)
-        .highlight(loc.getSourceRange());
-    break;
-  }
-  return true;
-}
-
 /// Given that this is an 'Unknown' value, emit diagnostic notes providing
-/// context about what the problem is.
+/// context about what the problem is. Specifically, point to interesting
+/// source locations and function calls in the call stack.
 void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
-  auto badInst = dyn_cast<SILInstruction>(getUnknownNode());
-  if (!badInst)
-    return;
+  auto unknownNode = getUnknownNode();
+  auto unknownReason = getUnknownReason();
+  auto errorCallStack = getUnknownCallStack();
 
-  bool emittedFirstNote = emitNoteDiagnostic(badInst, getUnknownReason(),
-                                             fallbackLoc);
+  ASTContext &ctx = unknownNode->getModule()->getASTContext();
 
-  auto sourceLoc = fallbackLoc.getSourceLoc();
-  auto &module = badInst->getModule();
-  if (sourceLoc.isInvalid()) {
-    diagnose(module.getASTContext(), sourceLoc, diag::constexpr_not_evaluable);
+  // Extract the location of the instruction/construct that triggered the error
+  // during interpretation, if available.
+  Optional<SourceLoc> triggerLoc = None;
+  if (auto badInst = dyn_cast<SILInstruction>(unknownNode)) {
+    triggerLoc = skipInternalLocations(badInst->getDebugLocation())
+                     .getLocation()
+                     .getSourceLoc();
+  }
+
+  // Determine the top-level expression where the error happens and use it as
+  // the location to emit diagnostics. Specifically, if the call-stack is
+  // non-empty, use the first call in the sequence as the error location as the
+  // error happens only in the context of this call. Use the fallback loc if
+  // the faulty top-level expression location cannot be found.
+  auto diagLoc =
+      errorCallStack.empty()
+          ? (triggerLoc ? triggerLoc.getValue() : fallbackLoc.getSourceLoc())
+          : errorCallStack.front();
+  if (diagLoc.isInvalid()) {
     return;
   }
-  for (auto &sourceLoc : llvm::reverse(getUnknownCallStack())) {
-    // Skip unknown sources.
-    if (!sourceLoc.isValid())
-      continue;
 
-    auto diag = emittedFirstNote ? diag::constexpr_called_from
-                                 : diag::constexpr_not_evaluable;
-    diagnose(module.getASTContext(), sourceLoc, diag);
-    emittedFirstNote = true;
+  // Emit a note at the trigger location as well if it is different from the
+  // top-level expression.
+  bool emitTriggerLocInDiag =
+      triggerLoc ? diagLoc != triggerLoc.getValue() : false;
+
+  switch (unknownReason) {
+  case UnknownReason::Default:
+    diagnose(ctx, diagLoc, diag::constexpr_unknown_reason_default);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_unevaluable_operation);
+    return;
+  case UnknownReason::TooManyInstructions:
+    diagnose(ctx, diagLoc, diag::constexpr_too_many_instructions,
+             ConstExprLimit);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_limit_exceeding_instruction);
+    return;
+  case UnknownReason::Loop:
+    diagnose(ctx, diagLoc, diag::constexpr_loop_found_note);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_loop_instruction);
+    return;
+  case UnknownReason::Overflow:
+    diagnose(ctx, diagLoc, diag::constexpr_overflow);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_overflow_operation);
+    return;
+  case UnknownReason::Trap:
+    diagnose(ctx, diagLoc, diag::constexpr_trap);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_trap_operation);
+    return;
+  case UnknownReason::InvalidOperandValue:
+    diagnose(ctx, diagLoc, diag::constexpr_invalid_operand_seen);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_operand_invalid_here);
+    return;
+  case UnknownReason::NotTopLevelConstant: {
+    // For top-level errors, trigger loc is better than diagLoc.
+    auto loc = emitTriggerLocInDiag ? *triggerLoc : diagLoc;
+    diagnose(ctx, loc, diag::constexpr_value_unknown_at_top_level);
+    return;
   }
+  case UnknownReason::MutipleTopLevelWriters: {
+    // For top-level errors, trigger loc is better than diagLoc.
+    auto loc = emitTriggerLocInDiag ? *triggerLoc : diagLoc;
+    diagnose(ctx, loc, diag::constexpr_multiple_writers_found_at_top_level);
+    return;
+  }
+  case UnknownReason::UnsupportedInstruction:
+    diagnose(ctx, diagLoc, diag::constexpr_unsupported_instruction_found);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc,
+               diag::constexpr_unsupported_instruction_found_here);
+    return;
+  case UnknownReason::CalleeImplementationUnknown:
+    diagnose(ctx, diagLoc, diag::constexpr_unknown_function_called);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_unknown_function_called_here);
+    return;
+  case UnknownReason::UntrackedSILValue:
+    diagnose(ctx, diagLoc, diag::constexpr_untracked_sil_value_use_found);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_untracked_sil_value_used_here);
+    return;
+  case UnknownReason::UnknownWitnessMethodConformance:
+    diagnose(ctx, diagLoc,
+             diag::constexpr_witness_call_with_no_conformance_found);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_witness_call_found_here);
+    return;
+  case UnknownReason::UnresolvableWitnessMethod:
+    diagnose(ctx, diagLoc, diag::constexpr_witness_call_with_no_target_found);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_witness_call_found_here);
+    return;
+  }
+  // TODO: print the call-stack in a controlled way if needed.
 }
 
 /// Returns the element of `aggregate` specified by the access path.

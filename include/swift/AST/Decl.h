@@ -78,6 +78,8 @@ namespace swift {
   class ParameterTypeFlags;
   class Pattern;
   struct PrintOptions;
+  struct PropertyDelegateBackingPropertyInfo;
+  struct PropertyDelegateTypeInfo;
   class ProtocolDecl;
   class ProtocolType;
   struct RawComment;
@@ -161,6 +163,7 @@ enum class DescriptiveDeclKind : uint8_t {
   Module,
   MissingMember,
   Requirement,
+  OpaqueType,
 };
 
 /// Keeps track of stage of circularity checking for the given protocol.
@@ -231,11 +234,14 @@ struct OverloadSignature {
   /// Whether this signature is of a member defined in an extension of a generic
   /// type.
   unsigned InExtensionOfGenericType : 1;
+  
+  /// Whether this declaration has an opaque return type.
+  unsigned HasOpaqueReturnType : 1;
 
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
         IsVariable(false), IsFunction(false), InProtocolExtension(false),
-        InExtensionOfGenericType(false) {}
+        InExtensionOfGenericType(false), HasOpaqueReturnType(false) {}
 };
 
 /// Determine whether two overload signatures conflict.
@@ -363,7 +369,7 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 4+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 4+1+1+1+1+1,
     /// The specifier associated with this variable or parameter.  This
     /// determines the storage semantics of the value e.g. mutability.
     Specifier : 4,
@@ -382,7 +388,10 @@ protected:
 
     /// Whether this is a property defined in the debugger's REPL.
     /// FIXME: Remove this once LLDB has proper support for resilience.
-    IsREPLVar : 1
+    IsREPLVar : 1,
+
+    /// Whether this is the backing storage for a property delegate.
+    IsPropertyDelegateBackingProperty : 1
   );
 
   SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1 + NumDefaultArgumentKindBits,
@@ -400,8 +409,7 @@ protected:
   SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
     StaticSpelling : 2
   );
-
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
 
@@ -425,7 +433,10 @@ protected:
 
     /// Whether this member was synthesized as part of a derived
     /// protocol conformance.
-    Synthesized : 1
+    Synthesized : 1,
+
+    /// Whether this member's body consists of a single expression.
+    HasSingleExpressionBody : 1
   );
 
   SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+2+1+1+2,
@@ -1885,7 +1896,10 @@ class PatternBindingEntry {
   enum class Flags {
     Checked = 1 << 0,
     Removed = 1 << 1,
-    Lazy    = 1 << 2
+    /// Whether the contents of this initializer were subsumed by
+    /// some other initialization, e.g., a lazy property's initializer
+    /// gets subsumed by the getter body.
+    Subsumed    = 1 << 2
   };
   llvm::PointerIntPair<Pattern *, 3, OptionSet<Flags>> PatternAndFlags;
 
@@ -1920,14 +1934,20 @@ public:
 
   Pattern *getPattern() const { return PatternAndFlags.getPointer(); }
   void setPattern(Pattern *P) { PatternAndFlags.setPointer(P); }
+
+  /// Whether the given pattern binding entry is initialized.
+  bool isInitialized() const;
+
   Expr *getInit() const {
     if (PatternAndFlags.getInt().contains(Flags::Removed) ||
         InitContextAndIsText.getInt())
       return nullptr;
     return InitExpr.Node;
   }
-  Expr *getNonLazyInit() const {
-    return isInitializerLazy() ? nullptr : getInit();
+  /// Retrieve the initializer if it should be executed to initialize this
+  /// particular pattern binding.
+  Expr *getExecutableInit() const {
+    return isInitializerSubsumed() ? nullptr : getInit();
   }
   SourceRange getOrigInitRange() const;
   void setInit(Expr *E);
@@ -1971,11 +1991,11 @@ public:
     PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Checked);
   }
 
-  bool isInitializerLazy() const {
-    return PatternAndFlags.getInt().contains(Flags::Lazy);
+  bool isInitializerSubsumed() const {
+    return PatternAndFlags.getInt().contains(Flags::Subsumed);
   }
-  void setInitializerLazy() {
-    PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Lazy);
+  void setInitializerSubsumed() {
+    PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Subsumed);
   }
 
   // Return the first variable initialized by this pattern.
@@ -2067,11 +2087,16 @@ public:
     getMutablePatternList()[i].setInitStringRepresentation(str);
   }
 
+  /// Whether the given pattern entry is initialized.
+  bool isInitialized(unsigned i) const {
+    return getPatternList()[i].isInitialized();
+  }
+
   Expr *getInit(unsigned i) const {
     return getPatternList()[i].getInit();
   }
-  Expr *getNonLazyInit(unsigned i) const {
-    return getPatternList()[i].getNonLazyInit();
+  Expr *getExecutableInit(unsigned i) const {
+    return getPatternList()[i].getExecutableInit();
   }
   
   SourceRange getOrigInitRange(unsigned i) const {
@@ -2112,12 +2137,12 @@ public:
     getMutablePatternList()[i].setInitializerChecked();
   }
 
-  bool isInitializerLazy(unsigned i) const {
-    return getPatternList()[i].isInitializerLazy();
+  bool isInitializerSubsumed(unsigned i) const {
+    return getPatternList()[i].isInitializerSubsumed();
   }
 
-  void setInitializerLazy(unsigned i) {
-    getMutablePatternList()[i].setInitializerLazy();
+  void setInitializerSubsumed(unsigned i) {
+    getMutablePatternList()[i].setInitializerSubsumed();
   }
   
   /// Does this binding declare something that requires storage?
@@ -2125,11 +2150,7 @@ public:
 
   /// Determines whether this binding either has an initializer expression, or is
   /// default initialized, without performing any type checking on it.
-  ///
-  /// This is only valid to check for bindings which have storage.
   bool isDefaultInitializable() const {
-    assert(hasStorage());
-
     for (unsigned i = 0, e = getNumPatternEntries(); i < e; ++i)
       if (!isDefaultInitializable(i))
         return false;
@@ -2306,6 +2327,8 @@ public:
     return D->getKind() == DeclKind::PoundDiagnostic;
   }
 };
+  
+class OpaqueTypeDecl;
 
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have a type, etc.
@@ -2336,10 +2359,18 @@ class ValueDecl : public Decl {
     /// the declaration will go through an extra level of indirection that
     /// allows the entity to be replaced at runtime.
     unsigned isDynamic : 1;
-  } LazySemanticInfo;
+
+    /// Whether the "isFinal" bit has been computed yet.
+    unsigned isFinalComputed : 1;
+
+    /// Whether this declaration is 'final'. A final class can't be subclassed,
+    /// a final class member can't be overriden.
+    unsigned isFinal : 1;
+  } LazySemanticInfo = { };
 
   friend class OverriddenDeclsRequest;
   friend class IsObjCRequest;
+  friend class IsFinalRequest;
   friend class IsDynamicRequest;
 
 protected:
@@ -2350,12 +2381,6 @@ protected:
     Bits.ValueDecl.AlreadyInLookupTable = false;
     Bits.ValueDecl.CheckedRedeclaration = false;
     Bits.ValueDecl.IsUserAccessible = true;
-    LazySemanticInfo.isObjCComputed = false;
-    LazySemanticInfo.isObjC = false;
-    LazySemanticInfo.hasOverriddenComputed = false;
-    LazySemanticInfo.hasOverridden = false;
-    LazySemanticInfo.isDynamicComputed = false;
-    LazySemanticInfo.isDynamic = false;
   }
 
   // MemberLookupTable borrows a bit from this type
@@ -2596,10 +2621,8 @@ public:
   /// Note whether this declaration is known to be exposed to Objective-C.
   void setIsObjC(bool Value);
 
-  /// Is this declaration marked with 'final'?
-  bool isFinal() const {
-    return getAttrs().hasAttribute<FinalAttr>();
-  }
+  /// Is this declaration 'final'?
+  bool isFinal() const;
 
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
@@ -2666,6 +2689,15 @@ public:
   /// True if this is a C function that was imported as a member of a type in
   /// Swift.
   bool isImportAsMember() const;
+  
+  /// Get the decl for this value's opaque result type, if it has one.
+  OpaqueTypeDecl *getOpaqueResultTypeDecl() const;
+  
+  /// Set the opaque return type decl for this decl.
+  ///
+  /// `this` must be of a decl type that supports opaque return types, and
+  /// must not have previously had an opaque result type set.
+  void setOpaqueResultTypeDecl(OpaqueTypeDecl *D);
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -2716,7 +2748,7 @@ public:
   }
 };
 
-/// A type declaration that can have generic parameters attached to it.  Because
+/// A type declaration that can have generic parameters attached to it. Because
 /// it has these generic parameters, it is always a DeclContext.
 class GenericTypeDecl : public GenericContext, public TypeDecl {
 public:
@@ -2741,7 +2773,87 @@ public:
   }
 };
 
-
+/// OpaqueTypeDecl - This is a declaration of an opaque type. The opaque type
+/// is formally equivalent to its underlying type, but abstracts it away from
+/// clients of the opaque type, only exposing the type as something conforming
+/// to a given set of constraints.
+///
+/// Currently, opaque types do not normally have an explicit spelling in source
+/// code. One is formed implicitly when a declaration is written with an opaque
+/// result type, as in:
+///
+/// func foo() -> opaque SignedInteger { return 1 }
+///
+/// The declared type is a special kind of ArchetypeType representing the
+/// abstracted underlying type.
+class OpaqueTypeDecl : public GenericTypeDecl {
+  /// The original declaration that "names" the opaque type. Although a specific
+  /// opaque type cannot be explicitly named, oapque types can propagate
+  /// arbitrarily through expressions, so we need to know *which* opaque type is
+  /// propagated.
+  ValueDecl *NamingDecl;
+  
+  /// The generic signature of the opaque interface to the type. This is the
+  /// outer generic signature with an added generic parameter representing the
+  /// underlying type.
+  GenericSignature *OpaqueInterfaceGenericSignature;
+  
+  /// The generic parameter that represents the underlying type.
+  GenericTypeParamType *UnderlyingInterfaceType;
+  
+  /// If known, the underlying type and conformances of the opaque type,
+  /// expressed as a SubstitutionMap for the opaque interface generic signature.
+  /// This maps types in the interface generic signature to the outer generic
+  /// signature of the original declaration.
+  Optional<SubstitutionMap> UnderlyingTypeSubstitutions;
+  
+  mutable Identifier OpaqueReturnTypeIdentifier;
+  
+public:
+  OpaqueTypeDecl(ValueDecl *NamingDecl,
+                 GenericParamList *GenericParams,
+                 DeclContext *DC,
+                 GenericSignature *OpaqueInterfaceGenericSignature,
+                 GenericTypeParamType *UnderlyingInterfaceType);
+  
+  ValueDecl *getNamingDecl() const { return NamingDecl; }
+  
+  GenericSignature *getOpaqueInterfaceGenericSignature() const {
+    return OpaqueInterfaceGenericSignature;
+  }
+  
+  GenericTypeParamType *getUnderlyingInterfaceType() const {
+    return UnderlyingInterfaceType;
+  }
+  
+  Optional<SubstitutionMap> getUnderlyingTypeSubstitutions() const {
+    return UnderlyingTypeSubstitutions;
+  }
+  
+  void setUnderlyingTypeSubstitutions(SubstitutionMap subs) {
+    assert(!UnderlyingTypeSubstitutions.hasValue() && "resetting underlying type?!");
+    UnderlyingTypeSubstitutions = subs;
+  }
+  
+  // Opaque type decls are currently always implicit
+  SourceRange getSourceRange() const { return SourceRange(); }
+  
+  // Get the identifier string that can be used to cross-reference unnamed
+  // opaque return types across files.
+  Identifier getOpaqueReturnTypeIdentifier() const;
+  
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::OpaqueType;
+  }
+  static bool classof(const GenericTypeDecl *D) {
+    return D->getKind() == DeclKind::OpaqueType;
+  }
+  static bool classof(const DeclContext *C) {
+    if (auto D = C->getAsDecl())
+      return classof(D);
+    return false;
+  }
+};
 
 /// TypeAliasDecl - This is a declaration of a typealias, for example:
 ///
@@ -3265,6 +3377,9 @@ public:
 
   /// Is this a key path type?
   Optional<KeyPathTypeKind> getKeyPathTypeKind() const;
+
+  /// Retrieve information about this type as a property delegate.
+  PropertyDelegateTypeInfo getPropertyDelegateTypeInfo() const;
 
 private:
   /// Predicate used to filter StoredPropertyRange.
@@ -4306,6 +4421,8 @@ protected:
   }
 
   void computeIsValidKeyPathComponent();
+  
+  OpaqueTypeDecl *OpaqueReturn = nullptr;
 
 public:
 
@@ -4591,11 +4708,34 @@ public:
 
   bool hasDidSetOrWillSetDynamicReplacement() const;
 
+  bool hasAnyNativeDynamicAccessors() const;
+
+  bool hasAnyDynamicReplacementAccessors() const;
+
+  OpaqueTypeDecl *getOpaqueResultTypeDecl() const {
+    return OpaqueReturn;
+  }
+  void setOpaqueResultTypeDecl(OpaqueTypeDecl *decl) {
+    assert(!OpaqueReturn && "already has opaque type decl");
+    OpaqueReturn = decl;
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractStorageDecl &&
            D->getKind() <= DeclKind::Last_AbstractStorageDecl;
   }
+};
+
+/// Describes which synthesized property for a property with an attached
+/// delegate is being referenced.
+enum class PropertyDelegateSynthesizedPropertyKind {
+  /// The backing storage property, which is a stored property of the
+  /// delegate type.
+  Backing,
+  /// A storage delegate (e.g., `$foo`), which is a wrapper over the
+  /// delegate instance's `delegateValue` property.
+  StorageDelegate,
 };
 
 /// VarDecl - 'var' and 'let' declarations.
@@ -4628,6 +4768,7 @@ protected:
     Bits.VarDecl.IsDebuggerVar = false;
     Bits.VarDecl.IsREPLVar = false;
     Bits.VarDecl.HasNonPatternBindingInit = false;
+    Bits.VarDecl.IsPropertyDelegateBackingProperty = false;
   }
 
   /// This is the type specified, including location information.
@@ -4794,12 +4935,19 @@ public:
     return nullptr;
   }
 
+  /// Whether there exists an initializer for this \c VarDecl.
+  bool isParentInitialized() const {
+    if (auto *PBD = getParentPatternBinding())
+      return PBD->getPatternEntryForVarDecl(this).isInitialized();
+    return false;
+  }
+
   // Return whether this VarDecl has an initial value, either by checking
   // if it has an initializer in its parent pattern binding or if it has
   // the @_hasInitialValue attribute.
   bool hasInitialValue() const {
     return getAttrs().hasAttribute<HasInitialValueAttr>() ||
-           getParentInitializer();
+           isParentInitialized();
   }
 
   VarDecl *getOverriddenDecl() const {
@@ -4914,6 +5062,65 @@ public:
   void setREPLVar(bool IsREPLVar) {
     Bits.VarDecl.IsREPLVar = IsREPLVar;
   }
+
+  /// Retrieve the custom attribute that attaches a property delegate to this
+  /// property.
+  CustomAttr *getAttachedPropertyDelegate() const;
+
+  /// Retrieve the type of the attached property delegate as a contextual
+  /// type.
+  ///
+  /// \returns a NULL type for properties without attached delegates,
+  /// an error type when the property delegate type itself is erroneous,
+  /// or the delegate type itself, which may involve unbound generic
+  /// types.
+  Type getAttachedPropertyDelegateType() const;
+
+  /// Retrieve information about the attached property delegate type.
+  PropertyDelegateTypeInfo getAttachedPropertyDelegateTypeInfo() const;
+
+  /// Retrieve the fully resolved attached property delegate type.
+  ///
+  /// This type will be the fully-resolved form of
+  /// \c getAttachedPropertyDelegateType(), which will not contain any
+  /// unbound generic types. It will be the type of the backing property.
+  Type getPropertyDelegateBackingPropertyType() const;
+
+  /// Retrieve information about the backing properties of the attached
+  /// property delegate.
+  PropertyDelegateBackingPropertyInfo
+      getPropertyDelegateBackingPropertyInfo() const;
+
+  /// Retrieve the backing storage property for a property that has an
+  /// attached property delegate.
+  ///
+  /// The backing storage property will be a stored property of the
+  /// delegate's type. This will be equivalent to
+  /// \c getAttachedPropertyDelegateType() when it is fully-specified;
+  /// if \c getAttachedPropertyDelegateType() involves an unbound
+  /// generic type, the backing storage property will be the appropriate
+  /// bound generic version.
+  VarDecl *getPropertyDelegateBackingProperty() const;
+
+  /// Whether this is a property with a property delegate that was initialized
+  /// via a value of the original type, e.g.,
+  ///
+  /// \code
+  /// @Lazy var i = 17
+  /// \end
+  bool isPropertyDelegateInitializedWithInitialValue() const;
+
+  /// If this property is the backing storage for a property with an attached
+  /// property delegate, return the original property.
+  ///
+  /// \param kind If not \c None, only returns the original property when
+  /// \c this property is the specified synthesized property.
+  VarDecl *getOriginalDelegatedProperty(
+      Optional<PropertyDelegateSynthesizedPropertyKind> kind = None) const;
+
+  /// Set the property that delegates to this property as it's backing
+  /// property.
+  void setOriginalDelegatedProperty(VarDecl *originalProperty);
 
   /// Return the Objective-C runtime name for this property.
   Identifier getObjCPropertyName() const;
@@ -5327,6 +5534,7 @@ protected:
     Bits.AbstractFunctionDecl.NeedsNewVTableEntry = false;
     Bits.AbstractFunctionDecl.HasComputedNeedsNewVTableEntry = false;
     Bits.AbstractFunctionDecl.Synthesized = false;
+    Bits.AbstractFunctionDecl.HasSingleExpressionBody = false;
   }
 
   void setBodyKind(BodyKind K) {
@@ -5334,6 +5542,17 @@ protected:
   }
 
 public:
+  void setHasSingleExpressionBody(bool Has = true) { 
+    Bits.AbstractFunctionDecl.HasSingleExpressionBody = Has;
+  }
+
+  bool hasSingleExpressionBody() const {
+    return Bits.AbstractFunctionDecl.HasSingleExpressionBody;
+  }
+
+  Expr *getSingleExpressionBody() const;
+  void setSingleExpressionBody(Expr *NewBody);
+
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
     assert(!getFullName().isSpecial() && "Cannot get string for special names");
@@ -5630,6 +5849,7 @@ class FuncDecl : public AbstractFunctionDecl {
   TypeLoc FnRetType;
 
   OperatorDecl *Operator = nullptr;
+  OpaqueTypeDecl *OpaqueReturn = nullptr;
 
 protected:
   FuncDecl(DeclKind Kind,
@@ -5781,6 +6001,14 @@ public:
   void setOperatorDecl(OperatorDecl *o) {
     assert(isOperator() && "can't set an OperatorDecl for a non-operator");
     Operator = o;
+  }
+  
+  OpaqueTypeDecl *getOpaqueResultTypeDecl() const {
+    return OpaqueReturn;
+  }
+  void setOpaqueResultTypeDecl(OpaqueTypeDecl *decl) {
+    assert(!OpaqueReturn && "already has opaque type decl");
+    OpaqueReturn = decl;
   }
   
   /// Returns true if the function is forced to be statically dispatched.

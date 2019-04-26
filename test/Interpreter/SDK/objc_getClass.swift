@@ -30,7 +30,7 @@ import resilient_objc_class
 // Old OS versions do not have this hook.
 let getClassHookMissing = {
   nil == dlsym(UnsafeMutableRawPointer(bitPattern: -2),
-    "objc_setHook_getClass")
+               "objc_setHook_getClass")
 }()
 
 var testSuite = TestSuite("objc_getClass")

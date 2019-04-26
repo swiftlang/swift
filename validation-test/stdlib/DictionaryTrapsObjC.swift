@@ -284,7 +284,12 @@ DictionaryTraps.test("ForcedVerbatimBridge.Value")
   }
 }
 
-DictionaryTraps.test("Downcast1") {
+DictionaryTraps.test("Downcast.Verbatim")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
   let d: Dictionary<NSObject, NSObject> = [ TestObjCKeyTy(10): NSObject(),
                                             NSObject() : NSObject() ]
   let d2: Dictionary<TestObjCKeyTy, NSObject> = _dictionaryDownCast(d)
@@ -296,10 +301,11 @@ DictionaryTraps.test("Downcast1") {
   for (_, _) in d2 { }
 }
 
-DictionaryTraps.test("Downcast2")
+DictionaryTraps.test("Downcast.NonVerbatimBridged")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
   .code {
   let d: Dictionary<NSObject, NSObject> = [ TestObjCKeyTy(10): NSObject(),
                                             NSObject() : NSObject() ]

@@ -2522,6 +2522,7 @@ for host in "${ALL_HOSTS[@]}"; do
                       -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                       -DClang_DIR:PATH=${llvm_build_dir}/lib/cmake/clang
                       -DLLVM_DIR:PATH=${llvm_build_dir}/lib/cmake/llvm
+                      -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
                       -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
                       -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
                       -DLLDB_IS_BUILDBOT_BUILD:BOOL="${LLDB_IS_BUILDBOT_BUILD}"
@@ -3102,7 +3103,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 call mkdir -p "${results_dir}"
 
                 if [[ "$using_xcodebuild" == "TRUE" ]] ; then
-                    LLDB_DOTEST_CC_OPTS="${LLDB_DOTEST_CC_OPTS} --filecheck $(build_directory $LOCAL_HOST llvm)/bin/FileCheck"
+                    LLDB_DOTEST_CC_OPTS="${LLDB_DOTEST_CC_OPTS} --filecheck $(build_directory $LOCAL_HOST llvm)/bin/FileCheck --dsymutil $(build_directory $LOCAL_HOST llvm)/bin/dsymutil"
                 fi
 
                 # Prefer to use lldb-dotest, as building it guarantees that we build all

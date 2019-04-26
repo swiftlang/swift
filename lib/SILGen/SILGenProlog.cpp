@@ -455,7 +455,24 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
       SILValue val = F.begin()->createFunctionArgument(ty);
       (void) val;
 
-      return;
+      continue;
+    }
+
+    if (capture.isOpaqueValue()) {
+      OpaqueValueExpr *opaqueValue = capture.getOpaqueValue();
+      Type type = opaqueValue->getType()->mapTypeOutOfContext();
+      type = GenericEnvironment::mapTypeIntoContext(
+          TheClosure.getGenericEnvironment(), type);
+      auto &lowering = getTypeLowering(type);
+      SILType ty = lowering.getLoweredType();
+      SILValue val = F.begin()->createFunctionArgument(ty);
+      OpaqueValues[opaqueValue] = ManagedValue::forUnmanaged(val);
+
+      // Opaque values are always passed 'owned', so add a clean up if needed.
+      if (!lowering.isTrivial())
+        enterDestroyCleanup(val);
+
+      continue;
     }
 
     emitCaptureArguments(*this, TheClosure, capture, ++ArgNo);

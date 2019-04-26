@@ -514,9 +514,9 @@ class X {
 }
 
 func testStaticKeyPathComponent() {
-  _ = \X.a // expected-error{{}}
+  _ = \X.a // expected-error{{cannot refer to static member}}
   _ = \X.Type.a // expected-error{{cannot refer to static member}}
-  _ = \X.b // expected-error{{}}
+  _ = \X.b // expected-error{{cannot refer to static member}}
   _ = \X.Type.b // expected-error{{cannot refer to static member}}
 }
 
@@ -707,6 +707,124 @@ var identity10: PartialKeyPath<Container> = \.self
 var identity11: AnyKeyPath = \Container.self
 
 var interleavedIdentityComponents = \Container.self.base.self?.self.i.self
+
+protocol P_With_Static_Members {
+  static var x: Int { get }
+  static var arr: [Int] { get }
+}
+
+func test_keypath_with_static_members(_ p: P_With_Static_Members) {
+  let _ = p[keyPath: \.x]
+  // expected-error@-1 {{key path cannot refer to static member 'x'}}
+  let _: KeyPath<P_With_Static_Members, Int> = \.x
+  // expected-error@-1 {{key path cannot refer to static member 'x'}}
+  let _ = \P_With_Static_Members.arr.count
+  // expected-error@-1 {{key path cannot refer to static member 'arr'}}
+  let _ = p[keyPath: \.arr.count]
+  // expected-error@-1 {{key path cannot refer to static member 'arr'}}
+
+  struct S {
+    static var foo: String = "Hello"
+    var bar: Bar
+  }
+
+  struct Bar {
+    static var baz: Int = 42
+  }
+
+  func foo(_ s: S) {
+    let _ = \S.Type.foo
+    // expected-error@-1 {{key path cannot refer to static member 'foo'}}
+    let _ = s[keyPath: \.foo]
+    // expected-error@-1 {{key path cannot refer to static member 'foo'}}
+    let _: KeyPath<S, String> = \.foo
+    // expected-error@-1 {{key path cannot refer to static member 'foo'}}
+    let _ = \S.foo
+    // expected-error@-1 {{key path cannot refer to static member 'foo'}}
+    let _ = \S.bar.baz
+    // expected-error@-1 {{key path cannot refer to static member 'baz'}}
+    let _ = s[keyPath: \.bar.baz]
+    // expected-error@-1 {{key path cannot refer to static member 'baz'}}
+  }
+}
+
+func test_keypath_with_mutating_getter() {
+  struct S {
+    var foo: Int {
+      mutating get { return 42 }
+    }
+
+    subscript(_: Int) -> [Int] {
+      mutating get { return [] }
+    }
+  }
+
+  _ = \S.foo
+  // expected-error@-1 {{key path cannot refer to 'foo', which has a mutating getter}}
+  let _: KeyPath<S, Int> = \.foo
+  // expected-error@-1 {{key path cannot refer to 'foo', which has a mutating getter}}
+  _ = \S.[0]
+  // expected-error@-1 {{key path cannot refer to 'subscript(_:)', which has a mutating getter}}
+  _ = \S.[0].count
+  // expected-error@-1 {{key path cannot refer to 'subscript(_:)', which has a mutating getter}}
+
+  func test_via_subscript(_ s: S) {
+    _ = s[keyPath: \.foo]
+    // expected-error@-1 {{key path cannot refer to 'foo', which has a mutating getter}}
+    _ = s[keyPath: \.[0].count]
+    // expected-error@-1 {{key path cannot refer to 'subscript(_:)', which has a mutating getter}}
+  }
+}
+
+func test_keypath_with_method_refs() {
+  struct S {
+    func foo() -> Int { return 42 }
+    static func bar() -> Int { return 0 }
+  }
+
+  let _: KeyPath<S, Int> = \.foo // expected-error {{key path cannot refer to instance method 'foo()'}}
+  let _: KeyPath<S, Int> = \.bar // expected-error {{key path cannot refer to static member 'bar()'}}
+  let _ = \S.Type.bar // expected-error {{key path cannot refer to static method 'bar()'}}
+
+  struct A {
+    func foo() -> B { return B() }
+    static func faz() -> B { return B() }
+  }
+
+  struct B {
+    var bar: Int = 42
+  }
+
+  let _: KeyPath<A, Int> = \.foo.bar // expected-error {{key path cannot refer to instance method 'foo()'}}
+  let _: KeyPath<A, Int> = \.faz.bar // expected-error {{key path cannot refer to static member 'faz()'}}
+  let _ = \A.foo.bar // expected-error {{key path cannot refer to instance method 'foo()'}}
+  let _ = \A.Type.faz.bar // expected-error {{key path cannot refer to static method 'faz()'}}
+}
+
+// SR-10467 - Argument type 'KeyPath<String, Int>' does not conform to expected type 'Any'
+func test_keypath_in_any_context() {
+  func foo(_: Any) {}
+  _ = foo(\String.count) // Ok
+}
+
+protocol PWithTypeAlias {
+  typealias Key = WritableKeyPath<Self, Int?>
+  static var fooKey: Key? { get }
+  static var barKey: Key! { get }
+  static var fazKey: Key?? { get }
+  static var bazKey: Key?! { get }
+}
+
+func test_keypath_inference_with_optionals() {
+  final class S : PWithTypeAlias {
+    static var fooKey: Key? { return \.foo }
+    static var barKey: Key! { return \.foo }
+    static var fazKey: Key?? { return \.foo }
+    static var bazKey: Key?! { return \.foo }
+
+    var foo: Int? = nil
+  }
+}
 
 func testSyntaxErrors() { // expected-note{{}}
   _ = \.  ; // expected-error{{expected member name following '.'}}

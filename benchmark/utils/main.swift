@@ -73,6 +73,7 @@ import Exclusivity
 import ExistentialPerformance
 import Fibonacci
 import FlattenList
+import FloatingPointParsing
 import FloatingPointPrinting
 import Hanoi
 import Hash
@@ -203,8 +204,6 @@ registerBenchmark(COWTree)
 registerBenchmark(COWArrayGuaranteedParameterOverhead)
 registerBenchmark(CString)
 registerBenchmark(CSVParsing)
-registerBenchmark(CSVParsingAlt)
-registerBenchmark(CSVParsingAltIndices)
 registerBenchmark(Calculator)
 registerBenchmark(CaptureProp)
 registerBenchmark(ChainedFilterMap)
@@ -246,6 +245,7 @@ registerBenchmark(ExistentialPerformance)
 registerBenchmark(Fibonacci)
 registerBenchmark(FlattenListLoop)
 registerBenchmark(FlattenListFlatMap)
+registerBenchmark(FloatingPointParsing)
 registerBenchmark(FloatingPointPrinting)
 registerBenchmark(Hanoi)
 registerBenchmark(HashTest)

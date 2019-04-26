@@ -14,8 +14,8 @@ struct Foo<T, U> {
 // CHECK-LABEL: sil hidden [ossa] @$s20property_abstraction4getF{{[_0-9a-zA-Z]*}}Foo{{.*}}F : $@convention(thin) (@guaranteed Foo<Int, Int>) -> @owned @callee_guaranteed (Int) -> Int {
 // CHECK:       bb0([[X_ORIG:%.*]] : @guaranteed $Foo<Int, Int>):
 // CHECK:         [[F_ORIG:%.*]] = struct_extract [[X_ORIG]] : $Foo<Int, Int>, #Foo.f
-// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @$s{{.*}}TR :
 // CHECK:         [[F_ORIG_COPY:%.*]] = copy_value [[F_ORIG]]
+// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @$s{{.*}}TR :
 // CHECK:         [[F_SUBST:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT_FN]]([[F_ORIG_COPY]])
 // CHECK:         return [[F_SUBST]]
 // CHECK:       } // end sil function '$s20property_abstraction4getF{{[_0-9a-zA-Z]*}}F'

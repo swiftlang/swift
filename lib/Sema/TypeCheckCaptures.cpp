@@ -62,6 +62,7 @@ class FindCapturedVars : public ASTWalker {
   SourceLoc &GenericParamCaptureLoc;
   SourceLoc &DynamicSelfCaptureLoc;
   DynamicSelfType *&DynamicSelf;
+  OpaqueValueExpr *&OpaqueValue;
   llvm::SmallPtrSet<ValueDecl *, 2> Diagnosed;
   /// The AbstractClosureExpr or AbstractFunctionDecl being analyzed.
   AnyFunctionRef AFR;
@@ -71,11 +72,13 @@ public:
                    SourceLoc &GenericParamCaptureLoc,
                    SourceLoc &DynamicSelfCaptureLoc,
                    DynamicSelfType *&DynamicSelf,
+                   OpaqueValueExpr *&OpaqueValue,
                    AnyFunctionRef AFR)
       : TC(tc), Captures(Captures),
         GenericParamCaptureLoc(GenericParamCaptureLoc),
         DynamicSelfCaptureLoc(DynamicSelfCaptureLoc),
         DynamicSelf(DynamicSelf),
+        OpaqueValue(OpaqueValue),
         AFR(AFR) {
     CaptureLoc = getCaptureLoc(AFR);
   }
@@ -427,6 +430,11 @@ public:
         DynamicSelfCaptureLoc = getCaptureLoc(innerClosure);
         DynamicSelf = captureInfo.getDynamicSelfType();
       }
+
+    if (!OpaqueValue) {
+      if (captureInfo.hasOpaqueValueCapture())
+        OpaqueValue = captureInfo.getOpaqueValue();
+    }
   }
 
   bool walkToDeclPre(Decl *D) override {
@@ -637,6 +645,15 @@ public:
       return { false, E };
     }
 
+    // Capture a placeholder opaque value.
+    if (auto opaqueValue = dyn_cast<OpaqueValueExpr>(E)) {
+      if (opaqueValue->isPlaceholder()) {
+        assert(!OpaqueValue || OpaqueValue == opaqueValue);
+        OpaqueValue = opaqueValue;
+        return { true, E };
+      }
+    }
+
     return { true, E };
   }
 };
@@ -654,14 +671,17 @@ void TypeChecker::maybeDiagnoseCaptures(Expr *E, AnyFunctionRef AFR) {
 
   if (AFR.getCaptureInfo().hasGenericParamCaptures() ||
       AFR.getCaptureInfo().hasDynamicSelfCapture() ||
-      AFR.getCaptureInfo().hasLocalCaptures()) {
+      AFR.getCaptureInfo().hasLocalCaptures() ||
+      AFR.getCaptureInfo().hasOpaqueValueCapture()) {
     unsigned kind;
     if (AFR.getCaptureInfo().hasLocalCaptures())
       kind = 0;
     else if (AFR.getCaptureInfo().hasGenericParamCaptures())
       kind = 1;
-    else
+    else if (AFR.getCaptureInfo().hasLocalCaptures())
       kind = 2;
+    else
+      kind = 3;
     diagnose(E->getLoc(),
              diag::c_function_pointer_from_function_with_context,
              /*closure*/ AFR.getAbstractClosureExpr() != nullptr,
@@ -680,10 +700,12 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   SourceLoc GenericParamCaptureLoc;
   SourceLoc DynamicSelfCaptureLoc;
   DynamicSelfType *DynamicSelf = nullptr;
+  OpaqueValueExpr *OpaqueValuePlaceholder = nullptr;
   FindCapturedVars finder(*this, Captures,
                           GenericParamCaptureLoc,
                           DynamicSelfCaptureLoc,
                           DynamicSelf,
+                          OpaqueValuePlaceholder,
                           AFR);
   if (AFR.getBody())
     AFR.getBody()->walk(finder);
@@ -706,7 +728,7 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
         // Walk the initializers for all properties declared in the type with
         // an initializer.
         for (auto &elt : PBD->getPatternList()) {
-          if (elt.isInitializerLazy())
+          if (elt.isInitializerSubsumed())
             continue;
 
           if (auto *init = elt.getInit())
@@ -722,6 +744,10 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
     if (AFD->getGenericParams())
       AFR.getCaptureInfo().setGenericParamCaptures(true);
   }
+
+  // Anything can capture an opaque value placeholder.
+  if (OpaqueValuePlaceholder)
+    AFR.getCaptureInfo().setOpaqueValue(OpaqueValuePlaceholder);
 
   // Only local functions capture dynamic 'Self'.
   if (AFR.getAsDeclContext()->getParent()->isLocalContext()) {

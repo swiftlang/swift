@@ -2609,6 +2609,7 @@ getSuperclassMetadata(ClassMetadata *self, bool allowDependency) {
                             /*non-blocking*/ allowDependency);
     MetadataResponse response =
       swift_getTypeByMangledName(request, superclassName,
+        substitutions.getGenericArgs(),
         [&substitutions](unsigned depth, unsigned index) {
           return substitutions.getMetadata(depth, index);
         },
@@ -2673,10 +2674,17 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     setUpObjCRuntimeGetImageNameFromClass();
   }, nullptr);
 
+#ifndef OBJC_REALIZECLASSFROMSWIFT_DEFINED
   // Temporary workaround until _objc_realizeClassFromSwift is in the SDK.
   static auto _objc_realizeClassFromSwift =
-    (Class (*)(Class _Nullable, const void *_Nullable))
+    (Class (*)(Class _Nullable, void *_Nullable))
     dlsym(RTLD_NEXT, "_objc_realizeClassFromSwift");
+#endif
+
+  // Temporary workaround until objc_loadClassref is in the SDK.
+  static auto objc_loadClassref =
+    (Class (*)(void *))
+    dlsym(RTLD_NEXT, "objc_loadClassref");
 #endif
 
   // Copy field offsets, generic arguments and (if necessary) vtable entries
@@ -2704,12 +2712,13 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     // however we should not be using it for anything in a non-generic
     // class.
     if (auto *stub = description->getObjCResilientClassStub()) {
-      if (_objc_realizeClassFromSwift == nullptr) {
+      if (_objc_realizeClassFromSwift == nullptr ||
+          objc_loadClassref == nullptr) {
         fatalError(0, "class %s requires missing Objective-C runtime feature; "
                   "the deployment target was newer than this OS\n",
                   self->getDescription()->Name.get());
       }
-      _objc_realizeClassFromSwift((Class) self, stub);
+      _objc_realizeClassFromSwift((Class) self, const_cast<void *>(stub));
     } else
       swift_instantiateObjCClass(self);
   }
@@ -2761,7 +2770,7 @@ _swift_updateClassMetadataImpl(ClassMetadata *self,
 #ifndef OBJC_REALIZECLASSFROMSWIFT_DEFINED
   // Temporary workaround until _objc_realizeClassFromSwift is in the SDK.
   static auto _objc_realizeClassFromSwift =
-    (Class (*)(Class _Nullable, const void *_Nullable))
+    (Class (*)(Class _Nullable, void *_Nullable))
     dlsym(RTLD_NEXT, "_objc_realizeClassFromSwift");
 #endif
 
@@ -4315,7 +4324,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
     // The protocol's Self is the only generic parameter that can occur in the
     // type.
     response =
-      swift_getTypeByMangledName(request, mangledName,
+      swift_getTypeByMangledName(request, mangledName, nullptr,
         [conformingType](unsigned depth, unsigned index) -> const Metadata * {
           if (depth == 0 && index == 0)
             return conformingType;
@@ -4343,6 +4352,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
                                                            conformance);
     SubstGenericParametersFromMetadata substitutions(originalConformingType);
     response = swift_getTypeByMangledName(request, mangledName,
+      substitutions.getGenericArgs(),
       [&substitutions](unsigned depth, unsigned index) {
         return substitutions.getMetadata(depth, index);
       },
@@ -5112,6 +5122,7 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   auto result =
     swift_getTypeByMangledName(MetadataState::Abstract,
                           mangledName,
+                          nullptr,
                           [](unsigned, unsigned){ return nullptr; },
                           [](const Metadata *, unsigned) { return nullptr; })
       .getMetadata();

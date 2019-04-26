@@ -110,6 +110,7 @@ protocol P : Initable {
   
   typealias E = Int
   typealias F = Self.E
+  typealias G = Array
 }
 
 protocol ClassP : class {
@@ -226,6 +227,9 @@ func staticExistential(_ p: P.Type, pp: P.Protocol) {
 
   _ = pp.F.self
   _ = p.F.self
+
+  // Make sure that we open generics
+  let _: [Int].Type = p.G.self
 }
 
 protocol StaticP {

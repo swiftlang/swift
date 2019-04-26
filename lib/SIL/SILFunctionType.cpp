@@ -743,6 +743,27 @@ lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
       continue;
     }
 
+    if (capture.isOpaqueValue()) {
+      OpaqueValueExpr *opaqueValue = capture.getOpaqueValue();
+      auto canType = opaqueValue->getType()->mapTypeOutOfContext()
+          ->getCanonicalType(origGenericSig);
+      auto &loweredTL =
+          Types.getTypeLowering(AbstractionPattern(genericSig, canType),
+                                canType, expansion);
+      auto loweredTy = loweredTL.getLoweredType();
+
+      ParameterConvention convention;
+      if (loweredTL.isAddressOnly()) {
+        convention = ParameterConvention::Indirect_In;
+      } else {
+        convention = ParameterConvention::Direct_Owned;
+      }
+      SILParameterInfo param(loweredTy.getASTType(), convention);
+      inputs.push_back(param);
+
+      continue;
+    }
+
     auto *VD = capture.getDecl();
     auto type = VD->getInterfaceType();
     auto canType = type->getCanonicalType(origGenericSig);
@@ -2155,9 +2176,8 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
       auto baseParams = baseFunc.getParams();
       assert(derivedParams.size() == baseParams.size());
       for (unsigned i = 0, e = derivedParams.size(); i < e; i++) {
-        // FIXME: Why are 'escaping' flags set inconsistently?
-        assert(derivedParams[i].getParameterFlags().withEscaping(false) ==
-               baseParams[i].getParameterFlags().withEscaping(false));
+        assert(derivedParams[i].getParameterFlags() ==
+               baseParams[i].getParameterFlags());
 
         params.emplace_back(
           copyOptionalityFromDerivedToBase(

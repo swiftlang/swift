@@ -562,4 +562,8 @@ func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSigna
 
 #assert(<BooleanLiteralExpr>true</BooleanLiteralExpr>)</PoundAssertStmt><PoundAssertStmt>
 #assert(<BooleanLiteralExpr>false</BooleanLiteralExpr>)</PoundAssertStmt><PoundAssertStmt>
-#assert(<BooleanLiteralExpr>true</BooleanLiteralExpr>, "hello world")</PoundAssertStmt>
+#assert(<BooleanLiteralExpr>true</BooleanLiteralExpr>, "hello world")</PoundAssertStmt><FunctionDecl><DeclModifier>
+
+public </DeclModifier>func anyFoo<FunctionSignature><ParameterClause>() </ParameterClause><ReturnClause>-> <SomeType>some <SimpleTypeIdentifier>Foo </SimpleTypeIdentifier></SomeType></ReturnClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><FunctionDecl><DeclModifier>
+public </DeclModifier>func qoo<FunctionSignature><ParameterClause>() </ParameterClause><ReturnClause>-> <SomeType>some <CompositionType><CompositionTypeElement><SimpleTypeIdentifier>O </SimpleTypeIdentifier>& </CompositionTypeElement><CompositionTypeElement><SimpleTypeIdentifier>O2 </SimpleTypeIdentifier></CompositionTypeElement></CompositionType></SomeType></ReturnClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><FunctionDecl>
+func zlop<FunctionSignature><ParameterClause>() </ParameterClause><ReturnClause>-> <SomeType>some <CompositionType><CompositionTypeElement><SimpleTypeIdentifier>C </SimpleTypeIdentifier>& </CompositionTypeElement><CompositionTypeElement><SimpleTypeIdentifier>AnyObject </SimpleTypeIdentifier>& </CompositionTypeElement><CompositionTypeElement><SimpleTypeIdentifier>P </SimpleTypeIdentifier></CompositionTypeElement></CompositionType></SomeType></ReturnClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl>

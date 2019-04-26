@@ -102,7 +102,9 @@ template <typename D> bool shouldLookupMembers(D *decl, SourceLoc loc) {
 
   // Within the braces, always look for members.
   auto &ctx = decl->getASTContext();
-  if (ctx.SourceMgr.rangeContainsTokenLoc(decl->getBraces(), loc))
+  auto braces = decl->getBraces();
+  if (braces.Start != braces.End &&
+      ctx.SourceMgr.rangeContainsTokenLoc(braces, loc))
     return true;
 
   // Within 'where' clause, we can also look for members.

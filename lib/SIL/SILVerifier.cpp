@@ -80,6 +80,10 @@ static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
   auto root = dyn_cast<PrimaryArchetypeType>(A->getRoot());
   if (!root)
     return true;
+  if (isa<OpenedArchetypeType>(A->getRoot()))
+    return true;
+  if (isa<OpaqueTypeArchetypeType>(A->getRoot()))
+    return true;
 
   // Ok, we have a primary archetype, make sure it is in the nested generic
   // environment of our caller.
@@ -1755,6 +1759,53 @@ public:
     require(Dest->getType().isAddress(), "Must store to an address dest");
     require(Dest->getType().getObjectType() == Src->getType(),
             "Store operand type and dest type mismatch");
+  }
+
+  void checkAssignByDelegateInst(AssignByDelegateInst *AI) {
+    SILValue Src = AI->getSrc(), Dest = AI->getDest();
+    require(AI->getModule().getStage() == SILStage::Raw,
+            "assign instruction can only exist in raw SIL");
+    require(Dest->getType().isAddress(), "Must store to an address dest");
+
+    unsigned indirectInitResults = Src->getType().isAddress() ? 1 : 0;
+
+    SILValue initFn = AI->getInitializer();
+    CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
+    SILFunctionConventions initConv(initTy, AI->getModule());
+    require(initConv.getNumIndirectSILResults() == indirectInitResults,
+            "init function has wrong number of indirect results");
+    unsigned firstArgIdx = initConv.getSILArgIndexOfFirstParam();
+    require(initConv.getNumSILArguments() == firstArgIdx + 1,
+            "init function has wrong number of arguments");
+    require(Src->getType() == initConv.getSILArgumentType(firstArgIdx),
+            "wrong argument type of init function");
+    switch (initConv.getNumIndirectSILResults()) {
+      case 0:
+        require(initConv.getNumDirectSILResults() == 1,
+                "wrong number of init function results");
+        require(Dest->getType().getObjectType() ==
+                initConv.getDirectSILResultTypes().front(),
+                "wrong init function result type");
+        break;
+      case 1:
+        require(initConv.getNumDirectSILResults() == 0,
+                "wrong number of init function results");
+        require(Dest->getType() == initConv.getIndirectSILResultTypes().front(),
+                "wrong indirect init function result type");
+        break;
+      default:
+        require(false, "wrong number of indirect init function results");
+    }
+
+    SILValue setterFn = AI->getSetter();
+    CanSILFunctionType setterTy = setterFn->getType().castTo<SILFunctionType>();
+    SILFunctionConventions setterConv(setterTy, AI->getModule());
+    require(setterConv.getNumIndirectSILResults() == 0,
+            "set function has indirect results");
+    require(setterConv.getNumSILArguments() == 1,
+            "init function has wrong number of arguments");
+    require(Src->getType() == setterConv.getSILArgumentType(0),
+            "wrong argument type of init function");
   }
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
