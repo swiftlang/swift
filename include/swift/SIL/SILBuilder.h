@@ -452,20 +452,11 @@ public:
 
   ApplyInst *createApply(
       SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
-      ArrayRef<SILValue> Args, bool isNonThrowing,
+      ArrayRef<SILValue> Args, bool isNonThrowing = false,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     return insert(ApplyInst::create(getSILDebugLocation(Loc), Fn, Subs, Args,
                                     isNonThrowing, C.silConv, *F,
                                     C.OpenedArchetypes, SpecializationInfo));
-  }
-
-  ApplyInst *createApply(
-      SILLocation Loc, SILValue Fn, ArrayRef<SILValue> Args, bool isNonThrowing,
-      const GenericSpecializationInformation *SpecializationInfo = nullptr) {
-    SILFunctionConventions conventions(Fn->getType().castTo<SILFunctionType>(),
-                                       getModule());
-    return createApply(Loc, Fn, SubstitutionMap(), Args, isNonThrowing,
-                       SpecializationInfo);
   }
 
   TryApplyInst *createTryApply(
@@ -490,7 +481,7 @@ public:
 
   BeginApplyInst *createBeginApply(
       SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
-      ArrayRef<SILValue> Args, bool isNonThrowing,
+      ArrayRef<SILValue> Args, bool isNonThrowing = false,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     return insert(BeginApplyInst::create(
         getSILDebugLocation(Loc), Fn, Subs, Args, isNonThrowing, C.silConv, *F,

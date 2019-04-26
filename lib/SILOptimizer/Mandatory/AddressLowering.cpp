@@ -982,7 +982,7 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
   case SILInstructionKind::ApplyInst:
     newCallInst = callBuilder.createApply(
         loc, apply.getCallee(), apply.getSubstitutionMap(), newCallArgs,
-        cast<ApplyInst>(origCallInst)->isNonThrowing(), nullptr);
+        cast<ApplyInst>(origCallInst)->isNonThrowing());
     break;
   case SILInstructionKind::TryApplyInst:
     // TODO: insert dealloc in the catch block.

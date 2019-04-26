@@ -1236,7 +1236,7 @@ SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
       loc, silDeclRef, getConstantInfo(silDeclRef));
 
   SILValue args[] = {majorValue, minorValue, subminorValue};
-  return B.createApply(loc, availabilityGTEFn, args, false);
+  return B.createApply(loc, availabilityGTEFn, SubstitutionMap(), args);
 }
 
 
@@ -1440,9 +1440,9 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
                                             nullptr)) {
       auto *proto = c->getProtocol();
       if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto) &&
-          isa<NormalProtocolConformance>(c) &&
-          c->isComplete())
+          isa<NormalProtocolConformance>(c)) {
         emitExternalWitnessTable(cast<NormalProtocolConformance>(c));
+      }
     }
     break;
   }

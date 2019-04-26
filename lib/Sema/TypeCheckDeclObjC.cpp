@@ -1628,18 +1628,6 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
     attr->setInvalid();
   }
 
-  if (!isa<TypeDecl>(D) && !D->hasInterfaceType()) {
-    ctx.getLazyResolver()->resolveDeclSignature(D);
-  }
-
-  if (!isa<TypeDecl>(D) && !isa<AccessorDecl>(D) && !isa<EnumElementDecl>(D)) {
-    if (ctx.getLazyResolver()) {
-      // Only record conformances when we have a lazy resolver.
-      useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
-                                          D->getInterfaceType());
-    }
-  }
-
   if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
     // Determine the foreign error convention.
     if (auto baseMethod = method->getOverriddenDecl()) {

@@ -1785,7 +1785,7 @@ static void emitRawApply(SILGenFunction &SGF,
   // If the function is a coroutine, we need to use 'begin_apply'.
   if (substFnType->isCoroutine()) {
     assert(!substFnType->hasErrorResult());
-    auto apply = SGF.B.createBeginApply(loc, fnValue, subs, argValues, false);
+    auto apply = SGF.B.createBeginApply(loc, fnValue, subs, argValues);
     for (auto result : apply->getAllResults())
       rawResults.push_back(result);
     return;
@@ -1793,7 +1793,7 @@ static void emitRawApply(SILGenFunction &SGF,
 
   // If we don't have an error result, we can make a simple 'apply'.
   if (!substFnType->hasErrorResult()) {
-    auto result = SGF.B.createApply(loc, fnValue, subs, argValues, false);
+    auto result = SGF.B.createApply(loc, fnValue, subs, argValues);
     rawResults.push_back(result);
 
   // Otherwise, we need to create a try_apply.
@@ -4533,7 +4533,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   SILType resultType = fnConv.getSILResultType();
 
   if (!silFnType->hasErrorResult()) {
-    return B.createApply(loc, fn, subs, args, false);
+    return B.createApply(loc, fn, subs, args);
   }
 
   SILBasicBlock *errorBB = createBasicBlock();
@@ -4567,7 +4567,7 @@ SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
   // TODO: adjust this to create try_begin_apply when appropriate.
   assert(!substFnType.castTo<SILFunctionType>()->hasErrorResult());
 
-  auto beginApply = B.createBeginApply(loc, fn, subs, args, false);
+  auto beginApply = B.createBeginApply(loc, fn, subs, args);
 
   auto yieldResults = beginApply->getYieldedValues();
   yields.append(yieldResults.begin(), yieldResults.end());

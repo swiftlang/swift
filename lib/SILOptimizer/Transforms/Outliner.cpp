@@ -358,7 +358,8 @@ BridgedProperty::outline(SILModule &M) {
     auto Loc = FirstInst->getLoc();
     SILValue FunRef(Builder.createFunctionRef(Loc, Fun));
     SILValue Apply(
-        Builder.createApply(Loc, FunRef, {FirstInst->getOperand(0)}, false));
+        Builder.createApply(Loc, FunRef, SubstitutionMap(),
+                            {FirstInst->getOperand(0)}));
     Builder.createBranch(Loc, NewTailBB);
     OldMergeBB->getArgument(0)->replaceAllUsesWith(Apply);
   }
@@ -961,7 +962,7 @@ ObjCMethodCall::outline(SILModule &M) {
       }
       OrigSigIdx++;
     }
-    OutlinedCall = Builder.createApply(Loc, FunRef, Args, false);
+    OutlinedCall = Builder.createApply(Loc, FunRef, SubstitutionMap(), Args);
     if (!BridgedCall->use_empty() && !BridgedReturn)
       BridgedCall->replaceAllUsesWith(OutlinedCall);
   }

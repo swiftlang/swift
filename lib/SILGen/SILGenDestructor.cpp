@@ -69,7 +69,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
       = emitSiblingMethodRef(cleanupLoc, baseSelf, dtorConstant, subMap);
 
     resultSelfValue = B.createApply(cleanupLoc, dtorValue.forward(*this),
-                                    subMap, baseSelf, false);
+                                    subMap, baseSelf);
   } else {
     resultSelfValue = selfValue;
   }
@@ -129,7 +129,7 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
     FullExpr CleanupScope(Cleanups, CleanupLocation::get(loc));
     ManagedValue borrowedSelf = emitManagedBeginBorrow(loc, initialSelfValue);
     selfForDealloc = B.createApply(loc, dtorValue.forward(*this), subMap,
-                                   borrowedSelf.getUnmanagedValue(), false);
+                                   borrowedSelf.getUnmanagedValue());
   }
 
   // Balance out the +1 from the self argument using end_lifetime.
@@ -246,7 +246,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
     = superclassTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
                                               superclass);
 
-  B.createApply(cleanupLoc, superclassDtorValue, subMap, superSelf, false);
+  B.createApply(cleanupLoc, superclassDtorValue, subMap, superSelf);
 
   // We know that the givne value came in at +1, but we pass the relevant value
   // as unowned to the destructor. Create a fake balance for the verifier to be

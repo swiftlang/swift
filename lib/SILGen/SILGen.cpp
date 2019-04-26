@@ -1649,6 +1649,7 @@ public:
       LLVM_DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
                  toplevel->print(llvm::dbgs()));
       toplevel->verify();
+      sgm.emitLazyConformancesForFunction(toplevel);
     }
 
     // If the source file contains an artificial main, emit the implicit
@@ -1689,10 +1690,6 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
     FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-tydecl", D);
     visit(D);
   }
-
-  // Mark any conformances as "used".
-  for (auto conformance : sf->getUsedConformances())
-    useConformance(ProtocolConformanceRef(conformance));
 }
 
 //===----------------------------------------------------------------------===//

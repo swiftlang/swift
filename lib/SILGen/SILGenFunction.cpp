@@ -516,7 +516,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                           SILType::getPrimitiveObjectType(anyObjectMetaTy),
                           {});
     SILValue optNameValue = B.createApply(
-        mainClass, NSStringFromClass, {}, metaTy, false);
+        mainClass, NSStringFromClass, {}, metaTy);
     ManagedValue optName = emitManagedRValueWithCleanup(optNameValue);
 
     // Fix up the string parameters to have the right type.
@@ -556,7 +556,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     SILValue args[] = {argc, managedArgv.getValue(), nilValue,
                        optName.getValue()};
 
-    B.createApply(mainClass, UIApplicationMain, SubstitutionMap{}, args, false);
+    B.createApply(mainClass, UIApplicationMain, SubstitutionMap(), args);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, ctx), 0);
     auto rType = F.getConventions().getSingleSILResultType();
@@ -601,7 +601,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     auto NSApplicationMain = B.createFunctionRef(mainClass, NSApplicationMainFn);
     SILValue args[] = { argc, argv };
 
-    B.createApply(mainClass, NSApplicationMain, SubstitutionMap{}, args, false);
+    B.createApply(mainClass, NSApplicationMain, SubstitutionMap(), args);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, getASTContext()), 0);
     auto rType = F.getConventions().getSingleSILResultType();

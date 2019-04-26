@@ -301,7 +301,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   Args.push_back(srcOp);
   Args.push_back(MetaTyVal);
 
-  auto *AI = Builder.createApply(Loc, funcRef, subMap, Args, false);
+  auto *AI = Builder.createApply(Loc, funcRef, subMap, Args);
 
   // If we have guaranteed normal arguments, insert the destroy.
   //
@@ -674,7 +674,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
   }
 
   // Generate a code to invoke the bridging function.
-  auto *NewAI = Builder.createApply(Loc, FnRef, subMap, Src, false);
+  auto *NewAI = Builder.createApply(Loc, FnRef, subMap, Src);
 
   auto releaseSrc = [&](SILBuilder &Builder) {
     if (AddressOnlyType) {

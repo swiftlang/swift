@@ -166,7 +166,7 @@ class BugReducerTester : public SILFunctionTransform {
         SILBuilder B(II);
         B.createApply(Loc, B.createFunctionRef(Loc, RuntimeCrasherFunc),
                       SubstitutionMap(),
-                      ArrayRef<SILValue>(), false /*NoThrow*/);
+                      ArrayRef<SILValue>());
 
         auto *Inst = cast<SingleValueInstruction>(&*II);
         ++II;

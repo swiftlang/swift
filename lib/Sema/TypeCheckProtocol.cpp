@@ -4289,12 +4289,6 @@ void TypeChecker::markConformanceUsed(ProtocolConformanceRef conformance,
     // Make sure that the type checker completes this conformance.
     if (normalConformance->isIncomplete())
       UsedConformances.insert(normalConformance);
-
-    // Record the usage of this conformance in the enclosing source
-    // file.
-    if (auto sf = dc->getParentSourceFile()) {
-      sf->addUsedConformance(normalConformance);
-    }
   }
 }
 
@@ -4313,92 +4307,6 @@ TypeChecker::LookUpConformance::operator()(
                          (ConformanceCheckFlags::Used|
                           ConformanceCheckFlags::InExpression|
                           ConformanceCheckFlags::SkipConditionalRequirements));
-}
-
-/// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
-///
-/// These conformances might not appear in any substitution lists produced
-/// by Sema, since bridging is done at the SILGen level, so we have to
-/// force them here to ensure SILGen can find them.
-void swift::useObjectiveCBridgeableConformances(DeclContext *dc, Type type) {
-  class Walker : public TypeWalker {
-    ASTContext &Ctx;
-    DeclContext *DC;
-    ProtocolDecl *Proto;
-
-  public:
-    Walker(DeclContext *dc, ProtocolDecl *proto)
-      : Ctx(dc->getASTContext()), DC(dc), Proto(proto) { }
-
-    Action walkToTypePre(Type ty) override {
-      ConformanceCheckOptions options =
-          (ConformanceCheckFlags::InExpression |
-           ConformanceCheckFlags::Used |
-           ConformanceCheckFlags::SuppressDependencyTracking);
-
-      // If we have a nominal type, "use" its conformance to
-      // _ObjectiveCBridgeable if it has one.
-      if (auto *nominalDecl = ty->getAnyNominal()) {
-        if (isa<ClassDecl>(nominalDecl) || isa<ProtocolDecl>(nominalDecl))
-          return Action::Continue;
-
-        auto lazyResolver = Ctx.getLazyResolver();
-        assert(lazyResolver &&
-               "Cannot do conforms-to-protocol check without a type checker");
-        TypeChecker &tc = *static_cast<TypeChecker *>(lazyResolver);
-        (void)tc.conformsToProtocol(ty, Proto, DC, options,
-                                    /*ComplainLoc=*/SourceLoc());
-
-        // Set and Dictionary bridging also requires the conformance
-        // of the key type to Hashable.
-        if (nominalDecl == Ctx.getSetDecl() ||
-            nominalDecl == Ctx.getDictionaryDecl()) {
-          if (auto boundGeneric = ty->getAs<BoundGenericType>()) {
-            auto args = boundGeneric->getGenericArgs();
-            if (!args.empty()) {
-              auto keyType = args[0];
-              auto *hashableProto =
-                Ctx.getProtocol(KnownProtocolKind::Hashable);
-              if (!hashableProto)
-                return Action::Stop;
-
-              (void)tc.conformsToProtocol(
-                  keyType, hashableProto, DC, options,
-                  /*ComplainLoc=*/SourceLoc());
-            }
-          }
-        }
-      }
-
-      return Action::Continue;
-    }
-  };
-
-  auto proto =
-    dc->getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
-  if (!proto) return;
-
-  Walker walker(dc, proto);
-  type.walk(walker);
-}
-
-void swift::useObjectiveCBridgeableConformancesOfArgs(
-       DeclContext *dc, BoundGenericType *bound) {
-  ASTContext &ctx = dc->getASTContext();
-  auto proto = ctx.getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
-  if (!proto) return;
-
-  // Check whether the bound generic type itself is bridged to
-  // Objective-C.
-  ConformanceCheckOptions options =
-    (ConformanceCheckFlags::InExpression |
-     ConformanceCheckFlags::SuppressDependencyTracking);
-  auto lazyResolver = ctx.getLazyResolver();
-  assert(lazyResolver && "Need a type checker to check conforms-to-protocol");
-  auto &tc = *static_cast<TypeChecker *>(lazyResolver);
-  (void)tc.conformsToProtocol(
-      bound->getDecl()->getDeclaredType(), proto, dc,
-      options, /*ComplainLoc=*/SourceLoc());
 }
 
 void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
