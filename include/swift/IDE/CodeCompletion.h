@@ -489,6 +489,7 @@ enum class CompletionKind {
   SuperExprDot,
   KeyPathExprObjC,
   KeyPathExprSwift,
+  TypeDeclResultBeginning,
   TypeSimpleBeginning,
   TypeIdentifierWithDot,
   TypeIdentifierWithoutDot,
