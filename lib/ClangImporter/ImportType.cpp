@@ -71,10 +71,8 @@ namespace {
       /// The source type is 'void'.
       Void,
 
-      /// The source type is 'BOOL'.
-      BOOL,
-
-      /// The source type is 'Boolean'.
+      /// The source type is 'BOOL' or 'Boolean' -- a type mapped to Swift's
+      /// 'Bool'.
       Boolean,
 
       /// The source type is an Objective-C class type bridged to a Swift
@@ -129,7 +127,6 @@ namespace {
     // See also ClangImporter.cpp's canImportAsOptional.
     switch (hint) {
     case ImportHint::None:
-    case ImportHint::BOOL:
     case ImportHint::Boolean:
     case ImportHint::NSUInteger:
     case ImportHint::Void:
@@ -685,7 +682,6 @@ namespace {
         case ImportHint::SwiftNewtypeFromCFPointer:
           return {mappedType, underlying.Hint};
 
-        case ImportHint::BOOL:
         case ImportHint::Boolean:
         case ImportHint::NSUInteger:
           // Toss out the special rules for these types; we still want to
@@ -715,7 +711,7 @@ namespace {
 
         ImportHint hint = ImportHint::None;
         if (type->getDecl()->getName() == "BOOL") {
-          hint = ImportHint::BOOL;
+          hint = ImportHint::Boolean;
         } else if (type->getDecl()->getName() == "Boolean") {
           // FIXME: Darwin only?
           hint = ImportHint::Boolean;
@@ -1381,8 +1377,8 @@ static ImportedType adjustTypeForConcreteImport(
 
   // Turn BOOL and DarwinBoolean into Bool in contexts that can bridge types
   // losslessly.
-  if ((hint == ImportHint::BOOL || hint == ImportHint::Boolean) &&
-      bridging == Bridgeability::Full && canBridgeTypes(importKind)) {
+  if (hint == ImportHint::Boolean && bridging == Bridgeability::Full &&
+      canBridgeTypes(importKind)) {
     return {impl.SwiftContext.getBoolDecl()->getDeclaredType(), false};
   }
 
