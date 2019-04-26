@@ -13,7 +13,6 @@ func testInferredElementResult() -> TensorHandle<Int32> {
   _ = #tfop("bar") as TensorHandle<Int32>
 }
 
-// expected-note @+1 2 {{value used here}}
 class ClassTest {
   // expected-warning @+2 {{value implicitly copied to the host}}
   // expected-warning @+1 {{'Tensor<Float>' implicitly copied to the accelerator}}
@@ -99,7 +98,7 @@ public func scalarToAccelerator(x: Float) -> Tensor<Float> {
 // tf-warn-scalar-transfer=true.
 public func scalarToHost() {
   var i = Tensor(0)
-  while i < 10 {
+  while i < 10 { // expected-warning {{method result implicitly copied to the accelerator, use .toAccelerator() to make transfer explicit}}
     print("Running loop body")
     i += 1
   }

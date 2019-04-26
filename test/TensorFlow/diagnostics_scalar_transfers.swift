@@ -13,7 +13,7 @@ public func scalarToAccelerator(x: Float) -> Tensor<Float> {
 
 public func scalarToHost() {
   var i = Tensor(0)
-  while i < 10 {  // expected-warning {{value implicitly copied to the host}}
+  while i < 10 {  // expected-warning {{value implicitly copied to the host}} expected-warning {{method result implicitly copied to the accelerator, use .toAccelerator() to make transfer explicit}}
     print("Running loop body")
     i += 1
   }
