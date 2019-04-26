@@ -1440,9 +1440,9 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
                                             nullptr)) {
       auto *proto = c->getProtocol();
       if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto) &&
-          isa<NormalProtocolConformance>(c) &&
-          c->isComplete())
+          isa<NormalProtocolConformance>(c)) {
         emitExternalWitnessTable(cast<NormalProtocolConformance>(c));
+      }
     }
     break;
   }
