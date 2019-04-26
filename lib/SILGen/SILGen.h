@@ -118,6 +118,8 @@ public:
   Optional<SILDeclRef> DarwinBooleanToBoolFn;
   Optional<SILDeclRef> NSErrorToErrorFn;
   Optional<SILDeclRef> ErrorToNSErrorFn;
+  Optional<SILDeclRef> BoolToWindowsBoolFn;
+  Optional<SILDeclRef> WindowsBoolToBoolFn;
 
   Optional<ProtocolDecl*> PointerProtocol;
 
@@ -367,6 +369,8 @@ public:
   SILDeclRef getObjCBoolToBoolFn();
   SILDeclRef getBoolToDarwinBooleanFn();
   SILDeclRef getDarwinBooleanToBoolFn();
+  SILDeclRef getBoolToWindowsBoolFn();
+  SILDeclRef getWindowsBoolToBoolFn();
   SILDeclRef getNSErrorToErrorFn();
   SILDeclRef getErrorToNSErrorFn();
 

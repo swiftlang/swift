@@ -59,27 +59,27 @@ public func spawnChild(_ args: [String])
 
   var saAttributes: SECURITY_ATTRIBUTES = SECURITY_ATTRIBUTES()
   saAttributes.nLength = DWORD(MemoryLayout<SECURITY_ATTRIBUTES>.size)
-  saAttributes.bInheritHandle = TRUE
+  saAttributes.bInheritHandle = true
   saAttributes.lpSecurityDescriptor = nil
 
-  if CreatePipe(&_stdin.read, &_stdin.write, &saAttributes, 0) == FALSE {
+  if !CreatePipe(&_stdin.read, &_stdin.write, &saAttributes, 0) {
     fatalError("CreatePipe() failed")
   }
-  if SetHandleInformation(_stdin.write, HANDLE_FLAG_INHERIT, 0) == FALSE {
+  if !SetHandleInformation(_stdin.write, HANDLE_FLAG_INHERIT, 0) {
     fatalError("SetHandleInformation() failed")
   }
 
-  if CreatePipe(&_stdout.read, &_stdout.write, &saAttributes, 0) == FALSE {
+  if !CreatePipe(&_stdout.read, &_stdout.write, &saAttributes, 0) {
     fatalError("CreatePipe() failed")
   }
-  if SetHandleInformation(_stdout.read, HANDLE_FLAG_INHERIT, 0) == FALSE {
+  if !SetHandleInformation(_stdout.read, HANDLE_FLAG_INHERIT, 0) {
     fatalError("SetHandleInformation() failed")
   }
 
-  if CreatePipe(&_stderr.read, &_stderr.write, &saAttributes, 0) == FALSE {
+  if !CreatePipe(&_stderr.read, &_stderr.write, &saAttributes, 0) {
     fatalError("CreatePipe() failed")
   }
-  if SetHandleInformation(_stderr.read, HANDLE_FLAG_INHERIT, 0) == FALSE {
+  if !SetHandleInformation(_stderr.read, HANDLE_FLAG_INHERIT, 0) {
     fatalError("SetHandleInformation() failed")
   }
 
@@ -98,21 +98,21 @@ public func spawnChild(_ args: [String])
   let command: String =
       ([CommandLine.arguments[0]] + args).joined(separator: " ")
   command.withCString(encodedAs: UTF16.self) { cString in
-    if CreateProcessW(nil, UnsafeMutablePointer<WCHAR>(mutating: cString),
-                      nil, nil, TRUE, 0, nil, nil,
-                      &siStartupInfo, &piProcessInfo) == FALSE {
+    if !CreateProcessW(nil, UnsafeMutablePointer<WCHAR>(mutating: cString),
+                       nil, nil, true, 0, nil, nil,
+                       &siStartupInfo, &piProcessInfo) {
       let dwError: DWORD = GetLastError()
       fatalError("CreateProcessW() failed \(dwError)")
     }
   }
 
-  if CloseHandle(_stdin.read) == FALSE {
+  if !CloseHandle(_stdin.read) {
     fatalError("CloseHandle() failed")
   }
-  if CloseHandle(_stdout.write) == FALSE {
+  if !CloseHandle(_stdout.write) {
     fatalError("CloseHandle() failed")
   }
-  if CloseHandle(_stderr.write) == FALSE {
+  if !CloseHandle(_stderr.write) {
     fatalError("CloseHandle() failed")
   }
 
@@ -132,7 +132,7 @@ public func waitProcess(_ process: HANDLE) -> ProcessTerminationStatus {
   }
 
   var status: DWORD = 0
-  if GetExitCodeProcess(process, &status) == FALSE {
+  if !GetExitCodeProcess(process, &status) {
     fatalError("GetExitCodeProcess() failed")
   }
 
