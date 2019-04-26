@@ -7,7 +7,7 @@ import Foundation
   func returnUnmanagedCFArray() throws -> Unmanaged<CFArray>
 }
 
-// CHECK-LABEL: define hidden swiftcc %TSo10CFArrayRefa* @"$s25unmanaged_objc_throw_func9SR_9035_CC22returnUnmanagedCFArrays0G0VySo0H3RefaGyKF"(%T25unmanaged_objc_throw_func9SR_9035_CC* swiftself, %swift.error** noalias nocapture {{(swifterror)?}} dereferenceable({{[0-9]+}})) #{{[0-9]+}} {
+// CHECK-LABEL: define hidden swiftcc %TSo10CFArrayRefa* @"$s25unmanaged_objc_throw_func9SR_9035_CC22returnUnmanagedCFArrays0G0VySo0H3RefaGyKF"
 @objc class SR_9035_C: NSObject, SR_9035_P {
   func returnUnmanagedCFArray() throws -> Unmanaged<CFArray> {
     // CHECK: %[[T0:.+]] = call swiftcc { %swift.bridge*, i8* } @"$ss27_allocateUninitializedArrayySayxG_BptBwlF"(i{{32|64}} 1, %swift.type* @"$sSiN")
@@ -28,7 +28,7 @@ import Foundation
   } 
 }
 
-// CHECK: %[[T0:.+]] = call swiftcc %TSo10CFArrayRefa* @"$s25unmanaged_objc_throw_func9SR_9035_CC22returnUnmanagedCFArrays0G0VySo0H3RefaGyKF"(%T25unmanaged_objc_throw_func9SR_9035_CC* swiftself %{{.+}}, %swift.error** noalias nocapture {{(swifterror)?}} dereferenceable({{[0-9]+}}) %swifterror) #{{[0-9]+}}
+// CHECK: %[[T0:.+]] = call swiftcc %TSo10CFArrayRefa* @"$s25unmanaged_objc_throw_func9SR_9035_CC22returnUnmanagedCFArrays0G0VySo0H3RefaGyKF"
 // CHECK-NEXT: %[[T2:.+]] = load %swift.error*, %swift.error** %swifterror, align {{[0-9]+}}
 // CHECK-NEXT: %[[T3:.+]] = icmp ne %swift.error* %[[T2]], null
 // CHECK-NEXT: br i1 %[[T3]], label %[[L1:.+]], label %[[L2:.+]]
