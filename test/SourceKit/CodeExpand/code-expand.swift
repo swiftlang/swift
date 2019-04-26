@@ -53,7 +53,9 @@ func f() {
 func f1() {
   bar(<#T##d: () -> ()##() -> ()#>)
 }
-// CHECK-NOT: bar { () -> () in
+// CHECK:      bar {
+// CHECK-NEXT: <#code#>
+// CHECK-NEXT: }
 
 func f1() {
   bar(<#T##d: () -> ()##() -> ()#>, <#T##d: () -> ()##() -> ()#>)
@@ -91,3 +93,95 @@ if true {
 
 foo(.foo(<#T##block: () -> Void##() -> Void#>))
 // CHECK: foo(.foo({
+
+func returnTrailing() -> Int {
+  return withtrail(<#T##() -> ()#>)
+// CHECK: return withtrail {
+// CHECK-NEXT: <#code#>
+}
+
+var yieldTrailing: Int {
+  _read {
+    yield withtrail(<#T##() -> ()#>)
+  // CHECK: yield withtrail {
+  // CHECK-NEXT: <#code#>
+  }
+}
+
+func caseTrailing() -> Int {
+  switch true {
+    case true: withtrail(<#T##() -> ()#>)
+// CHECK: case true: withtrail {
+// CHECK-NEXT: <#code#>
+    default: withtrail(<#T##() -> ()#>)
+// CHECK: default: withtrail {
+// CHECK-NEXT: <#code#>
+  }
+}
+
+func throwTrailing() -> Int {
+   throw withtrail(<#T##() -> ()#>)
+// CHECK: throw withtrail {
+// CHECK-NEXT: <#code#>
+}
+
+func singleExprTrailing1() -> Int {
+  withtrail(<#T##() -> ()#>)
+// CHECK: withtrail {
+// CHECK-NEXT: <#code#>
+}
+var singleExprTrailing2: Int {
+  withtrail(<#T##() -> ()#>)
+// CHECK: withtrail {
+// CHECK-NEXT: <#code#>
+}
+var singleExprTrailing3: Int {
+  get {
+    withtrail(<#T##() -> ()#>)
+// CHECK: withtrail {
+// CHECK-NEXT: <#code#>
+  }
+}
+
+closureTrailingMulti {
+  bah()
+  withtrail(<#T##() -> ()#>)
+// CHECK: bah()
+// CHECK-NEXT: withtrail {
+// CHECK-NEXT: <#code#>
+}
+
+closureIf {
+  if withtrail(<#T##() -> ()#>) {}
+// CHECK: if withtrail({
+// CHECK-NEXT: <#code#>
+}
+
+closureNonTrail {
+  nonTrail(<#T##() -> ()#>, 1)
+// CHECK: nonTrail({
+// CHECK-NEXT: <#code#>
+}
+
+singleExprClosureTrailing {
+  withtrail(<#T##() -> ()#>)
+// CHECK: withtrail {
+// CHECK-NEXT: <#code#>
+}
+
+singleExprClosureTrailingParens({
+  withtrail(<#T##() -> ()#>)
+// CHECK: withtrail {
+// CHECK-NEXT: <#code#>
+})
+
+singleExprClosureMultiArg(1) {
+  withtrail(<#T##() -> ()#>)
+// CHECK: withtrail {
+// CHECK-NEXT: <#code#>
+}
+singleExprClosureMultiArg(1) {
+  withtrail(<#T##() -> ()#>)
+// CHECK: withtrail {
+// CHECK-NEXT: <#code#>
+}

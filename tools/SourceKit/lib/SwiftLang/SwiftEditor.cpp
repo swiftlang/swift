@@ -1516,8 +1516,26 @@ private:
       bool walkToExprPre(Expr *E) override {
         auto SR = E->getSourceRange();
         if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc)) {
-          if (!checkCallExpr(E) && !EnclosingCallAndArg.first)
+          if (auto closure = dyn_cast<ClosureExpr>(E)) {
+            if (closure->hasSingleExpressionBody()) {
+              // Treat a single-expression body like a brace statement and reset
+              // the enclosing context. Note: when the placeholder is the whole
+              // body it is handled specially as wrapped in braces by
+              // shouldUseTrailingClosureInTuple().
+              auto SR = closure->getSingleExpressionBody()->getSourceRange();
+              if (SR.isValid() && SR.Start != TargetLoc &&
+                  SM.rangeContainsTokenLoc(SR, TargetLoc)) {
+                OuterStmt = nullptr;
+                OuterExpr = nullptr;
+                EnclosingCallAndArg = {nullptr, nullptr};
+                return true;
+              }
+            }
+          }
+
+          if (!checkCallExpr(E) && !EnclosingCallAndArg.first) {
             OuterExpr = E;
+          }
         }
         return true;
       }
@@ -1531,12 +1549,22 @@ private:
       bool walkToStmtPre(Stmt *S) override {
         auto SR = S->getSourceRange();
         if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc)) {
-          if (!EnclosingCallAndArg.first) {
-            if (isa<BraceStmt>(S))
-              // In case OuterStmt is already set, we should clear it to nullptr.
-              OuterStmt = nullptr;
-            else
-              OuterStmt = S;
+          // A statement inside an expression - e.g. `foo({ if ... })` - resets
+          // the enclosing context.
+          OuterExpr = nullptr;
+          EnclosingCallAndArg = {nullptr, nullptr};
+
+          switch (S->getKind()) {
+          case StmtKind::Brace:
+          case StmtKind::Return:
+          case StmtKind::Yield:
+          case StmtKind::Throw:
+            // A trailing closure is allowed in these statements.
+            OuterStmt = nullptr;
+            break;
+          default:
+            OuterStmt = S;
+            break;
           }
         }
         return true;
