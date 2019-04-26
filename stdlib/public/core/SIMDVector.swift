@@ -549,32 +549,6 @@ extension SIMD where Scalar: FloatingPoint {
     return Self(repeating: 1)
   }
   
-  /// The lanewise minimum of two vectors.
-  ///
-  /// Each element of the result is the minimum of the corresponding elements
-  /// of the inputs.
-  @_alwaysEmitIntoClient
-  public static func min(_ a: Self, _ b: Self) -> Self {
-    var result = Self()
-    for i in result.indices {
-      result[i] = Scalar.minimum(a[i], b[i])
-    }
-    return result
-  }
-  
-  /// The lanewise maximum of two vectors.
-  ///
-  /// Each element of the result is the minimum of the corresponding elements
-  /// of the inputs.
-  @_alwaysEmitIntoClient
-  public static func max(_ a: Self, _ b: Self) -> Self {
-    var result = Self()
-    for i in result.indices {
-      result[i] = Scalar.maximum(a[i], b[i])
-    }
-    return result
-  }
-  
   @_alwaysEmitIntoClient
   public mutating func clamp(lowerBound: Self, upperBound: Self) {
     self = self.clamped(lowerBound: lowerBound, upperBound: upperBound)
