@@ -1,0 +1,64 @@
+// RUN: %target-sil-opt -silgen-cleanup %s | %FileCheck %s
+
+import Builtin
+
+sil_stage raw
+
+import Swift
+import SwiftShims
+
+// CHECK-LABEL: sil [ossa] @struct_extract_load_to_load_struct_element_addr
+// CHECK: bb0([[IN:%[0-9]+]] : $*UInt8):
+// CHECK-NEXT:  [[IN_GEP:%[0-9]+]] = struct_element_addr [[IN]] : $*UInt8, #UInt8._value
+// CHECK-NEXT:  [[IN_LOADED:%[0-9]+]] = load [trivial] [[IN_GEP]] : $*Builtin.Int8
+// CHECK-NEXT:  return [[IN_LOADED]] : $Builtin.Int8
+sil [ossa] @struct_extract_load_to_load_struct_element_addr : $@convention(thin) (@inout UInt8) -> (Builtin.Int8) {
+bb0(%0 : $*UInt8):
+  %1 = load [trivial] %0 : $*UInt8
+  %5 = struct_extract %1 : $UInt8, #UInt8._value
+  return %5 : $Builtin.Int8
+}
+
+// CHECK-LABEL: sil [ossa] @tuple_extract_load_to_load_tuple_element_addr
+// CHECK: bb0([[IN:%[0-9]+]] : $*(Builtin.Int8, Builtin.Int8)):
+// CHECK-NEXT:  [[IN_GEP:%[0-9]+]] = tuple_element_addr [[IN]] : $*(Builtin.Int8, Builtin.Int8), 0
+// CHECK-NEXT:  [[IN_LOADED:%[0-9]+]] = load [trivial] [[IN_GEP]] : $*Builtin.Int8
+// CHECK-NEXT:  return [[IN_LOADED]] : $Builtin.Int8
+sil [ossa] @tuple_extract_load_to_load_tuple_element_addr : $@convention(thin) (@inout (Builtin.Int8, Builtin.Int8)) -> (Builtin.Int8) {
+bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
+  %1 = load [trivial] %0 : $*(Builtin.Int8, Builtin.Int8)
+  %5 = tuple_extract %1 : $(Builtin.Int8, Builtin.Int8), 0
+  return %5 : $Builtin.Int8
+}
+
+// Do not perform the optimization of the input load has multiple uses.
+//
+// CHECK-LABEL: sil [ossa] @multiple_use_struct_extract_load_to_load_struct_element_addr
+// CHECK: bb0([[IN:%[0-9]+]] : $*UInt8):
+// CHECK-NEXT: load
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil [ossa] @multiple_use_struct_extract_load_to_load_struct_element_addr : $@convention(thin) (@inout UInt8) -> (UInt8, Builtin.Int8) {
+bb0(%0 : $*UInt8):
+  %1 = load [trivial] %0 : $*UInt8
+  %5 = struct_extract %1 : $UInt8, #UInt8._value
+  %6 = tuple (%1 : $UInt8, %5 : $Builtin.Int8)
+  return %6 : $(UInt8, Builtin.Int8)
+}
+
+// Do not perform the optimization of the input load has multiple uses.
+//
+// CHECK-LABEL: sil [ossa] @multiple_use_tuple_extract_load_to_load_tuple_element_addr
+// CHECK: bb0
+// CHECK-NEXT: load
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil [ossa] @multiple_use_tuple_extract_load_to_load_tuple_element_addr : $@convention(thin) (@inout (Builtin.Int8, Builtin.Int8)) -> ((Builtin.Int8, Builtin.Int8), Builtin.Int8) {
+bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
+  %1 = load [trivial] %0 : $*(Builtin.Int8, Builtin.Int8)
+  %5 = tuple_extract %1 : $(Builtin.Int8, Builtin.Int8), 0
+  %6 = tuple (%1 : $(Builtin.Int8, Builtin.Int8), %5 : $Builtin.Int8)
+  return %6 : $((Builtin.Int8, Builtin.Int8), Builtin.Int8)
+}
