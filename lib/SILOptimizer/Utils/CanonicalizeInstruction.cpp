@@ -309,6 +309,84 @@ splitAggregateLoad(LoadInst *loadInst, CanonicalizeInstruction &pass) {
   return killInstAndIncidentalUses(loadInst, nextII, pass);
 }
 
+// Given a store within a single property struct, recursively form the parent
+// struct values and promote the store to the outer struct type.
+//
+// (store (struct_element_addr %base) object)
+//   ->
+// (store %base (struct object))
+static SILBasicBlock::iterator
+broadenSingleElementStores(StoreInst *storeInst,
+                           CanonicalizeInstruction &pass) {
+  // Keep track of the next iterator after any newly added or to-be-deleted
+  // instructions. This must be valid regardless of whether the pass immediately
+  // deletes the instructions or simply records them for later deletion.
+  auto nextII = std::next(storeInst->getIterator());
+
+  // Bail if the store's destination is not a struct_element_addr.
+  auto *sea = dyn_cast<StructElementAddrInst>(storeInst->getDest());
+  if (!sea)
+    return nextII;
+
+  auto *f = storeInst->getFunction();
+
+  // Continue up the struct_element_addr chain, as long as each struct only has
+  // a single property, creating StoreInsts along the way.
+  SILBuilderWithScope builder(storeInst);
+
+  SILValue result = storeInst->getSrc();
+  SILValue baseAddr = sea->getOperand();
+  SILValue storeAddr;
+  while (true) {
+    SILType baseAddrType = baseAddr->getType();
+
+    // If our aggregate has unreferenced storage then we can never prove if it
+    // actually has a single field.
+    if (baseAddrType.aggregateHasUnreferenceableStorage())
+      break;
+
+    auto *decl = baseAddrType.getStructOrBoundGenericStruct();
+    assert(
+      !decl->isResilient(f->getModule().getSwiftModule(),
+                         f->getResilienceExpansion()) &&
+        "This code assumes resilient structs can not have fragile fields. If "
+        "this assert is hit, this has been changed. Please update this code.");
+
+    // NOTE: If this is ever changed to support enums, we must check for address
+    // only types here. For structs we do not have to check since a single
+    // element struct with a loadable element can never be address only. We
+    // additionally do not have to worry about our input value being address
+    // only since we are storing into it.
+    auto props = decl->getStoredProperties();
+    if (std::next(props.begin()) != props.end())
+      break;
+
+    // Update the store location now that we know it is safe.
+    storeAddr = baseAddr;
+
+    // Otherwise, create the struct.
+    result = builder.createStruct(storeInst->getLoc(),
+                                  baseAddrType.getObjectType(), result);
+
+    // See if we have another struct_element_addr we can strip off. If we don't
+    // then this as much as we can promote.
+    sea = dyn_cast<StructElementAddrInst>(sea->getOperand());
+    if (!sea)
+      break;
+    baseAddr = sea->getOperand();
+  }
+  // If we failed to create any structs, bail.
+  if (result == storeInst->getSrc())
+    return nextII;
+
+  // Store the new struct-wrapped value into the final base address.
+  builder.createStore(storeInst->getLoc(), result, storeAddr,
+                      storeInst->getOwnershipQualifier());
+
+  // Erase the original store.
+  return killInstruction(storeInst, nextII, pass);
+}
+
 //===----------------------------------------------------------------------===//
 //                            Top-Level Entry Point
 //===----------------------------------------------------------------------===//
@@ -320,6 +398,9 @@ CanonicalizeInstruction::canonicalize(SILInstruction *inst) {
 
   if (auto *loadInst = dyn_cast<LoadInst>(inst))
     return splitAggregateLoad(loadInst, *this);
+
+  if (auto *storeInst = dyn_cast<StoreInst>(inst))
+    return broadenSingleElementStores(storeInst, *this);
 
   // Skip ahead.
   return std::next(inst->getIterator());
