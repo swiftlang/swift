@@ -4473,20 +4473,30 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
 
       if (Tok.is(tok::code_complete)) {
         if (CodeCompletion) {
+          CodeCompletionExpr *CCE = nullptr;
           if (IsFirstAccessor && !parsingLimitedSyntax) {
             // If CC token is the first token after '{', it might be implicit
             // getter. Set up dummy accessor as the decl context to populate
             // 'self' decl.
+
+            // FIXME: if there is already code inside the body, we should fall
+            // through to parseImplicitGetter and handle the completion there so
+            // that we can differentiate a single-expression body from the first
+            // expression in a multi-statement body.
             auto getter = createAccessorFunc(
                 accessors.LBLoc, /*ValueNamePattern*/ nullptr, GenericParams,
                 Indices, ElementTy, StaticLoc, Flags, AccessorKind::Get,
                 storage, this, /*AccessorKeywordLoc*/ SourceLoc());
+            CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
+            getter->setBody(BraceStmt::create(Context, Tok.getLoc(),
+                                              ASTNode(CCE), Tok.getLoc(),
+                                              /*implicit*/ true));
             accessors.add(getter);
             CodeCompletion->setParsedDecl(getter);
           } else {
             CodeCompletion->setParsedDecl(storage);
           }
-          CodeCompletion->completeAccessorBeginning();
+          CodeCompletion->completeAccessorBeginning(CCE);
         }
         consumeToken(tok::code_complete);
         accessorHasCodeCompletion = true;
