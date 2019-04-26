@@ -87,6 +87,10 @@ module Newtype {
   header "Newtype.h"
 }
 
+module NewtypeSystem [system] {
+  header "NewtypeSystem.h"
+}
+
 module ImportAsMember {
   export *
 
