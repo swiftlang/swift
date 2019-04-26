@@ -877,8 +877,14 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
 
     // If we already have a scope of the (possible) generic parameters,
     // add the body.
-    if (parent->getKind() == ASTScopeKind::ExtensionGenericParams)
+    if (parent->getKind() == ASTScopeKind::ExtensionGenericParams) {
+      // If there is no body because we have an invalid extension written
+      // without braces in the source, just return.
+      if (ext->getBraces().Start == ext->getBraces().End)
+        return nullptr;
+
       return new (ctx) ASTScope(parent, cast<IterableDeclContext>(ext));
+    }
 
     // Otherwise, form the extension's generic parameters scope.
     return new (ctx) ASTScope(parent, ext);
@@ -912,6 +918,17 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
       return scope;
 
     // Typealiases don't introduce any other scopes.
+    return nullptr;
+  }
+      
+  case DeclKind::OpaqueType: {
+    // If we have a generic type and our parent isn't describing our
+    // generic parameters, build the generic parameter scope.
+    auto opaque = cast<OpaqueTypeDecl>(decl);
+    if (auto scope = nextGenericParam(opaque->getGenericParams(), opaque))
+      return scope;
+
+    // Opaque type decls don't introduce any other scopes.
     return nullptr;
   }
 

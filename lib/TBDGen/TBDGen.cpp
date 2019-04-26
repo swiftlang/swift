@@ -199,6 +199,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
         LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD, useAllocator));
     addSymbol(
         LinkEntity::forDynamicallyReplaceableFunctionKey(AFD, useAllocator));
+
   }
   if (AFD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
     bool useAllocator = shouldUseAllocatorMangling(AFD);
@@ -230,6 +231,25 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   }
 }
 
+void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
+  // If there's an opaque return type, its descriptor is exported.
+  if (auto opaqueResult = FD->getOpaqueResultTypeDecl()) {
+    addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));
+    assert(opaqueResult->getNamingDecl() == FD);
+    if (FD->isNativeDynamic()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorImpl(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
+    }
+    if (FD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
+    }
+  }
+  visitAbstractFunctionDecl(FD);
+}
+
 void TBDGenVisitor::visitAccessorDecl(AccessorDecl *AD) {
   // Do nothing: accessors are always nested within the storage decl, but
   // sometimes appear outside it too. To avoid double-walking them, we
@@ -241,6 +261,22 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   // Add the property descriptor if the decl needs it.
   if (ASD->exportsPropertyDescriptor()) {
     addSymbol(LinkEntity::forPropertyDescriptor(ASD));
+  }
+  
+  // ...and the opaque result decl if it has one.
+  if (auto opaqueResult = ASD->getOpaqueResultTypeDecl()) {
+    addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));
+    assert(opaqueResult->getNamingDecl() == ASD);
+    if (ASD->hasAnyNativeDynamicAccessors()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorImpl(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
+    }
+    if (ASD->hasAnyDynamicReplacementAccessors()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
+    }
   }
 
   // Explicitly look at each accessor here: see visitAccessorDecl.
@@ -464,6 +500,7 @@ static bool isValidProtocolMemberForTBDGen(const Decl *D) {
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
     return true;
+  case DeclKind::OpaqueType:
   case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class:

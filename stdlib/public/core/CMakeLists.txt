@@ -184,7 +184,6 @@ set(SWIFTLIB_ESSENTIAL
 
 set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   AtomicInt.swift.gyb
-  BuiltinMath.swift.gyb
   Codable.swift.gyb
   FixedArray.swift.gyb
   FloatingPointParsing.swift.gyb
@@ -218,10 +217,11 @@ set(SWIFTLIB_SOURCES
   )
 
 set(SWIFTLIB_GYB_SOURCES
-    ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
-    ExistentialCollection.swift.gyb
-    SIMDVectorTypes.swift.gyb
-    Tuple.swift.gyb
+  ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
+  ExistentialCollection.swift.gyb
+  MathFunctions.swift.gyb
+  SIMDVectorTypes.swift.gyb
+  Tuple.swift.gyb
   )
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
 set(swift_core_link_flags "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")

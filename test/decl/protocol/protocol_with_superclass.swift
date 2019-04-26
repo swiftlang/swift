@@ -340,3 +340,15 @@ extension Amb { // expected-error {{'Amb' is ambiguous for type lookup in this c
     _ = ConcreteAlias.self
   }
 }
+
+protocol ProtoRefinesClassComposition : Generic<Int> & BaseProto {}
+
+func usesProtoRefinesClass1(_ t: ProtoRefinesClassComposition) {
+  t.genericMethod((1, 2))
+  let _: BaseProto = t
+}
+
+func usesProtoRefinesClass2<T : ProtoRefinesClassComposition>(_ t: T) {
+  t.genericMethod((1, 2))
+  let _: BaseProto = t
+}
