@@ -280,7 +280,7 @@ KNOWN_SETTINGS=(
     tensorflow-host-include-dir        ""        "Path to host TensorFlow headers"
     tensorflow-target-include-dir      ""        "Path to target Tensorflow headers"
     tensorflow-target-lib-dir          ""        "Path to target TensorFlow libraries"
-    tensorflow-swift-bindings          ""        "Path to TensorFlow Swift bindings repository"
+    tensorflow-swift-bindings          ""        "Path to TensorFlow Swift bindings file"
     tensorflow-swift-apis              ""        "Path to TensorFlow deep learning library repository"
 )
 
@@ -2476,7 +2476,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                     # Handle TensorFlow Swift bindings file.
                     if [[ ! "${TENSORFLOW_SWIFT_BINDINGS}" && -d "${TENSORFLOW_SWIFT_BINDINGS_DIR}" ]] ; then
-                        TENSORFLOW_SWIFT_BINDINGS="${TENSORFLOW_SWIFT_BINDINGS_DIR}"
+                        TENSORFLOW_SWIFT_BINDINGS="${TENSORFLOW_SWIFT_BINDINGS_DIR}/RawOpsGenerated.swift"
                     fi
                     if [[ "${TENSORFLOW_SWIFT_BINDINGS}" ]] ; then
                         cmake_options=(
