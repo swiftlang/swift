@@ -2687,7 +2687,7 @@ entry(%x : $*MyOptional):
 // CHECK:   [[PAYLOAD_EXTRAINHABITANTCNT:%.*]] = getelementptr inbounds %swift.type_layout, %swift.type_layout* [[PAYLOAD_TYPELAYOUT]], i32 0, i32 3
 // CHECK:   [[CNT:%.*]] = load i32, i32* [[PAYLOAD_EXTRAINHABITANTCNT]]
 // CHECK:   [[METADATA2:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
-// CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA2]], i64 -1
+// CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA2]], [[WORD]] -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
 // CHECK:   [[VWT2:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
 // CHECK:   [[XIC_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT2]], i32 0, i32 11
