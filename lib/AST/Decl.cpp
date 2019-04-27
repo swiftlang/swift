@@ -3526,13 +3526,14 @@ void AssociatedTypeDecl::computeType() {
   setInterfaceType(MetatypeType::get(interfaceTy, ctx));
 }
 
-TypeLoc &AssociatedTypeDecl::getDefaultDefinitionLoc() {
+Type AssociatedTypeDecl::getDefaultDefinitionType() const {
   if (Resolver) {
-    DefaultDefinition =
-      Resolver->loadAssociatedTypeDefault(this, ResolverContextData);
-    Resolver = nullptr;
+    const_cast<AssociatedTypeDecl *>(this)->DefaultDefinition
+      = TypeLoc::withoutLoc(
+        Resolver->loadAssociatedTypeDefault(this, ResolverContextData));
+    const_cast<AssociatedTypeDecl *>(this)->Resolver = nullptr;
   }
-  return DefaultDefinition;
+  return DefaultDefinition.getType();
 }
 
 SourceRange AssociatedTypeDecl::getSourceRange() const {

@@ -3058,14 +3058,22 @@ public:
     return cast<ProtocolDecl>(getDeclContext());
   }
 
-  /// Retrieve the default definition type.
-  Type getDefaultDefinitionType() const {
-    return getDefaultDefinitionLoc().getType();
+  /// Check if we have a default definition type.
+  bool hasDefaultDefinitionType() const {
+    // If we have a TypeRepr, return true immediately without kicking off
+    // a request.
+    return !DefaultDefinition.isNull() || getDefaultDefinitionType();
   }
 
-  TypeLoc &getDefaultDefinitionLoc();
+  /// Retrieve the default definition type.
+  Type getDefaultDefinitionType() const;
+
+  TypeLoc &getDefaultDefinitionLoc() {
+    return DefaultDefinition;
+  }
+
   const TypeLoc &getDefaultDefinitionLoc() const {
-    return const_cast<AssociatedTypeDecl *>(this)->getDefaultDefinitionLoc();
+    return DefaultDefinition;
   }
 
   /// Retrieve the trailing where clause for this associated type, if any.
@@ -3076,7 +3084,7 @@ public:
     TrailingWhere = trailingWhereClause;
   }
 
-  /// Set the interface type of this associated type declaration to a dependen
+  /// Set the interface type of this associated type declaration to a dependent
   /// member type of 'Self'.
   void computeType();
 

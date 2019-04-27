@@ -83,14 +83,7 @@ static CodableConformanceType typeConformsToCodable(TypeChecker &tc,
                                                     DeclContext *context,
                                                     Type target, bool isIUO,
                                                     ProtocolDecl *proto) {
-  target = context->mapTypeIntoContext(target->mapTypeOutOfContext());
-  // Some generic types need to be introspected to get at their "true" Codable
-  // conformance.
-  if (auto referenceType = target->getAs<ReferenceStorageType>()) {
-    // This is a weak/unowned/unmanaged var. Get the inner type before checking
-    // conformance.
-    target = referenceType->getReferentType();
-  }
+  target = context->mapTypeIntoContext(target);
 
   if (isIUO)
     return typeConformsToCodable(tc, context, target->getOptionalObjectType(),
@@ -129,17 +122,18 @@ static CodableConformanceType varConformsToCodable(TypeChecker &tc,
   // }
   //
   // Validate the decl eagerly.
-  if (!varDecl->hasType())
+  if (!varDecl->hasInterfaceType())
     tc.validateDecl(varDecl);
 
   // If the var decl didn't validate, it may still not have a type; confirm it
   // has a type before ensuring the type conforms to Codable.
-  if (!varDecl->hasType())
+  if (!varDecl->hasInterfaceType())
     return TypeNotValidated;
 
   bool isIUO =
       varDecl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-  return typeConformsToCodable(tc, context, varDecl->getType(), isIUO, proto);
+  return typeConformsToCodable(tc, context, varDecl->getValueInterfaceType(),
+                               isIUO, proto);
 }
 
 /// Validates the given CodingKeys enum decl by ensuring its cases are a 1-to-1
@@ -522,8 +516,6 @@ static std::tuple<VarDecl *, Type, bool>
 lookupVarDeclForCodingKeysCase(DeclContext *conformanceDC,
                                EnumElementDecl *elt,
                                NominalTypeDecl *targetDecl) {
-  ASTContext &C = elt->getASTContext();
-
   for (auto decl : targetDecl->lookupDirect(DeclName(elt->getName()))) {
     if (auto *vd = dyn_cast<VarDecl>(decl)) {
       if (!vd->isStatic()) {
@@ -532,17 +524,11 @@ lookupVarDeclForCodingKeysCase(DeclContext *conformanceDC,
         auto varType =
             conformanceDC->mapTypeIntoContext(vd->getValueInterfaceType());
 
-        bool useIfPresentVariant =
-            varType->getAnyNominal() == C.getOptionalDecl();
+        bool useIfPresentVariant = false;
 
-        if (useIfPresentVariant) {
-          // The type we request out of decodeIfPresent needs to be unwrapped
-          // one level.
-          // e.g. String? => decodeIfPresent(String.self, forKey: ...), not
-          //                 decodeIfPresent(String?.self, forKey: ...)
-          auto boundOptionalType =
-              dyn_cast<BoundGenericType>(varType->getCanonicalType());
-          varType = boundOptionalType->getGenericArgs()[0];
+        if (auto objType = varType->getOptionalObjectType()) {
+          varType = objType;
+          useIfPresentVariant = true;
         }
 
         return std::make_tuple(vd, varType, useIfPresentVariant);

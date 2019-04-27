@@ -4360,7 +4360,7 @@ public:
           continue;
         // FIXME: Also exclude the type alias that has already been specified.
         if (!Conformance->hasTypeWitness(ATD) ||
-            !ATD->getDefaultDefinitionLoc().isNull())
+            ATD->hasDefaultDefinitionType())
           continue;
         addTypeAlias(ATD,
           DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal);

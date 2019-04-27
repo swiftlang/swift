@@ -2321,9 +2321,9 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
     printInherited(decl);
   }
 
-  if (!decl->getDefaultDefinitionLoc().isNull()) {
+  if (decl->hasDefaultDefinitionType()) {
     Printer << " = ";
-    decl->getDefaultDefinitionLoc().getType().print(Printer, Options);
+    decl->getDefaultDefinitionType().print(Printer, Options);
   }
 
   // As with protocol's trailing where clauses, use the requirement signature

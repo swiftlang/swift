@@ -769,7 +769,7 @@ AssociatedTypeDecl *AssociatedTypeInference::findDefaultedAssociatedType(
                                              AssociatedTypeDecl *assocType) {
   // If this associated type has a default, we're done.
   tc.validateDecl(assocType);
-  if (!assocType->getDefaultDefinitionLoc().isNull())
+  if (assocType->hasDefaultDefinitionType())
     return assocType;
 
   // Look at overridden associated types.
