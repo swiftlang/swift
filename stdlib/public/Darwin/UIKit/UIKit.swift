@@ -298,7 +298,7 @@ internal struct _UIViewQuickLookState {
   static var views = Set<UIView>()
 }
 
-extension UIView : _DefaultCustomPlaygroundQuickLookable {
+extension UIView : __DefaultCustomPlaygroundQuickLookable {
   @available(*, deprecated, message: "UIView._defaultCustomPlaygroundQuickLook will be removed in a future Swift version")
   public var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook {
     if _UIViewQuickLookState.views.contains(self) {
