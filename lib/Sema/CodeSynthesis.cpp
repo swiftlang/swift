@@ -1493,6 +1493,7 @@ static VarDecl *synthesizePropertyDelegateStorageDelegateProperty(
       ctx, property->getCorrectStaticSpelling(), pbdPattern,
       /*init*/nullptr, dc, SourceLoc());
   addMemberToContextIfNeeded(pbd, dc, var);
+  pbd->setStatic(var->isStatic());
 
   // Determine the access level for the property.
   AccessLevel access =
@@ -1575,6 +1576,7 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
       ctx, backingVar->getCorrectStaticSpelling(), pbdPattern,
       /*init*/nullptr, dc, SourceLoc());
   addMemberToContextIfNeeded(pbd, dc, var);
+  pbd->setStatic(var->isStatic());
 
   // Take the initializer from the original property.
   auto parentPBD = var->getParentPatternBinding();
