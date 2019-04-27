@@ -6,7 +6,6 @@
 //
 // `KeyPathIterable` tests.
 
-import TensorFlow
 import StdlibUnittest
 
 var KeyPathIterableTests = TestSuite("KeyPathIterable")
@@ -38,7 +37,10 @@ struct ComplexNested : KeyPathIterable, Equatable {
 }
 
 // TF-123: Test type with `@differentiable` function stored property.
-struct TF_123<Scalar : TensorFlowScalar & Differentiable & FloatingPoint> : KeyPathIterable {
+struct Tensor<Scalar : Differentiable>: Differentiable {
+  var value: Scalar
+}
+struct TF_123<Scalar : Differentiable> : KeyPathIterable {
   let activation1: @differentiable (Float) -> Float
   let activation2: @differentiable (Tensor<Scalar>) -> Tensor<Scalar>
 }
@@ -177,6 +179,15 @@ KeyPathIterableTests.test("ComplexNested") {
                                dictionary: ["foo" : Simple(w: 2, b: 3),
                                             "bar" : Simple(w: 4, b: 5)])
   expectEqual(expected, x)
+}
+
+// Verify that `Array.DifferentiableView.allKeyPaths` uses public property
+// `base` instead of private property `_base`.
+KeyPathIterableTests.test("Array.DifferentiableView") {
+  let view = [Float].DifferentiableView([1, 2, 3])
+  let keyPaths1 = (0..<3).map { i in \Array<Float>.DifferentiableView.base[i] }
+  let keyPaths2 = view.allDifferentiableVariables.recursivelyAllWritableKeyPaths(to: Float.self)
+  expectEqual(keyPaths1, keyPaths2)
 }
 
 runAllTests()

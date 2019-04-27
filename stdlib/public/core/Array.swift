@@ -1875,7 +1875,7 @@ extension Array where Element : Differentiable {
   /// The view of an array as the differentiable product manifold of `Element`
   /// multiplied with itself `count` times.
   @_fixed_layout
-  public struct DifferentiableView : Differentiable & KeyPathIterable {
+  public struct DifferentiableView : Differentiable {
     private var _base: [Element]
 
     /// The viewed array.

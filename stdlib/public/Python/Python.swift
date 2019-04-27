@@ -146,21 +146,10 @@ extension PythonObject : CustomReflectable {
 // `PythonConvertible` protocol
 //===----------------------------------------------------------------------===//
 
+/// A type whose values can be converted to a `PythonObject`.
 public protocol PythonConvertible {
   /// A `PythonObject` instance representing this value.
   var pythonObject: PythonObject { get }
-}
-
-//===----------------------------------------------------------------------===//
-// `PythonConvertible` protocol
-//===----------------------------------------------------------------------===//
-
-public protocol ConvertibleFromPython {
-  /// Creates a new instance from the given `PythonObject`, if possible.
-  /// - Note: Conversion may fail if the given `PythonObject` instance is
-  ///   incompatible (e.g. a Python `string` object cannot be converted into an
-  ///   `Int`).
-  init?(_ object: PythonObject)
 }
 
 public extension PythonObject {
@@ -180,6 +169,19 @@ fileprivate extension PythonConvertible {
   var ownedPyObject: OwnedPyObjectPointer {
     return pythonObject.ownedPyObject
   }
+}
+
+//===----------------------------------------------------------------------===//
+// `ConvertibleFromPython` protocol
+//===----------------------------------------------------------------------===//
+
+/// A type that can be initialized from a `PythonObject`.
+public protocol ConvertibleFromPython {
+  /// Creates a new instance from the given `PythonObject`, if possible.
+  /// - Note: Conversion may fail if the given `PythonObject` instance is
+  ///   incompatible (e.g. a Python `string` object cannot be converted into an
+  ///   `Int`).
+  init?(_ object: PythonObject)
 }
 
 // `PythonObject` is trivially `PythonConvertible`.
