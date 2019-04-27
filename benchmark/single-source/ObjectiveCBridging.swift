@@ -73,9 +73,6 @@ public let ObjectiveCBridging = [
   BenchmarkInfo(name: "ObjectiveCBridgeFromNSDateComponents",
     runFunction: run_ObjectiveCBridgeFromNSDateComponents, tags: t,
     setUpFunction: setup_dateComponents),
-  BenchmarkInfo(name: "ObjectiveCBridgeASCIIStringFromFile",
-                runFunction: run_ASCIIStringFromFile, tags: ts,
-                setUpFunction: setup_ASCIIStringFromFile),
 ]
 
 #if _runtime(_ObjC)
@@ -712,35 +709,3 @@ public func run_ObjectiveCBridgeFromNSDateComponents(_ N: Int) {
   }
   #endif
 }
-
-var ASCIIStringFromFile:String? = nil
-public func setup_ASCIIStringFromFile() {
-  #if _runtime(_ObjC)
-  let url:URL
-  if #available(OSX 10.12, iOS 10.0, *) {
-    url = FileManager.default.temporaryDirectory.appendingPathComponent(
-      "sphinx.txt"
-    )
-  } else {
-    url = URL(fileURLWithPath: "/tmp/sphinx.txt")
-  }
-  var str = "Sphinx of black quartz judge my vow"
-  str = Array(repeating: str, count: 100).joined()
-  try? str.write(
-    to: url,
-    atomically: true,
-    encoding: .ascii
-  )
-  ASCIIStringFromFile = try! String(contentsOf: url, encoding: .ascii)
-  #endif
-}
-
-@inline(never)
-public func run_ASCIIStringFromFile(_ N: Int) {
-  #if _runtime(_ObjC)
-  for _ in 0 ..< N {
-    blackHole((ASCIIStringFromFile! + "").utf8.count)
-  }
-  #endif
-}
-
