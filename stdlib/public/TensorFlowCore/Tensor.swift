@@ -672,7 +672,7 @@ internal extension Tensor where Scalar : TensorFlowFloatingPoint {
       }
       let (lhsIndices, rhsIndices) = Raw.broadcastGradientArgs(s0: lhsShape, s1: rhsShape)
       let lhs = Raw.reshape(Raw.sum(v, reductionIndices: lhsIndices), shape: lhsShape)
-      let rhs = Raw.reshape(Raw.sum(Raw.neg(v), reductionIndices: rhsIndices), shape: rhsShape)
+      let rhs = Raw.reshape(Raw.neg(Raw.sum(v, reductionIndices: rhsIndices)), shape: rhsShape)
       return (lhs, rhs)
     })
   }
