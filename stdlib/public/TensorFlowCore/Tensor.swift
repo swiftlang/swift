@@ -613,30 +613,6 @@ extension Tensor : Equatable where Scalar : Equatable {
 }
 
 //===----------------------------------------------------------------------===//
-// Broadcasting
-//===----------------------------------------------------------------------===//
-
-// The following operators are placed in `TensorFlowCore` instead of
-// `TensorFlow` in order to allow `Tensor` to conform to `AdditiveArithmetic` 
-// and `Differentiable`.
-
-internal extension Tensor where Scalar : Numeric {
-  @inlinable
-  func unbroadcasted(toShape otherShape: Tensor<Int32>) -> Tensor<Scalar> {
-    let rankDiff = Raw.expandDims(
-      rankTensor - otherShape.scalarCountTensor, dim: Tensor<Int32>(0))
-    let ones = Raw.fill(dims: rankDiff, value: Tensor<Int32>(1))
-    let paddedShape = Raw.concatV2([ones, otherShape], axis: Tensor<Int32>(0))
-    let broadcastIndices = Raw.where_(Raw.notEqual(paddedShape, shapeTensor))
-    let reductionIndices = Raw.reshape(
-      broadcastIndices, shape: Tensor<Int32>([-1]))
-    let unbroadcasted = Raw.sum(
-      self, reductionIndices: reductionIndices, keepDims: false)
-    return Raw.reshape(unbroadcasted, shape: otherShape)
-  }  
-}
-
-//===----------------------------------------------------------------------===//
 // Additive Group
 //===----------------------------------------------------------------------===//
 
@@ -674,7 +650,13 @@ internal extension Tensor where Scalar : TensorFlowFloatingPoint {
   ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
     return (lhs + rhs, {
       [lhsShape = lhs.shapeTensor, rhsShape = rhs.shapeTensor] v in
-      (v.unbroadcasted(toShape: lhsShape), v.unbroadcasted(toShape: rhsShape))
+      if lhsShape == rhsShape {
+        return (v, v)
+      }
+      let (lhsIndices, rhsIndices) = Raw.broadcastGradientArgs(s0: lhsShape, s1: rhsShape)
+      let lhs = v.sum(squeezingAxes: lhsIndices).reshaped(toShape: lhsShape)
+      let rhs = v.sum(squeezingAxes: rhsIndices).reshaped(toShape: rhsShape)
+      return (lhs, rhs)
     })
   }
 
@@ -685,8 +667,13 @@ internal extension Tensor where Scalar : TensorFlowFloatingPoint {
   ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
     return (lhs - rhs, {
       [lhsShape = lhs.shapeTensor, rhsShape = rhs.shapeTensor] v in
-      (v.unbroadcasted(toShape: lhsShape),
-        Raw.neg(v).unbroadcasted(toShape: rhsShape))
+      if lhsShape == rhsShape {
+        return (v, Raw.neg(v))
+      }
+      let (lhsIndices, rhsIndices) = Raw.broadcastGradientArgs(s0: lhsShape, s1: rhsShape)
+      let lhs = v.sum(squeezingAxes: lhsIndices).reshaped(toShape: lhsShape)
+      let rhs = Raw.neg(v).sum(squeezingAxes: rhsIndices).reshaped(toShape: rhsShape)
+      return (lhs, rhs)
     })
   }
 }
