@@ -44,7 +44,7 @@ public enum Privacy {
 /// be used in the string interpolations passed to the log APIs.
 /// This limit is imposed by the ABI of os_log.
 @_transparent
-public var maxOSLogArgumentCount: Int { return 48 }
+public var maxOSLogArgumentCount: UInt8 { return 48 }
 
 @usableFromInline
 @_transparent
