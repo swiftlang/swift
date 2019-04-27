@@ -413,12 +413,20 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
   return false;
 }
 
-/// Determines whether the given type is bridged to an Objective-C class type.
-static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
+/// Determines whether the given type is a valid Objective-C class type that
+/// can be returned as a result of a throwing function.
+static bool isValidObjectiveCErrorResultType(DeclContext *dc, Type type) {
   switch (type->getForeignRepresentableIn(ForeignLanguage::ObjectiveC, dc)
             .first) {
   case ForeignRepresentableKind::Trivial:
   case ForeignRepresentableKind::None:
+    // Special case: If the type is Unmanaged<T>, then return true, because
+    // Unmanaged<T> can be represented in Objective-C (if T can be).
+    if (auto BGT = type->getAs<BoundGenericType>()) {
+      if (BGT->getDecl() == dc->getASTContext().getUnmanagedDecl()) {
+        return true;
+      }
+    }
     return false;
 
   case ForeignRepresentableKind::Object:
@@ -604,12 +612,12 @@ bool swift::isRepresentableInObjC(
 
       errorResultType = boolDecl->getDeclaredType()->getCanonicalType();
     } else if (!resultType->getOptionalObjectType() &&
-               isBridgedToObjectiveCClass(dc, resultType)) {
+               isValidObjectiveCErrorResultType(dc, resultType)) {
       // Functions that return a (non-optional) type bridged to Objective-C
       // can be throwing; they indicate failure with a nil result.
       kind = ForeignErrorConvention::NilResult;
     } else if ((optOptionalType = resultType->getOptionalObjectType()) &&
-               isBridgedToObjectiveCClass(dc, optOptionalType)) {
+               isValidObjectiveCErrorResultType(dc, optOptionalType)) {
       // Cannot return an optional bridged type, because 'nil' is reserved
       // to indicate failure. Call this out in a separate diagnostic.
       if (Diagnose) {
