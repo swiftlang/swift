@@ -11,13 +11,13 @@ import StdlibUnittest
 
 var TensorArrayProtocolTests = TestSuite("TensorArrayProtocol")
 
-struct Empty : TensorArrayProtocol {}
+struct Empty : TensorGroup {}
 
-struct Simple : TensorArrayProtocol {
+struct Simple : TensorGroup {
   var w, b: Tensor<Float>
 }
 
-struct Mixed : TensorArrayProtocol {
+struct Mixed : TensorGroup {
   // Mutable.
   var string: StringTensor
   var float: Tensor<Float>
@@ -25,14 +25,14 @@ struct Mixed : TensorArrayProtocol {
   let int: Tensor<Int32>
 }
 
-struct Nested : TensorArrayProtocol {
+struct Nested : TensorGroup {
   // Immutable.
   let simple: Simple
   // Mutable.
   var mixed: Mixed
 }
 
-struct Generic<T: TensorArrayProtocol, U: TensorArrayProtocol> : TensorArrayProtocol {
+struct Generic<T: TensorGroup, U: TensorGroup> : TensorGroup {
   var t: T
   var u: U
 }
@@ -157,7 +157,7 @@ TensorArrayProtocolTests.test("GenericUnpackTensorHandles") {
 TensorArrayProtocolTests.test("NestedGenericTensorHandleCount") {
   struct NestedGeneric {
     func function() {
-      struct UltraNested<T: TensorArrayProtocol, V: TensorArrayProtocol> : TensorArrayProtocol {
+      struct UltraNested<T: TensorGroup, V: TensorGroup> : TensorArrayProtocol {
         var a: Generic<T, V>
         var b: Generic<V, T>
       }
@@ -181,7 +181,7 @@ TensorArrayProtocolTests.test("NestedGenericTensorHandleCount") {
 TensorArrayProtocolTests.test("NestedGenericUnpackTensorHandles") {
   struct NestedGeneric {
     func function() {
-      struct UltraNested<T: TensorArrayProtocol, V: TensorArrayProtocol> : TensorArrayProtocol {
+      struct UltraNested<T: TensorGroup, V: TensorGroup> : TensorArrayProtocol {
         var a: Generic<T, V>
         var b: Generic<V, T>
       }
