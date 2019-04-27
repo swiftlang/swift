@@ -129,9 +129,13 @@ extension DispatchQueue {
 
 	@available(macOS 10.10, iOS 8.0, *)
 	public class func global(qos: DispatchQoS.QoSClass = .default) -> DispatchQueue {
+		return __dispatch_get_global_queue(Int(DispatchQoS.QoSClass.default.rawValue.rawValue), 0)
+	}
+	
+	public class var global: DispatchQueue {
 		return __dispatch_get_global_queue(Int(qos.rawValue.rawValue), 0)
 	}
-
+	
 	public class func getSpecific<T>(key: DispatchSpecificKey<T>) -> T? {
 		let k = Unmanaged.passUnretained(key).toOpaque()
 		if let p = __dispatch_get_specific(k) {
