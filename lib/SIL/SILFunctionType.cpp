@@ -1005,8 +1005,9 @@ static CanSILFunctionType getSILFunctionType(
   // from the function to which the argument is attached.
   if (constant && !constant->isDefaultArgGenerator()) {
     if (auto function = constant->getAnyFunctionRef()) {
-      // FIXME: Expansion
-      auto expansion = ResilienceExpansion::Minimal;
+      auto expansion = ResilienceExpansion::Maximal;
+      if (constant->isSerialized())
+        expansion = ResilienceExpansion::Minimal;
       lowerCaptureContextParameters(M, *function, genericSig, expansion,
                                     inputs);
     }

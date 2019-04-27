@@ -198,9 +198,13 @@ public:
   SILModule &getModule() const { return C.Module; }
   ASTContext &getASTContext() const { return getModule().getASTContext(); }
   const Lowering::TypeLowering &getTypeLowering(SILType T) const {
-    // FIXME: Expansion
-    return getModule().Types.getTypeLowering(T,
-                                             ResilienceExpansion::Minimal);
+    auto expansion = ResilienceExpansion::Maximal;
+    // If there's no current SILFunction, we're inserting into a global
+    // variable initializer.
+    if (F)
+      expansion = F->getResilienceExpansion();
+
+    return getModule().Types.getTypeLowering(T, expansion);
   }
 
   void setOpenedArchetypesTracker(SILOpenedArchetypesTracker *Tracker) {
@@ -2158,15 +2162,7 @@ private:
     if (!SILModuleConventions(M).useLoweredAddresses())
       return true;
 
-    // FIXME: Just call getTypeLowering() here, and move this code there
-
-    auto expansion = ResilienceExpansion::Maximal;
-    // If there's no current SILFunction, we're inserting into a global
-    // variable initializer.
-    if (F)
-      expansion = F->getResilienceExpansion();
-
-    return M.Types.getTypeLowering(Ty, expansion).isLoadable();
+    return getTypeLowering(Ty).isLoadable();
   }
 
   void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {
