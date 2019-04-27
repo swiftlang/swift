@@ -40,6 +40,8 @@ func forceHasMemberwiseInit() {
   _ = HasMemberwiseInit<Int>()
 }
 
+  // CHECK: sil_global hidden @$s18property_delegates9UseStaticV13$staticWibbleAA4LazyOySaySiGGvpZ : $Lazy<Array<Int>>
+
 // HasMemberwiseInit.x.setter
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s18property_delegates17HasMemberwiseInitV1xSbvs : $@convention(method) <T where T : DefaultInit> (Bool, @inout HasMemberwiseInit<T>) -> () {
 // CHECK: bb0(%0 : $Bool, %1 : $*HasMemberwiseInit<T>):
@@ -249,4 +251,11 @@ func triggerUseLazy() {
   _ = UseLazy<Int>(foo: 17)
   _ = UseLazy(bar: 17)
   _ = UseLazy<Int>(wibble: [1, 2, 3])
+}
+
+struct UseStatic {
+  // CHECK: sil hidden [transparent] [ossa] @$s18property_delegates9UseStaticV12staticWibbleSaySiGvgZ
+  // CHECK: sil hidden [global_init] [ossa] @$s18property_delegates9UseStaticV13$staticWibbleAA4LazyOySaySiGGvau
+  // CHECK: sil hidden [transparent] [ossa] @$s18property_delegates9UseStaticV12staticWibbleSaySiGvsZ
+  @Lazy static var staticWibble = [1, 2, 3]
 }
