@@ -654,8 +654,8 @@ internal extension Tensor where Scalar : TensorFlowFloatingPoint {
         return (v, v)
       }
       let (lhsIndices, rhsIndices) = Raw.broadcastGradientArgs(s0: lhsShape, s1: rhsShape)
-      let lhs = v.sum(squeezingAxes: lhsIndices).reshaped(toShape: lhsShape)
-      let rhs = v.sum(squeezingAxes: rhsIndices).reshaped(toShape: rhsShape)
+      let lhs = Raw.reshape(Raw.sum(v, reductionIndices: lhsIndices), shape: lhsShape)
+      let rhs = Raw.reshape(Raw.sum(v, reductionIndices: rhsIndices), shape: rhsShape)
       return (lhs, rhs)
     })
   }
@@ -671,8 +671,8 @@ internal extension Tensor where Scalar : TensorFlowFloatingPoint {
         return (v, Raw.neg(v))
       }
       let (lhsIndices, rhsIndices) = Raw.broadcastGradientArgs(s0: lhsShape, s1: rhsShape)
-      let lhs = v.sum(squeezingAxes: lhsIndices).reshaped(toShape: lhsShape)
-      let rhs = Raw.neg(v).sum(squeezingAxes: rhsIndices).reshaped(toShape: rhsShape)
+      let lhs = Raw.reshape(Raw.sum(v, reductionIndices: lhsIndices), shape: lhsShape)
+      let rhs = Raw.reshape(Raw.sum(Raw.neg(v), reductionIndices: rhsIndices), shape: rhsShape)
       return (lhs, rhs)
     })
   }
