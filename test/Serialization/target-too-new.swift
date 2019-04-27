@@ -15,5 +15,5 @@
 
 // REQUIRES: OS=macosx
 
-// CHECK: :[[@LINE+1]]:8: error: compiling for OS X 10.9, but module 'empty' has a minimum deployment target of OS X 10.50: {{.*}}empty.swiftmodule{{$}}
+// CHECK: :[[@LINE+1]]:8: error: compiling for macOS 10.9, but module 'empty' has a minimum deployment target of macOS 10.50: {{.*}}empty.swiftmodule{{$}}
 import empty

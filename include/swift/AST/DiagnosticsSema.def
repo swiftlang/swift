@@ -3971,8 +3971,9 @@ ERROR(dynamic_replacement_replaced_constructor_is_not_convenience, none,
 //------------------------------------------------------------------------------
 
 ERROR(availability_decl_unavailable, none,
-      "%select{getter for |setter for |}0%1 is unavailable",
-      (unsigned, DeclName))
+      "%select{getter for |setter for |}0%1 is unavailable"
+      "%select{ in %3|}2",
+      (unsigned, DeclName, bool, StringRef))
 
 #define REPLACEMENT_DECL_KIND_SELECT "select{| instance method| property}"
 ERROR(availability_decl_unavailable_rename, none,
@@ -3988,16 +3989,9 @@ ERROR(availability_decl_unavailable_rename_msg, none,
       (unsigned, DeclName, bool, unsigned, StringRef, StringRef))
 
 ERROR(availability_decl_unavailable_msg, none,
-      "%select{getter for |setter for |}0%1 is unavailable: %2",
-      (unsigned, DeclName, StringRef))
-
-ERROR(availability_decl_unavailable_in_swift, none,
-      "%select{getter for |setter for |}0%1 is unavailable in Swift",
-      (unsigned, DeclName))
-
-ERROR(availability_decl_unavailable_in_swift_msg, none,
-      "%select{getter for |setter for |}0%1 is unavailable in Swift: %2",
-      (unsigned, DeclName, StringRef))
+      "%select{getter for |setter for |}0%1 is unavailable"
+      "%select{ in %3|}2: %4",
+      (unsigned, DeclName, bool, StringRef, StringRef))
 
 NOTE(availability_marked_unavailable, none,
      "%select{getter for |setter for |}0%1 has been explicitly marked "
@@ -4013,18 +4007,18 @@ NOTE(availability_obsoleted, none,
 
 WARNING(availability_deprecated, none,
         "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
-        "deprecated%select{| %select{on|in}4 %3%select{| %5}4}2",
+        "deprecated%select{| in %3%select{| %5}4}2",
         (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple))
 
 WARNING(availability_deprecated_msg, none,
         "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
-        "deprecated%select{| %select{on|in}4 %3%select{| %5}4}2: %6",
+        "deprecated%select{| in %3%select{| %5}4}2: %6",
         (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple,
          StringRef))
 
 WARNING(availability_deprecated_rename, none,
         "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
-        "deprecated%select{| %select{on|in}4 %3%select{| %5}4}2: "
+        "deprecated%select{| in %3%select{| %5}4}2: "
         "%select{renamed to|replaced by}6%" REPLACEMENT_DECL_KIND_SELECT "7 "
         "'%8'",
         (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple, bool,
@@ -4041,7 +4035,7 @@ NOTE(availability_decl_more_than_enclosing_enclosing_here, none,
      "enclosing scope here", ())
 
 ERROR(availability_decl_only_version_newer, none,
-      "%0 is only available on %1 %2 or newer",
+      "%0 is only available in %1 %2 or newer",
       (DeclName, StringRef, llvm::VersionTuple))
 
 NOTE(availability_guard_with_version_check, none,
@@ -4051,13 +4045,13 @@ NOTE(availability_add_attribute, none,
      "add @available attribute to enclosing %0", (DescriptiveDeclKind))
 
 ERROR(availability_accessor_only_version_newer, none,
-      "%select{getter|setter}0 for %1 is only available on %2 %3"
+      "%select{getter|setter}0 for %1 is only available in %2 %3"
       " or newer",
       (/*AccessorKind*/unsigned, DeclName, StringRef, llvm::VersionTuple))
 
 ERROR(availability_inout_accessor_only_version_newer, none,
       "cannot pass as inout because %select{getter|setter}0 for %1 is only "
-      "available on %2 %3 or newer",
+      "available in %2 %3 or newer",
       (/*AccessorKind*/unsigned, DeclName, StringRef, llvm::VersionTuple))
 
 ERROR(availability_query_required_for_platform, none,
@@ -4079,7 +4073,7 @@ ERROR(availability_stored_property_no_potential,
       "'@available'", ())
 
 ERROR(availability_protocol_requires_version,
-      none, "protocol %0 requires %1 to be available on %2 %3 and newer",
+      none, "protocol %0 requires %1 to be available in %2 %3 and newer",
       (DeclName, DeclName, StringRef, llvm::VersionTuple))
 
 NOTE(availability_protocol_requirement_here, none,
