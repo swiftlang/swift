@@ -979,26 +979,6 @@ public func logSoftmax<T : FloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
 // Selection
 //===----------------------------------------------------------------------===//
 
-public extension Tensor where Scalar == Bool {
-  /// Returns a new tensor containing elements from either `left` or `right`,
-  /// depending on the elements of `self`.
-  ///
-  /// `self` acts as a mask that chooses, based on the value at each scalar,
-  ///  whether the corresponding scalar in the output should be taken from
-  /// `left` (if `true`) or `right` (if `false`).
-  ///
-  /// - Precondition: `left` and `right` must have the same shape. If
-  ///   `left` and `right` are scalar, then `self` must also be scalar. If
-  ///   `left` and `right` have rank greater than or equal to 1, then `self`
-  ///   must be either have the same shape as `left` or be a 1-D `Tensor` such
-  ///   that `self.scalarCount == left[0]`.
-  @available(*, deprecated, message: "Use '.replacing(with:mask:)' instead")
-  @inlinable
-  func selecting<T>(_ left: Tensor<T>, _ right: Tensor<T>) -> Tensor<T> {
-    return left.replacing(with: right, where: self)
-  }
-}
-
 public extension Tensor {
   /// Replaces elements of this tensor with `other` in the lanes where `mask` is
   /// `true`.
