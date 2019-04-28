@@ -122,6 +122,7 @@ IDENTIFIER(withKeywordArguments)
 
 // SWIFT_ENABLE_TENSORFLOW
 IDENTIFIER(TensorFlowCore)
+IDENTIFIER(TensorFlow)
 // KeyPathIterable
 IDENTIFIER(AllKeyPaths)
 IDENTIFIER(allKeyPaths)

@@ -41,7 +41,7 @@ TensorNonTPUTests.testAllBackends("BroadcastTensor") {
   // 1 -> 2 x 3 x 4
   let one = Tensor<Float>(1)
   var target = Tensor<Float>(repeating: 0.0, shape: [2, 3, 4])
-  let broadcasted = one.broadcast(like: target)
+  let broadcasted = one.broadcasted(like: target)
   expectEqual(Tensor(repeating: 1, shape: [2, 3, 4]), broadcasted)
   target .= Tensor(repeating: 1, shape: [1, 3, 1])
   expectEqual(Tensor(repeating: 1, shape: [2, 3, 4]), target)

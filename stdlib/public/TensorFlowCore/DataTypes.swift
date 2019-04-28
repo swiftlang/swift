@@ -31,45 +31,8 @@ public struct TensorDataType {
   public var _cDataType: TF_DataType
 
   @inlinable
-  internal init(_ cDataType: TF_DataType) {
+  public init(_ cDataType: TF_DataType) {
     self._cDataType = cDataType
-  }
-}
-
-@usableFromInline
-internal func makeTensor(
-  dataType: TensorDataType,
-  owning pointer: CTensorHandle
-) -> AnyTensor {
-  switch dataType._cDataType {
-  case TF_BOOL:
-    return Tensor<Bool>(handle: TensorHandle(_owning: pointer))
-  case TF_INT8:
-    return Tensor<Int8>(handle: TensorHandle(_owning: pointer))
-  case TF_UINT8:
-    return Tensor<UInt8>(handle: TensorHandle(_owning: pointer))
-  case TF_INT16:
-    return Tensor<Int16>(handle: TensorHandle(_owning: pointer))
-  case TF_UINT16:
-    return Tensor<UInt16>(handle: TensorHandle(_owning: pointer))
-  case TF_INT32:
-    return Tensor<Int32>(handle: TensorHandle(_owning: pointer))
-  case TF_UINT32:
-    return Tensor<UInt32>(handle: TensorHandle(_owning: pointer))
-  case TF_INT64:
-    return Tensor<Int64>(handle: TensorHandle(_owning: pointer))
-  case TF_UINT64:
-    return Tensor<UInt64>(handle: TensorHandle(_owning: pointer))
-  case TF_BFLOAT16:
-    return Tensor<BFloat16>(handle: TensorHandle(_owning: pointer))
-  case TF_FLOAT:
-    return Tensor<Float>(handle: TensorHandle(_owning: pointer))
-  case TF_DOUBLE:
-    return Tensor<Double>(handle: TensorHandle(_owning: pointer))
-  case TF_STRING:
-    fatalError("StringTensor does not conform to AnyTensor")
-  default:
-    fatalError("Unhandled type: \(dataType)")
   }
 }
 
@@ -133,7 +96,7 @@ extension Double : TensorFlowFloatingPoint {}
 private func _TFGetScalarOrDieImpl<Scalar>(
   _ handle: TensorHandle<Scalar>
 ) -> Scalar {
-  return handle.makeHostCopy().scalar!
+  return handle.hostScalar()!
 }
 
 // This is the implementation of the _getScalar requirement for each concrete
@@ -144,7 +107,7 @@ private func _TFGetScalarOrDieImpl<Scalar>(
 private func _TFGetScalarImpl<Scalar>(
   _ handle: TensorHandle<Scalar>
 ) -> Scalar? {
-  return handle.makeHostCopy().scalar
+  return handle.hostScalar()
 }
 
 extension Bool : TensorFlowScalar {

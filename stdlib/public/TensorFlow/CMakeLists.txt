@@ -27,10 +27,19 @@ list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
 list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
 list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-sil-ownership")
 list(APPEND swift_stdlib_compile_flags "-force-single-frontend-invocation")
-list(APPEND swift_stdlib_compile_flags "-O" "-whole-module-optimization")
+# FIXME(SR-7972): Some tests fail when TensorFlow is optimized.
+# list(APPEND swift_stdlib_compile_flags "-O" "-whole-module-optimization")
+list(APPEND swift_stdlib_compile_flags "-Onone")
 list(APPEND swift_stdlib_compile_flags "-DCOMPILING_TENSORFLOW_MODULE")
 
 set(SOURCES "")
+
+# Copy TensorFlow bindings sources, if they exist.
+if (TENSORFLOW_SWIFT_BINDINGS)
+  file(GLOB_RECURSE TENSORFLOW_SWIFT_BINDINGS_SOURCES
+    "${TENSORFLOW_SWIFT_BINDINGS}/*.swift")
+  list(APPEND SOURCES "${TENSORFLOW_SWIFT_BINDINGS_SOURCES}")
+endif()
 
 # Copy TensorFlow high-level API sources, if they exist.
 if (TENSORFLOW_SWIFT_APIS)

@@ -71,7 +71,8 @@ public enum _ExecutionMode : Equatable {
 /// `addEagerOpToGraph()`). When the trace is finalized (via `finalize()`), the
 /// trace graph function can then be executed (via `execute()`) by the eager
 /// runtime.
-private class TraceContext {
+@usableFromInline
+internal class TraceContext {
   let status: CTFStatus = TF_NewStatus()
 
   /// The trace graph, which will be converted to a trace graph function
@@ -140,6 +141,7 @@ private class TraceContext {
     TF_DeleteStatus(status)
   }
 
+  @usableFromInline
   func addEagerOpToGraph(_ op: CTFEOp,
                       _ retvals: UnsafeMutablePointer<OpaquePointer?>,
                       _ retvalCount: UnsafeMutablePointer<Int32>,
@@ -432,11 +434,13 @@ private class TraceContext {
 }
 
 // This enum keeps track of whether we are building or executing a trace.
-private enum TracingState {
+@usableFromInline
+internal enum TracingState {
   case notTracing
   case tracing(TraceContext)
 
   // Return nil if we are not in tracing mode.
+  @usableFromInline
   var context: TraceContext? {
     guard case let .tracing(context) = self else { return nil }
     return context
@@ -448,7 +452,8 @@ private enum TracingState {
 // @_frozen // SR-9739
 public enum _RuntimeConfig {
   // TODO: change this and subsequent properties from static to thread local.
-  fileprivate static var traceState: TracingState = .notTracing
+  @usableFromInline
+  internal static var traceState: TracingState = .notTracing
 
   /// Used to create unique trace graph function names.
   fileprivate static var traceGraphFunctionCounter = 0
@@ -626,7 +631,7 @@ public final class _ExecutionContext {
   public let tensorFlowConfig: UnsafeMutablePointer<TF_Buffer>
 
   /// The TFE_Context object.
-  @usableFromInline let eagerContext: CTFEContext
+  public let eagerContext: CTFEContext
 
   // NOTE: the following properties are intentionally not implemented as an enum
   // due to high churn, *please do not refactor for Swiftiness*.
@@ -972,17 +977,16 @@ public func _graph<State : _TensorArrayProtocolEnhanced,
 }
 
 // TODO: rename this to `graph` when it's ready for end users.
-public func _graph<State : _TensorArrayProtocolEnhanced,
-                   Data : TensorGroup>(
+public func _graph<State : _TensorArrayProtocolEnhanced, Data : TensorGroup>(
   with state: State,
   in fn: (State, Data) -> State
 ) -> (State, Data) -> State {
-  let graphFunction: (State, Data) -> (State, Tensor<Float>?) =
+  let graphFunction: (State, Data) -> (State, TensorHandle<Float>?) =
     withoutActuallyEscaping(fn) { escapableFn in
       let wrappedFn = {
         // The result argument needs to a type that conforms to TensorGroup.
-        // We are arbitrarily picking Tensor<Float> here.
-        (s: State, d: Data) -> (State, Tensor<Float>?) in
+        // We are arbitrarily picking TensorHandle<Float> here.
+        (s: State, d: Data) -> (State, TensorHandle<Float>?) in
           (escapableFn(s, d), nil)
       }
       return _graphInternal(with: state, in: wrappedFn)
@@ -1179,49 +1183,49 @@ public extension _ExecutionContext {
   }
 }
 
-@usableFromInline
-internal func dumpTensorContent<Scalar : _TensorFlowDataTypeCompatible>(
-  _ inputTensor: CTensorHandle, _: Scalar.Type
-) {
-  assert(TFE_TensorHandleIsConcrete(inputTensor) != 0)
+// @usableFromInline
+// internal func dumpTensorContent<Scalar : _TensorFlowDataTypeCompatible>(
+//   _ inputTensor: CTensorHandle, _: Scalar.Type
+// ) {
+//   assert(TFE_TensorHandleIsConcrete(inputTensor) != 0)
 
-  let array = ShapedArray<Scalar>(cTensorHandle: inputTensor)
-  debugLog("Rank is \(array.rank), shape is \(array.shape).")
-  debugLog("""
-    The content of the \(array.scalars.count) scalars are: \
-    \(array.scalars).
-    """)
-}
+//   let array = ShapedArray<Scalar>(cTensorHandle: inputTensor)
+//   debugLog("Rank is \(array.rank), shape is \(array.shape).")
+//   debugLog("""
+//     The content of the \(array.scalars.count) scalars are: \
+//     \(array.scalars).
+//     """)
+// }
 
-@usableFromInline
-internal func dumpCTensorHandleContent(
-  _ idx: Int,
-  _ inputTensorHandle: CTensorHandle) {
-  if TFE_TensorHandleIsConcrete(inputTensorHandle) == 0 {
-    debugLog("Skip dumpping a symbolic tensor handle.")
-    return
-  }
+// @usableFromInline
+// internal func dumpCTensorHandleContent(
+//   _ idx: Int,
+//   _ inputTensorHandle: CTensorHandle) {
+//   if TFE_TensorHandleIsConcrete(inputTensorHandle) == 0 {
+//     debugLog("Skip dumpping a symbolic tensor handle.")
+//     return
+//   }
 
-  let dType: TF_DataType = TFE_TensorHandleDataType(inputTensorHandle)
-  debugLog("Tensor \(idx) has TF data type \(dType).")
-  switch dType {
-  case TF_UINT8: dumpTensorContent(inputTensorHandle, UInt8.self)
-  case TF_INT8: dumpTensorContent(inputTensorHandle, Int8.self)
-  case TF_UINT16: dumpTensorContent(inputTensorHandle, UInt16.self)
-  case TF_INT16: dumpTensorContent(inputTensorHandle, Int16.self)
-  case TF_UINT32: dumpTensorContent(inputTensorHandle, UInt32.self)
-  case TF_INT32: dumpTensorContent(inputTensorHandle, Int32.self)
-  case TF_UINT64: dumpTensorContent(inputTensorHandle, UInt64.self)
-  case TF_INT64: dumpTensorContent(inputTensorHandle, Int64.self)
-  case TF_FLOAT: dumpTensorContent(inputTensorHandle, Float.self)
-  case TF_DOUBLE: dumpTensorContent(inputTensorHandle, Double.self)
-  case TF_BOOL: dumpTensorContent(inputTensorHandle, Bool.self)
-  // TODO: Handle `TF_BFloat16`? BFloat16 does not have a host-side
-  // representation and cannot be printed directly. Consider calling into TF
-  // runtime.
-  default: fatalError("Unsupported dtype \(dType)")
-  }
-}
+//   let dType: TF_DataType = TFE_TensorHandleDataType(inputTensorHandle)
+//   debugLog("Tensor \(idx) has TF data type \(dType).")
+//   switch dType {
+//   case TF_UINT8: dumpTensorContent(inputTensorHandle, UInt8.self)
+//   case TF_INT8: dumpTensorContent(inputTensorHandle, Int8.self)
+//   case TF_UINT16: dumpTensorContent(inputTensorHandle, UInt16.self)
+//   case TF_INT16: dumpTensorContent(inputTensorHandle, Int16.self)
+//   case TF_UINT32: dumpTensorContent(inputTensorHandle, UInt32.self)
+//   case TF_INT32: dumpTensorContent(inputTensorHandle, Int32.self)
+//   case TF_UINT64: dumpTensorContent(inputTensorHandle, UInt64.self)
+//   case TF_INT64: dumpTensorContent(inputTensorHandle, Int64.self)
+//   case TF_FLOAT: dumpTensorContent(inputTensorHandle, Float.self)
+//   case TF_DOUBLE: dumpTensorContent(inputTensorHandle, Double.self)
+//   case TF_BOOL: dumpTensorContent(inputTensorHandle, Bool.self)
+//   // TODO: Handle `TF_BFloat16`? BFloat16 does not have a host-side
+//   // representation and cannot be printed directly. Consider calling into TF
+//   // runtime.
+//   default: fatalError("Unsupported dtype \(dType)")
+//   }
+// }
 
 private class TFEState {
   let status: CTFStatus = TF_NewStatus()
@@ -1434,9 +1438,9 @@ public final class _TensorComputation {
 
     debugLog("Populating the op's input list.")
     for (i, inputTensorHandle) in inputTensorHandles.enumerated() {
-      if _RuntimeConfig.printsDebugLog {
-        dumpCTensorHandleContent(i, inputTensorHandle)
-      }
+      // if _RuntimeConfig.printsDebugLog {
+      //   dumpCTensorHandleContent(i, inputTensorHandle)
+      // }
       state.addInput(inputTensorHandle)
     }
 
@@ -1567,12 +1571,12 @@ public extension _TensorComputation {
   }
 }
 
-@usableFromInline
+@inlinable
 @_cdecl("_swift_tfc_EagerExecute")
-func _TFCEagerExecute(_ op: CTFEOp,
-                      _ retvals: UnsafeMutablePointer<OpaquePointer?>,
-                      _ retvalCount: UnsafeMutablePointer<Int32>,
-                      _ status: CTFStatus) {
+public func _TFCEagerExecute(_ op: CTFEOp,
+                             _ retvals: UnsafeMutablePointer<OpaquePointer?>,
+                             _ retvalCount: UnsafeMutablePointer<Int32>,
+                             _ status: CTFStatus) {
   if _RuntimeConfig.printsDebugLog {
     debugLog("Calling _TFCEagerExecute() over: ")
     TFE_OpPrintDebugString(op)
@@ -1770,11 +1774,6 @@ func _TFCOpAddInputFromTensorGroup<T : TensorArrayProtocol>(
 public protocol AnyTensor {
   var _rawTensorHandle: CTensorHandle { get }
   var _tensorFlowDataType: TensorDataType { get }
-}
-
-extension Tensor : AnyTensor {
-  public var _rawTensorHandle: CTensorHandle { return handle._cTensorHandle }
-  public var _tensorFlowDataType: TensorDataType { return Scalar.tensorFlowDataType }
 }
 
 @usableFromInline

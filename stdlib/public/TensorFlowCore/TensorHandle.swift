@@ -46,8 +46,8 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
     super.init(base: cTensorHandle)
   }
 
-  @usableFromInline
-  convenience init(copyingFromCTensor cTensor: CTensor) {
+  @inlinable
+  public convenience init(copyingFromCTensor cTensor: CTensor) {
     let status = TF_NewStatus()
     let cTensorHandle = TFE_NewTensorHandle(cTensor, status)
     checkOk(status)
@@ -71,8 +71,8 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
   ///
   /// `bufferInitializer` receives a buffer with exactly `byteCount` bytes of
   /// capacity. `bufferInitializer` must initialize the entire buffer.
-  @usableFromInline
-  convenience init(
+  @inlinable
+  public convenience init(
     shape: [Int],
     byteCount: Int,
     bufferInitializer: (UnsafeMutableRawPointer) -> Void
@@ -104,8 +104,8 @@ extension TensorHandle where Scalar : TensorFlowScalar {
   /// hold the scalars in a tensor with shape `shape`. `scalarsInitializer`
   /// must initialize the entire buffer, with contiguous scalars in row-major
   /// order.
-  @usableFromInline
-  convenience init(
+  @inlinable
+  public convenience init(
     shape: [Int],
     scalarsInitializer: (UnsafeMutablePointer<Scalar>) -> Void
   ) {
@@ -124,10 +124,23 @@ internal extension TensorHandle {
   /// - Returns: A `ShapedArray`.
   @usableFromInline
   @inline(never)
-  func makeHostCopy() -> ShapedArray<Scalar> {
+  func hostScalar() -> Scalar? {
     internalConsistencyCheck(isConcrete)
-    debugLog("Calling makeHostCopy() with c handle \(_cTensorHandle)")
-    return ShapedArray(cTensorHandle: _cTensorHandle)
+    debugLog("Calling hostScalar() with c handle \(_cTensorHandle)")
+    internalConsistencyCheck(TFE_TensorHandleIsConcrete(_cTensorHandle) != 0)
+    let status = TF_NewStatus()
+    let cTensor = TFE_TensorHandleResolve(_cTensorHandle, status)
+    checkOk(status)
+    TF_DeleteStatus(status)
+    internalConsistencyCheck(cTensor != nil)
+    debugLog("# of dims is \(TF_NumDims(cTensor!))")
+    debugLog("Returning a shaped array.")
+    defer { TF_DeleteTensor(cTensor!) }
+    guard TF_NumDims(cTensor!) == 0 else { return nil }
+    let startAddress = TF_TensorData(cTensor!)
+      .assumingMemoryBound(to: Scalar.self)
+    let bufferPointer = UnsafeBufferPointer(start: startAddress, count: 1)
+    return bufferPointer[0]
   }
 }
 
@@ -148,7 +161,7 @@ extension TensorHandle : TensorSendableReceivable {
     tensorHandle = TensorHandle<Scalar>(_owning: cTensorHandle!)
     if _RuntimeConfig.printsDebugLog {
       debugLog("The received tensor of id \(tensorID) has content:")
-      dumpTensorContent(tensorHandle._cTensorHandle, Scalar.self)
+      // dumpTensorContent(tensorHandle._cTensorHandle, Scalar.self)
     }
     return tensorHandle
   }
@@ -158,7 +171,7 @@ extension TensorHandle : TensorSendableReceivable {
                          _ tensorID: Int) {
     if _RuntimeConfig.printsDebugLog {
       debugLog("Sending tensor of id \(tensorID) and type \(Scalar.self) with:")
-      dumpTensorContent(_cTensorHandle, Scalar.self)
+      // dumpTensorContent(_cTensorHandle, Scalar.self)
     }
     let status = TF_NewStatus()
     internalConsistencyCheck(status != nil)
@@ -176,22 +189,6 @@ extension TensorHandle : TensorSendableReceivable {
     let cTensorHandle = _TFCCreateCTensorHandle(
         scalar, Scalar.tensorFlowDataType._cDataType)
     return TensorHandle<Scalar>(_owning: cTensorHandle)
-  }
-}
-
-internal extension ShapedArray where Scalar : _TensorFlowDataTypeCompatible {
-  @usableFromInline
-  @inline(never)
-  init(cTensorHandle: CTensorHandle) {
-    internalConsistencyCheck(TFE_TensorHandleIsConcrete(cTensorHandle) != 0)
-    let status = TF_NewStatus()
-    let cTensor = TFE_TensorHandleResolve(cTensorHandle, status)
-    checkOk(status)
-    TF_DeleteStatus(status)
-    internalConsistencyCheck(cTensor != nil)
-    debugLog("# of dims is \(TF_NumDims(cTensor!))")
-    debugLog("Returning a shaped array.")
-    self.init(owning: cTensor!)
   }
 }
 

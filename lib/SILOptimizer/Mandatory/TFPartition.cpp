@@ -4480,6 +4480,8 @@ void TFPartition::run() {
   // Swift programs by doing extraneous analysis.
   tfModule = ctx.getLoadedModule(ctx.Id_TensorFlowCore);
   if (!tfModule)
+    tfModule = ctx.getLoadedModule(ctx.Id_TensorFlow);
+  if (!tfModule)
     return;
 
   SILFunction *mainFunc = nullptr;

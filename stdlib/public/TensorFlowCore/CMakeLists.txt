@@ -36,22 +36,13 @@ set(SOURCES
   CompilerRuntime.swift
   DataTypes.swift
   Execution.swift
-  ShapedArray.swift
-  StringTensor.swift
-  Tensor.swift
+  Helpers.swift
   TensorGroup.swift
   TensorHandle.swift
   TensorProtocol.swift
   TensorShape.swift
-  Utilities.swift
-  Threading.swift)
-
-# Copy TensorFlow bindings file, if it exists.
-if (TENSORFLOW_SWIFT_BINDINGS)
-  file(GLOB_RECURSE TENSORFLOW_SWIFT_BINDINGS_SOURCES
-    "${TENSORFLOW_SWIFT_BINDINGS}/*.swift")
-  list(APPEND SOURCES "${TENSORFLOW_SWIFT_BINDINGS_SOURCES}")
-endif()
+  Threading.swift
+  Utilities.swift)
 
 add_swift_target_library(swiftTensorFlowCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   "${SOURCES}"

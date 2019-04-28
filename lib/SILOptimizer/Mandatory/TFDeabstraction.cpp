@@ -2605,6 +2605,8 @@ void TFDeabstractionPass::run() {
   // Swift programs by doing extraneous analysis.
   auto tfModule = ctx.getLoadedModule(ctx.Id_TensorFlowCore);
   if (!tfModule)
+    tfModule = ctx.getLoadedModule(ctx.Id_TensorFlow);
+  if (!tfModule)
     return;
 
   // If we are running on the TensorFlow module itself, do not perform
@@ -2615,7 +2617,8 @@ void TFDeabstractionPass::run() {
   // TODO: Rework the heuristics in inlineCalls() to be smarter.  In an ideal
   // world, we would be lazy about inlining, and only inline calls due to actual
   // inter-op value uses.
-  if (module->getSwiftModule() == tfModule)
+  if (module->getSwiftModule() == ctx.getLoadedModule(ctx.Id_TensorFlowCore) ||
+      module->getSwiftModule() == ctx.getLoadedModule(ctx.Id_TensorFlow))
     return;
 
   TensorFunctionClassifier tfc;
