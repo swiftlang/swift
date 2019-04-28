@@ -108,7 +108,7 @@ public func functionWithMyResilientTypesSize(_ s: __owned MySize, f: (__owned My
 
 // CHECK: [[DST_ADDR:%.*]] = bitcast %T17struct_resilience6MySizeV* [[DST]] to i8*
 
-// CHECK: call void @llvm.lifetime.start.p0i8([[INT]] {{8|16}}, i8* [[DST_ADDR]])
+// CHECK: call void @llvm.lifetime.start.p0i8({{i32|i64}} {{8|16}}, i8* [[DST_ADDR]])
 
 // CHECK: [[W_ADDR:%.*]] = getelementptr inbounds %T17struct_resilience6MySizeV, %T17struct_resilience6MySizeV* [[DST]], i32 0, i32 0
 // CHECK: [[W_PTR:%.*]] = getelementptr inbounds %TSi, %TSi* [[W_ADDR]], i32 0, i32 0
@@ -121,9 +121,9 @@ public func functionWithMyResilientTypesSize(_ s: __owned MySize, f: (__owned My
 // CHECK: [[FN:%.*]] = bitcast i8* %2 to void (%T17struct_resilience6MySizeV*, %T17struct_resilience6MySizeV*, %swift.refcounted*)*
 // CHECK: [[CONTEXT:%.*]] = bitcast %swift.opaque* %3 to %swift.refcounted*
 
-// CHECK: call swiftcc void [[FN]](%T17struct_resilience6MySizeV* noalias nocapture sret %0, %T17struct_resilience6MySizeV* noalias nocapture dereferenceable(16) [[DST]], %swift.refcounted* swiftself [[CONTEXT]])
+// CHECK: call swiftcc void [[FN]](%T17struct_resilience6MySizeV* noalias nocapture sret %0, %T17struct_resilience6MySizeV* noalias nocapture dereferenceable({{8|16}}) [[DST]], %swift.refcounted* swiftself [[CONTEXT]])
 // CHECK: [[DST_ADDR:%.*]] = bitcast %T17struct_resilience6MySizeV* [[DST]] to i8*
-// CHECK: call void @llvm.lifetime.end.p0i8([[INT]] {{8|16}}, i8* [[DST_ADDR]])
+// CHECK: call void @llvm.lifetime.end.p0i8({{i32|i64}} {{8|16}}, i8* [[DST_ADDR]])
 
 // CHECK: ret void
 
