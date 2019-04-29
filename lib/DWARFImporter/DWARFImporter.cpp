@@ -64,7 +64,7 @@ public:
       SmallVectorImpl<AbstractFunctionDecl *> &results) const override {}
 
   virtual void
-  getTopLevelDecls(SmallVectorImpl<Decl *> &results) const override {}
+  getTopLevelDecls(SmallVectorImpl<Decl *> &results) const override { return; }
 
   virtual void
   getDisplayDecls(SmallVectorImpl<Decl *> &results) const override {}
