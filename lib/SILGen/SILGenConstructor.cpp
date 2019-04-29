@@ -568,17 +568,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   SILType initTy;
 
   // Call the initializer.
-  SubstitutionMap subMap;
-  if (auto *genericEnv = ctor->getGenericEnvironmentOfContext()) {
-    auto *genericSig = genericEnv->getGenericSignature();
-    subMap = SubstitutionMap::get(
-      genericSig,
-      [&](SubstitutableType *t) -> Type {
-        return genericEnv->mapTypeIntoContext(
-          t->castTo<GenericTypeParamType>());
-      },
-      MakeAbstractConformanceForGenericType());
-  }
+  auto subMap = F.getForwardingSubstitutionMap();
 
   std::tie(initVal, initTy)
     = emitSiblingMethodRef(Loc, selfValue, initConstant, subMap);
