@@ -5223,6 +5223,30 @@ bool VarDecl::isSelfParameter() const {
   return false;
 }
 
+bool VarDecl::isMemberwiseInitialized() const {
+  if (!getDeclContext()->isTypeContext())
+    return false;
+
+  // Implicit, computed, and static properties are not initialized.
+  // The exception is lazy properties, which due to batch mode we may or
+  // may not have yet finalized, so they may currently be "stored" or
+  // "computed" in the current AST state.
+  if (isImplicit() || isStatic())
+    return false;
+
+  if (!hasStorage() && !getAttrs().hasAttribute<LazyAttr>() &&
+      !getAttachedPropertyDelegate())
+    return false;
+
+  // Initialized 'let' properties have storage, but don't get an argument
+  // to the memberwise initializer since they already have an initial
+  // value that cannot be overridden.
+  if (isLet() && isParentInitialized())
+    return false;
+
+  return true;
+}
+
 void VarDecl::setSpecifier(Specifier specifier) {
   Bits.VarDecl.Specifier = static_cast<unsigned>(specifier);
   setSupportsMutationIfStillStored(
