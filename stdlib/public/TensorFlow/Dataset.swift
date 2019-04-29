@@ -114,6 +114,20 @@ public extension Dataset {
   }
 
   @inlinable @inline(__always)
+  func map<ResultElement : TensorGroup>(parallelCallCount: Int,
+    _ transform: (Element) -> ResultElement) -> Dataset<ResultElement> {
+    return Dataset<ResultElement>(
+      _handle: #tfop("ParallelMapDataset", _handle, [Tensor<Int32>(0)],
+        [Tensor<Int64>(Int64(parallelCallCount))],
+        f$func: _tffunc(transform),
+        Targuments$dtype: [Int32.tensorFlowDataType],
+        output_types$dtype: ResultElement._typeList,
+        output_shapes: ResultElement._unknownShapeList
+      )
+    )
+  }
+
+  @inlinable @inline(__always)
   func filter(
     _ isIncluded: (Element) -> Tensor<Bool>
   ) -> Dataset {
