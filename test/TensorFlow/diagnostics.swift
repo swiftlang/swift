@@ -56,7 +56,7 @@ public func f() {
 // should be a single copy-to-host compiler warning.
 public func SR8412_CopyToHost() {
   for _ in 0...10 {
-    let x = Tensor(1)  // expected-warning {{value implicitly copied to the host}}
+    let x = Tensor(1)
     _hostOp(x)
   }
 }

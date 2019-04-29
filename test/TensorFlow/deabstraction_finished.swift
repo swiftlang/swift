@@ -4,10 +4,10 @@ import TensorFlow
 // FIXME: This should not build with -O.
 
 // CHECK-LABEL: --- TFDeabstraction Result: {{.*}}reproduceSR9365{{.*}}
-// CHECK: graph_op "Reproduce SR-9365"() {test: [$String: ], 
+// CHECK: graph_op "TensorSummary"({{.*}}) {labels: [$String: ], 
 @TensorFlowGraph
 func reproduceSR9365() {
-   let _: () = #tfop("Reproduce SR-9365", test: Array<String>())
+  let _: () = #tfop("TensorSummary", Tensor<Float>(0.0), labels: Array<String>())
 }
 
 public func trivialAdd(a: Tensor<Float>) -> Tensor<Float> {
@@ -90,12 +90,13 @@ CHECK-LABEL: ----
 
 public func stringAttributes() {
   let str = "abc"
-  // expected-error @+1 {{op named 'foo' is not registered in TensorFlow}}
-  let _ : TensorHandle<Float> = #tfop("foo", attr1: String(), attr2: str)
+  let _ : ResourceHandle =
+    #tfop(
+      "TensorSummary", Tensor<Float>(0.0), description: "", display_name: str)
 }
 /*
 CHECK-LABEL: --- INPUT FUNCTION {{.*}}stringAttributes
- CHECK: graph_op "foo"() {attr1: "", attr2: "abc", __device: "/job:localhost/replica:0/task:0/device:CPU:0"}
+ CHECK: graph_op "TensorSummary"({{.*}}) {description: "", display_name: "abc", __device: "/job:localhost/replica:0/task:0/device:CPU:0"}
 */
 
 public func tensorShape() -> Tensor<Float> {

@@ -18,6 +18,7 @@
 #ifndef SWIFT_SILOPTIMIZER_TENSORFLOW_H
 #define SWIFT_SILOPTIMIZER_TENSORFLOW_H
 
+#include "TFConstExpr.h"
 #include "TFDeviceSupport.h"
 #include "swift/AST/TensorFlow.h"
 #include "swift/SIL/GraphOperationInfo.h"
@@ -272,6 +273,12 @@ private:
                               const std::string &graphFnNameForCaller,
                               bool isAcceleratorOnly,
                               const GraphFunctionDeviceInfo &deviceInfo);
+};
+
+enum class TFPassKind {
+  Test,         // Use for testing
+  Mandatory,    // process tensorflow conventio functions.
+  Opt,          // process non-tensorflow convention functions.
 };
 
 } // end namespace tf

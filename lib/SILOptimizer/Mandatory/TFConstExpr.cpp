@@ -55,6 +55,8 @@ enum class WellKnownFunction {
   AssertionFailure,
   // Array._allocateUninitializedArray
   AllocateUninitializedArray,
+  // Array._adoptStorage
+  AdoptStorageUninitializedArray,
   // Array.init()
   ArrayInitEmpty,
 };
@@ -74,6 +76,15 @@ static WellKnownFunction classifyFunction(SILFunction *fn) {
 
   if (mangledName.contains("_allocateUninitializedArray"))
     return WellKnownFunction::AllocateUninitializedArray;
+
+  // TODO: This might be better handled with ArraySemanticsCall
+  if (fn->hasSemanticsAttr("array.uninitialized")) {
+    if (mangledName.contains("_adoptStorage"))
+      return WellKnownFunction::AdoptStorageUninitializedArray;
+    if (mangledName.contains("_allocateUninitialized"))
+      return WellKnownFunction::AllocateUninitializedArray;
+  }
+
   return WellKnownFunction::Unknown;
 }
 
@@ -824,7 +835,8 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
   // FIXME: This should be based on the SILFunction carrying a
   // @constexprSemantics sort of attribute that indicates it is well known,
   // just like the existing SemanticsAttr thing.
-  switch (classifyFunction(callee)) {
+  auto functionKind = classifyFunction(callee);
+  switch (functionKind) {
   default:
     break;
   case WellKnownFunction::StringInitEmpty: { // String.init()
@@ -871,13 +883,22 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     setValue(apply, arrayVal);
     return None;
   }
-  case WellKnownFunction::AllocateUninitializedArray: {
+  case WellKnownFunction::AllocateUninitializedArray:
+  case WellKnownFunction::AdoptStorageUninitializedArray: {
     // This function has this signature:
     //   func _allocateUninitializedArray<Element>(_ builtinCount: Builtin.Word)
     //     -> (Array<Element>, Builtin.RawPointer)
 
     // Figure out the allocation size.
-    auto numElementsSV = getConstantValue(apply->getOperand(1));
+    auto countIdx =
+        functionKind == WellKnownFunction::AdoptStorageUninitializedArray ? 2 : 1;
+    auto numElementsSV = getConstantValue(apply->getOperand(countIdx));
+    if (!numElementsSV.isConstant())
+      return numElementsSV;
+
+    if (numElementsSV.getKind() == SymbolicValue::Aggregate)
+      numElementsSV = numElementsSV.lookThroughSingleElementAggregates();
+
     if (!numElementsSV.isConstant())
       return numElementsSV;
 
@@ -1752,6 +1773,15 @@ bool ConstExprEvaluator::decodeAllocUninitializedArray(
     // Look through pointer_to_address
     auto pointer2addr =
         tupleExtract->getSingleUserOfType<PointerToAddressInst>();
+    if (!pointer2addr) {
+      // Check if this is through a struct extract.
+      if (auto structExtract = tupleExtract->getSingleUserOfType<StructExtractInst>()) {
+        if (arrayInsts)
+          arrayInsts->insert(structExtract);
+        pointer2addr =
+            structExtract->getSingleUserOfType<PointerToAddressInst>();
+      }
+    }
     if (!pointer2addr)
       return true;
     if (arrayInsts)
