@@ -630,6 +630,18 @@ namespace {
       IGF.Builder.CreateCall(
                     IGF.IGM.getInitEnumMetadataSingleCaseFn(),
                     {metadata, flags, payloadLayout});
+
+      // Pre swift-5.1 runtimes were missing the initialization of the
+      // the extraInhabitantCount field. Do it here instead.
+      auto payloadRef = IGF.Builder.CreateBitOrPointerCast(
+          payloadLayout, IGF.IGM.TypeLayoutTy->getPointerTo());
+      auto payloadExtraInhabitantCount =
+          IGF.Builder.CreateLoad(IGF.Builder.CreateStructGEP(
+              Address(payloadRef, Alignment(1)), 3,
+              Size(IGF.IGM.DataLayout.getTypeAllocSize(IGF.IGM.SizeTy) * 2 +
+                   IGF.IGM.DataLayout.getTypeAllocSize(IGF.IGM.Int32Ty))));
+      emitStoreOfExtraInhabitantCount(IGF, payloadExtraInhabitantCount,
+                                      metadata);
     }
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
