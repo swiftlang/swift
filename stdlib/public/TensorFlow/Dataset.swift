@@ -118,7 +118,7 @@ public extension Dataset {
     _ transform: (Element) -> ResultElement) -> Dataset<ResultElement> {
     return Dataset<ResultElement>(
       _handle: #tfop("ParallelMapDataset", _handle, [Tensor<Int32>(0)],
-        [Tensor<Int64>(Int64(parallelCallCount))],
+        [Tensor<Int32>(Int32(parallelCallCount))],
         f$func: _tffunc(transform),
         Targuments$dtype: [Int32.tensorFlowDataType],
         output_types$dtype: ResultElement._typeList,
