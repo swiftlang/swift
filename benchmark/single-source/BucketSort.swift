@@ -31,7 +31,7 @@ import Foundation
 public let BucketSort = BenchmarkInfo(
   name: "BucketSort",
   runFunction: run_BucketSort,
-  tags: [.validation, .algorithm],
+  tags: [.existential, .algorithm],
   setUpFunction: { blackHole(buckets) }
 )
 
