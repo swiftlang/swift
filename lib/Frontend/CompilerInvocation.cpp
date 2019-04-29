@@ -42,6 +42,25 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   setRuntimeResourcePath(LibPath.str());
 }
 
+/// If we haven't explicitly passed -prebuilt-module-cache-path, set it to
+/// the default value of <resource-dir>/<platform>/prebuilt-modules.
+/// @note This should be called once, after search path options and frontend
+///       options have been parsed.
+static void setDefaultPrebuiltCacheIfNecessary(
+  FrontendOptions &frontendOpts, const SearchPathOptions &searchPathOpts,
+  const llvm::Triple &triple) {
+
+  if (!frontendOpts.PrebuiltModuleCachePath.empty())
+    return;
+  if (searchPathOpts.RuntimeResourcePath.empty())
+    return;
+
+  SmallString<64> defaultPrebuiltPath{searchPathOpts.RuntimeResourcePath};
+  StringRef platform = getPlatformNameForTriple(triple);
+  llvm::sys::path::append(defaultPrebuiltPath, platform, "prebuilt-modules");
+  frontendOpts.PrebuiltModuleCachePath = defaultPrebuiltPath.str();
+}
+
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
                                       llvm::Triple &Triple) {
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeResourcePath);
@@ -178,7 +197,7 @@ static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
   OS << '"';
 }
 
-/// Save a copy of any flags marked as ParseableInterfaceOption, if running
+/// Save a copy of any flags marked as ModuleInterfaceOption, if running
 /// in a mode that is going to emit a .swiftinterface file.
 static void SaveParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
                                        FrontendOptions &FOpts,
@@ -187,7 +206,7 @@ static void SaveParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
     return;
   ArgStringList RenderedArgs;
   for (auto A : Args) {
-    if (A->getOption().hasFlag(options::ParseableInterfaceOption))
+    if (A->getOption().hasFlag(options::ModuleInterfaceOption))
       A->render(Args, RenderedArgs);
   }
   llvm::raw_string_ostream OS(Opts.ParseableInterfaceFlags);
@@ -200,6 +219,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           DiagnosticEngine &Diags,
                           const FrontendOptions &FrontendOpts) {
   using namespace options;
+  bool HadError = false;
 
   if (auto A = Args.getLastArg(OPT_swift_version)) {
     auto vers = version::Version::parseVersionString(
@@ -237,6 +257,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableOperatorDesignatedTypes |=
       Args.hasArg(OPT_enable_operator_designated_types);
+  
+  Opts.EnableOpaqueResultTypes |=
+      Args.hasArg(OPT_enable_opaque_result_types);
 
   // Always enable operator designated types for the standard library.
   Opts.EnableOperatorDesignatedTypes |= FrontendOpts.ParseStdlib;
@@ -274,10 +297,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       if (StringRef(A->getValue()).getAsInteger(10, limit)) {
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        A->getAsString(Args), A->getValue());
-        return true;
+        HadError = true;
+      } else {
+        Opts.TypoCorrectionLimit = limit;
       }
-
-      Opts.TypoCorrectionLimit = limit;
     }
   }
 
@@ -334,19 +357,30 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (StringRef(A->getValue()).getAsInteger(10, attempt)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
-      return true;
+      HadError = true;
+    } else {
+      Opts.DebugConstraintSolverAttempt = attempt;
     }
-
-    Opts.DebugConstraintSolverAttempt = attempt;
   }
+
+  for (const Arg *A : Args.filtered(OPT_debug_constraints_on_line)) {
+    unsigned line;
+    if (StringRef(A->getValue()).getAsInteger(10, line)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.DebugConstraintSolverOnLines.push_back(line);
+    }
+  }
+  llvm::sort(Opts.DebugConstraintSolverOnLines);
   
   if (const Arg *A = Args.getLastArg(OPT_debug_forbid_typecheck_prefix)) {
     Opts.DebugForbidTypecheckPrefix = A->getValue();
   }
 
-  if (Args.getLastArg(OPT_debug_cycles)) {
-    Opts.EvaluatorCycleDiagnostics = CycleDiagnosticKind::DebugDiagnose;
-  }
+  if (Args.getLastArg(OPT_debug_cycles))
+    Opts.DebugDumpCycles = true;
 
   if (const Arg *A = Args.getLastArg(OPT_output_request_graphviz)) {
     Opts.RequestEvaluatorGraphVizPath = A->getValue();
@@ -357,10 +391,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
-      return true;
+      HadError = true;
+    } else {
+      Opts.SolverMemoryThreshold = threshold;
     }
-    
-    Opts.SolverMemoryThreshold = threshold;
   }
 
   if (const Arg *A = Args.getLastArg(OPT_solver_shrink_unsolved_threshold)) {
@@ -368,10 +402,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
-      return true;
+      HadError = true;
+    } else {
+      Opts.SolverShrinkUnsolvedThreshold = threshold;
     }
-
-    Opts.SolverShrinkUnsolvedThreshold = threshold;
   }
 
   if (Args.getLastArg(OPT_solver_disable_shrink))
@@ -382,10 +416,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
-      return true;
+      HadError = true;
+    } else {
+      Opts.MaxCircularityDepth = threshold;
     }
-
-    Opts.MaxCircularityDepth = threshold;
   }
   
   for (const Arg *A : Args.filtered(OPT_D)) {
@@ -450,6 +484,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableConstraintSolverPerformanceHacks |=
       Args.hasArg(OPT_disable_constraint_solver_performance_hacks);
 
+  Opts.EnableObjCResilientClassStubs =
+      Args.hasArg(OPT_enable_objc_resilient_class_stubs);
+
   // Must be processed after any other language options that could affect
   // platform conditions.
   bool UnsupportedOS, UnsupportedArch;
@@ -468,7 +505,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Diags.diagnose(SourceLoc(), diag::error_unsupported_target_os, TargetArgOS);
   }
 
-  return UnsupportedOS || UnsupportedArch;
+  return HadError || UnsupportedOS || UnsupportedArch;
 }
 
 static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
@@ -768,9 +805,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.DisableSILPartialApply |=
     Args.hasArg(OPT_disable_sil_partial_apply);
   Opts.VerifySILOwnership &= !Args.hasArg(OPT_disable_sil_ownership_verifier);
-  Opts.EnableMandatorySemanticARCOpts |=
-      Args.hasArg(OPT_enable_mandatory_semantic_arc_opts);
   Opts.EnableLargeLoadableTypes |= Args.hasArg(OPT_enable_large_loadable_types);
+  Opts.StripOwnershipAfterSerialization |= Args.hasArg(OPT_enable_ownership_stripping_after_serialization);
 
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_path))
     Opts.OptRecordFile = A->getValue();
@@ -901,21 +937,20 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     else
       assert(A->getOption().matches(options::OPT_gnone) &&
              "unknown -g<kind> option");
-
-    if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables) {
-      if (Args.hasArg(options::OPT_debug_info_store_invocation)) {
-        ArgStringList RenderedArgs;
-        for (auto A : Args)
-          A->render(Args, RenderedArgs);
-        CompilerInvocation::buildDebugFlags(Opts.DebugFlags,
-                                            RenderedArgs, SDKPath,
-                                            ResourceDir);
-      }
-      // TODO: Should we support -fdebug-compilation-dir?
-      llvm::SmallString<256> cwd;
-      llvm::sys::fs::current_path(cwd);
-      Opts.DebugCompilationDir = cwd.str();
+  }
+  if (Opts.DebugInfoLevel >= IRGenDebugInfoLevel::LineTables) {
+    if (Args.hasArg(options::OPT_debug_info_store_invocation)) {
+      ArgStringList RenderedArgs;
+      for (auto A : Args)
+        A->render(Args, RenderedArgs);
+      CompilerInvocation::buildDebugFlags(Opts.DebugFlags,
+                                          RenderedArgs, SDKPath,
+                                          ResourceDir);
     }
+    // TODO: Should we support -fdebug-compilation-dir?
+    llvm::SmallString<256> cwd;
+    llvm::sys::fs::current_path(cwd);
+    Opts.DebugCompilationDir = cwd.str();
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_debug_info_format)) {
@@ -1001,6 +1036,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.ModuleName = FrontendOpts.ModuleName;
 
+  if (Args.hasArg(OPT_no_clang_module_breadcrumbs))
+    Opts.DisableClangModuleSkeletonCUs = true;
+
   if (Args.hasArg(OPT_use_jit))
     Opts.UseJIT = true;
   
@@ -1081,8 +1119,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EnableReflectionNames = false;
   }
 
-  if (Args.hasArg(OPT_enable_resilience_bypass)) {
-    Opts.EnableResilienceBypass = true;
+  if (Args.hasArg(OPT_force_public_linkage)) {
+    Opts.ForcePublicLinkage = true;
   }
 
   // PE/COFF cannot deal with the cross-module reference to the metadata parent
@@ -1289,6 +1327,8 @@ bool CompilerInvocation::parseArgs(
   }
 
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
+  setDefaultPrebuiltCacheIfNecessary(FrontendOpts, SearchPathOpts,
+                                     LangOpts.Target);
 
   return false;
 }

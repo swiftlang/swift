@@ -647,6 +647,10 @@ private:
              isLoadedLValue(ifExpr->getElseExpr());
     return false;
   }
+
+  /// Retrive an member reference associated with given member
+  /// looking through dynamic member lookup on the way.
+  ValueDecl *getMemberRef(ConstraintLocator *locator) const;
 };
 
 /// Intended to diagnose any possible contextual failure
@@ -979,6 +983,142 @@ public:
   InaccessibleMemberFailure(Expr *root, ConstraintSystem &cs, ValueDecl *member,
                             ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), Member(member) {}
+
+  bool diagnoseAsError() override;
+};
+
+
+// Diagnose an attempt to use AnyObject as the root type of a KeyPath
+//
+// ```swift
+// let keyPath = \AnyObject.bar
+// ```
+class AnyObjectKeyPathRootFailure final : public FailureDiagnostic {
+
+public:
+  AnyObjectKeyPathRootFailure(Expr *root, ConstraintSystem &cs,
+                              ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator) {}
+  
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to reference subscript as a keypath component
+/// where at least one of the index arguments doesn't conform to Hashable e.g.
+///
+/// ```swift
+/// protocol P {}
+///
+/// struct S {
+///   subscript<T: P>(x: Int, _ y: T) -> Bool { return true }
+/// }
+///
+/// func foo<T: P>(_ x: Int, _ y: T) {
+///   _ = \S.[x, y]
+/// }
+/// ```
+class KeyPathSubscriptIndexHashableFailure final : public FailureDiagnostic {
+  Type NonConformingType;
+
+public:
+  KeyPathSubscriptIndexHashableFailure(Expr *root, ConstraintSystem &cs,
+                                       Type type, ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), NonConformingType(type) {
+    assert(locator->isResultOfKeyPathDynamicMemberLookup() ||
+           locator->isKeyPathSubscriptComponent());
+  }
+
+  bool diagnoseAsError() override;
+};
+
+class InvalidMemberRefInKeyPath : public FailureDiagnostic {
+  ValueDecl *Member;
+
+public:
+  InvalidMemberRefInKeyPath(Expr *root, ConstraintSystem &cs, ValueDecl *member,
+                            ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), Member(member) {
+    assert(member->hasName());
+    assert(locator->isForKeyPathComponent());
+  }
+
+  DescriptiveDeclKind getKind() const { return Member->getDescriptiveKind(); }
+
+  DeclName getName() const { return Member->getFullName(); }
+
+  bool diagnoseAsError() override = 0;
+
+protected:
+  /// Compute location of the failure for diagnostic.
+  SourceLoc getLoc() const;
+};
+
+/// Diagnose an attempt to reference a static member as a key path component
+/// e.g.
+///
+/// ```swift
+/// struct S {
+///   static var foo: Int = 42
+/// }
+///
+/// _ = \S.Type.foo
+/// ```
+class InvalidStaticMemberRefInKeyPath final : public InvalidMemberRefInKeyPath {
+public:
+  InvalidStaticMemberRefInKeyPath(Expr *root, ConstraintSystem &cs,
+                                  ValueDecl *member, ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(root, cs, member, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to reference a member which has a mutating getter as a
+/// key path component e.g.
+///
+/// ```swift
+/// struct S {
+///   var foo: Int {
+///     mutating get { return 42 }
+///   }
+///
+///   subscript(_: Int) -> Bool {
+///     mutating get { return false }
+///   }
+/// }
+///
+/// _ = \S.foo
+/// _ = \S.[42]
+/// ```
+class InvalidMemberWithMutatingGetterInKeyPath final
+    : public InvalidMemberRefInKeyPath {
+public:
+  InvalidMemberWithMutatingGetterInKeyPath(Expr *root, ConstraintSystem &cs,
+                                           ValueDecl *member,
+                                           ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(root, cs, member, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to reference a method as a key path component
+/// e.g.
+///
+/// ```swift
+/// struct S {
+///   func foo() -> Int { return 42 }
+///   static func bar() -> Int { return 0 }
+/// }
+///
+/// _ = \S.foo
+/// _ = \S.Type.bar
+/// ```
+class InvalidMethodRefInKeyPath final : public InvalidMemberRefInKeyPath {
+public:
+  InvalidMethodRefInKeyPath(Expr *root, ConstraintSystem &cs, ValueDecl *method,
+                            ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(root, cs, method, locator) {
+    assert(isa<FuncDecl>(method));
+  }
 
   bool diagnoseAsError() override;
 };

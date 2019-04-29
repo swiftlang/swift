@@ -9,6 +9,8 @@ add_swift_target_library(swiftAVFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYP
   AVError.swift
   AVMetadataObject.swift
 
+  "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
+
   GYB_SOURCES
     NSValue.swift.gyb
 

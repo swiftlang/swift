@@ -199,6 +199,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
         LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD, useAllocator));
     addSymbol(
         LinkEntity::forDynamicallyReplaceableFunctionKey(AFD, useAllocator));
+
   }
   if (AFD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
     bool useAllocator = shouldUseAllocatorMangling(AFD);
@@ -224,10 +225,29 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   // call site.
   auto index = 0;
   for (auto *param : *AFD->getParameters()) {
-    if (param->getDefaultValue())
+    if (param->isDefaultArgument())
       addSymbol(SILDeclRef::getDefaultArgGenerator(AFD, index));
     index++;
   }
+}
+
+void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
+  // If there's an opaque return type, its descriptor is exported.
+  if (auto opaqueResult = FD->getOpaqueResultTypeDecl()) {
+    addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));
+    assert(opaqueResult->getNamingDecl() == FD);
+    if (FD->isNativeDynamic()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorImpl(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
+    }
+    if (FD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
+    }
+  }
+  visitAbstractFunctionDecl(FD);
 }
 
 void TBDGenVisitor::visitAccessorDecl(AccessorDecl *AD) {
@@ -241,6 +261,22 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   // Add the property descriptor if the decl needs it.
   if (ASD->exportsPropertyDescriptor()) {
     addSymbol(LinkEntity::forPropertyDescriptor(ASD));
+  }
+  
+  // ...and the opaque result decl if it has one.
+  if (auto opaqueResult = ASD->getOpaqueResultTypeDecl()) {
+    addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));
+    assert(opaqueResult->getNamingDecl() == ASD);
+    if (ASD->hasAnyNativeDynamicAccessors()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorImpl(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
+    }
+    if (ASD->hasAnyDynamicReplacementAccessors()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
+    }
   }
 
   // Explicitly look at each accessor here: see visitAccessorDecl.
@@ -343,18 +379,17 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
 
   visitNominalTypeDecl(CD);
 
-  auto hasResilientAncestor =
-      CD->hasResilientMetadata(SwiftModule, ResilienceExpansion::Minimal);
-  auto ancestor = CD->getSuperclassDecl();
-  while (ancestor && !hasResilientAncestor) {
-    hasResilientAncestor |=
-        ancestor->hasResilientMetadata(SwiftModule, ResilienceExpansion::Maximal);
-    ancestor = ancestor->getSuperclassDecl();
-  }
-
   // Types with resilient superclasses have some extra symbols.
-  if (hasResilientAncestor)
+  if (CD->checkAncestry(AncestryFlags::ResilientOther) ||
+      CD->hasResilientMetadata()) {
     addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
+
+    auto &Ctx = CD->getASTContext();
+    if (Ctx.LangOpts.EnableObjCResilientClassStubs) {
+      addSymbol(LinkEntity::forObjCResilientClassStub(
+          CD, TypeMetadataAddress::AddressPoint));
+    }
+  }
 
   // Emit dispatch thunks for every new vtable entry.
   struct VTableVisitor : public SILVTableVisitor<VTableVisitor> {
@@ -465,6 +500,7 @@ static bool isValidProtocolMemberForTBDGen(const Decl *D) {
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
     return true;
+  case DeclKind::OpaqueType:
   case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class:
@@ -590,7 +626,8 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   auto &ctx = M->getASTContext();
   auto isWholeModule = singleFile == nullptr;
   const auto &target = ctx.LangOpts.Target;
-  UniversalLinkageInfo linkInfo(target, opts.HasMultipleIGMs, isWholeModule);
+  UniversalLinkageInfo linkInfo(target, opts.HasMultipleIGMs, false,
+                                isWholeModule);
   auto availCtx = AvailabilityContext::forDeploymentTarget(ctx);
 
   tapi::internal::InterfaceFile file;

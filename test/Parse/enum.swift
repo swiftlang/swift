@@ -5,6 +5,9 @@
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 
+// Windows does not support FP80
+// XFAIL: OS=windows-msvc
+
 enum Empty {}
 
 enum Boolish {

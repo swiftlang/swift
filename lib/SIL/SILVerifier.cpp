@@ -80,6 +80,10 @@ static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
   auto root = dyn_cast<PrimaryArchetypeType>(A->getRoot());
   if (!root)
     return true;
+  if (isa<OpenedArchetypeType>(A->getRoot()))
+    return true;
+  if (isa<OpaqueTypeArchetypeType>(A->getRoot()))
+    return true;
 
   // Ok, we have a primary archetype, make sure it is in the nested generic
   // environment of our caller.
@@ -1757,6 +1761,53 @@ public:
             "Store operand type and dest type mismatch");
   }
 
+  void checkAssignByDelegateInst(AssignByDelegateInst *AI) {
+    SILValue Src = AI->getSrc(), Dest = AI->getDest();
+    require(AI->getModule().getStage() == SILStage::Raw,
+            "assign instruction can only exist in raw SIL");
+    require(Dest->getType().isAddress(), "Must store to an address dest");
+
+    unsigned indirectInitResults = Src->getType().isAddress() ? 1 : 0;
+
+    SILValue initFn = AI->getInitializer();
+    CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
+    SILFunctionConventions initConv(initTy, AI->getModule());
+    require(initConv.getNumIndirectSILResults() == indirectInitResults,
+            "init function has wrong number of indirect results");
+    unsigned firstArgIdx = initConv.getSILArgIndexOfFirstParam();
+    require(initConv.getNumSILArguments() == firstArgIdx + 1,
+            "init function has wrong number of arguments");
+    require(Src->getType() == initConv.getSILArgumentType(firstArgIdx),
+            "wrong argument type of init function");
+    switch (initConv.getNumIndirectSILResults()) {
+      case 0:
+        require(initConv.getNumDirectSILResults() == 1,
+                "wrong number of init function results");
+        require(Dest->getType().getObjectType() ==
+                initConv.getDirectSILResultTypes().front(),
+                "wrong init function result type");
+        break;
+      case 1:
+        require(initConv.getNumDirectSILResults() == 0,
+                "wrong number of init function results");
+        require(Dest->getType() == initConv.getIndirectSILResultTypes().front(),
+                "wrong indirect init function result type");
+        break;
+      default:
+        require(false, "wrong number of indirect init function results");
+    }
+
+    SILValue setterFn = AI->getSetter();
+    CanSILFunctionType setterTy = setterFn->getType().castTo<SILFunctionType>();
+    SILFunctionConventions setterConv(setterTy, AI->getModule());
+    require(setterConv.getNumIndirectSILResults() == 0,
+            "set function has indirect results");
+    require(setterConv.getNumSILArguments() == 1,
+            "init function has wrong number of arguments");
+    require(Src->getType() == setterConv.getSILArgumentType(0),
+            "wrong argument type of init function");
+  }
+
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   void checkLoad##Name##Inst(Load##Name##Inst *LWI) { \
     require(LWI->getType().isObject(), "Result of load must be an object"); \
@@ -2291,10 +2342,8 @@ public:
         ->getInstanceType()->getClassOrBoundGenericClass();
     require(class2,
             "Second operand of dealloc_partial_ref must be a class metatype");
-    while (class1 != class2) {
-      class1 = class1->getSuperclassDecl();
-      require(class1, "First operand not superclass of second instance type");
-    }
+    require(class2->isSuperclassOf(class1),
+            "First operand not superclass of second instance type");
   }
 
   void checkAllocBoxInst(AllocBoxInst *AI) {
@@ -4981,13 +5030,8 @@ void SILVTable::verify(const SILModule &M) const {
     assert(theClass && "vtable entry must refer to a class member");
 
     // The class context must be the vtable's class, or a superclass thereof.
-    auto c = getClass();
-    do {
-      if (c == theClass)
-        break;
-      c = c->getSuperclassDecl();
-    } while (c);
-    assert(c && "vtable entry must refer to a member of the vtable's class");
+    assert(theClass->isSuperclassOf(getClass()) &&
+           "vtable entry must refer to a member of the vtable's class");
 
     // All function vtable entries must be at their natural uncurry level.
     assert(!entry.Method.isCurried && "vtable entry must not be curried");

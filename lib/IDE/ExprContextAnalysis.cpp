@@ -16,6 +16,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
@@ -30,53 +31,6 @@
 
 using namespace swift;
 using namespace ide;
-
-//===----------------------------------------------------------------------===//
-// prepareForRetypechecking(Expr *)
-//===----------------------------------------------------------------------===//
-
-/// Prepare the given expression for type-checking again, prinicipally by
-/// erasing any ErrorType types on the given expression, allowing later
-/// type-checking to make progress.
-///
-/// FIXME: this is fundamentally a workaround for the fact that we may end up
-/// typechecking parts of an expression more than once - first for checking
-/// the context, and later for checking more-specific things like unresolved
-/// members.  We should restructure code-completion type-checking so that we
-/// never typecheck more than once (or find a more principled way to do it).
-void swift::ide::prepareForRetypechecking(Expr *E) {
-  assert(E);
-  struct Eraser : public ASTWalker {
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      if (expr && expr->getType() && (expr->getType()->hasError() ||
-                                      expr->getType()->hasUnresolvedType()))
-        expr->setType(Type());
-      if (auto *ACE = dyn_cast_or_null<AutoClosureExpr>(expr)) {
-        return { true, ACE->getSingleExpressionBody() };
-      }
-      return { true, expr };
-    }
-    bool walkToTypeLocPre(TypeLoc &TL) override {
-      if (TL.getType() && (TL.getType()->hasError() ||
-                           TL.getType()->hasUnresolvedType()))
-        TL.setType(Type());
-      return true;
-    }
-
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-      if (P && P->hasType() && (P->getType()->hasError() ||
-                                P->getType()->hasUnresolvedType())) {
-        P->setType(Type());
-      }
-      return { true, P };
-    }
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      return { false, S };
-    }
-  };
-
-  E->walk(Eraser());
-}
 
 //===----------------------------------------------------------------------===//
 // typeCheckContextUntil(DeclContext, SourceLoc)
@@ -241,7 +195,7 @@ namespace {
 class ExprParentFinder : public ASTWalker {
   friend class ExprContextAnalyzer;
   Expr *ChildExpr;
-  llvm::function_ref<bool(ParentTy, ParentTy)> Predicate;
+  std::function<bool(ParentTy, ParentTy)> Predicate;
 
   bool arePositionsSame(Expr *E1, Expr *E2) {
     return E1->getSourceRange().Start == E2->getSourceRange().Start &&
@@ -251,7 +205,7 @@ class ExprParentFinder : public ASTWalker {
 public:
   llvm::SmallVector<ParentTy, 5> Ancestors;
   ExprParentFinder(Expr *ChildExpr,
-                   llvm::function_ref<bool(ParentTy, ParentTy)> Predicate)
+                   std::function<bool(ParentTy, ParentTy)> Predicate)
       : ChildExpr(ChildExpr), Predicate(Predicate) {}
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -311,14 +265,16 @@ public:
 };
 
 /// Collect function (or subscript) members with the given \p name on \p baseTy.
-void collectPossibleCalleesByQualifiedLookup(
+static void collectPossibleCalleesByQualifiedLookup(
     DeclContext &DC, Type baseTy, DeclBaseName name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
+  bool isOnMetaType = baseTy->is<AnyMetatypeType>();
 
   SmallVector<ValueDecl *, 2> decls;
   auto resolver = DC.getASTContext().getLazyResolver();
   if (!DC.lookupQualified(baseTy->getMetatypeInstanceType(), name,
-                          NL_QualifiedDefault, resolver, decls))
+                          NL_QualifiedDefault | NL_ProtocolMembers, resolver,
+                          decls))
     return;
 
   for (auto *VD : decls) {
@@ -332,16 +288,18 @@ void collectPossibleCalleesByQualifiedLookup(
       continue;
     Type declaredMemberType = VD->getInterfaceType();
     if (VD->getDeclContext()->isTypeContext()) {
-      if (auto *FD = dyn_cast<FuncDecl>(VD)) {
-        if (!baseTy->is<AnyMetatypeType>())
+      if (isa<FuncDecl>(VD)) {
+        if (!isOnMetaType)
           declaredMemberType =
               declaredMemberType->castTo<AnyFunctionType>()->getResult();
-      }
-      if (auto *CD = dyn_cast<ConstructorDecl>(VD)) {
-        if (!baseTy->is<AnyMetatypeType>())
+      } else if (isa<ConstructorDecl>(VD)) {
+        if (!isOnMetaType)
           continue;
         declaredMemberType =
             declaredMemberType->castTo<AnyFunctionType>()->getResult();
+      } else if (isa<SubscriptDecl>(VD)) {
+        if (isOnMetaType != VD->isStatic())
+          continue;
       }
     }
 
@@ -350,15 +308,26 @@ void collectPossibleCalleesByQualifiedLookup(
 
     if (!fnType)
       continue;
-    if (auto *AFT = fnType->getAs<AnyFunctionType>()) {
-      candidates.emplace_back(AFT, VD);
+
+    if (fnType->is<AnyFunctionType>()) {
+      auto baseInstanceTy = baseTy->getMetatypeInstanceType();
+      // If we are calling to typealias type, 
+      if (isa<SugarType>(baseInstanceTy.getPointer())) {
+        auto canBaseTy = baseInstanceTy->getCanonicalType();
+        fnType = fnType.transform([&](Type t) -> Type {
+          if (t->getCanonicalType()->isEqual(canBaseTy))
+            return baseInstanceTy;
+          return t;
+        });
+      }
+      candidates.emplace_back(fnType->castTo<AnyFunctionType>(), VD);
     }
   }
 }
 
 /// Collect function (or subscript) members with the given \p name on
 /// \p baseExpr expression.
-void collectPossibleCalleesByQualifiedLookup(
+static void collectPossibleCalleesByQualifiedLookup(
     DeclContext &DC, Expr *baseExpr, DeclBaseName name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   ConcreteDeclRef ref = nullptr;
@@ -374,7 +343,7 @@ void collectPossibleCalleesByQualifiedLookup(
 }
 
 /// For the given \c callExpr, collect possible callee types and declarations.
-bool collectPossibleCalleesForApply(
+static bool collectPossibleCalleesForApply(
     DeclContext &DC, ApplyExpr *callExpr,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   auto *fnExpr = callExpr->getFn();
@@ -421,7 +390,7 @@ bool collectPossibleCalleesForApply(
 
 /// For the given \c subscriptExpr, collect possible callee types and
 /// declarations.
-bool collectPossibleCalleesForSubscript(
+static bool collectPossibleCalleesForSubscript(
     DeclContext &DC, SubscriptExpr *subscriptExpr,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   if (subscriptExpr->hasDecl()) {
@@ -438,14 +407,11 @@ bool collectPossibleCalleesForSubscript(
   return !candidates.empty();
 }
 
-/// Get index of \p CCExpr in \p Args. \p Args is usually a \c TupleExpr,
-/// \c ParenExpr, or a \c ArgumentShuffleExpr.
+/// Get index of \p CCExpr in \p Args. \p Args is usually a \c TupleExpr
+/// or \c ParenExpr.
 /// \returns \c true if success, \c false if \p CCExpr is not a part of \p Args.
-bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
-                       unsigned &Position, bool &HasName) {
-  if (auto ASE = dyn_cast<ArgumentShuffleExpr>(Args))
-    Args = ASE->getSubExpr();
-
+static bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
+                              unsigned &Position, bool &HasName) {
   if (isa<ParenExpr>(Args)) {
     HasName = false;
     Position = 0;
@@ -465,38 +431,6 @@ bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
     Position = i;
     return true;
   }
-  return false;
-}
-
-/// Translate argument index in \p Args to parameter index.
-/// Does nothing unless \p Args is \c ArgumentShuffleExpr.
-bool translateArgIndexToParamIndex(Expr *Args, unsigned &Position,
-                                   bool &HasName) {
-  auto ASE = dyn_cast<ArgumentShuffleExpr>(Args);
-  if (!ASE)
-    return true;
-
-  auto mapping = ASE->getElementMapping();
-  for (unsigned destIdx = 0, e = mapping.size(); destIdx != e; ++destIdx) {
-    auto srcIdx = mapping[destIdx];
-    if (srcIdx == (signed)Position) {
-      Position = destIdx;
-      return true;
-    }
-    if (srcIdx == ArgumentShuffleExpr::Variadic &&
-        llvm::is_contained(ASE->getVariadicArgs(), Position)) {
-      // The arg is a part of variadic args.
-      Position = destIdx;
-      HasName = false;
-      if (auto Args = dyn_cast<TupleExpr>(ASE->getSubExpr())) {
-        // Check if the first variadiac argument has the label.
-        auto firstVarArgIdx = ASE->getVariadicArgs().front();
-        HasName = Args->getElementNameLoc(firstVarArgIdx).isValid();
-      }
-      return true;
-    }
-  }
-
   return false;
 }
 
@@ -546,8 +480,6 @@ class ExprContextAnalyzer {
     bool HasName;
     if (!getPositionInArgs(*DC, Arg, ParsedExpr, Position, HasName))
       return false;
-    if (!translateArgIndexToParamIndex(Arg, Position, HasName))
-      return false;
 
     // Collect possible types (or labels) at the position.
     {
@@ -586,6 +518,12 @@ class ExprContextAnalyzer {
     case ExprKind::Binary:
     case ExprKind::PrefixUnary: {
       analyzeApplyExpr(Parent);
+      break;
+    }
+    case ExprKind::Array: {
+      if (auto type = ParsedExpr->getType()) {
+        recordPossibleType(type);
+      }
       break;
     }
     case ExprKind::Assign: {
@@ -695,6 +633,12 @@ class ExprContextAnalyzer {
       break;
     }
     default:
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+        assert(isSingleExpressionBodyForCodeCompletion(AFD->getBody()));
+        singleExpressionBody = true;
+        recordPossibleType(getReturnTypeFromContext(AFD));
+        break;
+      }
       llvm_unreachable("Unhandled decl kind.");
     }
   }
@@ -715,6 +659,14 @@ class ExprContextAnalyzer {
     }
   }
 
+  /// Whether the given \c BraceStmt, which must be the body of a function or
+  /// closure, should be treated as a single-expression return for the purposes
+  /// of code-completion.
+  ///
+  /// We cannot use hasSingleExpressionBody, because we explicitly do not use
+  /// the single-expression-body when there is code-completion in the expression
+  /// in order to avoid a base expression affecting the type. However, now that
+  /// we've typechecked, we will take the context type into account.
   static bool isSingleExpressionBodyForCodeCompletion(BraceStmt *body) {
     return body->getNumElements() == 1 && body->getElements()[0].is<Expr *>();
   }
@@ -735,31 +687,34 @@ public:
     if (!ParsedExpr)
       return;
 
-    ExprParentFinder Finder(ParsedExpr, [](ASTWalker::ParentTy Node,
-                                           ASTWalker::ParentTy Parent) {
+    ExprParentFinder Finder(ParsedExpr, [&](ASTWalker::ParentTy Node,
+                                            ASTWalker::ParentTy Parent) {
       if (auto E = Node.getAsExpr()) {
         switch (E->getKind()) {
-        case ExprKind::Call:
+        case ExprKind::Call: {
+          // Iff the cursor is in argument position.
+          auto argsRange = cast<CallExpr>(E)->getArg()->getSourceRange();
+          return SM.rangeContains(argsRange, ParsedExpr->getSourceRange());
+        }
+        case ExprKind::Subscript: {
+          // Iff the cursor is in index position.
+          auto argsRange = cast<SubscriptExpr>(E)->getIndex()->getSourceRange();
+          return SM.rangeContains(argsRange, ParsedExpr->getSourceRange());
+        }
         case ExprKind::Binary:
         case ExprKind::PrefixUnary:
         case ExprKind::Assign:
-        case ExprKind::Subscript:
+        case ExprKind::Array:
           return true;
         case ExprKind::Tuple: {
           auto ParentE = Parent.getAsExpr();
           return !ParentE ||
                  (!isa<CallExpr>(ParentE) && !isa<SubscriptExpr>(ParentE) &&
-                  !isa<BinaryExpr>(ParentE) && !isa<ArgumentShuffleExpr>(ParentE));
+                  !isa<BinaryExpr>(ParentE));
         }
-        case ExprKind::Closure: {
-          // Note: we cannot use hasSingleExpressionBody, because we explicitly
-          // do not use the single-expression-body when there is code-completion
-          // in the expression in order to avoid a base expression affecting
-          // the type. However, now that we've typechecked, we will take the
-          // context type into account.
+        case ExprKind::Closure:
           return isSingleExpressionBodyForCodeCompletion(
               cast<ClosureExpr>(E)->getBody());
-        }
         default:
           return false;
         }
@@ -780,6 +735,9 @@ public:
         case DeclKind::PatternBinding:
           return true;
         default:
+          if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
+            if (auto *body = AFD->getBody())
+              return isSingleExpressionBodyForCodeCompletion(body);
           return false;
         }
       } else if (auto P = Node.getAsPattern()) {

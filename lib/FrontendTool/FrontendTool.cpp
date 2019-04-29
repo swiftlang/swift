@@ -406,11 +406,12 @@ public:
       FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
 
 private:
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info) override {
+  void
+  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+                   StringRef FormatString,
+                   ArrayRef<DiagnosticArgument> FormatArgs,
+                   const DiagnosticInfo &Info,
+                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
     if (!(FixitAll || shouldTakeFixit(Kind, Info)))
       return;
     for (const auto &Fix : Info.FixIts) {
@@ -477,7 +478,6 @@ static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
   C.NumPostfixOperators += SF->PostfixOperators.size();
   C.NumPrefixOperators += SF->PrefixOperators.size();
   C.NumPrecedenceGroups += SF->PrecedenceGroups.size();
-  C.NumUsedConformances += SF->getUsedConformances().size();
 
   auto bufID = SF->getBufferID();
   if (bufID.hasValue()) {
@@ -587,7 +587,8 @@ static bool buildModuleFromParseableInterface(CompilerInvocation &Invocation,
       Instance.getASTContext(), Invocation.getClangModuleCachePath(),
       PrebuiltCachePath, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(),
-      FEOpts.SerializeParseableModuleInterfaceDependencyHashes);
+      FEOpts.SerializeModuleInterfaceDependencyHashes,
+      FEOpts.TrackSystemDeps);
 }
 
 static bool compileLLVMIR(CompilerInvocation &Invocation,
@@ -960,7 +961,7 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::EmitPCH)
     return precompileBridgingHeader(Invocation, Instance);
 
-  if (Action == FrontendOptions::ActionType::BuildModuleFromParseableInterface)
+  if (Action == FrontendOptions::ActionType::CompileModuleFromInterface)
     return buildModuleFromParseableInterface(Invocation, Instance);
 
   if (Invocation.getInputKind() == InputFileKind::LLVM)
@@ -1217,6 +1218,10 @@ static bool performCompileStepsPostSILGen(
   ASTContext &Context = Instance.getASTContext();
   SILOptions &SILOpts = Invocation.getSILOptions();
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
+
+  Optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
+  if (auto *SF = MSF.dyn_cast<SourceFile *>())
+    ricd.emplace(*SF);
 
   if (Stats)
     countStatsPostSILGen(*Stats, *SM);
@@ -1540,13 +1545,18 @@ createDispatchingDiagnosticConsumerIfNeeded(
           subconsumers.emplace_back(input.file(), std::move(consumer));
         return false;
       });
-  // For batch mode, the compiler must swallow diagnostics pertaining to
-  // non-primary files in order to avoid Xcode showing the same diagnostic
+  // For batch mode, the compiler must sometimes swallow diagnostics pertaining
+  // to non-primary files in order to avoid Xcode showing the same diagnostic
   // multiple times. So, create a diagnostic "eater" for those non-primary
   // files.
+  //
+  // This routine gets called in cases where no primary subconsumers are created.
+  // Don't bother to create non-primary subconsumers if there aren't any primary
+  // ones.
+  //
   // To avoid introducing bugs into WMO or single-file modes, test for multiple
   // primaries.
-  if (inputsAndOutputs.hasMultiplePrimaryInputs()) {
+  if (!subconsumers.empty() && inputsAndOutputs.hasMultiplePrimaryInputs()) {
     inputsAndOutputs.forEachNonPrimaryInput(
         [&](const InputFile &input) -> bool {
           subconsumers.emplace_back(input.file(), nullptr);
@@ -1627,11 +1637,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
     PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Error,
                          "fatal error encountered during compilation; please "
-                           "file a bug report with your project and the crash "
-                           "log", {},
-                         DiagnosticInfo());
+                         "file a bug report with your project and the crash "
+                         "log",
+                         {}, DiagnosticInfo(), SourceLoc());
     PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Note, reason,
-                         {}, DiagnosticInfo());
+                         {}, DiagnosticInfo(), SourceLoc());
     if (shouldCrash)
       abort();
   };

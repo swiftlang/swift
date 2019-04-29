@@ -22,8 +22,10 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/PropertyDelegates.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ResilienceExpansion.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -166,6 +168,8 @@ GET_BRIDGING_FN(ObjectiveC, REQUIRED, Bool, REQUIRED, ObjCBool)
 GET_BRIDGING_FN(ObjectiveC, REQUIRED, ObjCBool, REQUIRED, Bool)
 GET_BRIDGING_FN(Foundation, OPTIONAL, NSError, REQUIRED, Error)
 GET_BRIDGING_FN(Foundation, REQUIRED, Error, REQUIRED, NSError)
+GET_BRIDGING_FN(WinSDK, REQUIRED, Bool, REQUIRED, WindowsBool)
+GET_BRIDGING_FN(WinSDK, REQUIRED, WindowsBool, REQUIRED, Bool)
 
 #undef GET_BRIDGING_FN
 #undef REQUIRED
@@ -755,6 +759,8 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
 
 void SILGenModule::postEmitFunction(SILDeclRef constant,
                                     SILFunction *F) {
+  emitLazyConformancesForFunction(F);
+
   assert(!F->isExternalDeclaration() && "did not emit any function body?!");
   LLVM_DEBUG(llvm::dbgs() << "lowered sil:\n";
              F->print(llvm::dbgs()));
@@ -944,7 +950,7 @@ static bool requiresIVarInitialization(SILGenModule &SGM, ClassDecl *cd) {
     if (!pbd) continue;
 
     for (auto entry : pbd->getPatternList())
-      if (entry.getNonLazyInit())
+      if (entry.getExecutableInit())
         return true;
   }
 
@@ -1060,19 +1066,41 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   }
 }
 
-void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
-                                           DefaultArgumentKind kind,
-                                           DeclContext *initDC) {
-  switch (kind) {
+void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
+                                           ParamDecl *param) {
+  auto initDC = param->getDefaultArgumentInitContext();
+
+  switch (param->getDefaultArgumentKind()) {
   case DefaultArgumentKind::None:
     llvm_unreachable("No default argument here?");
 
-  case DefaultArgumentKind::Normal:
-    break;
+  case DefaultArgumentKind::Normal: {
+    auto arg = param->getDefaultValue();
+    emitOrDelayFunction(*this, constant,
+        [this,constant,arg,initDC](SILFunction *f) {
+      preEmitFunction(constant, arg, f, arg);
+      PrettyStackTraceSILFunction X("silgen emitDefaultArgGenerator ", f);
+      SILGenFunction SGF(*this, *f, initDC);
+      SGF.emitGeneratorFunction(constant, arg);
+      postEmitFunction(constant, f);
+    });
+    return;
+  }
+
+  case DefaultArgumentKind::StoredProperty: {
+    auto arg = param->getStoredProperty();
+    emitOrDelayFunction(*this, constant,
+        [this,constant,arg,initDC](SILFunction *f) {
+      preEmitFunction(constant, arg, f, arg);
+      PrettyStackTraceSILFunction X("silgen emitDefaultArgGenerator ", f);
+      SILGenFunction SGF(*this, *f, initDC);
+      SGF.emitGeneratorFunction(constant, arg);
+      postEmitFunction(constant, f);
+    });
+    return;
+  }
 
   case DefaultArgumentKind::Inherited:
-    return;
-
   case DefaultArgumentKind::Column:
   case DefaultArgumentKind::File:
   case DefaultArgumentKind::Line:
@@ -1081,18 +1109,8 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
   case DefaultArgumentKind::NilLiteral:
   case DefaultArgumentKind::EmptyArray:
   case DefaultArgumentKind::EmptyDictionary:
-  case DefaultArgumentKind::StoredProperty:
     return;
   }
-
-  emitOrDelayFunction(*this, constant,
-      [this,constant,arg,initDC](SILFunction *f) {
-    preEmitFunction(constant, arg, f, arg);
-    PrettyStackTraceSILFunction X("silgen emitDefaultArgGenerator ", f);
-    SILGenFunction SGF(*this, *f, initDC);
-    SGF.emitGeneratorFunction(constant, arg);
-    postEmitFunction(constant, f);
-  });
 }
 
 void SILGenModule::
@@ -1101,7 +1119,16 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
   auto *var = pbdEntry.getAnchoringVarDecl();
   auto *init = pbdEntry.getInit();
   auto *initDC = pbdEntry.getInitContext();
-  assert(!pbdEntry.isInitializerLazy());
+  assert(!pbdEntry.isInitializerSubsumed());
+
+  // If this is the backing storage for a property with an attached delegate
+  // that was initialized with `=`, use that expression as the initializer.
+  if (auto originalProperty = var->getOriginalDelegatedProperty()) {
+    auto delegateInfo =
+        originalProperty->getPropertyDelegateBackingPropertyInfo();
+    if (delegateInfo.originalInitialValue)
+      init = delegateInfo.originalInitialValue;
+  }
 
   SILDeclRef constant(var, SILDeclRef::Kind::StoredPropertyInitializer);
   emitOrDelayFunction(*this, constant,
@@ -1138,6 +1165,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding), f));
   auto dc = binding->getDeclContext();
   SILGenFunction(*this, *f, dc).emitLazyGlobalInitializer(binding, pbdEntry);
+  emitLazyConformancesForFunction(f);
   f->verify();
 
   return f;
@@ -1161,10 +1189,9 @@ void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
                                             ParameterList *paramList) {
   unsigned index = 0;
   for (auto param : *paramList) {
-    if (auto defaultArg = param->getDefaultValue())
+    if (param->isDefaultArgument())
       emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl, index),
-                              defaultArg, param->getDefaultArgumentKind(),
-                              param->getDefaultArgumentInitContext());
+                              param);
     ++index;
   }
 }
@@ -1268,7 +1295,7 @@ void SILGenModule::emitObjCDestructorThunk(DestructorDecl *destructor) {
 void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
   assert(!TopLevelSGF && "script mode PBDs should be in TopLevelCodeDecls");
   for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i)
-    if (pd->getNonLazyInit(i))
+    if (pd->getExecutableInit(i))
       emitGlobalInitialization(pd, i);
 }
 
@@ -1368,8 +1395,7 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
   // stored) and doesn't have a setter with less-than-public visibility.
   auto expansion = ResilienceExpansion::Maximal;
 
-  switch (SGM.M.getSwiftModule()->getResilienceStrategy()) {
-  case ResilienceStrategy::Default: {
+  if (!SGM.M.getSwiftModule()->isResilient()) {
     if (SGM.canStorageUseStoredKeyPathComponent(decl, expansion)) {
       // External modules can't directly access storage, unless this is a
       // property in a fixed-layout type.
@@ -1387,18 +1413,15 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
 
     return false;
   }
-  case ResilienceStrategy::Resilient: {
-    // A resilient module needs to handle binaries compiled against its older
-    // versions. This means we have to be a bit more conservative, since in
-    // earlier versions, a settable property may have withheld the setter,
-    // or a fixed-layout type may not have been.
-    // Without availability information, only get-only computed properties
-    // can resiliently use trivial descriptors.
-    return !SGM.canStorageUseStoredKeyPathComponent(decl, expansion)
-      && decl->getSetter() == nullptr;
-  }
-  }
-  llvm_unreachable("unhandled strategy");
+
+  // A resilient module needs to handle binaries compiled against its older
+  // versions. This means we have to be a bit more conservative, since in
+  // earlier versions, a settable property may have withheld the setter,
+  // or a fixed-layout type may not have been.
+  // Without availability information, only get-only computed properties
+  // can resiliently use trivial descriptors.
+  return !SGM.canStorageUseStoredKeyPathComponent(decl, expansion)
+    && decl->getSetter() == nullptr;
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
@@ -1498,37 +1521,6 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
       TopLevelSGF->visit(ESD.get<Decl*>());
     }
   }
-}
-
-void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
-  // We don't need to emit dependent conformances.
-  if (conformanceRef.isAbstract()) 
-    return;
-
-  auto conformance = conformanceRef.getConcrete();
-  auto root = conformance->getRootNormalConformance();
-
-  // If we already emitted this witness table, we don't need to track the fact
-  // we need it.
-  if (emittedWitnessTables.count(root))
-    return;
-
-  // If we delayed emitting this witness table, force it.
-  auto foundDelayed = delayedConformances.find(root);
-  if (foundDelayed != delayedConformances.end()) {
-    forcedConformances.push_back(*foundDelayed);
-    delayedConformances.erase(foundDelayed);
-    return;
-  }
-
-  // Otherwise, just remember the fact we used this conformance.
-  usedConformances.insert(root);
-}
-
-void SILGenModule::useConformancesFromSubstitutions(
-                                                const SubstitutionMap subs) {
-  for (auto conf : subs.getConformances())
-    useConformance(conf);
 }
 
 namespace {
@@ -1657,6 +1649,7 @@ public:
       LLVM_DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
                  toplevel->print(llvm::dbgs()));
       toplevel->verify();
+      sgm.emitLazyConformancesForFunction(toplevel);
     }
 
     // If the source file contains an artificial main, emit the implicit
@@ -1697,10 +1690,6 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
     FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-tydecl", D);
     visit(D);
   }
-
-  // Mark any conformances as "used".
-  for (auto conformance : sf->getUsedConformances())
-    useConformance(ProtocolConformanceRef(conformance));
 }
 
 //===----------------------------------------------------------------------===//

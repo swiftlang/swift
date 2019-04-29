@@ -260,7 +260,7 @@ void PartialApplyCombiner::releaseTemporaries() {
       continue;
     for (auto *EndPoint : PAFrontier) {
       Builder.setInsertionPoint(EndPoint);
-      if (!TmpType.isAddressOnly(PAI->getModule())) {
+      if (!TmpType.isAddressOnly(*PAI->getFunction())) {
         auto *Load = Builder.createLoad(PAI->getLoc(), Op,
                                         LoadOwnershipQualifier::Unqualified);
         Builder.createReleaseValue(PAI->getLoc(), Load, Builder.getDefaultAtomicity());
@@ -663,6 +663,10 @@ void SILCombiner::replaceWitnessMethodInst(
 // This function determines concrete type of an opened existential argument
 // using ProtocolConformanceAnalysis. The concrete type of the argument can be a
 // class, struct, or an enum.
+//
+// If some ConcreteOpenedExistentialInfo is returned, then new cast instructions
+// have already been added to Builder's tracking list. If the caller can't make
+// real progress then it must reset the Builder.
 Optional<ConcreteOpenedExistentialInfo>
 SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     Operand &ArgOperand) {
@@ -998,9 +1002,15 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
         });
   }
 
-  if (!UpdatedArgs)
+  if (!UpdatedArgs) {
+    // Remove any new instructions created while attempting to optimize this
+    // apply. Since the apply was never rewritten, if they aren't removed here,
+    // they will be removed later as dead when visited by SILCombine, causing
+    // SILCombine to loop infinitely, creating and destroying the casts.
+    recursivelyDeleteTriviallyDeadInstructions(*Builder.getTrackingList());
+    Builder.getTrackingList()->clear();
     return nullptr;
-
+  }
   // Now create the new apply instruction.
   SILBuilderWithScope ApplyBuilder(Apply.getInstruction(), BuilderCtx);
   FullApplySite NewApply;
@@ -1132,6 +1142,9 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply) {
   if (COEIs.empty())
     return nullptr;
 
+  // At least one COEI is present, so cast instructions may already have been
+  // inserted. We must either rewrite the apply or delete the casts and reset
+  // the Builder's tracking list.
   return createApplyWithConcreteType(Apply, COEIs, BuilderCtx);
 }
 

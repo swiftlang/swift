@@ -33,23 +33,23 @@ public struct A1: PublicProto, PrivateProto {}
 // NEGATIVE-NOT: extension conformances.A2
 public struct A2: PrivateProto, PublicProto {}
 // CHECK: public struct A3 {
-// CHECK-END: extension conformances.A3 : PublicProto {}
+// CHECK-END: extension conformances.A3 : conformances.PublicProto {}
 public struct A3: PublicProto & PrivateProto {}
 // CHECK: public struct A4 {
-// CHECK-END: extension conformances.A4 : PublicProto {}
+// CHECK-END: extension conformances.A4 : conformances.PublicProto {}
 public struct A4: PrivateProto & PublicProto {}
 
 public protocol PublicBaseProto {}
 private protocol PrivateSubProto: PublicBaseProto {}
 
 // CHECK: public struct B1 {
-// CHECK-END: extension conformances.B1 : PublicBaseProto {}
+// CHECK-END: extension conformances.B1 : conformances.PublicBaseProto {}
 public struct B1: PrivateSubProto {}
 // CHECK: public struct B2 : PublicBaseProto {
 // NEGATIVE-NOT: extension conformances.B2
 public struct B2: PublicBaseProto, PrivateSubProto {}
 // CHECK: public struct B3 {
-// CHECK-END: extension conformances.B3 : PublicBaseProto {}
+// CHECK-END: extension conformances.B3 : conformances.PublicBaseProto {}
 public struct B3: PublicBaseProto & PrivateSubProto {}
 // CHECK: public struct B4 : PublicBaseProto {
 // CHECK: extension B4 {
@@ -87,26 +87,26 @@ public struct OuterGeneric<T> {
 public protocol ConditionallyConformed {}
 public protocol ConditionallyConformedAgain {}
 
-// CHECK-END: extension conformances.OuterGeneric : ConditionallyConformed, ConditionallyConformedAgain where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
+// CHECK-END: extension conformances.OuterGeneric : conformances.ConditionallyConformed, conformances.ConditionallyConformedAgain where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
 extension OuterGeneric: ConditionallyConformed where T: PrivateProto {}
 extension OuterGeneric: ConditionallyConformedAgain where T == PrivateProto {}
 
-// CHECK-END: extension conformances.OuterGeneric.Inner : PublicBaseProto {}
-// CHECK-END: extension conformances.OuterGeneric.Inner : ConditionallyConformed, ConditionallyConformedAgain where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
+// CHECK-END: extension conformances.OuterGeneric.Inner : conformances.PublicBaseProto {}
+// CHECK-END: extension conformances.OuterGeneric.Inner : conformances.ConditionallyConformed, conformances.ConditionallyConformedAgain where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
 extension OuterGeneric.Inner: ConditionallyConformed where T: PrivateProto {}
 extension OuterGeneric.Inner: ConditionallyConformedAgain where T == PrivateProto {}
 
 private protocol AnotherPrivateSubProto: PublicBaseProto {}
 
 // CHECK: public struct C1 {
-// CHECK-END: extension conformances.C1 : PublicBaseProto {}
+// CHECK-END: extension conformances.C1 : conformances.PublicBaseProto {}
 public struct C1: PrivateSubProto, AnotherPrivateSubProto {}
 // CHECK: public struct C2 {
-// CHECK-END: extension conformances.C2 : PublicBaseProto {}
+// CHECK-END: extension conformances.C2 : conformances.PublicBaseProto {}
 public struct C2: PrivateSubProto & AnotherPrivateSubProto {}
 // CHECK: public struct C3 {
 // CHECK: extension C3 {
-// CHECK-END: extension conformances.C3 : PublicBaseProto {}
+// CHECK-END: extension conformances.C3 : conformances.PublicBaseProto {}
 public struct C3: PrivateSubProto {}
 extension C3: AnotherPrivateSubProto {}
 
@@ -120,10 +120,10 @@ public struct D1: PublicSubProto, PrivateSubProto {}
 // NEGATIVE-NOT: extension conformances.D2
 public struct D2: PrivateSubProto, PublicSubProto {}
 // CHECK: public struct D3 {
-// CHECK-END: extension conformances.D3 : PublicBaseProto, PublicSubProto {}
+// CHECK-END: extension conformances.D3 : conformances.PublicBaseProto, conformances.PublicSubProto {}
 public struct D3: PrivateSubProto & PublicSubProto {}
 // CHECK: public struct D4 {
-// CHECK-END: extension conformances.D4 : APublicSubProto, PublicBaseProto {}
+// CHECK-END: extension conformances.D4 : conformances.APublicSubProto, conformances.PublicBaseProto {}
 public struct D4: APublicSubProto & PrivateSubProto {}
 // CHECK: public struct D5 {
 // CHECK: extension D5 : PublicSubProto {
@@ -139,33 +139,33 @@ extension D6: PrivateSubProto {}
 private typealias PrivateProtoAlias = PublicProto
 
 // CHECK: public struct E1 {
-// CHECK-END: extension conformances.E1 : PublicProto {}
+// CHECK-END: extension conformances.E1 : conformances.PublicProto {}
 public struct E1: PrivateProtoAlias {}
 
 private typealias PrivateSubProtoAlias = PrivateSubProto
 
 // CHECK: public struct F1 {
-// CHECK-END: extension conformances.F1 : PublicBaseProto {}
+// CHECK-END: extension conformances.F1 : conformances.PublicBaseProto {}
 public struct F1: PrivateSubProtoAlias {}
 
 private protocol ClassConstrainedProto: PublicProto, AnyObject {}
 
 public class G1: ClassConstrainedProto {}
 // CHECK: public class G1 {
-// CHECK-END: extension conformances.G1 : PublicProto {}
+// CHECK-END: extension conformances.G1 : conformances.PublicProto {}
 
 public class Base {}
 private protocol BaseConstrainedProto: Base, PublicProto {}
 
 public class H1: Base, ClassConstrainedProto {}
 // CHECK: public class H1 : Base {
-// CHECK-END: extension conformances.H1 : PublicProto {}
+// CHECK-END: extension conformances.H1 : conformances.PublicProto {}
 
 public struct MultiGeneric<T, U, V> {}
 extension MultiGeneric: PublicProto where U: PrivateProto {}
 
 // CHECK: public struct MultiGeneric<T, U, V> {
-// CHECK-END: extension conformances.MultiGeneric : PublicProto where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
+// CHECK-END: extension conformances.MultiGeneric : conformances.PublicProto where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
 
 
 internal struct InternalImpl_BAD: PrivateSubProto {}

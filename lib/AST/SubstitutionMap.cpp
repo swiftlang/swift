@@ -310,7 +310,9 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   // If we have an archetype, map out of the context so we can compute a
   // conformance access path.
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {
-    type = archetype->getInterfaceType()->getCanonicalType();
+    if (!isa<OpaqueTypeArchetypeType>(archetype->getRoot())) {
+      type = archetype->getInterfaceType()->getCanonicalType();
+    }
   }
 
   // Error path: if we don't have a type parameter, there is no conformance.
@@ -444,7 +446,8 @@ SubstitutionMap SubstitutionMap::subst(SubstitutionMap subMap) const {
 }
 
 SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
-                                       LookupConformanceFn conformances) const {
+                                       LookupConformanceFn conformances,
+                                       SubstOptions options) const {
   if (empty()) return SubstitutionMap();
 
   SmallVector<Type, 4> newSubs;
@@ -454,7 +457,8 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
       newSubs.push_back(Type());
       continue;
     }
-    newSubs.push_back(type.subst(subs, conformances, SubstFlags::UseErrorType));
+    newSubs.push_back(type.subst(subs, conformances,
+                                 options | SubstFlags::UseErrorType));
   }
 
   SmallVector<ProtocolConformanceRef, 4> newConformances;
@@ -474,10 +478,11 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
           conformance.getConcrete()->subst(subs, conformances)));
     } else {
       auto origType = req.getFirstType();
-      auto substType = origType.subst(*this, SubstFlags::UseErrorType);
+      auto substType = origType.subst(*this,
+                                      options | SubstFlags::UseErrorType);
 
       newConformances.push_back(
-        conformance.subst(substType, subs, conformances));
+        conformance.subst(substType, subs, conformances, options));
     }
 
     oldConformances = oldConformances.slice(1);
@@ -485,6 +490,13 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
 
   assert(oldConformances.empty());
   return SubstitutionMap(genericSig, newSubs, newConformances);
+}
+
+SubstitutionMap
+SubstitutionMap::substOpaqueTypesWithUnderlyingTypes()
+const {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer;
+  return subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
 }
 
 SubstitutionMap
@@ -664,33 +676,20 @@ void SubstitutionMap::verify() const {
     if (conformance.isInvalid())
       continue;
 
-    // An existential type can have an abstract conformance to
-    // AnyObject or an @objc protocol.
-    if (conformance.isAbstract() &&
-        substType->isExistentialType()) {
-      auto *proto = conformance.getRequirement();
-      if (!proto->isObjC()) {
-        llvm::dbgs() << "Existential type conforms to something:\n";
-        substType->dump();
-        llvm::dbgs() << "SubstitutionMap:\n";
-        dump(llvm::dbgs());
-        llvm::dbgs() << "\n";
-      }
-
-      assert(proto->isObjC() &&
-             "an existential type can conform only to an "
-             "@objc-protocol");
-      continue;
-    }
     // All of the conformances should be concrete.
     if (!conformance.isConcrete()) {
-      llvm::dbgs() << "Concrete substType type:\n";
+      llvm::dbgs() << "Concrete type cannot have abstract conformance:\n";
       substType->dump(llvm::dbgs());
       llvm::dbgs() << "SubstitutionMap:\n";
       dump(llvm::dbgs());
       llvm::dbgs() << "\n";
     }
     assert(conformance.isConcrete() && "Conformance should be concrete");
+
+    if (substType->isExistentialType()) {
+      assert(isa<SelfProtocolConformance>(conformance.getConcrete()) &&
+              "Existential type cannot have normal conformance");
+    }
 
     ++conformanceIndex;
   }
@@ -701,3 +700,14 @@ void SubstitutionMap::profile(llvm::FoldingSetNodeID &id) const {
   id.AddPointer(storage);
 }
 
+bool SubstitutionMap::isIdentity() const {
+  for (unsigned i : indices(getReplacementTypes())) {
+    auto replacement = dyn_cast<GenericTypeParamType>(
+      getReplacementTypes()[i]->getCanonicalType(getGenericSignature()));
+    if (!replacement)
+      return false;
+    if (getGenericSignature()->getGenericParamOrdinal(replacement) != i)
+      return false;
+  }
+  return true;
+}

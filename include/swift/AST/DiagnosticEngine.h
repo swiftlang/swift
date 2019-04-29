@@ -28,7 +28,8 @@ namespace swift {
   class DiagnosticEngine;
   class SourceManager;
   class ValueDecl;
-  
+  class SourceFile;
+
   enum class PatternKind : uint8_t;
   enum class SelfAccessKind : uint8_t;
   enum class ReferenceOwnership : uint8_t;
@@ -561,6 +562,12 @@ namespace swift {
     /// emitted once all transactions have closed.
     unsigned TransactionCount = 0;
 
+    /// For batch mode, use this to know where to output a diagnostic from a
+    /// non-primary file. It's any location in the buffer of the current primary
+    /// input being compiled.
+    /// May be invalid.
+    SourceLoc bufferIndirectlyCausingDiagnostic;
+
     friend class InFlightDiagnostic;
     friend class DiagnosticTransaction;
     
@@ -799,6 +806,27 @@ namespace swift {
 
   public:
     static const char *diagnosticStringFor(const DiagID id);
+
+    /// If there is no clear .dia file for a diagnostic, put it in the one
+    /// corresponding to the SourceLoc given here.
+    /// In particular, in batch mode when a diagnostic is located in
+    /// a non-primary file, use this affordance to place it in the .dia
+    /// file for the primary that is currently being worked on.
+    void setBufferIndirectlyCausingDiagnosticToInput(SourceLoc);
+    void resetBufferIndirectlyCausingDiagnostic();
+    SourceLoc getDefaultDiagnosticLoc() const {
+      return bufferIndirectlyCausingDiagnostic;
+    }
+  };
+
+  class BufferIndirectlyCausingDiagnosticRAII {
+  private:
+    DiagnosticEngine &Diags;
+  public:
+    BufferIndirectlyCausingDiagnosticRAII(const SourceFile &SF);
+    ~BufferIndirectlyCausingDiagnosticRAII() {
+      Diags.resetBufferIndirectlyCausingDiagnostic();
+    }
   };
 
   /// Represents a diagnostic transaction. While a transaction is

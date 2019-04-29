@@ -276,6 +276,15 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   if (type->hasError())
     return None;
 
+  if (auto *locator = typeVar->getImpl().getLocator()) {
+    if (locator->isKeyPathType()) {
+      auto *BGT =
+          type->lookThroughAllOptionalTypes()->getAs<BoundGenericType>();
+      if (!BGT || !isKnownKeyPathDecl(getASTContext(), BGT->getDecl()))
+        return None;
+    }
+  }
+
   // If the source of the binding is 'OptionalObject' constraint
   // and type variable is on the left-hand side, that means
   // that it _has_ to be of optional type, since the right-hand
@@ -475,6 +484,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     case ConstraintKind::KeyPathApplication:
     case ConstraintKind::FunctionInput:
     case ConstraintKind::FunctionResult:
+    case ConstraintKind::OpaqueUnderlyingType:
       // Constraints from which we can't do anything.
       break;
 

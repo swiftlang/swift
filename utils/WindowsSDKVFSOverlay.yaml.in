@@ -29,6 +29,9 @@ roots:
   - name: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um"
     type: directory
     contents:
+      - name: accctrl.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/AccCtrl.h"
       - name: commctrl.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/CommCtrl.h"

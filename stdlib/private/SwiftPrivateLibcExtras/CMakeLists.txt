@@ -5,6 +5,8 @@ add_swift_target_library(swiftSwiftPrivateLibcExtras ${SWIFT_STDLIB_LIBRARY_BUIL
   Subprocess.c
   Subprocess.swift
 
+  "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
+
   SWIFT_MODULE_DEPENDS SwiftPrivate
   SWIFT_COMPILE_FLAGS
   SWIFT_MODULE_DEPENDS_OSX Darwin

@@ -490,47 +490,64 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
     // info than that, unlike a typealias
   }
 
+  if (!parentTy)
+    return;
+
   // If this decl is generic, the constraints are handled when the generic
   // parameters are applied, so we don't have to handle them here (which makes
   // getting the right substitution maps easier).
-  if (decl && !decl->isGeneric()) {
-    auto extension = dyn_cast<ExtensionDecl>(decl->getDeclContext());
-    if (parentTy && extension && extension->isConstrainedExtension()) {
-      auto contextSubMap = parentTy->getContextSubstitutionMap(
-          extension->getParentModule(),
-          extension->getSelfNominalTypeDecl());
-      if (!subMap) {
-        // The substitution map wasn't set above, meaning we should grab the map
-        // for the extension itself.
-        subMap = parentTy->getContextSubstitutionMap(
-            extension->getParentModule(), extension);
-      }
+  if (!decl || decl->isGeneric())
+    return;
 
-      if (auto *signature = decl->getGenericSignature()) {
-        cs.openGenericRequirements(
-            extension, signature, /*skipProtocolSelfConstraint*/ true, locator,
-            [&](Type type) {
-              // Why do we look in two substitution maps? We have to use the
-              // context substitution map to find types, because we need to
-              // avoid thinking about them when handling the constraints, or all
-              // the requirements in the signature become tautologies (if the
-              // extension has 'T == Int', subMap will map T -> Int, so the
-              // requirement becomes Int == Int no matter what the actual types
-              // are here). However, we need the conformances for the extension
-              // because the requirements might look like `T: P, T.U: Q`, where
-              // U is an associated type of protocol P.
-              return type.subst(QuerySubstitutionMap{contextSubMap},
-                                LookUpConformanceInSubstitutionMap(subMap),
-                                SubstFlags::UseErrorType);
-            });
-      }
+  // struct A<T> {
+  //   let foo: [T]
+  // }
+  //
+  // extension A : Codable where T: Codable {
+  //   enum CodingKeys: String, CodingKey {
+  //     case foo = "foo"
+  //   }
+  // }
+  //
+  // Reference to `A.CodingKeys.foo` would point to `A` as an
+  // unbound generic type. Conditional requirements would be
+  // added when `A` is "opened". Les delay this check until then.
+  if (parentTy->hasUnboundGenericType())
+    return;
+
+  auto extension = dyn_cast<ExtensionDecl>(decl->getDeclContext());
+  if (extension && extension->isConstrainedExtension()) {
+    auto contextSubMap = parentTy->getContextSubstitutionMap(
+        extension->getParentModule(), extension->getSelfNominalTypeDecl());
+    if (!subMap) {
+      // The substitution map wasn't set above, meaning we should grab the map
+      // for the extension itself.
+      subMap = parentTy->getContextSubstitutionMap(extension->getParentModule(),
+                                                   extension);
     }
 
-    // And now make sure sure the parent is okay, for things like X<T>.Y.Z.
-    if (parentTy) {
-      checkNestedTypeConstraints(cs, parentTy, locator);
+    if (auto *signature = decl->getGenericSignature()) {
+      cs.openGenericRequirements(
+          extension, signature, /*skipProtocolSelfConstraint*/ true, locator,
+          [&](Type type) {
+            // Why do we look in two substitution maps? We have to use the
+            // context substitution map to find types, because we need to
+            // avoid thinking about them when handling the constraints, or all
+            // the requirements in the signature become tautologies (if the
+            // extension has 'T == Int', subMap will map T -> Int, so the
+            // requirement becomes Int == Int no matter what the actual types
+            // are here). However, we need the conformances for the extension
+            // because the requirements might look like `T: P, T.U: Q`, where
+            // U is an associated type of protocol P.
+            return type.subst(QuerySubstitutionMap{contextSubMap},
+                              LookUpConformanceInSubstitutionMap(subMap),
+                              SubstFlags::UseErrorType);
+          });
     }
   }
+
+  // And now make sure sure the parent is okay, for things like X<T>.Y.Z.
+  checkNestedTypeConstraints(cs, parentTy, locator);
 }
 
 Type ConstraintSystem::openUnboundGenericType(
@@ -1189,19 +1206,6 @@ ConstraintSystem::getTypeOfMemberReference(
 
   FunctionType::Param baseObjParam(baseObjTy);
 
-  // Don't open existentials when accessing typealias members of
-  // protocols.
-  if (auto *alias = dyn_cast<TypeAliasDecl>(value)) {
-    if (baseObjTy->isExistentialType()) {
-      auto memberTy = alias->getInterfaceType();
-      // If we end up with a protocol typealias here, it's underlying
-      // type must be fully concrete.
-      assert(!memberTy->hasTypeParameter());
-      auto openedType = FunctionType::get({baseObjParam}, memberTy);
-      return { openedType, memberTy };
-    }
-  }
-
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
     assert(!isa<ModuleDecl>(typeDecl) && "Nested module?");
 
@@ -1270,7 +1274,8 @@ ConstraintSystem::getTypeOfMemberReference(
     // If self is a value type and the base type is an lvalue, wrap it in an
     // inout type.
     auto selfFlags = ParameterTypeFlags();
-    if (!outerDC->getDeclaredInterfaceType()->hasReferenceSemantics() &&
+    if (isInstance &&
+        !outerDC->getDeclaredInterfaceType()->hasReferenceSemantics() &&
         baseTy->is<LValueType>() &&
         !selfTy->hasError())
       selfFlags = selfFlags.withInOut(true);
@@ -1384,6 +1389,7 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::DynamicMemberLookup:
+  case OverloadChoiceKind::KeyPathDynamicMemberLookup:
   case OverloadChoiceKind::KeyPathApplication:
   case OverloadChoiceKind::TupleIndex:
     return Type();
@@ -1529,9 +1535,11 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     // existentials (as seen from the current abstraction level), which can't
     // be expressed in the type system currently.
     auto input = CS.createTypeVariable(
-        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument));
+        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+        TVO_CanBindToNoEscape);
     auto output = CS.createTypeVariable(
-        CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult));
+        CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
+        TVO_CanBindToNoEscape);
 
     FunctionType::Param inputArg(input,
                                  CS.getASTContext().getIdentifier("of"));
@@ -1547,14 +1555,17 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     // receives a copy of the argument closure that is temporarily made
     // @escaping.
     auto noescapeClosure = CS.createTypeVariable(
-        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument));
+        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+        TVO_CanBindToNoEscape);
     auto escapeClosure = CS.createTypeVariable(
-        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument));
+        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+        TVO_CanBindToNoEscape);
     CS.addConstraint(ConstraintKind::EscapableFunctionOf,
          escapeClosure, noescapeClosure,
          CS.getConstraintLocator(locator, ConstraintLocator::RValueAdjustment));
     auto result = CS.createTypeVariable(
-        CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult));
+        CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
+        TVO_CanBindToNoEscape);
     FunctionType::Param arg(escapeClosure);
     auto bodyClosure = FunctionType::get(arg, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
@@ -1576,14 +1587,17 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     // The body closure receives a freshly-opened archetype constrained by the
     // existential type as its input.
     auto openedTy = CS.createTypeVariable(
-        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument));
+        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+        TVO_CanBindToNoEscape);
     auto existentialTy = CS.createTypeVariable(
-        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument));
+        CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+        TVO_CanBindToNoEscape);
     CS.addConstraint(ConstraintKind::OpenedExistentialOf,
          openedTy, existentialTy,
          CS.getConstraintLocator(locator, ConstraintLocator::RValueAdjustment));
     auto result = CS.createTypeVariable(
-        CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult));
+        CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
+        TVO_CanBindToNoEscape);
     FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
     auto bodyClosure = FunctionType::get(bodyArgs, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
@@ -1680,6 +1694,20 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                        Type boundType,
                                        OverloadChoice choice,
                                        DeclContext *useDC) {
+  // Add a conformance constraint to make sure that given type conforms
+  // to Hashable protocol, which is important for key path subscript
+  // components.
+  auto verifyThatArgumentIsHashable = [&](unsigned index, Type argType,
+                                          ConstraintLocator *locator) {
+    if (auto *hashable = TC.getProtocol(choice.getDecl()->getLoc(),
+                                        KnownProtocolKind::Hashable)) {
+      addConstraint(ConstraintKind::ConformsTo, argType,
+                    hashable->getDeclaredType(),
+                    getConstraintLocator(
+                        locator, LocatorPathElt::getTupleElement(index)));
+    }
+  };
+
   // Determine the type to which we'll bind the overload set's type.
   Type refType;
   Type openedFullType;
@@ -1700,7 +1728,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
-  case OverloadChoiceKind::DynamicMemberLookup: {
+  case OverloadChoiceKind::DynamicMemberLookup:
+  case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
     // Retrieve the type of a reference to the specific declaration choice.
     if (auto baseTy = choice.getBaseType()) {
       assert(!baseTy->hasTypeParameter());
@@ -1754,7 +1783,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
           // For our original type T -> U?? we will generate:
           // A disjunction V = { U?, U }
           // and a disjunction boundType = { T -> V?, T -> V }
-          Type ty = createTypeVariable(locator);
+          Type ty = createTypeVariable(locator, TVO_CanBindToNoEscape);
 
           buildDisjunctionForImplicitlyUnwrappedOptional(ty, optTy, locator);
 
@@ -1822,7 +1851,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
         // Build the disjunction to attempt binding both T? and T (or
         // function returning T? and function returning T).
-        Type ty = createTypeVariable(locator, TVO_CanBindToLValue);
+        Type ty = createTypeVariable(locator,
+                                     TVO_CanBindToLValue |
+                                     TVO_CanBindToNoEscape);
         buildDisjunctionForImplicitlyUnwrappedOptional(ty, refType, locator);
         addConstraint(ConstraintKind::Bind, boundType,
                       OptionalType::get(ty->getRValueType()), locator);
@@ -1852,15 +1883,141 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       assert(refFnType->getParams().size() == 1 &&
              "subscript always has one arg");
       auto argType = refFnType->getParams()[0].getPlainType();
-      
-      auto protoKind = KnownProtocolKind::ExpressibleByStringLiteral;
-      auto protocol = getTypeChecker().getProtocol(choice.getDecl()->getLoc(),
-                                                   protoKind);
-      if (!protocol)
+
+      auto &TC = getTypeChecker();
+
+      auto stringLiteral =
+          TC.getProtocol(choice.getDecl()->getLoc(),
+                         KnownProtocolKind::ExpressibleByStringLiteral);
+      if (!stringLiteral)
         break;
+
       addConstraint(ConstraintKind::LiteralConformsTo, argType,
-                    protocol->getDeclaredType(),
-                    locator);
+                    stringLiteral->getDeclaredType(), locator);
+
+      // If this is used inside of the keypath expression, we need to make
+      // sure that argument is Hashable.
+      if (isa<KeyPathExpr>(locator->getAnchor()))
+        verifyThatArgumentIsHashable(0, argType, locator);
+    }
+
+    if (kind == OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+      auto *fnType = refType->castTo<FunctionType>();
+      assert(fnType->getParams().size() == 1 &&
+             "subscript always has one argument");
+      // Parameter type is KeyPath<T, U> where `T` is a root type
+      // and U is a leaf type (aka member type).
+      auto keyPathTy =
+          fnType->getParams()[0].getPlainType()->castTo<BoundGenericType>();
+
+      refType = fnType->getResult();
+
+      auto *keyPathDecl = keyPathTy->getAnyNominal();
+      assert(isKnownKeyPathDecl(getASTContext(), keyPathDecl) &&
+             "parameter is supposed to be a keypath");
+
+      auto *keyPathLoc = getConstraintLocator(
+          locator, LocatorPathElt::getKeyPathDynamicMember(keyPathDecl));
+
+      auto rootTy = keyPathTy->getGenericArgs()[0];
+      auto leafTy = keyPathTy->getGenericArgs()[1];
+
+      // Member would either point to mutable or immutable property, we
+      // don't which at the moment, so let's allow its type to be l-value.
+      auto memberTy = createTypeVariable(keyPathLoc,
+                                         TVO_CanBindToLValue |
+                                         TVO_CanBindToNoEscape);
+      // Attempt to lookup a member with a give name in the root type and
+      // assign result to the leaf type of the keypath.
+      bool isSubscriptRef = locator->isSubscriptMemberRef();
+      DeclName memberName =
+          isSubscriptRef ? DeclBaseName::createSubscript() : choice.getName();
+
+      addValueMemberConstraint(LValueType::get(rootTy), memberName, memberTy,
+                               useDC,
+                               isSubscriptRef ? FunctionRefKind::DoubleApply
+                                              : FunctionRefKind::Unapplied,
+                               /*outerAlternatives=*/{}, keyPathLoc);
+
+      // In case of subscript things are more compicated comparing to "dot"
+      // syntax, because we have to get "applicable function" constraint
+      // associated with index expression and re-bind it to match "member type"
+      // looked up by dynamically.
+      if (isSubscriptRef) {
+        // Make sure that regular subscript declarations (if any) are
+        // preferred over key path dynamic member lookup.
+        increaseScore(SK_KeyPathSubscript);
+
+        auto dynamicResultTy = boundType->castTo<TypeVariableType>();
+        llvm::SetVector<Constraint *> constraints;
+        CG.gatherConstraints(dynamicResultTy, constraints,
+                             ConstraintGraph::GatheringKind::EquivalenceClass,
+                             [](Constraint *constraint) {
+                               return constraint->getKind() ==
+                                      ConstraintKind::ApplicableFunction;
+                             });
+
+        assert(constraints.size() == 1);
+        auto *applicableFn = constraints.front();
+        retireConstraint(applicableFn);
+
+        // Original subscript expression e.g. `<base>[0]` generated following
+        // constraint `($T_A0, [$T_A1], ...) -> $T_R applicable fn $T_S` where
+        // `$T_S` is supposed to be bound to each subscript choice e.g.
+        // `(Int) -> Int`.
+        //
+        // Here is what we need to do to make this work as-if expression was
+        // `<base>[dynamicMember: \.[0]]`:
+        // - Right-hand side function type would have to get a new result type
+        //   since it would have to point to result type of `\.[0]`, arguments
+        //   though should stay the same.
+        // - Left-hand side `$T_S` is going to point to a new "member type"
+        //   we are looking up based on the root type of the key path.
+        // - Original result type `$T_R` is going to represent result of
+        //   the `[dynamicMember: \.[0]]` invocation.
+
+        // Result of the `WritableKeyPath` is going to be l-value type,
+        // let's adjust l-valueness of the result type to accommodate that.
+        //
+        // This is required because we are binding result of the subscript
+        // to its "member type" which becomes dynamic result type. We could
+        // form additional `applicable fn` constraint here and bind it to a
+        // function type, but it would create inconsistency with how properties
+        // are handled, which means more special handling in CSApply.
+        if (keyPathDecl == getASTContext().getWritableKeyPathDecl() ||
+            keyPathDecl == getASTContext().getReferenceWritableKeyPathDecl())
+          dynamicResultTy->getImpl().setCanBindToLValue(getSavedBindings(),
+                                                        /*enabled=*/true);
+
+        auto fnType = applicableFn->getFirstType()->castTo<FunctionType>();
+
+        auto subscriptResultTy = createTypeVariable(
+            getConstraintLocator(locator->getAnchor(),
+                                 ConstraintLocator::FunctionResult),
+            TVO_CanBindToLValue |
+            TVO_CanBindToNoEscape);
+
+        auto adjustedFnTy =
+            FunctionType::get(fnType->getParams(), subscriptResultTy);
+
+        addConstraint(ConstraintKind::ApplicableFunction, adjustedFnTy,
+                      memberTy, applicableFn->getLocator());
+
+        addConstraint(ConstraintKind::Bind, dynamicResultTy,
+                      fnType->getResult(), keyPathLoc);
+
+        addConstraint(ConstraintKind::Equal, subscriptResultTy, leafTy,
+                      keyPathLoc);
+      } else {
+        // Since member type is going to be bound to "leaf" generic parameter
+        // of the keypath, it has to be an r-value always, so let's add a new
+        // constraint to represent that conversion instead of loading member
+        // type into "leaf" directly.
+        addConstraint(ConstraintKind::Equal, memberTy, leafTy, keyPathLoc);
+      }
+
+      if (isa<KeyPathExpr>(locator->getAnchor()))
+        verifyThatArgumentIsHashable(0, keyPathTy, locator);
     }
     break;
   }
@@ -1887,12 +2044,14 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // The element type is T or @lvalue T based on the key path subtype and
     // the mutability of the base.
     auto keyPathIndexTy = createTypeVariable(
-        getConstraintLocator(locator, ConstraintLocator::FunctionArgument));
+        getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+        TVO_CanBindToInOut);
     auto elementTy = createTypeVariable(
             getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-            TVO_CanBindToLValue);
+            TVO_CanBindToLValue | TVO_CanBindToNoEscape);
     auto elementObjTy = createTypeVariable(
-        getConstraintLocator(locator, ConstraintLocator::FunctionArgument));
+        getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
+        TVO_CanBindToNoEscape);
     addConstraint(ConstraintKind::Equal, elementTy, elementObjTy, locator);
 
     // The element result is an lvalue or rvalue based on the key path class.
@@ -1927,6 +2086,21 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
           CD->hasThrows() != boundFunctionType->throws()) {
         boundType = boundFunctionType->withExtInfo(
             boundFunctionType->getExtInfo().withThrows());
+      }
+    }
+
+    if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
+      if (locator->isResultOfKeyPathDynamicMemberLookup() ||
+          locator->isKeyPathSubscriptComponent()) {
+        // Subscript type has a format of (Self[.Type) -> (Arg...) -> Result
+        auto declTy = openedFullType->castTo<FunctionType>();
+        auto subscriptTy = declTy->getResult()->castTo<FunctionType>();
+        // If we have subscript, each of the arguments has to conform to
+        // Hashable, because it would be used as a component inside key path.
+        for (auto index : indices(subscriptTy->getParams())) {
+          const auto &param = subscriptTy->getParams()[index];
+          verifyThatArgumentIsHashable(index, param.getPlainType(), locator);
+        }
       }
     }
 
@@ -2021,7 +2195,8 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
       // through lvalue, inout and IUO types here
       Type lookupBaseType = newBase->getWithoutSpecifierType();
 
-      if (lookupBaseType->mayHaveMembers()) {
+      if (lookupBaseType->mayHaveMembers() ||
+          lookupBaseType->is<DynamicSelfType>()) {
         auto *proto = assocType->getProtocol();
         auto conformance = cs.DC->getParentModule()->lookupConformance(
           lookupBaseType, proto);
@@ -2098,8 +2273,9 @@ DeclName OverloadChoice::getName() const {
       return DeclBaseName::createSubscript();
     
     case OverloadChoiceKind::DynamicMemberLookup:
-      return DeclName(DynamicNameAndFRK.getPointer());
-      
+    case OverloadChoiceKind::KeyPathDynamicMemberLookup:
+      return DeclName(DynamicMember.getPointer());
+
     case OverloadChoiceKind::BaseType:
     case OverloadChoiceKind::TupleIndex:
       llvm_unreachable("no name!");
@@ -2436,6 +2612,7 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
 
       case OverloadChoiceKind::KeyPathApplication:
       case OverloadChoiceKind::DynamicMemberLookup:
+      case OverloadChoiceKind::KeyPathDynamicMemberLookup:
         // Skip key path applications and dynamic member lookups, since we don't
         // want them to noise up unrelated subscript diagnostics.
         break;
@@ -2530,4 +2707,16 @@ void ConstraintSystem::generateConstraints(
 
     recordChoice(constraints, index, choices[index]);
   }
+}
+
+bool constraints::isKnownKeyPathType(Type type) {
+  if (auto *BGT = type->getAs<BoundGenericType>())
+    return isKnownKeyPathDecl(type->getASTContext(), BGT->getDecl());
+  return false;
+}
+
+bool constraints::isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl) {
+  return decl == ctx.getKeyPathDecl() || decl == ctx.getWritableKeyPathDecl() ||
+         decl == ctx.getReferenceWritableKeyPathDecl() ||
+         decl == ctx.getPartialKeyPathDecl() || decl == ctx.getAnyKeyPathDecl();
 }

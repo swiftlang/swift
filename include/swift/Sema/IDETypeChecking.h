@@ -65,10 +65,16 @@ namespace swift {
 
   struct ResolvedMemberResult {
     struct Implementation;
-    Implementation &Impl;
+    Implementation *Impl;
 
     ResolvedMemberResult();
     ~ResolvedMemberResult();
+    ResolvedMemberResult(const ResolvedMemberResult &) = delete;
+    ResolvedMemberResult & operator=(ResolvedMemberResult &) = delete;
+    ResolvedMemberResult(ResolvedMemberResult &&other) {
+      Impl = other.Impl;
+      other.Impl = nullptr;
+    }
     operator bool() const;
     bool hasBestOverload() const;
     ValueDecl* getBestOverload() const;
@@ -202,6 +208,41 @@ namespace swift {
   /// the decl context.
   bool resolveProtocolNames(DeclContext *DC, ArrayRef<const char *> names,
                             llvm::MapVector<ProtocolDecl*, StringRef> &result);
+
+  /// FIXME: All of the below goes away once CallExpr directly stores its
+  /// arguments.
+
+  /// Return value for getOriginalArgumentList().
+  struct OriginalArgumentList {
+    SmallVector<Expr *, 4> args;
+    SmallVector<Identifier, 4> labels;
+    SmallVector<SourceLoc, 4> labelLocs;
+    SourceLoc lParenLoc;
+    SourceLoc rParenLoc;
+    bool hasTrailingClosure = false;
+  };
+
+  /// When applying a solution to a constraint system, the type checker rewrites
+  /// argument lists of calls to insert default arguments and collect varargs.
+  /// Sometimes for diagnostics we want to work on the original argument list as
+  /// written by the user; this performs the reverse transformation.
+  OriginalArgumentList getOriginalArgumentList(Expr *expr);
+
+  /// Return true if the specified type or a super-class/super-protocol has the
+  /// @dynamicMemberLookup attribute on it.
+  bool hasDynamicMemberLookupAttribute(Type type);
+
+  /// Returns the root type of the keypath type in a keypath dynamic member
+  /// lookup subscript, or \c None if it cannot be determined.
+  ///
+  /// \param subscript The potential keypath dynamic member lookup subscript.
+  /// \param DC The DeclContext from which the subscript is being referenced.
+  Optional<Type> getRootTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
+                                                   const DeclContext *DC);
+
+  /// Determine whether the given property is part of the memberwise initializer
+  /// for a struct.
+  bool isMemberwiseInitialized(VarDecl *var);
 }
 
 #endif

@@ -1879,11 +1879,15 @@ namespace {
       // more no-payload case than extra inhabitants in the payload. This could
       // be slightly generalized to cases where there's multiple tag bits and
       // exactly one no-payload case in the highest used tag value.
+      unsigned extraInhabitantCount = getFixedExtraInhabitantCount(IGF.IGM);
       if (!tagBits ||
-        ElementsWithNoPayload.size() != getFixedExtraInhabitantCount(IGF.IGM)+1)
-          payloadResult = payload.emitCompare(IGF,
-                                        ti.getFixedExtraInhabitantMask(IGF.IGM),
-                                        payloadTag);
+          ElementsWithNoPayload.size() != extraInhabitantCount + 1) {
+        payloadResult = payload.emitCompare(
+            IGF,
+            extraInhabitantCount == 0 ? APInt::getAllOnesValue(PayloadBitCount)
+                                      : ti.getFixedExtraInhabitantMask(IGF.IGM),
+            payloadTag);
+      }
 
       // If any tag bits are present, they must match.
       llvm::Value *tagResult = nullptr;
@@ -6699,17 +6703,12 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
 }
 
 void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
-  if (!IRGen.tryEnableLazyTypeMetadata(theEnum))
+  if (!IRGen.hasLazyMetadata(theEnum)) {
     emitEnumMetadata(*this, theEnum);
-
-  emitNestedTypeDecls(theEnum->getMembers());
-
-  if (shouldEmitOpaqueTypeMetadataRecord(theEnum)) {
-    emitOpaqueTypeMetadataRecord(theEnum);
-    return;
+    emitFieldDescriptor(theEnum);
   }
 
-  emitFieldMetadataRecord(theEnum);
+  emitNestedTypeDecls(theEnum->getMembers());
 
   if (!isResilient(theEnum, ResilienceExpansion::Minimal))
     return;

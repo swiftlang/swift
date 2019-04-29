@@ -9,3 +9,9 @@ func test1(s: Test1) {
 func test2(s: Test2) {
   _ = s.property
 }
+
+// rdar://49482742 - shouldn't warn about 's' never being mutated
+func test3() {
+  var s = Test1()
+  _ = s.property
+}

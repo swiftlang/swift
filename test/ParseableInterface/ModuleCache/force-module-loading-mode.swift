@@ -54,7 +54,7 @@
 // RUN: %empty-directory(%t/MCP)
 
 // 6. Both are present but the module can't be opened.
-// RUN: chmod a-r %t/Lib.swiftmodule
+// RUN: %{python} %S/../Inputs/make-unreadable.py %t/Lib.swiftmodule
 // RUN: env SWIFT_FORCE_MODULE_LOADING=prefer-parseable not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=FROM-INTERFACE %s
 // RUN: %empty-directory(%t/MCP)
 // RUN: env SWIFT_FORCE_MODULE_LOADING=prefer-serialized not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP %s -I %t 2>&1 | %FileCheck -check-prefix=NO-SUCH-MODULE %s
@@ -69,7 +69,7 @@
 
 import Lib
 // NO-SUCH-MODULE: [[@LINE-1]]:8: error: no such module 'Lib'
-// BAD-MODULE: [[@LINE-2]]:8: error: malformed module file: {{.*}}Lib.swiftmodule
+// BAD-MODULE: [[@LINE-2]]:8: error: malformed compiled module: {{.*}}Lib.swiftmodule
 
 struct X {}
 let _: X = Lib.testValue

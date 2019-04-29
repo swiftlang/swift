@@ -775,8 +775,8 @@ ManagedValue SILGenFunction::emitExistentialErasure(
 
     auto upcast =
       B.createInitExistentialMetatype(loc, metatype,
-                                      existentialTL.getLoweredType(),
-                                      conformances);
+                      existentialTL.getLoweredType(),
+                      conformances);
     return ManagedValue::forUnmanaged(upcast);
   }
   case ExistentialRepresentation::Class: {
@@ -923,27 +923,20 @@ ManagedValue SILGenFunction::emitProtocolMetatypeToObject(SILLocation loc,
   return emitManagedRValueWithCleanup(value);
 }
 
-SILGenFunction::OpaqueValueState
+ManagedValue
 SILGenFunction::emitOpenExistential(
        SILLocation loc,
        ManagedValue existentialValue,
-       ArchetypeType *openedArchetype,
        SILType loweredOpenedType,
        AccessKind accessKind) {
   assert(isInFormalEvaluationScope());
 
-  // Open the existential value into the opened archetype value.
-  bool isUnique = true;
-  bool canConsume;
-  ManagedValue archetypeMV;
-  
   SILType existentialType = existentialValue.getType();
   switch (existentialType.getPreferredExistentialRepresentation(SGM.M)) {
   case ExistentialRepresentation::Opaque: {
     // With CoW existentials we can't consume the boxed value inside of
     // the existential. (We could only do so after a uniqueness check on
     // the box holding the value).
-    canConsume = false;
     if (existentialType.isAddress()) {
       OpenedExistentialAccess allowedAccess =
           getOpenedExistentialAccessFor(accessKind);
@@ -956,28 +949,20 @@ SILGenFunction::emitOpenExistential(
       SILValue archetypeValue =
         B.createOpenExistentialAddr(loc, existentialValue.getValue(),
                                     loweredOpenedType, allowedAccess);
-      archetypeMV = ManagedValue::forUnmanaged(archetypeValue);
+      return ManagedValue::forUnmanaged(archetypeValue);
     } else {
       // borrow the existential and return an unmanaged opened value.
-      archetypeMV = getBuilder().createOpenExistentialValue(
+      return B.createOpenExistentialValue(
           loc, existentialValue, loweredOpenedType);
     }
-    break;
   }
   case ExistentialRepresentation::Metatype:
     assert(existentialType.isObject());
-    archetypeMV = B.createOpenExistentialMetatype(
+    return B.createOpenExistentialMetatype(
         loc, existentialValue, loweredOpenedType);
-    // Metatypes are always trivial. Consuming would be a no-op.
-    canConsume = false;
-    break;
-  case ExistentialRepresentation::Class: {
+  case ExistentialRepresentation::Class:
     assert(existentialType.isObject());
-    archetypeMV =
-        B.createOpenExistentialRef(loc, existentialValue, loweredOpenedType);
-    canConsume = archetypeMV.hasCleanup();
-    break;
-  }
+    return B.createOpenExistentialRef(loc, existentialValue, loweredOpenedType);
   case ExistentialRepresentation::Boxed:
     if (existentialType.isAddress()) {
       existentialValue = emitLoad(loc, existentialValue.getValue(),
@@ -989,67 +974,43 @@ SILGenFunction::emitOpenExistential(
     existentialType = existentialValue.getType();
     assert(existentialType.isObject());
     if (loweredOpenedType.isAddress()) {
-      archetypeMV = ManagedValue::forUnmanaged(
+      return ManagedValue::forUnmanaged(
         B.createOpenExistentialBox(loc, existentialValue.getValue(),
                                    loweredOpenedType));
     } else {
       assert(!silConv.useLoweredAddresses());
-      archetypeMV = getBuilder().createOpenExistentialBoxValue(
+      return B.createOpenExistentialBoxValue(
         loc, existentialValue, loweredOpenedType);
     }
-    // NB: Don't forward the cleanup, because consuming a boxed value won't
-    // consume the box reference.
-    // The boxed value can't be assumed to be uniquely referenced.
-    // We can never consume it.
-    // TODO: We could use isUniquelyReferenced to shorten the duration of
-    // the box to the point that the opaque value is copied out.
-    isUnique = false;
-    canConsume = false;
-    break;
   case ExistentialRepresentation::None:
     llvm_unreachable("not existential");
   }
-
-  assert(!canConsume || isUnique); (void) isUnique;
-
-  return SILGenFunction::OpaqueValueState{
-    archetypeMV,
-    /*isConsumable*/ canConsume,
-    /*hasBeenConsumed*/ false
-  };
 }
 
-ManagedValue SILGenFunction::manageOpaqueValue(OpaqueValueState &entry,
+ManagedValue SILGenFunction::manageOpaqueValue(ManagedValue value,
                                                SILLocation loc,
                                                SGFContext C) {
   // If the opaque value is consumable, we can just return the
   // value with a cleanup. There is no need to retain it separately.
-  if (entry.IsConsumable) {
-    assert(!entry.HasBeenConsumed
-           && "Uniquely-referenced opaque value already consumed");
-    entry.HasBeenConsumed = true;
-    return entry.Value;
-  }
-
-  assert(!entry.Value.hasCleanup());
+  if (value.hasCleanup())
+    return value;
 
   // If the context wants a +0 value, guaranteed or immediate, we can
   // give it to them, because OpenExistential emission guarantees the
   // value.
-  if (C.isGuaranteedPlusZeroOk()) {
-    return entry.Value;
-  }
+  if (C.isGuaranteedPlusZeroOk())
+    return value;
 
   // If the context has an initialization a buffer, copy there instead
   // of making a temporary allocation.
   if (auto I = C.getEmitInto()) {
-    I->copyOrInitValueInto(*this, loc, entry.Value, /*init*/ false);
+    I->copyOrInitValueInto(*this, loc, value, /*init*/ false);
     I->finishInitialization(*this);
     return ManagedValue::forInContext();
   }
 
   // Otherwise, copy the value into a temporary.
-  return entry.Value.copyUnmanaged(*this, loc);
+  return value.copyUnmanaged(*this, loc);
 }
 
 ManagedValue SILGenFunction::emitConvertedRValue(Expr *E,

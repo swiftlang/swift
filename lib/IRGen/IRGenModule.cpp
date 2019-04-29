@@ -430,7 +430,24 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                     // point too.
   };
   ObjCBlockStructTy->setBody(objcBlockElts);
-  
+
+  // Class _Nullable callback(Class _Nonnull cls, void * _Nullable arg);
+  llvm::Type *params[] = { ObjCClassPtrTy, Int8PtrTy };
+  ObjCUpdateCallbackTy = llvm::FunctionType::get(ObjCClassPtrTy, params, false);
+
+  // The full class stub structure, including a word before the address point.
+  ObjCFullResilientClassStubTy = createStructType(*this, "objc_full_class_stub", {
+    SizeTy, // zero padding to appease the linker
+    SizeTy, // isa pointer -- always 1
+    ObjCUpdateCallbackTy->getPointerTo() // the update callback
+  });
+
+  // What we actually export.
+  ObjCResilientClassStubTy = createStructType(*this, "objc_class_stub", {
+    SizeTy, // isa pointer -- always 1
+    ObjCUpdateCallbackTy->getPointerTo() // the update callback
+  });
+
   auto ErrorStructTy = llvm::StructType::create(LLVMContext, "swift.error");
   // ErrorStruct is currently opaque to the compiler.
   ErrorPtrTy = ErrorStructTy->getPointerTo(DefaultAS);
@@ -446,6 +463,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   OpenedErrorTriplePtrTy = OpenedErrorTripleTy->getPointerTo(DefaultAS);
 
   WitnessTablePtrPtrTy = WitnessTablePtrTy->getPointerTo(DefaultAS);
+  
+  // todo
+  OpaqueTypeDescriptorTy = TypeContextDescriptorTy;
+  OpaqueTypeDescriptorPtrTy = OpaqueTypeDescriptorTy->getPointerTo();
 
   InvariantMetadataID = LLVMContext.getMDKindID("invariant.load");
   InvariantNode = llvm::MDNode::get(LLVMContext, {});
@@ -776,6 +797,7 @@ void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
     // Add it to the queue if it hasn't already been put there.
     if (canEmitWitnessTableLazily(wt) &&
         LazilyEmittedWitnessTables.insert(wt).second) {
+      assert(!FinishedEmittingLazyDefinitions);
       LazyWitnessTables.push_back(wt);
     }
   }
@@ -963,8 +985,12 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
     encodeForceLoadSymbolName(buf, linkLib.getName());
     auto ForceImportThunk =
         Module.getOrInsertFunction(buf, llvm::FunctionType::get(VoidTy, false));
-    ApplyIRLinkage(IRLinkage::ExternalImport)
-        .to(cast<llvm::GlobalValue>(ForceImportThunk));
+
+    const IRLinkage IRL =
+        llvm::Triple(Module.getTargetTriple()).isOSBinFormatCOFF()
+            ? IRLinkage::ExternalImport
+            : IRLinkage::ExternalWeakImport;
+    ApplyIRLinkage(IRL).to(cast<llvm::GlobalValue>(ForceImportThunk));
 
     buf += "_$";
     appendEncodedName(buf, IRGen.Opts.ModuleName);

@@ -55,7 +55,7 @@ case is B,
      is D,
      is S:
   ()
-case is E:
+case is E: // expected-warning {{cast from 'P' to unrelated type 'E' always fails}}
   ()
 default:
   ()
@@ -69,7 +69,7 @@ case let d as D:
   d.d()
 case let s as S:
   s.s()
-case let e as E:
+case let e as E: // expected-warning {{cast from 'P' to unrelated type 'E' always fails}}
   e.e()
 default:
   ()
@@ -120,7 +120,7 @@ case iPadHair<E>.HairForceOne:
   ()
 case iPadHair.HairForceOne: // expected-error{{generic enum type 'iPadHair' is ambiguous without explicit generic parameters when matching value of type 'HairType'}}
   ()
-case Watch.Edition: // TODO: should warn that cast can't succeed with currently known conformances
+case Watch.Edition: // expected-warning {{cast from 'HairType' to unrelated type 'Watch' always fails}}
   ()
 case .HairForceOne: // expected-error{{type 'HairType' has no member 'HairForceOne'}}
   ()

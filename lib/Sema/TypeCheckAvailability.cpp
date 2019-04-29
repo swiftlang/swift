@@ -27,6 +27,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -1544,77 +1545,68 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     SourceLoc removeRangeStart;
     SourceLoc removeRangeEnd;
 
-    const Expr *argExpr = call->getArg();
-    if (auto args = dyn_cast<TupleExpr>(argExpr)) {
-      size_t numElementsWithinParens = args->getNumElements();
-      numElementsWithinParens -= args->hasTrailingClosure();
-      if (selfIndex >= numElementsWithinParens)
+    auto *argExpr = call->getArg();
+    auto argList = getOriginalArgumentList(argExpr);
+
+    size_t numElementsWithinParens = argList.args.size();
+    numElementsWithinParens -= argList.hasTrailingClosure;
+    if (selfIndex >= numElementsWithinParens)
+      return;
+
+    if (parsed.IsGetter) {
+      if (numElementsWithinParens != 1)
         return;
+    } else if (parsed.IsSetter) {
+      if (numElementsWithinParens != 2)
+        return;
+    } else {
+      if (parsed.ArgumentLabels.size() != argList.args.size() - 1)
+        return;
+    }
 
-      if (parsed.IsGetter) {
-        if (numElementsWithinParens != 1)
-          return;
-      } else if (parsed.IsSetter) {
-        if (numElementsWithinParens != 2)
-          return;
+    selfExpr = argList.args[selfIndex];
+
+    if (selfIndex + 1 == numElementsWithinParens) {
+      if (selfIndex > 0) {
+        // Remove from the previous comma to the close-paren (half-open).
+        removeRangeStart = argList.args[selfIndex-1]->getEndLoc();
+        removeRangeStart = Lexer::getLocForEndOfToken(sourceMgr,
+                                                      removeRangeStart);
       } else {
-        if (parsed.ArgumentLabels.size() != args->getNumElements() - 1)
-          return;
+        // Remove from after the open paren to the close paren (half-open).
+        removeRangeStart = Lexer::getLocForEndOfToken(sourceMgr,
+                                                      argExpr->getStartLoc());
       }
 
-      selfExpr = args->getElement(selfIndex);
-
-      if (selfIndex + 1 == numElementsWithinParens) {
-        if (selfIndex > 0) {
-          // Remove from the previous comma to the close-paren (half-open).
-          removeRangeStart = args->getElement(selfIndex-1)->getEndLoc();
-          removeRangeStart = Lexer::getLocForEndOfToken(sourceMgr,
-                                                        removeRangeStart);
-        } else {
-          // Remove from after the open paren to the close paren (half-open).
-          removeRangeStart = Lexer::getLocForEndOfToken(sourceMgr,
-                                                        argExpr->getStartLoc());
-        }
-
-        // Prefer the r-paren location, so that we get the right behavior when
-        // there's a trailing closure, but handle some implicit cases too.
-        removeRangeEnd = args->getRParenLoc();
-        if (removeRangeEnd.isInvalid())
-          removeRangeEnd = args->getEndLoc();
-
-      } else {
-        // Remove from the label to the start of the next argument (half-open).
-        SourceLoc labelLoc = args->getElementNameLoc(selfIndex);
-        if (labelLoc.isValid())
-          removeRangeStart = labelLoc;
-        else
-          removeRangeStart = selfExpr->getStartLoc();
-
-        SourceLoc nextLabelLoc = args->getElementNameLoc(selfIndex + 1);
-        if (nextLabelLoc.isValid())
-          removeRangeEnd = nextLabelLoc;
-        else
-          removeRangeEnd = args->getElement(selfIndex + 1)->getStartLoc();
-      }
-
-      // Avoid later argument label fix-its for this argument.
-      if (!parsed.isPropertyAccessor()) {
-        Identifier oldLabel = args->getElementName(selfIndex);
-        StringRef oldLabelStr;
-        if (!oldLabel.empty())
-          oldLabelStr = oldLabel.str();
-        parsed.ArgumentLabels.insert(parsed.ArgumentLabels.begin() + selfIndex,
-                                     oldLabelStr);
-      }
+      // Prefer the r-paren location, so that we get the right behavior when
+      // there's a trailing closure, but handle some implicit cases too.
+      removeRangeEnd = argList.rParenLoc;
+      if (removeRangeEnd.isInvalid())
+        removeRangeEnd = argExpr->getEndLoc();
 
     } else {
-      if (selfIndex != 0 || !parsed.ArgumentLabels.empty())
-        return;
-      selfExpr = cast<ParenExpr>(argExpr)->getSubExpr();
-      // Remove from after the open paren to the close paren (half-open).
-      removeRangeStart = Lexer::getLocForEndOfToken(sourceMgr,
-                                                    argExpr->getStartLoc());
-      removeRangeEnd = argExpr->getEndLoc();
+      // Remove from the label to the start of the next argument (half-open).
+      SourceLoc labelLoc = argList.labelLocs[selfIndex];
+      if (labelLoc.isValid())
+        removeRangeStart = labelLoc;
+      else
+        removeRangeStart = selfExpr->getStartLoc();
+
+      SourceLoc nextLabelLoc = argList.labelLocs[selfIndex + 1];
+      if (nextLabelLoc.isValid())
+        removeRangeEnd = nextLabelLoc;
+      else
+        removeRangeEnd = argList.args[selfIndex + 1]->getStartLoc();
+    }
+
+    // Avoid later argument label fix-its for this argument.
+    if (!parsed.isPropertyAccessor()) {
+      Identifier oldLabel = argList.labels[selfIndex];
+      StringRef oldLabelStr;
+      if (!oldLabel.empty())
+        oldLabelStr = oldLabel.str();
+      parsed.ArgumentLabels.insert(parsed.ArgumentLabels.begin() + selfIndex,
+                                    oldLabelStr);
     }
 
     if (auto *inoutSelf = dyn_cast<InOutExpr>(selfExpr))
@@ -1698,7 +1690,9 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
   if (!call || !isa<CallExpr>(call))
     return;
 
-  const Expr *argExpr = call->getArg();
+  auto *argExpr = call->getArg();
+  auto argList = getOriginalArgumentList(argExpr);
+
   if (parsed.IsGetter) {
     diag.fixItRemove(argExpr->getSourceRange());
     return;
@@ -1707,16 +1701,16 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
   if (parsed.IsSetter) {
     const Expr *newValueExpr = nullptr;
 
-    if (auto args = dyn_cast<TupleExpr>(argExpr)) {
+    if (argList.args.size() >= 1) {
       size_t newValueIndex = 0;
       if (parsed.isInstanceMember()) {
         assert(parsed.SelfIndex.getValue() == 0 ||
                parsed.SelfIndex.getValue() == 1);
         newValueIndex = !parsed.SelfIndex.getValue();
       }
-      newValueExpr = args->getElement(newValueIndex);
+      newValueExpr = argList.args[newValueIndex];
     } else {
-      newValueExpr = cast<ParenExpr>(argExpr)->getSubExpr();
+      newValueExpr = argList.args[0];
     }
 
     diag.fixItReplaceChars(argExpr->getStartLoc(), newValueExpr->getStartLoc(),
@@ -1738,33 +1732,28 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     return labelStr.empty() ? Identifier() : ctx.getIdentifier(labelStr);
   });
 
-  if (auto args = dyn_cast<ArgumentShuffleExpr>(argExpr)) {
-    argExpr = args->getSubExpr();
+  // Coerce the `argumentLabelIDs` to the user supplied arguments.
+  // e.g:
+  //   @available(.., renamed: "new(w:x:y:z:)")
+  //   func old(a: Int, b: Int..., c: String="", d: Int=0){}
+  //   old(a: 1, b: 2, 3, 4, d: 5)
+  // coerce
+  //   argumentLabelIDs = {"w", "x", "y", "z"}
+  // to
+  //   argumentLabelIDs = {"w", "x", "", "", "z"}
+  auto I = argumentLabelIDs.begin();
 
-    // Coerce the `argumentLabelIDs` to the user supplied arguments.
-    // e.g:
-    //   @available(.., renamed: "new(w:x:y:z:)")
-    //   func old(a: Int, b: Int..., c: String="", d: Int=0){}
-    //   old(a: 1, b: 2, 3, 4, d: 5)
-    // coerce
-    //   argumentLabelIDs = {"w", "x", "y", "z"}
-    // to
-    //   argumentLabelIDs = {"w", "x", "", "", "z"}
-    auto elementMap = args->getElementMapping();
-    if (elementMap.size() != argumentLabelIDs.size()) {
-      // Mismatched lengths; give up.
+  auto updateLabelsForArg = [&](Expr *expr) {
+    if (isa<DefaultArgumentExpr>(expr) ||
+        isa<CallerDefaultArgumentExpr>(expr)) {
+      // Defaulted: remove param label of it.
+      I = argumentLabelIDs.erase(I);
       return;
     }
-    auto I = argumentLabelIDs.begin();
-    for (auto shuffleIdx : elementMap) {
-      switch (shuffleIdx) {
-      case ArgumentShuffleExpr::DefaultInitialize:
-      case ArgumentShuffleExpr::CallerDefaultInitialize:
-        // Defaulted: remove param label of it.
-        I = argumentLabelIDs.erase(I);
-        break;
-      case ArgumentShuffleExpr::Variadic: {
-        auto variadicArgsNum = args->getVariadicArgs().size();
+
+    if (auto *varargExpr = dyn_cast<VarargExpansionExpr>(expr)) {
+      if (auto *arrayExpr = dyn_cast<ArrayExpr>(varargExpr->getSubExpr())) {
+        auto variadicArgsNum = arrayExpr->getNumElements();
         if (variadicArgsNum == 0) {
           // No arguments: Remove param label of it.
           I = argumentLabelIDs.erase(I);
@@ -1772,65 +1761,42 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
           // One argument: Just advance.
           ++I;
         } else {
+          ++I;
+
           // Two or more arguments: Insert empty labels after the first one.
-          I = argumentLabelIDs.insert(++I, --variadicArgsNum, Identifier());
+          variadicArgsNum--;
+          I = argumentLabelIDs.insert(I, variadicArgsNum, Identifier());
           I += variadicArgsNum;
         }
-        break;
-      }
-      default:
-        // Normal: Just advance.
-        assert(shuffleIdx == (I - argumentLabelIDs.begin()) &&
-               "SE-0060 guarantee");
-        ++I;
-        break;
+        return;
       }
     }
+
+    // Normal: Just advance.
+    ++I;
+  };
+
+  if (auto *parenExpr = dyn_cast<ParenExpr>(argExpr)) {
+    updateLabelsForArg(parenExpr->getSubExpr());
+  } else {
+    for (auto *arg : cast<TupleExpr>(argExpr)->getElements())
+      updateLabelsForArg(arg);
   }
 
-  if (auto args = dyn_cast<TupleExpr>(argExpr)) {
-    if (argumentLabelIDs.size() != args->getNumElements()) {
-      // Mismatched lengths; give up.
-      return;
-    }
+  if (argumentLabelIDs.size() != argList.args.size()) {
+    // Mismatched lengths; give up.
+    return;
+  }
 
-    auto argumentLabelsToCheck = llvm::makeArrayRef(argumentLabelIDs);
-    // The argument label for a trailing closure is ignored.
-    if (args->hasTrailingClosure())
-      argumentLabelsToCheck = argumentLabelsToCheck.drop_back();
+  auto argumentLabelsToCheck = llvm::makeArrayRef(argumentLabelIDs);
+  // The argument label for a trailing closure is ignored.
+  if (argList.hasTrailingClosure)
+    argumentLabelsToCheck = argumentLabelsToCheck.drop_back();
 
-    if (args->hasElementNames()) {
-      if (std::equal(argumentLabelsToCheck.begin(), argumentLabelsToCheck.end(),
-                     args->getElementNames().begin())) {
-        // Already matching.
-        return;
-      }
-
-    } else {
-      if (std::all_of(argumentLabelsToCheck.begin(),argumentLabelsToCheck.end(),
-                      std::mem_fn(&Identifier::empty))) {
-        // Already matching (as in, there are no labels).
-        return;
-      }
-    }
-
-  } else if (auto args = dyn_cast<ParenExpr>(argExpr)) {
-    if (args->hasTrailingClosure()) {
-      // The argument label for a trailing closure is ignored.
-      return;
-    }
-
-    if (argumentLabelIDs.size() != 1) {
-      // Mismatched lengths; give up.
-      return;
-    }
-
-    if (argumentLabelIDs.front().empty()) {
-      // Already matching (no labels).
-      return;
-    }
-  } else {
-    llvm_unreachable("Unexpected arg expression");
+  if (std::equal(argumentLabelsToCheck.begin(), argumentLabelsToCheck.end(),
+                 argList.labels.begin())) {
+    // Already matching.
+    return;
   }
 
   diagnoseArgumentLabelError(ctx, argExpr, argumentLabelIDs, false, &diag);
@@ -2301,6 +2267,10 @@ public:
         = TC.getFragileFunctionKind(DC);
   }
 
+  bool shouldWalkIntoNonSingleExpressionClosure() override {
+    return false;
+  }
+
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     ExprStack.push_back(E);
 
@@ -2323,7 +2293,7 @@ public:
         // DerivedConformanceRawRepresentable will do the right thing.
         flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailable;
 
-      diagAvailability(DR->getDecl(), DR->getSourceRange(),
+      diagAvailability(DR->getDeclRef(), DR->getSourceRange(),
                        getEnclosingApplyExpr(), flags);
       maybeDiagStorageAccess(DR->getDecl(), DR->getSourceRange(), DC);
     }
@@ -2332,18 +2302,18 @@ public:
       return skipChildren();
     }
     if (auto OCDR = dyn_cast<OtherConstructorDeclRefExpr>(E))
-      diagAvailability(OCDR->getDecl(),
+      diagAvailability(OCDR->getDeclRef(),
                        OCDR->getConstructorLoc().getSourceRange(),
                        getEnclosingApplyExpr());
     if (auto DMR = dyn_cast<DynamicMemberRefExpr>(E))
-      diagAvailability(DMR->getMember().getDecl(),
+      diagAvailability(DMR->getMember(),
                        DMR->getNameLoc().getSourceRange(),
                        getEnclosingApplyExpr());
     if (auto DS = dyn_cast<DynamicSubscriptExpr>(E))
-      diagAvailability(DS->getMember().getDecl(), DS->getSourceRange());
+      diagAvailability(DS->getMember(), DS->getSourceRange());
     if (auto S = dyn_cast<SubscriptExpr>(E)) {
       if (S->hasDecl()) {
-        diagAvailability(S->getDecl().getDecl(), S->getSourceRange());
+        diagAvailability(S->getDecl(), S->getSourceRange());
         maybeDiagStorageAccess(S->getDecl().getDecl(), S->getSourceRange(), DC);
       }
     }
@@ -2358,7 +2328,7 @@ public:
       walkInOutExpr(IO);
       return skipChildren();
     }
-    
+
     return visitChildren();
   }
 
@@ -2369,16 +2339,16 @@ public:
     return E;
   }
 
-  bool diagAvailability(const ValueDecl *D, SourceRange R,
+  bool diagAvailability(ConcreteDeclRef declRef, SourceRange R,
                         const ApplyExpr *call = nullptr,
-                        DeclAvailabilityFlags flags = None);
+                        DeclAvailabilityFlags flags = None) const;
 
 private:
   bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
-                             const AvailableAttr *Attr);
+                             const AvailableAttr *Attr) const;
   bool diagnoseMemoryLayoutMigration(const ValueDecl *D, SourceRange R,
                                      const AvailableAttr *Attr,
-                                     const ApplyExpr *call);
+                                     const ApplyExpr *call) const;
 
   /// Walks up from a potential callee to the enclosing ApplyExpr.
   const ApplyExpr *getEnclosingApplyExpr() const {
@@ -2532,10 +2502,7 @@ private:
                                 DeclAvailabilityFlags Flags) const {
     Flags &= DeclAvailabilityFlag::ForInout;
     Flags |= DeclAvailabilityFlag::ContinueOnPotentialUnavailability;
-    if (diagnoseDeclAvailability(D, TC,
-                                 const_cast<DeclContext*>(ReferenceDC),
-                                 ReferenceRange,
-                                 Flags))
+    if (diagAvailability(D, ReferenceRange, /*call*/nullptr, Flags))
       return;
   }
 };
@@ -2544,11 +2511,12 @@ private:
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool
-AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
+AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
                                      const ApplyExpr *call,
-                                     DeclAvailabilityFlags Flags) {
-  if (!D)
+                                     DeclAvailabilityFlags Flags) const {
+  if (!declRef)
     return false;
+  const ValueDecl *D = declRef.getDecl();
 
   if (auto *attr = AvailableAttr::isUnavailable(D)) {
     if (diagnoseIncDecRemoval(D, R, attr))
@@ -2569,7 +2537,7 @@ AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
 
   if (FragileKind)
     if (R.isValid())
-      if (TC.diagnoseInlinableDeclRef(R.Start, D, DC, *FragileKind,
+      if (TC.diagnoseInlinableDeclRef(R.Start, declRef, DC, *FragileKind,
                                       TreatUsableFromInlineAsPublic))
         return true;
 
@@ -2632,9 +2600,9 @@ static bool isIntegerOrFloatingPointType(Type ty, DeclContext *DC,
 
 /// If this is a call to an unavailable ++ / -- operator, try to diagnose it
 /// with a fixit hint and return true.  If not, or if we fail, return false.
-bool AvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D,
-                                               SourceRange R,
-                                               const AvailableAttr *Attr) {
+bool
+AvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
+                                          const AvailableAttr *Attr) const {
   // We can only produce a fixit if we're talking about ++ or --.
   bool isInc = D->getBaseName() == "++";
   if (!isInc && D->getBaseName() != "--")
@@ -2694,10 +2662,11 @@ bool AvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D,
 
 /// If this is a call to an unavailable sizeof family function, diagnose it
 /// with a fixit hint and return true. If not, or if we fail, return false.
-bool AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
-                                                       SourceRange R,
-                                                       const AvailableAttr *Attr,
-                                                       const ApplyExpr *call) {
+bool
+AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
+                                                  SourceRange R,
+                                                  const AvailableAttr *Attr,
+                                                  const ApplyExpr *call) const {
 
   if (!D->getModuleContext()->isStdlibModule())
     return false;
@@ -2780,5 +2749,5 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
                                      DeclAvailabilityFlags Flags)
 {
   AvailabilityWalker AW(TC, DC);
-  return AW.diagAvailability(Decl, R, nullptr, Flags);
+  return AW.diagAvailability(const_cast<ValueDecl *>(Decl), R, nullptr, Flags);
 }

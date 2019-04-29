@@ -87,3 +87,8 @@ extension ConditionallyP2: P where T: Q, T: NonRetroactive {}
 
 func useConditionallyP2(_: RequiresP<ConditionallyP2<Y>>) {}
 // CHECK: sil hidden [ossa] @$s20mangling_retroactive18useConditionallyP2yyAA9RequiresPVyAA0dE0Vy12RetroactiveB1YVGAJ0G1A1PHPAiK1QAAyHC_AiA03NonG0HpyHCHCg_GF
+
+struct RequiresError<T> where T: Error { }
+extension ExternalGeneric: Error where Argument: Error { }
+func useRequiresError(_: RequiresError<ExternalGeneric<Error>>) {}
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive16useRequiresErroryyAA0dE0Vy12RetroactiveB15ExternalGenericVys0E0_pGAIsAhAsAH_psAHHPyHC_HCg_GF

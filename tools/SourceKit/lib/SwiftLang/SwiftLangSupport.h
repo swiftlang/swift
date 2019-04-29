@@ -74,6 +74,8 @@ namespace SourceKit {
   class Context;
   class NotificationCenter;
 
+  using TypeContextKind = swift::ide::CodeCompletionContext::TypeContextKind;
+
 class SwiftEditorDocument :
     public ThreadSafeRefCountedBase<SwiftEditorDocument> {
 
@@ -162,7 +164,7 @@ class SessionCache : public ThreadSafeRefCountedBase<SessionCache> {
   CompletionSink sink;
   std::vector<Completion *> sortedCompletions;
   CompletionKind completionKind;
-  bool completionHasExpectedTypes;
+  TypeContextKind typeContextKind;
   bool completionMayUseImplicitMemberExpr;
   FilterRules filterRules;
   llvm::sys::Mutex mtx;
@@ -171,11 +173,10 @@ public:
   SessionCache(CompletionSink &&sink,
                std::unique_ptr<llvm::MemoryBuffer> &&buffer,
                std::vector<std::string> &&args, CompletionKind completionKind,
-               bool hasExpectedTypes, bool mayUseImplicitMemberExpr,
+               TypeContextKind typeContextKind, bool mayUseImplicitMemberExpr,
                FilterRules filterRules)
       : buffer(std::move(buffer)), args(std::move(args)), sink(std::move(sink)),
-        completionKind(completionKind),
-        completionHasExpectedTypes(hasExpectedTypes),
+        completionKind(completionKind), typeContextKind(typeContextKind),
         completionMayUseImplicitMemberExpr(mayUseImplicitMemberExpr),
         filterRules(std::move(filterRules)) {}
   void setSortedCompletions(std::vector<Completion *> &&completions);
@@ -184,7 +185,7 @@ public:
   ArrayRef<std::string> getCompilerArgs();
   const FilterRules &getFilterRules();
   CompletionKind getCompletionKind();
-  bool getCompletionHasExpectedTypes();
+  TypeContextKind getCompletionTypeContextKind();
   bool getCompletionMayUseImplicitMemberExpr();
 };
 typedef RefPtr<SessionCache> SessionCacheRef;
@@ -246,11 +247,12 @@ public:
   ~RequestRefactoringEditConsumer();
   void accept(swift::SourceManager &SM, swift::ide::RegionType RegionType,
               ArrayRef<swift::ide::Replacement> Replacements) override;
-  void handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
-                        swift::DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<swift::DiagnosticArgument> FormatArgs,
-                        const swift::DiagnosticInfo &Info) override;
+  void
+  handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
+                   swift::DiagnosticKind Kind, StringRef FormatString,
+                   ArrayRef<swift::DiagnosticArgument> FormatArgs,
+                   const swift::DiagnosticInfo &Info,
+                   swift::SourceLoc bufferIndirectlyCausingDiagnostic) override;
 };
 
 class RequestRenameRangeConsumer : public swift::ide::FindRenameRangesConsumer,
@@ -263,11 +265,12 @@ public:
   ~RequestRenameRangeConsumer();
   void accept(swift::SourceManager &SM, swift::ide::RegionType RegionType,
               ArrayRef<swift::ide::RenameRangeDetail> Ranges) override;
-  void handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
-                        swift::DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<swift::DiagnosticArgument> FormatArgs,
-                        const swift::DiagnosticInfo &Info) override;
+  void
+  handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
+                   swift::DiagnosticKind Kind, StringRef FormatString,
+                   ArrayRef<swift::DiagnosticArgument> FormatArgs,
+                   const swift::DiagnosticInfo &Info,
+                   swift::SourceLoc bufferIndirectlyCausingDiagnostic) override;
 };
 
 struct SwiftStatistics {

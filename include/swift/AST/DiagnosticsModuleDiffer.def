@@ -92,6 +92,8 @@ ERROR(param_ownership_change,none,"%0 has %1 changing from %2 to %3", (StringRef
 
 ERROR(type_witness_change,none,"%0 has type witness type for %1 changing from %2 to %3", (StringRef, StringRef, StringRef, StringRef))
 
+ERROR(decl_new_witness_table_entry,none,"%0 now requires %select{|no}1 new witness table entry", (StringRef, bool))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

@@ -84,13 +84,17 @@ class TestNSRange : TestNSRangeSuper {
     }
 
     func testHashing() {
-        let r1 = NSRange(location: 10, length: 22)
-        let r2 = NSRange(location: 10, length: 22)
-        let r3 = NSRange(location: 1, length: 22)
-        expectEqual(r1.hashValue, r2.hashValue)
-        expectNotEqual(r1.hashValue, r3.hashValue)
-        let rangeSet: Set<NSRange> = [r1, r2, r3]
-        expectEqual(2, rangeSet.count)
+        let large = Int.max >> 2
+        let samples: [NSRange] = [
+            NSRange(location: 1, length: 1),
+            NSRange(location: 1, length: 2),
+            NSRange(location: 2, length: 1),
+            NSRange(location: 2, length: 2),
+            NSRange(location: large, length: large),
+            NSRange(location: 0, length: large),
+            NSRange(location: large, length: 0),
+        ]
+        checkHashable(samples, equalityOracle: { $0 == $1 })
     }
 
     func testBounding() {

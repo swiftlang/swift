@@ -111,7 +111,7 @@ void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
           SILType fieldType) -> ManagedValue {
         ManagedValue elt =
             SGF.B.createTupleElementAddr(loc, value, i, fieldType);
-        if (!fieldType.isAddressOnly(SGF.F.getModule())) {
+        if (!fieldType.isAddressOnly(SGF.F)) {
           return SGF.B.createLoadTake(loc, elt);
         }
 
@@ -1173,7 +1173,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
 
   // If an initial value expression was specified by the decl, emit it into
   // the initialization. Otherwise, mark it uninitialized for DI to resolve.
-  if (auto *Init = entry.getNonLazyInit()) {
+  if (auto *Init = entry.getExecutableInit()) {
     FullExpr Scope(Cleanups, CleanupLocation(Init));
     emitExprInto(Init, initialization.get(), SILLocation(PBD));
   } else {
@@ -1236,7 +1236,7 @@ SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
       loc, silDeclRef, getConstantInfo(silDeclRef));
 
   SILValue args[] = {majorValue, minorValue, subminorValue};
-  return B.createApply(loc, availabilityGTEFn, args, false);
+  return B.createApply(loc, availabilityGTEFn, SubstitutionMap(), args);
 }
 
 
@@ -1391,16 +1391,15 @@ CleanupHandle SILGenFunction::enterDeinitExistentialCleanup(
   return Cleanups.getTopCleanup();
 }
 
-void SILGenModule::emitExternalWitnessTable(ProtocolConformance *c) {
-  auto root = c->getRootNormalConformance();
+void SILGenModule::emitExternalWitnessTable(NormalProtocolConformance *c) {
   // Emit the witness table right now if we used it.
-  if (usedConformances.count(root)) {
+  if (usedConformances.count(c)) {
     getWitnessTable(c);
     return;
   }
   // Otherwise, remember it for later.
-  delayedConformances.insert({root, {lastEmittedConformance}});
-  lastEmittedConformance = root;
+  delayedConformances.insert({c, {lastEmittedConformance}});
+  lastEmittedConformance = c;
 }
 
 static bool isDeclaredInPrimaryFile(SILModule &M, Decl *d) {
@@ -1441,9 +1440,9 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
                                             nullptr)) {
       auto *proto = c->getProtocol();
       if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto) &&
-          isa<NormalProtocolConformance>(c) &&
-          c->isComplete())
-        emitExternalWitnessTable(c);
+          isa<NormalProtocolConformance>(c)) {
+        emitExternalWitnessTable(cast<NormalProtocolConformance>(c));
+      }
     }
     break;
   }
@@ -1476,6 +1475,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::PrecedenceGroup:
   case DeclKind::Module:
   case DeclKind::MissingMember:
+  case DeclKind::OpaqueType:
     llvm_unreachable("Not a valid external definition for SILGen");
   }
 }

@@ -36,6 +36,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/ClosureScope.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -255,7 +256,8 @@ static void checkUsesOfAccess(BeginAccessInst *access) {
   for (auto *use : access->getUses()) {
     auto user = use->getUser();
     assert(!isa<BeginAccessInst>(user));
-    assert(!isa<PartialApplyInst>(user));
+    assert(!isa<PartialApplyInst>(user) ||
+           onlyUsedByAssignByDelegate(cast<PartialApplyInst>(user)));
   }
 #endif
 }

@@ -3473,6 +3473,21 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.StringEqualityMismatch") {
   expectTrue(v == 42 || v == 23)
 }
 
+DictionaryTestSuite.test("Upcast.StringEqualityMismatch") {
+  // Upcasting from NSString to String keys changes their concept of equality,
+  // resulting in two equal keys, one of which should be discarded by the
+  // downcast. (Along with its associated value.)
+  // rdar://problem/35995647
+  let d: Dictionary<NSString, NSObject> = [
+    "cafe\u{301}": 1 as NSNumber,
+    "café": 2 as NSNumber,
+  ]
+  expectEqual(d.count, 2)
+  let d2 = d as Dictionary<String, NSObject>
+  expectEqual(d2.count, 1)
+}
+
+
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.OptionalDowncastFailure") {
   let nsd = NSDictionary(
     objects: [1 as NSNumber, 2 as NSNumber, 3 as NSNumber],
@@ -5700,14 +5715,14 @@ DictionaryTestSuite.test("BulkLoadingInitializer.Unique") {
     let d1 = Dictionary<TestKeyTy, TestEquatableValueTy>(
       _unsafeUninitializedCapacity: c,
       allowingDuplicates: false
-    ) { keys, values, count in
+    ) { keys, values in
       let k = keys.baseAddress!
       let v = values.baseAddress!
       for i in 0 ..< c {
         (k + i).initialize(to: TestKeyTy(i))
         (v + i).initialize(to: TestEquatableValueTy(i))
-        count += 1
       }
+      return c
     }
 
     let d2 = Dictionary(
@@ -5727,14 +5742,14 @@ DictionaryTestSuite.test("BulkLoadingInitializer.Nonunique") {
     let d1 = Dictionary<TestKeyTy, TestEquatableValueTy>(
       _unsafeUninitializedCapacity: c,
       allowingDuplicates: true
-    ) { keys, values, count in
+    ) { keys, values in
       let k = keys.baseAddress!
       let v = values.baseAddress!
       for i in 0 ..< c {
         (k + i).initialize(to: TestKeyTy(i / 2))
         (v + i).initialize(to: TestEquatableValueTy(i / 2))
-        count += 1
       }
+      return c
     }
 
     let d2 = Dictionary(

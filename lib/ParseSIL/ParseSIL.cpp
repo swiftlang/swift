@@ -3540,6 +3540,34 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     break;
   }
 
+  case SILInstructionKind::AssignByDelegateInst: {
+    SILValue Src, DestAddr, InitFn, SetFn;
+    SourceLoc DestLoc;
+    AssignOwnershipQualifier AssignQualifier;
+    if (parseTypedValueRef(Src,  B) ||
+        parseVerbatim("to") ||
+        parseAssignOwnershipQualifier(AssignQualifier, *this) ||
+        parseTypedValueRef(DestAddr, DestLoc, B) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseVerbatim("init") ||
+        parseTypedValueRef(InitFn, B) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseVerbatim("set") ||
+        parseTypedValueRef(SetFn, B) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    if (!DestAddr->getType().isAddress()) {
+      P.diagnose(DestLoc, diag::sil_operand_not_address, "destination",
+                 OpcodeName);
+      return true;
+    }
+
+    ResultVal = B.createAssignByDelegate(InstLoc, Src, DestAddr, InitFn, SetFn,
+                                         AssignQualifier);
+    break;
+  }
+
   case SILInstructionKind::BeginAccessInst:
   case SILInstructionKind::BeginUnpairedAccessInst:
   case SILInstructionKind::EndAccessInst:

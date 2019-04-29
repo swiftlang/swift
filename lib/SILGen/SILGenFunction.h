@@ -554,6 +554,11 @@ public:
     // be in a different scope.
   }
 
+  std::unique_ptr<Initialization>
+  prepareIndirectResultInit(CanType formalResultType,
+                            SmallVectorImpl<SILValue> &directResultsBuffer,
+                            SmallVectorImpl<CleanupHandle> &cleanups);
+
   //===--------------------------------------------------------------------===//
   // Entry points for codegen
   //===--------------------------------------------------------------------===//
@@ -623,6 +628,10 @@ public:
   
   /// Generate a nullary function that returns the given value.
   void emitGeneratorFunction(SILDeclRef function, Expr *value);
+
+  /// Generate a nullary function that returns the value of the given variable's
+  /// expression initializer.
+  void emitGeneratorFunction(SILDeclRef function, VarDecl *var);
 
   /// Generate an ObjC-compatible destructor (-dealloc).
   void emitObjCDestructor(SILDeclRef dtor);
@@ -971,28 +980,19 @@ public:
                                             CanType inputTy,
                                             SILType resultTy);
 
-  struct OpaqueValueState {
-    ManagedValue Value;
-    bool IsConsumable;
-    bool HasBeenConsumed;
-  };
-
-  ManagedValue manageOpaqueValue(OpaqueValueState &entry,
+  ManagedValue manageOpaqueValue(ManagedValue value,
                                  SILLocation loc,
                                  SGFContext C);
 
   /// Open up the given existential value and project its payload.
   ///
   /// \param existentialValue The existential value.
-  /// \param openedArchetype The opened existential archetype.
   /// \param loweredOpenedType The lowered type of the projection, which in
   /// practice will be the openedArchetype, possibly wrapped in a metatype.
-  OpaqueValueState
-  emitOpenExistential(SILLocation loc,
-                      ManagedValue existentialValue,
-                      ArchetypeType *openedArchetype,
-                      SILType loweredOpenedType,
-                      AccessKind accessKind);
+  ManagedValue emitOpenExistential(SILLocation loc,
+                                   ManagedValue existentialValue,
+                                   SILType loweredOpenedType,
+                                   AccessKind accessKind);
 
   /// Wrap the given value in an existential container.
   ///
@@ -1219,10 +1219,6 @@ public:
                                             AccessStrategy strategy,
                                             Expr *indices);
 
-  RValue prepareEnumPayload(EnumElementDecl *element,
-                            CanFunctionType substFnType,
-                            ArgumentSource &&indexExpr);
-
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,
                                         SILDeclRef accessor);
@@ -1426,7 +1422,7 @@ public:
   // Helpers for emitting ApplyExpr chains.
   //
 
-  RValue emitApplyExpr(Expr *e, SGFContext c);
+  RValue emitApplyExpr(ApplyExpr *e, SGFContext c);
 
   /// Emit a function application, assuming that the arguments have been
   /// lowered appropriately for the abstraction level but that the
@@ -1472,8 +1468,14 @@ public:
                                      SGFContext ctx);
 
   RValue emitApplyAllocatingInitializer(SILLocation loc, ConcreteDeclRef init,
-                                        RValue &&args, Type overriddenSelfType,
+                                        PreparedArguments &&args, Type overriddenSelfType,
                                         SGFContext ctx);
+
+  RValue emitApplyPropertyDelegateAllocator(SILLocation loc,
+                                            SubstitutionMap subs,
+                                            SILDeclRef ctorRef,
+                                            Type delegateTy,
+                                            CanAnyFunctionType funcTy);
 
   CleanupHandle emitBeginApply(SILLocation loc, ManagedValue fn,
                                SubstitutionMap subs, ArrayRef<ManagedValue> args,
@@ -1544,9 +1546,8 @@ public:
     emitOpenExistentialExprImpl(e, emitSubExpr);
   }
 
-  /// Mapping from active opaque value expressions to their values,
-  /// along with a bit for each indicating whether it has been consumed yet.
-  llvm::SmallDenseMap<OpaqueValueExpr *, OpaqueValueState>
+  /// Mapping from active opaque value expressions to their values.
+  llvm::SmallDenseMap<OpaqueValueExpr *, ManagedValue>
     OpaqueValues;
 
   /// A mapping from opaque value expressions to the open-existential
@@ -1568,11 +1569,11 @@ public:
 
   public:
     OpaqueValueRAII(SILGenFunction &self, OpaqueValueExpr *opaqueValue,
-                    OpaqueValueState state)
+                    ManagedValue value)
     : Self(self), OpaqueValue(opaqueValue) {
       assert(Self.OpaqueValues.count(OpaqueValue) == 0 &&
              "Opaque value already has a binding");
-      Self.OpaqueValues[OpaqueValue] = state;
+      Self.OpaqueValues[OpaqueValue] = value;
     }
 
     ~OpaqueValueRAII();
@@ -1879,7 +1880,8 @@ public:
   LValue emitLValue(Expr *E, SGFAccessKind accessKind,
                     LValueOptions options = LValueOptions());
 
-  RValue emitRValueForNonMemberVarDecl(SILLocation loc, VarDecl *var,
+  RValue emitRValueForNonMemberVarDecl(SILLocation loc,
+                                       ConcreteDeclRef declRef,
                                        CanType formalRValueType,
                                        AccessSemantics semantics,
                                        SGFContext C);

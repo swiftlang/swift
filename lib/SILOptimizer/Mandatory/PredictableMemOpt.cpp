@@ -1006,7 +1006,7 @@ void AvailableValueDataflowContext::updateAvailableValues(
     
     // If the copyaddr is of a non-loadable type, we can't promote it.  Just
     // consider it to be a clobber.
-    if (CAI->getSrc()->getType().isLoadable(getModule())) {
+    if (CAI->getSrc()->getType().isLoadable(*CAI->getFunction())) {
       // Otherwise, some part of the copy_addr's value is demanded by a load, so
       // we need to explode it to its component pieces.  This only expands one
       // level of the copyaddr.
@@ -1350,7 +1350,7 @@ static SILValue tryFindSrcAddrForLoad(SILInstruction *i) {
   // If this is a CopyAddr, verify that the element type is loadable.  If not,
   // we can't explode to a load.
   auto *cai = dyn_cast<CopyAddrInst>(i);
-  if (!cai || !cai->getSrc()->getType().isLoadable(cai->getModule()))
+  if (!cai || !cai->getSrc()->getType().isLoadable(*cai->getFunction()))
     return SILValue();
   return cai->getSrc();
 }
@@ -1471,7 +1471,7 @@ bool AllocOptimize::canPromoteDestroyAddr(
   // We cannot promote destroys of address-only types, because we can't expose
   // the load.
   SILType loadTy = address->getType().getObjectType();
-  if (loadTy.isAddressOnly(Module))
+  if (loadTy.isAddressOnly(*dai->getFunction()))
     return false;
   
   // If the box has escaped at this instruction, we can't safely promote the

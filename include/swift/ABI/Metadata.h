@@ -3005,6 +3005,58 @@ public:
     return cd->getKind() == ContextDescriptorKind::Protocol;
   }
 };
+  
+/// The descriptor for an opaque type.
+template <typename Runtime>
+struct TargetOpaqueTypeDescriptor final
+  : TargetContextDescriptor<Runtime>,
+    TrailingGenericContextObjects<TargetOpaqueTypeDescriptor<Runtime>,
+                                  TargetGenericContextDescriptorHeader,
+                                  RelativeDirectPointer<const char>>
+{
+private:
+  using TrailingGenericContextObjects
+    = TrailingGenericContextObjects<TargetOpaqueTypeDescriptor<Runtime>,
+                                    TargetGenericContextDescriptorHeader,
+                                    RelativeDirectPointer<const char>>;
+  using TrailingObjects =
+    typename TrailingGenericContextObjects::TrailingObjects;
+  friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+public:
+  using TrailingGenericContextObjects::getGenericContext;
+  using TrailingGenericContextObjects::getGenericContextHeader;
+  using TrailingGenericContextObjects::getFullGenericContextHeader;
+  using TrailingGenericContextObjects::getGenericParams;
+
+  // The kind-specific flags area is used to store the count of the generic
+  // arguments for underlying type(s) encoded in the descriptor.
+  unsigned getNumUnderlyingTypeArguments() const {
+    return this->Flags.getKindSpecificFlags();
+  }
+  
+  using TrailingGenericContextObjects::numTrailingObjects;
+  size_t numTrailingObjects(OverloadToken<RelativeDirectPointer<const char>>) const {
+    return getNumUnderlyingTypeArguments();
+  }
+  
+  StringRef getUnderlyingTypeArgument(unsigned i) const {
+    assert(i < getNumUnderlyingTypeArguments());
+    const char *ptr =
+    (this->template getTrailingObjects<RelativeDirectPointer<const char>>())[i];
+    
+    return Demangle::makeSymbolicMangledNameStringRef(ptr);
+  }
+  
+  static bool classof(const TargetContextDescriptor<Runtime> *cd) {
+    return cd->getKind() == ContextDescriptorKind::OpaqueType;
+  }
+};
+  
+using OpaqueTypeDescriptor = TargetOpaqueTypeDescriptor<InProcess>;
 
 /// The instantiation cache for generic metadata.  This must be guaranteed
 /// to zero-initialized before it is first accessed.  Its contents are private
@@ -3683,6 +3735,28 @@ struct TargetResilientSuperclass {
   TargetRelativeDirectPointer<Runtime, const void, /*nullable*/true> Superclass;
 };
 
+/// A structure that stores a reference to an Objective-C class stub.
+///
+/// This is not the class stub itself; it is part of a class context
+/// descriptor.
+template <typename Runtime>
+struct TargetObjCResilientClassStubInfo {
+  /// A relative pointer to an Objective-C resilient class stub.
+  ///
+  /// We do not declare a struct type for class stubs since the Swift runtime
+  /// does not need to interpret them. The class stub struct is part of
+  /// the Objective-C ABI, and is laid out as follows:
+  /// - isa pointer, always 1
+  /// - an update callback, of type 'Class (*)(Class *, objc_class_stub *)'
+  ///
+  /// Class stubs are used for two purposes:
+  ///
+  /// - Objective-C can reference class stubs when calling static methods.
+  /// - Objective-C and Swift can reference class stubs when emitting
+  ///   categories (in Swift, extensions with @objc members).
+  TargetRelativeDirectPointer<Runtime, const void> Stub;
+};
+
 template <typename Runtime>
 class TargetClassDescriptor final
     : public TargetTypeContextDescriptor<Runtime>,
@@ -3695,7 +3769,8 @@ class TargetClassDescriptor final
                               TargetVTableDescriptorHeader<Runtime>,
                               TargetMethodDescriptor<Runtime>,
                               TargetOverrideTableHeader<Runtime>,
-                              TargetMethodOverrideDescriptor<Runtime>> {
+                              TargetMethodOverrideDescriptor<Runtime>,
+                              TargetObjCResilientClassStubInfo<Runtime>> {
 private:
   using TrailingGenericContextObjects =
     TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
@@ -3706,7 +3781,8 @@ private:
                                   TargetVTableDescriptorHeader<Runtime>,
                                   TargetMethodDescriptor<Runtime>,
                                   TargetOverrideTableHeader<Runtime>,
-                                  TargetMethodOverrideDescriptor<Runtime>>;
+                                  TargetMethodOverrideDescriptor<Runtime>,
+                                  TargetObjCResilientClassStubInfo<Runtime>>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -3722,6 +3798,8 @@ public:
     TargetForeignMetadataInitialization<Runtime>;
   using SingletonMetadataInitialization =
     TargetSingletonMetadataInitialization<Runtime>;
+  using ObjCResilientClassStubInfo =
+    TargetObjCResilientClassStubInfo<Runtime>;
 
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredPointerDifference = typename Runtime::StoredPointerDifference;
@@ -3759,7 +3837,9 @@ public:
     /// positive size of metadata objects of this class (in words).
     uint32_t MetadataPositiveSizeInWords;
 
-    // Maybe add something here that's useful only for resilient types?
+    /// Otherwise, these flags are used to do things like indicating
+    /// the presence of an Objective-C resilient class stub.
+    ExtraClassDescriptorFlags ExtraClassFlags;
   };
 
   /// The number of additional members added by this class to the class
@@ -3833,6 +3913,10 @@ private:
       return 0;
 
     return getOverrideTable()->NumEntries;
+  }
+
+  size_t numTrailingObjects(OverloadToken<ObjCResilientClassStubInfo>) const {
+    return hasObjCResilientClassStub() ? 1 : 0;
   }
 
 public:
@@ -3954,7 +4038,24 @@ public:
            && i < numTrailingObjects(OverloadToken<MethodDescriptor>{}));
     return getMethodDescriptors()[i].Impl.get();
   }
-  
+
+  /// Whether this context descriptor references an Objective-C resilient
+  /// class stub. See the above description of TargetObjCResilientClassStubInfo
+  /// for details.
+  bool hasObjCResilientClassStub() const {
+    if (!hasResilientSuperclass())
+      return false;
+    return ExtraClassFlags.hasObjCResilientClassStub();
+  }
+
+  const void *getObjCResilientClassStub() const {
+    if (!hasObjCResilientClassStub())
+      return nullptr;
+
+    return this->template getTrailingObjects<ObjCResilientClassStubInfo>()
+      ->Stub.get();
+  }
+
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Class;
   }
@@ -4164,6 +4265,9 @@ TargetContextDescriptor<Runtime>::getGenericContext() const {
   case ContextDescriptorKind::Struct:
     return llvm::cast<TargetStructDescriptor<Runtime>>(this)
         ->getGenericContext();
+  case ContextDescriptorKind::OpaqueType:
+    return llvm::cast<TargetOpaqueTypeDescriptor<Runtime>>(this)
+        ->getGenericContext();
   default:    
     // We don't know about this kind of descriptor.
     return nullptr;
@@ -4215,6 +4319,8 @@ TargetTypeContextDescriptor<Runtime>::getGenericParams() const {
     return llvm::cast<TargetEnumDescriptor<Runtime>>(this)->getGenericParams();
   case ContextDescriptorKind::Struct:
     return llvm::cast<TargetStructDescriptor<Runtime>>(this)->getGenericParams();
+  case ContextDescriptorKind::OpaqueType:
+    return llvm::cast<TargetOpaqueTypeDescriptor<Runtime>>(this)->getGenericParams();
   default:
     swift_runtime_unreachable("Not a type context descriptor.");
   }

@@ -87,6 +87,12 @@ public typealias CLongDouble = Float80
 // Long Double type equivalent to Double type.
 public typealias CLongDouble = Double
 #endif
+#elseif os(Android)
+// On Android, long double is Float128 for AAPCS64, which we don't have yet in
+// Swift (SR-9072); and Double for ARMv7.
+#if arch(arm)
+public typealias CLongDouble = Double
+#endif
 #endif
 
 // FIXME: Is it actually UTF-32 on Darwin?

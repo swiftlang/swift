@@ -672,7 +672,7 @@ protocol SR_7984_P {
 struct A<T: String> {} // expected-error {{type 'T' constrained to non-protocol, non-class type 'String'}}
 struct B<T> where T: String {} // expected-error {{type 'T' constrained to non-protocol, non-class type 'String'}}
 protocol C {
-  associatedtype Foo: String // expected-error {{inheritance from non-protocol, non-class type 'String'}} expected-error {{type 'Self.Foo' constrained to non-protocol, non-class type 'String'}}
+  associatedtype Foo: String // expected-error {{type 'Self.Foo' constrained to non-protocol, non-class type 'String'}}
 }
 protocol D {
   associatedtype Foo where Foo: String // expected-error {{type 'Self.Foo' constrained to non-protocol, non-class type 'String'}}

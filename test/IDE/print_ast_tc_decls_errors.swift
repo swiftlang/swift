@@ -155,7 +155,7 @@ protocol ProtocolWithInheritance4 : FooClass, FooProtocol {}
 // NO-TYREPR: {{^}}protocol ProtocolWithInheritance4 : FooClass, FooProtocol {{{$}}
 // TYREPR: {{^}}protocol ProtocolWithInheritance4 : FooClass, FooProtocol {{{$}}
 
-protocol ProtocolWithInheritance5 : FooClass, BarClass {} // expected-error{{multiple inheritance from classes 'FooClass' and 'BarClass'}} expected-error{{protocol 'ProtocolWithInheritance5' cannot be a subclass of both 'BarClass' and 'FooClass'}} // expected-note{{superclass constraint 'Self' : 'FooClass' written here}}
+protocol ProtocolWithInheritance5 : FooClass, BarClass {} // expected-error{{multiple inheritance from classes 'FooClass' and 'BarClass'}} expected-error{{protocol 'ProtocolWithInheritance5' cannot require 'Self' to be a subclass of both 'BarClass' and 'FooClass'}} // expected-note{{superclass constraint 'Self' : 'FooClass' written here}}
 // NO-TYREPR: {{^}}protocol ProtocolWithInheritance5 : <<error type>>, <<error type>> {{{$}}
 // TYREPR: {{^}}protocol ProtocolWithInheritance5 : FooClass, BarClass {{{$}}
 

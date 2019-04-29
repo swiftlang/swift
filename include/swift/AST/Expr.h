@@ -22,6 +22,7 @@
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/TrailingCallArguments.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
@@ -59,6 +60,7 @@ namespace swift {
   class ParameterList;
   class EnumElementDecl;
   class CallExpr;
+  class KeyPathExpr;
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -290,23 +292,9 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(ImplicitConversionExpr, Expr);
 
-  SWIFT_INLINE_BITFIELD_FULL(TupleShuffleExpr, ImplicitConversionExpr, 16,
-    /// This contains an entry for each element in the Expr type.  Each element
-    /// specifies which index from the SubExpr that the destination element gets.
-    NumElementMappings : 16
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL(ArgumentShuffleExpr, ImplicitConversionExpr, 2+16+16+16,
-    TypeImpact : 2,
-    : NumPadBits,
-    NumCallerDefaultArgs : 16,
-    /// This contains an entry for each element in the Expr type.  Each element
-    /// specifies which index from the SubExpr that the destination element gets.
-    /// If the element value is DefaultInitialize, then the destination value
-    /// gets the default initializer for that tuple element value.
-    NumElementMappings : 16,
-    /// The arguments that are packed into the variadic element.
-    NumVariadicArgs : 16
+  SWIFT_INLINE_BITFIELD_FULL(DestructureTupleExpr, ImplicitConversionExpr, 16,
+    /// The number of elements in the tuple type being destructured.
+    NumElements : 16
   );
 
   SWIFT_INLINE_BITFIELD(ForceValueExpr, Expr, 1,
@@ -374,6 +362,10 @@ protected:
   SWIFT_INLINE_BITFIELD_FULL(SequenceExpr, Expr, 32,
     : NumPadBits,
     NumElements : 32
+  );
+
+  SWIFT_INLINE_BITFIELD(OpaqueValueExpr, Expr, 1,
+    IsPlaceholder : 1
   );
 
   } Bits;
@@ -552,6 +544,7 @@ public:
   void dump(raw_ostream &OS, unsigned Indent = 0) const;
   void dump(raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getType,
             llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
+            llvm::function_ref<Type(const KeyPathExpr *E, unsigned index)> getTypeOfKeyPathComponent,
             unsigned Indent = 0) const;
   
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
@@ -568,105 +561,6 @@ public:
   void *operator new(size_t Bytes, void *Mem) { 
     assert(Mem); 
     return Mem; 
-  }
-};
-
-/// Helper class to capture trailing call argument labels and related
-/// information, for expression nodes that involve argument labels, trailing
-/// closures, etc.
-template<typename Derived>
-class TrailingCallArguments
-    : private llvm::TrailingObjects<Derived, Identifier, SourceLoc> {
-  // We need to friend TrailingObjects twice here to work around an MSVC bug.
-  // If we have two functions of the same name with the parameter
-  // typename TrailingObjectsIdentifier::template OverloadToken<T> where T is
-  // different for each function, then MSVC reports a "member function already
-  // defined or declared" error, which is incorrect.
-  using TrailingObjectsIdentifier = llvm::TrailingObjects<Derived, Identifier>;
-  friend TrailingObjectsIdentifier;
-
-  using TrailingObjects = llvm::TrailingObjects<Derived, Identifier, SourceLoc>;
-  friend TrailingObjects;
-
-  Derived &asDerived() {
-    return *static_cast<Derived *>(this);
-  }
-
-  const Derived &asDerived() const {
-    return *static_cast<const Derived *>(this);
-  }
-
-  size_t numTrailingObjects(
-      typename TrailingObjectsIdentifier::template OverloadToken<Identifier>)
-      const {
-    return asDerived().getNumArguments();
-  }
-
-  size_t numTrailingObjects(
-      typename TrailingObjectsIdentifier::template OverloadToken<SourceLoc>)
-      const {
-    return asDerived().hasArgumentLabelLocs() ? asDerived().getNumArguments()
-                                              : 0;
-  }
-
-  /// Retrieve the buffer containing the argument labels.
-  MutableArrayRef<Identifier> getArgumentLabelsBuffer() {
-    return { this->template getTrailingObjects<Identifier>(),
-             asDerived().getNumArguments() };
-  }
-
-  /// Retrieve the buffer containing the argument label locations.
-  MutableArrayRef<SourceLoc> getArgumentLabelLocsBuffer() {
-    if (!asDerived().hasArgumentLabelLocs())
-      return { };
-    
-    return { this->template getTrailingObjects<SourceLoc>(),
-             asDerived().getNumArguments() };
-  }
-
-protected:
-  /// Determine the total size to allocate.
-  static size_t totalSizeToAlloc(ArrayRef<Identifier> argLabels,
-                                 ArrayRef<SourceLoc> argLabelLocs,
-                                 bool hasTrailingClosure) {
-    return TrailingObjects::template totalSizeToAlloc<Identifier, SourceLoc>(
-        argLabels.size(), argLabelLocs.size());
-  }
-
-  /// Initialize the actual call arguments.
-  void initializeCallArguments(ArrayRef<Identifier> argLabels,
-                               ArrayRef<SourceLoc> argLabelLocs,
-                               bool hasTrailingClosure) {
-    if (!argLabels.empty()) {
-      std::uninitialized_copy(argLabels.begin(), argLabels.end(),
-                              this->template getTrailingObjects<Identifier>());
-    }
-    
-    if (!argLabelLocs.empty())
-      std::uninitialized_copy(argLabelLocs.begin(), argLabelLocs.end(),
-                              this->template getTrailingObjects<SourceLoc>());
-  }
-
-public:
-  /// Retrieve the argument labels provided at the call site.
-  ArrayRef<Identifier> getArgumentLabels() const {
-    return { this->template getTrailingObjects<Identifier>(),
-             asDerived().getNumArguments() };
-  }
-
-  /// Retrieve the buffer containing the argument label locations.
-  ArrayRef<SourceLoc> getArgumentLabelLocs() const {
-    if (!asDerived().hasArgumentLabelLocs())
-      return { };
-    
-    return { this->template getTrailingObjects<SourceLoc>(),
-             asDerived().getNumArguments() };
-  }
-
-  /// Retrieve the location of the ith argument label.
-  SourceLoc getArgumentLabelLoc(unsigned i) const {
-    auto locs = getArgumentLabelLocs();
-    return i < locs.size() ? locs[i] : SourceLoc();
   }
 };
 
@@ -2207,6 +2101,7 @@ public:
 class CollectionExpr : public Expr {
   SourceLoc LBracketLoc;
   SourceLoc RBracketLoc;
+  ConcreteDeclRef Initializer;
 
   Expr *SemanticExpr = nullptr;
 
@@ -2283,6 +2178,14 @@ public:
            e->getKind() <= ExprKind::Last_CollectionExpr;
   }
 
+  /// Retrieve the initializer that will be used to construct the 'array'
+  /// literal from the result of the initializer.
+  ConcreteDeclRef getInitializer() const { return Initializer; }
+
+  /// Set the initializer that will be used to construct the 'array' literal.
+  void setInitializer(ConcreteDeclRef initializer) {
+    Initializer = initializer;
+  }
 };
  
 /// An array literal expression [a, b, c].
@@ -2313,6 +2216,8 @@ public:
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Array;
   }
+
+  Type getElementType();
 };
 
 /// A dictionary literal expression [a : x, b : y, c : z].
@@ -2960,188 +2865,64 @@ public:
   }
 };
 
-/// TupleShuffleExpr - This represents a permutation of a tuple value to a new
-/// tuple type.
-class TupleShuffleExpr final : public ImplicitConversionExpr,
-    private llvm::TrailingObjects<TupleShuffleExpr, unsigned> {
-  friend TrailingObjects;
-
-  size_t numTrailingObjects(OverloadToken<unsigned>) const {
-    return Bits.TupleShuffleExpr.NumElementMappings;
-  }
-
-private:
-  TupleShuffleExpr(Expr *subExpr, ArrayRef<unsigned> elementMapping,
-                   Type ty)
-    : ImplicitConversionExpr(ExprKind::TupleShuffle, subExpr, ty) {
-    Bits.TupleShuffleExpr.NumElementMappings = elementMapping.size();
-    std::uninitialized_copy(elementMapping.begin(), elementMapping.end(),
-                            getTrailingObjects<unsigned>());
-  }
-
+/// Use an opaque type to abstract a value of the underlying concrete type.
+class UnderlyingToOpaqueExpr : public ImplicitConversionExpr {
 public:
-  static TupleShuffleExpr *create(ASTContext &ctx, Expr *subExpr,
-                                  ArrayRef<unsigned> elementMapping,
-                                  Type ty);
-
-  ArrayRef<unsigned> getElementMapping() const {
-    return {getTrailingObjects<unsigned>(),
-            static_cast<size_t>(Bits.TupleShuffleExpr.NumElementMappings)};
-  }
-
+  UnderlyingToOpaqueExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::UnderlyingToOpaque, subExpr, ty) {}
+  
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::TupleShuffle;
+    return E->getKind() == ExprKind::UnderlyingToOpaque;
   }
 };
 
-/// ArgumentShuffleExpr - This represents a "complex" argument list of an
-/// ApplyExpr, with default arguments or varargs.
-///
-/// If hasScalarSource() is true, the subexpression should be treated
-/// as if it were implicitly injected into a single-element tuple
-/// type.  Otherwise, the subexpression is known to have a tuple type.
-class ArgumentShuffleExpr final : public ImplicitConversionExpr,
-    private llvm::TrailingObjects<ArgumentShuffleExpr, Expr *, int, unsigned> {
+/// DestructureTupleExpr - Destructure a tuple value produced by a source
+/// expression, binding the elements to OpaqueValueExprs, then evaluate the
+/// result expression written in terms of the OpaqueValueExprs.
+class DestructureTupleExpr final : public ImplicitConversionExpr,
+    private llvm::TrailingObjects<DestructureTupleExpr, OpaqueValueExpr *> {
   friend TrailingObjects;
 
-  size_t numTrailingObjects(OverloadToken<Expr *>) const {
-    return Bits.ArgumentShuffleExpr.NumCallerDefaultArgs;
+  size_t numTrailingObjects(OverloadToken<OpaqueValueExpr *>) const {
+    return Bits.DestructureTupleExpr.NumElements;
   }
-  size_t numTrailingObjects(OverloadToken<int>) const {
-    return Bits.ArgumentShuffleExpr.NumElementMappings;
-  }
-  size_t numTrailingObjects(OverloadToken<unsigned>) const {
-    return Bits.ArgumentShuffleExpr.NumVariadicArgs;
-  }
-
-public:
-  enum : int {
-    /// The element mapping value indicating that a field of the destination
-    /// tuple should be default-initialized.
-    DefaultInitialize = -1,
-    /// The element mapping is part of the variadic field.
-    Variadic = -2,
-    /// The element mapping value indicating that the field of the
-    /// destination tuple should be default-initialized with an expression
-    /// provided by the caller.
-    /// FIXME: Yet another indication that ArgumentShuffleExpr uses the wrong
-    /// formulation.
-    CallerDefaultInitialize = -3
-  };
-
-  enum TypeImpact {
-    /// The source value is a tuple which is destructured and modified to
-    /// create the result, which is a tuple.
-    ///
-    /// Example: (x: Int) => (x: Int, y: Int = 0).
-    TupleToTuple,
-
-    /// The source value is a tuple which is destructured and modified to
-    /// create the result, which is a scalar because it has one element and
-    /// no labels.
-    ///
-    /// Example: () -> (_: Int = 0)
-    /// Another example: (Int, Int) => (_: Int...)
-    TupleToScalar,
-
-    /// The source value is an individual value (possibly one with tuple
-    /// type) which is inserted into a particular position in the result,
-    /// which is a tuple.
-    ///
-    /// Example: (Int) -> (_: Int, y: Int = 0)
-    ScalarToTuple
-
-    // (ArgumentShuffleExpr are never created for a scalar-to-scalar conversion.)
-  };
 
 private:
-  /// If we're doing a varargs shuffle, this is the array type to build.
-  Type VarargsArrayTy;
+  Expr *DstExpr;
 
-  /// If there are any default arguments, the owning function
-  /// declaration.
-  ConcreteDeclRef DefaultArgsOwner;
-
-  ArgumentShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping,
-                      TypeImpact typeImpact,
-                      ConcreteDeclRef defaultArgsOwner,
-                      ArrayRef<unsigned> VariadicArgs,
-                      Type VarargsArrayTy,
-                      ArrayRef<Expr *> CallerDefaultArgs,
-                      Type ty)
-    : ImplicitConversionExpr(ExprKind::ArgumentShuffle, subExpr, ty),
-      VarargsArrayTy(VarargsArrayTy), DefaultArgsOwner(defaultArgsOwner) {
-    Bits.ArgumentShuffleExpr.TypeImpact = typeImpact;
-    Bits.ArgumentShuffleExpr.NumCallerDefaultArgs = CallerDefaultArgs.size();
-    Bits.ArgumentShuffleExpr.NumElementMappings = elementMapping.size();
-    Bits.ArgumentShuffleExpr.NumVariadicArgs = VariadicArgs.size();
-    std::uninitialized_copy(CallerDefaultArgs.begin(), CallerDefaultArgs.end(),
-                            getTrailingObjects<Expr*>());
-    std::uninitialized_copy(elementMapping.begin(), elementMapping.end(),
-                            getTrailingObjects<int>());
-    std::uninitialized_copy(VariadicArgs.begin(), VariadicArgs.end(),
-                            getTrailingObjects<unsigned>());
+  DestructureTupleExpr(ArrayRef<OpaqueValueExpr *> destructuredElements,
+                       Expr *srcExpr, Expr *dstExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::DestructureTuple, srcExpr, ty),
+      DstExpr(dstExpr) {
+    Bits.DestructureTupleExpr.NumElements = destructuredElements.size();
+    std::uninitialized_copy(destructuredElements.begin(),
+                            destructuredElements.end(),
+                            getTrailingObjects<OpaqueValueExpr *>());
   }
 
 public:
-  static ArgumentShuffleExpr *create(ASTContext &ctx, Expr *subExpr,
-                                     ArrayRef<int> elementMapping,
-                                     TypeImpact typeImpact,
-                                     ConcreteDeclRef defaultArgsOwner,
-                                     ArrayRef<unsigned> VariadicArgs,
-                                     Type VarargsArrayTy,
-                                     ArrayRef<Expr *> CallerDefaultArgs,
-                                     Type ty);
+  /// Create a tuple destructuring. The type of srcExpr must be a tuple type,
+  /// and the number of elements must equal the size of destructureElements.
+  static DestructureTupleExpr *
+  create(ASTContext &ctx,
+         ArrayRef<OpaqueValueExpr *> destructuredElements,
+         Expr *srcExpr, Expr *dstExpr, Type ty);
 
-  ArrayRef<int> getElementMapping() const {
-    return {getTrailingObjects<int>(),
-            static_cast<size_t>(Bits.ArgumentShuffleExpr.NumElementMappings)};
+  ArrayRef<OpaqueValueExpr *> getDestructuredElements() const {
+    return {getTrailingObjects<OpaqueValueExpr *>(),
+            static_cast<size_t>(Bits.DestructureTupleExpr.NumElements)};
   }
 
-  /// What is the type impact of this shuffle?
-  TypeImpact getTypeImpact() const {
-    return TypeImpact(Bits.ArgumentShuffleExpr.TypeImpact);
+  Expr *getResultExpr() const {
+    return DstExpr;
   }
 
-  bool isSourceScalar() const {
-    return getTypeImpact() == ScalarToTuple;
-  }
-
-  bool isResultScalar() const {
-    return getTypeImpact() == TupleToScalar;
-  }
-
-  Type getVarargsArrayType() const {
-    assert(!VarargsArrayTy.isNull());
-    return VarargsArrayTy;
-  }
-  Type getVarargsArrayTypeOrNull() const {
-    return VarargsArrayTy;
-  }
-
-  /// Retrieve the argument indices for the variadic arguments.
-  ArrayRef<unsigned> getVariadicArgs() const {
-    return {getTrailingObjects<unsigned>(),
-            static_cast<size_t>(Bits.ArgumentShuffleExpr.NumVariadicArgs)};
-  }
-
-  /// Retrieve the owner of the default arguments.
-  ConcreteDeclRef getDefaultArgsOwner() const { return DefaultArgsOwner; }
-
-  /// Retrieve the caller-defaulted arguments.
-  ArrayRef<Expr *> getCallerDefaultArgs() const {
-    return {getTrailingObjects<Expr*>(),
-            static_cast<size_t>(Bits.ArgumentShuffleExpr.NumCallerDefaultArgs)};
-  }
-
-  /// Retrieve the caller-defaulted arguments.
-  MutableArrayRef<Expr *> getCallerDefaultArgs() {
-    return {getTrailingObjects<Expr*>(),
-            static_cast<size_t>(Bits.ArgumentShuffleExpr.NumCallerDefaultArgs)};
+  void setResultExpr(Expr *dstExpr) {
+    DstExpr = dstExpr;
   }
 
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ArgumentShuffle;
+    return E->getKind() == ExprKind::DestructureTuple;
   }
 };
 
@@ -3995,19 +3776,102 @@ public:
 /// Opaque value expressions occur when a particular value within the AST
 /// needs to be re-used without being re-evaluated or for a value that is
 /// a placeholder. OpaqueValueExpr nodes are introduced by some other AST
-/// node (say, a \c DynamicMemberRefExpr) and can only be used within the
+/// node (say, an \c OpenExistentialExpr) and can only be used within the
 /// subexpressions of that AST node.
 class OpaqueValueExpr : public Expr {
   SourceLoc Loc;
 
 public:
-  explicit OpaqueValueExpr(SourceLoc Loc, Type Ty)
-    : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Loc(Loc) { }
+  explicit OpaqueValueExpr(SourceLoc Loc, Type Ty, bool isPlaceholder = false)
+    : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Loc(Loc) {
+    Bits.OpaqueValueExpr.IsPlaceholder = isPlaceholder;
+  }
+
+  /// Whether this opaque value expression represents a placeholder that
+  /// is injected before type checking to act as a placeholder for some
+  /// value to be specified later.
+  bool isPlaceholder() const { return Bits.OpaqueValueExpr.IsPlaceholder; }
 
   SourceRange getSourceRange() const { return Loc; }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OpaqueValue; 
+  }
+};
+
+/// An expression referring to a default argument left unspecified at the
+/// call site.
+///
+/// A DefaultArgumentExpr must only appear as a direct child of a
+/// ParenExpr or a TupleExpr that is itself a call argument.
+class DefaultArgumentExpr final : public Expr {
+  /// The owning declaration.
+  ConcreteDeclRef DefaultArgsOwner;
+
+  /// The caller parameter index.
+  unsigned ParamIndex;
+
+  /// The source location of the argument list.
+  SourceLoc Loc;
+
+public:
+  explicit DefaultArgumentExpr(ConcreteDeclRef defaultArgsOwner, unsigned paramIndex,
+                               SourceLoc loc, Type Ty)
+    : Expr(ExprKind::DefaultArgument, /*Implicit=*/true, Ty),
+      DefaultArgsOwner(defaultArgsOwner), ParamIndex(paramIndex), Loc(loc) { }
+
+  SourceRange getSourceRange() const {
+    return Loc;
+  }
+
+  ConcreteDeclRef getDefaultArgsOwner() const {
+    return DefaultArgsOwner;
+  }
+
+  unsigned getParamIndex() const {
+    return ParamIndex;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::DefaultArgument;
+  }
+};
+
+/// An expression referring to a caller-side default argument left unspecified
+/// at the call site.
+///
+/// A CallerDefaultArgumentExpr must only appear as a direct child of a
+/// ParenExpr or a TupleExpr that is itself a call argument.
+///
+/// FIXME: This only exists to distinguish caller default arguments from arguments
+/// that were specified at the call site. Once we remove SanitizeExpr, we can remove
+/// this hack too.
+class CallerDefaultArgumentExpr final : public Expr {
+  /// The expression that is evaluated to produce the default argument value.
+  Expr *SubExpr;
+
+  /// The source location of the argument list.
+  SourceLoc Loc;
+
+public:
+  explicit CallerDefaultArgumentExpr(Expr *subExpr, SourceLoc loc, Type Ty)
+    : Expr(ExprKind::CallerDefaultArgument, /*Implicit=*/true, Ty),
+      SubExpr(subExpr), Loc(loc) { }
+
+  SourceRange getSourceRange() const {
+    return Loc;
+  }
+
+  Expr *getSubExpr() const {
+    return SubExpr;
+  }
+
+  void setSubExpr(Expr *subExpr) {
+    SubExpr = subExpr;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::CallerDefaultArgument;
   }
 };
 
@@ -4021,8 +3885,7 @@ class ApplyExpr : public Expr {
   llvm::PointerIntPair<Expr *, 1, bool> ArgAndIsSuper;
   
   /// Returns true if \c e could be used as the call's argument. For most \c ApplyExpr
-  /// subclasses, this means it is a \c ParenExpr, \c TupleExpr, or 
-  /// \c ArgumentShuffleExpr.
+  /// subclasses, this means it is a \c ParenExpr or \c TupleExpr.
   bool validateArg(Expr *e) const;
 
 protected:
@@ -4086,7 +3949,7 @@ public:
            E->getKind() <= ExprKind::Last_ApplyExpr;
   }
 };
-  
+
 /// CallExpr - Application of an argument to a function, which occurs
 /// syntactically through juxtaposition with a TupleExpr whose
 /// leading '(' is unspaced.
@@ -5402,7 +5265,7 @@ inline bool ApplyExpr::validateArg(Expr *e) const {
   else if (isa<BinaryExpr>(this))
     return isa<TupleExpr>(e);
   else
-    return isa<ParenExpr>(e) || isa<TupleExpr>(e) || isa<ArgumentShuffleExpr>(e);
+    return isa<ParenExpr>(e) || isa<TupleExpr>(e);
 }
 
 inline Expr *const *CollectionExpr::getTrailingObjectsPointer() const {
@@ -5422,7 +5285,27 @@ inline const SourceLoc *CollectionExpr::getTrailingSourceLocs() const {
 }
 
 #undef SWIFT_FORWARD_SOURCE_LOCS_TO
-  
+
+/// Pack the argument information into a single argument, to match the
+/// representation expected by the AST.
+///
+/// \param argLabels The argument labels, which might be updated by this
+/// function.
+///
+/// \param argLabelLocs The argument label locations, which might be updated by
+/// this function.
+Expr *packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
+                         ArrayRef<Expr *> args,
+                         ArrayRef<Identifier> &argLabels,
+                         ArrayRef<SourceLoc> &argLabelLocs,
+                         SourceLoc rParenLoc,
+                         Expr *trailingClosure, bool implicit,
+                         SmallVectorImpl<Identifier> &argLabelsScratch,
+                         SmallVectorImpl<SourceLoc> &argLabelLocsScratch,
+                         llvm::function_ref<Type(const Expr *)> getType =
+                              [](const Expr *E) -> Type {
+                                return E->getType();
+                              });
 } // end namespace swift
 
 #endif

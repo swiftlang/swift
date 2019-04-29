@@ -203,6 +203,9 @@ static SubstitutionMap
 createSubstitutionMapFromGenericArgs(GenericSignature *genericSig,
                                      ArrayRef<Type> args,
                                      ModuleDecl *moduleDecl) {
+  if (!genericSig)
+    return SubstitutionMap();
+  
   SmallVector<GenericTypeParamType *, 4> genericParams;
   genericSig->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
     if (canonical)
@@ -245,6 +248,37 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
   // requirements of the signature here.
   auto substType = origType.subst(subs);
   return substType;
+}
+
+Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
+                                   ArrayRef<Type> args,
+                                   unsigned ordinal) {
+  if (opaqueDescriptor->getKind() == Node::Kind::OpaqueReturnTypeOf) {
+    auto definingDecl = opaqueDescriptor->getChild(0);
+    auto mangledName = mangleNode(definingDecl);
+    auto moduleNode = findModuleNode(definingDecl);
+    if (!moduleNode)
+      return Type();
+    auto parentModule = findModule(findModuleNode(definingDecl));
+    if (!parentModule)
+      return Type();
+
+    auto opaqueDecl = parentModule->lookupOpaqueResultType(mangledName,
+                                                           Resolver);
+    if (!opaqueDecl)
+      return Type();
+    // TODO: multiple opaque types
+    assert(ordinal == 0 && "not implemented");
+    if (ordinal != 0)
+      return Type();
+
+    SubstitutionMap subs = createSubstitutionMapFromGenericArgs(
+                         opaqueDecl->getGenericSignature(), args, parentModule);
+    return OpaqueTypeArchetypeType::get(opaqueDecl, subs);
+  }
+  
+  // TODO: named opaque types
+  return Type();
 }
 
 Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
@@ -360,10 +394,6 @@ Type ASTBuilder::createFunctionType(
                               .withValueOwnership(ownership)
                               .withVariadic(flags.isVariadic())
                               .withAutoClosure(flags.isAutoClosure());
-
-    if (auto *fnType = type->getAs<FunctionType>())
-      if (!fnType->isNoEscape())
-        parameterFlags = parameterFlags.withEscaping(true);
 
     funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
   }

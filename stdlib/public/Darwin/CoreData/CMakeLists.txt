@@ -6,6 +6,8 @@ add_swift_target_library(swiftCoreData ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} 
   NSManagedObjectContext.swift
   CoreData.mm
 
+  "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
+
   SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   SWIFT_MODULE_DEPENDS_OSX Darwin CoreFoundation CoreGraphics Dispatch Foundation IOKit ObjectiveC # auto-updated

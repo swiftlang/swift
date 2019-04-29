@@ -140,8 +140,10 @@ namespace irgen {
   class Signature;
   class StructMetadataLayout;
   struct SymbolicMangling;
+  struct GenericRequirement;
   class TypeConverter;
   class TypeInfo;
+  enum class TypeMetadataAddress;
   enum class ValueWitness : unsigned;
   enum class ClassMetadataStrategy;
 
@@ -208,6 +210,12 @@ private:
   // The current IGM for which IR is generated.
   IRGenModule *CurrentIGM = nullptr;
 
+  /// If this is true, adding anything to the below queues is an error.
+  bool FinishedEmittingLazyDefinitions = false;
+
+  /// A map recording if metadata can be emitted lazily for each nominal type.
+  llvm::DenseMap<TypeDecl *, bool> HasLazyMetadata;
+
   struct LazyTypeGlobalsInfo {
     /// Is there a use of the type metadata?
     bool IsMetadataUsed = false;
@@ -215,38 +223,47 @@ private:
     /// Is there a use of the nominal type descriptor?
     bool IsDescriptorUsed = false;
 
-    /// Have we already emitted a definition for the type metadata with
-    /// the current requirements?
+    /// Have we already emitted type metadata?
     bool IsMetadataEmitted = false;
 
-    /// Have we already emitted a definition for the type descriptor with
-    /// the current requirements?
+    /// Have we already emitted a type context descriptor?
     bool IsDescriptorEmitted = false;
-
-    /// Is the type a lazy type?
-    bool IsLazy = false;
   };
 
   /// The set of type metadata that have been enqueued for lazy emission.
-  ///
-  /// It can also contain some eagerly emitted metadata. Those are ignored in
-  /// lazy emission.
-  llvm::DenseMap<NominalTypeDecl*, LazyTypeGlobalsInfo> LazyTypeGlobals;
+  llvm::DenseMap<NominalTypeDecl *, LazyTypeGlobalsInfo> LazyTypeGlobals;
 
   /// The queue of lazy type metadata to emit.
-  llvm::SmallVector<NominalTypeDecl*, 4> LazyTypeMetadata;
+  llvm::SmallVector<NominalTypeDecl *, 4> LazyTypeMetadata;
 
   /// The queue of lazy type context descriptors to emit.
-  llvm::SmallVector<NominalTypeDecl*, 4> LazyTypeContextDescriptors;
+  llvm::SmallVector<NominalTypeDecl *, 4> LazyTypeContextDescriptors;
 
-  llvm::SmallPtrSet<SILFunction*, 4> LazilyEmittedFunctions;
+  /// Field metadata records that have already been lazily emitted, or are
+  /// queued up.
+  llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyEmittedFieldMetadata;
+  struct LazyOpaqueInfo {
+    bool IsLazy = false;
+    bool IsDescriptorUsed = false;
+    bool IsDescriptorEmitted = false;
+  };
+  /// The set of opaque types enqueued for lazy emission.
+  llvm::DenseMap<OpaqueTypeDecl*, LazyOpaqueInfo> LazyOpaqueTypes;
+  /// The queue of opaque type descriptors to emit.
+  llvm::SmallVector<OpaqueTypeDecl*, 4> LazyOpaqueTypeDescriptors;
 
-  llvm::SetVector<SILFunction*> DynamicReplacements;
+  /// The queue of lazy field metadata records to emit.
+  llvm::SmallVector<NominalTypeDecl *, 4> LazyFieldDescriptors;
 
-  /// SIL functions that we need to emit lazily.
-  llvm::SmallVector<SILFunction*, 4> LazyFunctionDefinitions;
+  llvm::SetVector<SILFunction *> DynamicReplacements;
 
-  /// The set of witness tables that have been enqueue for lazy emission.
+  /// SIL functions that have already been lazily emitted, or are queued up.
+  llvm::SmallPtrSet<SILFunction *, 4> LazilyEmittedFunctions;
+
+  /// The queue of SIL functions to emit.
+  llvm::SmallVector<SILFunction *, 4> LazyFunctionDefinitions;
+
+  /// Witness tables that have already been lazily emitted, or are queued up.
   llvm::SmallPtrSet<SILWitnessTable *, 4> LazilyEmittedWitnessTables;
 
   /// The queue of lazy witness tables to emit.
@@ -337,10 +354,10 @@ public:
   // Emit the code to replace dynamicReplacement(for:) functions.
   void emitDynamicReplacements();
 
-  /// Checks if the metadata of \p Nominal can be emitted lazily.
-  ///
-  /// If yes, \p Nominal is added to eligibleLazyMetadata and true is returned.
-  bool tryEnableLazyTypeMetadata(NominalTypeDecl *Nominal);
+  /// Checks if metadata for this type can be emitted lazily. This is true for
+  /// non-public types as well as imported types, except for classes and
+  /// protocols which are always emitted eagerly.
+  bool hasLazyMetadata(TypeDecl *type);
 
   /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
@@ -361,7 +378,7 @@ public:
     noteUseOfTypeGlobals(type, true, RequireMetadata);
   }
 
-  void noteUseOfTypeMetadata(Type type) {
+  void noteUseOfTypeMetadata(CanType type) {
     type.visit([&](Type t) {
       if (auto *nominal = t->getAnyNominal())
         noteUseOfTypeMetadata(nominal);
@@ -372,8 +389,17 @@ public:
                                       RequireMetadata_t requireMetadata) {
     noteUseOfTypeGlobals(type, false, requireMetadata);
   }
+  
+  void noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque);
 
-  void noteUseOfAnyParentTypeMetadata(NominalTypeDecl *type);
+  void noteUseOfFieldDescriptor(NominalTypeDecl *type);
+
+  void noteUseOfFieldDescriptors(CanType type) {
+    type.visit([&](Type t) {
+      if (auto *nominal = t->getAnyNominal())
+        noteUseOfFieldDescriptor(nominal);
+    });
+  }
 
 private:
   void noteUseOfTypeGlobals(NominalTypeDecl *type,
@@ -577,6 +603,9 @@ public:
   llvm::PointerType *ObjCSuperPtrTy;   /// %objc_super*
   llvm::StructType *ObjCBlockStructTy; /// %objc_block
   llvm::PointerType *ObjCBlockPtrTy;   /// %objc_block*
+  llvm::FunctionType *ObjCUpdateCallbackTy;
+  llvm::StructType *ObjCFullResilientClassStubTy;   /// %objc_full_class_stub
+  llvm::StructType *ObjCResilientClassStubTy;   /// %objc_class_stub
   llvm::StructType *ProtocolRecordTy;
   llvm::PointerType *ProtocolRecordPtrTy;
   llvm::StructType *ProtocolConformanceDescriptorTy;
@@ -595,6 +624,8 @@ public:
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
   llvm::PointerType *WitnessTablePtrPtrTy;   /// i8***
+  llvm::StructType *OpaqueTypeDescriptorTy;
+  llvm::PointerType *OpaqueTypeDescriptorPtrTy;
   llvm::Type *FloatTy;
   llvm::Type *DoubleTy;
   llvm::StructType *DynamicReplacementsTy; // { i8**, i8* }
@@ -848,6 +879,8 @@ public:
                                            ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfKeyPathPattern(KeyPathPattern *pattern,
                                           SILLocation diagLoc);
+  llvm::Constant *getAddrOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaqueType,
+                                                ConstantInit forDefinition);
   ConstantReference getConstantReferenceForProtocolDescriptor(ProtocolDecl *proto);
 
   ConstantIntegerLiteral getConstantIntegerLiteral(APInt value);
@@ -955,6 +988,8 @@ private:
   SmallVector<llvm::WeakTrackingVH, 4> ObjCNonLazyClasses;
   /// List of Objective-C categories, bitcast to i8*.
   SmallVector<llvm::WeakTrackingVH, 4> ObjCCategories;
+  /// List of Objective-C categories on class stubs, bitcast to i8*.
+  SmallVector<llvm::WeakTrackingVH, 4> ObjCCategoriesOnStubs;
   /// List of non-ObjC protocols described by this module.
   SmallVector<ProtocolDecl *, 4> SwiftProtocols;
   /// List of protocol conformances to generate descriptors for.
@@ -1022,16 +1057,12 @@ public:
   /// Builtin types referenced by types in this module when emitting
   /// reflection metadata.
   llvm::SetVector<CanType> BuiltinTypes;
-  /// Opaque but fixed-size types for which we also emit builtin type
-  /// descriptors, allowing the reflection library to layout these types
-  /// without knowledge of their contents. This includes imported structs
-  /// and fixed-size multi-payload enums.
-  llvm::SetVector<const NominalTypeDecl *> OpaqueTypes;
-  /// Imported structs referenced by types in this module when emitting
-  /// reflection metadata.
-  llvm::SetVector<const StructDecl *> ImportedStructs;
 
   llvm::Constant *getTypeRef(CanType type, MangledTypeRefRole role);
+  llvm::Constant *emitWitnessTableRefString(CanType type,
+                                            ProtocolConformanceRef conformance,
+                                            GenericSignature *genericSig,
+                                            bool shouldSetLowBit);
   llvm::Constant *getMangledAssociatedConformance(
                                   const NormalProtocolConformance *conformance,
                                   const AssociatedConformance &requirement);
@@ -1072,19 +1103,11 @@ public:
                                            bool inProtocolContext);
 
   void emitAssociatedTypeMetadataRecord(const RootProtocolConformance *C);
-  void emitFieldMetadataRecord(const NominalTypeDecl *Decl);
+  void emitFieldDescriptor(const NominalTypeDecl *Decl);
 
   /// Emit a reflection metadata record for a builtin type referenced
   /// from this module.
   void emitBuiltinTypeMetadataRecord(CanType builtinType);
-
-  /// Emit a reflection metadata record for an imported type referenced
-  /// from this module.
-  void emitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDecl);
-
-  /// Some nominal type declarations require us to emit a fixed-size type
-  /// descriptor, because they have special layout considerations.
-  bool shouldEmitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDecl);
 
   /// Emit reflection metadata records for builtin and imported types referenced
   /// from this module.
@@ -1181,6 +1204,9 @@ public:
   void emitStructDecl(StructDecl *D);
   void emitClassDecl(ClassDecl *D);
   void emitExtension(ExtensionDecl *D);
+  void emitFuncDecl(FuncDecl *D);
+  void emitAbstractStorageDecl(AbstractStorageDecl *D);
+  void emitOpaqueTypeDecl(OpaqueTypeDecl *D);
   void emitSILGlobalVariable(SILGlobalVariable *gv);
   void emitCoverageMapping();
   void emitSILFunction(SILFunction *f);
@@ -1269,7 +1295,6 @@ public:
                                              ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,
                                                ForDefinition_t forDefinition);
-  llvm::Constant *getAddrOfForeignTypeMetadataCandidate(CanType concreteType);
 
   llvm::Constant *getAddrOfClassMetadataBounds(ClassDecl *D,
                                                ForDefinition_t forDefinition);
@@ -1293,6 +1318,9 @@ public:
   llvm::Constant *getAddrOfClangImporterModuleContextDescriptor();
   ConstantReference getAddrOfParentContextDescriptor(DeclContext *from,
                                                      bool fromAnonymousContext);
+  ConstantReference getAddrOfContextDescriptorForParent(DeclContext *parent,
+                                                    DeclContext *ofChild,
+                                                    bool fromAnonymousContext);
   llvm::Constant *getAddrOfGenericEnvironment(CanGenericSignature signature);
   llvm::Constant *getAddrOfProtocolRequirementsBaseDescriptor(
                                                   ProtocolDecl *proto);
@@ -1330,6 +1358,10 @@ public:
 
   llvm::Function *getAddrOfObjCMetadataUpdateFunction(ClassDecl *D,
                                                       ForDefinition_t forDefinition);
+
+  llvm::Constant *getAddrOfObjCResilientClassStub(ClassDecl *D,
+                                                  ForDefinition_t forDefinition,
+                                                  TypeMetadataAddress addr);
 
   llvm::Function *
   getAddrOfSILFunction(SILFunction *f, ForDefinition_t forDefinition,
@@ -1401,6 +1433,11 @@ public:
   llvm::GlobalVariable *
   getGlobalForDynamicallyReplaceableThunk(LinkEntity &entity, llvm::Type *type,
                                           ForDefinition_t forDefinition);
+
+  llvm::Function *getAddrOfOpaqueTypeDescriptorAccessFunction(
+      OpaqueTypeDecl *decl, ForDefinition_t forDefinition, bool implementation);
+
+  void emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *);
 
 private:
   llvm::Constant *

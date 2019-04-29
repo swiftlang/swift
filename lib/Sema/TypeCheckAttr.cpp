@@ -14,18 +14,23 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckType.h"
-#include "swift/AST/GenericSignatureBuilder.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyDelegates.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/IDETypeChecking.h"
+#include "clang/Basic/CharInfo.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -87,6 +92,7 @@ public:
   IGNORED_ATTR(ForbidSerializingReference)
   IGNORED_ATTR(Frozen)
   IGNORED_ATTR(HasStorage)
+  IGNORED_ATTR(ImplementationOnly)
   IGNORED_ATTR(Implements)
   IGNORED_ATTR(ImplicitlyUnwrappedOptional)
   IGNORED_ATTR(Infix)
@@ -122,6 +128,8 @@ public:
   IGNORED_ATTR(WeakLinked)
   IGNORED_ATTR(DynamicReplacement)
   IGNORED_ATTR(PrivateImport)
+  IGNORED_ATTR(Custom)
+  IGNORED_ATTR(PropertyDelegate)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -319,10 +327,6 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
 }
 
 void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
-  // Members cannot be both dynamic and final.
-  if (D->getAttrs().hasAttribute<FinalAttr>())
-    diagnoseAndRemoveAttr(attr, diag::dynamic_with_final);
-
   // Members cannot be both dynamic and @nonobjc.
   if (D->getAttrs().hasAttribute<NonObjCAttr>())
     diagnoseAndRemoveAttr(attr, diag::dynamic_with_nonobjc);
@@ -414,8 +418,13 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
     diagnoseAndRemoveAttr(attr, diag::invalid_iboutlet);
 
-  if (!VD->isSettable(nullptr))
-    diagnoseAndRemoveAttr(attr, diag::iboutlet_only_mutable);
+  if (!VD->isSettable(nullptr)) {
+    // Allow non-mutable IBOutlet properties in module interfaces,
+    // as they may have been private(set)
+    SourceFile *Parent = VD->getDeclContext()->getParentSourceFile();
+    if (!Parent || Parent->Kind != SourceFileKind::Interface)
+      diagnoseAndRemoveAttr(attr, diag::iboutlet_only_mutable);
+  }
 
   // Verify that the field type is valid as an outlet.
   auto type = VD->getType();
@@ -715,6 +724,25 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
   }
 }
 
+/// Determine whether the given string is an attribute name that is
+/// reserved for the implementation.
+static bool isReservedAttributeName(StringRef name) {
+  for (unsigned i : indices(name)) {
+    if (name[i] == '_')
+      continue;
+
+    // First character is lowercase; reserved.
+    if (clang::isLowercase(name[i]))
+      return true;
+
+    // Everything else is reserved.
+    return false;
+  }
+
+  // All underscores is reserved.
+  return true;
+}
+
 namespace {
 class AttributeChecker : public AttributeVisitor<AttributeChecker> {
   TypeChecker &TC;
@@ -744,6 +772,7 @@ public:
     IGNORED_ATTR(Consuming)
     IGNORED_ATTR(Convenience)
     IGNORED_ATTR(Dynamic)
+    IGNORED_ATTR(DynamicReplacement)
     IGNORED_ATTR(Effects)
     IGNORED_ATTR(Exported)
     IGNORED_ATTR(ForbidSerializingReference)
@@ -752,6 +781,7 @@ public:
     IGNORED_ATTR(IBDesignable)
     IGNORED_ATTR(IBInspectable)
     IGNORED_ATTR(IBOutlet) // checked early.
+    IGNORED_ATTR(ImplementationOnly)
     IGNORED_ATTR(ImplicitlyUnwrappedOptional)
     IGNORED_ATTR(Indirect)
     IGNORED_ATTR(Inline)
@@ -768,6 +798,7 @@ public:
     IGNORED_ATTR(ObjCRuntimeName)
     IGNORED_ATTR(Optional)
     IGNORED_ATTR(Override)
+    IGNORED_ATTR(PrivateImport)
     IGNORED_ATTR(RawDocComment)
     IGNORED_ATTR(ReferenceOwnership)
     IGNORED_ATTR(RequiresStoredPropertyInits)
@@ -781,8 +812,6 @@ public:
     IGNORED_ATTR(Transparent)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(WeakLinked)
-    IGNORED_ATTR(DynamicReplacement)
-    IGNORED_ATTR(PrivateImport)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
@@ -833,6 +862,8 @@ public:
   void visitFrozenAttr(FrozenAttr *attr);
 
   void visitNonOverrideAttr(NonOverrideAttr *attr);
+  void visitCustomAttr(CustomAttr *attr);
+  void visitPropertyDelegateAttr(PropertyDelegateAttr *attr);
 };
 } // end anonymous namespace
 
@@ -969,23 +1000,84 @@ visitDynamicCallableAttr(DynamicCallableAttr *attr) {
   }
 }
 
+static bool hasSingleNonVariadicParam(SubscriptDecl *decl,
+                                      Identifier expectedLabel) {
+  auto *indices = decl->getIndices();
+  if (decl->isInvalid() || indices->size() != 1)
+    return false;
+
+  auto *index = indices->get(0);
+  if (index->isVariadic() || !index->hasValidSignature())
+    return false;
+
+  return index->getArgumentName() == expectedLabel;
+}
+
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
 /// The method is given to be defined as `subscript(dynamicMember:)`.
 bool swift::isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
                                                 DeclContext *DC,
                                                 TypeChecker &TC) {
+  // It could be
+  // - `subscript(dynamicMember: {Writable}KeyPath<...>)`; or
+  // - `subscript(dynamicMember: String*)`
+  return isValidKeyPathDynamicMemberLookup(decl, TC) ||
+         isValidStringDynamicMemberLookup(decl, DC, TC);
+
+}
+
+bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
+                                             DeclContext *DC,
+                                             TypeChecker &TC) {
   // There are two requirements:
   // - The subscript method has exactly one, non-variadic parameter.
   // - The parameter type conforms to `ExpressibleByStringLiteral`.
-  auto indices = decl->getIndices();
+  if (!hasSingleNonVariadicParam(decl, TC.Context.Id_dynamicMember))
+    return false;
+
+  const auto *param = decl->getIndices()->get(0);
+  auto paramType = param->getType();
 
   auto stringLitProto =
     TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
-  
-  return indices->size() == 1 && !indices->get(0)->isVariadic() &&
-    TC.conformsToProtocol(indices->get(0)->getType(),
-                          stringLitProto, DC, ConformanceCheckOptions());
+
+  // If this is `subscript(dynamicMember: String*)`
+  return bool(TC.conformsToProtocol(paramType, stringLitProto, DC,
+                                    ConformanceCheckOptions()));
+}
+
+bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
+                                              TypeChecker &TC) {
+  if (!hasSingleNonVariadicParam(decl, TC.Context.Id_dynamicMember))
+    return false;
+
+  const auto *param = decl->getIndices()->get(0);
+  if (auto NTD = param->getType()->getAnyNominal()) {
+    return NTD == TC.Context.getKeyPathDecl() ||
+           NTD == TC.Context.getWritableKeyPathDecl() ||
+           NTD == TC.Context.getReferenceWritableKeyPathDecl();
+  }
+  return false;
+}
+
+Optional<Type>
+swift::getRootTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
+                                         const DeclContext *DC) {
+  auto &TC = TypeChecker::createForContext(DC->getASTContext());
+
+  if (!isValidKeyPathDynamicMemberLookup(subscript, TC))
+    return None;
+
+  const auto *param = subscript->getIndices()->get(0);
+  auto keyPathType = param->getType()->getAs<BoundGenericType>();
+  if (!keyPathType)
+    return None;
+
+  assert(!keyPathType->getGenericArgs().empty() &&
+         "invalid keypath dynamic member");
+  auto rootType = keyPathType->getGenericArgs()[0];
+  return rootType;
 }
 
 /// The @dynamicMemberLookup attribute is only allowed on types that have at
@@ -2052,7 +2144,10 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
           // Check for type mismatch.
           TC.validateDecl(result);
           auto resultType = getDynamicComparisonType(result);
-          if (!resultType->isEqual(replacementStorageType)) {
+          if (!resultType->isEqual(replacementStorageType) &&
+              !resultType->matches(
+                  replacementStorageType,
+                  TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes)) {
             return true;
           }
 
@@ -2097,15 +2192,6 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
     if (origAccessor->getAccessorKind() != replacement->getAccessorKind())
       continue;
 
-    if (!replacement->getInterfaceType()->getCanonicalType()->matches(
-            origAccessor->getInterfaceType()->getCanonicalType(),
-            TypeMatchFlags::AllowABICompatible)) {
-      TC.diagnose(attr->getLocation(),
-                  diag::dynamic_replacement_accessor_type_mismatch,
-                  replacedVarName);
-      attr->setInvalid();
-      return nullptr;
-    }
     if (origAccessor->isImplicit() &&
         !(origStorage->getReadImpl() == ReadImplKind::Stored &&
           origStorage->getWriteImpl() == WriteImplKind::Stored)) {
@@ -2137,9 +2223,10 @@ findReplacedFunction(DeclName replacedFunctionName,
       continue;
     if (TC)
       TC->validateDecl(result);
+    TypeMatchOptions matchMode = TypeMatchFlags::AllowABICompatible;
+    matchMode |= TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
     if (result->getInterfaceType()->getCanonicalType()->matches(
-            replacement->getInterfaceType()->getCanonicalType(),
-            TypeMatchFlags::AllowABICompatible)) {
+            replacement->getInterfaceType()->getCanonicalType(), matchMode)) {
       if (!result->isDynamic()) {
         if (TC) {
           TC->diagnose(attr->getLocation(),
@@ -2380,12 +2467,9 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   auto *ED = cast<EnumDecl>(D);
 
-  switch (ED->getModuleContext()->getResilienceStrategy()) {
-  case ResilienceStrategy::Default:
+  if (!ED->getModuleContext()->isResilient()) {
     diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonresilient, attr);
     return;
-  case ResilienceStrategy::Resilient:
-    break;
   }
 
   if (ED->getFormalAccess() < AccessLevel::Public &&
@@ -2397,6 +2481,84 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
 void AttributeChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
   if (auto overrideAttr = D->getAttrs().getAttribute<OverrideAttr>()) {
     diagnoseAndRemoveAttr(overrideAttr, diag::nonoverride_and_override_attr);
+  }
+}
+
+void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
+  auto dc = D->getInnermostDeclContext();
+
+  // Figure out which nominal declaration this custom attribute refers to.
+  auto nominal = evaluateOrDefault(
+    TC.Context.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+
+  // If there is no nominal type with this name, complain about this being
+  // an unknown attribute.
+  if (!nominal) {
+    std::string typeName;
+    if (auto typeRepr = attr->getTypeLoc().getTypeRepr()) {
+      llvm::raw_string_ostream out(typeName);
+      typeRepr->print(out);
+    } else {
+      typeName = attr->getTypeLoc().getType().getString();
+    }
+
+    TC.diagnose(attr->getLocation(), diag::unknown_attribute,
+                typeName);
+    attr->setInvalid();
+    return;
+  }
+
+  // If the nominal type is a property delegate type, we can be delegating
+  // through a property.
+  if (nominal->getPropertyDelegateTypeInfo()) {
+    // Property delegates can only be applied to variables
+    if (!isa<VarDecl>(D) || isa<ParamDecl>(D)) {
+      TC.diagnose(attr->getLocation(),
+                  diag::property_delegate_attribute_not_on_property,
+                  nominal->getFullName());
+      attr->setInvalid();
+      return;
+    }
+
+    // If this attribute isn't the one that attached a property delegate to
+    // this property, complain.
+    auto var = cast<VarDecl>(D);
+    if (auto attached = var->getAttachedPropertyDelegate()) {
+      if (attached != attr) {
+        TC.diagnose(attr->getLocation(), diag::property_delegate_multiple);
+        TC.diagnose(attached->getLocation(),
+                    diag::previous_property_delegate_here);
+        return;
+      }
+    }
+
+    return;
+  }
+
+  TC.diagnose(attr->getLocation(), diag::nominal_type_not_attribute,
+              nominal->getDescriptiveKind(), nominal->getFullName());
+  nominal->diagnose(diag::decl_declared_here, nominal->getFullName());
+  attr->setInvalid();
+}
+
+
+void TypeChecker::checkParameterAttributes(ParameterList *params) {
+  for (auto param: *params) {
+    checkDeclAttributes(param);
+  }
+}
+
+void AttributeChecker::visitPropertyDelegateAttr(PropertyDelegateAttr *attr) {
+  auto nominal = dyn_cast<NominalTypeDecl>(D);
+  if (!nominal)
+    return;
+
+  // Force checking of the property delegate type.
+  (void)nominal->getPropertyDelegateTypeInfo();
+
+  // Make sure the name isn't reserved.
+  if (isReservedAttributeName(nominal->getName().str())) {
+    nominal->diagnose(diag::property_delegate_reserved_name);
   }
 }
 
@@ -2557,8 +2719,7 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
       isa<AccessorDecl>(D))
     return;
 
-  if (D->getAttrs().hasAttribute<FinalAttr>() ||
-      D->getAttrs().hasAttribute<NonObjCAttr>() ||
+  if (D->getAttrs().hasAttribute<NonObjCAttr>() ||
       D->getAttrs().hasAttribute<TransparentAttr>() ||
       D->getAttrs().hasAttribute<InlinableAttr>())
     return;

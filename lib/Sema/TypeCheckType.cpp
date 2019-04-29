@@ -22,8 +22,10 @@
 #include "TypoCorrection.h"
 
 #include "swift/Strings.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -55,13 +57,16 @@ TypeResolution TypeResolution::forStructural(DeclContext *dc) {
   return TypeResolution(dc, TypeResolutionStage::Structural);
 }
 
-TypeResolution TypeResolution::forInterface(DeclContext *dc) {
-  return forInterface(dc, dc->getGenericSignatureOfContext());
+TypeResolution TypeResolution::forInterface(DeclContext *dc,
+                                            LazyResolver *resolver) {
+  return forInterface(dc, dc->getGenericSignatureOfContext(), resolver);
 }
 
 TypeResolution TypeResolution::forInterface(DeclContext *dc,
-                                            GenericSignature *genericSig) {
+                                            GenericSignature *genericSig,
+                                            LazyResolver *resolver) {
   TypeResolution result(dc, TypeResolutionStage::Interface);
+  result.Resolver = resolver;
   result.complete.genericSig = genericSig;
   result.complete.builder = nullptr;
   return result;
@@ -708,7 +713,7 @@ Type TypeChecker::applyGenericArguments(Type type,
                      genericParams->size(), genericArgs.size(),
                      genericArgs.size() < genericParams->size())
           .highlight(generic->getAngleBrackets());
-      decl->diagnose(diag::kind_identifier_declared_here,
+      decl->diagnose(diag::kind_declname_declared_here,
                      DescriptiveDeclKind::GenericType, decl->getName());
     }
     return ErrorType::get(ctx);
@@ -876,11 +881,6 @@ Type TypeChecker::applyUnboundGenericArguments(
                                     subMap, resultType);
   }
 
-  if (isa<NominalTypeDecl>(decl) && resultType) {
-    (void)useObjectiveCBridgeableConformancesOfArgs(
-        dc, resultType->castTo<BoundGenericType>());
-  }
-
   return resultType;
 }
 
@@ -898,7 +898,7 @@ static void diagnoseUnboundGenericType(Type ty, SourceLoc loc) {
         diag.fixItInsertAfter(loc, genericArgsToAdd);
     }
   }
-  unbound->getDecl()->diagnose(diag::kind_identifier_declared_here,
+  unbound->getDecl()->diagnose(diag::kind_declname_declared_here,
                                DescriptiveDeclKind::GenericType,
                                unbound->getDecl()->getName());
 }
@@ -1032,6 +1032,44 @@ static std::string getDeclNameFromContext(DeclContext *dc,
   }
 }
 
+//
+// SE-0068 is "Expanding Swift Self to class members and value types"
+// https://github.com/apple/swift-evolution/blob/master/proposals/0068-universal-self.md
+//
+static Type SelfAllowedBySE0068(TypeResolution resolution,
+                                TypeResolutionOptions options) {
+  auto dc = resolution.getDeclContext();
+  ASTContext &ctx = dc->getASTContext();
+  DeclContext *nominalDC = nullptr;
+  NominalTypeDecl *nominal = nullptr;
+  if ((nominalDC = dc->getInnermostTypeContext()) &&
+      (nominal = nominalDC->getSelfNominalTypeDecl())) {
+    assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
+
+    bool insideClass = nominalDC->getSelfClassDecl() != nullptr;
+    AbstractFunctionDecl *methodDecl = dc->getInnermostMethodContext();
+    bool declaringMethod = methodDecl &&
+      methodDecl->getDeclContext() == dc->getParentForLookup();
+    bool isMutablePropertyOrSubscriptOfClass = insideClass &&
+      (options.is(TypeResolverContext::PatternBindingDecl) ||
+       options.is(TypeResolverContext::FunctionResult));
+    bool isTypeAliasInClass = insideClass &&
+      options.is(TypeResolverContext::TypeAliasDecl);
+
+    if (((!insideClass || !declaringMethod) &&
+         !isMutablePropertyOrSubscriptOfClass && !isTypeAliasInClass &&
+         !options.is(TypeResolverContext::GenericRequirement)) ||
+        options.is(TypeResolverContext::ExplicitCastExpr)) {
+      Type SelfType = nominal->getSelfInterfaceType();
+      if (insideClass)
+        SelfType = DynamicSelfType::get(SelfType, ctx);
+      return resolution.mapTypeIntoContext(SelfType);
+    }
+  }
+
+  return Type();
+}
+
 /// Diagnose a reference to an unknown type.
 ///
 /// This routine diagnoses a reference to an unknown type, and
@@ -1057,23 +1095,10 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       NominalTypeDecl *nominal = nullptr;
       if ((nominalDC = dc->getInnermostTypeContext()) &&
           (nominal = nominalDC->getSelfNominalTypeDecl())) {
+        // Attempt to refer to 'Self' within a non-protocol nominal
+        // type. Fix this by replacing 'Self' with the nominal type name.
         assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
 
-        bool insideClass = nominalDC->getSelfClassDecl() != nullptr;
-        AbstractFunctionDecl *methodDecl = dc->getInnermostMethodContext();
-        bool declaringMethod = methodDecl &&
-          methodDecl->getDeclContext() == dc->getParentForLookup();
-
-        if (((!insideClass || !declaringMethod) &&
-             !options.is(TypeResolverContext::GenericRequirement)) ||
-            options.is(TypeResolverContext::ExplicitCastExpr)) {
-          Type SelfType = nominal->getSelfInterfaceType();
-          if (insideClass)
-            SelfType = DynamicSelfType::get(SelfType, ctx);
-          return resolution.mapTypeIntoContext(SelfType);
-        }
-
-        // Attempt to refer to 'Self' within a non-protocol nominal type.
         // Produce a Fix-It replacing 'Self' with the nominal type name.
         auto name = getDeclNameFromContext(dc, nominal);
         diags.diagnose(comp->getIdLoc(), diag::self_in_nominal, name)
@@ -1337,6 +1362,10 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
     // source, bail out.
     if (options.contains(TypeResolutionFlags::SilenceErrors))
       return ErrorType::get(ctx);
+
+    if (id == ctx.Id_Self)
+      if (auto SelfType = SelfAllowedBySE0068(resolution, options))
+        return SelfType;
 
     return diagnoseUnknownType(resolution, nullptr, SourceRange(), comp,
                                options, lookupOptions);
@@ -1739,6 +1768,13 @@ bool TypeChecker::validateType(TypeLoc &Loc, TypeResolution resolution,
   }
 
   Loc.setType(type);
+  if (!type->hasError()) {
+    const DeclContext *DC = resolution.getDeclContext();
+    if (options.isAnyExpr() || DC->getParent()->isLocalContext())
+      if (DC->getResilienceExpansion() == ResilienceExpansion::Minimal)
+        diagnoseGenericTypeExportability(Loc, DC);
+  }
+
   return type->hasError();
 }
 
@@ -1831,6 +1867,10 @@ namespace {
     Type buildProtocolType(ProtocolTypeRepr *repr,
                            Type instanceType,
                            Optional<MetatypeRepresentation> storedRepr);
+    
+    Type resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
+                                 unsigned ordinal,
+                                 TypeResolutionOptions options);
   };
 } // end anonymous namespace
 
@@ -1933,6 +1973,24 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
 
   case TypeReprKind::Protocol:
     return resolveProtocolType(cast<ProtocolTypeRepr>(repr), options);
+      
+  case TypeReprKind::OpaqueReturn: {
+    // Only valid as the return type of a function, which should be handled
+    // during function decl type checking.
+    auto opaqueRepr = cast<OpaqueReturnTypeRepr>(repr);
+    if (!(options & TypeResolutionFlags::SilenceErrors)) {
+      diagnose(opaqueRepr->getOpaqueLoc(),
+               diag::unsupported_opaque_type);
+    }
+    
+    // Try to resolve the constraint upper bound type as a placeholder.
+    options |= TypeResolutionFlags::SilenceErrors;
+    auto constraintType = resolveType(opaqueRepr->getConstraint(),
+                                      options);
+    
+    return constraintType && !constraintType->hasError()
+      ? ErrorType::get(constraintType) : ErrorType::get(Context);
+  }
 
   case TypeReprKind::Fixed:
     return cast<FixedTypeRepr>(repr)->getType();
@@ -1977,6 +2035,12 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // The type we're working with, in case we want to build it differently
   // based on the attributes we see.
   Type ty;
+  
+  // If this is a reference to an opaque return type, resolve it.
+  if (auto &opaque = attrs.OpaqueReturnTypeOf) {
+    return resolveOpaqueReturnType(repr, opaque->mangledName, opaque->index,
+                                   options);
+  }
   
   // In SIL *only*, allow @thin, @thick, or @objc_metatype to apply to
   // a metatype.
@@ -2051,7 +2115,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
     if (attrs.has(attr)) {
-      diagnose(attrs.getLoc(attr), diag::attribute_not_supported);
+      diagnose(attrs.getLoc(attr), diag::unknown_attribute,
+               TypeAttributes::getAttrName(attr));
       attrs.clearAttribute(attr);
     }
   };
@@ -2059,7 +2124,12 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Some function representation attributes are not supported at source level;
   // only SIL knows how to handle them.  Reject them unless this is a SIL input.
   if (!(options & TypeResolutionFlags::SILType)) {
-    for (auto silOnlyAttr : {TAK_callee_owned, TAK_callee_guaranteed}) {
+    for (auto silOnlyAttr : {TAK_pseudogeneric,
+                             TAK_callee_owned,
+                             TAK_callee_guaranteed,
+                             TAK_noescape,
+                             TAK_yield_once,
+                             TAK_yield_many}) {
       checkUnsupportedAttr(silOnlyAttr);
     }
   }  
@@ -2179,7 +2249,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
 
       // Resolve the function type directly with these attributes.
-      FunctionType::ExtInfo extInfo(rep, attrs.has(TAK_noescape),
+      FunctionType::ExtInfo extInfo(rep, /*noescape=*/false,
                                     fnRepr->throws());
 
       ty = resolveASTFunctionType(fnRepr, options, extInfo);
@@ -2206,7 +2276,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   }
 
   // Handle @escaping
-  if (hasFunctionAttr && ty->is<FunctionType>()) {
+  if (ty->is<FunctionType>()) {
     if (attrs.has(TAK_escaping)) {
       // The attribute is meaningless except on non-variadic parameter types.
       if (!isParam || options.getBaseContext() == TypeResolverContext::EnumElementDecl) {
@@ -2231,9 +2301,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   if (hasFunctionAttr && !fnRepr) {
     if (attrs.has(TAK_autoclosure)) {
-      // @autoclosure usually auto-implies @noescape,
-      // don't complain about both of them.
-      attrs.clearAttribute(TAK_noescape);
       // @autoclosure is going to be diagnosed when type of
       // the parameter is validated, because that attribute
       // applies to the declaration now.
@@ -2390,6 +2457,41 @@ bool TypeResolver::resolveASTFunctionTypeParams(
   }
 
   return false;
+}
+
+Type TypeResolver::resolveOpaqueReturnType(TypeRepr *repr,
+                                           StringRef mangledName,
+                                           unsigned ordinal,
+                                           TypeResolutionOptions options) {
+  // The type repr should be a generic identifier type. We don't really use
+  // the identifier for anything, but we do resolve the generic arguments
+  // to instantiate the possibly-generic opaque type.
+  SmallVector<Type, 4> TypeArgs;
+  if (auto generic = dyn_cast<GenericIdentTypeRepr>(repr)) {
+    for (auto argRepr : generic->getGenericArgs()) {
+      auto argTy = resolveType(argRepr, options);
+      if (!argTy)
+        return Type();
+      TypeArgs.push_back(argTy);
+    }
+  }
+  
+  // Use type reconstruction to summon the opaque type decl.
+  Demangler demangle;
+  auto definingDeclNode = demangle.demangleSymbol(mangledName);
+  if (!definingDeclNode)
+    return Type();
+  ASTBuilder builder(Context);
+  builder.Resolver = resolution.Resolver;
+  auto opaqueNode =
+    builder.getNodeFactory().createNode(Node::Kind::OpaqueReturnTypeOf);
+  opaqueNode->addChild(definingDeclNode, builder.getNodeFactory());
+  
+  auto ty = builder.resolveOpaqueType(opaqueNode, TypeArgs, ordinal);
+  if (!ty) {
+    diagnose(repr->getLoc(), diag::no_opaque_return_type_of);
+  }
+  return ty;
 }
 
 Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
@@ -2905,9 +3007,6 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   if (!sliceTy)
     return ErrorType::get(Context);
 
-  // Check for _ObjectiveCBridgeable conformances in the element type.
-  useObjectiveCBridgeableConformances(DC, baseTy);
-
   return sliceTy;
 }
 
@@ -2937,11 +3036,6 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
             unboundTy, dictDecl, repr->getStartLoc(), resolution, args)) {
       return nullptr;
     }
-
-    // Check for _ObjectiveCBridgeable conformances in the key and value
-    // types.
-    useObjectiveCBridgeableConformances(DC, keyTy);
-    useObjectiveCBridgeableConformances(DC, valueTy);
 
     return dictTy;
   }
@@ -3335,6 +3429,10 @@ public:
       visit(compound->getComponentRange().back());
       return false;
     }
+    // Arbitrary protocol constraints are OK on opaque types.
+    if (isa<OpaqueReturnTypeRepr>(T))
+      return false;
+    
     visit(T);
     return true;
   }

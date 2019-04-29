@@ -2084,13 +2084,6 @@ TypeDecl *EquivalenceClass::lookupNestedType(
           foundMembers);
       for (auto member : foundMembers) {
         if (auto type = dyn_cast<TypeDecl>(member)) {
-          // Resolve the signature of this type.
-          if (!type->hasInterfaceType()) {
-            type->getASTContext().getLazyResolver()->resolveDeclSignature(type);
-            if (!type->hasInterfaceType())
-              continue;
-          }
-
           concreteDecls.push_back(type);
         }
       }
@@ -3812,6 +3805,18 @@ PotentialArchetype *GenericSignatureBuilder::realizePotentialArchetype(
   return pa;
 }
 
+static Type getStructuralType(TypeDecl *typeDecl, LazyResolver *resolver) {
+  if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
+    // Resolve the underlying type, if we haven't done so yet.
+    if (!typealias->hasInterfaceType())
+      resolver->resolveDeclSignature(typealias);
+
+    return typealias->getUnderlyingTypeLoc().getType();
+  }
+
+  return typeDecl->getDeclaredInterfaceType();
+}
+
 static Type substituteConcreteType(GenericSignatureBuilder &builder,
                                    PotentialArchetype *basePA,
                                    TypeDecl *concreteDecl) {
@@ -3819,17 +3824,11 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
 
   auto *proto = concreteDecl->getDeclContext()->getSelfProtocolDecl();
 
-  if (!concreteDecl->hasInterfaceType())
-    builder.getLazyResolver()->resolveDeclSignature(concreteDecl);
-
-  if (!concreteDecl->hasInterfaceType())
+  // Form an unsubstituted type referring to the given type declaration,
+  // for use in an inferred same-type requirement.
+  auto type = getStructuralType(concreteDecl, builder.getLazyResolver());
+  if (!type)
     return Type();
-
-  // The protocol concrete type has an underlying type written in terms
-  // of the protocol's 'Self' type.
-  auto typealias = dyn_cast<TypeAliasDecl>(concreteDecl);
-  auto type = typealias ? typealias->getUnderlyingTypeLoc().getType()
-                        : concreteDecl->getDeclaredInterfaceType();
 
   Type parentType;
   SubstitutionMap subMap;
@@ -3855,7 +3854,7 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
   }
 
   // If we had a typealias, form a sugared type.
-  if (typealias) {
+  if (auto *typealias = dyn_cast<TypeAliasDecl>(concreteDecl)) {
     type = TypeAliasType::get(typealias, parentType, subMap, type);
   }
 
@@ -4226,34 +4225,13 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
     return result;
   };
 
-  // Form an unsubstituted type referring to the given type declaration,
-  // for use in an inferred same-type requirement.
-  auto formUnsubstitutedType = [&](TypeDecl *typeDecl) -> Type {
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
-      return DependentMemberType::get(
-                               assocType->getProtocol()->getSelfInterfaceType(),
-                               assocType);
-    }
-
-    // Resolve the underlying type, if we haven't done so yet.
-    if (!typeDecl->hasInterfaceType()) {
-      getLazyResolver()->resolveDeclSignature(typeDecl);
-    }
-
-    if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
-      return typealias->getUnderlyingTypeLoc().getType();
-    }
-
-    return typeDecl->getDeclaredInterfaceType();
-  };
-
   // An inferred same-type requirement between the two type declarations
   // within this protocol or a protocol it inherits.
   auto addInferredSameTypeReq = [&](TypeDecl *first, TypeDecl *second) {
-    Type firstType = formUnsubstitutedType(first);
+    Type firstType = getStructuralType(first, getLazyResolver());
     if (!firstType) return;
 
-    Type secondType = formUnsubstitutedType(second);
+    Type secondType = getStructuralType(second, getLazyResolver());
     if (!secondType) return;
 
     auto inferredSameTypeSource =
@@ -4304,7 +4282,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
         source->kind == RequirementSource::RequirementSignatureSelf &&
         !assocTypeDecl->getAttrs().hasAttribute<NonOverrideAttr>() &&
         !assocTypeDecl->getAttrs().hasAttribute<OverrideAttr>() &&
-        assocTypeDecl->getDefaultDefinitionLoc().isNull() &&
+        !assocTypeDecl->hasDefaultDefinitionType() &&
         (!assocTypeDecl->getInherited().empty() ||
          assocTypeDecl->getTrailingWhereClause() ||
          getASTContext().LangOpts.WarnImplicitOverrides);
@@ -5170,11 +5148,6 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
                              UnresolvedType type,
                              const RequirementSource *parentSource,
                              ModuleDecl *inferForModule) {
-  if (isa<AssociatedTypeDecl>(decl) &&
-      decl->hasInterfaceType() &&
-      decl->getInterfaceType()->is<ErrorType>())
-    return ConstraintResult::Resolved;
-
   // Local function to get the source.
   auto getFloatingSource = [&](const TypeRepr *typeRepr, bool forInferred) {
     if (parentSource) {
@@ -6014,7 +5987,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
   }
 
   // Sort the constraints, so we get a deterministic ordering of diagnostics.
-  llvm::array_pod_sort(constraints.begin(), constraints.end());
+  std::sort(constraints.begin(), constraints.end());
 
   // Find a representative constraint.
   auto representativeConstraint =

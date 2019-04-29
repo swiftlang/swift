@@ -95,3 +95,14 @@ public struct ResilientRef {
 public struct ResilientWithInternalField {
   var x: Int
 }
+
+// Tuple parameters with resilient structs
+public class Subject {}
+
+public struct Container {
+  public var s: Subject
+}
+
+public struct PairContainer {
+  public var pair : (Container, Container)
+}

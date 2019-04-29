@@ -445,6 +445,12 @@ public:
 
   void emitCaseBody(CaseStmt *caseBlock);
 
+  SILValue getAddressOnlyTemporary(VarDecl *decl) {
+    auto found = Temporaries.find(decl);
+    assert(found != Temporaries.end());
+    return found->second;
+  }
+
 private:
   void emitWildcardDispatch(ClauseMatrix &matrix, ArgArray args, unsigned row,
                             const FailureHandler &failure);
@@ -751,7 +757,7 @@ forwardIntoSubtree(SILGenFunction &SGF, SILLocation loc,
   }
 
   // Only address only values use TakeOnSuccess.
-  assert(outerMV.getType().isAddressOnly(SGF.getModule()) &&
+  assert(outerMV.getType().isAddressOnly(SGF.F) &&
          "TakeOnSuccess can only be used with address only values");
 
   assert((consumptionKind == CastConsumptionKind::TakeAlways ||
@@ -1428,7 +1434,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
   SILLocation loc = firstPat;
 
   // If our source is an address that is loadable, perform a load_borrow.
-  if (src.getType().isAddress() && src.getType().isLoadable(SGF.getModule())) {
+  if (src.getType().isAddress() && src.getType().isLoadable(SGF.F)) {
     // We should only see take_on_success if we have a base type that is address
     // only.
     assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
@@ -1470,7 +1476,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
   // At this point we know that we must have an address only type, since we
   // would have loaded it earlier.
   SILValue v = src.getFinalManagedValue().forward(SGF);
-  assert(v->getType().isAddressOnly(SGF.getModule()) &&
+  assert(v->getType().isAddressOnly(SGF.F) &&
          "Loadable values were handled earlier");
 
   // The destructured tuple that we pass off to our sub pattern. This may
@@ -1603,7 +1609,7 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
   // We know that we must have a loadable type at this point since address only
   // types do not need reabstraction and are addresses. So we should have exited
   // above already.
-  assert(src.getType().isLoadable(SGF.getModule()) &&
+  assert(src.getType().isLoadable(SGF.F) &&
          "Should have a loadable value at this point");
 
   // Since our finalValue is loadable, we could not have had a take_on_success
@@ -1982,7 +1988,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
   loc.setDebugLoc(rows[0].Pattern);
 
   // If our source is an address that is loadable, perform a load_borrow.
-  if (src.getType().isAddress() && src.getType().isLoadable(SGF.getModule())) {
+  if (src.getType().isAddress() && src.getType().isLoadable(SGF.F)) {
     assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
            "Can only have take_on_success with address only values");
     src = {SGF.B.createLoadBorrow(loc, src.getFinalManagedValue()),
@@ -2002,7 +2008,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
   }
 
   // After this point we now that we must have an address only type.
-  assert(src.getType().isAddressOnly(SGF.getModule()) &&
+  assert(src.getType().isAddressOnly(SGF.F) &&
          "Should have an address only type here");
 
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
@@ -2326,23 +2332,15 @@ void PatternMatchEmission::initSharedCaseBlockDest(CaseStmt *caseBlock,
   auto *block = SGF.createBasicBlock();
   result.first->second.first = block;
 
-  // If we do not have any bound decls, we do not need to setup any phi
-  // arguments for the shared case block. Just bail early.
-  if (!caseBlock->hasBoundDecls()) {
-    return;
-  }
-
-  auto pattern = caseBlock->getCaseLabelItems()[0].getPattern();
-  SmallVector<VarDecl *, 4> patternVarDecls;
-  pattern->collectVariables(patternVarDecls);
-  for (auto *vd : patternVarDecls) {
+  // Add args for any pattern variables if we have any.
+  for (auto *vd : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
     if (!vd->hasName())
       continue;
 
     // We don't pass address-only values in basic block arguments.
     SILType ty = SGF.getLoweredType(vd->getType());
-    if (ty.isAddressOnly(SGF.F.getModule()))
-      continue;
+    if (ty.isAddressOnly(SGF.F))
+      return;
     block->createPhiArgument(ty, ValueOwnershipKind::Owned, vd);
   }
 }
@@ -2363,40 +2361,15 @@ void PatternMatchEmission::emitAddressOnlyAllocations() {
   for (auto &entry : SharedCases) {
     CaseStmt *caseBlock = entry.first;
 
-    // If we do not have any bound decls, we can bail early.
-    if (!caseBlock->hasBoundDecls()) {
-      continue;
-    }
-
-    // If we have a shared case with bound decls, then the 0th pattern has the
-    // order of variables that are the incoming BB arguments. Setup the VarLocs
-    // to point to the incoming args and setup initialization so any args needing
-    // cleanup will get that as well.
-    auto pattern = caseBlock->getCaseLabelItems()[0].getPattern();
-    SmallVector<VarDecl *, 4> patternVarDecls;
-    pattern->collectVariables(patternVarDecls);
-    for (auto *vd : patternVarDecls) {
+    // If we have a shared case with bound decls, setup the arguments for the
+    // shared block by emitting the temporary allocation used for the arguments
+    // of the shared block.
+    for (auto *vd : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
       if (!vd->hasName())
         continue;
 
       SILType ty = SGF.getLoweredType(vd->getType());
-      if (ty.isNull()) {
-        // If we're making the shared block on behalf of a previous case's
-        // fallthrough, caseBlock's VarDecl's won't be in the SGF yet, so
-        // determine phi types by using current vars of the same name.
-        for (auto var : SGF.VarLocs) {
-          auto varDecl = dyn_cast<VarDecl>(var.getFirst());
-          if (!varDecl || !varDecl->hasName() ||
-              varDecl->getName() != vd->getName())
-            continue;
-          ty = var.getSecond().value->getType();
-          if (var.getSecond().box) {
-            ty = ty.getObjectType();
-          }
-        }
-      }
-
-      if (!ty.isAddressOnly(SGF.F.getModule()))
+      if (!ty.isAddressOnly(SGF.F))
         continue;
       assert(!Temporaries[vd]);
       Temporaries[vd] = SGF.emitTemporaryAllocation(vd, ty);
@@ -2455,23 +2428,18 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
     assert(SGF.getCleanupsDepth() == PatternMatchStmtDepth);
     SWIFT_DEFER { assert(SGF.getCleanupsDepth() == PatternMatchStmtDepth); };
 
-    // If we do not have any bound decls, just emit the case body since we do
-    // not need to setup any var locs.
-    if (!caseBlock->hasBoundDecls()) {
+    if (!caseBlock->hasCaseBodyVariables()) {
       emitCaseBody(caseBlock);
       continue;
     }
 
-    // If we have a shared case with bound decls, then the 0th pattern has the
-    // order of variables that are the incoming BB arguments. Setup the VarLocs
-    // to point to the incoming args and setup initialization so any args
-    // needing cleanup will get that as well.
+    // If we have a shared case with bound decls, then the case stmt pattern has
+    // the order of variables that are the incoming BB arguments. Setup the
+    // VarLocs to point to the incoming args and setup initialization so any
+    // args needing Cleanup will get that as well.
     Scope scope(SGF.Cleanups, CleanupLocation(caseBlock));
-    auto pattern = caseBlock->getCaseLabelItems()[0].getPattern();
-    SmallVector<VarDecl *, 4> patternVarDecls;
-    pattern->collectVariables(patternVarDecls);
     unsigned argIndex = 0;
-    for (auto *vd : patternVarDecls) {
+    for (auto *vd : caseBlock->getCaseBodyVariables()) {
       if (!vd->hasName())
         continue;
 
@@ -2480,7 +2448,7 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
       // Initialize mv at +1. We always pass values in at +1 for today into
       // shared blocks.
       ManagedValue mv;
-      if (ty.isAddressOnly(SGF.F.getModule())) {
+      if (ty.isAddressOnly(SGF.F)) {
         // There's no basic block argument, since we don't allow basic blocks
         // to have address arguments.
         //
@@ -2529,36 +2497,54 @@ public:
   PatternMatchEmission &Emission;
 };
 
+namespace {
+
+struct UnexpectedEnumCaseInfo {
+  CanType subjectTy;
+  ManagedValue metatype;
+  ManagedValue rawValue;
+  NullablePtr<const EnumDecl> singleObjCEnum;
+
+  UnexpectedEnumCaseInfo(CanType subjectTy, ManagedValue metatype,
+                         ManagedValue rawValue, const EnumDecl *singleObjCEnum)
+      : subjectTy(subjectTy), metatype(metatype), rawValue(rawValue),
+        singleObjCEnum(singleObjCEnum) {
+    assert(isa<MetatypeInst>(metatype));
+    assert(bool(rawValue) && isa<UncheckedTrivialBitCastInst>(rawValue));
+    assert(singleObjCEnum->hasRawType());
+  }
+
+  UnexpectedEnumCaseInfo(CanType subjectTy, ManagedValue valueMetatype)
+      : subjectTy(subjectTy), metatype(valueMetatype), rawValue(),
+        singleObjCEnum() {
+    assert(isa<ValueMetatypeInst>(valueMetatype));
+  }
+
+  bool isSingleObjCEnum() const { return singleObjCEnum.isNonNull(); }
+
+  void cleanupInstsIfUnused() {
+    auto f = [](SILValue v) {
+      if (!v->use_empty())
+        return;
+      cast<SingleValueInstruction>(v)->eraseFromParent();
+    };
+    f(metatype.getValue());
+    if (rawValue)
+      f(rawValue.getValue());
+  }
+};
+
+} // end anonymous namespace
+
 static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
                                                   SILLocation loc,
-                                                  ManagedValue value,
-                                                  Type subjectTy,
-                                                  const EnumDecl *enumDecl) {
+                                                  UnexpectedEnumCaseInfo ueci) {
   ASTContext &ctx = SGF.getASTContext();
   auto diagnoseFailure = ctx.getDiagnoseUnexpectedEnumCaseValue();
   if (!diagnoseFailure) {
     SGF.B.createBuiltinTrap(loc);
     return;
   }
-
-  assert(enumDecl->isObjC());
-  assert(enumDecl->hasRawType());
-  assert(value.getType().isTrivial(SGF.F));
-
-  // Get the enum type as an Any.Type value.
-  SILType metatypeType = SGF.getLoweredType(
-      AbstractionPattern::getOpaque(),
-      MetatypeType::get(subjectTy));
-  SILValue metatype = SGF.B.createMetatype(loc, metatypeType);
-
-  // Bitcast the enum value to its raw type. (This is only safe for @objc
-  // enums.)
-  SILType loweredRawType = SGF.getLoweredType(enumDecl->getRawType());
-  assert(loweredRawType.isTrivial(SGF.F));
-  assert(loweredRawType.isObject());
-  auto rawValue = SGF.B.createUncheckedTrivialBitCast(loc, value,
-                                                      loweredRawType);
-  auto materializedRawValue = rawValue.materialize(SGF, loc);
 
   auto genericSig = diagnoseFailure->getGenericSignature();
   auto subs = SubstitutionMap::get(
@@ -2569,10 +2555,10 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
         assert(genericParam->getIndex() < 2);
         switch (genericParam->getIndex()) {
         case 0:
-          return subjectTy;
+          return ueci.subjectTy;
 
         case 1:
-          return enumDecl->getRawType();
+          return ueci.singleObjCEnum.get()->getRawType();
 
         default:
           llvm_unreachable("wrong generic signature for expected case value");
@@ -2580,16 +2566,14 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
       },
       LookUpConformanceInSignature(*genericSig));
 
-  SGF.emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, subs,
-                                  {ManagedValue::forUnmanaged(metatype),
-                                   materializedRawValue},
-                                  SGFContext());
+  SGF.emitApplyOfLibraryIntrinsic(
+      loc, diagnoseFailure, subs,
+      {ueci.metatype, ueci.rawValue.materialize(SGF, loc)}, SGFContext());
 }
 
 static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
                                              SILLocation loc,
-                                             ManagedValue value,
-                                             Type subjectTy) {
+                                             UnexpectedEnumCaseInfo ueci) {
   ASTContext &ctx = SGF.getASTContext();
   auto diagnoseFailure = ctx.getDiagnoseUnexpectedEnumCase();
   if (!diagnoseFailure) {
@@ -2597,21 +2581,14 @@ static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
     return;
   }
 
-  // Get the switched-upon value's type.
-  SILType metatypeType = SGF.getLoweredType(
-      AbstractionPattern::getOpaque(),
-      MetatypeType::get(subjectTy)->getCanonicalType());
-  ManagedValue metatype = SGF.B.createValueMetatype(loc, metatypeType, value);
-
   auto diagnoseSignature = diagnoseFailure->getGenericSignature();
   auto genericArgsMap = SubstitutionMap::get(
       diagnoseSignature,
-      [&](SubstitutableType *type) -> Type { return subjectTy; },
+      [&](SubstitutableType *type) -> Type { return ueci.subjectTy; },
       LookUpConformanceInSignature(*diagnoseSignature));
 
   SGF.emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, genericArgsMap,
-                                  metatype,
-                                  SGFContext());
+                                  ueci.metatype, SGFContext());
 }
 
 static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
@@ -2622,10 +2599,34 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
 
   // Certain case statements can be entered along multiple paths, either because
   // they have multiple labels or because of fallthrough. When we need multiple
-  // entrance path, we factor the paths with a shared block. If we don't have a
-  // fallthrough or a multi-pattern 'case', we can just emit the body inline and
-  // save some dead blocks. Emit the statement here and bail early.
+  // entrance path, we factor the paths with a shared block.
+  //
+  // If we don't have a fallthrough or a multi-pattern 'case', we can emit the
+  // body inline. Emit the statement here and bail early.
   if (!row.hasFallthroughTo() && caseBlock->getCaseLabelItems().size() == 1) {
+    // If we have case body vars, set them up to point at the matching var
+    // decls.
+    if (caseBlock->hasCaseBodyVariables()) {
+      // Since we know that we only have one case label item, grab its pattern
+      // vars and use that to update expected with the right SILValue.
+      //
+      // TODO: Do we need a copy here?
+      SmallVector<VarDecl *, 4> patternVars;
+      row.getCasePattern()->collectVariables(patternVars);
+      for (auto *expected : caseBlock->getCaseBodyVariables()) {
+        if (!expected->hasName())
+          continue;
+        for (auto *vd : patternVars) {
+          if (!vd->hasName() || vd->getName() != expected->getName()) {
+            continue;
+          }
+
+          // Ok, we found a match. Update the VarLocs for the case block.
+          auto v = SGF.VarLocs[vd];
+          SGF.VarLocs[expected] = v;
+        }
+      }
+    }
     emission.emitCaseBody(caseBlock);
     return;
   }
@@ -2639,7 +2640,9 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
 
   // If we do not have any bound decls, we do not need to setup any
   // variables. Just jump to the shared destination.
-  if (!caseBlock->hasBoundDecls()) {
+  if (!caseBlock->hasCaseBodyVariables()) {
+    // Don't emit anything yet, we emit it at the cleanup level of the switch
+    // statement.
     JumpDest sharedDest = emission.getSharedCaseBlockDest(caseBlock);
     SGF.Cleanups.emitBranchAndCleanups(sharedDest, caseBlock);
     return;
@@ -2650,18 +2653,13 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
   // +1 along to the shared case block dest. (The cleanups still happen, as they
   // are threaded through here messily, but the explicit retains here counteract
   // them, and then the retain/release pair gets optimized out.)
-  ArrayRef<CaseLabelItem> labelItems = caseBlock->getCaseLabelItems();
   SmallVector<SILValue, 4> args;
-  SmallVector<VarDecl *, 4> expectedVarOrder;
-  SmallVector<VarDecl *, 4> vars;
-  labelItems[0].getPattern()->collectVariables(expectedVarOrder);
-  row.getCasePattern()->collectVariables(vars);
-
-  SILModule &M = SGF.F.getModule();
-  for (auto expected : expectedVarOrder) {
+  SmallVector<VarDecl *, 4> patternVars;
+  row.getCasePattern()->collectVariables(patternVars);
+  for (auto *expected : caseBlock->getCaseBodyVariables()) {
     if (!expected->hasName())
       continue;
-    for (auto *var : vars) {
+    for (auto *var : patternVars) {
       if (!var->hasName() || var->getName() != expected->getName())
         continue;
 
@@ -2671,7 +2669,7 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
       // If we have an address-only type, initialize the temporary
       // allocation. We're not going to pass the address as a block
       // argument.
-      if (type.isAddressOnly(M)) {
+      if (type.isAddressOnly(SGF.F)) {
         emission.emitAddressOnlyInitialization(expected, value);
         break;
       }
@@ -2690,6 +2688,7 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
     }
   }
 
+  // Now that we have initialized our arguments, branch to the shared dest.
   SGF.Cleanups.emitBranchAndCleanups(sharedDest, caseBlock, args);
 }
 
@@ -2764,7 +2763,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     if (subjectMV.isPlusOne(*this)) {
       // And we have an address that is loadable, perform a load [take].
       if (subjectMV.getType().isAddress() &&
-          subjectMV.getType().isLoadable(getModule())) {
+          subjectMV.getType().isLoadable(F)) {
         subjectMV = B.createLoadTake(S, subjectMV);
       }
       return {subjectMV, CastConsumptionKind::TakeAlways};
@@ -2772,7 +2771,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
 
     // If we have a loadable address and +0, perform a load borrow.
     if (subjectMV.getType().isAddress() &&
-        subjectMV.getType().isLoadable(getModule())) {
+        subjectMV.getType().isLoadable(F)) {
       subjectMV = B.createLoadBorrow(S, subjectMV);
     }
 
@@ -2787,6 +2786,38 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     return {subjectMV.copy(*this, S), CastConsumptionKind::TakeAlways};
   }());
 
+  // If we need to diagnose an unexpected enum case or unexpected enum case
+  // value, we need access to a value metatype for the subject. Emit this state
+  // now before we emit the actual switch to ensure that the subject has not
+  // been consumed.
+  auto unexpectedEnumCaseInfo = ([&]() -> UnexpectedEnumCaseInfo {
+    SILLocation loc = RegularLocation::getAutoGeneratedLocation();
+    CanType canSubjectTy = subjectTy->getCanonicalType();
+    CanType metatypeType = MetatypeType::get(canSubjectTy)->getCanonicalType();
+    SILType loweredMetatypeType =
+        getLoweredType(AbstractionPattern::getOpaque(), metatypeType);
+    ManagedValue value = subject.getFinalManagedValue();
+
+    if (auto *singleEnumDecl = canSubjectTy->getEnumOrBoundGenericEnum()) {
+      if (singleEnumDecl->isObjC()) {
+        auto metatype = ManagedValue::forUnmanaged(
+            B.createMetatype(loc, loweredMetatypeType));
+
+        // Bitcast the enum value to its raw type. (This is only safe for @objc
+        // enums.)
+        SILType loweredRawType = getLoweredType(singleEnumDecl->getRawType());
+        assert(loweredRawType.isTrivial(F));
+        assert(loweredRawType.isObject());
+        auto rawValue =
+            B.createUncheckedTrivialBitCast(loc, value, loweredRawType);
+        return {canSubjectTy, metatype, rawValue, singleEnumDecl};
+      }
+    }
+
+    return {canSubjectTy,
+            B.createValueMetatype(loc, loweredMetatypeType, value)};
+  }());
+
   auto failure = [&](SILLocation location) {
     // If we fail to match anything, we trap. This can happen with a switch
     // over an @objc enum, which may contain any value of its underlying type,
@@ -2795,18 +2826,12 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     SWIFT_DEFER { B.createUnreachable(location); };
 
     // Special case: if it's a single @objc enum, we can print the raw value.
-    CanType ty = S->getSubjectExpr()->getType()->getCanonicalType();
-    if (auto *singleEnumDecl = ty->getEnumOrBoundGenericEnum()) {
-      if (singleEnumDecl->isObjC()) {
-        emitDiagnoseOfUnexpectedEnumCaseValue(*this, location,
-                                              subject.getFinalManagedValue(),
-                                              subjectTy, singleEnumDecl);
-        return;
-      }
+    if (unexpectedEnumCaseInfo.isSingleObjCEnum()) {
+      emitDiagnoseOfUnexpectedEnumCaseValue(*this, location,
+                                            unexpectedEnumCaseInfo);
+      return;
     }
-    emitDiagnoseOfUnexpectedEnumCase(*this, location,
-                                     subject.getFinalManagedValue(),
-                                     subjectTy);
+    emitDiagnoseOfUnexpectedEnumCase(*this, location, unexpectedEnumCaseInfo);
   };
 
   // Set up an initial clause matrix.
@@ -2832,50 +2857,53 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   } else {
     B.emitBlock(contBB);
   }
+
+  // Now that we have emitted everything, see if our unexpected enum case info
+  // metatypes were actually used. If not, delete them.
+  unexpectedEnumCaseInfo.cleanupInstsIfUnused();
 }
 
 void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
   assert(!SwitchStack.empty() && "fallthrough outside of switch?!");
   PatternMatchContext *context = SwitchStack.back();
-  
-  // Get the destination block.
-  CaseStmt *caseStmt = S->getFallthroughDest();
-  JumpDest sharedDest =
-  context->Emission.getSharedCaseBlockDest(caseStmt);
 
-  if (!caseStmt->hasBoundDecls()) {
+  // Get the destination block.
+  CaseStmt *destCaseStmt = S->getFallthroughDest();
+  JumpDest sharedDest = context->Emission.getSharedCaseBlockDest(destCaseStmt);
+
+  // If our destination case doesn't have any bound decls, there is no rebinding
+  // to do. Just jump to the shared dest.
+  if (!destCaseStmt->hasCaseBodyVariables()) {
     Cleanups.emitBranchAndCleanups(sharedDest, S);
     return;
   }
 
   // Generate branch args to pass along current vars to fallthrough case.
-  SILModule &M = F.getModule();
-  ArrayRef<CaseLabelItem> labelItems = caseStmt->getCaseLabelItems();
   SmallVector<SILValue, 4> args;
-  SmallVector<VarDecl *, 4> expectedVarOrder;
-  labelItems[0].getPattern()->collectVariables(expectedVarOrder);
+  CaseStmt *fallthroughSourceStmt = S->getFallthroughSource();
 
-  for (auto *expected : expectedVarOrder) {
+  for (auto *expected : destCaseStmt->getCaseBodyVariables()) {
     if (!expected->hasName())
       continue;
-    for (auto var : VarLocs) {
-      auto varDecl = dyn_cast<VarDecl>(var.getFirst());
-      if (!varDecl || !varDecl->hasName() ||
-          varDecl->getName() != expected->getName()) {
+
+    // The type checker enforces that if our destination case has variables then
+    // our fallthrough source must as well.
+    for (auto *var : fallthroughSourceStmt->getCaseBodyVariables()) {
+      if (!var->hasName() || var->getName() != expected->getName()) {
         continue;
       }
 
-      SILValue value = var.getSecond().value;
+      auto varLoc = VarLocs[var];
+      SILValue value = varLoc.value;
 
-      if (value->getType().isAddressOnly(M)) {
+      if (value->getType().isAddressOnly(F)) {
         context->Emission.emitAddressOnlyInitialization(expected, value);
         break;
       }
 
-      if (var.getSecond().box) {
-        auto &lowering = getTypeLowering(value->getType());
-        auto argValue = lowering.emitLoad(B, CurrentSILLoc, value,
-                                          LoadOwnershipQualifier::Copy);
+      if (varLoc.box) {
+        SILValue argValue = B.emitLoadValueOperation(
+            CurrentSILLoc, value, LoadOwnershipQualifier::Copy);
         args.push_back(argValue);
         break;
       }

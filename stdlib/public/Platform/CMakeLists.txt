@@ -9,6 +9,8 @@ add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_
     POSIXError.swift
     MachError.swift
 
+    "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
+
     GYB_SOURCES
       ${swift_platform_gyb_sources}
       Darwin.swift.gyb
@@ -23,6 +25,7 @@ add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_
 
 add_swift_target_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     ${swift_platform_sources}
+    POSIXError.swift
 
     GYB_SOURCES
       ${swift_platform_gyb_sources}
@@ -36,6 +39,7 @@ add_swift_target_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_O
 add_swift_target_library(swiftMSVCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     msvcrt.swift
     ${swift_platform_sources}
+    POSIXError.swift
 
     GYB_SOURCES
       ${swift_platform_gyb_sources}

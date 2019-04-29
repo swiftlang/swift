@@ -928,8 +928,7 @@ SingleValueInstruction *StringConcatenationOptimizer::optimize() {
   Arguments.push_back(FuncResultType);
 
   return Builder.createApply(AI->getLoc(), FRIConvertFromBuiltin,
-                             SubstitutionMap(), Arguments,
-                             false);
+                             SubstitutionMap(), Arguments);
 }
 
 /// Top level entry point
@@ -1503,20 +1502,18 @@ bool swift::simplifyUsers(SingleValueInstruction *I) {
 /// True if a type can be expanded
 /// without a significant increase to code size.
 bool swift::shouldExpand(SILModule &Module, SILType Ty) {
-  if (Ty.isAddressOnly(Module)) {
+  // FIXME: Expansion
+  auto Expansion = ResilienceExpansion::Minimal;
+
+  if (Module.Types.getTypeLowering(Ty, Expansion).isAddressOnly()) {
     return false;
   }
   if (EnableExpandAll) {
     return true;
   }
 
-  // FIXME: Expansion
-  unsigned numFields =
-    Module.Types.countNumberOfFields(Ty, ResilienceExpansion::Minimal);
-  if (numFields > 6) {
-    return false;
-  }
-  return true;
+  unsigned NumFields = Module.Types.countNumberOfFields(Ty, Expansion);
+  return (NumFields <= 6);
 }
 
 /// Some support functions for the global-opt and let-properties-opts

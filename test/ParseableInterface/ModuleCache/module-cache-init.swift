@@ -24,9 +24,10 @@
 // RUN: test -f %t/modulecache/LeafModule-*.swiftmodule
 // RUN: llvm-bcanalyzer -dump %t/modulecache/LeafModule-*.swiftmodule | %FileCheck %s -check-prefix=CHECK-LEAFMODULE
 // CHECK-LEAFMODULE: {{MODULE_NAME.*blob data = 'LeafModule'}}
-// CHECK-LEAFMODULE: {{FILE_DEPENDENCY.*Swift.swiftmodule([/\\].+[.]swiftmodule)?'}}
 // CHECK-LEAFMODULE: {{FILE_DEPENDENCY.*LeafModule.swiftinterface'}}
 // CHECK-LEAFMODULE: FUNC_DECL
+// RUN: llvm-bcanalyzer -dump %t/modulecache/LeafModule-*.swiftmodule | %FileCheck %s -check-prefix=CHECK-LEAFMODULE-NEGATIVE
+// CHECK-LEAFMODULE-NEGATIVE-NOT: {{FILE_DEPENDENCY.*Swift.swiftmodule([/\\].+[.]swiftmodule)?'}}
 //
 //
 // Phase 3: build TestModule into a .swiftmodule explicitly us OtherModule via OtherModule.swiftinterface, creating OtherModule-*.swiftmodule along the way.
@@ -37,9 +38,8 @@
 // RUN: test -f %t/TestModule.d
 // RUN: llvm-bcanalyzer -dump %t/modulecache/OtherModule-*.swiftmodule | %FileCheck %s -check-prefix=CHECK-OTHERMODULE
 // CHECK-OTHERMODULE: {{MODULE_NAME.*blob data = 'OtherModule'}}
-// CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*Swift.swiftmodule([/\\].+[.]swiftmodule)?'}}
+// CHECK-OTHERMODULE-NOT: {{FILE_DEPENDENCY.*Swift.swiftmodule([/\\].+[.]swiftmodule)?'}}
 // CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*LeafModule.swiftinterface'}}
-// CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*LeafModule-.*.swiftmodule'}}
 // CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*OtherModule.swiftinterface'}}
 // CHECK-OTHERMODULE: FUNC_DECL
 //
@@ -57,10 +57,13 @@
 // CHECK-DEPENDS: TestModule.swiftmodule :
 // CHECK-DEPENDS-DAG: LeafModule.swiftinterface
 // CHECK-DEPENDS-DAG: OtherModule.swiftinterface
-// CHECK-DEPENDS-DAG: {{OtherModule-[^ ]+.swiftmodule}}
 // CHECK-DEPENDS-DAG: Swift.swiftmodule
 // CHECK-DEPENDS-DAG: SwiftOnoneSupport.swiftmodule
-// CHECK-DEPENDS-DAG: {{LeafModule-[^ ]+.swiftmodule}}
+//
+// RUN: %FileCheck %s -check-prefix=CHECK-DEPENDS-NEGATIVE <%t/TestModule.d
+//
+// CHECK-DEPENDS-NEGATIVE-NOT: {{LeafModule-[^ ]+.swiftmodule}}
+// CHECK-DEPENDS-NEGATIVE-NOT: {{OtherModule-[^ ]+.swiftmodule}}
 
 import OtherModule
 

@@ -334,10 +334,8 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
         TC.checkFunctionErrorHandling(AFD);
         continue;
       }
-      if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-        (void)nominal->getAllConformances();
+      if (isa<NominalTypeDecl>(decl))
         continue;
-      }
       if (isa<VarDecl>(decl))
         continue;
       llvm_unreachable("Unhandled external definition kind");
@@ -460,6 +458,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     return;
 
   auto &Ctx = SF.getASTContext();
+  BufferIndirectlyCausingDiagnosticRAII cpr(SF);
 
   // Make sure we have a type checker.
   TypeChecker &TC = createTypeChecker(Ctx);
@@ -570,10 +569,10 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   auto &Ctx = SF.getASTContext();
   FrontendStatsTracer tracer(Ctx.Stats, "perform-whole-module-type-checking");
-  Ctx.diagnoseAttrsRequiringFoundation(SF);
-  Ctx.diagnoseObjCMethodConflicts(SF);
-  Ctx.diagnoseObjCUnsatisfiedOptReqConflicts(SF);
-  Ctx.diagnoseUnintendedObjCMethodOverrides(SF);
+  diagnoseAttrsRequiringFoundation(SF);
+  diagnoseObjCMethodConflicts(SF);
+  diagnoseObjCUnsatisfiedOptReqConflicts(SF);
+  diagnoseUnintendedObjCMethodOverrides(SF);
 
   // In whole-module mode, import verification is deferred until all files have
   // been type checked. This avoids caching imported declarations when a valid

@@ -600,6 +600,8 @@ int parseFile(
   Invocation.getLangOptions().VerifySyntaxTree = options::VerifySyntaxTree;
   Invocation.getLangOptions().RequestEvaluatorGraphVizPath = options::GraphVisPath;
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(InputFileName);
+  if (InputFileName.endswith(".swiftinterface"))
+    Invocation.setInputKind(InputFileKind::SwiftModuleInterface);
   Invocation.setMainExecutablePath(
     llvm::sys::fs::getMainExecutable(MainExecutablePath,
       reinterpret_cast<void *>(&anchorForGetMainExecutable)));

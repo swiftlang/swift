@@ -234,30 +234,21 @@ static bool areOverrideCompatibleSimple(ValueDecl *decl,
   if (parentDecl->isInvalid())
     return false;
 
-  if (auto func = dyn_cast<FuncDecl>(decl)) {
-    // Specific checking for methods.
-    auto parentFunc = cast<FuncDecl>(parentDecl);
-    if (func->isStatic() != parentFunc->isStatic())
-      return false;
-    if (func->isGeneric() != parentFunc->isGeneric())
-      return false;
-  } else if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-    auto parentCtor = cast<ConstructorDecl>(parentDecl);
-    if (ctor->isGeneric() != parentCtor->isGeneric())
-      return false;
+  // If their staticness is different, they aren't compatible.
+  if (decl->isStatic() != parentDecl->isStatic())
+    return false;
 
-    // Factory initializers cannot be overridden.
-    if (parentCtor->isFactoryInit())
-      return false;
-  } else if (auto var = dyn_cast<VarDecl>(decl)) {
-    auto parentVar = cast<VarDecl>(parentDecl);
-    if (var->isStatic() != parentVar->isStatic())
-      return false;
-  } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
-    auto parentSubscript = cast<SubscriptDecl>(parentDecl);
-    if (subscript->isGeneric() != parentSubscript->isGeneric())
+  // If their genericity is different, they aren't compatible.
+  if (auto genDecl = decl->getAsGenericContext()) {
+    auto genParentDecl = parentDecl->getAsGenericContext();
+    if (genDecl->isGeneric() != genParentDecl->isGeneric())
       return false;
   }
+
+  // Factory initializers cannot be overridden.
+  if (auto parentCtor = dyn_cast<ConstructorDecl>(parentDecl))
+    if (parentCtor->isFactoryInit())
+      return false;
 
   return true;
 }
@@ -560,25 +551,37 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
                                                         /*derivedSubs=*/None);
 
   for (auto i : indices(baseParams->getArray())) {
-    auto baseItfTy = baseParams->get(i)->getInterfaceType();
-    auto baseParamTy =
-        baseDecl->getAsGenericContext()->mapTypeIntoContext(baseItfTy);
+    auto *baseParam = baseParams->get(i);
+    auto *derivedParam = derivedParams->get(i);
+
+    // Make sure inout-ness and varargs match.
+    if (baseParam->isInOut() != derivedParam->isInOut() ||
+        baseParam->isVariadic() != derivedParam->isVariadic()) {
+      return false;
+    }
+
+    auto baseParamTy = baseParam->getInterfaceType();
     baseParamTy = baseParamTy.subst(subs);
-    auto derivedParamTy = derivedParams->get(i)->getInterfaceType();
+    auto derivedParamTy = derivedParam->getInterfaceType();
 
-    // Attempt contravariant match.
-    if (baseParamTy->matchesParameter(derivedParamTy, matchMode))
-      continue;
-
-    // Try once more for a match, using the underlying type of an
-    // IUO if we're allowing that.
-    if (baseParams->get(i)
-            ->getAttrs()
-            .hasAttribute<ImplicitlyUnwrappedOptionalAttr>() &&
-        matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam)) {
-      baseParamTy = baseParamTy->getOptionalObjectType();
-      if (baseParamTy->matches(derivedParamTy, matchMode))
+    if (baseParam->isInOut() || baseParam->isVariadic()) {
+      // Inout and vararg parameters must match exactly.
+      if (baseParamTy->isEqual(derivedParamTy))
         continue;
+    } else {
+      // Attempt contravariant match.
+      if (baseParamTy->matchesParameter(derivedParamTy, matchMode))
+        continue;
+
+      // Try once more for a match, using the underlying type of an
+      // IUO if we're allowing that.
+      if (baseParam->getAttrs()
+              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>() &&
+          matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam)) {
+        baseParamTy = baseParamTy->getOptionalObjectType();
+        if (baseParamTy->matches(derivedParamTy, matchMode))
+          continue;
+      }
     }
 
     // If there is no match, then we're done.
@@ -1320,6 +1323,9 @@ namespace  {
     UNINTERESTING_ATTR(WeakLinked)
     UNINTERESTING_ATTR(Frozen)
     UNINTERESTING_ATTR(HasInitialValue)
+    UNINTERESTING_ATTR(ImplementationOnly)
+    UNINTERESTING_ATTR(Custom)
+    UNINTERESTING_ATTR(PropertyDelegate)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -1679,6 +1685,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     switch (baseKind) {
     case DescriptiveDeclKind::StaticProperty:
     case DescriptiveDeclKind::StaticMethod:
+    case DescriptiveDeclKind::StaticSubscript:
       override->diagnose(diag::override_static, baseKind);
       break;
     default:

@@ -41,10 +41,11 @@ private:
   CompilerInvocation CompInv;
   std::unique_ptr<ParserUnit> Parser;
   class FormatterDiagConsumer : public swift::DiagnosticConsumer {
-    void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                          StringRef FormatString,
-                          ArrayRef<DiagnosticArgument> FormatArgs,
-                          const swift::DiagnosticInfo &Info) override {
+    void handleDiagnostic(
+        SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+        StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
+        const swift::DiagnosticInfo &Info,
+        const SourceLoc bufferIndirectlyCausingDiagnostic) override {
       llvm::errs() << "Parse error: ";
       DiagnosticEngine::formatDiagnosticText(llvm::errs(), FormatString,
                                              FormatArgs);

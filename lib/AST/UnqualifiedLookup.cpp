@@ -102,7 +102,9 @@ template <typename D> bool shouldLookupMembers(D *decl, SourceLoc loc) {
 
   // Within the braces, always look for members.
   auto &ctx = decl->getASTContext();
-  if (ctx.SourceMgr.rangeContainsTokenLoc(decl->getBraces(), loc))
+  auto braces = decl->getBraces();
+  if (braces.Start != braces.End &&
+      ctx.SourceMgr.rangeContainsTokenLoc(braces, loc))
     return true;
 
   // Within 'where' clause, we can also look for members.
@@ -1044,8 +1046,12 @@ void UnqualifiedLookupFactory::recordDependencyOnTopLevelName(
 void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
   // Add private imports to the extra search list.
   SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
-  if (auto FU = dyn_cast<FileUnit>(dc))
-    FU->getImportedModules(extraImports, ModuleDecl::ImportFilter::Private);
+  if (auto FU = dyn_cast<FileUnit>(dc)) {
+    ModuleDecl::ImportFilter importFilter;
+    importFilter |= ModuleDecl::ImportFilterKind::Private;
+    importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+    FU->getImportedModules(extraImports, importFilter);
+  }
 
   using namespace namelookup;
   SmallVector<ValueDecl *, 8> CurModuleResults;

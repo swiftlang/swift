@@ -77,7 +77,7 @@ def _apply_default_arguments(args):
         args.lldb_build_variant = args.build_variant
 
     if args.lldb_build_with_xcode is None:
-        args.lldb_build_with_xcode = '1'
+        args.lldb_build_with_xcode = '0'
 
     if args.foundation_build_variant is None:
         args.foundation_build_variant = args.build_variant
@@ -546,6 +546,10 @@ def create_argument_parser():
            help='build IndexStoreDB')
     option(['--sourcekit-lsp'], toggle_true('build_sourcekitlsp'),
            help='build SourceKitLSP')
+    option(['--toolchain-benchmarks'],
+           toggle_true('build_toolchainbenchmarks'),
+           help='build Swift Benchmarks using swiftpm against the just built '
+                'toolchain')
 
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')

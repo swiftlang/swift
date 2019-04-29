@@ -318,6 +318,30 @@ function(_add_variant_c_compile_flags)
     endforeach()
   endif()
 
+  set(ICU_UC_INCLUDE_DIR ${SWIFT_${CFLAGS_SDK}_${CFLAGS_ARCH}_ICU_UC_INCLUDE})
+  if(NOT "${ICU_UC_INCLUDE_DIR}" STREQUAL "" AND
+     NOT "${ICU_UC_INCLUDE_DIR}" STREQUAL "/usr/include" AND
+     NOT "${ICU_UC_INCLUDE_DIR}" STREQUAL "/usr/${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}/include" AND
+     NOT "${ICU_UC_INCLUDE_DIR}" STREQUAL "/usr/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_TRIPLE}/include")
+   if(SWIFT_COMPILER_IS_MSVC_LIKE)
+     list(APPEND result -I;${ICU_UC_INCLUDE_DIR})
+   else()
+     list(APPEND result -isystem;${ICU_UC_INCLUDE_DIR})
+   endif()
+  endif()
+
+  set(ICU_I18N_INCLUDE_DIR ${SWIFT_${CFLAGS_SDK}_${CFLAGS_ARCH}_ICU_I18N_INCLUDE})
+  if(NOT "${ICU_I18N_INCLUDE_DIR}" STREQUAL "" AND
+     NOT "${ICU_I18N_INCLUDE_DIR}" STREQUAL "/usr/include" AND
+     NOT "${ICU_I18N_INCLUDE_DIR}" STREQUAL "/usr/${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}/include" AND
+     NOT "${ICU_I18N_INCLUDE_DIR}" STREQUAL "/usr/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_TRIPLE}/include")
+   if(SWIFT_COMPILER_IS_MSVC_LIKE)
+     list(APPEND result -I;${ICU_I18N_INCLUDE_DIR})
+   else()
+     list(APPEND result -isystem;${ICU_I18N_INCLUDE_DIR})
+   endif()
+  endif()
+
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -467,12 +491,14 @@ function(_add_variant_link_flags)
   endif()
 
   if(NOT "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_UC}" STREQUAL "")
-    get_filename_component(SWIFT_${sdk}_${arch}_ICU_UC_LIBDIR "${SWIFT_${sdk}_${arch}_ICU_UC}" DIRECTORY)
-    list(APPEND library_search_directories "${SWIFT_${sdk}_${arch}_ICU_UC_LIBDIR}")
+    get_filename_component(SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_UC_LIBDIR
+      "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_UC}" DIRECTORY)
+    list(APPEND library_search_directories "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_UC_LIBDIR}")
   endif()
   if(NOT "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N}" STREQUAL "")
-    get_filename_component(SWIFT_${sdk}_${arch}_ICU_I18N_LIBDIR "${SWIFT_${sdk}_${arch}_ICU_I18N}" DIRECTORY)
-    list(APPEND library_search_directories "${SWIFT_${sdk}_${arch}_ICU_I18N_LIBDIR}")
+    get_filename_component(SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N_LIBDIR
+      "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N}" DIRECTORY)
+    list(APPEND library_search_directories "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N_LIBDIR}")
   endif()
 
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
@@ -958,21 +984,6 @@ function(_add_swift_library_single target name)
   endif()
   _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFTLIB_SINGLE_SDK}")
 
-  if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    if(NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}" STREQUAL "" AND
-       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}" STREQUAL "/usr/include" AND
-       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}/include" AND
-       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_TRIPLE}/include")
-     target_include_directories("${target}" SYSTEM PRIVATE "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}")
-    endif()
-    if(NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE}" STREQUAL "" AND
-       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE}" STREQUAL "/usr/include" AND
-       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}/include" AND
-       NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE}" STREQUAL "/usr/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_TRIPLE}/include")
-     target_include_directories("${target}" SYSTEM PRIVATE "${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE}")
-    endif()
-  endif()
-
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
     swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
     target_include_directories("${target}" SYSTEM PRIVATE ${SWIFTLIB_INCLUDE})
@@ -1016,6 +1027,11 @@ function(_add_swift_library_single target name)
     set_target_properties("${target}" PROPERTIES
       LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}
       ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR})
+    if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS AND SWIFTLIB_SINGLE_IS_STDLIB_CORE
+        AND libkind STREQUAL SHARED)
+      add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${target}> ${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR})
+    endif()
 
     foreach(config ${CMAKE_CONFIGURATION_TYPES})
       string(TOUPPER ${config} config_upper)
@@ -1026,14 +1042,16 @@ function(_add_swift_library_single target name)
     endforeach()
   endif()
 
-  if(${SWIFTLIB_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+  if(SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
     set(install_name_dir "@rpath")
 
     if(SWIFTLIB_SINGLE_IS_STDLIB)
-      # Always use @rpath for XCTest.
-      if(NOT "${module_name}" STREQUAL "XCTest")
-        set(install_name_dir "${SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR}")
-      endif()
+      set(install_name_dir "${SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR}")
+    endif()
+
+    # Always use @rpath for XCTest
+    if(module_name STREQUAL "XCTest")
+      set(install_name_dir "@rpath")
     endif()
 
     set_target_properties("${target}"
@@ -1294,7 +1312,7 @@ function(_add_swift_library_single target name)
   # doing so will result in incorrect symbol resolution and linkage.  We created
   # import library targets when the library was added.  Use that to adjust the
   # link libraries.
-  if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS AND NOT CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
+  if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS AND NOT CMAKE_SYSTEM_NAME STREQUAL Windows)
     foreach(library_list LINK_LIBRARIES INTERFACE_LINK_LIBRARIES PRIVATE_LINK_LIBRARIES)
       set(import_libraries)
       foreach(library ${SWIFTLIB_SINGLE_${library_list}})
@@ -1358,15 +1376,8 @@ endfunction()
 #   add_swift_host_library(name
 #     [SHARED]
 #     [STATIC]
-#     [DEPENDS dep1 ...]
-#     [INTERFACE_LINK_LIBRARIES dep1 ...]
-#     [SWIFT_MODULE_DEPENDS dep1 ...]
 #     [LLVM_COMPONENT_DEPENDS comp1 ...]
 #     [FILE_DEPENDS target1 ...]
-#     [C_COMPILE_FLAGS flag1...]
-#     [LINK_FLAGS flag1...]
-#     [INSTALL]
-#     INSTALL_IN_COMPONENT comp
 #     source1 [source2 source3 ...])
 #
 # name
@@ -1378,23 +1389,11 @@ endfunction()
 # STATIC
 #   Build a static library.
 #
-# DEPENDS
-#   Targets that this library depends on.
-#
 # LLVM_COMPONENT_DEPENDS
 #   LLVM components this library depends on.
 #
 # FILE_DEPENDS
 #   Additional files this library depends on.
-#
-# C_COMPILE_FLAGS
-#   Extra compiler flags (C, C++, ObjC).
-#
-# LINK_FLAGS
-#   Extra linker flags.
-#
-# INSTALL_IN_COMPONENT comp
-#   The Swift installation component that this library belongs to.
 #
 # source1 ...
 #   Sources to add into this library.
@@ -1409,7 +1408,6 @@ function(add_swift_host_library name)
         DEPENDS
         FILE_DEPENDS
         INTERFACE_LINK_LIBRARIES
-        LINK_FLAGS
         LINK_LIBRARIES
         LLVM_COMPONENT_DEPENDS)
 
@@ -1420,6 +1418,15 @@ function(add_swift_host_library name)
                         ${ARGN})
   set(ASHL_SOURCES ${ASHL_UNPARSED_ARGUMENTS})
 
+  if(ASHL_C_COMPILE_FLAGS)
+    message(SEND_ERROR "library ${name} is using C_COMPILE_FLAGS parameter which is deprecated.  Please use target_compile_definitions, target_compile_options, or target_include_directories instead")
+  endif()
+  if(ASHL_DEPENDS)
+    message(SEND_ERROR "library ${name} is using DEPENDS parameter which is deprecated.  Please use add_dependencies instead")
+  endif()
+  if(ASHL_INTERFACE_LINK_LIBRARIES)
+    message(SEND_ERROR "library ${name} is using INTERFACE_LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead.")
+  endif()
   if(ASHL_LINK_LIBRARIES)
     message(SEND_ERROR "library ${name} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
   endif()
@@ -1439,12 +1446,8 @@ function(add_swift_host_library name)
     ${ASHL_FORCE_BUILD_OPTIMIZED_keyword}
     SDK ${SWIFT_HOST_VARIANT_SDK}
     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
-    DEPENDS ${ASHL_DEPENDS}
     LLVM_COMPONENT_DEPENDS ${ASHL_LLVM_COMPONENT_DEPENDS}
     FILE_DEPENDS ${ASHL_FILE_DEPENDS}
-    C_COMPILE_FLAGS ${ASHL_C_COMPILE_FLAGS}
-    LINK_FLAGS ${ASHL_LINK_FLAGS}
-    INTERFACE_LINK_LIBRARIES ${ASHL_INTERFACE_LINK_LIBRARIES}
     INSTALL_IN_COMPONENT "dev"
     )
 
@@ -1881,9 +1884,12 @@ function(add_swift_target_library name)
       endforeach()
 
       # Add PrivateFrameworks, rdar://28466433
+      set(swiftlib_c_compile_flags_all ${SWIFTLIB_C_COMPILE_FLAGS})
       if(sdk IN_LIST SWIFT_APPLE_PLATFORMS AND SWIFTLIB_IS_SDK_OVERLAY)
         set(swiftlib_swift_compile_private_frameworks_flag "-Fsystem" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/System/Library/PrivateFrameworks/")
       endif()
+
+      list(APPEND swiftlib_c_compile_flags_all "-DSWIFT_TARGET_LIBRARY_NAME=${name}")
 
       # Add this library variant.
       _add_swift_library_single(
@@ -1902,7 +1908,7 @@ function(add_swift_target_library name)
         FRAMEWORK_DEPENDS_WEAK ${SWIFTLIB_FRAMEWORK_DEPENDS_WEAK}
         LLVM_COMPONENT_DEPENDS ${SWIFTLIB_LLVM_COMPONENT_DEPENDS}
         FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS} ${swiftlib_module_dependency_targets}
-        C_COMPILE_FLAGS ${SWIFTLIB_C_COMPILE_FLAGS}
+        C_COMPILE_FLAGS ${swiftlib_c_compile_flags_all}
         SWIFT_COMPILE_FLAGS ${swiftlib_swift_compile_flags_all} ${swiftlib_swift_compile_flags_arch} ${swiftlib_swift_compile_private_frameworks_flag}
         LINK_FLAGS ${swiftlib_link_flags_all}
         PRIVATE_LINK_LIBRARIES ${swiftlib_private_link_libraries_targets}

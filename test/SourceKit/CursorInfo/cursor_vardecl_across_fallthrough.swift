@@ -31,7 +31,7 @@ switch p {
 
 // CHECK2DECL: source.lang.swift.decl.var.local (16:20-16:21)
 // CHECK2DECL2: source.lang.swift.decl.var.local (16:42-16:43)
-// CHECK2REF: source.lang.swift.ref.var.local (16:20-16:21)
+// CHECK2REF: source.lang.swift.ref.var.local (16:42-16:43)
 
 // CHECKX: x
 // CHECKX: s:33cursor_vardecl_across_fallthrough1xL_Sivp
@@ -50,7 +50,7 @@ switch p {
 
 // CHECK4DECL: source.lang.swift.decl.var.local (16:27-16:28)
 // CHECK4DECL2: source.lang.swift.decl.var.local (16:49-16:50)
-// CHECK4REF: source.lang.swift.ref.var.local (16:27-16:28)
+// CHECK4REF: source.lang.swift.ref.var.local (16:49-16:50)
 
 // CHECKY: y
 // CHECKY: s:33cursor_vardecl_across_fallthrough1yL_SSvp
