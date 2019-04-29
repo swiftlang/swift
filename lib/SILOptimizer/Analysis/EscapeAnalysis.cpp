@@ -1070,6 +1070,11 @@ static bool mayContainReference(SILType Ty, const SILFunction &F) {
 
 bool EscapeAnalysis::isPointer(ValueBase *V) {
   auto *F = V->getFunction();
+
+  // The function can be null, e.g. if V is an undef.
+  if (!F)
+    return false;
+
   SILType Ty = V->getType();
   auto Iter = isPointerCache.find(Ty);
   if (Iter != isPointerCache.end())
