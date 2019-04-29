@@ -1367,6 +1367,14 @@ bool ContextualFailure::diagnoseAsError() {
     break;
   }
 
+  case ConstraintLocator::ContextualType: {
+    if (isKnownKeyPathType(FromType) && isKnownKeyPathType(ToType)) {
+      diagnostic = diag::cannot_convert_initializer_value;
+      break;
+    }
+
+    LLVM_FALLTHROUGH;
+  }
   default:
     return false;
   }
