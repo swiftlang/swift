@@ -778,6 +778,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 
   SourceLoc arrowLoc;
 
+  bool isThrow = false;
   auto diagnoseInvalidThrows = [&]() -> Optional<InFlightDiagnostic> {
     if (throwsLoc.isValid())
       return None;
@@ -787,6 +788,10 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     } else if (Tok.is(tok::kw_rethrows)) {
       throwsLoc = consumeToken();
       rethrows = true;
+    } else if (Tok.is(tok::kw_throw)) {
+        throwsLoc = consumeToken();
+        isThrow = true;
+        return diagnose(throwsLoc, diag::throw_in_function_type_and_wrong_position);
     }
 
     if (!throwsLoc.isValid())
@@ -807,13 +812,20 @@ Parser::parseFunctionSignature(Identifier SimpleName,
       arrowLoc = consumeToken(tok::colon);
     }
 
-    // Check for 'throws' and 'rethrows' after the arrow, but
+    // Check for 'throws', 'rethrows' and 'throw' after the arrow, but
     // before the type, and correct it.
+    // "-> throws Int {" becomes "throws -> Int {"
     if (auto diagOpt = diagnoseInvalidThrows()) {
       assert(arrowLoc.isValid());
       assert(throwsLoc.isValid());
-      (*diagOpt).fixItExchange(SourceRange(arrowLoc),
-                               SourceRange(throwsLoc));
+      if (isThrow) {
+          (*diagOpt)
+          .fixItInsert(arrowLoc, "throws ")
+          .fixItRemove(SourceRange(throwsLoc));
+      } else {
+          (*diagOpt).fixItExchange(SourceRange(arrowLoc),
+                                   SourceRange(throwsLoc));
+      } 
     }
 
     ParserResult<TypeRepr> ResultType =
@@ -830,7 +842,8 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     retType = nullptr;
   }
 
-  // Check for 'throws' and 'rethrows' after the type and correct it.
+  // Check for 'throws', 'rethrows' and 'throw' after the type and correct it.
+  // "-> Int throws {" becomes "throws -> Int {"
   if (auto diagOpt = diagnoseInvalidThrows()) {
     assert(arrowLoc.isValid());
     assert(retType);

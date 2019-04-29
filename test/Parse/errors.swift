@@ -110,6 +110,13 @@ func postRethrows2(_ f: () throws -> Int) -> rethrows Int { // expected-error{{'
   return try f()
 }
 
+func postThrow1() -> throw Int { // expected-error {{expected throwing specifier; did you mean 'throws'? 'throws' may only occur before '->'}} {{19-19=throws }} {{22-28=}}
+    return 0
+}
+func postThrow2() -> Int throw { // expected-error {{expected throwing specifier; did you mean 'throws'? 'throws' may only occur before '->'}} {{19-19=throws }} {{25-31=}}
+    return 0
+}
+
 func incompleteThrowType() {
   // FIXME: Bad recovery for incomplete function type.
   let _: () throws
