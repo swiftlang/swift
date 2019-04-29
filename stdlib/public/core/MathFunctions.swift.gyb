@@ -34,6 +34,7 @@ import SwiftShims
 /// ElementaryFunctions and FloatingPoint.
 ///
 /// [elfn]: http://en.wikipedia.org/wiki/Elementary_function
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 public protocol ElementaryFunctions {
 
 %for func in ElementaryFunctions:
@@ -59,77 +60,12 @@ public protocol ElementaryFunctions {
   static func root(_ x: Self, _ n: Int) -> Self
 }
 
-/// A type that models the real numbers.
-///
-/// Conformance to this protocol means that all the FloatingPoint operations
-/// are available, as well as the ElementaryFunctions, plus the following
-/// additional math functions: atan2, erf, erc, hypot, tgamma.
-///
-/// logGamma and signGamma are also available on non-Windows platforms.
-public protocol Real: ElementaryFunctions, FloatingPoint {
-%for func in RealFunctions:
-
-  ${func.comment}
-  static func ${func.decl("Self")}
-%end
-
-  /// `atan(y/x)` with quadrant fixup.
-  ///
-  /// There is an infinite family of angles whose tangent is `y/x`. `atan2`
-  /// selects the representative that is the angle between the vector `(x, y)`
-  /// and the real axis in the range [-π, π].
-  static func atan2(y: Self, x: Self) -> Self
-
-#if !os(Windows)
-  //  lgamma is not available on Windows.
-  //  TODO: provide an implementation of lgamma with the stdlib to support
-  //  Windows so we can vend a uniform interface.
-
-  /// `log(gamma(x))` computed without undue overflow.
-  ///
-  /// `log(abs(gamma(x)))` is returned. To get the sign of `gamma(x)` cheaply,
-  /// use `signGamma(x)`.
-  static func logGamma(_ x: Self) -> Self
-#endif
-}
-
-extension Real {
-#if !os(Windows)
-  //  lgamma is not available on Windows; no lgamma means signGamma
-  //  is basically useless, so don't bother exposing it.
-
-  /// The sign of `gamma(x)`.
-  ///
-  /// This function is typically used in conjunction with `logGamma(x)`, which
-  /// computes `log(abs(gamma(x)))`, to recover the sign information that is
-  /// lost to the absolute value.
-  ///
-  /// `gamma(x)` has a simple pole at each non-positive integer and an
-  /// essential singularity at infinity; we arbitrarily choose to return
-  /// `.plus` for the sign in those cases. For all other values, `signGamma(x)`
-  /// is `.plus` if `x >= 0` or `trunc(x)` is odd, and `.minus` otherwise.
-  @_alwaysEmitIntoClient
-  public static func signGamma(_ x: Self) -> FloatingPointSign {
-    if x >= 0 { return .plus }
-    let trunc = x.rounded(.towardZero)
-    // Treat poles as gamma(x) == +inf. This is arbitrary, but we need to
-    // pick one sign or the other.
-    if x == trunc { return .plus }
-    // Result is .minus if trunc is even, .plus otherwise. To figure out if
-    // trunc is even or odd, check if trunc/2 is an integer.
-    let halfTrunc = trunc/2
-    if halfTrunc == halfTrunc.rounded(.towardZero) { return .minus }
-    return .plus
-  }
-#endif
-}
-
 %for type in all_floating_point_types():
 % if type.bits == 80:
 #if (arch(i386) || arch(x86_64)) && !os(Windows)
 % end
 % Self = type.stdlib_name
-extension ${Self}: Real {
+extension ${Self}: ElementaryFunctions {
 % for func in ElementaryFunctions + RealFunctions:
 
   @_alwaysEmitIntoClient
@@ -172,9 +108,66 @@ extension ${Self}: Real {
   public static func logGamma(_ x: ${Self}) -> ${Self} {
     return _swift_stdlib_lgamma${type.cFuncSuffix}(x)
   }
+
+  @_alwaysEmitIntoClient
+  public static func signGamma(_ x: ${Self}) -> FloatingPointSign {
+    if x >= 0 { return .plus }
+    let trunc = x.rounded(.towardZero)
+    if x == trunc { return .plus }
+    let halfTrunc = trunc/2
+    if halfTrunc == halfTrunc.rounded(.towardZero) { return .minus }
+    return .plus
+  }
 #endif
 }
 % if type.bits == 80:
 #endif
 % end
+%end
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+extension SIMD where Scalar: ElementaryFunctions {
+% for func in ElementaryFunctions:
+
+  @_alwaysEmitIntoClient
+  public static func ${func.decl("Self")} {
+    var r = Self()
+    for i in r.indices {
+      r[i] = Scalar.${func.swiftName}(${func.params(suffix="[i]")})
+    }
+    return r
+  }
+% end
+
+  @_alwaysEmitIntoClient
+  public static func pow(_ x: Self, _ y: Self) -> Self {
+    var r = Self()
+    for i in r.indices {
+      r[i] = Scalar.pow(x[i], y[i])
+    }
+    return r
+  }
+
+  @_alwaysEmitIntoClient
+  public static func pow(_ x: Self, _ n: Int) -> Self {
+    var r = Self()
+    for i in r.indices {
+      r[i] = Scalar.pow(x[i], n)
+    }
+    return r
+  }
+
+  @_alwaysEmitIntoClient
+  public static func root(_ x: Self, _ n: Int) -> Self {
+    var r = Self()
+    for i in r.indices {
+      r[i] = Scalar.root(x[i], n)
+    }
+    return r
+  }
+}
+
+%for n in [2,3,4,8,16,32,64]:
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+extension SIMD${n}: ElementaryFunctions where Scalar: ElementaryFunctions { }
 %end
