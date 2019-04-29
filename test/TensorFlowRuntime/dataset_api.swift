@@ -65,6 +65,17 @@ DatasetAPITests.testAllBackends("SingleValueHOFs") {
   expectEqual([0, 2, 4], evens.flatMap { $0.scalars })
 }
 
+DatasetAPITests.testAllBackends("ParallelMap") {
+  let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
+  let dataset = Dataset(elements: scalars)
+  let addedOne: Dataset = dataset.map(parallelCallCount: 5) { $0 + 1 }
+  expectEqual([1, 2, 3, 4, 5], addedOne.flatMap { $0.scalars })
+  // Use '.==' in the following closure to avoid any conversions to
+  // host data types, which is not handled correctly in tracing.
+  let evens: Dataset = dataset.filter { Tensor($0 % 2) .== Tensor(0) }
+  expectEqual([0, 2, 4], evens.flatMap { $0.scalars })
+}
+
 DatasetAPITests.testAllBackends("MapToDifferentType") {
   let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
   let dataset = Dataset(elements: scalars)
