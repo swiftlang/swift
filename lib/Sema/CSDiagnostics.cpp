@@ -155,12 +155,25 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   auto *anchor = getRawAnchor();
   auto *locator = cs.getConstraintLocator(anchor);
 
-  if (isFromContextualType()) {
-    auto type = cs.getContextualType();
+  // Get a declaration associated with given type (if any).
+  // This is used to retrieve affected declaration when
+  // failure is in any way contextual, and declaration can't
+  // be fetched directly from constraint system.
+  auto getAffectedDeclFromType = [](Type type) -> ValueDecl * {
     assert(type);
-    auto *alias = dyn_cast<TypeAliasType>(type.getPointer());
-    return alias ? alias->getDecl() : type->getAnyGeneric();
-  }
+    // If problem is related to a typealias, let's point this
+    // diagnostic directly to its declaration without desugaring.
+    if (auto *alias = dyn_cast<TypeAliasType>(type.getPointer()))
+      return alias->getDecl();
+
+    if (auto *opaque = type->getAs<OpaqueTypeArchetypeType>())
+      return opaque->getDecl();
+
+    return type->getAnyGeneric();
+  };
+
+  if (isFromContextualType())
+    return getAffectedDeclFromType(cs.getContextualType());
 
   if (auto *AE = dyn_cast<CallExpr>(anchor)) {
     // NOTE: In valid code, the function can only be a TypeExpr
@@ -196,11 +209,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   if (overload)
     return overload->choice.getDecl();
 
-  auto ownerType = getOwnerType();
-  if (auto *NA = dyn_cast<TypeAliasType>(ownerType.getPointer()))
-    return NA->getDecl();
-
-  return ownerType->getAnyGeneric();
+  return getAffectedDeclFromType(getOwnerType());
 }
 
 GenericSignature *RequirementFailure::getSignature(ConstraintLocator *locator) {
@@ -262,6 +271,28 @@ bool RequirementFailure::diagnoseAsError() {
 
   auto lhs = resolveType(getLHS());
   auto rhs = resolveType(getRHS());
+
+  if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
+    auto *namingDecl = OTD->getNamingDecl();
+    emitDiagnostic(
+        anchor->getLoc(), diag::type_does_not_conform_in_opaque_return,
+        namingDecl->getDescriptiveKind(), namingDecl->getFullName(), lhs, rhs);
+
+    TypeLoc returnLoc;
+    if (auto *VD = dyn_cast<VarDecl>(namingDecl)) {
+      returnLoc = VD->getTypeLoc();
+    } else if (auto *FD = dyn_cast<FuncDecl>(namingDecl)) {
+      returnLoc = FD->getBodyResultTypeLoc();
+    } else if (auto *SD = dyn_cast<SubscriptDecl>(namingDecl)) {
+      returnLoc = SD->getElementTypeLoc();
+    }
+
+    if (returnLoc.hasLocation()) {
+      emitDiagnostic(returnLoc.getLoc(), diag::opaque_return_type_declared_here)
+          .highlight(returnLoc.getSourceRange());
+    }
+    return true;
+  }
 
   if (genericCtx != reqDC && (genericCtx->isChildContextOf(reqDC) ||
                               isStaticOrInstanceMember(AffectedDecl))) {
