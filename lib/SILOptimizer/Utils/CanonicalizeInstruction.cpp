@@ -20,6 +20,7 @@
 
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -54,14 +55,20 @@ static SILBasicBlock::iterator killInstruction(SILInstruction *inst,
 }
 
 // Helper to delete, or mark for deletion, an instruction with potential debug
-// uses.
+// or end of scope uses. All "real" uses must already be removed.
+//
+// fix_lifetime uses are not currently handled here. They are generally
+// (incorrectly) treated as "incidental" uses, but no canonicalizations need
+// them yet.
 static SILBasicBlock::iterator
-killInstAndDebugUses(SingleValueInstruction *inst,
-                     SILBasicBlock::iterator nextII,
-                     CanonicalizeInstruction &pass) {
-  for (Operand *du : getDebugUses(inst))
-    nextII = killInstruction(du->getUser(), nextII, pass);
-
+killInstAndIncidentalUses(SingleValueInstruction *inst,
+                          SILBasicBlock::iterator nextII,
+                          CanonicalizeInstruction &pass) {
+  while (!inst->use_empty()) {
+    auto *user = inst->use_begin()->getUser();
+    assert(user->isDebugInstruction() || isEndOfScopeMarker(user));
+    nextII = killInstruction(user, nextII, pass);
+  }
   return killInstruction(inst, nextII, pass);
 }
 
@@ -103,6 +110,37 @@ simplifyAndReplace(SILInstruction *inst, CanonicalizeInstruction &pass) {
 //                        Canonicalize Memory Operations
 //===----------------------------------------------------------------------===//
 
+// Replace all uses of an original struct or tuple extract instruction, with the
+// given load instruction. The caller ensures that the load only loads the
+// extracted field.
+static void replaceUsesOfExtract(SingleValueInstruction *extract,
+                                 LoadInst *loadInst,
+                                 CanonicalizeInstruction &pass) {
+  assert(extract->getType() == loadInst->getType());
+
+  SingleValueInstruction *loadedVal = loadInst;
+  if (loadInst->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+    // Borrow the load-copied subelement, with precisely the same scope as
+    // the aggregate borrow.
+    assert(extract->getNumOperands() == 1);
+    auto *origBorrow = cast<BeginBorrowInst>(extract->getOperand(0));
+    auto *newBorrow = SILBuilderWithScope(origBorrow)
+                          .createBeginBorrow(loadInst->getLoc(), loadInst);
+    pass.notifyNewInstruction(newBorrow);
+
+    assert(extract == origBorrow->getSingleNonEndingUse()->getUser());
+    for (auto *origEnd : origBorrow->getEndBorrows()) {
+      auto *endBorrow = SILBuilderWithScope(origEnd).createEndBorrow(
+          origEnd->getLoc(), newBorrow);
+      pass.notifyNewInstruction(endBorrow);
+    }
+    loadedVal = newBorrow;
+  }
+  LLVM_DEBUG(llvm::dbgs() << "Replacing " << *extract << "    with "
+                          << *loadedVal << "\n");
+  extract->replaceAllUsesWith(loadedVal);
+}
+
 // Given a load with multiple struct_extracts/tuple_extracts and no other uses,
 // canonicalize the load into several (struct_element_addr (load)) pairs.
 //
@@ -118,21 +156,25 @@ splitAggregateLoad(LoadInst *loadInst, CanonicalizeInstruction &pass) {
   // deletes the instructions or simply records them for later deletion.
   auto nextII = std::next(loadInst->getIterator());
 
+  bool needsBorrow;
   switch (loadInst->getOwnershipQualifier()) {
   case LoadOwnershipQualifier::Unqualified:
   case LoadOwnershipQualifier::Trivial:
+    needsBorrow = false;
+    break;
+  case LoadOwnershipQualifier::Copy:
+    needsBorrow = true;
     break;
   case LoadOwnershipQualifier::Take:
-  case LoadOwnershipQualifier::Copy:
-    // Skip ahead if the ownership qualifier isn't handled.
-    //
-    // FIXME: To handle Copy/Take, the code below needs to properly peek through
-    // and destroy borrow scopes.
+    // TODO: To handle a "take", we would need to generate additional destroys
+    // for any fields that aren't already extracted. This would be out-of-place
+    // for this transform, and I'm not sure if this a case that needs to be
+    // handled in SILGenCleanup.
     return nextII;
   }
   struct ProjInstPair {
     Projection proj;
-    SingleValueInstruction *svi;
+    SingleValueInstruction *extract;
 
     // When sorting, just look at the projection and ignore the instruction.
     // Including the instruction address in the sort key would be
@@ -142,9 +184,26 @@ splitAggregateLoad(LoadInst *loadInst, CanonicalizeInstruction &pass) {
 
   // Add load projections to a projection list.
   llvm::SmallVector<ProjInstPair, 8> projections;
+  llvm::SmallVector<BeginBorrowInst *, 8> borrows;
+  llvm::SmallVector<DestroyValueInst *, 8> destroys;
   for (auto *use : getNonDebugUses(loadInst)) {
     auto *user = use->getUser();
+    if (needsBorrow) {
+      if (auto *borrow = dyn_cast<BeginBorrowInst>(user)) {
+        // The transformation below also assumes a single borrow use.
+        auto *borrowedOper = borrow->getSingleNonEndingUse();
+        if (!borrowedOper)
+          return nextII;
 
+        borrows.push_back(borrow);
+        user = borrowedOper->getUser();
+
+      } else if (auto *destroy = dyn_cast<DestroyValueInst>(user)) {
+        destroys.push_back(destroy);
+        continue;
+      } else
+        return nextII;
+    }
     // If we have any non SEI, TEI instruction, don't do anything here.
     if (!isa<StructExtractInst>(user) && !isa<TupleExtractInst>(user))
       return nextII;
@@ -158,47 +217,88 @@ splitAggregateLoad(LoadInst *loadInst, CanonicalizeInstruction &pass) {
   // same value decl or index.
   std::sort(projections.begin(), projections.end());
 
+  // If the original load is dead, then do not delete it before
+  // diagnostics. Doing so would suppress DefiniteInitialization in cases like:
+  //
+  // struct S {
+  //   let a: Int
+  //   init() {
+  //     _ = a // must be diagnosed as use before initialization
+  //     a = 0
+  //   }
+  // }
+  //
+  // However, if the load has any projections, it must be deleted, otherwise
+  // exclusivity checking is too strict:
+  //
+  // extension S {
+  //   mutating func foo() {
+  //     _ = a // Must be diagnosed as a read of self.a only not the whole self.
+  //   }
+  // }
+  //
+  // TODO: This logic subtly anticipates SILGen behavior. In the future, change
+  // SILGen to avoid emitting the full load and never delete loads in Raw SIL.
+  if (projections.empty() && loadInst->getModule().getStage() == SILStage::Raw)
+    return nextII;
+
   // Create a new address projection instruction and load instruction for each
   // unique projection.
   Projection *lastProj = nullptr;
   LoadInst *lastNewLoad = nullptr;
   for (auto &pair : projections) {
     auto &proj = pair.proj;
-    auto *svi = pair.svi;
+    auto *extract = pair.extract;
 
     // If this projection is the same as the last projection we processed, just
     // replace all uses of the projection with the load we created previously.
     if (lastProj && proj == *lastProj) {
-      LLVM_DEBUG(llvm::dbgs() << "Replacing " << *svi
-                 << "    with " << *lastNewLoad<< "\n");
-      svi->replaceAllUsesWith(lastNewLoad);
-      nextII = killInstruction(svi, nextII, pass);
+      replaceUsesOfExtract(extract, lastNewLoad, pass);
+      nextII = killInstruction(extract, nextII, pass);
       continue;
     }
 
     // This is a unique projection. Create the new address projection and load.
     lastProj = &proj;
     // Insert new instructions before the original load.
-    SILBuilderWithScope B(loadInst);
-    auto *projInst = proj.createAddressProjection(B, loadInst->getLoc(),
-                                                  loadInst->getOperand())
-                         .get();
+    SILBuilderWithScope LoadBuilder(loadInst);
+    auto *projInst =
+        proj.createAddressProjection(LoadBuilder, loadInst->getLoc(),
+                                     loadInst->getOperand())
+            .get();
     pass.notifyNewInstruction(projInst);
 
-    lastNewLoad = B.createLoad(loadInst->getLoc(), projInst,
-                               loadInst->getOwnershipQualifier());
+    // When loading a trivial subelement, convert ownership.
+    LoadOwnershipQualifier loadOwnership = loadInst->getOwnershipQualifier();
+    if (loadOwnership != LoadOwnershipQualifier::Unqualified
+        && projInst->getType().isTrivial(*projInst->getFunction())) {
+      loadOwnership = LoadOwnershipQualifier::Trivial;
+    }
+
+    lastNewLoad =
+        LoadBuilder.createLoad(loadInst->getLoc(), projInst, loadOwnership);
     pass.notifyNewInstruction(lastNewLoad);
 
-    LLVM_DEBUG(llvm::dbgs() << "Replacing " << *svi
-               << "    with " << *lastNewLoad << "\n");
-    svi->replaceAllUsesWith(lastNewLoad);
-    nextII = killInstruction(svi, nextII, pass);
+    if (loadOwnership == LoadOwnershipQualifier::Copy) {
+      // Destroy the loaded value wherever the aggregate load was destroyed.
+      assert(loadInst->getOwnershipQualifier() == LoadOwnershipQualifier::Copy);
+      for (DestroyValueInst *destroy : destroys) {
+        SILBuilderWithScope(destroy).createDestroyValue(destroy->getLoc(),
+                                                        lastNewLoad);
+        pass.notifyNewInstruction(destroy);
+      }
+    }
+    replaceUsesOfExtract(extract, lastNewLoad, pass);
+    nextII = killInstruction(extract, nextII, pass);
   }
-  // Avoid removing dead loads from raw SIL. That may weaken definite-init.
-  if (loadInst->getModule().getStage() == SILStage::Raw)
-    return nextII;
+  // Remove the now unused borrows.
+  for (auto *borrow : borrows)
+    nextII = killInstAndIncidentalUses(borrow, nextII, pass);
 
   // Erase the old load.
+  for (auto *destroy : destroys)
+    nextII = killInstruction(destroy, nextII, pass);
+
   return killInstAndIncidentalUses(loadInst, nextII, pass);
 }
 

@@ -3255,6 +3255,15 @@ class BeginBorrowInst
   BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue)
       : UnaryInstructionBase(DebugLoc, LValue,
                              LValue->getType().getObjectType()) {}
+
+public:
+  /// Return the single use of this BeginBorrowInst, not including any
+  /// EndBorrowInst uses, or return nullptr if the borrow is dead or has
+  /// multiple uses.
+  ///
+  /// Useful for matching common SILGen patterns that emit one borrow per use,
+  /// and simplifying pass logic.
+  Operand *getSingleNonEndingUse() const;
 };
 
 /// Represents a store of a borrowed value into an address. Returns the borrowed
