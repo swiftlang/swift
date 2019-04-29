@@ -245,6 +245,7 @@ private:
   struct LazyOpaqueInfo {
     bool IsLazy = false;
     bool IsDescriptorUsed = false;
+    bool IsDescriptorEmitted = false;
   };
   /// The set of opaque types enqueued for lazy emission.
   llvm::DenseMap<OpaqueTypeDecl*, LazyOpaqueInfo> LazyOpaqueTypes;
