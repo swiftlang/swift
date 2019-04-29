@@ -2777,7 +2777,6 @@ namespace {
     llvm::SmallDenseMap<Identifier, bool> supportedOps;
 
   public:
-    ReturnStmt *returnStmt = nullptr;
     SkipUnhandledConstructInFunctionBuilder::UnhandledNode unhandledNode;
 
   private:
@@ -2855,9 +2854,7 @@ namespace {
     }
 
     Expr *visitReturnStmt(ReturnStmt *returnStmt) {
-      if (!this->returnStmt)
-        this->returnStmt = returnStmt;
-      return nullptr;
+      llvm_unreachable("Should not try visit bodies with return statements");
     }
 
     Expr *visitDoStmt(DoStmt *doStmt) {
@@ -2941,6 +2938,45 @@ namespace {
   };
 }
 
+/// Determine whether the given statement contains a 'return' statement anywhere.
+static bool hasReturnStmt(Stmt *stmt) {
+  class ReturnStmtFinder : public ASTWalker {
+  public:
+    bool hasReturnStmt = false;
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      return { false, expr };
+    }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      // Did we find a 'return' statement?
+      if (isa<ReturnStmt>(stmt)) {
+        hasReturnStmt = true;
+      }
+
+      return { !hasReturnStmt, stmt };
+    }
+
+    Stmt *walkToStmtPost(Stmt *stmt) override {
+      return hasReturnStmt ? nullptr : stmt;
+    }
+
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *pattern) override {
+      return { false, pattern };
+    }
+
+    bool walkToDeclPre(Decl *D) override { return false; }
+
+    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+
+    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+  };
+
+  ReturnStmtFinder finder{};
+  stmt->walk(finder);
+  return finder.hasReturnStmt;
+}
+
 ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
     ClosureExpr *closure, Type builderType, ConstraintLocator *calleeLocator,
     ConstraintLocatorBuilder locator) {
@@ -2956,15 +2992,16 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
     if (closure->hasSingleExpressionBody())
       return getTypeMatchSuccess();
 
+    // The presence of an explicit return suppresses the function builder
+    // translation.
+    if (hasReturnStmt(closure->getBody())) {
+      return getTypeMatchSuccess();
+    }
+
     // Check whether we can apply this function builder.
     BuilderClosureVisitor visitor(*this, /*wantExpr=*/false, builderType);
     (void)visitor.visit(closure->getBody());
 
-    // The presence of an explicit return suppresses the function builder
-    // translation.
-    if (visitor.returnStmt) {
-      return getTypeMatchSuccess();
-    }
 
     // If we saw a control-flow statement or declaration that the builder
     // cannot handle, we don't have a well-formed function builder application.
