@@ -1460,12 +1460,10 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
 
       if (doesStorageProduceLValue(subscript, overload.getBaseType(), useDC))
         elementTy = LValueType::get(elementTy);
-      else {
+      else if (elementTy->hasDynamicSelfType()) {
         Type selfType = overload.getBaseType()->getRValueType()
-            ->getMetatypeInstanceType()
-            ->lookThroughAllOptionalTypes();
-        if (elementTy->hasDynamicSelfType())
-          elementTy = elementTy->replaceCovariantResultType(selfType, 0);
+            ->getMetatypeInstanceType()->lookThroughAllOptionalTypes();
+        elementTy = elementTy->replaceCovariantResultType(selfType, 0);
       }
 
       // See ConstraintSystem::resolveOverload() -- optional and dynamic

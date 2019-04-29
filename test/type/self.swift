@@ -119,12 +119,60 @@ class B: A<Int> {
 class C {
   required init() {
   }
+
   func f() {
     func g(_: Self) {}
   }
   func g() {
     _ = Self.init() as? Self
     // expected-warning@-1 {{conditional cast from 'Self' to 'Self' always succeeds}}
+  }
+  func h(j: () -> Self) -> () -> Self {
+    // expected-error@-1 {{'Self' cannot be the type of a function argument in a class}}
+    // expected-error@-2 {{'Self' cannot be the type of a nested return value}}
+    return { return self }
+    // expected-error@-1 {{cannot convert value of type 'C' to closure result type 'Self'}}
+  }
+
+  let p0: Self?
+  var p1: Self? // expected-error {{'Self' is not available as the type of a mutable property}}
+  // expected-error@-1 {{'Self' cannot be the type of a function argument in a class}}
+  // expected-error@-2 {{'Self' cannot be the type of a function argument in a class}}
+
+  var prop: Self { // expected-error {{'Self' is not available as the type of a mutable property}}
+    get {
+      return self
+    }
+    set (newValue) { // expected-error {{'Self' cannot be the type of a function argument in a class}}
+    }
+  }
+  subscript (i: Int) -> Self { // expected-error {{'Self' is not available as the type of a mutable subscript}}
+    get {
+      return self
+    }
+    set (newValue) { // expected-error {{'Self' cannot be the type of a function argument in a class}}
+    }
+  }
+}
+
+struct S1 {
+  typealias _SELF = Self
+  let j = 99.1
+  subscript (i: Int) -> Self {
+    get {
+      return self
+    }
+    set(newValue) {
+    }
+  }
+  var foo: Self {
+    get {
+      return self// as! Self
+    }
+    set (newValue) {
+    }
+  }
+  func x(y: () -> Self, z: Self) {
   }
 }
 
@@ -143,7 +191,7 @@ struct S2 {
     }
     func foo(a: [Self]) -> Self? {
       Self.x()
-      return Self.init() as? Self
+      return self as? Self
       // expected-warning@-1 {{conditional cast from 'S2.S3<T>' to 'S2.S3<T>' always succeeds}}
     }
   }

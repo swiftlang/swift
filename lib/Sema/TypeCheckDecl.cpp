@@ -2236,13 +2236,16 @@ public:
   /// Diagnose instances of (Dynamic)Self as the type of a function arugument.
   void diagnoseSelfTypedParameters(Type Ty, SourceLoc Loc, int level = 0) {
     if (auto func = dyn_cast<FunctionType>(Ty->getCanonicalType())) {
-      if (level > 0 && isDynamicSelf(func->getResult()))
-        TC.diagnose(Loc, diag::self_in_nested_return);
       for (auto &param : func->getParams()) {
         if (isDynamicSelf(param.getParameterType())) {
           TC.diagnose(Loc, diag::self_in_parameter);
           diagnoseSelfTypedParameters(param.getParameterType(), Loc, level + 1);
         }
+      }
+      if (Type returnTy = func->getResult()) {
+        if (level > 0 && isDynamicSelf(returnTy))
+          TC.diagnose(Loc, diag::self_in_nested_return);
+        diagnoseSelfTypedParameters(returnTy, Loc, level + 1);
       }
     }
   }
@@ -3194,13 +3197,16 @@ public:
 =
     if (isDeclaredInClass(FD)) {
       for (auto *Param : *FD->getParameters()) {
-        auto TyLoc = Param->getTypeLoc();
-        auto Loc = TyLoc.hasLocation() ? TyLoc.getLoc() : Param->getLoc();
+        TypeLoc TyLoc = Param->getTypeLoc();
+        SourceLoc Loc = TyLoc.hasLocation() ? TyLoc.getLoc() : Param->getLoc();
         if (isDynamicSelf(Param->getInterfaceType()))
           TC.diagnose(Loc, diag::self_in_parameter);
         else
           diagnoseSelfTypedParameters(Param->getInterfaceType(), Loc, 1);
       }
+      TypeLoc RTyLoc = FD->getBodyResultTypeLoc();
+      if (RTyLoc.getType())
+        diagnoseSelfTypedParameters(RTyLoc.getType(), RTyLoc.getLoc(), 1);
     }
   }
 
