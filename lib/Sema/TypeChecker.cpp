@@ -508,20 +508,14 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     checkBridgedFunctions(TC.Context);
 
     // Type check the top-level elements of the source file.
-    bool hasTopLevelCode = false;
     for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-        hasTopLevelCode = true;
         // Immediately perform global name-binding etc.
         TC.typeCheckTopLevelCodeDecl(TLCD);
+        TC.contextualizeTopLevelCode(TLC, TLCD);
       } else {
         TC.typeCheckDecl(D);
       }
-    }
-
-    if (hasTopLevelCode) {
-      TC.contextualizeTopLevelCode(TLC,
-                             llvm::makeArrayRef(SF.Decls).slice(StartElem));
     }
 
     // If we're in REPL mode, inject temporary result variables and other stuff

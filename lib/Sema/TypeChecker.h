@@ -1479,7 +1479,7 @@ public:
   /// \returns true if any closures were found
   static bool contextualizeInitializer(Initializer *DC, Expr *init);
   static void contextualizeTopLevelCode(TopLevelContext &TLC,
-                                        ArrayRef<Decl*> topLevelDecls);
+                                        TopLevelCodeDecl *TLCD);
 
   /// Return the type-of-reference of the given value.
   ///
