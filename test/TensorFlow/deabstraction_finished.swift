@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -O -emit-sil -Xllvm -tf-module-level-graph=false -verify %s | %FileCheck %s
+// REQUIRES: deprecated_gpe_mode
 import TensorFlow
 
 // FIXME: This should not build with -O.

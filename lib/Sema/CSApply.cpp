@@ -6126,19 +6126,6 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
   Type fromType = cs.getType(expr);
   auto fromFnType = fromType->getAs<AnyFunctionType>();
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // If function types have different representations and one of them is
-  // @convention(tensorflow), reject it.
-  auto toTypeRepr = toType->getRepresentation();
-  auto fromTypeRepr = fromFnType->getRepresentation();
-  if (toTypeRepr != fromTypeRepr &&
-      (toTypeRepr == AnyFunctionType::Representation::TensorFlow ||
-       fromTypeRepr == AnyFunctionType::Representation::TensorFlow)) {
-    tc.diagnose(expr->getLoc(),
-                diag::invalid_tensorflow_fn_conversion);
-    return;
-  }
-
   // Conversions to C function pointer type are limited. Since a C function
   // pointer captures no context, we can only do the necessary thunking or
   // codegen if the original function is a direct reference to a global function
@@ -6782,21 +6769,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
             ->castTo<FunctionType>();
         expr = cs.cacheType(new (tc.Context)
             AutoDiffFunctionExtractOriginalExpr(expr, fromFunc));
-      }
-      // If we have a ClosureExpr, then we can safely propagate tensorflow
-      // convention to the closure expression.
-      // NOTE: we also need to check if the closure captures any values.
-      // However, capture information is not available at this point. Therefore,
-      // the check currently happens in the SILGen phase.
-      if (toEI.getRepresentation() ==
-              AnyFunctionType::Representation::TensorFlow &&
-          fromEI.getRepresentation() !=
-              AnyFunctionType::Representation::TensorFlow) {
-        auto newFromFuncType = fromFunc->withExtInfo(fromEI.withRepresentation(
-            AnyFunctionType::Representation::TensorFlow));
-        if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
-          fromFunc = newFromFuncType->castTo<FunctionType>();
-        }
       }
       // If we have a ClosureExpr, then we can safely propagate the 'no escape'
       // bit to the closure without invalidating prior analysis.

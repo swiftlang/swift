@@ -4113,8 +4113,6 @@ getActualFunctionTypeRepresentation(uint8_t rep) {
   CASE(Block)
   CASE(Thin)
   CASE(CFunctionPointer)
-  // SWIFT_ENABLE_TENSORFLOW
-  CASE(TensorFlow)
 #undef CASE
   default:
     return None;

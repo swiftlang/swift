@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -O -emit-sil %s -verify -enable-objc-interop -disable-objc-attr-requires-foundation-module -Xllvm -tf-dynamic-compilation=false | %FileCheck %s
+// REQUIRES: deprecated_gpe_mode
 
 import TensorFlow
 

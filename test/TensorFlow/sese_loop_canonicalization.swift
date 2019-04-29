@@ -2,6 +2,7 @@
 // preserves the loop nesting.  Note that we use `@_optimize(none)` to preserve the
 // structure of control flow for tests.
 // RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify | %FileCheck %s
+// REQUIRES: deprecated_gpe_mode
 
 import TensorFlow
 

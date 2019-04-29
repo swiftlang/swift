@@ -1,8 +1,5 @@
 // RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
 
-// SR-9737: hanging tests in GPE GPU mode
-// UN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
-
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 //

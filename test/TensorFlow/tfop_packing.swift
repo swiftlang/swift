@@ -1,6 +1,5 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/Inputs/ExternalStructs.swift -enable-resilience -emit-module -emit-module-path %t/ExternalStructs.swiftmodule
-// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -O -emit-sil -enable-resilience -I %t -verify %s | %FileCheck %s
 
 import TensorFlow
 import ExternalStructs
