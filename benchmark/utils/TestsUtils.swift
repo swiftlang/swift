@@ -151,6 +151,21 @@ public struct BenchmarkInfo {
     return _tearDownFunction
   }
 
+  /// DON'T USE ON NEW BENCHMARKS!
+  /// Optional `legacyFactor` is a multiplication constant applied to runtime
+  /// statistics reported in the benchmark summary (it doesn’t affect the
+  /// individual sample times reported in `--verbose` mode).
+  ///
+  /// It enables the migration of benchmark suite to smaller workloads (< 1 ms),
+  /// which are more robust to measurement errors from system under load,
+  /// while maintaining the continuity of longterm benchmark tracking.
+  ///
+  /// Most legacy benchmarks had workloads artificially inflated in their main
+  /// `for` loops with a constant integer factor and the migration consisted of
+  /// dividing it so that the optimized runtime (-O) was less than 1000 μs and
+  /// storing the divisor in `legacyFactor`. This effectively only increases the
+  /// frequency of measurement, gathering more samples that are much less likely
+  /// to be interrupted by a context switch.
   public var legacyFactor: Int?
 
   public init(name: String, runFunction: @escaping (Int) -> (), tags: [BenchmarkCategory],
