@@ -119,7 +119,7 @@ struct TagAccepter<Tag> {
   }
 }
 
-func testAcceptColorTagged(i: Int, s: String, d: Double) {
+func testAcceptColorTagged(b: Bool, i: Int, s: String, d: Double) {
   // CHECK: Tagged<
   acceptColorTagged {
     i.tag(.red)
@@ -133,6 +133,15 @@ func testAcceptColorTagged(i: Int, s: String, d: Double) {
     s.tag(.green)
     d.tag(.blue)
   }
+
+  // CHECK: Tagged<
+  TagAccepter<Color>.acceptTagged { () -> Tagged<Color, Int> in 
+    if b {
+      return i.tag(Color.green)
+    } else {
+      return i.tag(Color.blue)
+    }
+  }
 }
 
-testAcceptColorTagged(i: 17, s: "Hello", d: 3.14159)
+testAcceptColorTagged(b: true, i: 17, s: "Hello", d: 3.14159)
