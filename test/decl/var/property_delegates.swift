@@ -426,7 +426,7 @@ struct UseMutatingnessDelegates {
   @DelegateWithMutatingGetter
   var y = 17
 
-  @DelegateWithNonMutatingSetter // expected-error{{property delegate can only be applied to a 'var'}}
+  @DelegateWithNonMutatingSetter
   let z = 3.14159 // expected-note 2{{change 'let' to 'var' to make it mutable}}
 
   @ClassDelegate
@@ -574,6 +574,24 @@ func testDefaultedMemberwiseInits() {
   _ = DefaultedMemberwiseInits(x: Wrapper(value: false))
   _ = DefaultedMemberwiseInits(z: WrapperWithInitialValue(initialValue: 42))
 }
+
+struct DefaultedPrivateMemberwiseLets {
+  @Wrapper(value: true)
+  private let x: Bool
+
+  @WrapperWithInitialValue
+  var y: Int = 17
+
+  @WrapperWithInitialValue(initialValue: 17)
+  private let z: Int
+}
+
+func testDefaultedPrivateMemberwiseLets() {
+  _ = DefaultedPrivateMemberwiseLets()
+  _ = DefaultedPrivateMemberwiseLets(y: 42)
+  _ = DefaultedPrivateMemberwiseLets(x: Wrapper(value: false)) // expected-error{{incorrect argument label in call (have 'x:', expected 'y:')}}
+}
+
 
 // ---------------------------------------------------------------------------
 // Default initializers

@@ -1475,7 +1475,7 @@ static VarDecl *synthesizePropertyDelegateStorageDelegateProperty(
   // Form the property.
   auto dc = var->getDeclContext();
   VarDecl *property = new (ctx) VarDecl(/*IsStatic=*/var->isStatic(),
-                                        VarDecl::Specifier::Var,
+                                        var->getSpecifier(),
                                         /*IsCaptureList=*/false,
                                         var->getLoc(),
                                         name, dc);
@@ -1555,7 +1555,7 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
 
   // Create the backing storage property and note it in the cache.
   VarDecl *backingVar = new (ctx) VarDecl(/*IsStatic=*/var->isStatic(),
-                                          VarDecl::Specifier::Var,
+                                          var->getSpecifier(),
                                           /*IsCaptureList=*/false,
                                           var->getLoc(),
                                           name, dc);

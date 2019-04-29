@@ -4347,9 +4347,6 @@ NOTE(previous_property_delegate_here,none,
 
 ERROR(property_delegate_local,none,
       "property delegates are not yet supported on local properties", ())
-ERROR(property_delegate_let, none,
-      "property delegate can only be applied to a 'var'",
-      ())
 
 ERROR(property_with_delegate_conflict_attribute,none,
       "property %0 with a delegate cannot also be "

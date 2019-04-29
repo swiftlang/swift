@@ -225,12 +225,6 @@ AttachedPropertyDelegateRequest::evaluate(Evaluator &evaluator,
       return nullptr;
     }
 
-    // A property delegate cannot be attached to a 'let'.
-    if (var->isLet()) {
-      ctx.Diags.diagnose(attr->getLocation(), diag::property_delegate_let);
-      return nullptr;
-    }
-
     // Check for conflicting attributes.
     if (var->getAttrs().hasAttribute<LazyAttr>() ||
         var->getAttrs().hasAttribute<NSCopyingAttr>() ||

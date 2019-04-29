@@ -219,7 +219,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
 
     // An initialized 'let' property has a single value specified by the
     // initializer - it doesn't come from an argument.
-    if (!field->isStatic() && field->isLet() && field->getParentInitializer()) {
+    if (!field->isStatic() && field->isLet() && field->isParentInitialized()) {
       // Cleanup after this initialization.
       FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
       v = SGF.emitRValue(field->getParentInitializer())
