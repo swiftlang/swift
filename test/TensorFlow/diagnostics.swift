@@ -13,7 +13,6 @@ func testInferredElementResult() -> TensorHandle<Int32> {
   _ = #tfop("bar") as TensorHandle<Int32>
 }
 
-// expected-note @+1 2 {{value used here}}
 class ClassTest {
   // expected-warning @+2 {{value implicitly copied to the host}}
   // expected-warning @+1 {{'Tensor<Float>' implicitly copied to the accelerator}}
@@ -57,7 +56,7 @@ public func f() {
 // should be a single copy-to-host compiler warning.
 public func SR8412_CopyToHost() {
   for _ in 0...10 {
-    let x = Tensor(1)  // expected-warning {{value implicitly copied to the host}}
+    let x = Tensor(1)
     _hostOp(x)
   }
 }

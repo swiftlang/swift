@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -Xllvm -tf-dump-graph %s
-// RUN: %target-swift-frontend -emit-sil -Xllvm -tf-dump-graph %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -Xllvm -tf-dump-graph -O %s
+// RUN: %target-swift-frontend -emit-sil -Xllvm -tf-dump-graph -O %s | %FileCheck %s
 
 // FIXME: Our graph lowering doesn't handle ops with explicit shape attrs.
 // XFAIL: *

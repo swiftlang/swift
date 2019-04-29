@@ -4270,8 +4270,7 @@ bool TFFunctionPartition::partition(bool isTest) {
   PC.cloneFunction(resultValues);
 
   // Clean up the source function, removing the tensor code.
-  if ((!isAcceleratorOnly(hostFn) || llvm::TFDynamicCompilation) &&
-      !PC.finalizeOriginal())
+  if (!PC.finalizeOriginal())
     return true;
 
   // Success!
@@ -4377,8 +4376,9 @@ namespace {
 class TFPartition : public SILModuleTransform {
   ModuleDecl *tfModule = nullptr;
 
-  bool isTest = false;
+  TFPassKind passKind;
   TensorFunctionClassifier tfc;
+
   /// For partitionable functions, map the SIL host function names to the
   /// lowered TF graph artifacts.
   ///
@@ -4396,9 +4396,13 @@ class TFPartition : public SILModuleTransform {
       std::pair<SILFunction *, std::unique_ptr<TFFunctionPartition>>;
 
 public:
-  TFPartition(bool isTest)
-      : isTest(isTest),
+  TFPartition(TFPassKind kind)
+      : passKind(kind),
         moduleGraphLowering(TFGraphLowering(*this, graphFunctions)) {}
+
+  bool isTestPass() const { return passKind == TFPassKind::Test; }
+  bool isMandatoryPass() const { return passKind == TFPassKind::Mandatory; }
+  bool isOptPass() const { return passKind == TFPassKind::Opt; }
 
   /// The entry point to the transformation.
   void run() override;
@@ -4482,6 +4486,14 @@ void TFPartition::run() {
   if (!tfModule)
     return;
 
+  auto shouldProcessFunction = [this](const SILFunction &fn) {
+    if (passKind == TFPassKind::Mandatory) {
+      return isAcceleratorOnly(fn);
+    }
+    // In dynamic compilation mode, we partition accelerator-only functions.
+    return !llvm::TFDynamicCompilation || isAcceleratorOnly(fn);
+  };
+
   SILFunction *mainFunc = nullptr;
   // We use a two-pass design below. The first pass partitions and lowers those
   // partitionable functions into graphs. When we process a function that
@@ -4506,10 +4518,13 @@ void TFPartition::run() {
   // Track the set of functions that reference some function-typed attributes
   // whose graph function definitions are not yet available.
   SmallVector<HostPartitionContext, 16> hostPartitionContexts;
-  for (auto *fn : fns)
+  for (auto *fn : fns) {
+    if (!shouldProcessFunction(*fn))
+      continue;
     if (processFunction(fn, hostPartitionContexts))
       continue; // error already emitted, but continue processing other
                 // functions.
+  }
 
   if (hostPartitionContexts.empty() || !TFModuleLevelGraph)
     return;
@@ -4587,7 +4602,7 @@ bool TFPartition::processFunction(
   // and quit.  This allows writing regression tests for the tf-partition
   // pass in isolation.  This is pretty unconventional for a SIL pass, but
   // this is an unconventional pass!
-  if (isTest) {
+  if (isTestPass()) {
     llvm::outs() << "--- TFPartition Host Result: " << hostFn->getName()
                  << "\n";
     hostFn->print(llvm::outs());
@@ -4610,10 +4625,8 @@ bool TFPartition::partitionFunction(
   LLVM_DEBUG(llvm::dbgs() << "Processing SIL function " << hostFn->getName()
                           << " in TFPartition::partitionFunction().\n");
 
+
   if (!tfc.shouldBePartitioned(hostFn, /*forceTFFunctions=*/true))
-    return false;
-  
-  if (llvm::TFDynamicCompilation && !isAcceleratorOnly(*hostFn))
     return false;
 
   LLVM_DEBUG(llvm::dbgs() << "  " << hostFn->getName()
@@ -4652,16 +4665,20 @@ bool TFPartition::partitionFunction(
   // function for the tensor program body.
   // If we've encountered an error, exit without breaking the SIL:
   // an error has already been emitted.
-  return partitioner->partitionAndLowerGraph(isTest);
+  return partitioner->partitionAndLowerGraph(isTestPass());
 }
 
-SILTransform *swift::createTFPartition() {
-  return new TFPartition(/*isTest*/ false);
+SILTransform *swift::createTFPartitionMandatory() {
+  return new TFPartition(TFPassKind::Mandatory);
+}
+
+SILTransform *swift::createTFPartitionOpt() {
+  return new TFPartition(TFPassKind::Opt);
 }
 
 /// Create a version of the tf-partition pass that is used by sil-opt for
 /// testcases.  TF-Partition is not a normal pass, so we need an unconventional
 /// approach here.
 SILTransform *swift::createTFPartitionTest() {
-  return new TFPartition(/*isTest*/ true);
+  return new TFPartition(TFPassKind::Test);
 }

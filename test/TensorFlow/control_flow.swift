@@ -78,7 +78,7 @@ public func weighPetOnlyDefault(pet: Pet) {
 
 // CHECK-LABEL: ---- ANALYSIS STATE FOR FUNCTION {{.*}}testCondBranch
 // CHECK:       bb0:
-// CHECK:       [Copy]    cond_br {{.*}}, bb1, bb2
+// CHECK:       [Copy]    cond_br {{.*}}, bb2, bb1
 // CHECK:       bb1:
 // CHECK:       [Copy]    br bb3
 // CHECK:       bb2:
