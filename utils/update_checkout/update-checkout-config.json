@@ -3,7 +3,7 @@
     "https-clone-pattern": "https://github.com/%s.git",
     "repos" : {
        "swift": {
-            "remote": { "id": "apple/swift" } },
+            "remote": { "id": "swiftwasm/swift" } },
        "cmark": {
             "remote": { "id": "apple/swift-cmark" } },
         "llbuild": {
@@ -29,8 +29,7 @@
         "ninja": {
             "remote": { "id": "ninja-build/ninja" } },
         "icu": {
-            "remote": { "id": "unicode-org/icu" },
-            "platforms": [ "Linux" ]
+            "remote": { "id": "unicode-org/icu" }
         },
         "cmake": {
             "remote": { "id": "KitWare/CMake" },
@@ -43,11 +42,34 @@
         "swift-format": {
             "remote": { "id": "apple/swift-format" } },
         "llvm-project": {
-            "remote": { "id": "apple/llvm-project" } }
+            "remote": { "id": "swiftwasm/llvm-project" } }
     },
     "default-branch-scheme": "master",
     "branch-schemes": {
-       "master": {
+        "wasm": {
+            "aliases": ["wasm"],
+            "repos": {
+                "llvm-project": "swiftwasm",
+                "swift": "swiftwasm",
+                "cmark": "master",
+                "llbuild": "master",
+                "swiftpm": "master",
+                "swift-syntax": "master",
+                "swift-stress-tester": "master",
+                "swift-corelibs-xctest": "master",
+                "swift-corelibs-foundation": "master",
+                "swift-corelibs-libdispatch": "master",
+                "swift-integration-tests": "master",
+                "swift-xcode-playground-support": "master",
+                "ninja": "release",
+                "icu": "release-61-1",
+                "cmake": "v3.15.1",               
+                "indexstore-db": "master",
+                "sourcekit-lsp": "master",
+                "swift-format": "master"
+            }
+        },
+        "master": {
             "aliases": ["master", "swift/master"],
             "repos": {
                 "llvm-project": "swift/master",
