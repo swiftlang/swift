@@ -42,6 +42,25 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   setRuntimeResourcePath(LibPath.str(), /*IsDefault=*/true);
 }
 
+/// If we haven't explicitly passed -prebuilt-module-cache-path, set it to
+/// the default value of <resource-dir>/<platform>/prebuilt-modules.
+/// @note This should be called once, after search path options and frontend
+///       options have been parsed.
+static void setDefaultPrebuiltCacheIfNecessary(
+  FrontendOptions &frontendOpts, const SearchPathOptions &searchPathOpts,
+  const llvm::Triple &triple) {
+
+  if (!frontendOpts.PrebuiltModuleCachePath.empty())
+    return;
+  if (searchPathOpts.RuntimeResourcePath.empty())
+    return;
+
+  SmallString<64> defaultPrebuiltPath{searchPathOpts.RuntimeResourcePath};
+  StringRef platform = getPlatformNameForTriple(triple);
+  llvm::sys::path::append(defaultPrebuiltPath, platform, "prebuilt-modules");
+  frontendOpts.PrebuiltModuleCachePath = defaultPrebuiltPath.str();
+}
+
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
                                       llvm::Triple &Triple) {
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeResourcePath);
@@ -1300,6 +1319,8 @@ bool CompilerInvocation::parseArgs(
   }
 
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
+  setDefaultPrebuiltCacheIfNecessary(FrontendOpts, SearchPathOpts,
+                                     LangOpts.Target);
 
   return false;
 }
