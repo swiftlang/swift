@@ -515,7 +515,7 @@ public func %=(lhs: inout CGFloat, rhs: CGFloat) {
 
 %from SwiftMathFunctions import *
 
-extension CGFloat: Real {
+extension CGFloat: ElementaryFunctions {
 % for func in ElementaryFunctions + RealFunctions:
 
   @_alwaysEmitIntoClient
@@ -553,12 +553,20 @@ extension CGFloat: Real {
     return CGFloat(NativeType.atan2(y: y.native, x: x.native))
   }
 
-#if !os(Windows)
   @_alwaysEmitIntoClient
   public static func logGamma(_ x: CGFloat) -> CGFloat {
     return CGFloat(NativeType.logGamma(x.native))
   }
-#endif
+
+  @_alwaysEmitIntoClient
+  public static func signGamma(_ x: CGFloat) -> FloatingPointSign {
+    if x >= 0 { return .plus }
+    let trunc = x.rounded(.towardZero)
+    if x == trunc { return .plus }
+    let halfTrunc = trunc/2
+    if halfTrunc == halfTrunc.rounded(.towardZero) { return .minus }
+    return .plus
+  }
 }
 
 //===----------------------------------------------------------------------===//
