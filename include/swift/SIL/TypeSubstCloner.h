@@ -109,11 +109,7 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
 
       assert(Subs.empty() ||
              SubstCalleeSILType ==
-                 Callee->getType().substGenericArgs(AI.getModule(), Subs) ||
-             (Cloner.ReplacingOpaqueArchetypes &&
-              SubstCalleeSILType ==
-                  Cloner.getOpType(Callee->getType().substGenericArgs(
-                      AI.getModule(), Subs))));
+                 Callee->getType().substGenericArgs(AI.getModule(), Subs));
     }
 
     ArrayRef<SILValue> getArguments() const {
@@ -159,14 +155,12 @@ public:
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
                   SubstitutionMap ApplySubs,
-                  bool Inlining = false,
-                  bool ReplacingOpaqueArchetypes = false)
+                  bool Inlining = false)
     : SILClonerWithScopes<ImplClass>(To, Inlining),
       SwiftMod(From.getModule().getSwiftModule()),
       SubsMap(ApplySubs),
       Original(From),
-      Inlining(Inlining),
-      ReplacingOpaqueArchetypes(ReplacingOpaqueArchetypes) {
+      Inlining(Inlining) {
   }
 
 protected:
@@ -387,8 +381,6 @@ protected:
   SILFunction &Original;
   /// True, if used for inlining.
   bool Inlining;
-  /// True if replacing opaque result archetypes.
-  bool ReplacingOpaqueArchetypes;
 };
 
 } // end namespace swift

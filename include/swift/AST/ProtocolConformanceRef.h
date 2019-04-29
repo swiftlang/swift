@@ -109,11 +109,6 @@ public:
                                LookupConformanceFn conformances,
                                SubstOptions options = None) const;
 
-  /// Replace opaque types in the conforming type with their underlying types,
-  /// and resolve opaque conformances to their underlying conformances.
-  ProtocolConformanceRef substOpaqueTypesWithUnderlyingTypes(
-      Type origType, ModuleDecl *modulePerformingSubstitution) const;
-
   /// Given a dependent type (expressed in terms of this conformance's
   /// protocol), follow it from the conforming type.
   Type getAssociatedType(Type origType, Type dependentType,

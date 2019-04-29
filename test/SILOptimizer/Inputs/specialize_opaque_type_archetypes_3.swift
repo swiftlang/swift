@@ -83,4 +83,10 @@ public struct ResilientContainer {
     preventInlining()
     return x
   }
+
+  @inlinable
+  public func inlineableContext() {
+    let x = computedProperty
+    print(x)
+  }
 }

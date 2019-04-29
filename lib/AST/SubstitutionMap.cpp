@@ -492,12 +492,6 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
   return SubstitutionMap(genericSig, newSubs, newConformances);
 }
 
-SubstitutionMap SubstitutionMap::substOpaqueTypesWithUnderlyingTypes(
-    ModuleDecl *modulePerformingSubstitution) const {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(modulePerformingSubstitution);
-  return subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
-}
-
 SubstitutionMap
 SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
                                           Type selfType,

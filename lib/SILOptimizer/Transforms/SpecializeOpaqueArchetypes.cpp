@@ -10,28 +10,188 @@
 
 using namespace swift;
 
+/// A function object that can be used as a \c TypeSubstitutionFn and
+/// \c LookupConformanceFn for \c Type::subst style APIs to map opaque
+/// archetypes with underlying types visible at a given resilience expansion
+/// to their underlying types.
+class ReplaceOpaqueTypesWithUnderlyingTypes {
+public:
+  SILFunction *context;
+  ReplaceOpaqueTypesWithUnderlyingTypes(
+      SILFunction *context)
+      : context(context) {}
+
+  /// TypeSubstitutionFn
+  Type operator()(SubstitutableType *maybeOpaqueType) const;
+
+  /// LookupConformanceFn
+  Optional<ProtocolConformanceRef> operator()(CanType maybeOpaqueType,
+                                              Type replacementType,
+                                              ProtocolDecl *protocol) const;
+
+  bool shouldPerformSubstitution(OpaqueTypeDecl *opaque) const;
+
+  static bool shouldPerformSubstitution(OpaqueTypeDecl *opaque,
+                                        SILFunction *context);
+};
+
+static Type substOpaqueTypesWithUnderlyingTypes(
+    Type ty, SILFunction *context) {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(context);
+  return ty.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
+}
+
+static SubstitutionMap
+substOpaqueTypesWithUnderlyingTypes(SubstitutionMap map, SILFunction *context) {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(context);
+  return map.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
+}
+
+static ProtocolConformanceRef
+substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
+                                    SILFunction *context) {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(context);
+  return ref.subst(origType, replacer, replacer,
+                   SubstFlags::SubstituteOpaqueArchetypes);
+}
+
+static Optional<std::pair<ArchetypeType *, OpaqueTypeArchetypeType*>>
+getArchetypeAndRootOpaqueArchetype(Type maybeOpaqueType) {
+  auto archetype = dyn_cast<ArchetypeType>(maybeOpaqueType.getPointer());
+  if (!archetype)
+    return None;
+  auto opaqueRoot = dyn_cast<OpaqueTypeArchetypeType>(archetype->getRoot());
+  if (!opaqueRoot)
+    return None;
+
+  return std::make_pair(archetype, opaqueRoot);
+}
+bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
+    OpaqueTypeDecl *opaque) const {
+  return shouldPerformSubstitution(opaque, context);
+}
+
+bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
+    OpaqueTypeDecl *opaque, SILFunction *context) {
+  auto namingDecl = opaque->getNamingDecl();
+
+  // Allow replacement of opaque result types of inlineable function regardless
+  // of resilience and in which context.
+  if (namingDecl->getAttrs().hasAttribute<InlinableAttr>()) {
+    return true;
+  }
+  // Allow replacement of opaque result types in the context of maximal
+  // resilient expansion if the context's and the opaque type's module are the
+  // same.
+  auto expansion = context->getResilienceExpansion();
+  auto module = namingDecl->getModuleContext();
+  if (expansion == ResilienceExpansion::Maximal &&
+      module == context->getModule().getSwiftModule())
+    return true;
+
+  // Allow general replacement from non resilient modules. Otherwise, disallow.
+  return !module->isResilient();
+}
+
+Type ReplaceOpaqueTypesWithUnderlyingTypes::
+operator()(SubstitutableType *maybeOpaqueType) const {
+  auto archetypeAndRoot = getArchetypeAndRootOpaqueArchetype(maybeOpaqueType);
+  if (!archetypeAndRoot)
+    return maybeOpaqueType;
+
+  auto archetype = archetypeAndRoot->first;
+  auto opaqueRoot = archetypeAndRoot->second;
+
+  if (!shouldPerformSubstitution(opaqueRoot->getDecl())) {
+    return maybeOpaqueType;
+  }
+
+  auto subs = opaqueRoot->getDecl()->getUnderlyingTypeSubstitutions();
+  // TODO: Check the resilience expansion, and handle opaque types with
+  // unknown underlying types. For now, all opaque types are always
+  // fragile.
+  assert(subs.hasValue() && "resilient opaque types not yet supported");
+
+  // Apply the underlying type substitutions to the interface type of the
+  // archetype in question. This will map the inner generic signature of the
+  // opaque type to its outer signature.
+  auto partialSubstTy = archetype->getInterfaceType().subst(*subs);
+  // Then apply the substitutions from the root opaque archetype, to specialize
+  // for its type arguments.
+  auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
+
+  // If the type still contains opaque types, recur.
+  if (substTy->hasOpaqueArchetype()) {
+    return substOpaqueTypesWithUnderlyingTypes(substTy,
+                                               context);
+  }
+  return substTy;
+}
+
+Optional<ProtocolConformanceRef> ReplaceOpaqueTypesWithUnderlyingTypes::
+operator()(CanType maybeOpaqueType, Type replacementType,
+           ProtocolDecl *protocol) const {
+  auto abstractRef = ProtocolConformanceRef(protocol);
+
+  auto archetypeAndRoot = getArchetypeAndRootOpaqueArchetype(maybeOpaqueType);
+  if (!archetypeAndRoot) {
+    assert(maybeOpaqueType->isTypeParameter() ||
+           maybeOpaqueType->is<ArchetypeType>());
+    return abstractRef;
+  }
+
+  auto archetype = archetypeAndRoot->first;
+  auto opaqueRoot = archetypeAndRoot->second;
+
+  if (!shouldPerformSubstitution(opaqueRoot->getDecl())) {
+    return abstractRef;
+  }
+
+  auto subs = opaqueRoot->getDecl()->getUnderlyingTypeSubstitutions();
+  assert(subs.hasValue());
+
+  // Apply the underlying type substitutions to the interface type of the
+  // archetype in question. This will map the inner generic signature of the
+  // opaque type to its outer signature.
+  auto partialSubstTy = archetype->getInterfaceType().subst(*subs);
+  auto partialSubstRef =
+      abstractRef.subst(archetype->getInterfaceType(), *subs);
+
+  // Then apply the substitutions from the root opaque archetype, to specialize
+  // for its type arguments.
+  auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
+  auto substRef =
+      partialSubstRef.subst(partialSubstTy, opaqueRoot->getSubstitutions());
+
+  // If the type still contains opaque types, recur.
+  if (substTy->hasOpaqueArchetype()) {
+    return substOpaqueTypesWithUnderlyingTypes(substRef, substTy, context);
+  }
+  return substRef;
+}
+
 namespace {
 class OpaqueSpecializerCloner
-    : public TypeSubstCloner<OpaqueSpecializerCloner,
-                      SILOptFunctionBuilder /*unused*/> {
+    : public SILCloner<OpaqueSpecializerCloner> {
 
-  using SuperTy =
-      TypeSubstCloner<OpaqueSpecializerCloner, SILOptFunctionBuilder>;
+  using SuperTy = SILCloner<OpaqueSpecializerCloner>;
 
   SILBasicBlock *entryBlock;
   SILBasicBlock *cloneFromBlock;
-  ModuleDecl *currentModule;
+
+  /// Cache for substituted types.
+  llvm::DenseMap<SILType, SILType> TypeCache;
+
+  SILFunction &Original;
 
 public:
   friend class SILCloner<OpaqueSpecializerCloner>;
+  friend class SILCloner<OpaqueSpecializerCloner>;
   friend class SILInstructionVisitor<OpaqueSpecializerCloner>;
 
-  OpaqueSpecializerCloner(SubstitutionMap opaqueArchetypeSubs, SILFunction &fun)
-      : SuperTy(fun, fun, opaqueArchetypeSubs, false /*Inlining*/,
-                true /*ReplacingOpaqueArchetypes*/) {
+  OpaqueSpecializerCloner(SILFunction &fun) : SuperTy(fun), Original(fun) {
     entryBlock = fun.getEntryBlock();
     cloneFromBlock = entryBlock->split(entryBlock->begin());
-    currentModule = fun.getModule().getSwiftModule();
   }
 
   void clone();
@@ -41,7 +201,7 @@ protected:
                                           SILInstruction *cloned);
 
   void postProcess(SILInstruction *orig, SILInstruction *cloned) {
-    SILClonerWithScopes<OpaqueSpecializerCloner>::postProcess(orig, cloned);
+    SILCloner<OpaqueSpecializerCloner>::postProcess(orig, cloned);
     insertOpaqueToConcreteAddressCasts(orig, cloned);
   }
 
@@ -217,39 +377,29 @@ protected:
       return Sty;
 
    // Apply the opaque types substitution.
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer(currentModule);
-    Sty = Ty.subst(Original.getModule(), SubsMap)
-              .subst(Original.getModule(), replacer, replacer,
-                     CanGenericSignature(), true);
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(&Original);
+    Sty = Ty.subst(Original.getModule(), replacer, replacer,
+                   CanGenericSignature(), true);
     return Sty;
   }
 
   CanType remapASTType(CanType ty) {
     // Apply the opaque types substitution.
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer(currentModule);
-    return SuperTy::remapASTType(ty)
-        .subst(replacer, replacer,
-               SubstFlags::SubstituteOpaqueArchetypes |
-                   SubstFlags::AllowLoweredTypes)
+    return substOpaqueTypesWithUnderlyingTypes(ty, &Original)
         ->getCanonicalType();
   }
 
   ProtocolConformanceRef remapConformance(Type type,
                                           ProtocolConformanceRef conf) {
     // Apply the opaque types substitution.
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer(currentModule);
-    return SuperTy::remapConformance(type, conf)
-        .subst(type, replacer, replacer,
-               SubstFlags::SubstituteOpaqueArchetypes |
-                   SubstFlags::AllowLoweredTypes);
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(&Original);
+    return conf.subst(type, replacer, replacer,
+                      SubstFlags::SubstituteOpaqueArchetypes);
   }
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
     // Apply the opaque types substitution.
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer(currentModule);
-    return SuperTy::remapSubstitutionMap(Subs).subst(
-        replacer, replacer,
-        SubstFlags::SubstituteOpaqueArchetypes | SubstFlags::AllowLoweredTypes);
+    return substOpaqueTypesWithUnderlyingTypes(Subs, &Original);
   }
 };
 } // namespace
@@ -299,42 +449,51 @@ void OpaqueSpecializerCloner::insertOpaqueToConcreteAddressCasts(
 namespace {
 class OpaqueArchetypeSpecializer : public SILFunctionTransform {
   void run() override {
-    auto *currentModule = getFunction()->getModule().getSwiftModule();
+    auto *context = getFunction();
 
     auto opaqueArchetypeWouldChange = [=](CanType ty) -> bool {
       if (!ty->hasOpaqueArchetype())
         return false;
-      ReplaceOpaqueTypesWithUnderlyingTypes replacer(currentModule);
-      return ty.subst(replacer, replacer,
-                      SubstFlags::SubstituteOpaqueArchetypes |
-                          SubstFlags::AllowLoweredTypes)
-                 ->getCanonicalType() != ty;
+
+      return ty.findIf([=](Type type) -> bool {
+        if (auto opaqueTy = type->getAs<OpaqueTypeArchetypeType>()) {
+          auto opaque = opaqueTy->getDecl();
+          return ReplaceOpaqueTypesWithUnderlyingTypes::
+              shouldPerformSubstitution(opaque, context);
+        }
+        return false;
+      });
     };
 
     // Look for opaque type archetypes.
     bool foundOpaqueArchetype = false;
     for (auto &BB : *getFunction()) {
       for (auto &inst : BB) {
-        for (auto &opd : inst.getAllOperands()) {
-          if (!opaqueArchetypeWouldChange(opd.get()->getType().getASTType()))
-            continue;
-          foundOpaqueArchetype = true;
+        auto hasOpaqueOperand = [&] (SILInstruction &inst) -> bool {
+          // Check the operands for opaque types.
+          for (auto &opd : inst.getAllOperands())
+            if (opaqueArchetypeWouldChange(opd.get()->getType().getASTType()))
+              return true;
+          return false;
+        };
+        if ((foundOpaqueArchetype = hasOpaqueOperand(inst)))
           break;
-        }
-        if (foundOpaqueArchetype)
+        auto hasOpaqueResult = [&](SILInstruction &inst) -> bool {
+          // Check the results for opaque types.
+          for (const auto &res : inst.getResults())
+            if (opaqueArchetypeWouldChange(res->getType().getASTType()))
+              return true;
+          return false;
+        };
+        if ((foundOpaqueArchetype = hasOpaqueResult(inst)))
           break;
-        auto *allocStack = dyn_cast<AllocStackInst>(&inst);
-        if (!allocStack || !opaqueArchetypeWouldChange(
-                               allocStack->getElementType().getASTType()))
-          continue;
-        foundOpaqueArchetype = true;
-        break;
       }
+      if (foundOpaqueArchetype)
+        break;
     }
 
     if (foundOpaqueArchetype) {
-      SubstitutionMap subsMap = getFunction()->getForwardingSubstitutionMap();
-      OpaqueSpecializerCloner s(subsMap, *getFunction());
+      OpaqueSpecializerCloner s(*getFunction());
       s.clone();
       removeUnreachableBlocks(*getFunction());
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
