@@ -5230,7 +5230,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   if (isa<StructDecl>(decl)) {
     for (auto member : decl->getMembers()) {
       if (auto var = dyn_cast<VarDecl>(member)) {
-        if (!isMemberwiseInitialized(var))
+        if (!var->isMemberwiseInitialized())
           continue;
 
         validateDecl(var);
@@ -5303,7 +5303,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
         if (backingStorageVars.count(var) > 0)
           continue;
 
-        if (isMemberwiseInitialized(var)) {
+        if (var->isMemberwiseInitialized()) {
           // Initialized 'let' properties have storage, but don't get an argument
           // to the memberwise initializer since they already have an initial
           // value that cannot be overridden.

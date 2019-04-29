@@ -364,7 +364,7 @@ private:
       if (auto Original = Prop->getOriginalDelegatedProperty())
         Prop = Original;
 
-      if (!isMemberwiseInitialized(Prop))
+      if (!Prop->isMemberwiseInitialized())
         continue;
 
       if (CurLabel == LabelLocs.size())

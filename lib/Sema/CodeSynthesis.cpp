@@ -2050,26 +2050,6 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   arg->setDefaultArgumentKind(DefaultArgumentKind::StoredProperty);
 }
 
-bool swift::isMemberwiseInitialized(VarDecl *var) {
-  // Implicit, computed, and static properties are not initialized.
-  // The exception is lazy properties, which due to batch mode we may or
-  // may not have yet finalized, so they may currently be "stored" or
-  // "computed" in the current AST state.
-  if (var->isImplicit() || var->isStatic())
-    return false;
-
-  if (!var->hasStorage() && !var->getAttrs().hasAttribute<LazyAttr>() &&
-      !var->getAttachedPropertyDelegate())
-    return false;
-
-  // Initialized 'let' properties have storage, but don't get an argument
-  // to the memberwise initializer since they already have an initial
-  // value that cannot be overridden.
-  if (var->isLet() && var->isParentInitialized())
-    return false;
-
-  return true;
-}
 /// Create an implicit struct or class constructor.
 ///
 /// \param decl The struct or class for which a constructor will be created.
@@ -2097,7 +2077,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       if (!var)
         continue;
 
-      if (!isMemberwiseInitialized(var))
+      if (!var->isMemberwiseInitialized())
         continue;
 
       accessLevel = std::min(accessLevel, var->getFormalAccess());
