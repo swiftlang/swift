@@ -2707,6 +2707,12 @@ void ConstraintSystem::generateConstraints(
   }
 }
 
+bool constraints::isKnownKeyPathType(Type type) {
+  if (auto *BGT = type->getAs<BoundGenericType>())
+    return isKnownKeyPathDecl(type->getASTContext(), BGT->getDecl());
+  return false;
+}
+
 bool constraints::isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl) {
   return decl == ctx.getKeyPathDecl() || decl == ctx.getWritableKeyPathDecl() ||
          decl == ctx.getReferenceWritableKeyPathDecl() ||
