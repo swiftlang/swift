@@ -1132,7 +1132,9 @@ ConstraintSystem::solveImpl(Expr *&expr,
       constraintKind = ConstraintKind::Bind;
 
     auto *convertTypeLocator = getConstraintLocator(
-        getConstraintLocator(expr), ConstraintLocator::ContextualType);
+        expr, getContextualTypePurpose() == CTP_ReturnSingleExpr
+                  ? ConstraintLocator::SingleExprFuncResultType
+                  : ConstraintLocator::ContextualType);
 
     if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
       convertType = convertType.transform([&](Type type) -> Type {

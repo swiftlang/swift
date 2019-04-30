@@ -135,6 +135,8 @@ public:
     KeyPathRoot,
     /// The value of a key path
     KeyPathValue,
+    /// The expected type of the function with a single expression body.
+    SingleExprFuncResultType,
   };
 
   /// Determine the number of numeric values used for the given path
@@ -168,6 +170,7 @@ public:
     case KeyPathType:
     case KeyPathRoot:
     case KeyPathValue:
+    case SingleExprFuncResultType:
       return 0;
 
     case OpenedGeneric:
@@ -237,6 +240,7 @@ public:
     case KeyPathType:
     case KeyPathRoot:
     case KeyPathValue:
+    case SingleExprFuncResultType:
       return 0;
 
     case FunctionArgument:
