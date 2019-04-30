@@ -54,7 +54,7 @@ static void swift_image_constructor() {
 // WebAssembly hack: ok this should really go in its own file
 #define SWIFT_SECTION_RANGE(name)                                              \
   { reinterpret_cast<uintptr_t>(&__start_##name) + sizeof(void*),                              \
-    static_cast<uintptr_t>(&__stop_##name - &__start_##name) }
+    static_cast<uintptr_t>(&__stop_##name - &__start_##name - sizeof(void*)) }
 #endif
 
   sections = {
