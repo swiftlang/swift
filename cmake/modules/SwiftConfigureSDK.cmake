@@ -304,7 +304,7 @@ macro(configure_sdk_unix name architectures)
 
       if("${prefix}" STREQUAL "LINUX")
         if(arch MATCHES "(armv6|armv7)")
-          set(SWIFT_SDK_LINUX_ARCH_${arch}i_TRIPLE "${arch}-unknown-linux-gnueabihf")
+          set(SWIFT_SDK_LINUX_ARCH_${arch}_TRIPLE "${arch}-unknown-linux-gnueabihf")
         elseif(arch MATCHES "(aarch64|i686|powerpc64|powerpc64le|s390x|x86_64)")
           set(SWIFT_SDK_LINUX_ARCH_${arch}_TRIPLE "${arch}-unknown-linux-gnu")
         else()
