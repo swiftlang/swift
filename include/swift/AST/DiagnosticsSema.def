@@ -47,6 +47,8 @@ NOTE(implicit_member_declared_here,none,
      "%1 '%0' is implicitly declared", (StringRef, StringRef))
 NOTE(extended_type_declared_here,none,
      "extended type declared here", ())
+NOTE(opaque_return_type_declared_here,none,
+     "opaque return type declared here", ())
 
 //------------------------------------------------------------------------------
 // MARK: Constraint solver diagnostics
@@ -1582,6 +1584,9 @@ ERROR(type_does_not_conform_in_decl_ref,none,
       (DescriptiveDeclKind, DeclName, Type, Type, Type))
 ERROR(type_does_not_conform_decl_owner,none,
       "%0 %1 requires that %2 conform to %3",
+      (DescriptiveDeclKind, DeclName, Type, Type))
+ERROR(type_does_not_conform_in_opaque_return,none,
+      "return type of %0 %1 requires that %2 conform to %3",
       (DescriptiveDeclKind, DeclName, Type, Type))
 ERROR(types_not_equal_decl,none,
       "%0 %1 requires the types %2 and %3 be equivalent",
