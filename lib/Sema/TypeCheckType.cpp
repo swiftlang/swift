@@ -2459,6 +2459,8 @@ Type TypeResolver::resolveOpaqueReturnType(TypeRepr *repr,
   auto definingDeclNode = demangle.demangleSymbol(mangledName);
   if (!definingDeclNode)
     return Type();
+  if (definingDeclNode->getKind() == Node::Kind::Global)
+    definingDeclNode = definingDeclNode->getChild(0);
   ASTBuilder builder(Context);
   builder.Resolver = resolution.Resolver;
   auto opaqueNode =
