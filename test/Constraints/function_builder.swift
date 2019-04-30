@@ -1,6 +1,11 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
+enum Either<T,U> {
+  case first(T)
+  case second(U)
+}
+
 @_functionBuilder
 struct TupleBuilder {
   static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
@@ -25,6 +30,13 @@ struct TupleBuilder {
 
   static func buildDo<T>(_ value: T) -> T { return value }
   static func buildIf<T>(_ value: T?) -> T? { return value }
+
+  static func buildEither<T,U>(first value: T) -> Either<T,U> {
+    return .first(value)
+  }
+  static func buildEither<T,U>(second value: U) -> Either<T,U> {
+    return .second(value)
+  }
 }
 
 func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
@@ -53,6 +65,87 @@ tuplify(false) {
   if $0 {
     2.71828
     ["if", "stmt"]
+  }
+}
+
+// CHECK: ("chain0", main.Either<(Swift.String, Swift.Double), (Swift.Double, Swift.String)>.second(2.8, "capable"))
+tuplify(false) {
+  "chain0"
+  if $0 {
+    "marginal"
+    2.9
+  } else {
+    2.8
+    "capable"
+  }
+}
+
+// CHECK: ("chain1", nil)
+tuplify(false) {
+  "chain1"
+  if $0 {
+    "marginal"
+    2.9
+  } else if $0 {
+    2.8
+    "capable"
+  }
+}
+
+// CHECK: ("chain2", Optional(main.Either<(Swift.String, Swift.Double), (Swift.Double, Swift.String)>.first("marginal", 2.9)))
+tuplify(true) {
+  "chain2"
+  if $0 {
+    "marginal"
+    2.9
+  } else if $0 {
+    2.8
+    "capable"
+  }
+}
+
+// CHECK: ("chain3", main.Either<main.Either<(Swift.String, Swift.Double), (Swift.Double, Swift.String)>, main.Either<(Swift.Double, Swift.Double), (Swift.String, Swift.String)>>.first(main.Either<(Swift.String, Swift.Double), (Swift.Double, Swift.String)>.first("marginal", 2.9)))
+tuplify(true) {
+  "chain3"
+  if $0 {
+    "marginal"
+    2.9
+  } else if $0 {
+    2.8
+    "capable"
+  } else if $0 {
+    2.8
+    1.0
+  } else {
+    "wild"
+    "broken"
+  }
+}
+
+// CHECK: ("chain4", main.Either<main.Either<main.Either<(Swift.String, Swift.Int), (Swift.String, Swift.Int)>, main.Either<(Swift.String, Swift.Int), (Swift.String, Swift.Int)>>, main.Either<main.Either<(Swift.String, Swift.Int), (Swift.String, Swift.Int)>, (Swift.String, Swift.Int)>>.first
+tuplify(true) {
+  "chain4"
+  if $0 {
+    "0"
+    0
+  } else if $0 {
+    "1"
+    1
+  } else if $0 {
+    "2"
+    2
+  } else if $0 {
+    "3"
+    3
+  } else if $0 {
+    "4"
+    4
+  } else if $0 {
+    "5"
+    5
+  } else {
+    "6"
+    6
   }
 }
 
