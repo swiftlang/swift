@@ -319,36 +319,40 @@ func diagnose_requirement_failures() {
   struct S {
     var foo: some P { return S() } // expected-note {{declared here}}
     // expected-error@-1 {{return type of property 'foo' requires that 'S' conform to 'P'}}
-    // expected-error@-2 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
 
     subscript(_: Int) -> some P { // expected-note {{declared here}}
-      // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
       return S()
       // expected-error@-1 {{return type of subscript 'subscript(_:)' requires that 'S' conform to 'P'}}
     }
 
     func bar() -> some P { // expected-note {{declared here}}
-      // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
       return S()
       // expected-error@-1 {{return type of instance method 'bar()' requires that 'S' conform to 'P'}}
     }
 
     static func baz(x: String) -> some P { // expected-note {{declared here}}
-      // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
       return S()
       // expected-error@-1 {{return type of static method 'baz(x:)' requires that 'S' conform to 'P'}}
     }
   }
 
   func fn() -> some P { // expected-note {{declared here}}
-    // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
     return S()
     // expected-error@-1 {{return type of local function 'fn()' requires that 'S' conform to 'P'}}
   }
 }
 
 func global_function_with_requirement_failure() -> some P { // expected-note {{declared here}}
-  // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
   return 42 as Double
   // expected-error@-1 {{return type of global function 'global_function_with_requirement_failure()' requires that 'Double' conform to 'P'}}
+}
+
+func recursive_func_is_invalid_opaque() {
+  func rec(x: Int) -> some P {
+    // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
+    if x == 0 {
+      return rec(x: 0)
+    }
+    return rec(x: x - 1)
+  }
 }
