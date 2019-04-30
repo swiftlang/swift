@@ -470,7 +470,8 @@ EXPR_NODES = [
              Child('LeftParen', kind='LeftParenToken',
                    classification='StringInterpolationAnchor',
                    force_classification=True),
-             Child('Expression', kind='Expr'),
+             Child('Expressions', kind='FunctionCallArgumentList',
+                   collection_element_name='Expression'),
              Child('RightParen', kind='StringInterpolationAnchorToken'),
          ]),
 
