@@ -3805,13 +3805,12 @@ PotentialArchetype *GenericSignatureBuilder::realizePotentialArchetype(
   return pa;
 }
 
-static Type getStructuralType(TypeDecl *typeDecl, LazyResolver *resolver) {
+static Type getStructuralType(TypeDecl *typeDecl) {
   if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
-    // Resolve the underlying type, if we haven't done so yet.
-    if (!typealias->hasInterfaceType())
-      resolver->resolveDeclSignature(typealias);
+    if (auto resolved = typealias->getUnderlyingTypeLoc().getType())
+      return resolved;
 
-    return typealias->getUnderlyingTypeLoc().getType();
+    return typealias->getStructuralType();
   }
 
   return typeDecl->getDeclaredInterfaceType();
@@ -3826,7 +3825,7 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
 
   // Form an unsubstituted type referring to the given type declaration,
   // for use in an inferred same-type requirement.
-  auto type = getStructuralType(concreteDecl, builder.getLazyResolver());
+  auto type = getStructuralType(concreteDecl);
   if (!type)
     return Type();
 
@@ -4164,8 +4163,14 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       if (inheritedProto == proto) return TypeWalker::Action::Continue;
 
       for (auto req : inheritedProto->getMembers()) {
-        if (auto typeReq = dyn_cast<TypeDecl>(req))
+        if (auto typeReq = dyn_cast<TypeDecl>(req)) {
+          // Ignore generic types
+          if (auto genReq = dyn_cast<GenericTypeDecl>(req))
+            if (genReq->getGenericParams())
+              continue;
+
           inheritedTypeDecls[typeReq->getFullName()].push_back(typeReq);
+        }
       }
       return TypeWalker::Action::Continue;
     });
@@ -4228,10 +4233,10 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
   // An inferred same-type requirement between the two type declarations
   // within this protocol or a protocol it inherits.
   auto addInferredSameTypeReq = [&](TypeDecl *first, TypeDecl *second) {
-    Type firstType = getStructuralType(first, getLazyResolver());
+    Type firstType = getStructuralType(first);
     if (!firstType) return;
 
-    Type secondType = getStructuralType(second, getLazyResolver());
+    Type secondType = getStructuralType(second);
     if (!secondType) return;
 
     auto inferredSameTypeSource =

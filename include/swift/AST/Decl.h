@@ -2896,6 +2896,8 @@ public:
   /// For generic typealiases, return the unbound generic type.
   UnboundGenericType *getUnboundGenericType() const;
 
+  Type getStructuralType() const;
+
   bool isCompatibilityAlias() const {
     return Bits.TypeAliasDecl.IsCompatibilityAlias;
   }

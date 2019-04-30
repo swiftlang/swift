@@ -3451,6 +3451,15 @@ UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
       parentTy, getASTContext());
 }
 
+Type TypeAliasDecl::getStructuralType() const {
+  assert(!getGenericParams());
+  
+  auto &context = getASTContext();
+  return evaluateOrDefault(context.evaluator,
+                           StructuralTypeRequest { const_cast<TypeAliasDecl *>(this) },
+                           Type());
+}
+
 Type AbstractTypeParamDecl::getSuperclass() const {
   auto *genericEnv = getDeclContext()->getGenericEnvironmentOfContext();
   assert(genericEnv != nullptr && "Too much circularity");

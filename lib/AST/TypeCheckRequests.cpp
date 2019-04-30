@@ -652,3 +652,15 @@ void swift::simple_display(llvm::raw_ostream &out, const Type &type) {
   else
     out << "null";
 }
+
+//----------------------------------------------------------------------------//
+// StructuralTypeRequest.
+//----------------------------------------------------------------------------//
+
+void StructuralTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  diags.diagnose(SourceLoc(), diag::circular_reference);
+}
+
+void StructuralTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  diags.diagnose(SourceLoc(), diag::circular_reference_through);
+}
