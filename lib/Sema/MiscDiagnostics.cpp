@@ -2257,6 +2257,9 @@ class OpaqueUnderlyingTypeChecker : public ASTWalker {
   AbstractFunctionDecl *Implementation;
   OpaqueTypeDecl *OpaqueDecl;
   SmallVector<std::pair<Expr*, Type>, 4> Candidates;
+
+  bool HasInvalidReturn = false;
+
 public:
   OpaqueUnderlyingTypeChecker(TypeChecker &TC,
                               AbstractFunctionDecl *Implementation,
@@ -2270,7 +2273,13 @@ public:
   
   void check() {
     Implementation->getBody()->walk(*this);
-    
+
+    // If given function has any invalid returns in the body
+    // let's not try to validate the types, since it wouldn't
+    // be accurate.
+    if (HasInvalidReturn)
+      return;
+
     // If there are no candidates, then the body has no return statements, and
     // we have nothing to infer the underlying type from.
     if (Candidates.empty()) {
@@ -2348,6 +2357,20 @@ public:
                                   underlyingToOpaque->getSubExpr()->getType()));
     }
     return std::make_pair(false, E);
+  }
+
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    if (auto *RS = dyn_cast<ReturnStmt>(S)) {
+      if (RS->hasResult()) {
+        auto resultTy = RS->getResult()->getType();
+        // If expression associated with return statement doesn't have
+        // a type or type has an error, checking opaque types is going
+        // to produce incorrect diagnostics.
+        HasInvalidReturn |= resultTy.isNull() || resultTy->hasError();
+      }
+    }
+
+    return {true, S};
   }
 };
 
