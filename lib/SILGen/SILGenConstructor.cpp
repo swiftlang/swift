@@ -217,14 +217,8 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
     auto fieldTy = selfTy.getFieldType(field, SGF.SGM.M);
     SILValue v;
 
-    // An initialized 'let' property has a single value specified by the
-    // initializer - it doesn't come from an argument.
-    if (!field->isStatic() && field->isLet() && field->getParentInitializer()) {
-      // Cleanup after this initialization.
-      FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
-      v = SGF.emitRValue(field->getParentInitializer())
-             .forwardAsSingleStorageValue(SGF, fieldTy, Loc);
-    } else {
+    // If it's memberwise initialized, do so now.
+    if (field->isMemberwiseInitialized(/*preferDeclaredProperties=*/false)) {
       FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
@@ -237,6 +231,14 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
         v = std::move(*elti).forwardAsSingleStorageValue(SGF, fieldTy, Loc);
       }
       ++elti;
+    } else {
+      // Otherwise, use its initializer.
+      assert(field->isParentInitialized());
+
+      // Cleanup after this initialization.
+      FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
+      v = SGF.emitRValue(field->getParentInitializer())
+             .forwardAsSingleStorageValue(SGF, fieldTy, Loc);
     }
 
     eltValues.push_back(v);
