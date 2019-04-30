@@ -11,10 +11,10 @@ import Accelerate
 var Accelerate_vImageTests = TestSuite("Accelerate_vImage")
 
 if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
-    let width = UInt(48)
-    let height = UInt(12)
-    let widthi = 48
-    let heighti = 12
+    let width = UInt(64)
+    let height = UInt(32)
+    let widthi = 64
+    let heighti = 32
     
     //===----------------------------------------------------------------------===//
     //
@@ -269,7 +269,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         var destination = try! vImage_Buffer(width: 20, height: 20, bitsPerPixel: 32)
         
         expectCrashLater()
-        try! source.copy(destinationBuffer: &destination)
+        try! source.copy(destinationBuffer: &destination,
+                         pixelSize: 4)
     }
 
     Accelerate_vImageTests.test("vImage/CopyBadHeight") {
@@ -277,7 +278,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         var destination = try! vImage_Buffer(width: 20, height: 20, bitsPerPixel: 32)
         
         expectCrashLater()
-        try! source.copy(destinationBuffer: &destination)
+        try! source.copy(destinationBuffer: &destination,
+                         pixelSize: 4)
     }
     
     Accelerate_vImageTests.test("vImage/Copy") {
@@ -294,7 +296,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         var destination = try! vImage_Buffer(width: widthi, height: heighti,
                                              bitsPerPixel: 32)
         
-        try! source.copy(destinationBuffer: &destination)
+        try! source.copy(destinationBuffer: &destination,
+                         pixelSize: 4)
         
         let sourcePixels: [UInt8] = arrayFromBuffer(buffer: source,
                                                     count: pixels.count)
@@ -306,7 +309,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         source.free()
         destination.free()
     }
-    
+
     Accelerate_vImageTests.test("vImage/InitializeWithFormat") {
         let pixels: [UInt8] = (0 ..< width * height * 4).map { _ in
             return UInt8.random(in: 0 ..< 255)
