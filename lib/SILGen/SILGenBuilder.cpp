@@ -965,10 +965,21 @@ void SILGenBuilder::emitDestructureValueOperation(
     SILLocation loc, ManagedValue value,
     llvm::function_ref<void(unsigned, ManagedValue)> func) {
   CleanupCloner cloner(*this, value);
-  SILBuilder::emitDestructureValueOperation(
+
+  // NOTE: We can not directly use SILBuilder::emitDestructureValueOperation()
+  // here since we need to create all of our cleanups before invoking \p
+  // func. This is necessary since our func may want to emit conditional code
+  // with an early exit, emitting unused cleanups from the current scope via the
+  // function emitBranchAndCleanups(). If we have not yet created those
+  // cleanups, we will introduce a leak along that path.
+  SmallVector<ManagedValue, 8> destructuredValues;
+  emitDestructureValueOperation(
       loc, value.forward(SGF), [&](unsigned index, SILValue subValue) {
-        return func(index, cloner.clone(subValue));
+        destructuredValues.push_back(cloner.clone(subValue));
       });
+  for (auto p : llvm::enumerate(destructuredValues)) {
+    func(p.index(), p.value());
+  }
 }
 
 ManagedValue SILGenBuilder::createProjectBox(SILLocation loc, ManagedValue mv,

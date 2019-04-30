@@ -215,6 +215,10 @@ namespace irgen {
   /// Emit a load of the 'extraInhabitantCount' value witness.
   llvm::Value *emitLoadOfExtraInhabitantCount(IRGenFunction &IGF, SILType T);
 
+  /// Emit a stored to the 'extraInhabitantCount' value witness.
+  void emitStoreOfExtraInhabitantCount(IRGenFunction &IGF, llvm::Value *val,
+                                       llvm::Value *metadata);
+
   /// Returns the IsInline flag and the loaded flags value.
   std::pair<llvm::Value *, llvm::Value *>
   emitLoadOfIsInline(IRGenFunction &IGF, llvm::Value *metadata);
