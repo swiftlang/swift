@@ -1368,8 +1368,6 @@ private:
       break;
 
     case TypeKind::OpaqueTypeArchetype:
-      // TODO
-      break;
     case TypeKind::PrimaryArchetype:
     case TypeKind::OpenedArchetype:
     case TypeKind::NestedArchetype: {
