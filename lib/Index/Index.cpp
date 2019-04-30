@@ -360,11 +360,12 @@ private:
       return;
 
     unsigned CurLabel = 0;
-    for (auto Prop : TypeContext->getStoredProperties()) {
-      if (auto Original = Prop->getOriginalDelegatedProperty())
-        Prop = Original;
+    for (auto Member : TypeContext->getMembers()) {
+      auto Prop = dyn_cast<VarDecl>(Member);
+      if (!Prop)
+        continue;
 
-      if (!Prop->isMemberwiseInitialized())
+      if (!Prop->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
         continue;
 
       if (CurLabel == LabelLocs.size())

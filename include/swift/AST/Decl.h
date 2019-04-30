@@ -5152,7 +5152,13 @@ public:
 
   /// Determine whether this property will be part of the implicit memberwise
   /// initializer.
-  bool isMemberwiseInitialized() const;
+  ///
+  /// \param preferDeclaredProperties When encountering a `lazy` property
+  /// or a property that has an attached property delegate, prefer the
+  /// actual declared property (which may or may not be considered "stored"
+  /// as the moment) to the backing storage property. Otherwise, the stored
+  /// backing property will be treated as the member-initialized property.
+  bool isMemberwiseInitialized(bool preferDeclaredProperties) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 

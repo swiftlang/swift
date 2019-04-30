@@ -2082,7 +2082,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       if (!var)
         continue;
 
-      if (!var->isMemberwiseInitialized())
+      if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
         continue;
 
       accessLevel = std::min(accessLevel, var->getFormalAccess());
