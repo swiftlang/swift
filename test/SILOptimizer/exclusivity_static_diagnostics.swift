@@ -620,20 +620,31 @@ func nestedConflict(x: inout Int) {
 //
 // <rdar://problem/35561050> [SR-10145][Exclusivity] SILGen loads entire struct when reading captured 'let' stored property
 struct DisjointLetMember {
+  var dummy: AnyObject // Make this a nontrivial struct because the SIL is more involved.
   mutating func get(makeValue: ()->Int) -> Int {
     return makeValue()
   }
 }
 
+class IntWrapper {
+  var x = 0
+}
+
 struct DisjointLet {
-  let a = 2
-  var cache = DisjointLetMember()
+  let a = 2 // Using a `let` forces a full load.
+  let b: IntWrapper
+  var cache: DisjointLetMember
+
+  init(b: IntWrapper) {
+    self.b = b
+    self.cache = DisjointLetMember(dummy: b)
+  }
 
   mutating func testDisjointLet() -> Int {
     // Access to inout `self` for member .cache`.
     return cache.get {
       // Access to captured `self` for member .cache`.
-      a
+      a + b.x
     }
   }
 }
