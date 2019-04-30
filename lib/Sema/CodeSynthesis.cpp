@@ -1587,6 +1587,9 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   if (parentPBD->isInitialized(patternNumber) &&
       !parentPBD->isInitializerChecked(patternNumber)) {
     auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+    if (!var->hasType())
+      tc.validateDecl(var);
+
     tc.typeCheckPatternBinding(parentPBD, patternNumber);
   }
 
