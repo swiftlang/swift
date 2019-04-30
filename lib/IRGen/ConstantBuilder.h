@@ -99,7 +99,15 @@ public:
       // WebAssembly: hack: doesn't support PCrel data relocations
       // also, we should set the lowest bit, but I don't know how to do that
       // there's no GOT on WebAssembly anyways though
-      add(llvm::ConstantExpr::getPtrToInt(reference.getValue(), IGM().RelativeAddressTy, false));
+
+
+      llvm::Constant *offset = llvm::ConstantExpr::getPtrToInt(reference.getValue(), IGM().RelativeAddressTy, false);
+      // borrowed from addTaggedRelativeOffset
+      unsigned tag = unsigned(reference.isIndirect());
+      if (tag) {
+        offset = llvm::ConstantExpr::getAdd(offset, llvm::ConstantInt::get(IGM().RelativeAddressTy, tag));
+      }
+      add(offset);
       return;
     }
     addTaggedRelativeOffset(IGM().RelativeAddressTy,
