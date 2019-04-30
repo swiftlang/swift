@@ -879,19 +879,29 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
   emitNestedTypeDecls(st->getMembers());
 }
 
+void IRGenModule::maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque) {
+  if (IRGen.Opts.EnableAnonymousContextMangledNames) {
+    // If we're emitting anonymous context mangled names for debuggability,
+    // then emit all opaque type descriptors and make them runtime-discoverable
+    // so that remote ast/mirror can recover them.
+    addRuntimeResolvableType(opaque);
+    emitOpaqueTypeDecl(opaque);
+  } else if (!IRGen.hasLazyMetadata(opaque)) {
+    emitOpaqueTypeDecl(opaque);
+  }
+}
+
 void IRGenModule::emitFuncDecl(FuncDecl *fd) {
   // If there's an opaque return type for this function, emit its descriptor.
   if (auto opaque = fd->getOpaqueResultTypeDecl()) {
-    if (!IRGen.hasLazyMetadata(opaque))
-      emitOpaqueTypeDecl(opaque);
+    maybeEmitOpaqueTypeDecl(opaque);
   }
 }
 
 void IRGenModule::emitAbstractStorageDecl(AbstractStorageDecl *fd) {
   // If there's an opaque return type for this function, emit its descriptor.
   if (auto opaque = fd->getOpaqueResultTypeDecl()) {
-    if (!IRGen.hasLazyMetadata(opaque))
-      emitOpaqueTypeDecl(opaque);
+    maybeEmitOpaqueTypeDecl(opaque);
   }
 }
 
