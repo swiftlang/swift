@@ -470,14 +470,31 @@ extension String.UTF8View {
   @_effects(releasenone)
   internal func _foreignDistance(from i: Index, to j: Index) -> Int {
     _internalInvariant(_guts.isForeign)
+    
+    #if _runtime(_ObjC)
+    // Currently, foreign  means NSString
+    if let count = _cocoaStringUTF8Count(
+      _guts._object.cocoaObject,
+      range: i._encodedOffset ..< j._encodedOffset
+    ) {
+      //_cocoaStringUTF8Count gave us the scalar aligned count, but we still
+      //need to compensate for sub-scalar indexing, e.g. if `i` is in the middle
+      //of a two-byte UTF8 scalar.
+      let refinedCount = count - (i.transcodedOffset + j.transcodedOffset)
+      _internalInvariant(refinedCount == _distance(from: i, to: j))
+      return refinedCount
+    }
+    #endif
+
     return _distance(from: i, to: j)
+   
   }
 
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _foreignCount() -> Int {
     _internalInvariant(_guts.isForeign)
-    return _distance(from: startIndex, to: endIndex)
+    return _foreignDistance(from: startIndex, to: endIndex)
   }
 }
 
