@@ -119,7 +119,5 @@
 // MISSING_OPTION_G_ERROR: error: option '-debug-info-format={{.*}}' is missing a required argument (-g)
 
 // RUN: not %swift_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
-// RUN: not %swift_driver -gdwarf-types -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
 // RUN: not %swiftc_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
-// RUN: not %swiftc_driver -gdwarf-types -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
 // BAD_DEBUG_LEVEL_ERROR: error: argument '-debug-info-format=codeview' is not allowed with '{{.*}}'

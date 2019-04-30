@@ -104,7 +104,6 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
     break;
   case IRGenDebugInfoLevel::ASTTypes:
-  case IRGenDebugInfoLevel::DwarfTypes:
     CGO.DebugTypeExtRefs = true;
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::FullDebugInfo);
     break;

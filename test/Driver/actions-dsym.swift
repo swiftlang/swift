@@ -25,14 +25,6 @@
 // RUN: %swiftc_driver -driver-print-actions -target x86_64-apple-macosx10.9 -gnone -g -verify-debug-info %s 2>&1 | %FileCheck %s -check-prefixes=DEBUG,VERIFY-DEBUG-INFO
 // VERIFY-DEBUG-INFO: 5: verify-debug-info, {4}, none
 
-// RUN: %swiftc_driver -driver-print-actions -target x86_64-apple-macosx10.9 -gdwarf-types -verify-debug-info %s 2>&1 | %FileCheck %s -check-prefixes=EXEC-AND-MODULE,VERIFY-DEBUG-DWARF
-// EXEC-AND-MODULE: 0: input, "{{.*}}actions-dsym.swift", swift
-// EXEC-AND-MODULE: 1: compile, {0}, object
-// EXEC-AND-MODULE: 2: merge-module, {1}, swiftmodule
-// EXEC-AND-MODULE: 3: link, {1}, image
-// VERIFY-DEBUG-DWARF-TYPES: 4: generate-dSYM, {3}, dSYM
-// VERIFY-DEBUG-DWARF-TYPES: 5: verify-debug-info, {4}, none
-
 // RUN: %swiftc_driver -driver-print-actions -target x86_64-apple-macosx10.9 -gline-tables-only -verify-debug-info %s 2>&1 | %FileCheck %s -check-prefixes=BASIC,VERIFY-DEBUG-LINE-TABLES
 // VERIFY-DEBUG-LINE-TABLES-ONLY: 3: generate-dSYM, {2}, dSYM
 // VERIFY-DEBUG-LINE-TABLES-ONLY: 4: verify-debug-info, {3}, none
@@ -59,6 +51,11 @@
 
 // RUN: %swiftc_driver -driver-print-actions -target x86_64-apple-macosx10.9 -gnone -emit-executable -emit-module %s 2>&1 | %FileCheck %s -check-prefix=EXEC-AND-MODULE
 // RUN: %swiftc_driver -driver-print-actions -target x86_64-apple-macosx10.9 -g -gnone -emit-executable -emit-module %s 2>&1 | %FileCheck %s -check-prefix=EXEC-AND-MODULE
+
+// EXEC-AND-MODULE: 0: input, "{{.*}}actions-dsym.swift", swift
+// EXEC-AND-MODULE: 1: compile, {0}, object
+// EXEC-AND-MODULE: 2: merge-module, {1}, swiftmodule
+// EXEC-AND-MODULE: 3: link, {1}, image
 
 // RUN: %swiftc_driver -driver-print-actions -target x86_64-apple-macosx10.9 -g %S/Inputs/main.swift %S/../Inputs/empty.swift %s -module-name actions 2>&1 | %FileCheck %s -check-prefix=DEBUG-MULTI
 // DEBUG-MULTI: 0: input, "{{.*}}Inputs/main.swift", swift

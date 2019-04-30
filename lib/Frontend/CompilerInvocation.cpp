@@ -932,8 +932,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Opts.DebugInfoLevel = IRGenDebugInfoLevel::Normal;
     else if (A->getOption().matches(options::OPT_gline_tables_only))
       Opts.DebugInfoLevel = IRGenDebugInfoLevel::LineTables;
-    else if (A->getOption().matches(options::OPT_gdwarf_types))
-      Opts.DebugInfoLevel = IRGenDebugInfoLevel::DwarfTypes;
     else
       assert(A->getOption().matches(options::OPT_gnone) &&
              "unknown -g<kind> option");
@@ -972,14 +970,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                    debugFormatArg->getAsString(Args), "-g");
   }
   if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView &&
-      (Opts.DebugInfoLevel == IRGenDebugInfoLevel::LineTables ||
-       Opts.DebugInfoLevel == IRGenDebugInfoLevel::DwarfTypes)) {
+      Opts.DebugInfoLevel == IRGenDebugInfoLevel::LineTables) {
     const Arg *debugFormatArg = Args.getLastArg(options::OPT_debug_info_format);
     Diags.diagnose(SourceLoc(), diag::error_argument_not_allowed_with,
                    debugFormatArg->getAsString(Args),
-                   Opts.DebugInfoLevel == IRGenDebugInfoLevel::LineTables
-                     ? "-gline-tables-only"
-                     : "-gdwarf_types");
+                   "-gline-tables-only");
   }
 
   for (auto A : Args.getAllArgValues(options::OPT_debug_prefix_map)) {

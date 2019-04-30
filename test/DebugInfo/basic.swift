@@ -23,10 +23,6 @@
 // RUN: %target-swift-frontend %/s -emit-ir -g -o - \
 // RUN:   | %FileCheck %s --check-prefixes CHECK,DWARF-CHECK
 // --------------------------------------------------------------------
-// Currently -gdwarf-types should give the same results as -g.
-// RUN: %target-swift-frontend %/s -emit-ir -gdwarf-types -o - \
-// RUN:   | %FileCheck %s --check-prefixes CHECK,DWARF-CHECK
-// --------------------------------------------------------------------
 // Verify that -g -debug-info-format=dwarf gives the same results as -g.
 // RUN: %target-swift-frontend %/s -emit-ir -g -debug-info-format=dwarf -o - \
 // RUN:   | %FileCheck %s --check-prefixes CHECK,DWARF-CHECK

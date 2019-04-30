@@ -52,7 +52,6 @@ enum class IRGenDebugInfoLevel : unsigned {
   None,       ///< No debug info.
   LineTables, ///< Line tables only.
   ASTTypes,   ///< Line tables + AST type references.
-  DwarfTypes, ///< Line tables + AST type references + DWARF types.
   Normal = ASTTypes ///< The setting LLDB prefers.
 };
 

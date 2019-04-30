@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -gdwarf-types -o - | %FileCheck %s --check-prefix=DWARF
 
 // UNSUPPORTED: OS=watchos
 
@@ -12,7 +11,6 @@ enum Either {
 // CHECK-SAME:             size: {{328|168}},
 }
 // CHECK: ![[EMPTY:.*]] = !{}
-// DWARF: ![[INT:.*]] = !DICompositeType({{.*}}identifier: "$sSiD"
 let E : Either = .Neither;
 
 // CHECK: !DICompositeType({{.*}}name: "Color",
@@ -20,11 +18,6 @@ let E : Either = .Neither;
 // CHECK-SAME:             size: 8,
 // CHECK-SAME:             identifier: "$s4enum5ColorOD"
 enum Color : UInt64 {
-// This is effectively a 2-bit bitfield:
-// DWARF: !DIDerivedType(tag: DW_TAG_member, name: "Red"
-// DWARF-SAME:           baseType: ![[UINT64:[0-9]+]]
-// DWARF-SAME:           size: 8{{[,)]}}
-// DWARF: ![[UINT64]] = !DICompositeType({{.*}}identifier: "$ss6UInt64VD"
   case Red, Green, Blue
 }
 
@@ -33,13 +26,7 @@ enum Color : UInt64 {
 // CHECK-SAME:             size: 136{{[,)]}}
 // CHECK-SAME:             identifier: "$s4enum12MaybeIntPairOD"
 enum MaybeIntPair {
-// DWARF: !DIDerivedType(tag: DW_TAG_member, name: "none"
-// DWARF-SAME:           baseType: ![[INT]]{{[,)]}}
   case none
-// DWARF: !DIDerivedType(tag: DW_TAG_member, name: "just"
-// DWARF-SAME:           baseType: ![[INTTUP:[0-9]+]]
-// DWARF-SAME:           size: 128{{[,)]}}
-// DWARF: ![[INTTUP]] = !DICompositeType({{.*}}identifier: "$ss5Int64V_ABtD"
   case just(Int64, Int64)
 }
 
@@ -71,8 +58,6 @@ enum Rose<A> {
 func foo<T>(_ x : Rose<T>) -> Rose<T> { return x }
 
 // CHECK: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS:[0-9]+]], {{.*}}identifier: "$s4enum5TupleOyxGD")
-// DWARF: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS:[0-9]+]],
-// DWARF-SAME:             {{.*}}identifier: "$s4enum5TupleOyxG{{z?}}D")
 public enum Tuple<P> {
 	case C(P, () -> Tuple)
 }

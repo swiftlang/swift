@@ -72,9 +72,6 @@
 // RUN: %swiftc_driver -driver-print-actions -g -verify-debug-info %s 2>&1 | %FileCheck %s -check-prefixes=DEBUG
 // RUN: %swiftc_driver -driver-print-actions -gnone -g -verify-debug-info %s 2>&1 | %FileCheck %s -check-prefixes=DEBUG
 
-// RUN: %swiftc_driver -driver-print-actions -gdwarf-types -verify-debug-info %s 2>&1 | %FileCheck %s -check-prefixes=EXEC-AND-MODULE,VERIFY-DEBUG-DWARF
-// VERIFY-DEBUG-DWARF-TYPES: 0: verify-debug-info, {4}, none
-
 // RUN: %swiftc_driver -driver-print-actions -gline-tables-only -verify-debug-info %s 2>&1 | %FileCheck %s -check-prefixes=BASIC,VERIFY-DEBUG-LINE-TABLES
 // VERIFY-DEBUG-LINE-TABLES-ONLY: 0: verify-debug-info, {3}, none
 

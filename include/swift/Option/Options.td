@@ -540,9 +540,6 @@ def gnone : Flag<["-"], "gnone">, Group<g_Group>, Flags<[FrontendOption]>,
 def gline_tables_only : Flag<["-"], "gline-tables-only">,
   Group<g_Group>, Flags<[FrontendOption]>,
   HelpText<"Emit minimal debug info for backtraces only">;
-def gdwarf_types : Flag<["-"], "gdwarf-types">,
-  Group<g_Group>, Flags<[FrontendOption]>,
-  HelpText<"Emit full DWARF type info.">;
 def debug_prefix_map : Separate<["-"], "debug-prefix-map">,
     Flags<[FrontendOption]>,
     HelpText<"Remap source paths in debug info">;

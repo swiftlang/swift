@@ -1473,8 +1473,6 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.DebugInfoLevel = IRGenDebugInfoLevel::Normal;
     else if (A->getOption().matches(options::OPT_gline_tables_only))
       OI.DebugInfoLevel = IRGenDebugInfoLevel::LineTables;
-    else if (A->getOption().matches(options::OPT_gdwarf_types))
-      OI.DebugInfoLevel = IRGenDebugInfoLevel::DwarfTypes;
     else
       assert(A->getOption().matches(options::OPT_gnone) &&
              "unknown -g<kind> option");
@@ -1499,14 +1497,11 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                    debugFormatArg->getAsString(Args), "-g");
   }
   if (OI.DebugInfoFormat == IRGenDebugInfoFormat::CodeView &&
-      (OI.DebugInfoLevel == IRGenDebugInfoLevel::LineTables ||
-       OI.DebugInfoLevel == IRGenDebugInfoLevel::DwarfTypes)) {
+      OI.DebugInfoLevel == IRGenDebugInfoLevel::LineTables) {
     const Arg *debugFormatArg = Args.getLastArg(options::OPT_debug_info_format);
     Diags.diagnose(SourceLoc(), diag::error_argument_not_allowed_with,
                    debugFormatArg->getAsString(Args),
-                   OI.DebugInfoLevel == IRGenDebugInfoLevel::LineTables
-                     ? "-gline-tables-only"
-                     : "-gdwarf_types");
+                   "-gline-tables-only");
   }
 
   if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
