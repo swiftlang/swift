@@ -218,7 +218,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
     SILValue v;
 
     // If it's memberwise initialized, do so now.
-    if (field->isMemberwiseInitialized()) {
+    if (field->isMemberwiseInitialized(/*preferDeclaredProperties=*/false)) {
       FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
