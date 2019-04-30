@@ -205,8 +205,10 @@ extension vImage_Buffer {
     /// Copies this buffer to `destinationBuffer`.
     ///
     /// - Parameter destinationBuffer: The destination vImage buffer.
+    /// - Parameter pixelSize: The number of bytes for one pixel.
     /// - Parameter options: The options to use when performing this operation.
     public func copy(destinationBuffer: inout vImage_Buffer,
+                     pixelSize: Int,
                      flags options: vImage.Options = .noFlags) throws {
         
         if Int(width) == 0 {
@@ -218,7 +220,7 @@ extension vImage_Buffer {
         _ = withUnsafePointer(to: self) {
             error =  vImageCopyBuffer($0,
                                       &destinationBuffer,
-                                      rowBytes / Int(width),
+                                      pixelSize,
                                       options.flags)
         }
         
