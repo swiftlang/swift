@@ -631,11 +631,11 @@ public struct URL : ReferenceConvertible, Equatable {
     public init(fileURLWithFileSystemRepresentation path: UnsafePointer<Int8>, isDirectory: Bool, relativeTo baseURL: __shared URL?) {
         _url = URL._converted(from: NSURL(fileURLWithFileSystemRepresentation: path, isDirectory: isDirectory, relativeTo: baseURL))
     }
-    
-    public var hashValue: Int {
-        return _url.hash
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(_url)
     }
-    
+
     // MARK: -
     
     /// Returns the data representation of the URL's relativeString. 
