@@ -4403,6 +4403,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
                                       const Metadata *conformingType,
                                       const ProtocolRequirement *reqBase,
                                       const ProtocolRequirement *assocType) {
+  fprintf(stderr, "Entering slow path: %p %p %p %p\n", wtable, conformingType, reqBase, assocType);
 #ifndef NDEBUG
   {
     const ProtocolConformanceDescriptor *conformance = wtable->Description;
@@ -4429,6 +4430,8 @@ swift_getAssociatedTypeWitnessSlowImpl(
   const char *mangledNameBase =
     (const char *)(uintptr_t(witness) &
                    ~ProtocolRequirementFlags::AssociatedTypeMangledNameBit);
+  fprintf(stderr, "Mangled name base: %p\n", mangledNameBase);
+  fprintf(stderr, "name: %s\n", mangledNameBase);
 
   // Check whether the mangled name has the prefix byte indicating that
   // the mangled name is relative to the protocol itself.
@@ -4443,13 +4446,18 @@ swift_getAssociatedTypeWitnessSlowImpl(
   const ProtocolConformanceDescriptor *conformance = wtable->Description;
   const ProtocolDescriptor *protocol = conformance->getProtocol();
 
+  fprintf(stderr, "conformance %p protocol %p\n", conformance, protocol);
+
   // Extract the mangled name itself.
   StringRef mangledName =
     Demangle::makeSymbolicMangledNameStringRef(mangledNameBase);
 
+  fprintf(stderr, "mangledName: %s\n", mangledName.str().c_str());
+
   // Demangle the associated type.
   MetadataResponse response;
   if (inProtocolContext) {
+    fprintf(stderr, "in protocol context\n");
     // The protocol's Self is the only generic parameter that can occur in the
     // type.
     response =
@@ -4472,6 +4480,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
                                                        dependentDescriptor);
         }).getResponse();
   } else {
+    fprintf(stderr, "getting original conforming type\n");
     // The generic parameters in the associated type name are those of the
     // conforming type.
 
@@ -4490,6 +4499,18 @@ swift_getAssociatedTypeWitnessSlowImpl(
       }).getResponse();
   }
   auto assocTypeMetadata = response.Value;
+  fprintf(stderr, "assocTypeMetadata: %p\n", assocTypeMetadata);
+
+  if (true) {
+    auto conformingTypeNameInfo = swift_getTypeName(conformingType, true);
+    StringRef conformingTypeName(conformingTypeNameInfo.data,
+                                 conformingTypeNameInfo.length);
+    StringRef assocTypeName = findAssociatedTypeName(protocol, assocType);
+    fprintf(stderr, "fin: %s %s %s %s\n", assocTypeName.str().c_str(),
+      conformingTypeName.str().c_str(),
+      protocol->Name.get(),
+      mangledName.str().c_str());
+  }
 
   if (!assocTypeMetadata) {
     auto conformingTypeNameInfo = swift_getTypeName(conformingType, true);
@@ -4525,9 +4546,20 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
   // If the low bit of the witness is clear, it's already a metadata pointer.
   unsigned witnessIndex = assocType - reqBase;
   auto witness = ((const void* const *)wtable)[witnessIndex];
+  fprintf(stderr, "getAssociatedTypeWitness fastpath: %x %p\n", witnessIndex, witness);
   if (LLVM_LIKELY((uintptr_t(witness) &
         ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
     // Cached metadata pointers are always complete.
+    fprintf(stderr, "fastpath: %p\n", witness);
+    auto witnessPtr = (const Metadata *)witness;
+    witnessPtr->dump();
+    if (witnessPtr->getKind() == MetadataKind::Class) {
+      fprintf(stderr, "class description:\n");
+      auto witnessClass = witnessPtr->getClassObject();
+      fprintf(stderr, "%lx\n", *(unsigned long*)&witnessClass->Data);
+      if (witnessClass->isTypeMetadata())
+        fprintf(stderr, "name: %s\n", witnessClass->getDescription()->Name.get());
+    }
     return MetadataResponse{(const Metadata *)witness, MetadataState::Complete};
   }
 
