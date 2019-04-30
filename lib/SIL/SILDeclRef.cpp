@@ -301,6 +301,11 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   // serialized bodies, but no public symbol in the generated binary.
   if (d->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
     limit = Limit::AlwaysEmitIntoClient;
+  if (auto accessor = dyn_cast<AccessorDecl>(d)) {
+    auto *storage = accessor->getStorage();
+    if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+      limit = Limit::AlwaysEmitIntoClient;
+  }
 
   // ivar initializers and destroyers are completely contained within the class
   // from which they come, and never get seen externally.
