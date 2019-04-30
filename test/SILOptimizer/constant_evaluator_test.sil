@@ -626,9 +626,9 @@ bb0:
   return %5 : $String
 }
 
-// static String.+= infix(_:_:)
+// String.append(_:_:)
 // The semantics attribute is used by the interpreter.
-sil [serialized] [_semantics "string.append"] @$sSS2peoiyySSz_SStFZ : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
+sil [serialized] [_semantics "string.append"] @$sSS6appendyySSF : $@convention(method) (@guaranteed String, @inout String) -> ()
 
 // CHECK-LABEL: @interpretStringAppend
 sil @interpretStringAppend: $@convention(thin) () -> @owned String {
@@ -649,9 +649,9 @@ bb0:
   %13 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %14 = apply %13(%9, %10, %11, %12) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %15 = begin_access [modify] [static] %0 : $*String
-  // function_ref static String.+= infix(_:_:)
-  %16 = function_ref @$sSS2peoiyySSz_SStFZ : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
-  %17 = apply %16(%15, %14, %8) : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
+  // function_ref static String.append (_:_:)
+  %16 = function_ref @$sSS6appendyySSF : $@convention(method) (@guaranteed String, @inout String) -> ()
+  %17 = apply %16(%14, %15) : $@convention(method) (@guaranteed String, @inout String) -> ()
   end_access %15 : $*String
   release_value %14 : $String
   %20 = begin_access [read] [static] %0 : $*String
@@ -683,8 +683,8 @@ bb0:
   %14 = apply %13(%9, %10, %11, %12) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %15 = begin_access [modify] [static] %0 : $*String
   // function_ref static String.+= infix(_:_:)
-  %16 = function_ref @$sSS2peoiyySSz_SStFZ : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
-  %17 = apply %16(%15, %14, %8) : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
+  %16 = function_ref @$sSS6appendyySSF : $@convention(method) (@guaranteed String, @inout String) -> ()
+  %17 = apply %16(%14, %15) : $@convention(method) (@guaranteed String, @inout String) -> ()
   end_access %15 : $*String
   release_value %14 : $String
   %20 = begin_access [read] [static] %0 : $*String
@@ -836,8 +836,8 @@ bb4:
   %40 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %41 = apply %40(%36, %37, %38, %39) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %42 = begin_access [modify] [static] %10 : $*String
-  %43 = function_ref @$sSS2peoiyySSz_SStFZ : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
-  %44 = apply %43(%42, %41, %35) : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
+  %43 = function_ref @$sSS6appendyySSF : $@convention(method) (@guaranteed String, @inout String) -> ()
+  %44 = apply %43(%41, %42) : $@convention(method) (@guaranteed String, @inout String) -> ()
   end_access %42 : $*String
   release_value %41 : $String
   br bb6
@@ -857,8 +857,8 @@ bb7:
   %55 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %56 = apply %55(%51, %52, %53, %54) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %57 = begin_access [modify] [static] %10 : $*String
-  %58 = function_ref @$sSS2peoiyySSz_SStFZ : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
-  %59 = apply %58(%57, %56, %50) : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
+  %58 = function_ref @$sSS6appendyySSF : $@convention(method) (@guaranteed String, @inout String) -> ()
+  %59 = apply %58(%56, %57) : $@convention(method) (@guaranteed String, @inout String) -> ()
   end_access %57 : $*String
   release_value %56 : $String
   br bb13
@@ -872,8 +872,8 @@ bb8:
   %68 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %69 = apply %68(%64, %65, %66, %67) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %70 = begin_access [modify] [static] %10 : $*String
-  %71 = function_ref @$sSS2peoiyySSz_SStFZ : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
-  %72 = apply %71(%70, %69, %63) : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
+  %71 = function_ref @$sSS6appendyySSF : $@convention(method) (@guaranteed String, @inout String) -> ()
+  %72 = apply %71(%69, %70) : $@convention(method) (@guaranteed String, @inout String) -> ()
   end_access %70 : $*String
   release_value %69 : $String
   br bb13
@@ -903,8 +903,8 @@ bb11:
 
 bb12(%93 : $String):
   %94 = begin_access [modify] [static] %10 : $*String
-  %95 = function_ref @$sSS2peoiyySSz_SStFZ : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
-  %96 = apply %95(%94, %93, %76) : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
+  %95 = function_ref @$sSS6appendyySSF : $@convention(method) (@guaranteed String, @inout String) -> ()
+  %96 = apply %95(%93, %94) : $@convention(method) (@guaranteed String, @inout String) -> ()
   end_access %94 : $*String
   release_value %93 : $String
   br bb13
