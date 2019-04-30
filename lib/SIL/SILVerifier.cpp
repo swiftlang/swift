@@ -555,7 +555,8 @@ public:
   /// Require two function types to be ABI-compatible.
   void requireABICompatibleFunctionTypes(CanSILFunctionType type1,
                                          CanSILFunctionType type2,
-                                         const Twine &what) {
+                                         const Twine &what,
+                                         SILFunction *inFunction = nullptr) {
     auto complain = [=](const char *msg) -> std::function<void()> {
       return [=]{
         llvm::dbgs() << "  " << msg << '\n'
@@ -571,7 +572,7 @@ public:
     };
 
     // If we didn't have a failure, return.
-    auto Result = type1->isABICompatibleWith(type2);
+    auto Result = type1->isABICompatibleWith(type2, inFunction);
     if (Result.isCompatible())
       return;
 
@@ -3661,7 +3662,8 @@ public:
 
     // convert_function is required to be an ABI-compatible conversion.
     requireABICompatibleFunctionTypes(
-        opTI, resTI, "convert_function cannot change function ABI");
+        opTI, resTI, "convert_function cannot change function ABI",
+        ICI->getFunction());
   }
 
   void checkConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *ICI) {
@@ -3677,7 +3679,8 @@ public:
     // conversion once escapability is the same on both sides.
     requireABICompatibleFunctionTypes(
         opTI, resTI->getWithExtInfo(resTI->getExtInfo().withNoEscape(false)),
-        "convert_escape_to_noescape cannot change function ABI");
+        "convert_escape_to_noescape cannot change function ABI",
+        ICI->getFunction());
 
     // After mandatory passes convert_escape_to_noescape should not have the
     // '[not_guaranteed]' or '[escaped]' attributes.

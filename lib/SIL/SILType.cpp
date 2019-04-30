@@ -13,6 +13,7 @@
 #include "swift/SIL/SILType.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILFunctionConventions.h"
@@ -606,4 +607,26 @@ bool SILType::isLoweringOf(SILModule &Mod, CanType formalType) {
 
   // Other types are preserved through lowering.
   return loweredType.getASTType() == formalType;
+}
+
+bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
+    OpaqueTypeDecl *opaque, SILFunction *context) {
+  auto namingDecl = opaque->getNamingDecl();
+
+  // Allow replacement of opaque result types of inlineable function regardless
+  // of resilience and in which context.
+  if (namingDecl->getAttrs().hasAttribute<InlinableAttr>()) {
+    return true;
+  }
+  // Allow replacement of opaque result types in the context of maximal
+  // resilient expansion if the context's and the opaque type's module are the
+  // same.
+  auto expansion = context->getResilienceExpansion();
+  auto module = namingDecl->getModuleContext();
+  if (expansion == ResilienceExpansion::Maximal &&
+      module == context->getModule().getSwiftModule())
+    return true;
+
+  // Allow general replacement from non resilient modules. Otherwise, disallow.
+  return !module->isResilient();
 }
