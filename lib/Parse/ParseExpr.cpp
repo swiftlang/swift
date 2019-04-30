@@ -1898,7 +1898,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                         /*isPostfix=*/false, /*isExprBasic=*/true,
                         lParen, args, argLabels, argLabelLocs, rParen,
                         trailingClosureNeverPresent,
-                        SyntaxKind::FunctionCallArgumentList);
+                        SyntaxKind::Unknown);
       assert(!trailingClosureNeverPresent);
 
       Status |= S;
