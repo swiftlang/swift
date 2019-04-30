@@ -4163,8 +4163,14 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       if (inheritedProto == proto) return TypeWalker::Action::Continue;
 
       for (auto req : inheritedProto->getMembers()) {
-        if (auto typeReq = dyn_cast<TypeDecl>(req))
+        if (auto typeReq = dyn_cast<TypeDecl>(req)) {
+          // Ignore generic types
+          if (auto genReq = dyn_cast<GenericTypeDecl>(req))
+            if (genReq->getGenericParams())
+              continue;
+
           inheritedTypeDecls[typeReq->getFullName()].push_back(typeReq);
+        }
       }
       return TypeWalker::Action::Continue;
     });
