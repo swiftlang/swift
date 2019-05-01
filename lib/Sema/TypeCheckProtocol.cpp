@@ -4842,11 +4842,16 @@ static bool isNSCoding(ProtocolDecl *protocol) {
 
 /// Whether the given class has an explicit '@objc' name.
 static bool hasExplicitObjCName(ClassDecl *classDecl) {
+  // FIXME: Turn this function into a request instead of computing this
+  // as part of the @objc request.
+  (void) classDecl->isObjC();
+
   if (classDecl->getAttrs().hasAttribute<ObjCRuntimeNameAttr>())
     return true;
 
   auto objcAttr = classDecl->getAttrs().getAttribute<ObjCAttr>();
-  if (!objcAttr) return false;
+  if (!objcAttr)
+    return false;
 
   return objcAttr->hasName() && !objcAttr->isNameImplicit();
 }
@@ -4929,7 +4934,7 @@ static void inferStaticInitializeObjCMetadata(TypeChecker &tc,
   // If this class isn't always available on the deployment target, don't
   // mark it as statically initialized.
   // FIXME: This is a workaround. The proper solution is for IRGen to
-  // only statically initializae the Objective-C metadata when running on
+  // only statically initialize the Objective-C metadata when running on
   // a new-enough OS.
   if (auto sourceFile = classDecl->getParentSourceFile()) {
     AvailabilityContext availableInfo = AvailabilityContext::alwaysAvailable();
@@ -5079,7 +5084,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     if (auto classDecl = dc->getSelfClassDecl()) {
       if (Context.LangOpts.EnableObjCInterop &&
           isNSCoding(conformance->getProtocol()) &&
-          !classDecl->isGenericContext()) {
+          !classDecl->isGenericContext() &&
+          !classDecl->hasClangNode()) {
         diagnoseUnstableName(*this, conformance, classDecl);
         // Infer @_staticInitializeObjCMetadata if needed.
         inferStaticInitializeObjCMetadata(*this, classDecl);
