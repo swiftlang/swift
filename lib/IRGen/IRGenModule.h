@@ -1435,6 +1435,11 @@ public:
   getGlobalForDynamicallyReplaceableThunk(LinkEntity &entity, llvm::Type *type,
                                           ForDefinition_t forDefinition);
 
+  llvm::Function *getAddrOfOpaqueTypeDescriptorAccessFunction(
+      OpaqueTypeDecl *decl, ForDefinition_t forDefinition, bool implementation);
+
+  void emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *);
+
 private:
   llvm::Constant *
   getAddrOfSharedContextDescriptor(LinkEntity entity,
