@@ -150,6 +150,12 @@ sourcekitd_response_t sourcekitd_send_request_sync(sourcekitd_object_t req) {
   return resp;
 }
 
+sourcekitd_response_t
+sourcekitd_send_request_sync_with_filesystem(sourcekitd_object_t req,
+                                             void *vfs) {
+  llvm::report_fatal_error("XPC client does not support custom filesystems");
+}
+
 void sourcekitd_send_request(sourcekitd_object_t req,
                              sourcekitd_request_handle_t *out_handle,
                              sourcekitd_response_receiver_t receiver) {

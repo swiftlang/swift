@@ -402,19 +402,24 @@ convertFileContentsToInputs(const SmallVectorImpl<FileContent> &contents) {
   return inputsAndOutputs;
 }
 
-static FrontendInputsAndOutputs
-resolveSymbolicLinksInInputs(FrontendInputsAndOutputs &inputsAndOutputs,
-                             StringRef UnresolvedPrimaryFile,
-                             std::string &Error) {
+static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
+    FrontendInputsAndOutputs &inputsAndOutputs, StringRef UnresolvedPrimaryFile,
+    std::string &Error,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
+  if (!FileSystem)
+    FileSystem = llvm::vfs::getRealFileSystem();
+  llvm::SmallString<128> PrimaryFile;
+  if (auto err = FileSystem->getRealPath(UnresolvedPrimaryFile, PrimaryFile))
+    PrimaryFile = UnresolvedPrimaryFile;
+
   unsigned primaryCount = 0;
-  std::string PrimaryFile =
-      SwiftLangSupport::resolvePathSymlinks(UnresolvedPrimaryFile);
   // FIXME: The frontend should be dealing with symlinks, maybe similar to
   // clang's FileManager ?
   FrontendInputsAndOutputs replacementInputsAndOutputs;
   for (const InputFile &input : inputsAndOutputs.getAllInputs()) {
-    std::string newFilename =
-        SwiftLangSupport::resolvePathSymlinks(input.file());
+    llvm::SmallString<128> newFilename;
+    if (auto err = FileSystem->getRealPath(input.file(), newFilename))
+      newFilename = input.file();
     bool newIsPrimary = input.isPrimary() ||
                         (!PrimaryFile.empty() && PrimaryFile == newFilename);
     if (newIsPrimary) {
@@ -422,7 +427,7 @@ resolveSymbolicLinksInInputs(FrontendInputsAndOutputs &inputsAndOutputs,
     }
     assert(primaryCount < 2 && "cannot handle multiple primaries");
     replacementInputsAndOutputs.addInput(
-        InputFile(newFilename, newIsPrimary, input.buffer()));
+        InputFile(newFilename.str(), newIsPrimary, input.buffer()));
   }
 
   if (PrimaryFile.empty() || primaryCount == 1) {
@@ -436,11 +441,11 @@ resolveSymbolicLinksInInputs(FrontendInputsAndOutputs &inputsAndOutputs,
   return replacementInputsAndOutputs;
 }
 
-bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
-                                             ArrayRef<const char *> OrigArgs,
-                                             DiagnosticEngine &Diags,
-                                             StringRef UnresolvedPrimaryFile,
-                                             std::string &Error) {
+bool SwiftASTManager::initCompilerInvocation(
+    CompilerInvocation &Invocation, ArrayRef<const char *> OrigArgs,
+    DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
+    std::string &Error,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
   SmallVector<const char *, 16> Args;
   // Make sure to put '-resource-dir' at the top to allow overriding it by
   // the passed in arguments.
@@ -469,7 +474,7 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   Invocation.getFrontendOptions().InputsAndOutputs =
       resolveSymbolicLinksInInputs(
           Invocation.getFrontendOptions().InputsAndOutputs,
-          UnresolvedPrimaryFile, Error);
+          UnresolvedPrimaryFile, Error, FileSystem);
   if (!Error.empty())
     return true;
 

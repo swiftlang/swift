@@ -411,9 +411,10 @@ public:
   void indexSource(StringRef Filename, IndexingConsumer &Consumer,
                    ArrayRef<const char *> Args, StringRef Hash) override;
 
-  void codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
-                    SourceKit::CodeCompletionConsumer &Consumer,
-                    ArrayRef<const char *> Args) override;
+  void codeComplete(
+      llvm::MemoryBuffer *InputBuf, unsigned Offset,
+      SourceKit::CodeCompletionConsumer &Consumer, ArrayRef<const char *> Args,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) override;
 
   void codeCompleteOpen(StringRef name, llvm::MemoryBuffer *inputBuf,
                         unsigned offset, OptionsDictionary *options,

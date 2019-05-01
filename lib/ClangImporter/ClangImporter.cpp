@@ -1012,7 +1012,7 @@ ClangImporter::create(ASTContext &ctx,
 
   // Set up the file manager.
   {
-    if (!ctx.SearchPathOpts.VFSOverlayFiles.empty()) {
+    if (ctx.SourceMgr.getFileSystem() != llvm::vfs::getRealFileSystem()) {
       // If the clang instance has overlays it means the user has provided
       // -ivfsoverlay options and swift -vfsoverlay options.  We're going to
       // clobber their file system with our own, so warn about it.

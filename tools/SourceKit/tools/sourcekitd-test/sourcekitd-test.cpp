@@ -17,6 +17,7 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -27,6 +28,7 @@
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/Threading.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include <fstream>
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
@@ -151,6 +153,8 @@ static const char *semaName;
 
 static sourcekitd_uid_t NoteTest;
 static SourceKit::Semaphore noteSyncSemaphore(0);
+
+static llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> InjectedVFS;
 
 namespace {
 struct AsyncResponseInfo {
@@ -379,7 +383,8 @@ static sourcekitd_response_t sendRequestSync(sourcekitd_object_t req,
   Optional<PrintingTimer> timer;
   if (opts.timeRequest)
     timer.emplace("request time");
-  return sourcekitd_send_request_sync(req);
+  return sourcekitd_send_request_sync_with_filesystem(req,
+                                                      (void *)&InjectedVFS);
 }
 
 static int handleJsonRequestPath(StringRef QueryPath, const TestOptions &Opts) {
@@ -455,6 +460,31 @@ static int setExpectedTypes(const sourcekitd_test::TestOptions &Opts,
 }
 
 static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
+  if (Opts.VFSFiles.empty()) {
+    InjectedVFS = nullptr;
+  } else {
+    auto InMemoryFS = llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem>(
+        new llvm::vfs::InMemoryFileSystem());
+    for (auto &NameAndTarget : Opts.VFSFiles) {
+      auto TargetBufferOrErr =
+          llvm::MemoryBuffer::getFile(std::get<1>(NameAndTarget));
+      if (auto Err = TargetBufferOrErr.getError()) {
+        llvm::errs() << "Error reading target file '"
+                     << std::get<1>(NameAndTarget) << "': " << Err.message()
+                     << "\n";
+        return 1;
+      }
+      auto RenamedTargetBuffer = llvm::MemoryBuffer::getMemBufferCopy(
+          TargetBufferOrErr.get()->getBuffer(), std::get<0>(NameAndTarget));
+      InMemoryFS->addFile(std::get<0>(NameAndTarget), 0,
+                          std::move(RenamedTargetBuffer));
+    }
+
+    auto OverlayFS = llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>(
+        new llvm::vfs::OverlayFileSystem(llvm::vfs::getRealFileSystem()));
+    OverlayFS->pushOverlay(std::move(InMemoryFS));
+    InjectedVFS = std::move(OverlayFS);
+  }
 
   if (!Opts.JsonRequestPath.empty())
     return handleJsonRequestPath(Opts.JsonRequestPath, Opts);
@@ -2141,8 +2171,8 @@ static llvm::MemoryBuffer *getBufferForFilename(StringRef Filename) {
   if (It != Buffers.end())
     return It->second;
 
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-    llvm::MemoryBuffer::getFile(Filename);
+  auto FileBufOrErr = InjectedVFS ? InjectedVFS->getBufferForFile(Filename)
+                                  : llvm::MemoryBuffer::getFile(Filename);
   if (!FileBufOrErr) {
     llvm::errs() << "error opening input file '" << Filename << "' ("
                  << FileBufOrErr.getError().message() << ")\n";
