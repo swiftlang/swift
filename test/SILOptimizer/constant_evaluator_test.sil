@@ -740,6 +740,68 @@ bb3(%30 : $Builtin.Int64):
     return %30 : $Builtin.Int64
 } // CHECK: Returns int: 100
 
+// Test inject_enum_addr instruction.
+
+public enum Direction {
+  case north
+  case south
+  case east
+  case west
+}
+
+sil @isNorth : $@convention(thin) (@in_guaranteed Direction) -> Builtin.Int32 {
+bb0(%0 : $*Direction):
+  switch_enum_addr %0 : $*Direction, case #Direction.north!enumelt: bb1, default bb2
+
+bb1:
+  %3 = integer_literal $Builtin.Int32, 1
+  br bb3(%3 : $Builtin.Int32)
+
+bb2:
+  %6 = integer_literal $Builtin.Int32, 0
+  br bb3(%6 : $Builtin.Int32)
+
+bb3(%9 : $Builtin.Int32):
+  return %9 : $Builtin.Int32
+}
+
+// CHECK: @interpretTestInjectEnumAddr
+sil hidden @interpretTestInjectEnumAddr : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %1 = alloc_stack $Direction
+  inject_enum_addr %1 : $*Direction, #Direction.north!enumelt
+  %2 = function_ref @isNorth : $@convention(thin) (@in_guaranteed Direction) -> Builtin.Int32
+  %3 = apply %2(%1) : $@convention(thin) (@in_guaranteed Direction) -> Builtin.Int32
+  destroy_addr %1 : $*Direction
+  dealloc_stack %1 : $*Direction
+  return %3 : $Builtin.Int32
+} // CHECK: Returns int: 1
+
+// Test select_enum and select_enum_addr instructions.
+
+// CHECK: @interpretTestSelectEnum
+sil hidden @interpretTestSelectEnum : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %1 = enum $Direction, #Direction.north!enumelt
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = integer_literal $Builtin.Int32, 0
+  %4 = select_enum %1 : $Direction, case #Direction.north!enumelt: %2, default %3 : $Builtin.Int32
+  return %4 : $Builtin.Int32
+} // CHECK: Returns int: 1
+
+// CHECK: @interpretTestSelectEnumAddr
+sil hidden @interpretTestSelectEnumAddr : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %1 = alloc_stack $Direction
+  inject_enum_addr %1 : $*Direction, #Direction.north!enumelt
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = integer_literal $Builtin.Int32, 0
+  %4 = select_enum_addr %1 : $*Direction, case #Direction.north!enumelt: %2, default %3 : $Builtin.Int32
+  destroy_addr %1 : $*Direction
+  dealloc_stack %1 : $*Direction
+  return %4 : $Builtin.Int32
+} // CHECK: Returns int: 1
+
 // Test calling conventions.
 
 // Test struct with a string property. The struct will be passed and returned
