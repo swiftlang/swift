@@ -589,6 +589,11 @@ SOURCEKITD_PUBLIC SOURCEKITD_NONNULL_ALL SOURCEKITD_WARN_RESULT
 sourcekitd_response_t
 sourcekitd_send_request_sync(sourcekitd_object_t req);
 
+SOURCEKITD_PUBLIC
+    SOURCEKITD_NONNULL_ALL SOURCEKITD_WARN_RESULT sourcekitd_response_t
+    sourcekitd_send_request_sync_with_filesystem(sourcekitd_object_t req,
+                                                 void *vfs);
+
 /// Used to cancel a request that has been invoked asynchronously.
 typedef void *sourcekitd_request_handle_t;
 

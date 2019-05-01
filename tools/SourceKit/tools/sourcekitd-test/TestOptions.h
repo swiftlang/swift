@@ -110,6 +110,7 @@ struct TestOptions {
   bool isAsyncRequest = false;
   bool timeRequest = false;
   unsigned repeatRequest = 1;
+  llvm::SmallVector<std::pair<std::string, std::string>, 4> VFSFiles;
   llvm::Optional<bool> CancelOnSubsequentRequest;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
   void printHelp(bool ShowHidden) const;

@@ -18,8 +18,10 @@
 #endif
 
 #include "sourcekitd/sourcekitd.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <functional>
 #include <string>
 
@@ -155,7 +157,8 @@ void set_interrupted_connection_handler(llvm::function_ref<void()> handler);
 
 typedef std::function<void(sourcekitd_response_t)> ResponseReceiver;
 
-void handleRequest(sourcekitd_object_t Request, ResponseReceiver Receiver);
+void handleRequest(sourcekitd_object_t Request, ResponseReceiver Receiver,
+                   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem);
 
 void printRequestObject(sourcekitd_object_t Obj, llvm::raw_ostream &OS);
 void printResponse(sourcekitd_response_t Resp, llvm::raw_ostream &OS);

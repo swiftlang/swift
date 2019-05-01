@@ -353,6 +353,14 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       }
       break;
 
+    case OPT_vfs_files:
+      for (const char *VFSFile : InputArg->getValues()) {
+        auto NameAndTarget = StringRef(VFSFile).split('=');
+        VFSFiles.push_back(std::make_pair(std::get<0>(NameAndTarget).str(),
+                                          std::get<1>(NameAndTarget).str()));
+      }
+      break;
+
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "
                    << InputArg->getAsString(ParsedArgs) << '\n'

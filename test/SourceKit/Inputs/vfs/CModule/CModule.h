@@ -1,0 +1,3 @@
+struct StructDefinedInCModule {
+  int intFieldDefinedInCModule;
+};
