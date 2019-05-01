@@ -2086,7 +2086,8 @@ void ModuleFile::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
           dc = dc->getParent();
         if (auto nominal = dc->getSelfNominalTypeDecl())
           if (nominal->getName() == accessPath.front().first)
-            consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
+            consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
+                               DynamicLookupInfo::AnyObject);
       }
     }
     return;
@@ -2095,7 +2096,8 @@ void ModuleFile::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
   for (const auto &list : ClassMembersForDynamicLookup->data()) {
     for (auto item : list)
       consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
-                         DeclVisibilityKind::DynamicLookup);
+                         DeclVisibilityKind::DynamicLookup,
+                         DynamicLookupInfo::AnyObject);
   }
 }
 
