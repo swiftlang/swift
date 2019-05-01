@@ -13,10 +13,12 @@
 #ifndef LLVM_SOURCEKIT_LIB_SWIFTLANG_SWIFTASTMANAGER_H
 #define LLVM_SOURCEKIT_LIB_SWIFTLANG_SWIFTASTMANAGER_H
 
-#include "SwiftInvocation.h"
 #include "SourceKit/Core/LLVM.h"
+#include "SwiftInvocation.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <functional>
 #include <string>
 
@@ -91,9 +93,9 @@ public:
                            StringRef RuntimeResourcePath);
   ~SwiftASTManager();
 
-  SwiftInvocationRef getInvocation(ArrayRef<const char *> Args,
-                                   StringRef PrimaryFile,
-                                   std::string &Error);
+  SwiftInvocationRef getInvocation(
+      ArrayRef<const char *> Args, StringRef PrimaryFile, std::string &Error,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem = nullptr);
 
   /// Provides the AST associated with an invocation to the AST consumer,
   /// asynchronously.
@@ -109,11 +111,10 @@ public:
   std::unique_ptr<llvm::MemoryBuffer> getMemoryBuffer(StringRef Filename,
                                                       std::string &Error);
 
-  bool initCompilerInvocation(swift::CompilerInvocation &Invocation,
-                              ArrayRef<const char *> Args,
-                              swift::DiagnosticEngine &Diags,
-                              StringRef PrimaryFile,
-                              std::string &Error);
+  bool initCompilerInvocation(
+      swift::CompilerInvocation &Invocation, ArrayRef<const char *> Args,
+      swift::DiagnosticEngine &Diags, StringRef PrimaryFile, std::string &Error,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem = nullptr);
 
   bool initCompilerInvocation(swift::CompilerInvocation &CompInvok,
                               ArrayRef<const char *> OrigArgs,

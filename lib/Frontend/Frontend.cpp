@@ -175,8 +175,13 @@ void CompilerInstance::recordPrimarySourceFile(SourceFile *SF) {
     recordPrimaryInputBuffer(SF->getBufferID().getValue());
 }
 
-bool CompilerInstance::setup(const CompilerInvocation &Invok) {
+bool CompilerInstance::setup(
+    const CompilerInvocation &Invok,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS) {
   Invocation = Invok;
+
+  if (BaseFS)
+    SourceMgr.setFileSystem(BaseFS);
 
   // If initializing the overlay file system fails there's no sense in
   // continuing because the compiler will read the wrong files.
@@ -238,19 +243,20 @@ static bool loadAndValidateVFSOverlay(
 }
 
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
-  auto BaseFS = llvm::vfs::getRealFileSystem();
+  auto BaseFS = SourceMgr.getFileSystem();
   auto OverlayFS = llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>(
                     new llvm::vfs::OverlayFileSystem(BaseFS));
   bool hadAnyFailure = false;
+  bool hasOverlays = false;
   for (const auto &File : Invocation.getSearchPathOptions().VFSOverlayFiles) {
+    hasOverlays = true;
     hadAnyFailure |=
         loadAndValidateVFSOverlay(File, BaseFS, OverlayFS, Diagnostics);
   }
 
   // If we successfully loaded all the overlays, let the source manager and
   // diagnostic engine take advantage of the overlay file system.
-  if (!hadAnyFailure &&
-      (OverlayFS->overlays_begin() != OverlayFS->overlays_end())) {
+  if (!hadAnyFailure && hasOverlays) {
     SourceMgr.setFileSystem(OverlayFS);
   }
 

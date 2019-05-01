@@ -105,12 +105,11 @@ struct SwiftCodeCompletionConsumer
 };
 } // anonymous namespace
 
-static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
-                                  llvm::MemoryBuffer *UnresolvedInputFile,
-                                  unsigned Offset,
-                                  SwiftCodeCompletionConsumer &SwiftConsumer,
-                                  ArrayRef<const char *> Args,
-                                  std::string &Error) {
+static bool swiftCodeCompleteImpl(
+    SwiftLangSupport &Lang, llvm::MemoryBuffer *UnresolvedInputFile,
+    unsigned Offset, SwiftCodeCompletionConsumer &SwiftConsumer,
+    ArrayRef<const char *> Args, std::string &Error,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem = nullptr) {
 
   // Resolve symlinks for the input file; we resolve them for the input files
   // in the arguments as well.
@@ -148,7 +147,8 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
 
   CompilerInvocation Invocation;
   bool Failed = Lang.getASTManager()->initCompilerInvocation(
-      Invocation, Args, CI.getDiags(), InputFile->getBufferIdentifier(), Error);
+      Invocation, Args, CI.getDiags(), InputFile->getBufferIdentifier(), Error,
+      FileSystem);
   if (Failed) {
     return false;
   }
@@ -183,7 +183,7 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
   // FIXME: We need to be passing the buffers from the open documents.
   // It is not a huge problem in practice because Xcode auto-saves constantly.
 
-  if (CI.setup(Invocation)) {
+  if (CI.setup(Invocation, FileSystem)) {
     // FIXME: error?
     return true;
   }
@@ -198,10 +198,10 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
   return true;
 }
 
-void SwiftLangSupport::codeComplete(llvm::MemoryBuffer *UnresolvedInputFile,
-                                    unsigned Offset,
-                                    SourceKit::CodeCompletionConsumer &SKConsumer,
-                                    ArrayRef<const char *> Args) {
+void SwiftLangSupport::codeComplete(
+    llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
+    SourceKit::CodeCompletionConsumer &SKConsumer, ArrayRef<const char *> Args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
   SwiftCodeCompletionConsumer SwiftConsumer([&](
       MutableArrayRef<CodeCompletionResult *> Results,
       SwiftCompletionInfo &info) {
@@ -233,7 +233,7 @@ void SwiftLangSupport::codeComplete(llvm::MemoryBuffer *UnresolvedInputFile,
 
   std::string Error;
   if (!swiftCodeCompleteImpl(*this, UnresolvedInputFile, Offset, SwiftConsumer,
-                             Args, Error)) {
+                             Args, Error, FileSystem)) {
     SKConsumer.failed(Error);
   }
 }
