@@ -385,6 +385,15 @@ namespace swift {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
     }
 
+    // The following deployment targets ship an Objective-C runtime supporting
+    // the class metadata update callback mechanism:
+    //
+    // - macOS 10.14.4
+    // - iOS 12.2
+    // - tvOS 12.2
+    // - watchOS 5.2
+    bool doesTargetSupportObjCMetadataUpdateCallback() const;
+
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.
     ///
