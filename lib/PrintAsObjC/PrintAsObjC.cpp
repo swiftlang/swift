@@ -1143,8 +1143,6 @@ private:
           break;
         case FunctionTypeRepresentation::Thin:
         case FunctionTypeRepresentation::CFunctionPointer:
-        // SWIFT_ENABLE_TENSORFLOW
-        case FunctionTypeRepresentation::TensorFlow:
           break;
         }
       } else if (isObjCReferenceCountableObjectType(copyTy)) {
@@ -1889,8 +1887,6 @@ private:
   void visitFunctionType(FunctionType *FT, 
                          Optional<OptionalTypeKind> optionalKind) {
     switch (FT->getRepresentation()) {
-    // SWIFT_ENABLE_TENSORFLOW
-    case AnyFunctionType::Representation::TensorFlow:
     case AnyFunctionType::Representation::Thin:
       llvm_unreachable("can't represent thin functions in ObjC");
     // Native Swift function types bridge to block types.

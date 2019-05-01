@@ -2791,6 +2791,8 @@ ERROR(compiler_evaluable_ref_non_compiler_evaluable,none,
 // @TensorFlowGraph attribute
 ERROR(tf_graph_attr_top_level_only,none,
       "@TensorFlowGraph can only be applied to top-level functions", ())
+ERROR(tf_graph_deprecated_please_remove,none,
+      "@TensorFlowGraph has no effect and is deprecated. Please remove.", ())
 ERROR(tf_graph_attr_function_tensorflow_value_only,none,
       "@TensorFlowGraph can only be applied to functions whose parameters and "
       "return values are TensorFlow values or aggregates of TensorFlow "

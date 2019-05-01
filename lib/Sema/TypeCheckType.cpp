@@ -2021,8 +2021,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
               .Case("block", SILFunctionType::Representation::Block)
               .Case("thin", SILFunctionType::Representation::Thin)
               .Case("c", SILFunctionType::Representation::CFunctionPointer)
-              // SWIFT_ENABLE_TENSORFLOW
-              .Case("tensorflow", SILFunctionType::Representation::TensorFlow)
               .Case("method", SILFunctionType::Representation::Method)
               .Case("objc_method", SILFunctionType::Representation::ObjCMethod)
               .Case("witness_method",
@@ -2063,8 +2061,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           .Case("block", FunctionType::Representation::Block)
           .Case("thin", FunctionType::Representation::Thin)
           .Case("c", FunctionType::Representation::CFunctionPointer)
-          // SWIFT_ENABLE_TENSORFLOW
-          .Case("tensorflow", FunctionType::Representation::TensorFlow)
           .Default(None);
       if (!parsedRep) {
         diagnose(attrs.getLoc(TAK_convention),
@@ -2405,8 +2401,6 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
     }
     break;
 
-  // SWIFT_ENABLE_TENSORFLOW
-  case AnyFunctionType::Representation::TensorFlow:
   case AnyFunctionType::Representation::Thin:
   case AnyFunctionType::Representation::Swift:
     break;

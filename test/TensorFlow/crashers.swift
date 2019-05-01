@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify | %FileCheck %s
+// REQUIRES: deprecated_gpe_mode
 
 // This file contains various regression tests that crashed the compiler.
 

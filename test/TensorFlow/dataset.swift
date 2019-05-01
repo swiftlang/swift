@@ -1,11 +1,10 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil -verify %s | %FileCheck %s
+// REQUIRES: deprecated_gpe_mode
 import TensorFlow
 
 // Creates a dataset, which produces one float scalar value in each get next
 // call.
-// TODO: declare with @convention tensorflow
 // Enforce no sends/recvs, and all logic is lowered to TF graph.
-@TensorFlowGraph
 public func createMockDataSet() -> VariantHandle {
   let values = Tensor<Float>([1.0, 2.0, 3.0])
   // REGISTER_OP("TensorSliceDataset")

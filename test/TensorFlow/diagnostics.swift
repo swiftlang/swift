@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -Xllvm -tf-warn-send-recv -O -emit-sil -verify %s
+// REQUIRES: deprecated_gpe_mode
 
 import TensorFlow
 

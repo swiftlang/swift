@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift
+// REQUIRES: deprecated_gpe_mode
 
 import TensorFlow
 

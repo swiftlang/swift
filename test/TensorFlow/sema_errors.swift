@@ -22,22 +22,18 @@ public func testExpressibleByLiteral() {
 
 
 func testTensorFlowFunctionTypes() {
+  // expected-error@+2 {{convention 'tensorflow' not supported}}
+  // expected-error@+1 {{convention 'tensorflow' not supported}}
   var tf_fn, tf_fn2 : @convention(tensorflow) () -> ()
-  var fn : () -> ()
-  var cfn : @convention(c) () -> ()
 
   tf_fn = tf_fn2
-
-  tf_fn = fn // expected-error {{TensorFlow functions cannot be converted to other function types}}
-  fn = tf_fn // expected-error {{TensorFlow functions cannot be converted to other function types}}
-
-  tf_fn = cfn // expected-error {{TensorFlow functions cannot be converted to other function types}}
-  cfn = tf_fn // expected-error {{TensorFlow functions cannot be converted to other function types}}
+  tf_fn2 = tf_fn
 }
 
 
 // These are testcases that show the next steps in "@convention(tensorflow)" support.
 
+// expected-error@+1 {{convention 'tensorflow' not supported}}
 func takesTFFunc(fn : @convention(tensorflow) (Tensor<Float>) -> Tensor<Float>) {
 }
 
@@ -52,10 +48,11 @@ func testTFFunc() {
   // check if the closures that are tensorflow functions do not have captures.
   takesTFFunc { $0 + one }
   // FIXME: Should eventually be supported.
+  //expect-error@+1 {{convention 'tensorflow' not supported}}
   @convention(tensorflow) // expected-error {{attribute can only be applied to types, not declarations}}
   func inner1(a : Tensor<Float>) -> Tensor<Float> {
     return a+1
   }
-  takesTFFunc(fn: inner1)  // expected-error {{TensorFlow functions cannot be converted to other function types}}
+  takesTFFunc(fn: inner1)
 }
 

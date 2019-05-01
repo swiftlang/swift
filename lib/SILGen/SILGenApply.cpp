@@ -68,8 +68,6 @@ getIndirectApplyAbstractionPattern(SILGenFunction &SGF,
   switch (fnType->getRepresentation()) {
   case FunctionTypeRepresentation::Swift:
   case FunctionTypeRepresentation::Thin:
-  // SWIFT_ENABLE_TENSORFLOW
-  case FunctionTypeRepresentation::TensorFlow:
     return pattern;
 
   case FunctionTypeRepresentation::CFunctionPointer:

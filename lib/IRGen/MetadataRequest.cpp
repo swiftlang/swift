@@ -1034,8 +1034,6 @@ namespace {
         metadataConvention = FunctionMetadataConvention::Swift;
         isEscaping = !type->isNoEscape();
         break;
-      // SWIFT_ENABLE_TENSORFLOW
-      case FunctionTypeRepresentation::TensorFlow:
       case FunctionTypeRepresentation::Thin:
         metadataConvention = FunctionMetadataConvention::Thin;
         break;

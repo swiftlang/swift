@@ -1745,9 +1745,6 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, bool isAutoClosure) {
   case AnyFunctionType::Representation::Thin:
     return appendOperator("Xf");
   case AnyFunctionType::Representation::Swift:
-  // SWIFT_ENABLE_TENSORFLOW
-  case AnyFunctionType::Representation::TensorFlow:
-
     if (isAutoClosure) {
       if (fn->isNoEscape())
         return appendOperator("XK");

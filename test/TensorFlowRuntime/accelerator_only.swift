@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -emit-sil -O %s -verify | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
+// REQUIRES: deprecated_gpe_mode
 
 import TensorFlow
 #if TPU
