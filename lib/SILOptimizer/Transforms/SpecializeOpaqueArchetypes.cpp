@@ -10,31 +10,6 @@
 
 using namespace swift;
 
-/// A function object that can be used as a \c TypeSubstitutionFn and
-/// \c LookupConformanceFn for \c Type::subst style APIs to map opaque
-/// archetypes with underlying types visible at a given resilience expansion
-/// to their underlying types.
-class ReplaceOpaqueTypesWithUnderlyingTypes {
-public:
-  SILFunction *context;
-  ReplaceOpaqueTypesWithUnderlyingTypes(
-      SILFunction *context)
-      : context(context) {}
-
-  /// TypeSubstitutionFn
-  Type operator()(SubstitutableType *maybeOpaqueType) const;
-
-  /// LookupConformanceFn
-  Optional<ProtocolConformanceRef> operator()(CanType maybeOpaqueType,
-                                              Type replacementType,
-                                              ProtocolDecl *protocol) const;
-
-  bool shouldPerformSubstitution(OpaqueTypeDecl *opaque) const;
-
-  static bool shouldPerformSubstitution(OpaqueTypeDecl *opaque,
-                                        SILFunction *context);
-};
-
 static Type substOpaqueTypesWithUnderlyingTypes(
     Type ty, SILFunction *context) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(context);
@@ -45,129 +20,6 @@ static SubstitutionMap
 substOpaqueTypesWithUnderlyingTypes(SubstitutionMap map, SILFunction *context) {
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(context);
   return map.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
-}
-
-static ProtocolConformanceRef
-substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
-                                    SILFunction *context) {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(context);
-  return ref.subst(origType, replacer, replacer,
-                   SubstFlags::SubstituteOpaqueArchetypes);
-}
-
-static Optional<std::pair<ArchetypeType *, OpaqueTypeArchetypeType*>>
-getArchetypeAndRootOpaqueArchetype(Type maybeOpaqueType) {
-  auto archetype = dyn_cast<ArchetypeType>(maybeOpaqueType.getPointer());
-  if (!archetype)
-    return None;
-  auto opaqueRoot = dyn_cast<OpaqueTypeArchetypeType>(archetype->getRoot());
-  if (!opaqueRoot)
-    return None;
-
-  return std::make_pair(archetype, opaqueRoot);
-}
-bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
-    OpaqueTypeDecl *opaque) const {
-  return shouldPerformSubstitution(opaque, context);
-}
-
-bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
-    OpaqueTypeDecl *opaque, SILFunction *context) {
-  auto namingDecl = opaque->getNamingDecl();
-
-  // Allow replacement of opaque result types of inlineable function regardless
-  // of resilience and in which context.
-  if (namingDecl->getAttrs().hasAttribute<InlinableAttr>()) {
-    return true;
-  }
-  // Allow replacement of opaque result types in the context of maximal
-  // resilient expansion if the context's and the opaque type's module are the
-  // same.
-  auto expansion = context->getResilienceExpansion();
-  auto module = namingDecl->getModuleContext();
-  if (expansion == ResilienceExpansion::Maximal &&
-      module == context->getModule().getSwiftModule())
-    return true;
-
-  // Allow general replacement from non resilient modules. Otherwise, disallow.
-  return !module->isResilient();
-}
-
-Type ReplaceOpaqueTypesWithUnderlyingTypes::
-operator()(SubstitutableType *maybeOpaqueType) const {
-  auto archetypeAndRoot = getArchetypeAndRootOpaqueArchetype(maybeOpaqueType);
-  if (!archetypeAndRoot)
-    return maybeOpaqueType;
-
-  auto archetype = archetypeAndRoot->first;
-  auto opaqueRoot = archetypeAndRoot->second;
-
-  if (!shouldPerformSubstitution(opaqueRoot->getDecl())) {
-    return maybeOpaqueType;
-  }
-
-  auto subs = opaqueRoot->getDecl()->getUnderlyingTypeSubstitutions();
-  // TODO: Check the resilience expansion, and handle opaque types with
-  // unknown underlying types. For now, all opaque types are always
-  // fragile.
-  assert(subs.hasValue() && "resilient opaque types not yet supported");
-
-  // Apply the underlying type substitutions to the interface type of the
-  // archetype in question. This will map the inner generic signature of the
-  // opaque type to its outer signature.
-  auto partialSubstTy = archetype->getInterfaceType().subst(*subs);
-  // Then apply the substitutions from the root opaque archetype, to specialize
-  // for its type arguments.
-  auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
-
-  // If the type still contains opaque types, recur.
-  if (substTy->hasOpaqueArchetype()) {
-    return substOpaqueTypesWithUnderlyingTypes(substTy,
-                                               context);
-  }
-  return substTy;
-}
-
-Optional<ProtocolConformanceRef> ReplaceOpaqueTypesWithUnderlyingTypes::
-operator()(CanType maybeOpaqueType, Type replacementType,
-           ProtocolDecl *protocol) const {
-  auto abstractRef = ProtocolConformanceRef(protocol);
-
-  auto archetypeAndRoot = getArchetypeAndRootOpaqueArchetype(maybeOpaqueType);
-  if (!archetypeAndRoot) {
-    assert(maybeOpaqueType->isTypeParameter() ||
-           maybeOpaqueType->is<ArchetypeType>());
-    return abstractRef;
-  }
-
-  auto archetype = archetypeAndRoot->first;
-  auto opaqueRoot = archetypeAndRoot->second;
-
-  if (!shouldPerformSubstitution(opaqueRoot->getDecl())) {
-    return abstractRef;
-  }
-
-  auto subs = opaqueRoot->getDecl()->getUnderlyingTypeSubstitutions();
-  assert(subs.hasValue());
-
-  // Apply the underlying type substitutions to the interface type of the
-  // archetype in question. This will map the inner generic signature of the
-  // opaque type to its outer signature.
-  auto partialSubstTy = archetype->getInterfaceType().subst(*subs);
-  auto partialSubstRef =
-      abstractRef.subst(archetype->getInterfaceType(), *subs);
-
-  // Then apply the substitutions from the root opaque archetype, to specialize
-  // for its type arguments.
-  auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
-  auto substRef =
-      partialSubstRef.subst(partialSubstTy, opaqueRoot->getSubstitutions());
-
-  // If the type still contains opaque types, recur.
-  if (substTy->hasOpaqueArchetype()) {
-    return substOpaqueTypesWithUnderlyingTypes(substRef, substTy, context);
-  }
-  return substRef;
 }
 
 namespace {
@@ -214,13 +66,67 @@ protected:
     auto origResult = Inst->getOperand();
     auto clonedResult = getOpValue(Inst->getOperand());
     if (clonedResult->getType().getASTType() !=
-        origResult->getType().getASTType())
-      clonedResult = getBuilder().createUncheckedRefCast(
-          RegularLocation::getAutoGeneratedLocation(), clonedResult,
-          origResult->getType());
+        origResult->getType().getASTType()) {
+      clonedResult = createCast(RegularLocation::getAutoGeneratedLocation(),
+                                clonedResult, origResult->getType());
+    }
     recordClonedInstruction(
         Inst,
         getBuilder().createReturn(getOpLocation(Inst->getLoc()), clonedResult));
+  }
+
+  void visitStructInst(StructInst *Inst) {
+    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+    auto elements = getOpValueArray<8>(Inst->getElements());
+    auto structTy = getOpType(Inst->getType());
+    auto *structDecl = structTy.getStructOrBoundGenericStruct();
+    unsigned idx = 0;
+    // Adjust field types if neccessary.
+    for (VarDecl *field : structDecl->getStoredProperties()) {
+      SILType loweredType = structTy.getFieldType(
+          field, getBuilder().getFunction().getModule());
+      if (elements[idx]->getType() != loweredType) {
+        elements[idx] = createCast(getOpLocation(Inst->getLoc()), elements[idx],
+                                   loweredType);
+      }
+      idx++;
+    }
+    recordClonedInstruction(
+      Inst, getBuilder().createStruct(getOpLocation(Inst->getLoc()),
+                                      getOpType(Inst->getType()), elements));
+  }
+
+  void visitTupleInst(TupleInst *Inst) {
+    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+    auto elements = getOpValueArray<8>(Inst->getElements());
+    auto tupleTy = getOpType(Inst->getType());
+    for (size_t i = 0, size = Inst->getElements().size(); i < size; ++i) {
+      auto elementTy = tupleTy.getTupleElementType(i);
+      if (Inst->getElement(i)->getType() != elementTy) {
+        elements[i] =
+            createCast(getOpLocation(Inst->getLoc()), elements[i], elementTy);
+      }
+    }
+    recordClonedInstruction(
+        Inst, getBuilder().createTuple(getOpLocation(Inst->getLoc()),
+                                       getOpType(Inst->getType()), elements));
+  }
+
+  void visitEnumInst(EnumInst *Inst) {
+    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+    SILValue opd = SILValue();
+    if (Inst->hasOperand()) {
+      SILType caseTy = Inst->getType().getEnumElementType(
+          Inst->getElement(), getBuilder().getFunction().getModule());
+      opd = getOpValue(Inst->getOperand());
+      if (opd->getType() != caseTy) {
+        opd = createCast(getOpLocation(Inst->getLoc()), opd, caseTy);
+      }
+    }
+    recordClonedInstruction(
+        Inst, getBuilder().createEnum(getOpLocation(Inst->getLoc()), opd,
+                                      Inst->getElement(),
+                                      getOpType(Inst->getType())));
   }
 
   /// Projections should not change the type if the type is not specialized.
@@ -282,15 +188,8 @@ protected:
     for (auto idx : indices(Values)) {
       if (OrigValues[idx]->getType().getASTType() !=
           Values[idx]->getType().getASTType()) {
-        if (!Values[idx]->getType().isAddress()) {
-          Values[idx] = getBuilder().createUncheckedRefCast(
-              RegularLocation::getAutoGeneratedLocation(), Values[idx],
-              OrigValues[idx]->getType());
-        } else {
-          Values[idx] = getBuilder().createUncheckedAddrCast(
-              RegularLocation::getAutoGeneratedLocation(), Values[idx],
-              OrigValues[idx]->getType());
-        }
+        Values[idx] = createCast(RegularLocation::getAutoGeneratedLocation(),
+                                 Values[idx], OrigValues[idx]->getType());
       }
     }
 
@@ -332,8 +231,8 @@ protected:
     if (destType.getASTType() != srcType.getASTType()) {
       if (srcType.getASTType()->hasOpaqueArchetype()) {
         assert(!srcType.isAddress());
-        src = getBuilder().createUncheckedRefCast(
-            getOpLocation(Inst->getLoc()), src, destType.getObjectType());
+        src = createCast(getOpLocation(Inst->getLoc()), src,
+                         destType.getObjectType());
       } else if (destType.getASTType()->hasOpaqueArchetype()) {
         dst = getBuilder().createUncheckedAddrCast(
             getOpLocation(Inst->getLoc()), dst, srcType.getAddressType());
@@ -401,6 +300,55 @@ protected:
     // Apply the opaque types substitution.
     return substOpaqueTypesWithUnderlyingTypes(Subs, &Original);
   }
+
+  SILValue createCast(SILLocation loc, SILValue opd, SILType type) {
+    auto &CurFn = getBuilder().getFunction();
+    if (opd->getType().isAddress()) {
+      return getBuilder().createUncheckedAddrCast(loc, opd, type);
+    } else if (opd->getType().is<SILFunctionType>()) {
+      return getBuilder().createConvertFunction(
+          loc, opd, type, /*withoutActuallyEscaping*/ false);
+    } else if (opd->getType().isTrivial(CurFn)) {
+      return getBuilder().createUncheckedTrivialBitCast(loc, opd, type);
+    } else {
+      return getBuilder().createUncheckedRefCast(loc, opd, type);
+    }
+  }
+
+  void fixUp(SILFunction *) {
+    for (auto &BB : getBuilder().getFunction()) {
+      for (auto &cloned : BB) {
+        // Fix up the type of try_apply successor block arguments.
+        if (auto *tryApply = dyn_cast<TryApplyInst>(&cloned)) {
+          auto normalBB = tryApply->getNormalBB();
+          SILFunctionConventions calleeConv(
+              tryApply->getSubstCalleeType(),
+              tryApply->getFunction()->getModule());
+          auto normalBBType = (*normalBB->args_begin())->getType();
+          auto applyResultType = calleeConv.getSILResultType();
+          if (normalBBType != calleeConv.getSILResultType()) {
+            auto origPhi = normalBB->getPhiArguments()[0];
+            SILValue undef =
+                SILUndef::get(normalBBType, getBuilder().getFunction());
+            SmallVector<Operand *, 8> useList(origPhi->use_begin(),
+                                              origPhi->use_end());
+            for (auto *use : useList) {
+              use->set(undef);
+            }
+
+            auto *newPhi = normalBB->replacePhiArgument(
+                0, applyResultType, origPhi->getOwnershipKind());
+
+            getBuilder().setInsertionPoint(normalBB->begin());
+            auto cast = createCast(tryApply->getLoc(), newPhi, normalBBType);
+            for (auto *use : useList) {
+              use->set(cast);
+            }
+          }
+        }
+      }
+    }
+  }
 };
 } // namespace
 
@@ -434,6 +382,15 @@ void OpaqueSpecializerCloner::insertOpaqueToConcreteAddressCasts(
           auto cast = getBuilder().createUncheckedAddrCast(apply.getLoc(),
                                                            opd.get(), argType);
           opd.set(cast);
+        } else if (argType.is<SILFunctionType>()) {
+          auto cast = getBuilder().createConvertFunction(
+              apply.getLoc(), opd.get(), argType,
+              /*withoutActuallyEscaping*/ false);
+          opd.set(cast);
+        } else if (argType.isTrivial(getBuilder().getFunction())) {
+          auto cast = getBuilder().createUncheckedTrivialBitCast(
+              apply.getLoc(), opd.get(), argType);
+          opd.set(cast);
         } else {
           auto cast = getBuilder().createUncheckedRefCast(apply.getLoc(),
                                                           opd.get(), argType);
@@ -442,7 +399,6 @@ void OpaqueSpecializerCloner::insertOpaqueToConcreteAddressCasts(
       }
       ++idx;
     }
-    return;
   }
 }
 
@@ -450,6 +406,9 @@ namespace {
 class OpaqueArchetypeSpecializer : public SILFunctionTransform {
   void run() override {
     auto *context = getFunction();
+
+    if (!context->shouldOptimize())
+      return;
 
     auto opaqueArchetypeWouldChange = [=](CanType ty) -> bool {
       if (!ty->hasOpaqueArchetype())

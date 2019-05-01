@@ -372,3 +372,74 @@ public func testResilientInlinablePropertyCallsResilientInlinable() {
 // RESILIENT:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External218ResilientContainerV16computedPropertyQrvp", 0)
 // RESILIENT:  [[FUN:%.*]] = function_ref @$s9External218ResilientContainerV16computedPropertyQrvg
 // RESILIENT:  apply [[FUN]]([[RES]], %0)
+
+
+protocol P4 {
+  associatedtype AT
+  func foo(_ x: Int64) -> AT
+}
+struct PA : P4 {
+  func foo(_ x: Int64)  -> some P {
+    return Int64(x)
+  }
+}
+
+@inline(never)
+func testIt<T>(cl: (Int64) throws -> T) {
+ do {
+   print(try cl(5))
+ } catch (_) {}
+}
+
+// CHECK-LABEL: sil shared [noinline] @$s1A16testPartialApplyyyxAA2P4RzlFAA2PAV_Tg5
+// CHECK:  [[PA:%.*]] = alloc_stack $PA
+// CHECK:  store %0 to [[PA]] : $*PA
+// CHECK:  [[F:%.*]] = function_ref @$s1A2PAVAA2P4A2aDP3fooy2ATQzs5Int64VFTW : $@convention(witness_method: P4) (Int64, @in_guaranteed PA) -> @out @_opaqueReturnTypeOf("$s1A2PAV3fooyQrs5Int64VF", 0)
+// CHECK:  [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[PA]]) : $@convention(witness_method: P4) (Int64, @in_guaranteed PA) -> @out @_opaqueReturnTypeOf("$s1A2PAV3fooyQrs5Int64VF", 0)
+// CHECK:  convert_function [[C]] : $@callee_guaranteed (Int64) -> @out @_opaqueReturnTypeOf("$s1A2PAV3fooyQrs5Int64VF", {{.*}} to $@callee_guaranteed (Int64) -> (@out Int64, @error Error)
+@inline(never)
+func testPartialApply<T: P4>(_ t: T) {
+  let fun = t.foo
+  testIt(cl: fun)
+  print(fun(5))
+}
+
+public func testPartialApply() {
+  testPartialApply(PA())
+}
+
+struct Trivial<T> {
+  var x : Int64
+}
+
+func createTrivial<T>(_ t: T) -> Trivial<T> {
+  return Trivial<T>(x: 1)
+}
+
+// CHECK: sil @$s1A11testTrivialyyF : $@convention(thin) () -> ()
+// CHECK:   %0 = integer_literal $Builtin.Int64, 1
+// CHECK:   %1 = struct $Int64 (%0 : $Builtin.Int64)
+// CHECK:   %2 = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5 : $@convention(thin) (Int64) -> ()
+// CHECK:   %3 = apply %2(%1)
+public func testTrivial() {
+   let s = bar(10)
+   let t = createTrivial(s)
+   useP(t.x)
+}
+
+func createTuple<T>(_ t: T) -> (T,T) {
+  return (t, t)
+}
+
+// CHECK: sil @$s1A9testTupleyyF
+// CHECK:  [[I:%.*]] = integer_literal $Builtin.Int64, 10
+// CHECK:  [[I2:%.*]] = struct $Int64 ([[I]] : $Builtin.Int64)
+// CHECK:  [[F:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5 : $@convention(thin) (Int64) -> ()
+// CHECK:  apply [[F]]([[I2]]) : $@convention(thin) (Int64) -> ()
+// CHECK:  apply [[F]]([[I2]]) : $@convention(thin) (Int64) -> ()
+public func testTuple() {
+  let s = bar(10)
+  let t = createTuple(s)
+  useP(t.0)
+  useP(t.1)
+}

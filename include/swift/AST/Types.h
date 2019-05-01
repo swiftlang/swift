@@ -4092,7 +4092,8 @@ public:
   /// std::error_code. This is only meant to be used in assertions. When
   /// assertions are disabled, this just returns true.
   ABICompatibilityCheckResult
-  isABICompatibleWith(CanSILFunctionType other) const;
+  isABICompatibleWith(CanSILFunctionType other,
+                      SILFunction *context = nullptr) const;
 
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                       SubstitutionMap subs);
@@ -4820,6 +4821,31 @@ private:
 };
 BEGIN_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
 END_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
+
+/// A function object that can be used as a \c TypeSubstitutionFn and
+/// \c LookupConformanceFn for \c Type::subst style APIs to map opaque
+/// archetypes with underlying types visible at a given resilience expansion
+/// to their underlying types.
+class ReplaceOpaqueTypesWithUnderlyingTypes {
+public:
+  SILFunction *context;
+  ReplaceOpaqueTypesWithUnderlyingTypes(
+      SILFunction *context)
+      : context(context) {}
+
+  /// TypeSubstitutionFn
+  Type operator()(SubstitutableType *maybeOpaqueType) const;
+
+  /// LookupConformanceFn
+  Optional<ProtocolConformanceRef> operator()(CanType maybeOpaqueType,
+                                              Type replacementType,
+                                              ProtocolDecl *protocol) const;
+
+  bool shouldPerformSubstitution(OpaqueTypeDecl *opaque) const;
+
+  static bool shouldPerformSubstitution(OpaqueTypeDecl *opaque,
+                                        SILFunction *context);
+};
 
 /// An archetype that represents the dynamic type of an opened existential.
 class OpenedArchetypeType final : public ArchetypeType,
