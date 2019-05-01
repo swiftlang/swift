@@ -2011,7 +2011,7 @@ function set_lldb_xcodebuild_options() {
         lldb_xcodebuild_options=(
             "${lldb_xcodebuild_options[@]}"
             ENABLE_TENSORFLOW=1
-            EXTRA_OTHER_LDFLAGS="-L\$(LLDB_PATH_TO_SWIFT_BUILD)/lib/swift/\$(PLATFORM_NAME) ${RPATHS} -ltensorflow -ltensorflow_framework"
+            EXTRA_OTHER_LDFLAGS="-L\$(LLDB_PATH_TO_SWIFT_BUILD)/lib/swift/\$(PLATFORM_NAME) ${RPATHS} -ltensorflow"
         )
     fi
 }
@@ -2993,7 +2993,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 # Configure TensorFlow and build using bazel.
                 echo yes "" | "${source_dir}/configure"
                 with_pushd "${source_dir}" \
-                    call bazel build -c opt "${TENSORFLOW_BAZEL_OPTIONS[@]}" //tensorflow:libtensorflow.so //tensorflow:libtensorflow_framework.so
+                    call bazel build -c opt "${TENSORFLOW_BAZEL_OPTIONS[@]}" --define framework_shared_object=false //tensorflow:libtensorflow.so //tensorflow:libtensorflow_framework.so
 
                 # Set TensorFlow include/lib directories.
                 TENSORFLOW_HOST_INCLUDE_DIR="${source_dir}"
