@@ -125,6 +125,7 @@ extension String: RangeReplaceableCollection {
   ///     // Prints "Hello, friend"
   ///
   /// - Parameter other: Another string.
+  @_semantics("string.append")
   public mutating func append(_ other: String) {
     if self.isEmpty && !_guts.hasNativeStorage {
       self = other
