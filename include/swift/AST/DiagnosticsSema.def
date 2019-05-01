@@ -1028,6 +1028,9 @@ ERROR(extra_argument_to_nullary_call,none,
       "argument passed to call that takes no arguments", ())
 ERROR(extra_trailing_closure_in_call,none,
       "extra trailing closure passed in call", ())
+ERROR(trailing_closure_bad_param,none,
+      "trailing closure passed to parameter of type %0 that does not "
+      "accept a closure", (Type))
 ERROR(no_accessible_initializers,none,
       "%0 cannot be constructed because it has no accessible initializers",
       (Type))

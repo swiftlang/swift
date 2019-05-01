@@ -355,6 +355,10 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
       result = CC_ArgumentLabelMismatch;
       return true;
     }
+    bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx) override {
+      result = CC_ArgumentMismatch;
+      return true;
+    }
   } listener;
   
   // Use matchCallArguments to determine how close the argument list is (in
