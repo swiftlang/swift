@@ -15,6 +15,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/StringMap.h"
 #include <string>
 
 namespace sourcekitd_test {
@@ -112,6 +113,14 @@ struct TestOptions {
   unsigned repeatRequest = 1;
   // SWIFT_ENABLE_TENSORFLOW
   bool InMemoryClangModuleCache;
+  struct VFSFile {
+    std::string path;
+    bool passAsSourceText;
+    VFSFile(std::string path, bool passAsSourceText)
+        : path(std::move(path)), passAsSourceText(passAsSourceText) {}
+  };
+  llvm::StringMap<VFSFile> VFSFiles;
+  llvm::Optional<std::string> VFSName;
   llvm::Optional<bool> CancelOnSubsequentRequest;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
   void printHelp(bool ShowHidden) const;
