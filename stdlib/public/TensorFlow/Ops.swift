@@ -1665,30 +1665,6 @@ public extension Tensor {
   func broadcast<OtherScalar>(like other: Tensor<OtherScalar>) -> Tensor {
     return broadcast(toShape: other.shapeTensor)
   }
-}
-
-public extension Tensor where Scalar : Numeric {
-  @inlinable
-  func unbroadcast(toShape otherShape: Tensor<Int32>) -> Tensor {
-    let rankDiff = (rankTensor - otherShape.scalarCountTensor).rankLifted()
-    let ones: Tensor<Int32> = Raw.fill(dims: rankDiff, value: Tensor<Int32>(1))
-    let paddedShape = ones ++ otherShape
-    let nonEqualIndices = paddedShape .!= shapeTensor
-    let broadcastIndices = Raw.where_(nonEqualIndices).flattened()
-    let unbroadcasted: Tensor = Raw.sum(
-      self, reductionIndices: Tensor<Int32>(broadcastIndices), keepDims: false)
-    return Raw.reshape(unbroadcasted, shape: otherShape)
-  }
-
-  @inlinable @inline(__always)
-  func unbroadcast<OtherScalar>(like other: Tensor<OtherScalar>) -> Tensor {
-    return unbroadcast(toShape: other.shapeTensor)
-  }
-
-  @inlinable @inline(__always)
-  func unbroadcast(to shape: TensorShape) -> Tensor {
-    return unbroadcast(toShape: Tensor<Int32>(shape.dimensions.map(Int32.init)))
-  }
 
   @inlinable @inline(__always)
   static func .= (lhs: inout Tensor, rhs: Tensor) {

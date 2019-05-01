@@ -210,7 +210,10 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
     return (lhs + rhs, {
       [lhsShape = lhs.shapeTensor, rhsShape = rhs.shapeTensor] v in
-      return (v.unbroadcast(toShape: lhsShape), v.unbroadcast(toShape: rhsShape))
+      let (lhsAxes, rhsAxes) =
+        Raw.broadcastGradientArgs(s0: lhsShape, s1: rhsShape)
+      return (v.sum(squeezingAxes: lhsAxes).reshaped(toShape: lhsShape),
+              v.sum(squeezingAxes: rhsAxes).reshaped(toShape: rhsShape))
     })
   }
 
@@ -220,8 +223,10 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
     return (lhs - rhs, {
       [lhsShape = lhs.shapeTensor, rhsShape = rhs.shapeTensor] v in
-      return (v.unbroadcast(toShape: lhsShape),
-              -v.unbroadcast(toShape: rhsShape))
+      let (lhsAxes, rhsAxes) =
+        Raw.broadcastGradientArgs(s0: lhsShape, s1: rhsShape)
+      return (v.sum(squeezingAxes: lhsAxes).reshaped(toShape: lhsShape),
+              -v.sum(squeezingAxes: rhsAxes).reshaped(toShape: rhsShape))
     })
   }
 
@@ -229,10 +234,12 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   static func _vjpMultiply(
     lhs: Tensor, rhs: Tensor
   ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
-    return (lhs * rhs, {
-      [lhsShape = lhs.shapeTensor, rhsShape = rhs.shapeTensor] v in
-      ((rhs * v).unbroadcast(toShape: lhsShape),
-       (lhs * v).unbroadcast(toShape: rhsShape))
+    return (lhs * rhs, { v in
+      let (lhsShape, rhsShape) = (lhs.shapeTensor, rhs.shapeTensor)
+      let (lhsAxes, rhsAxes) =
+        Raw.broadcastGradientArgs(s0: lhsShape, s1: rhsShape)
+      return ((rhs * v).sum(squeezingAxes: lhsAxes).reshaped(toShape: lhsShape),
+              (lhs * v).sum(squeezingAxes: rhsAxes).reshaped(toShape: rhsShape))
     })
   }
 
@@ -240,10 +247,14 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   static func _vjpDivide(
     lhs: Tensor, rhs: Tensor
   ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
-    return (lhs / rhs, {
-      [lhsShape = lhs.shapeTensor, rhsShape = rhs.shapeTensor] v in
-      ((v / rhs).unbroadcast(toShape: lhsShape),
-       ((-lhs) / rhs.squared() * v).unbroadcast(toShape: rhsShape))
+    return (lhs / rhs, { v in
+      let (lhsShape, rhsShape) = (lhs.shapeTensor, rhs.shapeTensor)
+      let (lhsAxes, rhsAxes) =
+        Raw.broadcastGradientArgs(s0: lhsShape, s1: rhsShape)
+      return ((v / rhs).sum(squeezingAxes: lhsAxes)
+                .reshaped(toShape: lhsShape),
+              (-lhs / rhs.squared() * v).sum(squeezingAxes: rhsAxes)
+                .reshaped(toShape: rhsShape))
     })
   }
 }
@@ -267,14 +278,14 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   static func _vjpSubtract(
     lhs: Tensor, rhs: Scalar
   ) -> (Tensor, (Tensor) -> (Tensor, Scalar)) {
-    return (lhs - rhs, { v in (v, 0 - v.sum().scalarized()) })
+    return (lhs - rhs, { v in (v, -v.sum().scalarized()) })
   }
 
   @inlinable
   static func _vjpSubtract(
     lhs: Scalar, rhs: Tensor
   ) -> (Tensor, (Tensor) -> (Scalar, Tensor)) {
-    return (lhs - rhs, { v in (v.sum().scalarized(), 0 - v) })
+    return (lhs - rhs, { v in (v.sum().scalarized(), -v) })
   }
 
   @inlinable
@@ -296,7 +307,7 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
     lhs: Tensor, rhs: Scalar
   ) -> (Tensor, (Tensor) -> (Tensor, Scalar)) {
     return (lhs / rhs, { v in
-      (v / rhs, (v * (0 - lhs) / Tensor(rhs).squared()).sum().scalarized())
+      (v / rhs, (v * -lhs / Tensor(rhs).squared()).sum().scalarized())
     })
   }
 
@@ -317,7 +328,10 @@ func _vjpMinMaxHelper<T : TensorFlowFloatingPoint>(
   let denom = 1 + Tensor<T>(x .== y)
   let dfdx = vector * Tensor<T>(x .== originalValue) / denom
   let dfdy = vector * Tensor<T>(y .== originalValue) / denom
-  return (dfdx.unbroadcast(like: x), dfdy.unbroadcast(like: y))
+  let (xShape, yShape) = (x.shapeTensor, y.shapeTensor)
+  let (xAxes, yAxes) = Raw.broadcastGradientArgs(s0: xShape, s1: yShape)
+  return (dfdx.sum(squeezingAxes: xAxes).reshaped(toShape: xShape),
+          dfdy.sum(squeezingAxes: yAxes).reshaped(toShape: yShape))
 }
 
 @inlinable
@@ -325,8 +339,9 @@ func _vjpMax<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>, _ y: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> (Tensor<T>, Tensor<T>)) {
   let value = max(x, y)
-  return (value,
-    { v in _vjpMinMaxHelper(x, y, originalValue: value, vector: v) })
+  return (value, { v in
+    _vjpMinMaxHelper(x, y, originalValue: value, vector: v)
+  })
 }
 
 @inlinable
@@ -334,8 +349,9 @@ func _vjpMin<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>, _ y: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> (Tensor<T>, Tensor<T>)) {
   let value = min(x, y)
-  return (value,
-    { v in _vjpMinMaxHelper(x, y, originalValue: value, vector: v) })
+  return (value, { v in
+    _vjpMinMaxHelper(x, y, originalValue: value, vector: v)
+  })
 }
 
 @inlinable
@@ -344,8 +360,12 @@ func _vjpPow<T : TensorFlowFloatingPoint>(
 ) -> (Tensor<T>, (Tensor<T>) -> (Tensor<T>, Tensor<T>)) {
   let value = pow(x, y)
   return (value, { v in
-    ((v * y * pow(x, y-1)).unbroadcast(like: x),
-     (v * log(x) * value).unbroadcast(like: y))
+    let (xShape, yShape) = (x.shapeTensor, y.shapeTensor)
+    let (xAxes, yAxes) = Raw.broadcastGradientArgs(s0: xShape, s1: yShape)
+    return ((v * y * pow(x, y-1)).sum(squeezingAxes: xAxes)
+              .reshaped(toShape: xShape),
+            (v * log(x) * value).sum(squeezingAxes: yAxes)
+              .reshaped(toShape: yShape))
   })
 }
 
