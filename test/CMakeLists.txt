@@ -17,10 +17,10 @@ function(swift_configure_lit_site_cfg source_path destination_path installed_nam
   configure_file("${source_path}" "${destination_path}" @ONLY)
 
   if(NOT "${installed_name}" STREQUAL "")
-    swift_install_in_component(testsuite-tools
-        FILES "${destination_path}"
-        RENAME "${installed_name}"
-        DESTINATION "share/swift/testsuite")
+    swift_install_in_component(FILES "${destination_path}"
+                               RENAME "${installed_name}"
+                               DESTINATION "share/swift/testsuite"
+                               COMPONENT testsuite-tools)
   endif()
 endfunction()
 
