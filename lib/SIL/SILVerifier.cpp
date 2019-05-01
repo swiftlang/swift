@@ -410,6 +410,130 @@ void verifyKeyPathComponent(SILModule &M,
   baseTy = componentTy;
 }
 
+/// Check if according to the SIL language model this memory /must only/ be used
+/// immutably. Today this is only applied to in_guaranteed arguments and
+/// open_existential_addr. We should expand it as needed.
+struct ImmutableAddressUseVerifier {
+  SmallVector<Operand *, 32> worklist;
+
+  bool isConsumingOrMutatingApplyUse(Operand *use) {
+    ApplySite apply(use->getUser());
+    assert(apply && "Not an apply instruction kind");
+    auto conv = apply.getArgumentConvention(*use);
+    switch (conv) {
+    case SILArgumentConvention::Indirect_In_Guaranteed:
+      return false;
+
+    case SILArgumentConvention::Indirect_InoutAliasable:
+      // DISCUSSION: We do not consider inout_aliasable to be "truly mutating"
+      // since today it is just used as a way to mark a captured argument and
+      // not that something truly has mutating semantics. The reason why this
+      // is safe is that the typechecker guarantees that if our value was
+      // immutable, then the use in the closure must be immutable as well.
+      //
+      // TODO: Remove this in favor of using Inout and In_Guaranteed.
+      return false;
+
+    case SILArgumentConvention::Indirect_Out:
+    case SILArgumentConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_In_Constant:
+    case SILArgumentConvention::Indirect_Inout:
+      return true;
+
+    case SILArgumentConvention::Direct_Unowned:
+    case SILArgumentConvention::Direct_Guaranteed:
+    case SILArgumentConvention::Direct_Owned:
+    case SILArgumentConvention::Direct_Deallocating:
+      assert(conv.isIndirectConvention() && "Expect an indirect convention");
+      return true; // return something "conservative".
+    }
+    llvm_unreachable("covered switch isn't covered?!");
+  };
+
+  /// A "copy_addr %src [take] to *" is consuming on "%src".
+  /// A "copy_addr * to * %dst" is mutating on "%dst".
+  bool isConsumingOrMutatingCopyAddrUse(Operand *use) {
+    auto *copyAddr = cast<CopyAddrInst>(use->getUser());
+    if (copyAddr->getDest() == use->get())
+      return true;
+    if (copyAddr->getSrc() == use->get() && copyAddr->isTakeOfSrc() == IsTake)
+      return true;
+    return false;
+  }
+
+  bool isCastToNonConsuming(UncheckedAddrCastInst *i) {
+    for (auto *use : i->getUses()) {
+      auto *inst = use->getUser();
+      switch (inst->getKind()) {
+      case SILInstructionKind::ApplyInst:
+      case SILInstructionKind::TryApplyInst:
+      case SILInstructionKind::PartialApplyInst:
+        if (isConsumingOrMutatingApplyUse(use))
+          return false;
+        continue;
+      default:
+        continue;
+      }
+    }
+    return true;
+  }
+
+  bool isMutatingOrConsuming(SILValue address) {
+    for (auto *use : address->getUses()) {
+      auto *inst = use->getUser();
+      if (inst->isTypeDependentOperand(*use))
+        continue;
+      switch (inst->getKind()) {
+      case SILInstructionKind::MarkDependenceInst:
+        break;
+      case SILInstructionKind::ApplyInst:
+      case SILInstructionKind::TryApplyInst:
+      case SILInstructionKind::PartialApplyInst:
+        if (isConsumingOrMutatingApplyUse(use))
+          return true;
+        else
+          break;
+      case SILInstructionKind::CopyAddrInst:
+        if (isConsumingOrMutatingCopyAddrUse(use))
+          return true;
+        else
+          break;
+      case SILInstructionKind::DestroyAddrInst:
+        return true;
+      case SILInstructionKind::UncheckedAddrCastInst: {
+        if (isCastToNonConsuming(cast<UncheckedAddrCastInst>(inst))) {
+          break;
+        }
+        return true;
+      }
+      case SILInstructionKind::CheckedCastAddrBranchInst:
+        switch (cast<CheckedCastAddrBranchInst>(inst)->getConsumptionKind()) {
+        case CastConsumptionKind::BorrowAlways:
+          llvm_unreachable("checked_cast_addr_br cannot have BorrowAlways");
+        case CastConsumptionKind::CopyOnSuccess:
+          break;
+        case CastConsumptionKind::TakeAlways:
+        case CastConsumptionKind::TakeOnSuccess:
+          return true;
+        }
+        break;
+      case SILInstructionKind::LoadInst:
+        // A 'non-taking' value load is harmless.
+        return cast<LoadInst>(inst)->getOwnershipQualifier() ==
+               LoadOwnershipQualifier::Take;
+        break;
+      case SILInstructionKind::DebugValueAddrInst:
+        // Harmless use.
+        break;
+      default:
+        llvm_unreachable("Unhandled unexpected instruction");
+        break;
+      }
+    }
+    return false;
+  }
+};
+
 /// The SIL verifier walks over a SIL function / basic block / instruction,
 /// checking and enforcing its invariants.
 class SILVerifier : public SILVerifierBase<SILVerifier> {
@@ -2877,123 +3001,8 @@ public:
     if (allowedAccessKind == OpenedExistentialAccess::Mutable)
       return;
 
-    auto isConsumingOrMutatingApplyUse = [](Operand *use) -> bool {
-      ApplySite apply(use->getUser());
-      assert(apply && "Not an apply instruction kind");
-      auto conv = apply.getArgumentConvention(*use);
-      switch (conv) {
-      case SILArgumentConvention::Indirect_In_Guaranteed:
-        return false;
-
-      case SILArgumentConvention::Indirect_InoutAliasable:
-        // DISCUSSION: We do not consider inout_aliasable to be "truly mutating"
-        // since today it is just used as a way to mark a captured argument and
-        // not that something truly has mutating semantics. The reason why this
-        // is safe is that the typechecker guarantees that if our value was
-        // immutable, then the use in the closure must be immutable as well.
-        //
-        // TODO: Remove this in favor of using Inout and In_Guaranteed.
-        return false;
-
-      case SILArgumentConvention::Indirect_Out:
-      case SILArgumentConvention::Indirect_In:
-      case SILArgumentConvention::Indirect_In_Constant:
-      case SILArgumentConvention::Indirect_Inout:
-        return true;
-
-      case SILArgumentConvention::Direct_Unowned:
-      case SILArgumentConvention::Direct_Guaranteed:
-      case SILArgumentConvention::Direct_Owned:
-      case SILArgumentConvention::Direct_Deallocating:
-        assert(conv.isIndirectConvention() && "Expect an indirect convention");
-        return true; // return something "conservative".
-      }
-      llvm_unreachable("covered switch isn't covered?!");
-    };
-
-    // A "copy_addr %src [take] to *" is consuming on "%src".
-    // A "copy_addr * to * %dst" is mutating on "%dst".
-    auto isConsumingOrMutatingCopyAddrUse = [](Operand *use) -> bool {
-      auto *copyAddr = cast<CopyAddrInst>(use->getUser());
-      if (copyAddr->getDest() == use->get())
-        return true;
-      if (copyAddr->getSrc() == use->get() && copyAddr->isTakeOfSrc() == IsTake)
-        return true;
-      return false;
-    };
-
-    auto isMutatingOrConsuming = [=](OpenExistentialAddrInst *OEI) -> bool {
-      for (auto *use : OEI->getUses()) {
-        auto *inst = use->getUser();
-        if (inst->isTypeDependentOperand(*use))
-          continue;
-        switch (inst->getKind()) {
-        case SILInstructionKind::MarkDependenceInst:
-          break;
-        case SILInstructionKind::ApplyInst:
-        case SILInstructionKind::TryApplyInst:
-        case SILInstructionKind::PartialApplyInst:
-          if (isConsumingOrMutatingApplyUse(use))
-            return true;
-          else
-            break;
-        case SILInstructionKind::CopyAddrInst:
-          if (isConsumingOrMutatingCopyAddrUse(use))
-            return true;
-          else
-            break;
-        case SILInstructionKind::DestroyAddrInst:
-          return true;
-        case SILInstructionKind::UncheckedAddrCastInst: {
-          auto isCastToNonConsuming = [=](UncheckedAddrCastInst *I) -> bool {
-            for (auto *use : I->getUses()) {
-              auto *inst = use->getUser();
-              switch (inst->getKind()) {
-              case SILInstructionKind::ApplyInst:
-              case SILInstructionKind::TryApplyInst:
-              case SILInstructionKind::PartialApplyInst:
-                if (isConsumingOrMutatingApplyUse(use))
-                  return false;
-                continue;
-              default:
-                continue;
-              }
-            }
-            return true;
-          };
-          if (isCastToNonConsuming(cast<UncheckedAddrCastInst>(inst))) {
-            break;
-          }
-          return true;
-        }
-        case SILInstructionKind::CheckedCastAddrBranchInst:
-          switch (cast<CheckedCastAddrBranchInst>(inst)->getConsumptionKind()) {
-          case CastConsumptionKind::BorrowAlways:
-            llvm_unreachable("checked_cast_addr_br cannot have BorrowAlways");
-          case CastConsumptionKind::CopyOnSuccess:
-            break;
-          case CastConsumptionKind::TakeAlways:
-          case CastConsumptionKind::TakeOnSuccess:
-            return true;
-          }
-          break;
-        case SILInstructionKind::LoadInst:
-          // A 'non-taking' value load is harmless.
-          return cast<LoadInst>(inst)->getOwnershipQualifier() ==
-                 LoadOwnershipQualifier::Take;
-          break;
-        case SILInstructionKind::DebugValueAddrInst:
-          // Harmless use.
-          break;
-        default:
-          llvm_unreachable("Unhandled unexpected instruction");
-          break;
-        }
-      }
-      return false;
-    };
-    require(allowedAccessKind == OpenedExistentialAccess::Mutable
-            || !isMutatingOrConsuming(OEI),
+    require(allowedAccessKind == OpenedExistentialAccess::Mutable ||
+                !ImmutableAddressUseVerifier().isMutatingOrConsuming(OEI),
             "open_existential_addr uses that consumes or mutates but is not "
             "opened for mutation");
   }
