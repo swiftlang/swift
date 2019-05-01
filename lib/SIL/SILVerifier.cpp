@@ -2885,11 +2885,20 @@ public:
       case SILArgumentConvention::Indirect_In_Guaranteed:
         return false;
 
+      case SILArgumentConvention::Indirect_InoutAliasable:
+        // DISCUSSION: We do not consider inout_aliasable to be "truly mutating"
+        // since today it is just used as a way to mark a captured argument and
+        // not that something truly has mutating semantics. The reason why this
+        // is safe is that the typechecker guarantees that if our value was
+        // immutable, then the use in the closure must be immutable as well.
+        //
+        // TODO: Remove this in favor of using Inout and In_Guaranteed.
+        return false;
+
       case SILArgumentConvention::Indirect_Out:
       case SILArgumentConvention::Indirect_In:
       case SILArgumentConvention::Indirect_In_Constant:
       case SILArgumentConvention::Indirect_Inout:
-      case SILArgumentConvention::Indirect_InoutAliasable:
         return true;
 
       case SILArgumentConvention::Direct_Unowned:
