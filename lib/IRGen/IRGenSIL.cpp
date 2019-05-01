@@ -933,6 +933,9 @@ public:
   void visitAssignInst(AssignInst *i) {
     llvm_unreachable("assign is not valid in canonical SIL");
   }
+  void visitAssignByDelegateInst(AssignByDelegateInst *i) {
+    llvm_unreachable("assign_by_delegate is not valid in canonical SIL");
+  }
   void visitMarkUninitializedInst(MarkUninitializedInst *i) {
     llvm_unreachable("mark_uninitialized is not valid in canonical SIL");
   }
@@ -1218,18 +1221,11 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
   // Apply sanitizer attributes to the function.
   // TODO: Check if the function is supposed to be excluded from ASan either by
   // being in the external file or via annotations.
-  if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Address) {
-    // Disable ASan in coroutines; stack poisoning is not going to do
-    // reasonable things to the structural invariants.
-    if (!f->getLoweredFunctionType()->isCoroutine())
-      CurFn->addFnAttr(llvm::Attribute::SanitizeAddress);
-  }
+  if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Address)
+    CurFn->addFnAttr(llvm::Attribute::SanitizeAddress);
   if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread) {
     auto declContext = f->getDeclContext();
-    if (f->getLoweredFunctionType()->isCoroutine()) {
-      // Disable TSan in coroutines; the instrumentation currently interferes
-      // with coroutine structural invariants.
-    } else if (declContext && isa<DestructorDecl>(declContext)) {
+    if (declContext && isa<DestructorDecl>(declContext)) {
       // Do not report races in deinit and anything called from it
       // because TSan does not observe synchronization between retain
       // count dropping to '0' and the object deinitialization.

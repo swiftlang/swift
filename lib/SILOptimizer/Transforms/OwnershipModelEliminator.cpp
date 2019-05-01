@@ -156,7 +156,7 @@ OwnershipModelEliminatorVisitor::visitLoadBorrowInst(LoadBorrowInst *LBI) {
 
 bool OwnershipModelEliminatorVisitor::visitCopyValueInst(CopyValueInst *CVI) {
   // A copy_value of an address-only type cannot be replaced.
-  if (CVI->getType().isAddressOnly(B.getModule()))
+  if (CVI->getType().isAddressOnly(B.getFunction()))
     return false;
 
   // Now that we have set the unqualified ownership flag, destroy value
@@ -197,7 +197,7 @@ bool OwnershipModelEliminatorVisitor::visitUnmanagedAutoreleaseValueInst(
 
 bool OwnershipModelEliminatorVisitor::visitDestroyValueInst(DestroyValueInst *DVI) {
   // A destroy_value of an address-only type cannot be replaced.
-  if (DVI->getOperand()->getType().isAddressOnly(B.getModule()))
+  if (DVI->getOperand()->getType().isAddressOnly(B.getFunction()))
     return false;
 
   // Now that we have set the unqualified ownership flag, destroy value

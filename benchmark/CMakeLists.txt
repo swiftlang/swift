@@ -43,6 +43,7 @@ set(SWIFT_BENCH_MODULES
     single-source/BinaryFloatingPointProperties
     single-source/BitCount
     single-source/Breadcrumbs
+    single-source/BucketSort
     single-source/ByteSwap
     single-source/COWTree
     single-source/COWArrayGuaranteedParameterOverhead
@@ -85,6 +86,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ExistentialPerformance
     single-source/Fibonacci
     single-source/FlattenList
+    single-source/FloatingPointParsing
     single-source/FloatingPointPrinting
     single-source/Hanoi
     single-source/Hash

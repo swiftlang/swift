@@ -14,7 +14,6 @@ else()
 endif()
 
 add_swift_host_library(swiftAST STATIC
-  AccessScopeChecker.cpp
   AccessRequests.cpp
   ASTContext.cpp
   ASTDemangler.cpp
@@ -68,6 +67,7 @@ add_swift_host_library(swiftAST STATIC
   SwiftNameTranslation.cpp
   Type.cpp
   TypeCheckRequests.cpp
+  TypeDeclFinder.cpp
   TypeJoinMeet.cpp
   TypeRefinementContext.cpp
   TypeRepr.cpp
@@ -136,6 +136,6 @@ else()
   set(swift_ast_verifier_flag " -DSWIFT_DISABLE_AST_VERIFIER=1")
 endif()
 
-set_property(SOURCE Verifier.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
+set_property(SOURCE ASTVerifier.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
   "${swift_ast_verifier_flag}")
 

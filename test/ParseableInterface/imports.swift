@@ -5,7 +5,7 @@
 
 @_exported import empty
 import B.B2
-import func C.c // expected-warning {{scoped imports are not yet supported in parseable module interfaces}}
+import func C.c // expected-warning {{scoped imports are not yet supported in module interfaces}}
 import D
 @_implementationOnly import Secret_BAD
 

@@ -195,6 +195,28 @@ class LinkEntity {
     /// The nominal type descriptor for a nominal type.
     /// The pointer is a NominalTypeDecl*.
     NominalTypeDescriptor,
+    
+    /// The descriptor for an opaque type.
+    /// The pointer is an OpaqueTypeDecl*.
+    OpaqueTypeDescriptor,
+
+    /// The descriptor accessor for an opaque type used for dynamic functions.
+    /// The pointer is an OpaqueTypeDecl*.
+    OpaqueTypeDescriptorAccessor,
+
+    /// The descriptor accessor implementation for an opaque type used for
+    /// dynamic functions.
+    /// The pointer is an OpaqueTypeDecl*.
+    OpaqueTypeDescriptorAccessorImpl,
+
+    /// The descriptor accessor key of dynamic replacements for an opaque type.
+    /// The pointer is an OpaqueTypeDecl*.
+    OpaqueTypeDescriptorAccessorKey,
+
+    /// The descriptor accessor variable of dynamic replacements for an opaque
+    /// type.
+    /// The pointer is an OpaqueTypeDecl*.
+    OpaqueTypeDescriptorAccessorVar,
 
     /// The metadata pattern for a generic nominal type.
     /// The pointer is a NominalTypeDecl*.
@@ -345,10 +367,6 @@ class LinkEntity {
     /// A lazy cache variable for type metadata.
     /// The pointer is a canonical TypeBase*.
     TypeMetadataLazyCacheVariable,
-
-    /// A foreign type metadata candidate.
-    /// The pointer is a canonical TypeBase*.
-    ForeignTypeMetadataCandidate,
 
     /// A reflection metadata descriptor for a builtin or imported type.
     ReflectionBuiltinDescriptor,
@@ -688,12 +706,6 @@ public:
     return entity;
   }
 
-  static LinkEntity forForeignTypeMetadataCandidate(CanType type) {
-    LinkEntity entity;
-    entity.setForType(Kind::ForeignTypeMetadataCandidate, type);
-    return entity;
-  }
-
   static LinkEntity forClassMetadataBaseOffset(ClassDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::ClassMetadataBaseOffset, decl);
@@ -703,6 +715,36 @@ public:
   static LinkEntity forNominalTypeDescriptor(NominalTypeDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::NominalTypeDescriptor, decl);
+    return entity;
+  }
+
+  static LinkEntity forOpaqueTypeDescriptor(OpaqueTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::OpaqueTypeDescriptor, decl);
+    return entity;
+  }
+
+  static LinkEntity forOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::OpaqueTypeDescriptorAccessor, decl);
+    return entity;
+  }
+
+  static LinkEntity forOpaqueTypeDescriptorAccessorImpl(OpaqueTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::OpaqueTypeDescriptorAccessorImpl, decl);
+    return entity;
+  }
+
+  static LinkEntity forOpaqueTypeDescriptorAccessorKey(OpaqueTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::OpaqueTypeDescriptorAccessorKey, decl);
+    return entity;
+  }
+
+  static LinkEntity forOpaqueTypeDescriptorAccessorVar(OpaqueTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::OpaqueTypeDescriptorAccessorVar, decl);
     return entity;
   }
 
@@ -1047,14 +1089,14 @@ public:
            getKind() == Kind::ObjCResilientClassStub);
     return (TypeMetadataAddress)LINKENTITY_GET_FIELD(Data, MetadataAddress);
   }
-  bool isForeignTypeMetadataCandidate() const {
-    return getKind() == Kind::ForeignTypeMetadataCandidate;
-  }
   bool isObjCClassRef() const {
     return getKind() == Kind::ObjCClassRef;
   }
   bool isSILFunction() const {
     return getKind() == Kind::SILFunction;
+  }
+  bool isNominalTypeDescriptor() const {
+    return getKind() == Kind::NominalTypeDescriptor;
   }
 
   /// Determine whether this entity will be weak-imported.
@@ -1085,6 +1127,7 @@ struct IRLinkage {
   static const IRLinkage Internal;
 
   static const IRLinkage ExternalImport;
+  static const IRLinkage ExternalWeakImport;
   static const IRLinkage ExternalExport;
 };
 

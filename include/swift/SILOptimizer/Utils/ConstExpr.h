@@ -26,38 +26,37 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
-#include "llvm/Support/Allocator.h"
+#include "swift/SIL/SILBasicBlock.h"
+#include "llvm/ADT/SmallPtrSet.h"
 
 namespace swift {
-class ApplyInst;
 class ASTContext;
 class Operand;
-class SILInstruction;
+class SILFunction;
 class SILModule;
 class SILNode;
-class SILValue;
 class SymbolicValue;
+class SymbolicValueAllocator;
+class ConstExprFunctionState;
 enum class UnknownReason;
 
 /// This class is the main entrypoint for evaluating constant expressions.  It
 /// also handles caching of previously computed constexpr results.
 class ConstExprEvaluator {
-  /// We store arguments and result values for the cached constexpr calls we
-  /// have already analyzed in this ASTContext so that they are available even
-  /// after this ConstExprEvaluator is gone.
-  ASTContext &astContext;
+  SymbolicValueAllocator &allocator;
 
   /// The current call stack, used for providing accurate diagnostics.
   llvm::SmallVector<SourceLoc, 4> callStack;
 
-  ConstExprEvaluator(const ConstExprEvaluator &) = delete;
   void operator=(const ConstExprEvaluator &) = delete;
 
 public:
-  explicit ConstExprEvaluator(SILModule &m);
+  explicit ConstExprEvaluator(SymbolicValueAllocator &alloc);
   ~ConstExprEvaluator();
 
-  ASTContext &getASTContext() { return astContext; }
+  explicit ConstExprEvaluator(const ConstExprEvaluator &other);
+
+  SymbolicValueAllocator &getAllocator() { return allocator; }
 
   void pushCallStack(SourceLoc loc) { callStack.push_back(loc); }
 
@@ -82,6 +81,53 @@ public:
   /// that occur after after folding them.
   void computeConstantValues(ArrayRef<SILValue> values,
                              SmallVectorImpl<SymbolicValue> &results);
+};
+
+/// A constant-expression evaluator that can be used to step through a control
+/// flow graph (SILFunction body) by evaluating one instruction at a time.
+class ConstExprStepEvaluator {
+private:
+  ConstExprEvaluator evaluator;
+
+  ConstExprFunctionState *internalState;
+
+  unsigned stepsEvaluated = 0;
+
+  /// Targets of branches that were visited. This is used to detect loops during
+  /// evaluation.
+  SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
+
+  Optional<SymbolicValue>
+  incrementStepsAndCheckLimit(SILInstruction *inst,
+                              bool includeInInstructionLimit);
+
+  ConstExprStepEvaluator(const ConstExprEvaluator &) = delete;
+  void operator=(const ConstExprEvaluator &) = delete;
+
+public:
+  /// Constructs a step evaluator given an allocator and a non-null pointer to a
+  /// SILFunction.
+  explicit ConstExprStepEvaluator(SymbolicValueAllocator &alloc,
+                                  SILFunction *fun);
+  ~ConstExprStepEvaluator();
+
+  /// Evaluate an instruction in the current interpreter state.
+  /// \param instI instruction to be evaluated in the current interpreter state.
+  /// \returns a pair where the first and second elements are defined as
+  /// follows:
+  ///   The first element is the iterator to the next instruction from where
+  ///   the evaluation can continue, if the evaluation is successful.
+  ///   Otherwise, it is None.
+  ///
+  ///   Second element is None, if the evaluation is successful.
+  ///   Otherwise, is an unknown symbolic value that contains the error.
+  std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+  evaluate(SILBasicBlock::iterator instI,
+           bool includeInInstructionLimit = true);
+
+  Optional<SymbolicValue> lookupConstValue(SILValue value);
+
+  bool isKnownFunction(SILFunction *fun);
 };
 
 } // end namespace swift

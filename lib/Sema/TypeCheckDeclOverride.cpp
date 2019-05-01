@@ -1325,6 +1325,7 @@ namespace  {
     UNINTERESTING_ATTR(HasInitialValue)
     UNINTERESTING_ATTR(ImplementationOnly)
     UNINTERESTING_ATTR(Custom)
+    UNINTERESTING_ATTR(PropertyDelegate)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -1684,6 +1685,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     switch (baseKind) {
     case DescriptiveDeclKind::StaticProperty:
     case DescriptiveDeclKind::StaticMethod:
+    case DescriptiveDeclKind::StaticSubscript:
       override->diagnose(diag::override_static, baseKind);
       break;
     default:

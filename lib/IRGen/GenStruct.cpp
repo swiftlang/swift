@@ -871,16 +871,28 @@ Optional<unsigned> irgen::getPhysicalStructFieldIndex(IRGenModule &IGM,
 }
 
 void IRGenModule::emitStructDecl(StructDecl *st) {
-  if (!IRGen.tryEnableLazyTypeMetadata(st))
+  if (!IRGen.hasLazyMetadata(st)) {
     emitStructMetadata(*this, st);
+    emitFieldDescriptor(st);
+  }
 
   emitNestedTypeDecls(st->getMembers());
+}
 
-  if (shouldEmitOpaqueTypeMetadataRecord(st)) {
-    emitOpaqueTypeMetadataRecord(st);
-  } else {
-    emitFieldMetadataRecord(st);
-  }  
+void IRGenModule::emitFuncDecl(FuncDecl *fd) {
+  // If there's an opaque return type for this function, emit its descriptor.
+  if (auto opaque = fd->getOpaqueResultTypeDecl()) {
+    if (!IRGen.hasLazyMetadata(opaque))
+      emitOpaqueTypeDecl(opaque);
+  }
+}
+
+void IRGenModule::emitAbstractStorageDecl(AbstractStorageDecl *fd) {
+  // If there's an opaque return type for this function, emit its descriptor.
+  if (auto opaque = fd->getOpaqueResultTypeDecl()) {
+    if (!IRGen.hasLazyMetadata(opaque))
+      emitOpaqueTypeDecl(opaque);
+  }
 }
 
 namespace {

@@ -192,7 +192,7 @@ static bool mustDeserializeProtocolConformance(SILModule &M,
                                                ProtocolConformanceRef c) {
   if (!c.isConcrete())
     return false;
-  auto conformance = c.getConcrete()->getRootNormalConformance();
+  auto conformance = c.getConcrete()->getRootConformance();
   return M.Types.protocolRequiresWitnessTable(conformance->getProtocol())
     && isa<ClangModuleUnit>(conformance->getDeclContext()
                                        ->getModuleScopeContext());
@@ -217,8 +217,14 @@ void SILLinkerVisitor::visitProtocolConformance(
   // If the looked up witness table is a declaration, there is nothing we can
   // do here.
   if (WT == nullptr || WT->isDeclaration()) {
-    assert(!mustDeserialize &&
-           "unable to deserialize witness table when we must?!");
+#ifndef NDEBUG
+    if (mustDeserialize) {
+      llvm::errs() << "SILGen failed to emit required conformance:\n";
+      ref.dump(llvm::errs());
+      llvm::errs() << "\n";
+      abort();
+    }
+#endif
     return;
   }
 

@@ -2149,23 +2149,23 @@ bool SimplifyCFG::simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI) {
   bool MadeChange = false;
   CastOptimizer CastOpt(
       FuncBuilder, nullptr /*SILBuilderContext*/,
-      /* ReplaceValueUsesAction */
+      /* replaceValueUsesAction */
       [&MadeChange](SILValue oldValue, SILValue newValue) {
         MadeChange = true;
       },
-      /* ReplaceInstUsesAction */
+      /* replaceInstUsesAction */
       [&MadeChange](SILInstruction *I, ValueBase *V) { MadeChange = true; },
-      /* EraseInstAction */
+      /* eraseInstAction */
       [&MadeChange](SILInstruction *I) {
         MadeChange = true;
         I->eraseFromParent();
       },
-      /* WillSucceedAction */
+      /* willSucceedAction */
       [&]() {
         MadeChange |= removeIfDead(FailureBB);
         addToWorklist(ThisBB);
       },
-      /* WillFailAction */
+      /* willFailAction */
       [&]() {
         MadeChange |= removeIfDead(SuccessBB);
         addToWorklist(ThisBB);
@@ -2184,23 +2184,23 @@ bool SimplifyCFG::simplifyCheckedCastValueBranchBlock(
   bool MadeChange = false;
   CastOptimizer CastOpt(
       FuncBuilder, nullptr /*SILBuilderContext*/,
-      /* ReplaceValueUsesAction */
+      /* replaceValueUsesAction */
       [&MadeChange](SILValue oldValue, SILValue newValue) {
         MadeChange = true;
       },
-      /* ReplaceInstUsesAction */
+      /* replaceInstUsesAction */
       [&MadeChange](SILInstruction *I, ValueBase *V) { MadeChange = true; },
-      /* EraseInstAction */
+      /* eraseInstAction */
       [&MadeChange](SILInstruction *I) {
         MadeChange = true;
         I->eraseFromParent();
       },
-      /* WillSucceedAction */
+      /* willSucceedAction */
       [&]() {
         MadeChange |= removeIfDead(FailureBB);
         addToWorklist(ThisBB);
       },
-      /* WillFailAction */
+      /* willFailAction */
       [&]() {
         MadeChange |= removeIfDead(SuccessBB);
         addToWorklist(ThisBB);
@@ -2220,21 +2220,21 @@ simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI) {
   bool MadeChange = false;
   CastOptimizer CastOpt(
       FuncBuilder, nullptr /*SILBuilderContext*/,
-      /* ReplaceValueUsesAction */
+      /* replaceValueUsesAction */
       [&MadeChange](SILValue, SILValue) { MadeChange = true; },
-      /* ReplaceInstUsesAction */
+      /* replaceInstUsesAction */
       [&MadeChange](SILInstruction *I, ValueBase *V) { MadeChange = true; },
-      /* EraseInstAction */
+      /* eraseInstAction */
       [&MadeChange](SILInstruction *I) {
         MadeChange = true;
         I->eraseFromParent();
       },
-      /* WillSucceedAction */
+      /* willSucceedAction */
       [&]() {
         MadeChange |= removeIfDead(FailureBB);
         addToWorklist(ThisBB);
       },
-      /* WillFailAction */
+      /* willFailAction */
       [&]() {
         MadeChange |= removeIfDead(SuccessBB);
         addToWorklist(ThisBB);

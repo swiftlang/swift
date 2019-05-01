@@ -16,6 +16,7 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Basic/SourceManager.h"
@@ -223,6 +224,8 @@ int main(int argc_, const char **argv_) {
   const char **ThrowawayExpandedArgv = ExpandedArgs.data();
   PROGRAM_START(ThrowawayExpandedArgc, ThrowawayExpandedArgv);
   ArrayRef<const char *> argv(ExpandedArgs);
+
+  PrettyStackTraceSwiftVersion versionStackTrace;
 
   // Check if this invocation should execute a subcommand.
   StringRef ExecName = llvm::sys::path::stem(argv[0]);

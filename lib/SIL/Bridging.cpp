@@ -140,6 +140,8 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
         return t;
       if (builtinTy->getKind() == clang::BuiltinType::UChar)
         return getDarwinBooleanType();
+      if (builtinTy->getKind() == clang::BuiltinType::Int)
+        return getWindowsBoolType();
       assert(builtinTy->getKind() == clang::BuiltinType::SChar);
       return getObjCBoolType();
     }
@@ -224,7 +226,7 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
       ProtocolConformanceRef::getTypeWitnessByName(
         t, ProtocolConformanceRef(conformance),
         M.getASTContext().Id_ObjectiveCType,
-        nullptr);
+        M.getASTContext().getLazyResolver());
     assert(bridgedTy && "Missing _ObjectiveCType witness?");
     if (purpose == BridgedTypePurpose::ForResult && clangTy)
       bridgedTy = OptionalType::get(bridgedTy);

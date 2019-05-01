@@ -198,9 +198,13 @@ public:
   SILModule &getModule() const { return C.Module; }
   ASTContext &getASTContext() const { return getModule().getASTContext(); }
   const Lowering::TypeLowering &getTypeLowering(SILType T) const {
-    // FIXME: Expansion
-    return getModule().Types.getTypeLowering(T,
-                                             ResilienceExpansion::Minimal);
+    auto expansion = ResilienceExpansion::Maximal;
+    // If there's no current SILFunction, we're inserting into a global
+    // variable initializer.
+    if (F)
+      expansion = F->getResilienceExpansion();
+
+    return getModule().Types.getTypeLowering(T, expansion);
   }
 
   void setOpenedArchetypesTracker(SILOpenedArchetypesTracker *Tracker) {
@@ -452,20 +456,11 @@ public:
 
   ApplyInst *createApply(
       SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
-      ArrayRef<SILValue> Args, bool isNonThrowing,
+      ArrayRef<SILValue> Args, bool isNonThrowing = false,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     return insert(ApplyInst::create(getSILDebugLocation(Loc), Fn, Subs, Args,
                                     isNonThrowing, C.silConv, *F,
                                     C.OpenedArchetypes, SpecializationInfo));
-  }
-
-  ApplyInst *createApply(
-      SILLocation Loc, SILValue Fn, ArrayRef<SILValue> Args, bool isNonThrowing,
-      const GenericSpecializationInformation *SpecializationInfo = nullptr) {
-    SILFunctionConventions conventions(Fn->getType().castTo<SILFunctionType>(),
-                                       getModule());
-    return createApply(Loc, Fn, SubstitutionMap(), Args, isNonThrowing,
-                       SpecializationInfo);
   }
 
   TryApplyInst *createTryApply(
@@ -490,7 +485,7 @@ public:
 
   BeginApplyInst *createBeginApply(
       SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
-      ArrayRef<SILValue> Args, bool isNonThrowing,
+      ArrayRef<SILValue> Args, bool isNonThrowing = false,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     return insert(BeginApplyInst::create(
         getSILDebugLocation(Loc), Fn, Subs, Args, isNonThrowing, C.silConv, *F,
@@ -840,6 +835,16 @@ public:
     return insert(new (getModule())
                       AssignInst(getSILDebugLocation(Loc), Src, DestAddr,
                                  Qualifier));
+  }
+
+  AssignByDelegateInst *createAssignByDelegate(SILLocation Loc,
+                                               SILValue Src, SILValue Dest,
+                                               SILValue Initializer,
+                                               SILValue Setter,
+                                          AssignOwnershipQualifier Qualifier) {
+    return insert(new (getModule())
+                  AssignByDelegateInst(getSILDebugLocation(Loc), Src, Dest,
+                                       Initializer, Setter, Qualifier));
   }
 
   StoreBorrowInst *createStoreBorrow(SILLocation Loc, SILValue Src,
@@ -2157,15 +2162,7 @@ private:
     if (!SILModuleConventions(M).useLoweredAddresses())
       return true;
 
-    // FIXME: Just call getTypeLowering() here, and move this code there
-
-    auto expansion = ResilienceExpansion::Maximal;
-    // If there's no current SILFunction, we're inserting into a global
-    // variable initializer.
-    if (F)
-      expansion = F->getResilienceExpansion();
-
-    return M.Types.getTypeLowering(Ty, expansion).isLoadable();
+    return getTypeLowering(Ty).isLoadable();
   }
 
   void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {

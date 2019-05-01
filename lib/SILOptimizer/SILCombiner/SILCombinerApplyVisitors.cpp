@@ -260,7 +260,7 @@ void PartialApplyCombiner::releaseTemporaries() {
       continue;
     for (auto *EndPoint : PAFrontier) {
       Builder.setInsertionPoint(EndPoint);
-      if (!TmpType.isAddressOnly(PAI->getModule())) {
+      if (!TmpType.isAddressOnly(*PAI->getFunction())) {
         auto *Load = Builder.createLoad(PAI->getLoc(), Op,
                                         LoadOwnershipQualifier::Unqualified);
         Builder.createReleaseValue(PAI->getLoc(), Load, Builder.getDefaultAtomicity());

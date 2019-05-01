@@ -83,4 +83,7 @@ FUNC_DECL(ModifyAtReferenceWritableKeyPath, "_modifyAtReferenceWritableKeyPath")
 
 FUNC_DECL(Swap, "swap")
 
+FUNC_DECL(UnimplementedInitializer, "_unimplementedInitializer")
+FUNC_DECL(Undefined, "_undefined")
+
 #undef FUNC_DECL

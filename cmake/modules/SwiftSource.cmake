@@ -260,7 +260,7 @@ function(_compile_swift_files
 
   # Force swift 4 compatibility mode for overlays.
   if (SWIFTFILE_IS_SDK_OVERLAY)
-    list(APPEND swift_flags "-swift-version" "4")
+    list(APPEND swift_flags "-swift-version" "5")
   endif()
 
   if(SWIFTFILE_IS_SDK_OVERLAY)

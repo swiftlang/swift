@@ -4,7 +4,7 @@ struct S {
   let i: Int
 
   init() {
-    let _: WritableKeyPath<S, Int> = \.i // expected-error {{type of expression is ambiguous without more context}}
+    let _: WritableKeyPath<S, Int> = \.i // expected-error {{cannot convert value of type 'KeyPath<S, Int>' to specified type 'WritableKeyPath<S, Int>'}}
 
     S()[keyPath: \.i] = 1
     // expected-error@-1 {{cannot assign through subscript: immutable key path}}
@@ -12,7 +12,7 @@ struct S {
 }
 
 func test() {
-  let _: WritableKeyPath<C, Int> = \.i // expected-error {{type of expression is ambiguous without more context}}
+  let _: WritableKeyPath<C, Int> = \.i // expected-error {{cannot convert value of type 'KeyPath<C, Int>' to specified type 'WritableKeyPath<C, Int>'}}
 
   C()[keyPath: \.i] = 1
   // expected-error@-1 {{cannot assign through subscript: immutable key path}}

@@ -24,11 +24,10 @@ public let INFINITE: DWORD = DWORD(bitPattern: -1)
 // WinBase.h
 public let WAIT_OBJECT_0: DWORD = 0
 
-// minwindef.h
-public let FALSE: BOOL = 0
-
-// minwindef.h
-public let TRUE: BOOL = 1
+// WinBase.h
+public let STD_INPUT_HANDLE: DWORD = DWORD(bitPattern: -10)
+public let STD_OUTPUT_HANDLE: DWORD = DWORD(bitPattern: -11)
+public let STD_ERROR_HANDLE: DWORD = DWORD(bitPattern: -12)
 
 // handleapi.h
 public let INVALID_HANDLE_VALUE: HANDLE = HANDLE(bitPattern: -1)!
@@ -71,6 +70,9 @@ public let TOOLBARW_CLASSW: [WCHAR] = Array<WCHAR>("ToolbarWindow32".utf16)
 public let TRACKBAR_CLASSW: [WCHAR] = Array<WCHAR>("msctls_trackbar32".utf16)
 public let UPDOWN_CLASSW: [WCHAR] = Array<WCHAR>("msctls_updown32".utf16)
 
+// consoleapi.h
+public let PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE: DWORD_PTR = 0x00020016
+
 // Swift Convenience
 public extension FILETIME {
   var time_t: time_t {
@@ -83,5 +85,66 @@ public extension FILETIME {
     self = FILETIME(dwLowDateTime: DWORD(UNIXTime & 0xffffffff),
                     dwHighDateTime: DWORD((UNIXTime >> 32) & 0xffffffff))
   }
+}
+
+// WindowsBool
+
+/// The `BOOL` type declared in WinDefs.h and used throughout WinSDK
+///
+/// The C type is a typedef for `int`.
+@_fixed_layout
+public struct WindowsBool : ExpressibleByBooleanLiteral {
+  @usableFromInline
+  var _value: Int32
+
+  /// The value of `self`, expressed as a `Bool`.
+  @_transparent
+  public var boolValue: Bool {
+    return !(_value == 0)
+  }
+
+  @_transparent
+  public init(booleanLiteral value: Bool) {
+    self.init(value)
+  }
+
+  /// Create an instance initialized to `value`.
+  @_transparent
+  public init(_ value: Bool) {
+    self._value = value ? 1 : 0
+  }
+}
+
+extension WindowsBool : CustomReflectable {
+  /// Returns a mirror that reflects `self`.
+  public var customMirror: Mirror {
+    return Mirror(reflecting: boolValue)
+  }
+}
+
+extension WindowsBool : CustomStringConvertible {
+  /// A textual representation of `self`.
+  public var description: String {
+    return self.boolValue.description
+  }
+}
+
+extension WindowsBool : Equatable {
+  @_transparent
+  public static func ==(lhs: WindowsBool, rhs: WindowsBool) -> Bool {
+    return lhs.boolValue == rhs.boolValue
+  }
+}
+
+@_transparent
+public // COMPILER_INTRINSIC
+func _convertBoolToWindowsBool(_ b: Bool) -> WindowsBool {
+  return WindowsBool(b)
+}
+
+@_transparent
+public // COMPILER_INTRINSIC
+func _convertWindowsBoolToBool(_ b: WindowsBool) -> Bool {
+  return b.boolValue
 }
 

@@ -2683,6 +2683,15 @@ entry(%x : $*MyOptional):
 // CHECK:   [[T_VWT:%.*]] = load i8**, i8*** [[T_VWT_ADDR]]
 // CHECK:   [[T_LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[T_VWT]], i32 8
 // CHECK:   call void @swift_initEnumMetadataSingleCase(%swift.type* [[METADATA]], [[WORD]] 0, i8** [[T_LAYOUT]])
+// CHECK:   [[PAYLOAD_TYPELAYOUT:%.*]] = bitcast i8** [[T_LAYOUT]] to %swift.type_layout*
+// CHECK:   [[PAYLOAD_EXTRAINHABITANTCNT:%.*]] = getelementptr inbounds %swift.type_layout, %swift.type_layout* [[PAYLOAD_TYPELAYOUT]], i32 0, i32 3
+// CHECK:   [[CNT:%.*]] = load i32, i32* [[PAYLOAD_EXTRAINHABITANTCNT]]
+// CHECK:   [[METADATA2:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
+// CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA2]], [[WORD]] -1
+// CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+// CHECK:   [[VWT2:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
+// CHECK:   [[XIC_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT2]], i32 0, i32 11
+// CHECK:   store i32 [[CNT]], i32* [[XIC_ADDR]]
 // CHECK:   ret %swift.metadata_response
 
 // -- Fill function for dynamic single-payload. Call into the runtime to

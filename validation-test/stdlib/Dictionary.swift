@@ -3473,6 +3473,21 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.StringEqualityMismatch") {
   expectTrue(v == 42 || v == 23)
 }
 
+DictionaryTestSuite.test("Upcast.StringEqualityMismatch") {
+  // Upcasting from NSString to String keys changes their concept of equality,
+  // resulting in two equal keys, one of which should be discarded by the
+  // downcast. (Along with its associated value.)
+  // rdar://problem/35995647
+  let d: Dictionary<NSString, NSObject> = [
+    "cafe\u{301}": 1 as NSNumber,
+    "café": 2 as NSNumber,
+  ]
+  expectEqual(d.count, 2)
+  let d2 = d as Dictionary<String, NSObject>
+  expectEqual(d2.count, 1)
+}
+
+
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.OptionalDowncastFailure") {
   let nsd = NSDictionary(
     objects: [1 as NSNumber, 2 as NSNumber, 3 as NSNumber],

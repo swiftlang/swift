@@ -60,11 +60,10 @@ class HostSpecificConfiguration(object):
 
     """Configuration information for an individual host."""
 
-    def __init__(self, host_target, invocation):
+    def __init__(self, host_target, args):
         """Initialize for the given `host_target`."""
 
         # Compute the set of deployment targets to configure/build.
-        args = invocation.args
         if host_target == args.host_target:
             # This host is the user's desired product, so honor the requested
             # set of targets to configure/build.
@@ -80,6 +79,17 @@ class HostSpecificConfiguration(object):
             # cross-compiling, so we only need the target itself.
             stdlib_targets_to_configure = [host_target]
             stdlib_targets_to_build = set(stdlib_targets_to_configure)
+
+        # Compute derived information from the arguments.
+        #
+        # FIXME: We should move the platform-derived arguments to be entirely
+        # data driven, so that we can eliminate this code duplication and just
+        # iterate over all supported platforms.
+        platforms_to_skip_build = self.__platforms_to_skip_build(args)
+        platforms_to_skip_test = self.__platforms_to_skip_test(args)
+        platforms_archs_to_skip_test = \
+            self.__platforms_archs_to_skip_test(args)
+        platforms_to_skip_test_host = self.__platforms_to_skip_test_host(args)
 
         # Compute the lists of **CMake** targets for each use case (configure
         # vs. build vs. run) and the SDKs to configure with.
@@ -107,9 +117,9 @@ class HostSpecificConfiguration(object):
 
             # Compute which actions are desired.
             build = (
-                deployment_platform not in invocation.platforms_to_skip_build)
+                deployment_platform not in platforms_to_skip_build)
             test = (
-                deployment_platform not in invocation.platforms_to_skip_test)
+                deployment_platform not in platforms_to_skip_test)
             test_host_only = None
             dt_supports_benchmark = deployment_target.supports_benchmark
             build_benchmarks = build and dt_supports_benchmark
@@ -124,12 +134,12 @@ class HostSpecificConfiguration(object):
             # the host (i.e., they do not attempt to execute).
             if deployment_platform.uses_host_tests and \
                     deployment_platform not in \
-                    invocation.platforms_to_skip_test_host:
+                    platforms_to_skip_test_host:
                 test_host_only = True
 
             name = deployment_target.name
 
-            for skip_test_arch in invocation.platforms_archs_to_skip_test:
+            for skip_test_arch in platforms_archs_to_skip_test:
                 if deployment_target.name == skip_test_arch.name:
                     test = False
 
@@ -191,6 +201,90 @@ class HostSpecificConfiguration(object):
                     self.swift_test_run_targets.append(
                         "check-swift{}-optimize_none_implicit_dynamic-{}"
                         .format(subset_suffix, name))
+
+    def __platforms_to_skip_build(self, args):
+        platforms_to_skip_build = set()
+        if not args.build_linux:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.Linux)
+        if not args.build_freebsd:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.FreeBSD)
+        if not args.build_cygwin:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.Cygwin)
+        if not args.build_osx:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.OSX)
+        if not args.build_ios_device:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.iOS)
+        if not args.build_ios_simulator:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.iOSSimulator)
+        if not args.build_tvos_device:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.AppleTV)
+        if not args.build_tvos_simulator:
+            platforms_to_skip_build.add(
+                StdlibDeploymentTarget.AppleTVSimulator)
+        if not args.build_watchos_device:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.AppleWatch)
+        if not args.build_watchos_simulator:
+            platforms_to_skip_build.add(
+                StdlibDeploymentTarget.AppleWatchSimulator)
+        if not args.build_android:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.Android)
+        return platforms_to_skip_build
+
+    def __platforms_to_skip_test(self, args):
+        platforms_to_skip_test = set()
+        if not args.test_linux:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.Linux)
+        if not args.test_freebsd:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.FreeBSD)
+        if not args.test_cygwin:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.Cygwin)
+        if not args.test_osx:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.OSX)
+        if not args.test_ios_host:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.iOS)
+        else:
+            exit_rejecting_arguments("error: iOS device tests are not " +
+                                     "supported in open-source Swift.")
+        if not args.test_ios_simulator:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.iOSSimulator)
+        if not args.test_tvos_host:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTV)
+        else:
+            exit_rejecting_arguments("error: tvOS device tests are not " +
+                                     "supported in open-source Swift.")
+        if not args.test_tvos_simulator:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTVSimulator)
+        if not args.test_watchos_host:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.AppleWatch)
+        else:
+            exit_rejecting_arguments("error: watchOS device tests are not " +
+                                     "supported in open-source Swift.")
+        if not args.test_watchos_simulator:
+            platforms_to_skip_test.add(
+                StdlibDeploymentTarget.AppleWatchSimulator)
+        if not args.test_android:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.Android)
+
+        return platforms_to_skip_test
+
+    def __platforms_archs_to_skip_test(self, args):
+        platforms_archs_to_skip_test = set()
+        if not args.test_ios_32bit_simulator:
+            platforms_archs_to_skip_test.add(
+                StdlibDeploymentTarget.iOSSimulator.i386)
+        return platforms_archs_to_skip_test
+
+    def __platforms_to_skip_test_host(self, args):
+        platforms_to_skip_test_host = set()
+        if not args.test_android_host:
+            platforms_to_skip_test_host.add(StdlibDeploymentTarget.Android)
+        if not args.test_ios_host:
+            platforms_to_skip_test_host.add(StdlibDeploymentTarget.iOS)
+        if not args.test_tvos_host:
+            platforms_to_skip_test_host.add(StdlibDeploymentTarget.AppleTV)
+        if not args.test_watchos_host:
+            platforms_to_skip_test_host.add(StdlibDeploymentTarget.AppleWatch)
+        return platforms_to_skip_test_host
 
 
 class BuildScriptInvocation(object):
@@ -323,103 +417,7 @@ class BuildScriptInvocation(object):
             source_root=SWIFT_SOURCE_ROOT,
             build_root=os.path.join(SWIFT_BUILD_ROOT, args.build_subdir))
 
-        # Compute derived information from the arguments.
-        #
-        # FIXME: We should move the platform-derived arguments to be entirely
-        # data driven, so that we can eliminate this code duplication and just
-        # iterate over all supported platforms.
-        self.platforms_to_skip_build = self.__platforms_to_skip_build(args)
-        self.platforms_to_skip_test = self.__platforms_to_skip_test(args)
-        self.platforms_archs_to_skip_test = \
-            self.__platforms_archs_to_skip_test(args)
-        self.platforms_to_skip_test_host = \
-            self.__platforms_to_skip_test_host(args)
-
         self.build_libparser_only = args.build_libparser_only
-
-    def __platforms_to_skip_build(self, args):
-        platforms_to_skip_build = set()
-        if not args.build_linux:
-            platforms_to_skip_build.add(StdlibDeploymentTarget.Linux)
-        if not args.build_freebsd:
-            platforms_to_skip_build.add(StdlibDeploymentTarget.FreeBSD)
-        if not args.build_cygwin:
-            platforms_to_skip_build.add(StdlibDeploymentTarget.Cygwin)
-        if not args.build_osx:
-            platforms_to_skip_build.add(StdlibDeploymentTarget.OSX)
-        if not args.build_ios_device:
-            platforms_to_skip_build.add(StdlibDeploymentTarget.iOS)
-        if not args.build_ios_simulator:
-            platforms_to_skip_build.add(StdlibDeploymentTarget.iOSSimulator)
-        if not args.build_tvos_device:
-            platforms_to_skip_build.add(StdlibDeploymentTarget.AppleTV)
-        if not args.build_tvos_simulator:
-            platforms_to_skip_build.add(
-                StdlibDeploymentTarget.AppleTVSimulator)
-        if not args.build_watchos_device:
-            platforms_to_skip_build.add(StdlibDeploymentTarget.AppleWatch)
-        if not args.build_watchos_simulator:
-            platforms_to_skip_build.add(
-                StdlibDeploymentTarget.AppleWatchSimulator)
-        if not args.build_android:
-            platforms_to_skip_build.add(StdlibDeploymentTarget.Android)
-        return platforms_to_skip_build
-
-    def __platforms_to_skip_test(self, args):
-        platforms_to_skip_test = set()
-        if not args.test_linux:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.Linux)
-        if not args.test_freebsd:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.FreeBSD)
-        if not args.test_cygwin:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.Cygwin)
-        if not args.test_osx:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.OSX)
-        if not args.test_ios_host:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.iOS)
-        else:
-            exit_rejecting_arguments("error: iOS device tests are not " +
-                                     "supported in open-source Swift.")
-        if not args.test_ios_simulator:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.iOSSimulator)
-        if not args.test_tvos_host:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTV)
-        else:
-            exit_rejecting_arguments("error: tvOS device tests are not " +
-                                     "supported in open-source Swift.")
-        if not args.test_tvos_simulator:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTVSimulator)
-        if not args.test_watchos_host:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.AppleWatch)
-        else:
-            exit_rejecting_arguments("error: watchOS device tests are not " +
-                                     "supported in open-source Swift.")
-        if not args.test_watchos_simulator:
-            platforms_to_skip_test.add(
-                StdlibDeploymentTarget.AppleWatchSimulator)
-        if not args.test_android:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.Android)
-
-        return platforms_to_skip_test
-
-    def __platforms_archs_to_skip_test(self, args):
-        platforms_archs_to_skip_test = set()
-        if not args.test_ios_32bit_simulator:
-            platforms_archs_to_skip_test.add(
-                StdlibDeploymentTarget.iOSSimulator.i386)
-        return platforms_archs_to_skip_test
-
-    def __platforms_to_skip_test_host(self, args):
-        platforms_to_skip_test_host = set()
-        if not args.test_android_host:
-            platforms_to_skip_test_host.add(StdlibDeploymentTarget.Android)
-        if not args.test_ios_host:
-            platforms_to_skip_test_host.add(StdlibDeploymentTarget.iOS)
-        if not args.test_tvos_host:
-            platforms_to_skip_test_host.add(StdlibDeploymentTarget.AppleTV)
-        if not args.test_watchos_host:
-            platforms_to_skip_test_host.add(StdlibDeploymentTarget.AppleWatch)
-        return platforms_to_skip_test_host
 
     def initialize_runtime_environment(self):
         """Change the program environment for building."""
@@ -838,7 +836,7 @@ class BuildScriptInvocation(object):
         options = {}
         for host_target in [args.host_target] + args.cross_compile_hosts:
             # Compute the host specific configuration.
-            config = HostSpecificConfiguration(host_target, self)
+            config = HostSpecificConfiguration(host_target, args)
 
             # Convert into `build-script-impl` style variables.
             options[host_target] = {
@@ -897,7 +895,7 @@ class BuildScriptInvocation(object):
         if self.args.build_sourcekitlsp:
             product_classes.append(products.SourceKitLSP)
         if self.args.build_toolchainbenchmarks:
-            product_classes.append(products.ToolchainBenchmarks)
+            product_classes.append(products.Benchmarks)
         return product_classes
 
     def execute(self):
@@ -936,7 +934,7 @@ class BuildScriptInvocation(object):
         # Build...
         for host_target in all_hosts:
             # FIXME: We should only compute these once.
-            config = HostSpecificConfiguration(host_target.name, self)
+            config = HostSpecificConfiguration(host_target.name, self.args)
             print("Building the standard library for: {}".format(
                 " ".join(config.swift_stdlib_build_targets)))
             if config.swift_test_run_targets and (

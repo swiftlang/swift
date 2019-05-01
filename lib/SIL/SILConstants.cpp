@@ -14,6 +14,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/SILBuilder.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/TrailingObjects.h"
 using namespace swift;
 
@@ -143,7 +144,7 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
 /// Clone this SymbolicValue into the specified ASTContext and return the new
 /// version.  This only works for valid constants.
 SymbolicValue
-SymbolicValue::cloneInto(ASTContext &astContext) const {
+SymbolicValue::cloneInto(SymbolicValueAllocator &allocator) const {
   auto thisRK = representationKind;
   switch (thisRK) {
   case RK_UninitMemory:
@@ -156,26 +157,26 @@ SymbolicValue::cloneInto(ASTContext &astContext) const {
     return *this;
   case RK_IntegerInline:
   case RK_Integer:
-    return SymbolicValue::getInteger(getIntegerValue(), astContext);
+    return SymbolicValue::getInteger(getIntegerValue(), allocator);
   case RK_String:
-    return SymbolicValue::getString(getStringValue(), astContext);
+    return SymbolicValue::getString(getStringValue(), allocator);
   case RK_Aggregate: {
     auto elts = getAggregateValue();
     SmallVector<SymbolicValue, 4> results;
     results.reserve(elts.size());
     for (auto elt : elts)
-      results.push_back(elt.cloneInto(astContext));
-    return getAggregate(results, astContext);
+      results.push_back(elt.cloneInto(allocator));
+    return getAggregate(results, allocator);
   }
   case RK_EnumWithPayload:
-    return getEnumWithPayload(getEnumValue(), getEnumPayloadValue(), astContext);
+    return getEnumWithPayload(getEnumValue(), getEnumPayloadValue(), allocator);
   case RK_DirectAddress:
   case RK_DerivedAddress: {
     SmallVector<unsigned, 4> accessPath;
     auto *memObject = getAddressValue(accessPath);
     auto *newMemObject = SymbolicValueMemoryObject::create(
-        memObject->getType(), memObject->getValue(), astContext);
-    return getAddress(newMemObject, accessPath, astContext);
+        memObject->getType(), memObject->getValue(), allocator);
+    return getAddress(newMemObject, accessPath, allocator);
   }
   }
 }
@@ -186,9 +187,9 @@ SymbolicValue::cloneInto(ASTContext &astContext) const {
 
 SymbolicValueMemoryObject *
 SymbolicValueMemoryObject::create(Type type, SymbolicValue value,
-                                  ASTContext &astContext) {
-  auto *result = astContext.Allocate(sizeof(SymbolicValueMemoryObject),
-                                     alignof(SymbolicValueMemoryObject));
+                                  SymbolicValueAllocator &allocator) {
+  auto *result = allocator.allocate(sizeof(SymbolicValueMemoryObject),
+                                    alignof(SymbolicValueMemoryObject));
   new (result) SymbolicValueMemoryObject(type, value);
   return (SymbolicValueMemoryObject *)result;
 }
@@ -206,14 +207,14 @@ SymbolicValue SymbolicValue::getInteger(int64_t value, unsigned bitWidth) {
 }
 
 SymbolicValue SymbolicValue::getInteger(const APInt &value,
-                                        ASTContext &astContext) {
+                                        SymbolicValueAllocator &allocator) {
   // In the common case, we can form an inline representation.
   unsigned numWords = value.getNumWords();
   if (numWords == 1)
     return getInteger(value.getRawData()[0], value.getBitWidth());
 
-  // Copy the integers from the APInt into the bump pointer.
-  auto *words = astContext.Allocate<uint64_t>(numWords).data();
+  // Copy the integers from the APInt into the allocator.
+  auto *words = allocator.allocate<uint64_t>(numWords);
   std::uninitialized_copy(value.getRawData(), value.getRawData() + numWords,
                           words);
 
@@ -251,11 +252,11 @@ unsigned SymbolicValue::getIntegerValueBitWidth() const {
 
 // Returns a SymbolicValue representing a UTF-8 encoded string.
 SymbolicValue SymbolicValue::getString(StringRef string,
-                                       ASTContext &astContext) {
+                                       SymbolicValueAllocator &allocator) {
   // TODO: Could have an inline representation for strings if thre was demand,
   // just store a char[8] as the storage.
 
-  auto *resultPtr = astContext.Allocate<char>(string.size()).data();
+  auto *resultPtr = allocator.allocate<char>(string.size());
   std::uninitialized_copy(string.begin(), string.end(), resultPtr);
 
   SymbolicValue result;
@@ -280,10 +281,9 @@ StringRef SymbolicValue::getStringValue() const {
 /// This returns a constant Symbolic value with the specified elements in it.
 /// This assumes that the elements lifetime has been managed for this.
 SymbolicValue SymbolicValue::getAggregate(ArrayRef<SymbolicValue> elements,
-                                          ASTContext &astContext) {
+                                          SymbolicValueAllocator &allocator) {
   // Copy the elements into the bump pointer.
-  auto *resultElts =
-      astContext.Allocate<SymbolicValue>(elements.size()).data();
+  auto *resultElts = allocator.allocate<SymbolicValue>(elements.size());
   std::uninitialized_copy(elements.begin(), elements.end(), resultElts);
 
   SymbolicValue result;
@@ -320,10 +320,10 @@ struct alignas(SourceLoc) UnknownSymbolicValue final
 
   static UnknownSymbolicValue *create(SILNode *node, UnknownReason reason,
                                       ArrayRef<SourceLoc> elements,
-                                      ASTContext &astContext) {
+                                      SymbolicValueAllocator &allocator) {
     auto byteSize =
         UnknownSymbolicValue::totalSizeToAlloc<SourceLoc>(elements.size());
-    auto *rawMem = astContext.Allocate(byteSize, alignof(UnknownSymbolicValue));
+    auto *rawMem = allocator.allocate(byteSize, alignof(UnknownSymbolicValue));
 
     // Placement-new the value inside the memory we just allocated.
     auto value = ::new (rawMem) UnknownSymbolicValue(
@@ -353,12 +353,12 @@ private:
 
 SymbolicValue SymbolicValue::getUnknown(SILNode *node, UnknownReason reason,
                                         llvm::ArrayRef<SourceLoc> callStack,
-                                        ASTContext &astContext) {
+                                        SymbolicValueAllocator &allocator) {
   assert(node && "node must be present");
   SymbolicValue result;
   result.representationKind = RK_Unknown;
   result.value.unknown =
-      UnknownSymbolicValue::create(node, reason, callStack, astContext);
+      UnknownSymbolicValue::create(node, reason, callStack, allocator);
   return result;
 }
 
@@ -402,10 +402,10 @@ private:
 /// payload.
 SymbolicValue
 SymbolicValue::getEnumWithPayload(EnumElementDecl *decl, SymbolicValue payload,
-                                  ASTContext &astContext) {
+                                  SymbolicValueAllocator &allocator) {
   assert(decl && payload.isConstant());
-  auto rawMem = astContext.Allocate(sizeof(EnumWithPayloadSymbolicValue),
-                                    alignof(EnumWithPayloadSymbolicValue));
+  auto rawMem = allocator.allocate(sizeof(EnumWithPayloadSymbolicValue),
+                                   alignof(EnumWithPayloadSymbolicValue));
   auto enumVal = ::new (rawMem) EnumWithPayloadSymbolicValue(decl, payload);
 
   SymbolicValue result;
@@ -446,10 +446,10 @@ struct DerivedAddressValue final
 
   static DerivedAddressValue *create(SymbolicValueMemoryObject *memoryObject,
                                      ArrayRef<unsigned> elements,
-                                     ASTContext &astContext) {
+                                     SymbolicValueAllocator &allocator) {
     auto byteSize =
         DerivedAddressValue::totalSizeToAlloc<unsigned>(elements.size());
-    auto *rawMem = astContext.Allocate(byteSize, alignof(DerivedAddressValue));
+    auto *rawMem = allocator.allocate(byteSize, alignof(DerivedAddressValue));
 
     //  Placement initialize the object.
     auto dav =
@@ -483,11 +483,11 @@ private:
 /// indexed by a path.
 SymbolicValue SymbolicValue::getAddress(SymbolicValueMemoryObject *memoryObject,
                                         ArrayRef<unsigned> indices,
-                                        ASTContext &astContext) {
+                                        SymbolicValueAllocator &allocator) {
   if (indices.empty())
     return getAddress(memoryObject);
 
-  auto dav = DerivedAddressValue::create(memoryObject, indices, astContext);
+  auto dav = DerivedAddressValue::create(memoryObject, indices, allocator);
   SymbolicValue result;
   result.representationKind = RK_DerivedAddress;
   result.value.derivedAddress = dav;
@@ -568,74 +568,116 @@ SymbolicValue SymbolicValue::lookThroughSingleElementAggregates() const {
   }
 }
 
-/// Emits an explanatory note if there is useful information to note or if there
-/// is an interesting SourceLoc to point at.
-/// Returns true if a diagnostic was emitted.
-static bool emitNoteDiagnostic(SILInstruction *badInst, UnknownReason reason,
-                               SILLocation fallbackLoc) {
-  auto loc = skipInternalLocations(badInst->getDebugLocation()).getLocation();
-  if (loc.isNull()) {
-    // If we have important clarifying information, make sure to emit it.
-    if (reason == UnknownReason::Default || fallbackLoc.isNull())
-      return false;
-    loc = fallbackLoc;
-  }
-
-  auto &ctx = badInst->getModule().getASTContext();
-  auto sourceLoc = loc.getSourceLoc();
-  switch (reason) {
-  case UnknownReason::Default:
-    diagnose(ctx, sourceLoc, diag::constexpr_unknown_reason_default)
-        .highlight(loc.getSourceRange());
-    break;
-  case UnknownReason::TooManyInstructions:
-    // TODO: Should pop up a level of the stack trace.
-    diagnose(ctx, sourceLoc, diag::constexpr_too_many_instructions,
-             ConstExprLimit)
-        .highlight(loc.getSourceRange());
-    break;
-  case UnknownReason::Loop:
-    diagnose(ctx, sourceLoc, diag::constexpr_loop)
-        .highlight(loc.getSourceRange());
-    break;
-  case UnknownReason::Overflow:
-    diagnose(ctx, sourceLoc, diag::constexpr_overflow)
-        .highlight(loc.getSourceRange());
-    break;
-  case UnknownReason::Trap:
-    diagnose(ctx, sourceLoc, diag::constexpr_trap)
-        .highlight(loc.getSourceRange());
-    break;
-  }
-  return true;
-}
-
 /// Given that this is an 'Unknown' value, emit diagnostic notes providing
-/// context about what the problem is.
+/// context about what the problem is. Specifically, point to interesting
+/// source locations and function calls in the call stack.
 void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
-  auto badInst = dyn_cast<SILInstruction>(getUnknownNode());
-  if (!badInst)
-    return;
+  auto unknownNode = getUnknownNode();
+  auto unknownReason = getUnknownReason();
+  auto errorCallStack = getUnknownCallStack();
 
-  bool emittedFirstNote = emitNoteDiagnostic(badInst, getUnknownReason(),
-                                             fallbackLoc);
+  ASTContext &ctx = unknownNode->getModule()->getASTContext();
 
-  auto sourceLoc = fallbackLoc.getSourceLoc();
-  auto &module = badInst->getModule();
-  if (sourceLoc.isInvalid()) {
-    diagnose(module.getASTContext(), sourceLoc, diag::constexpr_not_evaluable);
+  // Extract the location of the instruction/construct that triggered the error
+  // during interpretation, if available.
+  Optional<SourceLoc> triggerLoc = None;
+  if (auto badInst = dyn_cast<SILInstruction>(unknownNode)) {
+    triggerLoc = skipInternalLocations(badInst->getDebugLocation())
+                     .getLocation()
+                     .getSourceLoc();
+  }
+
+  // Determine the top-level expression where the error happens and use it as
+  // the location to emit diagnostics. Specifically, if the call-stack is
+  // non-empty, use the first call in the sequence as the error location as the
+  // error happens only in the context of this call. Use the fallback loc if
+  // the faulty top-level expression location cannot be found.
+  auto diagLoc =
+      errorCallStack.empty()
+          ? (triggerLoc ? triggerLoc.getValue() : fallbackLoc.getSourceLoc())
+          : errorCallStack.front();
+  if (diagLoc.isInvalid()) {
     return;
   }
-  for (auto &sourceLoc : llvm::reverse(getUnknownCallStack())) {
-    // Skip unknown sources.
-    if (!sourceLoc.isValid())
-      continue;
 
-    auto diag = emittedFirstNote ? diag::constexpr_called_from
-                                 : diag::constexpr_not_evaluable;
-    diagnose(module.getASTContext(), sourceLoc, diag);
-    emittedFirstNote = true;
+  // Emit a note at the trigger location as well if it is different from the
+  // top-level expression.
+  bool emitTriggerLocInDiag =
+      triggerLoc ? diagLoc != triggerLoc.getValue() : false;
+
+  switch (unknownReason) {
+  case UnknownReason::Default:
+    diagnose(ctx, diagLoc, diag::constexpr_unknown_reason_default);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_unevaluable_operation);
+    return;
+  case UnknownReason::TooManyInstructions:
+    diagnose(ctx, diagLoc, diag::constexpr_too_many_instructions,
+             ConstExprLimit);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_limit_exceeding_instruction);
+    return;
+  case UnknownReason::Loop:
+    diagnose(ctx, diagLoc, diag::constexpr_loop_found_note);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_loop_instruction);
+    return;
+  case UnknownReason::Overflow:
+    diagnose(ctx, diagLoc, diag::constexpr_overflow);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_overflow_operation);
+    return;
+  case UnknownReason::Trap:
+    diagnose(ctx, diagLoc, diag::constexpr_trap);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_trap_operation);
+    return;
+  case UnknownReason::InvalidOperandValue:
+    diagnose(ctx, diagLoc, diag::constexpr_invalid_operand_seen);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_operand_invalid_here);
+    return;
+  case UnknownReason::NotTopLevelConstant: {
+    // For top-level errors, trigger loc is better than diagLoc.
+    auto loc = emitTriggerLocInDiag ? *triggerLoc : diagLoc;
+    diagnose(ctx, loc, diag::constexpr_value_unknown_at_top_level);
+    return;
   }
+  case UnknownReason::MutipleTopLevelWriters: {
+    // For top-level errors, trigger loc is better than diagLoc.
+    auto loc = emitTriggerLocInDiag ? *triggerLoc : diagLoc;
+    diagnose(ctx, loc, diag::constexpr_multiple_writers_found_at_top_level);
+    return;
+  }
+  case UnknownReason::UnsupportedInstruction:
+    diagnose(ctx, diagLoc, diag::constexpr_unsupported_instruction_found);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc,
+               diag::constexpr_unsupported_instruction_found_here);
+    return;
+  case UnknownReason::CalleeImplementationUnknown:
+    diagnose(ctx, diagLoc, diag::constexpr_unknown_function_called);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_unknown_function_called_here);
+    return;
+  case UnknownReason::UntrackedSILValue:
+    diagnose(ctx, diagLoc, diag::constexpr_untracked_sil_value_use_found);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_untracked_sil_value_used_here);
+    return;
+  case UnknownReason::UnknownWitnessMethodConformance:
+    diagnose(ctx, diagLoc,
+             diag::constexpr_witness_call_with_no_conformance_found);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_witness_call_found_here);
+    return;
+  case UnknownReason::UnresolvableWitnessMethod:
+    diagnose(ctx, diagLoc, diag::constexpr_witness_call_with_no_target_found);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, *triggerLoc, diag::constexpr_witness_call_found_here);
+    return;
+  }
+  // TODO: print the call-stack in a controlled way if needed.
 }
 
 /// Returns the element of `aggregate` specified by the access path.
@@ -694,7 +736,7 @@ SymbolicValueMemoryObject::getIndexedElement(ArrayRef<unsigned> accessPath) {
 static SymbolicValue setIndexedElement(SymbolicValue aggregate,
                                        ArrayRef<unsigned> accessPath,
                                        SymbolicValue newElement, Type type,
-                                       ASTContext &astCtx) {
+                                       SymbolicValueAllocator &allocator) {
   // We're done if we've run out of access path.
   if (accessPath.empty())
     return newElement;
@@ -715,7 +757,7 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
 
     SmallVector<SymbolicValue, 4> newElts(numMembers,
                                           SymbolicValue::getUninitMemory());
-    aggregate = SymbolicValue::getAggregate(newElts, astCtx);
+    aggregate = SymbolicValue::getAggregate(newElts, allocator);
   }
 
   assert(aggregate.getKind() == SymbolicValue::Aggregate &&
@@ -738,12 +780,11 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
 
   // Update the indexed element of the aggregate.
   SmallVector<SymbolicValue, 4> newElts(oldElts.begin(), oldElts.end());
-  newElts[elementNo] = setIndexedElement(newElts[elementNo],
-                                         accessPath.drop_front(), newElement,
-                                         eltType, astCtx);
+  newElts[elementNo] =
+      setIndexedElement(newElts[elementNo], accessPath.drop_front(), newElement,
+                        eltType, allocator);
 
-  aggregate = SymbolicValue::getAggregate(newElts, astCtx);
-
+  aggregate = SymbolicValue::getAggregate(newElts, allocator);
   return aggregate;
 }
 
@@ -755,6 +796,6 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
 /// Precondition: The access path must be valid for this memory object's type.
 void SymbolicValueMemoryObject::setIndexedElement(
     ArrayRef<unsigned> accessPath, SymbolicValue newElement,
-    ASTContext &astCtx) {
-  value = ::setIndexedElement(value, accessPath, newElement, type, astCtx);
+    SymbolicValueAllocator &allocator) {
+  value = ::setIndexedElement(value, accessPath, newElement, type, allocator);
 }

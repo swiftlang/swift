@@ -34,34 +34,34 @@ struct SILDynamicCastInst;
 
 /// This is a helper class used to optimize casts.
 class CastOptimizer {
-  SILOptFunctionBuilder &FunctionBuilder;
+  SILOptFunctionBuilder &functionBuilder;
 
   /// Temporary context for clients that do not provide their own.
-  SILBuilderContext TempBuilderContext;
+  SILBuilderContext tempBuilderContext;
 
   /// Reference to the provided SILBuilderContext.
-  SILBuilderContext &BuilderContext;
+  SILBuilderContext &builderContext;
 
   /// Callback that replaces the first SILValue's uses with a use of the second
   /// value.
-  std::function<void(SILValue, SILValue)> ReplaceValueUsesAction;
+  std::function<void(SILValue, SILValue)> replaceValueUsesAction;
 
   /// Callback that replaces a SingleValueInstruction with a ValueBase after
   /// updating any status in the caller.
   std::function<void(SingleValueInstruction *, ValueBase *)>
-      ReplaceInstUsesAction;
+      replaceInstUsesAction;
 
   /// Callback that erases an instruction and performs any state updates in the
   /// caller required.
-  std::function<void(SILInstruction *)> EraseInstAction;
+  std::function<void(SILInstruction *)> eraseInstAction;
 
   /// Callback to call after an optimization was performed based on the fact
   /// that a cast will succeed.
-  std::function<void()> WillSucceedAction;
+  std::function<void()> willSucceedAction;
 
   /// Callback to call after an optimization was performed based on the fact
   /// that a cast will fail.
-  std::function<void()> WillFailAction;
+  std::function<void()> willFailAction;
 
 public:
   CastOptimizer(SILOptFunctionBuilder &FunctionBuilder,
@@ -72,13 +72,13 @@ public:
                 std::function<void(SILInstruction *)> EraseAction,
                 std::function<void()> WillSucceedAction,
                 std::function<void()> WillFailAction = []() {})
-      : FunctionBuilder(FunctionBuilder),
-        TempBuilderContext(FunctionBuilder.getModule()),
-        BuilderContext(BuilderContext ? *BuilderContext : TempBuilderContext),
-        ReplaceValueUsesAction(ReplaceValueUsesAction),
-        ReplaceInstUsesAction(ReplaceInstUsesAction),
-        EraseInstAction(EraseAction), WillSucceedAction(WillSucceedAction),
-        WillFailAction(WillFailAction) {}
+      : functionBuilder(FunctionBuilder),
+        tempBuilderContext(FunctionBuilder.getModule()),
+        builderContext(BuilderContext ? *BuilderContext : tempBuilderContext),
+        replaceValueUsesAction(ReplaceValueUsesAction),
+        replaceInstUsesAction(ReplaceInstUsesAction),
+        eraseInstAction(EraseAction), willSucceedAction(WillSucceedAction),
+        willFailAction(WillFailAction) {}
 
   // This constructor is used in
   // 'SILOptimizer/Mandatory/ConstantPropagation.cpp'. MSVC2015 compiler

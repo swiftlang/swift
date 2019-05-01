@@ -178,7 +178,7 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
     
     /// The ISO 8601 week-numbering year of the receiver.
     ///
-    /// The Gregorian calendar defines a week to have 7 days, and a year to have 356 days, or 366 in a leap year. However, neither 356 or 366 divide evenly into a 7 day week, so it is often the case that the last week of a year ends on a day in the next year, and the first week of a year begins in the preceding year. To reconcile this, ISO 8601 defines a week-numbering year, consisting of either 52 or 53 full weeks (364 or 371 days), such that the first week of a year is designated to be the week containing the first Thursday of the year.
+    /// The Gregorian calendar defines a week to have 7 days, and a year to have 365 days, or 366 in a leap year. However, neither 365 or 366 divide evenly into a 7 day week, so it is often the case that the last week of a year ends on a day in the next year, and the first week of a year begins in the preceding year. To reconcile this, ISO 8601 defines a week-numbering year, consisting of either 52 or 53 full weeks (364 or 371 days), such that the first week of a year is designated to be the week containing the first Thursday of the year.
     ///
     /// You can use the yearForWeekOfYear property with the weekOfYear and weekday properties to get the date corresponding to a particular weekday of a given week of a year. For example, the 6th day of the 53rd week of the year 2005 (ISO 2005-W53-6) corresponds to Sat 1 January 2005 on the Gregorian calendar.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
@@ -263,10 +263,10 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
     
     // MARK: -
     
-    public var hashValue : Int {
-        return _handle.map { $0.hash }
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(_handle._uncopiedReference())
     }
-    
+
     // MARK: - Bridging Helpers
     
     fileprivate init(reference: __shared NSDateComponents) {

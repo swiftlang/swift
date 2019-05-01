@@ -18,9 +18,6 @@ let Flags = [FrontendOption, NoDriverOption] in {
 
 def triple : Separate<["-"], "triple">, Alias<target>;
 
-def color_diagnostics : Flag<["-"], "color-diagnostics">,
-  HelpText<"Print diagnostics in color">;
-
 def primary_file : Separate<["-"], "primary-file">,
   HelpText<"Produce output for this file, not the whole module">;
 
@@ -59,13 +56,13 @@ def emit_fixits_path
   : Separate<["-"], "emit-fixits-path">, MetaVarName<"<path>">,
     HelpText<"Output compiler fixits as source edits to <path>">;
 
-// For transition purposes.
-def emit_interface_path
-  : Separate<["-"], "emit-interface-path">,
-    Alias<emit_parseable_module_interface_path>;
+def serialize_module_interface_dependency_hashes
+  : Flag<["-"], "serialize-module-interface-dependency-hashes">,
+    Flags<[HelpHidden]>;
 
 def serialize_parseable_module_interface_dependency_hashes
   : Flag<["-"], "serialize-parseable-module-interface-dependency-hashes">,
+    Alias<serialize_module_interface_dependency_hashes>,
     Flags<[HelpHidden]>;
 
 def tbd_install_name
@@ -153,8 +150,8 @@ def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
 class DebugCrashOpt : Group<debug_crash_Group>;
 
 
-// Flags that are saved into parseable interfaces
-let Flags = [FrontendOption, NoDriverOption, HelpHidden, ParseableInterfaceOption] in {
+// Flags that are saved into module interfaces
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] in {
 
 def enable_objc_interop :
   Flag<["-"], "enable-objc-interop">,
@@ -188,6 +185,12 @@ def debug_constraints : Flag<["-"], "debug-constraints">,
 
 def debug_constraints_attempt : Separate<["-"], "debug-constraints-attempt">,
   HelpText<"Debug the constraint solver at a given attempt">;
+
+def debug_constraints_on_line : Separate<["-"], "debug-constraints-on-line">,
+  HelpText<"Debug the constraint solver for expressions on <line>">,
+  MetaVarName<"<line>">;
+def debug_constraints_on_line_EQ : Joined<["-"], "debug-constraints-on-line=">,
+  Alias<debug_constraints_on_line>;
 
 def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-loading">,
   HelpText<"Disable per-name lazy member loading">;
@@ -228,6 +231,10 @@ def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
 
 def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;
+
+def enable_ownership_stripping_after_serialization
+  : Flag<["-"], "enable-ownership-stripping-after-serialization">,
+  HelpText<"Strip ownership after serialization">;
 
 def disable_access_control : Flag<["-"], "disable-access-control">,
   HelpText<"Don't respect access control restrictions">;
@@ -398,6 +405,10 @@ def solver_enable_operator_designated_types :
   Flag<["-"], "solver-enable-operator-designated-types">,
   HelpText<"Enable operator designated types in constraint solver">;
 
+def enable_opaque_result_types :
+  Flag<["-"], "enable-opaque-result-types">,
+  HelpText<"Enable experimental opaque result types feature">;
+
 def switch_checking_invocation_threshold_EQ : Joined<["-"],
     "switch-checking-invocation-threshold=">;
 
@@ -509,14 +520,19 @@ def dump_interface_hash : Flag<["-"], "dump-interface-hash">,
    HelpText<"Parse input file(s) and dump interface token hash(es)">,
    ModeOpt;
 
+def compile_module_from_interface :
+  Flag<["-"], "compile-module-from-interface">,
+  HelpText<"Treat the (single) input as a swiftinterface and produce a module">,
+  ModeOpt;
+
 def build_module_from_parseable_interface :
   Flag<["-"], "build-module-from-parseable-interface">,
-  HelpText<"Treat the (single) input as a swiftinterface and produce a module">,
+  Alias<compile_module_from_interface>,
   ModeOpt;
 
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,
-  HelpText<"Directory of prebuilt modules for loading parseable interfaces">;
+  HelpText<"Directory of prebuilt modules for loading module interfaces">;
 def prebuilt_module_cache_path_EQ :
   Joined<["-"], "prebuilt-module-cache-path=">,
   Alias<prebuilt_module_cache_path>;

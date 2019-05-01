@@ -50,7 +50,7 @@ static bool allAssociatedValuesConformToProtocol(DeclContext *DC,
       continue;
 
     for (auto param : *PL) {
-      auto type = param->getType()->mapTypeOutOfContext();
+      auto type = param->getInterfaceType();
       if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
                                            protocol, DC,
                                            ConformanceCheckFlags::Used)) {
@@ -73,9 +73,9 @@ static bool allStoredPropertiesConformToProtocol(DeclContext *DC,
   auto storedProperties =
     theStruct->getStoredProperties(/*skipInaccessible=*/true);
   for (auto propertyDecl : storedProperties) {
-    if (!propertyDecl->hasType())
+    if (!propertyDecl->hasInterfaceType())
       lazyResolver->resolveDeclSignature(propertyDecl);
-    if (!propertyDecl->hasType())
+    if (!propertyDecl->hasInterfaceType())
       return false;
 
     auto type = propertyDecl->getValueInterfaceType();

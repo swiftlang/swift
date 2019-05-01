@@ -163,7 +163,7 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
   // argument.
   auto *MI = B.createFunctionRef(ReleaseInst->getLoc(), Dealloc);
 
-  B.createApply(ReleaseInst->getLoc(), MI, AllocSubMap, {object}, false);
+  B.createApply(ReleaseInst->getLoc(), MI, AllocSubMap, {object});
 
   NumReleasesDevirtualized++;
   ReleaseInst->eraseFromParent();

@@ -158,6 +158,8 @@ class subject_class1 { // no-error
 
   @objc
   func subject_instanceFunc() {} // no-error
+  
+  
 }
 
 @objc
@@ -506,7 +508,12 @@ class subject_subscriptGeneric<T> {
   }
 }
 
-
+class subject_subscriptInvalid1 {
+  @objc class subscript(_ i: Int) -> AnyObject? {
+  // expected-error@-1 {{class subscript cannot be marked @objc}}
+    return nil
+  }
+}
 
 class subject_subscriptInvalid2 {
   @objc
@@ -2340,3 +2347,12 @@ extension MyObjCClass {
   private func notExposedToObjC() {}
 }
 
+// SR-9035
+
+class SR_9035_C {}
+
+@objc protocol SR_9035_P {
+  func throwingMethod1() throws -> Unmanaged<CFArray> // Ok
+  func throwingMethod2() throws -> Unmanaged<SR_9035_C> // expected-error {{method cannot be a member of an @objc protocol because its result type cannot be represented in Objective-C}}
+  // expected-note@-1 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
+}

@@ -478,7 +478,6 @@ static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
   C.NumPostfixOperators += SF->PostfixOperators.size();
   C.NumPrefixOperators += SF->PrefixOperators.size();
   C.NumPrecedenceGroups += SF->PrecedenceGroups.size();
-  C.NumUsedConformances += SF->getUsedConformances().size();
 
   auto bufID = SF->getBufferID();
   if (bufID.hasValue()) {
@@ -588,7 +587,7 @@ static bool buildModuleFromParseableInterface(CompilerInvocation &Invocation,
       Instance.getASTContext(), Invocation.getClangModuleCachePath(),
       PrebuiltCachePath, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(),
-      FEOpts.SerializeParseableModuleInterfaceDependencyHashes,
+      FEOpts.SerializeModuleInterfaceDependencyHashes,
       FEOpts.TrackSystemDeps);
 }
 
@@ -962,7 +961,7 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::EmitPCH)
     return precompileBridgingHeader(Invocation, Instance);
 
-  if (Action == FrontendOptions::ActionType::BuildModuleFromParseableInterface)
+  if (Action == FrontendOptions::ActionType::CompileModuleFromInterface)
     return buildModuleFromParseableInterface(Invocation, Instance);
 
   if (Invocation.getInputKind() == InputFileKind::LLVM)
