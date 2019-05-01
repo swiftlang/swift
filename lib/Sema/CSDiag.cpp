@@ -3517,6 +3517,28 @@ public:
     return true;
   }
 
+  bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx) override {
+    Expr *arg = ArgExpr;
+
+    auto tuple = dyn_cast<TupleExpr>(ArgExpr);
+    if (tuple)
+      arg = tuple->getElement(argIdx);
+
+    auto &param = Parameters[paramIdx];
+    TC.diagnose(arg->getLoc(), diag::trailing_closure_bad_param,
+                param.getPlainType())
+      .highlight(arg->getSourceRange());
+
+    auto candidate = CandidateInfo[0];
+    if (candidate.getDecl())
+      TC.diagnose(candidate.getDecl(), diag::decl_declared_here,
+                  candidate.getDecl()->getFullName());
+
+    Diagnosed = true;
+
+    return true;
+  }
+
   bool diagnose() {
     // Use matchCallArguments to determine how close the argument list is (in
     // shape) to the specified candidates parameters.  This ignores the
