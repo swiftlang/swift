@@ -123,13 +123,6 @@ public:
     return mangleNominalTypeSymbol(Decl, "Mn");
   }
   
-  std::string mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl) {
-    beginMangling();
-    appendOpaqueDeclName(decl);
-    appendOperator("MQ");
-    return finalize();
-  }
-
   std::string mangleOpaqueTypeDescriptorAccessor(const OpaqueTypeDecl *decl) {
     beginMangling();
     appendOpaqueDeclName(decl);
