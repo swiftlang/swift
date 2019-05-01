@@ -288,3 +288,7 @@ bool LangOptions::doesTargetSupportObjCMetadataUpdateCallback() const {
   // tests that -enable-objc-interop.
   return false;
 }
+
+bool LangOptions::doesTargetSupportObjCGetClassHook() const {
+  return doesTargetSupportObjCMetadataUpdateCallback();
+}
