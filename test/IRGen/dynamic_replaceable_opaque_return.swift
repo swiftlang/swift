@@ -1,5 +1,10 @@
 // RUN: %target-swift-frontend -module-name A -swift-version 5 -primary-file %s -emit-ir | %FileCheck %s
 
+// No 32bit for now.
+// UNSUPPORTED: CPU=armv7
+// UNSUPPORTED: CPU=armv7s
+// UNSUPPORTED: CPU=i386
+
 // CHECK: @"$s1A3baryQrSiFQOMk" = global %swift.dyn_repl_link_entry { {{.*}}@"$s1A3baryQrSiFQOMh" to i8*), %swift.dyn_repl_link_entry* null }
 // CHECK: @"$s1A3baryQrSiFQOMj" = constant %swift.dyn_repl_key { {{.*}}%swift.dyn_repl_link_entry* @"$s1A3baryQrSiFQOMk"{{.*}}, i32 0 }, section "__TEXT,__const"
 // CHECK: @"$s1A16_replacement_bar1yQrSi_tFQOMk" = global %swift.dyn_repl_link_entry zeroinitializer
