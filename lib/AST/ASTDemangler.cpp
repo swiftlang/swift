@@ -1041,7 +1041,8 @@ ASTBuilder::findForeignTypeDecl(StringRef name,
 
     explicit Consumer(Demangle::Node::Kind kind) : ExpectedKind(kind) {}
 
-    void foundDecl(ValueDecl *decl, DeclVisibilityKind reason) override {
+    void foundDecl(ValueDecl *decl, DeclVisibilityKind reason,
+                   DynamicLookupInfo dynamicLookupInfo = {}) override {
       if (HadError) return;
       if (decl == Result) return;
       if (!Result) {
