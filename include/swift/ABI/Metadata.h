@@ -3044,11 +3044,16 @@ public:
     return getNumUnderlyingTypeArguments();
   }
   
+  const RelativeDirectPointer<const char> &
+  getUnderlyingTypeArgumentMangledName(unsigned i) const {
+    assert(i < getNumUnderlyingTypeArguments());
+    return (this
+         ->template getTrailingObjects<RelativeDirectPointer<const char>>())[i];
+  }
+  
   StringRef getUnderlyingTypeArgument(unsigned i) const {
     assert(i < getNumUnderlyingTypeArguments());
-    const char *ptr =
-    (this->template getTrailingObjects<RelativeDirectPointer<const char>>())[i];
-    
+    const char *ptr = getUnderlyingTypeArgumentMangledName(i);    
     return Demangle::makeSymbolicMangledNameStringRef(ptr);
   }
   

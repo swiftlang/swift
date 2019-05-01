@@ -724,6 +724,35 @@ public:
       return nullptr;
     return buildContextMangling(context, Dem);
   }
+  
+  /// Read the mangled underlying type from an opaque type descriptor.
+  BuiltType
+  readUnderlyingTypeForOpaqueTypeDescriptor(StoredPointer contextAddr,
+                                            unsigned ordinal) {
+    auto context = readContextDescriptor(contextAddr);
+    if (!context)
+      return BuiltType();
+    if (context->getKind() != ContextDescriptorKind::OpaqueType)
+      return BuiltType();
+    
+    auto opaqueType =
+      reinterpret_cast<const TargetOpaqueTypeDescriptor<Runtime> *>(
+                                                      context.getLocalBuffer());
+
+    if (ordinal >= opaqueType->getNumUnderlyingTypeArguments())
+      return BuiltType();
+    
+    auto nameAddr = resolveRelativeField(context,
+                     opaqueType->getUnderlyingTypeArgumentMangledName(ordinal));
+    
+    Demangle::Demangler Dem;
+    auto node = readMangledName(RemoteAddress(nameAddr),
+                                MangledNameKind::Type, Dem);
+    if (!node)
+      return BuiltType();
+    
+    return decodeMangledType(node);
+  }
 
   bool isTaggedPointer(StoredPointer objectAddress) {
     if (getTaggedPointerEncoding() != TaggedPointerEncodingKind::Extended)
@@ -1395,6 +1424,12 @@ private:
       break;
     case ContextDescriptorKind::Protocol:
       baseSize = sizeof(TargetProtocolDescriptor<Runtime>);
+      break;
+    case ContextDescriptorKind::OpaqueType:
+      baseSize = sizeof(TargetOpaqueTypeDescriptor<Runtime>);
+      metadataInitSize =
+        sizeof(typename Runtime::template RelativeDirectPointer<const char>)
+          * flags.getKindSpecificFlags();
       break;
     default:
       // We don't know about this kind of context.
