@@ -25,6 +25,18 @@ TensorADTests.testAllBackends("TestSimpleGrad") {
   expectEqual([[20], [40]], gradient(at: [[10], [20]], in: square))
 }
 
+// TODO: This is also failing!
+TensorADTests.testAllBackends("TestBroadcastingGrad") {
+  func foo(_ x: Tensor<Float>, _ y: Tensor<Float>) -> Tensor<Float> {
+    return x * y + x
+  }
+  let x = Tensor<Float>(ones: [1, 2, 1, 4])
+  let y = Tensor<Float>(ones: [4, 1, 3, 1])
+  let (dx, dy) = gradient(at: x, y, in: foo)
+  expectEqual(x.shape, dx.shape)
+  expectEqual(y.shape, dx.shape)
+}
+
 TensorADTests.testAllBackends("TestGenericGrad") {
   func square<T : TensorFlowFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
     return x * x
@@ -219,7 +231,7 @@ TensorADTests.testAllBackends("Differentiate global") {
 }
 
 TensorADTests.testAllBackends("Side effects") {
-/* This is failing reshape for some reason
+///* This is failing reshape for some reason
   let foo: @differentiable (Tensor<Float>) -> Tensor<Float> = { x in
     var a = x
     a = a + x
@@ -227,7 +239,7 @@ TensorADTests.testAllBackends("Side effects") {
     return a + x
   }
   expectEqual(Tensor([8, 8]), pullback(at: Tensor(4), in: foo)([1, 1]))
-*/
+//*/
 
   func bar(x: Tensor<Float>) -> Tensor<Float> {
     var a = x
