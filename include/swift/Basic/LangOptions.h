@@ -394,6 +394,15 @@ namespace swift {
     // - watchOS 5.2
     bool doesTargetSupportObjCMetadataUpdateCallback() const;
 
+    // The following deployment targets ship an Objective-C runtime supporting
+    // the objc_getClass() hook:
+    //
+    // - macOS 10.14.4
+    // - iOS 12.2
+    // - tvOS 12.2
+    // - watchOS 5.2
+    bool doesTargetSupportObjCGetClassHook() const;
+
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.
     ///

@@ -4839,6 +4839,12 @@ static void inferStaticInitializeObjCMetadata(TypeChecker &tc,
   if (classDecl->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
     return;
 
+  // If the class does not have a custom @objc name and the deployment target
+  // supports the objc_getClass() hook, the workaround is unnecessary.
+  if (tc.Context.LangOpts.doesTargetSupportObjCGetClassHook() &&
+      !hasExplicitObjCName(classDecl))
+    return;
+
   // If we know that the Objective-C metadata will be statically registered,
   // there's nothing to do.
   if (!classDecl->checkAncestry(AncestryFlags::Generic)) {
