@@ -374,6 +374,27 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     return createMemoryObject(value, enumVal.getEnumPayloadValue());
   }
 
+  if (isa<SelectEnumInst>(value) || isa<SelectEnumAddrInst>(value)) {
+    SelectEnumInstBase *selectInst = dyn_cast<SelectEnumInst>(value);
+    if (!selectInst) {
+      selectInst = dyn_cast<SelectEnumAddrInst>(value);
+    }
+
+    SILValue enumOperand = selectInst->getEnumOperand();
+    SymbolicValue enumValue = isa<SelectEnumInst>(selectInst)
+                                  ? getConstantValue(enumOperand)
+                                  : getConstAddrAndLoadResult(enumOperand);
+    if (!enumValue.isConstant())
+      return enumValue;
+
+    assert(enumValue.getKind() == SymbolicValue::Enum ||
+           enumValue.getKind() == SymbolicValue::EnumWithPayload);
+
+    SILValue resultOperand =
+        selectInst->getCaseResult(enumValue.getEnumValue());
+    return getConstantValue(resultOperand);
+  }
+
   // This instruction is a marker that returns its first operand.
   if (auto *bai = dyn_cast<BeginAccessInst>(value))
     return getConstantValue(bai->getOperand());
@@ -1277,6 +1298,11 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
       return value;
 
     return computeFSStore(value, copy->getOperand(1));
+  }
+
+  if (auto *injectEnumInst = dyn_cast<InjectEnumAddrInst>(inst)) {
+    return computeFSStore(SymbolicValue::getEnum(injectEnumInst->getElement()),
+                          injectEnumInst->getOperand());
   }
 
   // If the instruction produces normal results, try constant folding it.
