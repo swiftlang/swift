@@ -1971,16 +1971,37 @@ bool ConstraintSystem::repairFailures(
   auto *anchor = locator.getLocatorParts(path);
 
   if (path.empty()) {
+    if (!anchor)
+      return false;
+
     // If method reference forms a value type of the key path,
     // there is going to be a constraint to match result of the
     // member lookup to the generic parameter `V` of *KeyPath<R, V>
     // type associated with key path expression, which we need to
     // fix-up here.
-    if (anchor && isa<KeyPathExpr>(anchor)) {
+    if (isa<KeyPathExpr>(anchor)) {
       auto *fnType = lhs->getAs<FunctionType>();
       if (fnType && fnType->getResult()->isEqual(rhs))
         return true;
     }
+
+    if (isa<AssignExpr>(anchor)) {
+      if (auto *fnType = lhs->getAs<FunctionType>()) {
+        // If left-hand side is a function type but right-hand
+        // side isn't, let's check it would be possible to fix
+        // this by forming an explicit call.
+        if (!rhs->is<FunctionType>() && !rhs->isVoid() &&
+            fnType->getNumParams() == 0 &&
+            matchTypes(fnType->getResult(), rhs, ConstraintKind::Conversion,
+                       TypeMatchFlags::TMF_ApplyingFix, locator)
+                .isSuccess()) {
+          conversionsOrFixes.push_back(
+              InsertExplicitCall::create(*this, getConstraintLocator(locator)));
+          return true;
+        }
+      }
+    }
+
     return false;
   }
 
@@ -6445,6 +6466,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     return result;
   }
 
+  case FixKind::InsertCall:
   case FixKind::SkipSameTypeRequirement:
   case FixKind::SkipSuperclassRequirement:
   case FixKind::ContextualMismatch:
@@ -6453,7 +6475,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
 
   case FixKind::UseSubscriptOperator:
-  case FixKind::InsertCall:
   case FixKind::ExplicitlyEscaping:
   case FixKind::CoerceToCheckedCast:
   case FixKind::RelabelArguments:
