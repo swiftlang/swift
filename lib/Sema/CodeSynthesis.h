@@ -69,8 +69,6 @@ enum class ImplicitConstructorKind {
   Memberwise
 };
 
-bool isMemberwiseInitialized(VarDecl *var);
-
 /// Create an implicit struct or class constructor.
 ///
 /// \param decl The struct or class for which a constructor will be created.

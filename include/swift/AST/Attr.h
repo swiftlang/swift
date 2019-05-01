@@ -1428,6 +1428,7 @@ class CustomAttr final : public DeclAttribute,
   TypeLoc type;
   Expr *arg;
   PatternBindingInitializer *initContext;
+  Expr *semanticInit = nullptr;
 
   unsigned hasArgLabelLocs : 1;
   unsigned numArgLabels : 16;
@@ -1462,6 +1463,9 @@ public:
 
   Expr *getArg() const { return arg; }
   void setArg(Expr *newArg) { arg = newArg; }
+
+  Expr *getSemanticInit() const { return semanticInit; }
+  void setSemanticInit(Expr *expr) { semanticInit = expr; }
 
   PatternBindingInitializer *getInitContext() const { return initContext; }
 

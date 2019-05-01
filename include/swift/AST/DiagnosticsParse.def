@@ -852,10 +852,9 @@ ERROR(parameter_specifier_as_attr_disallowed,none,
       "'%0' before a parameter name is not allowed, place it before the parameter type instead",
       (StringRef))
 ERROR(parameter_specifier_repeated,none,
-      "parameter must not have multiple '__owned', 'inout', '__shared',"
-      " 'var', or 'let' specifiers", ())
-ERROR(parameter_let_var_as_attr,none,
-      "'%0' as a parameter attribute is not allowed",
+      "parameter must not have multiple '__owned', 'inout', or '__shared' specifiers", ())
+WARNING(parameter_let_var_as_attr,none,
+      "'%0' in this position is interpreted as an argument label",
       (StringRef))
 
 
@@ -1099,14 +1098,14 @@ ERROR(invalid_postfix_operator,none,
 
 ERROR(expected_member_name,PointsToFirstBadToken,
       "expected member name following '.'", ())
-ERROR(expected_dollar_numeric,none,
-      "expected numeric value following '$'", ())
 ERROR(dollar_numeric_too_large,none,
       "numeric value following '$' is too large", ())
 ERROR(numeric_literal_numeric_member,none,
       "expected named member of numeric literal", ())
 ERROR(standalone_dollar_identifier,none,
      "'$' is not an identifier; use backticks to escape it", ())
+ERROR(dollar_identifier_decl,none,
+     "cannot declare entity %0 with a '$' prefix", (Identifier))
 
 ERROR(anon_closure_arg_not_in_closure,none,
       "anonymous closure argument not contained in a closure", ())

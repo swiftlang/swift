@@ -228,6 +228,13 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     SizeTy  // extra inhabitant flags (optional)
   });
 
+  TypeLayoutTy = createStructType(*this, "swift.type_layout", {
+    SizeTy, // size
+    SizeTy, // stride
+    Int32Ty, // flags
+    Int32Ty // extra inhabitant count
+  });
+
   // A protocol descriptor describes a protocol. It is not type metadata in
   // and of itself, but is referenced in the structure of existential type
   // metadata records.
@@ -987,8 +994,12 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
     auto ForceImportThunk = cast<llvm::Function>(
         Module.getOrInsertFunction(buf, llvm::FunctionType::get(VoidTy, false))
             .getCallee());
-    ApplyIRLinkage(IRLinkage::ExternalImport)
-        .to(cast<llvm::GlobalValue>(ForceImportThunk));
+
+    const IRLinkage IRL =
+        llvm::Triple(Module.getTargetTriple()).isOSBinFormatCOFF()
+            ? IRLinkage::ExternalImport
+            : IRLinkage::ExternalWeakImport;
+    ApplyIRLinkage(IRL).to(cast<llvm::GlobalValue>(ForceImportThunk));
 
     buf += "_$";
     appendEncodedName(buf, IRGen.Opts.ModuleName);

@@ -156,8 +156,9 @@ public:
   }
 
   ResilienceExpansion getResilienceExpansion() const {
-    // FIXME: Expansion
-    return ResilienceExpansion::Minimal;
+    return (Serialized
+            ? ResilienceExpansion::Minimal
+            : ResilienceExpansion::Maximal);
   }
 
   /// Returns true if the \p ParamIdx'th (non-result) formal parameter is

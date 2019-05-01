@@ -174,7 +174,8 @@ func recursion(x: Int) -> some P {
   return recursion(x: x - 1)
 }
 
-func noReturnStmts() -> some P { fatalError() } // expected-error{{no return statements}}
+// FIXME: We need to emit a better diagnostic than the failure to convert Never to opaque.
+func noReturnStmts() -> some P { fatalError() } // expected-error{{cannot convert return expression of type 'Never' to return type 'some P'}} expected-error{{no return statements}}
 
 func mismatchedReturnTypes(_ x: Bool, _ y: Int, _ z: String) -> some P { // expected-error{{do not have matching underlying types}}
   if x {
@@ -287,4 +288,71 @@ var DoesNotConformComputedProp: some P {
 }
 */
 
+func redeclaration() -> some P { return 0 } // expected-note{{previously declared}}
+func redeclaration() -> some P { return 0 } // expected-error{{redeclaration}}
+func redeclaration() -> some Q { return 0 }
+func redeclaration() -> P { return 0 }
 
+var redeclaredProp: some P { return 0 } // expected-note 3{{previously declared}}
+var redeclaredProp: some P { return 0 } // expected-error{{redeclaration}}
+var redeclaredProp: some Q { return 0 } // expected-error{{redeclaration}}
+var redeclaredProp: P { return 0 } // expected-error{{redeclaration}}
+
+struct RedeclarationTest {
+  func redeclaration() -> some P { return 0 } // expected-note{{previously declared}}
+  func redeclaration() -> some P { return 0 } // expected-error{{redeclaration}}
+  func redeclaration() -> some Q { return 0 }
+  func redeclaration() -> P { return 0 }
+
+  var redeclaredProp: some P { return 0 } // expected-note 3{{previously declared}}
+  var redeclaredProp: some P { return 0 } // expected-error{{redeclaration}}
+  var redeclaredProp: some Q { return 0 } // expected-error{{redeclaration}}
+  var redeclaredProp: P { return 0 } // expected-error{{redeclaration}}
+
+  subscript(redeclared _: Int) -> some P { return 0 } // expected-note{{previously declared}}
+  subscript(redeclared _: Int) -> some P { return 0 } // expected-error{{redeclaration}}
+  subscript(redeclared _: Int) -> some Q { return 0 }
+  subscript(redeclared _: Int) -> P { return 0 }
+}
+
+func diagnose_requirement_failures() {
+  struct S {
+    var foo: some P { return S() } // expected-note {{declared here}}
+    // expected-error@-1 {{return type of property 'foo' requires that 'S' conform to 'P'}}
+
+    subscript(_: Int) -> some P { // expected-note {{declared here}}
+      return S()
+      // expected-error@-1 {{return type of subscript 'subscript(_:)' requires that 'S' conform to 'P'}}
+    }
+
+    func bar() -> some P { // expected-note {{declared here}}
+      return S()
+      // expected-error@-1 {{return type of instance method 'bar()' requires that 'S' conform to 'P'}}
+    }
+
+    static func baz(x: String) -> some P { // expected-note {{declared here}}
+      return S()
+      // expected-error@-1 {{return type of static method 'baz(x:)' requires that 'S' conform to 'P'}}
+    }
+  }
+
+  func fn() -> some P { // expected-note {{declared here}}
+    return S()
+    // expected-error@-1 {{return type of local function 'fn()' requires that 'S' conform to 'P'}}
+  }
+}
+
+func global_function_with_requirement_failure() -> some P { // expected-note {{declared here}}
+  return 42 as Double
+  // expected-error@-1 {{return type of global function 'global_function_with_requirement_failure()' requires that 'Double' conform to 'P'}}
+}
+
+func recursive_func_is_invalid_opaque() {
+  func rec(x: Int) -> some P {
+    // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
+    if x == 0 {
+      return rec(x: 0)
+    }
+    return rec(x: x - 1)
+  }
+}

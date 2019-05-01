@@ -129,12 +129,16 @@ public:
     SynthesizedArgument,
     /// The member looked up via keypath based dynamic lookup.
     KeyPathDynamicMember,
-    /// The root of a keypath
+    /// The type of the key path expression
+    KeyPathType,
+    /// The root of a key path
     KeyPathRoot,
-    /// The value of a keypath
+    /// The value of a key path
     KeyPathValue,
     /// The result type of a key path component. Not used for subscripts.
     KeyPathComponentResult,
+    /// The expected type of the function with a single expression body.
+    SingleExprFuncResultType,
   };
 
   /// Determine the number of numeric values used for the given path
@@ -165,9 +169,11 @@ public:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
     case ContextualType:
+    case KeyPathType:
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
+    case SingleExprFuncResultType:
       return 0;
 
     case OpenedGeneric:
@@ -234,9 +240,11 @@ public:
     case ContextualType:
     case SynthesizedArgument:
     case KeyPathDynamicMember:
+    case KeyPathType:
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
+    case SingleExprFuncResultType:
       return 0;
 
     case FunctionArgument:
@@ -533,6 +541,10 @@ public:
   /// Determine whether given locator points to the subscript reference
   /// e.g. `foo[0]` or `\Foo.[0]`
   bool isSubscriptMemberRef() const;
+
+  /// Determine whether give locator points to the type of the
+  /// key path expression.
+  bool isKeyPathType() const;
 
   /// Determine whether given locator points to the keypath root
   bool isKeyPathRoot() const;

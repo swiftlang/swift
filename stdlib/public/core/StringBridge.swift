@@ -69,6 +69,27 @@ internal func _cocoaStringSubscript(
   return _swift_stdlib_CFStringGetCharacterAtIndex(cfSelf, position)
 }
 
+@_effects(releasenone)
+internal func _cocoaStringCopyUTF8(
+  _ target: _CocoaString,
+  into bufPtr: UnsafeMutableBufferPointer<UInt8>
+) -> Int? {
+  let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
+  let len = _stdlib_binary_CFStringGetLength(target)
+  var count = 0
+  let converted = _swift_stdlib_CFStringGetBytes(
+    target,
+    _swift_shims_CFRange(location: 0, length: len),
+    kCFStringEncodingUTF8,
+    0,
+    0,
+    ptr,
+    bufPtr.count,
+    &count
+  )
+  return len == converted ? count : nil
+}
+
 @_effects(readonly)
 internal func _cocoaStringCompare(
   _ string: _CocoaString, _ other: _CocoaString

@@ -77,7 +77,8 @@ extension UnsafeBufferPointer: AccelerateBuffer { }
 extension UnsafeMutableBufferPointer: AccelerateMutableBuffer { }
 
 @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-extension Slice: AccelerateBuffer where Base: Collection { }
+extension Slice: AccelerateBuffer where Base: AccelerateBuffer { }
 
 @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
-extension Slice: AccelerateMutableBuffer where Base: MutableCollection { }
+extension Slice: AccelerateMutableBuffer
+where Base: AccelerateMutableBuffer & MutableCollection { }

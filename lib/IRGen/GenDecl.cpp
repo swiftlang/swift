@@ -1083,6 +1083,7 @@ void IRGenerator::emitTypeMetadataRecords() {
 void IRGenerator::emitLazyDefinitions() {
   while (!LazyTypeMetadata.empty() ||
          !LazyTypeContextDescriptors.empty() ||
+         !LazyOpaqueTypeDescriptors.empty() ||
          !LazyFieldDescriptors.empty() ||
          !LazyFunctionDefinitions.empty() ||
          !LazyWitnessTables.empty()) {
@@ -1106,6 +1107,15 @@ void IRGenerator::emitLazyDefinitions() {
       CurrentIGMPtr IGM = getGenModule(type->getDeclContext());
       emitLazyTypeContextDescriptor(*IGM.get(), type,
                                     RequireMetadata_t(entry.IsMetadataUsed));
+    }
+    while (!LazyOpaqueTypeDescriptors.empty()) {
+      OpaqueTypeDecl *type = LazyOpaqueTypeDescriptors.pop_back_val();
+      auto &entry = LazyOpaqueTypes.find(type)->second;
+      assert(hasLazyMetadata(type));
+      assert(entry.IsDescriptorUsed && !entry.IsDescriptorEmitted);
+      entry.IsDescriptorEmitted = true;
+      CurrentIGMPtr IGM = getGenModule(type->getDeclContext());
+      IGM->emitOpaqueTypeDecl(type);
     }
     while (!LazyFieldDescriptors.empty()) {
       NominalTypeDecl *type = LazyFieldDescriptors.pop_back_val();
@@ -1267,7 +1277,10 @@ void IRGenerator::noteUseOfFieldDescriptor(NominalTypeDecl *type) {
 void IRGenerator::noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque) {
   if (!opaque)
     return;
-  
+
+  if (!hasLazyMetadata(opaque))
+    return;
+
   auto insertResult = LazyOpaqueTypes.try_emplace(opaque);
   auto &entry = insertResult.first->second;
 

@@ -3700,6 +3700,13 @@ public:
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.
   virtual bool relabelArguments(ArrayRef<Identifier> newNames);
+
+  /// Indicates that the trailing closure argument at the given \c argIdx
+  /// cannot be passed to the last parameter at \c paramIdx.
+  ///
+  /// \returns true to indicate that this should cause a failure, false
+  /// otherwise.
+  virtual bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx);
 };
 
 /// Match the call arguments (as described by the given argument type) to
@@ -4010,6 +4017,14 @@ public:
                              IsExplicitConversion, isBeginningOfPartition);
   }
 };
+
+/// Determine whether given type is a known one
+/// for a key path `{Writable, ReferenceWritable}KeyPath`.
+bool isKnownKeyPathType(Type type);
+
+/// Determine whether given declaration is one for a key path
+/// `{Writable, ReferenceWritable}KeyPath`.
+bool isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl);
 } // end namespace constraints
 
 template<typename ...Args>

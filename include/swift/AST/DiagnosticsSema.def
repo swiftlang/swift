@@ -47,6 +47,8 @@ NOTE(implicit_member_declared_here,none,
      "%1 '%0' is implicitly declared", (StringRef, StringRef))
 NOTE(extended_type_declared_here,none,
      "extended type declared here", ())
+NOTE(opaque_return_type_declared_here,none,
+     "opaque return type declared here", ())
 
 //------------------------------------------------------------------------------
 // MARK: Constraint solver diagnostics
@@ -1028,6 +1030,9 @@ ERROR(extra_argument_to_nullary_call,none,
       "argument passed to call that takes no arguments", ())
 ERROR(extra_trailing_closure_in_call,none,
       "extra trailing closure passed in call", ())
+ERROR(trailing_closure_bad_param,none,
+      "trailing closure passed to parameter of type %0 that does not "
+      "accept a closure", (Type))
 ERROR(no_accessible_initializers,none,
       "%0 cannot be constructed because it has no accessible initializers",
       (Type))
@@ -1074,7 +1079,7 @@ ERROR(c_function_pointer_from_generic_function,none,
 ERROR(c_function_pointer_from_function_with_context,none,
       "a C function pointer cannot be formed from a "
       "%select{local function|closure}0 that captures "
-      "%select{context|generic parameters|dynamic Self type}1",
+      "%select{context|generic parameters|dynamic Self type|<<error>}1",
       (bool, unsigned))
 ERROR(invalid_autoclosure_forwarding,none,
       "add () to forward @autoclosure parameter", ())
@@ -1582,6 +1587,9 @@ ERROR(type_does_not_conform_in_decl_ref,none,
       (DescriptiveDeclKind, DeclName, Type, Type, Type))
 ERROR(type_does_not_conform_decl_owner,none,
       "%0 %1 requires that %2 conform to %3",
+      (DescriptiveDeclKind, DeclName, Type, Type))
+ERROR(type_does_not_conform_in_opaque_return,none,
+      "return type of %0 %1 requires that %2 conform to %3",
       (DescriptiveDeclKind, DeclName, Type, Type))
 ERROR(types_not_equal_decl,none,
       "%0 %1 requires the types %2 and %3 be equivalent",
@@ -4311,6 +4319,88 @@ WARNING(hashvalue_implementation,none,
         "'Hashable.hashValue' is deprecated as a protocol requirement; "
         "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",
         (Type))
+
+//------------------------------------------------------------------------------
+// MARK: property delegate diagnostics
+//------------------------------------------------------------------------------
+ERROR(property_delegate_no_value_property, none,
+  "property delegate type %0 does not contain a non-static property "
+  "named %1", (Type, Identifier))
+ERROR(property_delegate_ambiguous_value_property, none,
+  "property delegate type %0 has multiple non-static properties "
+  "named %1", (Type, Identifier))
+ERROR(property_delegate_wrong_initial_value_init, none,
+      "'init(initialValue:)' parameter type (%0) must be the same as its "
+      "'value' property type (%1) or an @autoclosure thereof", (Type, Type))
+ERROR(property_delegate_failable_initial_value_init, none,
+      "'init(initialValue:)' cannot be failable", ())
+ERROR(property_delegate_ambiguous_initial_value_init, none,
+  "property delegate type %0 has multiple initial-value initializers", (Type))
+ERROR(property_delegate_type_requirement_not_accessible,none,
+      "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
+      "more restrictive access than its enclosing property delegate type %3 "
+      "(which is %select{private|fileprivate|internal|public|open}4)",
+      (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
+ERROR(property_delegate_reserved_name,none,
+      "property delegate type name must start with an uppercase letter", ())
+
+ERROR(property_delegate_attribute_not_on_property, none,
+      "property delegate attribute %0 can only be applied to a property",
+      (DeclName))
+
+ERROR(property_delegate_multiple,none,
+      "only one property delegate can be attached to a given property", ())
+NOTE(previous_property_delegate_here,none,
+      "previous property delegate specified here", ())
+
+ERROR(property_delegate_local,none,
+      "property delegates are not yet supported on local properties", ())
+ERROR(property_delegate_let, none,
+      "property delegate can only be applied to a 'var'",
+      ())
+
+ERROR(property_with_delegate_conflict_attribute,none,
+      "property %0 with a delegate cannot also be "
+      "%select{lazy|@NSCopying|@NSManaged|weak|unowned|unmanaged}1",
+      (DeclName, int))
+ERROR(property_delegate_not_single_var, none,
+      "property delegate can only apply to a single variable", ())
+ERROR(property_with_delegate_in_bad_context,none,
+      "%select{|non-static |non-static }1property %0 declared inside "
+      "%select{a protocol|an extension|an enum}1 cannot have a delegate",
+      (DeclName, int))
+ERROR(property_with_delegate_overrides,none,
+      "property %0 with attached delegate cannot override another property",
+      (DeclName))
+
+ERROR(property_delegate_and_normal_init,none,
+      "property %0 with attached delegate cannot initialize both the "
+      "delegate type and the property", (DeclName))
+ERROR(property_delegate_init_without_initial_value, none,
+      "initializing property %0 with delegate %1 that lacks "
+      "an 'init(initialValue:)' initializer", (DeclName, Type))
+NOTE(property_delegate_direct_init,none,
+     "initialize the property delegate type directly with "
+     "'(...') on the attribute", ())
+
+ERROR(property_delegate_incompatible_unbound, none,
+      "property delegate type %0 must either specify all generic arguments "
+      "or require only a single generic argument", (Type))
+
+ERROR(property_delegate_type_access,none,
+      "%select{%select{variable|constant}0|property}1 "
+      "%select{must be declared %select{"
+      "%select{private|fileprivate|internal|%error|%error}3|private or fileprivate}4"
+      "|cannot be declared "
+      "%select{in this context|fileprivate|internal|public|open}3}2 "
+      "because its property delegate type uses "
+      "%select{a private|a fileprivate|an internal|%error|%error}5 type",
+      (bool, bool, bool, AccessLevel, bool, AccessLevel))
+ERROR(property_delegate_type_not_usable_from_inline,none,
+      "property delegate type referenced from a '@usableFromInline' "
+      "%select{%select{variable|constant}0|property}1 "
+      "must be '@usableFromInline' or public",
+      (bool, bool))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

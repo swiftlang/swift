@@ -3140,13 +3140,6 @@ static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
                                               CanType dynamicSelfType,
                                               CanSILFunctionType toType,
                                               ManagedValue fn) {
-  CanSILFunctionType substFnType = thunk->getLoweredFunctionType();
-
-  if (substFnType->getGenericSignature()) {
-    substFnType = substFnType->substGenericArgs(SGF.F.getModule(),
-                                                interfaceSubs);
-  }
-
   auto thunkValue = SGF.B.createFunctionRefFor(loc, thunk);
   SmallVector<ManagedValue, 2> thunkArgs;
   thunkArgs.push_back(fn);
@@ -3158,9 +3151,8 @@ static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
 
   return
     SGF.B.createPartialApply(loc, thunkValue,
-                             SILType::getPrimitiveObjectType(substFnType),
                              interfaceSubs, thunkArgs,
-                             SILType::getPrimitiveObjectType(toType));
+                             toType->getCalleeConvention());
 }
 
 /// Create a reabstraction thunk.
@@ -3209,6 +3201,7 @@ static ManagedValue createThunk(SILGenFunction &SGF,
                    outputOrigType,
                    outputSubstType,
                    dynamicSelfType);
+    SGF.SGM.emitLazyConformancesForFunction(thunk);
   }
 
   auto thunkedFn =
@@ -3314,6 +3307,7 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
     thunk->setGenericEnvironment(genericEnv);
     SILGenFunction thunkSGF(SGM, *thunk, FunctionDC);
     buildWithoutActuallyEscapingThunkBody(thunkSGF, dynamicSelfType);
+    SGM.emitLazyConformancesForFunction(thunk);
   }
   assert(thunk->isWithoutActuallyEscapingThunk());
 

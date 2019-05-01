@@ -688,7 +688,8 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
     SILBuilderWithScope B(Call);
     SmallVector<SILValue, 1> Args;
     auto *GetterRef = B.createFunctionRef(Call->getLoc(), GetterF);
-    auto *NewAI = B.createApply(Call->getLoc(), GetterRef, Args, false);
+    auto *NewAI = B.createApply(Call->getLoc(), GetterRef,
+                                SubstitutionMap(), Args);
 
     // FIXME: This is asserting that a specific SIL sequence follows an
     // addressor! SIL passes should never do this without first specifying a
@@ -904,7 +905,8 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
   for (auto *Load : GlobalLoadMap[SILG]) {
     SILBuilderWithScope B(Load);
     auto *GetterRef = B.createFunctionRef(Load->getLoc(), GetterF);
-    auto *Value = B.createApply(Load->getLoc(), GetterRef, {}, false);
+    auto *Value = B.createApply(Load->getLoc(), GetterRef,
+                                SubstitutionMap(), {});
 
     convertLoadSequence(Load, Value, B);
     HasChanged = true;

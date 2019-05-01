@@ -47,13 +47,13 @@ module SwiftGlibc [system] {
       export *
     }
 % end
-% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN", "HAIKU"]:
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN", "HAIKU", "ANDROID"]:
     module complex {
       header "${GLIBC_INCLUDE_PATH}/complex.h"
       export *
     }
 % end
-% if CMAKE_SDK in ["LINUX", "CYGWIN"]:
+% if CMAKE_SDK in ["LINUX", "CYGWIN", "ANDROID"]:
     module pty {
       header "${GLIBC_INCLUDE_PATH}/pty.h"
       export *
@@ -181,7 +181,7 @@ module SwiftGlibc [system] {
 
   // POSIX
   module POSIX {
-% if CMAKE_SDK in ["LINUX", "CYGWIN"]:
+% if CMAKE_SDK in ["LINUX", "CYGWIN", "ANDROID"]:
     module wait {
       header "${GLIBC_INCLUDE_PATH}/wait.h"
       export *
@@ -210,8 +210,18 @@ module SwiftGlibc [system] {
       export *
     }
 % end
+% if CMAKE_SDK == "ANDROID":
+    module cpio {
+      header "${GLIBC_INCLUDE_PATH}/cpio.h"
+      export *
+    }
+    module nl_types {
+      header "${GLIBC_INCLUDE_PATH}/nl_types.h"
+      export *
+    }
+% end
 
-% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN", "ANDROID"]:
     module ftw {
       header "${GLIBC_INCLUDE_PATH}/ftw.h"
       export *
@@ -228,10 +238,12 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/langinfo.h"
       export *
     }
+% if CMAKE_SDK != "ANDROID":
     module monetary {
       header "${GLIBC_INCLUDE_PATH}/monetary.h"
       export *
     }
+% end
     module netdb {
       header "${GLIBC_INCLUDE_PATH}/netdb.h"
       export *
@@ -256,6 +268,7 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/tar.h"
       export *
     }
+% if CMAKE_SDK != "ANDROID":
     module utmpx {
       header "${GLIBC_INCLUDE_PATH}/utmpx.h"
       export *
@@ -264,6 +277,7 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/wordexp.h"
       export *
     }
+% end
 % end
 
 % if CMAKE_SDK == "HAIKU":
@@ -393,7 +407,7 @@ module SwiftGlibc [system] {
     module sys {
       export *
 
-% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN", "HAIKU"]:
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN", "HAIKU", "ANDROID"]:
       module file {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/file.h"
         export *
@@ -478,7 +492,7 @@ module SwiftGlibc [system] {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/un.h"
         export *
       }
-% if CMAKE_SDK in ["LINUX"]:
+% if CMAKE_SDK in ["LINUX", "ANDROID"]:
       module user {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/user.h"
         export *
@@ -493,7 +507,7 @@ module SwiftGlibc [system] {
         export *
       }
     }
-% if CMAKE_SDK in ["LINUX", "FREEBSD"]:
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "ANDROID"]:
     module sysexits {
       header "${GLIBC_INCLUDE_PATH}/sysexits.h"
       export *

@@ -743,6 +743,27 @@ lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
       continue;
     }
 
+    if (capture.isOpaqueValue()) {
+      OpaqueValueExpr *opaqueValue = capture.getOpaqueValue();
+      auto canType = opaqueValue->getType()->mapTypeOutOfContext()
+          ->getCanonicalType(origGenericSig);
+      auto &loweredTL =
+          Types.getTypeLowering(AbstractionPattern(genericSig, canType),
+                                canType, expansion);
+      auto loweredTy = loweredTL.getLoweredType();
+
+      ParameterConvention convention;
+      if (loweredTL.isAddressOnly()) {
+        convention = ParameterConvention::Indirect_In;
+      } else {
+        convention = ParameterConvention::Direct_Owned;
+      }
+      SILParameterInfo param(loweredTy.getASTType(), convention);
+      inputs.push_back(param);
+
+      continue;
+    }
+
     auto *VD = capture.getDecl();
     auto type = VD->getInterfaceType();
     auto canType = type->getCanonicalType(origGenericSig);
@@ -984,8 +1005,9 @@ static CanSILFunctionType getSILFunctionType(
   // from the function to which the argument is attached.
   if (constant && !constant->isDefaultArgGenerator()) {
     if (auto function = constant->getAnyFunctionRef()) {
-      // FIXME: Expansion
-      auto expansion = ResilienceExpansion::Minimal;
+      auto expansion = ResilienceExpansion::Maximal;
+      if (constant->isSerialized())
+        expansion = ResilienceExpansion::Minimal;
       lowerCaptureContextParameters(M, *function, genericSig, expansion,
                                     inputs);
     }

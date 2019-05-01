@@ -651,10 +651,10 @@ void swift::performPCMacro(SourceFile &SF, TopLevelContext &TLC) {
     ExpressionFinder(TopLevelContext &TLC) : TLC(TLC) {}
 
     bool walkToDeclPre(Decl *D) override {
+      ASTContext &ctx = D->getASTContext();
       if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {
           if (FD->getBody()) {
-            ASTContext &ctx = FD->getASTContext();
             Instrumenter I(ctx, FD, TmpNameIndex);
             I.transformDecl(FD);
             return false;
@@ -663,15 +663,13 @@ void swift::performPCMacro(SourceFile &SF, TopLevelContext &TLC) {
       } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         if (!TLCD->isImplicit()) {
           if (BraceStmt *Body = TLCD->getBody()) {
-            ASTContext &ctx = static_cast<Decl *>(TLCD)->getASTContext();
             Instrumenter I(ctx, TLCD, TmpNameIndex);
             BraceStmt *NewBody = I.transformBraceStmt(Body, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
               TypeChecker &TC = TypeChecker::createForContext(ctx);
               TC.checkTopLevelErrorHandling(TLCD);
-              TC.contextualizeTopLevelCode(TLC,
-                                           SmallVector<Decl *, 1>(1, TLCD));
+              TC.contextualizeTopLevelCode(TLC, TLCD);
             }
             return false;
           }

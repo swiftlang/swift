@@ -10,9 +10,13 @@ endif()
 
 set(CMAKE_INSTALL_PREFIX "${SWIFT_DEST_ROOT}${TOOLCHAIN_DIR}/usr")
 
+set(SWIFT_STDLIB_BUILD_TYPE "Release" CACHE STRING
+    "Build type for the Swift standard library and SDK overlays [Debug, RelWithDebInfo, Release, MinSizeRel]")
+set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
+    STRINGS "Debug" "RelWithDebInfo" "Release" "MinSizeRel")
+
 # Only happens if it's called from a top-level cmake invocation.
 set(BUILD_STANDALONE TRUE)
-set(SWIFT_STDLIB_BUILD_TYPE "Release")
 set(SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES "SHARED")
 set(SWIFT_INSTALL_COMPONENTS "sdk-overlay" CACHE STRING "")
 set(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX "10.9" CACHE STRING "")

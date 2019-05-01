@@ -881,11 +881,6 @@ Type TypeChecker::applyUnboundGenericArguments(
                                     subMap, resultType);
   }
 
-  if (isa<NominalTypeDecl>(decl) && resultType) {
-    (void)useObjectiveCBridgeableConformancesOfArgs(
-        dc, resultType->castTo<BoundGenericType>());
-  }
-
   return resultType;
 }
 
@@ -3012,9 +3007,6 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   if (!sliceTy)
     return ErrorType::get(Context);
 
-  // Check for _ObjectiveCBridgeable conformances in the element type.
-  useObjectiveCBridgeableConformances(DC, baseTy);
-
   return sliceTy;
 }
 
@@ -3044,11 +3036,6 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
             unboundTy, dictDecl, repr->getStartLoc(), resolution, args)) {
       return nullptr;
     }
-
-    // Check for _ObjectiveCBridgeable conformances in the key and value
-    // types.
-    useObjectiveCBridgeableConformances(DC, keyTy);
-    useObjectiveCBridgeableConformances(DC, valueTy);
 
     return dictTy;
   }

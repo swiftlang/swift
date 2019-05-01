@@ -129,9 +129,9 @@ foreach(sdk ${SWIFT_SDKS})
     #        It is not relocatable to the target platform itself.
     #        This affects any cross-comipled targets that use glibc.modulemap.
 
-    swift_install_in_component(sdk-overlay
-        FILES "${glibc_modulemap_out}"
-        DESTINATION "lib/swift/${arch_subdir}")
+    swift_install_in_component(FILES "${glibc_modulemap_out}"
+                               DESTINATION "lib/swift/${arch_subdir}"
+                               COMPONENT sdk-overlay)
 
   endforeach()
 endforeach()

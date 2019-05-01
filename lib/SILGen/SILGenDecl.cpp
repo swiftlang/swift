@@ -111,7 +111,7 @@ void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
           SILType fieldType) -> ManagedValue {
         ManagedValue elt =
             SGF.B.createTupleElementAddr(loc, value, i, fieldType);
-        if (!fieldType.isAddressOnly(SGF.F.getModule())) {
+        if (!fieldType.isAddressOnly(SGF.F)) {
           return SGF.B.createLoadTake(loc, elt);
         }
 
@@ -1173,7 +1173,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
 
   // If an initial value expression was specified by the decl, emit it into
   // the initialization. Otherwise, mark it uninitialized for DI to resolve.
-  if (auto *Init = entry.getNonLazyInit()) {
+  if (auto *Init = entry.getExecutableInit()) {
     FullExpr Scope(Cleanups, CleanupLocation(Init));
     emitExprInto(Init, initialization.get(), SILLocation(PBD));
   } else {
@@ -1236,7 +1236,7 @@ SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
       loc, silDeclRef, getConstantInfo(silDeclRef));
 
   SILValue args[] = {majorValue, minorValue, subminorValue};
-  return B.createApply(loc, availabilityGTEFn, args, false);
+  return B.createApply(loc, availabilityGTEFn, SubstitutionMap(), args);
 }
 
 
@@ -1440,9 +1440,9 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
                                             nullptr)) {
       auto *proto = c->getProtocol();
       if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto) &&
-          isa<NormalProtocolConformance>(c) &&
-          c->isComplete())
+          isa<NormalProtocolConformance>(c)) {
         emitExternalWitnessTable(cast<NormalProtocolConformance>(c));
+      }
     }
     break;
   }
