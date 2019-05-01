@@ -43,7 +43,7 @@ enum class WellKnownFunction {
   StringInitEmpty,
   // String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
   StringMakeUTF8,
-  // static String.+= infix(_: inout String, _: String)
+  // static String.append (_: String, _: inout String)
   StringAppend,
   // static String.== infix(_: String)
   StringEquals
@@ -233,12 +233,11 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   if (auto *sei = dyn_cast<StructExtractInst>(value)) {
     auto aggValue = sei->getOperand();
     auto val = getConstantValue(aggValue);
-    if (val.isConstant()) {
-      assert(val.getKind() == SymbolicValue::Aggregate);
-      return val.getAggregateValue()[sei->getFieldNo()];
+    if (!val.isConstant()) {
+      return val;
     }
-    // Not a const.
-    return val;
+    assert(val.getKind() == SymbolicValue::Aggregate);
+    return val.getAggregateValue()[sei->getFieldNo()];
   }
 
   // If this is an unchecked_enum_data from a fragile type, then we can return
@@ -678,21 +677,27 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     return None;
   }
   case WellKnownFunction::StringAppend: {
-    // static String.+= infix(_: inout String, _: String)
+    // static String.append (_: String, _: inout String)
     assert(conventions.getNumDirectSILResults() == 0 &&
            conventions.getNumIndirectSILResults() == 0 &&
-           conventions.getNumParameters() == 3 &&
-           "unexpected String.+=() signature");
+           conventions.getNumParameters() == 2 &&
+           "unexpected String.append() signature");
 
-    auto firstOperand = apply->getOperand(1);
-    auto firstString = getConstAddrAndLoadResult(firstOperand);
-    if (firstString.getKind() != SymbolicValue::String) {
+    auto otherString = getConstantValue(apply->getOperand(1));
+    if (!otherString.isConstant()) {
+      return otherString;
+    }
+    if (otherString.getKind() != SymbolicValue::String) {
       return evaluator.getUnknown((SILInstruction *)apply,
                                   UnknownReason::InvalidOperandValue);
     }
 
-    auto otherString = getConstantValue(apply->getOperand(2));
-    if (otherString.getKind() != SymbolicValue::String) {
+    auto inoutOperand = apply->getOperand(2);
+    auto firstString = getConstAddrAndLoadResult(inoutOperand);
+    if (!firstString.isConstant()) {
+      return firstString;
+    }
+    if (firstString.getKind() != SymbolicValue::String) {
       return evaluator.getUnknown((SILInstruction *)apply,
                                   UnknownReason::InvalidOperandValue);
     }
@@ -700,7 +705,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     auto result = SmallString<8>(firstString.getStringValue());
     result.append(otherString.getStringValue());
     auto resultVal = SymbolicValue::getString(result, evaluator.getAllocator());
-    computeFSStore(resultVal, firstOperand);
+    computeFSStore(resultVal, inoutOperand);
     return None;
   }
   case WellKnownFunction::StringEquals: {
