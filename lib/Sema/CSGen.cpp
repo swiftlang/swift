@@ -2100,9 +2100,12 @@ namespace {
         // will avoid exponential typecheck behavior in the case of
         // tuples, nested arrays, and dictionary literals.
         //
+        // FIXME: This should be handled in the solver, not here.
+        //
         // Otherwise, create a new type variable.
         auto ty = Type();
-        if (!var->hasNonPatternBindingInit()) {
+        if (!var->hasNonPatternBindingInit() &&
+            !var->getAttachedPropertyDelegate()) {
           if (auto boundExpr = locator.trySimplifyToExpr()) {
             if (!boundExpr->isSemanticallyInOutExpr())
               ty = CS.getType(boundExpr)->getRValueType();
@@ -2487,7 +2490,8 @@ namespace {
     }
 
     Type visitOpaqueValueExpr(OpaqueValueExpr *expr) {
-      llvm_unreachable("Already type checked");
+      assert(expr->isPlaceholder() && "Already type checked");
+      return expr->getType();
     }
 
     Type visitDefaultArgumentExpr(DefaultArgumentExpr *expr) {
@@ -2974,6 +2978,11 @@ namespace {
       
       for (unsigned i : indices(E->getComponents())) {
         auto &component = E->getComponents()[i];
+        auto memberLocator = CS.getConstraintLocator(
+            locator, ConstraintLocator::PathElement::getKeyPathComponent(i));
+        auto resultLocator = CS.getConstraintLocator(
+            memberLocator, ConstraintLocator::KeyPathComponentResult);
+
         switch (auto kind = component.getKind()) {
         case KeyPathExpr::Component::Kind::Invalid:
           break;
@@ -2982,7 +2991,7 @@ namespace {
         // This should only appear in resolved ASTs, but we may need to
         // re-type-check the constraints during failure diagnosis.
         case KeyPathExpr::Component::Kind::Property: {
-          auto memberTy = CS.createTypeVariable(locator,
+          auto memberTy = CS.createTypeVariable(resultLocator,
                                                 TVO_CanBindToLValue |
                                                 TVO_CanBindToNoEscape);
           auto lookupName = kind == KeyPathExpr::Component::Kind::UnresolvedProperty
@@ -2992,8 +3001,6 @@ namespace {
           auto refKind = lookupName.isSimpleName()
             ? FunctionRefKind::Unapplied
             : FunctionRefKind::Compound;
-          auto memberLocator = CS.getConstraintLocator(E,
-                        ConstraintLocator::PathElement::getKeyPathComponent(i));
           CS.addValueMemberConstraint(base, lookupName,
                                       memberTy,
                                       CurDC,
@@ -3008,11 +3015,8 @@ namespace {
         // Subscript should only appear in resolved ASTs, but we may need to
         // re-type-check the constraints during failure diagnosis.
         case KeyPathExpr::Component::Kind::Subscript: {
-
-          auto *locator = CS.getConstraintLocator(E,
-                        ConstraintLocator::PathElement::getKeyPathComponent(i));
           base = addSubscriptConstraints(E, base, component.getIndexExpr(),
-                                         /*decl*/ nullptr, locator);
+                                         /*decl*/ nullptr, memberLocator);
           break;
         }
 
@@ -3026,18 +3030,20 @@ namespace {
           
           // We can't assign an optional back through an optional chain
           // today. Force the base to an rvalue.
-          auto rvalueTy = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
-          CS.addConstraint(ConstraintKind::Equal, base, rvalueTy, locator);
+          auto rvalueTy = CS.createTypeVariable(resultLocator,
+                                                TVO_CanBindToNoEscape);
+          CS.addConstraint(ConstraintKind::Equal, base, rvalueTy,
+                           resultLocator);
           base = rvalueTy;
           LLVM_FALLTHROUGH;
         }
         case KeyPathExpr::Component::Kind::OptionalForce: {
-          auto optionalObjTy = CS.createTypeVariable(locator,
+          auto optionalObjTy = CS.createTypeVariable(resultLocator,
                                                      TVO_CanBindToLValue |
                                                      TVO_CanBindToNoEscape);
           
           CS.addConstraint(ConstraintKind::OptionalObject, base, optionalObjTy,
-                           locator);
+                           resultLocator);
           
           base = optionalObjTy;
           break;
@@ -3052,6 +3058,10 @@ namespace {
         case KeyPathExpr::Component::Kind::Identity:
           continue;
         }
+
+        // By now, `base` is the result type of this component. Set it in the
+        // constraint system so we can find it later.
+        CS.setType(E, i, base);
       }
       
       // If there was an optional chaining component, the end result must be
@@ -3078,10 +3088,10 @@ namespace {
       } else {
         // The type of key path depends on the overloads chosen for the key
         // path components.
-        kpTy = CS.createTypeVariable(CS.getConstraintLocator(E),
-                                     TVO_CanBindToNoEscape);
-        CS.addKeyPathConstraint(kpTy, root, rvalueBase,
-                                CS.getConstraintLocator(E));
+        auto typeLoc =
+            CS.getConstraintLocator(locator, ConstraintLocator::KeyPathType);
+        kpTy = CS.createTypeVariable(typeLoc, TVO_CanBindToNoEscape);
+        CS.addKeyPathConstraint(kpTy, root, rvalueBase, locator);
       }
       return kpTy;
     }
@@ -3281,7 +3291,7 @@ namespace {
             expr = value->second;
             continue;
           } else {
-            assert(eraseOpenExistentialsOnly &&
+            assert((eraseOpenExistentialsOnly || OVE->isPlaceholder()) &&
                    "Didn't see this OVE in a containing OpenExistentialExpr?");
             // NOTE: In 'eraseOpenExistentialsOnly' mode, ASTWalker may walk
             // into other kind of expressions holding OVE.

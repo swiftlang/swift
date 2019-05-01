@@ -25,10 +25,12 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyDelegates.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/Basic/CharInfo.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -127,6 +129,7 @@ public:
   IGNORED_ATTR(DynamicReplacement)
   IGNORED_ATTR(PrivateImport)
   IGNORED_ATTR(Custom)
+  IGNORED_ATTR(PropertyDelegate)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -415,8 +418,13 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
     diagnoseAndRemoveAttr(attr, diag::invalid_iboutlet);
 
-  if (!VD->isSettable(nullptr))
-    diagnoseAndRemoveAttr(attr, diag::iboutlet_only_mutable);
+  if (!VD->isSettable(nullptr)) {
+    // Allow non-mutable IBOutlet properties in module interfaces,
+    // as they may have been private(set)
+    SourceFile *Parent = VD->getDeclContext()->getParentSourceFile();
+    if (!Parent || Parent->Kind != SourceFileKind::Interface)
+      diagnoseAndRemoveAttr(attr, diag::iboutlet_only_mutable);
+  }
 
   // Verify that the field type is valid as an outlet.
   auto type = VD->getType();
@@ -716,6 +724,25 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
   }
 }
 
+/// Determine whether the given string is an attribute name that is
+/// reserved for the implementation.
+static bool isReservedAttributeName(StringRef name) {
+  for (unsigned i : indices(name)) {
+    if (name[i] == '_')
+      continue;
+
+    // First character is lowercase; reserved.
+    if (clang::isLowercase(name[i]))
+      return true;
+
+    // Everything else is reserved.
+    return false;
+  }
+
+  // All underscores is reserved.
+  return true;
+}
+
 namespace {
 class AttributeChecker : public AttributeVisitor<AttributeChecker> {
   TypeChecker &TC;
@@ -836,6 +863,7 @@ public:
 
   void visitNonOverrideAttr(NonOverrideAttr *attr);
   void visitCustomAttr(CustomAttr *attr);
+  void visitPropertyDelegateAttr(PropertyDelegateAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2116,7 +2144,10 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
           // Check for type mismatch.
           TC.validateDecl(result);
           auto resultType = getDynamicComparisonType(result);
-          if (!resultType->isEqual(replacementStorageType)) {
+          if (!resultType->isEqual(replacementStorageType) &&
+              !resultType->matches(
+                  replacementStorageType,
+                  TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes)) {
             return true;
           }
 
@@ -2161,15 +2192,6 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
     if (origAccessor->getAccessorKind() != replacement->getAccessorKind())
       continue;
 
-    if (!replacement->getInterfaceType()->getCanonicalType()->matches(
-            origAccessor->getInterfaceType()->getCanonicalType(),
-            TypeMatchFlags::AllowABICompatible)) {
-      TC.diagnose(attr->getLocation(),
-                  diag::dynamic_replacement_accessor_type_mismatch,
-                  replacedVarName);
-      attr->setInvalid();
-      return nullptr;
-    }
     if (origAccessor->isImplicit() &&
         !(origStorage->getReadImpl() == ReadImplKind::Stored &&
           origStorage->getWriteImpl() == WriteImplKind::Stored)) {
@@ -2201,9 +2223,10 @@ findReplacedFunction(DeclName replacedFunctionName,
       continue;
     if (TC)
       TC->validateDecl(result);
+    TypeMatchOptions matchMode = TypeMatchFlags::AllowABICompatible;
+    matchMode |= TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
     if (result->getInterfaceType()->getCanonicalType()->matches(
-            replacement->getInterfaceType()->getCanonicalType(),
-            TypeMatchFlags::AllowABICompatible)) {
+            replacement->getInterfaceType()->getCanonicalType(), matchMode)) {
       if (!result->isDynamic()) {
         if (TC) {
           TC->diagnose(attr->getLocation(),
@@ -2485,15 +2508,57 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     return;
   }
 
+  // If the nominal type is a property delegate type, we can be delegating
+  // through a property.
+  if (nominal->getPropertyDelegateTypeInfo()) {
+    // Property delegates can only be applied to variables
+    if (!isa<VarDecl>(D) || isa<ParamDecl>(D)) {
+      TC.diagnose(attr->getLocation(),
+                  diag::property_delegate_attribute_not_on_property,
+                  nominal->getFullName());
+      attr->setInvalid();
+      return;
+    }
+
+    // If this attribute isn't the one that attached a property delegate to
+    // this property, complain.
+    auto var = cast<VarDecl>(D);
+    if (auto attached = var->getAttachedPropertyDelegate()) {
+      if (attached != attr) {
+        TC.diagnose(attr->getLocation(), diag::property_delegate_multiple);
+        TC.diagnose(attached->getLocation(),
+                    diag::previous_property_delegate_here);
+        return;
+      }
+    }
+
+    return;
+  }
+
   TC.diagnose(attr->getLocation(), diag::nominal_type_not_attribute,
               nominal->getDescriptiveKind(), nominal->getFullName());
   nominal->diagnose(diag::decl_declared_here, nominal->getFullName());
   attr->setInvalid();
 }
 
+
 void TypeChecker::checkParameterAttributes(ParameterList *params) {
   for (auto param: *params) {
     checkDeclAttributes(param);
+  }
+}
+
+void AttributeChecker::visitPropertyDelegateAttr(PropertyDelegateAttr *attr) {
+  auto nominal = dyn_cast<NominalTypeDecl>(D);
+  if (!nominal)
+    return;
+
+  // Force checking of the property delegate type.
+  (void)nominal->getPropertyDelegateTypeInfo();
+
+  // Make sure the name isn't reserved.
+  if (isReservedAttributeName(nominal->getName().str())) {
+    nominal->diagnose(diag::property_delegate_reserved_name);
   }
 }
 

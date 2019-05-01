@@ -144,8 +144,9 @@ enum class FixKind : uint8_t {
   /// of the index arguments to be Hashable.
   TreatKeyPathSubscriptIndexAsHashable,
 
-  /// Allow a reference to a static member as a key path component.
-  AllowStaticMemberRefInKeyPath,
+  /// Allow an invalid reference to a member declaration as part
+  /// of a key path component.
+  AllowInvalidRefInKeyPath,
 };
 
 class ConstraintFix {
@@ -455,6 +456,31 @@ public:
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
+};
+
+/// Detect situations where key path doesn't have capability required
+/// by the context e.g. read-only vs. writable, or either root or value
+/// types are incorrect e.g.
+///
+/// ```swift
+/// struct S { let foo: Int }
+/// let _: WritableKeyPath<S, Int> = \.foo
+/// ```
+///
+/// Here context requires a writable key path but `foo` property is
+/// read-only.
+class KeyPathContextualMismatch final : public ContextualMismatch {
+  KeyPathContextualMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
+                            ConstraintLocator *locator)
+      : ContextualMismatch(cs, lhs, rhs, locator) {}
+
+public:
+  std::string getName() const override {
+    return "fix key path contextual mismatch";
+  }
+
+  static KeyPathContextualMismatch *
+  create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
 };
 
 /// Detect situations when argument of the @autoclosure parameter is itself
@@ -783,23 +809,48 @@ public:
   create(ConstraintSystem &cs, Type type, ConstraintLocator *locator);
 };
 
-class AllowStaticMemberRefInKeyPath final : public ConstraintFix {
+class AllowInvalidRefInKeyPath final : public ConstraintFix {
+  enum RefKind {
+    // Allow a reference to a static member as a key path component.
+    StaticMember,
+    // Allow a reference to a declaration with mutating getter as
+    // a key path component.
+    MutatingGetter,
+    // Allow a reference to a method (instance or static) as
+    // a key path component.
+    Method,
+  } Kind;
+
   ValueDecl *Member;
 
-  AllowStaticMemberRefInKeyPath(ConstraintSystem &cs, ValueDecl *member,
-                                ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AllowStaticMemberRefInKeyPath, locator),
-        Member(member) {}
+  AllowInvalidRefInKeyPath(ConstraintSystem &cs, RefKind kind,
+                           ValueDecl *member, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInvalidRefInKeyPath, locator),
+        Kind(kind), Member(member) {}
 
 public:
   std::string getName() const override {
-    return "allow reference to a static member as a key path component";
+    switch (Kind) {
+    case RefKind::StaticMember:
+      return "allow reference to a static member as a key path component";
+    case RefKind::MutatingGetter:
+      return "allow reference to a member with mutating getter as a key "
+             "path component";
+    case RefKind::Method:
+      return "allow reference to a method as a key path component";
+    }
   }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static AllowStaticMemberRefInKeyPath *
-  create(ConstraintSystem &cs, ValueDecl *member, ConstraintLocator *locator);
+  /// Determine whether give reference requires a fix and produce one.
+  static AllowInvalidRefInKeyPath *
+  forRef(ConstraintSystem &cs, ValueDecl *member, ConstraintLocator *locator);
+
+private:
+  static AllowInvalidRefInKeyPath *create(ConstraintSystem &cs, RefKind kind,
+                                          ValueDecl *member,
+                                          ConstraintLocator *locator);
 };
 
 } // end namespace constraints

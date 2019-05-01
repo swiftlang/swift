@@ -19,7 +19,8 @@ STMT_NODES = [
              Child('LabelColon', kind='ColonToken',
                    is_optional=True),
              Child('WhileKeyword', kind='WhileToken'),
-             Child('Conditions', kind='ConditionElementList'),
+             Child('Conditions', kind='ConditionElementList',
+                   collection_element_name='Condition'),
              Child('Body', kind='CodeBlock'),
          ]),
 
@@ -39,7 +40,7 @@ STMT_NODES = [
 
     # switch-case-list -> switch-case switch-case-list?
     Node('SwitchCaseList', kind='SyntaxCollection',
-         element='Syntax',
+         element='Syntax', element_name='SwitchCase',
          element_choices=['SwitchCase', 'IfConfigDecl']),
 
     # repeat-while-stmt -> label? ':'? 'repeat' code-block 'while' expr ';'?
@@ -61,7 +62,8 @@ STMT_NODES = [
          traits=['WithCodeBlock'],
          children=[
              Child('GuardKeyword', kind='GuardToken'),
-             Child('Conditions', kind='ConditionElementList'),
+             Child('Conditions', kind='ConditionElementList',
+                   collection_element_name='Condition'),
              Child('ElseKeyword', kind='ElseToken'),
              Child('Body', kind='CodeBlock'),
          ]),
@@ -106,7 +108,8 @@ STMT_NODES = [
              Child('SwitchKeyword', kind='SwitchToken'),
              Child('Expression', kind='Expr'),
              Child('LeftBrace', kind='LeftBraceToken'),
-             Child('Cases', kind='SwitchCaseList'),
+             Child('Cases', kind='SwitchCaseList',
+                   collection_element_name='Case'),
              Child('RightBrace', kind='RightBraceToken'),
          ]),
 
@@ -125,7 +128,7 @@ STMT_NODES = [
              Child('DoKeyword', kind='DoToken'),
              Child('Body', kind='CodeBlock'),
              Child('CatchClauses', kind='CatchClauseList',
-                   is_optional=True),
+                   collection_element_name='CatchClause', is_optional=True),
          ]),
 
     # return-stmt -> 'return' expr? ';'?
@@ -150,7 +153,8 @@ STMT_NODES = [
     Node('YieldList', kind='Syntax',
          children=[
              Child('LeftParen', kind='LeftParenToken'),
-             Child('ElementList', kind='ExprList'),
+             Child('ElementList', kind='ExprList',
+                   collection_element_name='Element'),
              Child('TrailingComma', kind='CommaToken', is_optional=True),
              Child('RightParen', kind='RightParenToken'),
          ]),
@@ -198,7 +202,8 @@ STMT_NODES = [
          children=[
              Child('PoundAvailableKeyword', kind='PoundAvailableToken'),
              Child('LeftParen', kind='LeftParenToken'),
-             Child('AvailabilitySpec', kind='AvailabilitySpecList'),
+             Child('AvailabilitySpec', kind='AvailabilitySpecList',
+                   collection_element_name='AvailabilityArgument'),
              Child('RightParen', kind='RightParenToken'),
          ]),
     Node('MatchingPatternCondition', kind='Syntax',
@@ -250,7 +255,8 @@ STMT_NODES = [
              Child('LabelColon', kind='ColonToken',
                    is_optional=True),
              Child('IfKeyword', kind='IfToken'),
-             Child('Conditions', kind='ConditionElementList'),
+             Child('Conditions', kind='ConditionElementList',
+                   collection_element_name='Condition'),
              Child('Body', kind='CodeBlock'),
              Child('ElseKeyword', kind='ElseToken',
                    is_optional=True),
@@ -287,7 +293,8 @@ STMT_NODES = [
                        Child('Default', kind='SwitchDefaultLabel'),
                        Child('Case', kind='SwitchCaseLabel'),
                    ]),
-             Child('Statements', kind='CodeBlockItemList'),
+             Child('Statements', kind='CodeBlockItemList',
+                   collection_element_name='Statement'),
          ]),
 
     # switch-default-label -> 'default' ':'
@@ -312,7 +319,8 @@ STMT_NODES = [
     Node('SwitchCaseLabel', kind='Syntax',
          children=[
              Child('CaseKeyword', kind='CaseToken'),
-             Child('CaseItems', kind='CaseItemList'),
+             Child('CaseItems', kind='CaseItemList',
+                   collection_element_name='CaseItem'),
              Child('Colon', kind='ColonToken'),
          ]),
 

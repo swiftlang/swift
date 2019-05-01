@@ -82,6 +82,9 @@ TYPE_ATTR(yield_many)
 TYPE_ATTR(thin)
 TYPE_ATTR(thick)
 
+// Generated interface attributes
+TYPE_ATTR(_opaqueReturnTypeOf)
+
 // Schema for DECL_ATTR:
 //
 // - Attribute name.
@@ -396,6 +399,9 @@ SIMPLE_DECL_ATTR(_implementationOnly, ImplementationOnly,
 DECL_ATTR(_custom, Custom,
   OnAnyDecl | UserInaccessible,
   85)
+SIMPLE_DECL_ATTR(_propertyDelegate, PropertyDelegate,
+  OnStruct | OnClass | OnEnum,
+  86)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

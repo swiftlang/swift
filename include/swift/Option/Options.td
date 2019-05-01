@@ -300,6 +300,9 @@ def serialize_diagnostics_path : Separate<["-"], "serialize-diagnostics-path">,
 def serialize_diagnostics_path_EQ: Joined<["-"], "serialize-diagnostics-path=">,
   Flags<[FrontendOption, NoBatchOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   Alias<serialize_diagnostics_path>;
+def color_diagnostics : Flag<["-"], "color-diagnostics">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Print diagnostics in color">;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
@@ -321,7 +324,7 @@ def module_link_name : Separate<["-"], "module-link-name">,
 def module_link_name_EQ : Joined<["-"], "module-link-name=">,
   Flags<[FrontendOption]>, Alias<module_link_name>;
 def autolink_force_load : Flag<["-"], "autolink-force-load">,
-  Flags<[FrontendOption, HelpHidden]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, HelpHidden]>,
   HelpText<"Force ld to link against this module even if no symbols are used">;
 
 def emit_module : Flag<["-"], "emit-module">,

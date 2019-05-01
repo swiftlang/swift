@@ -60,6 +60,7 @@ namespace swift {
   class ParameterList;
   class EnumElementDecl;
   class CallExpr;
+  class KeyPathExpr;
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -363,6 +364,10 @@ protected:
     NumElements : 32
   );
 
+  SWIFT_INLINE_BITFIELD(OpaqueValueExpr, Expr, 1,
+    IsPlaceholder : 1
+  );
+
   } Bits;
 
 private:
@@ -539,6 +544,7 @@ public:
   void dump(raw_ostream &OS, unsigned Indent = 0) const;
   void dump(raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getType,
             llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
+            llvm::function_ref<Type(const KeyPathExpr *E, unsigned index)> getTypeOfKeyPathComponent,
             unsigned Indent = 0) const;
   
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
@@ -2859,6 +2865,17 @@ public:
   }
 };
 
+/// Use an opaque type to abstract a value of the underlying concrete type.
+class UnderlyingToOpaqueExpr : public ImplicitConversionExpr {
+public:
+  UnderlyingToOpaqueExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::UnderlyingToOpaque, subExpr, ty) {}
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UnderlyingToOpaque;
+  }
+};
+
 /// DestructureTupleExpr - Destructure a tuple value produced by a source
 /// expression, binding the elements to OpaqueValueExprs, then evaluate the
 /// result expression written in terms of the OpaqueValueExprs.
@@ -3765,8 +3782,15 @@ class OpaqueValueExpr : public Expr {
   SourceLoc Loc;
 
 public:
-  explicit OpaqueValueExpr(SourceLoc Loc, Type Ty)
-    : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Loc(Loc) { }
+  explicit OpaqueValueExpr(SourceLoc Loc, Type Ty, bool isPlaceholder = false)
+    : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Loc(Loc) {
+    Bits.OpaqueValueExpr.IsPlaceholder = isPlaceholder;
+  }
+
+  /// Whether this opaque value expression represents a placeholder that
+  /// is injected before type checking to act as a placeholder for some
+  /// value to be specified later.
+  bool isPlaceholder() const { return Bits.OpaqueValueExpr.IsPlaceholder; }
 
   SourceRange getSourceRange() const { return Loc; }
   

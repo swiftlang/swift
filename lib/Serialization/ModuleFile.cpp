@@ -898,6 +898,9 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
       case index_block::LOCAL_TYPE_DECLS:
         LocalTypeDecls = readLocalDeclTable(scratch, blobData);
         break;
+      case index_block::OPAQUE_RETURN_TYPE_DECLS:
+        OpaqueReturnTypeDecls = readLocalDeclTable(scratch, blobData);
+        break;
       case index_block::NESTED_TYPE_DECLS:
         NestedTypeDecls = readNestedTypeDeclsTable(scratch, blobData);
         break;
@@ -1332,6 +1335,11 @@ ModuleFile::ModuleFile(
           SearchPaths.push_back({blobData, isFramework, isSystem});
           break;
         }
+        case input_block::PARSEABLE_INTERFACE_PATH: {
+          if (extInfo)
+            extInfo->setParseableInterface(blobData);
+          break;
+        }
         default:
           // Unknown input kind, possibly for use by a future version of the
           // module format.
@@ -1660,6 +1668,19 @@ TypeDecl *ModuleFile::lookupLocalType(StringRef MangledName) {
     return nullptr;
 
   return cast<TypeDecl>(getDecl(*iter));
+}
+
+OpaqueTypeDecl *ModuleFile::lookupOpaqueResultType(StringRef MangledName) {
+  PrettyStackTraceModuleFile stackEntry(*this);
+
+  if (!OpaqueReturnTypeDecls)
+    return nullptr;
+  
+  auto iter = OpaqueReturnTypeDecls->find(MangledName);
+  if (iter == OpaqueReturnTypeDecls->end())
+    return nullptr;
+  
+  return cast<OpaqueTypeDecl>(getDecl(*iter));
 }
 
 TypeDecl *ModuleFile::lookupNestedType(Identifier name,
@@ -2138,6 +2159,19 @@ ModuleFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl *> &results) {
 
   for (auto DeclID : LocalTypeDecls->data()) {
     auto TD = cast<TypeDecl>(getDecl(DeclID));
+    results.push_back(TD);
+  }
+}
+
+void
+ModuleFile::getOpaqueReturnTypeDecls(SmallVectorImpl<OpaqueTypeDecl *> &results)
+{
+  PrettyStackTraceModuleFile stackEntry(*this);
+  if (!OpaqueReturnTypeDecls)
+    return;
+
+  for (auto DeclID : OpaqueReturnTypeDecls->data()) {
+    auto TD = cast<OpaqueTypeDecl>(getDecl(DeclID));
     results.push_back(TD);
   }
 }

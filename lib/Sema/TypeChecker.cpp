@@ -334,10 +334,8 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
         TC.checkFunctionErrorHandling(AFD);
         continue;
       }
-      if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-        (void)nominal->getAllConformances();
+      if (isa<NominalTypeDecl>(decl))
         continue;
-      }
       if (isa<VarDecl>(decl))
         continue;
       llvm_unreachable("Unhandled external definition kind");
@@ -510,20 +508,14 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     checkBridgedFunctions(TC.Context);
 
     // Type check the top-level elements of the source file.
-    bool hasTopLevelCode = false;
     for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-        hasTopLevelCode = true;
         // Immediately perform global name-binding etc.
         TC.typeCheckTopLevelCodeDecl(TLCD);
+        TC.contextualizeTopLevelCode(TLC, TLCD);
       } else {
         TC.typeCheckDecl(D);
       }
-    }
-
-    if (hasTopLevelCode) {
-      TC.contextualizeTopLevelCode(TLC,
-                             llvm::makeArrayRef(SF.Decls).slice(StartElem));
     }
 
     // If we're in REPL mode, inject temporary result variables and other stuff
@@ -571,10 +563,10 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   auto &Ctx = SF.getASTContext();
   FrontendStatsTracer tracer(Ctx.Stats, "perform-whole-module-type-checking");
-  Ctx.diagnoseAttrsRequiringFoundation(SF);
-  Ctx.diagnoseObjCMethodConflicts(SF);
-  Ctx.diagnoseObjCUnsatisfiedOptReqConflicts(SF);
-  Ctx.diagnoseUnintendedObjCMethodOverrides(SF);
+  diagnoseAttrsRequiringFoundation(SF);
+  diagnoseObjCMethodConflicts(SF);
+  diagnoseObjCUnsatisfiedOptReqConflicts(SF);
+  diagnoseUnintendedObjCMethodOverrides(SF);
 
   // In whole-module mode, import verification is deferred until all files have
   // been type checked. This avoids caching imported declarations when a valid

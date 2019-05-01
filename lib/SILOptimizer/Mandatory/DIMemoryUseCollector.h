@@ -267,7 +267,7 @@ struct DIMemoryUse {
   }
 
   /// onlyTouchesTrivialElements - Return true if all of the accessed elements
-  /// have trivial type.
+  /// have trivial type and the access itself is a trivial instruction.
   bool onlyTouchesTrivialElements(const DIMemoryObjectInfo &MemoryInfo) const;
 
   /// getElementBitmask - Return a bitmask with the touched tuple elements

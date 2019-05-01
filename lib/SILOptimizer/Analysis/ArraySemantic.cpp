@@ -683,7 +683,7 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
   assert(getKind() == ArrayCallKind::kGetElement &&
          "Must be a get_element call");
   // We only handle loadable types.
-  if (!V->getType().isLoadable(SemanticsCall->getModule()))
+  if (!V->getType().isLoadable(*SemanticsCall->getFunction()))
    return false;
 
   // Expect a check_subscript call or the empty dependence.
@@ -715,15 +715,17 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
 }
 
 bool swift::ArraySemanticsCall::replaceByAppendingValues(
-    SILModule &M, SILFunction *AppendFn, SILFunction *ReserveFn,
+    SILFunction *AppendFn, SILFunction *ReserveFn,
     const SmallVectorImpl<SILValue> &Vals, SubstitutionMap Subs) {
   assert(getKind() == ArrayCallKind::kAppendContentsOf &&
          "Must be an append_contentsOf call");
   assert(AppendFn && "Must provide an append SILFunction");
 
+  auto *F = SemanticsCall->getFunction();
+
   // We only handle loadable types.
-  if (any_of(Vals, [&M](SILValue V) -> bool {
-        return !V->getType().isLoadable(M);
+  if (any_of(Vals, [F](SILValue V) -> bool {
+        return !V->getType().isLoadable(*F);
       }))
     return false;
   
@@ -751,7 +753,7 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
       Builder.createIntegerLiteral(Loc, BuiltinIntTy, Vals.size());
     StructInst *Capacity = Builder.createStruct(Loc,
         SILType::getPrimitiveObjectType(CanType(IntType)), {CapacityLiteral});
-    Builder.createApply(Loc, ReserveFnRef, Subs, {Capacity, ArrRef}, false);
+    Builder.createApply(Loc, ReserveFnRef, Subs, {Capacity, ArrRef});
   }
 
   for (SILValue V : Vals) {
@@ -764,7 +766,7 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
                                 IsInitialization_t::IsInitialization);
 
     SILValue Args[] = {AllocStackInst, ArrRef};
-    Builder.createApply(Loc, FnRef, Subs, Args, false);
+    Builder.createApply(Loc, FnRef, Subs, Args);
     Builder.createDeallocStack(Loc, AllocStackInst);
     if (!isConsumedParameter(AppendFnTy->getParameters()[0].getConvention())) {
       ValLowering.emitDestroyValue(Builder, Loc, CopiedVal);

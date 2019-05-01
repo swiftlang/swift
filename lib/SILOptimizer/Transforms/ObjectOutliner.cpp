@@ -27,23 +27,26 @@ class ObjectOutliner {
   NominalTypeDecl *ArrayDecl = nullptr;
   int GlobIdx = 0;
 
+  // Instructions to be deleted.
+  llvm::SmallVector<SILInstruction *, 4> ToRemove;
+
   bool isCOWType(SILType type) {
     return type.getNominalOrBoundGenericNominal() == ArrayDecl;
   }
 
-  bool isValidUseOfObject(SILInstruction *Val, bool isCOWObject,
+  bool isValidUseOfObject(SILInstruction *Val,
+                          bool isCOWObject,
                           ApplyInst **FindStringCall = nullptr);
 
   bool getObjectInitVals(SILValue Val,
                          llvm::DenseMap<VarDecl *, StoreInst *> &MemberStores,
                          llvm::SmallVectorImpl<StoreInst *> &TailStores,
+                         unsigned NumTailTupleElements,
                          ApplyInst **FindStringCall);
-  bool handleTailAddr(int TailIdx, SILInstruction *I,
+  bool handleTailAddr(int TailIdx, SILInstruction *I, unsigned NumTailTupleElements,
                       llvm::SmallVectorImpl<StoreInst *> &TailStores);
 
-  bool
-  optimizeObjectAllocation(AllocRefInst *ARI,
-                           llvm::SmallVector<SILInstruction *, 4> &ToRemove);
+  bool optimizeObjectAllocation(AllocRefInst *ARI);
   void replaceFindStringCall(ApplyInst *FindStringCall);
 
 public:
@@ -60,23 +63,27 @@ bool ObjectOutliner::run(SILFunction *F) {
   for (auto &BB : *F) {
     auto Iter = BB.begin();
 
-    // We can't remove instructions willy-nilly as we iterate because
-    // that might cause a pointer to the next instruction to become
-    // garbage, causing iterator invalidations (and crashes).
-    // Instead, we collect in a list the instructions we want to remove
-    // and erase the BB they belong to at the end of the loop, once we're
-    // sure it's safe to do so.
-    llvm::SmallVector<SILInstruction *, 4> ToRemove;
-
     while (Iter != BB.end()) {
       SILInstruction *I = &*Iter;
       Iter++;
       if (auto *ARI = dyn_cast<AllocRefInst>(I)) {
-        hasChanged |= optimizeObjectAllocation(ARI, ToRemove);
+        unsigned GarbageSize = ToRemove.size();
+
+        // Try to replace the alloc_ref with a static object.
+        if (optimizeObjectAllocation(ARI)) {
+          hasChanged = true;
+        } else {
+          // No transformation was made. Restore the original state of the garbage list.
+          assert(GarbageSize <= ToRemove.size());
+          ToRemove.resize(GarbageSize);
+        }
       }
     }
+    // Delaying the deallocation of instructions avoids problems with iterator invalidation in the
+    // instruction loop above.
     for (auto *I : ToRemove)
       I->eraseFromParent();
+    ToRemove.clear();
   }
   return hasChanged;
 }
@@ -177,6 +184,13 @@ bool ObjectOutliner::isValidUseOfObject(SILInstruction *I, bool isCOWObject,
     BuiltinValueKind K = BI->getBuiltinInfo().ID;
     if (K == BuiltinValueKind::ICMP_EQ || K == BuiltinValueKind::ICMP_NE)
       return true;
+    if (K == BuiltinValueKind::DestroyArray) {
+      // We must not try to delete the tail allocated values. Although this would be a no-op
+      // (because we only handle trivial types), it would be semantically wrong to apply this
+      // builtin on the outlined object.
+      ToRemove.push_back(BI);
+      return true;
+    }
     return false;
   }
 
@@ -194,13 +208,27 @@ bool ObjectOutliner::isValidUseOfObject(SILInstruction *I, bool isCOWObject,
 
 /// Handle the address of a tail element.
 bool ObjectOutliner::handleTailAddr(int TailIdx, SILInstruction *TailAddr,
-                              llvm::SmallVectorImpl<StoreInst *> &TailStores) {
-  if (TailIdx >= 0 && TailIdx < (int)TailStores.size()) {
-    if (auto *SI = dyn_cast<StoreInst>(TailAddr)) {
-      if (!isValidInitVal(SI->getSrc()) || TailStores[TailIdx])
-        return false;
-      TailStores[TailIdx] = SI;
+                                    unsigned NumTailTupleElements,
+                                    llvm::SmallVectorImpl<StoreInst *> &TailStores) {
+  if (NumTailTupleElements > 0) {
+    if (auto *TEA = dyn_cast<TupleElementAddrInst>(TailAddr)) {
+      unsigned TupleIdx = TEA->getFieldNo();
+      assert(TupleIdx < NumTailTupleElements);
+      for (Operand *Use : TEA->getUses()) {
+        if (!handleTailAddr(TailIdx * NumTailTupleElements + TupleIdx, Use->getUser(), 0,
+                            TailStores))
+          return false;
+      }
       return true;
+    }
+  } else {
+    if (TailIdx >= 0 && TailIdx < (int)TailStores.size()) {
+      if (auto *SI = dyn_cast<StoreInst>(TailAddr)) {
+        if (!isValidInitVal(SI->getSrc()) || TailStores[TailIdx])
+          return false;
+        TailStores[TailIdx] = SI;
+        return true;
+      }
     }
   }
   return isValidUseOfObject(TailAddr, /*isCOWObject*/false);
@@ -210,12 +238,13 @@ bool ObjectOutliner::handleTailAddr(int TailIdx, SILInstruction *TailAddr,
 bool ObjectOutliner::getObjectInitVals(SILValue Val,
                         llvm::DenseMap<VarDecl *, StoreInst *> &MemberStores,
                         llvm::SmallVectorImpl<StoreInst *> &TailStores,
+                        unsigned NumTailTupleElements,
                         ApplyInst **FindStringCall) {
   for (Operand *Use : Val->getUses()) {
     SILInstruction *User = Use->getUser();
     if (auto *UC = dyn_cast<UpcastInst>(User)) {
       // Upcast is transparent.
-      if (!getObjectInitVals(UC, MemberStores, TailStores, FindStringCall))
+      if (!getObjectInitVals(UC, MemberStores, TailStores, NumTailTupleElements, FindStringCall))
         return false;
     } else if (auto *REA = dyn_cast<RefElementAddrInst>(User)) {
       // The address of a stored property.
@@ -242,11 +271,11 @@ bool ObjectOutliner::getObjectInitVals(SILValue Val,
             TailIdx = Index->getValue().getZExtValue();
 
           for (Operand *IAUse : IA->getUses()) {
-            if (!handleTailAddr(TailIdx, IAUse->getUser(), TailStores))
+            if (!handleTailAddr(TailIdx, IAUse->getUser(), NumTailTupleElements, TailStores))
               return false;
           }
         // Without an index_addr it's the first tail element.
-        } else if (!handleTailAddr(/*TailIdx*/0, TailUser, TailStores)) {
+        } else if (!handleTailAddr(/*TailIdx*/0, TailUser, NumTailTupleElements, TailStores)) {
           return false;
         }
       }
@@ -280,9 +309,7 @@ public:
 ///     func getarray() -> [Int] {
 ///       return [1, 2, 3]
 ///     }
-bool ObjectOutliner::optimizeObjectAllocation(
-    AllocRefInst *ARI, llvm::SmallVector<SILInstruction *, 4> &ToRemove) {
-
+bool ObjectOutliner::optimizeObjectAllocation(AllocRefInst *ARI) {
   if (ARI->isObjC())
     return false;
 
@@ -316,13 +343,30 @@ bool ObjectOutliner::optimizeObjectAllocation(
   llvm::SmallVector<VarDecl *, 16> Fields;
   getFields(Cl, Fields);
 
+  llvm::DenseMap<VarDecl *, StoreInst *> MemberStores;
+
+  // A store for each element of the tail allocated array. In case of a tuple, there is a store
+  // for each tuple element. For example, a 3 element array of 2-element tuples
+  //     [ (i0, i1), (i2, i3), (i4, i5) ]
+  // results in following store instructions, collected in TailStores:
+  //     [ store i0, store i1, store i2, store i3, store i4, store i5 ]
+  llvm::SmallVector<StoreInst *, 16> TailStores;
+
+  unsigned NumStores = NumTailElems;
+  unsigned NumTailTupleElems = 0;
+  if (auto Tuple = TailType.getAs<TupleType>()) {
+    NumTailTupleElems = Tuple->getNumElements();
+    if (NumTailTupleElems == 0)
+      return false;
+    NumStores *= NumTailTupleElems;
+  }
+
+  TailStores.resize(NumStores);
+  ApplyInst *FindStringCall = nullptr;
+
   // Get the initialization stores of the object's properties and tail
   // allocated elements. Also check if there are any "bad" uses of the object.
-  llvm::DenseMap<VarDecl *, StoreInst *> MemberStores;
-  llvm::SmallVector<StoreInst *, 16> TailStores;
-  TailStores.resize(NumTailElems);
-  ApplyInst *FindStringCall = nullptr;
-  if (!getObjectInitVals(ARI, MemberStores, TailStores, &FindStringCall))
+  if (!getObjectInitVals(ARI, MemberStores, TailStores, NumTailTupleElems, &FindStringCall))
     return false;
 
   // Is there a store for all the class properties?
@@ -372,13 +416,32 @@ bool ObjectOutliner::optimizeObjectAllocation(
                            cast<SingleValueInstruction>(MemberStore->getSrc())));
     ToRemove.push_back(MemberStore);
   }
-  // Create the initializers for the tail elements.
   unsigned NumBaseElements = ObjectArgs.size();
-  for (StoreInst *TailStore : TailStores) {
-    ObjectArgs.push_back(Cloner.clone(
-                           cast<SingleValueInstruction>(TailStore->getSrc())));
-    ToRemove.push_back(TailStore);
+
+  // Create the initializers for the tail elements.
+  if (NumTailTupleElems == 0) {
+    // The non-tuple element case.
+    for (StoreInst *TailStore : TailStores) {
+      ObjectArgs.push_back(Cloner.clone(
+                             cast<SingleValueInstruction>(TailStore->getSrc())));
+      ToRemove.push_back(TailStore);
+    }
+  } else {
+    // The elements are tuples: combine NumTailTupleElems elements from TailStores to a single tuple
+    // instruction.
+    for (unsigned EIdx = 0; EIdx < NumTailElems; EIdx++) {
+      SmallVector<SILValue, 8> TupleElems;
+      for (unsigned TIdx = 0; TIdx < NumTailTupleElems; TIdx++) {
+        StoreInst *TailStore = TailStores[EIdx * NumTailTupleElems + TIdx];
+        SILValue V = Cloner.clone(cast<SingleValueInstruction>(TailStore->getSrc()));
+        TupleElems.push_back(V);
+        ToRemove.push_back(TailStore);
+      }
+      auto *TI = Cloner.getBuilder().createTuple(ARI->getLoc(), TailType, TupleElems);
+      ObjectArgs.push_back(TI);
+    }
   }
+
   // Create the initializer for the object itself.
   SILBuilder StaticInitBuilder(Glob);
   StaticInitBuilder.createObject(ArtificialUnreachableLocation(),

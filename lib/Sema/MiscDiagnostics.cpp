@@ -2210,9 +2210,132 @@ public:
     return { true, S };
   }
 };
+  
+/// An AST walker that determines the underlying type of an opaque return decl
+/// from its associated function body.
+class OpaqueUnderlyingTypeChecker : public ASTWalker {
+  TypeChecker &TC;
+  AbstractFunctionDecl *Implementation;
+  OpaqueTypeDecl *OpaqueDecl;
+  SmallVector<std::pair<Expr*, Type>, 4> Candidates;
+
+  bool HasInvalidReturn = false;
+
+public:
+  OpaqueUnderlyingTypeChecker(TypeChecker &TC,
+                              AbstractFunctionDecl *Implementation,
+                              OpaqueTypeDecl *OpaqueDecl)
+    : TC(TC),
+      Implementation(Implementation),
+      OpaqueDecl(OpaqueDecl)
+  {
+    
+  }
+  
+  void check() {
+    Implementation->getBody()->walk(*this);
+
+    // If given function has any invalid returns in the body
+    // let's not try to validate the types, since it wouldn't
+    // be accurate.
+    if (HasInvalidReturn)
+      return;
+
+    // If there are no candidates, then the body has no return statements, and
+    // we have nothing to infer the underlying type from.
+    if (Candidates.empty()) {
+      TC.diagnose(Implementation->getLoc(),
+                  diag::opaque_type_no_underlying_type_candidates);
+      return;
+    }
+    
+    // Check whether all of the underlying type candidates match up.
+    auto opaqueTypeInContext =
+      Implementation->mapTypeIntoContext(OpaqueDecl->getDeclaredInterfaceType());
+    Type underlyingType = Candidates.front().second;
+    
+    bool mismatch = false;
+    for (auto otherCandidate : llvm::makeArrayRef(Candidates).slice(1)) {
+      // Disregard tautological candidates.
+      if (otherCandidate.second->isEqual(opaqueTypeInContext))
+        continue;
+        
+      if (!underlyingType->isEqual(otherCandidate.second)) {
+        mismatch = true;
+        break;
+      }
+    }
+    
+    if (mismatch) {
+      TC.diagnose(Implementation->getLoc(),
+                  diag::opaque_type_mismatched_underlying_type_candidates);
+      for (auto candidate : Candidates) {
+        TC.diagnose(candidate.first->getLoc(),
+                    diag::opaque_type_underlying_type_candidate_here,
+                    candidate.second);
+      }
+      return;
+    }
+    
+    // The underlying type can't be defined recursively
+    // in terms of the opaque type itself.
+    auto isSelfReferencing = underlyingType.findIf([&](Type t) -> bool {
+      return t->isEqual(opaqueTypeInContext);
+    });
+    
+    if (isSelfReferencing) {
+      TC.diagnose(Candidates.front().first->getLoc(),
+                  diag::opaque_type_self_referential_underlying_type,
+                  underlyingType);
+      return;
+    }
+    
+    // If we have one successful candidate, then save it as the underlying type
+    // of the opaque decl.
+    // Form a substitution map that defines it in terms of the other context
+    // generic parameters.
+    underlyingType = underlyingType->mapTypeOutOfContext();
+    auto underlyingSubs = SubstitutionMap::get(
+      OpaqueDecl->getOpaqueInterfaceGenericSignature(),
+      [&](SubstitutableType *t) -> Type {
+        if (t->isEqual(OpaqueDecl->getUnderlyingInterfaceType())) {
+          return underlyingType;
+        }
+        return Type(t);
+      },
+      LookUpConformanceInModule(OpaqueDecl->getModuleContext()));
+    
+    OpaqueDecl->setUnderlyingTypeSubstitutions(underlyingSubs);
+  }
+  
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (auto underlyingToOpaque = dyn_cast<UnderlyingToOpaqueExpr>(E)) {
+      assert(E->getType()->isEqual(
+       Implementation->mapTypeIntoContext(OpaqueDecl->getDeclaredInterfaceType()))
+             && "unexpected opaque type in function body");
+      
+      Candidates.push_back(std::make_pair(underlyingToOpaque->getSubExpr(),
+                                  underlyingToOpaque->getSubExpr()->getType()));
+    }
+    return std::make_pair(false, E);
+  }
+
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    if (auto *RS = dyn_cast<ReturnStmt>(S)) {
+      if (RS->hasResult()) {
+        auto resultTy = RS->getResult()->getType();
+        // If expression associated with return statement doesn't have
+        // a type or type has an error, checking opaque types is going
+        // to produce incorrect diagnostics.
+        HasInvalidReturn |= resultTy.isNull() || resultTy->hasError();
+      }
+    }
+
+    return {true, S};
+  }
+};
 
 } // end anonymous namespace
-
 
 // After we have scanned the entire region, diagnose variables that could be
 // declared with a narrower usage kind.
@@ -2699,6 +2822,19 @@ void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
   // Check for unused variables, as well as variables that are could be
   // declared as constants.
   AFD->getBody()->walk(VarDeclUsageChecker(TC, AFD));
+  
+  // If the function has an opaque return type, check the return expressions
+  // to determine the underlying type.
+  if (auto opaqueResultTy = AFD->getOpaqueResultTypeDecl()) {
+    OpaqueUnderlyingTypeChecker(TC, AFD, opaqueResultTy).check();
+  } else if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
+    if (accessor->isGetter()) {
+      if (auto opaqueResultTy
+                          = accessor->getStorage()->getOpaqueResultTypeDecl()) {
+        OpaqueUnderlyingTypeChecker(TC, AFD, opaqueResultTy).check();
+      }
+    }
+  }
 }
 
 // Perform MiscDiagnostics on Switch Statements.
@@ -3395,36 +3531,39 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     }
 
     static bool hasImplicitlyUnwrappedResult(Expr *E) {
-      auto getDeclForExpr = [&](Expr *E) -> ValueDecl * {
-        if (auto *call = dyn_cast<CallExpr>(E))
-          E = call->getDirectCallee();
-
-        if (auto *subscript = dyn_cast<SubscriptExpr>(E)) {
-          if (subscript->hasDecl())
-            return subscript->getDecl().getDecl();
-
-          return nullptr;
-        }
-
-        if (auto *memberRef = dyn_cast<MemberRefExpr>(E))
-          return memberRef->getMember().getDecl();
-        if (auto *declRef = dyn_cast<DeclRefExpr>(E))
-          return declRef->getDecl();
-        if (auto *apply = dyn_cast<ApplyExpr>(E))
-          return apply->getCalledValue();
-
-        return nullptr;
-      };
-
-      // Look through implicit conversions like loads, derived-to-base
-      // conversion, etc.
-      if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E))
-        E = ICE->getSubExpr();
-
-      auto *decl = getDeclForExpr(E);
+      auto *decl = getDeclForImplicitlyUnwrappedExpr(E);
 
       return decl
         && decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    }
+
+    static ValueDecl *getDeclForImplicitlyUnwrappedExpr(Expr *E) {
+      E = E->getValueProvidingExpr();
+
+      // Look through implicit conversions like loads, derived-to-base
+      // conversion, etc.
+      if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E)) {
+        E = ICE->getSubExpr();
+      }
+
+      if (auto *subscript = dyn_cast<SubscriptExpr>(E)) {
+        if (subscript->hasDecl())
+          return subscript->getDecl().getDecl();
+        return nullptr;
+      }
+
+      if (auto *memberRef = dyn_cast<MemberRefExpr>(E))
+        return memberRef->getMember().getDecl();
+
+      if (auto *declRef = dyn_cast<DeclRefExpr>(E))
+        return declRef->getDecl();
+
+      if (auto *apply = dyn_cast<ApplyExpr>(E)) {
+        auto *decl = apply->getCalledValue();
+        if (decl && isa<AbstractFunctionDecl>(decl))
+          return decl;
+      }
+      return nullptr;
     }
 
     void visitErasureExpr(ErasureExpr *E, OptionalToAnyCoercion coercion) {
@@ -3455,15 +3594,32 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       size_t optionalityDifference = 0;
       if (!isOptionalToAnyCoercion(srcType, destType, optionalityDifference))
         return;
+      
+      // If we're implicitly unwrapping from IUO to Any then emit a custom
+      // diagnostic
+      if (hasImplicitlyUnwrappedResult(subExpr)) {
+        if (auto decl = getDeclForImplicitlyUnwrappedExpr(subExpr)) {
+          TC.diagnose(subExpr->getStartLoc(), diag::iuo_to_any_coercion,
+                      /* from */ srcType, /* to */ destType)
+              .highlight(subExpr->getSourceRange());
 
-      TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
-                  /* from */ srcType, /* to */ destType)
-        .highlight(subExpr->getSourceRange());
+          auto noteDiag = isa<FuncDecl>(decl)
+                              ? diag::iuo_to_any_coercion_note_func_result
+                              : diag::iuo_to_any_coercion_note;
 
+          TC.diagnose(decl->getLoc(), noteDiag, decl->getDescriptiveKind(),
+                      decl->getFullName());
+        }
+      } else {
+        TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
+                    /* from */ srcType, /* to */ destType)
+            .highlight(subExpr->getSourceRange());
+      }
+      
       if (optionalityDifference == 1) {
         TC.diagnose(subExpr->getLoc(), diag::default_optional_to_any)
-          .highlight(subExpr->getSourceRange())
-          .fixItInsertAfter(subExpr->getEndLoc(), " ?? <#default value#>");
+            .highlight(subExpr->getSourceRange())
+            .fixItInsertAfter(subExpr->getEndLoc(), " ?? <#default value#>");
       }
 
       SmallString<4> forceUnwrapString;

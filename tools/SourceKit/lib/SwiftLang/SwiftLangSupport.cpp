@@ -31,6 +31,7 @@
 #include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -117,6 +118,7 @@ public:
   UID_FOR(Constructor)
   UID_FOR(Destructor)
   UID_FOR(Subscript)
+  UID_FOR(OpaqueType)
 #undef UID_FOR
 };
 
@@ -848,19 +850,28 @@ std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
 
   return InputPath;
 #else
-  char full_path[MAX_PATH];
+  wchar_t full_path[MAX_PATH] = {0};
+  llvm::SmallVector<llvm::UTF16, 50> utf16Path;
+  llvm::convertUTF8ToUTF16String(InputPath.c_str(), utf16Path);
 
-  HANDLE fileHandle = CreateFileA(
-      InputPath.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING,
-      FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+  HANDLE fileHandle = CreateFileW(
+      (LPCWSTR)utf16Path.data(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+      OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
 
   if (fileHandle == INVALID_HANDLE_VALUE)
     return InputPath;
 
-  DWORD success = GetFinalPathNameByHandleA(
-      fileHandle, full_path, sizeof(full_path), FILE_NAME_NORMALIZED);
+  bool success = GetFinalPathNameByHandleW(fileHandle, full_path, MAX_PATH,
+                                            FILE_NAME_NORMALIZED);
   CloseHandle(fileHandle);
-  return (success ? full_path : InputPath);
+  std::string utf8Path;
+  if (success) {
+    llvm::ArrayRef<char> pathRef((const char *)full_path,
+                                 (const char *)(full_path + MAX_PATH));
+    success &= llvm::convertUTF16ToUTF8String(pathRef, utf8Path);
+  }
+
+  return (success ? utf8Path : InputPath);
 #endif
 }
 

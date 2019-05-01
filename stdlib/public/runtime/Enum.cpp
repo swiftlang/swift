@@ -54,6 +54,7 @@ swift::swift_initEnumMetadataSingleCase(EnumMetadata *self,
   layout.size = payloadLayout->size;
   layout.stride = payloadLayout->stride;
   layout.flags = payloadLayout->flags.withEnumWitnesses(true);
+  layout.extraInhabitantCount = payloadLayout->getNumExtraInhabitants();
 
   vwtable->publishLayout(layout);
 }

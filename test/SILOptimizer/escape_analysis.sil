@@ -74,6 +74,24 @@ struct FourFields {
   let d : Y
 }
 
+sil @take_indirect_tuple : $@convention(method) (@in (Int, ())) -> ()
+
+// CHECK-LABEL: CG of handle_undef
+// CHECK:         Val %2 Esc: G, Succ: (%2.1)
+// CHECK:         Con %2.1 Esc: G, Succ: 
+// CHECK:       End
+sil @handle_undef : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = tuple $(Int, ()) (%0, undef)
+  %5 = alloc_stack $(Int, ())
+  store %1 to %5 : $*(Int, ())
+  %7 = function_ref @take_indirect_tuple : $@convention(method) (@in (Int, ())) -> ()
+  %8 = apply %7(%5) : $@convention(method) (@in (Int, ())) -> ()
+  dealloc_stack %5 : $*(Int, ())
+  %10 = tuple ()
+  return %10 : $()
+}
+
 // Sanity check with a simple function.
 
 // CHECK-LABEL: CG of test_simple

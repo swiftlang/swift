@@ -47,6 +47,8 @@ NOTE(implicit_member_declared_here,none,
      "%1 '%0' is implicitly declared", (StringRef, StringRef))
 NOTE(extended_type_declared_here,none,
      "extended type declared here", ())
+NOTE(opaque_return_type_declared_here,none,
+     "opaque return type declared here", ())
 
 //------------------------------------------------------------------------------
 // MARK: Constraint solver diagnostics
@@ -658,6 +660,9 @@ ERROR(reserved_member_name,none,
       " 'foo.%1' expression", (DeclName, StringRef))
 
 ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
+ERROR(invalid_redecl_init,none,
+      "invalid redeclaration of synthesized %select{|memberwise }1%0",
+      (DeclName, bool))
 WARNING(invalid_redecl_swift5_warning,none,
         "redeclaration of %0 is deprecated and will be an error in Swift 5",
         (DeclName))
@@ -1071,7 +1076,7 @@ ERROR(c_function_pointer_from_generic_function,none,
 ERROR(c_function_pointer_from_function_with_context,none,
       "a C function pointer cannot be formed from a "
       "%select{local function|closure}0 that captures "
-      "%select{context|generic parameters|dynamic Self type}1",
+      "%select{context|generic parameters|dynamic Self type|<<error>}1",
       (bool, unsigned))
 ERROR(invalid_autoclosure_forwarding,none,
       "add () to forward @autoclosure parameter", ())
@@ -1282,6 +1287,19 @@ WARNING(expr_dynamic_lookup_swift3_objc_inference,none,
         "reference to %0 %1 of %2 depends on '@objc' inference "
         "deprecated in Swift 4",
         (DescriptiveDeclKind, DeclName, Identifier))
+
+ERROR(inherited_default_value_not_in_designated_constructor,none,
+      "default value inheritance via 'super' is only valid on the parameters of "
+      "designated initializers", ())
+ERROR(inherited_default_value_used_in_non_overriding_constructor,none,
+      "default value inheritance via 'super' can only be used when "
+      "overriding a designated initializer", ())
+ERROR(corresponding_param_not_defaulted,none,
+      "default value inheritance via 'super' requires that the corresponding "
+      "parameter of the overridden designated initializer has a default value",
+      ())
+NOTE(inherited_default_param_here,none,
+     "corresponding parameter declared here", ())
 
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
@@ -1497,6 +1515,14 @@ WARNING(function_type_usable_from_inline_warn,none,
         "should be '@usableFromInline' or public",
         (unsigned, bool))
 
+// Opaque return types
+ERROR(opaque_type_invalid_constraint,none,
+      "an 'opaque' type must specify only 'Any', 'AnyObject', protocols, "
+      "and/or a base class", ())
+ERROR(inferred_opaque_type,none,
+      "property definition has inferred type %0, involving the 'some' "
+      "return type of another declaration", (Type))
+
 // Extensions
 ERROR(non_nominal_extension,none,
       "non-nominal type %0 cannot be extended", (Type))
@@ -1558,6 +1584,9 @@ ERROR(type_does_not_conform_in_decl_ref,none,
       (DescriptiveDeclKind, DeclName, Type, Type, Type))
 ERROR(type_does_not_conform_decl_owner,none,
       "%0 %1 requires that %2 conform to %3",
+      (DescriptiveDeclKind, DeclName, Type, Type))
+ERROR(type_does_not_conform_in_opaque_return,none,
+      "return type of %0 %1 requires that %2 conform to %3",
       (DescriptiveDeclKind, DeclName, Type, Type))
 ERROR(types_not_equal_decl,none,
       "%0 %1 requires the types %2 and %3 be equivalent",
@@ -2025,8 +2054,9 @@ NOTE(same_type_redundancy_here,none,
      "inferred from type here}0",
      (unsigned, Type, Type))
 ERROR(requires_superclass_conflict,none,
-      "%select{generic parameter |protocol |}0%1 cannot be a subclass of both "
-      "%2 and %3", (unsigned, Type, Type, Type))
+      "%select{generic parameter %1 cannot|protocol %1 cannot require 'Self' to|" 
+      "%1 cannot}0 be a subclass of both %2 and %3",
+      (unsigned, Type, Type, Type))
 WARNING(redundant_superclass_constraint,none,
         "redundant superclass constraint %0 : %1", (Type, Type))
 NOTE(superclass_redundancy_here,none,
@@ -3014,6 +3044,15 @@ WARNING(optional_pattern_match_promotion,none,
         (Type, Type))
 WARNING(optional_to_any_coercion,none,
         "expression implicitly coerced from %0 to %1", (Type, Type))
+WARNING(iuo_to_any_coercion,none,
+        "coercion of implicitly unwrappable value of type %0 to %1 does not "
+        "unwrap optional", (Type, Type))
+NOTE(iuo_to_any_coercion_note,none,
+     "implicitly unwrapped %0 %1 declared here",
+     (DescriptiveDeclKind, DeclName))
+NOTE(iuo_to_any_coercion_note_func_result,none,
+     "%0 %1 with implicitly unwrapped result type is declared here",
+     (DescriptiveDeclKind, DeclName))
 NOTE(default_optional_to_any,none,
      "provide a default value to avoid this warning", ())
 NOTE(force_optional_to_any,none,
@@ -3203,6 +3242,18 @@ NOTE(duplicate_where, none,
 ERROR(trailing_closure_requires_parens,none,
       "trailing closure requires parentheses for disambiguation in this"
       " context", ())
+
+ERROR(opaque_type_no_underlying_type_candidates,none,
+      "function declares an opaque return type, but has no return statements "
+      "in its body from which to infer an underlying type", ())
+ERROR(opaque_type_mismatched_underlying_type_candidates,none,
+      "function declares an opaque return type, but the return statements "
+      "in its body do not have matching underlying types", ())
+NOTE(opaque_type_underlying_type_candidate_here,none,
+     "return statement has underlying type %0", (Type))
+ERROR(opaque_type_self_referential_underlying_type,none,
+      "function opaque return type was inferred as %0, which defines the "
+      "opaque type in terms of itself", (Type))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Patterns
@@ -3512,6 +3563,13 @@ ERROR(unsupported_convention,none,
 ERROR(unreferenced_generic_parameter,none,
       "generic parameter '%0' is not used in function signature", (StringRef))
 
+// Opaque types
+ERROR(unsupported_opaque_type,none,
+      "'some' types are only implemented for the declared type of properties and subscripts and the return type of functions", ())
+
+ERROR(opaque_type_unsupported_pattern,none,
+      "'some' type can only be declared on a single property declaration", ())
+
 // SIL
 ERROR(opened_non_protocol,none,
       "@opened cannot be applied to non-protocol type %0", (Type))
@@ -3702,6 +3760,9 @@ WARNING(witness_swift3_objc_inference,none,
         "use of %0 %1 to satisfy a requirement of protocol %2 depends on "
         "'@objc' inference deprecated in Swift 4",
         (DescriptiveDeclKind, DeclName, Type))
+
+ERROR(no_opaque_return_type_of,none,
+      "unable to resolve type for _opaqueReturnTypeOf attribute", ())
 
 
 ERROR(objc_observing_accessor, none,
@@ -4255,6 +4316,88 @@ WARNING(hashvalue_implementation,none,
         "'Hashable.hashValue' is deprecated as a protocol requirement; "
         "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",
         (Type))
+
+//------------------------------------------------------------------------------
+// MARK: property delegate diagnostics
+//------------------------------------------------------------------------------
+ERROR(property_delegate_no_value_property, none,
+  "property delegate type %0 does not contain a non-static property "
+  "named %1", (Type, Identifier))
+ERROR(property_delegate_ambiguous_value_property, none,
+  "property delegate type %0 has multiple non-static properties "
+  "named %1", (Type, Identifier))
+ERROR(property_delegate_wrong_initial_value_init, none,
+      "'init(initialValue:)' parameter type (%0) must be the same as its "
+      "'value' property type (%1) or an @autoclosure thereof", (Type, Type))
+ERROR(property_delegate_failable_initial_value_init, none,
+      "'init(initialValue:)' cannot be failable", ())
+ERROR(property_delegate_ambiguous_initial_value_init, none,
+  "property delegate type %0 has multiple initial-value initializers", (Type))
+ERROR(property_delegate_type_requirement_not_accessible,none,
+      "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
+      "more restrictive access than its enclosing property delegate type %3 "
+      "(which is %select{private|fileprivate|internal|public|open}4)",
+      (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
+ERROR(property_delegate_reserved_name,none,
+      "property delegate type name must start with an uppercase letter", ())
+
+ERROR(property_delegate_attribute_not_on_property, none,
+      "property delegate attribute %0 can only be applied to a property",
+      (DeclName))
+
+ERROR(property_delegate_multiple,none,
+      "only one property delegate can be attached to a given property", ())
+NOTE(previous_property_delegate_here,none,
+      "previous property delegate specified here", ())
+
+ERROR(property_delegate_local,none,
+      "property delegates are not yet supported on local properties", ())
+ERROR(property_delegate_let, none,
+      "property delegate can only be applied to a 'var'",
+      ())
+
+ERROR(property_with_delegate_conflict_attribute,none,
+      "property %0 with a delegate cannot also be "
+      "%select{lazy|@NSCopying|@NSManaged|weak|unowned|unmanaged}1",
+      (DeclName, int))
+ERROR(property_delegate_not_single_var, none,
+      "property delegate can only apply to a single variable", ())
+ERROR(property_with_delegate_in_bad_context,none,
+      "%select{|non-static |non-static }1property %0 declared inside "
+      "%select{a protocol|an extension|an enum}1 cannot have a delegate",
+      (DeclName, int))
+ERROR(property_with_delegate_overrides,none,
+      "property %0 with attached delegate cannot override another property",
+      (DeclName))
+
+ERROR(property_delegate_and_normal_init,none,
+      "property %0 with attached delegate cannot initialize both the "
+      "delegate type and the property", (DeclName))
+ERROR(property_delegate_init_without_initial_value, none,
+      "initializing property %0 with delegate %1 that lacks "
+      "an 'init(initialValue:)' initializer", (DeclName, Type))
+NOTE(property_delegate_direct_init,none,
+     "initialize the property delegate type directly with "
+     "'(...') on the attribute", ())
+
+ERROR(property_delegate_incompatible_unbound, none,
+      "property delegate type %0 must either specify all generic arguments "
+      "or require only a single generic argument", (Type))
+
+ERROR(property_delegate_type_access,none,
+      "%select{%select{variable|constant}0|property}1 "
+      "%select{must be declared %select{"
+      "%select{private|fileprivate|internal|%error|%error}3|private or fileprivate}4"
+      "|cannot be declared "
+      "%select{in this context|fileprivate|internal|public|open}3}2 "
+      "because its property delegate type uses "
+      "%select{a private|a fileprivate|an internal|%error|%error}5 type",
+      (bool, bool, bool, AccessLevel, bool, AccessLevel))
+ERROR(property_delegate_type_not_usable_from_inline,none,
+      "property delegate type referenced from a '@usableFromInline' "
+      "%select{%select{variable|constant}0|property}1 "
+      "must be '@usableFromInline' or public",
+      (bool, bool))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

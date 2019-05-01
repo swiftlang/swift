@@ -1469,6 +1469,11 @@ void WitnessTableBuilder::defineAssociatedTypeWitnessTableAccessFunction(
                                 CanType associatedType,
                                 ProtocolConformanceRef associatedConformance) {
   bool hasArchetype = associatedType->hasArchetype();
+  OpaqueTypeArchetypeType *associatedRootOpaqueType = nullptr;
+  if (auto assocArchetype = dyn_cast<ArchetypeType>(associatedType)) {
+    associatedRootOpaqueType = dyn_cast<OpaqueTypeArchetypeType>(
+                                                     assocArchetype->getRoot());
+  }
 
   assert(isa<NormalProtocolConformance>(Conformance) && "has associated type");
 
@@ -1524,7 +1529,7 @@ void WitnessTableBuilder::defineAssociatedTypeWitnessTableAccessFunction(
   }
 
   // If there are no archetypes, return a reference to the table.
-  if (!hasArchetype) {
+  if (!hasArchetype && !associatedRootOpaqueType) {
     auto wtable = conformanceI->getTable(IGF, &associatedTypeMetadata);
     IGF.Builder.CreateRet(wtable);
     return;
@@ -1561,6 +1566,17 @@ void WitnessTableBuilder::defineAssociatedTypeWitnessTableAccessFunction(
   IGF.bindLocalTypeDataFromTypeMetadata(ConcreteType, IsExact, self,
                                         MetadataState::Abstract);
 
+  // If the associated type is opaque, use the runtime to fetch the conformance.
+  if (associatedRootOpaqueType) {
+    assert(associatedType == CanType(associatedRootOpaqueType)
+           && "associated type is nested type of opaque type?! not implemented");
+    auto wtable = emitOpaqueTypeWitnessTableRef(IGF,
+                          CanOpaqueTypeArchetypeType(associatedRootOpaqueType),
+                          associatedProtocol);
+    IGF.Builder.CreateRet(wtable);
+    return;
+  }
+  
   // Find abstract conformances.
   // TODO: provide an API to find the best metadata path to the conformance
   // and decide whether it's expensive enough to be worth caching.
@@ -2956,14 +2972,12 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
 
   // Construct a representative function type.
   auto generics = ncGenerics->getCanonicalSignature();
-  CanSILFunctionType fnType = [&]() -> CanSILFunctionType {
-    return SILFunctionType::get(generics, SILFunctionType::ExtInfo(),
+  auto fnType = SILFunctionType::get(generics, SILFunctionType::ExtInfo(),
                                 SILCoroutineKind::None,
                                 /*callee*/ ParameterConvention::Direct_Unowned,
                                 /*params*/ {}, /*yields*/ {},
                                 /*results*/ {}, /*error*/ None,
                                 IGM.Context);
-  }();
 
   // Figure out what we're actually still required to pass 
   PolymorphicConvention convention(IGM, fnType);

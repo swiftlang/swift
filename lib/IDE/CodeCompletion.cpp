@@ -486,6 +486,7 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
   case DeclKind::MissingMember:
+  case DeclKind::OpaqueType:
     llvm_unreachable("not expecting such a declaration result");
   case DeclKind::Module:
     return CodeCompletionDeclKind::Module;
@@ -929,6 +930,18 @@ calculateMaxTypeRelationForDecl(
     bool IsImplicitlyCurriedInstanceMethod = false) {
   auto Result = CodeCompletionResult::ExpectedTypeRelation::Unrelated;
   for (auto Type : typeContext.possibleTypes) {
+    // Do not use Void type context for a single-expression body, since the
+    // implicit return does not constrain the expression.
+    //
+    //     { ... -> ()  in x } // x can be anything
+    //
+    // This behaves differently from explicit return, and from non-Void:
+    //
+    //     { ... -> Int in x }        // x must be Int
+    //     { ... -> ()  in return x } // x must be Void
+    if (typeContext.isSingleExpressionBody && Type->isVoid())
+      continue;
+
     Result = std::max(Result, calculateTypeRelationForDecl(
                                   D, Type, IsImplicitlyCurriedInstanceMethod));
 
@@ -1345,6 +1358,7 @@ public:
   void completeExprSuperDot(SuperRefExpr *SRE) override;
   void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) override;
 
+  void completeTypeDeclResultBeginning() override;
   void completeTypeSimpleBeginning() override;
   void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) override;
   void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) override;
@@ -1357,7 +1371,7 @@ public:
   void completeInPrecedenceGroup(SyntaxKind SK) override;
   void completeNominalMemberBeginning(
       SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) override;
-  void completeAccessorBeginning() override;
+  void completeAccessorBeginning(CodeCompletionExpr *E) override;
 
   void completePoundAvailablePlatform() override;
   void completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) override;
@@ -1648,7 +1662,15 @@ public:
         expectedTypeContext.possibleTypes.push_back(T);
   }
 
-  bool hasExpectedTypes() const { return !expectedTypeContext.empty(); }
+  CodeCompletionContext::TypeContextKind typeContextKind() const {
+    if (expectedTypeContext.empty()) {
+      return CodeCompletionContext::TypeContextKind::None;
+    } else if (expectedTypeContext.isSingleExpressionBody) {
+      return CodeCompletionContext::TypeContextKind::SingleExpressionBody;
+    } else {
+      return CodeCompletionContext::TypeContextKind::Required;
+    }
+  }
 
   bool needDot() const {
     return NeedLeadingDot;
@@ -1872,10 +1894,14 @@ public:
 
   void addTypeAnnotation(CodeCompletionResultBuilder &Builder, Type T) {
     T = T->getReferenceStorageReferent();
-    if (T->isVoid())
+    if (T->isVoid()) {
       Builder.addTypeAnnotation("Void");
-    else
-      Builder.addTypeAnnotation(T.getString());
+    } else {
+      PrintOptions PO;
+      PO.OpaqueReturnTypePrinting =
+          PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+      Builder.addTypeAnnotation(T.getString(PO));
+    }
   }
 
   void addTypeAnnotationForImplicitlyUnwrappedOptional(
@@ -1893,6 +1919,8 @@ public:
     T = T->getReferenceStorageReferent();
     PrintOptions PO;
     PO.PrintOptionalAsImplicitlyUnwrapped = true;
+    PO.OpaqueReturnTypePrinting =
+        PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
     Builder.addTypeAnnotation(T.getString(PO) + suffix);
   }
 
@@ -1929,6 +1957,10 @@ public:
       // FIXME: Code completion should only deal with one or the other,
       // and not both.
       if (auto *archetypeType = t->getAs<ArchetypeType>()) {
+        // Don't erase opaque archetype.
+        if (isa<OpaqueTypeArchetypeType>(archetypeType))
+          return t;
+
         auto protos = archetypeType->getConformsTo();
         if (!protos.empty())
           return buildProtocolComposition(protos);
@@ -2472,6 +2504,8 @@ public:
               FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
 
           PrintOptions PO;
+          PO.OpaqueReturnTypePrinting =
+              PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
           PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
           ResultType.print(OS, PO);
         }
@@ -2593,8 +2627,8 @@ public:
   }
 
   void addSubscriptCall(const SubscriptDecl *SD, DeclVisibilityKind Reason) {
-    // Don't add subscript call to meta types.
-    if (!ExprType || ExprType->is<AnyMetatypeType>())
+    // Don't add subscript call to unqualified completion.
+    if (!ExprType)
       return;
 
     // Subscript after '.' is valid only after type part of Swift keypath
@@ -3545,9 +3579,7 @@ public:
       builder.addSimpleNamedParameter("values");
       builder.addRightParen();
       for (auto T : expectedTypeContext.possibleTypes) {
-        if (!T)
-          continue;
-        if (T->is<TupleType>()) {
+        if (T && T->is<TupleType>() && !T->isVoid()) {
           addTypeAnnotation(builder, T);
           builder.setExpectedTypeRelation(CodeCompletionResult::Identical);
           break;
@@ -4024,19 +4056,74 @@ public:
       Builder.addAccessControlKeyword(Access);
   }
 
+  /// Return type if the result type if \p VD should be represented as opaque
+  /// result type.
+  TypeLoc getOpaqueResultTypeLoc(const ValueDecl *VD, DeclVisibilityKind Reason) {
+    if (Reason !=
+        DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal)
+      return nullptr;
+
+    auto currTy = CurrDeclContext->getDeclaredTypeInContext();
+    if (!currTy)
+      return nullptr;
+
+    Type ResultT;
+    if (auto *FD = dyn_cast<FuncDecl>(VD))
+      ResultT = FD->getResultInterfaceType();
+    else if (auto *SD = dyn_cast<SubscriptDecl>(VD))
+      ResultT = SD->getElementInterfaceType();
+    else if (auto *VarD = dyn_cast<VarDecl>(VD))
+      ResultT = VarD->getInterfaceType();
+    else
+      return nullptr;
+
+    if (!ResultT->is<DependentMemberType>())
+      // The result is not associatedtype.
+      return nullptr;
+
+    // If associatedtype doesn't have conformance/superclass constraint, we
+    // can't use opaque type.
+    auto assocTyD = ResultT->castTo<DependentMemberType>()->getAssocType();
+    if (!assocTyD->getInherited().size())
+      return nullptr;
+
+    // Try substitution to see if the associated type is resolved to concrete
+    // type.
+    auto substMap = currTy->getMemberSubstitutionMap(
+        CurrDeclContext->getParentModule(), VD);
+    ResultT = ResultT.subst(substMap, SubstFlags::UseErrorType);
+    if (!ResultT || !ResultT->is<DependentMemberType>())
+      // If resolved print it.
+      return nullptr;
+
+    return assocTyD->getInherited()[0];
+  }
+
   void addValueOverride(const ValueDecl *VD, DeclVisibilityKind Reason,
                         CodeCompletionResultBuilder &Builder,
                         bool hasDeclIntroducer) {
+    class DeclPrinter : public StreamPrinter {
+      TypeLoc OpaqueBaseTy;
 
-    class DeclNameOffsetLocatorPrinter : public StreamPrinter {
     public:
       using StreamPrinter::StreamPrinter;
 
       Optional<unsigned> NameOffset;
 
+      DeclPrinter(raw_ostream &OS, TypeLoc OpaqueBaseTy)
+          : StreamPrinter(OS), OpaqueBaseTy(OpaqueBaseTy) {}
+
       void printDeclLoc(const Decl *D) override {
         if (!NameOffset.hasValue())
           NameOffset = OS.tell();
+      }
+
+      // As for FuncDecl, SubscriptDecl, and VarDecl,
+      void printDeclResultTypePre(ValueDecl *VD, TypeLoc &TL) override {
+        if (!OpaqueBaseTy.isNull()) {
+          OS << "some ";
+          TL = OpaqueBaseTy;
+        }
       }
     };
 
@@ -4044,7 +4131,7 @@ public:
     unsigned NameOffset = 0;
     {
       llvm::raw_svector_ostream OS(DeclStr);
-      DeclNameOffsetLocatorPrinter Printer(OS);
+      DeclPrinter Printer(OS, getOpaqueResultTypeLoc(VD, Reason));
       PrintOptions Options;
       if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
         Options.setBaseType(transformType);
@@ -4053,6 +4140,7 @@ public:
       Options.ExclusiveAttrList.push_back(TAK_autoclosure);
       Options.PrintOverrideKeyword = false;
       Options.PrintPropertyAccessors = false;
+      Options.PrintSubscriptAccessors = false;
       Options.PrintStaticKeyword = !hasStaticOrClass;
       VD->print(Printer, Options);
       NameOffset = Printer.NameOffset.getValue();
@@ -4066,7 +4154,7 @@ public:
         Builder.addOverrideKeyword();
       else {
         auto dist = Ctx.SourceMgr.getByteDistance(
-                      introducerLoc, Ctx.SourceMgr.getCodeCompletionLoc());
+            introducerLoc, Ctx.SourceMgr.getCodeCompletionLoc());
         Builder.setNumBytesToErase(dist);
         Builder.addOverrideKeyword();
         Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));
@@ -4102,6 +4190,15 @@ public:
         SemanticContextKind::Super, {});
     Builder.setAssociatedDecl(VD);
     addValueOverride(VD, Reason, Builder, hasVarIntroducer);
+  }
+
+  void addSubscriptOverride(const SubscriptDecl *SD, DeclVisibilityKind Reason) {
+    CodeCompletionResultBuilder Builder(
+        Sink, CodeCompletionResult::ResultKind::Declaration,
+        SemanticContextKind::Super, {});
+    Builder.setAssociatedDecl(SD);
+    addValueOverride(SD, Reason, Builder, false);
+    Builder.addBraceStmtWithCursor();
   }
 
   void addTypeAlias(const AssociatedTypeDecl *ATD, DeclVisibilityKind Reason) {
@@ -4167,7 +4264,7 @@ public:
     if (D->shouldHideFromEditor())
       return;
 
-    if (D->getAttrs().hasAttribute<FinalAttr>() ||
+    if (D->isFinal() ||
         // A 'class' member with an initial value cannot be overriden either.
         (D->isStatic() && D->getAttrs().hasAttribute<HasInitialValueAttr>()))
       return;
@@ -4206,6 +4303,11 @@ public:
       if (hasVarIntroducer || (!hasIntroducer && !hasInitializerModifier))
         addVarOverride(VD, Reason);
       return;
+    }
+
+    if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
+      if (!hasIntroducer && !hasInitializerModifier)
+        addSubscriptOverride(SD, Reason);
     }
 
     if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
@@ -4258,7 +4360,7 @@ public:
           continue;
         // FIXME: Also exclude the type alias that has already been specified.
         if (!Conformance->hasTypeWitness(ATD) ||
-            !ATD->getDefaultDefinitionLoc().isNull())
+            ATD->hasDefaultDefinitionType())
           continue;
         addTypeAlias(ATD,
           DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal);
@@ -4445,6 +4547,11 @@ void CodeCompletionCallbacksImpl::completePoundAvailablePlatform() {
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completeTypeDeclResultBeginning() {
+  Kind = CompletionKind::TypeDeclResultBeginning;
+  CurDeclContext = P.CurDeclContext;
+}
+
 void CodeCompletionCallbacksImpl::completeTypeSimpleBeginning() {
   Kind = CompletionKind::TypeSimpleBeginning;
   CurDeclContext = P.CurDeclContext;
@@ -4616,9 +4723,11 @@ void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeAccessorBeginning() {
+void CodeCompletionCallbacksImpl::completeAccessorBeginning(
+    CodeCompletionExpr *E) {
   Kind = CompletionKind::AccessorBeginning;
   CurDeclContext = P.CurDeclContext;
+  CodeCompleteTokenExpr = E;
 }
 
 static bool isDynamicLookup(Type T) {
@@ -4719,10 +4828,13 @@ static void addExprKeywords(CodeCompletionResultSink &Sink) {
   addKeyword(Sink, "#dsohandle", CodeCompletionKeywordKind::pound_dsohandle, "UnsafeMutableRawPointer");
 }
 
+static void addOpaqueTypeKeyword(CodeCompletionResultSink &Sink) {
+  addKeyword(Sink, "some", CodeCompletionKeywordKind::None, "some");
+}
+
 static void addAnyTypeKeyword(CodeCompletionResultSink &Sink) {
   addKeyword(Sink, "Any", CodeCompletionKeywordKind::None, "Any");
 }
-
 
 void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
                                               bool MaybeFuncBody) {
@@ -4792,6 +4904,13 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::TypeIdentifierWithoutDot:
     break;
 
+  case CompletionKind::TypeDeclResultBeginning:
+    if (!isa<ProtocolDecl>(CurDeclContext))
+      if (CurDeclContext->isTypeContext() ||
+          (ParsedDecl && isa<FuncDecl>(ParsedDecl)))
+        addOpaqueTypeKeyword(Sink);
+
+    LLVM_FALLTHROUGH;
   case CompletionKind::TypeSimpleBeginning:
     addAnyTypeKeyword(Sink);
     break;
@@ -5161,6 +5280,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
+  case CompletionKind::TypeDeclResultBeginning:
   case CompletionKind::TypeSimpleBeginning: {
     Lookup.getTypeCompletionsInDeclContext(
         P.Context.SourceMgr.getCodeCompletionLoc());
@@ -5201,8 +5321,12 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::AccessorBeginning: {
-    if (isa<AccessorDecl>(ParsedDecl))
+    if (isa<AccessorDecl>(ParsedDecl)) {
+      ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
+      Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
+                              ContextInfo.isSingleExpressionBody());
       DoPostfixExprBeginning();
+    }
     break;
   }
 
@@ -5391,7 +5515,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.RequestedCachedResults.clear();
   }
 
-  CompletionContext.HasExpectedTypeRelation = Lookup.hasExpectedTypes();
+  CompletionContext.typeContextKind = Lookup.typeContextKind();
 
   deliverCompletionResults();
 }

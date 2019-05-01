@@ -278,6 +278,14 @@ public:
                          const TypeRef *parent) {
     return BoundGenericTypeRef::create(*this, *mangledName, args, parent);
   }
+  
+  const TypeRef *
+  resolveOpaqueType(NodePointer opaqueDescriptor,
+                    const std::vector<const TypeRef *> &genericArgs,
+                    unsigned ordinal) {
+    // TODO
+    return nullptr;
+  }
 
   const TupleTypeRef *
   createTupleType(ArrayRef<const TypeRef *> elements,
@@ -476,6 +484,10 @@ public:
       switch (kind) {
       case Demangle::SymbolicReferenceKind::Context:
         return reader.readDemanglingForContextDescriptor(address, Dem);
+      case Demangle::SymbolicReferenceKind::AccessorFunctionReference:
+        // The symbolic reference points at a resolver function, but we can't
+        // execute code in the target process to resolve it from here.
+        return nullptr;
       }
       
       return nullptr;
