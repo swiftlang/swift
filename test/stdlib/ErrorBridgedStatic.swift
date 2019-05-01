@@ -4,6 +4,7 @@
 // RUN: strip %t/ErrorBridgedStatic
 // RUN: %target-run %t/ErrorBridgedStatic
 
+// REQUIRES: rdar50279940
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // REQUIRES: static_stdlib
