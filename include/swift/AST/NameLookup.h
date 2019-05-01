@@ -205,6 +205,51 @@ enum class DeclVisibilityKind {
   DynamicLookup,
 };
 
+/// For Decls found with DeclVisibilityKind::DynamicLookup, contains details of
+/// how they were looked up. For example, the SubscriptDecl used to find a
+/// KeyPath dynamic member.
+class DynamicLookupInfo {
+public:
+  enum Kind {
+    None,
+    AnyObject,
+    KeyPathDynamicMember,
+  };
+
+  struct KeyPathDynamicMemberInfo {
+    /// The subscript(dynamicMember:) by which we found the declaration.
+    SubscriptDecl *subscript = nullptr;
+
+    /// The type context of `subscript`, which may be different than the
+    /// original base type of the lookup if this declaration was found by nested
+    /// dynamic lookups.
+    Type baseType = Type();
+
+    /// Visibility of the declaration itself without dynamic lookup.
+    ///
+    /// For example, dynamic lookup for KeyPath<Derived, U>, might find
+    /// Base::foo with originalVisibility == MemberOfSuper.
+    DeclVisibilityKind originalVisibility = DeclVisibilityKind::DynamicLookup;
+  };
+
+  Kind getKind() const { return kind; }
+
+  const KeyPathDynamicMemberInfo &getKeyPathDynamicMember() const;
+
+  DynamicLookupInfo() : kind(None) {}
+  DynamicLookupInfo(Kind kind) : kind(kind) {
+    assert(kind != KeyPathDynamicMember && "use KeyPathDynamicMemberInfo ctor");
+  }
+
+  /// Construct for a KeyPath dynamic member lookup.
+  DynamicLookupInfo(SubscriptDecl *subscript, Type baseType,
+                    DeclVisibilityKind originalVisibility);
+
+private:
+  Kind kind;
+  KeyPathDynamicMemberInfo keypath = {};
+};
+
 /// An abstract base class for a visitor that consumes declarations found within
 /// a given context.
 class VisibleDeclConsumer {
@@ -213,7 +258,8 @@ public:
   virtual ~VisibleDeclConsumer() = default;
 
   /// This method is called by findVisibleDecls() every time it finds a decl.
-  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) = 0;
+  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                         DynamicLookupInfo dynamicLookupInfo = {}) = 0;
 };
 
 /// An implementation of VisibleDeclConsumer that's built from a lambda.
@@ -223,7 +269,7 @@ class LambdaDeclConsumer : public VisibleDeclConsumer {
 public:
   LambdaDeclConsumer(Fn &&callback) : Callback(std::move(callback)) {}
 
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind reason) {
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind reason, DynamicLookupInfo) {
     Callback(VD, reason);
   }
 };
@@ -240,7 +286,8 @@ public:
   explicit VectorDeclConsumer(SmallVectorImpl<ValueDecl *> &decls)
     : results(decls) {}
 
-  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                         DynamicLookupInfo) override {
     results.push_back(VD);
   }
 };
@@ -259,7 +306,8 @@ public:
                     bool isTypeLookup)
     : name(name), results(results), isTypeLookup(isTypeLookup) {}
 
-  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                         DynamicLookupInfo dynamicLookupInfo = {}) override {
     // Give clients an opportunity to filter out non-type declarations early,
     // to avoid circular validation.
     if (isTypeLookup && !isa<TypeDecl>(VD))
@@ -280,7 +328,8 @@ public:
                               VisibleDeclConsumer &consumer)
     : DC(DC), ChainedConsumer(consumer) {}
 
-  void foundDecl(ValueDecl *D, DeclVisibilityKind reason) override;
+  void foundDecl(ValueDecl *D, DeclVisibilityKind reason,
+                 DynamicLookupInfo dynamicLookupInfo = {}) override;
 };
 
 /// Remove any declarations in the given set that were overridden by

@@ -2225,9 +2225,10 @@ public:
     assert(CMU);
   }
 
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                 DynamicLookupInfo dynamicLookupInfo) override {
     if (isVisibleFromModule(ModuleFilter, VD))
-      NextConsumer.foundDecl(VD, Reason);
+      NextConsumer.foundDecl(VD, Reason, dynamicLookupInfo);
   }
 };
 
@@ -2242,9 +2243,10 @@ public:
     assert(CMU);
   }
 
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                 DynamicLookupInfo dynamicLookupInfo) override {
     if (isDeclaredInModule(ModuleFilter, VD))
-      NextConsumer.foundDecl(VD, Reason);
+      NextConsumer.foundDecl(VD, Reason, dynamicLookupInfo);
   }
 };
 
@@ -2307,9 +2309,10 @@ public:
                               topLevelModule->Name == "CoreServices");
   }
 
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                 DynamicLookupInfo dynamicLookupInfo) override {
     if (!shouldDiscard(VD))
-      NextConsumer.foundDecl(VD, Reason);
+      NextConsumer.foundDecl(VD, Reason, dynamicLookupInfo);
   }
 };
 
@@ -2551,7 +2554,8 @@ public:
   explicit VectorDeclPtrConsumer(SmallVectorImpl<Decl *> &Decls)
     : Results(Decls) {}
 
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                 DynamicLookupInfo) override {
     Results.push_back(VD);
   }
 };
@@ -3526,14 +3530,16 @@ void ClangImporter::Implementation::lookupObjCMembers(
       // FIXME: If we didn't need to check alternate decls here, we could avoid
       // importing the member at all by checking importedName ahead of time.
       if (decl->getFullName().matchesRef(name)) {
-        consumer.foundDecl(decl, DeclVisibilityKind::DynamicLookup);
+        consumer.foundDecl(decl, DeclVisibilityKind::DynamicLookup,
+                           DynamicLookupInfo::AnyObject);
       }
 
       // Check for an alternate declaration; if its name matches,
       // report it.
       for (auto alternate : getAlternateDecls(decl)) {
         if (alternate->getFullName().matchesRef(name)) {
-          consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup);
+          consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup,
+                             DynamicLookupInfo::AnyObject);
         }
       }
       return true;
