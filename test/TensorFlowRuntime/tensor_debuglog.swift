@@ -3,9 +3,6 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 //
-// Compiler-only testing for TPU graph lowering (e.g. shape requirements by XLA).
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-target-tpu -O -emit-sil %s >/dev/null
-//
 // Tensor API tests, with debug logging enabled.
 
 import TensorFlow

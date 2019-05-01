@@ -1,5 +1,6 @@
 // This example tests the canonicalization and lowering of a graph with SharedSESERegion.
 // RUN: %target-sil-opt -tf-lower-graph -tf-dump-intermediates -tf-dump-graph -assume-parsing-unqualified-ownership-sil %s -o /dev/null | %FileCheck %s
+// REQUIRES: deprecated_gpe_mode
 import Builtin
 import Swift
 import TensorFlow
