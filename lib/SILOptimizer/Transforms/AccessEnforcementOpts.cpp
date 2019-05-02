@@ -949,6 +949,10 @@ canMerge(PostDominanceInfo *postDomTree,
 static bool mergeAccesses(
     SILFunction *F, PostDominanceInfo *postDomTree,
     const AccessConflictAndMergeAnalysis::MergeablePairs &mergePairs) {
+
+  if (mergePairs.empty())
+    return false;
+
   bool changed = false;
 
   // Compute a map from each block to its SCC -
