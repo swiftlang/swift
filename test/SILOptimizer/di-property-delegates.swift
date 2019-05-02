@@ -304,9 +304,50 @@ func testGenericClass() {
   }
 }
 
+@_propertyDelegate
+struct WrapperWithDefaultInit<Value> {
+  private var _value: Value? = nil
+
+  init() {
+    print("default init called on \(Value.self)")
+  }
+  
+  var value: Value {
+    get {
+      return _value!
+    } set {
+      print("set value \(newValue)")
+      _value = newValue
+    }
+  }
+}
+
+struct UseWrapperWithDefaultInit {
+  @WrapperWithDefaultInit<Int>
+  var x: Int
+
+  @WrapperWithDefaultInit<String>
+  var y: String
+
+  init(y: String) {
+    self.y = y
+  }
+}
+
+func testDefaultInit() {
+  // CHECK: ## DefaultInit
+  print("\n## DefaultInit")
+
+  let use = UseWrapperWithDefaultInit(y: "hello")
+  // CHECK: default init called on Int
+
+  // FIXME: DI should eliminate the following call
+  // CHECK: default init called on String
+  // CHECK: set value hello
+}
 
 testIntStruct()
 testIntClass()
 testRefStruct()
 testGenericClass()
-
+testDefaultInit()

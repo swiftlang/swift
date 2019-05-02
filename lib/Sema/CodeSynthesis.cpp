@@ -1523,6 +1523,23 @@ static VarDecl *synthesizePropertyDelegateStorageDelegateProperty(
   return property;
 }
 
+static void typeCheckSynthesizedDelegateInitializer(
+    PatternBindingDecl *pbd, VarDecl *backingVar, PatternBindingDecl *parentPBD,
+    Expr *&initializer) {
+  DeclContext *dc = pbd->getDeclContext();
+  ASTContext &ctx = dc->getASTContext();
+
+  // Type-check the initialization.
+  auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+  tc.typeCheckExpression(initializer, dc);
+  if (auto initializerContext =
+          dyn_cast_or_null<Initializer>(
+            pbd->getPatternEntryForVarDecl(backingVar).getInitContext())) {
+    tc.contextualizeInitializer(initializerContext, initializer);
+  }
+  tc.checkPropertyDelegateErrorHandling(pbd, initializer);
+}
+
 llvm::Expected<PropertyDelegateBackingPropertyInfo>
 PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
                                                      VarDecl *var) const {
@@ -1592,14 +1609,6 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
 
     tc.typeCheckPatternBinding(parentPBD, patternNumber);
   }
-
-  Expr *originalInitialValue = nullptr;
-  if (Expr *init = parentPBD->getInit(patternNumber)) {
-    pbd->setInit(0, init);
-    pbd->setInitializerChecked(0);
-    originalInitialValue = findOriginalPropertyDelegateInitialValue(var, init);
-  }
-
   // Mark the backing property as 'final'. There's no sensible way to override.
   if (dc->getSelfClassDecl())
     makeFinal(ctx, backingVar);
@@ -1618,6 +1627,23 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   AccessLevel setterAccess =
       std::min(defaultAccess, var->getSetterFormalAccess());
   backingVar->overwriteSetterAccess(setterAccess);
+
+  Expr *originalInitialValue = nullptr;
+  if (Expr *init = parentPBD->getInit(patternNumber)) {
+    pbd->setInit(0, init);
+    pbd->setInitializerChecked(0);
+    originalInitialValue = findOriginalPropertyDelegateInitialValue(var, init);
+  } else if (!parentPBD->isInitialized(patternNumber) &&
+             delegateInfo.defaultInit) {
+    // FIXME: Record this expression somewhere so that DI can perform the
+    // initialization itself.
+    auto typeExpr = TypeExpr::createImplicit(storageType, ctx);
+    Expr *initializer = CallExpr::createImplicit(ctx, typeExpr, {}, { });
+    typeCheckSynthesizedDelegateInitializer(pbd, backingVar, parentPBD,
+                                            initializer);
+    pbd->setInit(0, initializer);
+    pbd->setInitializerChecked(0);
+  }
 
   // If there is a storage delegate property (delegateVar) in the delegate,
   // synthesize a computed property for '$foo'.
@@ -1643,16 +1669,9 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   Expr *initializer =
       CallExpr::createImplicit(ctx, typeExpr, {origValue},
                                {ctx.Id_initialValue});
+  typeCheckSynthesizedDelegateInitializer(pbd, backingVar, parentPBD,
+                                          initializer);
 
-  // Type-check the initialization.
-  auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
-  tc.typeCheckExpression(initializer, dc);
-  if (auto initializerContext =
-          dyn_cast_or_null<Initializer>(
-            pbd->getPatternEntryForVarDecl(backingVar).getInitContext())) {
-    tc.contextualizeInitializer(initializerContext, initializer);
-  }
-  tc.checkPropertyDelegateErrorHandling(parentPBD, initializer);
   return PropertyDelegateBackingPropertyInfo(
       backingVar, storageVar, originalInitialValue, initializer, origValue);
 }
