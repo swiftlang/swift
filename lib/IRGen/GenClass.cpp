@@ -2327,7 +2327,7 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
 
     // If the Objective-C runtime is new enough, we can just use the update
     // pattern unconditionally.
-    if (Types.doesPlatformSupportObjCMetadataUpdateCallback())
+    if (Context.LangOpts.doesTargetSupportObjCMetadataUpdateCallback())
       return ClassMetadataStrategy::Update;
 
     // Otherwise, check if we have legacy type info for backward deployment.
