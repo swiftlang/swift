@@ -1397,7 +1397,7 @@ public:
   }
 
   /// Returns the Swift module that overlays a Clang module.
-  virtual ModuleDecl *getAdapterModule() const { return nullptr; }
+  virtual ModuleDecl *getOverlayModule() const { return nullptr; }
 
   virtual bool isSystemModule() const { return false; }
 

@@ -448,7 +448,7 @@ bool NormalProtocolConformance::isRetroactive() const {
     // defined in a Clang module.
     if (auto nominalLoadedModule =
           dyn_cast<LoadedFile>(nominal->getModuleScopeContext())) {
-      if (auto overlayModule = nominalLoadedModule->getAdapterModule())
+      if (auto overlayModule = nominalLoadedModule->getOverlayModule())
         nominalModule = overlayModule;
     }
 
