@@ -5334,7 +5334,9 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
     origVar = origDelegate;
   if (origVar->getFormalAccess() < AccessLevel::Internal &&
       origVar->getAttachedPropertyDelegate() &&
-      origVar->isParentInitialized())
+      (origVar->isParentInitialized() ||
+       (origVar->getParentPatternBinding() &&
+        origVar->getParentPatternBinding()->isDefaultInitializable())))
     return false;
 
   return true;
@@ -5745,8 +5747,25 @@ ParamDecl::getDefaultValueStringRepresentation(
           return getASTContext().SourceMgr.extractText(charRange);
         }
 
-        auto init = findOriginalPropertyDelegateInitialValue(
-            original, original->getParentInitializer());
+        // If there is no parent initializer, we used the default initializer.
+        auto parentInit = original->getParentInitializer();
+        if (!parentInit) {
+          if (auto type = original->getPropertyDelegateBackingPropertyType()) {
+            if (auto nominal = type->getAnyNominal()) {
+              scratch.clear();
+              auto typeName = nominal->getName().str();
+              scratch.append(typeName.begin(), typeName.end());
+              scratch.push_back('(');
+              scratch.push_back(')');
+              return {scratch.data(), scratch.size()};
+            }
+          }
+
+          return ".init()";
+        }
+
+        auto init =
+            findOriginalPropertyDelegateInitialValue(original, parentInit);
         return extractInlinableText(getASTContext().SourceMgr, init, scratch);
       }
     }
