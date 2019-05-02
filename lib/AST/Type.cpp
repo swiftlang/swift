@@ -2474,12 +2474,36 @@ getArchetypeAndRootOpaqueArchetype(Type maybeOpaqueType) {
 
 bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
     OpaqueTypeDecl *opaque) const {
-  return shouldPerformSubstitution(opaque, context);
+  return shouldPerformSubstitution(opaque, contextModule, contextExpansion);
 }
 
-static Type substOpaqueTypesWithUnderlyingTypes(
-    Type ty, SILFunction *context) {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(context);
+bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
+    OpaqueTypeDecl *opaque, ModuleDecl *contextModule,
+    ResilienceExpansion contextExpansion) {
+  auto namingDecl = opaque->getNamingDecl();
+
+  // Allow replacement of opaque result types of inlineable function regardless
+  // of resilience and in which context.
+  if (namingDecl->getAttrs().hasAttribute<InlinableAttr>()) {
+    return true;
+  }
+  // Allow replacement of opaque result types in the context of maximal
+  // resilient expansion if the context's and the opaque type's module are the
+  // same.
+  auto module = namingDecl->getModuleContext();
+  if (contextExpansion == ResilienceExpansion::Maximal &&
+      module == contextModule)
+    return true;
+
+  // Allow general replacement from non resilient modules. Otherwise, disallow.
+  return !module->isResilient();
+}
+
+static Type
+substOpaqueTypesWithUnderlyingTypes(Type ty, ModuleDecl *contextModule,
+                                    ResilienceExpansion contextExpansion) {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(contextModule,
+                                                 contextExpansion);
   return ty.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
 }
 
@@ -2512,15 +2536,18 @@ operator()(SubstitutableType *maybeOpaqueType) const {
 
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
-    return substOpaqueTypesWithUnderlyingTypes(substTy, context);
+    return substOpaqueTypesWithUnderlyingTypes(substTy, contextModule,
+                                               contextExpansion);
   }
   return substTy;
 }
 
 static ProtocolConformanceRef
 substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
-                                    SILFunction *context) {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(context);
+                                    ModuleDecl *contextModule,
+                                    ResilienceExpansion contextExpansion) {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(contextModule,
+                                                 contextExpansion);
   return ref.subst(origType, replacer, replacer,
                    SubstFlags::SubstituteOpaqueArchetypes);
 }
@@ -2562,7 +2589,8 @@ operator()(CanType maybeOpaqueType, Type replacementType,
 
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
-    return substOpaqueTypesWithUnderlyingTypes(substRef, substTy, context);
+    return substOpaqueTypesWithUnderlyingTypes(substRef, substTy, contextModule,
+                                               contextExpansion);
   }
   return substRef;
 }
