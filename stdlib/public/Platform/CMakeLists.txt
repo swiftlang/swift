@@ -3,6 +3,13 @@ set(swift_platform_sources
     TiocConstants.swift
     tgmath.swift.gyb)
 
+set(darwin_depends)
+if(NOT BUILD_STANDALONE)
+  # This is overly conservative, but we have so few API notes files that
+  # haven't migrated to the Swift repo that it's probably fine in practice.
+  list(APPEND darwin_depends copy_apinotes)
+endif()
+
 add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     Darwin.swift.gyb
     ${swift_platform_sources}
@@ -13,9 +20,7 @@ add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS ALL_APPLE_PLATFORMS
 
-    # This is overly conservative, but we have so few API notes files that
-    # haven't migrated to the Swift repo that it's probably fine in practice.
-    DEPENDS copy_apinotes)
+    DEPENDS ${darwin_depends})
 
 add_swift_target_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     Glibc.swift.gyb
