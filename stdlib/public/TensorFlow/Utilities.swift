@@ -156,29 +156,3 @@ public func _hostOp<Scalar>(_ x: Tensor<Scalar>) {
 public func _hostOp<Scalar : TensorFlowScalar>(_ x: TensorHandle<Scalar>) {
   print(Tensor(handle: x))
 }
-
-/// Some TPU ops (e.g. infeed/outfeed) require tensor shape info, which the APIs
-/// below can provide.
-///
-/// TODO: Remove these helper APIs, when we have a better shape
-/// inference/propagation design.
-@inlinable @inline(__always)
-public func _scalarTensorWithShape<Scalar>(
-  _ x: Tensor<Scalar>
-) -> Tensor<Scalar> {
-  let ret: TensorHandle<Scalar> =
-    #tfop("Identity", x, T$dtype: Scalar.tensorFlowDataType,
-          __shapes: [TensorShape()])
-  return Tensor<Scalar>(handle: ret)
-}
-
-@inlinable @inline(__always)
-public func _addScalarTensorsWithShape<Scalar>(
-  _ x: Tensor<Scalar>,
-  _ y: Tensor<Scalar>
-) -> Tensor<Scalar> {
-  let ret: TensorHandle<Scalar> =
-    #tfop("Add", x, y, T$dtype: Scalar.tensorFlowDataType,
-          __shapes: [TensorShape()])
-  return Tensor<Scalar>(handle: ret)
-}

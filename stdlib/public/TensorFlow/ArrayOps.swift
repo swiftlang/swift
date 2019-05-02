@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file contains some Array ops that cannot be properly handled by #tfop.
+// This file contains some custom raw ops.
 //
 // TODO: These should be deleted once we can properly generate raw ops for these.
 //

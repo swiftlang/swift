@@ -47,27 +47,6 @@ public struct Tensor<Scalar : TensorFlowScalar> : TensorProtocol {
 //===----------------------------------------------------------------------===//
 // Compiler intrinsics
 //===----------------------------------------------------------------------===//
-//
-// By default, when a `Tensor` value is implicitly passed between host and
-// tensor code, the partitioning pass will generate a warning. Users can
-// indicate that they are doing something intentionally by using these methods,
-// which silences the warning.
-//
-// TODO: These would be nicer defined as builtins rather than "well known
-// functions".
-
-@usableFromInline @inline(never)
-@_silgen_name("__tf_to_accel")
-func _TFToAcclerator<Scalar>(_ handle: TensorHandle<Scalar>) -> TensorHandle<Scalar> {
-  return handle
-}
-
-@usableFromInline @inline(never)
-@_silgen_name("__tf_to_host")
-func _TFToHost<Scalar>(_ handle: TensorHandle<Scalar>)
-  -> TensorHandle<Scalar> {
-  return handle
-}
 
 /// This function converts a `TensorHandle` that is known to have a 0-d value
 /// into the scalar that it produces. This is intended for use in op definitions
@@ -146,57 +125,6 @@ func _TFTensorFromScalars1D<Scalar : TensorFlowScalar>(_ scalars: [Scalar])
 func _TFHoistable<Scalar>(_ fn: () -> TensorHandle<Scalar>)
   -> TensorHandle<Scalar> {
   return Scalar._hoistableClosure(fn)
-}
-
-//===----------------------------------------------------------------------===//
-// Memory transfer markers
-//===----------------------------------------------------------------------===//
-
-public extension Tensor {
-  /// Mark memory transfer to accelerator.
-  /// - Parameters:
-  ///   - shape: When sending the tensor to a TF XLA device (including TPU),
-  ///   must specify the tensor shape as required by XLA compilation.
-  @inlinable @inline(__always)
-  func toAccelerator(shape: TensorShape) -> Tensor {
-    let tensor = toAccelerator()
-    // If the tensor is to be sent from host to TPU, the shape is specified on
-    // TF CPU first, before TF CPU sends the tensor to TPU.
-    let ret: TensorHandle<Scalar> = #tfop(
-      "Identity",
-      tensor,
-      T$dtype: Scalar.tensorFlowDataType,
-      __shapes: [shape],
-      __device: "/job:localhost/replica:0/task:0/device:CPU:0")
-    return Tensor(handle: ret)
-  }
-
-  /// Mark memory transfer to accelerator.
-  @inlinable @inline(__always)
-  func toAccelerator() -> Tensor {
-    return Tensor(handle: _TFToAcclerator(handle))
-  }
-
-  /// Mark memory transfer to host.
-  /// - Parameters:
-  ///   - shape: When sending the tensor to a TF XLA device (including TPU),
-  ///   must specify the tensor shape as required by XLA compilation.
-  @inlinable @inline(__always)
-  func toHost(shape: TensorShape) -> Tensor {
-    // If the `self` tensor resides on TPU, the shape is specified on that
-    // device first, before outfeeding the tensor to CPU, a required step for
-    // sending the tensor to the host.
-    let tensor: TensorHandle<Scalar> =
-      #tfop("Identity", self, T$dtype: Scalar.tensorFlowDataType,
-            __shapes: [shape])
-    return Tensor(handle: tensor).toHost()
-  }
-
-  /// Mark memory transfer to host.
-  @inlinable @inline(__always)
-  func toHost() -> Tensor {
-    return Tensor(handle: _TFToHost(handle))
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -875,11 +803,8 @@ public extension Tensor {
     @inline(__always)
     get {
       debugLog("Returning a host copy of array.")
-      internalConsistencyCheck(toHost().handle.isConcrete)
-
-      // This is considered to be a well known way to produce a copy to the
-      // host, so an "implicit copy to host" warning should not be produced.
-      return toHost().handle.makeHostCopy()
+      internalConsistencyCheck(handle.isConcrete)
+      return handle.makeHostCopy()
     }
   }
 
