@@ -261,6 +261,10 @@ ERROR(invalid_vfs_overlay_file,none,
 WARNING(module_interface_scoped_import_unsupported,none,
         "scoped imports are not yet supported in module interfaces",
         ())
+WARNING(warn_unsupported_module_interface_swift_version,none,
+        "module interfaces are only supported with Swift language version 5 "
+        "or later (currently using -swift-version %0)",
+        (StringRef))
 ERROR(error_extracting_version_from_module_interface,none,
       "error extracting version from module interface", ())
 ERROR(unsupported_version_of_module_interface,none,
