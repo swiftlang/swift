@@ -989,16 +989,16 @@ bool AssignmentFailure::diagnoseAsError() {
     if (!choice->isDecl()) {
       if (choice->getKind() == OverloadChoiceKind::KeyPathApplication &&
           !isa<ApplyExpr>(immInfo.first)) {
-        std::string message = "the key path";
+        std::string message = "";
         if (auto *SE = dyn_cast<SubscriptExpr>(immInfo.first)) {
           if (auto *tupleExpr = dyn_cast<TupleExpr>(SE->getIndex())) {
             if (auto *DRE = dyn_cast<DeclRefExpr>(tupleExpr->getElement(0))) {
               auto identifier = DRE->getDecl()->getBaseName().getIdentifier();
-              message = "'" + identifier.str().str() + "'";
+              message = "'" + identifier.str().str() + "' ";
             }
           }
         }
-        emitDiagnostic(Loc, DeclDiagnostic, message + " is a read-only key path")
+        emitDiagnostic(Loc, DeclDiagnostic, message + "is read-only")
             .highlight(immInfo.first->getSourceRange());
         return true;
       }
@@ -1016,7 +1016,7 @@ bool AssignmentFailure::diagnoseAsError() {
       auto type = getType(immInfo.first);
 
       if (isKnownKeyPathType(type))
-        message += " is a read-only key path";
+        message += " is read-only";
       else if (VD->isCaptureList())
         message += " is an immutable capture";
       else if (VD->isImplicit())
