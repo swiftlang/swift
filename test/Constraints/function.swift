@@ -85,22 +85,22 @@ sr590(())
 sr590((1, 2))
 
 // SR-2657: Poor diagnostics when function arguments should be '@escaping'.
-private class SR2657BlockClass<T> {
+private class SR2657BlockClass<T> { // expected-note 3 {{generic parameters are always considered '@escaping'}}
   let f: T
   init(f: T) { self.f = f }
 }
 
 func takesAny(_: Any) {}
 
-func foo(block: () -> (), other: () -> Int) { // expected-note 2 {{parameter 'block' is implicitly non-escaping}}
+func foo(block: () -> (), other: () -> Int) {
   let _ = SR2657BlockClass(f: block)
   // expected-error@-1 {{converting non-escaping value to 'T' may allow it to escape}}
   let _ = SR2657BlockClass<()->()>(f: block)
-  // expected-error@-1 {{passing non-escaping parameter 'block' to function expecting an @escaping closure}}
+  // expected-error@-1 {{converting non-escaping parameter 'block' to generic parameter 'T' may allow it to escape}}
   let _: SR2657BlockClass<()->()> = SR2657BlockClass(f: block)
-  // expected-error@-1 {{converting non-escaping value to 'T' may allow it to escape}}
+  // expected-error@-1 {{converting non-escaping parameter 'block' to generic parameter 'T' may allow it to escape}}
   let _: SR2657BlockClass<()->()> = SR2657BlockClass<()->()>(f: block)
-  // expected-error@-1 {{passing non-escaping parameter 'block' to function expecting an @escaping closure}}
+  // expected-error@-1 {{converting non-escaping parameter 'block' to generic parameter 'T' may allow it to escape}}
   _ = SR2657BlockClass<Any>(f: block)  // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
   _ = SR2657BlockClass<Any>(f: other) // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
   takesAny(block)  // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
