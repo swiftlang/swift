@@ -423,10 +423,12 @@ BeginAccessInst *AccessConflictAndMergeAnalysis::findMergeableOutOfScopeAccess(
   // Given a mergeableAccess, 'A', another out-of-scope access, 'B', and the
   // current access, 'C' which has identical storage as 'A', the only situation
   // in which it is illegal to merge 'A' with 'C' is when 'B' has non-distinct
-  // storage from 'A'/'C' and 'B' begins after 'A' and ends before 'C'. This
-  // would introduce a false conflict. Since it is impossible to determine here
-  // whether 'A' and 'B' overlap, we assume they do not and avoid merging. The
-  // case in which they actually do overlap is an unimportant to optimize.
+  // storage from 'A'/'C', 'B' begins after 'A', and 'B' ends before
+  // 'C'. Merging 'A' with 'C' would then introduce a false conflict. Since it
+  // is impossible to determine here whether 'A' and 'B' overlap, we assume they
+  // do not and simply avoid merging whenever 'B' and 'C' overlap. It is not
+  // important to optimize the case in which 'A' and 'B' overlap because
+  // potential conflicts like that are unlikely.
   if (llvm::any_of(state.outOfScopeConflictFreeAccesses,
                    [&](BeginAccessInst *bai) {
                      auto storageInfo = result.getAccessInfo(bai);
