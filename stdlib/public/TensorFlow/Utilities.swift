@@ -163,14 +163,14 @@ public func _hostOp<Scalar : TensorFlowScalar>(_ x: TensorHandle<Scalar>) {
 /// TODO: Remove these helper APIs, when we have a better shape
 /// inference/propagation design.
 @inlinable @inline(__always)
-public func _scalarTensorWithShape<Scalar>(
+public func _scalarTensorWithShape<Scalar: TensorFlowScalar>(
   _ x: Tensor<Scalar>
 ) -> Tensor<Scalar> {
   return Raw.identity(x)
 }
 
 @inlinable @inline(__always)
-public func _addScalarTensorsWithShape<Scalar>(
+public func _addScalarTensorsWithShape<Scalar: TensorFlowNumeric>(
   _ x: Tensor<Scalar>,
   _ y: Tensor<Scalar>
 ) -> Tensor<Scalar> {
