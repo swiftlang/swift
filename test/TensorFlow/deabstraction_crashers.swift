@@ -11,7 +11,3 @@ public func SR8299(a: Tensor<Float>) {
 func one() -> Int {
   return 1
 }
-
-public func SR8369(a: Tensor<Float>, idx: Tensor<Int32>) -> Tensor<Float> {
-  return Tensor<Float>(oneHotAtIndices: idx.toAccelerator(), depth: 0, axis: one())
-}
