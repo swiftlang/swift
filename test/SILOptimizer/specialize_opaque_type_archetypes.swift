@@ -3,8 +3,10 @@
 // RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_3.swift -enable-library-evolution -module-name External2 -emit-module -emit-module-path %t/External2.swiftmodule
 // RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_4.swift -I %t -enable-library-evolution -module-name External3 -emit-module -emit-module-path %t/External3.swiftmodule
 // RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_3.swift -I %t -enable-library-evolution -module-name External2 -Osize -emit-module -o - | %target-sil-opt -module-name External2 | %FileCheck --check-prefix=RESILIENT %s
+// RUN: %target-swift-frontend -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%ptrsize
 // RUN: %target-swift-frontend -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil  -sil-verify-all %s | %FileCheck %s
 // RUN: %target-swift-frontend -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -emit-sil -sil-verify-all %s | %FileCheck %s
+
 import External
 import External2
 import External3
@@ -391,12 +393,12 @@ struct PA : P4 {
 // CHECK:   [[F:%.*]] = function_ref @$s1A2PAV4testyyF
 // CHECK:   apply [[F]]([[V]])
 
-// CHECK-LABEL: sil hidden @$s1A2PAV4testyyF : $@convention(method) (PA) -> ()
-// CHECK:   [[V:%.*]] = integer_literal $Builtin.Int64, 5
-// CHECK:   [[I:%.*]] = struct $Int64 ([[V]] : $Builtin.Int64)
-// CHECK:   [[F:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5
-// CHECK:   apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
-// CHECK:   apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
+// CHECK-64-LABEL: sil hidden @$s1A2PAV4testyyF : $@convention(method) (PA) -> ()
+// CHECK-64:   [[V:%.*]] = integer_literal $Builtin.Int64, 5
+// CHECK-64:   [[I:%.*]] = struct $Int64 ([[V]] : $Builtin.Int64)
+// CHECK-64:   [[F:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5
+// CHECK-64:   apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
+// CHECK-64:   apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
 
 @inline(never)
 func testIt<T>(cl: (Int64) throws -> T) {
