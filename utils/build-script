@@ -300,9 +300,9 @@ class BuildScriptInvocation(object):
                     "headers/libraries); please pick one")
 
             if args.tensorflow_swift_bindings is not None and \
-               not os.path.isfile(args.tensorflow_swift_bindings):
+               not os.path.isdir(args.tensorflow_swift_bindings):
                 diagnostics.fatal(
-                    "invalid file specified for --tensorflow-swift-bindings "
+                    "invalid repository specified for --tensorflow-swift-bindings "
                     "(was '{}')".format(args.tensorflow_swift_bindings))
 
             if args.tensorflow_swift_apis is not None:

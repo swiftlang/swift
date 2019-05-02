@@ -38,12 +38,6 @@ func loadStridesInt32() -> [Int32] {
   return stridesInt32
 }
 
-var stridesInt64 = [Int64(1), Int64(1), Int64(1), Int64(1)]
-@inline(never)
-func loadStridesInt64() -> [Int64] {
-  return stridesInt64
-}
-
 var trueBool = true
 @inline(never)
 func loadTrue() -> Bool {
@@ -92,28 +86,10 @@ func loadDouble_0point1() -> Double {
   return double_0point1
 }
 
-var float_1: Float = 1
-@inline(never)
-func loadFloat_1() -> Float {
-  return float_1
-}
-
-var float_0point1: Float = 0.1
-@inline(never)
-func loadFloat_0point1() -> Float {
-  return float_0point1
-}
-
 var boundariesDouble: [Double] = [0, 1, 2, 3]
 @inline(never)
 func loadBoundariesDouble() -> [Double] {
   return boundariesDouble
-}
-
-var boundariesFloat: [Float] = [0, 1, 2, 3]
-@inline(never)
-func loadBoundariesFloat() -> [Float] {
-  return boundariesFloat
 }
 
 var tensorShapeArray = [TensorShape([1]), TensorShape([2])]
@@ -134,10 +110,10 @@ func loadTensorDataTypeArray() -> [TensorDataType] {
   return tensorDataTypeArray
 }
 
-var VALIDString = "VALID"
+var VALID = Raw.Padding2.valid
 @inline(never)
-func loadVALIDString() -> String {
-  return VALIDString
+func loadVALID() -> Raw.Padding2 {
+  return VALID
 }
 
 var stringArrayAB = ["a", "b"]
@@ -231,26 +207,13 @@ DynamicAttributeTests.testAllBackends("NormalAttribute Double") {
   expectEqual(false, result2.scalar!)
 }
 
-DynamicAttributeTests.testAllBackends("NormalAttribute Float") {
-  let x = Tensor<Float>(1)
-  let y = Tensor<Float>(1.5)
-
-  let result1: Tensor<Bool> = #tfop("ApproximateEqual", x, y,
-                                    T$dtype: Float.tensorFlowDataType,
-                                    tolerance: loadFloat_1())
-  expectEqual(true, result1.scalar!)
-
-  let result2: Tensor<Bool> = #tfop("ApproximateEqual", x, y,
-                                    T$dtype: Float.tensorFlowDataType,
-                                    tolerance: loadFloat_0point1())
-  expectEqual(false, result2.scalar!)
-}
-
 DynamicAttributeTests.testAllBackends("NormalAttribute String") {
-  let result: Tensor<Float> = #tfop("Conv2D", convImage, convFilter,
-                                    T$dtype: Float.tensorFlowDataType,
-                                    strides: [1, 1, 1, 1] as [Int32],
-                                    padding: loadVALIDString())
+  let result = Raw.conv2D(
+    convImage,
+    filter: convFilter,
+    strides: [1, 1, 1, 1] as [Int32], 
+    padding: loadVALID(),
+    explicitPaddings: [])
   expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
 
@@ -259,18 +222,12 @@ DynamicAttributeTests.testAllBackends("NormalAttribute Array<Bool>") {
 }
 
 DynamicAttributeTests.testAllBackends("NormalAttribute Array<Int32>") {
-  let result: Tensor<Float> = #tfop("Conv2D", convImage, convFilter,
-                                    T$dtype: Float.tensorFlowDataType,
-                                    strides: loadStridesInt32(),
-                                    padding: "VALID")
-  expectPointwiseNearlyEqual(convExpectedResult, result.array)
-}
-
-DynamicAttributeTests.testAllBackends("NormalAttribute Array<Int64>") {
-  let result: Tensor<Float> = #tfop("Conv2D", convImage, convFilter,
-                                    T$dtype: Float.tensorFlowDataType,
-                                    strides: loadStridesInt64(),
-                                    padding: "VALID")
+  let result = Raw.conv2D(
+    convImage,
+    filter: convFilter,
+    strides: loadStridesInt32(),
+    padding: .valid,
+    explicitPaddings: [])
   expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
 
@@ -281,37 +238,30 @@ DynamicAttributeTests.testAllBackends("NormalAttribute Array<Double>") {
   expectEqual(expectedResult, result.array)
 }
 
-DynamicAttributeTests.testAllBackends("NormalAttribute Array<Float>") {
-  let input = Tensor<Float>([-1, 0.1, 4.3, 1.2])
-  let result: Tensor<Int32> = #tfop("Bucketize", input,
-                                    T$dtype: Float.tensorFlowDataType,
-                                    boundaries: loadBoundariesFloat())
-  let expectedResult = ShapedArray<Int32>([0, 1, 4, 2])
-  expectEqual(expectedResult, result.array)
-}
-
 /// Checks that `dataset` is a TensorSliceDataset of
 /// Tensor<Int32>([1, 2]) and Tensor<Int32>([[1, 1], [2, 2]])
 func check(dataset: VariantHandle) {
   let outputTypes = [Int32.tensorFlowDataType, Int32.tensorFlowDataType]
   let outputShapes = [nil, nil] as [TensorShape?]
-  let iterator: ResourceHandle = #tfop(
-    "IteratorV2", shared_name: "blah", container: "earth",
-    output_types$dtype: outputTypes, output_shapes: outputShapes
-  )
-  #tfop("MakeIterator", dataset, iterator) as Void
-  var next: (Tensor<Int32>, Tensor<Int32>) = #tfop(
-    "IteratorGetNext", iterator,
-    output_types$dtype: outputTypes, output_shapes: outputShapes
-  )
-  expectEqual(ShapedArray<Int32>([1]), next.0.array)
-  expectEqual(ShapedArray<Int32>([1, 1]), next.1.array)
-  next = #tfop(
-    "IteratorGetNext", iterator,
-    output_types$dtype: outputTypes, output_shapes: outputShapes
-  )
-  expectEqual(ShapedArray<Int32>([2]), next.0.array)
-  expectEqual(ShapedArray<Int32>([2, 2]), next.1.array)
+  let iterator = Raw.iteratorV2(
+    sharedName: "blah",
+    container: "earth",
+    outputTypes: outputTypes,
+    outputShapes: outputShapes)
+  Raw.makeIterator(dataset: dataset, iterator: iterator)
+
+  struct TensorTuple: TensorGroup {
+    let first: Tensor<Int32>
+    let second: Tensor<Int32>
+  }
+
+  var next: TensorTuple = Raw.iteratorGetNext(
+    iterator: iterator, outputShapes: outputShapes)
+  expectEqual(ShapedArray<Int32>([1]), next.first.array)
+  expectEqual(ShapedArray<Int32>([1, 1]), next.second.array)
+  next = Raw.iteratorGetNext(iterator: iterator, outputShapes: outputShapes)
+  expectEqual(ShapedArray<Int32>([2]), next.first.array)
+  expectEqual(ShapedArray<Int32>([2, 2]), next.second.array)
 }
 
 #if !CUDA
@@ -319,22 +269,18 @@ func check(dataset: VariantHandle) {
 DynamicAttributeTests.testAllBackends("NormalAttribute Array<TensorShape>") {
   let elements1 = Tensor<Int32>([[1], [2]])
   let elements2 = Tensor<Int32>([[1, 1], [2, 2]])
-  let dataset: VariantHandle = #tfop(
-    "TensorSliceDataset", elements1, elements2,
-    Toutput_types$dtype: [Int32.tensorFlowDataType, Int32.tensorFlowDataType],
-    output_shapes: loadTensorShapeArray()
-  )
+  let dataset = Raw.tensorSliceDataset(
+    components: [elements1, elements2],
+    outputShapes: loadTensorShapeArray())
   check(dataset: dataset)
 }
 
 DynamicAttributeTests.testAllBackends("NormalAttribute Array<TensorShape?>") {
   let elements1 = Tensor<Int32>([[1], [2]])
   let elements2 = Tensor<Int32>([[1, 1], [2, 2]])
-  let dataset: VariantHandle = #tfop(
-    "TensorSliceDataset", [elements1, elements2],
-    Toutput_types$dtype: [Int32.tensorFlowDataType, Int32.tensorFlowDataType],
-    output_shapes: loadOptionalTensorShapeArray()
-  )
+  let dataset = Raw.tensorSliceDataset(
+    components: [elements1, elements2],
+    outputShapes: loadOptionalTensorShapeArray())
   check(dataset: dataset)
 }
 
@@ -346,33 +292,38 @@ DynamicAttributeTests.testAllBackends("NormalAttribute Array<String>") {
   // with features {"a": [1.0], "b": [2.0], "c": [3.0]}.
   let exampleBytesBase64 = StringTensor(
     "Ci0KDQoBYRIIEgYKBAAAgD8KDQoBYhIIEgYKBAAAAEAKDQoBYxIIEgYKBAAAQEA=")
-  let exampleBytes: StringTensor = #tfop("DecodeBase64", exampleBytesBase64)
+  let exampleBytes = Raw.decodeBase64(exampleBytesBase64)
+
+  struct Empty: TensorGroup {}
 
   // Call "ParseSingleExample" with the "dense_keys" list(string) attr. We
   // only select 2 out of the 3 keys from the example, to verify that the
   // "dense_keys" argument is actually having an effect.
-  let (parsedA, parsedB): (Tensor<Float>, Tensor<Float>) = #tfop(
-    "ParseSingleExample", exampleBytes,
-    [Tensor<Float>([0]), Tensor<Float>([0])],
-    num_sparse: Int64(0), sparse_keys: loadStringArrayEmpty(),
-    dense_keys: loadStringArrayAB(),
-    sparse_types$dtype: [] as [TensorDataType],
-    Tdense$dtype: [Float.tensorFlowDataType, Float.tensorFlowDataType],
-    dense_shapes: [TensorShape([1]), TensorShape([1])]
-  )
+  let parsed: (
+    sparseIndices: [Tensor<Int64>],
+    sparseValues: Empty,
+    sparseShapes: [Tensor<Int64>],
+    denseValues: [Tensor<Float>]
+  ) = Raw.parseSingleExample(
+    serialized: exampleBytes,
+    denseDefaults: [Tensor<Float>([0]), Tensor<Float>([0])],
+    numSparse: Int64(0),
+    sparseKeys: loadStringArrayEmpty(),
+    denseKeys: loadStringArrayAB(),
+    denseShapes: [TensorShape([1]), TensorShape([1])])
 
-  expectEqual(ShapedArray<Float>([1]), parsedA.array)
-  expectEqual(ShapedArray<Float>([2]), parsedB.array)
+  expectEqual(ShapedArray<Float>([1]), parsed.denseValues[0].array)
+  expectEqual(ShapedArray<Float>([2]), parsed.denseValues[1].array)
 }
 #endif // !CUDA
 
 DynamicAttributeTests.testAllBackends("TFDataTypeAttribute TensorDataType") {
   let t1 = Tensor<Int32>(-1)
-  let t1Result: Tensor<Int32> = #tfop("Abs", t1, T$dtype: loadDtypeInt32())
+  let t1Result = Raw.abs(t1)
   expectEqual(1, t1Result.scalar!)
 
   let t2 = Tensor<Double>(-2)
-  let t2Result: Tensor<Double> = #tfop("Abs", t2, T$dtype: loadDtypeDouble())
+  let t2Result = Raw.abs(t2)
   expectEqual(2, t2Result.scalar!)
 }
 
@@ -381,35 +332,28 @@ DynamicAttributeTests.testAllBackends("TFDataTypeAttribute TensorDataType") {
 DynamicAttributeTests.testAllBackends("TFDataTypeAttribute Array<TensorDataType>") {
   let elements1 = Tensor<Int32>([[1], [2]])
   let elements2 = Tensor<Int32>([[1, 1], [2, 2]])
-  let dataset: VariantHandle = #tfop(
-    "TensorSliceDataset", [elements1, elements2],
-    Toutput_types$dtype: loadTensorDataTypeArray(),
-    output_shapes: [nil, nil] as [TensorShape?]
-  )
+  let dataset = Raw.tensorSliceDataset(
+    components: [elements1, elements2],
+    outputShapes: [nil, nil])
   check(dataset: dataset)
 }
 #endif // !CUDA
 
 DynamicAttributeTests.testAllBackends("ShapeAttribute TensorShape") {
   let t = Tensor<Float>([5.0])
-  let result: Tensor<Float> = #tfop("EnsureShape", t, shape$shape: loadShape(),
-                                    T$dtype: Float.tensorFlowDataType)
+  let result = Raw.ensureShape(t, shape: loadShape())
   expectEqual(t, result)
 }
 
 DynamicAttributeTests.testAllBackends("ShapeAttribute TensorShape? non-nil") {
   let t = Tensor<Float>([5.0])
-  let result: Tensor<Float> = #tfop("EnsureShape", t,
-                                    shape$shape: loadOptionalShape(),
-                                    T$dtype: Float.tensorFlowDataType)
+  let result = Raw.ensureShape(t, shape: loadOptionalShape())
   expectEqual(t, result)
 }
 
 DynamicAttributeTests.testAllBackends("ShapeAttribute TensorShape? nil") {
   let t = Tensor<Float>([5.0])
-  let result: Tensor<Float> = #tfop("EnsureShape", t,
-                                    shape$shape: loadUnknownShape(),
-                                    T$dtype: Float.tensorFlowDataType)
+  let result = Raw.ensureShape(t, shape: loadUnknownShape())
   expectEqual(t, result)
 }
 

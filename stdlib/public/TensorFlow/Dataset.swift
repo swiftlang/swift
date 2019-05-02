@@ -148,7 +148,6 @@ public extension Dataset {
       bufferSize: Tensor(Int64(sampleCount)),
       seed: seed1,
       seed2: seed2,
-      reshuffleEachIteration: reshuffleForEachIterator,
       outputTypes: Element._typeList,
       outputShapes: Element._unknownShapeList))
   }

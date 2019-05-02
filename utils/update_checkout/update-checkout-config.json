@@ -241,7 +241,7 @@
                 "ninja": "253e94c1fa511704baeb61cf69995bbf09ba435e",
                 "icu": "release-61-1",
                 "tensorflow": "447e512d332ab86172a3b13119900b4d021d0c65",
-                "tensorflow-swift-bindings": "a7ccb727514414d31df9e403f34fa923bdf6a519",
+                "tensorflow-swift-bindings": "ee5ded283a32b6fb5a17d99af6dd34ef7278a405",
                 "tensorflow-swift-apis": "cfefd63fa60a55d1da1e2a412ed561eb3448e691"
             }
         }

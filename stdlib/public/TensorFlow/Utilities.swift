@@ -163,22 +163,16 @@ public func _hostOp<Scalar : TensorFlowScalar>(_ x: TensorHandle<Scalar>) {
 /// TODO: Remove these helper APIs, when we have a better shape
 /// inference/propagation design.
 @inlinable @inline(__always)
-public func _scalarTensorWithShape<Scalar>(
+public func _scalarTensorWithShape<Scalar: TensorFlowScalar>(
   _ x: Tensor<Scalar>
 ) -> Tensor<Scalar> {
-  let ret: TensorHandle<Scalar> =
-    #tfop("Identity", x, T$dtype: Scalar.tensorFlowDataType,
-          __shapes: [TensorShape()])
-  return Tensor<Scalar>(handle: ret)
+  return Raw.identity(x)
 }
 
 @inlinable @inline(__always)
-public func _addScalarTensorsWithShape<Scalar>(
+public func _addScalarTensorsWithShape<Scalar: TensorFlowNumeric>(
   _ x: Tensor<Scalar>,
   _ y: Tensor<Scalar>
 ) -> Tensor<Scalar> {
-  let ret: TensorHandle<Scalar> =
-    #tfop("Add", x, y, T$dtype: Scalar.tensorFlowDataType,
-          __shapes: [TensorShape()])
-  return Tensor<Scalar>(handle: ret)
+  return Raw.add(x, y)
 }
