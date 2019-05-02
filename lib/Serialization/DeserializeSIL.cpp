@@ -1547,7 +1547,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     }
     // TODO: deserialize `noClustering`.
     ResultVal =
-        Builder.createGraphOperation(Loc, MangledName, Args, {},
+        Builder.createGraphOperation(Loc, MangledName, Args,
                                      /*noClustering*/ false, ResultSILTypes);
     break;
   }

@@ -54,19 +54,12 @@ void GraphOperationBuilder::addListArgument(OperandValueArrayRef arguments,
   }
 }
 
-/// Add an attribute with known constant value to the GraphOperationInst.
-void GraphOperationBuilder::addAttribute(
-    const GraphOperationAttribute &attribute) {
-  Attributes.push_back(attribute);
-}
-
 /// Build the GraphOperationInst.
 GraphOperationInst* GraphOperationBuilder::build(
     SILBuilder &B, ASTContext &C, SILLocation loc,
     ArrayRef<SILType> resultSILTypes) const {
   return B.createGraphOperation(loc, C.getIdentifier(MangledName), Operands,
-                                Attributes, /*noClustering*/ false,
-                                resultSILTypes);
+                                /*noClustering*/ false, resultSILTypes);
 }
 
 } // end namespace tf

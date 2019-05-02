@@ -28,8 +28,6 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
-// SWIFT_ENABLE_TENSORFLOW
-#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -1521,16 +1519,8 @@ public:
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  void checkGraphOperationInst(GraphOperationInst *GI) {
-    llvm::DenseSet<Identifier> attributeNames;
-    for (auto attr : GI->getAttributes()) {
-      require(attributeNames.insert(attr.name).second,
-              "Duplicate attribute name '" + attr.name.str() + "'");
-      require(attr.value.isConstant(), "Invalid graph operation attribute");
-    }
-  }
+  void checkGraphOperationInst(GraphOperationInst *GI) {}
 
-  
   void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {
     auto fnType = requireObjectType(SILFunctionType, FRI,
                                     "result of function_ref");

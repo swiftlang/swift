@@ -31,7 +31,6 @@
 #include "swift/Basic/Range.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
-#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunctionConventions.h"
@@ -57,8 +56,6 @@ class MultipleValueInstruction;
 class MultipleValueInstructionResult;
 class DestructureTupleInst;
 class DestructureStructInst;
-// SWIFT_ENABLE_TENSORFLOW
-class SymbolicValue;
 struct GraphOperationAttribute;
 class GraphOperationInst;
 class NonValueInstruction;
@@ -7904,13 +7901,6 @@ inline DestructureTupleInst *DestructureTupleResult::getParent() {
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// A graph operation attribute, used by GraphOperationInst.
-/// Attributes have a name and a constant value.
-struct GraphOperationAttribute {
-  Identifier name;
-  SymbolicValue value;
-};
-
 /// A result for the graph_op instruction. See documentation for
 /// graph_op for more information.
 class GraphOperationResult final : public MultipleValueInstructionResult {
@@ -7934,14 +7924,11 @@ public:
   }
 };
 
-/// A graph operation, which takes operands and attributes and returns results.
+/// A graph operation, which takes operands and returns results.
 ///
 /// Operands have values that are possibly unknown at compile time. Operands
 /// are grouped into `GraphOperationInfo::StructuredArgument`s. See there for
 /// more documentation. This structure is mangled into `Name`.
-///
-/// Attributes have values that are known at compile time, and these values are
-/// stored in the GraphOperationInst.
 ///
 /// Results can be represented in 3 different ways:
 /// 1. As a single output parameter with type that is a TensorFlow value or
@@ -7969,8 +7956,6 @@ class GraphOperationInst final
   Identifier Name;
   /// The number of operands.
   unsigned NumOperands;
-  /// The attributes of the graph operation.
-  MutableArrayRef<GraphOperationAttribute> Attributes;
   /// When true, this instruction is to be executed out-of-graph (via eager op
   /// dispatch). Otherwise, we attempt to "cluster" this graph op with other
   /// graph ops into a graph function. For an op with dynamic attribute(s), it
@@ -7978,8 +7963,7 @@ class GraphOperationInst final
   bool NoClustering;
 
   GraphOperationInst(SILModule &M, SILDebugLocation loc, Identifier name,
-                     ArrayRef<SILValue> arguments,
-                     ArrayRef<GraphOperationAttribute> attrs, bool noClustering,
+                     ArrayRef<SILValue> arguments, bool noClustering,
                      ArrayRef<SILType> resultTypes,
                      ArrayRef<ValueOwnershipKind> resultOwnerships);
 
@@ -7990,12 +7974,11 @@ public:
   ~GraphOperationInst();
   static GraphOperationInst *
   create(SILModule &M, SILDebugLocation loc, Identifier name,
-         ArrayRef<SILValue> arguments, ArrayRef<GraphOperationAttribute> attrs,
+         ArrayRef<SILValue> arguments,
          bool noClustering, ArrayRef<SILType> resultTypes);
 
   Identifier getName() const { return Name; }
   unsigned getNumOperands() const { return NumOperands; }
-  unsigned getNumAttributes() const { return Attributes.size(); }
 
   unsigned numTrailingObjects(OverloadToken<Operand>) const {
     return NumOperands;
@@ -8012,17 +7995,6 @@ public:
   OperandValueArrayRef getArguments() const {
     return OperandValueArrayRef(getAllOperands());
   }
-  GraphOperationAttribute getAttribute(unsigned i) const;
-
-  ArrayRef<GraphOperationAttribute> getAttributes() const {
-    return Attributes;
-  }
-
-  MutableArrayRef<GraphOperationAttribute> getAttributes() {
-    return Attributes;
-  }
-
-  Optional<SymbolicValue> getAttributeNamed(StringRef name) const;
 
   void setNoClustering(bool noClustering) { NoClustering = noClustering; }
   bool getNoClustering() const { return NoClustering; }

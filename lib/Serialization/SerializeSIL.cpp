@@ -985,10 +985,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case SILInstructionKind::GraphOperationInst: {
-    // TODO(SR-8848): Serialize attributes.
     const GraphOperationInst *GI = cast<GraphOperationInst>(&SI);
-    assert(GI->getNumAttributes() == 0 &&
-           "attribute serialization not implemented");
     SmallVector<ValueID, 4> ListOfValues;
     for (auto Arg : GI->getArguments()) {
       ListOfValues.push_back(addValueRef(Arg));

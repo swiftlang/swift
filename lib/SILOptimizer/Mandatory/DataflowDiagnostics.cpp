@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "TFConstExpr.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -19,7 +18,8 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
-#include "swift/SIL/SILConstants.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
@@ -114,45 +114,6 @@ static void diagnoseStaticReports(const SILInstruction *I,
   }
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-/// \brief Emit a diagnostic for `poundAssert` builtins whose condition is
-/// false or whose condition cannot be evaluated.
-static void diagnosePoundAssert(const SILInstruction *I,
-                                SILModule &M,
-                                ConstExprEvaluator &constantEvaluator) {
-  auto *builtinInst = dyn_cast<BuiltinInst>(I);
-  if (!builtinInst ||
-      builtinInst->getBuiltinKind() != BuiltinValueKind::PoundAssert)
-    return;
-
-  SmallVector<SymbolicValue, 1> values;
-  constantEvaluator.computeConstantValues({builtinInst->getArguments()[0]},
-                                          values);
-  SymbolicValue value = values[0];
-  if (!value.isConstant()) {
-    diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
-             diag::pound_assert_condition_not_constant);
-
-    // If we have more specific information about what went wrong, emit
-    // notes.
-    if (value.getKind() == SymbolicValue::Unknown)
-      value.emitUnknownDiagnosticNotes(builtinInst->getLoc());
-    return;
-  }
-  assert(value.getKind() == SymbolicValue::Integer &&
-         "sema prevents non-integer #assert condition");
-
-  APInt intValue = value.getIntegerValue();
-  assert(intValue.getBitWidth() == 1 &&
-         "sema prevents non-int1 #assert condition");
-  if (intValue.isNullValue()) {
-    auto *message = cast<StringLiteralInst>(builtinInst->getArguments()[1]);
-    diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
-             diag::pound_assert_failure, message->getValue());
-    return;
-  }
-}
-
 namespace {
 class EmitDFDiagnostics : public SILFunctionTransform {
   ~EmitDFDiagnostics() override {}
@@ -164,14 +125,10 @@ class EmitDFDiagnostics : public SILFunctionTransform {
       return;
 
     SILModule &M = getFunction()->getModule();
-    ConstExprEvaluator constantEvaluator(M);
     for (auto &BB : *getFunction())
       for (auto &I : BB) {
         diagnoseUnreachable(&I, M.getASTContext());
         diagnoseStaticReports(&I, M);
-
-        // SWIFT_ENABLE_TENSORFLOW
-        diagnosePoundAssert(&I, M, constantEvaluator);
       }
   }
 };

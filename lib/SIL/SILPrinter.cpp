@@ -24,7 +24,6 @@
 #include "swift/SIL/CFG.h"
 // SWIFT_ENABLE_TENSORFLOW
 #include "swift/SIL/GraphOperationInfo.h"
-#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -1225,87 +1224,6 @@ public:
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  void visitSymbolicValue(SymbolicValue v) {
-    switch (v.getKind()) {
-    case SymbolicValue::Integer: {
-      APInt intValue = v.getIntegerValue();
-      *this << "i" << intValue.getBitWidth() << " " << intValue;
-      return;
-    }
-    case SymbolicValue::Float: {
-      APFloat floatValue = v.getFloatValue();
-      *this << "f" << APFloat::getSizeInBits(floatValue.getSemantics()) << " ";
-
-      APInt bits = floatValue.bitcastToAPInt();
-      *this << "0x" << bits.toString(16, /*Signed*/ false);
-      *this << " ";
-
-      SmallString<12> decimal;
-      floatValue.toString(decimal);
-      *this << "/* " << decimal << " */";
-      return;
-    }
-    case SymbolicValue::String:
-      *this << QuotedString(v.getStringValue());
-      return;
-    case SymbolicValue::Metatype:
-      *this << SILType::getPrimitiveObjectType(v.getMetatypeValue());
-      return;
-    case SymbolicValue::Function: {
-      auto function = v.getFunctionValue();
-      *this << "@" << function->getName();
-      *this << " : $" << function->getLoweredFunctionType();
-      switch (v.getFunctionSubstitutionConvention()) {
-      case FunctionSubstitutionConvention::Normal:
-        *this << " (N)";
-        break;
-      case FunctionSubstitutionConvention::Witness:
-        *this << " (W)";
-        break;
-      }
-      return;
-    }
-    case SymbolicValue::Aggregate: {
-      *this << '(';
-      interleave(v.getAggregateValue(), [&](SymbolicValue element) {
-        visitSymbolicValue(element);
-      }, [&] {
-        *this << ", ";
-      });
-      *this << ')';
-      return;
-    }
-    case SymbolicValue::Enum:
-      *this << SILDeclRef(v.getEnumValue(), SILDeclRef::Kind::EnumElement);
-      return;
-    case SymbolicValue::EnumWithPayload:
-      *this << '(';
-      *this << SILDeclRef(v.getEnumValue(), SILDeclRef::Kind::EnumElement);
-      *this << ", ";
-      visitSymbolicValue(v.getEnumPayloadValue());
-      *this << ')';
-      return;
-    case SymbolicValue::Array: {
-      CanType elementType;
-      auto elements = v.getArrayValue(elementType);
-
-      *this << "[$" << elementType << ": ";
-      interleave(elements, [&](SymbolicValue element) {
-        visitSymbolicValue(element);
-      }, [&] {
-        *this << ", ";
-      });
-      *this << ']';
-      return;
-    }
-    case SymbolicValue::UninitMemory:
-    case SymbolicValue::Unknown:
-    case SymbolicValue::Address:
-      llvm_unreachable("Unimplemented SymbolicValue case");
-    }
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
   void visitGraphOperationInst(GraphOperationInst *GI) {
     tf::GraphOperationInfo info(GI);
     auto opName = info.getOperationName();
@@ -1338,18 +1256,6 @@ public:
       *this << ", ";
     });
     *this << ")";
-
-    if (GI->getNumAttributes()) {
-      *this << " {";
-      interleave(GI->getAttributes(), [&](GraphOperationAttribute attr) {
-        *this << attr.name.str();
-        *this << ": ";
-        visitSymbolicValue(attr.value);
-      }, [&] {
-        *this << ", ";
-      });
-      *this << "}";
-    }
 
     *this << " : ";
     interleave(GI->getResultTypes(), [&](SILType type) {

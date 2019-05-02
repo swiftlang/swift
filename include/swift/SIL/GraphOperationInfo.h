@@ -20,7 +20,6 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/AST/TensorFlow.h"
-#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SmallVector.h"
@@ -28,7 +27,6 @@
 
 namespace swift {
 class GraphOperationInst;
-class SymbolicValue;
 
 namespace tf {
 /// Holds information about a TensorFlow operation as represented in SIL
@@ -192,14 +190,6 @@ public:
     return StructuredArguments;
   }
 
-  /// Get an int-typed attribute at `attrIdx`, which must have `attrName`.
-  int64_t getIntAttr(unsigned attrIdx, llvm::StringRef attrName) const;
-
-  /// Get a string-typed attribute at `attrIdx`, which must have `attrName`.
-  std::string getStringAttr(unsigned attrIdx, llvm::StringRef attrName) const;
-  // /// Get a float-typed attribute at `attrIdx`, which must have `attrName`.
-  // float getFloatAttr(unsigned attrIdx, llvm::StringRef attrName) const;
-
   void assertWithDump(bool cond, const char *assertMsg) const;
 
   /// Return the string suffix for the specified ArgumentLowering.
@@ -235,32 +225,6 @@ static const char TF_DEVICE_ATTR[] = "__device";
 // is used when creating TPU infeed/outfeed ops, and is dropped when creating
 // other TF ops (e.g. a "Const" op).
 static const char TF_SHAPE_ARRAY_ATTR[] = "__shapes";
-
-/// Return true if `attrName` is TF_SHAPE_ARRAY_ATTR, `attrValue` is an array of
-/// TensorShape-typed elements.
-bool isShapeArrayPseudoAttr(StringRef attrName, SymbolicValue attrValue);
-
-/// Decode a shape attribute of type TensorShape or Optional<TensorShape>. It
-/// stores the dimensions to `result`, and return the rank. Note that "nil as
-/// Optional<TensorShape>" represents "unknown rank", and that we return -1 in
-/// that case.
-int decodeShapeAttr(const ASTContext &ctx, SymbolicValue attr,
-                    SmallVectorImpl<int64_t> &result);
-
-/// Decode the shape array in `attrValue` into `dims`, `numDims` and `dimPtrs`.
-void decodeShapeArray(const ASTContext &ctx, SymbolicValue attrValue,
-                      SmallVectorImpl<int64_t> &dims,
-                      SmallVectorImpl<int> &numDims,
-                      SmallVectorImpl<int64_t *> &dimPtrs);
-
-/// Return the TF_DataType represented by `value`. `value` must be a 32-bit
-/// unsigned integer value, or a single element aggregate of a 32-bit unsigned
-/// integer value.
-unsigned getTFDataType(SymbolicValue value);
-
-/// Return a constant integer representing the TensorDataType for the given
-/// Swift type. `type` must be a valid TensorFlow type.
-SymbolicValue convertSwiftTypeToConstantTFDataType(Type type);
 
 /// Return the graph function name for a SIL function that is being used as a
 /// function attribute. This transformation may modify the name to make it

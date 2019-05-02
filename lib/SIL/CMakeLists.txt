@@ -13,7 +13,6 @@ add_swift_host_library(swiftSIL STATIC
   DebugUtils.cpp
   Dominance.cpp
   DynamicCasts.cpp
-  GraphFunctionDeviceInfo.cpp
   InstructionUtils.cpp
   MemAccessUtils.cpp
   Linker.cpp
@@ -29,7 +28,6 @@ add_swift_host_library(swiftSIL STATIC
   SILArgument.cpp
   SILBasicBlock.cpp
   SILBuilder.cpp
-  SILConstants.cpp
   SILCoverageMap.cpp
   SILDebugScope.cpp
   SILDeclRef.cpp
