@@ -2111,6 +2111,29 @@ private:
       // contexts; just create the node directly here and return.
       return dem.createNode(nodeKind, std::move(moduleName));
     }
+        
+    case ContextDescriptorKind::OpaqueType: {
+      // The opaque type may have a named anonymous context for us to map
+      // back to its defining decl.
+      if (!parentDescriptorResult)
+        return nullptr;
+      auto anonymous =
+        dyn_cast_or_null<TargetAnonymousContextDescriptor<Runtime>>(
+                                    parentDescriptorResult->getLocalBuffer());
+      if (!anonymous)
+        return nullptr;
+      
+      auto mangledNode =
+                    demangleAnonymousContextName(*parentDescriptorResult, dem);
+      if (!mangledNode)
+        return nullptr;
+      if (mangledNode->getKind() == Node::Kind::Global)
+        mangledNode = mangledNode->getChild(0);
+      
+      auto opaqueNode = dem.createNode(Node::Kind::OpaqueReturnTypeOf);
+      opaqueNode->addChild(mangledNode, dem);
+      return opaqueNode;
+    }
     
     default:
       // Not a kind of context we know about.

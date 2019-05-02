@@ -4790,7 +4790,7 @@ public:
     return Substitutions;
   }
   
-  /// Get the generic signature used to build out this archetype. This is
+  /// Get the generic signature used to build out this archetype. This isa
   /// equivalent to the OpaqueTypeDecl's interface generic signature, with
   /// all of the generic parameters aside from the opaque type's interface
   /// type same-type-constrained to their substitutions for this type.
