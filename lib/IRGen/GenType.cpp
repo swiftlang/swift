@@ -1147,37 +1147,19 @@ static bool doesPlatformUseLegacyLayouts(StringRef platformName,
   return false;
 }
 
-// The following Apple platforms ship an Objective-C runtime supporting
-// the class metadata update hook:
-//
-// - macOS 10.14.4
-// - iOS 12.2
-// - tvOS 12.2
-// - watchOS 5.2
-static bool doesPlatformSupportObjCMetadataUpdateCallback(
-    const llvm::Triple &triple) {
-  if (triple.isMacOSX())
-    return !triple.isMacOSXVersionLT(10, 14, 4);
-  if (triple.isiOS()) // also returns true on tvOS
-    return !triple.isOSVersionLT(12, 2);
-  if (triple.isWatchOS())
-    return !triple.isOSVersionLT(5, 2);
-
-  return false;
-}
-
 TypeConverter::TypeConverter(IRGenModule &IGM)
   : IGM(IGM),
     FirstType(invalidTypeInfo()) {
-  const auto &Triple = IGM.Context.LangOpts.Target;
-
-  SupportsObjCMetadataUpdateCallback =
-    ::doesPlatformSupportObjCMetadataUpdateCallback(Triple);
+  // Whether the Objective-C runtime is guaranteed to invoke the class
+  // metadata update callback when realizing a Swift class referenced from
+  // Objective-C.
+  bool supportsObjCMetadataUpdateCallback =
+    IGM.Context.LangOpts.doesTargetSupportObjCMetadataUpdateCallback();
 
   // If our deployment target allows us to rely on the metadata update
   // callback being called, we don't have to emit a legacy layout for a
   // class with resiliently-sized fields.
-  if (SupportsObjCMetadataUpdateCallback)
+  if (supportsObjCMetadataUpdateCallback)
     return;
 
   // We have a bunch of -parse-stdlib tests that pass a -target in the test
@@ -1191,6 +1173,8 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
 
   StringRef path = IGM.IRGen.Opts.ReadLegacyTypeInfoPath;
   if (path.empty()) {
+    const auto &Triple = IGM.Context.LangOpts.Target;
+
     // If the flag was not explicitly specified, look for a file in a
     // platform-specific location, if this platform is known to require
     // one.
