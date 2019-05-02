@@ -1580,6 +1580,15 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
   if (entry.isInitialized())
     return true;
 
+  // If it has an attached property delegate that vends an `init()`, use that
+  // for default initialization.
+  if (auto singleVar = getSingleVar()) {
+    if (auto delegateInfo = singleVar->getAttachedPropertyDelegateTypeInfo()) {
+      if (delegateInfo.defaultInit)
+        return true;
+    }
+  }
+
   if (entry.getPattern()->isNeverDefaultInitializable())
     return false;
 
