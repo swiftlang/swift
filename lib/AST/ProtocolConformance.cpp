@@ -141,13 +141,6 @@ ProtocolConformanceRef::subst(Type origType,
   llvm_unreachable("Invalid conformance substitution");
 }
 
-ProtocolConformanceRef
-ProtocolConformanceRef::substOpaqueTypesWithUnderlyingTypes(Type origType) const {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer;
-  return subst(origType, replacer, replacer,
-               SubstFlags::SubstituteOpaqueArchetypes);
-}
-
 Type
 ProtocolConformanceRef::getTypeWitnessByName(Type type,
                                              ProtocolConformanceRef conformance,
