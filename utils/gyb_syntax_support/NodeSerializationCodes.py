@@ -233,6 +233,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'DeclName': 228,
     'PoundAssertStmt': 229,
     'SomeType': 230,
+    'CustomAttribute': 231,
 }
 
 

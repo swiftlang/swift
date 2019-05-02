@@ -551,7 +551,7 @@ struct ReadModify {
   }
 }
 
-@_alignment(16) public struct float3 { public var x, y, z: Float }
+@custom @_alignment(16) public struct float3 { public var x, y, z: Float }
 
 #sourceLocation(file: "otherFile.swift", line: 5)
 
@@ -568,3 +568,11 @@ func foo() {}
 public func anyFoo() -> some Foo {}
 public func qoo() -> some O & O2 {}
 func zlop() -> some C & AnyObject & P {}
+
+@custom(a, b,c)
+func foo() {}
+
+@custom_attr
+@custom(A: a, B: b, C:c)
+func foo() {}
+
