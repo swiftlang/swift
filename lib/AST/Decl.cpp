@@ -5316,6 +5316,18 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   if (isLet() && isParentInitialized())
     return false;
 
+  // Properties with attached delegates that have an access level < internal
+  // but do have an initializer don't participate in the memberwise
+  // initializer, because they would arbitrarily lower the access of the
+  // memberwise initializer.
+  auto origVar = this;
+  if (auto origDelegate = getOriginalDelegatedProperty())
+    origVar = origDelegate;
+  if (origVar->getFormalAccess() < AccessLevel::Internal &&
+      origVar->getAttachedPropertyDelegate() &&
+      origVar->isParentInitialized())
+    return false;
+
   return true;
 }
 

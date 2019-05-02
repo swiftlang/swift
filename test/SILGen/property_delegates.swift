@@ -103,15 +103,9 @@ func forceHasMemberwiseInit() {
 
 // CHECK: return
 
-// CHECK-LABEL: sil private [ossa] @$s18property_delegates9HasNestedV1yACyxGSayxG_tc33_
-// CHECK: [[STACK_SLOT:%.*]] = alloc_stack $HasNested<T>.PrivateDelegate<Array<T>>
-// CHECK: [[METATYPE:%.*]] = metatype $@thin HasNested<T>.PrivateDelegate<Array<T>>.Type
-// CHECK: [[ARRAY_STACK_SLOT:%.*]] = alloc_stack $Array<T>
-// CHECK: store %0 to [init] [[ARRAY_STACK_SLOT]] : $*Array<T>
-// CHECK: [[INIT:%.*]] = function_ref @$s18property_delegates9HasNestedV15PrivateDelegate{{.*}}initialValue
-// CHECK: [[DELEGATE_INSTANCE:%.*]] = apply [[INIT]]<T, [T]>([[STACK_SLOT]], [[ARRAY_STACK_SLOT]], [[METATYPE]])
-// CHECK: [[DELEGATE_VALUE:%.*]] = load [take] [[STACK_SLOT]] : $*HasNested<T>.PrivateDelegate<Array<T>>
-// CHECK: struct $HasNested<T> ([[DELEGATE_VALUE]] : $HasNested<T>.PrivateDelegate<Array<T>>)
+// CHECK-LABEL: sil hidden [transparent] [ossa] @$s18property_delegates9HasNestedV2$y33_4EEAE04FCFB319F460A84BF3BE29C303LLAC15PrivateDelegateAELLVyx_SayxGGvpfi : $@convention(thin) <T> () -> @owned Array<T> {
+// CHECK: bb0:
+// CHECK: function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
 struct HasNested<T> {
   @_propertyDelegate
   private struct PrivateDelegate<U> {
@@ -125,7 +119,7 @@ struct HasNested<T> {
   private var y: [T] = []
 
   static func blah(y: [T]) -> HasNested<T> {
-    return HasNested<T>(y: y)
+    return HasNested<T>()
   }
 }
 

@@ -177,32 +177,31 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
                                       fieldTy.getAddressType());
       InitializationPtr init(new KnownAddressInitialization(slot));
 
-      // An initialized 'let' property has a single value specified by the
-      // initializer - it doesn't come from an argument.
-      if (!field->isStatic() && field->isLet() &&
-          field->getParentInitializer()) {
+      // If it's memberwise initialized, do so now.
+      if (field->isMemberwiseInitialized(/*preferDeclaredProperties=*/false)) {
+        assert(elti != eltEnd &&
+               "number of args does not match number of fields");
+        (void)eltEnd;
+        FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
+        if (!maybeEmitPropertyDelegateInitFromValue(
+              SGF, Loc, field, std::move(*elti),
+              [&](Expr *expr) {
+                SGF.emitExprInto(expr, init.get());
+              })) {
+          std::move(*elti).forwardInto(SGF, Loc, init.get());
+        }
+        ++elti;
+      } else {
 #ifndef NDEBUG
-        assert(field->getType()->isEqual(field->getParentInitializer()->getType())
-               && "Checked by sema");
+        assert(
+            field->getType()->isEqual(field->getParentInitializer()->getType())
+              && "Checked by sema");
 #endif
 
         // Cleanup after this initialization.
         FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
         SGF.emitExprInto(field->getParentInitializer(), init.get());
-        continue;
       }
-
-      assert(elti != eltEnd && "number of args does not match number of fields");
-      (void)eltEnd;
-      FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
-      if (!maybeEmitPropertyDelegateInitFromValue(
-            SGF, Loc, field, std::move(*elti),
-            [&](Expr *expr) {
-              SGF.emitExprInto(expr, init.get());
-            })) {
-        std::move(*elti).forwardInto(SGF, Loc, init.get());
-      }
-      ++elti;
     }
     SGF.B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(Loc),
                        SGF.emitEmptyTuple(Loc));
