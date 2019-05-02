@@ -188,10 +188,6 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     return;
   }
 
-  if (auto opaqueDecl = AFD->getOpaqueResultTypeDecl()) {
-    addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueDecl));
-  }
-
   addSymbol(SILDeclRef(AFD));
 
   // Add the global function pointer for a dynamically replaceable function.
@@ -204,11 +200,6 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(
         LinkEntity::forDynamicallyReplaceableFunctionKey(AFD, useAllocator));
 
-    if (auto opaqueDecl = AFD->getOpaqueResultTypeDecl()) {
-      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorImpl(opaqueDecl));
-      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueDecl));
-      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueDecl));
-    }
   }
   if (AFD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
     bool useAllocator = shouldUseAllocatorMangling(AFD);
@@ -216,9 +207,6 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
         AFD, useAllocator));
     addSymbol(
         LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD, useAllocator));
-    if (auto opaqueDecl = AFD->getOpaqueResultTypeDecl()) {
-      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueDecl));
-    }
   }
 
   if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {
@@ -247,6 +235,17 @@ void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
   // If there's an opaque return type, its descriptor is exported.
   if (auto opaqueResult = FD->getOpaqueResultTypeDecl()) {
     addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));
+    assert(opaqueResult->getNamingDecl() == FD);
+    if (FD->isNativeDynamic()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorImpl(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
+    }
+    if (FD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
+    }
   }
   visitAbstractFunctionDecl(FD);
 }
@@ -267,7 +266,17 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   // ...and the opaque result decl if it has one.
   if (auto opaqueResult = ASD->getOpaqueResultTypeDecl()) {
     addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));
-    addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+    assert(opaqueResult->getNamingDecl() == ASD);
+    if (ASD->hasAnyNativeDynamicAccessors()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorImpl(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
+    }
+    if (ASD->hasAnyDynamicReplacementAccessors()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
+    }
   }
 
   // Explicitly look at each accessor here: see visitAccessorDecl.

@@ -2150,6 +2150,26 @@ matchFunctionWithOpaqueResultType(const AbstractFunctionDecl *replacement,
 }
 
 static bool matchOpaqueResultType(Type replacement, Type replaced) {
+  if (replacement->isEqual(replaced))
+    return true;
+
+  if (auto fn1 = dyn_cast<AnyFunctionType>(replacement->getCanonicalType())) {
+    auto fn2 = dyn_cast<AnyFunctionType>(replaced->getCanonicalType());
+    if (!fn2)
+      return false;
+    auto fn2Params = fn2.getParams();
+    auto fn1Params = fn1.getParams();
+    if (fn2Params.size() != fn1Params.size()) {
+      return false;
+    }
+    for (auto i : indices(fn2Params)) {
+      if (!matchOpaqueResultType(fn2Params[i].getOldType(),
+                                 fn1Params[i].getOldType()))
+        return false;
+    }
+    return matchOpaqueResultType(fn1.getResult(), fn2.getResult());
+  }
+
   auto resultTy = replacement->getAs<OpaqueTypeArchetypeType>();
   if (!resultTy)
     return false;
@@ -2234,16 +2254,6 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
     if (origAccessor->getAccessorKind() != replacement->getAccessorKind())
       continue;
 
-    if (!matchFunctionWithOpaqueResultType(replacement, origAccessor) &&
-        !replacement->getInterfaceType()->getCanonicalType()->matches(
-            origAccessor->getInterfaceType()->getCanonicalType(),
-            TypeMatchFlags::AllowABICompatible)) {
-      TC.diagnose(attr->getLocation(),
-                  diag::dynamic_replacement_accessor_type_mismatch,
-                  replacedVarName);
-      attr->setInvalid();
-      return nullptr;
-    }
     if (origAccessor->isImplicit() &&
         !(origStorage->getReadImpl() == ReadImplKind::Stored &&
           origStorage->getWriteImpl() == WriteImplKind::Stored)) {

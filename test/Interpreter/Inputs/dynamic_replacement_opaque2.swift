@@ -18,4 +18,23 @@ extension Container {
   func _replacement_bar(y x: Int) -> some P {
     return Pair()
   }
+
+  @_dynamicReplacement(for: computedProperty)
+  var _replacement_computedProperty : some P {
+     get {
+       return Pair()
+     }
+     set {
+      print("replacement \(newValue)")
+     }
+  }
+  @_dynamicReplacement(for: subscript(_:))
+  subscript(y x: Int) -> some P {
+    get {
+      return Pair()
+    }
+    set {
+      print("replacement \(newValue)")
+    }
+  }
 }

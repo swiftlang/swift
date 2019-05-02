@@ -1361,7 +1361,9 @@ void IRGenerator::emitDynamicReplacements() {
     assert(origFunc);
     assert(origFunc->getLoweredFunctionType()->hasOpaqueArchetype());
     auto conv = newFunc->getConventions();
-    assert(conv.hasIndirectSILResults());
+    // Storage setters don't have indirect results.
+    if (!conv.hasIndirectSILResults())
+      continue;
     for (auto res : conv.getIndirectSILResultTypes()) {
       if (!res.getASTType()->hasOpaqueArchetype())
         continue;
@@ -2171,13 +2173,39 @@ static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
 }
 
 void IRGenModule::emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
+  auto *namingDecl = opaque->getNamingDecl();
+  auto *abstractStorage = dyn_cast<AbstractStorageDecl>(namingDecl);
+
+  bool isNativeDynamic = false;
+  bool isDynamicReplacement = false;
+
+  // Don't emit accessors for abstract storage that is not dynamic or a dynamic
+  // replacement.
+  if (abstractStorage) {
+    isNativeDynamic = abstractStorage->hasAnyNativeDynamicAccessors();
+    isDynamicReplacement = abstractStorage->hasAnyDynamicReplacementAccessors();
+    if (!isNativeDynamic && !isDynamicReplacement)
+      return;
+  }
+
+  // Don't emit accessors for functions that are not dynamic or dynamic
+  // replacements.
+  if (!abstractStorage) {
+    isNativeDynamic = opaque->getNamingDecl()->isNativeDynamic();
+    isDynamicReplacement = opaque->getNamingDecl()
+                               ->getAttrs()
+                               .hasAttribute<DynamicReplacementAttr>();
+    if (!isNativeDynamic && !isDynamicReplacement)
+      return;
+  }
+
   auto accessor =
       getAddrOfOpaqueTypeDescriptorAccessFunction(opaque, ForDefinition, false);
 
-  if (opaque->getNamingDecl()->isNativeDynamic()) {
+  if (isNativeDynamic) {
     auto thunk = accessor;
-    auto impl =
-      getAddrOfOpaqueTypeDescriptorAccessFunction(opaque, ForDefinition, true);
+    auto impl = getAddrOfOpaqueTypeDescriptorAccessFunction(
+        opaque, ForDefinition, true);
     auto varEntity = LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaque);
     auto keyEntity = LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaque);
 

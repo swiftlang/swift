@@ -9,10 +9,10 @@
 // CHECK: @"$s1A3baryQrSiFQOMj" = constant %swift.dyn_repl_key { {{.*}}%swift.dyn_repl_link_entry* @"$s1A3baryQrSiFQOMk"{{.*}}, i32 0 }, section "__TEXT,__const"
 // CHECK: @"$s1A16_replacement_bar1yQrSi_tFQOMk" = global %swift.dyn_repl_link_entry zeroinitializer
 // CHECK: @"\01l_unnamed_dynamic_replacements" =
-// CHECK:   private constant { i32, i32, [2 x { i32, i32, i32, i32 }] }
-// CHECK:   { i32 0, i32 2, [2 x { i32, i32, i32, i32 }] [
-// CHECK:     { i32, i32, i32, i32 } { {{.*}}%swift.dyn_repl_key* @"$s1A3baryQrSiFTx"{{.*}}@"$s1A16_replacement_bar1yQrSi_tF"{{.*}}%swift.dyn_repl_link_entry* @"$s1A16_replacement_bar1yQrSi_tFTX"{{.*}}, i32 0 },
-// CHECK:     { i32, i32, i32, i32 } { {{.*}}%swift.dyn_repl_key* @"$s1A3baryQrSiFQOMj"{{.*}},{{.*}}@"$s1A16_replacement_bar1yQrSi_tFQOMg"{{.*}},{{.*}}@"$s1A16_replacement_bar1yQrSi_tFQOMk"{{.*}}, i32 0 }] }, section "__TEXT,__const", align 8
+// CHECK:   private constant { i32, i32, [4 x { i32, i32, i32, i32 }] }
+// CHECK:   { i32 0, i32 4, [4 x { i32, i32, i32, i32 }] [
+// CHECK:     { i32, i32, i32, i32 } { {{.*}}%swift.dyn_repl_key* @"$s1A3baryQrSiFTx"{{.*}}@"$s1A16_replacement_bar1yQrSi_tF"{{.*}}%swift.dyn_repl_link_entry* @"$s1A16_replacement_bar1yQrSi_tFTX"{{.*}}, i32 0 }, { i32, i32, i32, i32 } { {{.*}}%swift.dyn_repl_key* @"$s1A9ContainerV4propQrvgTx"{{.*}}@"$s1A9ContainerV7_r_propQrvg"{{.*}}, i32 0 }, { i32, i32, i32, i32 } { {{.*}}%swift.dyn_repl_key* @"$s1A3baryQrSiFQOMj"{{.*}},{{.*}}@"$s1A16_replacement_bar1yQrSi_tFQOMg"{{.*}},{{.*}}@"$s1A16_replacement_bar1yQrSi_tFQOMk"{{.*}}, i32 0 }, { i32, i32, i32, i32 } { {{.*}}%swift.dyn_repl_key* @"$s1A9ContainerV4propQrvpQOMj"{{.*}},{{.*}}@"$s1A9ContainerV7_r_propQrvpQOMg"{{.*}},{{.*}}@"$s1A9ContainerV7_r_propQrvpQOMk"{{.*}}, i32 0 }] }
+// CHECK: , section "__TEXT,__const"
 
 public protocol P {
   func myValue() -> Int
@@ -57,4 +57,42 @@ struct Pair : P {
 @_dynamicReplacement(for:bar(_:))
 public func _replacement_bar(y x: Int) -> some P {
   return Pair()
+}
+
+struct Container {
+  dynamic var prop : some P {
+    get {
+      return 0
+    }
+  }
+}
+
+// CHECK: define hidden swiftcc %swift.type_descriptor* @"$s1A9ContainerV4propQrvpQOMg"()
+// CHECK: entry:
+// CHECK:   %0 = load i8*, i8** getelementptr inbounds (%swift.dyn_repl_link_entry, %swift.dyn_repl_link_entry* @"$s1A9ContainerV4propQrvpQOMk", i32 0, i32 0)
+// CHECK:   %1 = bitcast i8* %0 to %swift.type_descriptor* ()*
+// CHECK:   %2 = tail call swiftcc %swift.type_descriptor* %1()
+// CHECK:   ret %swift.type_descriptor* %2
+
+// CHECK: define hidden swiftcc %swift.type_descriptor* @"$s1A9ContainerV4propQrvpQOMh"()
+// CHECK: entry:
+// CHECK:   ret %swift.type_descriptor* bitcast ({{.*}} @"$s1A9ContainerV4propQrvpQOMQ" to %swift.type_descriptor*)
+
+extension Container {
+  @_dynamicReplacement(for: prop)
+  var _r_prop : some P {
+    get {
+      return 1
+    }
+  }
+}
+
+// CHECK: define hidden swiftcc %swift.type_descriptor* @"$s1A9ContainerV7_r_propQrvpQOMg"()
+// CHECK: entry:
+// CHECK:  ret %swift.type_descriptor* bitcast ({{.*}} @"$s1A9ContainerV7_r_propQrvpQOMQ" to %swift.type_descriptor*)
+
+
+// CHECK-NOT: s1A16noOpaqueAccessor{{.*}}Mg
+public func noOpaqueAccessor() -> some P {
+  return 0
 }
