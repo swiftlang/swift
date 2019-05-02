@@ -121,7 +121,8 @@ public:
   /// after mapping all blocks.
   void cloneReachableBlocks(SILBasicBlock *startBB,
                             ArrayRef<SILBasicBlock *> exitBlocks,
-                            SILBasicBlock *insertAfterBB = nullptr);
+                            SILBasicBlock *insertAfterBB = nullptr,
+                            bool havePrepopulatedFunctionArgs = false);
 
   /// Clone all blocks in this function and all instructions in those
   /// blocks.
@@ -579,13 +580,15 @@ void SILCloner<ImplClass>::visitInstructionsInBlock(SILBasicBlock* BB) {
 template <typename ImplClass>
 void SILCloner<ImplClass>::cloneReachableBlocks(
   SILBasicBlock *startBB, ArrayRef<SILBasicBlock *> exitBlocks,
-  SILBasicBlock *insertAfterBB) {
+  SILBasicBlock *insertAfterBB,
+  bool havePrepopulatedFunctionArgs) {
 
   SILFunction *F = startBB->getParent();
   assert(F == &Builder.getFunction()
          && "cannot clone region across functions.");
   assert(BBMap.empty() && "This API does not allow clients to map blocks.");
-  assert(ValueMap.empty() && "Stale ValueMap.");
+  assert((havePrepopulatedFunctionArgs || ValueMap.empty()) &&
+         "Stale ValueMap.");
 
   auto *clonedStartBB = insertAfterBB ? F->createBasicBlockAfter(insertAfterBB)
     : F->createBasicBlock();
