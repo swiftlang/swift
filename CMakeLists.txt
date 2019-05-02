@@ -598,7 +598,7 @@ else()
   # FIXME: Only matches v6l/v7l - by far the most common variants
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv6l")
     set(SWIFT_HOST_VARIANT_ARCH_default "armv6")
-  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv7l")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "armv7l|armv7-a")
     set(SWIFT_HOST_VARIANT_ARCH_default "armv7")
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "AMD64")
     set(SWIFT_HOST_VARIANT_ARCH_default "x86_64")
