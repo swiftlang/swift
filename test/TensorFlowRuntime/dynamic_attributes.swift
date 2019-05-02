@@ -38,12 +38,6 @@ func loadStridesInt32() -> [Int32] {
   return stridesInt32
 }
 
-var stridesInt64 = [Int64(1), Int64(1), Int64(1), Int64(1)]
-@inline(never)
-func loadStridesInt64() -> [Int64] {
-  return stridesInt64
-}
-
 var trueBool = true
 @inline(never)
 func loadTrue() -> Bool {
@@ -92,28 +86,10 @@ func loadDouble_0point1() -> Double {
   return double_0point1
 }
 
-var float_1: Float = 1
-@inline(never)
-func loadFloat_1() -> Float {
-  return float_1
-}
-
-var float_0point1: Float = 0.1
-@inline(never)
-func loadFloat_0point1() -> Float {
-  return float_0point1
-}
-
 var boundariesDouble: [Double] = [0, 1, 2, 3]
 @inline(never)
 func loadBoundariesDouble() -> [Double] {
   return boundariesDouble
-}
-
-var boundariesFloat: [Float] = [0, 1, 2, 3]
-@inline(never)
-func loadBoundariesFloat() -> [Float] {
-  return boundariesFloat
 }
 
 var tensorShapeArray = [TensorShape([1]), TensorShape([2])]
@@ -231,23 +207,13 @@ DynamicAttributeTests.testAllBackends("NormalAttribute Double") {
   expectEqual(false, result2.scalar!)
 }
 
-DynamicAttributeTests.testAllBackends("NormalAttribute Float") {
-  let x = Tensor<Float>(1)
-  let y = Tensor<Float>(1.5)
-
-  let result1 = Raw.approximateEqual(x, y, tolerance: loadFloat_1())
-  expectEqual(true, result1.scalar!)
-
-  let result2 = Raw.approximateEqual(x, y, tolerance: loadFloat_0point1())
-  expectEqual(false, result2.scalar!)
-}
-
 DynamicAttributeTests.testAllBackends("NormalAttribute String") {
   let result = Raw.conv2D(
     convImage,
     filter: convFilter,
     strides: [1, 1, 1, 1] as [Int32], 
-    padding: loadVALID())
+    padding: loadVALID(),
+    explicitPaddings: [])
   expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
 
@@ -260,16 +226,8 @@ DynamicAttributeTests.testAllBackends("NormalAttribute Array<Int32>") {
     convImage,
     filter: convFilter,
     strides: loadStridesInt32(),
-    padding: .valid)
-  expectPointwiseNearlyEqual(convExpectedResult, result.array)
-}
-
-DynamicAttributeTests.testAllBackends("NormalAttribute Array<Int64>") {
-  let result = Raw.conv2D(
-    convImage,
-    filter: convFilter,
-    strides: loadStridesInt64(),
-    padding: .valid)
+    padding: .valid,
+    explicitPaddings: [])
   expectPointwiseNearlyEqual(convExpectedResult, result.array)
 }
 
@@ -280,24 +238,17 @@ DynamicAttributeTests.testAllBackends("NormalAttribute Array<Double>") {
   expectEqual(expectedResult, result.array)
 }
 
-DynamicAttributeTests.testAllBackends("NormalAttribute Array<Float>") {
-  let input = Tensor<Float>([-1, 0.1, 4.3, 1.2])
-  let result = Raw.bucketize(input, boundaries: loadBoundariesFloat())
-  let expectedResult = ShapedArray<Int32>([0, 1, 4, 2])
-  expectEqual(expectedResult, result.array)
-}
-
 /// Checks that `dataset` is a TensorSliceDataset of
 /// Tensor<Int32>([1, 2]) and Tensor<Int32>([[1, 1], [2, 2]])
 func check(dataset: VariantHandle) {
   let outputTypes = [Int32.tensorFlowDataType, Int32.tensorFlowDataType]
   let outputShapes = [nil, nil] as [TensorShape?]
   let iterator = Raw.iteratorV2(
-    shared_name: "blah",
+    sharedName: "blah",
     container: "earth",
-    outputTypes,
+    outputTypes: outputTypes,
     outputShapes: outputShapes)
-  Raw.makeIterator(dataset, iterator)
+  Raw.makeIterator(dataset: dataset, iterator: iterator)
 
   struct TensorTuple: TensorGroup {
     let first: Tensor<Int32>
@@ -305,10 +256,10 @@ func check(dataset: VariantHandle) {
   }
 
   var next: TensorTuple = Raw.iteratorGetNext(
-    iterator, outputShapes: outputShapes)
+    iterator: iterator, outputShapes: outputShapes)
   expectEqual(ShapedArray<Int32>([1]), next.first.array)
   expectEqual(ShapedArray<Int32>([1, 1]), next.second.array)
-  next = Raw.iteratorGetNext(iterator, outputShapes: outputShapes)
+  next = Raw.iteratorGetNext(iterator: iterator, outputShapes: outputShapes)
   expectEqual(ShapedArray<Int32>([2]), next.first.array)
   expectEqual(ShapedArray<Int32>([2, 2]), next.second.array)
 }
@@ -343,15 +294,17 @@ DynamicAttributeTests.testAllBackends("NormalAttribute Array<String>") {
     "Ci0KDQoBYRIIEgYKBAAAgD8KDQoBYhIIEgYKBAAAAEAKDQoBYxIIEgYKBAAAQEA=")
   let exampleBytes = Raw.decodeBase64(exampleBytesBase64)
 
-  struct TensorTuple: TensorGroup {
-    let first: Tensor<Float>
-    let second: Tensor<Float>
-  }
+  struct Empty: TensorGroup {}
 
   // Call "ParseSingleExample" with the "dense_keys" list(string) attr. We
   // only select 2 out of the 3 keys from the example, to verify that the
   // "dense_keys" argument is actually having an effect.
-  let parsed = Raw.parseSingleExample(
+  let parsed: (
+    sparseIndices: [Tensor<Int64>],
+    sparseValues: Empty,
+    sparseShapes: [Tensor<Int64>],
+    denseValues: [Tensor<Float>]
+  ) = Raw.parseSingleExample(
     serialized: exampleBytes,
     denseDefaults: [Tensor<Float>([0]), Tensor<Float>([0])],
     numSparse: Int64(0),
