@@ -23,8 +23,6 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
-// SWIFT_ENABLE_TENSORFLOW
-#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
@@ -2583,7 +2581,7 @@ DestructureTupleInst *DestructureTupleInst::create(SILModule &M,
 // SWIFT_ENABLE_TENSORFLOW
 GraphOperationInst::GraphOperationInst(
     SILModule &M, SILDebugLocation loc, Identifier name,
-    ArrayRef<SILValue> arguments, ArrayRef<GraphOperationAttribute> attrs,
+    ArrayRef<SILValue> arguments,
     bool noClustering, ArrayRef<SILType> resultTypes,
     ArrayRef<ValueOwnershipKind> resultOwnerships)
     : InstructionBase(loc), MultipleValueInstructionTrailingObjects(
@@ -2592,23 +2590,17 @@ GraphOperationInst::GraphOperationInst(
   auto allOperands = getAllOperands();
   for (unsigned i : indices(arguments))
     new (&allOperands[i]) Operand(this, arguments[i]);
-  auto attrBuf = new GraphOperationAttribute[attrs.size()];
-  Attributes = MutableArrayRef<GraphOperationAttribute>(
-    static_cast<GraphOperationAttribute *>(attrBuf), attrs.size());
-  std::uninitialized_copy(attrs.begin(), attrs.end(), Attributes.data());
 }
 
 GraphOperationInst::~GraphOperationInst() {
   for (auto &operand : getAllOperands())
     operand.~Operand();
-  delete[] getAttributes().data();
 }
 
 GraphOperationInst *
 GraphOperationInst::create(SILModule &M, SILDebugLocation loc, Identifier name,
-                           ArrayRef<SILValue> arguments,
-                           ArrayRef<GraphOperationAttribute> attributes,
-                           bool noClustering, ArrayRef<SILType> resultTypes) {
+                           ArrayRef<SILValue> arguments, bool noClustering,
+                           ArrayRef<SILType> resultTypes) {
   llvm::SmallVector<ValueOwnershipKind, 4> resultOwnerships;
   for (auto resultType : resultTypes) {
     auto ownership = resultType.isTrivial(M)
@@ -2621,18 +2613,6 @@ GraphOperationInst::create(SILModule &M, SILDebugLocation loc, Identifier name,
       1, resultTypes.size(), arguments.size());
   void *buffer = M.allocateInst(size, alignof(GraphOperationInst));
   return ::new (buffer)
-      GraphOperationInst(M, loc, name, arguments, attributes, noClustering,
+      GraphOperationInst(M, loc, name, arguments, noClustering,
                          resultTypes, resultOwnerships);
 }
-
-GraphOperationAttribute GraphOperationInst::getAttribute(unsigned i) const {
-  return getAttributes()[i];
-}
-
-
-Optional<SymbolicValue> GraphOperationInst::getAttributeNamed(StringRef name) const {
-  for (auto attr : getAttributes())
-    if (attr.name.is(name))
-      return attr.value;
-  return None;
-};

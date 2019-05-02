@@ -19,7 +19,6 @@
 #ifndef SWIFT_SIL_GRAPH_OPERATION_BUILDER_H
 #define SWIFT_SIL_GRAPH_OPERATION_BUILDER_H
 
-#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -32,7 +31,6 @@ namespace tf {
 class GraphOperationBuilder {
   std::string MangledName;
   llvm::SmallVector<SILValue, 4> Operands;
-  llvm::SmallVector<GraphOperationAttribute, 4> Attributes;
 
 public:
   /// Start building a GraphOperationInst for op `OpName`.
@@ -48,11 +46,6 @@ public:
   /// Add a list argument to the GraphOperationInst, with an optional name.
   void addListArgument(OperandValueArrayRef arguments,
                        llvm::StringRef name = llvm::StringRef());
-
-  /// Add an attribute with known constant value to the GraphOperationInst.
-  void addAttribute(const GraphOperationAttribute &attribute);
-
-  ArrayRef<GraphOperationAttribute> getAttributes() const { return Attributes; }
 
   /// Build the GraphOperationInst.
   GraphOperationInst *build(SILBuilder &B, ASTContext &C, SILLocation loc,

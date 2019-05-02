@@ -1,4 +1,3 @@
-// RUN: %target-run-use-device-stack-swift %swift-tensorflow-test-run-extra-options
 // RUN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize

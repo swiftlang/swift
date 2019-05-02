@@ -12,7 +12,6 @@
 
 #include "swift/SIL/GraphOperationInfo.h"
 #include "swift/SIL/PrettyStackTrace.h"
-#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILInstruction.h"
 
 using llvm::SmallVectorImpl;
@@ -64,26 +63,6 @@ GraphOperationInfo::GraphOperationInfo(const GraphOperationInst *inst) : inst(in
       llvm_unreachable("unknown marker kind");
     }
   }
-}
-
-int64_t GraphOperationInfo::getIntAttr(unsigned attrIdx,
-                                       StringRef attrName) const {
-  auto attr = inst->getAttribute(attrIdx);
-  auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
-  assert(attrInfo && "attribute has malformed name");
-  assert(attrInfo->first == attrName);
-  auto attrValue = attr.value;
-  return attrValue.getIntegerValue().getLimitedValue();
-}
-
-std::string GraphOperationInfo::getStringAttr(unsigned attrIdx,
-                                              StringRef attrName) const {
-  auto attr = inst->getAttribute(attrIdx);
-  auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
-  assert(attrInfo && "attribute has malformed name");
-  assert(attrInfo->first == attrName);
-  auto attrValue = attr.value;
-  return attrValue.getStringValue().str();
 }
 
 void GraphOperationInfo::assertWithDump(bool cond,
@@ -167,86 +146,6 @@ bool tf::isTensorFlowValue(SILType ty) {
 /// if so, which one it is.
 TFValueKind tf::classifyTensorFlowValue(SILType ty) {
   return classifyTensorFlowValue(ty.getASTType());
-}
-
-bool tf::isShapeArrayPseudoAttr(StringRef attrName, SymbolicValue attrValue) {
-  if (attrName != TF_SHAPE_ARRAY_ATTR)
-    return false;
-  CanType eltType;
-  (void)attrValue.getArrayValue(eltType);
-  return eltType->getString() == "TensorShape";
-}
-
-int tf::decodeShapeAttr(const ASTContext &ctx, SymbolicValue attr,
-                        SmallVectorImpl<int64_t> &result) {
-  // Handle "nil as Optional<TensorShape>" unknown rank case.
-  if (attr.getKind() == SymbolicValue::Kind::Enum &&
-      attr.getEnumValue() == ctx.getOptionalNoneDecl()) {
-    return -1;
-  }
-
-  // Extract value from Optional<TensorShape>.
-  if (attr.getKind() == SymbolicValue::Kind::EnumWithPayload) {
-    attr = attr.getEnumPayloadValue();
-  }
-
-  attr = attr.lookThroughSingleElementAggregates();
-
-  CanType eltType;
-  auto arrayValue = attr.getArrayValue(eltType);
-  for (auto elt : arrayValue) {
-    elt = elt.lookThroughSingleElementAggregates();
-    result.push_back(elt.getIntegerValue().sextOrTrunc(64).getLimitedValue());
-  }
-  return arrayValue.size();
-}
-
-/// Decode the shape array in `attrValue` into `dims`, `numDims` and `dimPtrs`.
-void tf::decodeShapeArray(const ASTContext &ctx, SymbolicValue attrValue,
-                          SmallVectorImpl<int64_t> &dims,
-                          SmallVectorImpl<int> &numDims,
-                          SmallVectorImpl<int64_t *> &dimPtrs) {
-  CanType eltType;
-  auto shapeArray = attrValue.getArrayValue(eltType);
-  assert(eltType->getString() == "TensorShape" ||
-         eltType->getString() == "Optional<TensorShape>");
-  auto numShapes = shapeArray.size();
-  for (unsigned shapeIdx = 0; shapeIdx != numShapes; ++shapeIdx) {
-    auto shape = shapeArray[shapeIdx];
-    numDims.push_back(decodeShapeAttr(ctx, shape, dims));
-  }
-
-  // Now that we've build the array of dimensions, convert it to the array
-  // of pointers that TensorFlow needs.  This is safe now that the vector
-  // has finished its resizing.
-  auto dimPtr = dims.data();
-  for (unsigned shapeIdx = 0; shapeIdx != numShapes; ++shapeIdx) {
-    dimPtrs.push_back(dimPtr);
-
-    // Make sure to handle the "unknown rank" case (numDims[shapeIdx] == -1) by
-    // without incrementing the pointer.
-    if (numDims[shapeIdx] >= 0)
-      dimPtr += numDims[shapeIdx];
-  }
-}
-
-/// Return the TF_DataType value represented by `value`. `value` must be a
-/// valid tensorflow type ID.
-unsigned tf::getTFDataType(SymbolicValue value) {
-  value = value.lookThroughSingleElementAggregates();
-  assert(value.getKind() == SymbolicValue::Integer);
-  assert(value.getIntegerValue().isIntN(32));
-  unsigned tfType = value.getIntegerValue().getLimitedValue();
-  assert(tfType > 0 && "0 is invalid TF_DataType");
-  return tfType;
-}
-
-/// Return a constant integer representing the TF_DataType value for the given
-/// Swift type. `type` must be a valid TensorFlow type.
-SymbolicValue tf::convertSwiftTypeToConstantTFDataType(Type type) {
-  unsigned tfType = convertSwiftTypeToTF(type);
-  assert(tfType != 0);
-  return SymbolicValue::getInteger(tfType, 32);
 }
 
 /// Return the graph function name for a SIL function that is being used as a
