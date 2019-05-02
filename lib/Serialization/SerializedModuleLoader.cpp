@@ -32,6 +32,68 @@ using namespace swift;
 using swift::version::Version;
 
 namespace {
+
+/// Apply \c body for each target-specific module file base name to search.
+void forEachTargetModuleBasename(const ASTContext &Ctx,
+                                 llvm::function_ref<void(StringRef)> body) {
+  auto normalizedTarget = getTargetSpecificModuleTriple(Ctx.LangOpts.Target);
+  body(normalizedTarget.str());
+
+  // We used the un-normalized architecture as a target-specific
+  // module name. Fall back to that behavior.
+  body(Ctx.LangOpts.Target.getArchName());
+
+  // FIXME: We used to use "major architecture" names for these files---the
+  // names checked in "#if arch(...)". Fall back to that name in the one case
+  // where it's different from what Swift 4.2 supported: 32-bit ARM platforms.
+  // We should be able to drop this once there's an Xcode that supports the
+  // new names.
+  if (Ctx.LangOpts.Target.getArch() == llvm::Triple::ArchType::arm)
+    body("arm");
+}
+
+enum class SearchPathKind {
+  Import,
+  Framework,
+  RuntimeLibrary,
+};
+
+/// Apply \p body for each module search path in \p Ctx until \p body returns
+/// non-None value. Returns the return value from \p body, or \c None.
+Optional<bool> forEachModuleSearchPath(
+    const ASTContext &Ctx,
+    llvm::function_ref<Optional<bool>(StringRef, SearchPathKind)> callback) {
+  for (const auto &path : Ctx.SearchPathOpts.ImportSearchPaths)
+    if (auto result = callback(path, SearchPathKind::Import))
+      return result;
+
+  for (const auto &path : Ctx.SearchPathOpts.FrameworkSearchPaths)
+    if (auto result = callback(path.Path, SearchPathKind::Framework))
+      return result;
+
+  // Apple platforms have extra implicit framework search paths:
+  // $SDKROOT/System/Library/Frameworks/ ; and
+  // $SDKROOT/Library/Frameworks/
+  if (Ctx.LangOpts.Target.isOSDarwin()) {
+    SmallString<128> scratch;
+    scratch = Ctx.SearchPathOpts.SDKPath;
+    llvm::sys::path::append(scratch, "System", "Library", "Frameworks");
+    if (auto result = callback(scratch, SearchPathKind::Framework))
+      return result;
+
+    scratch = Ctx.SearchPathOpts.SDKPath;
+    llvm::sys::path::append(scratch, "Library", "Frameworks");
+    if (auto result = callback(scratch, SearchPathKind::Framework))
+      return result;
+  }
+
+  for (auto importPath : Ctx.SearchPathOpts.RuntimeLibraryImportPaths) {
+    if (auto result = callback(importPath, SearchPathKind::RuntimeLibrary))
+      return result;
+  }
+
+  return None;
+}
 } // end unnamed namespace
 
 // Defined out-of-line so that we can see ~ModuleFile.
@@ -54,12 +116,11 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
   suffix += '.';
   suffix += extension;
 
-  SmallVector<SmallString<64>, 3> targetFiles;
-  targetFiles.emplace_back(
-      getTargetSpecificModuleTriple(Ctx.LangOpts.Target).str());
-  targetFiles.back() += suffix;
-  targetFiles.emplace_back(Ctx.LangOpts.Target.getArchName());
-  targetFiles.back() += suffix;
+  SmallVector<SmallString<64>, 2> targetFiles;
+  forEachTargetModuleBasename(Ctx, [&](StringRef targetName) {
+    targetFiles.emplace_back(targetName);
+    targetFiles.back() += suffix;
+  });
 
   auto &fs = *Ctx.SourceMgr.getFileSystem();
 
@@ -89,96 +150,80 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
     return false;
   };
 
-  auto tryImportSearchPath = [&](StringRef searchPath) {
-    // Look for:
-    // $PATH/{name}.swiftmodule/{arch}.{extension} ; Or
-    // $PATH/{name}.{extension}
-    forEachDirectoryEntryPath(searchPath, [&](StringRef path) {
-      auto pathExt = llvm::sys::path::extension(path);
-      if (pathExt != moduleSuffix && pathExt != suffix)
-        return;
+  forEachModuleSearchPath(Ctx, [&](StringRef searchPath, SearchPathKind Kind) {
+    switch (Kind) {
+    case SearchPathKind::Import: {
+      // Look for:
+      // $PATH/{name}.swiftmodule/{arch}.{extension} ; Or
+      // $PATH/{name}.{extension}
+      forEachDirectoryEntryPath(searchPath, [&](StringRef path) {
+        auto pathExt = llvm::sys::path::extension(path);
+        if (pathExt != moduleSuffix && pathExt != suffix)
+          return;
 
-      auto stat = fs.status(path);
-      if (!stat)
-        return;
-      if (pathExt == moduleSuffix && stat->isDirectory()) {
-        if (!checkTargetFiles(path))
-          return;
-      } else if (pathExt != suffix) {
-        return;
-      }
-      // Extract module name.
-      auto name = llvm::sys::path::filename(path).drop_back(pathExt.size());
-      names.push_back(Ctx.getIdentifier(name));
-    });
-  };
-
-  auto tryRuntimeLibraryPath = [&](StringRef searchPath) {
-    // Look for:
-    // (Darwin OS) $PATH/{name}.swiftmodule/{arch}.{extension}
-    // (Other OS)  $PATH/{name}.{extension}
-    bool requireTargetSpecificModule = Ctx.LangOpts.Target.isOSDarwin();
-    forEachDirectoryEntryPath(searchPath, [&](StringRef path) {
-      auto pathExt = llvm::sys::path::extension(path);
-      if (requireTargetSpecificModule) {
-        if (pathExt != moduleSuffix)
-          return;
-        if (!checkTargetFiles(path))
-          return;
-      } else {
         auto stat = fs.status(path);
-        if (!stat || stat->isDirectory())
+        if (!stat)
           return;
-        if (suffix != pathExt)
+        if (pathExt == moduleSuffix && stat->isDirectory()) {
+          if (!checkTargetFiles(path))
+            return;
+        } else if (pathExt != suffix || stat->isDirectory()) {
           return;
-      }
-      // Extract module name.
-      auto name = llvm::sys::path::filename(path).drop_back(pathExt.size());
-      names.push_back(Ctx.getIdentifier(name));
-    });
-  };
+        }
+        // Extract module name.
+        auto name = llvm::sys::path::filename(path).drop_back(pathExt.size());
+        names.push_back(Ctx.getIdentifier(name));
+      });
+      return None;
+    }
+    case SearchPathKind::RuntimeLibrary: {
+      // Look for:
+      // (Darwin OS) $PATH/{name}.swiftmodule/{arch}.{extension}
+      // (Other OS)  $PATH/{name}.{extension}
+      bool requireTargetSpecificModule = Ctx.LangOpts.Target.isOSDarwin();
+      forEachDirectoryEntryPath(searchPath, [&](StringRef path) {
+        auto pathExt = llvm::sys::path::extension(path);
+        if (requireTargetSpecificModule) {
+          if (pathExt != moduleSuffix)
+            return;
+          if (!checkTargetFiles(path))
+            return;
+        } else {
+          if (suffix != pathExt)
+            return;
+          auto stat = fs.status(path);
+          if (!stat || stat->isDirectory())
+            return;
+        }
+        // Extract module name.
+        auto name = llvm::sys::path::filename(path).drop_back(pathExt.size());
+        names.push_back(Ctx.getIdentifier(name));
+      });
+      return None;
+    }
+    case SearchPathKind::Framework: {
+      // Look for:
+      // $PATH/{name}.framework/Modules/{name}.swiftmodule/{arch}.{extension}
+      forEachDirectoryEntryPath(searchPath, [&](StringRef path) {
+        if (llvm::sys::path::extension(path) != ".framework")
+          return;
 
-  auto tryFrameworkSearchPath = [&](StringRef searchPath) {
-    // Look for:
-    // $PATH/{name}.framework/Modules/{name}.swiftmodule/{arch}.{extension}
-    forEachDirectoryEntryPath(searchPath, [&](StringRef path) {
-      if (llvm::sys::path::extension(path) != ".framework")
-        return;
+        // Extract Framework name.
+        auto name = llvm::sys::path::filename(path).drop_back(
+            StringLiteral(".framework").size());
 
-      // Extract Framework name.
-      auto name = llvm::sys::path::filename(path).drop_back(
-          StringLiteral(".framework").size());
+        SmallString<256> moduleDir;
+        llvm::sys::path::append(moduleDir, path, "Modules",
+                                name + moduleSuffix);
+        if (!checkTargetFiles(moduleDir))
+          return;
 
-      SmallString<128> moduleDir;
-      llvm::sys::path::append(moduleDir, path, "Modules", name + moduleSuffix);
-      if (!checkTargetFiles(moduleDir))
-        return;
-
-      names.push_back(Ctx.getIdentifier(name));
-    });
-  };
-
-  for (const auto &path : Ctx.SearchPathOpts.ImportSearchPaths)
-    tryImportSearchPath(path);
-
-  for (const auto &path : Ctx.SearchPathOpts.FrameworkSearchPaths)
-    tryFrameworkSearchPath(path.Path);
-
-  // Apple platforms have extra implicit framework search paths:
-  // $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/
-  if (Ctx.LangOpts.Target.isOSDarwin()) {
-    SmallString<128> scratch;
-    scratch = Ctx.SearchPathOpts.SDKPath;
-    llvm::sys::path::append(scratch, "System", "Library", "Frameworks");
-    tryFrameworkSearchPath(scratch);
-
-    scratch = Ctx.SearchPathOpts.SDKPath;
-    llvm::sys::path::append(scratch, "Library", "Frameworks");
-    tryFrameworkSearchPath(scratch);
-  }
-
-  for (auto importPath : Ctx.SearchPathOpts.RuntimeLibraryImportPaths)
-    tryRuntimeLibraryPath(importPath);
+        names.push_back(Ctx.getIdentifier(name));
+      });
+      return None;
+    }
+    }
+  });
 }
 
 void SerializedModuleLoader::collectVisibleTopLevelModuleNames(
@@ -329,26 +374,11 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
   ModuleFilenamePair fileNames(moduleName);
 
   SmallVector<ModuleFilenamePair, 4> targetFileNamePairs;
-
-  auto normalizedTarget = getTargetSpecificModuleTriple(Ctx.LangOpts.Target);
-  targetFileNamePairs.push_back(ModuleFilenamePair(normalizedTarget.str()));
-
-  // Before this, we used the un-normalized architecture as a target-specific
-  // module name. Fall back to that behavior.
-  targetFileNamePairs.push_back(
-    ModuleFilenamePair(Ctx.LangOpts.Target.getArchName())
-  );
-
-  // FIXME: We used to use "major architecture" names for these files---the
-  // names checked in "#if arch(...)". Fall back to that name in the one case
-  // where it's different from what Swift 4.2 supported: 32-bit ARM platforms.
-  // We should be able to drop this once there's an Xcode that supports the
-  // new names.
-  if (Ctx.LangOpts.Target.getArch() == llvm::Triple::ArchType::arm)
-    targetFileNamePairs.push_back(ModuleFilenamePair("arm"));
+  forEachTargetModuleBasename(Ctx, [&](StringRef targetName) {
+    targetFileNamePairs.emplace_back(targetName);
+  });
 
   auto &fs = *Ctx.SourceMgr.getFileSystem();
-  isFramework = false;
 
   llvm::SmallString<256> currPath;
 
@@ -371,6 +401,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
 
     // We can only get here if all targetFileNamePairs failed with
     // 'std::errc::no_such_file_or_directory'.
+    auto normalizedTarget = getTargetSpecificModuleTriple(Ctx.LangOpts.Target);
     if (maybeDiagnoseTargetMismatch(moduleID.second, moduleName,
                                     normalizedTarget.str(), currPath)) {
       return false;
@@ -379,101 +410,60 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
     }
   };
 
-  for (auto path : Ctx.SearchPathOpts.ImportSearchPaths) {
-    currPath = path;
-    llvm::sys::path::append(currPath, fileNames.module.str());
-    llvm::ErrorOr<llvm::vfs::Status> statResult = fs.status(currPath);
+  auto result = forEachModuleSearchPath(
+      Ctx, [&](StringRef path, SearchPathKind Kind) -> Optional<bool> {
+        currPath = path;
 
-    if (statResult && statResult->isDirectory()) {
-      // A .swiftmodule directory contains architecture-specific files.
-      if (auto outcome = findTargetSpecificModuleFiles())
-        return *outcome;
-    } else {
-      // We can't just return the error; the path we're looking for might not
-      // be "Foo.swiftmodule".
-      auto result = findModuleFilesInDirectory(moduleID, path,
-                                               fileNames.module.str(),
-                                               fileNames.moduleDoc.str(),
-                                               moduleBuffer, moduleDocBuffer);
-      if (!result)
-        return true;
-      else if (result == std::errc::not_supported)
-        return false;
-    }
-  }
+        switch (Kind) {
+        case SearchPathKind::Import:
+        case SearchPathKind::RuntimeLibrary: {
+          isFramework = false;
+          llvm::sys::path::append(currPath, fileNames.module.str());
 
-  {
-    llvm::SmallString<64> moduleFramework(moduleID.first.str());
-    moduleFramework += ".framework";
-    isFramework = true;
+          bool checkTargetSpecificModule;
+          if (Kind == SearchPathKind::RuntimeLibrary) {
+            // Apple platforms always use target-specific files within a
+            // .swiftmodule directory for the stdlib; non-Apple platforms
+            // always use single-architecture swiftmodules.
+            checkTargetSpecificModule = Ctx.LangOpts.Target.isOSDarwin();
+          } else {
+            llvm::ErrorOr<llvm::vfs::Status> statResult = fs.status(currPath);
+            // Even if stat fails, we can't just return the error; the path
+            // we're looking for might not be "Foo.swiftmodule".
+            checkTargetSpecificModule = statResult && statResult->isDirectory();
+          }
 
-    auto tryFrameworkImport = [&](StringRef frameworkPath) -> Optional<bool> {
-      currPath = frameworkPath;
-      llvm::sys::path::append(currPath, moduleFramework.str());
+          if (checkTargetSpecificModule)
+            // A .swiftmodule directory contains architecture-specific files.
+            return findTargetSpecificModuleFiles();
 
-      // Check if the framework directory exists
-      if (!fs.exists(currPath)) {
-        return None;
-      }
+          auto result = findModuleFilesInDirectory(
+              moduleID, path, fileNames.module.str(), fileNames.moduleDoc.str(),
+              moduleBuffer, moduleDocBuffer);
+          if (!result)
+            return true;
+          else if (result == std::errc::not_supported)
+            return false;
+          else
+            return None;
+        }
+        case SearchPathKind::Framework: {
+          isFramework = true;
+          llvm::sys::path::append(currPath,
+                                  moduleID.first.str() + ".framework");
 
-      // Frameworks always use architecture-specific files within a .swiftmodule
-      // directory.
-      llvm::sys::path::append(currPath, "Modules", fileNames.module.str());
-      return findTargetSpecificModuleFiles();
-    };
+          // Check if the framework directory exists.
+          if (!fs.exists(currPath))
+            return None;
 
-    for (const auto &framepath : Ctx.SearchPathOpts.FrameworkSearchPaths) {
-      if (auto outcome = tryFrameworkImport(framepath.Path))
-        return outcome.getValue();
-    }
-
-    if (Ctx.LangOpts.Target.isOSDarwin()) {
-      // Apple platforms have extra implicit framework search paths:
-      // $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/
-      SmallString<256> scratch;
-      scratch = Ctx.SearchPathOpts.SDKPath;
-      llvm::sys::path::append(scratch, "System", "Library", "Frameworks");
-      if (auto outcome = tryFrameworkImport(scratch))
-        return outcome.getValue();
-
-      scratch = Ctx.SearchPathOpts.SDKPath;
-      llvm::sys::path::append(scratch, "Library", "Frameworks");
-      if (auto outcome = tryFrameworkImport(scratch))
-        return outcome.getValue();
-    }
-  }
-
-  // Search the runtime import paths.
-  isFramework = false;
-
-  // Apple platforms always use target-specific files within a
-  // .swiftmodule directory for the stdlib; non-Apple platforms
-  // always use single-architecture swiftmodules.
-  // We could move the `if` outside of the `for` instead of inside,
-  // but I/O will be so slow that we won't notice the difference,
-  // so it's not worth the code duplication.
-  bool hasTargetSpecificRuntimeModules = Ctx.LangOpts.Target.isOSDarwin();
-
-  for (auto RuntimeLibraryImportPath :
-       Ctx.SearchPathOpts.RuntimeLibraryImportPaths) {
-    currPath = RuntimeLibraryImportPath;
-    if (hasTargetSpecificRuntimeModules) {
-      llvm::sys::path::append(currPath, fileNames.module.str());
-      if (auto outcome = findTargetSpecificModuleFiles())
-        return *outcome;
-    } else {
-      auto result = findModuleFilesInDirectory(moduleID, currPath,
-                                               fileNames.module.str(),
-                                               fileNames.moduleDoc.str(),
-                                               moduleBuffer, moduleDocBuffer);
-      if (!result)
-        return true;
-      else if (result == std::errc::not_supported)
-        return false;
-    }
-  }
-
-  return false;
+          // Frameworks always use architecture-specific files within a
+          // .swiftmodule directory.
+          llvm::sys::path::append(currPath, "Modules", fileNames.module.str());
+          return findTargetSpecificModuleFiles();
+        }
+        }
+      });
+  return result.getValueOr(false);
 }
 
 static std::pair<StringRef, clang::VersionTuple>
