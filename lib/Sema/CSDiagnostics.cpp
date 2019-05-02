@@ -1008,7 +1008,7 @@ bool AssignmentFailure::diagnoseAsError() {
     // Otherwise, we cannot resolve this because the available setter candidates
     // are all mutating and the base must be mutating.  If we dug out a
     // problematic decl, we can produce a nice tailored diagnostic.
-    if (auto *VD = dyn_cast_or_null<VarDecl>(choice->getDecl())) {
+    if (auto *VD = dyn_cast<VarDecl>(choice->getDecl())) {
       std::string message = "'";
       message += VD->getName().str().str();
       message += "'";
