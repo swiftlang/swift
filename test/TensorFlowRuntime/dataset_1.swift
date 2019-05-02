@@ -24,40 +24,39 @@ import StdlibUnittest
 var DatasetTests = TestSuite("Dataset")
 
 #if !CUDA
+struct SimpleOutput : TensorGroup {
+  let a: TensorHandle<Int32>
+  let b: TensorHandle<Int32>
+}
 DatasetTests.testAllBackends("MultiValue") {
   enableCPU()
   let elements1: Tensor<Int32> = [0, 1, 2]
   let elements2: Tensor<Int32> = [10, 11, 12]
   let outputTypes = [Int32.tensorFlowDataType, Int32.tensorFlowDataType]
   let outputShapes: [TensorShape?] = [nil, nil]
-  let dataset: VariantHandle = #tfop(
-    "TensorSliceDataset", [elements1, elements2],
-    Toutput_types$dtype: outputTypes,
-    output_shapes: outputShapes
+  let dataset: VariantHandle = Raw.tensorSliceDataset(
+    components: [elements1, elements2],
+    outputShapes: outputShapes
   )
-  let iterator: ResourceHandle = #tfop(
-    "IteratorV2", shared_name: "blah", container: "earth",
-    output_types$dtype: outputTypes, output_shapes: outputShapes
+  let iterator: ResourceHandle = Raw.iteratorV2(sharedName: "blah",
+    container: "earth", outputTypes: outputTypes, outputShapes: outputShapes
   )
-  #tfop("MakeIterator", dataset, iterator) as Void
-  var next: (TensorHandle<Int32>, TensorHandle<Int32>) = #tfop(
-    "IteratorGetNext", iterator,
-    output_types$dtype: outputTypes, output_shapes: outputShapes
+  Raw.makeIterator(dataset: dataset, iterator: iterator)
+  var next: SimpleOutput = Raw.iteratorGetNext(
+    iterator: iterator, outputShapes: outputShapes
   )
-  expectEqual(0, Tensor(handle: next.0).scalarized())
-  expectEqual(10, Tensor(handle: next.1).scalarized())
-  next = #tfop(
-    "IteratorGetNext", iterator,
-    output_types$dtype: outputTypes, output_shapes: outputShapes
+  expectEqual(0, Tensor(handle: next.a).scalarized())
+  expectEqual(10, Tensor(handle: next.b).scalarized())
+  next = Raw.iteratorGetNext(
+    iterator: iterator, outputShapes: outputShapes
   )
-  expectEqual(1, Tensor(handle: next.0).scalarized())
-  expectEqual(11, Tensor(handle: next.1).scalarized())
-  next = #tfop(
-    "IteratorGetNext", iterator,
-    output_types$dtype: outputTypes, output_shapes: outputShapes
+  expectEqual(1, Tensor(handle: next.a).scalarized())
+  expectEqual(11, Tensor(handle: next.b).scalarized())
+  next = Raw.iteratorGetNext(
+    iterator: iterator, outputShapes: outputShapes
   )
-  expectEqual(2, Tensor(handle: next.0).scalarized())
-  expectEqual(12, Tensor(handle: next.1).scalarized())
+  expectEqual(2, Tensor(handle: next.a).scalarized())
+  expectEqual(12, Tensor(handle: next.b).scalarized())
 }
 #endif
 

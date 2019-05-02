@@ -462,9 +462,7 @@ func objcSelector<FunctionSignature><ParameterClause>() </ParameterClause></Func
 func objectLiterals<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<ObjectLiteralExpr>
   #fileLiteral(<FunctionCallArgument><IdentifierExpr>a</IdentifierExpr></FunctionCallArgument>)</ObjectLiteralExpr><ObjectLiteralExpr>
   #colorLiteral(<FunctionCallArgument><IdentifierExpr>a</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>b</IdentifierExpr></FunctionCallArgument>)</ObjectLiteralExpr><ObjectLiteralExpr>
-  #imageLiteral(<FunctionCallArgument><IdentifierExpr>a</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>b</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>c</IdentifierExpr></FunctionCallArgument>)</ObjectLiteralExpr><ObjectLiteralExpr>
-  // SWIFT_ENABLE_TENSORFLOW
-  #tfop(<FunctionCallArgument><StringLiteralExpr>"Add"</StringLiteralExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>a</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>b</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument>T: <DotSelfExpr><IdentifierExpr>Int32</IdentifierExpr>.self</DotSelfExpr></FunctionCallArgument>)</ObjectLiteralExpr><PoundColumnExpr>
+  #imageLiteral(<FunctionCallArgument><IdentifierExpr>a</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>b</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>c</IdentifierExpr></FunctionCallArgument>)</ObjectLiteralExpr><PoundColumnExpr>
   #column</PoundColumnExpr><PoundFileExpr>
   #file</PoundFileExpr><PoundFunctionExpr>
   #function</PoundFunctionExpr><PoundDsohandleExpr>

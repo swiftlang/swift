@@ -33,7 +33,7 @@ StringTensorTests.test("StringTFOP") {
   TensorFlow.enableCPU()
 
   let encoded = StringTensor("aGVsbG8gd29ybGQ=")
-  let decoded: StringTensor = #tfop("DecodeBase64", encoded)
+  let decoded: StringTensor = Raw.decodeBase64(encoded)
   let expectedDecoded = StringTensor("hello world")
   let comparison = expectedDecoded.elementsEqual(decoded)
   expectEqual(ShapedArray(shape: [], scalars: [true]), comparison.array)
