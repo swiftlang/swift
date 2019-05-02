@@ -2233,7 +2233,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfSets") {
         getAsNSSet([1 + i,  2 + i, 3 + i]))
   }
 
-  var a = nsa as [AnyObject] as! [Set<NSObject>]
+  let a = nsa as [AnyObject] as! [Set<NSObject>]
   for i in 0..<3 {
     let s = a[i]
     var iter = s.makeIterator()
@@ -2254,7 +2254,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfSets") {
         getAsNSSet([1 + i, 2 + i, 3 + i]))
   }
 
-  var a = nsa as [AnyObject] as! [Set<TestBridgedKeyTy>]
+  let a = nsa as [AnyObject] as! [Set<TestBridgedKeyTy>]
   for i in 0..<3 {
     let d = a[i]
     var iter = d.makeIterator()
@@ -4098,6 +4098,38 @@ SetTestSuite.test("SetAlgebra.IsSupersetOf.EmptySet") {
 
   expectFalse(s1.isSuperset(of: s2))
   expectTrue(s1.isSuperset(of: s3))
+}
+
+// Test filter(_:)
+
+SetTestSuite.test("SetAlgebra.Filter.SingleEntry") {
+  var s = Set<Int>([1010])
+
+  expectTrue(s.contains(1010))
+
+  let filter = s.filter { $0 > 1000 }
+
+  expectTrue(s.contains(1010))
+  expectTrue(filter.contains(1010))
+}
+
+SetTestSuite.test("SetAlgebra.Filter.MultipleEntries") {
+  var s: Set<Int> = [1010, 1020, 1030]
+
+  let filter = s.filter { $0 > 1010 }
+
+  expectFalse(filter.contains(1010))
+  expectTrue(filter.contains(1020))
+  expectTrue(filter.contains(1030))
+}
+
+SetTestSuite.test("SetAlgebra.Filter.EmptySet") {
+  var s: Set<Int> = []
+
+  let filter = s.filter { $0 > 1000 }
+
+  expectFalse(filter.contains(1010))
+  expectTrue(filter.isEmpty)
 }
 
 // Test remove()
