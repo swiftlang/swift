@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -tf-xla-cfg-canonicalize -assume-parsing-unqualified-ownership-sil %s -o /dev/null | %FileCheck %s
+// REQUIRES: deprecated_gpe_mode
 
 
 import Builtin
