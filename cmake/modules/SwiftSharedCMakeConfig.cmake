@@ -196,13 +196,12 @@ endmacro()
 #   product
 #     The product name, e.g. Swift or SourceKit. Used as prefix for some
 #     cmake variables.
-#
-#   is_cross_compiling
-#     Whether this is cross-compiling host tools.
 macro(swift_common_standalone_build_config product)
   swift_common_standalone_build_config_llvm(${product})
-  swift_common_standalone_build_config_clang(${product})
-  swift_common_standalone_build_config_cmark(${product})
+  if(SWIFT_INCLUDE_TOOLS)
+    swift_common_standalone_build_config_clang(${product})
+    swift_common_standalone_build_config_cmark(${product})
+  endif()
 
   # Enable groups for IDE generators (Xcode and MSVC).
   set_property(GLOBAL PROPERTY USE_FOLDERS ON)
