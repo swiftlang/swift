@@ -160,7 +160,61 @@ static ConstructorDecl *findInitialValueInit(ASTContext &ctx,
 
   // The initializer must not be failable.
   if (init->getFailability() != OTK_None) {
-    init->diagnose(diag::property_delegate_failable_initial_value_init);
+    init->diagnose(diag::property_delegate_failable_init, initName);
+    return nullptr;
+  }
+
+  return init;
+}
+
+/// Determine whether we have a suitable init() within a property
+/// delegate type.
+static ConstructorDecl *findDefaultInit(ASTContext &ctx,
+                                        NominalTypeDecl *nominal) {
+  SmallVector<ConstructorDecl *, 2> defaultValueInitializers;
+  DeclName initName(ctx, DeclBaseName::createConstructor(),
+                    ArrayRef<Identifier>());
+  SmallVector<ValueDecl *, 2> decls;
+  nominal->lookupQualified(nominal, initName, NL_QualifiedDefault, decls);
+  for (const auto &decl : decls) {
+    auto init = dyn_cast<ConstructorDecl>(decl);
+    if (!init || init->getDeclContext() != nominal)
+      continue;
+
+    defaultValueInitializers.push_back(init);
+  }
+
+  switch (defaultValueInitializers.size()) {
+  case 0:
+    return nullptr;
+
+  case 1:
+    break;
+
+  default:
+    // Diagnose ambiguous init() initializers.
+    nominal->diagnose(diag::property_delegate_ambiguous_default_value_init,
+                      nominal->getDeclaredType());
+    for (auto init : defaultValueInitializers) {
+      init->diagnose(diag::kind_declname_declared_here,
+                     init->getDescriptiveKind(), init->getFullName());
+    }
+    return nullptr;
+  }
+
+  // 'init()' must be as accessible as the nominal type.
+  auto init = defaultValueInitializers.front();
+  if (init->getFormalAccess() < nominal->getFormalAccess()) {
+    init->diagnose(diag::property_delegate_type_requirement_not_accessible,
+                     init->getFormalAccess(), init->getDescriptiveKind(),
+                     init->getFullName(), nominal->getDeclaredType(),
+                     nominal->getFormalAccess());
+    return nullptr;
+  }
+
+  // The initializer must not be failable.
+  if (init->getFailability() != OTK_None) {
+    init->diagnose(diag::property_delegate_failable_init, initName);
     return nullptr;
   }
 
@@ -186,6 +240,7 @@ PropertyDelegateTypeInfoRequest::evaluate(
   PropertyDelegateTypeInfo result;
   result.valueVar = valueVar;
   result.initialValueInit = findInitialValueInit(ctx, nominal, valueVar);
+  result.defaultInit = findDefaultInit(ctx, nominal);
   result.delegateValueVar =
     findValueProperty(ctx, nominal, ctx.Id_delegateValue, /*allowMissing=*/true);
 
