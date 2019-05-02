@@ -740,18 +740,18 @@ TensorTests.testAllBackends("ReshapeTensor") {
   expectEqual([1, 3, 1, 2, 1], result.shape)
 }
 
-TensorTests.testAllBackends("Unbroadcast1") {
+TensorTests.testAllBackends("Unbroadcasted1") {
   let x = Tensor<Float>(repeating: 1, shape: [2, 3, 4, 5])
   let y = Tensor<Float>(repeating: 1, shape: [4, 5])
-  let z = x.unbroadcast(like: y)
+  let z = x.unbroadcasted(like: y)
   expectEqual(ShapedArray<Float>(repeating: 6, shape: [4, 5]),
               z.array)
 }
 
-TensorTests.testAllBackends("Unbroadcast2") {
+TensorTests.testAllBackends("Unbroadcasted2") {
   let x = Tensor<Float>(repeating: 1, shape: [2, 3, 4, 5])
   let y = Tensor<Float>(repeating: 1, shape: [3, 1, 5])
-  let z = x.unbroadcast(like: y)
+  let z = x.unbroadcasted(like: y)
   expectEqual(ShapedArray<Float>(repeating: 8, shape: [3, 1, 5]),
               z.array)
 }

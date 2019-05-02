@@ -28,33 +28,13 @@ list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
 list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-sil-ownership")
 list(APPEND swift_stdlib_compile_flags "-force-single-frontend-invocation")
 # FIXME(SR-7972): Some tests fail when TensorFlow is optimized.
+# list(APPEND swift_stdlib_compile_flags "-O" "-whole-module-optimization")
 list(APPEND swift_stdlib_compile_flags "-Onone")
 list(APPEND swift_stdlib_compile_flags "-DCOMPILING_TENSORFLOW_MODULE")
 
-set(SOURCES
-  CompilerRuntime.swift
-  CompositeMath.swift
-  Dataset.swift
-  DataTypes.swift
-  Execution.swift
-  Gradients.swift
-  Ops.swift
-  ShapedArray.swift
-  StringOps.swift
-  StringTensor.swift
-  Tensor.swift
-  TensorGroup.swift
-  TensorHandle.swift
-  TensorProtocol.swift
-  TensorShape.swift
-  Utilities.swift
-  ArrayOps.swift
-  Threading.swift
-  ExecuteOp.swift.gyb
-  # NumPy bridging for `ShapedArray` and `Tensor`.
-  PythonConversion.swift)
+set(SOURCES "")
 
-# Copy TensorFlow bindings file, if it exists.
+# Copy TensorFlow bindings sources, if they exist.
 if (TENSORFLOW_SWIFT_BINDINGS)
   file(GLOB_RECURSE TENSORFLOW_SWIFT_BINDINGS_SOURCES
     "${TENSORFLOW_SWIFT_BINDINGS}/*.swift")
