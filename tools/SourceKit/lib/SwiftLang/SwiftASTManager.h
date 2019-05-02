@@ -93,9 +93,9 @@ public:
                            StringRef RuntimeResourcePath);
   ~SwiftASTManager();
 
-  SwiftInvocationRef getInvocation(ArrayRef<const char *> Args,
-                                   StringRef PrimaryFile,
-                                   std::string &Error);
+  SwiftInvocationRef getInvocation(
+      ArrayRef<const char *> Args, StringRef PrimaryFile, std::string &Error,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem = nullptr);
 
   /// Provides the AST associated with an invocation to the AST consumer,
   /// asynchronously.
