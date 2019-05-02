@@ -4845,10 +4845,11 @@ END_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
 /// to their underlying types.
 class ReplaceOpaqueTypesWithUnderlyingTypes {
 public:
-  SILFunction *context;
-  ReplaceOpaqueTypesWithUnderlyingTypes(
-      SILFunction *context)
-      : context(context) {}
+  ModuleDecl *contextModule;
+  ResilienceExpansion contextExpansion;
+  ReplaceOpaqueTypesWithUnderlyingTypes(ModuleDecl *contextModule,
+                                        ResilienceExpansion contextExpansion)
+      : contextModule(contextModule), contextExpansion(contextExpansion) {}
 
   /// TypeSubstitutionFn
   Type operator()(SubstitutableType *maybeOpaqueType) const;
@@ -4861,7 +4862,8 @@ public:
   bool shouldPerformSubstitution(OpaqueTypeDecl *opaque) const;
 
   static bool shouldPerformSubstitution(OpaqueTypeDecl *opaque,
-                                        SILFunction *context);
+                                        ModuleDecl *contextModule,
+                                        ResilienceExpansion contextExpansion);
 };
 
 /// An archetype that represents the dynamic type of an opened existential.
