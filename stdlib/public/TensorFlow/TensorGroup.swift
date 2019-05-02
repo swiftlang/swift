@@ -233,7 +233,7 @@ extension Array : TensorArrayProtocol where Element : TensorGroup {
   public var _typeList: [TensorDataType] {
     return Array<TensorDataType>([[TensorDataType]](
       repeating: Element._typeList,
-      count: Int(Element._tensorHandleCount)).joined())
+      count: count).joined())
   }
 
   public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?, count: Int) {

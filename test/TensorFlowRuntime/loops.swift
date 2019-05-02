@@ -84,7 +84,7 @@ LoopsTests.testAllBackends("SR-8191") {
   var i = 0
   repeat {
     let y = t + t
-    _hostOp(y.toHost(shape: []))
+    _hostOp(y)
     i += 1
   } while i < 10
   // TODO: remove the extra code below once TPU execution supports 0 output

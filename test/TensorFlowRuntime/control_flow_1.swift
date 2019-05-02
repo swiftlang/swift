@@ -102,11 +102,11 @@ public func testEnumWithPayload(_ x: EnumWithPayload, _ expectedVal: Float) {
     _hostOp(x)
   case .b(let x):
     _hostOp(x)
-    let tx = Tensor<Float>(x).toAccelerator(shape: [])
+    let tx = Tensor<Float>(x)
     val += tx
     val = _scalarTensorWithShape(val)
   case .c(let x, let y):
-    val *= x.toAccelerator(shape: []) + y.toAccelerator(shape: [])
+    val *= x + y
     val = _scalarTensorWithShape(val)
     _hostOp(x)
     _hostOp(y)
@@ -148,7 +148,7 @@ public func testSwitchEnum(_ a: Tensor<Float>?,
                            _ expectedVal: Float) {
   var b = Tensor<Float>(2.0)
   if let a = a {
-    b += a.toAccelerator(shape: [])
+    b += a
     b = _scalarTensorWithShape(b)
   }
   b -= 1.0

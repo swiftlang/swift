@@ -56,7 +56,9 @@ set(SOURCES
 
 # Copy TensorFlow bindings file, if it exists.
 if (TENSORFLOW_SWIFT_BINDINGS)
-  list(APPEND SOURCES "${TENSORFLOW_SWIFT_BINDINGS}")
+  file(GLOB_RECURSE TENSORFLOW_SWIFT_BINDINGS_SOURCES
+    "${TENSORFLOW_SWIFT_BINDINGS}/*.swift")
+  list(APPEND SOURCES "${TENSORFLOW_SWIFT_BINDINGS_SOURCES}")
 endif()
 
 # Copy TensorFlow high-level API sources, if they exist.

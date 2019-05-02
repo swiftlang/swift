@@ -25,18 +25,6 @@
 // we also define some helper function wrappers, e.g. to make things symmetric
 // and generally feel nice to use.
 //
-// The ops themselves are defined by the primitive #tfop(...) syntax, here are
-// some examples:
-//     result = #tfop("Add", lhs, rhs)
-//     result = #tfop("Const", dtype: Float.self, value$tensor: 4.0)
-//
-// The first parameter to this syntax is the TensorFlow op name as a string.
-// After that, the inputs are specified, and then attributes are specified
-// with their name as the keyword argument.
-//
-// Inputs and outputs must be of TensorHandle, ResourceHandle, or VariantHandle
-// type.  These are magic types known to the compiler.
-//
 
 infix operator ++ : AdditionPrecedence
 
@@ -700,17 +688,15 @@ internal extension Tensor where Scalar : TensorFlowFloatingPoint {
   @inlinable @inline(__always)
   func _vjpConcatenated(with other: Tensor, alongAxis axis: Int)
     -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
-    let idx = axis < 0 ? axis + rank : axis
-    let splits = Tensor<Int32>([shapeTensor[idx], other.shapeTensor[idx]])
+    let posAxis = axis < 0 ? axis + rank: axis
+    let splits = Tensor<Int32>([shapeTensor[posAxis], other.shapeTensor[posAxis]])
     return (concatenated(with: other, alongAxis: axis), { result in
-      let ret: (TensorHandle<Scalar>, TensorHandle<Scalar>) = #tfop("SplitV",
-        result,
-        splits,
-        Tensor<Int32>(Int32(axis)),
-        num_split: Int64(2),
-        T$dtype: Scalar.tensorFlowDataType,
-        Tlen$dtype: Int32.tensorFlowDataType)
-      return (Tensor(handle: ret.0), Tensor(handle: ret.1))
+      let gradients = Raw.splitV(
+        value: result,
+        sizeSplits: splits,
+        splitDim: Tensor<Int32>(Int32(axis)),
+        numSplit: Int64(splits.shape[0]))
+      return (gradients[0], gradients[1])
     })
   }
 }
