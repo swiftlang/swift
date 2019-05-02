@@ -374,15 +374,29 @@ public func testResilientInlinablePropertyCallsResilientInlinable() {
 // RESILIENT:  apply [[FUN]]([[RES]], %0)
 
 
-protocol P4 {
+public protocol P4 {
   associatedtype AT
   func foo(_ x: Int64) -> AT
+  func test()
 }
+
 struct PA : P4 {
   func foo(_ x: Int64)  -> some P {
     return Int64(x)
   }
 }
+
+// CHECK-LABEL: sil private [transparent] [thunk] @$s1A2PAVAA2P4A2aDP4testyyFTW
+// CHECK:   [[V:%.*]] = load %0 : $*PA
+// CHECK:   [[F:%.*]] = function_ref @$s1A2PAV4testyyF
+// CHECK:   apply [[F]]([[V]])
+
+// CHECK-LABEL: sil hidden @$s1A2PAV4testyyF : $@convention(method) (PA) -> ()
+// CHECK:   [[V:%.*]] = integer_literal $Builtin.Int64, 5
+// CHECK:   [[I:%.*]] = struct $Int64 ([[V]] : $Builtin.Int64)
+// CHECK:   [[F:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5
+// CHECK:   apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
+// CHECK:   apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
 
 @inline(never)
 func testIt<T>(cl: (Int64) throws -> T) {
@@ -442,4 +456,12 @@ public func testTuple() {
   let t = createTuple(s)
   useP(t.0)
   useP(t.1)
+}
+
+extension PA {
+  func test() {
+    var p = (foo, foo)
+    useP(p.0(5))
+    useP(p.1(5))
+  }
 }

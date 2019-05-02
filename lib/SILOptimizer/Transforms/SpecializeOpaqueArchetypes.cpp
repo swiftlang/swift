@@ -331,8 +331,19 @@ protected:
           loc, opd, type, /*withoutActuallyEscaping*/ false);
     } else if (opd->getType().isTrivial(CurFn)) {
       return getBuilder().createUncheckedTrivialBitCast(loc, opd, type);
-    } else {
+    } else if (opd->getType().isObject()) {
       return getBuilder().createUncheckedRefCast(loc, opd, type);
+    } else {
+      // This could be improved upon by recursively recomposing the type.
+      auto *stackLoc = getBuilder().createAllocStack(loc, type);
+      auto *addr =
+          getBuilder().createUncheckedAddrCast(loc, stackLoc, opd->getType());
+      getBuilder().createTrivialStoreOr(loc, addr, opd,
+                                        StoreOwnershipQualifier::Init);
+      SILValue res = getBuilder().createTrivialLoadOr(
+          loc, addr, LoadOwnershipQualifier::Take);
+      getBuilder().createDeallocStack(loc, stackLoc);
+      return res;
     }
   }
 
@@ -399,24 +410,7 @@ void OpaqueSpecializerCloner::insertOpaqueToConcreteAddressCasts(
       auto argIdx = apply.getCalleeArgIndex(opd);
       auto argType = substConv.getSILArgumentType(argIdx);
       if (argType.getASTType() != opd.get()->getType().getASTType()) {
-        if (argConv.isIndirectConvention()) {
-          auto cast = getBuilder().createUncheckedAddrCast(apply.getLoc(),
-                                                           opd.get(), argType);
-          opd.set(cast);
-        } else if (argType.is<SILFunctionType>()) {
-          auto cast = getBuilder().createConvertFunction(
-              apply.getLoc(), opd.get(), argType,
-              /*withoutActuallyEscaping*/ false);
-          opd.set(cast);
-        } else if (argType.isTrivial(getBuilder().getFunction())) {
-          auto cast = getBuilder().createUncheckedTrivialBitCast(
-              apply.getLoc(), opd.get(), argType);
-          opd.set(cast);
-        } else {
-          auto cast = getBuilder().createUncheckedRefCast(apply.getLoc(),
-                                                          opd.get(), argType);
-          opd.set(cast);
-        }
+        opd.set(createCast(apply.getLoc(), opd.get(), argType));
       }
       ++idx;
     }
