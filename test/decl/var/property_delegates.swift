@@ -610,6 +610,24 @@ func testDefaultInitializers() {
   _ = NoDefaultInitializerStruct() // expected-error{{missing argument for parameter 'x' in call}}
 }
 
+struct DefaultedPrivateMemberwiseLets {
+  @Wrapper(value: true)
+  private var x: Bool
+
+  @WrapperWithInitialValue
+  var y: Int = 17
+
+  @WrapperWithInitialValue(initialValue: 17)
+  private var z: Int
+}
+
+func testDefaultedPrivateMemberwiseLets() {
+  _ = DefaultedPrivateMemberwiseLets()
+  _ = DefaultedPrivateMemberwiseLets(y: 42)
+  _ = DefaultedPrivateMemberwiseLets(x: Wrapper(value: false)) // expected-error{{incorrect argument label in call (have 'x:', expected 'y:')}}
+}
+
+
 // ---------------------------------------------------------------------------
 // Storage references
 // ---------------------------------------------------------------------------
