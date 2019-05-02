@@ -700,17 +700,15 @@ internal extension Tensor where Scalar : TensorFlowFloatingPoint {
   @inlinable @inline(__always)
   func _vjpConcatenated(with other: Tensor, alongAxis axis: Int)
     -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
-    let idx = axis < 0 ? axis + rank : axis
-    let splits = Tensor<Int32>([shapeTensor[idx], other.shapeTensor[idx]])
+    let posAxis = axis < 0 ? axis + rank: axis
+    let splits = Tensor<Int32>([shapeTensor[posAxis], other.shapeTensor[posAxis]])
     return (concatenated(with: other, alongAxis: axis), { result in
-      let ret: (TensorHandle<Scalar>, TensorHandle<Scalar>) = #tfop("SplitV",
-        result,
-        splits,
-        Tensor<Int32>(Int32(axis)),
-        num_split: Int64(2),
-        T$dtype: Scalar.tensorFlowDataType,
-        Tlen$dtype: Int32.tensorFlowDataType)
-      return (Tensor(handle: ret.0), Tensor(handle: ret.1))
+      let gradients = Raw.splitV(
+        value: result,
+        sizeSplits: splits,
+        splitDim: Tensor<Int32>(Int32(axis)),
+        numSplit: Int64(splits.shape[0]))
+      return (gradients[0], gradients[1])
     })
   }
 }
