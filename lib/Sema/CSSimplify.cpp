@@ -3710,11 +3710,6 @@ bool swift::hasDynamicMemberLookupAttribute(Type type) {
   return ::hasDynamicMemberLookupAttribute(type, DynamicMemberLookupCache);
 }
 
-static bool isKeyPathDynamicMemberLookup(ConstraintLocator *locator) {
-  auto path = locator ? locator->getPath() : None;
-  return !path.empty() && path.back().isKeyPathDynamicMember();
-}
-
 /// Given a ValueMember, UnresolvedValueMember, or TypeMember constraint,
 /// perform a lookup into the specified base type to find a candidate list.
 /// The list returned includes the viable candidates as well as the unviable
@@ -3753,7 +3748,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // is a single argument with `keypath:` label or `\.` syntax is used.
   if (memberName.isSimpleName() &&
       memberName.getBaseName().getKind() == DeclBaseName::Kind::Subscript &&
-      !isKeyPathDynamicMemberLookup(memberLocator)) {
+      !(memberLocator && memberLocator->isForKeyPathDynamicMemberLookup())) {
     if (baseTy->isAnyObject()) {
       result.addUnviable(
           OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication),
@@ -4019,7 +4014,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // based dynamic member lookup. Since it's unknown upfront
     // what kind of declaration lookup is going to find, let's
     // double check here that given keypath is appropriate for it.
-    if (isKeyPathDynamicMemberLookup(memberLocator)) {
+    if (memberLocator && memberLocator->isForKeyPathDynamicMemberLookup()) {
       auto path = memberLocator->getPath();
       auto *keyPath = path.back().getKeyPath();
       if (auto *storage = dyn_cast<AbstractStorageDecl>(decl)) {
@@ -4416,8 +4411,15 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
   // Not all of the choices handled here are going
   // to refer to a declaration.
   if (choice.isDecl()) {
-    if (auto *CD = dyn_cast<ConstructorDecl>(choice.getDecl())) {
+    auto *decl = choice.getDecl();
+
+    if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
       if (auto *fix = validateInitializerRef(cs, CD, locator))
+        return fix;
+    }
+
+    if (locator->isForKeyPathDynamicMemberLookup()) {
+      if (auto *fix = AllowInvalidRefInKeyPath::forRef(cs, decl, locator))
         return fix;
     }
   }
