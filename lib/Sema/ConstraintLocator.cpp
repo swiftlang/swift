@@ -165,6 +165,12 @@ bool ConstraintLocator::isForKeyPathComponent() const {
   });
 }
 
+bool ConstraintLocator::isForGenericParameter() const {
+  auto path = getPath();
+  return !path.empty() &&
+         path.back().getKind() == ConstraintLocator::GenericParameter;
+}
+
 void ConstraintLocator::dump(SourceManager *sm) {
   dump(sm, llvm::errs());
   llvm::errs() << "\n";

@@ -564,6 +564,9 @@ public:
   /// components.
   bool isForKeyPathComponent() const;
 
+  /// Determine whether this locator points to the generic parameter.
+  bool isForGenericParameter() const;
+
   /// Produce a profile of this locator, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
                       ArrayRef<PathElement> path);
