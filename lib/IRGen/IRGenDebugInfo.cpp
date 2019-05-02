@@ -2134,10 +2134,6 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
     const SILDebugScope *DS, ValueDecl *VarDecl, StringRef Name, unsigned ArgNo,
     IndirectionKind Indirection, ArtificialKind Artificial) {
-  // Self is always an artificial argument.
-  if (ArgNo > 0 && Name == IGM.Context.Id_self.str())
-    Artificial = ArtificialValue;
-
   // FIXME: Make this an assertion.
   // assert(DS && "variable has no scope");
   if (!DS)
@@ -2169,10 +2165,15 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   assert(DITy && "could not determine debug type of variable");
 
   unsigned Line = Loc.Line;
+
+  // Self is always an artificial argument, so are variables without location.
+  if (!Line || (ArgNo > 0 && Name == IGM.Context.Id_self.str()))
+    Artificial = ArtificialValue;
+
   llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
   if (Artificial || DITy->isArtificial() || DITy == InternalType)
     Flags |= llvm::DINode::FlagArtificial;
-
+  
   // This could be Opts.Optimize if we would also unique DIVariables here.
   bool Optimized = false;
   // Create the descriptor for the variable.
