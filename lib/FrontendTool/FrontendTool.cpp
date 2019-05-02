@@ -358,12 +358,26 @@ static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
 /// \returns true if there were any errors
 ///
 /// \see swift::emitParseableInterface
-static bool printParseableInterfaceIfNeeded(StringRef outputPath,
-                                            ParseableInterfaceOptions const &Opts,
-                                            ModuleDecl *M) {
+static bool
+printParseableInterfaceIfNeeded(StringRef outputPath,
+                                ParseableInterfaceOptions const &Opts,
+                                LangOptions const &LangOpts,
+                                ModuleDecl *M) {
   if (outputPath.empty())
     return false;
-  return withOutputFile(M->getDiags(), outputPath,
+
+  DiagnosticEngine &diags = M->getDiags();
+  if (!LangOpts.isSwiftVersionAtLeast(5)) {
+    assert(LangOpts.isSwiftVersionAtLeast(4));
+    diags.diagnose(SourceLoc(),
+                   diag::warn_unsupported_module_interface_swift_version,
+                   LangOpts.isSwiftVersionAtLeast(4, 2) ? "4.2" : "4");
+  }
+  if (M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
+    diags.diagnose(SourceLoc(),
+                   diag::warn_unsupported_module_interface_library_evolution);
+  }
+  return withOutputFile(diags, outputPath,
                         [M, Opts](raw_ostream &out) -> bool {
     return swift::emitParseableInterface(out, Opts, M);
   });
@@ -922,6 +936,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
     hadAnyError |= printParseableInterfaceIfNeeded(
         Invocation.getParseableInterfaceOutputPathForWholeModule(),
         Invocation.getParseableInterfaceOptions(),
+        Invocation.getLangOptions(),
         Instance.getMainModule());
   }
 
