@@ -158,6 +158,11 @@ bool ConstraintLocator::isKeyPathSubscriptComponent() const {
   });
 }
 
+bool ConstraintLocator::isForKeyPathDynamicMemberLookup() const {
+  auto path = getPath();
+  return !path.empty() && path.back().isKeyPathDynamicMember();
+}
+
 bool ConstraintLocator::isForKeyPathComponent() const {
   return llvm::any_of(getPath(), [&](const LocatorPathElt &elt) {
     return elt.isKeyPathComponent();
