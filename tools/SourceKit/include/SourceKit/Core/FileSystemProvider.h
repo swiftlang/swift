@@ -28,6 +28,14 @@ namespace SourceKit {
 /// specifying 'key.vfs.args'. SourceKit then passes the given arguments to the
 /// selected FileSystemProvider, and uses the resulting llvm::vfs::FileSystem
 /// while serving the request.
+///
+/// The following requests currently support custom FileSystemProviders (other
+/// requests respond with an invalid request error if you try):
+/// - source.request.editor.open: Associates the given custom filesystem with
+///                               this editor file, so that all subsequent
+///                               operations on this editor file use it.
+/// - source.request.codecomplete: Uses the given custom filesystem to process.
+/// - source.request.cursorinfo: Uses the given custom filesystem to process.
 class FileSystemProvider {
 public:
   virtual ~FileSystemProvider() = default;
