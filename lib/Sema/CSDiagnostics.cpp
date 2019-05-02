@@ -2513,17 +2513,19 @@ SourceLoc InvalidMemberRefInKeyPath::getLoc() const {
 }
 
 bool InvalidStaticMemberRefInKeyPath::diagnoseAsError() {
-  emitDiagnostic(getLoc(), diag::expr_keypath_static_member, getName());
+  emitDiagnostic(getLoc(), diag::expr_keypath_static_member, getName(),
+                 isForKeyPathDynamicMemberLookup());
   return true;
 }
 
 bool InvalidMemberWithMutatingGetterInKeyPath::diagnoseAsError() {
-  emitDiagnostic(getLoc(), diag::expr_keypath_mutating_getter, getName());
+  emitDiagnostic(getLoc(), diag::expr_keypath_mutating_getter, getName(),
+                 isForKeyPathDynamicMemberLookup());
   return true;
 }
 
 bool InvalidMethodRefInKeyPath::diagnoseAsError() {
   emitDiagnostic(getLoc(), diag::expr_keypath_not_property, getKind(),
-                 getName());
+                 getName(), isForKeyPathDynamicMemberLookup());
   return true;
 }

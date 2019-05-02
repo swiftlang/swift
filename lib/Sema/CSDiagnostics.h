@@ -1039,7 +1039,8 @@ public:
                             ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), Member(member) {
     assert(member->hasName());
-    assert(locator->isForKeyPathComponent());
+    assert(locator->isForKeyPathComponent() ||
+           locator->isForKeyPathDynamicMemberLookup());
   }
 
   DescriptiveDeclKind getKind() const { return Member->getDescriptiveKind(); }
@@ -1051,6 +1052,10 @@ public:
 protected:
   /// Compute location of the failure for diagnostic.
   SourceLoc getLoc() const;
+
+  bool isForKeyPathDynamicMemberLookup() const {
+    return getLocator()->isForKeyPathDynamicMemberLookup();
+  }
 };
 
 /// Diagnose an attempt to reference a static member as a key path component
