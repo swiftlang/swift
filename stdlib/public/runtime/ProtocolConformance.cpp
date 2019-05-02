@@ -553,7 +553,6 @@ static const ProtocolConformanceDescriptor *
 swift_conformsToSwiftProtocolImpl(const Metadata * const type,
                                   const ProtocolDescriptor *protocol,
                                   StringRef module) {
-  fprintf(stderr, "in impl2\n");
   auto &C = Conformances.get();
 
   // See if we have a cached conformance. The ConcurrentMap data structure
@@ -580,25 +579,17 @@ swift_conformsToSwiftProtocolImpl(const Metadata * const type,
     C.cacheFailure(type, protocol, snapshot.count());
     return nullptr;
   }
-  fprintf(stderr, "got to really scan\n");
+
   // Really scan conformance records.
   for (size_t i = startIndex; i < endIndex; i++) {
-    fprintf(stderr, "index = %lx\n", (unsigned long)i);
     auto &section = snapshot.Start[i];
     // Eagerly pull records for nondependent witnesses into our cache.
     for (const auto &record : section) {
-      fprintf(stderr, "got a record\n");
-      auto descriptorPtr = record.get();
-      auto &descriptor = *descriptorPtr;
-      fprintf(stderr, "got the descriptor: %p\n", descriptorPtr);
-      fprintf(stderr, "got the protocol: %p\n", descriptor.getProtocol());
-      descriptor.getProtocol()->dump();
-      fprintf(stderr, "got it\n");
+      auto &descriptor = *record.get();
 
       // We only care about conformances for this protocol.
       if (descriptor.getProtocol() != protocol)
         continue;
-      fprintf(stderr, "about to get matching type\n");
 
       // If there's a matching type, record the positive result.
       ConformanceCandidate candidate(descriptor);
@@ -613,7 +604,6 @@ swift_conformsToSwiftProtocolImpl(const Metadata * const type,
   }
   
   // Conformance scan is complete.
-  fprintf(stderr, "about to update cache\n");
 
   // Search the cache once more, and this time update the cache if necessary.
   FoundConformance = searchInConformanceCache(type, protocol);
@@ -628,18 +618,10 @@ swift_conformsToSwiftProtocolImpl(const Metadata * const type,
 static const WitnessTable *
 swift_conformsToProtocolImpl(const Metadata * const type,
                              const ProtocolDescriptor *protocol) {
-  // WebAssembly: logging pls
-  fprintf(stderr, "swift_conformsToProtocolImpl: %p %p\n", type, protocol);
-  protocol->dump();
-  fprintf(stderr, "trying to dump the type now\n");
-  type->dump();
-  fprintf(stderr, "dumped the type\n");
-  // end WebAssembly
   auto description =
     swift_conformsToSwiftProtocol(type, protocol, StringRef());
   if (!description)
     return nullptr;
-  description->getProtocol()->dump();
 
   return description->getWitnessTable(
       findConformingSuperclass(type, description));

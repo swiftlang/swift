@@ -299,46 +299,18 @@ _findExtendedTypeContextDescriptor(const ContextDescriptor *maybeExtension,
 /// buildContextDescriptorMangling in MetadataReader.
 bool swift::_isCImportedTagType(const TypeContextDescriptor *type,
                                 const ParsedTypeIdentity &identity) {
-  fprintf(stderr, "trying to dump type %p\n", type);
-  fprintf(stderr, "name: %s\n", type->Name.get());
-  fprintf(stderr, "trying to dump identity %p\n", &identity);
-  fprintf(stderr, "User facing name: %s\n", identity.UserFacingName.str().c_str());
-  fprintf(stderr, "ok, let's go\n");
   // Tag types are always imported as structs or enums.
   if (type->getKind() != ContextDescriptorKind::Enum &&
       type->getKind() != ContextDescriptorKind::Struct)
     return false;
 
-  fprintf(stderr, "is it a c typedef\n");
-
   // Not a typedef imported as a nominal type.
   if (identity.isCTypedef())
     return false;
 
-  fprintf(stderr, "is related entity\n");
-
   // Not a related entity.
   if (identity.isAnyRelatedEntity())
     return false;
-
-  fprintf(stderr, "is c imported context\n");
-  fprintf(stderr, "type's parent, raw: %x\n", *((unsigned int*)&type->Parent));
-  fprintf(stderr, "type's parent: %p\n", type->Parent.get());
-//  fprintf(stderr, "type's parent name: %s\n", type->Parent->Name.get());
-  fprintf(stderr, "trying to get module context\n");
-
-  for (auto cur = type->Parent.get(); true; cur = cur->Parent.get()) {
-    fprintf(stderr, "cur %p\n", cur);
-    fprintf(stderr, "cur %x\n", (unsigned int)cur->getKind());
-    if (auto module = dyn_cast<ModuleContextDescriptor>(cur)) {
-      fprintf(stderr, "found\n");
-      break;
-    }
-  }
-
-  fprintf(stderr, "type's parent module context: %p\n", type->Parent->getModuleContext());
-  fprintf(stderr, "trying to get name\n");
-  fprintf(stderr, "type's parent module context name: %s\n", type->Parent->getModuleContext()->Name.get());
 
   // Imported from C.
   return type->Parent->isCImportedContext();
