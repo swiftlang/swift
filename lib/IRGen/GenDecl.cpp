@@ -1485,8 +1485,8 @@ void IRGenerator::emitEagerClassInitialization() {
   RegisterFn->setCallingConv(IGM->DefaultCC);
 
   for (ClassDecl *CD : ClassesForEagerInitialization) {
-    Type Ty = CD->getDeclaredType();
-    llvm::Value *MetaData = RegisterIGF.emitTypeMetadataRef(getAsCanType(Ty));
+    auto Ty = CD->getDeclaredType()->getCanonicalType();
+    llvm::Value *MetaData = RegisterIGF.emitTypeMetadataRef(Ty);
     assert(CD->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>());
 
     // Get the metadata to make sure that the class is registered. We need to 

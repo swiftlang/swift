@@ -815,15 +815,8 @@ void IRGenerator::addClassForEagerInitialization(ClassDecl *ClassDecl) {
   if (!ClassDecl->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
     return;
 
-  // Exclude some classes where those attributes make no sense but could be set
-  // for some reason. Just to be on the safe side.
-  Type ClassTy = ClassDecl->getDeclaredType();
-  if (ClassTy->is<UnboundGenericType>())
-    return;
-  if (ClassTy->hasArchetype())
-    return;
-  if (ClassDecl->hasClangNode())
-    return;
+  assert(!ClassDecl->isGenericContext());
+  assert(!ClassDecl->hasClangNode());
 
   ClassesForEagerInitialization.push_back(ClassDecl);
 }
