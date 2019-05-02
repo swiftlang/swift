@@ -3,8 +3,10 @@ add_swift_unittest(SwiftClangImporterTests
 )
 
 target_link_libraries(SwiftClangImporterTests
-    PRIVATE
-    swiftClangImporter
-    swiftParse
-    swiftAST
+  PRIVATE
+  swiftClangImporter
+  swiftParse
+  swiftAST
+  # FIXME: Circular dependencies.
+  swiftSIL
 )
