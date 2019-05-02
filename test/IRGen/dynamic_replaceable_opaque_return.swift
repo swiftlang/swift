@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -module-name A -swift-version 5 -primary-file %s -emit-ir | %FileCheck %s
 
+// REQUIRES: objc_interop
+
 // No 32bit for now.
 // UNSUPPORTED: CPU=armv7
 // UNSUPPORTED: CPU=armv7s
