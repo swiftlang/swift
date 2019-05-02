@@ -5,6 +5,7 @@
 // RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
 // REQUIRES: tensorflow
+// REQUIRES: deprecated_gpe_mode
 
 import TensorFlow
 #if TPU
