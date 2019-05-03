@@ -925,7 +925,7 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
     // with 'sil' definitions.
     parseIntoSourceFile(MainFile, MainFile.getBufferID().getValue(), &Done,
                         TheSILModule ? &SILContext : nullptr, &PersistentState,
-                        DelayedParseCB, /*DelayedBodyParsing=*/false);
+                        DelayedParseCB, /*DelayedBodyParsing=*/!mainIsPrimary);
 
     if (mainIsPrimary && (Done || CurTUElem < MainFile.Decls.size())) {
       switch (LimitStage) {
