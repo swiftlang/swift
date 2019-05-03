@@ -93,6 +93,15 @@ option(SWIFT_INCLUDE_DOCS
     "Create targets for building docs."
     TRUE)
 
+set(_swift_include_apinotes_default FALSE)
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(_swift_include_apinotes_default TRUE)
+endif()
+
+option(SWIFT_INCLUDE_APINOTES
+  "Create targets for installing the remaining apinotes in the built toolchain."
+  ${_swift_include_apinotes_default})
+
 #
 # Miscellaneous User-configurable options.
 #
@@ -1042,12 +1051,8 @@ endif()
 # https://bugs.swift.org/browse/SR-5975
 add_subdirectory(stdlib)
 
-if(SWIFT_BUILD_SDK_OVERLAY)
-  list_intersect("${SWIFT_APPLE_PLATFORMS}" "${SWIFT_SDKS}"
-                 building_darwin_sdks)
-  if(building_darwin_sdks)
-    add_subdirectory(apinotes)
-  endif()
+if(SWIFT_INCLUDE_APINOTES)
+  add_subdirectory(apinotes)
 endif()
 
 add_subdirectory(include)
