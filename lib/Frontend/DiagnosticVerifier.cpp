@@ -246,6 +246,9 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
     } else if (MatchStart.startswith("expected-error")) {
       ExpectedClassification = llvm::SourceMgr::DK_Error;
       MatchStart = MatchStart.substr(strlen("expected-error"));
+    } else if (MatchStart.startswith("expected-remark")) {
+      ExpectedClassification = llvm::SourceMgr::DK_Remark;
+      MatchStart = MatchStart.substr(strlen("expected-remark"));
     } else
       continue;
 
