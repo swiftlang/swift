@@ -601,6 +601,10 @@ void TBDGenVisitor::addFirstFileSymbols() {
     SmallString<32> buf;
     addSymbol(irgen::encodeForceLoadSymbolName(buf, Opts.ModuleLinkName));
   }
+
+
+  SmallString<32> buf;
+  addSymbol(irgen::encodeResilienceMarkerSymbolName(buf, SwiftModule));
 }
 
 /// Converts a version tuple into a packed version, ignoring components beyond

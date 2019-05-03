@@ -921,6 +921,20 @@ swift::irgen::encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
   return os.str();
 }
 
+StringRef
+swift::irgen::encodeResilienceMarkerSymbolName(llvm::SmallVectorImpl<char> &buf,
+                                               ModuleDecl *module) {
+  llvm::raw_svector_ostream os{buf};
+  if (module->isResilient()) {
+    os << "_swift_RESILIENT_MODULE_$";
+  } else {
+    os << "_swift_FRAGILE_MODULE_$";
+  }
+
+  appendEncodedName(os, module->getName().str());
+  return os.str();
+}
+
 llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
                                                       StringRef library) {
   llvm::SmallString<32> buffer;
@@ -1120,6 +1134,23 @@ void IRGenModule::emitAutolinkInfo() {
   }
 }
 
+void IRGenModule::emitResilienceInfo() {
+  if (isFirstObjectFileInModule(*this)) {
+    llvm::SmallString<64> buf;
+    encodeResilienceMarkerSymbolName(buf, getSwiftModule());
+
+    auto value = llvm::ConstantInt::get(SizeTy, 0);
+    auto var =
+        new llvm::GlobalVariable(*getModule(), value->getType(), true,
+                                 llvm::GlobalValue::ExternalLinkage,
+                                 value, buf);
+    ApplyIRLinkage(IRLinkage::ExternalExport).to(var);
+    var->setAlignment(getPointerAlignment().getValue());
+
+    addUsedGlobal(var);
+  }
+}
+
 void IRGenModule::cleanupClangCodeGenMetadata() {
   // Remove llvm.ident that ClangCodeGen might have left in the module.
   auto *LLVMIdent = Module.getNamedMetadata("llvm.ident");
@@ -1194,6 +1225,7 @@ bool IRGenModule::finalize() {
     return false;
 
   emitAutolinkInfo();
+  emitResilienceInfo();
   emitGlobalLists();
   if (DebugInfo)
     DebugInfo->finalize();

@@ -43,8 +43,8 @@ bb0:
   return %1 : $()
 }
 
-// CHECK-macho: @llvm.used = appending global [2 x i8*] [i8* bitcast (void ()* @frieda to i8*), i8* bitcast (i16* @__swift_reflection_version to i8*)], section "llvm.metadata"
-// CHECK-elf: @llvm.used = appending global [3 x i8*] [i8* bitcast (void ()* @frieda to i8*), i8* bitcast (i16* @__swift_reflection_version to i8*), i8* getelementptr inbounds ([0 x i8], [0 x i8]* @_swift1_autolink_entries, i32 0, i32 0)], section "llvm.metadata"
+// CHECK-macho: @llvm.used = appending global [3 x i8*] [i8* bitcast (void ()* @frieda to i8*), i8* bitcast (i16* @__swift_reflection_version to i8*), i8* bitcast (i64* @"_swift_FRAGILE_MODULE_$_unused" to i8*)], section "llvm.metadata"
+// CHECK-elf: @llvm.used = appending global [4 x i8*] [i8* bitcast (void ()* @frieda to i8*), i8* bitcast (i16* @__swift_reflection_version to i8*), i8* getelementptr inbounds ([0 x i8], [0 x i8]* @_swift1_autolink_entries, i32 0, i32 0), i8* bitcast (i64* @"_swift_FRAGILE_MODULE_$_unused" to i8*)], section "llvm.metadata"
 
 // CHECK: define linkonce_odr hidden swiftcc void @qux()
 // CHECK: define hidden swiftcc void @fred()

@@ -1200,6 +1200,10 @@ public:
 
 StringRef encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
                                     StringRef name);
+
+StringRef encodeResilienceMarkerSymbolName(llvm::SmallVectorImpl<char> &buf,
+                                           ModuleDecl *module);
+
 }
 }
 

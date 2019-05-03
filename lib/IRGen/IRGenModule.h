@@ -1043,6 +1043,7 @@ private:
 
   void emitGlobalLists();
   void emitAutolinkInfo();
+  void emitResilienceInfo();
   void cleanupClangCodeGenMetadata();
 
 //--- Remote reflection metadata --------------------------------------------
