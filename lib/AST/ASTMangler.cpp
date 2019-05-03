@@ -2613,6 +2613,20 @@ void ASTMangler::appendConcreteProtocolConformance(
         auto conformanceAccessPath =
           CurGenericSignature->getConformanceAccessPath(type, proto);
         appendDependentProtocolConformance(conformanceAccessPath);
+      } else if (auto opaqueType = canType->getAs<OpaqueTypeArchetypeType>()) {
+        GenericSignature *opaqueSignature = opaqueType->getBoundSignature();
+        GenericTypeParamType *opaqueTypeParam = opaqueSignature->getGenericParams().back();
+        ConformanceAccessPath conformanceAccessPath =
+            opaqueSignature->getConformanceAccessPath(opaqueTypeParam, proto);
+
+        // Append the conformance access path with the signature of the opaque type.
+        CanGenericSignature savedSignature = CurGenericSignature;
+        CurGenericSignature = opaqueSignature->getCanonicalSignature();
+        appendDependentProtocolConformance(conformanceAccessPath);
+        CurGenericSignature = savedSignature;
+
+        appendType(canType);
+        appendOperator("HO");
       } else {
         auto conditionalConf = module->lookupConformance(canType, proto);
         appendConcreteProtocolConformance(conditionalConf->getConcrete());
