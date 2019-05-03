@@ -13,13 +13,14 @@
 // This file implements semantic analysis for declaration overrides.
 //
 //===----------------------------------------------------------------------===//
-#include "TypeChecker.h"
 #include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -943,6 +944,22 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
                                baseDecl->getFullName());
     fixDeclarationName(diag, decl, baseDecl->getFullName());
     emittedMatchError = true;
+  }
+
+  auto baseGenericCtx = baseDecl->getAsGenericContext();
+  auto declGenericCtx = decl->getAsGenericContext();
+
+  // If the generic signatures are different, then complain.
+  if (baseGenericCtx && declGenericCtx) {
+    auto baseGenericSig = baseGenericCtx->getGenericSignature();
+    auto declGenericSig = declGenericCtx->getGenericSignature();
+
+    if (!baseGenericSig->requirementsNotSatisfiedBy(declGenericSig).empty()) {
+      diags.diagnose(decl, diag::override_method_different_generic_sig,
+                     decl->getBaseName());
+      diags.diagnose(baseDecl, diag::overridden_here);
+      emittedMatchError = true;
+    }
   }
 
   // If we have an explicit ownership modifier and our parent doesn't,
