@@ -508,10 +508,6 @@ class CollectionIndex<C : Collection> : Index<C, C.I> {
 
 // Overrides with different generic signature
 
-class SR_4206_Class {
-  func helloWorld<T>(_ arg: T)
-}
-
 protocol SR_4206_P0 {}
 
 protocol SR_4206_P1: SR_4206_P0 {}
