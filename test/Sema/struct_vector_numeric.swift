@@ -1,5 +1,5 @@
 // SWIFT_ENABLE_TENSORFLOW
-// RUN: %target-swift-frontend -typecheck -verify %s -verify-ignore-unknown
+// RUN: %target-swift-frontend -typecheck -verify -primary-file %s %S/Inputs/struct_vector_numeric_other_module.swift
 
 func testVectorNumeric<T : VectorNumeric>(
 _ x: inout T, scalar: T.Scalar
@@ -18,16 +18,20 @@ struct Float2: VectorNumeric {
   var x: Float
   var y: Float
 }
-var float2 = Float2(x: 1, y: 1)
-testVectorNumeric(&float2, scalar: 1)
+func testFloat2() {
+  var float2 = Float2(x: 1, y: 1)
+  testVectorNumeric(&float2, scalar: 1)
+}
 
 // Test generic type.
 struct Vector2<T : VectorNumeric>: VectorNumeric {
   var x: T
   var y: T
 }
-_ = Vector2<Double>(x: 1, y: 1)
-_ = Vector2<Float2>(x: float2, y: float2)
+func testVector2(float2: Float2) {
+  _ = Vector2<Double>(x: 1, y: 1)
+  _ = Vector2<Float2>(x: float2, y: float2)
+}
 func testGeneric<T : VectorNumeric>(vec2: inout Vector2<T>, scalar: T.Scalar) {
   testVectorNumeric(&vec2, scalar: scalar)
 }
@@ -37,17 +41,21 @@ struct Nested: VectorNumeric {
   var float2: Float2
   var float: Float
 }
-var nested = Nested(float2: float2, float: 1)
-testVectorNumeric(&nested, scalar: 1)
+func testNested(float2: Float2) {
+  var nested = Nested(float2: float2, float: 1)
+  testVectorNumeric(&nested, scalar: 1)
+}
 
 struct NestedGeneric: VectorNumeric {
   var vec2: Vector2<Float>
   var float2: Float2
   var float: Float
 }
-var nestedGeneric = NestedGeneric(vec2: Vector2<Float>(x: 1, y: 1),
-                                  float2: float2, float: 1)
-testVectorNumeric(&nestedGeneric, scalar: 1)
+func testNestedGeneric(float2: Float2) {
+  var nestedGeneric = NestedGeneric(vec2: Vector2<Float>(x: 1, y: 1),
+                                    float2: float2, float: 1)
+  testVectorNumeric(&nestedGeneric, scalar: 1)
+}
 
 // Test type in generic context.
 struct A<T> {
@@ -58,7 +66,7 @@ struct A<T> {
     }
   }
 }
-func testGenericContext<T, U, V>() -> A<T>.B<U, V>.GenericContextNested {
+func testGenericContext<T, U, V>(float2: Float2) -> A<T>.B<U, V>.GenericContextNested {
   var genericNested =
     A<T>.B<U, V>.GenericContextNested(float2: float2, float: 1)
   testVectorNumeric(&genericNested, scalar: 1)
@@ -93,3 +101,13 @@ struct HasCustomNonMemberwiseInitializer<T : VectorNumeric>: VectorNumeric {
   var value: T
   init(randomLabel value: T) { self.value = value }
 }
+
+// Test derived conformances in disallowed contexts.
+
+// expected-error @+2 {{type 'OtherFileNonconforming' does not conform to protocol 'VectorNumeric'}}
+// expected-error @+1 {{implementation of 'VectorNumeric' cannot be automatically synthesized in an extension in a different file to the type}}
+extension OtherFileNonconforming : VectorNumeric {}
+
+// expected-error @+2 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'VectorNumeric'}}
+// expected-error @+1 {{implementation of 'VectorNumeric' cannot be automatically synthesized in an extension in a different file to the type}}
+extension GenericOtherFileNonconforming : VectorNumeric {}
