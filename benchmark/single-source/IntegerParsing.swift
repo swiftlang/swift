@@ -13,19 +13,19 @@
 import TestsUtils
 
 public let IntegerParsing = [
-  BenchmarkInfo(name: "ParseIntFromDecimal",
+  BenchmarkInfo(name: "ParseInt.Decimal",
     runFunction: run_ParseIntFromDecimal,
     tags: [.validation, .api],
     setUpFunction: { blackHole(decimalStrings) }),
-  BenchmarkInfo(name: "ParseIntFromBinary",
+  BenchmarkInfo(name: "ParseInt.Binary",
     runFunction: run_ParseIntFromBinary,
     tags: [.validation, .api],
     setUpFunction: { blackHole(binaryStrings) }),
-  BenchmarkInfo(name: "ParseIntFromHex",
+  BenchmarkInfo(name: "ParseInt.Hex",
     runFunction: run_ParseIntFromHex,
     tags: [.validation, .api],
     setUpFunction: { blackHole(hexStrings) }),
-  BenchmarkInfo(name: "ParseIntFromUncommonRadix",
+  BenchmarkInfo(name: "ParseInt.UncommonRadix",
     runFunction: run_ParseIntFromUncommonRadix,
     tags: [.validation, .api],
     setUpFunction: { blackHole(uncommonRadixStrings) }),
