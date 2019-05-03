@@ -22,24 +22,26 @@ extension Tensor : _TensorArrayProtocolEnhanced {
   }
 }
 
+struct State : TensorGroup {
+  let i: Tensor<Int32>
+  let n: Tensor<Int32>
+}
+
 TracerTests.testAllBackends("SimpleTFFunction") {
-  func cond(i: Tensor<Int32>, n: Tensor<Int32>) -> (Tensor<Int32>) {
-    return (Tensor<Int32>(i .< n))
+  func cond(s: State) -> Tensor<Int32> {
+    return Tensor<Int32>(s.i .< s.n)
   }
 
-  func body(i: Tensor<Int32>) -> Tensor<Int32> {
-    return i + 1
+  func body(s: State) -> State {
+    return State(i: s.i + 1, n: s.n)
   }
-
-  let tffunc = _tffunc(with: Tensor<Int32>(0), in: cond)
 
   func runWhile(_ n: Int32) -> Tensor<Int32> {
-    return #tfop(
-      "While",
-      Tensor<Int32>(0),
-      T$dtype: [Int32.tensorFlowDataType],
-      cond$func: tffunc(Tensor<Int32>(n)),
-      body$func: _tffunc(body))
+    return Raw.while_(
+      State(i: Tensor<Int32>(0), n: Tensor<Int32>(n)),
+      cond: cond,
+      body: body,
+      outputShapes: [nil]).i
   }
 
   expectEqualWithScalarTensor(10, runWhile(10))
