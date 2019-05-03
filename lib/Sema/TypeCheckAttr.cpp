@@ -23,8 +23,6 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
-// SWIFT_ENABLE_TENSORFLOW
-#include "swift/AST/TensorFlow.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"

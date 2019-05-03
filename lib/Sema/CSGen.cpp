@@ -22,7 +22,6 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/TensorFlow.h"   // SWIFT_ENABLE_TENSORFLOW
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SetVector.h"
@@ -1356,100 +1355,13 @@ namespace {
 
     // SWIFT_ENABLE_TENSORFLOW
     // #tfop is type checked and SILGen'd differently than the rest of the
-    // literals.  We really should use a completely separate AST node (rather
-    // that repurposing ObjectLiteralExpr) but that would be a substantially
-    // more invasive patch that we don't want to keep out of tree.
+    // literals.
     Type visitTFOpExpr(ObjectLiteralExpr *expr) {
       assert(expr->isTFOp() && "Unexpected expression");
       auto &tc = CS.getTypeChecker();
-      auto locator = CS.getConstraintLocator(expr);
-      auto tensorArrayProtoTy = tc.Context.getProtocol(
-          KnownProtocolKind::TensorArrayProtocol)->getDeclaredType();
-
-      // The TensorFlow module defines the "TensorHandle" type, which is the
-      // representation of a tensor value.  If we can't find it, then we reject
-      // uses of #tfop.
-      if (!tc.Context.getTensorHandleDecl()) {
-        tc.diagnose(expr->getLoc(), diag::invalid_tfop,
-                    "#tfop() may only be used in a module that imports TensorFlow");
-        return nullptr;
-      }
-
-      auto *tt = dyn_cast<TupleExpr>(expr->getArg());
-      if (!tt) {
-        // A one-element #tfop just takes an op name.
-        auto arg = expr->getArg()->getSemanticsProvidingExpr();
-        auto opname = dyn_cast<StringLiteralExpr>(arg);
-        if (!opname) {
-          tc.diagnose(expr->getLoc(), diag::invalid_tfop,
-                      "#tfop() takes a string literal and a list of inputs and "
-                      "attributes");
-          return nullptr;
-        }
-        return CS.createTypeVariable(locator, 0);
-      }
-
-      if (tt->getNumElements() == 0) {
-        tc.diagnose(expr->getLoc(), diag::invalid_tfop,
-                    "#tfop() takes a string literal and a list of inputs and "
-                    "attributes");
-        return nullptr;
-      }
-
-      // Check that we have a string literal.
-      auto opname = dyn_cast<StringLiteralExpr>(tt->getElement(0));
-      if (!opname) {
-        tc.diagnose(expr->getLoc(), diag::invalid_tfop,
-                    "#tfop() takes a string literal and a list of inputs and "
-                    "attributes");
-        return nullptr;
-      }
-
-      // Infer the argument types based on the constraint characters.
-      SmallVector<TupleTypeElt, 4> argTypes;
-
-      // The first operand should type check as strings.
-      auto stringType = tc.Context.getStringDecl()->getDeclaredType();
-      argTypes.push_back(TupleTypeElt(stringType));
-
-      // The #tfop list is a list of inputs (with no keyword arguments) followed
-      // by a list of attributes (with keyword arguments).  Add type constraints
-      // for each of them, and make sure there is no intermixing between the
-      // two lists.
-      bool sawAttribute = false;
-      for (unsigned i = 1, e = tt->getNumElements(); i != e; ++i) {
-        if (!tt->getElementName(i).empty()) {
-          sawAttribute = true;
-        } else if (sawAttribute) {
-          tc.diagnose(tt->getElement(i)->getStartLoc(), diag::invalid_tfop,
-                      "expected keyword argument for attribute name, "
-                      "or an additional letter in constraint string");
-          return nullptr;
-        }
-
-        // We infer the type of inputs from context.
-        auto ty = CS.createTypeVariable(locator, 0);
-        if (!sawAttribute) {
-          // It is an input.
-          // All inputs must conform to TensorArrayProtocol.
-          auto constraintLocator = CS.getConstraintLocator(
-            expr,
-            {ConstraintLocator::ApplyArgument,
-             LocatorPathElt::getTupleElement(i)},
-            0);
-          CS.addConstraint(ConstraintKind::ConformsTo, ty, tensorArrayProtoTy,
-                           constraintLocator);
-        }
-        argTypes.push_back(TupleTypeElt(ty, tt->getElementName(i)));
-      }
-
-      // Now that we know what all of the arguments are supposed to be, add a
-      // constraint to the constraint system.
-      auto desiredArgTypes = TupleType::get(argTypes, tc.Context);
-      CS.addConstraint(
-          ConstraintKind::Conversion, CS.getType(tt), desiredArgTypes,
-          CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
-      return CS.createTypeVariable(locator, 0);
+      tc.diagnose(expr->getLoc(), diag::invalid_tfop,
+                  "#tfop() is deprecated and cannot be used");
+      return nullptr;
     }
 
     Type visitDeclRefExpr(DeclRefExpr *E) {

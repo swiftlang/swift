@@ -56,8 +56,6 @@ class MultipleValueInstruction;
 class MultipleValueInstructionResult;
 class DestructureTupleInst;
 class DestructureStructInst;
-struct GraphOperationAttribute;
-class GraphOperationInst;
 class NonValueInstruction;
 class SILBasicBlock;
 class SILBuilder;
@@ -7899,110 +7897,6 @@ inline DestructureTupleInst *DestructureTupleResult::getParent() {
   auto *Parent = MultipleValueInstructionResult::getParent();
   return cast<DestructureTupleInst>(Parent);
 }
-
-/// SWIFT_ENABLE_TENSORFLOW
-/// A result for the graph_op instruction. See documentation for
-/// graph_op for more information.
-class GraphOperationResult final : public MultipleValueInstructionResult {
-public:
-  GraphOperationResult(unsigned Index, SILType Type,
-                       ValueOwnershipKind OwnershipKind)
-  : MultipleValueInstructionResult(ValueKind::GraphOperationResult, Index,
-                                   Type, OwnershipKind) {}
-
-  static bool classof(const SILNode *N) {
-    return N->getKind() == SILNodeKind::GraphOperationResult;
-  }
-
-  GraphOperationInst *getParent() {
-    auto *Parent = MultipleValueInstructionResult::getParent();
-    return cast<GraphOperationInst>(Parent);
-  };
-
-  const GraphOperationInst *getParent() const {
-    return const_cast<GraphOperationResult *>(this)->getParent();
-  }
-};
-
-/// A graph operation, which takes operands and returns results.
-///
-/// Operands have values that are possibly unknown at compile time. Operands
-/// are grouped into `GraphOperationInfo::StructuredArgument`s. See there for
-/// more documentation. This structure is mangled into `Name`.
-///
-/// Results can be represented in 3 different ways:
-/// 1. As a single output parameter with type that is a TensorFlow value or
-///    aggregate of TensorFlow values.
-/// 2. As a single result that is a TensorFlow value or aggregate of TensorFlow
-///    values.
-/// 3. As multiple results, where each result is a TensorFlow value (not an
-///    aggregate of TensorFlow values!).
-/// The later result representations are "better" than the earlier ones because
-/// code performing the operations has to do less work to deal with the results.
-/// Various compiler passes try to improve the result representations.
-/// Successful deabstraction currently guarantees that the result will be in
-/// form 3.
-class GraphOperationInst final
-  : public InstructionBase<
-               SILInstructionKind::GraphOperationInst,
-               MultipleValueInstruction>,
-    public MultipleValueInstructionTrailingObjects<
-               GraphOperationInst, GraphOperationResult,
-               InitialTrailingObjects<>,
-               FinalTrailingObjects<Operand>> {
-  friend TrailingObjects;
-
-  /// The name of the graph operation.
-  Identifier Name;
-  /// The number of operands.
-  unsigned NumOperands;
-  /// When true, this instruction is to be executed out-of-graph (via eager op
-  /// dispatch). Otherwise, we attempt to "cluster" this graph op with other
-  /// graph ops into a graph function. For an op with dynamic attribute(s), it
-  /// must run out-of-graph, and thus have this field set to true.
-  bool NoClustering;
-
-  GraphOperationInst(SILModule &M, SILDebugLocation loc, Identifier name,
-                     ArrayRef<SILValue> arguments, bool noClustering,
-                     ArrayRef<SILType> resultTypes,
-                     ArrayRef<ValueOwnershipKind> resultOwnerships);
-
-public:
-  using MultipleValueInstructionTrailingObjects::numTrailingObjects;
-  using MultipleValueInstructionTrailingObjects::totalSizeToAlloc;
-
-  ~GraphOperationInst();
-  static GraphOperationInst *
-  create(SILModule &M, SILDebugLocation loc, Identifier name,
-         ArrayRef<SILValue> arguments,
-         bool noClustering, ArrayRef<SILType> resultTypes);
-
-  Identifier getName() const { return Name; }
-  unsigned getNumOperands() const { return NumOperands; }
-
-  unsigned numTrailingObjects(OverloadToken<Operand>) const {
-    return NumOperands;
-  }
-
-  ArrayRef<Operand> getAllOperands() const {
-    return { getTrailingObjects<Operand>(), NumOperands };
-  }
-
-  MutableArrayRef<Operand> getAllOperands() {
-    return { getTrailingObjects<Operand>(), NumOperands };
-  }
-
-  OperandValueArrayRef getArguments() const {
-    return OperandValueArrayRef(getAllOperands());
-  }
-
-  void setNoClustering(bool noClustering) { NoClustering = noClustering; }
-  bool getNoClustering() const { return NoClustering; }
-
-  static bool classof(const SILNode *N) {
-    return N->getKind() == SILNodeKind::GraphOperationInst;
-  }
-};
 
 inline SILType *AllocRefInstBase::getTypeStorage() {
   // If the size of the subclasses are equal, then all of this compiles away.

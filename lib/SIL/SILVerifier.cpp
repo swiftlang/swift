@@ -1518,9 +1518,6 @@ public:
       checkAutoDiffBuiltinInst(BI);
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  void checkGraphOperationInst(GraphOperationInst *GI) {}
-
   void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {
     auto fnType = requireObjectType(SILFunctionType, FRI,
                                     "result of function_ref");
