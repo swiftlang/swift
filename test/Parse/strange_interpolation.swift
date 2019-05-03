@@ -54,5 +54,12 @@ print("[\(stringInterpolationSegment: x)]")
 // expected-warning@-2{{labeled interpolations will not be ignored in Swift 5}}
 // expected-note@-3{{remove 'stringInterpolationSegment' label to keep current behavior}} {{11-39=}}
 
+print("[ \(foo: "[\(bar: x)]") ]")
+// CHECK-NEXT: [ [1] ]
+// expected-warning@-2{{labeled interpolations will not be ignored in Swift 5}}
+// expected-note@-3{{remove 'foo' label to keep current behavior}} {{12-17=}}
+// expected-warning@-4{{labeled interpolations will not be ignored in Swift 5}}
+// expected-note@-5{{remove 'bar' label to keep current behavior}} {{21-26=}}
+
 print("End")
 // CHECK-NEXT: End
