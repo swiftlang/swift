@@ -477,13 +477,15 @@ ERROR(expr_keypath_type_of_property,none,
 ERROR(expr_keypath_generic_type,none,
       "key path cannot refer to generic type %0", (DeclName))
 ERROR(expr_keypath_not_property,none,
-      "key path cannot refer to %0 %1", (DescriptiveDeclKind, DeclName))
+      "%select{key path|dynamic key path member lookup}2 cannot refer to %0 %1",
+      (DescriptiveDeclKind, DeclName, bool))
 ERROR(expr_keypath_mutating_getter,none,
-      "key path cannot refer to %0, which has a mutating getter",
-      (DeclName))
+      "%select{key path|dynamic key path member lookup}1 cannot refer to %0, "
+      "which has a mutating getter",
+      (DeclName, bool))
 ERROR(expr_keypath_static_member,none,
-      "key path cannot refer to static member %0",
-      (DeclName))
+      "%select{key path|dynamic key path member lookup}1 cannot refer to static member %0",
+      (DeclName, bool))
 ERROR(expr_keypath_empty,none,
       "empty key path does not refer to a property", ())
 ERROR(expr_unsupported_objc_key_path_component,none,
