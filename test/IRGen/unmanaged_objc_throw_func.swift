@@ -16,7 +16,7 @@ import Foundation
     // CHECK-NEXT: %[[T3:.+]] = bitcast i8* %[[T2]] to %TSi*
     // CHECK-NEXT: %._value = getelementptr inbounds %TSi, %TSi* %[[T3]], i32 0, i32 0
     // CHECK-NEXT: store i{{32|64}} 1, i{{32|64}}* %._value, align {{[0-9]+}}
-    // CHECK-NEXT: %[[LITERAL:.+]] = call swiftcc %swift.bridge* @"$sSa12arrayLiteralSayxGxd_tcfCSi_Tg5"(%swift.bridge* %[[T1]])
+    // CHECK-NEXT: %[[LITERAL:.+]] = call swiftcc %swift.bridge* @"$sSa12arrayLiteralSayxGxd_tcfC{{.*}}"(%swift.bridge* %[[T1]]{{(, %swift\.type\* @"\$sSiN")?}})
     // CHECK-NEXT: %[[T4:.+]] = call swiftcc %TSo7NSArrayC* @"$sSa10FoundationE19_bridgeToObjectiveCSo7NSArrayCyF"(%swift.bridge* %[[LITERAL]], %swift.type* @"$sSiN")
     // CHECK-NEXT: %[[T5:.+]] = bitcast %TSo7NSArrayC* %[[T4]] to %TSo10CFArrayRefa*
     // CHECK-NEXT: call void asm sideeffect "", "r"(%TSo10CFArrayRefa* %[[T5]])
