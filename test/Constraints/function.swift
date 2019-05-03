@@ -106,3 +106,22 @@ func foo(block: () -> (), other: () -> Int) {
   takesAny(block)  // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
   takesAny(other) // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
 }
+
+protocol P {
+  associatedtype U
+}
+
+func test_passing_noescape_function_to_dependent_member() {
+  struct S<T : P> { // expected-note {{generic parameters are always considered '@escaping'}}
+    func foo(_: T.U) {}
+  }
+
+  struct Q : P {
+    typealias U = () -> Int
+  }
+
+  func test(_ s: S<Q>, fn: () -> Int) {
+    s.foo(fn)
+    // expected-error@-1 {{converting non-escaping parameter 'fn' to generic parameter 'Q.U' (aka '() -> Int') may allow it to escape}}
+  }
+}

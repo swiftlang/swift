@@ -459,6 +459,16 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
   auto *locator = getLocator();
   auto diagnostic = diag::general_noescape_to_escaping;
 
+  auto getGenericParamType =
+      [](TypeVariableType *typeVar) -> GenericTypeParamType * {
+    auto *locator = typeVar->getImpl().getLocator();
+    if (locator->isForGenericParameter()) {
+      const auto &GP = locator->getPath().back();
+      return GP.getGenericParameter();
+    }
+    return nullptr;
+  };
+
   ParamDecl *PD = nullptr;
   if (auto *DRE = dyn_cast<DeclRefExpr>(anchor)) {
     PD = dyn_cast<ParamDecl>(DRE->getDecl());
@@ -476,17 +486,32 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
         (path.back().getKind() == ConstraintLocator::ApplyArgToParam)) {
       if (auto paramType =
               getParameterTypeFor(getRawAnchor(), path.back().getValue2())) {
-        // If this is a situation when non-escaping parameter is passed
-        // to the argument which represents generic parameter, there is
-        // a tailored diagnostic for that.
-        if (auto *GP = paramType->getAs<GenericTypeParamType>()) {
-          emitDiagnostic(anchor->getLoc(),
-                         diag::converting_noespace_param_to_generic_type,
-                         PD->getName(), GP->getName());
+        if (paramType->isTypeVariableOrMember()) {
+          auto diagnoseGenericParamFailure = [&](Type genericParam,
+                                                 GenericTypeParamDecl *decl) {
+            emitDiagnostic(anchor->getLoc(),
+                           diag::converting_noespace_param_to_generic_type,
+                           PD->getName(), genericParam);
 
-          emitDiagnostic(GP->getDecl(),
-                         diag::generic_parameters_always_escaping);
-          return true;
+            emitDiagnostic(decl, diag::generic_parameters_always_escaping);
+          };
+
+          // If this is a situation when non-escaping parameter is passed
+          // to the argument which represents generic parameter, there is
+          // a tailored diagnostic for that.
+
+          if (auto *DMT = paramType->getAs<DependentMemberType>()) {
+            auto baseTy = DMT->getBase()->castTo<TypeVariableType>();
+            diagnoseGenericParamFailure(resolveType(DMT),
+                                        getGenericParamType(baseTy)->getDecl());
+            return true;
+          }
+
+          auto *typeVar = paramType->getAs<TypeVariableType>();
+          if (auto *GP = getGenericParamType(typeVar)) {
+            diagnoseGenericParamFailure(GP, GP->getDecl());
+            return true;
+          }
         }
       }
 
@@ -550,17 +575,7 @@ Type NoEscapeFuncToTypeConversionFailure::getParameterTypeFor(
 
   if (auto *fnType = choice->openedType->getAs<FunctionType>()) {
     const auto &param = fnType->getParams()[paramIdx];
-
-    auto paramType = param.getPlainType();
-    if (auto *typeVar = paramType->getAs<TypeVariableType>()) {
-      auto *locator = typeVar->getImpl().getLocator();
-      if (locator->isForGenericParameter()) {
-        const auto &GP = locator->getPath().back();
-        return GP.getGenericParameter();
-      }
-    }
-
-    return paramType;
+    return param.getPlainType();
   }
 
   return Type();
