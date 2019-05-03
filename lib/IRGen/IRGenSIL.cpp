@@ -2000,6 +2000,7 @@ visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *i) {
 // The code structure resembles
 // TFGraphFunctionLowering::visitGraphOperationInst().
 void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
+  assert(false);
   auto &astCtx = CurSILFn->getASTContext();
   tf::GraphOperationInfo opInfo(i);
 

@@ -7,11 +7,6 @@
 import TensorFlow
 
 
-// Make sure we cleanly diagnose this.
-public func testAmbiguous() {
-  #tfop("foo")  // expected-error {{type of expression is ambiguous without more context}}
-}
-
 public func testExpressibleByLiteral() {
   let _: Tensor<Int32> = [1, 2, 3, 4] // ok
   let _: Tensor<Float> = [1, 2.0, 3, 4] // ok

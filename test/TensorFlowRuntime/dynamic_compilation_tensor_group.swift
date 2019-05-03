@@ -17,8 +17,7 @@ var TensorGroupTest = TestSuite("TensorGroup")
 /// T is address-only because it is generic.
 @inline(never)
 func tensorSliceDataset<T: TensorGroup>(_ t: T) -> VariantHandle {
-  return #tfop("TensorSliceDataset", t, Toutput_types$dtype: T._typeList,
-               output_shapes: T._unknownShapeList)
+  return Raw.tensorSliceDataset(components: t, outputShapes: T._unknownShapeList)
 }
 
 /// This function cannot be compiled in graph mode because it executes a #tfop
@@ -26,33 +25,11 @@ func tensorSliceDataset<T: TensorGroup>(_ t: T) -> VariantHandle {
 /// T is address-only because it is generic.
 @inline(never)
 func first<T: TensorGroup>(_ dataset: VariantHandle) -> T {
-  let iterator: ResourceHandle = #tfop(
-    "IteratorV2", shared_name: "blah", container: "earth",
-    output_types$dtype: T._typeList, output_shapes: T._unknownShapeList)
-  #tfop("MakeIterator", dataset, iterator) as Void
-  return #tfop("IteratorGetNext", iterator, output_types$dtype: T._typeList,
-               output_shapes: T._unknownShapeList)
-}
-
-/// This function cannot be compiled in graph mode because it executes a #tfop
-/// with generic return type T.
-/// T is address-only because it is generic.
-@inline(never)
-func pack<T: TensorGroup, Scalar: TensorFlowScalar>(
-    _ t: T
-) -> Tensor<Scalar> {
-  return #tfop("Pack", t, T$dtype: Scalar.tensorFlowDataType)
-}
-
-/// This function cannot be compiled in graph mode because it executes a #tfop
-/// with generic return type T.
-/// T is address-only because it is generic.
-@inline(never)
-func unpack<T: TensorGroup, Scalar: TensorFlowScalar>(
-    _ tensor: Tensor<Scalar>
-) -> T {
-  return #tfop("Unpack", tensor, num: Int64(T._tensorHandleCount),
-               T$dtype: Scalar.tensorFlowDataType)
+  let iterator: ResourceHandle = Raw.iteratorV2(sharedName: "blah",
+    container: "earth",
+    outputTypes: T._typeList, outputShapes: T._unknownShapeList)
+  Raw.makeIterator(dataset: dataset, iterator: iterator)
+  return Raw.iteratorGetNext(iterator: iterator, outputShapes: T._unknownShapeList)
 }
 
 struct Example {
@@ -94,21 +71,22 @@ TensorGroupTest.testAllBackends("dataset, address-only") {
 
 TensorGroupTest.testAllBackends("input, address-only") {
   let example = Example(x: Tensor([1, 2]), y: Tensor([3, 4]))
-  let packed: Tensor<Float> = pack(example)
+  let packed: Tensor<Float> = Raw.pack([example.x, example.y])
   expectEqual(ShapedArray(shape: [2, 2], scalars: [1, 2, 3, 4]), packed.array)
 }
 
 TensorGroupTest.testAllBackends("output, address-only") {
   let tensor = Tensor<Float>(shape: [2, 2], scalars: [1, 2, 3, 4])
-  let example: Example = unpack(tensor)
-  expectEqual(ShapedArray(shape: [2], scalars: [1, 2]), example.x.array)
-  expectEqual(ShapedArray(shape: [2], scalars: [3, 4]), example.y.array)
+  let example: [Tensor<Float>] = Raw.unpack(value: tensor, num: 2)
+  expectEqual(2, example.count)
+  expectEqual(ShapedArray(shape: [2], scalars: [1, 2]), example[0].array)
+  expectEqual(ShapedArray(shape: [2], scalars: [3, 4]), example[1].array)
 }
 
 TensorGroupTest.testAllBackends("output to empty struct, address-only") {
   let tensor = Tensor<Float>(shape: [0], scalars: [])
-  let example: EmptyExample = unpack(tensor)
-  expectEqual(EmptyExample(), example)
+  let example: [Tensor<Float>] = Raw.unpack(value: tensor, num: 0)
+  expectEqual(0, example.count)
 }
 
 // When the input is a loadable type that conforms to TensorGroup, the
@@ -117,19 +95,16 @@ TensorGroupTest.testAllBackends("output to empty struct, address-only") {
 // values.
 TensorGroupTest.testAllBackends("input, loadable") {
   let example = Example(x: Tensor([1, 2]), y: Tensor([3, 4]))
-  let packed: Tensor<Float> = #tfop("Pack", example,
-                                    T$dtype: Float.tensorFlowDataType)
+  let packed: Tensor<Float> = Raw.pack([example.x, example.y])
   expectEqual(ShapedArray(shape: [2, 2], scalars: [1, 2, 3, 4]),
               packed.array)
 }
 
 TensorGroupTest.testAllBackends("output, loadable") {
   let tensor = Tensor<Float>(shape: [2, 2], scalars: [1, 2, 3, 4])
-  let example: Example = #tfop("Unpack", tensor,
-                               num: Int64(Example._tensorHandleCount),
-                               T$dtype: Float.tensorFlowDataType)
-  expectEqual(ShapedArray(shape: [2], scalars: [1, 2]), example.x.array)
-  expectEqual(ShapedArray(shape: [2], scalars: [3, 4]), example.y.array)
+  let example: [Tensor<Float>] = Raw.unpack(value: tensor, num: 2)
+  expectEqual(ShapedArray(shape: [2], scalars: [1, 2]), example[0].array)
+  expectEqual(ShapedArray(shape: [2], scalars: [3, 4]), example[1].array)
 }
 
 @inline(never)
@@ -141,8 +116,7 @@ func some_tf_op(n : Int) {
     arr_exp.insert(contentsOf: [Float(i), 2, 3], at: arr_exp.count)
   }
 
-  let actual: Tensor<Float> = #tfop("Pack",
-    arr, T$dtype: Float.tensorFlowDataType, axis: Int64(0))
+  let actual: Tensor<Float> = Raw.pack(arr)
   let expected  = ShapedArray<Float>(shape: [n, 3], scalars: arr_exp)
   expectEqual(expected, actual.array)
 }

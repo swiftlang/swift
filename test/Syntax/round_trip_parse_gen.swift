@@ -463,8 +463,6 @@ func objectLiterals() {
   #fileLiteral(a)
   #colorLiteral(a, b)
   #imageLiteral(a, b, c)
-  // SWIFT_ENABLE_TENSORFLOW
-  #tfop("Add", a, b, T: Int32.self)
   #column
   #file
   #function
