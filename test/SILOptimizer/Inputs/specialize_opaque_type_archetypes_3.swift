@@ -34,6 +34,13 @@ public struct ResilientContainer {
     return x
   }
 
+  @_alwaysEmitIntoClient
+  @inline(never)
+  public var inlineableProperty2 : some ExternalP2 {
+    return x
+  }
+
+
   @inlinable
   public func inlineableContext() {
     let x = computedProperty

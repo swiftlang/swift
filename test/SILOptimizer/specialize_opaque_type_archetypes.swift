@@ -337,6 +337,17 @@ public func testResilientInlinableProperty() {
   useP(r.inlineableProperty.myValue3())
 }
 
+// CHECK-LABEL: sil @$s1A31testResilientInlinableProperty3yyF
+// CHECK:  [[CONTAINER:%.*]] = alloc_stack $ResilientContainer
+// CHECK:  [[RES:%.*]] = alloc_stack $Int64
+// CHECK:  [[FUN:%.*]] = function_ref @$s9External218ResilientContainerV19inlineableProperty2Qrvg
+// CHECK:  [[RES2:%.*]] = unchecked_addr_cast [[RES]] : $*Int64 to $*@_opaqueReturnTypeOf("$s9External218ResilientContainerV19inlineableProperty2Qrvp", 0)
+// CHECK:  apply [[FUN]]([[RES2]], [[CONTAINER]])
+public func testResilientInlinableProperty3() {
+  let r = ResilientContainer()
+  useP(r.inlineableProperty2.myValue3())
+}
+
 // CHECK-LABEL: sil @$s1A22testResilientProperty2yyF
 // CHECK:  [[CONTAINER:%.*]] = alloc_stack $ResilientContainer2
 // CHECK:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External319ResilientContainer2V16computedPropertyQrvp", 0)
