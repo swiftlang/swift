@@ -798,9 +798,9 @@ sourcekitd::createErrorRequestInvalid(const char *Description) {
 }
 
 sourcekitd_response_t
-sourcekitd::createErrorRequestFailed(const char *Description) {
+sourcekitd::createErrorRequestFailed(StringRef Description) {
   return retained(new SKDError(SOURCEKITD_ERROR_REQUEST_FAILED, 
-                      StringRef(Description)));
+                      Description));
 }
 
 sourcekitd_response_t

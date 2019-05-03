@@ -161,7 +161,7 @@ void printRequestObject(sourcekitd_object_t Obj, llvm::raw_ostream &OS);
 void printResponse(sourcekitd_response_t Resp, llvm::raw_ostream &OS);
 
 sourcekitd_response_t createErrorRequestInvalid(const char *Description);
-sourcekitd_response_t createErrorRequestFailed(const char *Description);
+sourcekitd_response_t createErrorRequestFailed(llvm::StringRef Description);
 sourcekitd_response_t createErrorRequestInterrupted(const char *Description);
 sourcekitd_response_t createErrorRequestCancelled();
 
