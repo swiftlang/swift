@@ -995,8 +995,8 @@ private:
   SmallVector<ProtocolDecl *, 4> SwiftProtocols;
   /// List of protocol conformances to generate descriptors for.
   std::vector<ConformanceDescription> ProtocolConformances;
-  /// List of nominal types to generate type metadata records for.
-  SmallVector<NominalTypeDecl *, 4> RuntimeResolvableTypes;
+  /// List of types to generate runtime-resolvable metadata records for.
+  SmallVector<GenericTypeDecl *, 4> RuntimeResolvableTypes;
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
@@ -1270,7 +1270,7 @@ public:
                                         ConstantInitFuture init,
                                         llvm::StringRef section = {});
 
-  TypeEntityReference getTypeEntityReference(NominalTypeDecl *D);
+  TypeEntityReference getTypeEntityReference(GenericTypeDecl *D);
 
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType);
   ConstantReference getAddrOfTypeMetadata(CanType concreteType,
@@ -1302,8 +1302,9 @@ public:
   llvm::Constant *getAddrOfTypeContextDescriptor(NominalTypeDecl *D,
                                       RequireMetadata_t requireMetadata,
                                       ConstantInit definition = ConstantInit());
-  llvm::Constant *getAddrOfAnonymousContextDescriptor(DeclContext *DC,
-                                      ConstantInit definition = ConstantInit());
+  llvm::Constant *getAddrOfAnonymousContextDescriptor(
+                          PointerUnion<DeclContext *, VarDecl *> Name,
+                          ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfExtensionContextDescriptor(ExtensionDecl *ED,
                                       ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfModuleContextDescriptor(ModuleDecl *D,
@@ -1460,7 +1461,8 @@ private:
                                         llvm::Type *overrideDeclType = nullptr);
 
   void emitLazyPrivateDefinitions();
-  void addRuntimeResolvableType(NominalTypeDecl *nominal);
+  void addRuntimeResolvableType(GenericTypeDecl *nominal);
+  void maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque);
 
   /// Add all conformances of the given \c DeclContext LazyWitnessTables.
   void addLazyConformances(DeclContext *dc);

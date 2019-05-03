@@ -171,6 +171,8 @@ public:
 
   std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
 
+  std::string mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl);
+  
   std::string mangleDeclType(const ValueDecl *decl);
   
   std::string mangleObjCRuntimeName(const NominalTypeDecl *Nominal);
