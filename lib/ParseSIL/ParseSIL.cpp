@@ -28,8 +28,6 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-/// SWIFT_ENABLE_TENSORFLOW
-#include "swift/SIL/GraphOperationBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
@@ -2978,118 +2976,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createBuiltin(InstLoc, Id, ResultTy, subMap, Args);
-    break;
-  }
-  // SWIFT_ENABLE_TENSORFLOW
-  case SILInstructionKind::GraphOperationInst: {
-    bool noClustering = false;
-    if (P.consumeIf(tok::l_square)) {
-      // The only valid option is [no_clustering], when we see an l_square.
-      noClustering = true;
-
-      Identifier ident;
-      if (parseSILIdentifier(ident, diag::expected_in_attribute_list) ||
-          ident.str() != "no_clustering") {
-        P.diagnose(P.Tok, diag::expected_tok_in_sil_instr,
-                   "'no_clustering' attribute");
-        return true;
-      }
-      if (P.parseToken(tok::r_square,
-                       diag::sil_graph_op_no_clustering_attr_expected_rsquare))
-        return true;
-    }
-
-    // Parse graph operation name.
-    if (P.Tok.isNot(tok::string_literal)) {
-      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "graph_op name");
-      return true;
-    }
-    StringRef opName = P.Tok.getText().drop_front().drop_back();
-    if (opName.find(',') != StringRef::npos) {
-      P.diagnose(P.Tok, diag::sil_graph_op_name_comma);
-      return true;
-    }
-    tf::GraphOperationBuilder opBuilder(opName);
-    P.consumeToken(tok::string_literal);
-
-    // Parses a top-level operand to the graphop, and add it to `opBuilder`.
-    auto parseOperand = [&]() -> ParserStatus {
-      // Parse the optional operand name.
-      StringRef operandName;
-      if (P.Tok.is(tok::identifier)) {
-        operandName = P.Tok.getText();
-        P.consumeToken();
-      }
-
-      if (P.Tok.is(tok::l_square)) {
-        // It is a list operand.
-        SourceLoc lSquareLoc = P.consumeToken(tok::l_square);
-        SourceLoc rSquareLoc;
-        SmallVector<SILValue, 4> elements;
-
-        // Parses an element of a list operand, and adds it to `elements`.
-        auto parseListOperandElement = [&]() -> ParserStatus {
-          SILValue value;
-          if (parseTypedValueRef(value, B))
-            return makeParserError();
-          elements.push_back(value);
-          return makeParserSuccess();
-        };
-
-        ParserStatus status = P.parseList(tok::r_square, lSquareLoc, rSquareLoc,
-                                          /*AllowSepAfterLast*/ false,
-                                          diag::sil_graph_op_expected_rsquare,
-                                          SyntaxKind::TuplePatternElementList,
-                                          parseListOperandElement);
-        if (status.isError())
-          return status;
-        opBuilder.addListArgument(elements, operandName);
-        return makeParserSuccess();
-      } else {
-        // It is a single operand.
-        SILValue value;
-        if (parseTypedValueRef(value, B))
-          return makeParserError();
-        opBuilder.addArgument(value, operandName);
-        return makeParserSuccess();
-      }
-    };
-
-    // Parse graph operation operands.
-    if (P.Tok.isNot(tok::l_paren)) {
-      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "(");
-      return true;
-    }
-    SourceLoc lParenLoc = P.consumeToken(tok::l_paren);
-    SourceLoc rParenLoc;
-    ParserStatus status = P.parseList(tok::r_paren, lParenLoc, rParenLoc,
-                                      /*AllowSepAfterLast*/ false,
-                                      diag::sil_graph_op_expected_rparen,
-                                      SyntaxKind::TuplePatternElementList,
-                                      parseOperand);
-    if (status.isError())
-      return true;
-
-    // Parse graph operation result types.
-    if (P.parseToken(tok::colon,
-                     diag::sil_graph_op_expected_colon_before_result_types))
-      return true;
-    SmallVector<SILType, 4> resultTypes;
-    SILType temp;
-    while (true) {
-      if (parseSILType(temp))
-        return true;
-      resultTypes.push_back(temp);
-      if (!P.consumeIf(tok::comma))
-        break;
-    }
-
-    if (parseSILDebugLocation(InstLoc, B))
-      return true;
-
-    auto op = opBuilder.build(B, P.Context, InstLoc, resultTypes);
-    op->setNoClustering(noClustering);
-    ResultVal = op;
     break;
   }
   case SILInstructionKind::OpenExistentialAddrInst:

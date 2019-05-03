@@ -29,9 +29,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/TensorFlow.h" // SWIFT_ENABLE_TENSORFLOW
 #include "swift/Basic/StringExtras.h"
-#include "swift/SIL/GraphOperationInfo.h" // SWIFT_ENABLE_TENSORFLOW
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -425,9 +423,6 @@ namespace {
   /// \brief Rewrites an expression by applying the solution of a constraint
   /// system to that expression.
   class ExprRewriter : public ExprVisitor<ExprRewriter, Expr *> {
-  // SWIFT_ENABLE_TENSORFLOW
-  private:
-    tf::AttributeTypeClassifier atc;
   public:
     ConstraintSystem &cs;
     DeclContext *dc;

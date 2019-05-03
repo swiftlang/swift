@@ -984,24 +984,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         rawExtractee, adfei->getDifferentiationOrder());
     break;
   }
-  case SILInstructionKind::GraphOperationInst: {
-    const GraphOperationInst *GI = cast<GraphOperationInst>(&SI);
-    SmallVector<ValueID, 4> ListOfValues;
-    for (auto Arg : GI->getArguments()) {
-      ListOfValues.push_back(addValueRef(Arg));
-      ListOfValues.push_back(S.addTypeRef(Arg->getType().getASTType()));
-      ListOfValues.push_back((unsigned)Arg->getType().getCategory());
-    }
-    for (auto ResultTy : GI->getResultTypes()) {
-      ListOfValues.push_back(S.addTypeRef(ResultTy.getASTType()));
-      ListOfValues.push_back((unsigned)ResultTy.getCategory());
-    }
-    SILInstGraphOperationLayout::emitRecord(
-        Out, ScratchRecord, SILAbbrCodes[SILInstGraphOperationLayout::Code],
-        S.addDeclBaseNameRef(GI->getName()), GI->getArguments().size(),
-        ListOfValues);
-    break;
-  }
   case SILInstructionKind::ApplyInst: {
     // Format: attributes such as transparent and number of substitutions,
     // the callee's substituted and unsubstituted types, a value for
@@ -2500,7 +2482,6 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILSpecializeAttrLayout>();
   // SWIFT_ENABLE_TENSORFLOW
   registerSILAbbr<SILDifferentiableAttrLayout>();
-  registerSILAbbr<SILInstGraphOperationLayout>();
   registerSILAbbr<SILInstAutoDiffFunctionLayout>();
   registerSILAbbr<SILInstAutoDiffFunctionExtractLayout>();
 

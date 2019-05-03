@@ -40,8 +40,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/DynamicCasts.h"
-// SWIFT_ENABLE_TENSORFLOW
-#include "swift/SIL/GraphOperationBuilder.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -2486,47 +2484,7 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
 
 RValue RValueEmitter::
 visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
-  // SWIFT_ENABLE_TENSORFLOW
-  if (!E->isTFOp())
-    return visit(E->getSemanticExpr(), C);
-
-  // If this is a tensorflow operation, we have a bit more work to do: we emit
-  // a GraphOperationInst.
-  auto tuple = dyn_cast<TupleExpr>(E->getArg());
-
-  auto opNameArg = tuple ? tuple->getElement(0) : E->getArg();
-  opNameArg = opNameArg->getSemanticsProvidingExpr();
-  auto opName = cast<StringLiteralExpr>(opNameArg)->getValue();
-  tf::GraphOperationBuilder opBuilder(opName);
-
-  if (tuple) {
-    for (unsigned i = 1, e = tuple->getNumElements(); i != e; ++i) {
-      // Arguments of this graph_op will be taken at +0 instead of +1, for
-      // consistency with the default calling convention of taking function
-      // parameters as @guaranteed instead of @owned.
-      // e.g. Say E represents #tfop("Add", x, x). x can be passed into this
-      // expression without having to do a strong_retain (or copy_value) first.
-      auto operand =
-          SGF.emitRValueAsSingleValue(tuple->getElement(i),
-                                      SGFContext::AllowGuaranteedPlusZero)
-             .getValue();
-      opBuilder.addArgument(operand, tuple->getElementName(i).str());
-    }
-  }
-
-  auto &resultTL = SGF.getTypeLowering(E->getType());
-  if (resultTL.isLoadable()) {
-    auto graphOpInst = opBuilder.build(SGF.B, SGF.getASTContext(), E,
-                                       resultTL.getLoweredType());
-    return RValue(SGF, E,
-                  SGF.emitManagedRValueWithCleanup(graphOpInst->getResult(0),
-                                                   resultTL));
-  } else {
-    auto address = SGF.getBufferForExprResult(E, resultTL.getLoweredType(), C);
-    opBuilder.addArgument(address, "$out");
-    opBuilder.build(SGF.B, SGF.getASTContext(), E, /*resultSilTypes=*/{});
-    return RValue(SGF, E, SGF.manageBufferForExprResult(address, resultTL, C));
-  }
+  return visit(E->getSemanticExpr(), C);
 }
 
 RValue RValueEmitter::

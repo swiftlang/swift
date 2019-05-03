@@ -1179,15 +1179,6 @@ OperandOwnershipKindClassifier::visitBuiltinInst(BuiltinInst *bi) {
   return OperandOwnershipKindBuiltinClassifier().check(bi);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-OperandOwnershipKindMap
-OperandOwnershipKindClassifier::visitGraphOperationInst(
-    GraphOperationInst *gi) {
-  // Graph ops take operands at +0.
-  return {gi->getOperand(getOperandIndex()).getOwnershipKind(),
-          UseLifetimeConstraint::MustBeLive};
-}
-
 //===----------------------------------------------------------------------===//
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//

@@ -1095,11 +1095,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW
-  case SIL_INST_GRAPH_OPERATION:
-    SILInstGraphOperationLayout::readRecord(scratch, ValID, NumArguments,
-                                            ListOfValues);
-    RawOpCode = (unsigned)SILInstructionKind::GraphOperationInst;
-    break;
   case SIL_INST_AUTODIFF_FUNCTION:
     SILInstAutoDiffFunctionLayout::readRecord(scratch, /*order*/ Attr,
                                               /*numParams*/ Attr2, NumArguments,
@@ -1525,30 +1520,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto order = Attr2;
     ResultVal =
         Builder.createAutoDiffFunctionExtract(Loc, extractee, order, val);
-    break;
-  }
-  case SILInstructionKind::GraphOperationInst: {
-    // TODO(SR-8848): Deserialize attributes.
-    auto EndOfArgValues = 3 * NumArguments;
-    Identifier MangledName = MF->getIdentifier(ValID);
-    SmallVector<SILValue, 4> Args;
-    for (unsigned i = 0, e = EndOfArgValues; i < e; i += 3) {
-      auto ArgASTTy = MF->getType(ListOfValues[i+1]);
-      auto ArgTy = getSILType(ArgASTTy,
-                              (SILValueCategory)(unsigned)ListOfValues[i+2]);
-      Args.push_back(getLocalValue(ListOfValues[i], ArgTy));
-    }
-    SmallVector<SILType, 4> ResultSILTypes;
-    for (unsigned i = EndOfArgValues, e = ListOfValues.size(); i < e; i += 2) {
-      auto ASTTy = MF->getType(ListOfValues[i]);
-      auto Ty = getSILType(ASTTy,
-                           (SILValueCategory)(unsigned)ListOfValues[i+1]);
-      ResultSILTypes.push_back(Ty);
-    }
-    // TODO: deserialize `noClustering`.
-    ResultVal =
-        Builder.createGraphOperation(Loc, MangledName, Args,
-                                     /*noClustering*/ false, ResultSILTypes);
     break;
   }
   case SILInstructionKind::AllocGlobalInst: {
