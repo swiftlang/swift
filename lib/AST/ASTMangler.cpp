@@ -2665,3 +2665,10 @@ void ASTMangler::appendOpParamForLayoutConstraint(LayoutConstraint layout) {
     break;
   }
 }
+
+std::string ASTMangler::mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl) {
+  beginMangling();
+  appendOpaqueDeclName(decl);
+  appendOperator("MQ");
+  return finalize();
+}

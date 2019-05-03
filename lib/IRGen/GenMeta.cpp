@@ -512,11 +512,22 @@ namespace {
     
     using super = ContextDescriptorBuilderBase;
     
-    DeclContext *DC;
+    PointerUnion<DeclContext *, VarDecl *> Name;
   
+    DeclContext *getInnermostDeclContext() {
+      if (auto DC = Name.dyn_cast<DeclContext *>()) {
+        return DC;
+      }
+      if (auto VD = Name.dyn_cast<VarDecl *>()) {
+        return VD->getInnermostDeclContext();
+      }
+      llvm_unreachable("unknown name kind");
+    }
+      
   public:
-    AnonymousContextDescriptorBuilder(IRGenModule &IGM, DeclContext *DC)
-      : super(IGM), DC(DC)
+    AnonymousContextDescriptorBuilder(IRGenModule &IGM,
+                                    PointerUnion<DeclContext *, VarDecl *> Name)
+      : super(IGM), Name(Name)
     {
     }
     
@@ -528,7 +539,7 @@ namespace {
   
     ConstantReference getParent() {
       return IGM.getAddrOfParentContextDescriptor(
-               DC, /*fromAnonymousContext=*/true);
+               getInnermostDeclContext(), /*fromAnonymousContext=*/true);
     }
     
     ContextDescriptorKind getContextKind() {
@@ -536,7 +547,7 @@ namespace {
     }
     
     GenericSignature *getGenericSignature() {
-      return DC->getGenericSignatureOfContext();
+      return getInnermostDeclContext()->getGenericSignatureOfContext();
     }
     
     bool isUniqueDescriptor() {
@@ -556,7 +567,7 @@ namespace {
         return;
 
       IRGenMangler mangler;
-      auto mangledName = mangler.mangleContext(DC);
+      auto mangledName = mangler.mangleAnonymousDescriptorName(Name);
       auto mangledNameConstant =
         IGM.getAddrOfGlobalString(mangledName,
                                   /*willBeRelativelyAddressed*/ true);
@@ -565,7 +576,7 @@ namespace {
 
     void emit() {
       asImpl().layout();
-      auto addr = IGM.getAddrOfAnonymousContextDescriptor(DC,
+      auto addr = IGM.getAddrOfAnonymousContextDescriptor(Name,
                                                      B.finishAndCreateFuture());
       auto var = cast<llvm::GlobalVariable>(addr);
       
@@ -1717,6 +1728,16 @@ namespace {
     }
     
     ConstantReference getParent() {
+      // VarDecls aren't normally contexts, but we still want to mangle
+      // an anonymous context for one.
+      if (IGM.IRGen.Opts.EnableAnonymousContextMangledNames) {
+        if (auto namingVar = dyn_cast<VarDecl>(O->getNamingDecl())) {
+          return ConstantReference(
+                           IGM.getAddrOfAnonymousContextDescriptor(namingVar),
+                           ConstantReference::Direct);
+        }
+      }
+      
       DeclContext *parent = O->getNamingDecl()->getInnermostDeclContext();
 
       // If we have debug mangled names enabled for anonymous contexts, nest
@@ -1871,8 +1892,9 @@ IRGenModule::getAddrOfExtensionContextDescriptor(ExtensionDecl *ED,
 }
 
 llvm::Constant *
-IRGenModule::getAddrOfAnonymousContextDescriptor(DeclContext *DC,
-                                                 ConstantInit definition) {
+IRGenModule::getAddrOfAnonymousContextDescriptor(
+                                     PointerUnion<DeclContext *, VarDecl *> DC,
+                                     ConstantInit definition) {
   auto entity = LinkEntity::forAnonymousDescriptor(DC);
   return getAddrOfSharedContextDescriptor(entity, definition,
     [&]{ AnonymousContextDescriptorBuilder(*this, DC).emit(); });
