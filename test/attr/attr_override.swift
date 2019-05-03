@@ -505,3 +505,32 @@ class Index<F, T> {
 class CollectionIndex<C : Collection> : Index<C, C.I> {
   override func map(_ f: C) -> C.I {}
 }
+
+// Overrides with different generic signature
+
+class SR_4206_Class {
+  func helloWorld<T>(_ arg: T)
+}
+
+protocol SR_4206_P0 {}
+
+protocol SR_4206_P1: SR_4206_P0 {}
+protocol SR_4206_P2: SR_4206_P0 {}
+
+class SR_4206_C1 {
+  func foo<T: SR_4206_P1>(param: T) {} // expected-note {{overridden declaration is here}}
+}
+
+class SR_4206_C2: SR_4206_C1 {
+  override func foo<T: SR_4206_P2>(param: T) {} // expected-error {{cannot override method 'foo' with a different generic signature}}
+}
+
+class SR_4206_C3 {}
+class SR_4206_C4<T>: SR_4206_C3 {}
+
+class SR_4206_C5 {
+  func test<E: SR_4206_C3>(_: E) {} // expected-note {{overridden declaration is here}}
+}
+class SR_4206_C6<T>: SR_4206_C5 {
+  override func test<E>(_: E) where E: SR_4206_C4<T> {} // expected-error {{cannot override method 'test' with a different generic signature}}
+}
