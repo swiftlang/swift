@@ -4790,7 +4790,7 @@ public:
     return Substitutions;
   }
   
-  /// Get the generic signature used to build out this archetype. This is
+  /// Get the generic signature used to build out this archetype. This isa
   /// equivalent to the OpaqueTypeDecl's interface generic signature, with
   /// all of the generic parameters aside from the opaque type's interface
   /// type same-type-constrained to their substitutions for this type.
@@ -4803,6 +4803,18 @@ public:
   
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpaqueTypeArchetype;
+  }
+  
+  /// Get the ordinal of the type within the declaration's opaque signature.
+  ///
+  /// If a method declared its return type as:
+  ///
+  ///   func foo() -> (some P, some Q)
+  ///
+  /// then the underlying type of `some P` would be ordinal 0, and `some Q` would be ordinal 1.
+  unsigned getOrdinal() const {
+    // TODO: multiple opaque types
+    return 0;
   }
   
   static void Profile(llvm::FoldingSetNodeID &ID,

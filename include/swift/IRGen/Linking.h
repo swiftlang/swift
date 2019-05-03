@@ -728,9 +728,10 @@ public:
     return entity;
   }
 
-  static LinkEntity forAnonymousDescriptor(DeclContext *dc) {
+  static LinkEntity forAnonymousDescriptor(
+                                    PointerUnion<DeclContext *, VarDecl *> dc) {
     LinkEntity entity;
-    entity.Pointer = const_cast<void*>(static_cast<const void*>(dc));
+    entity.Pointer = dc.getOpaqueValue();
     entity.SecondaryPointer = nullptr;
     entity.Data =
       LINKENTITY_SET_FIELD(Kind, unsigned(Kind::AnonymousDescriptor));
@@ -973,9 +974,10 @@ public:
     return reinterpret_cast<ExtensionDecl*>(Pointer);
   }
 
-  const DeclContext *getDeclContext() const {
+  const PointerUnion<DeclContext *, VarDecl *> getAnonymousDeclContext() const {
     assert(getKind() == Kind::AnonymousDescriptor);
-    return reinterpret_cast<DeclContext*>(Pointer);
+    return PointerUnion<DeclContext *, VarDecl *>
+      ::getFromOpaqueValue(reinterpret_cast<void*>(Pointer));
   }
 
   SILFunction *getSILFunction() const {
