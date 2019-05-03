@@ -637,44 +637,6 @@ static void lookupVisibleMemberDeclsImpl(
   } while (1);
 }
 
-static void lookupVisibleDynamicMemberLookupDecls(
-    Type baseType, VisibleDeclConsumer &consumer, const DeclContext *dc,
-    LookupState LS, DeclVisibilityKind reason, LazyResolver *typeResolver,
-    GenericSignatureBuilder *GSB, VisitedSet &visited) {
-
-  if (!hasDynamicMemberLookupAttribute(baseType))
-    return;
-
-  auto &ctx = dc->getASTContext();
-
-  // Lookup the `subscript(dynamicMember:)` methods in this type.
-  auto subscriptName =
-      DeclName(ctx, DeclBaseName::createSubscript(), ctx.Id_dynamicMember);
-
-  SmallVector<ValueDecl *, 2> subscripts;
-  dc->lookupQualified(baseType, subscriptName, NL_QualifiedDefault,
-                      typeResolver, subscripts);
-
-  for (ValueDecl *VD : subscripts) {
-    auto *subscript = dyn_cast<SubscriptDecl>(VD);
-    if (!subscript)
-      continue;
-
-    auto rootType = getRootTypeOfKeypathDynamicMember(subscript, dc);
-    if (!rootType)
-      continue;
-
-    auto subs =
-        baseType->getMemberSubstitutionMap(dc->getParentModule(), subscript);
-    auto memberType = rootType->subst(subs);
-    if (!memberType || !memberType->mayHaveMembers())
-      continue;
-
-    lookupVisibleMemberDeclsImpl(memberType, consumer, dc, LS, reason,
-                                 typeResolver, GSB, visited);
-  }
-}
-
 swift::DynamicLookupInfo::DynamicLookupInfo(
     SubscriptDecl *subscript, Type baseType,
     DeclVisibilityKind originalVisibility)
@@ -829,8 +791,8 @@ public:
     //
     // If the member is a free function and not a member of a type,
     // don't substitute either.
-    bool shouldSubst = (!BaseTy->isAnyObject() &&
-                        !BaseTy->hasTypeVariable() &&
+    bool shouldSubst = (Reason != DeclVisibilityKind::DynamicLookup &&
+                        !BaseTy->isAnyObject() && !BaseTy->hasTypeVariable() &&
                         (BaseTy->getNominalOrBoundGenericNominal() ||
                          BaseTy->is<ArchetypeType>()) &&
                         VD->getDeclContext()->isTypeContext());
@@ -904,6 +866,9 @@ struct KeyPathDynamicMemberConsumer : public VisibleDeclConsumer {
   VisibleDeclConsumer &consumer;
   std::function<bool(DeclBaseName)> seenBaseName;
 
+  SubscriptDecl *currentSubscript = nullptr;
+  Type currentBaseType = Type();
+
   KeyPathDynamicMemberConsumer(VisibleDeclConsumer &consumer,
                                std::function<bool(DeclBaseName)> seenBaseName)
       : consumer(consumer), seenBaseName(std::move(seenBaseName)) {}
@@ -921,10 +886,70 @@ struct KeyPathDynamicMemberConsumer : public VisibleDeclConsumer {
     // non-dynamic members.
     if (isa<SubscriptDecl>(VD) || !seenBaseName(VD->getBaseName()))
       consumer.foundDecl(VD, DeclVisibilityKind::DynamicLookup,
-                         {nullptr, Type(), reason});
+                         {currentSubscript, currentBaseType, reason});
   }
+
+  struct SubscriptChange {
+    KeyPathDynamicMemberConsumer &consumer;
+    SubscriptDecl *oldSubscript;
+    Type oldBaseType;
+
+    SubscriptChange(KeyPathDynamicMemberConsumer &consumer,
+                    SubscriptDecl *newSubscript, Type newBaseType)
+        : consumer(consumer), oldSubscript(newSubscript),
+          oldBaseType(newBaseType) {
+      std::swap(consumer.currentSubscript, oldSubscript);
+      std::swap(consumer.currentBaseType, oldBaseType);
+    }
+    ~SubscriptChange() {
+      consumer.currentSubscript = oldSubscript;
+      consumer.currentBaseType = oldBaseType;
+    }
+  };
 };
 } // end anonymous namespace
+
+static void lookupVisibleDynamicMemberLookupDecls(
+    Type baseType, KeyPathDynamicMemberConsumer &consumer,
+    const DeclContext *dc, LookupState LS, DeclVisibilityKind reason,
+    LazyResolver *typeResolver, GenericSignatureBuilder *GSB,
+    VisitedSet &visited) {
+
+  if (!hasDynamicMemberLookupAttribute(baseType))
+    return;
+
+  auto &ctx = dc->getASTContext();
+
+  // Lookup the `subscript(dynamicMember:)` methods in this type.
+  auto subscriptName =
+      DeclName(ctx, DeclBaseName::createSubscript(), ctx.Id_dynamicMember);
+
+  SmallVector<ValueDecl *, 2> subscripts;
+  dc->lookupQualified(baseType, subscriptName, NL_QualifiedDefault,
+                      typeResolver, subscripts);
+
+  for (ValueDecl *VD : subscripts) {
+    auto *subscript = dyn_cast<SubscriptDecl>(VD);
+    if (!subscript)
+      continue;
+
+    auto rootType = getRootTypeOfKeypathDynamicMember(subscript, dc);
+    if (!rootType)
+      continue;
+
+    auto subs =
+        baseType->getMemberSubstitutionMap(dc->getParentModule(), subscript);
+    auto memberType = rootType->subst(subs);
+    if (!memberType || !memberType->mayHaveMembers())
+      continue;
+
+    KeyPathDynamicMemberConsumer::SubscriptChange(consumer, subscript,
+                                                  baseType);
+
+    lookupVisibleMemberDeclsImpl(memberType, consumer, dc, LS, reason,
+                                 typeResolver, GSB, visited);
+  }
+}
 
 /// Enumerate all members in \c BaseTy (including members of extensions,
 /// superclasses and implemented protocols), as seen from the context \c CurrDC.

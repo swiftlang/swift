@@ -1992,10 +1992,18 @@ public:
     });
   }
 
-  Type getTypeOfMember(const ValueDecl *VD, Optional<Type> ExprType = None) {
-    if (!ExprType)
-      ExprType = this->ExprType;
+  Type getTypeOfMember(const ValueDecl *VD,
+                       DynamicLookupInfo dynamicLookupInfo) {
+    if (dynamicLookupInfo.getKind() == DynamicLookupInfo::None) {
+      return getTypeOfMember(VD, this->ExprType);
+    } else {
+      // FIXME: for keypath dynamic members we should substitute the subscript
+      // return type; for now just avoid substituting at all by passing null.
+      return getTypeOfMember(VD, Type());
+    }
+  }
 
+  Type getTypeOfMember(const ValueDecl *VD, Type ExprType) {
     auto *M = CurrDeclContext->getParentModule();
     auto *GenericSig = VD->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
@@ -2003,11 +2011,11 @@ public:
     assert(VD->hasValidSignature());
     Type T = VD->getInterfaceType();
 
-    if (*ExprType) {
+    if (ExprType) {
       Type ContextTy = VD->getDeclContext()->getDeclaredInterfaceType();
       if (ContextTy) {
         // Look through lvalue types and metatypes
-        Type MaybeNominalType = (*ExprType)->getRValueType();
+        Type MaybeNominalType = ExprType->getRValueType();
 
         if (auto Metatype = MaybeNominalType->getAs<MetatypeType>())
           MaybeNominalType = Metatype->getInstanceType();
@@ -2096,7 +2104,7 @@ public:
       return;
 
     // Add a type annotation.
-    Type VarType = getTypeOfMember(VD);
+    Type VarType = getTypeOfMember(VD, dynamicLookupInfo);
     if (Name != Ctx.Id_self && VD->isInOut()) {
       // It is useful to show inout for function parameters.
       // But for 'self' it is just noise.
@@ -2437,7 +2445,7 @@ public:
     Identifier Name = FD->getName();
     assert(!Name.empty() && "name should not be empty");
 
-    Type FunctionType = getTypeOfMember(FD);
+    Type FunctionType = getTypeOfMember(FD, dynamicLookupInfo);
     assert(FunctionType);
 
     auto AFT = FunctionType->getAs<AnyFunctionType>();
@@ -2549,7 +2557,7 @@ public:
                           bool IsOnType = true,
                           Identifier addName = Identifier()) {
     foundFunction(CD);
-    Type MemberType = getTypeOfMember(CD, BaseType);
+    Type MemberType = getTypeOfMember(CD, BaseType.getValueOr(ExprType));
     AnyFunctionType *ConstructorType = nullptr;
     if (auto MemberFuncType = MemberType->getAs<AnyFunctionType>())
       ConstructorType = MemberFuncType->getResult()
@@ -2659,7 +2667,8 @@ public:
     if (HaveDot && !IsAfterSwiftKeyPathRoot)
       return;
 
-    auto subscriptType = getTypeOfMember(SD)->getAs<AnyFunctionType>();
+    auto subscriptType =
+        getTypeOfMember(SD, dynamicLookupInfo)->getAs<AnyFunctionType>();
     if (!subscriptType)
       return;
 
@@ -2802,7 +2811,7 @@ public:
 
     // Enum element is of function type; (Self.type) -> Self or
     // (Self.Type) -> (Args...) -> Self.
-    Type EnumType = getTypeOfMember(EED);
+    Type EnumType = getTypeOfMember(EED, dynamicLookupInfo);
     if (EnumType->is<AnyFunctionType>())
       EnumType = EnumType->castTo<AnyFunctionType>()->getResult();
 
