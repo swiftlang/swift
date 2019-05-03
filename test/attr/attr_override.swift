@@ -530,3 +530,13 @@ class SR_4206_C5 {
 class SR_4206_C6<T>: SR_4206_C5 {
   override func test<E>(_: E) where E: SR_4206_C4<T> {} // expected-error {{cannot override method 'test' with a different generic signature}}
 }
+
+protocol SR_4206_Proto {}
+
+class GenericClass_SR_4206<T> {
+  func foo<T: SR_4206_Proto>(arg: T) {} // expected-error {{overridden declaration is here}}
+}
+
+class ConcreteClass_SR_4206: GenericClass_SR_4206<SR_4206_Proto> {
+  override func foo<T>(arg: T) {} // expected-error {{cannot override method 'foo' with a different generic signature}}
+}
