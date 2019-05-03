@@ -2400,9 +2400,263 @@ public:
     return alias;
   }
 
+<<<<<<< HEAD
   Expected<Decl *>
   deserializeGenericTypeParamDecl(ArrayRef<uint64_t> scratch,
                                   StringRef blobData) {
+=======
+        StringRef message = blobData.substr(0, messageSize);
+        blobData = blobData.substr(messageSize);
+        StringRef rename = blobData.substr(0, renameSize);
+        llvm::VersionTuple Introduced, Deprecated, Obsoleted;
+        DECODE_VER_TUPLE(Introduced)
+        DECODE_VER_TUPLE(Deprecated)
+        DECODE_VER_TUPLE(Obsoleted)
+
+        PlatformAgnosticAvailabilityKind platformAgnostic;
+        if (isUnavailable)
+          platformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
+        else if (isDeprecated)
+          platformAgnostic = PlatformAgnosticAvailabilityKind::Deprecated;
+        else if (((PlatformKind)platform) == PlatformKind::none &&
+                 (!Introduced.empty() ||
+                  !Deprecated.empty() ||
+                  !Obsoleted.empty()))
+          platformAgnostic =
+            PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
+        else
+          platformAgnostic = PlatformAgnosticAvailabilityKind::None;
+
+        Attr = new (ctx) AvailableAttr(
+          SourceLoc(), SourceRange(),
+          (PlatformKind)platform, message, rename,
+          Introduced, SourceRange(),
+          Deprecated, SourceRange(),
+          Obsoleted, SourceRange(),
+          platformAgnostic, isImplicit);
+        break;
+
+#undef DEF_VER_TUPLE_PIECES
+#undef LIST_VER_TUPLE_PIECES
+#undef DECODE_VER_TUPLE
+      }
+
+      case decls_block::ObjC_DECL_ATTR: {
+        bool isImplicit;
+        bool isImplicitName;
+        bool isSwift3Inferred;
+        uint64_t numArgs;
+        ArrayRef<uint64_t> rawPieceIDs;
+        serialization::decls_block::ObjCDeclAttrLayout::readRecord(
+          scratch, isImplicit, isSwift3Inferred, isImplicitName, numArgs,
+          rawPieceIDs);
+
+        SmallVector<Identifier, 4> pieces;
+        for (auto pieceID : rawPieceIDs)
+          pieces.push_back(getIdentifier(pieceID));
+
+        if (numArgs == 0)
+          Attr = ObjCAttr::create(ctx, None, isImplicitName);
+        else
+          Attr = ObjCAttr::create(ctx, ObjCSelector(ctx, numArgs-1, pieces),
+                                  isImplicitName);
+        Attr->setImplicit(isImplicit);
+        cast<ObjCAttr>(Attr)->setSwift3Inferred(isSwift3Inferred);
+        break;
+      }
+
+      case decls_block::Specialize_DECL_ATTR: {
+        unsigned exported;
+        SpecializeAttr::SpecializationKind specializationKind;
+        unsigned specializationKindVal;
+        SmallVector<Requirement, 8> requirements;
+
+        serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
+          scratch, exported, specializationKindVal);
+
+        specializationKind = specializationKindVal
+                                 ? SpecializeAttr::SpecializationKind::Partial
+                                 : SpecializeAttr::SpecializationKind::Full;
+
+        readGenericRequirements(requirements, DeclTypeCursor);
+
+        Attr = SpecializeAttr::create(ctx, SourceLoc(), SourceRange(),
+                                      requirements, exported != 0,
+                                      specializationKind);
+        break;
+      }
+
+      // SWIFT_ENABLE_TENSORFLOW
+      case decls_block::Differentiable_DECL_ATTR: {
+        bool isImplicit;
+        uint64_t jvpNameId;
+        DeclID jvpDeclId;
+        uint64_t vjpNameId;
+        DeclID vjpDeclId;
+        ArrayRef<uint64_t> parameters;
+        SmallVector<Requirement, 4> requirements;
+
+        serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
+            scratch, isImplicit, jvpNameId, jvpDeclId, vjpNameId, vjpDeclId,
+            parameters);
+
+        Optional<DeclNameWithLoc> jvp;
+        FuncDecl *jvpDecl = nullptr;
+        if (jvpNameId != 0 && jvpDeclId != 0) {
+          jvp = { getIdentifier(jvpNameId), DeclNameLoc() };
+          jvpDecl = cast<FuncDecl>(getDecl(jvpDeclId));
+        }
+        Optional<DeclNameWithLoc> vjp;
+        FuncDecl *vjpDecl = nullptr;
+        if (vjpNameId != 0 && vjpDeclId != 0) {
+          vjp = { getIdentifier(vjpNameId), DeclNameLoc() };
+          vjpDecl = cast<FuncDecl>(getDecl(vjpDeclId));
+        }
+
+        llvm::SmallBitVector parametersBitVector(parameters.size());
+        for (unsigned i : indices(parameters))
+          parametersBitVector[i] = parameters[i];
+        auto *indices = AutoDiffParameterIndices::get(parametersBitVector, ctx);
+
+        readGenericRequirements(requirements, DeclTypeCursor);
+
+        auto diffAttr =
+            DifferentiableAttr::create(ctx, isImplicit, SourceLoc(),
+                                       SourceRange(), indices, jvp, vjp,
+                                       requirements);
+        diffAttr->setJVPFunction(jvpDecl);
+        diffAttr->setVJPFunction(vjpDecl);
+        Attr = diffAttr;
+        break;
+      }
+
+      case decls_block::DynamicReplacement_DECL_ATTR: {
+        bool isImplicit;
+        uint64_t numArgs;
+        ArrayRef<uint64_t> rawPieceIDs;
+        DeclID replacedFunID;
+        serialization::decls_block::DynamicReplacementDeclAttrLayout::
+            readRecord(scratch, isImplicit, replacedFunID, numArgs, rawPieceIDs);
+
+        auto replacedFunDecl = getDeclChecked(replacedFunID);
+        if (!replacedFunDecl)
+          return replacedFunDecl.takeError();
+        auto baseName = getDeclBaseName(rawPieceIDs[0]);
+        SmallVector<Identifier, 4> pieces;
+        for (auto pieceID : rawPieceIDs.slice(1))
+          pieces.push_back(getIdentifier(pieceID));
+
+        assert(numArgs != 0);
+        assert(!isImplicit && "Need to update for implicit");
+        Attr = DynamicReplacementAttr::create(
+            ctx, DeclName(ctx, baseName, ArrayRef<Identifier>(pieces)),
+            cast<AbstractFunctionDecl>(*replacedFunDecl));
+        break;
+      }
+
+#define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
+      case decls_block::CLASS##_DECL_ATTR: { \
+        bool isImplicit; \
+        serialization::decls_block::CLASS##DeclAttrLayout::readRecord( \
+            scratch, isImplicit); \
+        Attr = new (ctx) CLASS##Attr(isImplicit); \
+        break; \
+      }
+#include "swift/AST/Attr.def"
+
+      default:
+        // We don't know how to deserialize this kind of attribute.
+        error();
+        return nullptr;
+      }
+
+      if (!Attr)
+        return nullptr;
+
+      AddAttribute(Attr);
+
+    } else if (recordID == decls_block::PRIVATE_DISCRIMINATOR) {
+      IdentifierID discriminatorID;
+      decls_block::PrivateDiscriminatorLayout::readRecord(scratch,
+                                                          discriminatorID);
+      privateDiscriminatorRAII.discriminator = getIdentifier(discriminatorID);
+
+    } else if (recordID == decls_block::LOCAL_DISCRIMINATOR) {
+      unsigned discriminator;
+      decls_block::LocalDiscriminatorLayout::readRecord(scratch, discriminator);
+      localDiscriminatorRAII.discriminator = discriminator;
+    } else if (recordID == decls_block::FILENAME_FOR_PRIVATE) {
+      IdentifierID filenameID;
+      decls_block::FilenameForPrivateLayout::readRecord(scratch, filenameID);
+      filenameForPrivate.filename = getIdentifier(filenameID);
+    } else {
+      break;
+    }
+
+    // Advance bitstream cursor to the next record.
+    entry = DeclTypeCursor.advance();
+
+    // Prepare to read the next record.
+    scratch.clear();
+  }
+
+  PrettyDeclDeserialization stackTraceEntry(
+     this, declOrOffset, DID, static_cast<decls_block::RecordKind>(recordID));
+
+  switch (recordID) {
+  case decls_block::TYPE_ALIAS_DECL: {
+    IdentifierID nameID;
+    DeclContextID contextID;
+    TypeID underlyingTypeID, interfaceTypeID;
+    bool isImplicit;
+    GenericEnvironmentID genericEnvID;
+    uint8_t rawAccessLevel;
+    ArrayRef<uint64_t> dependencyIDs;
+
+    decls_block::TypeAliasLayout::readRecord(scratch, nameID, contextID,
+                                             underlyingTypeID, interfaceTypeID,
+                                             isImplicit, genericEnvID,
+                                             rawAccessLevel, dependencyIDs);
+
+    Identifier name = getIdentifier(nameID);
+
+    for (TypeID dependencyID : dependencyIDs) {
+      auto dependency = getTypeChecked(dependencyID);
+      if (!dependency) {
+        return llvm::make_error<TypeError>(
+            name, takeErrorInfo(dependency.takeError()));
+      }
+    }
+
+    auto DC = getDeclContext(contextID);
+
+    auto genericParams = maybeReadGenericParams(DC);
+    if (declOrOffset.isComplete())
+      return declOrOffset;
+
+    auto alias = createDecl<TypeAliasDecl>(SourceLoc(), SourceLoc(), name,
+                                           SourceLoc(), genericParams, DC);
+    declOrOffset = alias;
+
+    configureGenericEnvironment(alias, genericEnvID);
+
+    alias->setUnderlyingType(getType(underlyingTypeID));
+
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
+      alias->setAccess(*accessLevel);
+    } else {
+      error();
+      return nullptr;
+    }
+
+    if (isImplicit)
+      alias->setImplicit();
+
+    break;
+  }
+
+  case decls_block::GENERIC_TYPE_PARAM_DECL: {
+>>>>>>> origin/tensorflow
     IdentifierID nameID;
     bool isImplicit;
     unsigned depth;
@@ -4272,6 +4526,8 @@ getActualSILFunctionTypeRepresentation(uint8_t rep) {
   CASE(Method)
   CASE(ObjCMethod)
   CASE(WitnessMethod)
+  // SWIFT_ENABLE_TENSORFLOW
+  CASE(TensorFlow)
 #undef CASE
   default:
     return None;
@@ -4349,6 +4605,21 @@ Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
 #undef CASE
   }
   return None;
+}
+
+/// Translate from the serialization SILParameterDifferentiability enumerators,
+/// which are guaranteed to be stable, to the AST ones.
+static Optional<swift::SILParameterDifferentiability>
+getActualSILParameterDifferentiability(uint8_t raw) {
+  switch (serialization::SILParameterDifferentiability(raw)) {
+#define CASE(ID)                                                               \
+  case serialization::SILParameterDifferentiability::ID:                       \
+    return swift::SILParameterDifferentiability::ID;
+  CASE(DifferentiableOrNotApplicable)
+  CASE(NotDifferentiable)
+  }
+  return None;
+#undef CASE
 }
 
 /// Translate from the serialization ResultConvention enumerators,
@@ -4587,20 +4858,26 @@ public:
                                             bool isGeneric) {
     TypeID resultID;
     uint8_t rawRepresentation;
-    bool noescape = false, throws;
+
+    // SWIFT_ENABLE_TENSORFLOW
+    bool noescape = false, throws = false, differentiable = false;
     GenericSignature *genericSig = nullptr;
 
     if (!isGeneric) {
       decls_block::FunctionTypeLayout::readRecord(scratch, resultID,
                                                   rawRepresentation,
                                                   noescape,
-                                                  throws);
+                                                  // SWIFT_ENABLE_TENSORFLOW
+                                                  throws,
+                                                  differentiable);
     } else {
       GenericSignatureID rawGenericSig;
       decls_block::GenericFunctionTypeLayout::readRecord(scratch,
                                                          resultID,
                                                          rawRepresentation,
                                                          throws,
+                                                         // SWIFT_ENABLE_TENSORFLOW
+                                                         differentiable,
                                                          rawGenericSig);
       genericSig = MF.getGenericSignature(rawGenericSig);
     }
@@ -4611,7 +4888,13 @@ public:
       return nullptr;
     }
 
+<<<<<<< HEAD
     auto info = FunctionType::ExtInfo(*representation, noescape, throws);
+=======
+    auto info = FunctionType::ExtInfo(*representation, noescape,
+                                      // SWIFT_ENABLE_TENSORFLOW
+                                      throws, differentiable);
+>>>>>>> origin/tensorflow
 
     auto resultTy = MF.getTypeChecked(resultID);
     if (!resultTy)
@@ -4631,11 +4914,22 @@ public:
 
       IdentifierID labelID;
       TypeID typeID;
+<<<<<<< HEAD
       bool isVariadic, isAutoClosure;
       unsigned rawOwnership;
       decls_block::FunctionParamLayout::readRecord(scratch, labelID, typeID,
                                                    isVariadic, isAutoClosure,
                                                    rawOwnership);
+=======
+      // SWIFT_ENABLE_TENSORFLOW
+      bool isVariadic, isAutoClosure, isEscaping, isNonDifferentiable;
+      unsigned rawOwnership;
+      decls_block::FunctionParamLayout::readRecord(scratch, labelID, typeID,
+                                                   isVariadic, isAutoClosure,
+                                                   // SWIFT_ENABLE_TENSORFLOW
+                                                   isEscaping, rawOwnership,
+                                                   isNonDifferentiable);
+>>>>>>> origin/tensorflow
 
       auto ownership =
           getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
@@ -4651,7 +4945,13 @@ public:
       params.emplace_back(paramTy.get(),
                           MF.getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
+<<<<<<< HEAD
                                              *ownership));
+=======
+                                             // SWIFT_ENABLE_TENSORFLOW
+                                             isEscaping, *ownership,
+                                             isNonDifferentiable));
+>>>>>>> origin/tensorflow
     }
 
     if (!isGeneric) {
@@ -4957,6 +5257,8 @@ public:
     uint8_t rawRepresentation;
     bool pseudogeneric = false;
     bool noescape;
+    // SWIFT_ENABLE_TENSORFLOW
+    bool differentiable;
     bool hasErrorResult;
     unsigned numParams;
     unsigned numYields;
@@ -4970,6 +5272,8 @@ public:
                                              rawRepresentation,
                                              pseudogeneric,
                                              noescape,
+                                             // SWIFT_ENABLE_TENSORFLOW
+                                             differentiable,
                                              hasErrorResult,
                                              numParams,
                                              numYields,
@@ -4984,7 +5288,9 @@ public:
       MF.error();
       return nullptr;
     }
-    SILFunctionType::ExtInfo extInfo(*representation, pseudogeneric, noescape);
+    // SWIFT_ENABLE_TENSORFLOW
+    SILFunctionType::ExtInfo extInfo(*representation, pseudogeneric, noescape,
+                                     differentiable);
 
     // Process the coroutine kind.
     auto coroutineKind = getActualSILCoroutineKind(rawCoroutineKind);
@@ -5000,8 +5306,10 @@ public:
       return nullptr;
     }
 
-    auto processParameter = [&](TypeID typeID, uint64_t rawConvention)
-                                  -> llvm::Expected<SILParameterInfo> {
+    // SWIFT_ENABLE_TENSORFLOW
+    auto processParameter =
+        [&](TypeID typeID, uint64_t rawConvention,
+            uint64_t rawParamDiff) -> llvm::Expected<SILParameterInfo> {
       auto convention = getActualParameterConvention(rawConvention);
       if (!convention) {
         MF.error();
@@ -5010,7 +5318,20 @@ public:
       auto type = MF.getTypeChecked(typeID);
       if (!type)
         return type.takeError();
-      return SILParameterInfo(type.get()->getCanonicalType(), *convention);
+      // SWIFT_ENABLE_TENSORFLOW
+      auto paramDiff =
+          swift::SILParameterDifferentiability::DifferentiableOrNotApplicable;
+      if (differentiable) {
+        auto paramDiffOpt =
+            getActualSILParameterDifferentiability(rawParamDiff);
+        if (!paramDiffOpt) {
+          error();
+          llvm_unreachable("an error is a fatal exit at this point");
+        }
+        paramDiff = *paramDiffOpt;
+      }
+      return SILParameterInfo(type.get()->getCanonicalType(), *convention,
+                              paramDiff);
     };
 
     auto processYield = [&](TypeID typeID, uint64_t rawConvention)
@@ -5040,9 +5361,18 @@ public:
     };
 
     // Bounds check.  FIXME: overflow
+<<<<<<< HEAD
     if (2 * numParams + 2 * numResults + 2 * unsigned(hasErrorResult)
           > variableData.size()) {
       MF.error();
+=======
+    // SWIFT_ENABLE_TENSORFLOW
+    unsigned entriesPerParam = differentiable ? 3 : 2;
+    if (entriesPerParam * numParams + 2 * numResults +
+            2 * unsigned(hasErrorResult) >
+        variableData.size()) {
+      error();
+>>>>>>> origin/tensorflow
       return nullptr;
     }
 
@@ -5054,7 +5384,11 @@ public:
     for (unsigned i = 0; i != numParams; ++i) {
       auto typeID = variableData[nextVariableDataIndex++];
       auto rawConvention = variableData[nextVariableDataIndex++];
-      auto param = processParameter(typeID, rawConvention);
+      // SWIFT_ENABLE_TENSORFLOW
+      uint64_t paramDiff = 0;
+      if (differentiable)
+        paramDiff = variableData[nextVariableDataIndex++];
+      auto param = processParameter(typeID, rawConvention, paramDiff);
       if (!param)
         return param.takeError();
       allParams.push_back(param.get());

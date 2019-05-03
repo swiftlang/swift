@@ -232,7 +232,19 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'NamedAttributeStringArgument': 227,
     'DeclName': 228,
     'PoundAssertStmt': 229,
+<<<<<<< HEAD
     'SomeType': 230,
+=======
+    # SWIFT_ENABLE_TENSORFLOW
+    'DifferentiableAttributeArguments': 230,
+    'DifferentiationParamsClause': 231,
+    'DifferentiationParams': 232,
+    'DifferentiationParamList': 233,
+    'DifferentiationParam': 234,
+    'DifferentiableAttributeFuncSpecifier': 235,
+    'FunctionDeclName': 236,
+    'DifferentiatingAttributeArguments': 237,
+>>>>>>> origin/tensorflow
 }
 
 

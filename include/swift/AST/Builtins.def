@@ -375,6 +375,10 @@ BUILTIN_SIL_OPERATION(AllocWithTailElems, "allocWithTailElems", Special)
 /// Projects the first tail-allocated element of type E from a class C.
 BUILTIN_SIL_OPERATION(ProjectTailElems, "projectTailElems", Special)
 
+// SWIFT_ENABLE_TENSORFLOW
+/// autodiffApply
+BUILTIN_SIL_OPERATION(AutoDiffApply, "autodiffApply", Special)
+
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.
@@ -550,6 +554,25 @@ BUILTIN_MISC_OPERATION(WillThrow, "willThrow", "", Special)
 
 /// poundAssert has type (Builtin.Int1, Builtin.RawPointer) -> ().
 BUILTIN_MISC_OPERATION(PoundAssert, "poundAssert", "", Special)
+
+// SWIFT_ENABLE_TENSORFLOW
+/// tensorflowSend_X has type <T> (T) -> ().  The X in the name is an integer
+/// ID number that allows matching sends and receives.
+BUILTIN_MISC_OPERATION(TensorFlowSend, "tensorflowSend", "", Special)
+
+/// tensorflowReceive_X has type <T> () -> T.  The X in the name is an integer
+/// ID number that allows matching sends and receives.
+BUILTIN_MISC_OPERATION(TensorFlowReceive, "tensorflowReceive", "", Special)
+
+// Automatic differentiation builtins.
+/// autodiffCreateTape has type <T> () -> Builtin.AutoDiffTape<T>.
+BUILTIN_MISC_OPERATION(AutoDiffCreateTape, "autodiffCreateTape", "", Special)
+/// autodiffPushToTape has type <T> (Builtin.AutoDiffTape<T>, T, Builtin.Word) -> ().
+BUILTIN_MISC_OPERATION(AutoDiffPushToTape, "autodiffPushToTape", "", Special)
+/// autodiffPopFromTape has type <T> (Builtin.AutoDiffTape<T>, Builtin.Word) -> T.
+BUILTIN_MISC_OPERATION(AutoDiffPopFromTape, "autodiffPopFromTape", "", Special)
+/// autodiffDestroyTape has type <T> (Builtin.AutoDiffTape<T>) -> ().
+BUILTIN_MISC_OPERATION(AutoDiffDestroyTape, "autodiffDestroyTape", "", Special)
 
 #undef BUILTIN_MISC_OPERATION
 

@@ -565,6 +565,129 @@ TryApplyInst *TryApplyInst::create(
                                      normalBB, errorBB, specializationInfo);
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+SILType
+AutoDiffFunctionInst::getAutoDiffType(SILValue originalFunction,
+                                      unsigned differentiationOrder,
+                                      const SmallBitVector &parameterIndices) {
+  auto fnTy = originalFunction->getType().castTo<SILFunctionType>();
+  auto diffTy =
+      fnTy->getWithDifferentiability(differentiationOrder, parameterIndices);
+  return SILType::getPrimitiveObjectType(diffTy);
+}
+
+AutoDiffFunctionInst::AutoDiffFunctionInst(
+    SILModule &module, SILDebugLocation debugLoc,
+    const SmallBitVector &parameterIndices, unsigned differentiationOrder,
+    SILValue originalFunction, ArrayRef<SILValue> associatedFunctions)
+    : InstructionBaseWithTrailingOperands(
+          originalFunction, associatedFunctions, debugLoc,
+          getAutoDiffType(originalFunction, differentiationOrder,
+                          parameterIndices),
+          originalFunction.getOwnershipKind()),
+      parameterIndices(parameterIndices),
+      differentiationOrder(differentiationOrder),
+      numOperands(1 + associatedFunctions.size()) {}
+
+AutoDiffFunctionInst *AutoDiffFunctionInst::create(
+    SILModule &module, SILDebugLocation debugLoc,
+    const SmallBitVector &parameterIndices,
+    unsigned differentiationOrder, SILValue originalFunction,
+    ArrayRef<SILValue> associatedFunctions) {
+  size_t size = totalSizeToAlloc<Operand>(associatedFunctions.size() + 1);
+  void *buffer = module.allocateInst(size, alignof(AutoDiffFunctionInst));
+  return ::new (buffer) AutoDiffFunctionInst(module, debugLoc,
+                                             parameterIndices,
+                                             differentiationOrder,
+                                             originalFunction,
+                                             associatedFunctions);
+}
+
+std::pair<SILValue, SILValue> AutoDiffFunctionInst::
+getAssociatedFunctionPair(unsigned differentiationOrder) const {
+  assert(differentiationOrder > 0 &&
+         differentiationOrder <= this->differentiationOrder);
+  assert(!getAssociatedFunctions().empty() && "No associated functions. Maybe "
+         "the differentiation pass has not run?");
+  auto offset = (differentiationOrder - 1) * 2;
+  auto assocFns = getAssociatedFunctions();
+  return {assocFns[offset].get(), assocFns[offset+1].get()};
+}
+
+SILValue AutoDiffFunctionInst::
+getAssociatedFunction(unsigned differentiationOrder,
+                      AutoDiffAssociatedFunctionKind kind) const {
+  assert(differentiationOrder > 0 &&
+         differentiationOrder <= this->differentiationOrder);
+  auto offset = autodiff::getOffsetForAutoDiffAssociatedFunction(
+      differentiationOrder, kind);
+  return getAssociatedFunctions()[offset].get();
+}
+
+AutoDiffFunctionExtractInst::Extractee::Extractee(
+    AutoDiffAssociatedFunctionKind kind) {
+  switch (kind) {
+  case AutoDiffAssociatedFunctionKind::JVP:
+    rawValue = JVP;
+    return;
+  case AutoDiffAssociatedFunctionKind::VJP:
+    rawValue = VJP;
+    return;
+  }
+}
+
+AutoDiffFunctionExtractInst::Extractee::Extractee(StringRef string) {
+  Optional<innerty> result =
+      llvm::StringSwitch<Optional<innerty>>(string)
+          .Case("original", Original)
+          .Case("jvp", JVP)
+          .Case("vjp", VJP);
+  assert(result && "Invalid string");
+  rawValue = *result;
+}
+
+Optional<AutoDiffAssociatedFunctionKind>
+AutoDiffFunctionExtractInst::Extractee::getExtracteeAsAssociatedFunction()
+    const {
+  switch (rawValue) {
+  case Original:
+    return None;
+  case JVP:
+    return {AutoDiffAssociatedFunctionKind::JVP};
+  case VJP:
+    return {AutoDiffAssociatedFunctionKind::VJP};
+  }
+}
+
+SILType AutoDiffFunctionExtractInst::
+getExtracteeType(SILValue function, Extractee extractee,
+                 unsigned differentiationOrder, SILModule &module) {
+  auto fnTy = function->getType().castTo<SILFunctionType>();
+  assert(fnTy->getExtInfo().isDifferentiable());
+  auto originalFnTy = fnTy->getWithoutDifferentiability();
+  auto kindOpt = extractee.getExtracteeAsAssociatedFunction();
+  if (!kindOpt) {
+    assert(extractee == Extractee::Original);
+    assert(differentiationOrder == 0);
+    return SILType::getPrimitiveObjectType(originalFnTy);
+  }
+  auto resultFnTy = originalFnTy->getAutoDiffAssociatedFunctionType(
+        fnTy->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
+        differentiationOrder, *kindOpt, module,
+        LookUpConformanceInModule(module.getSwiftModule()));
+  return SILType::getPrimitiveObjectType(resultFnTy);
+}
+
+AutoDiffFunctionExtractInst::AutoDiffFunctionExtractInst(
+    SILModule &module, SILDebugLocation debugLoc, Extractee extractee,
+    unsigned differentiationOrder, SILValue theFunction)
+    : InstructionBase(debugLoc,
+                      getExtracteeType(theFunction, extractee,
+                                       differentiationOrder, module),
+                      theFunction.getOwnershipKind()),
+      extractee(extractee), differentiationOrder(differentiationOrder),
+      operands(this, theFunction) {}
+
 FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,
                                          SILDebugLocation DebugLoc,
                                          SILFunction *F)

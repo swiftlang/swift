@@ -128,6 +128,16 @@ public protocol AdditiveArithmetic : Equatable {
   static func -=(lhs: inout Self, rhs: Self)
 }
 
+public extension AdditiveArithmetic {
+  static func +=(lhs: inout Self, rhs: Self) {
+    lhs = lhs + rhs
+  }
+
+  static func -=(lhs: inout Self, rhs: Self) {
+    lhs = lhs - rhs
+  }
+}
+
 public extension AdditiveArithmetic where Self : ExpressibleByIntegerLiteral {
   /// The zero value.
   ///

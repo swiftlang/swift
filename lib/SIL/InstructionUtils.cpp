@@ -483,6 +483,11 @@ void swift::findClosuresForFunctionValue(
         worklistInsert(SVI->getOperand(0));
         continue;
       }
+      // SWIFT_ENABLE_TENSORFLOW
+      if (auto *ADFI = dyn_cast<AutoDiffFunctionInst>(I)) {
+        worklistInsert(ADFI->getOperand(0));
+        continue;
+      }
     }
     // Look through Optionals.
     if (V->getType().getOptionalObjectType()) {

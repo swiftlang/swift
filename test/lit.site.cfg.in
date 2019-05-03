@@ -43,6 +43,14 @@ if "@SWIFT_ASAN_BUILD@" == "TRUE":
 else:
     config.available_features.add('no_asan')
 
+if "@SWIFT_ENABLE_TENSORFLOW@" == "TRUE":
+    config.available_features.add('tensorflow')
+else:
+    config.available_features.add('no_tensorflow')
+
+if "@TENSORFLOW_SWIFT_BINDINGS@":
+    config.available_features.add('tensorflow_swift_bindings')
+
 if "@SWIFT_RUNTIME_ENABLE_LEAK_CHECKER@" == "TRUE":
     config.available_features.add('leak-checker')
 

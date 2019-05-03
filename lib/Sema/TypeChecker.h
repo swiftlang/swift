@@ -2044,6 +2044,9 @@ public:
   void checkPropertyDelegateErrorHandling(PatternBindingDecl *binding,
                                           Expr *expr);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  void checkFunctionBodyCompilerEvaluable(AbstractFunctionDecl *D);
+
   void addExprForDiagnosis(Expr *E1, Expr *Result) {
     DiagnosedExprs[E1] = Result;
   }
@@ -2112,10 +2115,28 @@ public:
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.
   DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
+<<<<<<< HEAD
   
   Type getOrCreateOpaqueResultType(TypeResolution resolution,
                                    ValueDecl *originatingDecl,
                                    OpaqueReturnTypeRepr *repr);
+=======
+
+  /// SWIFT_ENABLE_TENSORFLOW
+  // Returns the function declaration corresponding to the given function name
+  // and lookup context. If the function declaration cannot be resolved, emits a
+  // diagnostic and returns nullptr.
+  FuncDecl *lookupFuncDecl(
+      DeclName funcName, SourceLoc funcNameLoc, Type baseType,
+      DeclContext *lookupContext,
+      const std::function<bool(FuncDecl *)> &isValidFuncDecl,
+      const std::function<void()> &overloadDiagnostic,
+      const std::function<void()> &ambiguousDiagnostic,
+      const std::function<void()> &notFunctionDiagnostic,
+      NameLookupOptions lookupOptions = defaultMemberLookupOptions,
+      const Optional<std::function<bool(FuncDecl *)>> &hasValidTypeCtx = None,
+      const Optional<std::function<void()>> &invalidTypeCtxDiagnostic = None);
+>>>>>>> origin/tensorflow
 };
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic

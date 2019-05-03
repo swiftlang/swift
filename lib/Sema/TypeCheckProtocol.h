@@ -210,6 +210,10 @@ enum class MatchKind : uint8_t {
 
   /// The witness is explicitly @nonobjc but the requirement is @objc.
   NonObjC,
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// The @differentiable attribute does not match.
+  DifferentiableConflict,
 };
 
 /// Describes the kind of optional adjustment performed when
@@ -424,6 +428,8 @@ struct RequirementMatch {
     case MatchKind::RethrowsConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
+      // SWIFT_ENABLE_TENSORFLOW
+    case MatchKind::DifferentiableConflict:
       return false;
     }
 
@@ -453,6 +459,8 @@ struct RequirementMatch {
     case MatchKind::RethrowsConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
+      // SWIFT_ENABLE_TENSORFLOW
+    case MatchKind::DifferentiableConflict:
       return false;
     }
 

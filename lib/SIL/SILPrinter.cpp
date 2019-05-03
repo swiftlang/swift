@@ -344,6 +344,23 @@ void SILDeclRef::print(raw_ostream &OS) const {
 
   if (isDirectReference)
     OS << ((isDot || uncurryLevel != 0) ? '.' : '!')  << "direct";
+
+  // SWIFT_ENABLE_TENSORFLOW
+  if (autoDiffAssociatedFunctionIdentifier) {
+    auto *autoDiffFuncId = autoDiffAssociatedFunctionIdentifier;
+    OS << ((isDot || uncurryLevel != 0 || isForeign || isDirectReference)
+               ? '.' : '!');
+    switch (autoDiffFuncId->getKind()) {
+    case AutoDiffAssociatedFunctionKind::JVP:
+      OS << "jvp.";
+      break;
+    case AutoDiffAssociatedFunctionKind::VJP:
+      OS << "vjp.";
+      break;
+    }
+    OS << autoDiffFuncId->getDifferentiationOrder() << "."
+       << autoDiffFuncId->getParameterIndices()->getString();
+  }
 }
 
 void SILDeclRef::dump() const {
@@ -1138,6 +1155,47 @@ public:
 
   void visitEndApplyInst(EndApplyInst *AI) {
     *this << Ctx.getID(AI->getOperand());
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
+    if (adfi->getParameterIndices().any()) {
+      *this << "[wrt";
+      for (auto i : adfi->getParameterIndices().set_bits())
+        *this << ' ' << i;
+      *this << "] ";
+    }
+    *this << "[order " << adfi->getDifferentiationOrder() << "] ";
+    *this << getIDAndType(adfi->getOriginalFunction());
+    if (!adfi->getAssociatedFunctions().empty()) {
+      *this << " with ";
+      interleave(range(1, adfi->getDifferentiationOrder() + 1),
+                 [&](unsigned order) {
+                   auto pair = adfi->getAssociatedFunctionPair(order);
+                   *this << '{' << getIDAndType(pair.first) << ", "
+                         << getIDAndType(pair.second) << '}';
+                 }, [this] { *this << ", "; });
+    }
+  }
+
+  void visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *adfei) {
+    *this << '[';
+    switch (adfei->getExtractee()) {
+    case AutoDiffFunctionExtractee::Original:
+      *this << "original";
+      break;
+    case AutoDiffFunctionExtractee::JVP:
+      *this << "jvp";
+      break;
+    case AutoDiffFunctionExtractee::VJP:
+      *this << "vjp";
+      break;
+    }
+    *this << "] ";
+    auto order = adfei->getDifferentiationOrder();
+    if (order > 0)
+      *this << "[order " << order << "] ";
+    *this << getIDAndType(adfei->getFunctionOperand());
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {
@@ -2366,6 +2424,11 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[_specialize "; Attr->print(OS); OS << "] ";
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  for (auto *Attr : getDifferentiableAttrs()) {
+    OS << "[differentiable "; Attr->print(OS); OS << "] ";
+  }
+
   // TODO: Handle clang node owners which don't have a name.
   if (hasClangNode() && getClangNodeOwner()->hasName()) {
     OS << "[clang ";
@@ -2714,6 +2777,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
     for (const Decl *D : topLevelDecls) {
       if (!WholeModuleMode && !(D->getDeclContext() == AssociatedDeclContext))
           continue;
+      // SWIFT_ENABLE_TENSORFLOW
       if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D) ||
            isa<ExtensionDecl>(D) || isa<ImportDecl>(D)) &&
           !D->isImplicit()) {
@@ -3047,6 +3111,49 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
                  }
                },
                [&] { OS << ", "; });
+  }
+}
+
+/// SWIFT_ENABLE_TENSORFLOW
+void SILDifferentiableAttr::print(llvm::raw_ostream &OS) const {
+  auto &indices = getIndices();
+  OS << "source " << indices.source << " wrt ";
+  interleave(indices.parameters.set_bits(),
+             [&](unsigned index) { OS << index; },
+             [&] { OS << ", "; });
+  if (!JVPName.empty()) {
+    OS << " jvp @" << JVPName;
+  }
+  if (!VJPName.empty()) {
+    OS << " vjp @" << VJPName;
+  }
+  if (!getRequirements().empty()) {
+    OS << " where ";
+    SILFunction *original = getOriginal();
+    assert(original);
+    auto genericEnv = original->getGenericEnvironment();
+    PrintOptions SubPrinter = PrintOptions::printSIL();
+    interleave(getRequirements(), [&](Requirement req) {
+      if (!genericEnv) {
+         req.print(OS, SubPrinter);
+         return;
+      }
+      // Use GenericEnvironment to produce user-friendly
+      // names instead of something like 't_0_0'.
+      auto FirstTy = genericEnv->getSugaredType(req.getFirstType());
+      if (req.getKind() != RequirementKind::Layout) {
+        auto SecondTy =
+        genericEnv->getSugaredType(req.getSecondType());
+        Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
+        ReqWithDecls.print(OS, SubPrinter);
+      } else {
+        Requirement ReqWithDecls(req.getKind(), FirstTy,
+                                 req.getLayoutConstraint());
+        ReqWithDecls.print(OS, SubPrinter);
+      }
+    }, [&] {
+      OS << ", ";
+    });
   }
 }
 

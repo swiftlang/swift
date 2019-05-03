@@ -93,7 +93,10 @@ getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
   auto *vd = thunk.getDecl();
 
   // Reference the next uncurrying level of the function.
-  SILDeclRef next = SILDeclRef(vd, thunk.kind);
+  // SWIFT_ENABLE_TENSORFLOW
+  SILDeclRef next = SILDeclRef(vd, thunk.kind, /*isCurried*/ false,
+                               /*isForeign*/ false,
+                               thunk.autoDiffAssociatedFunctionIdentifier);
   assert(!next.isCurried);
 
   auto constantInfo = SGF.SGM.Types.getConstantInfo(next);

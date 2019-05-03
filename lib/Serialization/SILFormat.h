@@ -172,6 +172,10 @@ namespace sil_block {
     SIL_PROPERTY,
     SIL_ONE_OPERAND_EXTRA_ATTR,
     SIL_TWO_OPERANDS_EXTRA_ATTR,
+    // SWIFT_ENABLE_TENSORFLOW
+    SIL_DIFFERENTIABLE_ATTR,
+    SIL_INST_AUTODIFF_FUNCTION,
+    SIL_INST_AUTODIFF_FUNCTION_EXTRACT,
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
@@ -288,6 +292,8 @@ namespace sil_block {
                      BCFixed<2>,  // optimizationMode
                      BCFixed<3>,  // side effect info.
                      BCVBR<8>,    // number of specialize attributes
+                     // SWIFT_ENABLE_TENSORFLOW
+                     BCVBR<8>,    // number of differentiable attributes
                      BCFixed<1>,  // has qualified ownership
                      BCFixed<1>,  // must be weakly referenced
                      BCFixed<1>,  // is dynamically replacable
@@ -297,6 +303,8 @@ namespace sil_block {
                      DeclIDField, // ClangNode owner
                      BCArray<IdentifierIDField> // Semantics Attribute
                      // followed by specialize attributes
+                     // SWIFT_ENABLE_TENSORFLOW
+                     // followed by reverse differentiable attributes
                      // followed by generic param list, if any
                      >;
 
@@ -305,6 +313,15 @@ namespace sil_block {
                      BCFixed<1>, // exported
                      BCFixed<1> // specialization kind
                      >;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  using SILDifferentiableAttrLayout = BCRecordLayout<
+    SIL_DIFFERENTIABLE_ATTR,
+    IdentifierIDField,  // JVP name.
+    IdentifierIDField,  // VJP name.
+    BCFixed<32>,        // Indices' source.
+    BCArray<BCFixed<1>> // Indices' parameters bitvector.
+  >;
 
   // Has an optional argument list where each argument is a typed valueref.
   using SILBasicBlockLayout = BCRecordLayout<
@@ -389,6 +406,24 @@ namespace sil_block {
     TypeIDField,          // callee substituted type
     ValueIDField,         // callee value
     BCArray<ValueIDField> // a list of arguments
+  >;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  using SILInstAutoDiffFunctionLayout = BCRecordLayout<
+    SIL_INST_AUTODIFF_FUNCTION,
+    BCVBR<8>,             // differentiation order
+    BCVBR<8>,             // number of function parameters
+    BCVBR<8>,             // number of operands
+    BCArray<ValueIDField> // parameter indices and operands
+  >;
+
+  using SILInstAutoDiffFunctionExtractLayout = BCRecordLayout<
+    SIL_INST_AUTODIFF_FUNCTION_EXTRACT,
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField,
+    BCFixed<2>, // extractee
+    BCVBR<8>    // order
   >;
 
   // SIL instructions with one type. (alloc_stack)

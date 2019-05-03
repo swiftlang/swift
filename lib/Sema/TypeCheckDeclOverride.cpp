@@ -1299,6 +1299,14 @@ namespace  {
     UNINTERESTING_ATTR(DynamicReplacement)
     UNINTERESTING_ATTR(PrivateImport)
 
+    // SWIFT_ENABLE_TENSORFLOW
+    UNINTERESTING_ATTR(Differentiable)
+    UNINTERESTING_ATTR(Differentiating)
+    UNINTERESTING_ATTR(CompilerEvaluable)
+    UNINTERESTING_ATTR(TensorFlowGraph)
+    UNINTERESTING_ATTR(FieldwiseDifferentiable)
+    UNINTERESTING_ATTR(NoDerivative)
+
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)
     UNINTERESTING_ATTR(Postfix)

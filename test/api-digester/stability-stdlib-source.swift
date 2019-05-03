@@ -1,3 +1,5 @@
+// SWIFT_ENABLE_TENSORFLOW
+// UNSUPPORTED: tensorflow
 // REQUIRES: OS=macosx
 // RUN: %empty-directory(%t.tmp)
 // mkdir %t.tmp/module-cache && mkdir %t.tmp/dummy.sdk

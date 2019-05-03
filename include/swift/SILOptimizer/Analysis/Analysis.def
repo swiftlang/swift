@@ -45,5 +45,7 @@ ANALYSIS(RCIdentity)
 ANALYSIS(SideEffect)
 ANALYSIS(TypeExpansion)
 ANALYSIS(PassManagerVerifier)
+// SWIFT_ENABLE_TENSORFLOW
+ANALYSIS(DifferentiableActivity)
 
 #undef ANALYSIS

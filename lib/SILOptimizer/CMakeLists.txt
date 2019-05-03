@@ -1,3 +1,10 @@
+if(SWIFT_ENABLE_TENSORFLOW)
+  find_package(TensorFlow REQUIRED)
+  if (TF_PATH_ADJUSTMENT)
+    include_directories(BEFORE "${TF_INCLUDE_DIR}/${TF_PATH_ADJUSTMENT}")
+  endif()
+  include_directories(BEFORE "${TF_INCLUDE_DIR}")
+endif()
 
 set(SILOPTIMIZER_SOURCES)
 
@@ -34,6 +41,12 @@ add_subdirectory(UtilityPasses)
 add_subdirectory(Utils)
 
 add_swift_host_library(swiftSILOptimizer STATIC
+<<<<<<< HEAD
   ${SILOPTIMIZER_SOURCES})
 target_link_libraries(swiftSILOptimizer PRIVATE
   swiftSIL)
+=======
+  ${SILOPTIMIZER_SOURCES}
+  LINK_LIBRARIES swiftSIL
+  INTERFACE_LINK_LIBRARIES "${TF_LIBRARIES}")
+>>>>>>> origin/tensorflow

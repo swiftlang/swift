@@ -502,6 +502,34 @@ public:
                                                  beginApply));
   }
 
+  /// SWIFT_ENABLE_TENSORFLOW
+  AutoDiffFunctionInst *createAutoDiffFunction(
+      SILLocation loc, const llvm::SmallBitVector &parameterIndices,
+      unsigned differentiationOrder, SILValue original,
+      ArrayRef<SILValue> associatedFunctions = {}) {
+    return insert(AutoDiffFunctionInst::create(getModule(),
+                                               getSILDebugLocation(loc),
+                                               parameterIndices,
+                                               differentiationOrder,
+                                               original,
+                                               associatedFunctions));
+  }
+  
+  AutoDiffFunctionExtractInst *createAutoDiffFunctionExtract(
+      SILLocation loc, AutoDiffFunctionExtractInst::Extractee extractee,
+      unsigned differentiationOrder, SILValue theFunction) {
+    return insert(new (getModule()) AutoDiffFunctionExtractInst(
+        getModule(), getSILDebugLocation(loc), extractee, differentiationOrder,
+        theFunction));
+  }
+
+  AutoDiffFunctionExtractInst *createAutoDiffFunctionExtractOriginal(
+      SILLocation loc, SILValue theFunction) {
+    return insert(new (getModule()) AutoDiffFunctionExtractInst(
+        getModule(), getSILDebugLocation(loc),
+        AutoDiffFunctionExtractee::Original, 0, theFunction));
+  }
+
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
                              SubstitutionMap Subs,
                              ArrayRef<SILValue> Args) {

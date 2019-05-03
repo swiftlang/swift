@@ -147,7 +147,8 @@
     "SmallBuffer.swift"
   ],
   "KeyPaths": [
-    "KeyPath.swift"
+    "KeyPath.swift",
+    "KeyPathIterable.swift"
   ],
   "Reflection": [
     "Dump.swift",
@@ -171,6 +172,9 @@
     "Vector": [
       "SIMDVector.swift",
       "SIMDVectorTypes.swift"]}
+  ],
+  "AutoDiff": [
+    "AutoDiff.swift",
   ],
   "Optional": [
     "Optional.swift"

@@ -2643,6 +2643,7 @@ bool LoadableByAddress::fixStoreToBlockStorageInstr(
   return true;
 }
 
+<<<<<<< HEAD
 bool LoadableByAddress::recreateTupleInstr(
     SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
   auto *tupleInstr = dyn_cast<TupleInst>(&I);
@@ -2664,6 +2665,83 @@ bool LoadableByAddress::recreateTupleInstr(
   SmallVector<SILValue, 8> elems;
   for (auto elem : tupleInstr->getElements()) {
     elems.push_back(elem);
+=======
+void LoadableByAddress::recreateConvInstrs() {
+  for (auto *convInstr : conversionInstrs) {
+    IRGenModule *currIRMod =
+        getIRGenModule()->IRGen.getGenModule(convInstr->getFunction());
+    SILType currSILType = convInstr->getType();
+    if (auto *thinToPointer = dyn_cast<ThinFunctionToPointerInst>(convInstr)) {
+      currSILType = thinToPointer->getOperand()->getType();
+    }
+    auto currSILFunctionType = currSILType.castTo<SILFunctionType>();
+    GenericEnvironment *genEnv =
+        convInstr->getFunction()->getGenericEnvironment();
+    CanSILFunctionType newFnType = MapperCache.getNewSILFunctionType(
+        genEnv, currSILFunctionType, *currIRMod);
+    SILType newType = SILType::getPrimitiveObjectType(newFnType);
+    SILBuilderWithScope convBuilder(convInstr);
+    SingleValueInstruction *newInstr = nullptr;
+    switch (convInstr->getKind()) {
+    case SILInstructionKind::ThinToThickFunctionInst: {
+      auto instr = cast<ThinToThickFunctionInst>(convInstr);
+      newInstr = convBuilder.createThinToThickFunction(
+          instr->getLoc(), instr->getOperand(), newType);
+      break;
+    }
+    case SILInstructionKind::ThinFunctionToPointerInst: {
+      auto instr = cast<ThinFunctionToPointerInst>(convInstr);
+      newType = MapperCache.getNewSILType(genEnv, instr->getType(),
+                                          *getIRGenModule());
+      newInstr = convBuilder.createThinFunctionToPointer(
+          instr->getLoc(), instr->getOperand(), newType);
+      break;
+    }
+    case SILInstructionKind::ConvertFunctionInst: {
+      auto instr = cast<ConvertFunctionInst>(convInstr);
+      newInstr = convBuilder.createConvertFunction(
+          instr->getLoc(), instr->getOperand(), newType,
+          instr->withoutActuallyEscaping());
+      break;
+    }
+    case SILInstructionKind::ConvertEscapeToNoEscapeInst: {
+      auto instr = cast<ConvertEscapeToNoEscapeInst>(convInstr);
+      newInstr = convBuilder.createConvertEscapeToNoEscape(
+          instr->getLoc(), instr->getOperand(), newType,
+          instr->isEscapedByUser(), instr->isLifetimeGuaranteed());
+      break;
+    }
+    case SILInstructionKind::MarkDependenceInst: {
+      auto instr = cast<MarkDependenceInst>(convInstr);
+      newInstr = convBuilder.createMarkDependence(
+          instr->getLoc(), instr->getValue(), instr->getBase());
+      break;
+    }
+    // SWIFT_ENABLE_TENSORFLOW
+    case SILInstructionKind::AutoDiffFunctionInst: {
+      auto instr = cast<AutoDiffFunctionInst>(convInstr);
+      SmallVector<SILValue, 2> associatedFunctions;
+      for (auto &assocFn : instr->getAssociatedFunctions())
+        associatedFunctions.push_back(assocFn.get());
+      newInstr = convBuilder.createAutoDiffFunction(
+          instr->getLoc(), instr->getParameterIndices(),
+          instr->getDifferentiationOrder(), instr->getOriginalFunction(),
+          associatedFunctions);
+      break;
+    }
+    case SILInstructionKind::AutoDiffFunctionExtractInst: {
+      auto instr = cast<AutoDiffFunctionExtractInst>(convInstr);
+      newInstr = convBuilder.createAutoDiffFunctionExtract(
+          instr->getLoc(), instr->getExtractee(),
+          instr->getDifferentiationOrder(), instr->getFunctionOperand());
+      break;
+    }
+     default:
+      llvm_unreachable("Unexpected conversion instruction");
+    }
+    convInstr->replaceAllUsesWith(newInstr);
+    convInstr->getParent()->erase(convInstr);
+>>>>>>> origin/tensorflow
   }
   auto *newTuple = tupleBuilder.createTuple(tupleInstr->getLoc(), elems);
   tupleInstr->replaceAllUsesWith(newTuple);
@@ -2813,7 +2891,10 @@ void LoadableByAddress::run() {
               case SILInstructionKind::ConvertEscapeToNoEscapeInst:
               case SILInstructionKind::MarkDependenceInst:
               case SILInstructionKind::ThinFunctionToPointerInst:
-              case SILInstructionKind::ThinToThickFunctionInst: {
+              // SWIFT_ENABLE_TENSORFLOW
+              case SILInstructionKind::ThinToThickFunctionInst:
+              case SILInstructionKind::AutoDiffFunctionInst:
+              case SILInstructionKind::AutoDiffFunctionExtractInst: {
                 conversionInstrs.insert(
                               cast<SingleValueInstruction>(currInstr));
                 break;
@@ -2880,6 +2961,10 @@ void LoadableByAddress::run() {
           if (modApplies.count(PAI) == 0) {
             modApplies.insert(PAI);
           }
+        } else if (auto *ADFI = dyn_cast<AutoDiffFunctionInst>(&I)) {
+          conversionInstrs.insert(ADFI);
+        } else if (auto *ADFEI = dyn_cast<AutoDiffFunctionExtractInst>(&I)) {
+          conversionInstrs.insert(ADFEI);
         }
       }
     }

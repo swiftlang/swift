@@ -23,25 +23,18 @@
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Intrinsics.h"
-#include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/SmallBitVector.h"
-#include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/Support/SaveAndRestore.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Transforms/Utils/Local.h"
-#include "clang/AST/ASTContext.h"
-#include "clang/Basic/TargetInfo.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/IRGenOptions.h"
+#include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
+#include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/IRGenOptions.h"
-#include "swift/AST/Pattern.h"
-#include "swift/AST/ParameterList.h"
-#include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/Types.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -49,8 +42,17 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/InstructionUtils.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
+#include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SmallBitVector.h"
+#include "llvm/ADT/TinyPtrVector.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "llvm/IR/TypeBuilder.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Transforms/Utils/Local.h"
 
 #include "CallEmission.h"
 #include "Explosion.h"
@@ -893,7 +895,7 @@ public:
       }
     }
   }
-  
+
   //===--------------------------------------------------------------------===//
   // SIL instruction lowering
   //===--------------------------------------------------------------------===//
@@ -915,6 +917,10 @@ public:
   void visitFullApplySite(FullApplySite i);
   void visitPartialApplyInst(PartialApplyInst *i);
   void visitBuiltinInst(BuiltinInst *i);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  void visitAutoDiffFunctionInst(AutoDiffFunctionInst *i);
+  void visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *i);
 
   void visitFunctionRefBaseInst(FunctionRefBaseInst *i);
   void visitFunctionRefInst(FunctionRefInst *i);
@@ -1841,6 +1847,36 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+void IRGenSILFunction::visitAutoDiffFunctionInst(AutoDiffFunctionInst *i) {
+  // The original function and associated functions can be thin or thick.
+  auto origExp = getLoweredExplosion(i->getOriginalFunction());
+  Explosion e;
+  e.add(origExp.claimAll());
+  for (auto &assocFnOp : i->getAssociatedFunctions())
+    e.add(getLoweredExplosion(assocFnOp.get()).claimAll());
+  setLoweredExplosion(i, e);
+}
+
+void IRGenSILFunction::
+visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *i) {
+  unsigned structFieldOffset = 0;
+  if (i->getExtractee() != AutoDiffFunctionExtractee::Original)
+    structFieldOffset = 1 + autodiff::getOffsetForAutoDiffAssociatedFunction(
+      i->getDifferentiationOrder(), i->getAssociatedFunctionKind());
+  unsigned fieldSize = 1;
+  auto fnRepr = i->getFunctionOperand()->getType().getFunctionRepresentation();
+  if (fnRepr == SILFunctionTypeRepresentation::Thick) {
+    structFieldOffset *= 2;
+    fieldSize = 2;
+  }
+  auto adFnExp = getLoweredExplosion(i->getFunctionOperand());
+  Explosion e;
+  e.add(adFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
+  (void)adFnExp.claimAll();
+  setLoweredExplosion(i, e);
+}
+
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto fn = i->getReferencedFunction();
 
@@ -2154,6 +2190,8 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
       return getSwiftFunctionPointerCallee(IGF, functionValue, selfValue,
                                            std::move(calleeInfo), false);
 
+    // SWIFT_ENABLE_TENSORFLOW
+    case SILFunctionType::Representation::TensorFlow:
     case SILFunctionType::Representation::CFunctionPointer:
       assert(!selfValue && "C function pointer has self?");
       return getCFunctionPointerCallee(IGF, functionValue,
@@ -2207,6 +2245,8 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     break;
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILFunctionType::Representation::TensorFlow:
   case SILFunctionType::Representation::ObjCMethod:
   case SILFunctionType::Representation::Thick:
   case SILFunctionType::Representation::Block:
@@ -2255,11 +2295,29 @@ void IRGenSILFunction::visitTryApplyInst(swift::TryApplyInst *i) {
 }
 
 void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
-  const LoweredValue &calleeLV = getLoweredValue(site.getCallee());
-  
   auto origCalleeType = site.getOrigCalleeType();
   auto substCalleeType = site.getSubstCalleeType();
-  
+
+  // SWIFT_ENABLE_TENSORFLOW
+  Optional<LoweredValue> tmpCalleeLV;
+  if (site.getOrigCalleeType()->isDifferentiable()) {
+    auto adFnExp = getLoweredExplosion(site.getCallee());
+    Explosion e;
+    unsigned fieldSize = 1;
+    if (origCalleeType->getRepresentation() ==
+        SILFunctionTypeRepresentation::Thick) {
+      fieldSize = 2;
+    }
+    e.add(adFnExp.getRange(0, 0 + fieldSize));
+    (void)adFnExp.claimAll();
+    tmpCalleeLV = LoweredValue(e);
+
+    origCalleeType = origCalleeType->getWithoutDifferentiability();
+    substCalleeType = substCalleeType->getWithoutDifferentiability();
+  }
+  const LoweredValue &calleeLV =
+      tmpCalleeLV ? *tmpCalleeLV : getLoweredValue(site.getCallee());
+
   auto args = site.getArguments();
   SILFunctionConventions origConv(origCalleeType, getSILModule());
   assert(origConv.getNumSILArguments() == args.size());
@@ -2418,6 +2476,8 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
   case LoweredValue::Kind::FunctionPointer: {
     llvm::Value *context = nullptr;
     switch (fnType->getRepresentation()) {
+    // SWIFT_ENABLE_TENSORFLOW
+    case SILFunctionTypeRepresentation::TensorFlow:
     case SILFunctionTypeRepresentation::CFunctionPointer:
     case SILFunctionTypeRepresentation::Block:
     case SILFunctionTypeRepresentation::ObjCMethod:
@@ -4397,13 +4457,19 @@ void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {
 
 void IRGenSILFunction::visitConvertEscapeToNoEscapeInst(
     swift::ConvertEscapeToNoEscapeInst *i) {
-  // This instruction makes the context trivial.
+  // SWIFT_ENABLE_TENSORFLOW
+  // This instruction makes the context(s) trivial. A function contains multiple
+  // function pointers and contexts when it's differentiable.
   Explosion in = getLoweredExplosion(i->getOperand());
-  llvm::Value *fn = in.claimNext();
-  llvm::Value *ctx = in.claimNext();
   Explosion out;
-  out.add(fn);
-  out.add(Builder.CreateBitCast(ctx, IGM.OpaquePtrTy));
+  // SWIFT_ENABLE_TENSORFLOW
+  for (unsigned index : range(in.size() / 2)) {
+    (void)index;
+    llvm::Value *fn = in.claimNext();
+    llvm::Value *ctx = in.claimNext();
+    out.add(fn);
+    out.add(Builder.CreateBitCast(ctx, IGM.OpaquePtrTy));
+  }
   setLoweredExplosion(i, out);
 }
 

@@ -34,6 +34,7 @@ class DominanceInfo;
 class PostOrderFunctionInfo;
 class ReversePostOrderInfo;
 class Operand;
+class SILDebugLocation;  // SWIFT_ENABLE_TENSORFLOW: FIXME(clattner): upstream.
 class SILInstruction;
 class SILLocation;
 class DeadEndBlocks;
@@ -344,6 +345,10 @@ public:
 
   /// Get a location for this value.
   SILLocation getLoc() const;
+
+  // SWIFT_ENABLE_TENSORFLOW: FIXME(clattner): merge upstream.
+  /// Get a debug location for this value.
+  SILDebugLocation getDebugLocation() const;
 
   /// Convert this SILValue into an opaque pointer like type. For use with
   /// PointerLikeTypeTraits.

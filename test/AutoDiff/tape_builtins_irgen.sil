@@ -1,0 +1,41 @@
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -o - | %FileCheck %s
+
+sil_stage raw
+
+import Swift
+import Builtin
+
+sil @foo : $@convention(thin) (Float, Float) -> Float {
+bb0(%0 : @trivial $Float, %1 : @trivial $Float):
+  %tape = builtin "autodiffCreateTape"<Float>() : $_AutoDiffTape<Float>
+  %id = integer_literal $Builtin.Word, 0
+  builtin "autodiffPushToTape"<Float>(%tape : $_AutoDiffTape<Float>, %0 : $Float, %id : $Builtin.Word) : $()
+  %val = builtin "autodiffPopFromTape"<Float>(%tape : $_AutoDiffTape<Float>, %id : $Builtin.Word) : $Float
+  builtin "autodiffDestroyTape"<Float>(%tape : $_AutoDiffTape<Float>) : $()
+  return %val : $Float
+}
+
+// CHECK: %TSf = type <{ float }>
+// CHECK: @"$sSfN" = external global %swift.type, align 8
+
+// CHECK-LABEL: float @foo(float, float) #0 {
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   %2 = alloca float, align 8
+// CHECK-NEXT:   %.coercion.coerced = alloca %TSf, align 4
+// CHECK-NEXT:   %3 = call %swift.opaque* @swift_autodiffCreateTape(%swift.type* @"$sSfN")
+// CHECK-NEXT:   store float %0, float* %2, align 8
+// CHECK-NEXT:   %4 = bitcast float* %2 to %swift.opaque*
+// CHECK-NEXT:   call void @swift_autodiffPushToTape(%swift.opaque* %3, %swift.opaque* %4)
+// CHECK-NEXT:   %5 = call %swift.opaque* @swift_autodiffPopFromTape(%swift.opaque* %3)
+// CHECK-NEXT:   %6 = bitcast %swift.opaque* %5 to %TSf*
+// CHECK-NEXT:   %7 = load %TSf, %TSf* %6, align 8
+// CHECK-NEXT:   call void @swift_autodiffDestroyTape(%swift.opaque* %3)
+// CHECK-NEXT:   %8 = bitcast %TSf* %.coercion.coerced to i8*
+// CHECK-NEXT:   call void @llvm.lifetime.start.p0i8(i64 32, i8* %8)
+// CHECK-NEXT:   store %TSf %7, %TSf* %.coercion.coerced, align 4
+// CHECK-NEXT:   %9 = bitcast %TSf* %.coercion.coerced to float*
+// CHECK-NEXT:   %10 = load float, float* %9, align 4
+// CHECK-NEXT:   %11 = bitcast %TSf* %.coercion.coerced to i8*
+// CHECK-NEXT:   call void @llvm.lifetime.end.p0i8(i64 32, i8* %11)
+// CHECK-NEXT:   ret float %10
+// CHECK-NEXT: }

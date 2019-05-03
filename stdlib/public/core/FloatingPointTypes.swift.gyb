@@ -1625,6 +1625,17 @@ extension ${Self} {
   }
 }
 
+extension ${Self} {
+  @usableFromInline
+  @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
+  @differentiating(-)
+  static func _vjpNegate(x: ${Self})
+    -> (value: ${Self}, pullback: (${Self}) -> ${Self}) {
+    return (-x, { v in -v })
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Explicit conversions between types.
 //===----------------------------------------------------------------------===//
@@ -1774,6 +1785,46 @@ extension ${Self} {
   }
 }
 
+/// SWIFT_ENABLE_TENSORFLOW
+/// Vector-Jacobian products of standard binary operators.
+extension ${Self} {
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @differentiating(+)
+  static func _vjpAdd(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
+    return (lhs + rhs, { v in (v, v) })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @differentiating(-)
+  static func _vjpSubtract(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
+    return (lhs - rhs, { v in (v, -v) })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @differentiating(*)
+  static func _vjpMultiply(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
+    return (lhs * rhs, { v in (rhs * v, lhs * v) })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @differentiating(/)
+  static func _vjpDivide(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
+    return (lhs / rhs, { v in (v / rhs, -lhs / (rhs * rhs) * v) })
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Strideable Conformance
 //===----------------------------------------------------------------------===//
@@ -1817,6 +1868,24 @@ extension ${Self} : Strideable {
   @_transparent
   public func advanced(by amount: ${Self}) -> ${Self} {
     return self + amount
+  }
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+//===----------------------------------------------------------------------===//
+// VectorNumeric Conformance
+//===----------------------------------------------------------------------===//
+
+extension ${Self} : VectorNumeric {
+  public typealias Scalar = ${Self}
+}
+
+extension ${Self} : Differentiable {
+  public typealias TangentVector = ${Self}
+  public typealias CotangentVector = ${Self}
+  public typealias AllDifferentiableVariables = ${Self}
+  public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
+    return cotangent
   }
 }
 

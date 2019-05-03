@@ -1512,8 +1512,16 @@ bool swift::shouldExpand(SILModule &Module, SILType Ty) {
     return true;
   }
 
+<<<<<<< HEAD
   unsigned NumFields = Module.Types.countNumberOfFields(Ty, Expansion);
   return (NumFields <= 6);
+=======
+  unsigned numFields = Module.Types.countNumberOfFields(Ty);
+  if (numFields > 6) {
+    return false;
+  }
+  return true;
+>>>>>>> origin/tensorflow
 }
 
 /// Some support functions for the global-opt and let-properties-opts

@@ -28,6 +28,8 @@ from .swiftevolve import SwiftEvolve
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
 from .xctest import XCTest
+# SWIFT_ENABLE_TENSORFLOW
+from .tensorflow import TensorFlow
 
 __all__ = [
     'CMark',
@@ -43,10 +45,15 @@ __all__ = [
     'Swift',
     'SwiftPM',
     'XCTest',
+<<<<<<< HEAD
     'SwiftSyntax',
     'SKStressTester',
     'SwiftEvolve',
     'IndexStoreDB',
     'SourceKitLSP',
     'Benchmarks',
+=======
+    # SWIFT_ENABLE_TENSORFLOW
+    'TensorFlow',
+>>>>>>> origin/tensorflow
 ]

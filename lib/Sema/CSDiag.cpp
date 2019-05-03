@@ -4809,9 +4809,19 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
 
     auto arg = callExpr->getArg();
+    // SWIFT_ENABLE_TENSORFLOW
+    auto isDynamicCallable =
+        CS.DynamicCallableCache[fnType->getCanonicalType()].isValid();
+
+    auto *nominal = fnType->getAnyNominal();
+    auto hasCallMethods = nominal &&
+        llvm::any_of(nominal->getMembers(), [](Decl *member) {
+          auto funcDecl = dyn_cast<FuncDecl>(member);
+          return funcDecl && funcDecl->isCallable();
+        });
 
     // Diagnose @dynamicCallable errors.
-    if (CS.DynamicCallableCache[fnType->getCanonicalType()].isValid()) {
+    if (isDynamicCallable) {
       auto dynamicCallableMethods =
         CS.DynamicCallableCache[fnType->getCanonicalType()];
 
@@ -4867,7 +4877,9 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         }
       }
 
-    return true;
+    // SWIFT_ENABLE_TENSORFLOW
+    if (!isDynamicCallable && !hasCallMethods)
+      return true;
   }
   
   bool hasTrailingClosure = callArgHasTrailingClosure(callExpr->getArg());
@@ -6245,6 +6257,7 @@ bool FailureDiagnosis::visitKeyPathExpr(KeyPathExpr *KPE) {
   return diagnoseKeyPathComponents(CS, KPE, rootType);
 }
 
+
 bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
   // If we had a contextual type, then it either conforms to
   // ExpressibleByArrayLiteral or it is an invalid contextual type.
@@ -6403,6 +6416,11 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
 /// the target.
 bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
   auto &TC = CS.getTypeChecker();
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // TensorFlow ops don't act like other literals.
+  if (E->isTFOp())
+    return false;
 
   // Type check the argument first.
   auto protocol = TC.getLiteralProtocol(E);

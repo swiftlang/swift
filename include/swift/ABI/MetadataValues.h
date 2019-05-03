@@ -746,6 +746,8 @@ class TargetFunctionTypeFlags {
     ThrowsMask        = 0x01000000U,
     ParamFlagsMask    = 0x02000000U,
     EscapingMask      = 0x04000000U,
+    // SWIFT_ENABLE_TENSORFLOW
+    DifferentiableMask  = 0x08000000U
   };
   int_type Data;
   
@@ -781,6 +783,13 @@ public:
     return TargetFunctionTypeFlags<int_type>((Data & ~EscapingMask) |
                                              (isEscaping ? EscapingMask : 0));
   }
+  
+  // SWIFT_ENABLE_TENSORFLOW
+  constexpr TargetFunctionTypeFlags<int_type>
+  withDifferentiable(bool isDifferentiable) const {
+    return TargetFunctionTypeFlags<int_type>((Data & ~DifferentiableMask) |
+                                   (isDifferentiable ? DifferentiableMask : 0));
+  }
 
   unsigned getNumParameters() const { return Data & NumParametersMask; }
 
@@ -794,6 +803,11 @@ public:
 
   bool isEscaping() const {
     return bool (Data & EscapingMask);
+  }
+  
+  // SWIFT_ENABLE_TENSORFLOW
+  bool isDifferentiable() const {
+    return bool (Data & DifferentiableMask);
   }
 
   bool hasParameterFlags() const { return bool(Data & ParamFlagsMask); }
@@ -818,9 +832,11 @@ using FunctionTypeFlags = TargetFunctionTypeFlags<size_t>;
 template <typename int_type>
 class TargetParameterTypeFlags {
   enum : int_type {
-    ValueOwnershipMask = 0x7F,
-    VariadicMask       = 0x80,
-    AutoClosureMask    = 0x100,
+    // SWIFT_ENABLE_TENSORFLOW
+    ValueOwnershipMask    = 0x7F,
+    VariadicMask          = 0x80,
+    AutoClosureMask       = 0x100,
+    NonDifferentiableMask = 0x200
   };
   int_type Data;
 
@@ -850,6 +866,8 @@ public:
   bool isNone() const { return Data == 0; }
   bool isVariadic() const { return Data & VariadicMask; }
   bool isAutoClosure() const { return Data & AutoClosureMask; }
+  // SWIFT_ENABLE_TENSORFLOW
+  bool isNonDifferentiable() const { return Data & NonDifferentiableMask; }
 
   ValueOwnership getValueOwnership() const {
     return (ValueOwnership)(Data & ValueOwnershipMask);

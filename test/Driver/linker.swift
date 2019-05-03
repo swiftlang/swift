@@ -1,5 +1,11 @@
+<<<<<<< HEAD
 // Must be able to run xcrun-return-self.sh
 // REQUIRES: shell
+=======
+// SWIFT_ENABLE_TENSORFLOW: This test is unsupported because moving Swift executables without the TensorFlow libraries causes dynamic linking to fail.
+// UNSUPPORTED: tensorflow
+
+>>>>>>> origin/tensorflow
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck %s < %t.simple.txt
 // RUN: %FileCheck -check-prefix SIMPLE %s < %t.simple.txt

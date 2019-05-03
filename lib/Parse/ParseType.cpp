@@ -567,27 +567,31 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
 ///   type-identifier:
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
-ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
-  if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
-    // is this the 'Any' type
-    if (Tok.is(tok::kw_Any)) {
-      return parseAnyType();
-    } else if (Tok.is(tok::code_complete)) {
-      if (CodeCompletion)
-        CodeCompletion->completeTypeSimpleBeginning();
-      // Eat the code completion token because we handled it.
-      consumeToken(tok::code_complete);
-      return makeParserCodeCompletionResult<IdentTypeRepr>();
+/// SWIFT_ENABLE_TENSORFLOW: Added `isParsingQualifiedDeclName` flag.
+ParserResult<TypeRepr>
+Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
+  if (!isParsingQualifiedDeclName || Tok.isNotAnyOperator()) {
+    if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
+      // is this the 'Any' type
+      if (Tok.is(tok::kw_Any)) {
+        return parseAnyType();
+      } else if (Tok.is(tok::code_complete)) {
+        if (CodeCompletion)
+          CodeCompletion->completeTypeSimpleBeginning();
+        // Eat the code completion token because we handled it.
+        consumeToken(tok::code_complete);
+        return makeParserCodeCompletionResult<IdentTypeRepr>();
+      }
+
+      diagnose(Tok, diag::expected_identifier_for_type);
+
+      // If there is a keyword at the start of a new line, we won't want to
+      // skip it as a recovery but rather keep it.
+      if (Tok.isKeyword() && !Tok.isAtStartOfLine())
+        consumeToken();
+
+      return nullptr;
     }
-
-    diagnose(Tok, diag::expected_identifier_for_type);
-
-    // If there is a keyword at the start of a new line, we won't want to
-    // skip it as a recovery but rather keep it.
-    if (Tok.isKeyword() && !Tok.isAtStartOfLine())
-      consumeToken();
-
-    return nullptr;
   }
   SyntaxParsingContext IdentTypeCtxt(SyntaxContext, SyntaxContextKind::Type);
 
@@ -597,8 +601,46 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
   while (true) {
     SourceLoc Loc;
     Identifier Name;
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // Returns true if the last type identifier component has been parsed.
+    // This function is used only when `isParsingQualifiedDeclName` is true.
+    auto parsedLastComponent = [&] {
+      // First, parse a single type identifier component.
+      if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
+        return false;
+      consumeToken();
+
+      if (startsWithLess(Tok)) {
+        if (!canParseGenericArguments())
+          return false;
+      }
+
+      // A period followed by an operator is often parsed as a single token
+      // (e.g. `.+` in `Float.+`).
+      // If this is encountered, return false so that the type identifier
+      // component can be parsed.
+      if (startsWithSymbol(Tok, '.') && Tok.getLength() != 1)
+        return false;
+
+      // If the next token is not a period, then this must be the last component
+      // in the type identifier.
+      return Tok.isNot(tok::period) && Tok.isNot(tok::period_prefix);
+    };
+    if (isParsingQualifiedDeclName) {
+      BacktrackingScope backtrack(*this);
+      // If last type identifier component has been parsed, then the next
+      // token is (the start of) the final decl name. Break to stop parsing type
+      // components.
+      if (parsedLastComponent())
+        break;
+    }
+
     if (Tok.is(tok::kw_Self)) {
       Loc = consumeIdentifier(&Name);
+    } else if (isParsingQualifiedDeclName && Tok.isAnyOperator()) {
+      // If an operator is encountered, break and do not backtrack later.
+      break;
     } else {
       // FIXME: specialize diagnostic for 'Type': type cannot start with
       // 'metatype'
@@ -645,8 +687,23 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
       if (!Tok.isAtStartOfLine())
         Status.setHasCodeCompletion();
       break;
+    // If parsing qualified decl name and encountered a token like `.+` in
+    // `Float.+`, consume the period so that `+` is treated correctly as a
+    // standalone token.
+    } else if (isParsingQualifiedDeclName && startsWithSymbol(Tok, '.') &&
+               Tok.getLength() != 1) {
+      consumeStartingCharacterOfCurrentToken(tok::period);
+      continue;
     }
     break;
+  }
+
+  if (isParsingQualifiedDeclName) {
+    // Set the parsing context to transparent to propagate the trailing period
+    // after the base type to the parent context.
+    IdentTypeCtxt.setTransparent();
+    if (ComponentsR.empty())
+      Status.setIsParseError();
   }
 
   IdentTypeRepr *ITR = nullptr;

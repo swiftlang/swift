@@ -995,8 +995,15 @@ static void addOpaqueAccessorToStorage(AbstractStorageDecl *storage,
   }
 }
 
+<<<<<<< HEAD
 static void addExpectedOpaqueAccessorsToStorage(AbstractStorageDecl *storage,
                                                 ASTContext &ctx) {
+=======
+/// SWIFT_ENABLE_TENSORFLOW
+/// Made public so that DerivedConformanceParameterized can call it.
+void swift::addExpectedOpaqueAccessorsToStorage(TypeChecker &TC,
+                                                AbstractStorageDecl *storage) {
+>>>>>>> origin/tensorflow
   // Nameless vars from interface files should not have any accessors.
   // TODO: Replace this check with a broader check that all storage decls
   //       from interface files have all their accessors up front.

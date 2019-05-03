@@ -142,6 +142,17 @@ struct ASTContext::Implementation {
   /// The AnyObject type.
   CanType AnyObjectType;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// The declaration of TensorFlow.TensorHandle<T>.
+  ClassDecl *TensorHandleDecl = nullptr;
+  /// The declaration of TensorFlow.TensorShape.
+  StructDecl *TensorShapeDecl = nullptr;
+  /// The declaration of TensorFlow.TensorDataType.
+  StructDecl *TensorDataTypeDecl = nullptr;
+
+  /// The declaration of Swift._AutoDiffTape<T>.
+  ClassDecl *AutoDiffTapeDecl = nullptr;
+
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** The declaration of Swift.NAME. */ \
   DECL_CLASS *NAME##Decl = nullptr;
@@ -379,7 +390,34 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<GenericSignature> GenericSignatures;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
+<<<<<<< HEAD
   llvm::DenseMap<UUID, OpenedArchetypeType *> OpenedExistentialArchetypes;
+=======
+  llvm::DenseMap<UUID, ArchetypeType *> OpenedExistentialArchetypes;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// A cache of tangent spaces per type.
+  llvm::DenseMap<CanType, Optional<VectorSpace>> VectorSpaces;
+
+  /// For uniquifying `AutoDiffParameterIndices` allocations.
+  llvm::FoldingSet<AutoDiffParameterIndices> AutoDiffParameterIndicesSet;
+
+  /// For uniquifying `AutoDiffAssociatedFunctionIdentifier` allocations.
+  llvm::FoldingSet<AutoDiffAssociatedFunctionIdentifier>
+      AutoDiffAssociatedFunctionIdentifiers;
+
+  /// List of Objective-C member conflicts we have found during type checking.
+  std::vector<ObjCMethodConflict> ObjCMethodConflicts;
+
+  /// List of optional @objc protocol requirements that have gone
+  /// unsatisfied, which might conflict with other Objective-C methods.
+  std::vector<ObjCUnsatisfiedOptReq> ObjCUnsatisfiedOptReqs;
+
+  /// List of Objective-C methods created by the type checker (and not
+  /// by the Clang importer or deserialized), which is used for
+  /// checking unintended Objective-C overrides.
+  std::vector<AbstractFunctionDecl *> ObjCMethods;
+>>>>>>> origin/tensorflow
 
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
@@ -786,6 +824,76 @@ CanType ASTContext::getAnyObjectType() const {
   return getImpl().AnyObjectType;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Retrieve the decl for TensorFlow.TensorHandle iff the TensorFlow module has
+/// been imported.  Otherwise, this returns null.
+ClassDecl *ASTContext::getTensorHandleDecl() const {
+  if (getImpl().TensorHandleDecl)
+    return getImpl().TensorHandleDecl;
+
+  // See if the TensorFlow module was imported.  If not, return null.
+  auto tfModule = getLoadedModule(Id_TensorFlow);
+  if (!tfModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> results;
+  tfModule->lookupValue({ }, getIdentifier("TensorHandle"),
+                        NLKind::UnqualifiedLookup, results);
+
+  for (auto result : results)
+    if (auto CD = dyn_cast<ClassDecl>(result))
+      return getImpl().TensorHandleDecl = CD;
+  return nullptr;
+}
+
+/// Retrieve the decl for TensorFlow.TensorShape iff the TensorFlow module has
+/// been imported.  Otherwise, this returns null.
+StructDecl *ASTContext::getTensorShapeDecl() const {
+  if (getImpl().TensorShapeDecl)
+    return getImpl().TensorShapeDecl;
+
+  // See if the TensorFlow module was imported.  If not, return null.
+  auto tfModule = getLoadedModule(Id_TensorFlow);
+  if (!tfModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> results;
+  tfModule->lookupValue({}, getIdentifier("TensorShape"),
+                        NLKind::UnqualifiedLookup, results);
+
+  for (auto result : results)
+    if (auto CD = dyn_cast<StructDecl>(result))
+      return getImpl().TensorShapeDecl = CD;
+  return nullptr;
+}
+
+/// Retrieve the decl for TensorFlow.TensorDataType iff the TensorFlow module has
+/// been imported.  Otherwise, this returns null.
+StructDecl *ASTContext::getTensorDataTypeDecl() const {
+  if (getImpl().TensorDataTypeDecl)
+    return getImpl().TensorDataTypeDecl;
+
+  // See if the TensorFlow module was imported.  If not, return null.
+  auto tfModule = getLoadedModule(Id_TensorFlow);
+  if (!tfModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> results;
+  tfModule->lookupValue({}, getIdentifier("TensorDataType"),
+                        NLKind::UnqualifiedLookup, results);
+
+  for (auto result : results)
+    if (auto CD = dyn_cast<StructDecl>(result))
+      return getImpl().TensorDataTypeDecl = CD;
+  return nullptr;
+}
+
+CanType ASTContext::getAutoDiffTapeType() const {
+  if (auto adtDecl = get_AutoDiffTapeDecl())
+    return adtDecl->getDeclaredType()->getCanonicalType();
+  return CanType();
+}
+
 CanType ASTContext::getNeverType() const {
   auto neverDecl = getNeverDecl();
   if (!neverDecl)
@@ -859,6 +967,14 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::CFObject:
     M = getLoadedModule(Id_CoreFoundation);
     break;
+  // SWIFT_ENABLE_TENSORFLOW
+  case KnownProtocolKind::TensorArrayProtocol:
+  case KnownProtocolKind::TensorGroup:
+  case KnownProtocolKind::TensorFlowDataTypeCompatible:
+  case KnownProtocolKind::TensorSendableReceivable:
+  case KnownProtocolKind::TensorProtocol:
+    M = getLoadedModule(Id_TensorFlow);
+    break;
   default:
     M = getStdlibModule();
     break;
@@ -872,6 +988,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   for (auto result : results) {
     if (auto protocol = dyn_cast<ProtocolDecl>(result)) {
       getImpl().KnownProtocols[index] = protocol;
+      protocol->setKnownProtocolKind(kind);
       return protocol;
     }
   }
@@ -1678,6 +1795,15 @@ ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
   auto moduleID = ModulePath[0];
   for (auto &importer : getImpl().ModuleLoaders) {
     if (ModuleDecl *M = importer->loadModule(moduleID.second, ModulePath)) {
+<<<<<<< HEAD
+=======
+      if (ModulePath.size() == 1 &&
+          (ModulePath[0].first == StdlibModuleName ||
+           ModulePath[0].first == Id_Foundation ||
+           // SWIFT_ENABLE_TENSORFLOW
+           ModulePath[0].first == Id_TensorFlow))
+        recordKnownProtocols(M);
+>>>>>>> origin/tensorflow
       return M;
     }
   }
@@ -2847,7 +2973,9 @@ void AnyFunctionType::decomposeInput(
   default:
     result.emplace_back(type->getInOutObjectType(), Identifier(),
                         ParameterTypeFlags::fromParameterType(
-                          type, false, false, ValueOwnership::Default));
+                          // SWIFT_ENABLE_TENSORFLOW
+                          type, false, false, ValueOwnership::Default,
+                          /*nonDifferentiable*/ false));
     return;
   }
 }
@@ -3200,6 +3328,15 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
              "Cannot return an @noescape function type");
     }
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Make sure that NotDifferentiable parameters only exist on differentiable
+  // functions.
+  if (!ext.isDifferentiable())
+    for (auto param : getParameters())
+      assert(param.getDifferentiability() ==
+                 SILParameterDifferentiability::DifferentiableOrNotApplicable &&
+             "non-differentiable function has NotDifferentiable parameter");
 #endif
 }
 
@@ -4361,6 +4498,7 @@ LayoutConstraint LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind
   return LayoutConstraint(New);
 }
 
+<<<<<<< HEAD
 Type &ASTContext::getDefaultTypeRequestCache(SourceFile *SF,
                                              KnownProtocolKind kind) {
   return getImpl().DefaultTypeRequestCaches[SF][size_t(kind)];
@@ -4404,4 +4542,57 @@ void VarDecl::setOriginalDelegatedProperty(VarDecl *originalProperty) {
   ASTContext &ctx = getASTContext();
   assert(ctx.getImpl().OriginalDelegatedProperties.count(this) == 0);
   ctx.getImpl().OriginalDelegatedProperties[this] = originalProperty;
+=======
+// SWIFT_ENABLE_TENSORFLOW
+AutoDiffParameterIndices *
+AutoDiffParameterIndices::get(llvm::SmallBitVector indices, ASTContext &C) {
+  auto &foldingSet = C.getImpl().AutoDiffParameterIndicesSet;
+
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(indices.size());
+  for (unsigned setBit : indices.set_bits())
+    id.AddInteger(setBit);
+
+  void *insertPos;
+  auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+
+  // TODO(SR-9290): Note that the AutoDiffParameterIndices' destructor never
+  // gets called, which causes a small memory leak in the case that the
+  // SmallBitVector decides to allocate some heap space.
+  void *mem = C.Allocate(sizeof(AutoDiffParameterIndices),
+                         alignof(AutoDiffParameterIndices));
+  auto *newNode = ::new (mem) AutoDiffParameterIndices(indices);
+  foldingSet.InsertNode(newNode, insertPos);
+
+  return newNode;
+}
+
+AutoDiffAssociatedFunctionIdentifier *
+AutoDiffAssociatedFunctionIdentifier::get(
+    AutoDiffAssociatedFunctionKind kind, unsigned differentiationOrder,
+    AutoDiffParameterIndices *parameterIndices, ASTContext &C) {
+  assert(parameterIndices);
+
+  auto &foldingSet = C.getImpl().AutoDiffAssociatedFunctionIdentifiers;
+
+  llvm::FoldingSetNodeID id;
+  id.AddInteger((unsigned)kind);
+  id.AddInteger(differentiationOrder);
+  id.AddPointer(parameterIndices);
+
+  void *insertPos;
+  auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+
+  void *mem = C.Allocate(sizeof(AutoDiffAssociatedFunctionIdentifier),
+                         alignof(AutoDiffAssociatedFunctionIdentifier));
+  auto *newNode = ::new (mem) AutoDiffAssociatedFunctionIdentifier(
+      kind, differentiationOrder, parameterIndices);
+  foldingSet.InsertNode(newNode, insertPos);
+
+  return newNode;
+>>>>>>> origin/tensorflow
 }

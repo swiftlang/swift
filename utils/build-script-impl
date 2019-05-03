@@ -49,6 +49,8 @@ KNOWN_SETTINGS=(
     host-cxx                    ""               "the path to CXX, the 'clang++' compiler for the host platform. **This argument is required**"
     host-lipo                   ""               "the path to lipo for creating universal binaries on Darwin"
     host-libtool                ""               "the path to libtool"
+    # SWIFT_ENABLE_TENSORFLOW
+    host-bazel                  ""               "the path to bazel, used to build TensorFlow. **This argument is required for TensorFlow support**"
     darwin-xcrun-toolchain      "default"        "the name of the toolchain to use on Darwin"
     ninja-bin                   ""               "the path to Ninja tool"
     cmark-build-type            "Debug"          "the CMake build variant for CommonMark (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
@@ -138,6 +140,8 @@ KNOWN_SETTINGS=(
     skip-build-foundation       ""               "set to skip building foundation"
     skip-build-libdispatch      ""               "set to skip building libdispatch"
     skip-build-libicu           ""               "set to skip building libicu"
+    # SWIFT_ENABLE_TENSORFLOW
+    skip-build-tensorflow       ""               "set to skip building TensorFlow"
     skip-build-benchmarks       ""               "set to skip building Swift Benchmark Suite"
     skip-build-external-benchmarks "1"            "set to skip building the external Swift Benchmark Suite. (skipped by default)"
     skip-build-playgroundsupport ""              "set to skip building PlaygroundSupport"
@@ -153,6 +157,8 @@ KNOWN_SETTINGS=(
     skip-test-foundation        ""               "set to skip testing foundation"
     skip-test-libdispatch       ""               "set to skip testing libdispatch"
     skip-test-libicu            ""               "set to skip testing libicu"
+    # SWIFT_ENABLE_TENSORFLOW
+    skip-test-tensorflow        ""               "set to skip testing TensorFlow"
     skip-test-playgroundsupport ""               "set to skip testing PlaygroundSupport"
     skip-test-linux             ""               "set to skip testing Swift stdlibs for Linux"
     skip-test-freebsd           ""               "set to skip testing Swift stdlibs for FreeBSD"
@@ -214,6 +220,8 @@ KNOWN_SETTINGS=(
     install-libcxx              ""               "whether to install libc++"
     install-libdispatch         ""               "whether to install libdispatch"
     install-libicu              ""               "whether to install libicu"
+    # SWIFT_ENABLE_TENSORFLOW
+    install-tensorflow          ""               "whether to install TensorFlow"
     install-playgroundsupport   ""               "whether to install PlaygroundSupport"
     darwin-install-extract-symbols ""            "whether to extract symbols with dsymutil during installations"
     host-target                 ""               "The host target. LLVM, Clang, and Swift will be built for this target. The built LLVM and Clang will be used to compile Swift for the cross-compilation targets. **This argument is required**"
@@ -262,6 +270,8 @@ KNOWN_SETTINGS=(
     foundation-cmake-options           ""        "CMake options used for all foundation targets"
     libdispatch-cmake-options          ""        "CMake options used for all libdispatch targets"
     libicu-cmake-options               ""        "CMake options used for all libicu targets"
+    # SWIFT_ENABLE_TENSORFLOW
+    tensorflow-bazel-options           ""        "Bazel options used for all TensorFlow targets"
     llbuild-cmake-options              ""        "CMake options used for all llbuild targets"
     lldb-cmake-options                 ""        "CMake options used for all lldb targets"
     llvm-cmake-options                 ""        "CMake options used for all llvm targets"
@@ -279,6 +289,15 @@ KNOWN_SETTINGS=(
     coverage-db                        ""        "If set, coverage database to use when prioritizing testing"
     build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
     skip-local-host-install            ""        "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
+    # SWIFT_ENABLE_TENSORFLOW
+    enable-tensorflow                  ""        "If true, enable compiling with TensorFlow support"
+    enable-tensorflow-gpu              ""        "If true, enable compiling with TensorFlow GPU support"
+    tensorflow-host-lib-dir            ""        "Path to host TensorFlow libraries"
+    tensorflow-host-include-dir        ""        "Path to host TensorFlow headers"
+    tensorflow-target-include-dir      ""        "Path to target Tensorflow headers"
+    tensorflow-target-lib-dir          ""        "Path to target TensorFlow libraries"
+    tensorflow-swift-bindings          ""        "Path to TensorFlow Swift bindings repository"
+    tensorflow-swift-apis              ""        "Path to TensorFlow deep learning library repository"
 )
 
 # Centralized access point for traced command invocation.
@@ -990,6 +1009,13 @@ if [ -z "${CMAKE}" ] ; then
     echo "Environment variable CMAKE must be specified."
     exit 1
 fi
+# SWIFT_ENABLE_TENSORFLOW
+if [[ "${ENABLE_TENSORFLOW}" ]]; then
+    if [ -z "${HOST_BAZEL}" ] ; then
+        echo "Can't find bazel, needed for building TensorFlow."
+        exit 1
+    fi
+fi
 
 function xcrun_find_tool() {
   xcrun --sdk macosx --toolchain "${DARWIN_XCRUN_TOOLCHAIN}" --find "$@"
@@ -1208,10 +1234,29 @@ LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 LIBCXX_SOURCE_DIR="${WORKSPACE}/libcxx"
 PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support"
+# SWIFT_ENABLE_TENSORFLOW
+TENSORFLOW_SOURCE_DIR="${WORKSPACE}/tensorflow"
+TENSORFLOW_SWIFT_BINDINGS_DIR="${WORKSPACE}/tensorflow-swift-bindings"
+TENSORFLOW_SWIFT_APIS_DIR="${WORKSPACE}/tensorflow-swift-apis"
 
 if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR} ]]; then
     echo "Couldn't find PlaygroundSupport source directory."
     exit 1
+fi
+# SWIFT_ENABLE_TENSORFLOW
+if [[ "${ENABLE_TENSORFLOW}" ]]; then
+    if [[ ! "${SKIP_BUILD_TENSORFLOW}" && ! -d "${TENSORFLOW_SOURCE_DIR}" ]]; then
+        echo "Couldn't find TensorFlow source directory."
+        exit 1
+    fi
+    if [[ "${TENSORFLOW_SWIFT_BINDINGS}" && ! -d "${TENSORFLOW_SWIFT_BINDINGS}" ]]; then
+        echo "Invalid TensorFlow Swift bindings repository specified."
+        exit 1
+    fi
+    if [[ "${TENSORFLOW_SWIFT_APIS}" && ! -d "${TENSORFLOW_SWIFT_APIS}" ]]; then
+        echo "Invalid TensorFlow high-level APIs repository specified."
+        exit 1
+    fi
 fi
 
 # Symlink clang into the llvm tree.
@@ -1247,6 +1292,10 @@ if [[ ! "${SKIP_BUILD_LIBCXX}" ]] ; then
 fi
 if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" libicu)
+fi
+# SWIFT_ENABLE_TENSORFLOW
+if [[ ! "${SKIP_BUILD_TENSORFLOW}" ]] ; then
+    PRODUCTS=("${PRODUCTS[@]}" tensorflow)
 fi
 PRODUCTS=("${PRODUCTS[@]}" swift)
 if [[ ! "${SKIP_BUILD_LLDB}" ]] ; then
@@ -1306,6 +1355,48 @@ function contains_product() {
   return 1
 }
 
+# SWIFT_ENABLE_TENSORFLOW
+function verify_tensorflow_directories() {
+    # NOTE: This function must be called after TensorFlow is built from source
+    # if --build-tensorflow if true. Otherwise, host include/library directories
+    # will not be set.
+    if [[ ! "${ENABLE_TENSORFLOW}" ]]; then
+        return 1
+    fi
+
+    # Iterate through host/target and include/lib.
+    local error=
+    for platform in "HOST" "TARGET"; do
+        for dir_type in "INCLUDE" "LIB"; do
+            lower_platform="$(tolower ${platform})"
+            lower_dir_type="$(tolower ${dir_type})"
+            dir_name="TENSORFLOW_${platform}_${dir_type}_DIR"
+
+            # Always perform check for "HOST" arguments.
+            # Perform check for "TARGET" arguments only if they are specified.
+            if [[ "${platform}" == "HOST" || "${!dir_name}" ]]; then
+                if [[ ! -e "${!dir_name}" ]]; then
+                    echo "Error: TensorFlow ${lower_platform} ${lower_dir_type} directory does not exist (was '${!dir_name}')"
+                    error=1
+                fi
+
+                # Check that "LIB" arguments contain the necessary libraries.
+                if [[ "dir_type" == "LIB" ]]; then
+                    for lib_name in tensorflow tensorflow_framework; do
+                        lib="lib${lib_name}.so"
+                        if [[ ! -e "${!dir_name}/${lib}" ]]; then
+                            echo "Error: '${lib}' does not exist in TensorFlow ${lower_platform} ${lower_dir_type} directory (was '${!dir_name}')"
+                            error=1
+                        fi
+                    done
+                fi
+            fi
+        done
+    done
+    if [[ "$error" ]]; then
+        exit 1
+    fi
+}
 
 # get_host_specific_variable(host, name)
 #
@@ -1556,6 +1647,7 @@ COMMON_C_FLAGS=" -Wno-unknown-warning-option -Werror=unguarded-availability-new"
 eval COMMON_CMAKE_OPTIONS=(${COMMON_CMAKE_OPTIONS})
 eval EXTRA_CMAKE_OPTIONS=(${EXTRA_CMAKE_OPTIONS})
 eval BUILD_ARGS=(${BUILD_ARGS})
+eval TENSORFLOW_BAZEL_OPTIONS=(${TENSORFLOW_BAZEL_OPTIONS})
 
 eval CMAKE_BUILD=("${DISTCC_PUMP}" "${CMAKE}" "--build")
 
@@ -1616,6 +1708,9 @@ function build_directory_bin() {
                 echo "${root}/${LIBDISPATCH_BUILD_TYPE}/bin"
                 ;;
             libicu)
+                ;;
+            # SWIFT_ENABLE_TENSORFLOW
+            tensorflow)
                 ;;
             playgroundsupport)
                 echo "${root}/${PLAYGROUNDSUPPORT_BUILD_TYPE}/bin"
@@ -1767,6 +1862,9 @@ function cmake_config_opt() {
                 echo "--config ${LIBDISPATCH_BUILD_TYPE}"
                 ;;
             libicu)
+                ;;
+            # SWIFT_ENABLE_TENSORFLOW
+            tensorflow)
                 ;;
             playgroundsupport)
                 echo "--config ${PLAYGROUNDSUPPORT_BUILD_TYPE}"
@@ -1983,6 +2081,22 @@ function set_lldb_xcodebuild_options() {
 	    "${lldb_xcodebuild_options[@]}"
 	    OTHER_CFLAGS="-DNDEBUG"
 	)
+    fi
+    # SWIFT_ENABLE_TENSORFLOW
+    if [[ "${ENABLE_TENSORFLOW}" && "$(uname -s)" == "Darwin" ]] ; then
+        set_lldb_build_mode
+        # FIXME: This is a hack: adding rpaths with many `..` that jump across
+        # frameworks is bad practice. It would be cleaner/more robust to copy
+        # the TensorFlow libraries to LLDB.framework.
+        LLDB_BINARY_RPATH="-Wl,-rpath,@executable_path/../lib/swift/\$(PLATFORM_NAME)"
+        LLDB_BINARES_RPATH="-Wl,-rpath,@executable_path/../../../../../../../usr/lib/swift/\$(PLATFORM_NAME)"
+        LLDB_SO_RPATH="-Wl,-rpath,@loader_path/../../../../../../usr/lib/swift/\$(PLATFORM_NAME)"
+        RPATHS="${LLDB_BINARY_RPATH} ${LLDB_BINARIES_RPATH} ${LLDB_SO_RPATH}"
+        lldb_xcodebuild_options=(
+            "${lldb_xcodebuild_options[@]}"
+            ENABLE_TENSORFLOW=1
+            EXTRA_OTHER_LDFLAGS="-L\$(LLDB_PATH_TO_SWIFT_BUILD)/lib/swift/\$(PLATFORM_NAME) ${RPATHS} -ltensorflow"
+        )
     fi
 }
 
@@ -2426,11 +2540,77 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
+<<<<<<< HEAD
                 if [ "${SWIFT_INSTALL_COMPONENTS}" ] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_INSTALL_COMPONENTS:STRING="${SWIFT_INSTALL_COMPONENTS}"
                     )
+=======
+                if [[ "${ENABLE_TENSORFLOW}" ]] ; then
+                    # Verify TensorFlow include/library directories.
+                    verify_tensorflow_directories
+
+                    # Copy TensorFlow libraries to correct destination.
+                    SWIFT_LIB_PATH="$(build_directory_bin ${host} swift)/../lib"
+                    TF_LIB_DIR="${SWIFT_LIB_PATH}/swift/${SWIFT_HOST_VARIANT}"
+                    call mkdir -p "${TF_LIB_DIR}"
+
+                    # Bazel-built libraries do not have write permission, which is
+                    # problematic for overwriting/stripping symbols. Thus, write
+                    # permission is added here.
+                    for lib_name in tensorflow tensorflow_framework; do
+                        lib=".*lib${lib_name}.so[0-9.]*"
+                        dylib=".*lib${lib_name}[0-9.]*.dylib"
+                        find "${TF_LIB_DIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec rm -f {} \;
+                        find "${TENSORFLOW_HOST_LIB_DIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec chmod +w {} +
+                        find "${TENSORFLOW_HOST_LIB_DIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec cp -p {} "${TF_LIB_DIR}" \;
+                    done
+
+                    if [[ ! "${TENSORFLOW_TARGET_LIB_DIR}" ]] ; then
+                        TENSORFLOW_TARGET_LIB_DIR="${TENSORFLOW_HOST_LIB_DIR}"
+                    fi
+                    if [[ ! "${TENSORFLOW_TARGET_INCLUDE_DIR}" ]] ; then
+                        TENSORFLOW_TARGET_INCLUDE_DIR="${TENSORFLOW_HOST_INCLUDE_DIR}"
+                    fi
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_ENABLE_TENSORFLOW:BOOL=TRUE
+                        -DSWIFT_TENSORFLOW_HOST_LIB_DIR:PATH="${TENSORFLOW_HOST_LIB_DIR}"
+                        -DSWIFT_TENSORFLOW_HOST_INCLUDE_DIR:PATH="${TENSORFLOW_HOST_INCLUDE_DIR}"
+                        -DSWIFT_TENSORFLOW_TARGET_LIB_DIR:PATH="${TENSORFLOW_TARGET_LIB_DIR}"
+                        -DSWIFT_TENSORFLOW_TARGET_INCLUDE_DIR:PATH="${TENSORFLOW_TARGET_INCLUDE_DIR}"
+                    )
+
+                    # Propagate TensorFlow GPU support flag to CMake.
+                    if [[ "${ENABLE_TENSORFLOW_GPU}" ]] ; then
+                        cmake_options=(
+                            "${cmake_options[@]}"
+                            -DSWIFT_ENABLE_TENSORFLOW_GPU:BOOL=TRUE
+                        )
+                    fi
+
+                    # Handle TensorFlow Swift bindings file.
+                    if [[ ! "${TENSORFLOW_SWIFT_BINDINGS}" && -d "${TENSORFLOW_SWIFT_BINDINGS_DIR}" ]] ; then
+                        TENSORFLOW_SWIFT_BINDINGS="${TENSORFLOW_SWIFT_BINDINGS_DIR}"
+                    fi
+                    if [[ "${TENSORFLOW_SWIFT_BINDINGS}" ]] ; then
+                        cmake_options=(
+                            "${cmake_options[@]}"
+                            -DTENSORFLOW_SWIFT_BINDINGS:PATH="${TENSORFLOW_SWIFT_BINDINGS}"
+                        )
+                    fi
+                    # Handle TensorFlow high-level APIs repository.
+                    if [[ ! "${TENSORFLOW_SWIFT_APIS}" && -d "${TENSORFLOW_SWIFT_APIS_DIR}" ]] ; then
+                        TENSORFLOW_SWIFT_APIS="${TENSORFLOW_SWIFT_APIS_DIR}"
+                    fi
+                    if [[ "${TENSORFLOW_SWIFT_APIS}" ]] ; then
+                        cmake_options=(
+                            "${cmake_options[@]}"
+                            -DTENSORFLOW_SWIFT_APIS:PATH="${TENSORFLOW_SWIFT_APIS}"
+                        )
+                    fi
+>>>>>>> origin/tensorflow
                 fi
 
                 if contains_product "lldb" ; then
@@ -2440,6 +2620,16 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DLLDB_ENABLE:BOOL=TRUE
                         -DLLDB_BUILD_DIR:STRING="${lldb_build_dir}"
                     )
+                    if [[ "${ENABLE_TENSORFLOW}" ]] ; then
+                        lldb_cmake_options=(
+                            "${lldb_cmake_options[@]}"
+                            -DSWIFT_ENABLE_TENSORFLOW:BOOL=TRUE
+                            -DSWIFT_TENSORFLOW_HOST_LIB_DIR:PATH="${TENSORFLOW_HOST_LIB_DIR}"
+                            -DSWIFT_TENSORFLOW_HOST_INCLUDE_DIR:PATH="${TENSORFLOW_HOST_INCLDUE_DIR}"
+                            -DSWIFT_TENSORFLOW_TARGET_LIB_DIR:PATH="${TENSORFLOW_TARGET_LIB_DIR}"
+                            -DSWIFT_TENSORFLOW_TARGET_INCLUDE_DIR:PATH="${TENSORFLOW_TARGET_INCLUDE_DIR}"
+                        )
+                    fi
                 fi
 
                 build_targets=(all "${SWIFT_STDLIB_TARGETS[@]}")
@@ -2476,6 +2666,13 @@ for host in "${ALL_HOSTS[@]}"; do
                 lldb_build_dir=$(build_directory ${host} lldb)
                 swift_build_dir=$(build_directory ${host} swift)
 
+                # SWIFT_ENABLE_TENSORFLOW
+                # Add host variant information.
+                cmake_options=(
+                    "${cmake_options[@]}"
+                    -DHOST_VARIANT:STRING="${SWIFT_HOST_VARIANT}"
+                    -DHOST_VARIANT_ARCH:STRING="${SWIFT_HOST_VARIANT_ARCH}")
+
                 # Add any lldb extra cmake arguments here.
 
                 cmake_options=(
@@ -2501,6 +2698,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 # Get the build date
                 LLDB_BUILD_DATE=$(date +%Y-%m-%d)
 
+<<<<<<< HEAD
                 using_xcodebuild="FALSE"
                 if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
                     using_xcodebuild="TRUE"
@@ -2513,6 +2711,120 @@ for host in "${ALL_HOSTS[@]}"; do
                   with_pushd ${source_dir} \
                       call xcodebuild -target desktop -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
                   continue
+=======
+                case "${host}" in
+                    linux-*)
+                        cmake_options=(
+                            "${cmake_options[@]}"
+                            -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
+                            -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
+                            -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
+                            -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
+                            -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
+                            -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
+                            -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
+                            -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
+                            -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
+                            -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
+                            -DLLDB_ALLOW_STATIC_BINDINGS=1
+                        )
+                        ;;
+                    freebsd-*)
+                        cmake_options=(
+                            "${cmake_options[@]}"
+                            -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
+                            -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
+                            -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
+                            -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
+                            -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
+                            -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
+                            -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
+                            -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
+                            -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
+                            -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
+                            -DLLDB_ALLOW_STATIC_BINDINGS=1
+                        )
+                        ;;
+                    cygwin-*)
+                        cmake_options=(
+                            "${cmake_options[@]}"
+                            -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
+                            -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
+                            -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
+                            -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
+                            -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
+                            -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
+                            -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
+                            -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
+                            -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
+                            -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
+                            -DLLDB_ALLOW_STATIC_BINDINGS=1
+                        )
+                        ;;
+                    haiku-*)
+                        cmake_options=(
+                            "${cmake_options[@]}"
+                            -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
+                            -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
+                            -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
+                            -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
+                            -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
+                            -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
+                            -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
+                            -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
+                            -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
+                            -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
+                            -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
+                            -DLLDB_ALLOW_STATIC_BINDINGS=1
+                        )
+                        ;;
+                    macosx-*)
+                        if [[ "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
+                            # Set up flags to pass to xcodebuild
+                            set_lldb_build_mode
+                            set_lldb_xcodebuild_options
+                            with_pushd ${source_dir} \
+                                call xcodebuild -target desktop -configuration ${LLDB_BUILD_MODE} "${lldb_xcodebuild_options[@]}"
+                            continue
+		        else
+                            cmake_options=(
+                                "${cmake_options[@]}"
+                                -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
+                                -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
+                                -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
+                                -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
+                                -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
+                                -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
+                                -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
+                                -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
+                                -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
+                                -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
+                                -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
+				-DLLDB_BUILD_FRAMEWORK:BOOL=TRUE
+                                -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
+                                -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
+                                -DLLDB_ALLOW_STATIC_BINDINGS=1
+                                -DLLDB_CODESIGN_IDENTITY=""
+                            )
+                        fi
+                        ;;
+                esac
+                if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
+                    cmake_options+=(
+                        -DLLDB_INCLUDE_TESTS=NO
+                        )
+>>>>>>> origin/tensorflow
                 else
                   cmake_options=(
                       "${cmake_options[@]}"
@@ -2823,6 +3135,22 @@ for host in "${ALL_HOSTS[@]}"; do
                 # libicu builds itself and doesn't use cmake
                 continue
                 ;;
+            # SWIFT_ENABLE_TENSORFLOW
+            tensorflow)
+                # Configure TensorFlow and build using bazel.
+                echo yes "" | "${source_dir}/configure"
+                with_pushd "${source_dir}" \
+                    call bazel build -c opt "${TENSORFLOW_BAZEL_OPTIONS[@]}" --define framework_shared_object=false //tensorflow:libtensorflow.so //tensorflow:libtensorflow_framework.so
+
+                # Set TensorFlow include/lib directories.
+                TENSORFLOW_HOST_INCLUDE_DIR="${source_dir}"
+                TENSORFLOW_HOST_LIB_DIR="${source_dir}/bazel-bin/tensorflow"
+                TENSORFLOW_TARGET_INCLUDE_DIR="${source_dir}"
+                TENSORFLOW_TARGET_LIB_DIR="${source_dir}/bazel-bin/tensorflow"
+
+                # TensorFlow builds itself and doesn't use CMake.
+                continue
+                ;;
             playgroundsupport)
                 if [[ "$(uname -s)" != "Darwin" ]]; then
                     echo "error: unable to build PlaygroundLogger and PlaygroundSupport on this platform"
@@ -3015,7 +3343,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     set_lldb_build_mode
                     # Run the LLDB unittests (gtests).
                     with_pushd ${LLDB_SOURCE_DIR} \
-                               call xcodebuild -scheme lldb-gtest -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
+                               call xcodebuild -scheme lldb-gtest -configuration ${LLDB_BUILD_MODE} "${lldb_xcodebuild_options[@]}"
                     rc=$?
                     if [[ "$rc" -ne 0 ]] ; then
                         >&2 echo "error: LLDB gtests failed"
@@ -3391,6 +3719,18 @@ for host in "${ALL_HOSTS[@]}"; do
                 { set +x; } 2>/dev/null
                 continue
                 ;;
+           # SWIFT_ENABLE_TENSORFLOW
+           tensorflow)
+               if [[ "${SKIP_TEST_TENSORFLOW}" ]]; then
+                   continue
+               fi
+               echo "--- Running tests for ${product} ---"
+               with_pushd "${TENSORFLOW_SOURCE_DIR}" \
+                   # TODO: Hook into TensorFlow tests.
+                   echo "Testing TensorFlow is currently not supported."
+               echo "--- Finished tests for ${product} ---"
+               continue
+               ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -3525,8 +3865,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     macosx-*)
                         set_lldb_xcodebuild_options
                         set_lldb_build_mode
+                        set_lldb_xcodebuild_options
                         with_pushd ${LLDB_SOURCE_DIR} \
-                            call xcodebuild -target toolchain -configuration ${LLDB_BUILD_MODE} install ${lldb_xcodebuild_options[@]} DSTROOT="${host_install_destdir}" LLDB_TOOLCHAIN_PREFIX="${TOOLCHAIN_PREFIX}"
+                            call xcodebuild -target toolchain -configuration ${LLDB_BUILD_MODE} install "${lldb_xcodebuild_options[@]}" DSTROOT="${host_install_destdir}" LLDB_TOOLCHAIN_PREFIX="${TOOLCHAIN_PREFIX}"
                         continue
                         ;;
                 esac
@@ -3719,6 +4060,29 @@ for host in "${ALL_HOSTS[@]}"; do
                 call cp -a "${ICU_TMP_INSTALL_DIR}/include/unicode" "${ICU_INSTALL_DIR}include"
                 call mkdir -p "${ICU_INSTALL_DIR}share/icuswift"
                 call cp -a "${ICU_TMP_INSTALL_DIR}/share/icuswift" "${ICU_INSTALL_DIR}share"
+                continue
+                ;;
+            # SWIFT_ENABLE_TENSORFLOW
+            tensorflow)
+                if [[ -z "${INSTALL_TENSORFLOW}" ]]; then
+                    continue
+                fi
+                if [[ -z "${INSTALL_DESTDIR}" ]] ; then
+                    echo "--install-destdir is required to install products."
+                    exit 1
+                fi
+                echo "--- Installing ${product} ---"
+                TF_BUILD_DIR="$(build_directory ${host} ${product})"
+                TF_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}"
+                TF_DEST_DIR="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})lib/swift/${SWIFT_HOST_VARIANT}"
+                mkdir -p "${TF_DEST_DIR}"
+                for lib_name in tensorflow tensorflow_framework
+                do
+                    lib=".*lib${lib_name}.so[0-9.]*"
+                    dylib=".*lib${lib_name}[0-9.]*.dylib"
+                    find "${TF_LIBDIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec echo "{} => ${TF_DEST_DIR}" \;
+                    find "${TF_LIBDIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec cp -a {} "${TF_DEST_DIR}" \;
+                done
                 continue
                 ;;
             playgroundsupport)

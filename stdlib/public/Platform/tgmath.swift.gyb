@@ -91,6 +91,42 @@ public func ldexp(_ x: ${T}, _ n : Int) -> ${T} {
 
 %end
 
+// SWIFT_ENABLE_TENSORFLOW
+%for T in ['Float', 'Double', 'Float80']:
+%   if T == 'Float80':
+#if (arch(i386) || arch(x86_64)) && !os(Windows)
+%   end
+@usableFromInline
+func _vjpExp(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  let value = exp(x)
+  return (value, { v in value * v })
+}
+
+@usableFromInline
+func _vjpLog(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (log(x), { v in v / x })
+}
+
+@usableFromInline
+func _vjpSin(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (sin(x), { v in v * cos(x) })
+}
+
+@usableFromInline
+func _vjpCos(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (cos(x), { v in -v * sin(x) })
+}
+
+@usableFromInline
+func _vjpTan(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  let value = tan(x)
+  return (value, { v in v * (1 + value * value) })
+}
+%   if T == 'Float80':
+#endif
+%   end
+%end
+
 //  Floating-point properties that are exposed as functions in the C math
 //  library. Mark those function names unavailable and direct users to the
 //  properties instead.
@@ -164,6 +200,36 @@ UnaryIntrinsicFunctions = [
     'cos', 'sin', 'exp', 'exp2', 'log', 'log10', 'log2', 'nearbyint', 'rint'
 ]
 
+<<<<<<< HEAD
+=======
+# (T, T) -> T
+BinaryFunctions = [
+    'atan2', 'hypot', 'pow',
+    'copysign', 'nextafter', 'fdim', 'fmax', 'fmin'
+]
+
+# These functions have special implementations.
+OtherFunctions = [
+    'scalbn', 'lgamma', 'remquo', 'nan', 'jn', 'yn'
+]
+
+# SWIFT_ENABLE_TENSORFLOW
+# These functions are imported correctly as-is.
+OkayFunctions = ['j0', 'j1', 'y0', 'y1']
+
+HasVJP = ["exp", "log", "tan", "cos", "sin"]
+
+# These functions are not supported for various reasons.
+UnhandledFunctions = [
+    'math_errhandling', 'scalbln',
+    'lrint', 'lround', 'llrint', 'llround', 'nexttoward',
+    'isgreater', 'isgreaterequal', 'isless', 'islessequal',
+    'islessgreater', 'isunordered', '__exp10',
+    '__sincos', '__cospi', '__sinpi', '__tanpi', '__sincospi'
+]
+
+
+>>>>>>> origin/tensorflow
 def AllFloatTypes():
     for bits in allFloatBits:
         yield floatName(bits), cFloatName(bits), cFuncSuffix(bits)
@@ -196,6 +262,10 @@ def TypedBinaryFunctions():
 #if (arch(i386) || arch(x86_64)) && !os(Windows)
 %  end
 @_transparent
+// SWIFT_ENABLE_TENSORFLOW
+%   if ufunc in HasVJP:
+@differentiable(vjp: _vjp${ufunc.capitalize()}(_:))
+%   end
 public func ${ufunc}(_ x: ${T}) -> ${T} {
   return ${T}.${ufunc}(x)
 }
@@ -246,12 +316,20 @@ public func tgamma(_ x: Float80) -> Float80 {
 %  end
 %  if ufunc[-3:] != 'int':
 @_transparent
+// SWIFT_ENABLE_TENSORFLOW
+%   if ufunc in HasVJP:
+@differentiable(vjp: _vjp${ufunc.capitalize()}(_:))
+%   end
 public func ${ufunc}(_ x: ${T}) -> ${T} {
   return ${T}.${ufunc}(x)
 }
 %  else:
 @available(swift, deprecated: 5.1, message: "Swift does not model dynamic rounding modes, use x.rounded(.toNearestOrEven) instead.")
 @_transparent
+// SWIFT_ENABLE_TENSORFLOW
+%   if ufunc in HasVJP:
+@differentiable(vjp: _vjp${ufunc.capitalize()}(_:))
+%   end
 public func ${ufunc}(_ x: ${T}) -> ${T} {
   return x.rounded(.toNearestOrEven)
 }

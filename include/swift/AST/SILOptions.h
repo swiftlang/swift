@@ -129,8 +129,25 @@ public:
   /// Emit extra exclusvity markers for memory access and verify coverage.
   bool VerifyExclusivity = false;
 
+<<<<<<< HEAD
   /// Enable large loadable types IRGen pass.
   bool EnableLargeLoadableTypes = true;
+=======
+  /// Enable the mandatory semantic arc optimizer.
+  bool EnableMandatorySemanticARCOpts = false;
+
+  /// \brief Enable large loadable types IRGen pass.
+  // bool EnableLargeLoadableTypes = true;
+  // FIXME(TF-11, SR-9849): Disabled because LoadableByAddress cannot handle
+  // some functions that return closures that take/return large loadable types.
+  bool EnableLargeLoadableTypes = false;
+
+  /// Enable serialization of the module just before differentiation.  This
+  /// allows the differentiation pass to differentiate SIL that has been loaded
+  /// from this module.  The LLDB REPL uses this so that the differentiation
+  /// pass can differentiate functions defined on different lines.
+  bool SerializeForDifferentiation = false;
+>>>>>>> origin/tensorflow
 
   /// Should the default pass pipelines strip ownership during the diagnostic
   /// pipeline or after serialization.

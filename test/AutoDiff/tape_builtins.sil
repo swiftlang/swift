@@ -1,0 +1,25 @@
+// RUN: %target-sil-opt -sil-print-all -verify %s | %FileCheck %s
+
+sil_stage raw
+
+import Swift
+import Builtin
+
+sil @foo : $@convention(thin) (Float, Float) -> Float {
+bb0(%0 : @trivial $Float, %1 : @trivial $Float):
+  %tape = builtin "autodiffCreateTape"<Float>() : $_AutoDiffTape<Float>
+  %id = integer_literal $Builtin.Word, 0
+  builtin "autodiffPushToTape"<Float>(%tape : $_AutoDiffTape<Float>, %0 : $Float, %id : $Builtin.Word) : $()
+  %val = builtin "autodiffPopFromTape"<Float>(%tape : $_AutoDiffTape<Float>, %id : $Builtin.Word) : $Float
+  builtin "autodiffDestroyTape"<Float>(%tape : $_AutoDiffTape<Float>) : $()
+  return %val : $Float
+}
+
+// CHECK-LABEL: @foo
+// CHECK: bb0(%0 : @trivial $Float, %1 : @trivial $Float):
+// CHECK:  [[tape:%.*]] = builtin "autodiffCreateTape"<Float>() : $_AutoDiffTape<Float>
+// CHECK:  [[id:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK:  builtin "autodiffPushToTape"<Float>([[tape]] : $_AutoDiffTape<Float>, %0 : $Float, [[id]] : $Builtin.Word) : $()
+// CHECK:  [[val:%.*]] = builtin "autodiffPopFromTape"<Float>([[tape]] : $_AutoDiffTape<Float>, [[id]] : $Builtin.Word) : $Float
+// CHECK:  builtin "autodiffDestroyTape"<Float>([[tape]] : $_AutoDiffTape<Float>) : $()
+// CHECK:  return [[val]] : $Float

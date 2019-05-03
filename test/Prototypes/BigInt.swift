@@ -16,8 +16,17 @@
 // REQUIRES: executable_test
 // REQUIRES: CPU=x86_64
 
+<<<<<<< HEAD
 // Requires swift-version 4
 // UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
+=======
+// SWIFT_ENABLE_TENSORFLOW
+// This test is currently unsupported because the addition of `+` operators
+// to the stdlib (via `VectorNumeric`) causes type-checking to fail.
+// Re-enable when type-checking no longer fails.
+// UNSUPPORTED: executable_test
+
+>>>>>>> origin/tensorflow
 import StdlibUnittest
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   import Darwin

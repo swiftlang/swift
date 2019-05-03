@@ -83,6 +83,8 @@ static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep,
     return OptForPartialApply;
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Block:
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILFunctionTypeRepresentation::TensorFlow:
     return false;
   }
 

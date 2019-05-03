@@ -63,6 +63,20 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(SwiftOnoneSupport)
 endif()
 
+# SWIFT_ENABLE_TENSORFLOW
+if(SWIFT_BUILD_STDLIB)
+  add_subdirectory(Python)
+endif()
+
+# SWIFT_ENABLE_TENSORFLOW
+# Note: Python should be built before TensorFlow because Python is a
+# dependency for `numpy.ndarray` bridging to `ShapedArray`/`Tensor`.
+if(SWIFT_BUILD_STDLIB AND SWIFT_ENABLE_TENSORFLOW)
+  # TODO: Add TensorFlow support for iOS/Raspberry Pi.
+  add_subdirectory(CTensorFlow)
+  add_subdirectory(TensorFlow)
+endif()
+
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
   add_subdirectory(Reflection)
   add_subdirectory(SwiftRemoteMirror)

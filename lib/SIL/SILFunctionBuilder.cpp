@@ -68,6 +68,36 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
     return;
   auto *decl = constant.getDecl();
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // Propagate @differentiable attributes.
+  // Don't propagate @differentiable to:
+  // - Non-getter accessors (setters, modifiers, etc).
+  // - Default argument generator functions.
+  // - Thunks. Those are currently handled in SILGenThunk.cpp.
+  if ((!isa<AccessorDecl>(decl) || cast<AccessorDecl>(decl)->isGetter()) &&
+      constant.kind != SILDeclRef::Kind::DefaultArgGenerator &&
+      !constant.autoDiffAssociatedFunctionIdentifier &&
+      !constant.isStoredPropertyInitializer() &&
+      !constant.isThunk()) {
+    for (auto *A : Attrs.getAttributes<DifferentiableAttr>()) {
+      std::string jvpName, vjpName;
+      // Get JVP/VJP names.
+      if (auto *jvpFn = A->getJVPFunction())
+        jvpName = SILDeclRef(jvpFn).mangle();
+      if (auto *vjpFn = A->getVJPFunction())
+        vjpName = SILDeclRef(vjpFn).mangle();
+      // Get lowered argument indices.
+      auto paramIndices = A->getParameterIndices();
+      auto loweredParamIndices = paramIndices->getLowered(
+          decl->getInterfaceType()->castTo<AnyFunctionType>());
+      SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
+      auto silDiffAttr = SILDifferentiableAttr::create(
+          M, indices, A->getRequirements(), M.allocateCopy(jvpName),
+          M.allocateCopy(vjpName));
+      F->addDifferentiableAttr(silDiffAttr);
+    }
+  }
+
   // Only emit replacements for the objc entry point of objc methods.
   if (decl->isObjC() &&
       F->getLoweredFunctionType()->getExtInfo().getRepresentation() !=
@@ -98,6 +128,7 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
          replacedFunc->getLoweredFunctionType()->hasOpaqueArchetype());
 
   F->setDynamicallyReplacedFunction(replacedFunc);
+
 }
 
 SILFunction *
@@ -164,9 +195,10 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();
-      // Add attributes for e.g. computed properties.
-      addFunctionAttributes(F, storage->getAttrs(), mod);
+      // SWIFT_ENABLE_TENSORFLOW
+      addFunctionAttributes(F, storage->getAttrs(), mod, constant);
     }
+    // SWIFT_ENABLE_TENSORFLOW
     addFunctionAttributes(F, decl->getAttrs(), mod, constant);
   }
 

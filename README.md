@@ -1,10 +1,8 @@
-<img src="https://swift.org/assets/images/swift.svg" alt="Swift logo" height="70" >
+# Swift for TensorFlow
 
-# Swift Programming Language
-
-
-| | **Architecture** | **Master** | **Package** |
+| OS | CI platform | x86_64 | GPU |
 |---|:---:|:---:|:---:|
+<<<<<<< HEAD
 | **macOS**        | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-osx/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-osx)|[![Build Status](https://ci.swift.org/job/oss-swift-package-osx/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-osx)|
 | **Ubuntu 14.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-14_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-14_04)|
 | **Ubuntu 16.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04)|
@@ -32,43 +30,30 @@
 Swift is a high-performance system programming language.  It has a clean
 and modern syntax, offers seamless access to existing C and Objective-C code
 and frameworks, and is memory safe by default.
+=======
+| **macOS** | Google Kokoro | ![Build Status](https://storage.googleapis.com/tensorflow-kokoro-build-badges/macos-swift-tf-release.svg) | _coming soon_ |
+| **Ubuntu 16.04** | Swift.org CI | [![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow) | N/A |
+>>>>>>> origin/tensorflow
 
-Although inspired by Objective-C and many other languages, Swift is not itself a
-C-derived language. As a complete and independent language, Swift packages core
-features like flow control, data structures, and functions, with high-level
-constructs like objects, protocols, closures, and generics. Swift embraces
-modules, eliminating the need for headers and the code duplication they entail.
+Welcome to Swift for TensorFlow!
 
-To learn more about the programming language, visit [swift.org](https://swift.org/documentation/).
+Swift for TensorFlow is a new programming language for TensorFlow. It is a copy of the compiler for the [Swift Programming Language](https://swift.org) that adds first-class compiler and language support for machine learning.
 
-## Contributing to Swift
+This repository covers the compiler and standard libraries. Please visit the [documentation repository](https://github.com/tensorflow/swift) for more information about the project, including a project overview, technical details, and guidelines for contributing. To use Swift for TensorFlow out of the box, follow the [installation instructions](https://github.com/tensorflow/swift/blob/master/Installation.md). To build from source, follow the instructions below.
 
-Contributions to Swift are welcomed and encouraged! Please see the
-[Contributing to Swift guide](https://swift.org/contributing/).
+**Note:** Swift for TensorFlow is an early stage research project. It has been released to enable open source development and is not yet ready for general use by machine learning developers.
 
-To be a truly great community, [Swift.org](https://swift.org/) needs to welcome
-developers from all walks of life, with different backgrounds, and with a wide
-range of experience. A diverse and friendly community will have more great
-ideas, more unique perspectives, and produce more great code. We will work
-diligently to make the Swift community welcoming to everyone.
+## Building Swift for TensorFlow
 
-To give clarity of what is expected of our members, Swift has adopted the
-code of conduct defined by the Contributor Covenant. This document is used
-across many open source communities, and we think it articulates our values
-well. For more, see the [Code of Conduct](https://swift.org/community/#code-of-conduct).
+These instructions give the most direct path to a working development environment for Swift for TensorFlow.
 
-## Getting Started
+**Note:** Building from source is necessary only if you want to modify the source code or build with a custom version of TensorFlow.
 
-These instructions give the most direct path to a working Swift development
-environment. To build from source you will need about 2 GB of disk space for the
-source code and up to 70 GB of disk space for the build artifacts with full
-debugging. Depending on your machine, a clean build can take a few minutes to
-several hours. Naturally, incremental builds are much faster.
-
+To build from source you will need 2 GB of disk space for the source code and over 20 GB of disk space for the build artifacts. A clean build can take multiple hours, but incremental builds will finish much faster.
 
 ### System Requirements
 
-macOS, Ubuntu Linux LTS, and the latest Ubuntu Linux release are the current
+macOS, Ubuntu Linux LTS 14.04, and Ubuntu Linux LTS 16.04 are the current
 supported host development operating systems.
 
 Please make sure you use Python 2.x. Python 3.x is not supported currently.
@@ -77,21 +62,18 @@ Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
 To build for macOS, you need [Xcode 10.2 beta](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
-Check this document or the host information on <https://ci.swift.org> for the
-current required version.
+Check this document for the current required version.
 
-You will also need [CMake](https://cmake.org) and [Ninja](https://ninja-build.org),
-which can be installed via a package manager:
+You will also need [CMake](https://cmake.org), [Ninja](https://ninja-build.org), and [Bazel](https://www.bazel.build), which can be installed via a package manager.
 
 **[Homebrew](https://brew.sh/)**
 
-    brew install cmake ninja
+```shell
+brew install cmake ninja
+brew cask install caskroom/versions/java8 # required for Bazel
+```
 
-**[MacPorts](https://macports.org)**
-
-    sudo port install cmake ninja
-
-Instructions for installing CMake and Ninja directly can be found [below](#build-dependencies).
+Additionally, [Bazel](https://www.bazel.build) v0.22.0 is required to build with TensorFlow support. Instructions to download Bazel directly can be found [below](###bazel). You can find instructions for installing CMake, and Ninja directly [below](#build-dependencies) as well.
 
 #### Linux
 
@@ -99,14 +81,16 @@ For Ubuntu, you'll need the following development dependencies:
 
     sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-openssl-dev systemtap-sdt-dev tzdata rsync
 
+Additionally, [Bazel](https://www.bazel.build) v0.22.0 is required to build with TensorFlow support. Ubuntu installation instructions can be found [below](###bazel).
+
 **Note:** LLDB currently requires at least `swig-1.3.40` but will successfully build
 with version 2 shipped with Ubuntu.
 
-Build instructions for Ubuntu 14.04 LTS can be found [here](docs/Ubuntu14.md).
+Additional build instructions for Ubuntu 14.04 LTS can be found [here](docs/Ubuntu14.md). These are necessary for building Swift for TensorFlow correctly.
 
 ### Getting Sources for Swift and Related Projects
 
-First create a directory for all of the Swift sources:
+First, create a directory for all of the Swift sources:
 
     mkdir swift-source
     cd swift-source
@@ -114,25 +98,36 @@ First create a directory for all of the Swift sources:
 **Note:** This is important since update-checkout (see below) checks out
 repositories next to the Swift source directory. This means that if one clones
 Swift and has other unrelated repositories, update-checkout may not clone those
-repositories and will update them instead.
+repositories and will update them instead. Additionally, ensure Python 2.7 is being 
+used for this step, whether via conda environment or other means.
+
+**TensorFlow Support:** To build with TensorFlow support, the `tensorflow`
+scheme must be specified when cloning sources. The `tensorflow` scheme pins
+specific versions of every Swift companion directory and is updated with every
+upstream merge from the master branch.
 
 **Via HTTPS**  For those checking out sources as read-only, HTTPS works best:
 
-    git clone https://github.com/apple/swift.git
-    ./swift/utils/update-checkout --clone
+    git clone https://github.com/apple/swift.git -b tensorflow
+    ./swift/utils/update-checkout --clone --scheme tensorflow
+    cd swift
 
 **Via SSH**  For those who plan on regularly making direct commits,
 cloning over SSH may provide a better experience (which requires
 [uploading SSH keys to GitHub](https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/)):
 
-    git clone git@github.com:apple/swift.git
-    ./swift/utils/update-checkout --clone-with-ssh
+    git clone git@github.com:apple/swift.git -b tensorflow
+    ./swift/utils/update-checkout --clone-with-ssh --scheme tensorflow
+    cd swift
 
-### Building Swift
+### Building Swift with TensorFlow support
 
 The `build-script` is a high-level build automation script that supports basic
 options such as building a Swift-compatible LLDB, building the Swift Package
 Manager, building for various platforms, running tests after builds, and more.
+TensorFlow support is enabled by the `--enable-tensorflow` flag. TensorFlow will
+be automatically cloned from GitHub and built from source using Bazel when this
+flag is specified.
 
 There are two primary build systems to use: Xcode and Ninja. The Xcode build
 system allows you to work in Xcode, but Ninja is a bit faster and supports
@@ -140,26 +135,58 @@ more environments.
 
 To build using Ninja, run:
 
-    utils/build-script --release-debuginfo
+    utils/build-script --enable-tensorflow --release-debuginfo
 
 When developing Swift, it helps to build what you're working on in a debug
 configuration while building the rest of the project with optimizations. Below
 are some examples of using debug variants:
 
-    utils/build-script --release-debuginfo --debug-swift # Swift frontend built in debug
-    utils/build-script --release-debuginfo --debug-swift-stdlib # Standard library built in debug
-    utils/build-script --release-debuginfo --debug-swift --force-optimized-typechecker # Swift frontend sans type checker built in debug
+    utils/build-script --enable-tensorflow --release-debuginfo --debug-swift # Swift frontend built in debug
+    utils/build-script --enable-tensorflow --release-debuginfo --debug-swift-stdlib # Standard library built in debug
+    utils/build-script --enable-tensorflow --release-debuginfo --debug-swift --force-optimized-typechecker # Swift frontend sans type checker built in debug
 
 Limiting the amount of debug code in the compiler has a very large impact on
 Swift compile times, and in turn the test execution time. If you want to build
 the entire project in debug, you can run:
 
-    utils/build-script --debug
+    utils/build-script  --enable-tensorflow --debug
 
 For documentation of all available arguments, as well as additional usage
 information, see the inline help:
 
     utils/build-script -h
+
+### Customize TensorFlow support
+
+ If you want to build with custom TensorFlow headers and shared libraries, please specify the `--tensorflow-host-include-dir` and `--tensorflow-host-lib-dir` arguments:
+
+    utils/build-script --enable-tensorflow --tensorflow-host-include-dir=<path_to_tensorflow_headers> --tensorflow-host-lib-dir=<path_to_tensorflow_libraries>
+
+You can assign specific values to these arguments after a double-dash `--` in
+your build-script command. For example:
+
+    utils/build-script -- enable-tensorflow=True
+
+Below is more information about TensorFlow-related build arguments.
+
+* `enable-tensorflow`: If true, enables TensorFlow support for Swift.
+    * Default value: `False`.
+* `build-tensorflow`: If true, automatically clone and build TensorFlow from source.
+    * Default value: If `enable-tensorflow` is `True` and `tensorflow-host-lib-dir` and `tensorflow-host-include-dir` are not specified, then `True`. Otherwise, `False`.
+* `host-bazel`: The absolute path to Bazel, used to build TensorFlow.
+    * By default, the path is auto detected.
+* `tensorflow-bazel-options`: Comma separated options passed to Bazel when building TensorFlow, e.g. `--copt=-mavx,--copt=-msse4.2`.
+    * Default: None.
+* `tensorflow-host-include-dir`: A directory containing custom TensorFlow headers.
+    * Default value: None.
+* `tensorflow-host-lib-dir`: A directory containing custom TensorFlow shared libraries (`libtensorflow.so` and `libtensorflow_framework.so`).
+    * Default value: None.
+* `tensorflow-swift-apis`: A path to the [tensorflow/swift-apis](https://github.com/tensorflow/swift-apis) deep learning library repository.
+    * Default value: `tensorflow-swift-apis` if the [tensorflow/swift-apis](https://github.com/tensorflow/swift-apis) repository is cloned. Otherwise, none.
+* `tensorflow-swift-bindings`: A path to the [tensorflow/swift-bindings](https://github.com/tensorflow/swift-bindings) repository.
+    * Default value: `tensorflow-swift-bindings` if the [tensorflow/swift-bindings](https://github.com/tensorflow/swift-bindings) repository is cloned. Otherwise, none.
+
+### Build systems
 
 #### Xcode
 
@@ -217,31 +244,31 @@ then run the build product in Terminal.
 #### Building
 
 Swift toolchains are created using the script
-[build-toolchain](https://github.com/apple/swift/blob/master/utils/build-toolchain). This
-script is used by swift.org's CI to produce snapshots and can allow for one to
+[build-toolchain-tensorflow](https://github.com/apple/swift/blob/tensorflow/utils/build-toolchain-tensorflow).
+This script is used by swift.org's CI to produce snapshots and can allow for one to
 locally reproduce such builds for development or distribution purposes. E.x.:
 
 ```
-  $ ./utils/build-toolchain $BUNDLE_PREFIX
+  $ ./utils/build-toolchain-tensorflow $BUNDLE_PREFIX
 ```
 
-where ``$BUNDLE_PREFIX`` is a string that will be prepended to the build 
-date to give the bundle identifier of the toolchain's ``Info.plist``. For 
-instance, if ``$BUNDLE_PREFIX`` was ``com.example``, the toolchain 
-produced will have the bundle identifier ``com.example.YYYYMMDD``. It 
-will be created in the directory you run the script with a filename 
-of the form: ``swift-LOCAL-YYYY-MM-DD-a-osx.tar.gz``.
+where ``$BUNDLE_PREFIX`` is a string that will be prepended to the build
+date to give the bundle identifier of the toolchain's ``Info.plist``. For
+instance, if ``$BUNDLE_PREFIX`` was ``com.example``, the toolchain
+produced will have the bundle identifier ``com.example.YYYYMMDD``. It
+will be created in the directory you run the script with a filename
+ of the form: ``swift-tensorflow-LOCAL-YYYY-MM-DD-a-osx.tar.gz``.
 
-Beyond building the toolchain, ``build-toolchain`` also supports the 
-following (non-exhaustive) set of useful options::
+Beyond building the toolchain, ``build-toolchain-tensorflow`` also supports the
+following (non-exhaustive) set of useful options:
 
 - ``--dry-run``: Perform a dry run build. This is off by default.
 - ``--test``: Test the toolchain after it has been compiled. This is off by default.
-- ``--distcc``: Use distcc to speed up the build by distributing the c++ part of
-  the swift build. This is off by default.
+- ``--gpu`` (Linux only): Build with GPU support. This is off by default.
+- ``--pkg`` (macOS only): Build a toolchain installer package (`.pkg`). This is off by default.
 
 More options may be added over time. Please pass ``--help`` to
-``build-toolchain`` to see the full set of options.
+``build-toolchain-tensorflow`` to see the full set of options.
 
 #### Installing into Xcode
 
@@ -271,7 +298,7 @@ compiler crashes.
 Make sure you are using the [correct release](#macos) of Xcode.
 
 If you have changed Xcode versions but still encounter errors that appear to
-be related to the Xcode version, try passing `--clean` to `build-script`.
+be related to the Xcode version, try passing `--rebuild` to `build-script`.
 
 When a new version of Xcode is released, you can update your build without
 recompiling the entire project by passing the `--reconfigure` option.
@@ -281,42 +308,35 @@ described above.
 
 ## Testing Swift
 
-See [docs/Testing.md](docs/Testing.md), in particular the section on [lit.py](docs/Testing.md#using-litpy).
+The simplest way to run the Swift test suite is using the `tensorflow_test`
+build preset, which runs the entire Swift test suite (including new TensorFlow
+tests):
 
-## Learning More
+    utils/build-script --preset=tensorflow_test
 
-Be sure to look through the [docs](https://github.com/apple/swift/tree/master/docs)
-directory for more information about the compiler. In particular, the documents
-titled [Debugging the Swift Compiler](docs/DebuggingTheCompiler.rst) and
-[Continuous Integration for Swift](docs/ContinuousIntegration.md) are very
-helpful to understand before submitting your first PR.
+Swift for TensorFlow adds the following new test suites:
 
-### Building Documentation
-
-To read the compiler documentation, start by installing the
-[Sphinx](http://sphinx-doc.org) documentation generator tool by running the
-command:
-
+<<<<<<< HEAD
     easy_install -U "Sphinx < 2.0"
+=======
+- [test/AutoDiff](test/AutoDiff): tests for
+  [automatic differentiation](https://github.com/tensorflow/swift/blob/master/docs/AutomaticDifferentiation.md).
+- [test/TensorFlow](test/TensorFlow): TensorFlow infrastructure tests that don't
+  depend on the TensorFlow runtime.
+- [test/TensorFlowRuntime](test/TensorFlowRuntime): TensorFlow runtime tests.
+>>>>>>> origin/tensorflow
 
-Once complete, you can build the Swift documentation by changing directory into
-[docs](https://github.com/apple/swift/tree/master/docs) and typing `make`. This
-compiles the `.rst` files in the [docs](https://github.com/apple/swift/tree/master/docs)
-directory into HTML in the `docs/_build/html` directory.
+Before submitting pull requests involving large code changes, please run the
+command above locally to ensure all tests pass.
 
-Many of the docs are out of date, but you can see some historical design
-documents in the `docs` directory.
-
-Another source of documentation is the standard library itself, located in
-`stdlib`. Much of the language is actually implemented in the library
-(including `Int`), and the standard library gives some examples of what can be
-expressed today.
+For more details on testing, see [docs/Testing.md](docs/Testing.md), in
+particular the section on [lit.py](docs/Testing.md#using-litpy).
 
 ## Build Dependencies
 
 ### CMake
-[CMake](https://cmake.org) is the core infrastructure used to configure builds of 
-Swift and its companion projects; at least version 3.4.3 is required. 
+[CMake](https://cmake.org) is the core infrastructure used to configure builds of
+Swift and its companion projects; at least version 3.4.3 is required.
 
 On macOS, you can download the [CMake Binary Distribution](https://cmake.org/download),
 bundled as an application, copy it to `/Applications`, and add the embedded
@@ -349,3 +369,11 @@ next to the other projects and it will be bootstrapped automatically:
     git clone git@github.com:ninja-build/ninja.git && cd ninja
     git checkout release
     cat README
+
+### Bazel
+[Bazel](https://bazel.build) is the build tool used to build TensorFlow. Installing Bazel is necessary for building Swift with TensorFlow support.
+
+The Bazel website has detailed installation instructions for
+[macOS](https://docs.bazel.build/versions/master/install-os-x.html) and
+[Ubuntu](https://docs.bazel.build/versions/master/install-ubuntu.html).
+When picking the version to download in step 2, select v0.22.0 which can be found in the release notes [here](https://github.com/bazelbuild/bazel/releases/tag/0.22.0).

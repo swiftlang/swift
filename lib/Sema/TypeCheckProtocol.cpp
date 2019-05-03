@@ -671,6 +671,27 @@ swift::matchWitness(
     }
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // '@differentiable' attributes must match completely.
+  for (auto *reqDiffAttr : reqAttrs.getAttributes<DifferentiableAttr>()) {
+    auto witnessDiffAttrs =
+        witnessAttrs.getAttributes<DifferentiableAttr, /*AllowInvalid*/ true>();
+    bool reqDiffAttrMatch = llvm::any_of(
+        witnessDiffAttrs, [&](const DifferentiableAttr *witnessDiffAttr) {
+          return witnessDiffAttr->getParameterIndices() &&
+                 reqDiffAttr->getParameterIndices() &&
+                 witnessDiffAttr->parametersMatch(*reqDiffAttr);
+        });
+    if (!reqDiffAttrMatch) {
+      if (auto *vdWitness = dyn_cast<VarDecl>(witness))
+        return RequirementMatch(
+            getStandinForAccessor(vdWitness, AccessorKind::Get),
+            MatchKind::DifferentiableConflict);
+      else
+        return RequirementMatch(witness, MatchKind::DifferentiableConflict);
+    }
+  }
+
   // Now finalize the match.
   return finalize(anyRenaming, optionalAdjustments);
 }
@@ -1806,10 +1827,20 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
       // should go into the new extension we (might) suggest here.
       impliedDisablesMissingWitnessFixits = true;
 
-      diagnoseConformanceImpliedByConditionalConformance(
-          TC.Diags, conformance, implyingConf, issueFixit);
-
-      conformance->setInvalid();
+      // SWIFT_ENABLE_TENSORFLOW
+      // Before diagnosing implied conditional conformances, check if the
+      // implied protocol is an underscored protocol for internal purposes
+      // (e.g. `_Differentiable` or `__Differentiable`, which are workarounds
+      // for TF-213). If so, allow the implied conformance.
+      auto *proto = conformance->getProtocol();
+      auto &ctx = DC->getASTContext();
+      // TODO(TF-213): Remove underscore `Differentiable` protocols.
+      if (proto != ctx.getProtocol(KnownProtocolKind::__Differentiable) &&
+          proto != ctx.getProtocol(KnownProtocolKind::_Differentiable) ) {
+        diagnoseConformanceImpliedByConditionalConformance(
+            TC.Diags, conformance, implyingConf, issueFixit);
+        conformance->setInvalid();
+      }
     }
   }
 
@@ -2220,6 +2251,21 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   case MatchKind::NonObjC:
     diags.diagnose(match.Witness, diag::protocol_witness_not_objc);
     break;
+  // SWIFT_ENABLE_TENSORFLOW
+  case MatchKind::DifferentiableConflict: {
+    for (auto *da : req->getAttrs()
+             .getAttributes<DifferentiableAttr, /*allowInvalid*/ true>()) {
+      assert(da);
+      std::string diffAttrReq;
+      llvm::raw_string_ostream stream(diffAttrReq);
+      da->print(stream, req,
+                /*prettyPrintInModule*/ match.Witness->getModuleContext());
+      diags.diagnose(match.Witness,
+          diag::protocol_witness_missing_specific_differentiable_attr,
+          StringRef(stream.str()).trim());
+    }
+    break;
+  }
   }
 }
 
@@ -5463,6 +5509,31 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   case KnownProtocolKind::Decodable:
     return derived.deriveDecodable(Requirement);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  case KnownProtocolKind::KeyPathIterable:
+    return derived.deriveKeyPathIterable(Requirement);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case KnownProtocolKind::TensorArrayProtocol:
+    return derived.deriveTensorArrayProtocol(Requirement);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case KnownProtocolKind::TensorGroup:
+    return derived.deriveTensorGroup(Requirement);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case KnownProtocolKind::AdditiveArithmetic:
+    return derived.deriveAdditiveArithmetic(Requirement);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case KnownProtocolKind::VectorNumeric:
+    return derived.deriveVectorNumeric(Requirement);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // TODO(TF-213): Replace with `KnownProtocolKind::Differentiable`.
+  case KnownProtocolKind::__Differentiable:
+    return derived.deriveDifferentiable(Requirement);
+
   default:
     return nullptr;
   }
@@ -5486,6 +5557,14 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
     return derived.deriveRawRepresentable(AssocType);
   case KnownProtocolKind::CaseIterable:
     return derived.deriveCaseIterable(AssocType);
+  // SWIFT_ENABLE_TENSORFLOW
+  case KnownProtocolKind::KeyPathIterable:
+    return derived.deriveKeyPathIterable(AssocType);
+  case KnownProtocolKind::VectorNumeric:
+    return derived.deriveVectorNumeric(AssocType);
+  // TODO(TF-213): Replace with `KnownProtocolKind::Differentiable`.
+  case KnownProtocolKind::__Differentiable:
+    return derived.deriveDifferentiable(AssocType);
   default:
     return nullptr;
   }

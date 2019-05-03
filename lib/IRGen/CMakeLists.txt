@@ -1,3 +1,11 @@
+if(SWIFT_ENABLE_TENSORFLOW)
+  find_package(TensorFlow REQUIRED)
+  if (TF_PATH_ADJUSTMENT)
+    include_directories(BEFORE "${TF_INCLUDE_DIR}/${TF_PATH_ADJUSTMENT}" )
+  endif()
+  include_directories(BEFORE "${TF_INCLUDE_DIR}")
+endif()
+
 add_swift_host_library(swiftIRGen STATIC
   AllocStackHoisting.cpp
   ClassLayout.cpp
@@ -16,6 +24,8 @@ add_swift_host_library(swiftIRGen STATIC
   GenControl.cpp
   GenCoverage.cpp
   GenDecl.cpp
+  # SWIFT_ENABLE_TENSORFLOW
+  GenDiffFunc.cpp
   GenEnum.cpp
   GenExistential.cpp
   GenFunc.cpp

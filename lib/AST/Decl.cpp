@@ -3361,6 +3361,79 @@ bool NominalTypeDecl::isOptionalDecl() const {
   return this == getASTContext().getOptionalDecl();
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+ConstructorDecl *NominalTypeDecl::getEffectiveMemberwiseInitializer() {
+  auto isEffectiveMemberwiseInitializer = [&](ConstructorDecl *ctorDecl) {
+    // Check for `nullptr`.
+    if (!ctorDecl)
+      return false;
+    // Return true if `ctorDecl` is marked as a memberwise initializer.
+    if (ctorDecl->isMemberwiseInitializer())
+      return true;
+    // Get all stored properties, excluding `let` properties with initial
+    // values.
+    SmallVector<VarDecl *, 8> storedProperties;
+    for (auto *vd : getStoredProperties()) {
+      if (vd->isLet() && vd->hasInitialValue())
+        continue;
+      storedProperties.push_back(vd);
+    }
+    // Return false if constructor does not have interface type set. It is not
+    // possible to determine whether it is a memberwise initializer.
+    if (!ctorDecl->hasInterfaceType())
+      return false;
+    auto ctorType =
+        ctorDecl->getMethodInterfaceType()->getAs<AnyFunctionType>();
+    // Return false if constructor does not have a valid method interface type.
+    if (!ctorType)
+      return false;
+    // Return false if stored property/initializer parameter count do not match.
+    if (storedProperties.size() != ctorType->getNumParams())
+      return false;
+    // Return true if all stored property types/names match initializer
+    // parameter types/labels.
+    return llvm::all_of(
+        llvm::zip(storedProperties, ctorType->getParams()),
+        [&](std::tuple<VarDecl *, AnyFunctionType::Param> pair) {
+          auto *storedProp = std::get<0>(pair);
+          auto param = std::get<1>(pair);
+          return storedProp->getInterfaceType()->isEqual(
+                     param.getPlainType()) &&
+                 storedProp->getName() == param.getLabel();
+        });
+  };
+
+  ConstructorDecl *memberwiseInitDecl = nullptr;
+  auto ctorDecls = lookupDirect(DeclBaseName::createConstructor());
+  for (auto decl : ctorDecls) {
+    auto ctorDecl = dyn_cast<ConstructorDecl>(decl);
+    if (!isEffectiveMemberwiseInitializer(ctorDecl))
+      continue;
+    assert(!memberwiseInitDecl && "Memberwise initializer already found");
+    memberwiseInitDecl = ctorDecl;
+  }
+  return memberwiseInitDecl;
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+void NominalTypeDecl::addFixedLayoutAttr() {
+  auto &C = getASTContext();
+  // If nominal already has `@_fixed_layout`, return.
+  if (getAttrs().hasAttribute<FixedLayoutAttr>())
+    return;
+  auto access = getEffectiveAccess();
+  // If nominal does not have at least internal access, return.
+  if (access < AccessLevel::Internal)
+    return;
+  // If nominal is internal, it should have the `@usableFromInline` attribute.
+  if (access == AccessLevel::Internal &&
+      !getAttrs().hasAttribute<UsableFromInlineAttr>()) {
+    getAttrs().add(new (C) UsableFromInlineAttr(/*Implicit*/ true));
+  }
+  // Add `@_fixed_layout` to the nominal.
+  getAttrs().add(new (C) FixedLayoutAttr(/*Implicit*/ true));
+}
+
 Optional<KeyPathTypeKind> NominalTypeDecl::getKeyPathTypeKind() const {
   auto &ctx = getASTContext();
 #define CASE(NAME) if (this == ctx.get##NAME##Decl()) return KPTK_##NAME;

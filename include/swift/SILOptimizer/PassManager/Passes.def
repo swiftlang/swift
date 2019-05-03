@@ -291,6 +291,10 @@ PASS(StripDebugInfo, "strip-debug-info",
      "Strip Debug Information")
 PASS(SwiftArrayOpts, "array-specialize",
      "Loop Specialization for Array Properties")
+// SWIFT_ENABLE_TENSORFLOW
+PASS(Differentiation, "differentiation",
+     "Automatic Differentiation")
+// SWIFT_ENABLE_TENSORFLOW End
 PASS(UnsafeGuaranteedPeephole, "unsafe-guaranteed-peephole",
      "SIL retain/release Peephole Removal for Builtin.unsafeGuaranteed")
 PASS(UsePrespecialized, "use-prespecialized",

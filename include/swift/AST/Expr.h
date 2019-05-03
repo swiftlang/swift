@@ -26,6 +26,8 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/Availability.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -1150,6 +1152,13 @@ public:
 
   LiteralKind getLiteralKind() const {
     return static_cast<LiteralKind>(Bits.ObjectLiteralExpr.LitKind);
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Return true if this object literal is the #tfop(...) op descriptor for
+  /// TensorFlow.
+  bool isTFOp() const {
+    return getLiteralKind() == LiteralKind::tfop;
   }
 
   Expr *getArg() const { return Arg; }
@@ -2865,8 +2874,53 @@ public:
   }
 };
 
+<<<<<<< HEAD
 /// Use an opaque type to abstract a value of the underlying concrete type.
 class UnderlyingToOpaqueExpr : public ImplicitConversionExpr {
+=======
+// SWIFT_ENABLE_TENSORFLOW
+class AutoDiffFunctionExpr : public ImplicitConversionExpr {
+public:
+  AutoDiffFunctionExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(ExprKind::AutoDiffFunction, subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::AutoDiffFunction;
+  }
+};
+
+class AutoDiffFunctionExtractOriginalExpr : public ImplicitConversionExpr {
+public:
+  AutoDiffFunctionExtractOriginalExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(ExprKind::AutoDiffFunctionExtractOriginal,
+                               subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::AutoDiffFunctionExtractOriginal;
+  }
+};
+
+/// TupleShuffleExpr - This represents a permutation of a tuple value to a new
+/// tuple type.
+///
+/// If hasScalarSource() is true, the subexpression should be treated
+/// as if it were implicitly injected into a single-element tuple
+/// type.  Otherwise, the subexpression is known to have a tuple type.
+class TupleShuffleExpr final : public ImplicitConversionExpr,
+    private llvm::TrailingObjects<TupleShuffleExpr, Expr *, int, unsigned> {
+  friend TrailingObjects;
+
+  size_t numTrailingObjects(OverloadToken<Expr *>) const {
+    return Bits.TupleShuffleExpr.NumCallerDefaultArgs;
+  }
+  size_t numTrailingObjects(OverloadToken<int>) const {
+    return Bits.TupleShuffleExpr.NumElementMappings;
+  }
+  size_t numTrailingObjects(OverloadToken<unsigned>) const {
+    return Bits.TupleShuffleExpr.NumVariadicArgs;
+  }
+
+>>>>>>> origin/tensorflow
 public:
   UnderlyingToOpaqueExpr(Expr *subExpr, Type ty)
     : ImplicitConversionExpr(ExprKind::UnderlyingToOpaque, subExpr, ty) {}
@@ -3772,8 +3826,7 @@ public:
 };
 
 /// An expression referring to an opaque object of a fixed type.
-///
-/// Opaque value expressions occur when a particular value within the AST
+/// /// Opaque value expressions occur when a particular value within the AST
 /// needs to be re-used without being re-evaluated or for a value that is
 /// a placeholder. OpaqueValueExpr nodes are introduced by some other AST
 /// node (say, an \c OpenExistentialExpr) and can only be used within the

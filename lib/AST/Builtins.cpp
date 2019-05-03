@@ -191,7 +191,9 @@ getBuiltinGenericFunction(Identifier Id,
                           ArrayRef<AnyFunctionType::Param> ArgParamTypes,
                           Type ResType,
                           GenericParamList *GenericParams,
-                          GenericEnvironment *Env) {
+                          GenericEnvironment *Env,
+                          // SWIFT_ENABLE_TENSORFLOW
+                          bool Rethrows = false) {
   assert(GenericParams && "Missing generic parameters");
   auto &Context = ResType->getASTContext();
 
@@ -221,7 +223,8 @@ getBuiltinGenericFunction(Identifier Id,
                                StaticSpellingKind::None,
                                /*FuncLoc=*/SourceLoc(),
                                Name, /*NameLoc=*/SourceLoc(),
-                               /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                               // SWIFT_ENABLE_TENSORFLOW
+                               /*Throws=*/ Rethrows, /*ThrowsLoc=*/SourceLoc(),
                                GenericParams,
                                paramList,
                                TypeLoc::withoutLoc(ResType), DC);
@@ -231,6 +234,9 @@ getBuiltinGenericFunction(Identifier Id,
   func->setValidationToChecked();
   func->setImplicit();
   func->setAccess(AccessLevel::Public);
+  // SWIFT_ENABLE_TENSORFLOW
+  if (Rethrows)
+    func->getAttrs().add(new (Context) RethrowsAttr(/*ThrowsLoc*/ SourceLoc()));
 
   return func;
 }
@@ -458,24 +464,23 @@ namespace {
   private:
     GenericParamList *TheGenericParamList;
     SmallVector<GenericTypeParamDecl*, 2> GenericTypeParams;
-    GenericEnvironment *GenericEnv = nullptr;
+    // SWIFT_ENABLE_TENSORFLOW
+    GenericSignatureBuilder Builder;
     SmallVector<AnyFunctionType::Param, 4> InterfaceParams;
     Type InterfaceResult;
+    // SWIFT_ENABLE_TENSORFLOW
+    bool Rethrows = false;
 
   public:
     BuiltinGenericSignatureBuilder(ASTContext &ctx, unsigned numGenericParams = 1)
-        : Context(ctx) {
+    // SWIFT_ENABLE_TENSORFLOW
+        : Context(ctx), Builder(ctx) {
       TheGenericParamList = getGenericParams(ctx, numGenericParams,
                                              GenericTypeParams);
 
-      GenericSignatureBuilder Builder(ctx);
       for (auto gp : GenericTypeParams) {
         Builder.addGenericParameter(gp);
       }
-
-      auto GenericSig =
-        std::move(Builder).computeGenericSignature(SourceLoc());
-      GenericEnv = GenericSig->createGenericEnvironment();
     }
 
     template <class G>
@@ -491,11 +496,29 @@ namespace {
       InterfaceResult = generator.build(*this);
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
+    template <class G>
+    void addConformanceRequirement(const G &generator, ProtocolDecl *proto) {
+      Requirement req(RequirementKind::Conformance,
+                      generator.build(*this),
+                      proto->getDeclaredType());
+      auto source =
+          GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
+      Builder.addRequirement(req, source, Context.getStdlibModule());
+    }
+
+    void setRethrows(bool rethrows = true) {
+      Rethrows = rethrows;
+    }
+
     ValueDecl *build(Identifier name) {
+      auto GenericSig = std::move(Builder).computeGenericSignature(SourceLoc());
+      auto GenericEnv = GenericSig->createGenericEnvironment();
       return getBuiltinGenericFunction(name, InterfaceParams,
                                        InterfaceResult,
                                        TheGenericParamList,
-                                       GenericEnv);
+                                       GenericEnv,
+                                       /*Rethrows*/ Rethrows);
     }
 
     // Don't use these generator classes directly; call the make{...}
@@ -948,6 +971,131 @@ static ValueDecl *getGetObjCTypeEncodingOperation(ASTContext &Context,
   BuiltinGenericSignatureBuilder builder(Context);
   builder.addParameter(makeMetatype(makeGenericParam()));
   builder.setResult(makeConcrete(Context.TheRawPointerType));
+  return builder.build(Id);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+static ValueDecl *getTensorFlowSend(ASTContext &Context, Identifier Id) {
+  // <T> (T) -> ()
+  BuiltinGenericSignatureBuilder builder(Context);
+  builder.addParameter(makeGenericParam());
+  builder.setResult(makeConcrete(Context.TheEmptyTupleType));
+  return builder.build(Id);
+}
+
+static ValueDecl *getTensorFlowReceive(ASTContext &Context, Identifier Id) {
+  // <T> () -> (T)
+  BuiltinGenericSignatureBuilder builder(Context);
+  builder.setResult(makeGenericParam());
+  return builder.build(Id);
+}
+
+static ValueDecl *getAutoDiffCreateTape(ASTContext &Context, Identifier Id) {
+  // <T> () -> (Swift._AutoDiffTape<T>)
+  BuiltinGenericSignatureBuilder builder(Context, 1);
+  auto *tapeDecl = Context.get_AutoDiffTapeDecl();
+  builder.setResult(makeBoundGenericType(tapeDecl, makeGenericParam()));
+  return builder.build(Id);
+}
+
+static ValueDecl *getAutoDiffPushToTape(ASTContext &Context, Identifier Id) {
+  // <T> (Swift._AutoDiffTape<T>, T, Builtin.Word) -> ()
+  BuiltinGenericSignatureBuilder builder(Context, 1);
+  auto *tapeDecl = Context.get_AutoDiffTapeDecl();
+  auto T = makeGenericParam();
+  builder.addParameter(makeBoundGenericType(tapeDecl, T));
+  builder.addParameter(T);
+  builder.addParameter(makeConcrete(BuiltinIntegerType::getWordType(Context)));
+  builder.setResult(makeConcrete(Context.TheEmptyTupleType));
+  return builder.build(Id);
+}
+
+static ValueDecl *getAutoDiffPopFromTape(ASTContext &Context, Identifier Id) {
+  // <T> (Swift._AutoDiffTape<T>, Builtin.Word) -> (T)
+  BuiltinGenericSignatureBuilder builder(Context, 1);
+  auto *tapeDecl = Context.get_AutoDiffTapeDecl();
+  auto T = makeGenericParam();
+  builder.addParameter(makeBoundGenericType(tapeDecl, T));
+  builder.addParameter(makeConcrete(BuiltinIntegerType::getWordType(Context)));
+  builder.setResult(T);
+  return builder.build(Id);
+}
+
+static ValueDecl *getAutoDiffDestroyTape(ASTContext &Context, Identifier Id) {
+  // <T> (Swift._AutoDiffTape<T>) -> ()
+  BuiltinGenericSignatureBuilder builder(Context, 1);
+  auto *tapeDecl = Context.get_AutoDiffTapeDecl();
+  builder.addParameter(makeBoundGenericType(tapeDecl, makeGenericParam()));
+  builder.setResult(makeConcrete(Context.TheEmptyTupleType));
+  return builder.build(Id);
+}
+
+static ValueDecl *getAutoDiffApplyAssociatedFunction(
+    ASTContext &Context, Identifier Id, AutoDiffAssociatedFunctionKind kind,
+    unsigned arity, unsigned order, bool rethrows) {
+  assert(arity >= 1);
+  assert(order == 1 && "higher-order differentiation is not supported yet");
+  // JVP:
+  //   <...T...(arity), R> (@differentiable (...T) throws -> R, ...T)
+  //       rethrows -> (R, (...T.TangentVector) -> R.TangentVector)
+  // VJP:
+  //   <...T...(arity), R> (@differentiable (...T) throws -> R, ...T)
+  //       rethrows -> (R, (R.CotangentVector) -> ...T.CotangentVector)
+  unsigned numGenericParams = 1 + arity;
+  BuiltinGenericSignatureBuilder builder(Context, numGenericParams);
+  // Look up the Differentiable protocol.
+  SmallVector<ValueDecl *, 1> diffableProtoLookup;
+  Context.lookupInSwiftModule("Differentiable", diffableProtoLookup);
+  assert(diffableProtoLookup.size() == 1);
+  auto *diffableProto = cast<ProtocolDecl>(diffableProtoLookup.front());
+  // Create type parameters and add conformance constraints.
+  auto fnResultGen = makeGenericParam(arity);
+  builder.addConformanceRequirement(fnResultGen, diffableProto);
+  SmallVector<decltype(fnResultGen), 2> fnArgGens;
+  for (auto i : range(arity)) {
+    auto T = makeGenericParam(i);
+    builder.addConformanceRequirement(T, diffableProto);
+    fnArgGens.push_back(T);
+  }
+  // Generator for the first argument, i.e. the @differentiable function.
+  BuiltinGenericSignatureBuilder::LambdaGenerator firstArgGen {
+    // Generator for the function type at the argument position, i.e. the
+    // function being differentiated.
+    [=, &fnArgGens](BuiltinGenericSignatureBuilder &builder) -> Type {
+      FunctionType::ExtInfo ext;
+      auto extInfo = FunctionType::ExtInfo()
+          .withDifferentiable().withNoEscape().withThrows(rethrows);
+      SmallVector<FunctionType::Param, 2> params;
+      for (auto &paramGen : fnArgGens)
+        params.push_back(FunctionType::Param(paramGen.build(builder)));
+      auto innerFunction = FunctionType::get(params,
+                                             fnResultGen.build(builder));
+      return innerFunction->withExtInfo(extInfo);
+    }
+  };
+  // Eagerly build the type of the first arg, then use that to compute the type
+  // of the associated function type.
+  auto *origFnTy =
+      firstArgGen.build(builder)->castTo<AnyFunctionType>();
+  origFnTy = origFnTy->getWithoutDifferentiability()->withExtInfo(
+      origFnTy->getExtInfo().withNoEscape(false));
+  auto autodiffBuilder = AutoDiffParameterIndicesBuilder::inferParameters(
+      origFnTy, Context.getStdlibModule());
+  auto *paramIndices = autodiffBuilder.build(Context);
+  // Generator for the resultant function type, i.e. the AD associated function.
+  BuiltinGenericSignatureBuilder::LambdaGenerator resultGen{
+      [=, &Context](BuiltinGenericSignatureBuilder &builder) -> Type {
+        auto assocFnTy = origFnTy->getAutoDiffAssociatedFunctionType(
+            paramIndices, /*resultIndex*/ 0, /*differentiationOrder*/ 1, kind,
+            LookUpConformanceInModule(Context.TheBuiltinModule));
+        return assocFnTy->getResult();
+      }};
+  builder.addParameter(firstArgGen);
+  for (auto argGen : fnArgGens)
+    builder.addParameter(argGen);
+  if (rethrows)
+    builder.setRethrows();
+  builder.setResult(resultGen);
   return builder.build(Id);
 }
 
@@ -1697,7 +1845,17 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
     return getAllocWithTailElemsOperation(Context, Id, NumTailTypes);
   }
-
+  // SWIFT_ENABLE_TENSORFLOW
+  if (OperationName.startswith("autodiffApply_")) {
+    AutoDiffAssociatedFunctionKind kind;
+    unsigned arity, order;
+    bool rethrows;
+    if (!autodiff::getBuiltinAutoDiffApplyConfig(OperationName, kind, arity,
+                                                 order, rethrows))
+      return nullptr;
+    return getAutoDiffApplyAssociatedFunction(Context, Id, kind, arity,
+                                              order, rethrows);
+  }
   auto BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
 #define BUILTIN(id, name, Attrs) .Case(name, BuiltinValueKind::id)
 #include "swift/AST/Builtins.def"
@@ -1949,6 +2107,22 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::UnsafeGuaranteedEnd:
     return getUnsafeGuaranteedEnd(Context, Id);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case BuiltinValueKind::TensorFlowSend:
+    return getTensorFlowSend(Context, Id);
+  case BuiltinValueKind::TensorFlowReceive:
+    return getTensorFlowReceive(Context, Id);
+  case BuiltinValueKind::AutoDiffCreateTape:
+    return getAutoDiffCreateTape(Context, Id);
+  case BuiltinValueKind::AutoDiffPushToTape:
+    return getAutoDiffPushToTape(Context, Id);
+  case BuiltinValueKind::AutoDiffPopFromTape:
+    return getAutoDiffPopFromTape(Context, Id);
+  case BuiltinValueKind::AutoDiffDestroyTape:
+    return getAutoDiffDestroyTape(Context, Id);
+  case BuiltinValueKind::AutoDiffApply:
+    llvm_unreachable("Handled above");
 
   case BuiltinValueKind::OnFastPath:
     return getOnFastPath(Context, Id);

@@ -403,13 +403,20 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
         S.addUniquedStringRef(F.getObjCReplacement().str());
   }
   unsigned numSpecAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
+  unsigned numDiffAttrs = NoBody ? 0 : F.getDifferentiableAttrs().size();
   SILFunctionLayout::emitRecord(
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
       (unsigned)F.isTransparent(), (unsigned)F.isSerialized(),
       (unsigned)F.isThunk(), (unsigned)F.isWithoutActuallyEscapingThunk(),
       (unsigned)F.isGlobalInit(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getEffectsKind(),
+<<<<<<< HEAD
       (unsigned)numSpecAttrs, (unsigned)F.hasOwnership(),
+=======
+      // SWIFT_ENABLE_TENSORFLOW
+      (unsigned)numSpecAttrs, (unsigned)numDiffAttrs,
+      (unsigned)F.hasQualifiedOwnership(),
+>>>>>>> origin/tensorflow
       F.isWeakLinked(), (unsigned)F.isDynamicallyReplaceable(), FnID,
       replacedFunctionID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
@@ -422,6 +429,33 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
                                         (unsigned)SA->isExported(),
                                         (unsigned)SA->getSpecializationKind());
     S.writeGenericRequirements(SA->getRequirements(), SILAbbrCodes);
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  auto &Ctx = F.getASTContext();
+  for (auto *DA : F.getDifferentiableAttrs()) {
+    unsigned differentiableAttrAbbrCode =
+        SILAbbrCodes[SILDifferentiableAttrLayout::Code];
+
+    if (F.getModule().getStage() == SILStage::Canonical)
+      assert(DA->hasJVP() && DA->hasVJP() &&
+             "JVP and VJP must exist in canonical SIL");
+
+    auto &paramIndices = DA->getIndices();
+    SmallVector<bool, 4> parameters;
+    for (unsigned i : indices(paramIndices.parameters))
+      parameters.push_back(paramIndices.parameters[i]);
+
+    SILDifferentiableAttrLayout::emitRecord(
+        Out, ScratchRecord, differentiableAttrAbbrCode,
+        DA->hasJVP()
+            ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getJVPName()))
+            : IdentifierID(),
+        DA->hasVJP()
+            ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getVJPName()))
+            : IdentifierID(),
+        paramIndices.source, parameters);
+    S.writeGenericRequirements(DA->getRequirements(), SILAbbrCodes);
   }
 
   // Assign a unique ID to each basic block of the SILFunction.
@@ -935,6 +969,37 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                              (unsigned)BI->getType().getCategory(),
                              S.addDeclBaseNameRef(BI->getName()),
                              Args);
+    break;
+  }
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILInstructionKind::AutoDiffFunctionInst: {
+    auto *adfi = cast<AutoDiffFunctionInst>(&SI);
+    SmallVector<ValueID, 4> trailingInfo;
+    auto &paramIndices = adfi->getParameterIndices();
+    for (unsigned idx : paramIndices.set_bits())
+      trailingInfo.push_back(idx);
+    for (auto &op : adfi->getAllOperands()) {
+      auto val = op.get();
+      trailingInfo.push_back(S.addTypeRef(val->getType().getASTType()));
+      trailingInfo.push_back((unsigned)val->getType().getCategory());
+      trailingInfo.push_back(addValueRef(val));
+    }
+    SILInstAutoDiffFunctionLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstAutoDiffFunctionLayout::Code],
+        adfi->getDifferentiationOrder(), (unsigned)paramIndices.size(),
+        adfi->getNumOperands(), trailingInfo);
+    break;
+  }
+  case SILInstructionKind::AutoDiffFunctionExtractInst: {
+    auto *adfei = cast<AutoDiffFunctionExtractInst>(&SI);
+    auto operandRef = addValueRef(adfei->getFunctionOperand());
+    auto operandType = adfei->getFunctionOperand()->getType();
+    auto operandTypeRef = S.addTypeRef(operandType.getASTType());
+    auto rawExtractee = (unsigned)adfei->getExtractee();
+    SILInstAutoDiffFunctionExtractLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstAutoDiffFunctionExtractLayout::Code],
+        operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
+        rawExtractee, adfei->getDifferentiationOrder());
     break;
   }
   case SILInstructionKind::ApplyInst: {
@@ -2432,6 +2497,10 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInstCastLayout>();
   registerSILAbbr<SILInstWitnessMethodLayout>();
   registerSILAbbr<SILSpecializeAttrLayout>();
+  // SWIFT_ENABLE_TENSORFLOW
+  registerSILAbbr<SILDifferentiableAttrLayout>();
+  registerSILAbbr<SILInstAutoDiffFunctionLayout>();
+  registerSILAbbr<SILInstAutoDiffFunctionExtractLayout>();
 
   // Register the abbreviation codes so these layouts can exist in both
   // decl blocks and sil blocks.

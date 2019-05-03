@@ -1764,12 +1764,20 @@ ConstantFolder::processWorkList() {
           // We were able to fold, so all users should use the new folded value.
           User->getResult(Index)->replaceAllUsesWith(C);
 
+<<<<<<< HEAD
           // The new constant could be further folded now, add it to the
           // worklist.
           if (auto *Inst = C->getDefiningInstruction())
             WorkList.insert(Inst);
         }
       }
+=======
+      // The new constant could be further folded now, add it to the worklist.
+      // SWIFT_ENABLE_TENSORFLOW
+      if (auto *Inst = C->getDefiningInstruction())
+        if (isa<SingleValueInstruction>(Inst))
+          WorkList.insert(Inst);
+>>>>>>> origin/tensorflow
     }
 
     // Eagerly DCE. We do this after visiting all users to ensure we don't

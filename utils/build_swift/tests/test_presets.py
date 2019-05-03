@@ -33,6 +33,10 @@ PRESET_DEFAULTS = {
     'darwin_toolchain_display_name_short': 'DispalyNameShort',
     'darwin_toolchain_version': '1.0',
     'darwin_toolchain_xctoolchain_name': 'default',
+    # SWIFT_ENABLE_TENSORFLOW
+    'darwin_toolchain_installer_package': '/tmp/install/swift-installer.pkg',
+    # SWIFT_ENABLE_TENSORFLOW
+    'darwin_toolchain_application_cert': 'cert_name',
     'extra_swift_args': '',
     'install_destdir': '/tmp/install',
     'install_symroot': '/tmp/install/symroot',

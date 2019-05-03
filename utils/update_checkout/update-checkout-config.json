@@ -34,6 +34,12 @@
             "remote": { "id": "apple/swift-xcode-playground-support" } },
         "ninja": {
             "remote": { "id": "ninja-build/ninja" } },
+        "tensorflow": {
+            "remote": { "id": "tensorflow/tensorflow" } },
+        "tensorflow-swift-bindings": {
+            "remote": { "id": "tensorflow/swift-bindings" } },
+        "tensorflow-swift-apis": {
+            "remote": { "id": "tensorflow/swift-apis" } },
         "icu": {
             "remote": { "id": "unicode-org/icu" },
             "platforms": [ "Linux" ]
@@ -319,6 +325,35 @@
                 "clang-tools-extra": "swift-5.1-branch",
                 "libcxx": "swift-5.1-branch",
                 "indexstore-db": "swift-5.1-branch",
+                "sourcekit-lsp": "swift-5.1-branch"
+            }
+        },
+        "tensorflow": {
+            "aliases": ["tensorflow"],
+            "repos": {
+                "llvm": "swift-DEVELOPMENT-SNAPSHOT-2019-05-02-a",
+                "clang": "swift-DEVELOPMENT-SNAPSHOT-2019-05-02-a",
+                "swift": "tensorflow",
+                "lldb": "4cf2c810dd91795935181610fd406c96e0d6d957",
+                "cmark": "swift-DEVELOPMENT-SNAPSHOT-2019-05-02-a",
+                "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2019-05-02-a",
+                "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2019-05-02-a",
+                "swift-syntax": "1aeb642da66a23a66c9ac80d74813e1a4b963999",
+                "swift-stress-tester": "2fc093642df924f6adf9de9e4397c7c6fc8b5fc8",
+                "compiler-rt": "swift-DEVELOPMENT-SNAPSHOT-2019-05-02-a",
+                "swift-corelibs-xctest": "swift-DEVELOPMENT-SNAPSHOT-2019-05-02-a",
+                "swift-corelibs-foundation": "swift-DEVELOPMENT-SNAPSHOT-2019-05-02-a",
+                "swift-corelibs-libdispatch": "swift-DEVELOPMENT-SNAPSHOT-2019-05-02-a",
+                "swift-integration-tests": "swift-DEVELOPMENT-SNAPSHOT-2019-05-02-a",
+                "swift-xcode-playground-support": "swift-DEVELOPMENT-SNAPSHOT-2019-05-02-a",
+                "ninja": "253e94c1fa511704baeb61cf69995bbf09ba435e",
+                "icu": "release-61-1",
+                "clang-tools-extra": "swift-DEVELOPMENT-SNAPSHOT-2019-05-02-a",
+                "libcxx": "swift-5.1-branch",
+                "tensorflow": "447e512d332ab86172a3b13119900b4d021d0c65",
+                "tensorflow-swift-bindings": "ee5ded283a32b6fb5a17d99af6dd34ef7278a405",
+                "tensorflow-swift-apis": "cfefd63fa60a55d1da1e2a412ed561eb3448e691",
+                "indexstore-db": "master",
                 "sourcekit-lsp": "swift-5.1-branch"
             }
         }

@@ -47,9 +47,8 @@ protected:
   TypeSubstitutionMap OpenedExistentialSubs;
   SILOpenedArchetypesTracker OpenedArchetypesTracker;
 
-private:
-  /// MARK: Private state hidden from CRTP extensions.
-
+// SWIFT_ENABLE_TENSORFLOW
+protected:
   // The old-to-new value map.
   llvm::DenseMap<SILValue, SILValue> ValueMap;
 
@@ -57,6 +56,10 @@ private:
   /// blocks.
   llvm::DenseMap<SILBasicBlock*, SILBasicBlock*> BBMap;
 
+// SWIFT_ENABLE_TENSORFLOW
+
+ /// MARK: Private state hidden from CRTP extensions.
+private:
   // The original blocks in DFS preorder. All blocks in this list are mapped.
   // After cloning, this represents the entire cloned CFG.
   //
@@ -945,6 +948,35 @@ SILCloner<ImplClass>::visitEndApplyInst(EndApplyInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createEndApply(getOpLocation(Inst->getLoc()),
                                         getOpValue(Inst->getOperand())));
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitAutoDiffFunctionInst(AutoDiffFunctionInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  SmallVector<SILValue, 16> mappedAssocFns;
+  mappedAssocFns.reserve(Inst->getNumAssociatedFunctions());
+  for (auto &fn : Inst->getAssociatedFunctions())
+    mappedAssocFns.push_back(getOpValue(fn.get()));
+  recordClonedInstruction(Inst,
+    getBuilder().createAutoDiffFunction(getOpLocation(Inst->getLoc()),
+                                        Inst->getParameterIndices(),
+                                        Inst->getDifferentiationOrder(),
+                                        getOpValue(Inst->getOriginalFunction()),
+                                        mappedAssocFns));
+}
+
+template<typename ImplClass>
+void SILCloner<ImplClass>::
+visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst,
+      getBuilder().createAutoDiffFunctionExtract(
+          getOpLocation(Inst->getLoc()),
+          Inst->getExtractee(),
+          Inst->getDifferentiationOrder(),
+          getOpValue(Inst->getFunctionOperand())));
 }
 
 template<typename ImplClass>

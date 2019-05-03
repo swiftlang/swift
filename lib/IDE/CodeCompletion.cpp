@@ -2415,6 +2415,12 @@ public:
   void addMethodCall(const FuncDecl *FD, DeclVisibilityKind Reason) {
     if (FD->getName().empty())
       return;
+
+    // Suppress "sequenced" as a result, because it crashes completions.
+    // TODO(TF-315): Fix properly and then remove this.
+    if (FD->getName().str() == "sequenced")
+      return;
+
     foundFunction(FD);
 
     Identifier Name = FD->getName();

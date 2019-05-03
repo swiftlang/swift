@@ -101,11 +101,20 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   // there.
   const auto &Options = P.getOptions();
   P.addClosureLifetimeFixup();
+<<<<<<< HEAD
   if (Options.shouldOptimize()) {
     P.addSemanticARCOpts();
   }
   if (!Options.StripOwnershipAfterSerialization)
     P.addOwnershipModelEliminator();
+=======
+  P.addOwnershipModelEliminator();
+  // SWIFT_ENABLE_TENSORFLOW
+  if (Options.SerializeForDifferentiation) {
+    P.addSerializeSILPass();
+  }
+  P.addDifferentiation();
+>>>>>>> origin/tensorflow
   P.addMandatoryInlining();
   P.addMandatorySILLinker();
 
@@ -664,6 +673,18 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
 
   return P;
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+//===----------------------------------------------------------------------===//
+//                          TensorFlow Pass Pipeline
+//===----------------------------------------------------------------------===//
+
+SILPassPipelinePlan SILPassPipelinePlan::getTFPartitionPassPipeline() {
+  SILPassPipelinePlan P;
+  P.startPipeline("TensorFlow Partitioning");
+  return P;
+}
+/// SWIFT_ENABLE_TENSORFLOW End
 
 //===----------------------------------------------------------------------===//
 //                          Inst Count Pass Pipeline

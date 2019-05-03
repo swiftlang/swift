@@ -56,6 +56,69 @@ void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
   }
 }
 
+/// SWIFT_ENABLE_TENSORFLOW
+SILDifferentiableAttr::
+SILDifferentiableAttr(const SILAutoDiffIndices &indices,
+                      StringRef jvpName,
+                      StringRef vjpName,
+                      TrailingWhereClause *whereClause)
+  : indices(indices), JVPName(jvpName), VJPName(vjpName),
+    WhereClause(whereClause),
+    NumRequirements(whereClause ? whereClause->getRequirements().size() : 0) {}
+
+SILDifferentiableAttr::
+SILDifferentiableAttr(const SILAutoDiffIndices &indices,
+                      StringRef jvpName,
+                      StringRef vjpName,
+                      ArrayRef<Requirement> requirements)
+  : indices(indices), JVPName(jvpName), VJPName(vjpName),
+    NumRequirements(requirements.size()) {
+  std::copy(requirements.begin(), requirements.end(), getRequirementsData());
+}
+
+SILDifferentiableAttr *
+SILDifferentiableAttr::create(SILModule &M,
+                              const SILAutoDiffIndices &indices,
+                              StringRef jvpName,
+                              StringRef vjpName,
+                              TrailingWhereClause *whereClause) {
+  unsigned size = sizeof(SILDifferentiableAttr);
+  if (whereClause)
+    size += whereClause->getRequirements().size() * sizeof(Requirement);
+  void *mem = M.allocate(size, alignof(SILDifferentiableAttr));
+  return ::new (mem)
+      SILDifferentiableAttr(indices, jvpName, vjpName, whereClause);
+}
+
+SILDifferentiableAttr *
+SILDifferentiableAttr::create(SILModule &M,
+                              const SILAutoDiffIndices &indices,
+                              ArrayRef<Requirement> requirements,
+                              StringRef jvpName,
+                              StringRef vjpName) {
+  unsigned size = sizeof(SILDifferentiableAttr) +
+      requirements.size() * sizeof(Requirement);
+  void *mem = M.allocate(size, alignof(SILDifferentiableAttr));
+  return ::new (mem)
+      SILDifferentiableAttr(indices, jvpName, vjpName, requirements);
+}
+
+void SILDifferentiableAttr::setRequirements(
+    ArrayRef<Requirement> requirements) {
+  unsigned numClauseRequirements =
+      WhereClause ? WhereClause->getRequirements().size() : 0;
+  assert(requirements.size() <= numClauseRequirements &&
+         "Requirements size must not exceed number of requirements used for "
+         "allocation");
+  NumRequirements = numClauseRequirements;
+  std::copy(requirements.begin(), requirements.end(), getRequirementsData());
+}
+
+void SILFunction::addDifferentiableAttr(SILDifferentiableAttr *attr) {
+  attr->Original = this;
+  DifferentiableAttrs.push_back(attr);
+}
+
 SILFunction *
 SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
                     CanSILFunctionType loweredType,
@@ -107,6 +170,11 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
       EffectsKindAttr(E), EntryCount(entryCount) {
   assert(!Transparent || !IsDynamicReplaceable);
   validateSubclassScope(classSubclassScope, isThunk, nullptr);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Function type cannot be @differentiable.
+  assert(!LoweredType->isDifferentiable() &&
+         "SIL function declarations cannot have an @differentiable type");
 
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
@@ -561,6 +629,14 @@ SubstitutionMap SILFunction::getForwardingSubstitutionMap() {
 
 bool SILFunction::shouldVerifyOwnership() const {
   return !hasSemanticsAttr("verify.ownership.sil.never");
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+unsigned SILFunction::codeSize() const {
+  unsigned size = 0;
+  for (auto &BB : *this)
+    size += BB.codeSize();
+  return size;
 }
 
 static Identifier getIdentifierForObjCSelector(ObjCSelector selector, ASTContext &Ctxt) {

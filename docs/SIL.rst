@@ -5485,6 +5485,107 @@ destination (if it returns with ``throw``).
 
 The rules on generic substitutions are identical to those of ``apply``.
 
+.. SWIFT_ENABLE_TENSORFLOW
+
+Automatic Differentiation
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+autodiff_function
+`````````````````
+
+::
+
+  sil-instruction ::= 'autodiff_function'
+                      sil-autodiff-function-parameter-indices?
+                      sil-autodiff-function-order?
+                      sil-value ':' sil-type
+                      sil-autodiff-associated-functions-clause?
+                      
+  sil-autodiff-function-parameter-indices ::= '[' 'wrt' [0-9]+ (',', [0-9]+)* ']'
+  sil-autodiff-function-differentiation-order ::= '[' 'order' [0-9]+ ']'
+  sil-autodiff-associated-functions-clause ::= 'with' sil-autodiff-associated-function-list
+                                               (',' sil-autodiff-associated-function-list)*
+  sil-autodiff-associated-function-list ::= '{' sil-value ',' sil-value '}'
+
+
+  autodiff_function [wrt 0] [order 1] %0 : $(T) -> T \
+    with {%1 : $(T) -> (T) -> T, %2 : $(T) -> (T) -> T}
+
+Bundles a function with its associated differentiation functions up to a
+specified differentiation order into an ``@differentiable`` function. There are
+2 associated functions per differentiation order: a Jacobian-vector products
+(JVP) function and a vector-Jacobian products (VJP) function.
+
+``[wrt ...]`` specifies parameter indices that the original function is
+differentiable with respect to. When not specified, it defaults to all
+parameters.
+
+``[order ...]`` specifies the maximum differentiation order for the resulting
+function. The number of lists of associated functions is equal to the order.
+
+A ``with`` clause specifies the differentiation functions associated
+with the original function. When a ``with`` clause is not specified, the first
+operand will be differentiated to produce associated functions, and a ``with``
+clause will be added to the instruction.
+
+In raw SIL, it is optional to provide a ``with`` clause. In canonical SIL, a
+``with`` clause is mandatory.
+
+
+autodiff_function_extract
+`````````````````````````
+
+::
+
+  sil-instruction ::= 'autodiff_function_extract'
+                      sil-autodiff-associated-function-kind
+                      sil-autodiff-function-order
+                      sil-value ':' sil-type
+
+  sil-autodiff-function-extractee ::= '[' sil-autodiff-function-extractee ']'
+  sil-autodiff-function-extractee-name ::= 'original' | 'jvp' | 'vjp'
+  sil-autodiff-function-differentiation-order ::= '[' 'order' [0-9]+ ']'
+
+
+  autodiff_function_extract [original] %0 : $@differentiable (T) -> T
+  autodiff_function_extract [jvp] [order 1] %0 : $@differentiable (T) -> T
+  autodiff_function_extract [vjp] [order 1] %0 : $@differentiable (T) -> T
+
+Extracts the original function or an associated function from the given
+``@differentiable`` function at a specific differentiation order. It must be
+provided with an extractee: ``[original]``, ``[jvp]`` or ``[vjp]``.
+
+.. SWIFT_ENABLE_TENSORFLOW
+
+Graph Program Extraction
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+graph_op
+````````
+::
+
+  sil-instruction ::= 'graph_op' string-literal
+                      '(' (sil-operand (',' sil-operand)*)? ')'
+                      ('{' (sil-graph-op-attr (',' sil-graph-op-attr)*)? '}')?
+                      ':' sil-type (',' sil-type)*
+  sil-graph-op-attr ::= sil-identifier ':' sil-symbolic-value
+  sil-symbolic-value ::= i[0-9]+ int-literal |
+                         f(32|64) float-literal |
+                         sil-type |
+                         '[' (sil-symbolic-value (',' sil-symbolic-value)*)? ']'
+
+  %add = graph_op "tf.Add"(%x : $Tensor<Float>, %y : $Tensor<Float>) \
+    {T: $Float} : $Tensor<Float>
+
+Represents a graph program operation.
+
+``graph_op`` instructions have a name, zero or more operands, zero or more
+attributes (an identifier and SIL constant value), and one or more result
+types.
+
+This instruction is only valid in raw SIL and is rewritten and extracted by the
+graph program extraction passes (debastraction, partitioning, graph lowering).
+
 Assertion configuration
 ~~~~~~~~~~~~~~~~~~~~~~~
 

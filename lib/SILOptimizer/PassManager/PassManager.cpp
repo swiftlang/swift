@@ -350,6 +350,17 @@ void SILPassManager::dumpPassInfo(const char *Title, unsigned TransIdx,
   llvm::dbgs() << '\n';
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+static void logS4TFPassEvent(long long Delta, llvm::sys::TimePoint<> StartTime,
+                             StringRef passName, bool isFunctionPass,
+                             StringRef funcName) {
+  auto tt = llvm::sys::toTimeT(StartTime);
+  auto strTime = ctime(&tt);
+  strTime[strlen(strTime) - 1] = '\0';
+  llvm::dbgs() << "S4TF," << Delta << "," << strTime << "," << passName << ","
+               << (isFunctionPass ? "F" : "M") << "," << funcName << "\n";
+}
+
 void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
 
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
@@ -415,6 +426,13 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   if (SILPrintPassTime) {
     llvm::dbgs() << Delta << " (" << SFT->getID() << "," << F->getName()
                  << ")\n";
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // Write CSV-formatted events, so that we can do aggregate analysis. Format:
+    // [S4TF] Delta,StartTime,PassName,PassType,FuncName
+    // Here PassType is F since it's a function pass.
+    logS4TFPassEvent(Delta, StartTime, SFT->getID(), /*isFunctionPass*/ true,
+                     F->getName());
   }
 
   // If this pass invalidated anything, print and verify.
@@ -561,6 +579,13 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
   auto Delta = (std::chrono::system_clock::now() - StartTime).count();
   if (SILPrintPassTime) {
     llvm::dbgs() << Delta << " (" << SMT->getID() << ",Module)\n";
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // Write CSV-formatted events, so that we can do aggregate analysis. Format:
+    // [S4TF] Delta,StartTime,PassName,PassType
+    // Here PassType is M since it's a module pass.
+    logS4TFPassEvent(Delta, StartTime, SMT->getID(), /*isFunctionPass*/ false,
+                     /*funcName*/ "");
   }
 
   // If this pass invalidated anything, print and verify.

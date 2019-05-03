@@ -1251,6 +1251,10 @@ namespace {
       if (expr->getType())
         return expr->getType();
 
+      // SWIFT_ENABLE_TENSORFLOW
+      if (expr->isTFOp())
+        return visitTFOpExpr(expr);
+
       auto &tc = CS.getTypeChecker();
       auto protocol = tc.getLiteralProtocol(expr);
       if (!protocol) {
@@ -1300,6 +1304,17 @@ namespace {
         result = OptionalType::get(result);
 
       return result;
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // #tfop is type checked and SILGen'd differently than the rest of the
+    // literals.
+    Type visitTFOpExpr(ObjectLiteralExpr *expr) {
+      assert(expr->isTFOp() && "Unexpected expression");
+      auto &tc = CS.getTypeChecker();
+      tc.diagnose(expr->getLoc(), diag::invalid_tfop,
+                  "#tfop() is deprecated and cannot be used");
+      return nullptr;
     }
 
     Type visitDeclRefExpr(DeclRefExpr *E) {

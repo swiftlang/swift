@@ -1577,6 +1577,12 @@ SourceFile::getCachedVisibleDecls() const {
   return getCache().AllVisibleValues;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+void SourceFile::addVisibleDecl(ValueDecl *decl) {
+  Decls.push_back(decl);
+  getCache().AllVisibleValues.push_back(decl);
+}
+
 static void performAutoImport(
     SourceFile &SF,
     SourceFile::ImplicitModuleImportKind implicitModuleImportKind) {

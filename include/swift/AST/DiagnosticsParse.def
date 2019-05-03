@@ -483,8 +483,14 @@ ERROR(expected_sil_value_ownership_kind,none,
       "expected value ownership kind in SIL code", ())
 ERROR(expected_sil_colon,none,
       "expected ':' before %0", (StringRef))
+<<<<<<< HEAD
 ERROR(expected_sil_tuple_index,none,
       "expected tuple element index", ())
+=======
+// SWIFT_ENABLE_TENSORFLOW
+ERROR(malformed_autodiff_parameter_indices,none,
+      "malformed autodiff parameter indices", ())
+>>>>>>> origin/tensorflow
 
 // SIL Values
 ERROR(sil_value_redefinition,none,
@@ -1478,6 +1484,62 @@ ERROR(attr_specialize_expected_partial_or_full,none,
 ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,
       "expected a member name as second parameter in '_implements' attribute", ())
 
+// SWIFT_ENABLE_TENSORFLOW
+// differentiable
+ERROR(attr_differentiable_expected_function_name,PointsToFirstBadToken,
+      "expected a %0 function name", (StringRef))
+ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
+      "expected a list of parameters to differentiate with respect to", ())
+ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
+      "use 'wrt:' to specify parameters to differentiate with respect to", ())
+ERROR(attr_differentiable_missing_label,PointsToFirstBadToken,
+      "missing label '%0:' in '@differentiable' attribute", (StringRef))
+ERROR(attr_differentiable_expected_label,none,
+      "expected a function specifier label, e.g. 'wrt:', 'jvp:', or 'vjp:'", ())
+
+// differentiating
+ERROR(attr_differentiating_expected_original_name,PointsToFirstBadToken,
+      "expected an original function name", ())
+
+// differentiation `wrt` parameters clause
+ERROR(expected_colon_after_label,PointsToFirstBadToken,
+      "expected a colon ':' after '%0'", (StringRef))
+ERROR(diff_params_clause_expected_parameter,PointsToFirstBadToken,
+      "expected a parameter, which can be a function parameter name or 'self'",
+      ())
+
+// [differentiable ...] (sil-decl attr)
+ERROR(sil_attr_differentiable_expected_keyword,PointsToFirstBadToken,
+      "expected '%0' in 'differentiable' attribute", (StringRef))
+ERROR(sil_attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
+      "expected an comma-separated list of parameter indices, e.g. (0, 1)", ())
+ERROR(sil_attr_differentiable_expected_rsquare,PointsToFirstBadToken,
+      "expected ']' to end 'differentiable' attribute", ())
+ERROR(sil_attr_differentiable_expected_parameter_index,PointsToFirstBadToken,
+      "expected the index of a parameter to differentiate w.r.t.", ())
+ERROR(sil_attr_differentiable_expected_source_index,PointsToFirstBadToken,
+      "expected the index of a result to differentiate from", ())
+
+// SIL autodiff
+ERROR(sil_inst_autodiff_attr_expected_rsquare,PointsToFirstBadToken,
+      "expected ']' to complete the %0", (StringRef))
+ERROR(sil_inst_autodiff_expected_order,PointsToFirstBadToken,
+      "expected an unsigned integer indicating the differentiation order", ())
+ERROR(sil_inst_autodiff_expected_nonzero_order,PointsToFirstBadToken,
+      "expected a non-zero differentiation order", ())
+ERROR(sil_inst_autodiff_expected_parameter_index,PointsToFirstBadToken,
+      "expected the index of a parameter to differentiate with respect to", ())
+ERROR(sil_inst_autodiff_operand_list_expected_lbrace,PointsToFirstBadToken,
+      "expected '{' to start an associated function list", ())
+ERROR(sil_inst_autodiff_operand_list_expected_comma,PointsToFirstBadToken,
+      "expected ',' between operands in an associated function list", ())
+ERROR(sil_inst_autodiff_operand_list_expected_rbrace,PointsToFirstBadToken,
+      "expected '}' to start an associated function list", ())
+ERROR(sil_inst_autodiff_num_operand_list_order_mismatch,PointsToFirstBadToken,
+      "the number of operand lists does not match the order", ())
+ERROR(sil_inst_autodiff_expected_associated_function_kind_attr,PointsToFirstBadToken,
+      "expects an assoiacted function kind attribute, e.g. '[jvp]'", ())
+
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
 //------------------------------------------------------------------------------
@@ -1604,6 +1666,22 @@ ERROR(availability_query_repeated_platform, none,
 //------------------------------------------------------------------------------
 ERROR(unknown_syntax_entity, PointsToFirstBadToken,
       "unknown %0 syntax exists in the source", (StringRef))
+
+// SWIFT_ENABLE_TENSORFLOW
+ERROR(sil_const_expected_int_datatype,PointsToFirstBadToken,
+      "expected integer datatype ('i[0-9]+', e.g. 'i32')", ())
+ERROR(sil_const_expected_int_value,PointsToFirstBadToken,
+      "expected integer value in SIL constant value", ())
+ERROR(sil_const_expected_fp_datatype,PointsToFirstBadToken,
+      "expected floating point datatype ('f32' or 'f64')", ())
+ERROR(sil_const_expected_fp_value,PointsToFirstBadToken,
+      "expected floating point value in SIL constant value", ())
+ERROR(sil_const_array_expected_rsquare,PointsToFirstBadToken,
+      "expected ']' at end of array 'SymbolicValue'", ())
+ERROR(sil_const_aggregate_expected_rparen,PointsToFirstBadToken,
+      "expected ')' at end of aggregate 'SymbolicValue'", ())
+ERROR(sil_const_expected_fn_sub_conv,PointsToFirstBadToken,
+      "expected '(N)' or '(W)' function substitution convention", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

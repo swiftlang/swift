@@ -940,6 +940,10 @@ public protocol _ExpressibleByFileReferenceLiteral {
   init(fileReferenceLiteralResourceName path: String)
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+// This isn't actually used, but needs to exist for #tfop() processing.
+public protocol _ExpressibleByTensorFlowOp {}
+
 /// A container is destructor safe if whether it may store to memory on
 /// destruction only depends on its type parameters destructors.
 /// For example, whether `Array<Element>` may store to memory on destruction

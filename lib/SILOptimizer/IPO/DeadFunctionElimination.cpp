@@ -16,6 +16,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
+// SWIFT_ENABLE_TENSORFLOW end
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -25,6 +26,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
+
 
 STATISTIC(NumDeadFunc, "Number of dead functions eliminated");
 

@@ -76,12 +76,28 @@ PROTOCOL_(SwiftNewtypeWrapper)
 PROTOCOL(CodingKey)
 PROTOCOL(Encodable)
 PROTOCOL(Decodable)
+// SWIFT_ENABLE_TENSORFLOW
+PROTOCOL(AdditiveArithmetic)
+PROTOCOL(Numeric)
+PROTOCOL(FloatingPoint)
+PROTOCOL(KeyPathIterable)
+PROTOCOL(TensorArrayProtocol)
+PROTOCOL(TensorGroup)
+PROTOCOL_(TensorFlowDataTypeCompatible)
+PROTOCOL(TensorProtocol)
+PROTOCOL(TensorSendableReceivable)
+PROTOCOL(VectorNumeric)
+// TODO(TF-213): Remove underscore `Differentiable` protocols.
+PROTOCOL(__Differentiable)
+PROTOCOL(_Differentiable)
+PROTOCOL(Differentiable)
 
 PROTOCOL_(ObjectiveCBridgeable)
 PROTOCOL_(DestructorSafeContainer)
 
 PROTOCOL(StringInterpolationProtocol)
 
+<<<<<<< HEAD
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "Array", false)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByBooleanLiteral, "BooleanLiteralType", true)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByDictionaryLiteral, "Dictionary", false)
@@ -96,6 +112,24 @@ EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByUnicodeScalarLiteral, "UnicodeScala
 EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByColorLiteral, "_ColorLiteralType", true)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByImageLiteral, "_ImageLiteralType", true)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByFileReferenceLiteral, "_FileReferenceLiteralType", true)
+=======
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByBooleanLiteral)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByDictionaryLiteral)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByExtendedGraphemeClusterLiteral)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByFloatLiteral)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByIntegerLiteral)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByStringInterpolation)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByStringLiteral)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByNilLiteral)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByUnicodeScalarLiteral)
+
+EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByColorLiteral)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByImageLiteral)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByFileReferenceLiteral)
+// SWIFT_ENABLE_TENSORFLOW
+EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByTensorFlowOp)
+>>>>>>> origin/tensorflow
 
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinBooleanLiteral)
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinExtendedGraphemeClusterLiteral)

@@ -49,7 +49,17 @@ void makeFinal(ASTContext &ctx, ValueDecl *D);
 bool checkOverrides(ValueDecl *decl);
 
 // These are implemented in CodeSynthesis.cpp.
+<<<<<<< HEAD
 void maybeAddAccessorsToStorage(AbstractStorageDecl *storage);
+=======
+
+// SWIFT_ENABLE_TENSORFLOW
+// Made public for use in DerivedConformanceDifferentiable.cpp.
+void addExpectedOpaqueAccessorsToStorage(TypeChecker &TC,
+                                         AbstractStorageDecl *storage);
+
+void maybeAddAccessorsToStorage(TypeChecker &TC, AbstractStorageDecl *storage);
+>>>>>>> origin/tensorflow
 
 void triggerAccessorSynthesis(TypeChecker &TC, AbstractStorageDecl *storage);
 

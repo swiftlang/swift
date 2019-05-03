@@ -9,6 +9,14 @@
 // run when optimizations are enabled.
 // REQUIRES: swift_test_mode_optimize_none
 
+// SWIFT_ENABLE_TENSORFLOW
+// `utils/symbolicate-linux-fatal` fails with TensorFlow support because
+// libtensorflow.so is not linked properly. `import lldb` causes an import
+// error:
+// "ImportError: libtensorflow.so: cannot open shared object file"
+// The lldb swig setup scripts should be edited to fix this.
+// UNSUPPORTED: tensorflow
+
 func funcB() {
     fatalError("linux-fatal-backtrace");
 }

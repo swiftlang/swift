@@ -968,6 +968,19 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   return false;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+bool Parser::parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
+                                  const Diagnostic &D) {
+  auto IntTok = Tok;
+  if (parseToken(tok::integer_literal, Loc, D))
+    return true;
+  if (IntTok.getText().getAsInteger(0, Result)) {
+    diagnose(IntTok.getLoc(), D);
+    return true;
+  }
+  return false;
+}
+
 static SyntaxKind getListElementKind(SyntaxKind ListKind) {
   switch (ListKind) {
   case SyntaxKind::FunctionCallArgumentList:

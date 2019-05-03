@@ -52,7 +52,11 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
+<<<<<<< HEAD
 const uint16_t SWIFTMODULE_VERSION_MINOR = 488; // assign_by_delegate
+=======
+const uint16_t SWIFTMODULE_VERSION_MINOR = 472; // Last change: `@differentiating` wrt
+>>>>>>> origin/tensorflow
 
 using DeclIDField = BCFixed<31>;
 
@@ -170,6 +174,8 @@ enum class FunctionTypeRepresentation : uint8_t {
   Block,
   Thin,
   CFunctionPointer,
+  // SWIFT_ENABLE_TENSORFLOW
+  TensorFlow,
 };
 using FunctionTypeRepresentationField = BCFixed<4>;
 
@@ -190,7 +196,9 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   Block,
   Thin,
   CFunctionPointer,
-  
+  // SWIFT_ENABLE_TENSORFLOW
+  TensorFlow,
+
   FirstSIL = 8,
   Method = FirstSIL,
   ObjCMethod,
@@ -269,6 +277,14 @@ enum class ParameterConvention : uint8_t {
   Indirect_In_Constant,
 };
 using ParameterConventionField = BCFixed<4>;
+
+// SWIFT_ENABLE_TENSORFLOW
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class SILParameterDifferentiability : uint8_t {
+  DifferentiableOrNotApplicable,
+  NotDifferentiable,
+};
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -761,18 +777,30 @@ namespace decls_block {
     TypeIDField, // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,  // noescape?
-    BCFixed<1>   // throws?
-
+    // SWIFT_ENABLE_TENSORFLOW
+    BCFixed<1>,  // throws?
+    BCFixed<1>   // differentiable?
     // trailed by parameters
   >;
 
   using FunctionParamLayout = BCRecordLayout<
     FUNCTION_PARAM,
+<<<<<<< HEAD
     IdentifierIDField,  // name
     TypeIDField,        // type
     BCFixed<1>,         // vararg?
     BCFixed<1>,         // autoclosure?
     ValueOwnershipField // inout, shared or owned?
+=======
+    // SWIFT_ENABLE_TENSORFLOW
+    IdentifierIDField,   // name
+    TypeIDField,         // type
+    BCFixed<1>,          // vararg?
+    BCFixed<1>,          // autoclosure?
+    BCFixed<1>,          // escaping?
+    ValueOwnershipField, // inout, shared or owned?
+    BCFixed<1>           // nondifferentiable?
+>>>>>>> origin/tensorflow
   >;
 
   using MetatypeTypeLayout = BCRecordLayout<
@@ -834,6 +862,8 @@ namespace decls_block {
     TypeIDField,         // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,          // throws?
+    // SWIFT_ENABLE_TENSORFLOW
+    BCFixed<1>,          // differentiable?
     GenericSignatureIDField // generic signture
 
     // trailed by parameters
@@ -846,12 +876,16 @@ namespace decls_block {
     SILFunctionTypeRepresentationField, // representation
     BCFixed<1>,            // pseudogeneric?
     BCFixed<1>,            // noescape?
+    // SWIFT_ENABLE_TENSORFLOW
+    BCFixed<1>,            // differentiable?
     BCFixed<1>,            // error result?
     BCFixed<30>,           // number of parameters
     BCFixed<30>,           // number of yields
     BCFixed<30>,           // number of results
     GenericSignatureIDField, // generic signature
-    BCArray<TypeIDField>   // parameter types/conventions, alternating
+    // SWIFT_ENABLE_TENSORFLOW
+    BCArray<TypeIDField>   // for each parameter: type, convention, and (if
+                           // function is differentiable) differentiability,
                            // followed by result types/conventions, alternating
                            // followed by error result type/convention
     // Optionally a protocol conformance (for witness_methods)
@@ -1622,6 +1656,26 @@ namespace decls_block {
     Specialize_DECL_ATTR,
     BCFixed<1>, // exported flag
     BCFixed<1> // specialization kind
+  >;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  using DifferentiableDeclAttrLayout = BCRecordLayout<
+    Differentiable_DECL_ATTR,
+    BCFixed<1>, // Implicit flag.
+    IdentifierIDField, // JVP name.
+    DeclIDField, // JVP function declaration.
+    IdentifierIDField, // VJP name.
+    DeclIDField, // VJP function declaration.
+    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
+  >;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  using DifferentiatingDeclAttrLayout = BCRecordLayout<
+    Differentiating_DECL_ATTR,
+    BCFixed<1>, // Implicit flag.
+    IdentifierIDField, // Original name.
+    DeclIDField, // Original function declaration.
+    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
   >;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) \

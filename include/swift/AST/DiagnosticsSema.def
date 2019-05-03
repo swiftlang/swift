@@ -736,6 +736,10 @@ NOTE(object_literal_resolve_import,none,
      "import %0 to use '%1' as the default %2 literal type",
      (StringRef, StringRef, StringRef))
 
+// SWIFT_ENABLE_TENSORFLOW
+// TensorFlow op literal
+ERROR(invalid_tfop,none, "%0", (StringRef))
+
 ERROR(use_local_before_declaration,none,
       "use of local variable %0 before its declaration", (DeclName))
 ERROR(unsupported_existential_type,none,
@@ -1067,6 +1071,11 @@ ERROR(string_index_not_integer,none,
 NOTE(string_index_not_integer_note,none,
      "consider using an existing high level algorithm, "
      "str.startIndex.advanced(by: n), or a projection like str.utf8", ())
+
+// SWIFT_ENABLE_TENSORFLOW
+ERROR(invalid_tensorflow_fn_conversion,none,
+      "TensorFlow functions cannot be converted to other function types", ())
+
 
 ERROR(invalid_c_function_pointer_conversion_expr,none,
       "a C function pointer can only be formed from a reference to a 'func' or "
@@ -2468,6 +2477,35 @@ ERROR(broken_encodable_requirement,none,
       "Encodable protocol is broken: unexpected requirement", ())
 ERROR(broken_decodable_requirement,none,
       "Decodable protocol is broken: unexpected requirement", ())
+// SWIFT_ENABLE_TENSORFLOW
+ERROR(broken_key_path_iterable_requirement,none,
+      "KeyPathIterable protocol is broken: unexpected requirement", ())
+ERROR(broken_tensor_array_protocol_requirement,none,
+      "TensorArrayProtocol protocol is broken: unexpected requirement", ())
+ERROR(broken_tensor_group_requirement,none,
+      "TensorGroup protocol is broken: unexpected requirement", ())
+ERROR(parameterized_no_parameters_struct,none,
+      "cannot automatically synthesize %0 because 'Parameters' struct does not "
+      "exist", (Type))
+ERROR(parameterized_invalid_parameters_struct,none,
+      "cannot automatically synthesize %0 because 'Parameters' struct is "
+      "invalid", (Type))
+ERROR(broken_additive_arithmetic_requirement,none,
+      "AdditiveArithmetic protocol is broken: unexpected requirement", ())
+ERROR(broken_vector_numeric_requirement,none,
+      "VectorNumeric protocol is broken: unexpected requirement", ())
+ERROR(broken_differentiable_requirement,none,
+      "Differentiable protocol is broken: unexpected requirement", ())
+WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,
+      "stored property %0 has no derivative because it does not conform to "
+      "'Differentiable'; add '@noDerivative' to make it explicit",
+      (Identifier))
+WARNING(differentiable_constant_property_implicit_noderivative_fixit,none,
+      "'let' properties with a default value do not have a derivative; add "
+      "'@noDerivative' to make it explicit, or change it to 'var' to allow "
+      "derivatives", ())
+NOTE(protocol_witness_missing_differentiable_attr,none,
+     "candidate is missing attribute '%0'", (StringRef))
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
@@ -2638,6 +2676,135 @@ ERROR(implements_attr_non_protocol_type,none,
 ERROR(implements_attr_protocol_not_conformed_to,none,
       "containing type %0 does not conform to protocol %1",
       (DeclName, DeclName))
+
+// SWIFT_ENABLE_TENSORFLOW
+// @differentiable
+ERROR(differentiable_attr_void_result,none,
+      "cannot differentiate void function %0", (DeclName))
+ERROR(differentiable_attr_associated_function_protocol,none,
+      "cannot specify associated differentiation function on protocol "
+      "requirement", ())
+ERROR(differentiable_attr_overload_not_found,none,
+      "%0 does not have expected type %1", (DeclName, Type))
+ERROR(differentiable_attr_no_currying,none,
+      "'@differentiable' cannot be defined on functions that return functions", ())
+ERROR(differentiable_attr_duplicate,none,
+      "duplicate '@differentiable' attribute", ())
+ERROR(differentiable_attr_function_not_same_type_context,none,
+      "%0 is not defined in the current type context", (DeclName))
+ERROR(differentiable_attr_specified_not_function,none,
+      "%0 is not a function to be used as associated differentiation function",
+      (DeclName))
+ERROR(differentiable_attr_ambiguous_function_identifier,none,
+      "ambiguous or overloaded identifier %0 cannot be used in '@differentiable' "
+      "attribute", (DeclName))
+ERROR(differentiable_attr_invalid_access,none,
+      "associated differentiation function %0 is required to either be public "
+      "or @usableFromInline because the original function %1 is public or "
+      "@usableFromInline", (DeclName, DeclName))
+ERROR(differentiable_attr_result_not_differentiable,none,
+      "can only differentiate functions with results that conform to "
+      "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
+ERROR(differentiable_attr_empty_where_clause,none,
+      "empty 'where' clause in '@differentiable' attribute", ())
+ERROR(differentiable_attr_nongeneric_trailing_where,none,
+      "trailing 'where' clause in '@differentiable' attribute of non-generic function %0", (DeclName))
+ERROR(differentiable_attr_unsupported_req_kind,none,
+      "layout requirement are not supported by '@differentiable' attribute", ())
+ERROR(differentiable_attr_class_unsupported,none,
+      "class members cannot be marked with '@differentiable'", ())
+NOTE(protocol_witness_missing_specific_differentiable_attr,none,
+     "candidate is missing attribute '%0'", (StringRef))
+
+// @differentiating
+ERROR(differentiating_attr_expected_result_tuple,none,
+      "'@differentiating' attribute requires function to return a two-element tuple of type "
+      "'(value: T..., pullback: (U.CotangentVector) -> T.CotangentVector...)' or "
+      "'(value: T..., differential: (T.TangentVector...) -> U.TangentVector)'", ())
+ERROR(differentiating_attr_invalid_result_tuple_value_label,none,
+      "'@differentiating' attribute requires function to return a two-element "
+      "tuple (first element must have label 'value:')", ())
+ERROR(differentiating_attr_invalid_result_tuple_func_label,none,
+      "'@differentiating' attribute requires function to return a two-element "
+      "tuple (second element must have label 'pullback:' or 'differential:')", ())
+ERROR(differentiating_attr_result_value_not_differentiable,none,
+      "'@differentiating' attribute requires function to return a two-element "
+      "tuple (first element type %0 must conform to 'Differentiable')", (Type))
+ERROR(differentiating_attr_result_func_type_mismatch,none,
+      "function result's %0 type does not match %1", (Identifier, DeclName))
+NOTE(differentiating_attr_result_func_type_mismatch_note,none,
+     "%0 does not have expected type %1", (Identifier, Type))
+NOTE(differentiating_attr_result_func_original_note,none,
+     "%0 defined here", (DeclName))
+ERROR(differentiating_attr_overload_not_found,none,
+      "could not find function %0 with expected type %1", (DeclName, Type))
+ERROR(differentiating_attr_not_in_same_file_as_original,none,
+      "derivative not in the same file as the original function", ())
+ERROR(differentiating_attr_original_already_has_derivative,none,
+      "a derivative already exists for %0", (DeclName))
+
+// differentiation `wrt` parameters clause
+ERROR(diff_function_no_parameters,none,
+      "%0 has no parameters to differentiate with respect to", (DeclName))
+ERROR(diff_params_clause_param_name_unknown,none,
+      "unknown parameter name %0", (Identifier))
+ERROR(diff_params_clause_self_instance_method_only,none,
+      "'self' parameter is only applicable to instance methods", ())
+ERROR(diff_params_clause_self_must_be_first,none,
+      "'self' parameter must come first in the parameter list", ())
+ERROR(diff_params_clause_params_not_original_order,none,
+      "parameter names must be specified in original order", ())
+ERROR(diff_params_clause_no_inferred_parameters,PointsToFirstBadToken,
+      "no differentiation parameters could be inferred; must differentiate "
+      "with respect to at least one parameter conforming to 'Differentiable'",
+      ())
+ERROR(diff_params_clause_cannot_diff_wrt_objects_or_existentials,none,
+      "class objects and protocol existentials (%0) cannot be differentiated "
+      "with respect to", (Type))
+ERROR(diff_params_clause_cannot_diff_wrt_functions,none,
+      "functions (%0) cannot be differentiated with respect to", (Type))
+ERROR(diff_params_clause_param_not_differentiable,none,
+      "can only differentiate with respect to parameters that conform to "
+      "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
+
+// @compilerEvaluable
+ERROR(compiler_evaluable_bad_context,none,
+      "@compilerEvaluable functions not allowed here", ())
+ERROR(compiler_evaluable_loop,none,
+      "loops not allowed in @compilerEvaluable functions", ())
+ERROR(compiler_evaluable_forbidden_expression,none,
+      "expression not allowed in @compilerEvaluable functions", ())
+ERROR(compiler_evaluable_non_local_mutable,none,
+      "referencing non-local mutable variables not allowed in @compilerEvaluable functions", ())
+ERROR(compiler_evaluable_forbidden_type,none,
+      "type %0 cannot be used in @compilerEvaluable functions", (Type))
+ERROR(compiler_evaluable_ref_non_compiler_evaluable,none,
+      "@compilerEvaluable functions may not reference non-@compilerEvaluable functions", ())
+
+// @TensorFlowGraph attribute
+ERROR(tf_graph_attr_top_level_only,none,
+      "@TensorFlowGraph can only be applied to top-level functions", ())
+ERROR(tf_graph_deprecated_please_remove,none,
+      "@TensorFlowGraph has no effect and is deprecated. Please remove.", ())
+ERROR(tf_graph_attr_function_tensorflow_value_only,none,
+      "@TensorFlowGraph can only be applied to functions whose parameters and "
+      "return values are TensorFlow values or aggregates of TensorFlow "
+      "values", ())
+ERROR(tf_graph_attr_no_generic_functions,none,
+      "@TensorFlowGraph cannot be applied to generic functions", ())
+ERROR(tf_graph_attr_no_functions_with_captures,none,
+      "@TensorFlowGraph cannot be applied to functions that capture values",
+      ())
+
+// @noDerivative attribute
+ERROR(noderivative_only_on_stored_properties_in_differentiable_structs,none,
+      "'@noDerivative' is only allowed on stored properties in structure types "
+      "that declare a conformance to 'Differentiable'", ())
+
+// @_fieldwiseDifferentiable attribute
+ERROR(fieldwise_differentiable_only_on_differentiable_structs,none,
+      "'@_fieldwiseDifferentiable' is only allowed on structure types that "
+      "conform to 'Differentiable'", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Expressions
@@ -3566,12 +3733,27 @@ ERROR(unsupported_convention,none,
 ERROR(unreferenced_generic_parameter,none,
       "generic parameter '%0' is not used in function signature", (StringRef))
 
+<<<<<<< HEAD
 // Opaque types
 ERROR(unsupported_opaque_type,none,
       "'some' types are only implemented for the declared type of properties and subscripts and the return type of functions", ())
 
 ERROR(opaque_type_unsupported_pattern,none,
       "'some' type can only be declared on a single property declaration", ())
+=======
+// SWIFT_ENABLE_TENSORFLOW
+// Function differentiability
+ERROR(autodiff_attr_argument_not_differentiable,none,
+      "argument is not differentiable, but the enclosing function type is "
+      "marked '@differentiable'; did you want to add '@nondiff' to this argument?",
+      ())
+ERROR(autodiff_attr_result_not_differentiable,none,
+      "result is not differentiable, but the function type is marked "
+      "'@differentiable'", ())
+ERROR(nondiff_attr_invalid_on_nondifferentiable_function,none,
+      "'nondiff' cannot be applied to arguments of a non-differentiable "
+      "function", ())
+>>>>>>> origin/tensorflow
 
 // SIL
 ERROR(opened_non_protocol,none,

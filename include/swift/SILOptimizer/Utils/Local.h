@@ -609,6 +609,18 @@ protected:
   }
 };
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Attempt to promote the specified array of stack allocations to SSA
+/// registers.  Promotion can fail if the allocation escapes.
+void promoteAllocsToSSA(ArrayRef<AllocStackInst*> allocs,
+                        DominanceInfo *domInfo);
+
+// SWIFT_ENABLE_TENSORFLOW
+/// Run scalar-replacement-of-aggregate on the input set of instructions. Only
+/// explode those alloc_stack insts over which shouldExplode() return true.
+bool runSROAOnInsts(ArrayRef<AllocStackInst *> Insts,
+                    const std::function<bool(AllocStackInst *)> &shouldExplode);
+
 /// Move only data structure that is the result of findLocalApplySite.
 ///
 /// NOTE: Generally it is not suggested to have move only types that contain

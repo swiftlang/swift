@@ -266,6 +266,15 @@ private:
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
 
+<<<<<<< HEAD
+=======
+  // SWIFT_ENABLE_TENSORFLOW
+public:
+  /// Method which returns the SerializedSILLoader, creating the loader if it
+  /// has not been created yet.
+  SerializedSILLoader *getSILLoader();
+
+>>>>>>> origin/tensorflow
   /// Folding set for key path patterns.
   llvm::FoldingSet<KeyPathPattern> KeyPathPatterns;
 

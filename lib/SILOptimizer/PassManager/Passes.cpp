@@ -134,6 +134,21 @@ void swift::runSILPassesForOnone(SILModule &Module) {
   }
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// \brief Run the partioning pass for TensorFlow operations.
+void swift::runSILTFPartitionPass(SILModule &Module) {
+  if (Module.getOptions().VerifyAll)
+    Module.verify();
+
+  SILPassManager PM(&Module, "TensorFlow", /*isMandatoryPipeline=*/ true);
+  PM.executePassPipelinePlan(SILPassPipelinePlan::getTFPartitionPassPipeline());
+
+  // Verify the module, if required.
+  if (Module.getOptions().VerifyAll)
+    Module.verify();
+
+}
+
 void swift::runSILOptimizationPassesWithFileSpecification(SILModule &M,
                                                           StringRef Filename) {
   SILPassManager PM(&M);

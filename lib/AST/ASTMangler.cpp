@@ -199,6 +199,7 @@ std::string ASTMangler::mangleWitnessThunk(
                                      const ProtocolConformance *Conformance,
                                            const ValueDecl *Requirement) {
   beginMangling();
+
   // Concrete witness thunks get a special mangling.
   if (Conformance) {
     if (!isa<SelfProtocolConformance>(Conformance)) {
@@ -1404,6 +1405,8 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   switch (fn->getRepresentation()) {
     case SILFunctionTypeRepresentation::Thick:
     case SILFunctionTypeRepresentation::Thin:
+    // SWIFT_ENABLE_TENSORFLOW
+    case SILFunctionTypeRepresentation::TensorFlow:
       break;
     case SILFunctionTypeRepresentation::Block:
       OpArgs.push_back('B');

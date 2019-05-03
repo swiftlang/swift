@@ -69,6 +69,8 @@ class SILFunctionBuilder {
                                          IsThunk_t isThunk,
                                          IsDynamicallyReplaceable_t isDynamic);
 
+
+
   /// Return the declaration of a function, or create it if it doesn't exist.
   SILFunction *getOrCreateFunction(
       SILLocation loc, StringRef name, SILLinkage linkage,

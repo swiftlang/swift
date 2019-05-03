@@ -166,6 +166,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   Int32Ty = llvm::Type::getInt32Ty(getLLVMContext());
   Int32PtrTy = Int32Ty->getPointerTo();
   Int64Ty = llvm::Type::getInt64Ty(getLLVMContext());
+  // SWIFT_ENABLE_TENSORFLOW
+  DoubleTy = llvm::Type::getDoubleTy(getLLVMContext());
+  FloatTy = llvm::Type::getFloatTy(getLLVMContext());
+
   Int8PtrTy = llvm::Type::getInt8PtrTy(getLLVMContext());
   Int8PtrPtrTy = Int8PtrTy->getPointerTo(0);
   SizeTy = DataLayout.getIntPtrType(getLLVMContext(), /*addrspace*/ 0);
@@ -539,6 +543,8 @@ namespace RuntimeConstants {
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
   const auto FirstParamReturned = llvm::Attribute::Returned;
+  // SWIFT_ENABLE_TENSORFLOW
+  const auto FirstParamStructRet = llvm::Attribute::StructRet;
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
@@ -551,6 +557,12 @@ static bool isReturnAttribute(llvm::Attribute::AttrKind Attr) {
 // associated with the first function parameter.
 static bool isReturnedAttribute(llvm::Attribute::AttrKind Attr) {
   return Attr == llvm::Attribute::Returned;
+}
+// SWIFT_ENABLE_TENSORFLOW
+// Similar to the 'return' attribute we assume that the 'sret' attributed is
+// associated with the first function parameter.
+static bool isStructRetAttribute(llvm::Attribute::AttrKind Attr) {
+  return Attr == llvm::Attribute::StructRet;
 }
 
 namespace {
@@ -621,7 +633,8 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
     for (auto Attr : attrs) {
       if (isReturnAttribute(Attr))
         buildRetAttr.addAttribute(Attr);
-      else if (isReturnedAttribute(Attr))
+      // SWIFT_ENABLE_TENSORFLOW
+      else if (isReturnedAttribute(Attr) || isStructRetAttribute(Attr))
         buildFirstParamAttr.addAttribute(Attr);
       else
         buildFnAttr.addAttribute(Attr);

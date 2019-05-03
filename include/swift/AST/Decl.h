@@ -3388,8 +3388,20 @@ public:
   /// Is this a key path type?
   Optional<KeyPathTypeKind> getKeyPathTypeKind() const;
 
+<<<<<<< HEAD
   /// Retrieve information about this type as a property delegate.
   PropertyDelegateTypeInfo getPropertyDelegateTypeInfo() const;
+=======
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Get effective memberwise initializer for the given nominal type, if it
+  /// exists: either a synthesized memberwise initializer or a user-defined
+  /// initializer with the same signature.
+  ConstructorDecl *getEffectiveMemberwiseInitializer();
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Add `@_fixed_layout` attribute to the nominal type, if possible.
+  void addFixedLayoutAttr();
+>>>>>>> origin/tensorflow
 
 private:
   /// Predicate used to filter StoredPropertyRange.
@@ -5929,6 +5941,9 @@ public:
 
   bool isStatic() const {
     return Bits.FuncDecl.IsStatic;
+  }
+  bool isCallable() const {
+    return getName().str() == "call" && isInstanceMember();
   }
   /// \returns the way 'static'/'class' was spelled in the source.
   StaticSpellingKind getStaticSpelling() const {

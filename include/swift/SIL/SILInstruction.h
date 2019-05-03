@@ -17,6 +17,8 @@
 #ifndef SWIFT_SIL_INSTRUCTION_H
 #define SWIFT_SIL_INSTRUCTION_H
 
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
@@ -7707,6 +7709,146 @@ class TryApplyInst final
          SILOpenedArchetypesState &OpenedArchetypes,
          const GenericSpecializationInformation *SpecializationInfo);
 };
+
+// SWIFT_ENABLE_TENSORFLOW
+/// `autodiff_function` - given a function and differentiation indices and its
+/// associated differentiation functions, create an `@differentiable` function that
+/// represents a bundle of these functions and configurations.
+class AutoDiffFunctionInst final :
+    public InstructionBaseWithTrailingOperands<
+               SILInstructionKind::AutoDiffFunctionInst,
+               AutoDiffFunctionInst, OwnershipForwardingSingleValueInst> {
+private:
+  friend SILBuilder;
+  /// Differentiation parameter indices.
+  SmallBitVector parameterIndices;
+  /// The order of differentiation.
+  unsigned differentiationOrder;
+  /// The number of operands. The first operand is always the original function.
+  /// The rest of operands determined by the order of differentiation and whether
+  /// this is the new AD model or the legacy reverse-mode AD model.
+  unsigned numOperands;
+
+  AutoDiffFunctionInst(SILModule &module, SILDebugLocation debugLoc,
+                       const SmallBitVector &parameterIndices,
+                       unsigned differentiationOrder,
+                       SILValue originalFunction,
+                       ArrayRef<SILValue> associatedFunctions);
+
+public:
+  static AutoDiffFunctionInst *create(SILModule &module,
+                                      SILDebugLocation debugLoc,
+                                      const SmallBitVector &parameterIndices,
+                                      unsigned differentiationOrder,
+                                      SILValue originalFunction,
+                                      ArrayRef<SILValue> associatedFunctions);
+
+  static SILType getAutoDiffType(SILValue original,
+                                 unsigned differentiationOrder,
+                                 const SmallBitVector &parameterIndices);
+
+  /// Returns the original function.
+  SILValue getOriginalFunction() const { return getAllOperands()[0].get(); }
+
+  /// Returns differentiation indices.
+  const SmallBitVector &getParameterIndices() const {
+    return parameterIndices;
+  }
+
+  /// Returns the differentiation order.
+  unsigned getDifferentiationOrder() const {
+    return differentiationOrder;
+  }
+
+  unsigned getNumAssociatedFunctions() const {
+    return numOperands - 1;
+  }
+
+  bool hasAssociatedFunctions() const {
+    return numOperands > 1;
+  }
+
+  ArrayRef<Operand> getAssociatedFunctions() const {
+    return getAllOperands().drop_front();
+  }
+
+  std::pair<SILValue, SILValue>
+  getAssociatedFunctionPair(unsigned differentiationOrder) const;
+
+  SILValue getAssociatedFunction(unsigned differentiationOrder,
+                                 AutoDiffAssociatedFunctionKind kind) const;
+};
+
+/// `autodiff_function_extract` - given an `@differentiable` function representing a
+/// bundle of the original function and associated functions, extract the
+/// specified function.
+class AutoDiffFunctionExtractInst
+    : public InstructionBase<SILInstructionKind::AutoDiffFunctionExtractInst,
+                             OwnershipForwardingSingleValueInst> {
+public:
+  struct Extractee {
+    enum innerty : unsigned {
+      Original = 0,
+      JVP = 1,
+      VJP = 2
+    } rawValue;
+    Extractee() = default;
+    Extractee(innerty rawValue) : rawValue(rawValue) {}
+    Extractee(unsigned rawValue) : Extractee((innerty)rawValue) {}
+    Extractee(AutoDiffAssociatedFunctionKind kind);
+    explicit Extractee(StringRef name);
+    operator innerty() const { return rawValue; }
+
+    Optional<AutoDiffAssociatedFunctionKind>
+    getExtracteeAsAssociatedFunction() const;
+  };
+
+private:
+  /// The extractee.
+  Extractee extractee;
+  /// The differentiation order. A zero value is only legal when the extractee
+  /// is the original function, and it is a private representation only.
+  unsigned differentiationOrder;
+  /// The list containing the `@differentiable` function operand.
+  FixedOperandList<1> operands;
+
+  static SILType
+  getExtracteeType(SILValue function, Extractee extractee,
+                   unsigned differentiationOrder, SILModule &module);
+
+public:
+  explicit AutoDiffFunctionExtractInst(
+      SILModule &module, SILDebugLocation debugLoc, Extractee extractee,
+      unsigned differentiationOrder, SILValue theFunction);
+
+  Extractee getExtractee() const {
+    return extractee;
+  }
+
+  AutoDiffAssociatedFunctionKind getAssociatedFunctionKind() const {
+    auto kind = extractee.getExtracteeAsAssociatedFunction();
+    assert(kind);
+    return *kind;
+  }
+
+  SILValue getFunctionOperand() const {
+    return operands[0].get();
+  }
+
+  unsigned getDifferentiationOrder() const {
+    return differentiationOrder;
+  }
+
+  ArrayRef<Operand> getAllOperands() const {
+    return operands.asArray();
+  }
+
+  MutableArrayRef<Operand> getAllOperands() {
+    return operands.asArray();
+  }
+};
+
+typedef AutoDiffFunctionExtractInst::Extractee AutoDiffFunctionExtractee;
 
 // This is defined out of line to work around the fact that this depends on
 // PartialApplyInst being defined, but PartialApplyInst is a subclass of
