@@ -2372,6 +2372,11 @@ public:
 
     return {true, S};
   }
+  
+  // Don't descend into nested decls.
+  bool walkToDeclPre(Decl *D) override {
+    return false;
+  }
 };
 
 } // end anonymous namespace

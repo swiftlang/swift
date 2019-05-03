@@ -1205,8 +1205,6 @@ public:
   void emitStructDecl(StructDecl *D);
   void emitClassDecl(ClassDecl *D);
   void emitExtension(ExtensionDecl *D);
-  void emitFuncDecl(FuncDecl *D);
-  void emitAbstractStorageDecl(AbstractStorageDecl *D);
   void emitOpaqueTypeDecl(OpaqueTypeDecl *D);
   void emitSILGlobalVariable(SILGlobalVariable *gv);
   void emitCoverageMapping();
