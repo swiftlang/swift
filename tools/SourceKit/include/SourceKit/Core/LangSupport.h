@@ -358,6 +358,10 @@ struct RefactoringInfo {
 };
 
 struct CursorInfoData {
+<<<<<<< HEAD
+=======
+  bool IsCancelled = false;
+>>>>>>> aad86098551240bff9af8aa6617861fdd0619c22
   // If nonempty, a proper Info could not be resolved (and the rest of the Info
   // will be empty). Clients can potentially use this to show a diagnostic
   // message to the user in lieu of using the empty response.
@@ -409,6 +413,10 @@ struct RangeInfo {
 };
 
 struct NameTranslatingInfo {
+<<<<<<< HEAD
+=======
+  bool IsCancelled = false;
+>>>>>>> aad86098551240bff9af8aa6617861fdd0619c22
   // If nonempty, a proper Info could not be resolved (and the rest of the Info
   // will be empty). Clients can potentially use this to show a diagnostic
   // message to the user in lieu of using the empty response.
@@ -718,37 +726,67 @@ public:
                              unsigned Length, bool Actionables,
                              bool CancelOnSubsequentRequest,
                              ArrayRef<const char *> Args,
+<<<<<<< HEAD
                       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
+=======
+                      std::function<void(const CursorInfoData &,
+                                         StringRef Error)> Receiver) = 0;
+>>>>>>> aad86098551240bff9af8aa6617861fdd0619c22
 
 
   virtual void getNameInfo(StringRef Filename, unsigned Offset,
                            NameTranslatingInfo &Input,
                            ArrayRef<const char *> Args,
+<<<<<<< HEAD
                 std::function<void(const RequestResult<NameTranslatingInfo> &)> Receiver) = 0;
+=======
+                std::function<void(const NameTranslatingInfo &,
+                                   StringRef Error)> Receiver) = 0;
+>>>>>>> aad86098551240bff9af8aa6617861fdd0619c22
 
   virtual void getRangeInfo(StringRef Filename, unsigned Offset, unsigned Length,
                             bool CancelOnSubsequentRequest,
                             ArrayRef<const char *> Args,
+<<<<<<< HEAD
                             std::function<void(const RequestResult<RangeInfo> &)> Receiver) = 0;
+=======
+                            std::function<void(const RangeInfo&,
+                                               StringRef Error)> Receiver) = 0;
+>>>>>>> aad86098551240bff9af8aa6617861fdd0619c22
 
   virtual void
   getCursorInfoFromUSR(StringRef Filename, StringRef USR,
                        bool CancelOnSubsequentRequest,
                        ArrayRef<const char *> Args,
+<<<<<<< HEAD
                      std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
+=======
+                     std::function<void(const CursorInfoData &,
+                                        StringRef Error)> Receiver) = 0;
+>>>>>>> aad86098551240bff9af8aa6617861fdd0619c22
 
   virtual void findRelatedIdentifiersInFile(StringRef Filename,
                                             unsigned Offset,
                                             bool CancelOnSubsequentRequest,
                                             ArrayRef<const char *> Args,
+<<<<<<< HEAD
                    std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver) = 0;
+=======
+                   std::function<void(const RelatedIdentsInfo &,
+                                      StringRef Error)> Receiver) = 0;
+>>>>>>> aad86098551240bff9af8aa6617861fdd0619c22
 
   virtual llvm::Optional<std::pair<unsigned, unsigned>>
       findUSRRange(StringRef DocumentName, StringRef USR) = 0;
 
   virtual void findInterfaceDocument(StringRef ModuleName,
                                      ArrayRef<const char *> Args,
+<<<<<<< HEAD
                     std::function<void(const RequestResult<InterfaceDocInfo> &)> Receiver) = 0;
+=======
+                    std::function<void(const InterfaceDocInfo &,
+                                       StringRef Error)> Receiver) = 0;
+>>>>>>> aad86098551240bff9af8aa6617861fdd0619c22
 
   virtual void findModuleGroups(StringRef ModuleName,
                                 ArrayRef<const char *> Args,
@@ -775,8 +813,13 @@ public:
   virtual void collectExpressionTypes(StringRef FileName,
                                       ArrayRef<const char *> Args,
                                       ArrayRef<const char *> ExpectedProtocols,
+<<<<<<< HEAD
                                       std::function<void(const
                                           RequestResult<ExpressionTypesInFile> &)> Receiver) = 0;
+=======
+                                      std::function<void(const ExpressionTypesInFile&,
+                                                         StringRef Error)> Receiver) = 0;
+>>>>>>> aad86098551240bff9af8aa6617861fdd0619c22
 
   virtual void getDocInfo(llvm::MemoryBuffer *InputBuf,
                           StringRef ModuleName,
