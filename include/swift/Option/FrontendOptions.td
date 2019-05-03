@@ -384,6 +384,9 @@ def warn_long_expression_type_checking : Separate<["-"], "warn-long-expression-t
 def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-type-checking=">,
   Alias<warn_long_expression_type_checking>;
 
+def Rmodule_interface_rebuild : Flag<["-"], "Rmodule-interface-rebuild">,
+  HelpText<"Emits a remark if an imported module needs to be re-compiled from its module interface">;
+
 def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
 
 def solver_disable_shrink :
