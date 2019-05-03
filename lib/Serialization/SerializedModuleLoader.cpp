@@ -264,24 +264,24 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
     moduleFramework += ".framework";
     isFramework = true;
 
-    auto tryFrameworkImport = [&](StringRef frameworkPath) -> bool {
+    auto tryFrameworkImport = [&](StringRef frameworkPath) -> Optional<bool> {
       currPath = frameworkPath;
       llvm::sys::path::append(currPath, moduleFramework.str());
 
       // Check if the framework directory exists
       if (!fs.exists(currPath)) {
-        return false;
+        return None;
       }
 
       // Frameworks always use architecture-specific files within a .swiftmodule
       // directory.
       llvm::sys::path::append(currPath, "Modules", fileNames.module.str());
-      return findTargetSpecificModuleFiles().getValueOr(false);
+      return findTargetSpecificModuleFiles();
     };
 
     for (const auto &framepath : Ctx.SearchPathOpts.FrameworkSearchPaths) {
-      if (tryFrameworkImport(framepath.Path))
-        return true;
+      if (auto outcome = tryFrameworkImport(framepath.Path))
+        return outcome.getValue();
     }
 
     if (Ctx.LangOpts.Target.isOSDarwin()) {
@@ -290,13 +290,13 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
       SmallString<256> scratch;
       scratch = Ctx.SearchPathOpts.SDKPath;
       llvm::sys::path::append(scratch, "System", "Library", "Frameworks");
-      if (tryFrameworkImport(scratch))
-        return true;
+      if (auto outcome = tryFrameworkImport(scratch))
+        return outcome.getValue();
 
       scratch = Ctx.SearchPathOpts.SDKPath;
       llvm::sys::path::append(scratch, "Library", "Frameworks");
-      if (tryFrameworkImport(scratch))
-        return true;
+      if (auto outcome = tryFrameworkImport(scratch))
+        return outcome.getValue();
     }
   }
 

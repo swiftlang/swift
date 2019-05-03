@@ -4330,12 +4330,12 @@ namespace {
     }
 
     template <typename T, typename U>
-    T *resolveSwiftDeclImpl(const U *decl, Identifier name, ModuleDecl *adapter) {
+    T *resolveSwiftDeclImpl(const U *decl, Identifier name, ModuleDecl *overlay) {
       const auto &languageVersion =
           Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
 
       SmallVector<ValueDecl *, 4> results;
-      adapter->lookupValue({}, name, NLKind::QualifiedLookup, results);
+      overlay->lookupValue({}, name, NLKind::QualifiedLookup, results);
       T *found = nullptr;
       for (auto result : results) {
         if (auto singleResult = dyn_cast<T>(result)) {
@@ -4361,8 +4361,8 @@ namespace {
     template <typename T, typename U>
     T *resolveSwiftDecl(const U *decl, Identifier name,
                         ClangModuleUnit *clangModule) {
-      if (auto adapter = clangModule->getAdapterModule())
-        return resolveSwiftDeclImpl<T>(decl, name, adapter);
+      if (auto overlay = clangModule->getOverlayModule())
+        return resolveSwiftDeclImpl<T>(decl, name, overlay);
       if (clangModule == Impl.ImportedHeaderUnit) {
         // Use an index-based loop because new owners can come in as we're
         // iterating.
@@ -4414,7 +4414,7 @@ namespace {
       // FIXME: Figure out how to deal with incomplete protocols, since that
       // notion doesn't exist in Swift.
       if (!decl->hasDefinition()) {
-        // Check if this protocol is implemented in its adapter.
+        // Check if this protocol is implemented in its overlay.
         if (auto clangModule = Impl.getClangModuleForDecl(decl, true))
           if (auto native = resolveSwiftDecl<ProtocolDecl>(decl, name,
                                                            clangModule))
@@ -4545,7 +4545,7 @@ namespace {
       auto name = importedName.getDeclName().getBaseIdentifier();
 
       if (!decl->hasDefinition()) {
-        // Check if this class is implemented in its adapter.
+        // Check if this class is implemented in its overlay.
         if (auto clangModule = Impl.getClangModuleForDecl(decl, true)) {
           if (auto native = resolveSwiftDecl<ClassDecl>(decl, name,
                                                         clangModule)) {
@@ -5199,13 +5199,13 @@ static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
   const DeclContext *containingFile = nominal->getModuleScopeContext();
   ModuleDecl *originalModule = containingFile->getParentModule();
 
-  ModuleDecl *adapterModule = nullptr;
+  ModuleDecl *overlayModule = nullptr;
   if (auto *clangUnit = dyn_cast<ClangModuleUnit>(containingFile))
-    adapterModule = clangUnit->getAdapterModule();
+    overlayModule = clangUnit->getOverlayModule();
 
   for (ExtensionDecl *extension : nominal->getExtensions()) {
     ModuleDecl *extensionModule = extension->getParentModule();
-    if (extensionModule != originalModule && extensionModule != adapterModule &&
+    if (extensionModule != originalModule && extensionModule != overlayModule &&
         extensionModule != foundationModule) {
       continue;
     }
@@ -5302,7 +5302,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
       return false;
 
     // Break circularity by only looking for declared conformances in the
-    // original module, or possibly its adapter.
+    // original module, or possibly its overlay.
     if (conformsToProtocolInOriginalModule(computedNominal, proto,
                                            Impl.tryLoadFoundationModule(),
                                            Impl.getTypeResolver())) {

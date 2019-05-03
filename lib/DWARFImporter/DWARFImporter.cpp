@@ -127,7 +127,7 @@ public:
     ModuleWrappers.insert({name, wrapperUnit});
     decl->addFile(*wrapperUnit);
 
-    // Force load adapter modules for all imported modules.
+    // Force load overlay modules for all imported modules.
     decl->forAllVisibleModules({}, [](ModuleDecl::ImportedModule import) {});
 
     return decl;
