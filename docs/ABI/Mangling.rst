@@ -694,6 +694,7 @@ Property behaviors are implemented using private protocol conformances.
       dependent-associated-conformance 'HA' DEPENDENT-CONFORMANCE-INDEX
 
   dependent-associated-conformance ::= type protocol
+  dependent-protocol-conformance ::= dependent-protocol-conformance opaque-type 'HO'
 
 A compact representation used to represent mangled protocol conformance witness
 arguments at runtime. The ``module`` is only specified for conformances that
