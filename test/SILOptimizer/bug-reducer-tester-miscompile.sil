@@ -20,15 +20,15 @@
 // Now test the base case. We emit a sib file/etc to make sure all of the
 // components of our test work, even though we could just use a sil file
 // directly.
-// RUN: %target-sil-opt %s -emit-sib -o %t/good.sib -module-name main
-// RUN: %target-swift-frontend -c %t/good.sib -o %t/good.o -module-name main
-// RUN: %target-swiftc_driver -o %t/good %t/good.o %t/main.o -module-name main
+// RUN: %target-sil-opt %s -emit-sib -o %t/good.sib -module-name good
+// RUN: %target-swift-frontend -c %t/good.sib -o %t/good.o -module-name good
+// RUN: %target-swiftc_driver -o %t/good %t/good.o %t/main.o -module-name good
 // RUN: %t/good | %FileCheck %s
 
 // Now try to miscompile
-// RUN: %target-sil-opt -bug-reducer-tester %s -bug-reducer-tester-failure-kind=miscompile -bug-reducer-tester-target-func='target_func' -emit-sib -o %t/miscompile.sib -module-name main
-// RUN: %target-swift-frontend -c %t/miscompile.sib -o %t/miscompile.o -module-name main
-// RUN: %target-swiftc_driver -o %t/miscompile %t/miscompile.o %t/main.o -module-name main
+// RUN: %target-sil-opt -bug-reducer-tester %s -bug-reducer-tester-failure-kind=miscompile -bug-reducer-tester-target-func='target_func' -emit-sib -o %t/miscompile.sib -module-name miscompile
+// RUN: %target-swift-frontend -c %t/miscompile.sib -o %t/miscompile.o -module-name miscompile
+// RUN: %target-swiftc_driver -o %t/miscompile %t/miscompile.o %t/main.o -module-name miscompile
 // RUN: %t/miscompile | %FileCheck -check-prefix=MISCOMPILE %s
 
 // CHECK: swift

@@ -1699,15 +1699,9 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
 std::unique_ptr<SILModule>
 SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF) {
   SharedTimer timer("SILGen");
-  const DeclContext *DC;
-  if (SF) {
-    DC = SF;
-  } else {
-    DC = mod;
-  }
 
-  std::unique_ptr<SILModule> M(
-      new SILModule(mod, options, DC, /*wholeModule*/ SF == nullptr));
+  std::unique_ptr<SILModule> M = createEmptyModule(mod, options, SF,
+                                                /*wholeModule*/ SF == nullptr);
   SILGenModule SGM(*M, mod);
 
   if (SF) {

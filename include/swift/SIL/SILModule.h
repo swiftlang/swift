@@ -340,12 +340,12 @@ public:
   /// If a source file is provided, SIL will only be emitted for decls in that
   /// source file.
   static std::unique_ptr<SILModule>
-  constructSIL(ModuleDecl *M, SILOptions &Options, FileUnit *sf = nullptr);
+  constructSIL(ModuleDecl *M, SILOptions &Options, FileUnit *SF = nullptr);
 
   /// Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
   static std::unique_ptr<SILModule>
-  createEmptyModule(ModuleDecl *M, SILOptions &Options,
+  createEmptyModule(ModuleDecl *M, SILOptions &Options, FileUnit *SF = nullptr,
                     bool WholeModule = false);
 
   /// Get the Swift module associated with this SIL module.

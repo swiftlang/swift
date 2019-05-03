@@ -152,10 +152,18 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
 
 void CompilerInstance::createSILModule() {
   assert(MainModule && "main module not created yet");
+
+  SourceFile &MainFile =
+      MainModule->getMainSourceFile(Invocation.getSourceFileKind());
+
   // Assume WMO if a -primary-file option was not provided.
+  bool WholeModule =
+      Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule();
+
   TheSILModule = SILModule::createEmptyModule(
-      getMainModule(), Invocation.getSILOptions(),
-      Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule());
+      MainModule, Invocation.getSILOptions(),
+      WholeModule ? nullptr : &MainFile,
+      WholeModule);
 }
 
 void CompilerInstance::setSILModule(std::unique_ptr<SILModule> M) {
@@ -619,13 +627,6 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   ModuleDecl *mainModule = getMainModule();
   Context->LoadedModules[mainModule->getName()] = mainModule;
 
-  if (Invocation.getInputKind() == InputFileKind::SIL) {
-    assert(!InputSourceCodeBufferIDs.empty());
-    assert(InputSourceCodeBufferIDs.size() == 1);
-    assert(MainBufferID != NO_SUCH_BUFFER);
-    createSILModule();
-  }
-
   if (Invocation.getImplicitModuleImportKind() ==
       SourceFile::ImplicitModuleImportKind::Stdlib) {
     if (!loadStdlib())
@@ -646,6 +647,13 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   // Make sure the main file is the first file in the module, so do this now.
   if (MainBufferID != NO_SUCH_BUFFER)
     addMainFileToModule(implicitImports);
+
+  if (Invocation.getInputKind() == InputFileKind::SIL) {
+    assert(!InputSourceCodeBufferIDs.empty());
+    assert(InputSourceCodeBufferIDs.size() == 1);
+    assert(MainBufferID != NO_SUCH_BUFFER);
+    createSILModule();
+  }
 
   parseAndCheckTypesUpTo(implicitImports, LimitStage);
 }

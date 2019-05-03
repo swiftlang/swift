@@ -118,10 +118,17 @@ SILModule::~SILModule() {
 }
 
 std::unique_ptr<SILModule>
-SILModule::createEmptyModule(ModuleDecl *M, SILOptions &Options,
+SILModule::createEmptyModule(ModuleDecl *M, SILOptions &Options, FileUnit *SF,
                              bool WholeModule) {
+  const DeclContext *DC;
+  if (SF) {
+    DC = SF;
+  } else {
+    DC = M;
+  }
+
   return std::unique_ptr<SILModule>(
-      new SILModule(M, Options, M, WholeModule));
+      new SILModule(M, Options, DC, WholeModule));
 }
 
 ASTContext &SILModule::getASTContext() const {
