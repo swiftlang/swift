@@ -986,16 +986,20 @@ bool AssignmentFailure::diagnoseAsError() {
   // Attempt diagnostics based on the overload choice.
   if (choice.hasValue()) {
 
+    auto getKeyPathArgument = [](SubscriptExpr *expr) {
+      auto *TE = dyn_cast<TupleExpr>(expr->getIndex());
+      assert(TE->getNumElements() == 1);
+      return TE->getElement(0);
+    };
+
     if (!choice->isDecl()) {
       if (choice->getKind() == OverloadChoiceKind::KeyPathApplication &&
           !isa<ApplyExpr>(immInfo.first)) {
         std::string message = "";
         if (auto *SE = dyn_cast<SubscriptExpr>(immInfo.first)) {
-          if (auto *tupleExpr = dyn_cast<TupleExpr>(SE->getIndex())) {
-            if (auto *DRE = dyn_cast<DeclRefExpr>(tupleExpr->getElement(0))) {
-              auto identifier = DRE->getDecl()->getBaseName().getIdentifier();
-              message = "'" + identifier.str().str() + "' ";
-            }
+          if (auto *DRE = dyn_cast<DeclRefExpr>(getKeyPathArgument(SE))) {
+            auto identifier = DRE->getDecl()->getBaseName().getIdentifier();
+            message = "'" + identifier.str().str() + "' ";
           }
         }
         emitDiagnostic(Loc, DeclDiagnostic, message + "is read-only")
