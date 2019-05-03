@@ -621,6 +621,100 @@ public:
 
 namespace {
 
+/// Keeps track of the various reasons the module interface loader needed to
+/// fall back and rebuild a module from its interface.
+struct ModuleRebuildInfo {
+  enum class ModuleKind {
+    Normal,
+    Cached,
+    Forwarding,
+    Prebuilt
+  };
+  struct OutOfDateModule {
+    std::string path;
+    Optional<serialization::Status> serializationStatus;
+    ModuleKind kind;
+    SmallVector<std::string, 10> outOfDateDependencies;
+  };
+  SmallVector<OutOfDateModule, 3> outOfDateModules;
+
+  OutOfDateModule &getOrInsertOutOfDateModule(StringRef path) {
+    for (auto &mod : outOfDateModules) {
+      if (mod.path == path) return mod;
+    }
+    outOfDateModules.push_back({path, None, ModuleKind::Normal, {}});
+    return outOfDateModules.back();
+  }
+
+  /// Sets the kind of a module that failed to load.
+  void setModuleKind(StringRef path, ModuleKind kind) {
+    getOrInsertOutOfDateModule(path).kind = kind;
+  }
+
+  /// Sets the serialization status of the module at \c path. If this is
+  /// anything other than \c Valid, a note will be added stating why the module
+  /// was invalid.
+  void setSerializationStatus(StringRef path, serialization::Status status) {
+    getOrInsertOutOfDateModule(path).serializationStatus = status;
+  }
+
+  /// Registers an out-of-date dependency at \c depPath for the module
+  /// at \c modulePath.
+  void addOutOfDateDependency(StringRef modulePath, StringRef depPath) {
+    getOrInsertOutOfDateModule(modulePath)
+      .outOfDateDependencies.push_back(depPath);
+  }
+
+  const char *invalidModuleReason(serialization::Status status) {
+    using namespace serialization;
+    switch (status) {
+    case Status::FormatTooOld:
+      return "compiled with an older version of the compiler";
+    case Status::FormatTooNew:
+      return "compiled with a newer version of the compiler";
+    case Status::Malformed:
+      return "malformed";
+    case Status::TargetIncompatible:
+      return "compiled for a different target platform";
+    case Status::TargetTooNew:
+      return "target platform newer than current platform";
+    default: return nullptr;
+    }
+  }
+
+  /// Emits a diagnostic for all out-of-date compiled or forwarding modules
+  /// encountered while trying to load a module.
+  void diagnose(ASTContext &ctx, SourceLoc loc, StringRef moduleName,
+                 StringRef interfacePath) {
+    ctx.Diags.diagnose(loc, diag::rebuilding_module_from_interface,
+                       moduleName, interfacePath);
+
+    // We may have found multiple failing modules, that failed for different
+    // reasons. Emit a note for each of them.
+    for (auto &mod : outOfDateModules) {
+      ctx.Diags.diagnose(loc, diag::out_of_date_module_here,
+                         (unsigned)mod.kind, mod.path);
+
+      // Diagnose any out-of-date dependencies in this module.
+      for (auto &dep : mod.outOfDateDependencies) {
+        ctx.Diags.diagnose(loc, diag::module_interface_dependency_out_of_date,
+                           dep);
+      }
+
+      // If there was a compiled module that wasn't able to be read, diagnose
+      // the reason we couldn't read it.
+      if (auto status = mod.serializationStatus) {
+        if (auto reason = invalidModuleReason(*status)) {
+          ctx.Diags.diagnose(loc, diag::compiled_module_invalid_reason,
+              mod.path, reason);
+        } else {
+          ctx.Diags.diagnose(loc, diag::compiled_module_invalid, mod.path);
+        }
+      }
+    }
+  }
+};
+
 /// Handles the details of loading parseable interfaces as modules, and will
 /// do the necessary lookup to determine if we should be loading from the
 /// normal cache, the prebuilt cache, a module adjacent to the interface, or
@@ -631,6 +725,7 @@ class ParseableInterfaceModuleLoaderImpl {
   ASTContext &ctx;
   llvm::vfs::FileSystem &fs;
   DiagnosticEngine &diags;
+  ModuleRebuildInfo rebuildInfo;
   const StringRef modulePath;
   const std::string interfacePath;
   const StringRef moduleName;
@@ -639,17 +734,20 @@ class ParseableInterfaceModuleLoaderImpl {
   const SourceLoc diagnosticLoc;
   DependencyTracker *const dependencyTracker;
   const ModuleLoadingMode loadMode;
+  const bool remarkOnRebuildFromInterface;
 
   ParseableInterfaceModuleLoaderImpl(
     ASTContext &ctx, StringRef modulePath, StringRef interfacePath,
     StringRef moduleName, StringRef cacheDir, StringRef prebuiltCacheDir,
-    SourceLoc diagLoc, DependencyTracker *dependencyTracker = nullptr,
+    SourceLoc diagLoc, bool remarkOnRebuildFromInterface,
+    DependencyTracker *dependencyTracker = nullptr,
     ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized)
   : ctx(ctx), fs(*ctx.SourceMgr.getFileSystem()), diags(ctx.Diags),
     modulePath(modulePath), interfacePath(interfacePath),
     moduleName(moduleName), prebuiltCacheDir(prebuiltCacheDir),
     cacheDir(cacheDir), diagnosticLoc(diagLoc),
-    dependencyTracker(dependencyTracker), loadMode(loadMode) {}
+    dependencyTracker(dependencyTracker), loadMode(loadMode),
+    remarkOnRebuildFromInterface(remarkOnRebuildFromInterface) {}
 
   /// Construct a cache key for the .swiftmodule being generated. There is a
   /// balance to be struck here between things that go in the cache key and
@@ -745,13 +843,15 @@ class ParseableInterfaceModuleLoaderImpl {
 
   // Check if all the provided file dependencies are up-to-date compared to
   // what's currently on disk.
-  bool dependenciesAreUpToDate(ArrayRef<FileDependency> deps) {
+  bool dependenciesAreUpToDate(StringRef modulePath,
+                               ArrayRef<FileDependency> deps) {
     SmallString<128> SDKRelativeBuffer;
     for (auto &in : deps) {
       StringRef fullPath = getFullDependencyPath(in, SDKRelativeBuffer);
       if (!dependencyIsUpToDate(in, fullPath)) {
         LLVM_DEBUG(llvm::dbgs() << "Dep " << fullPath
                    << " is directly out of date\n");
+        rebuildInfo.addOutOfDateDependency(modulePath, fullPath);
         return false;
       }
       LLVM_DEBUG(llvm::dbgs() << "Dep " << fullPath << " is up to date\n");
@@ -762,15 +862,18 @@ class ParseableInterfaceModuleLoaderImpl {
   // Check that the output .swiftmodule file is at least as new as all the
   // dependencies it read when it was built last time.
   bool serializedASTBufferIsUpToDate(
-    const llvm::MemoryBuffer &buf, SmallVectorImpl<FileDependency> &allDeps) {
+      StringRef path, const llvm::MemoryBuffer &buf,
+      SmallVectorImpl<FileDependency> &allDeps) {
     LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << modulePath << "\n");
     auto validationInfo = serialization::validateSerializedAST(
         buf.getBuffer(), /*ExtendedValidationInfo=*/nullptr, &allDeps);
 
-    if (validationInfo.status != serialization::Status::Valid)
+    if (validationInfo.status != serialization::Status::Valid) {
+      rebuildInfo.setSerializationStatus(path, validationInfo.status);
       return false;
+    }
 
-    return dependenciesAreUpToDate(allDeps);
+    return dependenciesAreUpToDate(path, allDeps);
   }
 
   // Check that the output .swiftmodule file is at least as new as all the
@@ -782,15 +885,16 @@ class ParseableInterfaceModuleLoaderImpl {
     if (!OutBuf)
       return false;
     moduleBuffer = std::move(*OutBuf);
-    return serializedASTBufferIsUpToDate(*moduleBuffer, AllDeps);
+    return serializedASTBufferIsUpToDate(modulePath, *moduleBuffer, AllDeps);
   }
 
   // Check that a "forwarding" .swiftmodule file is at least as new as all the
   // dependencies it read when it was built last time. Requires that the
   // forwarding module has been loaded from disk.
   bool forwardingModuleIsUpToDate(
-    const ForwardingModule &fwd, SmallVectorImpl<FileDependency> &deps,
-    std::unique_ptr<llvm::MemoryBuffer> &moduleBuffer) {
+      StringRef path, const ForwardingModule &fwd,
+      SmallVectorImpl<FileDependency> &deps,
+      std::unique_ptr<llvm::MemoryBuffer> &moduleBuffer) {
     // First, make sure the underlying module path exists and is valid.
     auto modBuf = fs.getBufferForFile(fwd.underlyingModulePath);
     if (!modBuf || !serializedASTLooksValid(*modBuf.get()))
@@ -805,7 +909,7 @@ class ParseableInterfaceModuleLoaderImpl {
           dep.path, /*isSDKRelative=*/false, dep.size,
           dep.lastModificationTime));
     }
-    if (!dependenciesAreUpToDate(deps))
+    if (!dependenciesAreUpToDate(path, deps))
       return false;
 
     moduleBuffer = std::move(*modBuf);
@@ -924,6 +1028,7 @@ class ParseableInterfaceModuleLoaderImpl {
       llvm_unreachable("module interface loader should not have been created");
     }
 
+
     // First, check the cached module path. Whatever's in this cache represents
     // the most up-to-date knowledge we have about the module.
     if (auto cachedBufOrError = fs.getBufferForFile(cachedOutputPath)) {
@@ -939,7 +1044,8 @@ class ParseableInterfaceModuleLoaderImpl {
       if (isForwardingModule) {
         if (auto forwardingModule = ForwardingModule::load(*buf)) {
           std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
-          if (forwardingModuleIsUpToDate(*forwardingModule, deps,
+          if (forwardingModuleIsUpToDate(cachedOutputPath,
+                                         *forwardingModule, deps,
                                          moduleBuffer)) {
             LLVM_DEBUG(llvm::dbgs() << "Found up-to-date forwarding module at "
                                     << cachedOutputPath << "\n");
@@ -949,15 +1055,19 @@ class ParseableInterfaceModuleLoaderImpl {
 
           LLVM_DEBUG(llvm::dbgs() << "Found out-of-date forwarding module at "
                      << cachedOutputPath << "\n");
+          rebuildInfo.setModuleKind(cachedOutputPath,
+                                    ModuleRebuildInfo::ModuleKind::Forwarding);
         }
       // Otherwise, check if the AST buffer itself is up to date.
-      } else if (serializedASTBufferIsUpToDate(*buf, deps)) {
+      } else if (serializedASTBufferIsUpToDate(cachedOutputPath, *buf, deps)) {
         LLVM_DEBUG(llvm::dbgs() << "Found up-to-date cached module at "
                                 << cachedOutputPath << "\n");
         return DiscoveredModule::normal(cachedOutputPath, std::move(buf));
       } else {
         LLVM_DEBUG(llvm::dbgs() << "Found out-of-date cached module at "
                    << cachedOutputPath << "\n");
+        rebuildInfo.setModuleKind(cachedOutputPath,
+                                  ModuleRebuildInfo::ModuleKind::Cached);
       }
     }
 
@@ -983,6 +1093,8 @@ class ParseableInterfaceModuleLoaderImpl {
         } else {
           LLVM_DEBUG(llvm::dbgs() << "Found out-of-date prebuilt module at "
                                   << path->str() << "\n");
+          rebuildInfo.setModuleKind(*path,
+                                    ModuleRebuildInfo::ModuleKind::Prebuilt);
         }
       }
     }
@@ -999,7 +1111,8 @@ class ParseableInterfaceModuleLoaderImpl {
 
     auto adjacentModuleBuffer = fs.getBufferForFile(modulePath);
     if (adjacentModuleBuffer) {
-      if (serializedASTBufferIsUpToDate(*adjacentModuleBuffer.get(), deps)) {
+      if (serializedASTBufferIsUpToDate(modulePath, *adjacentModuleBuffer.get(),
+                                        deps)) {
         LLVM_DEBUG(llvm::dbgs() << "Found up-to-date module at "
                                 << modulePath
                                 << "; deferring to serialized module loader\n");
@@ -1022,6 +1135,8 @@ class ParseableInterfaceModuleLoaderImpl {
       } else {
         LLVM_DEBUG(llvm::dbgs() << "Found out-of-date module at "
                                 << modulePath << "\n");
+        rebuildInfo.setModuleKind(modulePath,
+                                  ModuleRebuildInfo::ModuleKind::Normal);
       }
     } else if (adjacentModuleBuffer.getError() != notFoundError) {
       return std::make_error_code(std::errc::not_supported);
@@ -1159,7 +1274,15 @@ class ParseableInterfaceModuleLoaderImpl {
     }
 
     std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
-    // We didn't discover a module corresponding to this interface. Build one.
+
+    // We didn't discover a module corresponding to this interface.
+
+    // Diagnose that we didn't find a loadable module, if we were asked to.
+    if (remarkOnRebuildFromInterface) {
+      rebuildInfo.diagnose(ctx, diagnosticLoc, moduleName,
+                           interfacePath);
+    }
+
     if (builder.buildSwiftModule(cachedOutputPath, /*shouldSerializeDeps*/true,
                                  &moduleBuffer))
       return std::make_error_code(std::errc::invalid_argument);
@@ -1214,7 +1337,8 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
   // Create an instance of the Impl to do the heavy lifting.
   ParseableInterfaceModuleLoaderImpl Impl(
                 Ctx, ModPath, InPath, ModuleID.first.str(),
-                CacheDir, PrebuiltCacheDir, ModuleID.second, dependencyTracker,
+                CacheDir, PrebuiltCacheDir, ModuleID.second,
+                RemarkOnRebuildFromInterface, dependencyTracker,
                 LoadMode);
 
   // Ask the impl to find us a module that we can load or give us an error
