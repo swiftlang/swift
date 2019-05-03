@@ -1000,6 +1000,7 @@ public:
   llvm::SetVector<TypeDecl *> LocalTypeDecls;
   
   /// The set of validated opaque return type decls in the source file.
+  llvm::SmallVector<OpaqueTypeDecl *, 4> OpaqueReturnTypes;
   llvm::StringMap<OpaqueTypeDecl *> ValidatedOpaqueReturnTypes;
   /// The set of parsed decls with opaque return types that have not yet
   /// been validated.
