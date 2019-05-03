@@ -242,8 +242,8 @@ private:
   /// Field metadata records that have already been lazily emitted, or are
   /// queued up.
   llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyEmittedFieldMetadata;
+
   struct LazyOpaqueInfo {
-    bool IsLazy = false;
     bool IsDescriptorUsed = false;
     bool IsDescriptorEmitted = false;
   };
