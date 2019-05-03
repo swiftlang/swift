@@ -2497,9 +2497,18 @@ bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
 
   // Allow replacement of opaque result types of inlineable function regardless
   // of resilience and in which context.
-  if (namingDecl->getAttrs().hasAttribute<InlinableAttr>()) {
-    return true;
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(namingDecl)) {
+    if (afd->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+      return true;
+    }
+  } else if (auto *asd = dyn_cast<AbstractStorageDecl>(namingDecl)) {
+    auto *getter = asd->getGetter();
+    if (getter &&
+        getter->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+      return true;
+    }
   }
+
   // Allow replacement of opaque result types in the context of maximal
   // resilient expansion if the context's and the opaque type's module are the
   // same.
