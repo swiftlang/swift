@@ -2032,7 +2032,8 @@ bool ConstraintSystem::repairFailures(
         // If left-hand side is a function type but right-hand
         // side isn't, let's check it would be possible to fix
         // this by forming an explicit call.
-        if (!rhs->is<FunctionType>() && !rhs->isVoid() &&
+        auto convertTo = rhs->lookThroughAllOptionalTypes();
+        if (!convertTo->is<FunctionType>() && !convertTo->isVoid() &&
             fnType->getNumParams() == 0 &&
             matchTypes(fnType->getResult(), rhs, ConstraintKind::Conversion,
                        TypeMatchFlags::TMF_ApplyingFix, locator)
