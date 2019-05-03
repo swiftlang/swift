@@ -243,7 +243,6 @@ private:
   /// queued up.
   llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyEmittedFieldMetadata;
   struct LazyOpaqueInfo {
-    bool IsLazy = false;
     bool IsDescriptorUsed = false;
     bool IsDescriptorEmitted = false;
   };
