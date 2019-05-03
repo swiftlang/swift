@@ -302,6 +302,55 @@ public:
 struct Statistic;
 typedef std::function<void(ArrayRef<Statistic *> stats)> StatisticsReceiver;
 
+// Used to wrap the result of a request. There are three possibilities:
+// - The request succeeded (`value` is valid)
+// - The request was cancelled
+// - The request failed (with an `error`)
+template <typename T>
+class RequestResult {
+private:
+  enum Type {
+    Value,
+    Error,
+    Cancelled
+  };
+  union {
+    const T *data;
+    StringRef error;
+  };
+  RequestResult::Type type;
+
+  RequestResult(const T &V): data(&V), type(Value) {}
+  RequestResult(StringRef E): error(E), type(Error) {}
+  RequestResult(): type(Cancelled) {}
+
+public:
+  static RequestResult fromResult(const T &value) {
+    return RequestResult(value);
+  }
+  static RequestResult fromError(StringRef error) {
+    return RequestResult(error);
+  }
+  static RequestResult cancelled() {
+    return RequestResult();
+  }
+
+  const T &value() const {
+    assert(type == Value);
+    return *data;
+  }
+  bool isError() const {
+    return type == Error;
+  }
+  StringRef getError() const {
+    assert(type == Error);
+    return error;
+  }
+  bool isCancelled() const {
+    return type == Cancelled;
+  }
+};
+
 struct RefactoringInfo {
   UIdent Kind;
   StringRef KindName;
@@ -309,7 +358,6 @@ struct RefactoringInfo {
 };
 
 struct CursorInfoData {
-  bool IsCancelled = false;
   // If nonempty, a proper Info could not be resolved (and the rest of the Info
   // will be empty). Clients can potentially use this to show a diagnostic
   // message to the user in lieu of using the empty response.
@@ -355,14 +403,12 @@ struct CursorInfoData {
 };
 
 struct RangeInfo {
-  bool IsCancelled = false;
   UIdent RangeKind;
   StringRef ExprType;
   StringRef RangeContent;
 };
 
 struct NameTranslatingInfo {
-  bool IsCancelled = false;
   // If nonempty, a proper Info could not be resolved (and the rest of the Info
   // will be empty). Clients can potentially use this to show a diagnostic
   // message to the user in lieu of using the empty response.
@@ -389,7 +435,6 @@ struct SemanticRefactoringInfo {
 };
 
 struct RelatedIdentsInfo {
-  bool IsCancelled = false;
   /// (Offset,Length) pairs.
   ArrayRef<std::pair<unsigned, unsigned>> Ranges;
 };
@@ -500,10 +545,9 @@ struct RenameLocations {
   std::vector<RenameLocation> LineColumnLocs;
 };
 
-typedef std::function<void(ArrayRef<CategorizedEdits> Edits,
-                           StringRef Error)> CategorizedEditsReceiver;
-typedef std::function<void(ArrayRef<CategorizedRenameRanges> Edits,
-                           StringRef Error)>
+typedef std::function<void(RequestResult<ArrayRef<CategorizedEdits>> Result)>
+    CategorizedEditsReceiver;
+typedef std::function<void(RequestResult<ArrayRef<CategorizedRenameRanges>> Result)>
     CategorizedRenameRangesReceiver;
 
 class DocInfoConsumer {
@@ -674,48 +718,41 @@ public:
                              unsigned Length, bool Actionables,
                              bool CancelOnSubsequentRequest,
                              ArrayRef<const char *> Args,
-                      std::function<void(const CursorInfoData &,
-                                         StringRef Error)> Receiver) = 0;
+                      std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
 
   virtual void getNameInfo(StringRef Filename, unsigned Offset,
                            NameTranslatingInfo &Input,
                            ArrayRef<const char *> Args,
-                std::function<void(const NameTranslatingInfo &,
-                                   StringRef Error)> Receiver) = 0;
+                std::function<void(const RequestResult<NameTranslatingInfo> &)> Receiver) = 0;
 
   virtual void getRangeInfo(StringRef Filename, unsigned Offset, unsigned Length,
                             bool CancelOnSubsequentRequest,
                             ArrayRef<const char *> Args,
-                            std::function<void(const RangeInfo&,
-                                               StringRef Error)> Receiver) = 0;
+                            std::function<void(const RequestResult<RangeInfo> &)> Receiver) = 0;
 
   virtual void
   getCursorInfoFromUSR(StringRef Filename, StringRef USR,
                        bool CancelOnSubsequentRequest,
                        ArrayRef<const char *> Args,
-                     std::function<void(const CursorInfoData &,
-                                        StringRef Error)> Receiver) = 0;
+                     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
   virtual void findRelatedIdentifiersInFile(StringRef Filename,
                                             unsigned Offset,
                                             bool CancelOnSubsequentRequest,
                                             ArrayRef<const char *> Args,
-                   std::function<void(const RelatedIdentsInfo &,
-                                      StringRef Error)> Receiver) = 0;
+                   std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver) = 0;
 
   virtual llvm::Optional<std::pair<unsigned, unsigned>>
       findUSRRange(StringRef DocumentName, StringRef USR) = 0;
 
   virtual void findInterfaceDocument(StringRef ModuleName,
                                      ArrayRef<const char *> Args,
-                    std::function<void(const InterfaceDocInfo &,
-                                       StringRef Error)> Receiver) = 0;
+                    std::function<void(const RequestResult<InterfaceDocInfo> &)> Receiver) = 0;
 
   virtual void findModuleGroups(StringRef ModuleName,
                                 ArrayRef<const char *> Args,
-                                std::function<void(ArrayRef<StringRef>,
-                                                   StringRef Error)> Receiver) = 0;
+                                std::function<void(const RequestResult<ArrayRef<StringRef>> &)> Receiver) = 0;
 
   virtual void syntacticRename(llvm::MemoryBuffer *InputBuf,
                                ArrayRef<RenameLocations> RenameLocations,
@@ -738,8 +775,8 @@ public:
   virtual void collectExpressionTypes(StringRef FileName,
                                       ArrayRef<const char *> Args,
                                       ArrayRef<const char *> ExpectedProtocols,
-                                      std::function<void(const ExpressionTypesInFile&,
-                                                         StringRef Error)> Receiver) = 0;
+                                      std::function<void(const
+                                          RequestResult<ExpressionTypesInFile> &)> Receiver) = 0;
 
   virtual void getDocInfo(llvm::MemoryBuffer *InputBuf,
                           StringRef ModuleName,
