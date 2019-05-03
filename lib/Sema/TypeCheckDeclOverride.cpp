@@ -954,11 +954,13 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     auto baseGenericSig = baseGenericCtx->getGenericSignature();
     auto declGenericSig = declGenericCtx->getGenericSignature();
 
-    if (!baseGenericSig->requirementsNotSatisfiedBy(declGenericSig).empty()) {
-      diags.diagnose(decl, diag::override_method_different_generic_sig,
-                     decl->getBaseName());
-      diags.diagnose(baseDecl, diag::overridden_here);
-      emittedMatchError = true;
+    if (baseGenericSig && declGenericSig) {
+      if (!baseGenericSig->requirementsNotSatisfiedBy(declGenericSig).empty()) {
+        diags.diagnose(decl, diag::override_method_different_generic_sig,
+                       decl->getBaseName());
+        diags.diagnose(baseDecl, diag::overridden_here);
+        emittedMatchError = true;
+      }
     }
   }
 
