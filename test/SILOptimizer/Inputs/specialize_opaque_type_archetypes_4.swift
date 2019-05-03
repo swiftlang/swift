@@ -1,67 +1,17 @@
 import External2
 
-@usableFromInline
-@inline(never)
-func preventInlining() {}
-
 // When specializing the opaque result type for this function we should not
 // specialize the opaque result type of the recursive invocation.
 @inlinable
+@inline(never)
 public func inlinableExternalResilientCallsResilient() -> some ExternalP2 {
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
   return externalResilient()
 }
 
 // In this case we should look through the recursion.
 @inlinable
+@inline(never)
 public func inlinableExternalResilientCallsInlinableExternalResilient() -> some ExternalP2 {
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
   return inlinableExternalResilient()
 }
 
@@ -76,60 +26,14 @@ public struct ResilientContainer2 {
   }
 
   @inlinable
+  @inline(never)
   public var inlineableProperty : some ExternalP2 {
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
     return r.computedProperty
   }
 
   @inlinable
+  @inline(never)
   public var inlineablePropertyCallsResilientInlineable : some ExternalP2 {
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
     return r.inlineableProperty
   }
 }
