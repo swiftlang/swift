@@ -270,19 +270,19 @@ static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
 }
 
 // Synthesize body for `AdditiveArithmetic.+` operator.
-static void deriveBodyAdditiveArithmetic_add(AbstractFunctionDecl *funcDecl) {
+static void deriveBodyAdditiveArithmetic_add(AbstractFunctionDecl *funcDecl, void*) {
   deriveBodyMathOperator(funcDecl, Add);
 }
 
 // Synthesize body for `AdditiveArithmetic.-` operator.
 static void
-deriveBodyAdditiveArithmetic_subtract(AbstractFunctionDecl *funcDecl) {
+deriveBodyAdditiveArithmetic_subtract(AbstractFunctionDecl *funcDecl, void*) {
   deriveBodyMathOperator(funcDecl, Subtract);
 }
 
 // Synthesize body for `VectorNumeric.*` operator.
 static void
-deriveBodyVectorNumeric_scalarMultiply(AbstractFunctionDecl *funcDecl) {
+deriveBodyVectorNumeric_scalarMultiply(AbstractFunctionDecl *funcDecl, void*) {
   deriveBodyMathOperator(funcDecl, ScalarMultiply);
 }
 
@@ -333,13 +333,13 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
   operatorDecl->setImplicit();
   switch (op) {
   case Add:
-    operatorDecl->setBodySynthesizer(deriveBodyAdditiveArithmetic_add);
+    operatorDecl->setBodySynthesizer(deriveBodyAdditiveArithmetic_add, nullptr);
     break;
   case Subtract:
-    operatorDecl->setBodySynthesizer(deriveBodyAdditiveArithmetic_subtract);
+    operatorDecl->setBodySynthesizer(deriveBodyAdditiveArithmetic_subtract, nullptr);
     break;
   case ScalarMultiply:
-    operatorDecl->setBodySynthesizer(deriveBodyVectorNumeric_scalarMultiply);
+    operatorDecl->setBodySynthesizer(deriveBodyVectorNumeric_scalarMultiply, nullptr);
     break;
   }
   if (auto env = parentDC->getGenericEnvironmentOfContext())
@@ -355,7 +355,7 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
 }
 
 // Synthesize body for the `AdditiveArithmetic.zero` computed property getter.
-static void deriveBodyAdditiveArithmetic_zero(AbstractFunctionDecl *funcDecl) {
+static void deriveBodyAdditiveArithmetic_zero(AbstractFunctionDecl *funcDecl, void*) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -439,7 +439,7 @@ static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
   // Create `zero` getter.
   auto *getterDecl =
       derived.declareDerivedPropertyGetter(TC, zeroDecl, returnTy);
-  getterDecl->setBodySynthesizer(deriveBodyAdditiveArithmetic_zero);
+  getterDecl->setBodySynthesizer(deriveBodyAdditiveArithmetic_zero, nullptr);
   zeroDecl->setAccessors(StorageImplInfo::getImmutableComputed(), SourceLoc(),
                          {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext({getterDecl, zeroDecl, pbDecl});

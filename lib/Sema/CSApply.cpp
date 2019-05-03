@@ -321,23 +321,12 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
 }
 
 /// Form a type checked expression for the index of a @dynamicMemberLookup
-/// subscript index parameter, using the specified name, type, and source loc.
+/// subscript index parameter.
 /// The index expression will have a tuple type of `(dynamicMember: T)`.
-<<<<<<< HEAD
 static Expr *buildDynamicMemberLookupIndexExpr(StringRef name, SourceLoc loc,
                                                DeclContext *dc,
                                                ConstraintSystem &cs) {
   auto &ctx = cs.TC.Context;
-=======
-///
-/// Note: propagating source location is necessary to prevent diagnostics with
-/// unknown location.
-static Expr *buildDynamicMemberLookupIndexExpr(StringRef name, Type ty,
-                                               SourceLoc loc, DeclContext *dc,
-                                               ConstraintSystem &cs) {
-  auto &ctx = cs.TC.Context;
-
->>>>>>> origin/tensorflow
   // Build and type check the string literal index value to the specific
   // string type expected by the subscript.
   Expr *nameExpr = new (ctx) StringLiteralExpr(name, loc, /*implicit*/true);
@@ -2077,6 +2066,9 @@ namespace {
     }
 
     Expr *handleStringLiteralExpr(LiteralExpr *expr) {
+      if (cs.getType(expr) && !cs.getType(expr)->hasTypeVariable())
+        return expr;
+      
       auto stringLiteral = dyn_cast<StringLiteralExpr>(expr);
       auto magicLiteral = dyn_cast<MagicIdentifierLiteralExpr>(expr);
       assert(bool(stringLiteral) != bool(magicLiteral) &&
@@ -5943,7 +5935,7 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
   auto &tc = cs.getTypeChecker();
   Type fromType = cs.getType(expr);
   auto fromFnType = fromType->getAs<AnyFunctionType>();
-
+  
   // Conversions to C function pointer type are limited. Since a C function
   // pointer captures no context, we can only do the necessary thunking or
   // codegen if the original function is a direct reference to a global function
@@ -6594,11 +6586,19 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       isInDefaultArgumentContext = (initalizerCtx->getInitializerKind() ==
                                     InitializerKind::DefaultArgument);
     auto toEI = toFunc->getExtInfo();
-<<<<<<< HEAD
     assert(toType->is<FunctionType>());
+    // SWIFT_ENABLE_TENSORFLOW
+    auto fromEI = fromFunc->getExtInfo();
+    // Handle implicit conversion from @differentiable.
+    if (fromEI.isDifferentiable() && !toEI.isDifferentiable()) {
+      fromFunc = fromFunc->getWithoutDifferentiability()
+          ->castTo<FunctionType>();
+      expr = cs.cacheType(new (tc.Context)
+          AutoDiffFunctionExtractOriginalExpr(expr, fromFunc));
+    }
     // If we have a ClosureExpr, then we can safely propagate the 'no escape'
     // bit to the closure without invalidating prior analysis.
-    auto fromEI = fromFunc->getExtInfo();
+    fromEI = fromFunc->getExtInfo();
     if (toEI.isNoEscape() && !fromEI.isNoEscape()) {
       auto newFromFuncType = fromFunc->withExtInfo(fromEI.withNoEscape());
       if (!isInDefaultArgumentContext &&
@@ -6616,48 +6616,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
           maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
           expr = cs.cacheType(new (tc.Context) FunctionConversionExpr(
               expr, escapingToFuncTy));
-=======
-    // Coercion from one function type to another, this produces a
-    // FunctionConversionExpr in its full generality.
-    if (auto fromFunc = fromType->getAs<FunctionType>()) {
-      assert(toType->is<FunctionType>());
-      // SWIFT_ENABLE_TENSORFLOW
-      auto fromEI = fromFunc->getExtInfo();
-      // Handle implicit conversion from @differentiable.
-      if (fromEI.isDifferentiable() && !toEI.isDifferentiable()) {
-        fromFunc = fromFunc->getWithoutDifferentiability()
-            ->castTo<FunctionType>();
-        expr = cs.cacheType(new (tc.Context)
-            AutoDiffFunctionExtractOriginalExpr(expr, fromFunc));
-      }
-      // If we have a ClosureExpr, then we can safely propagate the 'no escape'
-      // bit to the closure without invalidating prior analysis.
-      fromEI = fromFunc->getExtInfo();
-      if (toEI.isNoEscape() && !fromEI.isNoEscape()) {
-        auto newFromFuncType = fromFunc->withExtInfo(fromEI.withNoEscape());
-        if (!isInDefaultArgumentContext &&
-            applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
-          fromFunc = newFromFuncType->castTo<FunctionType>();
-          // Propagating the 'no escape' bit might have satisfied the entire
-          // conversion.  If so, we're done, otherwise keep converting.
-          if (fromFunc->isEqual(toType))
-            return expr;
-        } else if (isInDefaultArgumentContext) {
-          // First apply the conversion *without* noescape attribute.
-          if (!newFromFuncType->isEqual(toType)) {
-            auto escapingToFuncTy =
-                toFunc->withExtInfo(toEI.withNoEscape(false));
-            maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
-            expr = cs.cacheType(new (tc.Context) FunctionConversionExpr(
-                expr, escapingToFuncTy));
-          }
-          // Apply an explict function conversion *only* for the escape to
-          // noescape conversion. This conversion will be stripped by the
-          // default argument generator. (We can't return a @noescape function)
-          auto newExpr = cs.cacheType(new (tc.Context)
-                                          FunctionConversionExpr(expr, toFunc));
-          return newExpr;
->>>>>>> origin/tensorflow
         }
         // Apply an explict function conversion *only* for the escape to
         // noescape conversion. This conversion will be stripped by the
@@ -6670,32 +6628,26 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
 
-<<<<<<< HEAD
-    return cs.cacheType(new (tc.Context)
-                            FunctionConversionExpr(expr, toType));
-=======
-      // SWIFT_ENABLE_TENSORFLOW
-      auto toEINoADConversion =
-          toEI.withDifferentiable(fromEI.isDifferentiable());
-      auto toFuncNoADConversion = toFunc->withExtInfo(toEINoADConversion);
-      if (toEI.isDifferentiable() && !fromEI.isDifferentiable())
-        toFuncNoADConversion =
-            toFuncNoADConversion->getWithoutDifferentiability();
+    // SWIFT_ENABLE_TENSORFLOW
+    auto toEINoADConversion =
+        toEI.withDifferentiable(fromEI.isDifferentiable());
+    auto toFuncNoADConversion = toFunc->withExtInfo(toEINoADConversion);
+    if (toEI.isDifferentiable() && !fromEI.isDifferentiable())
+      toFuncNoADConversion =
+          toFuncNoADConversion->getWithoutDifferentiability();
+    expr = cs.cacheType(new (tc.Context)
+                            FunctionConversionExpr(expr,
+                                                   toFuncNoADConversion));
+
+    // Make the conversion to @differentiable happen after all other conversions,
+    // because some of the other conversions are not currently supported on
+    // @differentiable functions. (e.g. escape_to_noescape).
+    // After we do support those conversions, the order will no longer matter.
+    if (!fromEI.isDifferentiable() && toEI.isDifferentiable())
       expr = cs.cacheType(new (tc.Context)
-                              FunctionConversionExpr(expr,
-                                                     toFuncNoADConversion));
+                              AutoDiffFunctionExpr(expr, toFunc));
 
-      // Make the conversion to @differentiable happen after all other conversions,
-      // because some of the other conversions are not currently supported on
-      // @differentiable functions. (e.g. escape_to_noescape).
-      // After we do support those conversions, the order will no longer matter.
-      if (!fromEI.isDifferentiable() && toEI.isDifferentiable())
-        expr = cs.cacheType(new (tc.Context)
-                                AutoDiffFunctionExpr(expr, toFunc));
-
-      return expr;
-    }
->>>>>>> origin/tensorflow
+    return expr;
   }
 
   // Coercions from one metatype to another.
@@ -7302,7 +7254,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         cs.setType(replacement, resultTy);
         return replacement;
       }
-
+      
       case DeclTypeCheckingSemantics::Normal:
         return nullptr;
       }
@@ -7328,7 +7280,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       return special;
     }
   }
-
+  
   bool unwrapResult = false;
   if (auto *IUOFnTy = dyn_cast<ImplicitlyUnwrappedFunctionConversionExpr>(fn)) {
     unwrapResult = true;

@@ -57,7 +57,7 @@ static ArraySliceType *computeAllKeyPathsType(NominalTypeDecl *nominal) {
 
 // Synthesize body for the `allKeyPaths` computed property getter.
 static void
-deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl) {
+deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void*) {
   auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
 
@@ -115,7 +115,7 @@ deriveKeyPathIterable_allKeyPaths(DerivedConformance &derived) {
   // Create `allKeyPaths` getter.
   auto *getterDecl = derived.declareDerivedPropertyGetter(
       derived.TC, allKeyPathsDecl, returnTy);
-  getterDecl->setBodySynthesizer(deriveBodyKeyPathIterable_allKeyPaths);
+  getterDecl->setBodySynthesizer(deriveBodyKeyPathIterable_allKeyPaths, nullptr);
   allKeyPathsDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
                                 SourceLoc(), {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext({getterDecl, allKeyPathsDecl, pbDecl});

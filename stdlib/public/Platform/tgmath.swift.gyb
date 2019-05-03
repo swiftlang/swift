@@ -200,36 +200,9 @@ UnaryIntrinsicFunctions = [
     'cos', 'sin', 'exp', 'exp2', 'log', 'log10', 'log2', 'nearbyint', 'rint'
 ]
 
-<<<<<<< HEAD
-=======
-# (T, T) -> T
-BinaryFunctions = [
-    'atan2', 'hypot', 'pow',
-    'copysign', 'nextafter', 'fdim', 'fmax', 'fmin'
-]
-
-# These functions have special implementations.
-OtherFunctions = [
-    'scalbn', 'lgamma', 'remquo', 'nan', 'jn', 'yn'
-]
-
 # SWIFT_ENABLE_TENSORFLOW
-# These functions are imported correctly as-is.
-OkayFunctions = ['j0', 'j1', 'y0', 'y1']
-
 HasVJP = ["exp", "log", "tan", "cos", "sin"]
 
-# These functions are not supported for various reasons.
-UnhandledFunctions = [
-    'math_errhandling', 'scalbln',
-    'lrint', 'lround', 'llrint', 'llround', 'nexttoward',
-    'isgreater', 'isgreaterequal', 'isless', 'islessequal',
-    'islessgreater', 'isunordered', '__exp10',
-    '__sincos', '__cospi', '__sinpi', '__tanpi', '__sincospi'
-]
-
-
->>>>>>> origin/tensorflow
 def AllFloatTypes():
     for bits in allFloatBits:
         yield floatName(bits), cFloatName(bits), cFuncSuffix(bits)

@@ -170,15 +170,10 @@ ABSTRACT_EXPR(ImplicitConversion, Expr)
   EXPR(PointerToPointer, ImplicitConversionExpr)
   EXPR(ForeignObjectConversion, ImplicitConversionExpr)
   EXPR(UnevaluatedInstance, ImplicitConversionExpr)
-<<<<<<< HEAD
   EXPR(UnderlyingToOpaque, ImplicitConversionExpr)
-  EXPR_RANGE(ImplicitConversion, Load, UnderlyingToOpaque)
-=======
-  // SWIFT_ENABLE_TENSORFLOW
   EXPR(AutoDiffFunction, ImplicitConversionExpr)
   EXPR(AutoDiffFunctionExtractOriginal, ImplicitConversionExpr)
   EXPR_RANGE(ImplicitConversion, Load, AutoDiffFunctionExtractOriginal)
->>>>>>> origin/tensorflow
 ABSTRACT_EXPR(ExplicitCast, Expr)
   ABSTRACT_EXPR(CheckedCast, ExplicitCastExpr)
     EXPR(ForcedCheckedCast, CheckedCastExpr)

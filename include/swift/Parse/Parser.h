@@ -802,9 +802,6 @@ public:
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
 
-<<<<<<< HEAD
-  /// Parse a comma separated list of some elements.
-=======
   /// SWIFT_ENABLE_TENSORFLOW
   /// \brief Parse an unsigned integer and returns it in \p Result. On failure
   /// emit the specified error diagnostic, and a note at the specified note
@@ -812,8 +809,7 @@ public:
   bool parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
                             const Diagnostic &D);
 
-  /// \brief Parse a comma separated list of some elements.
->>>>>>> origin/tensorflow
+  /// Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                          bool AllowSepAfterLast, Diag<> ErrorDiag,
                          syntax::SyntaxKind Kind,
@@ -1472,13 +1468,10 @@ public:
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
   ParserResult<Expr> parseExprCollection();
-<<<<<<< HEAD
   ParserResult<Expr> parseExprCollectionElement(Optional<bool> &isDictionary);
   ParserResult<Expr> parseExprPoundAssert();
-=======
   ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc);
   ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc);
->>>>>>> origin/tensorflow
   ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
   ParserResult<Expr>
   parseExprPoundCodeCompletion(Optional<StmtKind> ParentKind);

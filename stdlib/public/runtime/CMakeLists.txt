@@ -31,12 +31,9 @@ set(swift_runtime_objc_sources
 set(swift_runtime_sources
     AnyHashableSupport.cpp
     Array.cpp
-<<<<<<< HEAD
-    BackDeployment.cpp
-=======
     # SWIFT_ENABLE_TENSORFLOW
     AutoDiff.cpp
->>>>>>> origin/tensorflow
+    BackDeployment.cpp
     Casting.cpp
     CompatibilityOverride.cpp
     CygwinPort.cpp

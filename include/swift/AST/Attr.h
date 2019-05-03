@@ -1425,7 +1425,6 @@ public:
   }
 };
 
-<<<<<<< HEAD
 /// Defines a custom attribute.
 class CustomAttr final : public DeclAttribute,
                          public TrailingCallArguments<CustomAttr> {
@@ -1478,8 +1477,6 @@ public:
   }
 };
 
-/// Attributes that may be applied to declarations.
-=======
 // SWIFT_ENABLE_TENSORFLOW
 struct DeclNameWithLoc {
   DeclName Name;
@@ -1666,8 +1663,7 @@ public:
   }
 };
 
-/// \brief Attributes that may be applied to declarations.
->>>>>>> origin/tensorflow
+/// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
   DeclAttribute *DeclAttrs;

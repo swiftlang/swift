@@ -2540,13 +2540,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-<<<<<<< HEAD
                 if [ "${SWIFT_INSTALL_COMPONENTS}" ] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_INSTALL_COMPONENTS:STRING="${SWIFT_INSTALL_COMPONENTS}"
                     )
-=======
+                fi
+
                 if [[ "${ENABLE_TENSORFLOW}" ]] ; then
                     # Verify TensorFlow include/library directories.
                     verify_tensorflow_directories
@@ -2610,7 +2610,6 @@ for host in "${ALL_HOSTS[@]}"; do
                             -DTENSORFLOW_SWIFT_APIS:PATH="${TENSORFLOW_SWIFT_APIS}"
                         )
                     fi
->>>>>>> origin/tensorflow
                 fi
 
                 if contains_product "lldb" ; then
@@ -2698,7 +2697,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 # Get the build date
                 LLDB_BUILD_DATE=$(date +%Y-%m-%d)
 
-<<<<<<< HEAD
                 using_xcodebuild="FALSE"
                 if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
                     using_xcodebuild="TRUE"
@@ -2706,125 +2704,11 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 if [[ "${using_xcodebuild}" == "TRUE" ]] ; then
                   # Set up flags to pass to xcodebuild
-                  set_lldb_xcodebuild_options
                   set_lldb_build_mode
+                  set_lldb_xcodebuild_options
                   with_pushd ${source_dir} \
-                      call xcodebuild -target desktop -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
+                      call xcodebuild -target desktop -configuration "${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}"
                   continue
-=======
-                case "${host}" in
-                    linux-*)
-                        cmake_options=(
-                            "${cmake_options[@]}"
-                            -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
-                            -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
-                            -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
-                            -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
-                            -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
-                            -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
-                            -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
-                            -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
-                            -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
-                            -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
-                            -DLLDB_ALLOW_STATIC_BINDINGS=1
-                        )
-                        ;;
-                    freebsd-*)
-                        cmake_options=(
-                            "${cmake_options[@]}"
-                            -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
-                            -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
-                            -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
-                            -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
-                            -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
-                            -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
-                            -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
-                            -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
-                            -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
-                            -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
-                            -DLLDB_ALLOW_STATIC_BINDINGS=1
-                        )
-                        ;;
-                    cygwin-*)
-                        cmake_options=(
-                            "${cmake_options[@]}"
-                            -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
-                            -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
-                            -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
-                            -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
-                            -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
-                            -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
-                            -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
-                            -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
-                            -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
-                            -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
-                            -DLLDB_ALLOW_STATIC_BINDINGS=1
-                        )
-                        ;;
-                    haiku-*)
-                        cmake_options=(
-                            "${cmake_options[@]}"
-                            -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
-                            -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
-                            -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
-                            -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
-                            -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
-                            -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
-                            -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
-                            -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
-                            -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
-                            -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
-                            -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
-                            -DLLDB_ALLOW_STATIC_BINDINGS=1
-                        )
-                        ;;
-                    macosx-*)
-                        if [[ "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
-                            # Set up flags to pass to xcodebuild
-                            set_lldb_build_mode
-                            set_lldb_xcodebuild_options
-                            with_pushd ${source_dir} \
-                                call xcodebuild -target desktop -configuration ${LLDB_BUILD_MODE} "${lldb_xcodebuild_options[@]}"
-                            continue
-		        else
-                            cmake_options=(
-                                "${cmake_options[@]}"
-                                -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
-                                -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
-                                -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
-                                -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
-                                -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
-                                -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
-                                -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
-                                -DLLDB_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
-                                -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
-                                -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
-                                -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
-				-DLLDB_BUILD_FRAMEWORK:BOOL=TRUE
-                                -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
-                                -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
-                                -DLLDB_ALLOW_STATIC_BINDINGS=1
-                                -DLLDB_CODESIGN_IDENTITY=""
-                            )
-                        fi
-                        ;;
-                esac
-                if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
-                    cmake_options+=(
-                        -DLLDB_INCLUDE_TESTS=NO
-                        )
->>>>>>> origin/tensorflow
                 else
                   cmake_options=(
                       "${cmake_options[@]}"
@@ -3865,7 +3749,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     macosx-*)
                         set_lldb_xcodebuild_options
                         set_lldb_build_mode
-                        set_lldb_xcodebuild_options
                         with_pushd ${LLDB_SOURCE_DIR} \
                             call xcodebuild -target toolchain -configuration ${LLDB_BUILD_MODE} install "${lldb_xcodebuild_options[@]}" DSTROOT="${host_install_destdir}" LLDB_TOOLCHAIN_PREFIX="${TOOLCHAIN_PREFIX}"
                         continue

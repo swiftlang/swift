@@ -2487,14 +2487,9 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
                                 ParameterTypeFlags flags, bool escaping) {
   if (!options.excludeAttrKind(TAK_autoclosure) && flags.isAutoClosure())
     printer << "@autoclosure ";
-<<<<<<< HEAD
-=======
-  if (!options.excludeAttrKind(TAK_escaping) && flags.isEscaping())
-    printer << "@escaping ";
   // SWIFT_ENABLE_TENSORFLOW
   if (!options.excludeAttrKind(TAK_nondiff) && flags.isNonDifferentiable())
     printer << "@nondiff ";
->>>>>>> origin/tensorflow
 
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:

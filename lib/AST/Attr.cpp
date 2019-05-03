@@ -946,16 +946,13 @@ StringRef DeclAttribute::getAttrName() const {
     return "_implements";
   case DAK_ClangImporterSynthesizedType:
     return "_clangImporterSynthesizedType";
-<<<<<<< HEAD
   case DAK_Custom:
     return "<<custom>>";
-=======
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiable:
     return "differentiable";
   case DAK_Differentiating:
     return "differentiating";
->>>>>>> origin/tensorflow
   }
   llvm_unreachable("bad DeclAttrKind");
 }

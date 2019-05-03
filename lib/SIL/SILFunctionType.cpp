@@ -97,8 +97,6 @@ CanType SILFunctionType::getSelfInstanceType() const {
   return selfTy;
 }
 
-<<<<<<< HEAD
-=======
 // SWIFT_ENABLE_TENSORFLOW
 SmallBitVector
 SILFunctionType::getDifferentiationParameterIndices() const {
@@ -169,7 +167,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   // Given a type, returns its formal SIL parameter info.
   auto getCotangentParameterInfoForOriginalResult = [&](
       CanType cotanType, ResultConvention origResConv) -> SILParameterInfo {
-    auto &tl = typeConverter.getTypeLowering(cotanType);
+    auto &tl = typeConverter.getTypeLowering(cotanType, ResilienceExpansion::Minimal);
     ParameterConvention conv;
     switch (origResConv) {
     case ResultConvention::Owned:
@@ -192,7 +190,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   // Given a type, returns its formal SIL result info.
   auto getCotangentResultInfoForOriginalParameter = [&](
       CanType cotanType, ParameterConvention origParamConv) -> SILResultInfo {
-    auto &tl = typeConverter.getTypeLowering(cotanType);
+    auto &tl = typeConverter.getTypeLowering(cotanType, ResilienceExpansion::Minimal);
     ResultConvention conv;
     switch (origParamConv) {
     case ParameterConvention::Direct_Owned:
@@ -304,24 +302,6 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
                               getWitnessMethodConformanceOrNone());
 }
 
-ProtocolDecl *
-SILFunctionType::getDefaultWitnessMethodProtocol() const {
-  assert(getRepresentation() == SILFunctionTypeRepresentation::WitnessMethod);
-  auto selfTy = getSelfInstanceType();
-  if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy)) {
-    assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
-    auto superclass = GenericSig->getSuperclassBound(paramTy);
-    if (superclass)
-      return nullptr;
-    auto protos = GenericSig->getConformsTo(paramTy);
-    assert(protos.size() == 1);
-    return protos[0];
-  }
-
-  return nullptr;
-}
-
->>>>>>> origin/tensorflow
 ClassDecl *
 SILFunctionType::getWitnessMethodClass() const {
   auto selfTy = getSelfInstanceType();

@@ -390,10 +390,7 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<GenericSignature> GenericSignatures;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
-<<<<<<< HEAD
   llvm::DenseMap<UUID, OpenedArchetypeType *> OpenedExistentialArchetypes;
-=======
-  llvm::DenseMap<UUID, ArchetypeType *> OpenedExistentialArchetypes;
 
   // SWIFT_ENABLE_TENSORFLOW
   /// A cache of tangent spaces per type.
@@ -405,19 +402,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// For uniquifying `AutoDiffAssociatedFunctionIdentifier` allocations.
   llvm::FoldingSet<AutoDiffAssociatedFunctionIdentifier>
       AutoDiffAssociatedFunctionIdentifiers;
-
-  /// List of Objective-C member conflicts we have found during type checking.
-  std::vector<ObjCMethodConflict> ObjCMethodConflicts;
-
-  /// List of optional @objc protocol requirements that have gone
-  /// unsatisfied, which might conflict with other Objective-C methods.
-  std::vector<ObjCUnsatisfiedOptReq> ObjCUnsatisfiedOptReqs;
-
-  /// List of Objective-C methods created by the type checker (and not
-  /// by the Clang importer or deserialized), which is used for
-  /// checking unintended Objective-C overrides.
-  std::vector<AbstractFunctionDecl *> ObjCMethods;
->>>>>>> origin/tensorflow
 
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
@@ -988,7 +972,6 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   for (auto result : results) {
     if (auto protocol = dyn_cast<ProtocolDecl>(result)) {
       getImpl().KnownProtocols[index] = protocol;
-      protocol->setKnownProtocolKind(kind);
       return protocol;
     }
   }
@@ -1795,15 +1778,6 @@ ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
   auto moduleID = ModulePath[0];
   for (auto &importer : getImpl().ModuleLoaders) {
     if (ModuleDecl *M = importer->loadModule(moduleID.second, ModulePath)) {
-<<<<<<< HEAD
-=======
-      if (ModulePath.size() == 1 &&
-          (ModulePath[0].first == StdlibModuleName ||
-           ModulePath[0].first == Id_Foundation ||
-           // SWIFT_ENABLE_TENSORFLOW
-           ModulePath[0].first == Id_TensorFlow))
-        recordKnownProtocols(M);
->>>>>>> origin/tensorflow
       return M;
     }
   }
@@ -4498,7 +4472,6 @@ LayoutConstraint LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind
   return LayoutConstraint(New);
 }
 
-<<<<<<< HEAD
 Type &ASTContext::getDefaultTypeRequestCache(SourceFile *SF,
                                              KnownProtocolKind kind) {
   return getImpl().DefaultTypeRequestCaches[SF][size_t(kind)];
@@ -4542,7 +4515,8 @@ void VarDecl::setOriginalDelegatedProperty(VarDecl *originalProperty) {
   ASTContext &ctx = getASTContext();
   assert(ctx.getImpl().OriginalDelegatedProperties.count(this) == 0);
   ctx.getImpl().OriginalDelegatedProperties[this] = originalProperty;
-=======
+}
+
 // SWIFT_ENABLE_TENSORFLOW
 AutoDiffParameterIndices *
 AutoDiffParameterIndices::get(llvm::SmallBitVector indices, ASTContext &C) {
@@ -4594,5 +4568,4 @@ AutoDiffAssociatedFunctionIdentifier::get(
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;
->>>>>>> origin/tensorflow
 }

@@ -1251,10 +1251,6 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // cast to the result type - it could be substituted.
     if (origConv.getSILResultType().hasTypeParameter()) {
       auto ResType = fwd->getReturnType();
-<<<<<<< HEAD
-      if (ResType != callResult->getType())
-        callResult = subIGF.coerceValue(callResult, ResType, subIGF.IGM.DataLayout);
-=======
       // SWIFT_ENABLE_TENSORFLOW
       if (auto *structType = dyn_cast<llvm::StructType>(ResType)) {
         // Cast all struct elements to the desired type.
@@ -1269,8 +1265,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         callResult = castResult;
       }
       else
-        callResult = subIGF.Builder.CreateBitCast(callResult, ResType);
->>>>>>> origin/tensorflow
+        if (ResType != callResult->getType())
+          callResult = subIGF.coerceValue(callResult, ResType, subIGF.IGM.DataLayout);
     }
     subIGF.Builder.CreateRet(callResult);
   }

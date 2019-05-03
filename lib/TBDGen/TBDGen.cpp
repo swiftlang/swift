@@ -215,10 +215,6 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(SILDeclRef(AFD).asForeign());
   }
 
-<<<<<<< HEAD
-  auto publicDefaultArgGenerators = SwiftModule->isTestingEnabled() ||
-                                    SwiftModule->arePrivateImportsEnabled();
-=======
   // SWIFT_ENABLE_TENSORFLOW
   // The AutoDiff pass creates an order-1 JVP and VJP for every function with a
   // `@differentiable` attribute.
@@ -240,8 +236,8 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     }
   }
 
-  auto publicDefaultArgGenerators = SwiftModule->isTestingEnabled();
->>>>>>> origin/tensorflow
+  auto publicDefaultArgGenerators = SwiftModule->isTestingEnabled() ||
+                                    SwiftModule->arePrivateImportsEnabled();
   if (!publicDefaultArgGenerators)
     return;
 

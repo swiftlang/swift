@@ -411,19 +411,19 @@ SIMPLE_DECL_ATTR(_propertyDelegate, PropertyDelegate,
 DECL_ATTR(differentiable, Differentiable,
   OnAccessor | OnConstructor | OnFunc | OnVar | OnSubscript | LongAttribute |
   AllowMultipleAttributes,
-  83)
+  87)
 DECL_ATTR(differentiating, Differentiating,
   OnFunc | LongAttribute | AllowMultipleAttributes |
-  NotSerialized, 84)
+  NotSerialized, 88)
 SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
                  OnAccessor | OnFunc | OnConstructor | OnSubscript,
-                 /* Not serialized */ 85)
+                 /* Not serialized */ 89)
 SIMPLE_DECL_ATTR(TensorFlowGraph, TensorFlowGraph,
-                 OnFunc, 86)
+                 OnFunc, 90)
 SIMPLE_DECL_ATTR(_fieldwiseDifferentiable, FieldwiseDifferentiable,
-                 OnNominalType | UserInaccessible, 87)
+                 OnNominalType | UserInaccessible, 91)
 SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
-                 OnVar, 88)
+                 OnVar, 92)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

@@ -395,16 +395,12 @@ ERROR(shifting_all_significant_bits,none,
 ERROR(static_report_error, none,
       "static report error", ())
 
-<<<<<<< HEAD
-=======
 // SWIFT_ENABLE_TENSORFLOW
->>>>>>> origin/tensorflow
 ERROR(pound_assert_condition_not_constant,none,
        "#assert condition not constant", ())
 ERROR(pound_assert_failure,none,
        "%0", (StringRef))
 
-<<<<<<< HEAD
 NOTE(constexpr_unknown_reason_default,none,
     "cannot evaluate expression as constant here", ())
 NOTE(constexpr_unevaluable_operation,none,
@@ -456,7 +452,6 @@ NOTE(constexpr_witness_call_with_no_target_found, none,
     "cannot resolve a witness method call to a concrete function", ())
 NOTE(constexpr_witness_call_found_here, none,
     "witness method call found here", ())
-=======
 // Automatic differentiation diagnostics
 ERROR(autodiff_internal_swift_not_imported,none,
       "AD internal error: the Swift module is not imported", ())
@@ -517,7 +512,6 @@ NOTE(autodiff_class_member_not_supported,none,
      "differentiating class members is not supported yet", ())
 NOTE(autodiff_missing_return,none,
      "missing return for differentiation", ())
->>>>>>> origin/tensorflow
 
 ERROR(non_physical_addressof,none,
       "addressof only works with purely physical lvalues; "

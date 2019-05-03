@@ -894,6 +894,7 @@ class BuildScriptInvocation(object):
                 "--enable-tensorflow",
                 "--host-bazel", toolchain.bazel,
             ]
+            print(impl_args)
             # If args.build-tensorflow, include/lib directories will be
             # configured automatically by build-script-impl.
             if not args.build_tensorflow:

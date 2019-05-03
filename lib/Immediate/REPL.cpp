@@ -876,21 +876,7 @@ private:
       // non-whole-module generation.
       sil = performSILGeneration(*M->getFiles().front(), CI.getSILOptions());
       runSILDiagnosticPasses(*sil);
-<<<<<<< HEAD
       runSILOwnershipEliminatorPass(*sil);
-=======
-
-      // SWIFT_ENABLE_TENSORFLOW
-      // FIXME: When partitioning joins the mandatory pass pipeline, we should
-      // be able to stop running the optimization passes and drop the explicit
-      // call of the partitioning pass.
-      sil->setSerializeSILAction([]{});
-      runSILOptPreparePasses(*sil);
-      runSILOptimizationPasses(*sil);
-      runSILTFPartitionPass(*sil);
-      // SWIFT_ENABLE_TENSORFLOW_END
-
->>>>>>> origin/tensorflow
       runSILLoweringPasses(*sil);
     }
 

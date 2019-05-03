@@ -67,7 +67,7 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, DeclName name) {
 
 /// Derive the body for the '_typeList' getter.
 static void
-deriveBodyTensorGroup_typeList(AbstractFunctionDecl *funcDecl) {
+deriveBodyTensorGroup_typeList(AbstractFunctionDecl *funcDecl, void*) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -138,7 +138,7 @@ static ValueDecl *deriveTensorGroup_typeList(DerivedConformance &derived) {
   // Create `_typeList` getter.
   auto *getterDecl = derived.declareDerivedPropertyGetter(
       TC, typeListDecl, returnType);
-  getterDecl->setBodySynthesizer(deriveBodyTensorGroup_typeList);
+  getterDecl->setBodySynthesizer(deriveBodyTensorGroup_typeList, nullptr);
   typeListDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
                              SourceLoc(), {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext({getterDecl, typeListDecl, patDecl});
@@ -148,7 +148,7 @@ static ValueDecl *deriveTensorGroup_typeList(DerivedConformance &derived) {
 
 // Synthesize body for `init(_owning:)`.
 static void 
-deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl) {
+deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void*) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -338,7 +338,7 @@ static ValueDecl *deriveTensorGroup_constructor(
                               /*GenericParams*/ nullptr, parentDC);
   initDecl->setImplicit();
   initDecl->setSynthesized();
-  initDecl->setBodySynthesizer(bodySynthesizer);
+  initDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
 
   if (auto env = parentDC->getGenericEnvironmentOfContext())
     initDecl->setGenericEnvironment(env);
@@ -368,7 +368,7 @@ static ValueDecl
   return deriveTensorGroup_constructor(
       derived, C.getIdentifier("_owning"),
       C.getIdentifier("tensorHandles"), addressType, voidType,
-      deriveBodyTensorGroup_init);
+      {deriveBodyTensorGroup_init, nullptr});
 }
 
 ValueDecl *DerivedConformance::deriveTensorGroup(ValueDecl *requirement) {

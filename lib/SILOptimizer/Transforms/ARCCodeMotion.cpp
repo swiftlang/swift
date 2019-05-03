@@ -1151,15 +1151,8 @@ public:
     if (!F->shouldOptimize())
       return;
 
-<<<<<<< HEAD
     // FIXME: Support ownership.
     if (F->hasOwnership())
-=======
-    // SWIFT_ENABLE_TENSORFLOW
-    // FIXME: This pass is incredibly slow with large functions.  Disable it
-    // when EnableARCOptimizations is disabled.
-    if (!F->getModule().getOptions().EnableARCOptimizations)
->>>>>>> origin/tensorflow
       return;
 
     LLVM_DEBUG(llvm::dbgs() << "*** ARCCM on function: " << F->getName()

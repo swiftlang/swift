@@ -5742,7 +5742,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
         auto param = func1->getParams()[i];
         auto paramType = param.getPlainType();
 
-        auto *tvParam = createTypeVariable(loc);
+        auto *tvParam = createTypeVariable(loc, TVO_CanBindToNoEscape);
         auto locatorBuilder =
             locator.withPathElement(LocatorPathElt::getTupleElement(i));
         addConstraint(ConstraintKind::ArgumentConversion, paramType,

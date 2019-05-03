@@ -3133,7 +3133,6 @@ CanSILFunctionType SILGenFunction::buildThunkType(
                               getASTContext());
 }
 
-<<<<<<< HEAD
 static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
                                               SILLocation loc,
                                               SILFunction *thunk,
@@ -3155,7 +3154,7 @@ static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
                              interfaceSubs, thunkArgs,
                              toType->getCalleeConvention());
 }
-=======
+
 static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
                                         SILLocation loc,
                                         ManagedValue fn,
@@ -3163,7 +3162,6 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
                                         CanAnyFunctionType inputSubstType,
                                         AbstractionPattern outputOrigType,
                                         CanAnyFunctionType outputSubstType);
->>>>>>> origin/tensorflow
 
 /// Create a reabstraction thunk.
 static ManagedValue createThunk(SILGenFunction &SGF,
@@ -3272,7 +3270,7 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
   auto &expectedTLNotDiff = SGF.getTypeLowering(outputOrigTypeNotDiff,
                                                 outputSubstTypeNotDiff);
   SILValue original = SGF.B.createAutoDiffFunctionExtractOriginal(loc, fnValue);
-  auto managedOriginal = original->getType().isTrivial(SGF.SGM.M)
+  auto managedOriginal = original->getType().isTrivial(SGF.F)
                              ? ManagedValue::forTrivialObjectRValue(original)
                              : ManagedValue::forBorrowedObjectRValue(original);
   ManagedValue originalThunk = createThunk(
@@ -3314,7 +3312,7 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
     auto assocFn = SGF.B.createAutoDiffFunctionExtract(
         loc, kind,
         /*differentiationOrder*/ 1, fnValue);
-    auto managedAssocFn = assocFn->getType().isTrivial(SGF.SGM.M)
+    auto managedAssocFn = assocFn->getType().isTrivial(SGF.F)
                               ? ManagedValue::forTrivialObjectRValue(assocFn)
                               : ManagedValue::forBorrowedObjectRValue(assocFn);
     return createThunk(SGF, loc, managedAssocFn, assocFnInputOrigType,

@@ -486,7 +486,7 @@ Type ASTBuilder::createImplFunctionType(
 
   auto einfo = SILFunctionType::ExtInfo(representation,
                                         flags.isPseudogeneric(),
-                                        !flags.isEscaping());
+                                        !flags.isEscaping(), false);
 
   llvm::SmallVector<SILParameterInfo, 8> funcParams;
   llvm::SmallVector<SILYieldInfo, 8> funcYields;

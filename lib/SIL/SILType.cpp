@@ -592,7 +592,6 @@ bool SILType::isLoweringOf(SILModule &Mod, CanType formalType) {
   return loweredType.getASTType() == formalType;
 }
 
-<<<<<<< HEAD
 bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
     OpaqueTypeDecl *opaque, SILFunction *context) {
   auto namingDecl = opaque->getNamingDecl();
@@ -613,12 +612,12 @@ bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
 
   // Allow general replacement from non resilient modules. Otherwise, disallow.
   return !module->isResilient();
-=======
+}
+
 // SWIFT_ENABLE_TENSORFLOW
 /// Returns true if this SILType is a differentiable type.
 bool SILType::isDifferentiable(SILModule &M) const {
   return getASTType()->getAutoDiffAssociatedVectorSpace(
       AutoDiffAssociatedVectorSpaceKind::Tangent,
       LookUpConformanceInModule(M.getSwiftModule())).hasValue();
->>>>>>> origin/tensorflow
 }

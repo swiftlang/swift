@@ -2400,263 +2400,9 @@ public:
     return alias;
   }
 
-<<<<<<< HEAD
   Expected<Decl *>
   deserializeGenericTypeParamDecl(ArrayRef<uint64_t> scratch,
                                   StringRef blobData) {
-=======
-        StringRef message = blobData.substr(0, messageSize);
-        blobData = blobData.substr(messageSize);
-        StringRef rename = blobData.substr(0, renameSize);
-        llvm::VersionTuple Introduced, Deprecated, Obsoleted;
-        DECODE_VER_TUPLE(Introduced)
-        DECODE_VER_TUPLE(Deprecated)
-        DECODE_VER_TUPLE(Obsoleted)
-
-        PlatformAgnosticAvailabilityKind platformAgnostic;
-        if (isUnavailable)
-          platformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
-        else if (isDeprecated)
-          platformAgnostic = PlatformAgnosticAvailabilityKind::Deprecated;
-        else if (((PlatformKind)platform) == PlatformKind::none &&
-                 (!Introduced.empty() ||
-                  !Deprecated.empty() ||
-                  !Obsoleted.empty()))
-          platformAgnostic =
-            PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
-        else
-          platformAgnostic = PlatformAgnosticAvailabilityKind::None;
-
-        Attr = new (ctx) AvailableAttr(
-          SourceLoc(), SourceRange(),
-          (PlatformKind)platform, message, rename,
-          Introduced, SourceRange(),
-          Deprecated, SourceRange(),
-          Obsoleted, SourceRange(),
-          platformAgnostic, isImplicit);
-        break;
-
-#undef DEF_VER_TUPLE_PIECES
-#undef LIST_VER_TUPLE_PIECES
-#undef DECODE_VER_TUPLE
-      }
-
-      case decls_block::ObjC_DECL_ATTR: {
-        bool isImplicit;
-        bool isImplicitName;
-        bool isSwift3Inferred;
-        uint64_t numArgs;
-        ArrayRef<uint64_t> rawPieceIDs;
-        serialization::decls_block::ObjCDeclAttrLayout::readRecord(
-          scratch, isImplicit, isSwift3Inferred, isImplicitName, numArgs,
-          rawPieceIDs);
-
-        SmallVector<Identifier, 4> pieces;
-        for (auto pieceID : rawPieceIDs)
-          pieces.push_back(getIdentifier(pieceID));
-
-        if (numArgs == 0)
-          Attr = ObjCAttr::create(ctx, None, isImplicitName);
-        else
-          Attr = ObjCAttr::create(ctx, ObjCSelector(ctx, numArgs-1, pieces),
-                                  isImplicitName);
-        Attr->setImplicit(isImplicit);
-        cast<ObjCAttr>(Attr)->setSwift3Inferred(isSwift3Inferred);
-        break;
-      }
-
-      case decls_block::Specialize_DECL_ATTR: {
-        unsigned exported;
-        SpecializeAttr::SpecializationKind specializationKind;
-        unsigned specializationKindVal;
-        SmallVector<Requirement, 8> requirements;
-
-        serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
-          scratch, exported, specializationKindVal);
-
-        specializationKind = specializationKindVal
-                                 ? SpecializeAttr::SpecializationKind::Partial
-                                 : SpecializeAttr::SpecializationKind::Full;
-
-        readGenericRequirements(requirements, DeclTypeCursor);
-
-        Attr = SpecializeAttr::create(ctx, SourceLoc(), SourceRange(),
-                                      requirements, exported != 0,
-                                      specializationKind);
-        break;
-      }
-
-      // SWIFT_ENABLE_TENSORFLOW
-      case decls_block::Differentiable_DECL_ATTR: {
-        bool isImplicit;
-        uint64_t jvpNameId;
-        DeclID jvpDeclId;
-        uint64_t vjpNameId;
-        DeclID vjpDeclId;
-        ArrayRef<uint64_t> parameters;
-        SmallVector<Requirement, 4> requirements;
-
-        serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
-            scratch, isImplicit, jvpNameId, jvpDeclId, vjpNameId, vjpDeclId,
-            parameters);
-
-        Optional<DeclNameWithLoc> jvp;
-        FuncDecl *jvpDecl = nullptr;
-        if (jvpNameId != 0 && jvpDeclId != 0) {
-          jvp = { getIdentifier(jvpNameId), DeclNameLoc() };
-          jvpDecl = cast<FuncDecl>(getDecl(jvpDeclId));
-        }
-        Optional<DeclNameWithLoc> vjp;
-        FuncDecl *vjpDecl = nullptr;
-        if (vjpNameId != 0 && vjpDeclId != 0) {
-          vjp = { getIdentifier(vjpNameId), DeclNameLoc() };
-          vjpDecl = cast<FuncDecl>(getDecl(vjpDeclId));
-        }
-
-        llvm::SmallBitVector parametersBitVector(parameters.size());
-        for (unsigned i : indices(parameters))
-          parametersBitVector[i] = parameters[i];
-        auto *indices = AutoDiffParameterIndices::get(parametersBitVector, ctx);
-
-        readGenericRequirements(requirements, DeclTypeCursor);
-
-        auto diffAttr =
-            DifferentiableAttr::create(ctx, isImplicit, SourceLoc(),
-                                       SourceRange(), indices, jvp, vjp,
-                                       requirements);
-        diffAttr->setJVPFunction(jvpDecl);
-        diffAttr->setVJPFunction(vjpDecl);
-        Attr = diffAttr;
-        break;
-      }
-
-      case decls_block::DynamicReplacement_DECL_ATTR: {
-        bool isImplicit;
-        uint64_t numArgs;
-        ArrayRef<uint64_t> rawPieceIDs;
-        DeclID replacedFunID;
-        serialization::decls_block::DynamicReplacementDeclAttrLayout::
-            readRecord(scratch, isImplicit, replacedFunID, numArgs, rawPieceIDs);
-
-        auto replacedFunDecl = getDeclChecked(replacedFunID);
-        if (!replacedFunDecl)
-          return replacedFunDecl.takeError();
-        auto baseName = getDeclBaseName(rawPieceIDs[0]);
-        SmallVector<Identifier, 4> pieces;
-        for (auto pieceID : rawPieceIDs.slice(1))
-          pieces.push_back(getIdentifier(pieceID));
-
-        assert(numArgs != 0);
-        assert(!isImplicit && "Need to update for implicit");
-        Attr = DynamicReplacementAttr::create(
-            ctx, DeclName(ctx, baseName, ArrayRef<Identifier>(pieces)),
-            cast<AbstractFunctionDecl>(*replacedFunDecl));
-        break;
-      }
-
-#define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
-      case decls_block::CLASS##_DECL_ATTR: { \
-        bool isImplicit; \
-        serialization::decls_block::CLASS##DeclAttrLayout::readRecord( \
-            scratch, isImplicit); \
-        Attr = new (ctx) CLASS##Attr(isImplicit); \
-        break; \
-      }
-#include "swift/AST/Attr.def"
-
-      default:
-        // We don't know how to deserialize this kind of attribute.
-        error();
-        return nullptr;
-      }
-
-      if (!Attr)
-        return nullptr;
-
-      AddAttribute(Attr);
-
-    } else if (recordID == decls_block::PRIVATE_DISCRIMINATOR) {
-      IdentifierID discriminatorID;
-      decls_block::PrivateDiscriminatorLayout::readRecord(scratch,
-                                                          discriminatorID);
-      privateDiscriminatorRAII.discriminator = getIdentifier(discriminatorID);
-
-    } else if (recordID == decls_block::LOCAL_DISCRIMINATOR) {
-      unsigned discriminator;
-      decls_block::LocalDiscriminatorLayout::readRecord(scratch, discriminator);
-      localDiscriminatorRAII.discriminator = discriminator;
-    } else if (recordID == decls_block::FILENAME_FOR_PRIVATE) {
-      IdentifierID filenameID;
-      decls_block::FilenameForPrivateLayout::readRecord(scratch, filenameID);
-      filenameForPrivate.filename = getIdentifier(filenameID);
-    } else {
-      break;
-    }
-
-    // Advance bitstream cursor to the next record.
-    entry = DeclTypeCursor.advance();
-
-    // Prepare to read the next record.
-    scratch.clear();
-  }
-
-  PrettyDeclDeserialization stackTraceEntry(
-     this, declOrOffset, DID, static_cast<decls_block::RecordKind>(recordID));
-
-  switch (recordID) {
-  case decls_block::TYPE_ALIAS_DECL: {
-    IdentifierID nameID;
-    DeclContextID contextID;
-    TypeID underlyingTypeID, interfaceTypeID;
-    bool isImplicit;
-    GenericEnvironmentID genericEnvID;
-    uint8_t rawAccessLevel;
-    ArrayRef<uint64_t> dependencyIDs;
-
-    decls_block::TypeAliasLayout::readRecord(scratch, nameID, contextID,
-                                             underlyingTypeID, interfaceTypeID,
-                                             isImplicit, genericEnvID,
-                                             rawAccessLevel, dependencyIDs);
-
-    Identifier name = getIdentifier(nameID);
-
-    for (TypeID dependencyID : dependencyIDs) {
-      auto dependency = getTypeChecked(dependencyID);
-      if (!dependency) {
-        return llvm::make_error<TypeError>(
-            name, takeErrorInfo(dependency.takeError()));
-      }
-    }
-
-    auto DC = getDeclContext(contextID);
-
-    auto genericParams = maybeReadGenericParams(DC);
-    if (declOrOffset.isComplete())
-      return declOrOffset;
-
-    auto alias = createDecl<TypeAliasDecl>(SourceLoc(), SourceLoc(), name,
-                                           SourceLoc(), genericParams, DC);
-    declOrOffset = alias;
-
-    configureGenericEnvironment(alias, genericEnvID);
-
-    alias->setUnderlyingType(getType(underlyingTypeID));
-
-    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
-      alias->setAccess(*accessLevel);
-    } else {
-      error();
-      return nullptr;
-    }
-
-    if (isImplicit)
-      alias->setImplicit();
-
-    break;
-  }
-
-  case decls_block::GENERIC_TYPE_PARAM_DECL: {
->>>>>>> origin/tensorflow
     IdentifierID nameID;
     bool isImplicit;
     unsigned depth;
@@ -4323,6 +4069,50 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
+      // SWIFT_ENABLE_TENSORFLOW
+      case decls_block::Differentiable_DECL_ATTR: {
+        bool isImplicit;
+        uint64_t jvpNameId;
+        DeclID jvpDeclId;
+        uint64_t vjpNameId;
+        DeclID vjpDeclId;
+        ArrayRef<uint64_t> parameters;
+        SmallVector<Requirement, 4> requirements;
+
+        serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
+            scratch, isImplicit, jvpNameId, jvpDeclId, vjpNameId, vjpDeclId,
+            parameters);
+
+        Optional<DeclNameWithLoc> jvp;
+        FuncDecl *jvpDecl = nullptr;
+        if (jvpNameId != 0 && jvpDeclId != 0) {
+          jvp = { MF.getIdentifier(jvpNameId), DeclNameLoc() };
+          jvpDecl = cast<FuncDecl>(MF.getDecl(jvpDeclId));
+        }
+        Optional<DeclNameWithLoc> vjp;
+        FuncDecl *vjpDecl = nullptr;
+        if (vjpNameId != 0 && vjpDeclId != 0) {
+          vjp = { MF.getIdentifier(vjpNameId), DeclNameLoc() };
+          vjpDecl = cast<FuncDecl>(MF.getDecl(vjpDeclId));
+        }
+
+        llvm::SmallBitVector parametersBitVector(parameters.size());
+        for (unsigned i : indices(parameters))
+          parametersBitVector[i] = parameters[i];
+        auto *indices = AutoDiffParameterIndices::get(parametersBitVector, ctx);
+
+        MF.readGenericRequirements(requirements, MF.DeclTypeCursor);
+
+        auto diffAttr =
+            DifferentiableAttr::create(ctx, isImplicit, SourceLoc(),
+                                       SourceRange(), indices, jvp, vjp,
+                                       requirements);
+        diffAttr->setJVPFunction(jvpDecl);
+        diffAttr->setVJPFunction(vjpDecl);
+        Attr = diffAttr;
+        break;
+      }
+
       case decls_block::DynamicReplacement_DECL_ATTR: {
         bool isImplicit;
         uint64_t numArgs;
@@ -4888,13 +4678,9 @@ public:
       return nullptr;
     }
 
-<<<<<<< HEAD
-    auto info = FunctionType::ExtInfo(*representation, noescape, throws);
-=======
     auto info = FunctionType::ExtInfo(*representation, noescape,
                                       // SWIFT_ENABLE_TENSORFLOW
                                       throws, differentiable);
->>>>>>> origin/tensorflow
 
     auto resultTy = MF.getTypeChecked(resultID);
     if (!resultTy)
@@ -4914,22 +4700,11 @@ public:
 
       IdentifierID labelID;
       TypeID typeID;
-<<<<<<< HEAD
-      bool isVariadic, isAutoClosure;
+      bool isVariadic, isAutoClosure, isNonDifferentiable;
       unsigned rawOwnership;
       decls_block::FunctionParamLayout::readRecord(scratch, labelID, typeID,
                                                    isVariadic, isAutoClosure,
-                                                   rawOwnership);
-=======
-      // SWIFT_ENABLE_TENSORFLOW
-      bool isVariadic, isAutoClosure, isEscaping, isNonDifferentiable;
-      unsigned rawOwnership;
-      decls_block::FunctionParamLayout::readRecord(scratch, labelID, typeID,
-                                                   isVariadic, isAutoClosure,
-                                                   // SWIFT_ENABLE_TENSORFLOW
-                                                   isEscaping, rawOwnership,
-                                                   isNonDifferentiable);
->>>>>>> origin/tensorflow
+                                                   rawOwnership, isNonDifferentiable);
 
       auto ownership =
           getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
@@ -4945,13 +4720,7 @@ public:
       params.emplace_back(paramTy.get(),
                           MF.getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
-<<<<<<< HEAD
-                                             *ownership));
-=======
-                                             // SWIFT_ENABLE_TENSORFLOW
-                                             isEscaping, *ownership,
-                                             isNonDifferentiable));
->>>>>>> origin/tensorflow
+                                             *ownership, isNonDifferentiable));
     }
 
     if (!isGeneric) {
@@ -5325,7 +5094,7 @@ public:
         auto paramDiffOpt =
             getActualSILParameterDifferentiability(rawParamDiff);
         if (!paramDiffOpt) {
-          error();
+          MF.error();
           llvm_unreachable("an error is a fatal exit at this point");
         }
         paramDiff = *paramDiffOpt;
@@ -5361,18 +5130,12 @@ public:
     };
 
     // Bounds check.  FIXME: overflow
-<<<<<<< HEAD
-    if (2 * numParams + 2 * numResults + 2 * unsigned(hasErrorResult)
-          > variableData.size()) {
-      MF.error();
-=======
     // SWIFT_ENABLE_TENSORFLOW
     unsigned entriesPerParam = differentiable ? 3 : 2;
     if (entriesPerParam * numParams + 2 * numResults +
             2 * unsigned(hasErrorResult) >
         variableData.size()) {
-      error();
->>>>>>> origin/tensorflow
+      MF.error();
       return nullptr;
     }
 

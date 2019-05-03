@@ -942,19 +942,10 @@ getWitnessMethodSubstitutions(
       witnessThunkSig);
 }
 
-<<<<<<< HEAD
 SubstitutionMap
 swift::getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI,
                                      SILFunction *F,
                                      ProtocolConformanceRef CRef) {
-=======
-// SWIFT_ENABLE_TENSORFLOW
-// This function is made public so it can be used by the constexpr propagation
-// logic.
-SubstitutionMap
-getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI, SILFunction *F,
-                              ProtocolConformanceRef CRef) {
->>>>>>> origin/tensorflow
   auto witnessFnTy = F->getLoweredFunctionType();
   assert(witnessFnTy->getRepresentation() ==
          SILFunctionTypeRepresentation::WitnessMethod);

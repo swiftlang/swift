@@ -877,8 +877,7 @@ namespace {
       : public LoadableAggTypeLowering<DifferentiableSILFuncionTypeLowering,
                                        DifferentiableSILFunctionTypeIndex> {
   public:
-    DifferentiableSILFuncionTypeLowering(CanType type)
-        : LoadableAggTypeLowering(type) {}
+    using LoadableAggTypeLowering::LoadableAggTypeLowering;
 
     SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
                                SILValue tupleValue,
@@ -911,7 +910,7 @@ namespace {
       auto paramIndices = fnTy->getDifferentiationParameterIndices();
       children.push_back(Child{
         {AutoDiffFunctionExtractee::Original, 0},
-        M.Types.getTypeLowering(origFnTy)
+        M.Types.getTypeLowering(origFnTy, getResilienceExpansion())
       });
       for (auto order : range(1, maxOrder + 1)) {
         for (AutoDiffAssociatedFunctionKind kind
@@ -923,7 +922,7 @@ namespace {
           auto silTy = SILType::getPrimitiveObjectType(assocFnTy);
           children.push_back(Child{
             {AutoDiffFunctionExtractee(kind), order},
-            M.Types.getTypeLowering(silTy)
+            M.Types.getTypeLowering(silTy, getResilienceExpansion())
           });
         }
       }
@@ -1425,7 +1424,7 @@ namespace {
     }
 
     // SWIFT_ENABLE_TENSORFLOW
-    const TypeLowering *
+    TypeLowering *
     visitDifferentiableSILFunctionType(CanSILFunctionType type) {
       assert(type->isDifferentiable());
       auto props = getDifferentiableSILFunctionTypeRecursiveProperties(type);

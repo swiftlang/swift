@@ -1869,16 +1869,13 @@ namespace {
     Type buildProtocolType(ProtocolTypeRepr *repr,
                            Type instanceType,
                            Optional<MetatypeRepresentation> storedRepr);
-<<<<<<< HEAD
     
     Type resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
                                  unsigned ordinal,
                                  TypeResolutionOptions options);
-=======
 
     // SWIFT_ENABLE_TENSORFLOW
     bool isDifferentiableType(Type ty);
->>>>>>> origin/tensorflow
   };
 } // end anonymous namespace
 
@@ -2039,6 +2036,10 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   // Remember whether this is a function parameter.
   bool isParam = options.is(TypeResolverContext::FunctionInput);
+
+  bool isVariadicFunctionParam =
+      options.is(TypeResolverContext::VariadicFunctionInput) &&
+      !options.hasBase(TypeResolverContext::EnumElementDecl);
 
   // The type we're working with, in case we want to build it differently
   // based on the attributes we see.
@@ -2216,17 +2217,11 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         }
       }
 
-<<<<<<< HEAD
       // Resolve the function type directly with these attributes.
       SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
-                                       attrs.has(TAK_noescape));
-=======
-    // Resolve the function type directly with these attributes.
-    SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
-                                     // SWIFT_ENABLE_TENSORFLOW
-                                     attrs.has(TAK_noescape),
-                                     attrs.has(TAK_autodiff) || attrs.has(TAK_differentiable));
->>>>>>> origin/tensorflow
+                                       // SWIFT_ENABLE_TENSORFLOW
+                                       attrs.has(TAK_noescape),
+                                       attrs.has(TAK_autodiff) || attrs.has(TAK_differentiable));
 
       ty = resolveSILFunctionType(fnRepr, options, coroutineKind, extInfo,
                                   calleeConvention, witnessMethodProtocol);
@@ -2254,10 +2249,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
       // @autoclosure is only valid on parameters.
       if (!isParam && attrs.has(TAK_autoclosure)) {
-        bool isVariadicFunctionParam =
-            options.is(TypeResolverContext::VariadicFunctionInput) &&
-            !options.hasBase(TypeResolverContext::EnumElementDecl);
-
         diagnose(attrs.getLoc(TAK_autoclosure),
                  isVariadicFunctionParam ? diag::attr_not_on_variadic_parameters
                                          : diag::attr_only_on_parameters,
@@ -2267,25 +2258,12 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
       // Resolve the function type directly with these attributes.
       FunctionType::ExtInfo extInfo(rep, /*noescape=*/false,
-                                    fnRepr->throws());
+                                    fnRepr->throws(), false);
 
       ty = resolveASTFunctionType(fnRepr, options, extInfo);
       if (!ty || ty->hasError())
         return ty;
     }
-<<<<<<< HEAD
-=======
-
-    // Resolve the function type directly with these attributes.
-    FunctionType::ExtInfo extInfo(rep,
-                                  attrs.has(TAK_noescape),
-                                  // SWIFT_ENABLE_TENSORFLOW
-                                  fnRepr->throws(),
-                                  attrs.has(TAK_autodiff) || attrs.has(TAK_differentiable));
-
-    ty = resolveASTFunctionType(fnRepr, options, extInfo);
-    if (!ty || ty->hasError()) return ty;
->>>>>>> origin/tensorflow
   }
 
   auto instanceOptions = options;

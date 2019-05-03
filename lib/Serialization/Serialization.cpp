@@ -2437,7 +2437,6 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     return;
   }
 
-<<<<<<< HEAD
     case DAK_Custom: {
       auto abbrCode = DeclTypeAbbrCodes[CustomDeclAttrLayout::Code];
       auto theAttr = cast<CustomAttr>(DA);
@@ -2446,7 +2445,6 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
         addTypeRef(theAttr->getTypeLoc().getType()));
       return;
     }
-=======
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiable: {
     auto abbrCode = DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
@@ -2478,7 +2476,6 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     writeGenericRequirements(attr->getRequirements(), DeclTypeAbbrCodes);
     return;
   }
->>>>>>> origin/tensorflow
   }
 }
 
@@ -4086,13 +4083,9 @@ void Serializer::writeType(Type ty) {
       FunctionParamLayout::emitRecord(
           Out, ScratchRecord, abbrCode, addDeclBaseNameRef(param.getLabel()),
           addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
-<<<<<<< HEAD
-          paramFlags.isAutoClosure(), rawOwnership);
-=======
           // SWIFT_ENABLE_TENSORFLOW
-          paramFlags.isAutoClosure(), paramFlags.isEscaping(), rawOwnership,
+          paramFlags.isAutoClosure(), rawOwnership,
           paramFlags.isNonDifferentiable());
->>>>>>> origin/tensorflow
     }
 
     break;

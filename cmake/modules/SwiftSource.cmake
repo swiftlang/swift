@@ -228,9 +228,7 @@ function(_compile_swift_files
 
   # The standard library and overlays are always built resiliently.
   if(SWIFTFILE_IS_STDLIB)
-<<<<<<< HEAD
     list(APPEND swift_flags "-enable-library-evolution")
-=======
     # SWIFT_ENABLE_TENSORFLOW
     # FIXME: `-enable-resilience` is currently disabled for the TensorFlow
     # module because it causes compilation to crash during IRGen.
@@ -241,7 +239,6 @@ function(_compile_swift_files
        NOT "${SWIFTFILE_MODULE_NAME}" STREQUAL "DifferentiationUnittest")
       list(APPEND swift_flags "-Xfrontend" "-enable-resilience")
     endif()
->>>>>>> origin/tensorflow
   endif()
 
   if(SWIFT_STDLIB_USE_NONATOMIC_RC)

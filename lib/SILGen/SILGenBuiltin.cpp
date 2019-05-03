@@ -1032,15 +1032,11 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
 static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
     AutoDiffAssociatedFunctionKind kind, unsigned arity, unsigned order,
     bool rethrows, SILGenFunction &SGF, SILLocation loc,
-    SubstitutionMap substitutions, Expr *argument, SGFContext C) {
-  // Get values of the original function and arguments.
-  auto *argTuple = cast<TupleExpr>(argument);
-  auto origFnVal =
-      SGF.emitRValueAsSingleValue(argTuple->getElement(0)).forward(SGF);
+    SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
+  auto origFnVal = args[0].getValue();
   SmallVector<SILValue, 2> origFnArgVals;
-  for (auto *origFnArgExpr : argTuple->getElements().drop_front(1))
-    origFnArgVals.push_back(
-        SGF.emitRValueAsSingleValue(origFnArgExpr).forward(SGF));
+  for (auto& arg : args.drop_front(1))
+    origFnArgVals.push_back(arg.getValue());
 
   // Get the associated function.
   SILValue assocFn = SGF.B.createAutoDiffFunctionExtract(
@@ -1049,8 +1045,8 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
 
   // We don't need to destroy the original function or retain the `assocFn`,
   // because they are trivial (because they are @noescape).
-  assert(origFnVal->getType().isTrivial(SGF.SGM.M));
-  assert(assocFn->getType().isTrivial(SGF.SGM.M));
+  assert(origFnVal->getType().isTrivial(SGF.F));
+  assert(assocFn->getType().isTrivial(SGF.F));
   bool assocFnNeedsDestroy = false;
 
   // Unwrap curry levels.
@@ -1078,7 +1074,7 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
   // Destroys all the values.
   auto destroyValues = [&](ArrayRef<SILValue> argumentValues) {
     for (auto argumentValue : argumentValues) {
-      if (argumentValue->getType().isTrivial(SGF.SGM.M))
+      if (argumentValue->getType().isTrivial(SGF.F))
         continue;
 
       if (argumentValue->getType().isObject()) {
@@ -1086,7 +1082,8 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
         continue;
       }
 
-      SGF.B.createDestroyAddr(loc, argumentValue);
+      if (false)
+        SGF.B.createDestroyAddr(loc, argumentValue);
     }
   };
 
@@ -1099,7 +1096,7 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
     auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
         currentParameter, curryLevel->getNumParameters());
     auto applyResult = SGF.B.createApply(
-        loc, assocFn, curryLevelArgVals, /*isNonThrowing*/ false);
+        loc, assocFn, substitutions, curryLevelArgVals, /*isNonThrowing*/ false);
     currentParameter += curryLevel->getNumParameters();
 
     if (assocFnNeedsDestroy)
@@ -1128,7 +1125,7 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
         currentParameter);
     for (auto origFnArgVal : curryLevelArgVals)
       applyArgs.push_back(origFnArgVal);
-    auto differential = SGF.B.createApply(loc, assocFn, applyArgs,
+    auto differential = SGF.B.createApply(loc, assocFn, substitutions, applyArgs,
                                           /*isNonThrowing*/ false);
 
     if (assocFnNeedsDestroy)
@@ -1146,7 +1143,7 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
   // Apply the last curry level, in the case where it only has direct results.
   auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
       currentParameter);
-  auto resultTuple = SGF.B.createApply(loc, assocFn, curryLevelArgVals,
+  auto resultTuple = SGF.B.createApply(loc, assocFn, substitutions, curryLevelArgVals,
                                        /*isNonThrowing*/ false);
 
   if (assocFnNeedsDestroy)
@@ -1160,7 +1157,8 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
 static ManagedValue emitBuiltinAutoDiffApply(SILGenFunction &SGF,
                                              SILLocation loc,
                                              SubstitutionMap substitutions,
-                                             Expr *argument, SGFContext C) {
+                                             ArrayRef<ManagedValue> args,
+                                             SGFContext C) {
   auto *callExpr = loc.castToASTNode<CallExpr>();
   auto builtinDecl = cast<FuncDecl>(cast<DeclRefExpr>(
       cast<DotSyntaxBaseIgnoredExpr>(callExpr->getDirectCallee())->getRHS())
@@ -1174,7 +1172,7 @@ static ManagedValue emitBuiltinAutoDiffApply(SILGenFunction &SGF,
   assert(successfullyParsed);
   return emitBuiltinAutoDiffApplyAssociatedFunction(kind, arity, order,
                                                     rethrows, SGF, loc,
-                                                    substitutions, argument, C);
+                                                    substitutions, args, C);
 }
 
 Optional<SpecializedEmitter>

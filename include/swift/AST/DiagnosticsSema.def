@@ -3733,14 +3733,13 @@ ERROR(unsupported_convention,none,
 ERROR(unreferenced_generic_parameter,none,
       "generic parameter '%0' is not used in function signature", (StringRef))
 
-<<<<<<< HEAD
 // Opaque types
 ERROR(unsupported_opaque_type,none,
       "'some' types are only implemented for the declared type of properties and subscripts and the return type of functions", ())
 
 ERROR(opaque_type_unsupported_pattern,none,
       "'some' type can only be declared on a single property declaration", ())
-=======
+
 // SWIFT_ENABLE_TENSORFLOW
 // Function differentiability
 ERROR(autodiff_attr_argument_not_differentiable,none,
@@ -3753,7 +3752,6 @@ ERROR(autodiff_attr_result_not_differentiable,none,
 ERROR(nondiff_attr_invalid_on_nondifferentiable_function,none,
       "'nondiff' cannot be applied to arguments of a non-differentiable "
       "function", ())
->>>>>>> origin/tensorflow
 
 // SIL
 ERROR(opened_non_protocol,none,

@@ -304,14 +304,9 @@ private:
 
   /// Cache of module names that fail the 'canImport' test in this context.
   llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
-<<<<<<< HEAD
   
-  /// Retrieve the allocator for the given arena.
-=======
-
 public:
-  /// \brief Retrieve the allocator for the given arena.
->>>>>>> origin/tensorflow
+  /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
 

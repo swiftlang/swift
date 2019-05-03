@@ -229,6 +229,7 @@ ATTRIBUTE_NODES = [
          children=[
              Child('LeftParen', kind='LeftParenToken'),
              Child('DiffParams', kind='DifferentiationParamList',
+                   collection_element_name='DifferentiationParam',
                    description='The parameters for differentiation.'),
              Child('RightParen', kind='RightParenToken'),
          ]),

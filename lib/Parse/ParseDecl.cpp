@@ -2429,7 +2429,6 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     Attributes.convention = conventionName;
     Attributes.conventionWitnessMethodProtocol = witnessMethodProtocol;
     break;
-<<<<<<< HEAD
       
   case TAK__opaqueReturnTypeOf: {
     // Parse the mangled decl name and index.
@@ -2472,7 +2471,6 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     Attributes.setOpaqueReturnTypeOf(mangling, index);
     break;
   }
-=======
   // SWIFT_ENABLE_TENSORFLOW
   // @autodiff(...) attribute.
   case TAK_autodiff:
@@ -2480,7 +2478,6 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   // @differentiable(...) attribute.
   case TAK_differentiable:
     break;
->>>>>>> origin/tensorflow
   }
 
   Attributes.setAttr(attr, Loc);

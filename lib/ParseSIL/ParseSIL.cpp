@@ -5636,23 +5636,13 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
   SILFunction *DynamicallyReplacedFunction = nullptr;
   Identifier objCReplacementFor;
   if (parseSILLinkage(FnLinkage, P) ||
-<<<<<<< HEAD
       parseDeclSILOptional(
           &isTransparent, &isSerialized, &isCanonical, &hasOwnershipSSA,
           &isThunk, &isDynamic, &DynamicallyReplacedFunction,
           &objCReplacementFor, &isGlobalInit, &inlineStrategy, &optimizationMode, nullptr,
           &isWeakLinked, &isWithoutActuallyEscapingThunk, &Semantics,
-          &SpecAttrs, &ClangDecl, &MRK, FunctionState, M) ||
-=======
-      parseDeclSILOptional(&isTransparent, &isSerialized, &isCanonical,
-                           &isThunk, &isDynamic, &DynamicallyReplacedFunction,
-                           &objCReplacementFor, &isGlobalInit, &inlineStrategy,
-                           &optimizationMode, nullptr, &isWeakLinked,
-                           &isWithoutActuallyEscapingThunk, &Semantics,
-                           // SWIFT_ENABLE_TENSORFLOW
-                           &SpecAttrs, &DiffAttrs, &ClangDecl, &MRK,
-                           FunctionState, M) ||
->>>>>>> origin/tensorflow
+          // SWIFT_ENABLE_TENSORFLOW
+          &SpecAttrs, &DiffAttrs, &ClangDecl, &MRK, FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
       P.parseToken(tok::colon, diag::expected_sil_type))
@@ -5884,11 +5874,7 @@ bool SILParserTUState::parseSILGlobal(Parser &P) {
       // SWIFT_ENABLE_TENSORFLOW
       parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-<<<<<<< HEAD
-                           &isLet, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, State, M) ||
-=======
-                           nullptr, State, M) ||
->>>>>>> origin/tensorflow
+                           &isLet, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, diag::expected_sil_value_name) ||
       P.parseToken(tok::colon, diag::expected_sil_type))
@@ -5936,12 +5922,7 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
   IsSerialized_t Serialized = IsNotSerialized;
   if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-<<<<<<< HEAD
-                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, SP, M))
-=======
-                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, SP, M))
->>>>>>> origin/tensorflow
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, SP, M))
     return true;
   
   ValueDecl *VD;
@@ -6010,13 +5991,8 @@ bool SILParserTUState::parseSILVTable(Parser &P) {
   // SWIFT_ENABLE_TENSORFLOW
   if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-<<<<<<< HEAD
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           VTableState, M))
-=======
-                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, VTableState, M))
->>>>>>> origin/tensorflow
     return true;
 
   // Parse the class name.
@@ -6555,13 +6531,8 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
   // SWIFT_ENABLE_TENSORFLOW
   if (parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-<<<<<<< HEAD
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           WitnessState, M))
-=======
-                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, WitnessState, M))
->>>>>>> origin/tensorflow
     return true;
 
   Scope S(&P, ScopeKind::TopLevel);

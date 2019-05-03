@@ -360,7 +360,7 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
 }
 
 // Synthesize body for `moved(along:)`.
-static void deriveBodyDifferentiable_moved(AbstractFunctionDecl *funcDecl) {
+static void deriveBodyDifferentiable_moved(AbstractFunctionDecl *funcDecl, void*) {
   auto &C = funcDecl->getASTContext();
   deriveBodyDifferentiable_method(funcDecl, C.Id_moved,
                                   C.getIdentifier("along"));
@@ -368,7 +368,7 @@ static void deriveBodyDifferentiable_moved(AbstractFunctionDecl *funcDecl) {
 
 // Synthesize body for `tangentVector(from:)`.
 static void
-deriveBodyDifferentiable_tangentVector(AbstractFunctionDecl *funcDecl) {
+deriveBodyDifferentiable_tangentVector(AbstractFunctionDecl *funcDecl, void*) {
   auto &C = funcDecl->getASTContext();
   deriveBodyDifferentiable_method(funcDecl, C.Id_tangentVector,
                                   C.getIdentifier("from"));
@@ -397,7 +397,7 @@ static ValueDecl *deriveDifferentiable_method(
                                    /*GenericParams=*/nullptr, params,
                                    TypeLoc::withoutLoc(returnType), parentDC);
   funcDecl->setImplicit();
-  funcDecl->setBodySynthesizer(bodySynthesizer);
+  funcDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
 
   if (auto env = parentDC->getGenericEnvironmentOfContext())
     funcDecl->setGenericEnvironment(env);
@@ -441,7 +441,7 @@ static ValueDecl *deriveDifferentiable_moved(DerivedConformance &derived) {
   return deriveDifferentiable_method(
       derived, C.Id_moved, C.getIdentifier("along"),
       C.getIdentifier("direction"), tangentType, selfInterfaceType,
-      deriveBodyDifferentiable_moved);
+      {deriveBodyDifferentiable_moved, nullptr});
 }
 
 // Synthesize the `tangentVector(from:)` function declaration.
@@ -459,7 +459,7 @@ deriveDifferentiable_tangentVector(DerivedConformance &derived) {
   return deriveDifferentiable_method(
       derived, C.Id_tangentVector, C.getIdentifier("from"),
       C.getIdentifier("cotangent"), cotangentType, tangentType,
-      deriveBodyDifferentiable_tangentVector);
+      {deriveBodyDifferentiable_tangentVector, nullptr});
 }
 
 // Return the underlying `allDifferentiableVariables` of a VarDecl `x`.
@@ -489,7 +489,7 @@ static ValueDecl *getUnderlyingAllDiffableVariables(DeclContext *DC,
 
 // Synthesize getter body for `allDifferentiableVariables` computed property.
 static void
-derivedBody_allDifferentiableVariablesGetter(AbstractFunctionDecl *getterDecl) {
+derivedBody_allDifferentiableVariablesGetter(AbstractFunctionDecl *getterDecl, void*) {
   auto *parentDC = getterDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -549,7 +549,7 @@ derivedBody_allDifferentiableVariablesGetter(AbstractFunctionDecl *getterDecl) {
 
 // Synthesize setter body for `allDifferentiableVariables` computed property.
 static void
-derivedBody_allDifferentiableVariablesSetter(AbstractFunctionDecl *setterDecl) {
+derivedBody_allDifferentiableVariablesSetter(AbstractFunctionDecl *setterDecl, void*) {
   auto *parentDC = setterDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -639,7 +639,7 @@ deriveDifferentiable_allDifferentiableVariables(DerivedConformance &derived) {
   derived.addMembersToConformanceContext(
       {getterDecl, setterDecl, allDiffableVarsDecl, pbDecl});
 
-  addExpectedOpaqueAccessorsToStorage(TC, allDiffableVarsDecl);
+  addExpectedOpaqueAccessorsToStorage(allDiffableVarsDecl, C);
   triggerAccessorSynthesis(TC, allDiffableVarsDecl);
 
   return allDiffableVarsDecl;
@@ -788,7 +788,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
       member->getAttrs().add(diffableAttr);
       // If getter does not exist, trigger synthesis and compute type.
       if (!member->getGetter())
-        addExpectedOpaqueAccessorsToStorage(TC, member);
+        addExpectedOpaqueAccessorsToStorage(member, C);
       if (!member->getGetter()->hasInterfaceType())
         TC.resolveDeclSignature(member->getGetter());
       // Compute getter parameter indices.

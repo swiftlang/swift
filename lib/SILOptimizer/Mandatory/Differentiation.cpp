@@ -211,8 +211,8 @@ static FuncDecl *findOperatorDeclInProtocol(DeclName operatorName,
 /// Assuming the buffer is for indirect passing, returns the store ownership
 /// qualifier for creating a `store` instruction into the buffer.
 static StoreOwnershipQualifier getBufferSOQ(Type type, SILFunction &fn) {
-  if (fn.hasQualifiedOwnership())
-    return fn.getModule().Types.getTypeLowering(type).isTrivial()
+  if (fn.hasOwnership())
+    return fn.getModule().Types.getTypeLowering(type, ResilienceExpansion::Minimal).isTrivial()
                ? StoreOwnershipQualifier::Trivial
                : StoreOwnershipQualifier::Init;
   return StoreOwnershipQualifier::Unqualified;
@@ -221,8 +221,8 @@ static StoreOwnershipQualifier getBufferSOQ(Type type, SILFunction &fn) {
 /// Assuming the buffer is for indirect passing, returns the load ownership
 /// qualified for creating a `load` instruction from the buffer.
 static LoadOwnershipQualifier getBufferLOQ(Type type, SILFunction &fn) {
-  if (fn.hasQualifiedOwnership())
-    return fn.getModule().Types.getTypeLowering(type).isTrivial()
+  if (fn.hasOwnership())
+    return fn.getModule().Types.getTypeLowering(type, ResilienceExpansion::Minimal).isTrivial()
                ? LoadOwnershipQualifier::Trivial
                : LoadOwnershipQualifier::Take;
   return LoadOwnershipQualifier::Unqualified;
@@ -1707,7 +1707,7 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
         operandFnTy->getExtInfo().withNoEscape());
     auto silTy = SILType::getPrimitiveObjectType(noEscapeType);
     return builder.createConvertEscapeToNoEscape(
-        loc, innerNewFunc, silTy, cetn->isEscapedByUser(),
+        loc, innerNewFunc, silTy,
         cetn->isLifetimeGuaranteed());
   }
   // convert_function
@@ -2042,7 +2042,7 @@ static CanSILFunctionType buildThunkType(SILFunction *fn,
   // Does the thunk type involve an open existential type?
   CanArchetypeType openedExistential;
   auto archetypeVisitor = [&](CanType t) {
-    if (auto archetypeTy = dyn_cast<ArchetypeType>(t)) {
+    if (auto archetypeTy = dyn_cast<OpenedArchetypeType>(t)) {
       if (archetypeTy->getOpenedExistentialType()) {
         assert((openedExistential == CanArchetypeType() ||
                 openedExistential == archetypeTy) &&
@@ -2097,7 +2097,7 @@ static CanSILFunctionType buildThunkType(SILFunction *fn,
 
   // Add the function type as the parameter.
   auto contextConvention =
-      SILType::getPrimitiveObjectType(sourceType).isTrivial(module)
+      SILType::getPrimitiveObjectType(sourceType).isTrivial(*fn)
           ? ParameterConvention::Direct_Unowned
           : ParameterConvention::Direct_Guaranteed;
   SmallVector<SILParameterInfo, 4> params;
@@ -2171,7 +2171,7 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   Mangle::ASTMangler mangler;
   std::string name = mangler.mangleReabstractionThunkHelper(
       thunkType, fromInterfaceType, toInterfaceType,
-      module.getSwiftModule());
+      Type(), module.getSwiftModule());
 
   auto *thunk = fb.getOrCreateSharedFunction(
       loc, name, thunkDeclType, IsBare, IsTransparent, IsSerialized,
@@ -2180,7 +2180,7 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
     return thunk;
 
   thunk->setGenericEnvironment(genericEnv);
-  thunk->setUnqualifiedOwnership();
+  thunk->setOwnershipEliminated();
   auto *entry = thunk->createBasicBlock();
   SILBuilder builder(entry);
   createEntryArguments(thunk);
@@ -2261,7 +2261,7 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   }
 
   auto *apply = builder.createApply(
-      loc, fnArg, arguments, /*isNonThrowing*/ false);
+      loc, fnArg, SubstitutionMap(), arguments, /*isNonThrowing*/ false);
 
   // Get return elements.
   SmallVector<SILValue, 4> results;
@@ -2582,7 +2582,7 @@ public:
     auto &builder = getBuilder();
     builder.setInsertionPoint(exit);
     auto structLoweredTy =
-        getContext().getTypeConverter().getLoweredType(structTy);
+        getContext().getTypeConverter().getLoweredType(structTy, ResilienceExpansion::Minimal);
     auto primValsVal = builder.createStruct(loc, structLoweredTy, primalValues);
     // If the original result was a tuple, return a tuple of all elements in the
     // original result tuple and the primal value struct value.
@@ -3029,7 +3029,7 @@ public:
         context.getTypeConverter(), canGenSig);
     auto loweredPullbackType =
         getOpType(context.getTypeConverter().getLoweredType(
-                      pullbackDecl->getInterfaceType()->getCanonicalType()))
+                      pullbackDecl->getInterfaceType()->getCanonicalType(), ResilienceExpansion::Minimal))
             .castTo<SILFunctionType>();
     if (!loweredPullbackType->isEqual(actualPullbackType)) {
       // Set non-reabstracted original pullback type in nested apply info.
@@ -3878,7 +3878,7 @@ public:
 
     builder.setInsertionPoint(adjointEntry);
     if (seed->getType().isAddress()) {
-      if (seed->getType().isLoadable(getModule())) {
+      if (seed->getType().isLoadable(builder.getFunction())) {
         builder.createRetainValueAddr(adjLoc, seed,
                                       builder.getDefaultAtomicity());
       }
@@ -4114,7 +4114,7 @@ public:
 
     // Call the pullback.
     auto *pullbackCall = builder.createApply(
-        ai->getLoc(), pullback, args, /*isNonThrowing*/ false);
+        ai->getLoc(), pullback, SubstitutionMap(), args, /*isNonThrowing*/ false);
 
     // Extract all results from `pullbackCall`.
     SmallVector<SILValue, 8> dirResults;
@@ -4248,7 +4248,7 @@ public:
             AutoDiffAssociatedVectorSpaceKind::Cotangent,
             LookUpConformanceInModule(getModule().getSwiftModule()))
                 ->getType()->getCanonicalType();
-        assert(!getModule().Types.getTypeLowering(cotangentVectorTy)
+        assert(!getModule().Types.getTypeLowering(cotangentVectorTy, ResilienceExpansion::Minimal)
                    .isAddressOnly());
         auto *cotangentVectorDecl =
             cotangentVectorTy->getStructOrBoundGenericStruct();
@@ -4320,7 +4320,7 @@ public:
           AutoDiffAssociatedVectorSpaceKind::Cotangent,
           LookUpConformanceInModule(getModule().getSwiftModule()))
               ->getType()->getCanonicalType();
-      assert(!getModule().Types.getTypeLowering(cotangentVectorTy)
+      assert(!getModule().Types.getTypeLowering(cotangentVectorTy, ResilienceExpansion::Minimal)
                  .isAddressOnly());
       auto cotangentVectorSILTy =
           SILType::getPrimitiveObjectType(cotangentVectorTy);
@@ -4357,7 +4357,7 @@ public:
                 field->getModuleContext(), field);
             auto fieldTy = field->getType().subst(substMap);
             auto fieldSILTy =
-                getContext().getTypeConverter().getLoweredType(fieldTy);
+                getContext().getTypeConverter().getLoweredType(fieldTy, ResilienceExpansion::Minimal);
             assert(fieldSILTy.isObject());
             eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
           }
@@ -4381,7 +4381,7 @@ public:
 
       // Call the pullback.
       auto *pullbackCall = builder.createApply(
-          loc, pullback, {vector}, /*isNonThrowing*/ false);
+          loc, pullback, SubstitutionMap(), {vector}, /*isNonThrowing*/ false);
       assert(!pullbackCall->hasIndirectResults());
 
       // Accumulate adjoint for the `struct_extract` operand.
@@ -4913,7 +4913,7 @@ void AdjointEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
 }
 
 SILValue AdjointEmitter::emitZeroDirect(CanType type, SILLocation loc) {
-  auto silType = getModule().Types.getLoweredLoadableType(type);
+  auto silType = getModule().Types.getLoweredLoadableType(type, ResilienceExpansion::Minimal);
   auto *buffer = builder.createAllocStack(loc, silType);
   auto *initAccess = builder.createBeginAccess(loc, buffer, SILAccessKind::Init,
                                                SILAccessEnforcement::Static,
@@ -5366,7 +5366,7 @@ void DifferentiationTask::createEmptyPrimal() {
                              original->getLocation(), original->isBare(),
                              IsNotTransparent, original->isSerialized(),
                              original->isDynamicallyReplaceable());
-  primal->setUnqualifiedOwnership();
+  primal->setOwnershipEliminated();
   primal->setDebugScope(new (context.getModule())
                             SILDebugScope(original->getLocation(), primal));
   LLVM_DEBUG(getADDebugStream() << "Primal function created \n"
@@ -5391,7 +5391,7 @@ void DifferentiationTask::createEmptyAdjoint() {
   // Given a type, returns its formal SIL parameter info.
   auto getCotangentParameterInfoForOriginalResult = [&](
       CanType cotanType, ResultConvention origResConv) -> SILParameterInfo {
-    auto &tl = context.getTypeConverter().getTypeLowering(cotanType);
+    auto &tl = context.getTypeConverter().getTypeLowering(cotanType, ResilienceExpansion::Minimal);
     ParameterConvention conv;
     switch (origResConv) {
     case ResultConvention::Owned:
@@ -5414,7 +5414,7 @@ void DifferentiationTask::createEmptyAdjoint() {
   // Given a type, returns its formal SIL result info.
   auto getCotangentResultInfoForOriginalParameter = [&](
       CanType cotanType, ParameterConvention origParamConv) -> SILResultInfo {
-    auto &tl = context.getTypeConverter().getTypeLowering(cotanType);
+    auto &tl = context.getTypeConverter().getTypeLowering(cotanType, ResilienceExpansion::Minimal);
     ResultConvention conv;
     switch (origParamConv) {
     case ParameterConvention::Direct_Owned:
@@ -5506,7 +5506,7 @@ void DifferentiationTask::createEmptyAdjoint() {
                               original->getLocation(), original->isBare(),
                               IsNotTransparent, original->isSerialized(),
                               original->isDynamicallyReplaceable());
-  adjoint->setUnqualifiedOwnership();
+  adjoint->setOwnershipEliminated();
   adjoint->setDebugScope(new (module)
                              SILDebugScope(original->getLocation(), adjoint));
 }
@@ -5542,7 +5542,7 @@ void DifferentiationTask::createJVP(bool isExported) {
                           original->getLocation(), original->isBare(),
                           IsNotTransparent, original->isSerialized(),
                           original->isDynamicallyReplaceable());
-  jvp->setUnqualifiedOwnership();
+  jvp->setOwnershipEliminated();
   jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
   attr->setJVPName(jvpName);
 
@@ -5555,7 +5555,7 @@ void DifferentiationTask::createJVP(bool isExported) {
   auto loc = jvp->getLocation();
   builder.createReturn(
       loc, SILUndef::get(jvp->mapTypeIntoContext(jvpConv.getSILResultType()),
-                         module));
+                         builder.getFunction()));
 }
 
 void DifferentiationTask::createVJP(bool isExported) {
@@ -5600,7 +5600,7 @@ void DifferentiationTask::createVJP(bool isExported) {
                           original->getLocation(), original->isBare(),
                           IsNotTransparent, original->isSerialized(),
                           original->isDynamicallyReplaceable());
-  vjp->setUnqualifiedOwnership();
+  vjp->setOwnershipEliminated();
   vjp->setDebugScope(new (module) SILDebugScope(original->getLocation(), vjp));
   attr->setVJPName(vjpName);
 
@@ -5768,7 +5768,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
         }
         retInst->eraseFromParent();
 
-        newF->setUnqualifiedOwnership();
+        newF->setOwnershipEliminated();
 
         if (processAutoDiffFunctionInst(adfi)) {
           return nullptr;

@@ -83,7 +83,7 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, DeclName name) {
 // Synthesize body for `_unpackTensorHandles(into:)`.
 static void 
 deriveBodyTensorArrayProtocol_unpackTensorHandles(
-    AbstractFunctionDecl *funcDecl) {
+    AbstractFunctionDecl *funcDecl, void*) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -241,7 +241,7 @@ static ValueDecl *deriveTensorArrayProtocol_method(
                                    /*GenericParams*/ nullptr, params,
                                    TypeLoc::withoutLoc(returnType), parentDC);
   funcDecl->setImplicit();
-  funcDecl->setBodySynthesizer(bodySynthesizer);
+  funcDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
 
   if (auto env = parentDC->getGenericEnvironmentOfContext())
     funcDecl->setGenericEnvironment(env);
@@ -271,13 +271,13 @@ static ValueDecl
   return deriveTensorArrayProtocol_method(
       derived, C.Id_unpackTensorHandles, C.getIdentifier("into"),
       C.getIdentifier("address"), addressType, voidType,
-      deriveBodyTensorArrayProtocol_unpackTensorHandles);
+      {deriveBodyTensorArrayProtocol_unpackTensorHandles, nullptr});
 }
 
 /// Derive the body for the '_tensorHandleCount' getter.
 static void
 deriveBodyTensorArrayProtocol_tensorHandleCount(
-    AbstractFunctionDecl *funcDecl) {
+    AbstractFunctionDecl *funcDecl, void*) {
   auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
 
@@ -354,7 +354,7 @@ static ValueDecl *deriveTensorArrayProtocol_tensorHandleCount(
   auto *getterDecl = derived.declareDerivedPropertyGetter(
     TC, tensorHandleCountDecl, returnType);
   getterDecl->setBodySynthesizer(
-    deriveBodyTensorArrayProtocol_tensorHandleCount);
+    deriveBodyTensorArrayProtocol_tensorHandleCount, nullptr);
   tensorHandleCountDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
                                       SourceLoc(), {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext(
@@ -366,7 +366,7 @@ static ValueDecl *deriveTensorArrayProtocol_tensorHandleCount(
 
 /// Derive the body for the '_typeList' getter.
 static void
-deriveBodyTensorArrayProtocol_typeList(AbstractFunctionDecl *funcDecl) {
+deriveBodyTensorArrayProtocol_typeList(AbstractFunctionDecl *funcDecl, void*) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -438,7 +438,7 @@ static ValueDecl *deriveTensorArrayProtocol_typeList(
   // Create `_typeList` getter.
   auto *getterDecl = derived.declareDerivedPropertyGetter(
       TC, typeListDecl, returnType);
-  getterDecl->setBodySynthesizer(deriveBodyTensorArrayProtocol_typeList);
+  getterDecl->setBodySynthesizer(deriveBodyTensorArrayProtocol_typeList, nullptr);
   typeListDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
                              SourceLoc(), {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext({getterDecl, typeListDecl, patDecl});
@@ -448,7 +448,7 @@ static ValueDecl *deriveTensorArrayProtocol_typeList(
 
 // Synthesize body for `init(_owning:count:)`.
 static void 
-deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl) {
+deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl, void*) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -647,7 +647,7 @@ static ValueDecl
                               /*GenericParams*/ nullptr, parentDC);
   initDecl->setImplicit();
   initDecl->setSynthesized();
-  initDecl->setBodySynthesizer(deriveBodyTensorArrayProtocol_init);
+  initDecl->setBodySynthesizer(deriveBodyTensorArrayProtocol_init, nullptr);
 
   if (auto env = parentDC->getGenericEnvironmentOfContext())
     initDecl->setGenericEnvironment(env);

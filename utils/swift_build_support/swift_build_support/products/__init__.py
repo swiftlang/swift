@@ -45,15 +45,12 @@ __all__ = [
     'Swift',
     'SwiftPM',
     'XCTest',
-<<<<<<< HEAD
     'SwiftSyntax',
     'SKStressTester',
     'SwiftEvolve',
     'IndexStoreDB',
     'SourceKitLSP',
     'Benchmarks',
-=======
     # SWIFT_ENABLE_TENSORFLOW
     'TensorFlow',
->>>>>>> origin/tensorflow
 ]

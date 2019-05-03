@@ -1758,14 +1758,9 @@ class ParameterTypeFlags {
     AutoClosure = 1 << 1,
     OwnershipShift = 2,
     Ownership   = 7 << OwnershipShift,
-<<<<<<< HEAD
-
-    NumBits = 5
-=======
     // SWIFT_ENABLE_TENSORFLOW
-    NonDifferentiable = 1 << 6,
-    NumBits = 7
->>>>>>> origin/tensorflow
+    NonDifferentiable = 1 << 5,
+    NumBits = 6
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits < 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -1778,21 +1773,13 @@ public:
     return ParameterTypeFlags(OptionSet<ParameterFlags>(raw));
   }
 
-<<<<<<< HEAD
   ParameterTypeFlags(bool variadic, bool autoclosure,
-                     ValueOwnership ownership)
-      : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
-              uint8_t(ownership) << OwnershipShift) {}
-=======
-  ParameterTypeFlags(bool variadic, bool autoclosure, bool escaping,
                      // SWIFT_ENABLE_TENSORFLOW
                      ValueOwnership ownership, bool nonDifferentiable)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
-              (escaping ? Escaping : 0) |
               // SWIFT_ENABLE_TENSORFLOW
               (uint8_t(ownership) << OwnershipShift) |
               (nonDifferentiable ? NonDifferentiable : 0)) {}
->>>>>>> origin/tensorflow
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
@@ -1917,14 +1904,9 @@ public:
   ParameterTypeFlags asParamFlags() const {
     return ParameterTypeFlags(/*variadic*/ false,
                               /*autoclosure*/ false,
-<<<<<<< HEAD
-                              getValueOwnership());
-=======
-                              /*escaping*/ false,
                               // SWIFT_ENABLE_TENSORFLOW
                               getValueOwnership(),
                               /*nondifferentiable*/ false);
->>>>>>> origin/tensorflow
   }
 
   bool operator ==(const YieldTypeFlags &other) const {
@@ -3098,9 +3080,6 @@ public:
     return getExtInfo().getRepresentation();
   }
 
-<<<<<<< HEAD
-  /// True if the parameter declaration it is attached to is guaranteed
-=======
   // SWIFT_ENABLE_TENSORFLOW
   /// Given `indices`, `differentiationOrder`, and `kind`, calculates the type
   /// of the corresponding autodiff associated function.
@@ -3116,8 +3095,7 @@ public:
 
   AnyFunctionType *getWithoutDifferentiability() const;
 
-  /// \brief True if the parameter declaration it is attached to is guaranteed
->>>>>>> origin/tensorflow
+  /// True if the parameter declaration it is attached to is guaranteed
   /// to not persist the closure for longer than the duration of the call.
   bool isNoEscape() const {
     return getExtInfo().isNoEscape();
@@ -4168,8 +4146,6 @@ public:
 
   CanType getSelfInstanceType() const;
 
-<<<<<<< HEAD
-=======
   // SWIFT_ENABLE_TENSORFLOW
   CanSILFunctionType getWithDifferentiability(
       unsigned differentiationOrder, const SmallBitVector &parameterIndices);
@@ -4190,12 +4166,6 @@ public:
   /// differentiable.
   SmallBitVector getDifferentiationParameterIndices() const;
 
-  /// If this is a @convention(witness_method) function with a protocol
-  /// constrained self parameter, return the protocol constraint for
-  /// the Self type.
-  ProtocolDecl *getDefaultWitnessMethodProtocol() const;
-
->>>>>>> origin/tensorflow
   /// If this is a @convention(witness_method) function with a class
   /// constrained self parameter, return the class constraint for the
   /// Self type.
@@ -5684,15 +5654,9 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 inline ParameterTypeFlags
 ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
                                       bool isAutoClosure,
-<<<<<<< HEAD
-                                      ValueOwnership ownership) {
-=======
                                       // SWIFT_ENABLE_TENSORFLOW
                                       ValueOwnership ownership,
                                       bool isNonDifferentiable) {
-  bool escaping = paramTy->is<AnyFunctionType>() &&
-                  !paramTy->castTo<AnyFunctionType>()->isNoEscape();
->>>>>>> origin/tensorflow
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -5702,12 +5666,8 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
            ownership == ValueOwnership::InOut);
     ownership = ValueOwnership::InOut;
   }
-<<<<<<< HEAD
-  return {isVariadic, isAutoClosure, ownership};
-=======
   // SWIFT_ENABLE_TENSORFLOW
-  return {isVariadic, isAutoClosure, escaping, ownership, isNonDifferentiable};
->>>>>>> origin/tensorflow
+  return {isVariadic, isAutoClosure, ownership, isNonDifferentiable};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

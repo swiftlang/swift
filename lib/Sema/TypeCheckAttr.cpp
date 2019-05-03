@@ -128,10 +128,8 @@ public:
   IGNORED_ATTR(WeakLinked)
   IGNORED_ATTR(DynamicReplacement)
   IGNORED_ATTR(PrivateImport)
-<<<<<<< HEAD
   IGNORED_ATTR(Custom)
   IGNORED_ATTR(PropertyDelegate)
-=======
   // SWIFT_ENABLE_TENSORFLOW
   IGNORED_ATTR(Differentiable)
   IGNORED_ATTR(Differentiating)
@@ -139,7 +137,6 @@ public:
   IGNORED_ATTR(TensorFlowGraph)
   IGNORED_ATTR(FieldwiseDifferentiable)
   IGNORED_ATTR(NoDerivative)
->>>>>>> origin/tensorflow
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -872,10 +869,8 @@ public:
   void visitFrozenAttr(FrozenAttr *attr);
 
   void visitNonOverrideAttr(NonOverrideAttr *attr);
-<<<<<<< HEAD
   void visitCustomAttr(CustomAttr *attr);
   void visitPropertyDelegateAttr(PropertyDelegateAttr *attr);
-=======
 
   // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableAttr(DifferentiableAttr *attr);
@@ -884,7 +879,6 @@ public:
   void visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr);
   void visitFieldwiseDifferentiableAttr(FieldwiseDifferentiableAttr *attr);
   void visitNoDerivativeAttr(NoDerivativeAttr *attr);
->>>>>>> origin/tensorflow
 };
 } // end anonymous namespace
 
@@ -2505,7 +2499,6 @@ void AttributeChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
   }
 }
 
-<<<<<<< HEAD
 void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   auto dc = D->getInnermostDeclContext();
 
@@ -2526,7 +2519,63 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
 
     TC.diagnose(attr->getLocation(), diag::unknown_attribute,
                 typeName);
-=======
+    attr->setInvalid();
+    return;
+  }
+
+  // If the nominal type is a property delegate type, we can be delegating
+  // through a property.
+  if (nominal->getPropertyDelegateTypeInfo()) {
+    // Property delegates can only be applied to variables
+    if (!isa<VarDecl>(D) || isa<ParamDecl>(D)) {
+      TC.diagnose(attr->getLocation(),
+                  diag::property_delegate_attribute_not_on_property,
+                  nominal->getFullName());
+      attr->setInvalid();
+      return;
+    }
+
+    // If this attribute isn't the one that attached a property delegate to
+    // this property, complain.
+    auto var = cast<VarDecl>(D);
+    if (auto attached = var->getAttachedPropertyDelegate()) {
+      if (attached != attr) {
+        TC.diagnose(attr->getLocation(), diag::property_delegate_multiple);
+        TC.diagnose(attached->getLocation(),
+                    diag::previous_property_delegate_here);
+        return;
+      }
+    }
+
+    return;
+  }
+
+  TC.diagnose(attr->getLocation(), diag::nominal_type_not_attribute,
+              nominal->getDescriptiveKind(), nominal->getFullName());
+  nominal->diagnose(diag::decl_declared_here, nominal->getFullName());
+  attr->setInvalid();
+}
+
+
+void TypeChecker::checkParameterAttributes(ParameterList *params) {
+  for (auto param: *params) {
+    checkDeclAttributes(param);
+  }
+}
+
+void AttributeChecker::visitPropertyDelegateAttr(PropertyDelegateAttr *attr) {
+  auto nominal = dyn_cast<NominalTypeDecl>(D);
+  if (!nominal)
+    return;
+
+  // Force checking of the property delegate type.
+  (void)nominal->getPropertyDelegateTypeInfo();
+
+  // Make sure the name isn't reserved.
+  if (isReservedAttributeName(nominal->getName().str())) {
+    nominal->diagnose(diag::property_delegate_reserved_name);
+  }
+}
 // SWIFT_ENABLE_TENSORFLOW
 /// Returns true if the given type conforms to `Differentiable` in the given
 /// module.
@@ -2883,21 +2932,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     TC.diagnose(attr->getLocation(), diag::differentiable_attr_void_result,
                 original->getFullName())
         .highlight(original->getSourceRange());
->>>>>>> origin/tensorflow
     attr->setInvalid();
     return;
   }
 
-<<<<<<< HEAD
-  // If the nominal type is a property delegate type, we can be delegating
-  // through a property.
-  if (nominal->getPropertyDelegateTypeInfo()) {
-    // Property delegates can only be applied to variables
-    if (!isa<VarDecl>(D) || isa<ParamDecl>(D)) {
-      TC.diagnose(attr->getLocation(),
-                  diag::property_delegate_attribute_not_on_property,
-                  nominal->getFullName());
-=======
   // Start type-checking the arguments of the @differentiable attribute. This
   // covers 'wrt:', 'jvp:', and 'vjp:', all of which are optional.
 
@@ -2914,52 +2952,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       // Where clause must not be empty.
       TC.diagnose(attr->getLocation(),
                   diag::differentiable_attr_empty_where_clause);
->>>>>>> origin/tensorflow
       attr->setInvalid();
       return;
     }
 
-<<<<<<< HEAD
-    // If this attribute isn't the one that attached a property delegate to
-    // this property, complain.
-    auto var = cast<VarDecl>(D);
-    if (auto attached = var->getAttachedPropertyDelegate()) {
-      if (attached != attr) {
-        TC.diagnose(attr->getLocation(), diag::property_delegate_multiple);
-        TC.diagnose(attached->getLocation(),
-                    diag::previous_property_delegate_here);
-        return;
-      }
-    }
-
-    return;
-  }
-
-  TC.diagnose(attr->getLocation(), diag::nominal_type_not_attribute,
-              nominal->getDescriptiveKind(), nominal->getFullName());
-  nominal->diagnose(diag::decl_declared_here, nominal->getFullName());
-  attr->setInvalid();
-}
-
-
-void TypeChecker::checkParameterAttributes(ParameterList *params) {
-  for (auto param: *params) {
-    checkDeclAttributes(param);
-  }
-}
-
-void AttributeChecker::visitPropertyDelegateAttr(PropertyDelegateAttr *attr) {
-  auto nominal = dyn_cast<NominalTypeDecl>(D);
-  if (!nominal)
-    return;
-
-  // Force checking of the property delegate type.
-  (void)nominal->getPropertyDelegateTypeInfo();
-
-  // Make sure the name isn't reserved.
-  if (isReservedAttributeName(nominal->getName().str())) {
-    nominal->diagnose(diag::property_delegate_reserved_name);
-=======
     auto *originalGenSig = original->getGenericSignature();
     if (!originalGenSig) {
       // Attributes with where clauses can only be declared on
@@ -3458,7 +3454,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     // Emit note with expected differential/pullback type on actual type
     // location.
     auto *tupleReturnTypeRepr =
-        cast<TupleTypeRepr>(derivative->getReturnTypeLoc().getTypeRepr());
+        cast<TupleTypeRepr>(derivative->getBodyResultTypeLoc().getTypeRepr());
     auto *funcEltTypeRepr = tupleReturnTypeRepr->getElementType(1);
     TC.diagnose(funcEltTypeRepr->getStartLoc(),
                 diag::differentiating_attr_result_func_type_mismatch_note,
@@ -3649,7 +3645,6 @@ void AttributeChecker::visitNoDerivativeAttr(NoDerivativeAttr *attr) {
     diagnoseAndRemoveAttr(attr,
         diag::noderivative_only_on_stored_properties_in_differentiable_structs);
     return;
->>>>>>> origin/tensorflow
   }
 }
 

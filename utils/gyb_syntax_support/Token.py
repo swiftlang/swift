@@ -333,7 +333,7 @@ SYNTAX_TOKENS = [
 
     # SWIFT_ENABLE_TENSORFLOW
     PoundObjectLiteral('PoundTensorFlowOp', 'tfop', text='#tfop',
-                       serialization_code=118,
+                       serialization_code=119,
                        description='TensorFlow operation',
                        protocol='ExpressibleByTensorFlowOp'),
 ]

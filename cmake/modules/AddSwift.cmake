@@ -2203,8 +2203,6 @@ function(_add_swift_executable_single name)
         "-Xlinker" "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
   endif()
 
-<<<<<<< HEAD
-=======
   # SWIFT_ENABLE_TENSORFLOW
   set(swift_relative_library_path "../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
   is_darwin_based_sdk("${SWIFTEXE_SINGLE_SDK}" IS_DARWIN)
@@ -2219,11 +2217,6 @@ function(_add_swift_executable_single name)
   endif()
   # END SWIFT_ENABLE_TENSORFLOW
 
-  # Find the names of dependency library targets.
-  #
-  # We don't add the ${ARCH} to the target suffix because we want to link
-  # against fat libraries.
->>>>>>> origin/tensorflow
   _list_add_string_suffix(
       "${SWIFTEXE_SINGLE_LINK_LIBRARIES}"
       "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
@@ -2279,11 +2272,7 @@ function(_add_swift_executable_single name)
   target_link_libraries("${name}" PRIVATE ${SWIFTEXE_SINGLE_LINK_LIBRARIES})
   swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_LLVM_COMPONENT_DEPENDS})
 
-<<<<<<< HEAD
   set_target_properties(${name} PROPERTIES FOLDER "Swift executables")
-=======
-  set_target_properties(${name}
-      PROPERTIES FOLDER "Swift executables")
 
   # SWIFT_ENABLE_TENSORFLOW
   if(NOT "${local_rpath}" STREQUAL "")
@@ -2291,166 +2280,6 @@ function(_add_swift_executable_single name)
   endif()
   set_target_properties("${name}" PROPERTIES BUILD_WITH_INSTALL_RPATH YES)
   # END SWIFT_ENABLE_TENSORFLOW
-endfunction()
-
-# Add an executable for each target variant. Executables are given suffixes
-# with the variant SDK and ARCH.
-#
-# See add_swift_executable for detailed documentation.
-#
-# Additional parameters:
-#   [LINK_FAT_LIBRARIES lipo_target1 ...]
-#     Fat libraries to link with.
-function(add_swift_target_executable name)
-  # Parse the arguments we were given.
-  cmake_parse_arguments(SWIFTEXE_TARGET
-    "EXCLUDE_FROM_ALL;;BUILD_WITH_STDLIB"
-    ""
-    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_FAT_LIBRARIES"
-    ${ARGN})
-
-  set(SWIFTEXE_TARGET_SOURCES ${SWIFTEXE_TARGET_UNPARSED_ARGUMENTS})
-
-  translate_flag(${SWIFTEXE_TARGET_EXCLUDE_FROM_ALL}
-      "EXCLUDE_FROM_ALL"
-      SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG)
-
-  # All Swift executables depend on the standard library.
-  list(APPEND SWIFTEXE_TARGET_LINK_FAT_LIBRARIES swiftCore)
-  # All Swift executables depend on the swiftSwiftOnoneSupport library.
-  list(APPEND SWIFTEXE_TARGET_DEPENDS swiftSwiftOnoneSupport)
-
-  if(NOT "${SWIFT_BUILD_STDLIB}")
-    list(REMOVE_ITEM SWIFTEXE_TARGET_LINK_FAT_LIBRARIES
-        swiftCore)
-  endif()
-
-  foreach(sdk ${SWIFT_SDKS})
-    foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
-      set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-      set(VARIANT_NAME "${name}${VARIANT_SUFFIX}")
-
-      set(SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG_CURRENT
-          ${SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG})
-      if(NOT "${VARIANT_SUFFIX}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SUFFIX}")
-        # By default, don't build executables for target SDKs to avoid building
-        # target stdlibs.
-        set(SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG_CURRENT "EXCLUDE_FROM_ALL")
-      endif()
-
-      if(SWIFTEXE_TARGET_BUILD_WITH_STDLIB)
-        add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}" ${VARIANT_NAME})
-      endif()
-
-      # Don't add the ${arch} to the suffix.  We want to link against fat
-      # libraries.
-      _list_add_string_suffix(
-          "${SWIFTEXE_TARGET_DEPENDS}"
-          "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}"
-          SWIFTEXE_TARGET_DEPENDS_with_suffix)
-      _add_swift_executable_single(
-          ${VARIANT_NAME}
-          ${SWIFTEXE_TARGET_SOURCES}
-          DEPENDS ${SWIFTEXE_TARGET_DEPENDS_with_suffix}
-          LLVM_COMPONENT_DEPENDS ${SWIFTEXE_TARGET_LLVM_COMPONENT_DEPENDS}
-          SDK "${sdk}"
-          ARCHITECTURE "${arch}"
-          LINK_FAT_LIBRARIES ${SWIFTEXE_TARGET_LINK_FAT_LIBRARIES}
-          ${SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG_CURRENT})
-
-      if(${sdk} IN_LIST SWIFT_APPLE_PLATFORMS)
-        add_custom_command_target(unused_var2
-         COMMAND "codesign" "-f" "-s" "-" "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${VARIANT_NAME}"
-         CUSTOM_TARGET_NAME "${VARIANT_NAME}_signed"
-         OUTPUT "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${VARIANT_NAME}_signed"
-         DEPENDS ${VARIANT_NAME})
-      else()
-        # No code signing on other platforms.
-        add_custom_command_target(unused_var2
-         CUSTOM_TARGET_NAME "${VARIANT_NAME}_signed"
-         OUTPUT "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${VARIANT_NAME}_signed"
-         DEPENDS ${VARIANT_NAME})
-       endif()
-    endforeach()
-  endforeach()
-endfunction()
-
-# Add an executable for the host machine.
-#
-# Usage:
-#   add_swift_executable(name
-#     [DEPENDS dep1 ...]
-#     [LLVM_COMPONENT_DEPENDS comp1 ...]
-#     [FILE_DEPENDS target1 ...]
-#     [LINK_LIBRARIES target1 ...]
-#     [EXCLUDE_FROM_ALL]
-#     [DONT_STRIP_NON_MAIN_SYMBOLS]
-#     [DISABLE_ASLR]
-#     source1 [source2 source3 ...])
-#
-#   name
-#     Name of the executable (e.g., swift).
-#
-#   LIBRARIES
-#     Libraries this executable depends on, without variant suffixes.
-#
-#   LLVM_COMPONENT_DEPENDS
-#     LLVM components this executable depends on.
-#
-#   FILE_DEPENDS
-#     Additional files this executable depends on.
-#
-#   LINK_LIBRARIES
-#     Libraries to link with.
-#
-#   EXCLUDE_FROM_ALL
-#     Whether to exclude this executable from the ALL_BUILD target.
-#
-#   DONT_STRIP_NON_MAIN_SYMBOLS
-#     Should we not strip non main symbols.
-#
-#   DISABLE_ASLR
-#     Should we compile with -Wl,-no_pie so that ASLR is disabled?
-#
-#   source1 ...
-#     Sources to add into this executable.
-#
-# Note:
-#   Host executables are not given a variant suffix. To build an executable for
-#   each SDK and ARCH variant, use add_swift_target_executable.
-function(add_swift_executable name)
-  # Parse the arguments we were given.
-  cmake_parse_arguments(SWIFTEXE
-    "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR"
-    ""
-    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;COMPILE_FLAGS"
-    ${ARGN})
-
-  translate_flag(${SWIFTEXE_EXCLUDE_FROM_ALL}
-      "EXCLUDE_FROM_ALL"
-      SWIFTEXE_EXCLUDE_FROM_ALL_FLAG)
-  translate_flag(${SWIFTEXE_DONT_STRIP_NON_MAIN_SYMBOLS}
-      "DONT_STRIP_NON_MAIN_SYMBOLS"
-      SWIFTEXE_DONT_STRIP_NON_MAIN_SYMBOLS_FLAG)
-  translate_flag(${SWIFTEXE_DISABLE_ASLR}
-      "DISABLE_ASLR"
-      SWIFTEXE_DISABLE_ASLR_FLAG)
-
-  set(SWIFTEXE_SOURCES ${SWIFTEXE_UNPARSED_ARGUMENTS})
-
-  _add_swift_executable_single(
-      ${name}
-      ${SWIFTEXE_SOURCES}
-      DEPENDS ${SWIFTEXE_DEPENDS}
-      LLVM_COMPONENT_DEPENDS ${SWIFTEXE_LLVM_COMPONENT_DEPENDS}
-      LINK_LIBRARIES ${SWIFTEXE_LINK_LIBRARIES}
-      SDK ${SWIFT_HOST_VARIANT_SDK}
-      ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
-      COMPILE_FLAGS ${SWIFTEXE_COMPILE_FLAGS}
-      ${SWIFTEXE_EXCLUDE_FROM_ALL_FLAG}
-      ${SWIFTEXE_DONT_STRIP_NON_MAIN_SYMBOLS_FLAG}
-      ${SWIFTEXE_DISABLE_ASLR_FLAG})
->>>>>>> origin/tensorflow
 endfunction()
 
 macro(add_swift_tool_subdirectory name)
