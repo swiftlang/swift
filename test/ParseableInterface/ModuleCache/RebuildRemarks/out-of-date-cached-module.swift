@@ -14,7 +14,7 @@
 // RUN: touch %t/Build/TestModule.swiftinterface
 
 // 5. Try to import the now out-of-date cached module
-// RUN: %target-swift-frontend -typecheck -verify %s -I %t/Build -Rmodule-interface-rebuild -module-cache-path %t/ModuleCache -Xllvm -debug-only=textual-module-interface
+// RUN: %target-swift-frontend -typecheck -verify %s -I %t/Build -Rmodule-interface-rebuild -module-cache-path %t/ModuleCache
 
 import TestModule // expected-remark {{rebuilding module 'TestModule' from interface}}
 // expected-note @-1 {{cached module is out of date}}
