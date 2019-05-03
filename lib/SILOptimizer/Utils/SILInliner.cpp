@@ -334,6 +334,28 @@ SILInliner::inlineFunction(SILFunction *calleeFunction, FullApplySite apply,
   return std::make_pair(nextI, cloner.getLastClonedBB());
 }
 
+std::pair<SILBasicBlock::iterator, SILBasicBlock *>
+SILInliner::inlineFullApply(FullApplySite apply,
+                            SILInliner::InlineKind inlineKind,
+                            SILOptFunctionBuilder &funcBuilder) {
+  SmallVector<SILValue, 8> appliedArgs;
+  for (const auto &arg : apply.getArguments())
+    appliedArgs.push_back(arg);
+
+  SILFunction *caller = apply.getFunction();
+  SILOpenedArchetypesTracker OpenedArchetypesTracker(caller);
+  caller->getModule().registerDeleteNotificationHandler(
+      &OpenedArchetypesTracker);
+  // The callee only needs to know about opened archetypes used in
+  // the substitution list.
+  OpenedArchetypesTracker.registerUsedOpenedArchetypes(apply.getInstruction());
+
+  SILInliner Inliner(funcBuilder, inlineKind, apply.getSubstitutionMap(),
+                     OpenedArchetypesTracker);
+  return Inliner.inlineFunction(apply.getReferencedFunction(), apply,
+                                appliedArgs);
+}
+
 SILInlineCloner::SILInlineCloner(
     SILFunction *calleeFunction, FullApplySite apply,
     SILOptFunctionBuilder &funcBuilder, InlineKind inlineKind,
