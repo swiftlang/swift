@@ -826,14 +826,16 @@ void IRGenModule::addObjCClass(llvm::Constant *classPtr, bool nonlazy) {
     ObjCNonLazyClasses.push_back(classPtr);
 }
 
-void IRGenModule::addRuntimeResolvableType(NominalTypeDecl *nominal) {
+void IRGenModule::addRuntimeResolvableType(GenericTypeDecl *type) {
   // Collect the nominal type records we emit into a special section.
-  RuntimeResolvableTypes.push_back(nominal);
+  RuntimeResolvableTypes.push_back(type);
 
-  // As soon as the type metadata is available, all the type's conformances
-  // must be available, too. The reason is that a type (with the help of its
-  // metadata) can be checked at runtime if it conforms to a protocol.
-  addLazyConformances(nominal);
+  if (auto nominal = dyn_cast<NominalTypeDecl>(type)) {
+    // As soon as the type metadata is available, all the type's conformances
+    // must be available, too. The reason is that a type (with the help of its
+    // metadata) can be checked at runtime if it conforms to a protocol.
+    addLazyConformances(nominal);
+  }
 }
 
 ConstantReference
@@ -1160,18 +1162,19 @@ void IRGenerator::addLazyFunction(SILFunction *f) {
 }
 
 bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
+  assert(isa<NominalTypeDecl>(type) ||
+         isa<OpaqueTypeDecl>(type));
   auto found = HasLazyMetadata.find(type);
   if (found != HasLazyMetadata.end())
     return found->second;
 
   auto canBeLazy = [&]() -> bool {
-    if (isa<ClangModuleUnit>(type->getInnermostDeclContext()
-                                 ->getModuleScopeContext())) {
+    auto *dc = type->getDeclContext();
+    if (isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
       if (auto nominal = dyn_cast<NominalTypeDecl>(type)) {
         return requiresForeignTypeMetadata(nominal);
       }
-    } else if (type->getInnermostDeclContext()->getParentModule()
-                                                     == SIL.getSwiftModule()) {
+    } else if (dc->getParentModule() == SIL.getSwiftModule()) {
       // When compiling with -Onone keep all metadata for the debugger. Even if
       // it is not used by the program itself.
       if (!Opts.shouldOptimize())
@@ -2744,41 +2747,49 @@ getObjCClassByNameReference(IRGenModule &IGM, ClassDecl *cls) {
   SmallString<64> objcRuntimeNameBuffer;
   auto ref = IGM.getAddrOfGlobalString(
                                  cls->getObjCRuntimeName(objcRuntimeNameBuffer),
-                                 /*willByRelativelyAddressed=*/true);
+                                 /*willBeRelativelyAddressed=*/true);
 
   return TypeEntityReference(kind, ref);
 }
 
 TypeEntityReference
-IRGenModule::getTypeEntityReference(NominalTypeDecl *decl) {
+IRGenModule::getTypeEntityReference(GenericTypeDecl *decl) {
   if (auto protocol = dyn_cast<ProtocolDecl>(decl)) {
     assert(!protocol->isObjC() && "imported protocols not handled here");
     return getProtocolDescriptorEntityReference(*this, protocol);
   }
-
-  auto clas = dyn_cast<ClassDecl>(decl);
-  if (!clas) {
-    return getTypeContextDescriptorEntityReference(*this, decl);
+  
+  if (auto opaque = dyn_cast<OpaqueTypeDecl>(decl)) {
+    auto entity = LinkEntity::forOpaqueTypeDescriptor(opaque);
+    IRGen.noteUseOfOpaqueTypeDescriptor(opaque);
+    return getContextDescriptorEntityReference(*this, entity);
   }
 
-  switch (clas->getForeignClassKind()) {
-  case ClassDecl::ForeignKind::RuntimeOnly:
-    return getObjCClassByNameReference(*this, clas);
-
-  case ClassDecl::ForeignKind::CFType:
-    return getTypeContextDescriptorEntityReference(*this, clas);
-
-  case ClassDecl::ForeignKind::Normal:
-    if (hasKnownSwiftMetadata(*this, clas)) {
-      return getTypeContextDescriptorEntityReference(*this, clas);
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    auto clas = dyn_cast<ClassDecl>(decl);
+    if (!clas) {
+      return getTypeContextDescriptorEntityReference(*this, nominal);
     }
 
-    // Note: we would like to use an Objective-C class reference, but the
-    // Darwin linker currently has a bug where it will coalesce these symbols
-    // *after* computing a relative offset, causing incorrect relative
-    // offsets in the metadata. Therefore, reference Objective-C classes by
-    // their runtime names.
-    return getObjCClassByNameReference(*this, clas);
+    switch (clas->getForeignClassKind()) {
+    case ClassDecl::ForeignKind::RuntimeOnly:
+      return getObjCClassByNameReference(*this, clas);
+
+    case ClassDecl::ForeignKind::CFType:
+      return getTypeContextDescriptorEntityReference(*this, clas);
+
+    case ClassDecl::ForeignKind::Normal:
+      if (hasKnownSwiftMetadata(*this, clas)) {
+        return getTypeContextDescriptorEntityReference(*this, clas);
+      }
+
+      // Note: we would like to use an Objective-C class reference, but the
+      // Darwin linker currently has a bug where it will coalesce these symbols
+      // *after* computing a relative offset, causing incorrect relative
+      // offsets in the metadata. Therefore, reference Objective-C classes by
+      // their runtime names.
+      return getObjCClassByNameReference(*this, clas);
+    }
   }
   llvm_unreachable("bad foreign type kind");
 }

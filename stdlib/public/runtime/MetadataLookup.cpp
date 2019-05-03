@@ -242,7 +242,7 @@ swift::swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
 }
 
 static const ContextDescriptor *
-_findNominalTypeDescriptor(Demangle::NodePointer node,
+_findContextDescriptor(Demangle::NodePointer node,
                            Demangle::Demangler &Dem);
 
 /// Find the context descriptor for the type extended by the given extension.
@@ -267,7 +267,7 @@ _findExtendedTypeContextDescriptor(const ExtensionContextDescriptor *extension,
     node = Demangle::getUnspecialized(node, demangler);
   }
 
-  return _findNominalTypeDescriptor(node, demangler);
+  return _findContextDescriptor(node, demangler);
 }
 
 /// Recognize imported tag types, which have a special mangling rule.
@@ -438,7 +438,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
       DemanglerForRuntimeTypeResolution<> demangler;
 
       auto extendedDescriptorFromNode =
-        _findNominalTypeDescriptor(extendedContextNode, demangler);
+        _findContextDescriptor(extendedContextNode, demangler);
 
       Demangle::NodePointer extendedContextDemangled;
       auto extendedDescriptorFromDemangled =
@@ -581,14 +581,14 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
 }
 
 // returns the nominal type descriptor for the type named by typeName
-static const TypeContextDescriptor *
+static const ContextDescriptor *
 _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
                            Demangle::NodePointer node) {
   for (auto &section : T.SectionsToScan.snapshot()) {
     for (const auto &record : section) {
-      if (auto ntd = record.getTypeContextDescriptor()) {
-        if (_contextDescriptorMatchesMangling(ntd, node)) {
-          return ntd;
+      if (auto context = record.getContextDescriptor()) {
+        if (_contextDescriptorMatchesMangling(context, node)) {
+          return context;
         }
       }
     }
@@ -598,9 +598,9 @@ _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
 }
 
 static const ContextDescriptor *
-_findNominalTypeDescriptor(Demangle::NodePointer node,
+_findContextDescriptor(Demangle::NodePointer node,
                            Demangle::Demangler &Dem) {
-  const ContextDescriptor *foundNominal = nullptr;
+  const ContextDescriptor *foundContext = nullptr;
   auto &T = TypeMetadataRecords.get();
 
   // If we have a symbolic reference to a context, resolve it immediately.
@@ -620,18 +620,18 @@ _findNominalTypeDescriptor(Demangle::NodePointer node,
     return Value->getDescription();
 
   // Check type metadata records
-  foundNominal = _searchTypeMetadataRecords(T, node);
+  foundContext = _searchTypeMetadataRecords(T, node);
 
   // Check protocol conformances table. Note that this has no support for
   // resolving generic types yet.
-  if (!foundNominal)
-    foundNominal = _searchConformancesByMangledTypeName(node);
+  if (!foundContext)
+    foundContext = _searchConformancesByMangledTypeName(node);
 
-  if (foundNominal) {
-    T.NominalCache.getOrInsert(mangledName, foundNominal);
+  if (foundContext) {
+    T.NominalCache.getOrInsert(mangledName, foundContext);
   }
 
-  return foundNominal;
+  return foundContext;
 }
 
 #pragma mark Protocol descriptor cache
@@ -1107,7 +1107,7 @@ public:
   BuiltTypeDecl createTypeDecl(NodePointer node,
                                bool &typeAlias) const {
     // Look for a nominal type descriptor based on its mangled name.
-    return _findNominalTypeDescriptor(node, demangler);
+    return _findContextDescriptor(node, demangler);
   }
 
   BuiltProtocolDecl createProtocolDecl(NodePointer node) const {
