@@ -1162,18 +1162,19 @@ void IRGenerator::addLazyFunction(SILFunction *f) {
 }
 
 bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
+  assert(isa<NominalTypeDecl>(type) ||
+         isa<OpaqueTypeDecl>(type));
   auto found = HasLazyMetadata.find(type);
   if (found != HasLazyMetadata.end())
     return found->second;
 
   auto canBeLazy = [&]() -> bool {
-    if (isa<ClangModuleUnit>(type->getInnermostDeclContext()
-                                 ->getModuleScopeContext())) {
+    auto *dc = type->getDeclContext();
+    if (isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
       if (auto nominal = dyn_cast<NominalTypeDecl>(type)) {
         return requiresForeignTypeMetadata(nominal);
       }
-    } else if (type->getInnermostDeclContext()->getParentModule()
-                                                     == SIL.getSwiftModule()) {
+    } else if (dc->getParentModule() == SIL.getSwiftModule()) {
       // When compiling with -Onone keep all metadata for the debugger. Even if
       // it is not used by the program itself.
       if (!Opts.shouldOptimize())
