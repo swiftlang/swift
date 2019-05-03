@@ -834,12 +834,7 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
 
 void SwiftLangSupport::findInterfaceDocument(StringRef ModuleName,
                                              ArrayRef<const char *> Args,
-<<<<<<< HEAD
                        std::function<void(const RequestResult<InterfaceDocInfo> &)> Receiver) {
-=======
-                       std::function<void(const InterfaceDocInfo &,
-                                          StringRef Error)> Receiver) {
->>>>>>> aad86098551240bff9af8aa6617861fdd0619c22
   InterfaceDocInfo Info;
 
   CompilerInstance CI;
@@ -851,11 +846,7 @@ void SwiftLangSupport::findInterfaceDocument(StringRef ModuleName,
   std::string Error;
   if (getASTManager()->initCompilerInvocation(Invocation, Args, CI.getDiags(),
                                              StringRef(), Error)) {
-<<<<<<< HEAD
     return Receiver(RequestResult<InterfaceDocInfo>::fromError(Error));
-=======
-    return Receiver({}, Error);
->>>>>>> aad86098551240bff9af8aa6617861fdd0619c22
   }
 
   if (auto IFaceGenRef = IFaceGenContexts.find(ModuleName, Invocation))
@@ -913,9 +904,5 @@ void SwiftLangSupport::findInterfaceDocument(StringRef ModuleName,
   }
   Info.CompilerArgs = NewArgs;
 
-<<<<<<< HEAD
   return Receiver(RequestResult<InterfaceDocInfo>::fromResult(Info));
-=======
-  return Receiver(Info, "");
->>>>>>> aad86098551240bff9af8aa6617861fdd0619c22
 }
