@@ -995,19 +995,20 @@ bool AssignmentFailure::diagnoseAsError() {
     if (!choice->isDecl()) {
       if (choice->getKind() == OverloadChoiceKind::KeyPathApplication &&
           !isa<ApplyExpr>(immInfo.first)) {
-        std::string message = "";
+        std::string message = "key path is read-only";
         if (auto *SE = dyn_cast<SubscriptExpr>(immInfo.first)) {
           if (auto *DRE = dyn_cast<DeclRefExpr>(getKeyPathArgument(SE))) {
             auto identifier = DRE->getDecl()->getBaseName().getIdentifier();
-            message = "'" + identifier.str().str() + "' ";
+            message =
+                "'" + identifier.str().str() + "' is a read-only key path";
           }
         }
-        emitDiagnostic(Loc, DeclDiagnostic, message + "is read-only")
+        emitDiagnostic(Loc, DeclDiagnostic, message)
             .highlight(immInfo.first->getSourceRange());
         return true;
       }
       return false;
-    } 
+    }
 
     // Otherwise, we cannot resolve this because the available setter candidates
     // are all mutating and the base must be mutating.  If we dug out a
@@ -1042,7 +1043,7 @@ bool AssignmentFailure::diagnoseAsError() {
       // note to fixit prepend a 'self.'.
       if (auto typeContext = DC->getInnermostTypeContext()) {
         UnqualifiedLookup lookup(VD->getFullName(), typeContext,
-                                getASTContext().getLazyResolver());
+                                 getASTContext().getLazyResolver());
         for (auto &result : lookup.Results) {
           const VarDecl *typeVar = dyn_cast<VarDecl>(result.getValueDecl());
           if (typeVar && typeVar != VD && typeVar->isSettable(DC) &&
@@ -1053,7 +1054,7 @@ bool AssignmentFailure::diagnoseAsError() {
                 dyn_cast_or_null<AccessorDecl>(DC->getInnermostMethodContext());
             if (!AD || AD->getStorage() != typeVar) {
               emitDiagnostic(Loc, diag::masked_instance_variable,
-                            typeContext->getSelfTypeInContext())
+                             typeContext->getSelfTypeInContext())
                   .fixItInsert(Loc, "self.");
             }
           }
@@ -1102,9 +1103,8 @@ bool AssignmentFailure::diagnoseAsError() {
           .highlight(immInfo.first->getSourceRange());
       return true;
     }
-  
   }
-  
+
   // Fall back to producing diagnostics based on the expression since we
   // couldn't determine anything from the OverloadChoice.
 
@@ -1265,7 +1265,7 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
   auto *DC = getDC();
   expr = expr->getValueProvidingExpr();
 
-  auto isImmutable = [&](ValueDecl *decl) {
+  auto isImmutable = [&DC](ValueDecl *decl) {
     if (auto *storage = dyn_cast<AbstractStorageDecl>(decl))
       return !storage->isSettable(nullptr) ||
              !storage->isSetterAccessibleFrom(DC);
@@ -1276,7 +1276,6 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
   // Provide specific diagnostics for assignment to subscripts whose base expr
   // is known to be an rvalue.
   if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
-
     // If we found a decl for the subscript, check to see if it is a set-only
     // subscript decl.
     if (SE->hasDecl()) {
@@ -1289,10 +1288,8 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
       }
     }
 
-    Optional<OverloadChoice> member;
-
-    auto loc = cs.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
-    member = getMemberRef(loc);
+    Optional<OverloadChoice> member = getMemberRef(
+        cs.getConstraintLocator(SE, ConstraintLocator::SubscriptMember));
 
     // If it isn't settable, return it.
     if (member) {
@@ -1303,7 +1300,7 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
       if (!member->isDecl()) {
         // This must be a keypath application
         assert(member->getKind() == OverloadChoiceKind::KeyPathApplication);
-        
+
         auto *argType = getType(SE->getIndex())->castTo<TupleType>();
         assert(argType->getNumElements() == 1);
 
