@@ -77,45 +77,49 @@ private let largeUncommonRadixStrings: [String]
 @inline(never)
 public func run_ParseIntFromSmallDecimal(N: Int) {
   var result = 0
-  for _ in 0..<N {
+  let count = N*10
+  for _ in 0..<count {
     for string in smallDecimalStrings {
       result &+= Int(string, radix: 10)!
     }
   }
-  CheckResults(result == smallValuesSum &* N)
+  CheckResults(result == smallValuesSum &* count)
 }
 
 @inline(never)
 public func run_ParseIntFromSmallBinary(N: Int) {
   var result = 0
-  for _ in 0..<N {
+  let count = N*10
+  for _ in 0..<count {
     for string in smallBinaryStrings {
       result &+= Int(string, radix: 2)!
     }
   }
-  CheckResults(result == smallValuesSum &* N)
+  CheckResults(result == smallValuesSum &* count)
 }
 
 @inline(never)
 public func run_ParseIntFromSmallHex(N: Int) {
   var result = 0
-  for _ in 0..<N {
+  let count = N*10
+  for _ in 0..<count {
     for string in smallHexStrings {
       result &+= Int(string, radix: 16)!
     }
   }
-  CheckResults(result == smallValuesSum &* N)
+  CheckResults(result == smallValuesSum &* count)
 }
 
 @inline(never)
 public func run_ParseIntFromSmallUncommonRadix(N: Int) {
   var result = 0
-  for _ in 0..<N {
+  let count = N*10
+  for _ in 0..<count {
     for string in smallUncommonRadixStrings {
       result &+= Int(string, radix: uncommonRadix)!
     }
   }
-  CheckResults(result == smallValuesSum &* N)
+  CheckResults(result == smallValuesSum &* count)
 }
 
 @inline(never)
