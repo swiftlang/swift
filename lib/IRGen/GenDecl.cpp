@@ -435,6 +435,8 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
     emitGlobalDecl(decl);
   for (auto *localDecl : SF.LocalTypeDecls)
     emitGlobalDecl(localDecl);
+  for (auto *opaqueDecl : SF.OpaqueReturnTypes)
+    maybeEmitOpaqueTypeDecl(opaqueDecl);
 
   SF.collectLinkLibraries([this](LinkLibrary linkLib) {
       this->addLinkLibrary(linkLib);
@@ -1886,17 +1888,10 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
     return;
 
   case DeclKind::Var:
-    emitAbstractStorageDecl(cast<AbstractStorageDecl>(D));
-    return;
-
   case DeclKind::Accessor:
+  case DeclKind::Func:
     // Handled in SIL.
     return;
-
-  case DeclKind::Func:
-    // The function body itself is lowered to SIL, but there may be associated
-    // decls to emit.
-    return emitFuncDecl(cast<FuncDecl>(D));
   
   case DeclKind::TopLevelCode:
     // All the top-level code will be lowered separately.
@@ -3887,12 +3882,9 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
       continue;
 
     case DeclKind::Func:
-      emitFuncDecl(cast<FuncDecl>(member));
-      continue;
-
     case DeclKind::Var:
     case DeclKind::Subscript:
-      emitAbstractStorageDecl(cast<AbstractStorageDecl>(member));
+      // Handled in SIL.
       continue;
         
     case DeclKind::PatternBinding:
