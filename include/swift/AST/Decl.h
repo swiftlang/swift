@@ -1271,6 +1271,11 @@ public:
   void print(ASTPrinter &Printer) const;
 };
   
+/// GenericParam - This type is a common interface to all the different types of
+/// generic parameters that exist.
+///
+/// Some of the methods of this class may need to be deleted and / or refactored
+/// once they are no longer shared between all the `ParamKind`s.
 class GenericParam final {
 public:
   enum class ParamKind {
@@ -1278,11 +1283,17 @@ public:
   };
 
 private:
+  /// The type of this generic parameter.
   ParamKind Kind;
-    
-  GenericTypeParamDecl *GTPD;
+
+  union {
+    /// If this `GenericParam` is a `TypeParam`, this pointer contains a
+    /// reference to a `GenericTypeParamDecl`.
+    GenericTypeParamDecl *GTPD;
+  };
     
 public:
+  /// Create a new `GenericParam` wrapping a `GenericTypeParamDecl`.
   GenericParam(GenericTypeParamDecl *GTPD)
     : Kind(ParamKind::TypeParam), GTPD(GTPD)
     {}
