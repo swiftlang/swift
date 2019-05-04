@@ -834,6 +834,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(input_block, MODULE_FLAGS);
   BLOCK_RECORD(input_block, SEARCH_PATH);
   BLOCK_RECORD(input_block, FILE_DEPENDENCY);
+  BLOCK_RECORD(input_block, DEPENDENCY_DIRECTORY);
   BLOCK_RECORD(input_block, PARSEABLE_INTERFACE_PATH);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
@@ -1061,6 +1062,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   input_block::ImportedHeaderContentsLayout ImportedHeaderContents(Out);
   input_block::SearchPathLayout SearchPath(Out);
   input_block::FileDependencyLayout FileDependency(Out);
+  input_block::DependencyDirectoryLayout DependencyDirectory(Out);
   input_block::ParseableInterfaceLayout ParseableInterface(Out);
 
   if (options.SerializeOptionsForDebugging) {
@@ -1074,13 +1076,24 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
       SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false, path);
   }
 
+  // Note: We're not using StringMap here because we don't need to own the
+  // strings.
+  llvm::DenseMap<StringRef, unsigned> dependencyDirectories;
   for (auto const &dep : options.Dependencies) {
+    StringRef directoryName = llvm::sys::path::parent_path(dep.getPath());
+    unsigned &dependencyDirectoryIndex = dependencyDirectories[directoryName];
+    if (!dependencyDirectoryIndex) {
+      // This name must be newly-added. Give it a new ID (and skip 0).
+      dependencyDirectoryIndex = dependencyDirectories.size();
+      DependencyDirectory.emit(ScratchRecord, directoryName);
+    }
     FileDependency.emit(ScratchRecord,
                         dep.getSize(),
                         getRawModTimeOrHash(dep),
                         dep.isHashBased(),
                         dep.isSDKRelative(),
-                        dep.getPath());
+                        dependencyDirectoryIndex,
+                        llvm::sys::path::filename(dep.getPath()));
   }
 
   if (!options.ParseableInterface.empty())
