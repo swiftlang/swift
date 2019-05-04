@@ -608,7 +608,8 @@ GenericSignature::requirementsNotSatisfiedBy(GenericSignature *otherSig,
 		
 		if (subMap) {
       auto subsReq = req.subst(subMap);
-			reqToCheck = subsReq.hasValue() ? subsReq.getValue() : reqToCheck;
+			assert(subsReq.hasValue() && "using unsubstituted req?");
+			reqToCheck = subsReq.getValue();
     }
 		
     if (!otherSig->isRequirementSatisfied(reqToCheck))
