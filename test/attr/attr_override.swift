@@ -540,3 +540,18 @@ class GenericClass_SR_4206<T> {
 class ConcreteClass_SR_4206: GenericClass_SR_4206<SR_4206_Proto> {
   override func foo<T>(arg: T) {} // expected-error {{cannot override method 'foo' with a different generic signature}}
 }
+
+protocol SR_4206_Key {}
+
+protocol SR_4206_Container {
+  associatedtype Key: SR_4206_Key
+}
+
+class SR_4206_Base<Key: SR_4206_Key> {
+  func foo(forKey key: Key) throws {}
+}
+
+class SR_4206_Derived<C: SR_4206_Container> : SR_4206_Base<C.Key> {
+  typealias Key = C.Key
+  override func foo(forKey key: Key) throws {} // Ok
+}
