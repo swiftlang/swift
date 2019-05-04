@@ -327,7 +327,8 @@ getFieldAt(const Metadata *base, unsigned index) {
   
   const FieldDescriptor &descriptor = *fields;
   auto &field = descriptor.getFields()[index];
-  auto name = field.getFieldName(0);
+  // Bounds are always valid as the offset is constant.
+  auto name = field.getFieldName(0, 0, 1);
 
   // Enum cases don't always have types.
   if (!field.hasMangledTypeName())

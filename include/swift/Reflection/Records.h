@@ -85,10 +85,11 @@ public:
       (const char *)((uintptr_t)MangledTypeName.get() + Offset));
   }
 
-  StringRef getFieldName(uintptr_t Offset)  const {
-    if (FieldName)
-      return (const char *)((uintptr_t)FieldName.get() + Offset);
-    return "";
+  StringRef getFieldName(uintptr_t Offset, uintptr_t Low,
+                         uintptr_t High) const {
+    if (Offset < Low || Offset > High)
+      return "";
+    return (const char *)((uintptr_t)FieldName.get() + Offset);
   }
 
   bool isIndirectCase() const {

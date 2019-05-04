@@ -194,7 +194,9 @@ bool TypeRefBuilder::getFieldTypeRefs(
                        - FD.second->TypeReference.SectionOffset;
     auto FieldOffset = FD.second->Field.SectionOffset
                      - FD.second->ReflectionString.SectionOffset;
-    auto FieldName = Field.getFieldName(FieldOffset);
+    auto Low = FD.second->ReflectionString.SectionOffset;
+    auto High = FD.second->ReflectionString.Metadata.size();
+    auto FieldName = Field.getFieldName(FieldOffset, Low, High);
 
     // Empty cases of enums do not have a type
     if (FD.first->isEnum() && !Field.hasMangledTypeName()) {
@@ -339,8 +341,10 @@ void TypeRefBuilder::dumpFieldSection(std::ostream &OS) {
         OS << '-';
       OS << '\n';
       for (auto &field : descriptor) {
-        OS << std::string(field.getFieldName(NameOffset).begin(),
-                          field.getFieldName(NameOffset).end());
+        auto Low = sections.ReflectionString.SectionOffset;
+        auto High = sections.ReflectionString.Metadata.size();
+        OS << std::string(field.getFieldName(NameOffset, Low, High).begin(),
+                          field.getFieldName(NameOffset, Low, High).end());
         if (field.hasMangledTypeName()) {
           OS << ": ";
           dumpTypeRef(field.getMangledTypeName(TypeRefOffset), OS);
