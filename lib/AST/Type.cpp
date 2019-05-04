@@ -2306,6 +2306,13 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
     if (isABICompatibleEvenAddingOptional(t1, t2))
       return true;
 
+  if (matchMode.contains(TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes))
+    if (auto opaque1 = t1->getAs<OpaqueTypeArchetypeType>())
+      if (auto opaque2 = t2->getAs<OpaqueTypeArchetypeType>())
+        return opaque1->getBoundSignature() == opaque2->getBoundSignature() &&
+               opaque1->getInterfaceType()->getCanonicalType()->matches(
+                   opaque2->getInterfaceType()->getCanonicalType(), matchMode);
+
   return false;
 }
 

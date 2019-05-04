@@ -2120,7 +2120,10 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
           // Check for type mismatch.
           TC.validateDecl(result);
           auto resultType = getDynamicComparisonType(result);
-          if (!resultType->isEqual(replacementStorageType)) {
+          if (!resultType->isEqual(replacementStorageType) &&
+              !resultType->matches(
+                  replacementStorageType,
+                  TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes)) {
             return true;
           }
 
@@ -2165,15 +2168,6 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
     if (origAccessor->getAccessorKind() != replacement->getAccessorKind())
       continue;
 
-    if (!replacement->getInterfaceType()->getCanonicalType()->matches(
-            origAccessor->getInterfaceType()->getCanonicalType(),
-            TypeMatchFlags::AllowABICompatible)) {
-      TC.diagnose(attr->getLocation(),
-                  diag::dynamic_replacement_accessor_type_mismatch,
-                  replacedVarName);
-      attr->setInvalid();
-      return nullptr;
-    }
     if (origAccessor->isImplicit() &&
         !(origStorage->getReadImpl() == ReadImplKind::Stored &&
           origStorage->getWriteImpl() == WriteImplKind::Stored)) {
@@ -2205,9 +2199,10 @@ findReplacedFunction(DeclName replacedFunctionName,
       continue;
     if (TC)
       TC->validateDecl(result);
+    TypeMatchOptions matchMode = TypeMatchFlags::AllowABICompatible;
+    matchMode |= TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
     if (result->getInterfaceType()->getCanonicalType()->matches(
-            replacement->getInterfaceType()->getCanonicalType(),
-            TypeMatchFlags::AllowABICompatible)) {
+            replacement->getInterfaceType()->getCanonicalType(), matchMode)) {
       if (!result->isDynamic()) {
         if (TC) {
           TC->diagnose(attr->getLocation(),

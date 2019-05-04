@@ -1768,6 +1768,7 @@ namespace {
       
       var->setConstant(true);
       IGM.setTrueConstGlobal(var);
+      IGM.emitOpaqueTypeDescriptorAccessor(O);
     }
     
     uint16_t getKindSpecificFlags() {

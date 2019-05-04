@@ -1329,12 +1329,9 @@ llvm::GlobalVariable *IRGenModule::getGlobalForDynamicallyReplaceableThunk(
 ///      struct ChainEntry *next;
 ///   }
 static llvm::GlobalVariable *getChainEntryForDynamicReplacement(
-    IRGenModule &IGM, SILFunction *SILFn,
-    llvm::Function *implFunction = nullptr,
+    IRGenModule &IGM, LinkEntity entity, llvm::Function *implFunction = nullptr,
     ForDefinition_t forDefinition = ForDefinition) {
 
-  LinkEntity entity =
-      LinkEntity::forDynamicallyReplaceableFunctionVariable(SILFn);
   auto linkEntry = IGM.getGlobalForDynamicallyReplaceableThunk(
       entity, IGM.DynamicReplacementLinkEntryTy, forDefinition);
   if (!forDefinition)
@@ -1358,6 +1355,31 @@ void IRGenerator::emitDynamicReplacements() {
 
   auto &IGM = *getPrimaryIGM();
 
+  // Collect all the type metadata accessor replacements.
+  SmallVector<OpaqueTypeArchetypeType *, 8> newFuncTypes;
+  SmallVector<OpaqueTypeArchetypeType *, 8> origFuncTypes;
+  llvm::SmallSet<OpaqueTypeArchetypeType *, 8> newUniqueOpaqueTypes;
+  llvm::SmallSet<OpaqueTypeArchetypeType *, 8> origUniqueOpaqueTypes;
+  for (auto *newFunc : DynamicReplacements) {
+    if (!newFunc->getLoweredFunctionType()->hasOpaqueArchetype())
+      continue;
+    CanType(newFunc->getLoweredFunctionType()).visit([&](CanType ty) {
+      if (auto opaque = ty->getAs<OpaqueTypeArchetypeType>())
+        if (newUniqueOpaqueTypes.insert(opaque).second)
+          newFuncTypes.push_back(opaque);
+    });
+    auto *origFunc = newFunc->getDynamicallyReplacedFunction();
+    assert(origFunc);
+    assert(origFunc->getLoweredFunctionType()->hasOpaqueArchetype());
+    CanType(origFunc->getLoweredFunctionType()).visit([&](CanType ty) {
+      if (auto opaque = ty->getAs<OpaqueTypeArchetypeType>())
+        if (origUniqueOpaqueTypes.insert(opaque).second)
+          origFuncTypes.push_back(opaque);
+    });
+
+    assert(origFuncTypes.size() == newFuncTypes.size());
+  }
+
   // struct ReplacementScope {
   //   uint32t flags; // unused
   //   uint32t numReplacements;
@@ -1371,13 +1393,15 @@ void IRGenerator::emitDynamicReplacements() {
   ConstantInitBuilder builder(IGM);
   auto replacementScope = builder.beginStruct();
   replacementScope.addInt32(0); // unused flags.
-  replacementScope.addInt32(DynamicReplacements.size());
+  replacementScope.addInt32(DynamicReplacements.size() + newFuncTypes.size());
 
   auto replacementsArray =
       replacementScope.beginArray();
   for (auto *newFunc : DynamicReplacements) {
+    LinkEntity entity =
+        LinkEntity::forDynamicallyReplaceableFunctionVariable(newFunc);
     auto replacementLinkEntry =
-        getChainEntryForDynamicReplacement(IGM, newFunc);
+        getChainEntryForDynamicReplacement(IGM, entity);
     // TODO: replacementLinkEntry->setZeroSection()
     auto *origFunc = newFunc->getDynamicallyReplacedFunction();
     assert(origFunc);
@@ -1394,6 +1418,26 @@ void IRGenerator::emitDynamicReplacements() {
         replacementLinkEntry); // direct relative reference.
     replacement.addInt32(
         Opts.EnableDynamicReplacementChaining ? 1 : 0);
+    replacement.finishAndAddTo(replacementsArray);
+  }
+  // Emit replacements of the opaque type descriptor accessor.
+  for (auto i : indices(origFuncTypes)) {
+    LinkEntity entity = LinkEntity::forOpaqueTypeDescriptorAccessorVar(
+        newFuncTypes[i]->getDecl());
+    auto replacementLinkEntry = getChainEntryForDynamicReplacement(IGM, entity);
+    auto keyRef = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+        LinkEntity::forOpaqueTypeDescriptorAccessorKey(
+            origFuncTypes[i]->getDecl()));
+    llvm::Constant *newFnPtr = llvm::ConstantExpr::getBitCast(
+        IGM.getAddrOfOpaqueTypeDescriptorAccessFunction(
+            newFuncTypes[i]->getDecl(), NotForDefinition, false),
+        IGM.Int8PtrTy);
+    auto replacement = replacementsArray.beginStruct();
+    replacement.addRelativeAddress(keyRef);   // tagged relative reference.
+    replacement.addRelativeAddress(newFnPtr); // direct relative reference.
+    replacement.addRelativeAddress(
+        replacementLinkEntry); // direct relative reference.
+    replacement.addInt32(0);
     replacement.finishAndAddTo(replacementsArray);
   }
   replacementsArray.finishAndAddTo(replacementScope);
@@ -2062,9 +2106,7 @@ static void addLLVMFunctionAttributes(SILFunction *f, Signature &signature) {
 ///   int32_t flags;
 /// }
 static llvm::GlobalVariable *createGlobalForDynamicReplacementFunctionKey(
-    IRGenModule &IGM, SILFunction *SILFn, llvm::GlobalVariable *linkEntry) {
-  LinkEntity keyEntity =
-      LinkEntity::forDynamicallyReplaceableFunctionKey(SILFn);
+    IRGenModule &IGM, LinkEntity keyEntity, llvm::GlobalVariable *linkEntry) {
   auto key = IGM.getGlobalForDynamicallyReplaceableThunk(
       keyEntity, IGM.DynamicReplacementKeyTy, ForDefinition);
 
@@ -2080,18 +2122,19 @@ static llvm::GlobalVariable *createGlobalForDynamicReplacementFunctionKey(
 
 /// Emit the thunk that dispatches to the dynamically replaceable function.
 static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
-                                            SILFunction *SILFn,
+                                            LinkEntity varEntity,
+                                            LinkEntity keyEntity,
                                             llvm::Function *dispatchFn,
                                             llvm::Function *implFn,
                                             Signature &signature) {
 
   // Create and initialize the first link entry for the chain of replacements.
   // The first implementation is initialized with 'implFn'.
-  auto linkEntry = getChainEntryForDynamicReplacement(IGM, SILFn, implFn);
+  auto linkEntry = getChainEntryForDynamicReplacement(IGM, varEntity, implFn);
 
   // Create the key data structure. This is used from other modules to refer to
   // the chain of replacements.
-  createGlobalForDynamicReplacementFunctionKey(IGM, SILFn, linkEntry);
+  createGlobalForDynamicReplacementFunctionKey(IGM, keyEntity, linkEntry);
 
   // We should never inline the implementation function.
   implFn->addFnAttr(llvm::Attribute::NoInline);
@@ -2121,6 +2164,63 @@ static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
     B.CreateRet(Res);
 }
 
+void IRGenModule::emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
+  auto *namingDecl = opaque->getNamingDecl();
+  auto *abstractStorage = dyn_cast<AbstractStorageDecl>(namingDecl);
+
+  bool isNativeDynamic = false;
+  bool isDynamicReplacement = false;
+
+  // Don't emit accessors for abstract storage that is not dynamic or a dynamic
+  // replacement.
+  if (abstractStorage) {
+    isNativeDynamic = abstractStorage->hasAnyNativeDynamicAccessors();
+    isDynamicReplacement = abstractStorage->hasAnyDynamicReplacementAccessors();
+    if (!isNativeDynamic && !isDynamicReplacement)
+      return;
+  }
+
+  // Don't emit accessors for functions that are not dynamic or dynamic
+  // replacements.
+  if (!abstractStorage) {
+    isNativeDynamic = opaque->getNamingDecl()->isNativeDynamic();
+    isDynamicReplacement = opaque->getNamingDecl()
+                               ->getAttrs()
+                               .hasAttribute<DynamicReplacementAttr>();
+    if (!isNativeDynamic && !isDynamicReplacement)
+      return;
+  }
+
+  auto accessor =
+      getAddrOfOpaqueTypeDescriptorAccessFunction(opaque, ForDefinition, false);
+
+  if (isNativeDynamic) {
+    auto thunk = accessor;
+    auto impl = getAddrOfOpaqueTypeDescriptorAccessFunction(
+        opaque, ForDefinition, true);
+    auto varEntity = LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaque);
+    auto keyEntity = LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaque);
+
+    auto fnType = llvm::FunctionType::get(OpaqueTypeDescriptorPtrTy, {}, false);
+    Signature signature(fnType, llvm::AttributeList(), SwiftCC);
+    emitDynamicallyReplaceableThunk(*this, varEntity, keyEntity, thunk, impl,
+                                    signature);
+    // We should never inline the thunk function.
+    thunk->addFnAttr(llvm::Attribute::NoInline);
+    accessor = impl;
+  }
+
+  // The implementation just returns the opaque type descriptor.
+  llvm::BasicBlock *entryBB =
+      llvm::BasicBlock::Create(getLLVMContext(), "entry", accessor);
+  IRBuilder B(getLLVMContext(), false);
+  B.SetInsertPoint(entryBB);
+  if (DebugInfo)
+    DebugInfo->emitArtificialFunction(B, accessor);
+  auto *desc = getAddrOfOpaqueTypeDescriptor(opaque, ConstantInit());
+  B.CreateRet(desc);
+}
+
 /// Calls the previous implementation before this dynamic replacement became
 /// active.
 void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
@@ -2137,8 +2237,10 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
                      f->getOptimizationMode());
   implFn->addFnAttr(llvm::Attribute::NoInline);
 
-  auto linkEntry =
-      getChainEntryForDynamicReplacement(*this, f, nullptr, NotForDefinition);
+  LinkEntity varEntity =
+      LinkEntity::forDynamicallyReplaceableFunctionVariable(f);
+  auto linkEntry = getChainEntryForDynamicReplacement(*this, varEntity, nullptr,
+                                                      NotForDefinition);
 
   // Load the function and dispatch to it forwarding our arguments.
   llvm::BasicBlock *entryBB =
@@ -2193,7 +2295,12 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
         LinkInfo implLink = LinkInfo::get(*this, implEntity, forDefinition);
         auto implFn = createFunction(*this, implLink, signature, fn,
                                      f->getOptimizationMode());
-        emitDynamicallyReplaceableThunk(*this, f, fn, implFn, signature);
+        LinkEntity varEntity =
+            LinkEntity::forDynamicallyReplaceableFunctionVariable(f);
+        LinkEntity keyEntity =
+            LinkEntity::forDynamicallyReplaceableFunctionKey(f);
+        emitDynamicallyReplaceableThunk(*this, varEntity, keyEntity, fn, implFn,
+                                        signature);
         return implFn;
       }
     }
@@ -2277,7 +2384,11 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
     auto implFn = createFunction(*this, implLink, signature, insertBefore,
                                  f->getOptimizationMode());
 
-    emitDynamicallyReplaceableThunk(*this, f, fn, implFn, signature);
+    LinkEntity varEntity =
+        LinkEntity::forDynamicallyReplaceableFunctionVariable(f);
+    LinkEntity keyEntity = LinkEntity::forDynamicallyReplaceableFunctionKey(f);
+    emitDynamicallyReplaceableThunk(*this, varEntity, keyEntity, fn, implFn,
+                                    signature);
     return implFn;
   }
   return fn;
@@ -3074,6 +3185,28 @@ IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
 
   llvm::Type *params[] = { SizeTy }; // MetadataRequest
   auto fnType = llvm::FunctionType::get(TypeMetadataResponseTy, params, false);
+  Signature signature(fnType, llvm::AttributeList(), SwiftCC);
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  entry = createFunction(*this, link, signature);
+  return entry;
+}
+
+/// Fetch the opaque type descriptor access function.
+llvm::Function *IRGenModule::getAddrOfOpaqueTypeDescriptorAccessFunction(
+    OpaqueTypeDecl *decl, ForDefinition_t forDefinition, bool implementation) {
+  IRGen.noteUseOfOpaqueTypeDescriptor(decl);
+
+  LinkEntity entity =
+      implementation ? LinkEntity::forOpaqueTypeDescriptorAccessorImpl(decl)
+                     : LinkEntity::forOpaqueTypeDescriptorAccessor(decl);
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) {
+    if (forDefinition)
+      updateLinkageForDefinition(*this, entry, entity);
+    return entry;
+  }
+
+  auto fnType = llvm::FunctionType::get(OpaqueTypeDescriptorPtrTy, {}, false);
   Signature signature(fnType, llvm::AttributeList(), SwiftCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);

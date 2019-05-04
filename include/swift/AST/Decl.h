@@ -4690,6 +4690,10 @@ public:
 
   bool hasDidSetOrWillSetDynamicReplacement() const;
 
+  bool hasAnyNativeDynamicAccessors() const;
+
+  bool hasAnyDynamicReplacementAccessors() const;
+
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const {
     return OpaqueReturn;
   }
