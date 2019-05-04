@@ -55,5 +55,5 @@ import fixit_stub_mutability_proto_module
 class Class2: ExternalMutabilityProto { // expected-error{{type 'Class2' does not conform to protocol 'ExternalMutabilityProto'}} expected-note{{do you want to add protocol stubs?}} {{40-40=\n    func foo() {\n        <#code#>\n    \}\n\n    subscript() -> Int {\n        get {\n            <#code#>\n        \}\n        set(newValue) {\n            <#code#>\n        \}\n    \}\n}}
 }
 
-struct Struct2: ExternalMutabilityProto { // expected-error{{type 'Struct2' does not conform to protocol 'ExternalMutabilityProto'}} expected-note{{do you want to add protocol stubs?}} {{42-42=\n    mutating func foo() {\n        <#code#>\n    \}\n\n    subscript() -> Int {\n        get {\n            <#code#>\n        \}\n        nonmutating set(newValue) {\n            <#code#>\n        \}\n    \}\n}}
+struct Struct2: ExternalMutabilityProto { // expected-error{{type 'Struct2' does not conform to protocol 'ExternalMutabilityProto'}} expected-note{{do you want to add protocol stubs?}} {{42-42=\n    mutating func foo() {\n        <#code#>\n    \}\n\n    subscript() -> Int {\n        mutating get {\n            <#code#>\n        \}\n        nonmutating set(newValue) {\n            <#code#>\n        \}\n    \}\n}}
 }

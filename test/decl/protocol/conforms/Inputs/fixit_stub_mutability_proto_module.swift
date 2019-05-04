@@ -1,4 +1,4 @@
 public protocol ExternalMutabilityProto {
     mutating func foo()
-    subscript() -> Int { get nonmutating set }
+    subscript() -> Int { mutating get nonmutating set }
 }
