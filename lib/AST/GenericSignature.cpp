@@ -605,12 +605,12 @@ GenericSignature::requirementsNotSatisfiedBy(GenericSignature *otherSig,
   // Find the requirements that aren't satisfied.
   for (const auto &req : getRequirements()) {
     auto reqToCheck = req;
-    if (subMap) {
+		
+		if (subMap) {
       auto subsReq = req.subst(subMap);
-      if (subsReq.hasValue()) {
-        reqToCheck = subsReq.getValue();
-      }
+			reqToCheck = subsReq.hasValue() ? subsReq.getValue() : reqToCheck;
     }
+		
     if (!otherSig->isRequirementSatisfied(reqToCheck))
       result.push_back(req);
   }
