@@ -864,27 +864,35 @@ public:
 
 struct KeyPathDynamicMemberConsumer : public VisibleDeclConsumer {
   VisibleDeclConsumer &consumer;
-  std::function<bool(DeclBaseName)> seenBaseName;
+  std::function<bool(DeclBaseName)> seenStaticBaseName;
+  llvm::DenseSet<DeclBaseName> seen;
 
   SubscriptDecl *currentSubscript = nullptr;
   Type currentBaseType = Type();
 
   KeyPathDynamicMemberConsumer(VisibleDeclConsumer &consumer,
                                std::function<bool(DeclBaseName)> seenBaseName)
-      : consumer(consumer), seenBaseName(std::move(seenBaseName)) {}
+      : consumer(consumer), seenStaticBaseName(std::move(seenBaseName)) {}
+
+  bool checkShadowed(ValueDecl *VD) {
+    // Dynamic lookup members are only visible if they are not shadowed by
+    // other members.
+    return !isa<SubscriptDecl>(VD) && seen.insert(VD->getBaseName()).second &&
+           !seenStaticBaseName(VD->getBaseName());
+  }
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind reason,
                  DynamicLookupInfo dynamicLookupInfo) override {
+    assert(dynamicLookupInfo.getKind() !=
+           DynamicLookupInfo::KeyPathDynamicMember);
+
     // Only variables and subscripts are allowed in a keypath.
     if (!isa<AbstractStorageDecl>(VD))
       return;
 
-    assert(dynamicLookupInfo.getKind() !=
-           DynamicLookupInfo::KeyPathDynamicMember);
-
     // Dynamic lookup members are only visible if they are not shadowed by
     // non-dynamic members.
-    if (isa<SubscriptDecl>(VD) || !seenBaseName(VD->getBaseName()))
+    if (checkShadowed(VD))
       consumer.foundDecl(VD, DeclVisibilityKind::DynamicLookup,
                          {currentSubscript, currentBaseType, reason});
   }
@@ -913,7 +921,28 @@ static void lookupVisibleDynamicMemberLookupDecls(
     Type baseType, KeyPathDynamicMemberConsumer &consumer,
     const DeclContext *dc, LookupState LS, DeclVisibilityKind reason,
     LazyResolver *typeResolver, GenericSignatureBuilder *GSB,
-    VisitedSet &visited) {
+    VisitedSet &visited, llvm::DenseSet<TypeBase *> &seenDynamicLookup);
+
+static void lookupVisibleMemberAndDynamicMemberDecls(
+    Type baseType, VisibleDeclConsumer &consumer,
+    KeyPathDynamicMemberConsumer &dynamicMemberConsumer, const DeclContext *DC,
+    LookupState LS, DeclVisibilityKind reason, LazyResolver *typeResolver,
+    GenericSignatureBuilder *GSB, VisitedSet &visited,
+    llvm::DenseSet<TypeBase *> &seenDynamicLookup) {
+  lookupVisibleMemberDeclsImpl(baseType, consumer, DC, LS, reason, typeResolver,
+                               GSB, visited);
+  lookupVisibleDynamicMemberLookupDecls(baseType, dynamicMemberConsumer, DC, LS,
+                                        reason, typeResolver, GSB, visited,
+                                        seenDynamicLookup);
+}
+
+static void lookupVisibleDynamicMemberLookupDecls(
+    Type baseType, KeyPathDynamicMemberConsumer &consumer,
+    const DeclContext *dc, LookupState LS, DeclVisibilityKind reason,
+    LazyResolver *typeResolver, GenericSignatureBuilder *GSB,
+    VisitedSet &visited, llvm::DenseSet<TypeBase *> &seenDynamicLookup) {
+  if (!seenDynamicLookup.insert(baseType.getPointer()).second)
+    return;
 
   if (!hasDynamicMemberLookupAttribute(baseType))
     return;
@@ -946,8 +975,9 @@ static void lookupVisibleDynamicMemberLookupDecls(
     KeyPathDynamicMemberConsumer::SubscriptChange(consumer, subscript,
                                                   baseType);
 
-    lookupVisibleMemberDeclsImpl(memberType, consumer, dc, LS, reason,
-                                 typeResolver, GSB, visited);
+    lookupVisibleMemberAndDynamicMemberDecls(memberType, consumer, consumer, dc,
+                                             LS, reason, typeResolver, GSB,
+                                             visited, seenDynamicLookup);
   }
 }
 
@@ -963,15 +993,14 @@ static void lookupVisibleMemberDecls(
     GenericSignatureBuilder *GSB) {
   OverrideFilteringConsumer overrideConsumer(BaseTy, CurrDC, TypeResolver);
   KeyPathDynamicMemberConsumer dynamicConsumer(
-      overrideConsumer,
+      Consumer,
       [&](DeclBaseName name) { return overrideConsumer.seenBaseName(name); });
 
   VisitedSet Visited;
-  lookupVisibleMemberDeclsImpl(BaseTy, overrideConsumer, CurrDC, LS, Reason,
-                               TypeResolver, GSB, Visited);
-
-  lookupVisibleDynamicMemberLookupDecls(BaseTy, dynamicConsumer, CurrDC, LS,
-                                        Reason, TypeResolver, GSB, Visited);
+  llvm::DenseSet<TypeBase *> seenDynamicLookup;
+  lookupVisibleMemberAndDynamicMemberDecls(
+      BaseTy, overrideConsumer, dynamicConsumer, CurrDC, LS, Reason,
+      TypeResolver, GSB, Visited, seenDynamicLookup);
 
   // Report the declarations we found to the real consumer.
   for (const auto &DeclAndReason : overrideConsumer.DeclsToReport)
