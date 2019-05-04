@@ -954,12 +954,25 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     auto baseGenericSig = baseGenericCtx->getGenericSignature();
     auto declGenericSig = declGenericCtx->getGenericSignature();
 
-    if (baseGenericSig && declGenericSig) {
-      if (!baseGenericSig->requirementsNotSatisfiedBy(declGenericSig).empty()) {
-        diags.diagnose(decl, diag::override_method_different_generic_sig,
-                       decl->getBaseName());
-        diags.diagnose(baseDecl, diag::overridden_here);
-        emittedMatchError = true;
+    auto baseClass = baseGenericCtx->getInnermostTypeContext();
+    auto derivedClass = declGenericCtx->getInnermostTypeContext();
+
+    if (baseClass && derivedClass) {
+      if (isa<ClassDecl>(baseClass) && isa<ClassDecl>(derivedClass)) {
+        auto subMap = derivedClass->getSelfClassDecl()
+                          ->getSuperclass()
+                          ->getContextSubstitutionMap(decl->getModuleContext(),
+                                                      baseClass);
+        if (baseGenericSig && declGenericSig) {
+          if (!baseGenericSig
+                   ->requirementsNotSatisfiedBy(declGenericSig, subMap)
+                   .empty()) {
+            diags.diagnose(decl, diag::override_method_different_generic_sig,
+                           decl->getBaseName());
+            diags.diagnose(baseDecl, diag::overridden_here);
+            emittedMatchError = true;
+          }
+        }
       }
     }
   }

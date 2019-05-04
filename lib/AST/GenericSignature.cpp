@@ -587,8 +587,9 @@ bool GenericSignature::isRequirementSatisfied(Requirement requirement) {
   llvm_unreachable("unhandled kind");
 }
 
-SmallVector<Requirement, 4> GenericSignature::requirementsNotSatisfiedBy(
-                                                 GenericSignature *otherSig) {
+SmallVector<Requirement, 4>
+GenericSignature::requirementsNotSatisfiedBy(GenericSignature *otherSig,
+                                             SubstitutionMap subMap) {
   SmallVector<Requirement, 4> result;
 
   // If the signatures are the same, all requirements are satisfied.
@@ -603,7 +604,14 @@ SmallVector<Requirement, 4> GenericSignature::requirementsNotSatisfiedBy(
 
   // Find the requirements that aren't satisfied.
   for (const auto &req : getRequirements()) {
-    if (!otherSig->isRequirementSatisfied(req))
+    auto reqToCheck = req;
+    if (subMap) {
+      auto subsReq = req.subst(subMap);
+      if (subsReq.hasValue()) {
+        reqToCheck = subsReq.getValue();
+      }
+    }
+    if (!otherSig->isRequirementSatisfied(reqToCheck))
       result.push_back(req);
   }
 
