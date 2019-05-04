@@ -278,18 +278,9 @@ bool RequirementFailure::diagnoseAsError() {
         anchor->getLoc(), diag::type_does_not_conform_in_opaque_return,
         namingDecl->getDescriptiveKind(), namingDecl->getFullName(), lhs, rhs);
 
-    TypeLoc returnLoc;
-    if (auto *VD = dyn_cast<VarDecl>(namingDecl)) {
-      returnLoc = VD->getTypeLoc();
-    } else if (auto *FD = dyn_cast<FuncDecl>(namingDecl)) {
-      returnLoc = FD->getBodyResultTypeLoc();
-    } else if (auto *SD = dyn_cast<SubscriptDecl>(namingDecl)) {
-      returnLoc = SD->getElementTypeLoc();
-    }
-
-    if (returnLoc.hasLocation()) {
-      emitDiagnostic(returnLoc.getLoc(), diag::opaque_return_type_declared_here)
-          .highlight(returnLoc.getSourceRange());
+    if (auto *repr = namingDecl->getOpaqueResultTypeRepr()) {
+      emitDiagnostic(repr->getLoc(), diag::opaque_return_type_declared_here)
+          .highlight(repr->getSourceRange());
     }
     return true;
   }
