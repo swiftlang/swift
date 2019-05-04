@@ -21,7 +21,7 @@ internal protocol _AbstractStringStorage : _NSCopying {
   var count: Int { get }
   var isASCII: Bool { get }
   var start: UnsafePointer<UInt8> { get }
-  var length: Int { get } // In UTF16 code units.
+  var UTF16Length: Int { get }
 }
 
 internal let _cocoaASCIIEncoding:UInt = 1 /* NSASCIIStringEncoding */
@@ -141,16 +141,26 @@ extension _AbstractStringStorage {
       }
       // At this point we've proven that it is an NSString of some sort, but not
       // one of ours.
-      if length != _stdlib_binary_CFStringGetLength(other) {
-        return 0
-      }
+
       defer { _fixLifetime(other) }
+      
+      let otherUTF16Length = _stdlib_binary_CFStringGetLength(other)
+      
       // CFString will only give us ASCII bytes here, but that's fine.
       // We already handled non-ASCII UTF8 strings earlier since they're Swift.
       if let otherStart = _cocoaUTF8Pointer(other) {
+        //We know that otherUTF16Length is also its byte count at this point
+        if count != otherUTF16Length {
+          return 0
+        }
         return (start == otherStart ||
           (memcmp(start, otherStart, count) == 0)) ? 1 : 0
       }
+      
+      if UTF16Length != otherUTF16Length {
+        return 0
+      }
+      
       /*
        The abstract implementation of -isEqualToString: falls back to -compare:
        immediately, so when we run out of fast options to try, do the same.
@@ -221,7 +231,7 @@ final internal class __StringStorage
 #if _runtime(_ObjC)
 
   @objc(length)
-  final internal var length: Int {
+  final internal var UTF16Length: Int {
     @_effects(readonly) @inline(__always) get {
       return asString.utf16.count // UTF16View special-cases ASCII for us.
     }
@@ -701,7 +711,7 @@ final internal class __SharedStringStorage
 #if _runtime(_ObjC)
 
   @objc(length)
-  final internal var length: Int {
+  final internal var UTF16Length: Int {
     @_effects(readonly) get {
       return asString.utf16.count // UTF16View special-cases ASCII for us.
     }
