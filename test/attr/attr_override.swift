@@ -534,7 +534,7 @@ class SR_4206_C6<T>: SR_4206_C5 {
 protocol SR_4206_Proto {}
 
 class GenericClass_SR_4206<T> {
-  func foo<T: SR_4206_Proto>(arg: T) {} // expected-error {{overridden declaration is here}}
+  func foo<T: SR_4206_Proto>(arg: T) {} // expected-note {{overridden declaration is here}}
 }
 
 class ConcreteClass_SR_4206: GenericClass_SR_4206<SR_4206_Proto> {
