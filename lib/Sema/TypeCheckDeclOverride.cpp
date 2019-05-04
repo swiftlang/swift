@@ -947,18 +947,43 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   }
 
   auto baseGenericCtx = baseDecl->getAsGenericContext();
-  auto declGenericCtx = decl->getAsGenericContext();
+  auto derivedGenericCtx = decl->getAsGenericContext();
 
   // If the generic signatures are different, then complain.
-  if (baseGenericCtx && declGenericCtx) {
+  if (baseGenericCtx && derivedGenericCtx) {
     auto baseGenericSig = baseGenericCtx->getGenericSignature();
-    auto declGenericSig = declGenericCtx->getGenericSignature();
-    
-    if (baseGenericSig != declGenericSig) {
-      diags.diagnose(decl, diag::override_method_different_generic_sig,
-                     decl->getBaseName());
-      diags.diagnose(baseDecl, diag::overridden_here);
-      emittedMatchError = true;
+    auto derivedGenericSig = derivedGenericCtx->getGenericSignature();
+
+    auto baseClass = baseGenericCtx->getInnermostTypeContext();
+    auto derivedClass = derivedGenericCtx->getInnermostTypeContext();
+
+    if (baseClass && derivedClass) {
+      if (isa<ClassDecl>(baseClass) && isa<ClassDecl>(derivedClass)) {
+        auto derivedSuperclass = derivedClass->getSelfClassDecl()->getSuperclass();
+        auto derivedSubMap = derivedSuperclass
+                              ? derivedSuperclass->getContextSubstitutionMap(
+                                    decl->getModuleContext(), baseClass)
+                              : SubstitutionMap();
+
+        if (baseGenericSig && derivedGenericSig) {
+          auto baseReqsNotSatisfied =
+              !baseGenericSig
+                   ->requirementsNotSatisfiedBy(derivedGenericSig, derivedSubMap)
+                   .empty();
+
+          auto derivedReqsNotSatisfied =
+              !derivedGenericSig
+                   ->requirementsNotSatisfiedBy(baseGenericSig, derivedSubMap)
+                   .empty();
+
+          if (baseReqsNotSatisfied || derivedReqsNotSatisfied) {
+            diags.diagnose(decl, diag::override_method_different_generic_sig,
+                           decl->getBaseName());
+            diags.diagnose(baseDecl, diag::overridden_here);
+            emittedMatchError = true;
+          }
+        }
+      }
     }
   }
 

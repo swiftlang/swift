@@ -613,7 +613,7 @@ GenericSignature::requirementsNotSatisfiedBy(GenericSignature *otherSig,
     }
 		
     if (!otherSig->isRequirementSatisfied(reqToCheck))
-      result.push_back(req);
+      result.push_back(reqToCheck);
   }
 
   return result;
