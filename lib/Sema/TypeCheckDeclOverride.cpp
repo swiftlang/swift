@@ -959,17 +959,18 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
 
     if (baseClass && derivedClass) {
       if (isa<ClassDecl>(baseClass) && isa<ClassDecl>(derivedClass)) {
-        auto derivedSuperclass = derivedClass->getSelfClassDecl()->getSuperclass();
+        auto derivedSuperclass =
+            derivedClass->getSelfClassDecl()->getSuperclass();
         auto derivedSubMap = derivedSuperclass
-                              ? derivedSuperclass->getContextSubstitutionMap(
-                                    decl->getModuleContext(), baseClass)
-                              : SubstitutionMap();
+                                 ? derivedSuperclass->getContextSubstitutionMap(
+                                       decl->getModuleContext(), baseClass)
+                                 : SubstitutionMap();
 
         if (baseGenericSig && derivedGenericSig) {
-          auto baseReqsNotSatisfied =
-              !baseGenericSig
-                   ->requirementsNotSatisfiedBy(derivedGenericSig, derivedSubMap)
-                   .empty();
+          auto baseReqsNotSatisfied = !baseGenericSig
+                                           ->requirementsNotSatisfiedBy(
+                                               derivedGenericSig, derivedSubMap)
+                                           .empty();
 
           auto derivedReqsNotSatisfied =
               !derivedGenericSig
