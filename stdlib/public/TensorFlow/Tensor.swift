@@ -29,10 +29,11 @@ infix operator .== : ComparisonPrecedence
 // Tensor
 //===----------------------------------------------------------------------===//
 
-/// A `Tensor` is a generalization of vectors and matrices to potentially 
-/// higher dimensions.It represents multidimensional array of elements.An 
-/// associated data-type describes the format of each element in the tensor
-/// (such as integer, a floating point number or something else, etc.).
+/// A multidimensional array of elements that is a generalization of  
+/// vectors and matrices to potentially higher dimensions.  
+///  
+/// An associated data-type describes the format of each element in the 
+/// tensor (such as integer, a floating point number or something else, etc.). 
 @_fixed_layout
 public struct Tensor<Scalar : TensorFlowScalar> : TensorProtocol {
   /// The underlying `TensorHandle`.
