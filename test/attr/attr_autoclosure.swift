@@ -188,6 +188,7 @@ func rdar_20591571() {
 
   func id<T>(_: T) -> T {}
   func same<T>(_: T, _: T) {}
+  // expected-note@-1 2 {{generic parameters are always considered '@escaping'}}
 
   func takesAnAutoclosure(_ fn: @autoclosure () -> Int, _ efn: @escaping @autoclosure () -> Int) {
     // These are OK -- they count as non-escaping uses
@@ -198,8 +199,8 @@ func rdar_20591571() {
     let _ = efn
 
     _ = id(fn)          // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
-    _ = same(fn, { 3 }) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
-    _ = same({ 3 }, fn) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
+    _ = same(fn, { 3 }) // expected-error {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
+    _ = same({ 3 }, fn) // expected-error {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
 
     withoutActuallyEscaping(fn) { _ in }              // Ok
     withoutActuallyEscaping(fn) { (_: () -> Int) in } // Ok

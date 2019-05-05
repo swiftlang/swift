@@ -3075,10 +3075,15 @@ NOTE(silence_debug_description_in_interpolation_segment_call,none,
 NOTE(noescape_parameter,none,
     "parameter %0 is implicitly non-escaping",
      (Identifier))
+NOTE(generic_parameters_always_escaping,none,
+     "generic parameters are always considered '@escaping'", ())
 
 ERROR(passing_noescape_to_escaping,none,
       "passing non-escaping parameter %0 to function expecting an @escaping closure",
       (Identifier))
+ERROR(converting_noespace_param_to_generic_type,none,
+      "converting non-escaping parameter %0 to generic parameter %1 may allow it to escape",
+      (Identifier, Type))
 ERROR(assigning_noescape_to_escaping,none,
       "assigning non-escaping parameter %0 to an @escaping closure",
       (Identifier))
