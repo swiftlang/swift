@@ -1585,6 +1585,17 @@ bool MissingCallFailure::diagnoseAsError() {
     }
   }
 
+  if (auto *AE = dyn_cast<AssignExpr>(baseExpr)) {
+    auto *srcExpr = AE->getSrc();
+    if (auto *fnType = getType(srcExpr)->getAs<FunctionType>()) {
+      emitDiagnostic(srcExpr->getLoc(), diag::missing_nullary_call,
+                     fnType->getResult())
+          .highlight(srcExpr->getSourceRange())
+          .fixItInsertAfter(srcExpr->getEndLoc(), "()");
+      return true;
+    }
+  }
+
   emitDiagnostic(baseExpr->getLoc(), diag::did_not_call_function_value)
       .fixItInsertAfter(insertLoc, "()");
   return true;

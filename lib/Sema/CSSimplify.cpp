@@ -1964,24 +1964,45 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
 /// Attempt to repair typing failures and record fixes if needed.
 /// \return true if at least some of the failures has been repaired
 /// successfully, which allows type matcher to continue.
-static bool
-repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
-               SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
-               ConstraintLocatorBuilder locator) {
+bool ConstraintSystem::repairFailures(
+    Type lhs, Type rhs, SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
+    ConstraintLocatorBuilder locator) {
   SmallVector<LocatorPathElt, 4> path;
   auto *anchor = locator.getLocatorParts(path);
 
   if (path.empty()) {
+    if (!anchor)
+      return false;
+
     // If method reference forms a value type of the key path,
     // there is going to be a constraint to match result of the
     // member lookup to the generic parameter `V` of *KeyPath<R, V>
     // type associated with key path expression, which we need to
     // fix-up here.
-    if (anchor && isa<KeyPathExpr>(anchor)) {
+    if (isa<KeyPathExpr>(anchor)) {
       auto *fnType = lhs->getAs<FunctionType>();
       if (fnType && fnType->getResult()->isEqual(rhs))
         return true;
     }
+
+    if (isa<AssignExpr>(anchor)) {
+      if (auto *fnType = lhs->getAs<FunctionType>()) {
+        // If left-hand side is a function type but right-hand
+        // side isn't, let's check it would be possible to fix
+        // this by forming an explicit call.
+        auto convertTo = rhs->lookThroughAllOptionalTypes();
+        if (!convertTo->is<FunctionType>() && !convertTo->isVoid() &&
+            fnType->getNumParams() == 0 &&
+            matchTypes(fnType->getResult(), rhs, ConstraintKind::Conversion,
+                       TypeMatchFlags::TMF_ApplyingFix, locator)
+                .isSuccess()) {
+          conversionsOrFixes.push_back(
+              InsertExplicitCall::create(*this, getConstraintLocator(locator)));
+          return true;
+        }
+      }
+    }
+
     return false;
   }
 
@@ -1991,14 +2012,14 @@ repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
   case ConstraintLocator::ApplyArgToParam: {
     if (lhs->getOptionalObjectType() && !rhs->getOptionalObjectType()) {
       conversionsOrFixes.push_back(
-          ForceOptional::create(cs, lhs, lhs->getOptionalObjectType(),
-                                cs.getConstraintLocator(locator)));
+          ForceOptional::create(*this, lhs, lhs->getOptionalObjectType(),
+                                getConstraintLocator(locator)));
     }
     break;
   }
 
   case ConstraintLocator::FunctionArgument: {
-    auto *argLoc = cs.getConstraintLocator(
+    auto *argLoc = getConstraintLocator(
         locator.withPathElement(LocatorPathElt::getSynthesizedArgument(0)));
 
     // Let's drop the last element which points to a single argument
@@ -2009,7 +2030,7 @@ repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
           path.back().getKind() == ConstraintLocator::ContextualType))
       return false;
 
-    auto arg = llvm::find_if(cs.getTypeVariables(),
+    auto arg = llvm::find_if(getTypeVariables(),
                              [&argLoc](const TypeVariableType *typeVar) {
                                return typeVar->getImpl().getLocator() == argLoc;
                              });
@@ -2026,27 +2047,27 @@ repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
     //
     // But if `T.Element` didn't get resolved to `Void` we'd like
     // to diagnose this as a missing argument which can't be ignored.
-    if (arg != cs.getTypeVariables().end()) {
+    if (arg != getTypeVariables().end()) {
       auto fnType = FunctionType::get({FunctionType::Param(lhs)},
-                                      cs.getASTContext().TheEmptyTupleType);
+                                      getASTContext().TheEmptyTupleType);
       conversionsOrFixes.push_back(AddMissingArguments::create(
-          cs, fnType, {FunctionType::Param(*arg)},
-          cs.getConstraintLocator(anchor, path,
-                                  /*summaryFlags=*/0)));
+          *this, fnType, {FunctionType::Param(*arg)},
+          getConstraintLocator(anchor, path,
+                               /*summaryFlags=*/0)));
     }
     break;
   }
 
   case ConstraintLocator::TypeParameterRequirement:
   case ConstraintLocator::ConditionalRequirement: {
-    if (auto *fix = fixRequirementFailure(cs, lhs, rhs, anchor, path))
+    if (auto *fix = fixRequirementFailure(*this, lhs, rhs, anchor, path))
       conversionsOrFixes.push_back(fix);
     break;
   }
 
   case ConstraintLocator::ClosureResult: {
-    auto *fix = ContextualMismatch::create(cs, lhs, rhs,
-                                           cs.getConstraintLocator(locator));
+    auto *fix = ContextualMismatch::create(*this, lhs, rhs,
+                                           getConstraintLocator(locator));
     conversionsOrFixes.push_back(fix);
     break;
   }
@@ -2056,14 +2077,14 @@ repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
     // between them are mutability and/or root, value type mismatch.
     if (isKnownKeyPathType(lhs) && isKnownKeyPathType(rhs)) {
       auto *fix = KeyPathContextualMismatch::create(
-          cs, lhs, rhs, cs.getConstraintLocator(locator));
+          *this, lhs, rhs, getConstraintLocator(locator));
       conversionsOrFixes.push_back(fix);
     }
 
     if (lhs->is<FunctionType>() && !rhs->is<AnyFunctionType>() &&
         isa<ClosureExpr>(anchor)) {
-      auto *fix = ContextualMismatch::create(cs, lhs, rhs,
-                                             cs.getConstraintLocator(locator));
+      auto *fix = ContextualMismatch::create(*this, lhs, rhs,
+                                             getConstraintLocator(locator));
       conversionsOrFixes.push_back(fix);
     }
     break;
@@ -2903,7 +2924,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   // Attempt to repair any failures identifiable at this point.
   if (attemptFixes) {
-    if (repairFailures(*this, type1, type2, conversionsOrFixes, locator)) {
+    if (repairFailures(type1, type2, conversionsOrFixes, locator)) {
       if (conversionsOrFixes.empty())
         return getTypeMatchSuccess();
     }
@@ -6446,6 +6467,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     return result;
   }
 
+  case FixKind::InsertCall:
   case FixKind::SkipSameTypeRequirement:
   case FixKind::SkipSuperclassRequirement:
   case FixKind::ContextualMismatch:
@@ -6454,7 +6476,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
 
   case FixKind::UseSubscriptOperator:
-  case FixKind::InsertCall:
   case FixKind::ExplicitlyEscaping:
   case FixKind::CoerceToCheckedCast:
   case FixKind::RelabelArguments:
