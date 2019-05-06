@@ -4097,7 +4097,8 @@ public:
   /// std::error_code. This is only meant to be used in assertions. When
   /// assertions are disabled, this just returns true.
   ABICompatibilityCheckResult
-  isABICompatibleWith(CanSILFunctionType other) const;
+  isABICompatibleWith(CanSILFunctionType other,
+                      SILFunction *context = nullptr) const;
 
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                       SubstitutionMap subs);
@@ -4844,17 +4845,27 @@ END_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
 /// to their underlying types.
 class ReplaceOpaqueTypesWithUnderlyingTypes {
 public:
-  ReplaceOpaqueTypesWithUnderlyingTypes() {}
-  
+  ModuleDecl *contextModule;
+  ResilienceExpansion contextExpansion;
+  ReplaceOpaqueTypesWithUnderlyingTypes(ModuleDecl *contextModule,
+                                        ResilienceExpansion contextExpansion)
+      : contextModule(contextModule), contextExpansion(contextExpansion) {}
+
   /// TypeSubstitutionFn
   Type operator()(SubstitutableType *maybeOpaqueType) const;
-  
+
   /// LookupConformanceFn
   Optional<ProtocolConformanceRef> operator()(CanType maybeOpaqueType,
                                               Type replacementType,
                                               ProtocolDecl *protocol) const;
+
+  bool shouldPerformSubstitution(OpaqueTypeDecl *opaque) const;
+
+  static bool shouldPerformSubstitution(OpaqueTypeDecl *opaque,
+                                        ModuleDecl *contextModule,
+                                        ResilienceExpansion contextExpansion);
 };
-  
+
 /// An archetype that represents the dynamic type of an opened existential.
 class OpenedArchetypeType final : public ArchetypeType,
     private ArchetypeTrailingObjects<OpenedArchetypeType>

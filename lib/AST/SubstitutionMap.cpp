@@ -472,7 +472,8 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
 
     // Fast path for concrete case -- we don't need to compute substType
     // at all.
-    if (conformance.isConcrete()) {
+    if (conformance.isConcrete() &&
+        !options.contains(SubstFlags::SubstituteOpaqueArchetypes)) {
       newConformances.push_back(
         ProtocolConformanceRef(
           conformance.getConcrete()->subst(subs, conformances)));
@@ -490,13 +491,6 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
 
   assert(oldConformances.empty());
   return SubstitutionMap(genericSig, newSubs, newConformances);
-}
-
-SubstitutionMap
-SubstitutionMap::substOpaqueTypesWithUnderlyingTypes()
-const {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer;
-  return subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
 }
 
 SubstitutionMap
