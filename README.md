@@ -2,38 +2,8 @@
 
 | OS | CI platform | x86_64 | GPU |
 |---|:---:|:---:|:---:|
-<<<<<<< HEAD
-| **macOS**        | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-osx/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-osx)|[![Build Status](https://ci.swift.org/job/oss-swift-package-osx/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-osx)|
-| **Ubuntu 14.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-14_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-14_04)|
-| **Ubuntu 16.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04)|
-| **Ubuntu 18.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-18_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-18_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-18_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-18_04)|
-
-**Swift Community-Hosted CI Platforms**
-
-| **OS** | **Architecture** | **Build** |
-|---|:---:|:---:|
-|**[Debian 9.1 (Raspberry Pi)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/armv7_debian_stretch.json)** | ARMv7 | [![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-debian-9_1/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-debian-9_1)|
-|**[Fedora 27](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_fedora_27.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-fedora-27/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-fedora-27)|
-|**[Ubuntu 16.04](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04)|
-|**[Ubuntu 16.04 ](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/ppc64le_ubuntu_16_04.json)** | PPC64LE |[![Build Status](https://ci-external.swift.org/job/oss-swift-4.1-RA-linux-ubuntu-16.04-ppc64le/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-4.1-RA-linux-ubuntu-16.04-ppc64le)|
-|**[Ubuntu 16.04 ](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/aarch64_ubuntu_16.04.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-aarch64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-aarch64)|
-|**[Android](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_LTS_android.json)** | ARMv7 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android)|
-|**[Android](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_LTS_android.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android-arm64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android-arm64)|
-|**[Ubuntu 16.04 (TensorFlow)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_tensorflow.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow)|
-|**[macOS 10.13 (TensorFlow)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_macos_high_sierra_tensorflow.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-macOS-tensorflow/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-macOS-tensorflow)|
-|**[Ubuntu 16.04 (TensorFlow with GPU)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_tensorflow_gpu.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow-gpu/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow-gpu)|
-|**[Debian 9.5](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_debian_9.5.json)** | x86_64 | [![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-debian-9_5/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-debian-9_5)|
-
-
-## Welcome to Swift
-
-Swift is a high-performance system programming language.  It has a clean
-and modern syntax, offers seamless access to existing C and Objective-C code
-and frameworks, and is memory safe by default.
-=======
 | **macOS** | Google Kokoro | ![Build Status](https://storage.googleapis.com/tensorflow-kokoro-build-badges/macos-swift-tf-release.svg) | _coming soon_ |
 | **Ubuntu 16.04** | Swift.org CI | [![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow) | N/A |
->>>>>>> origin/tensorflow
 
 Welcome to Swift for TensorFlow!
 
@@ -316,15 +286,12 @@ tests):
 
 Swift for TensorFlow adds the following new test suites:
 
-<<<<<<< HEAD
-    easy_install -U "Sphinx < 2.0"
-=======
 - [test/AutoDiff](test/AutoDiff): tests for
   [automatic differentiation](https://github.com/tensorflow/swift/blob/master/docs/AutomaticDifferentiation.md).
 - [test/TensorFlow](test/TensorFlow): TensorFlow infrastructure tests that don't
   depend on the TensorFlow runtime.
 - [test/TensorFlowRuntime](test/TensorFlowRuntime): TensorFlow runtime tests.
->>>>>>> origin/tensorflow
+
 
 Before submitting pull requests involving large code changes, please run the
 command above locally to ensure all tests pass.
