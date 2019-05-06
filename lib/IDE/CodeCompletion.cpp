@@ -1799,7 +1799,8 @@ public:
   }
 
   SemanticContextKind getSemanticContext(const Decl *D,
-                                         DeclVisibilityKind Reason) {
+                                         DeclVisibilityKind Reason,
+                                         DynamicLookupInfo dynamicLookupInfo) {
     if (ForcedSemanticContext)
       return *ForcedSemanticContext;
 
@@ -1845,12 +1846,27 @@ public:
       }
 
     case DeclVisibilityKind::DynamicLookup:
-      // AnyObject results can come from different modules, including the
-      // current module, but we always assign them the OtherModule semantic
-      // context.  These declarations are uniqued by signature, so it is
-      // totally random (determined by the hash function) which of the
-      // equivalent declarations (across multiple modules) we will get.
-      return SemanticContextKind::OtherModule;
+      switch (dynamicLookupInfo.getKind()) {
+      case DynamicLookupInfo::None:
+        llvm_unreachable("invalid DynamicLookupInfo::Kind for dynamic lookup");
+
+      case DynamicLookupInfo::AnyObject:
+        // AnyObject results can come from different modules, including the
+        // current module, but we always assign them the OtherModule semantic
+        // context.  These declarations are uniqued by signature, so it is
+        // totally random (determined by the hash function) which of the
+        // equivalent declarations (across multiple modules) we will get.
+        return SemanticContextKind::OtherModule;
+
+      case DynamicLookupInfo::KeyPathDynamicMember:
+        // Use the visibility of the underlying declaration.
+        // FIXME: KeyPath<AnyObject, U> !?!?
+        assert(dynamicLookupInfo.getKeyPathDynamicMember().originalVisibility !=
+               DeclVisibilityKind::DynamicLookup);
+        return getSemanticContext(
+            D, dynamicLookupInfo.getKeyPathDynamicMember().originalVisibility,
+            {});
+      }
     }
     llvm_unreachable("unhandled kind");
   }
@@ -1976,10 +1992,18 @@ public:
     });
   }
 
-  Type getTypeOfMember(const ValueDecl *VD, Optional<Type> ExprType = None) {
-    if (!ExprType)
-      ExprType = this->ExprType;
+  Type getTypeOfMember(const ValueDecl *VD,
+                       DynamicLookupInfo dynamicLookupInfo) {
+    if (dynamicLookupInfo.getKind() == DynamicLookupInfo::None) {
+      return getTypeOfMember(VD, this->ExprType);
+    } else {
+      // FIXME: for keypath dynamic members we should substitute the subscript
+      // return type; for now just avoid substituting at all by passing null.
+      return getTypeOfMember(VD, Type());
+    }
+  }
 
+  Type getTypeOfMember(const ValueDecl *VD, Type ExprType) {
     auto *M = CurrDeclContext->getParentModule();
     auto *GenericSig = VD->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
@@ -1987,11 +2011,11 @@ public:
     assert(VD->hasValidSignature());
     Type T = VD->getInterfaceType();
 
-    if (*ExprType) {
+    if (ExprType) {
       Type ContextTy = VD->getDeclContext()->getDeclaredInterfaceType();
       if (ContextTy) {
         // Look through lvalue types and metatypes
-        Type MaybeNominalType = (*ExprType)->getRValueType();
+        Type MaybeNominalType = ExprType->getRValueType();
 
         if (auto Metatype = MaybeNominalType->getAs<MetatypeType>())
           MaybeNominalType = Metatype->getInstanceType();
@@ -2057,7 +2081,8 @@ public:
     return Type();
   }
 
-  void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason) {
+  void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason,
+                     DynamicLookupInfo dynamicLookupInfo) {
     if (!VD->hasName() ||
         !VD->isAccessibleFrom(CurrDeclContext) ||
         VD->shouldHideFromEditor())
@@ -2068,9 +2093,8 @@ public:
 
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
-        Sink,
-        CodeCompletionResult::ResultKind::Declaration,
-        getSemanticContext(VD, Reason), expectedTypeContext);
+        Sink, CodeCompletionResult::ResultKind::Declaration,
+        getSemanticContext(VD, Reason, dynamicLookupInfo), expectedTypeContext);
     Builder.setAssociatedDecl(VD);
     addLeadingDot(Builder);
     addValueBaseName(Builder, Name);
@@ -2080,7 +2104,7 @@ public:
       return;
 
     // Add a type annotation.
-    Type VarType = getTypeOfMember(VD);
+    Type VarType = getTypeOfMember(VD, dynamicLookupInfo);
     if (Name != Ctx.Id_self && VD->isInOut()) {
       // It is useful to show inout for function parameters.
       // But for 'self' it is just noise.
@@ -2412,7 +2436,8 @@ public:
     llvm_unreachable("Unhandled LookupKind in switch.");
   }
 
-  void addMethodCall(const FuncDecl *FD, DeclVisibilityKind Reason) {
+  void addMethodCall(const FuncDecl *FD, DeclVisibilityKind Reason,
+                     DynamicLookupInfo dynamicLookupInfo) {
     if (FD->getName().empty())
       return;
     foundFunction(FD);
@@ -2420,7 +2445,7 @@ public:
     Identifier Name = FD->getName();
     assert(!Name.empty() && "name should not be empty");
 
-    Type FunctionType = getTypeOfMember(FD);
+    Type FunctionType = getTypeOfMember(FD, dynamicLookupInfo);
     assert(FunctionType);
 
     auto AFT = FunctionType->getAs<AnyFunctionType>();
@@ -2444,7 +2469,8 @@ public:
       CommandWordsPairs Pairs;
       CodeCompletionResultBuilder Builder(
           Sink, CodeCompletionResult::ResultKind::Declaration,
-          getSemanticContext(FD, Reason), expectedTypeContext);
+          getSemanticContext(FD, Reason, dynamicLookupInfo),
+          expectedTypeContext);
       setClangDeclKeywords(FD, Pairs, Builder);
       Builder.setAssociatedDecl(FD);
       addLeadingDot(Builder);
@@ -2526,11 +2552,12 @@ public:
   }
 
   void addConstructorCall(const ConstructorDecl *CD, DeclVisibilityKind Reason,
+                          DynamicLookupInfo dynamicLookupInfo,
                           Optional<Type> BaseType, Optional<Type> Result,
                           bool IsOnType = true,
                           Identifier addName = Identifier()) {
     foundFunction(CD);
-    Type MemberType = getTypeOfMember(CD, BaseType);
+    Type MemberType = getTypeOfMember(CD, BaseType.getValueOr(ExprType));
     AnyFunctionType *ConstructorType = nullptr;
     if (auto MemberFuncType = MemberType->getAs<AnyFunctionType>())
       ConstructorType = MemberFuncType->getResult()
@@ -2553,7 +2580,8 @@ public:
       CommandWordsPairs Pairs;
       CodeCompletionResultBuilder Builder(
           Sink, CodeCompletionResult::ResultKind::Declaration,
-          getSemanticContext(CD, Reason), expectedTypeContext);
+          getSemanticContext(CD, Reason, dynamicLookupInfo),
+          expectedTypeContext);
       setClangDeclKeywords(CD, Pairs, Builder);
       Builder.setAssociatedDecl(CD);
       if (needInit) {
@@ -2604,7 +2632,8 @@ public:
   }
 
   void addConstructorCallsForType(Type type, Identifier name,
-                                  DeclVisibilityKind Reason) {
+                                  DeclVisibilityKind Reason,
+                                  DynamicLookupInfo dynamicLookupInfo) {
     if (!Ctx.LangOpts.CodeCompleteInitsInPostfixExpr && !IsUnresolvedMember)
       return;
 
@@ -2620,13 +2649,15 @@ public:
             cast<ConstructorDecl>(init)->getFailability() == OTK_Optional) {
           continue;
         }
-        addConstructorCall(cast<ConstructorDecl>(init), Reason, type, None,
+        addConstructorCall(cast<ConstructorDecl>(init), Reason,
+                           dynamicLookupInfo, type, None,
                            /*IsOnType=*/true, name);
       }
     }
   }
 
-  void addSubscriptCall(const SubscriptDecl *SD, DeclVisibilityKind Reason) {
+  void addSubscriptCall(const SubscriptDecl *SD, DeclVisibilityKind Reason,
+                        DynamicLookupInfo dynamicLookupInfo) {
     // Don't add subscript call to unqualified completion.
     if (!ExprType)
       return;
@@ -2636,15 +2667,15 @@ public:
     if (HaveDot && !IsAfterSwiftKeyPathRoot)
       return;
 
-    auto subscriptType = getTypeOfMember(SD)->getAs<AnyFunctionType>();
+    auto subscriptType =
+        getTypeOfMember(SD, dynamicLookupInfo)->getAs<AnyFunctionType>();
     if (!subscriptType)
       return;
 
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
-        Sink,
-        CodeCompletionResult::ResultKind::Declaration,
-        getSemanticContext(SD, Reason), expectedTypeContext);
+        Sink, CodeCompletionResult::ResultKind::Declaration,
+        getSemanticContext(SD, Reason, dynamicLookupInfo), expectedTypeContext);
     Builder.setAssociatedDecl(SD);
     setClangDeclKeywords(SD, Pairs, Builder);
 
@@ -2671,15 +2702,15 @@ public:
     addTypeAnnotation(Builder, resultTy);
   }
 
-  void addNominalTypeRef(const NominalTypeDecl *NTD,
-                         DeclVisibilityKind Reason) {
+  void addNominalTypeRef(const NominalTypeDecl *NTD, DeclVisibilityKind Reason,
+                         DynamicLookupInfo dynamicLookupInfo) {
     if (IsUnresolvedMember)
       return;
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
-        Sink,
-        CodeCompletionResult::ResultKind::Declaration,
-        getSemanticContext(NTD, Reason), expectedTypeContext);
+        Sink, CodeCompletionResult::ResultKind::Declaration,
+        getSemanticContext(NTD, Reason, dynamicLookupInfo),
+        expectedTypeContext);
     Builder.setAssociatedDecl(NTD);
     setClangDeclKeywords(NTD, Pairs, Builder);
     addLeadingDot(Builder);
@@ -2687,14 +2718,15 @@ public:
     addTypeAnnotation(Builder, NTD->getDeclaredType());
   }
 
-  void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason) {
+  void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason,
+                       DynamicLookupInfo dynamicLookupInfo) {
     if (IsUnresolvedMember)
       return;
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
-        Sink,
-        CodeCompletionResult::ResultKind::Declaration,
-        getSemanticContext(TAD, Reason), expectedTypeContext);
+        Sink, CodeCompletionResult::ResultKind::Declaration,
+        getSemanticContext(TAD, Reason, dynamicLookupInfo),
+        expectedTypeContext);
     Builder.setAssociatedDecl(TAD);
     setClangDeclKeywords(TAD, Pairs, Builder);
     addLeadingDot(Builder);
@@ -2719,12 +2751,12 @@ public:
   }
 
   void addGenericTypeParamRef(const GenericTypeParamDecl *GP,
-                              DeclVisibilityKind Reason) {
+                              DeclVisibilityKind Reason,
+                              DynamicLookupInfo dynamicLookupInfo) {
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
-        Sink,
-        CodeCompletionResult::ResultKind::Declaration,
-        getSemanticContext(GP, Reason), expectedTypeContext);
+        Sink, CodeCompletionResult::ResultKind::Declaration,
+        getSemanticContext(GP, Reason, dynamicLookupInfo), expectedTypeContext);
     setClangDeclKeywords(GP, Pairs, Builder);
     Builder.setAssociatedDecl(GP);
     addLeadingDot(Builder);
@@ -2733,12 +2765,12 @@ public:
   }
 
   void addAssociatedTypeRef(const AssociatedTypeDecl *AT,
-                            DeclVisibilityKind Reason) {
+                            DeclVisibilityKind Reason,
+                            DynamicLookupInfo dynamicLookupInfo) {
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
-        Sink,
-        CodeCompletionResult::ResultKind::Declaration,
-        getSemanticContext(AT, Reason), expectedTypeContext);
+        Sink, CodeCompletionResult::ResultKind::Declaration,
+        getSemanticContext(AT, Reason, dynamicLookupInfo), expectedTypeContext);
     setClangDeclKeywords(AT, Pairs, Builder);
     Builder.setAssociatedDecl(AT);
     addLeadingDot(Builder);
@@ -2749,7 +2781,7 @@ public:
 
   void addPrecedenceGroupRef(PrecedenceGroupDecl *PGD) {
     auto semanticContext =
-      getSemanticContext(PGD, DeclVisibilityKind::VisibleAtTopLevel);
+        getSemanticContext(PGD, DeclVisibilityKind::VisibleAtTopLevel, {});
     CodeCompletionResultBuilder builder(
       Sink, CodeCompletionResult::ResultKind::Declaration,
       semanticContext, {});
@@ -2758,8 +2790,8 @@ public:
     builder.setAssociatedDecl(PGD);
   };
 
-  void addEnumElementRef(const EnumElementDecl *EED,
-                         DeclVisibilityKind Reason,
+  void addEnumElementRef(const EnumElementDecl *EED, DeclVisibilityKind Reason,
+                         DynamicLookupInfo dynamicLookupInfo,
                          bool HasTypeContext) {
     if (!EED->hasName() ||
         !EED->isAccessibleFrom(CurrDeclContext) ||
@@ -2770,7 +2802,7 @@ public:
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         HasTypeContext ? SemanticContextKind::ExpressionSpecific
-                       : getSemanticContext(EED, Reason),
+                       : getSemanticContext(EED, Reason, dynamicLookupInfo),
         expectedTypeContext);
     Builder.setAssociatedDecl(EED);
     setClangDeclKeywords(EED, Pairs, Builder);
@@ -2779,7 +2811,7 @@ public:
 
     // Enum element is of function type; (Self.type) -> Self or
     // (Self.Type) -> (Args...) -> Self.
-    Type EnumType = getTypeOfMember(EED);
+    Type EnumType = getTypeOfMember(EED, dynamicLookupInfo);
     if (EnumType->is<AnyFunctionType>())
       EnumType = EnumType->castTo<AnyFunctionType>()->getResult();
 
@@ -2846,11 +2878,13 @@ public:
 
   /// Add the compound function name for the given function.
   void addCompoundFunctionName(AbstractFunctionDecl *AFD,
-                               DeclVisibilityKind Reason) {
+                               DeclVisibilityKind Reason,
+                               DynamicLookupInfo dynamicLookupInfo) {
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
-        getSemanticContext(AFD, Reason), expectedTypeContext);
+        getSemanticContext(AFD, Reason, dynamicLookupInfo),
+        expectedTypeContext);
     setClangDeclKeywords(AFD, Pairs, Builder);
     Builder.setAssociatedDecl(AFD);
 
@@ -2879,7 +2913,8 @@ public:
   }
 
   // Implement swift::VisibleDeclConsumer.
-  void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
+  void foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
+                 DynamicLookupInfo dynamicLookupInfo) override {
     if (D->shouldHideFromEditor())
       return;
 
@@ -2901,7 +2936,7 @@ public:
       if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
         // Do we want compound function names here?
         if (shouldUseFunctionReference(CD)) {
-          addCompoundFunctionName(CD, Reason);
+          addCompoundFunctionName(CD, Reason, dynamicLookupInfo);
           return;
         }
 
@@ -2924,10 +2959,12 @@ public:
           // the initializer is required, the base type's instance type is not a class,
           // or this is a 'self' or 'super' reference.
           if (IsStaticMetatype || IsUnresolvedMember || Ty->is<ArchetypeType>())
-            addConstructorCall(CD, Reason, None, Result, /*isOnType*/true);
+            addConstructorCall(CD, Reason, dynamicLookupInfo, None, Result,
+                               /*isOnType*/ true);
           else if ((IsSelfRefExpr || IsSuperRefExpr || !Ty->is<ClassType>() ||
                     CD->isRequired()) && !HaveLParen)
-            addConstructorCall(CD, Reason, None, Result, /*isOnType*/false);
+            addConstructorCall(CD, Reason, dynamicLookupInfo, None, Result,
+                               /*isOnType*/ false);
           return;
         }
         if (!HaveLParen) {
@@ -2938,7 +2975,8 @@ public:
           // initializers and for 'super' in convenience initializers.
           if ((IsSelfRefExpr && CDC->isConvenienceInit()) ||
               ((IsSuperRefExpr && !CDC->isConvenienceInit())))
-            addConstructorCall(CD, Reason, None, None, /*IsOnType=*/false);
+            addConstructorCall(CD, Reason, dynamicLookupInfo, None, None,
+                               /*IsOnType=*/false);
         }
         return;
       }
@@ -2951,7 +2989,7 @@ public:
     case LookupKind::ValueInDeclContext:
     case LookupKind::ImportFromModule:
       if (auto *VD = dyn_cast<VarDecl>(D)) {
-        addVarDeclRef(VD, Reason);
+        addVarDeclRef(VD, Reason, dynamicLookupInfo);
         return;
       }
 
@@ -2967,77 +3005,79 @@ public:
 
         // Do we want compound function names here?
         if (shouldUseFunctionReference(FD)) {
-          addCompoundFunctionName(FD, Reason);
+          addCompoundFunctionName(FD, Reason, dynamicLookupInfo);
           return;
         }
 
-        addMethodCall(FD, Reason);
+        addMethodCall(FD, Reason, dynamicLookupInfo);
         return;
       }
 
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-        addNominalTypeRef(NTD, Reason);
+        addNominalTypeRef(NTD, Reason, dynamicLookupInfo);
         addConstructorCallsForType(NTD->getDeclaredInterfaceType(),
-                                   NTD->getName(), Reason);
+                                   NTD->getName(), Reason, dynamicLookupInfo);
         return;
       }
 
       if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
-        addTypeAliasRef(TAD, Reason);
+        addTypeAliasRef(TAD, Reason, dynamicLookupInfo);
         auto type = TAD->mapTypeIntoContext(TAD->getDeclaredInterfaceType());
         if (type->mayHaveMembers())
-          addConstructorCallsForType(type, TAD->getName(), Reason);
+          addConstructorCallsForType(type, TAD->getName(), Reason,
+                                     dynamicLookupInfo);
         return;
       }
 
       if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
-        addGenericTypeParamRef(GP, Reason);
+        addGenericTypeParamRef(GP, Reason, dynamicLookupInfo);
         for (auto *protocol : GP->getConformingProtocols())
           addConstructorCallsForType(protocol->getDeclaredInterfaceType(),
-                                     GP->getName(), Reason);
+                                     GP->getName(), Reason, dynamicLookupInfo);
         return;
       }
 
       if (auto *AT = dyn_cast<AssociatedTypeDecl>(D)) {
-        addAssociatedTypeRef(AT, Reason);
+        addAssociatedTypeRef(AT, Reason, dynamicLookupInfo);
         return;
       }
 
       if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
-        addEnumElementRef(EED, Reason, /*HasTypeContext=*/false);
+        addEnumElementRef(EED, Reason, dynamicLookupInfo,
+                          /*HasTypeContext=*/false);
         return;
       }
 
       // Swift key path allows .[0]
       if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
-        addSubscriptCall(SD, Reason);
+        addSubscriptCall(SD, Reason, dynamicLookupInfo);
         return;
       }
       return;
 
     case LookupKind::EnumElement:
-      handleEnumElement(D, Reason);
+      handleEnumElement(D, Reason, dynamicLookupInfo);
       return;
 
     case LookupKind::Type:
     case LookupKind::TypeInDeclContext:
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-        addNominalTypeRef(NTD, Reason);
+        addNominalTypeRef(NTD, Reason, dynamicLookupInfo);
         return;
       }
 
       if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
-        addTypeAliasRef(TAD, Reason);
+        addTypeAliasRef(TAD, Reason, dynamicLookupInfo);
         return;
       }
 
       if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
-        addGenericTypeParamRef(GP, Reason);
+        addGenericTypeParamRef(GP, Reason, dynamicLookupInfo);
         return;
       }
 
       if (auto *AT = dyn_cast<AssociatedTypeDecl>(D)) {
-        addAssociatedTypeRef(AT, Reason);
+        addAssociatedTypeRef(AT, Reason, dynamicLookupInfo);
         return;
       }
 
@@ -3045,12 +3085,14 @@ public:
     }
   }
 
-  bool handleEnumElement(ValueDecl *D, DeclVisibilityKind Reason) {
+  bool handleEnumElement(ValueDecl *D, DeclVisibilityKind Reason,
+                         DynamicLookupInfo dynamicLookupInfo) {
     if (!D->hasInterfaceType())
       TypeResolver->resolveDeclSignature(D);
 
     if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
-      addEnumElementRef(EED, Reason, /*HasTypeContext=*/true);
+      addEnumElementRef(EED, Reason, dynamicLookupInfo,
+                        /*HasTypeContext=*/true);
       return true;
     } else if (auto *ED = dyn_cast<EnumDecl>(D)) {
       llvm::DenseSet<EnumElementDecl *> Elements;
@@ -3058,7 +3100,8 @@ public:
       for (auto *Ele : Elements) {
         if (!Ele->hasInterfaceType())
           TypeResolver->resolveDeclSignature(Ele);
-        addEnumElementRef(Ele, Reason, /*HasTypeContext=*/true);
+        addEnumElementRef(Ele, Reason, dynamicLookupInfo,
+                          /*HasTypeContext=*/true);
       }
       return true;
     }
@@ -3292,7 +3335,7 @@ public:
     // FIXME: we should get the semantic context of the function, not the
     // operator decl.
     auto semanticContext =
-        getSemanticContext(op, DeclVisibilityKind::VisibleAtTopLevel);
+        getSemanticContext(op, DeclVisibilityKind::VisibleAtTopLevel, {});
     CodeCompletionResultBuilder builder(
         Sink, CodeCompletionResult::ResultKind::Declaration, semanticContext,
         {});
@@ -3341,7 +3384,7 @@ public:
     // FIXME: we should get the semantic context of the function, not the
     // operator decl.
     auto semanticContext =
-        getSemanticContext(op, DeclVisibilityKind::VisibleAtTopLevel);
+        getSemanticContext(op, DeclVisibilityKind::VisibleAtTopLevel, {});
     CodeCompletionResultBuilder builder(
         Sink, CodeCompletionResult::ResultKind::Declaration, semanticContext,
         {});
@@ -3593,9 +3636,10 @@ public:
     DeclFilter Filter;
     FilteredDeclConsumer(swift::VisibleDeclConsumer &Consumer,
                          DeclFilter Filter) : Consumer(Consumer), Filter(Filter) {}
-    void foundDecl(ValueDecl *VD, DeclVisibilityKind Kind) override {
+    void foundDecl(ValueDecl *VD, DeclVisibilityKind Kind,
+                   DynamicLookupInfo dynamicLookupInfo) override {
       if (Filter(VD, Kind))
-        Consumer.foundDecl(VD, Kind);
+        Consumer.foundDecl(VD, Kind, dynamicLookupInfo);
     }
   };
 
@@ -3624,7 +3668,7 @@ public:
           if (!isa<ProtocolDecl>(NTD) &&
               NTD->getModuleContext() != CurrDeclContext->getParentModule()) {
             addNominalTypeRef(NT->getDecl(),
-                              DeclVisibilityKind::VisibleAtTopLevel);
+                              DeclVisibilityKind::VisibleAtTopLevel, {});
           }
         }
       }
@@ -3686,7 +3730,8 @@ public:
     // type and has the same type (or if the member is a function, then the
     // same result type) as the contextual type.
     FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD,
-                                             DeclVisibilityKind reason) {
+                                             DeclVisibilityKind Reason) {
+
       if (VD->isOperator())
         return false;
 
@@ -3713,11 +3758,11 @@ public:
       // Only non-failable constructors are implicitly referenceable.
       if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
         switch (CD->getFailability()) {
-          case OTK_None:
-          case OTK_ImplicitlyUnwrappedOptional:
-            return true;
-          case OTK_Optional:
-            return false;
+        case OTK_None:
+        case OTK_ImplicitlyUnwrappedOptional:
+          return true;
+        case OTK_Optional:
+          return false;
         }
       }
 
@@ -3816,7 +3861,7 @@ public:
     if (!TheEnumDecl)
       return;
     for (auto Element : TheEnumDecl->getAllElements()) {
-      foundDecl(Element, DeclVisibilityKind::MemberOfCurrentNominal);
+      foundDecl(Element, DeclVisibilityKind::MemberOfCurrentNominal, {});
     }
   }
 
@@ -4058,7 +4103,8 @@ public:
 
   /// Return type if the result type if \p VD should be represented as opaque
   /// result type.
-  TypeLoc getOpaqueResultTypeLoc(const ValueDecl *VD, DeclVisibilityKind Reason) {
+  TypeLoc getOpaqueResultTypeLoc(const ValueDecl *VD, DeclVisibilityKind Reason,
+                                 DynamicLookupInfo dynamicLookupInfo) {
     if (Reason !=
         DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal)
       return nullptr;
@@ -4100,6 +4146,7 @@ public:
   }
 
   void addValueOverride(const ValueDecl *VD, DeclVisibilityKind Reason,
+                        DynamicLookupInfo dynamicLookupInfo,
                         CodeCompletionResultBuilder &Builder,
                         bool hasDeclIntroducer) {
     class DeclPrinter : public StreamPrinter {
@@ -4131,7 +4178,8 @@ public:
     unsigned NameOffset = 0;
     {
       llvm::raw_svector_ostream OS(DeclStr);
-      DeclPrinter Printer(OS, getOpaqueResultTypeLoc(VD, Reason));
+      DeclPrinter Printer(
+          OS, getOpaqueResultTypeLoc(VD, Reason, dynamicLookupInfo));
       PrintOptions Options;
       if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
         Options.setBaseType(transformType);
@@ -4167,16 +4215,18 @@ public:
     Builder.addTextChunk(DeclStr.str().substr(NameOffset));
   }
 
-  void addMethodOverride(const FuncDecl *FD, DeclVisibilityKind Reason) {
+  void addMethodOverride(const FuncDecl *FD, DeclVisibilityKind Reason,
+                         DynamicLookupInfo dynamicLookupInfo) {
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         SemanticContextKind::Super, {});
     Builder.setAssociatedDecl(FD);
-    addValueOverride(FD, Reason, Builder, hasFuncIntroducer);
+    addValueOverride(FD, Reason, dynamicLookupInfo, Builder, hasFuncIntroducer);
     Builder.addBraceStmtWithCursor();
   }
 
-  void addVarOverride(const VarDecl *VD, DeclVisibilityKind Reason) {
+  void addVarOverride(const VarDecl *VD, DeclVisibilityKind Reason,
+                      DynamicLookupInfo dynamicLookupInfo) {
     // Overrides cannot use 'let', but if the 'override' keyword is specified
     // then the intention is clear, so provide the results anyway.  The compiler
     // can then provide an error telling you to use 'var' instead.
@@ -4189,19 +4239,21 @@ public:
         Sink, CodeCompletionResult::ResultKind::Declaration,
         SemanticContextKind::Super, {});
     Builder.setAssociatedDecl(VD);
-    addValueOverride(VD, Reason, Builder, hasVarIntroducer);
+    addValueOverride(VD, Reason, dynamicLookupInfo, Builder, hasVarIntroducer);
   }
 
-  void addSubscriptOverride(const SubscriptDecl *SD, DeclVisibilityKind Reason) {
+  void addSubscriptOverride(const SubscriptDecl *SD, DeclVisibilityKind Reason,
+                            DynamicLookupInfo dynamicLookupInfo) {
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         SemanticContextKind::Super, {});
     Builder.setAssociatedDecl(SD);
-    addValueOverride(SD, Reason, Builder, false);
+    addValueOverride(SD, Reason, dynamicLookupInfo, Builder, false);
     Builder.addBraceStmtWithCursor();
   }
 
-  void addTypeAlias(const AssociatedTypeDecl *ATD, DeclVisibilityKind Reason) {
+  void addTypeAlias(const AssociatedTypeDecl *ATD, DeclVisibilityKind Reason,
+                    DynamicLookupInfo dynamicLookupInfo) {
     CodeCompletionResultBuilder Builder(Sink,
       CodeCompletionResult::ResultKind::Declaration,
       SemanticContextKind::Super, {});
@@ -4215,7 +4267,8 @@ public:
     Builder.addSimpleNamedParameter("Type");
   }
 
-  void addConstructor(const ConstructorDecl *CD, DeclVisibilityKind Reason) {
+  void addConstructor(const ConstructorDecl *CD, DeclVisibilityKind Reason,
+                      DynamicLookupInfo dynamicLookupInfo) {
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
@@ -4257,7 +4310,8 @@ public:
   }
 
   // Implement swift::VisibleDeclConsumer.
-  void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
+  void foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
+                 DynamicLookupInfo dynamicLookupInfo) override {
     if (Reason == DeclVisibilityKind::MemberOfCurrentNominal)
       return;
 
@@ -4295,19 +4349,19 @@ public:
         return;
 
       if (hasFuncIntroducer || (!hasIntroducer && !hasInitializerModifier))
-        addMethodOverride(FD, Reason);
+        addMethodOverride(FD, Reason, dynamicLookupInfo);
       return;
     }
 
     if (auto *VD = dyn_cast<VarDecl>(D)) {
       if (hasVarIntroducer || (!hasIntroducer && !hasInitializerModifier))
-        addVarOverride(VD, Reason);
+        addVarOverride(VD, Reason, dynamicLookupInfo);
       return;
     }
 
     if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
       if (!hasIntroducer && !hasInitializerModifier)
-        addSubscriptOverride(SD, Reason);
+        addSubscriptOverride(SD, Reason, dynamicLookupInfo);
     }
 
     if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
@@ -4317,7 +4371,7 @@ public:
           hasStaticOrClass)
         return;
       if (CD->isRequired() || CD->isDesignatedInit())
-        addConstructor(CD, Reason);
+        addConstructor(CD, Reason, dynamicLookupInfo);
       return;
     }
   }
@@ -4340,7 +4394,7 @@ public:
       if (Constructor->hasStubImplementation())
         continue;
       if (Constructor->isDesignatedInit())
-        addConstructor(Constructor, DeclVisibilityKind::MemberOfSuper);
+        addConstructor(Constructor, DeclVisibilityKind::MemberOfSuper, {});
     }
   }
 
@@ -4362,8 +4416,10 @@ public:
         if (!Conformance->hasTypeWitness(ATD) ||
             ATD->hasDefaultDefinitionType())
           continue;
-        addTypeAlias(ATD,
-          DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal);
+        addTypeAlias(
+            ATD,
+            DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal,
+            {});
       }
     }
   }
@@ -5423,8 +5479,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (auto GT = ParsedTypeLoc.getType()->getAnyGeneric()) {
       if (auto Params = GT->getGenericParams()) {
         for (auto GP : Params->getParams()) {
-          Lookup.addGenericTypeParamRef(GP,
-                                        DeclVisibilityKind::GenericParameter);
+          Lookup.addGenericTypeParamRef(
+              GP, DeclVisibilityKind::GenericParameter, {});
         }
       }
     }
