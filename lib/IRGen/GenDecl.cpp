@@ -1278,6 +1278,23 @@ void IRGenerator::noteUseOfFieldDescriptor(NominalTypeDecl *type) {
   LazyFieldDescriptors.push_back(type);
 }
 
+void IRGenerator::markOpaqueTypeDescriptorEmitted(OpaqueTypeDecl *opaque) {
+  if (!opaque)
+    return;
+
+  auto insertResult = LazyOpaqueTypes.try_emplace(opaque);
+  auto &entry = insertResult.first->second;
+  entry.IsDescriptorUsed = true;
+  entry.IsDescriptorEmitted = true;
+  LazyOpaqueTypeDescriptors.erase(
+    std::remove_if(LazyOpaqueTypeDescriptors.begin(),
+                   LazyOpaqueTypeDescriptors.end(),
+                   [&](OpaqueTypeDecl *entry) -> bool {
+                     return entry == opaque;
+                   }),
+    LazyOpaqueTypeDescriptors.end());
+}
+
 void IRGenerator::noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque) {
   if (!opaque)
     return;
