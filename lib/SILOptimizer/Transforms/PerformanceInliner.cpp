@@ -901,33 +901,22 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
       continue;
     }
 
-    SmallVector<SILValue, 8> Args;
-    for (const auto &Arg : AI.getArguments())
-      Args.push_back(Arg);
+    LLVM_DEBUG(dumpCaller(Caller); llvm::dbgs()
+                                   << "    inline [" << Callee->size() << "->"
+                                   << Caller->size() << "] "
+                                   << Callee->getName() << "\n");
 
-    LLVM_DEBUG(dumpCaller(Caller);
-               llvm::dbgs() << "    inline [" << Callee->size() << "->"
-                            << Caller->size()
-                            << "] " << Callee->getName() << "\n");
-
-    SILOpenedArchetypesTracker OpenedArchetypesTracker(Caller);
-    Caller->getModule().registerDeleteNotificationHandler(
-        &OpenedArchetypesTracker);
-    // The callee only needs to know about opened archetypes used in
-    // the substitution list.
-    OpenedArchetypesTracker.registerUsedOpenedArchetypes(AI.getInstruction());
-
-    SILInliner Inliner(FuncBuilder, SILInliner::InlineKind::PerformanceInline,
-                       AI.getSubstitutionMap(), OpenedArchetypesTracker);
-
-    needUpdateStackNesting |= Inliner.needsUpdateStackNesting(AI);
+    // Note that this must happen before inlining as the apply instruction
+    // will be deleted after inlining.
+    needUpdateStackNesting |= SILInliner::needsUpdateStackNesting(AI);
 
     // We've already determined we should be able to inline this, so
     // unconditionally inline the function.
     //
-    // If for whatever reason we can not inline this function, inlineFunction
+    // If for whatever reason we can not inline this function, inlineFullApply
     // will assert, so we are safe making this assumption.
-    Inliner.inlineFunction(Callee, AI, Args);
+    SILInliner::inlineFullApply(AI, SILInliner::InlineKind::PerformanceInline,
+                                FuncBuilder);
     NumFunctionsInlined++;
   }
   // The inliner splits blocks at call sites. Re-merge trivial branches to
