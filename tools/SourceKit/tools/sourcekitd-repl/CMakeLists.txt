@@ -11,7 +11,7 @@ if(HAVE_UNICODE_LIBEDIT)
   add_sourcekit_executable(sourcekitd-repl
     sourcekitd-repl.cpp
     LINK_LIBS ${SOURCEKITD_REPL_LINK_LIBS} edit
-    LLVM_COMPONENT_DEPENDS support coverage lto
+    LLVM_LINK_COMPONENTS support coverage lto
   )
   if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
     target_link_libraries(sourcekitd-repl PRIVATE dispatch BlocksRuntime)
