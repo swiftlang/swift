@@ -285,6 +285,24 @@ public:
       (*this)(requests)...);
   }
 
+  /// Cache a precomputed value for the given request, so that it will not
+  /// be computed.
+  template<typename Request,
+           typename std::enable_if<Request::hasExternalCache>::type* = nullptr>
+  void cacheOutput(const Request &request,
+                   typename Request::OutputType &&output) {
+    request.cacheResult(std::move(output));
+  }
+
+  /// Cache a precomputed value for the given request, so that it will not
+  /// be computed.
+  template<typename Request,
+           typename std::enable_if<!Request::hasExternalCache>::type* = nullptr>
+  void cacheOutput(const Request &request,
+                   typename Request::OutputType &&output) {
+    cache.insert({getCanonicalRequest(request), std::move(output)});
+  }
+
   /// Clear the cache stored within this evaluator.
   ///
   /// Note that this does not clear the caches of requests that use external
