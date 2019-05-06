@@ -1049,7 +1049,9 @@ endif()
 # created. This then will cause SwiftSyntax to fail to build.
 #
 # https://bugs.swift.org/browse/SR-5975
-add_subdirectory(stdlib)
+if(SWIFT_BUILD_STDLIB)
+  add_subdirectory(stdlib)
+endif()
 
 if(SWIFT_INCLUDE_APINOTES)
   add_subdirectory(apinotes)
