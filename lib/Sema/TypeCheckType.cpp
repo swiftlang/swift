@@ -2258,7 +2258,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
       // Resolve the function type directly with these attributes.
       FunctionType::ExtInfo extInfo(rep, /*noescape=*/false,
-                                    fnRepr->throws(), false);
+                                    // SWIFT_ENABLE_TENSORFLOW
+                                    fnRepr->throws(),
+                                    attrs.has(TAK_autodiff) || attrs.has(TAK_differentiable));
 
       ty = resolveASTFunctionType(fnRepr, options, extInfo);
       if (!ty || ty->hasError())
