@@ -563,14 +563,11 @@ func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSigna
 
 #assert(<BooleanLiteralExpr>true</BooleanLiteralExpr>)</PoundAssertStmt><PoundAssertStmt>
 #assert(<BooleanLiteralExpr>false</BooleanLiteralExpr>)</PoundAssertStmt><PoundAssertStmt>
-<<<<<<< HEAD
 #assert(<BooleanLiteralExpr>true</BooleanLiteralExpr>, "hello world")</PoundAssertStmt><FunctionDecl><DeclModifier>
 
 public </DeclModifier>func anyFoo<FunctionSignature><ParameterClause>() </ParameterClause><ReturnClause>-> <SomeType>some <SimpleTypeIdentifier>Foo </SimpleTypeIdentifier></SomeType></ReturnClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><FunctionDecl><DeclModifier>
 public </DeclModifier>func qoo<FunctionSignature><ParameterClause>() </ParameterClause><ReturnClause>-> <SomeType>some <CompositionType><CompositionTypeElement><SimpleTypeIdentifier>O </SimpleTypeIdentifier>& </CompositionTypeElement><CompositionTypeElement><SimpleTypeIdentifier>O2 </SimpleTypeIdentifier></CompositionTypeElement></CompositionType></SomeType></ReturnClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><FunctionDecl>
-func zlop<FunctionSignature><ParameterClause>() </ParameterClause><ReturnClause>-> <SomeType>some <CompositionType><CompositionTypeElement><SimpleTypeIdentifier>C </SimpleTypeIdentifier>& </CompositionTypeElement><CompositionTypeElement><SimpleTypeIdentifier>AnyObject </SimpleTypeIdentifier>& </CompositionTypeElement><CompositionTypeElement><SimpleTypeIdentifier>P </SimpleTypeIdentifier></CompositionTypeElement></CompositionType></SomeType></ReturnClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl>
-=======
-#assert(<BooleanLiteralExpr>true</BooleanLiteralExpr>, "hello world")</PoundAssertStmt><FunctionDecl><Attribute>
+func zlop<FunctionSignature><ParameterClause>() </ParameterClause><ReturnClause>-> <SomeType>some <CompositionType><CompositionTypeElement><SimpleTypeIdentifier>C </SimpleTypeIdentifier>& </CompositionTypeElement><CompositionTypeElement><SimpleTypeIdentifier>AnyObject </SimpleTypeIdentifier>& </CompositionTypeElement><CompositionTypeElement><SimpleTypeIdentifier>P </SimpleTypeIdentifier></CompositionTypeElement></CompositionType></SomeType></ReturnClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><FunctionDecl><Attribute>
 
 // SWIFT_ENABLE_TENSORFLOW
 @differentiable(<DifferentiableAttributeArguments><DifferentiableAttributeFuncSpecifier>jvp: <FunctionDeclName>foo<DeclNameArguments>(<DeclNameArgument>_:</DeclNameArgument><DeclNameArgument>_:</DeclNameArgument>)</DeclNameArguments></FunctionDeclName></DifferentiableAttributeFuncSpecifier></DifferentiableAttributeArguments>)</Attribute>
@@ -599,4 +596,3 @@ func bazDerivative<FunctionSignature><ParameterClause>(<FunctionParameter>_ x: <
     -> <TupleType>(<TupleTypeElement>value: <SimpleTypeIdentifier>Float</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement>pullback: <FunctionType>(<TupleTypeElement><SimpleTypeIdentifier>Float</SimpleTypeIdentifier></TupleTypeElement>) -> <TupleType>(<TupleTypeElement><SimpleTypeIdentifier>Float</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement><SimpleTypeIdentifier>Float</SimpleTypeIdentifier></TupleTypeElement>)</TupleType></FunctionType></TupleTypeElement>) </TupleType></ReturnClause></FunctionSignature><CodeBlock>{<ReturnStmt>
   return <TupleExpr>(<TupleElement><IdentifierExpr>x</IdentifierExpr>, </TupleElement><TupleElement><ClosureExpr>{ <ClosureSignature><ClosureParam>v </ClosureParam>in </ClosureSignature><IdentifierExpr>v </IdentifierExpr>}</ClosureExpr></TupleElement>)</TupleExpr></ReturnStmt>
 }</CodeBlock></FunctionDecl>
->>>>>>> origin/tensorflow

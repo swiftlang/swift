@@ -565,11 +565,10 @@ func foo() {}
 #assert(false)
 #assert(true, "hello world")
 
-<<<<<<< HEAD
 public func anyFoo() -> some Foo {}
 public func qoo() -> some O & O2 {}
 func zlop() -> some C & AnyObject & P {}
-=======
+
 // SWIFT_ENABLE_TENSORFLOW
 @differentiable(jvp: foo(_:_:))
 func bar(_ x: Float, _: Float) -> Float { return 1 }
@@ -597,4 +596,4 @@ func bazDerivative(_ x: Float, y: Float)
     -> (value: Float, pullback: (Float) -> (Float, Float)) {
   return (x, { v in v })
 }
->>>>>>> origin/tensorflow
+
