@@ -524,8 +524,7 @@ private:
   };
 
   bool processNode(DominanceInfoNode *Node);
-  bool processOpenExistentialRef(OpenExistentialRefInst *Inst, ValueBase *V,
-                                 SILBasicBlock::iterator &I);
+  bool processOpenExistentialRef(OpenExistentialRefInst *Inst, ValueBase *V);
 };
 } // namespace swift
 
@@ -660,9 +659,8 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
 /// be replaced by a dominating instruction.
 /// \Inst is the open_existential_ref instruction
 /// \V is the dominating open_existential_ref instruction
-/// \I is the iterator referring to the current instruction.
-bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst, ValueBase *V,
-                                    SILBasicBlock::iterator &I) {
+bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
+                                    ValueBase *V) {
   // All the open instructions are single-value instructions.
   auto VI = dyn_cast<SingleValueInstruction>(V);
   if (!VI) return false;
@@ -707,7 +705,7 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst, ValueBase *V,
   OpenedArchetypesTracker.registerOpenedArchetypes(VI);
   // Use a cloner. It makes copying the instruction and remapping of
   // opened archetypes trivial.
-  InstructionCloner Cloner(I->getFunction());
+  InstructionCloner Cloner(Inst->getFunction());
   Cloner.registerOpenedExistentialRemapping(
       OldOpenedArchetype->castTo<ArchetypeType>(), NewOpenedArchetype);
   auto &Builder = Cloner.getBuilder();
@@ -763,9 +761,7 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst, ValueBase *V,
     // Result types of candidate's uses instructions may be using this archetype.
     // Thus, we need to try to replace it there.
     Candidate->replaceAllUsesPairwiseWith(NewI);
-    if (I == Candidate->getIterator())
-      I = NewI->getIterator();
-    eraseFromParentWithDebugInsts(Candidate, I);
+    eraseFromParentWithDebugInsts(Candidate);
   }
   return true;
 }
@@ -787,7 +783,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     // Dead instructions should just be removed.
     if (isInstructionTriviallyDead(Inst)) {
       LLVM_DEBUG(llvm::dbgs() << "SILCSE DCE: " << *Inst << '\n');
-      eraseFromParentWithDebugInsts(Inst, nextI);
+      nextI = eraseFromParentWithDebugInsts(Inst);
       Changed = true;
       ++NumSimplify;
       continue;
@@ -823,9 +819,12 @@ bool CSE::processNode(DominanceInfoNode *Node) {
       // because replacing these instructions may require a replacement
       // of the opened archetype type operands in some of the uses.
       if (!isa<OpenExistentialRefInst>(Inst)
-          || processOpenExistentialRef(cast<OpenExistentialRefInst>(Inst),
-                                       cast<OpenExistentialRefInst>(AvailInst),
-                                       nextI)) {
+          || processOpenExistentialRef(
+              cast<OpenExistentialRefInst>(Inst),
+              cast<OpenExistentialRefInst>(AvailInst))) {
+        // processOpenExistentialRef may delete instructions other than Inst, so
+        // nextI must be reassigned.
+        nextI = std::next(Inst->getIterator());
         Inst->replaceAllUsesPairwiseWith(AvailInst);
         Inst->eraseFromParent();
         Changed = true;
