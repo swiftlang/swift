@@ -857,6 +857,10 @@ ERROR(did_not_call_method,none,
       "method %0 was used as a property; add () to call it",
       (Identifier))
 
+ERROR(init_not_instance_member_use_assignment,none,
+      "'init' is a member of the type; use assignment "
+      "to initalize the value instead", ())
+
 ERROR(init_not_instance_member,none,
       "'init' is a member of the type; use 'type(of: ...)' to initialize "
       "a new object of the same dynamic type", ())

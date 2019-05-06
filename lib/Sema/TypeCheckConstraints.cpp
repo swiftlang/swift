@@ -2646,9 +2646,10 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   auto contextualPurpose = CTP_Unused;
   TypeCheckExprOptions flags = TypeCheckExprFlags::ConvertTypeIsOnlyAHint;
 
+  contextualPurpose = CTP_Initialization;
+
   if (pattern->hasType()) {
     contextualType = TypeLoc::withoutLoc(pattern->getType());
-    contextualPurpose = CTP_Initialization;
 
     // If we already had an error, don't repeat the problem.
     if (contextualType.getType()->hasError())

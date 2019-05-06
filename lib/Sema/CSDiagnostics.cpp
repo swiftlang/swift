@@ -1984,6 +1984,7 @@ bool MissingMemberFailure::diagnoseAsError() {
 bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   auto loc = getAnchor()->getLoc();
   auto &cs = getConstraintSystem();
+  auto *DC = getDC();
   auto locator = getLocator();
 
   if (loc.isInvalid()) {
@@ -2041,6 +2042,37 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         emitDiagnostic(loc, diag::super_initializer_not_in_initializer);
         return true;
       }
+
+      // Dig through the chain of member accesses until we find the last
+      // UnresolvedDotExpr.
+      auto *lastUnresolved = ctorRef;
+      while (auto *nextMember =
+                 dyn_cast_or_null<UnresolvedDotExpr>(lastUnresolved->getBase()))
+        lastUnresolved = nextMember;
+
+      if (auto *DRE = dyn_cast<DeclRefExpr>(lastUnresolved->getBase())) {
+        auto isInsideCall = [this](Expr *expr) {
+          auto &cs = getConstraintSystem();
+          auto argExpr = cs.getParentExpr(expr);
+          if (!argExpr)
+            return false;
+          auto possibleCallExpr = cs.getParentExpr(expr);
+          return possibleCallExpr && isa<CallExpr>(possibleCallExpr);
+        };
+
+        auto *initCall = cs.getParentExpr(cs.getParentExpr(ctorRef));
+
+        // We can only check if the base is settable here so provide the
+        // assignment diagnostic as it's our best guess.
+        if (DRE->getDecl()->isSettable(DC, DRE) && !isInsideCall(initCall) &&
+            cs.getContextualTypePurpose() == CTP_Unused) {
+          auto fixItLoc = ctorRef->getBase()->getSourceRange().End;
+          emitDiagnostic(loc, diag::init_not_instance_member_use_assignment)
+              .fixItInsertAfter(fixItLoc, " = ");
+          return true;
+        }
+      }
+
       SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
       emitDiagnostic(loc, diag::init_not_instance_member)
           .fixItInsert(fixItRng.Start, "type(of: ")
