@@ -239,6 +239,9 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
 static bool validateInputBlock(
     llvm::BitstreamCursor &cursor, SmallVectorImpl<uint64_t> &scratch,
     SmallVectorImpl<SerializationOptions::FileDependency> &dependencies) {
+  SmallVector<StringRef, 4> dependencyDirectories;
+  SmallString<256> dependencyFullPathBuffer;
+
   while (!cursor.AtEndOfStream()) {
     auto entry = cursor.advance();
     if (entry.Kind == llvm::BitstreamEntry::EndBlock)
@@ -255,17 +258,30 @@ static bool validateInputBlock(
       bool isHashBased = scratch[2] != 0;
       bool isSDKRelative = scratch[3] != 0;
 
+      StringRef path = blobData;
+      size_t directoryIndex = scratch[4];
+      if (directoryIndex != 0) {
+        if (directoryIndex > dependencyDirectories.size())
+          return true;
+        dependencyFullPathBuffer = dependencyDirectories[directoryIndex-1];
+        llvm::sys::path::append(dependencyFullPathBuffer, blobData);
+        path = dependencyFullPathBuffer;
+      }
+
       if (isHashBased) {
         dependencies.push_back(
           SerializationOptions::FileDependency::hashBased(
-            blobData, isSDKRelative, scratch[0], scratch[1]));
+            path, isSDKRelative, scratch[0], scratch[1]));
       } else {
         dependencies.push_back(
           SerializationOptions::FileDependency::modTimeBased(
-            blobData, isSDKRelative, scratch[0], scratch[1]));
+            path, isSDKRelative, scratch[0], scratch[1]));
       }
       break;
     }
+    case input_block::DEPENDENCY_DIRECTORY:
+      dependencyDirectories.push_back(blobData);
+      break;
     default:
       // Unknown metadata record, possibly for use by a future version of the
       // module format.
