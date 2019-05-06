@@ -267,11 +267,6 @@ EXPR_NODES = [
              Child('Digits', kind='IntegerLiteralToken'),
          ]),
 
-    Node('StringLiteralExpr', kind='Expr',
-         children=[
-             Child("StringLiteral", kind='StringLiteralToken')
-         ]),
-
     # true or false
     Node('BooleanLiteralExpr', kind='Expr',
          children=[
@@ -476,7 +471,7 @@ EXPR_NODES = [
          ]),
 
     # e.g. "abc \(foo()) def"
-    Node('StringInterpolationExpr', kind='Expr',
+    Node('StringLiteralExpr', kind='Expr',
          children=[
              Child('OpenQuote', kind='Token',
                    token_choices=[

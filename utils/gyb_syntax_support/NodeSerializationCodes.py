@@ -66,7 +66,6 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'ForcedValueExpr': 61,
     'PostfixUnaryExpr': 62,
     'SpecializeExpr': 63,
-    'StringInterpolationExpr': 64,
     'KeyPathExpr': 65,
     'KeyPathBaseExpr': 66,
     'ObjcKeyPathExpr': 67,

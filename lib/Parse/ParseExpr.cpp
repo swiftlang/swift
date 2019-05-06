@@ -2003,16 +2003,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   SourceLoc Loc = Tok.getLoc();
   SourceLoc EndLoc = Loc.getAdvancedLoc(Tok.getLength());
 
-  // The simple case: just a single literal segment.
-  if (Segments.size() == 1 &&
-      Segments.front().Kind == Lexer::StringSegment::Literal) {
-    consumeToken();
-    return makeParserResult(
-        createStringLiteralExprFromSegment(Context, L, Segments.front(), Loc));
-  }
-
-  // We are now sure this is a string interpolation expression.
-  LocalContext.setCreateSyntax(SyntaxKind::StringInterpolationExpr);
   StringRef OpenQuoteStr, CloseQuoteStr;
   tok QuoteKind;
   std::tie(OpenQuoteStr, CloseQuoteStr, QuoteKind) = Tok.isMultilineString() ?
