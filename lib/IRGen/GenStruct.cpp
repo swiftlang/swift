@@ -886,6 +886,8 @@ void IRGenModule::maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque) {
     // so that remote ast/mirror can recover them.
     addRuntimeResolvableType(opaque);
     emitOpaqueTypeDecl(opaque);
+    if (IRGen.hasLazyMetadata(opaque))
+      IRGen.markOpaqueTypeDescriptorEmitted(opaque);
   } else if (!IRGen.hasLazyMetadata(opaque)) {
     emitOpaqueTypeDecl(opaque);
   }
