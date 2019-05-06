@@ -24,6 +24,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/PropertyDelegates.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -3358,12 +3359,23 @@ void Serializer::writeDecl(const Decl *D) {
       rawSetterAccessLevel =
         getRawStableAccessLevel(var->getSetterFormalAccess());
 
+    unsigned numBackingProperties = 0;
     Type ty = var->getInterfaceType();
-    SmallVector<TypeID, 2> accessorsAndDependencies;
+    SmallVector<TypeID, 2> arrayFields;
     for (auto accessor : accessors.Decls)
-      accessorsAndDependencies.push_back(addDeclRef(accessor));
+      arrayFields.push_back(addDeclRef(accessor));
+    if (auto backingInfo = var->getPropertyDelegateBackingPropertyInfo()) {
+      if (backingInfo.backingVar) {
+        ++numBackingProperties;
+        arrayFields.push_back(addDeclRef(backingInfo.backingVar));
+      }
+      if (backingInfo.storageDelegateVar) {
+        ++numBackingProperties;
+        arrayFields.push_back(addDeclRef(backingInfo.storageDelegateVar));
+      }
+    }
     for (Type dependency : collectDependenciesFromType(ty->getCanonicalType()))
-      accessorsAndDependencies.push_back(addTypeRef(dependency));
+      arrayFields.push_back(addTypeRef(dependency));
 
     unsigned abbrCode = DeclTypeAbbrCodes[VarLayout::Code];
     VarLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -3385,7 +3397,8 @@ void Serializer::writeDecl(const Decl *D) {
                           addDeclRef(var->getOverriddenDecl()),
                           rawAccessLevel, rawSetterAccessLevel,
                           addDeclRef(var->getOpaqueResultTypeDecl()),
-                          accessorsAndDependencies);
+                          numBackingProperties,
+                          arrayFields);
     break;
   }
 
