@@ -1863,8 +1863,8 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                                        SyntaxKind::ExpressionSegment);
 
       // Backslash is part of an expression segment.
-      Token BackSlash(tok::backslash,
-                      CharSourceRange(Segment.Loc.getAdvancedLoc(-1), 1).str());
+      SourceLoc BackSlashLoc = Segment.Loc.getAdvancedLoc(-1);
+      Token BackSlash(tok::backslash, CharSourceRange(BackSlashLoc, 1).str());
       ExprContext.addToken(BackSlash, EmptyTrivia, EmptyTrivia);
       // Create a temporary lexer that lexes from the body of the string.
       LexerState BeginState =
@@ -1889,7 +1889,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                                            tok::string_interpolation_anchor);
 
       auto callee = new (Context) UnresolvedDotExpr(InterpolationVarRef,
-                                                    /*dotloc=*/SourceLoc(),
+                                                    /*dotloc=*/BackSlashLoc,
                                                     appendInterpolation,
                                                     /*nameloc=*/DeclNameLoc(),
                                                     /*Implicit=*/true);
