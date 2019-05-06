@@ -643,8 +643,10 @@ private:
   /// to complain about "x" being a let property if "v.v" are both mutable.
   ///
   /// \returns The base subexpression that looks immutable (or that can't be
-  /// analyzed any further) along with a decl extracted from it if we could.
-  std::pair<Expr *, ValueDecl *> resolveImmutableBase(Expr *expr) const;
+  /// analyzed any further) along with an OverloadChoice extracted from it if we
+  /// could.
+  std::pair<Expr *, Optional<OverloadChoice>>
+  resolveImmutableBase(Expr *expr) const;
 
   static Diag<StringRef> findDeclDiagonstic(ASTContext &ctx, Expr *destExpr);
 
@@ -660,7 +662,7 @@ private:
 
   /// Retrive an member reference associated with given member
   /// looking through dynamic member lookup on the way.
-  ValueDecl *getMemberRef(ConstraintLocator *locator) const;
+  Optional<OverloadChoice> getMemberRef(ConstraintLocator *locator) const;
 };
 
 /// Intended to diagnose any possible contextual failure
