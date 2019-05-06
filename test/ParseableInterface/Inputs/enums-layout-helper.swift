@@ -28,8 +28,8 @@ public enum FutureproofEnum: Int {
   case c = 100
 }
 
-// CHECK-LABEL: public enum FrozenObjCEnum : Int
-@_frozen @objc public enum FrozenObjCEnum: Int {
+// CHECK-LABEL: public enum FrozenObjCEnum : Int32
+@_frozen @objc public enum FrozenObjCEnum: Int32 {
   // CHECK-NEXT: case a = 1{{$}}
   case a = 1
   // CHECK-NEXT: case b = 10{{$}}
