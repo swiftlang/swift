@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 487; // Last change: Opaque result types generic params
+const uint16_t SWIFTMODULE_VERSION_MINOR = 488; // Last change: dependency directories
 
 using DeclIDField = BCFixed<31>;
 
@@ -644,6 +644,7 @@ namespace input_block {
     MODULE_FLAGS, // [unused]
     SEARCH_PATH,
     FILE_DEPENDENCY,
+    DEPENDENCY_DIRECTORY,
     PARSEABLE_INTERFACE_PATH
   };
 
@@ -689,7 +690,13 @@ namespace input_block {
     FileModTimeOrContentHashField, // mtime or content hash (for validation)
     BCFixed<1>,                    // are we reading mtime (0) or hash (1)?
     BCFixed<1>,                    // SDK-relative?
+    BCVBR<8>,                      // subpath-relative index (0=none)
     BCBlob                         // path
+  >;
+
+  using DependencyDirectoryLayout = BCRecordLayout<
+    DEPENDENCY_DIRECTORY,
+    BCBlob
   >;
 
   using ParseableInterfaceLayout = BCRecordLayout<
