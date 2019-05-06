@@ -750,7 +750,6 @@ function(_add_swift_library_single target name)
         GYB_SOURCES
         INCORPORATE_OBJECT_LIBRARIES
         INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
-        INTERFACE_LINK_LIBRARIES
         LINK_FLAGS
         LINK_LIBRARIES
         LLVM_COMPONENT_DEPENDS
@@ -892,7 +891,6 @@ function(_add_swift_library_single target name)
         ${SWIFTLIB_SINGLE_DEPENDS}
         ${SWIFTLIB_SINGLE_FILE_DEPENDS}
         ${SWIFTLIB_SINGLE_LINK_LIBRARIES}
-        ${SWIFTLIB_SINGLE_INTERFACE_LINK_LIBRARIES}
       SDK ${SWIFTLIB_SINGLE_SDK}
       ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
       MODULE_NAME ${module_name}
@@ -1313,7 +1311,7 @@ function(_add_swift_library_single target name)
   # import library targets when the library was added.  Use that to adjust the
   # link libraries.
   if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS AND NOT CMAKE_SYSTEM_NAME STREQUAL Windows)
-    foreach(library_list LINK_LIBRARIES INTERFACE_LINK_LIBRARIES PRIVATE_LINK_LIBRARIES)
+    foreach(library_list LINK_LIBRARIES PRIVATE_LINK_LIBRARIES)
       set(import_libraries)
       foreach(library ${SWIFTLIB_SINGLE_${library_list}})
         # Ensure that the library is a target.  If an absolute path was given,
@@ -1341,14 +1339,6 @@ function(_add_swift_library_single target name)
   else()
     target_link_libraries("${target}" PRIVATE
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
-  endif()
-  if("${libkind}" STREQUAL "OBJECT")
-    precondition_list_empty(
-        "${SWIFTLIB_SINGLE_INTERFACE_LINK_LIBRARIES}"
-        "OBJECT_LIBRARY may not link to anything")
-  else()
-    target_link_libraries("${target}" INTERFACE
-        ${SWIFTLIB_SINGLE_INTERFACE_LINK_LIBRARIES})
   endif()
 
   set_property(TARGET "${target}" PROPERTY
@@ -1407,7 +1397,6 @@ function(add_swift_host_library name)
         C_COMPILE_FLAGS
         DEPENDS
         FILE_DEPENDS
-        INTERFACE_LINK_LIBRARIES
         LINK_LIBRARIES
         LLVM_COMPONENT_DEPENDS)
 
@@ -1423,9 +1412,6 @@ function(add_swift_host_library name)
   endif()
   if(ASHL_DEPENDS)
     message(SEND_ERROR "library ${name} is using DEPENDS parameter which is deprecated.  Please use add_dependencies instead")
-  endif()
-  if(ASHL_INTERFACE_LINK_LIBRARIES)
-    message(SEND_ERROR "library ${name} is using INTERFACE_LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead.")
   endif()
   if(ASHL_LINK_LIBRARIES)
     message(SEND_ERROR "library ${name} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
@@ -1478,7 +1464,6 @@ endfunction()
 #     [STATIC]
 #     [DEPENDS dep1 ...]
 #     [LINK_LIBRARIES dep1 ...]
-#     [INTERFACE_LINK_LIBRARIES dep1 ...]
 #     [SWIFT_MODULE_DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS_WEAK dep1 ...]
@@ -1631,7 +1616,6 @@ function(add_swift_target_library name)
         GYB_SOURCES
         INCORPORATE_OBJECT_LIBRARIES
         INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
-        INTERFACE_LINK_LIBRARIES
         LINK_FLAGS
         LINK_LIBRARIES
         LLVM_COMPONENT_DEPENDS
