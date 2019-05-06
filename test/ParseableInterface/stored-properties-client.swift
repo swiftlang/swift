@@ -1,5 +1,7 @@
 // RUN: %empty-directory(%t)
 
+// REQUIRES: executable_test
+
 // 1. Build ../stored-properties.swift to a dylib and emit its interface in %t
 
 // RUN: %target-build-swift-dylib(%t/%target-library-name(StoredProperties)) -emit-module-interface-path %t/StoredProperties.swiftinterface %S/stored-properties.swift -module-name StoredProperties -swift-version 5
