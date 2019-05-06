@@ -856,10 +856,6 @@ public:
     return getIdentifier(getSwiftName(kind));
   }
 
-  /// Collect visible clang modules from the ClangModuleLoader. These modules are
-  /// not necessarily loaded.
-  void getVisibleTopLevelClangModules(SmallVectorImpl<clang::Module*> &Modules) const;
-
   /// Populate \p names with visible top level module names.
   /// This guarantees that resulted \p names doesn't have duplicated names.
   void getVisibleTopLevelModuleNames(SmallVectorImpl<Identifier> &names) const;

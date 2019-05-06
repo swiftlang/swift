@@ -47,10 +47,6 @@
 #include "swift/Syntax/SyntaxArena.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
-#include "clang/AST/Attr.h"
-#include "clang/AST/DeclObjC.h"
-#include "clang/Lex/HeaderSearch.h"
-#include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringMap.h"
@@ -1421,12 +1417,6 @@ ModuleDecl *ASTContext::getLoadedModule(
 
 ModuleDecl *ASTContext::getLoadedModule(Identifier ModuleName) const {
   return LoadedModules.lookup(ModuleName);
-}
-
-void ASTContext::getVisibleTopLevelClangModules(
-    SmallVectorImpl<clang::Module*> &Modules) const {
-  getClangModuleLoader()->getClangPreprocessor().getHeaderSearchInfo().
-    collectAllModules(Modules);
 }
 
 static AllocationArena getArena(GenericSignature *genericSig) {

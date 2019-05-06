@@ -72,8 +72,7 @@ Optional<bool> forEachModuleSearchPath(
       return result;
 
   // Apple platforms have extra implicit framework search paths:
-  // $SDKROOT/System/Library/Frameworks/ ; and
-  // $SDKROOT/Library/Frameworks/
+  // $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
   if (Ctx.LangOpts.Target.isOSDarwin()) {
     SmallString<128> scratch;
     scratch = Ctx.SearchPathOpts.SDKPath;
@@ -154,7 +153,7 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
     switch (Kind) {
     case SearchPathKind::Import: {
       // Look for:
-      // $PATH/{name}.swiftmodule/{arch}.{extension} ; Or
+      // $PATH/{name}.swiftmodule/{arch}.{extension} or
       // $PATH/{name}.{extension}
       forEachDirectoryEntryPath(searchPath, [&](StringRef path) {
         auto pathExt = llvm::sys::path::extension(path);
