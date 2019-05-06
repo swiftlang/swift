@@ -391,7 +391,6 @@ public:
   }
   
   void noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque);
-  void markOpaqueTypeDescriptorEmitted(OpaqueTypeDecl *opaque);
 
   void noteUseOfFieldDescriptor(NominalTypeDecl *type);
 
