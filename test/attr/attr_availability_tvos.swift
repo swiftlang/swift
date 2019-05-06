@@ -5,21 +5,21 @@
 func doSomething() { }
 // expected-note @-1{{'doSomething()' was obsoleted in tvOS 9.0}}
 
-doSomething() // expected-error{{'doSomething()' is unavailable: you don't want to do that anyway}}
+doSomething() // expected-error{{'doSomething()' is unavailable in tvOS: you don't want to do that anyway}}
 
 // Preservation of major.minor.micro
 @available(tvOS, introduced: 1.0, deprecated: 2.0, obsoleted: 8.0)
 func doSomethingElse() { }
 // expected-note @-1{{'doSomethingElse()' was obsoleted in tvOS 8.0}}
 
-doSomethingElse() // expected-error{{'doSomethingElse()' is unavailable}}
+doSomethingElse() // expected-error{{'doSomethingElse()' is unavailable in tvOS}}
 
 // Preservation of minor-only version
 @available(tvOS, introduced: 1.0, deprecated: 1.5, obsoleted: 9)
 func doSomethingReallyOld() { }
 // expected-note @-1{{'doSomethingReallyOld()' was obsoleted in tvOS 9}}
 
-doSomethingReallyOld() // expected-error{{'doSomethingReallyOld()' is unavailable}}
+doSomethingReallyOld() // expected-error{{'doSomethingReallyOld()' is unavailable in tvOS}}
 
 // Test deprecations in 9.0 and later
 
@@ -54,12 +54,12 @@ func functionWithDeprecatedLaterParameter(p: DeprecatedClassIn8_0) { }
 func functionIntroducedOntvOS9_2() { }
 
 if #available(iOS 9.3, *) {
-  functionIntroducedOntvOS9_2() // expected-error {{'functionIntroducedOntvOS9_2()' is only available on tvOS 9.2 or newer}}
+  functionIntroducedOntvOS9_2() // expected-error {{'functionIntroducedOntvOS9_2()' is only available in tvOS 9.2 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 }
 
 if #available(iOS 9.3, tvOS 9.1, *) {
-  functionIntroducedOntvOS9_2() // expected-error {{'functionIntroducedOntvOS9_2()' is only available on tvOS 9.2 or newer}} {{29-32=9.2}}
+  functionIntroducedOntvOS9_2() // expected-error {{'functionIntroducedOntvOS9_2()' is only available in tvOS 9.2 or newer}} {{29-32=9.2}}
 }
 
 if #available(iOS 9.1, tvOS 9.2, *) {
