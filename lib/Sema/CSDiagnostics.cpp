@@ -2670,3 +2670,9 @@ bool InvalidMethodRefInKeyPath::diagnoseAsError() {
                  getName(), isForKeyPathDynamicMemberLookup());
   return true;
 }
+
+bool InvalidUseOfAddressOf::diagnoseAsError() {
+  auto *anchor = cast<AssignExpr>(getAnchor());
+  emitDiagnostic(anchor->getSrc()->getLoc(), diag::extraneous_address_of);
+  return true;
+}
