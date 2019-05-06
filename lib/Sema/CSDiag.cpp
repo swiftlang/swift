@@ -142,6 +142,12 @@ void constraints::simplifyLocator(Expr *&anchor,
         continue;
       }
 
+      if (auto subscriptExpr = dyn_cast<SubscriptExpr>(anchor)) {
+        anchor = subscriptExpr->getIndex();
+        path = path.slice(1);
+        continue;
+      }
+
       if (auto objectLiteralExpr = dyn_cast<ObjectLiteralExpr>(anchor)) {
         targetAnchor = nullptr;
         targetPath.clear();
