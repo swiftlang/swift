@@ -58,12 +58,13 @@ public enum _ExecutionMode : Equatable {
 /// `addEagerOpToGraph()`). When the trace is finalized (via `finalize()`), the
 /// trace graph function can then be executed (via `execute()`) by the eager
 /// runtime.
-private class TraceContext {
+@_fixed_layout
+public final class TraceContext {
   let status: CTFStatus = TF_NewStatus()
 
   /// The trace graph, which will be converted to a trace graph function
   /// (TF_Function) upon finalizing.
-  let graph = TF_NewGraph()
+  public let graph = TF_NewGraph()
 
   /// The list of inputs to the trace graph function. It starts with the inputs
   /// to the function that we trace (referred to as the "tracee function" or
@@ -97,7 +98,8 @@ private class TraceContext {
 
   /// The trace context object used in TF C API calls that convert eager ops to
   /// (trace) graph nodes.
-  let cTraceContext: CTFETraceContext
+  // public let cTraceContext: CTFETraceContext
+  public let cTraceContext: OpaquePointer
 
   /// The trace graph function created by `finalize()`.
   var traceGraphFn: CTFFunction?
@@ -109,7 +111,7 @@ private class TraceContext {
 
   /// `dtypes` is the (flattened) list of TF_DataType of input tensors
   /// to the trace function.
-  init(dtypes: [TF_DataType]) {
+  public init(dtypes: [TF_DataType]) {
     debugLog("Instiantiating TraceContext with \(dtypes.count) input tensors.")
     for (i, dtype) in dtypes.enumerated() {
       let desc = TF_NewOperation(graph, "Placeholder", "input_\(i)")
@@ -611,6 +613,8 @@ public final class _ExecutionContext {
 
   /// The buffer storing a serialized TensorFlow config proto.
   public let tensorFlowConfig: UnsafeMutablePointer<TF_Buffer>
+
+  public let traceContext: TraceContext = TraceContext(dtypes: [])
 
   /// The TFE_Context object.
   @usableFromInline let eagerContext: CTFEContext

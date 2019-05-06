@@ -16,22 +16,43 @@
 
 import CTensorFlow
 
+@usableFromInline
+enum LazyTensorHandle {
+  case conc(CTensorHandle)
+  case sym(TFE_Op)
+}
+
 /// `_AnyTensorHandle` is the scalar-agnostic base type for `TensorHandle`, used
 /// specifically for low-level, type-erased passings of Swift-level tensor
 /// handles in the compiler.
 @_fixed_layout // required because the compiler accesses _cTensorHandle directly.
 public class _AnyTensorHandle {
+
+  @usableFromInline
+  let lazyHandle: LazyTensorHandle
+
   /// The underlying `TFE_TensorHandle *`.
   ///
   /// - Note: The compiler knows that `_AnyTensorHandle` has a single stored
   /// property, and assumes that this is it. Changing the design of
   /// `TensorHandle` will require tweaking the compiler.
-  public let _cTensorHandle: CTensorHandle
+  public var _cTensorHandle: CTensorHandle {
+    get {
+      switch lazyHandle {
+        case .conc(let h): return h
+        case .sym(let op): return op.evaluate()
+      }
+    }
+  }
 
   /// Private initializer from a `CTensorHandle`. Should only be called from
   /// `TensorHandle<Scalar>.init`.
   fileprivate init(base: CTensorHandle) {
-    self._cTensorHandle = base
+    self.lazyHandle = .conc(base)
+  }
+
+  fileprivate init(op: TFE_Op) {
+    self.lazyHandle = .sym(op)
   }
 }
 
@@ -43,6 +64,11 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
   where Scalar : _TensorFlowDataTypeCompatible {
   public init(_owning cTensorHandle: CTensorHandle) {
     super.init(base: cTensorHandle)
+  }
+
+  @usableFromInline
+  init(_lazy op: TFE_Op) {
+    super.init(op: op)
   }
 
   @usableFromInline
