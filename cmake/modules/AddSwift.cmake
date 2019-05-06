@@ -642,7 +642,7 @@ endfunction()
 #     [LINK_LIBRARIES dep1 ...]
 #     [FRAMEWORK_DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS_WEAK dep1 ...]
-#     [LLVM_COMPONENT_DEPENDS comp1 ...]
+#     [LLVM_LINK_COMPONENTS comp1 ...]
 #     [C_COMPILE_FLAGS flag1...]
 #     [SWIFT_COMPILE_FLAGS flag1...]
 #     [LINK_FLAGS flag1...]
@@ -688,7 +688,7 @@ endfunction()
 # FRAMEWORK_DEPENDS_WEAK
 #   System frameworks this library depends on that should be weakly-linked.
 #
-# LLVM_COMPONENT_DEPENDS
+# LLVM_LINK_COMPONENTS
 #   LLVM components this library depends on.
 #
 # C_COMPILE_FLAGS
@@ -752,7 +752,7 @@ function(_add_swift_library_single target name)
         INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
         LINK_FLAGS
         LINK_LIBRARIES
-        LLVM_COMPONENT_DEPENDS
+        LLVM_LINK_COMPONENTS
         PRIVATE_LINK_LIBRARIES
         SWIFT_COMPILE_FLAGS)
 
@@ -1188,7 +1188,7 @@ function(_add_swift_library_single target name)
 
   if(NOT SWIFTLIB_SINGLE_TARGET_LIBRARY)
     # Call llvm_config() only for libraries that are part of the compiler.
-    swift_common_llvm_config("${target}" ${SWIFTLIB_SINGLE_LLVM_COMPONENT_DEPENDS})
+    swift_common_llvm_config("${target}" ${SWIFTLIB_SINGLE_LLVM_LINK_COMPONENTS})
   endif()
 
   # Collect compile and link flags for the static and non-static targets.
@@ -1366,7 +1366,7 @@ endfunction()
 #   add_swift_host_library(name
 #     [SHARED]
 #     [STATIC]
-#     [LLVM_COMPONENT_DEPENDS comp1 ...]
+#     [LLVM_LINK_COMPONENTS comp1 ...]
 #     [FILE_DEPENDS target1 ...]
 #     source1 [source2 source3 ...])
 #
@@ -1379,7 +1379,7 @@ endfunction()
 # STATIC
 #   Build a static library.
 #
-# LLVM_COMPONENT_DEPENDS
+# LLVM_LINK_COMPONENTS
 #   LLVM components this library depends on.
 #
 # FILE_DEPENDS
@@ -1398,7 +1398,7 @@ function(add_swift_host_library name)
         DEPENDS
         FILE_DEPENDS
         LINK_LIBRARIES
-        LLVM_COMPONENT_DEPENDS)
+        LLVM_LINK_COMPONENTS)
 
   cmake_parse_arguments(ASHL
                         "${options}"
@@ -1432,7 +1432,7 @@ function(add_swift_host_library name)
     ${ASHL_FORCE_BUILD_OPTIMIZED_keyword}
     SDK ${SWIFT_HOST_VARIANT_SDK}
     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
-    LLVM_COMPONENT_DEPENDS ${ASHL_LLVM_COMPONENT_DEPENDS}
+    LLVM_LINK_COMPONENTS ${ASHL_LLVM_LINK_COMPONENTS}
     FILE_DEPENDS ${ASHL_FILE_DEPENDS}
     INSTALL_IN_COMPONENT "dev"
     )
@@ -1467,7 +1467,7 @@ endfunction()
 #     [SWIFT_MODULE_DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS_WEAK dep1 ...]
-#     [LLVM_COMPONENT_DEPENDS comp1 ...]
+#     [LLVM_LINK_COMPONENTS comp1 ...]
 #     [FILE_DEPENDS target1 ...]
 #     [TARGET_SDKS sdk1...]
 #     [C_COMPILE_FLAGS flag1...]
@@ -1533,7 +1533,7 @@ endfunction()
 # FRAMEWORK_DEPENDS_WEAK
 #   System frameworks this library depends on that should be weak-linked
 #
-# LLVM_COMPONENT_DEPENDS
+# LLVM_LINK_COMPONENTS
 #   LLVM components this library depends on.
 #
 # FILE_DEPENDS
@@ -1618,7 +1618,7 @@ function(add_swift_target_library name)
         INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
         LINK_FLAGS
         LINK_LIBRARIES
-        LLVM_COMPONENT_DEPENDS
+        LLVM_LINK_COMPONENTS
         PRIVATE_LINK_LIBRARIES
         SWIFT_COMPILE_FLAGS
         SWIFT_COMPILE_FLAGS_IOS
@@ -1890,7 +1890,7 @@ function(add_swift_target_library name)
         LINK_LIBRARIES ${swiftlib_link_libraries}
         FRAMEWORK_DEPENDS ${swiftlib_framework_depends_flattened}
         FRAMEWORK_DEPENDS_WEAK ${SWIFTLIB_FRAMEWORK_DEPENDS_WEAK}
-        LLVM_COMPONENT_DEPENDS ${SWIFTLIB_LLVM_COMPONENT_DEPENDS}
+        LLVM_LINK_COMPONENTS ${SWIFTLIB_LLVM_LINK_COMPONENTS}
         FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS} ${swiftlib_module_dependency_targets}
         C_COMPILE_FLAGS ${swiftlib_c_compile_flags_all}
         SWIFT_COMPILE_FLAGS ${swiftlib_swift_compile_flags_all} ${swiftlib_swift_compile_flags_arch} ${swiftlib_swift_compile_private_frameworks_flag}
@@ -2106,7 +2106,7 @@ function(_add_swift_executable_single name)
   cmake_parse_arguments(SWIFTEXE_SINGLE
     "EXCLUDE_FROM_ALL"
     "SDK;ARCHITECTURE"
-    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;COMPILE_FLAGS"
+    "DEPENDS;LLVM_LINK_COMPONENTS;LINK_LIBRARIES;COMPILE_FLAGS"
     ${ARGN})
 
   set(SWIFTEXE_SINGLE_SOURCES ${SWIFTEXE_SINGLE_UNPARSED_ARGUMENTS})
@@ -2207,7 +2207,7 @@ function(_add_swift_executable_single name)
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
   target_link_libraries("${name}" PRIVATE ${SWIFTEXE_SINGLE_LINK_LIBRARIES})
-  swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_LLVM_COMPONENT_DEPENDS})
+  swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_LLVM_LINK_COMPONENTS})
 
   set_target_properties(${name} PROPERTIES FOLDER "Swift executables")
 endfunction()
