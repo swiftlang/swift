@@ -761,13 +761,25 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
     auto memberAssocInterfaceType = memberAssocType->hasArchetype()
                                         ? memberAssocType->mapTypeOutOfContext()
                                         : memberAssocType;
+    auto memberAssocContextualType =
+        parentDC->mapTypeIntoContext(memberAssocInterfaceType);
     newMember->setInterfaceType(memberAssocInterfaceType);
-    newMember->setType(parentDC->mapTypeIntoContext(memberAssocInterfaceType));
+    newMember->setType(memberAssocContextualType);
+    Pattern *memberPattern =
+        new (C) NamedPattern(newMember, /*implicit*/ true);
+    memberPattern = TypedPattern::createImplicit(
+        C, memberPattern, memberAssocContextualType);
+    memberPattern->setType(memberAssocContextualType);
+    auto *memberBinding = PatternBindingDecl::createImplicit(
+        C, StaticSpellingKind::None, memberPattern, /*initExpr*/ nullptr,
+        structDecl);
     structDecl->addMember(newMember);
+    structDecl->addMember(memberBinding);
     newMember->copyFormalAccessFrom(member, /*sourceIsParentContext*/ true);
     newMember->setValidationToChecked();
     newMember->setSetterAccess(member->getFormalAccess());
     C.addSynthesizedDecl(newMember);
+    C.addSynthesizedDecl(memberBinding);
 
     // Now that this member is in the associated type, it should be marked
     // `@differentiable` so that the differentiation transform will synthesize
