@@ -5694,9 +5694,7 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
     if (!Body.hasCodeCompletion() && BS->getNumElements() == 1) {
       auto Element = BS->getElement(0);
       if (auto *stmt = Element.dyn_cast<Stmt *>()) {
-        auto kind = AFD->getKind();
-        if (kind == DeclKind::Var || kind == DeclKind::Subscript ||
-            kind == DeclKind::Func ) {
+        if (isa<FuncDecl>(AFD)) {
           if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
             if (!returnStmt->hasResult()) {
               auto returnExpr = TupleExpr::createEmpty(Context,
