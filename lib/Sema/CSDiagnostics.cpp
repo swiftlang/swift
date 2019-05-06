@@ -989,6 +989,7 @@ bool AssignmentFailure::diagnoseAsError() {
     auto getKeyPathArgument = [](SubscriptExpr *expr) {
       auto *TE = dyn_cast<TupleExpr>(expr->getIndex());
       assert(TE->getNumElements() == 1);
+      assert(TE->getElementName(0).str() == "keyPath");
       return TE->getElement(0);
     };
 
