@@ -2075,7 +2075,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
     // Collect all string segments.
     SyntaxParsingContext SegmentsCtx(SyntaxContext,
-                                     SyntaxKind::StringInterpolationSegments);
+                                     SyntaxKind::StringLiteralSegments);
     Status = parseStringSegments(Segments, EntireTok, InterpolationVar, 
                                  Stmts, LiteralCapacity, InterpolationCount);
 

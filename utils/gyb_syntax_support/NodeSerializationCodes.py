@@ -170,7 +170,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'TupleElementList': 165,
     'ArrayElementList': 166,
     'DictionaryElementList': 167,
-    'StringInterpolationSegments': 168,
+    'StringLiteralSegments': 168,
     'DeclNameArgumentList': 169,
     'ExprList': 170,
     'ClosureCaptureItemList': 171,
