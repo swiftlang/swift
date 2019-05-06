@@ -2035,7 +2035,7 @@ bool ConstraintSystem::repairFailures(
         return true;
     }
 
-    if (isa<AssignExpr>(anchor)) {
+    if (auto *AE = dyn_cast<AssignExpr>(anchor)) {
       if (auto *fnType = lhs->getAs<FunctionType>()) {
         // If left-hand side is a function type but right-hand
         // side isn't, let's check it would be possible to fix
@@ -2050,6 +2050,12 @@ bool ConstraintSystem::repairFailures(
               InsertExplicitCall::create(*this, getConstraintLocator(locator)));
           return true;
         }
+      }
+
+      if (isa<InOutExpr>(AE->getSrc())) {
+        conversionsOrFixes.push_back(
+            RemoveAddressOf::create(*this, getConstraintLocator(locator)));
+        return true;
       }
     }
 
@@ -6508,6 +6514,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
 
   case FixKind::InsertCall:
+  case FixKind::RemoveAddressOf:
   case FixKind::SkipSameTypeRequirement:
   case FixKind::SkipSuperclassRequirement:
   case FixKind::ContextualMismatch:

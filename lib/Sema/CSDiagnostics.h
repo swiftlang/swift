@@ -1140,6 +1140,26 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose extraneous use of address of (`&`) which could only be
+/// associated with arguments to inout parameters e.g.
+///
+/// ```swift
+/// struct S {}
+///
+/// var a: S = ...
+/// var b: S = ...
+///
+/// a = &b
+/// ```
+class InvalidUseOfAddressOf final : public FailureDiagnostic {
+public:
+  InvalidUseOfAddressOf(Expr *root, ConstraintSystem &cs,
+                        ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

@@ -57,6 +57,8 @@ enum class FixKind : uint8_t {
 
   /// Introduce a '&' to take the address of an lvalue.
   AddressOf,
+  /// Remove extraneous use of `&`.
+  RemoveAddressOf,
 
   /// Replace a coercion ('as') with a forced checked cast ('as!').
   CoerceToCheckedCast,
@@ -851,6 +853,21 @@ private:
   static AllowInvalidRefInKeyPath *create(ConstraintSystem &cs, RefKind kind,
                                           ValueDecl *member,
                                           ConstraintLocator *locator);
+};
+
+class RemoveAddressOf final : public ConstraintFix {
+  RemoveAddressOf(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RemoveAddressOf, locator) {}
+
+public:
+  std::string getName() const override {
+    return "remove extraneous use of `&`";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static RemoveAddressOf *create(ConstraintSystem &cs,
+                                 ConstraintLocator *locator);
 };
 
 } // end namespace constraints
