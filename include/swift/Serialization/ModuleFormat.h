@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 488; // assign_by_delegate
+const uint16_t SWIFTMODULE_VERSION_MINOR = 489; // backing variables
 
 using DeclIDField = BCFixed<31>;
 
@@ -1047,7 +1047,8 @@ namespace decls_block {
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
     DeclIDField, // opaque return type decl
-    BCArray<TypeIDField> // accessors and dependencies
+    BCFixed<2>,  // # of property delegate backing properties
+    BCArray<TypeIDField> // accessors, backing properties, and dependencies
   >;
 
   using ParamLayout = BCRecordLayout<

@@ -263,6 +263,11 @@ AttachedPropertyDelegateRequest::evaluate(Evaluator &evaluator,
     if (!nominal || !nominal->getAttrs().hasAttribute<PropertyDelegateAttr>())
       continue;
 
+    // If the declaration came from a module file, we've already done all of
+    // the semantic checking required.
+    if (!dc->getParentSourceFile())
+      return mutableAttr;
+
     // Check various restrictions on which properties can have delegates
     // attached to them.
 
