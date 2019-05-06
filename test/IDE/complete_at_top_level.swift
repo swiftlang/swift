@@ -470,10 +470,9 @@ func resyncParserB14() {}
 var stringInterp = "\(#^STRING_INTERP_3^#)"
 _ = "" + "\(#^STRING_INTERP_4^#)" + ""
 // STRING_INTERP: Begin completions
-// FIXME: Why is this TypeRelation[Invalid] in STRING_INTERP_4?
-// STRING_INTERP-DAG: Decl[InstanceMethod]/CurrNominal{{(/NotRecommended/TypeRelation\[Invalid\])?}}:   ['(']{#(value): _#}[')'][#Void#]; name=value: _
+// STRING_INTERP-DAG: Decl[InstanceMethod]/CurrNominal:   ['(']{#(value): _#}[')'][#Void#]; name=value: _
 // STRING_INTERP-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#];
-// STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule: fooFunc1()[#Void#];
+// STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: fooFunc1()[#Void#];
 // STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule: optStr()[#String?#];
 // STRING_INTERP-DAG: Decl[GlobalVar]/Local: fooObject[#FooStruct#];
 // STRING_INTERP: End completions
