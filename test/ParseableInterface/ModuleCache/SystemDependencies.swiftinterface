@@ -43,11 +43,12 @@
 // NEGATIVE-NOT: SomeCModule.h
 // CHECK: SomeCModule.h
 
-// CHECK-DUMP-NOT: usr/include
-// CHECK-DUMP: DEPENDENCY_DIRECTORY{{.+}}'usr/include'
+// CHECK-DUMP-NOT: usr{{[/\\]}}include
+// CHECK-DUMP: DEPENDENCY_DIRECTORY{{.+}}'usr{{[/\\]}}include'
 // CHECK-DUMP-NEXT: FILE_DEPENDENCY{{.+}}'module.modulemap'
-// CHECK-DUMP-NEXT: FILE_DEPENDENCY{{.+}}'SomeCModule.h'
-// CHECK-DUMP-NOT: usr/include
+// CHECK-DUMP-NOT: FILE_DEPENDENCY{{.+}}'SomeCModule.h'
+// CHECK-DUMP: FILE_DEPENDENCY{{.+}}'SomeCModule.h'
+// CHECK-DUMP-NOT: usr{{[/\\]}}include
 
 // MODULECACHE-COUNT-2: SystemDependencies-{{[^ ]+}}.swiftmodule
 
