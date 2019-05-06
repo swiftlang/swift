@@ -67,18 +67,22 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COMPLETE -F %t/Frameworks -sdk %t -I %t/Modules | %FileCheck %s
 
-// CHECK-NOT: IosInterfaceFW
-// CHECK-NOT: NonTargetInterfaceFW
-// CHECK-NOT: NonTargetSerializedFW
-// CHECK-NOT: IosInterfaceMod
-// CHECK-NOT: DirInterfaceMod
-// CHECK-NOT: EmptyDirInterfaceMod
-// CHECK-NOT: EmptyDirSerializedMod
-// CHECK-NOT: UnrelatedFile
-// CHECK-NOT: ModuleInFrameworkDir
-// CHECK-NOT: FrameworkInModuleDir
-// CHECK-NOT: NameMismatchFW
-// CHECK-NOT: MismatchNameFW
+// CHECK: Begin completion
+// CHECK-NOT: IosInterfaceFW[#Module#]
+// CHECK-NOT: NonTargetInterfaceFW[#Module#]
+// CHECK-NOT: NonTargetSerializedFW[#Module#]
+// CHECK-NOT: IosInterfaceMod[#Module#]
+// CHECK-NOT: DirInterfaceMod[#Module#]
+// CHECK-NOT: EmptyDirInterfaceMod[#Module#]
+// CHECK-NOT: EmptyDirSerializedMod[#Module#]
+// CHECK-NOT: UnrelatedFile[#Module#]
+// CHECK-NOT: ModuleInFrameworkDir[#Module#]
+// CHECK-NOT: FrameworkInModuleDir[#Module#]
+// CHECK-NOT: NameMismatchFW[#Module#]
+// CHECK-NOT: MismatchNameFW[#Module#]
+// CHECK-NOT: SwiftOnoneSupport[#Module#]
+// CHECK-NOT: Builtin[#Module#]
+// CHECK-NOT: Module[_
 
 // CHECK-DAG: MacAndLinuxInterfaceFW[#Module#]
 // CHECK-DAG: MacAndLinuxSerializedFW[#Module#]
@@ -88,5 +92,6 @@
 // CHECK-DAG: NonTargetSerializedMod[#Module#]
 
 // CHECK-DAG: Swift[#Module#]
+// CHECK: End completion
 
 import #^COMPLETE^#

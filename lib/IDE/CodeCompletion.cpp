@@ -33,6 +33,7 @@
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Syntax/SyntaxKind.h"
+#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -1761,11 +1762,10 @@ public:
 
     auto mainModuleName = CurrDeclContext->getParentModule()->getName();
     for (auto ModuleName : ModuleNames) {
-      if (ModuleName == mainModuleName)
-        continue;
-      if (ModuleName.str().startswith("_"))
-        continue;
-      if (ModuleName == Ctx.SwiftShimsModuleName)
+      if (ModuleName.str().startswith("_") ||
+          ModuleName == mainModuleName ||
+          ModuleName == Ctx.SwiftShimsModuleName ||
+          ModuleName.str() == SWIFT_ONONE_SUPPORT)
         continue;
 
       auto MD = ModuleDecl::create(ModuleName, Ctx);
