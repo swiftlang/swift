@@ -28,7 +28,7 @@ EXPR_NODES = [
     Node('DictionaryElementList', kind='SyntaxCollection',
          element='DictionaryElement'),
 
-    Node('StringInterpolationSegments', kind='SyntaxCollection',
+    Node('StringLiteralSegments', kind='SyntaxCollection',
          element='Syntax', element_name='Segment',
          element_choices=['StringSegment', 'ExpressionSegment']),
 
@@ -483,7 +483,7 @@ EXPR_NODES = [
                        'StringQuoteToken',
                        'MultilineStringQuoteToken',
                    ]),
-             Child('Segments', kind='StringInterpolationSegments',
+             Child('Segments', kind='StringLiteralSegments',
                    collection_element_name='Segment'),
              Child('CloseQuote', kind='Token',
                    token_choices=[
