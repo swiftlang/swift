@@ -1983,7 +1983,8 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 }
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
-  do {
+  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    // Identity of empty sets changed in https://github.com/apple/swift/pull/22527
     var s = getBridgedNonverbatimSet([])
     expectTrue(isNativeSet(s))
     expectEqual(0, s.count)
@@ -2174,6 +2175,10 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
 }
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+    // Identity of empty sets changed in https://github.com/apple/swift/pull/22527
+    return
+  }
   let s1 = getBridgedNonverbatimSet([])
   let identity1 = s1._rawIdentifier()
   expectTrue(isNativeSet(s1))
@@ -4617,45 +4622,49 @@ SetTestSuite.test("IndexValidation.RemoveAt.AfterGrow") {
 }
 
 #if _runtime(_ObjC)
-SetTestSuite.test("ForcedNonverbatimBridge.Trap.String")
+if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  // https://github.com/apple/swift/pull/23174
+  SetTestSuite.test("ForcedNonverbatimBridge.Trap.String")
   .skip(.custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+      { _isFastAssertConfiguration() },
+      reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches("Could not cast value of type")
   .code {
+    let s1: NSSet = [
+      "Gordon" as NSString,
+      "William" as NSString,
+      "Katherine" as NSString,
+      "Lynn" as NSString,
+      "Brian" as NSString,
+      1756 as NSNumber]
 
-  let s1: NSSet = [
-    "Gordon" as NSString,
-    "William" as NSString,
-    "Katherine" as NSString,
-    "Lynn" as NSString,
-    "Brian" as NSString,
-    1756 as NSNumber]
-
-  expectCrashLater()
-  _ = s1 as! Set<String>
+    expectCrashLater()
+    _ = s1 as! Set<String>
+  }
 }
 #endif
 
 #if _runtime(_ObjC)
-SetTestSuite.test("ForcedNonverbatimBridge.Trap.Int")
+if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  // https://github.com/apple/swift/pull/23174
+  SetTestSuite.test("ForcedNonverbatimBridge.Trap.Int")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches("Could not cast value of type")
   .code {
+    let s1: NSSet = [
+      4 as NSNumber,
+      8 as NSNumber,
+      15 as NSNumber,
+      16 as NSNumber,
+      23 as NSNumber,
+      42 as NSNumber,
+      "John" as NSString]
 
-  let s1: NSSet = [
-    4 as NSNumber,
-    8 as NSNumber,
-    15 as NSNumber,
-    16 as NSNumber,
-    23 as NSNumber,
-    42 as NSNumber,
-    "John" as NSString]
-
-  expectCrashLater()
-  _ = s1 as! Set<Int>
+    expectCrashLater()
+    _ = s1 as! Set<Int>
+  }
 }
 #endif
 
@@ -4768,61 +4777,70 @@ SetTestSuite.test("ForcedVerbatimDowncast.Trap.Int")
 #endif
 
 #if _runtime(_ObjC)
-SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.String")
+if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  // https://github.com/apple/swift/pull/23174
+  SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.String")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches("Could not cast value of type")
   .code {
-  let s1: Set<NSObject> = [
-    "Gordon" as NSString,
-    "William" as NSString,
-    "Katherine" as NSString,
-    "Lynn" as NSString,
-    "Brian" as NSString,
-    1756 as NSNumber]
-  expectCrashLater()
-  // Nonverbatim downcasts are greedy and they trap immediately.
-  let s2 = s1 as! Set<String>
-  _ = s2.contains("Gordon")
+    let s1: Set<NSObject> = [
+      "Gordon" as NSString,
+      "William" as NSString,
+      "Katherine" as NSString,
+      "Lynn" as NSString,
+      "Brian" as NSString,
+      1756 as NSNumber]
+    expectCrashLater()
+    // Nonverbatim downcasts are greedy and they trap immediately.
+    let s2 = s1 as! Set<String>
+    _ = s2.contains("Gordon")
+  }
 }
 #endif
 
 #if _runtime(_ObjC)
-SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.Int")
+if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  // https://github.com/apple/swift/pull/23174
+  SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.Int")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches("Could not cast value of type")
   .code {
-  let s1: Set<NSObject> = [
-    4 as NSNumber,
-    8 as NSNumber,
-    15 as NSNumber,
-    16 as NSNumber,
-    23 as NSNumber,
-    42 as NSNumber,
-    "John" as NSString]
-  expectCrashLater()
-  // Nonverbatim downcasts are greedy and they trap immediately.
-  let s2 = s1 as! Set<Int>
-  _ = s2.contains(23)
+    let s1: Set<NSObject> = [
+      4 as NSNumber,
+      8 as NSNumber,
+      15 as NSNumber,
+      16 as NSNumber,
+      23 as NSNumber,
+      42 as NSNumber,
+      "John" as NSString]
+    expectCrashLater()
+    // Nonverbatim downcasts are greedy and they trap immediately.
+    let s2 = s1 as! Set<Int>
+    _ = s2.contains(23)
+  }
 }
 #endif
 
 #if _runtime(_ObjC)
-SetTestSuite.test("Upcast.StringEqualityMismatch") {
-  // Upcasting from NSString to String keys changes their concept of equality,
-  // resulting in two equal keys, one of which should be discarded by the
-  // downcast. (Along with its associated value.)
-  // rdar://problem/35995647
-  let s: Set<NSString> = [
-    "cafe\u{301}",
-    "café"
-  ]
-  expectEqual(s.count, 2)
-  let s2 = s as Set<String>
-  expectEqual(s2.count, 1)
+if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  // https://github.com/apple/swift/pull/23683
+  SetTestSuite.test("Upcast.StringEqualityMismatch") {
+    // Upcasting from NSString to String keys changes their concept of equality,
+    // resulting in two equal keys, one of which should be discarded by the
+    // downcast. (Along with its associated value.)
+    // rdar://problem/35995647
+    let s: Set<NSString> = [
+      "cafe\u{301}",
+      "café"
+    ]
+    expectEqual(s.count, 2)
+    let s2 = s as Set<String>
+    expectEqual(s2.count, 1)
+  }
 }
 #endif
 
