@@ -289,7 +289,7 @@ struct GenericRoot<T> {
 func testGenericRoot1(r: GenericRoot<Point>) {
   r.#^testGenericRoot1^#
 }
-// FIXME: Type should be substituted to Point.
+// FIXME: Type should be substituted to Int.
 // testGenericRoot1: Decl[InstanceVar]/CurrNominal:      foo[#T#];
 
 class C {
