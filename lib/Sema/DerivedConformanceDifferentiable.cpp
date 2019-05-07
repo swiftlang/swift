@@ -1118,12 +1118,6 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
         derived, C.Id_AllDifferentiableVariables);
     auto *allDiffableVarsStruct = allDiffableVarsStructSynthesis.first;
     auto freshlySynthesized = allDiffableVarsStructSynthesis.second;
-    // `AllDifferentiableVariables` must conform to `AdditiveArithmetic`.
-    // This should be guaranteed.
-    assert(TC.conformsToProtocol(
-               allDiffableVarsStruct->getDeclaredTypeInContext(), addArithProto,
-               parentDC, ConformanceCheckFlags::Used) &&
-           "`AllDifferentiableVariables` must conform to `AdditiveArithmetic`");
     // When the struct is freshly synthesized, we check emit warnings for
     // implicit `@noDerivative` members. Checking for fresh synthesis is
     // necessary because this code path will be executed called multiple times
