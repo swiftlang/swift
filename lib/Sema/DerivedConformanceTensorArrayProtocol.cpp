@@ -39,8 +39,7 @@ bool DerivedConformance::canDeriveTensorArrayProtocol(NominalTypeDecl *nominal,
     return false;
   // All stored properties must conform to `TensorGroup`.
   auto &C = nominal->getASTContext();
-  auto *tensorGroupProto =
-      C.getProtocol(KnownProtocolKind::TensorGroup);
+  auto *tensorGroupProto = C.getProtocol(KnownProtocolKind::TensorGroup);
   return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
     if (!v->hasInterfaceType())
       C.getLazyResolver()->resolveDeclSignature(v);
@@ -500,7 +499,7 @@ deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl, void *) {
   Type intType = C.getIntDecl()->getDeclaredType();
   TypeExpr *intTE = TypeExpr::createImplicit(intType, C);
 
-  // Iterate over members and call `self.t = T(_owning:)`.
+  // Iterate over members and call `self.member = MemberType(_owning:)`.
   llvm::SmallVector<ASTNode, 2> thenMemberExprs;
   llvm::SmallVector<ASTNode, 2> elseMemberExprs;
   for (auto member : nominal->getStoredProperties()) {
