@@ -12,7 +12,7 @@ func testFutureproofEnum() -> FutureproofEnum {
   // CHECK: [[CASE:%.+]] = load i32, i32* @"$s3Lib15FutureproofEnumO1byA2CmFWC"
   // CHECK: [[METADATA_RESPONSE:%.+]] = tail call swiftcc %swift.metadata_response @"$s3Lib15FutureproofEnumOMa"
   // CHECK: [[METADATA:%.+]] = extractvalue %swift.metadata_response [[METADATA_RESPONSE]], 0
-  // CHECK: tail call void {{%.+}}(%swift.opaque* noalias %0, i32 [[CASE]], %swift.type* [[METADATA]])
+  // CHECK: call void {{%.+}}(%swift.opaque* noalias %0, i32 [[CASE]], %swift.type* [[METADATA]])
   // CHECK-NEXT: ret void
   return .b
 } // CHECK-NEXT: {{^}$}}
