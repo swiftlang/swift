@@ -64,12 +64,14 @@
         {
           "kind": "Conformance",
           "name": "P2",
-          "printedName": "P2"
+          "printedName": "P2",
+          "usr": "s:4cake2P2P"
         },
         {
           "kind": "Conformance",
           "name": "P1",
-          "printedName": "P1"
+          "printedName": "P1",
+          "usr": "s:4cake2P1P"
         }
       ]
     },
@@ -145,12 +147,14 @@
         {
           "kind": "Conformance",
           "name": "P1",
-          "printedName": "P1"
+          "printedName": "P1",
+          "usr": "s:4cake2P1P"
         },
         {
           "kind": "Conformance",
           "name": "P2",
-          "printedName": "P2"
+          "printedName": "P2",
+          "usr": "s:4cake2P2P"
         }
       ]
     },
@@ -620,12 +624,14 @@
         {
           "kind": "Conformance",
           "name": "Equatable",
-          "printedName": "Equatable"
+          "printedName": "Equatable",
+          "usr": "s:SQ"
         },
         {
           "kind": "Conformance",
           "name": "Hashable",
-          "printedName": "Hashable"
+          "printedName": "Hashable",
+          "usr": "s:SH"
         },
         {
           "kind": "Conformance",
@@ -645,7 +651,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "usr": "s:SY"
         }
       ]
     },
@@ -1028,7 +1035,8 @@
         {
           "kind": "Conformance",
           "name": "PSuper",
-          "printedName": "PSuper"
+          "printedName": "PSuper",
+          "usr": "s:4cake6PSuperP"
         }
       ]
     },
@@ -1120,12 +1128,14 @@
           "kind": "Conformance",
           "name": "P1",
           "printedName": "P1",
+          "usr": "s:4cake2P1P",
           "isABIPlaceholder": true
         },
         {
           "kind": "Conformance",
           "name": "P2",
-          "printedName": "P2"
+          "printedName": "P2",
+          "usr": "s:4cake2P2P"
         }
       ]
     },
@@ -1177,12 +1187,14 @@
         {
           "kind": "Conformance",
           "name": "FixedWidthInteger",
-          "printedName": "FixedWidthInteger"
+          "printedName": "FixedWidthInteger",
+          "usr": "s:s17FixedWidthIntegerP"
         },
         {
           "kind": "Conformance",
           "name": "SignedInteger",
-          "printedName": "SignedInteger"
+          "printedName": "SignedInteger",
+          "usr": "s:SZ"
         },
         {
           "kind": "Conformance",
@@ -1202,17 +1214,20 @@
                 }
               ]
             }
-          ]
+          ],
+          "usr": "s:Sz"
         },
         {
           "kind": "Conformance",
           "name": "LosslessStringConvertible",
-          "printedName": "LosslessStringConvertible"
+          "printedName": "LosslessStringConvertible",
+          "usr": "s:s25LosslessStringConvertibleP"
         },
         {
           "kind": "Conformance",
           "name": "SignedNumeric",
-          "printedName": "SignedNumeric"
+          "printedName": "SignedNumeric",
+          "usr": "s:s13SignedNumericP"
         },
         {
           "kind": "Conformance",
@@ -1239,12 +1254,14 @@
                 }
               ]
             }
-          ]
+          ],
+          "usr": "s:Sj"
         },
         {
           "kind": "Conformance",
           "name": "CustomStringConvertible",
-          "printedName": "CustomStringConvertible"
+          "printedName": "CustomStringConvertible",
+          "usr": "s:s23CustomStringConvertibleP"
         },
         {
           "kind": "Conformance",
@@ -1264,12 +1281,14 @@
                 }
               ]
             }
-          ]
+          ],
+          "usr": "s:Sx"
         },
         {
           "kind": "Conformance",
           "name": "AdditiveArithmetic",
-          "printedName": "AdditiveArithmetic"
+          "printedName": "AdditiveArithmetic",
+          "usr": "s:s18AdditiveArithmeticP"
         },
         {
           "kind": "Conformance",
@@ -1296,42 +1315,50 @@
                 }
               ]
             }
-          ]
+          ],
+          "usr": "s:s27ExpressibleByIntegerLiteralP"
         },
         {
           "kind": "Conformance",
           "name": "Comparable",
-          "printedName": "Comparable"
+          "printedName": "Comparable",
+          "usr": "s:SL"
         },
         {
           "kind": "Conformance",
           "name": "P1",
-          "printedName": "P1"
+          "printedName": "P1",
+          "usr": "s:4cake2P1P"
         },
         {
           "kind": "Conformance",
           "name": "Encodable",
-          "printedName": "Encodable"
+          "printedName": "Encodable",
+          "usr": "s:SE"
         },
         {
           "kind": "Conformance",
           "name": "Decodable",
-          "printedName": "Decodable"
+          "printedName": "Decodable",
+          "usr": "s:Se"
         },
         {
           "kind": "Conformance",
           "name": "Hashable",
-          "printedName": "Hashable"
+          "printedName": "Hashable",
+          "usr": "s:SH"
         },
         {
           "kind": "Conformance",
           "name": "Equatable",
-          "printedName": "Equatable"
+          "printedName": "Equatable",
+          "usr": "s:SQ"
         },
         {
           "kind": "Conformance",
           "name": "CustomReflectable",
-          "printedName": "CustomReflectable"
+          "printedName": "CustomReflectable",
+          "usr": "s:s17CustomReflectableP"
         },
         {
           "kind": "Conformance",
@@ -1441,12 +1468,14 @@
                 }
               ]
             }
-          ]
+          ],
+          "usr": "s:s10SIMDScalarP"
         },
         {
           "kind": "Conformance",
           "name": "CVarArg",
-          "printedName": "CVarArg"
+          "printedName": "CVarArg",
+          "usr": "s:s7CVarArgP"
         }
       ]
     }
