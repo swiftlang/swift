@@ -245,16 +245,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// Stores information about lazy deserialization of various declarations.
   llvm::DenseMap<const DeclContext *, LazyContextData *> LazyContexts;
 
-  /// Stored generic signature builders for canonical generic signatures.
-  llvm::DenseMap<GenericSignature *, std::unique_ptr<GenericSignatureBuilder>>
-    GenericSignatureBuilders;
-
-  /// Canonical generic environments for canonical generic signatures.
-  ///
-  /// The keys are the generic signature builders in \c GenericSignatureBuilders.
-  llvm::DenseMap<GenericSignatureBuilder *, GenericEnvironment *>
-    CanonicalGenericEnvironments;
-  
   /// The single-parameter generic signature with no constraints, <T>.
   CanGenericSignature SingleGenericParameterSignature;
 
@@ -327,6 +317,19 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
     llvm::FoldingSet<OpaqueTypeArchetypeType> OpaqueArchetypes;
 
+    llvm::FoldingSet<GenericSignature> GenericSignatures;
+
+    /// Stored generic signature builders for canonical generic signatures.
+    llvm::DenseMap<GenericSignature *, std::unique_ptr<GenericSignatureBuilder>>
+      GenericSignatureBuilders;
+
+    /// Canonical generic environments for canonical generic signatures.
+    ///
+    /// The keys are the generic signature builders in
+    /// \c GenericSignatureBuilders.
+    llvm::DenseMap<GenericSignatureBuilder *, GenericEnvironment *>
+      CanonicalGenericEnvironments;
+
     /// The set of function types.
     llvm::FoldingSet<FunctionType> FunctionTypes;
 
@@ -377,7 +380,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   llvm::FoldingSet<SILBoxType> SILBoxTypes;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> IntegerTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
-  llvm::FoldingSet<GenericSignature> GenericSignatures;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, OpenedArchetypeType *> OpenedExistentialArchetypes;
 
@@ -1427,18 +1429,31 @@ void ASTContext::getVisibleTopLevelClangModules(
     collectAllModules(Modules);
 }
 
+static AllocationArena getArena(GenericSignature *genericSig) {
+  if (!genericSig)
+    return AllocationArena::Permanent;
+
+  if (genericSig->hasTypeVariable())
+    return AllocationArena::ConstraintSolver;
+
+  return AllocationArena::Permanent;
+}
+
 void ASTContext::registerGenericSignatureBuilder(
                                        GenericSignature *sig,
                                        GenericSignatureBuilder &&builder) {
   auto canSig = sig->getCanonicalSignature();
-  auto known = getImpl().GenericSignatureBuilders.find(canSig);
-  if (known != getImpl().GenericSignatureBuilders.end()) {
+  auto arena = getArena(sig);
+  auto &genericSignatureBuilders =
+      getImpl().getArena(arena).GenericSignatureBuilders;
+  auto known = genericSignatureBuilders.find(canSig);
+  if (known != genericSignatureBuilders.end()) {
     ++NumRegisteredGenericSignatureBuildersAlready;
     return;
   }
 
   ++NumRegisteredGenericSignatureBuilders;
-  getImpl().GenericSignatureBuilders[canSig] =
+  genericSignatureBuilders[canSig] =
     llvm::make_unique<GenericSignatureBuilder>(std::move(builder));
 }
 
@@ -1446,15 +1461,18 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
                                                       CanGenericSignature sig) {
   // Check whether we already have a generic signature builder for this
   // signature and module.
-  auto known = getImpl().GenericSignatureBuilders.find(sig);
-  if (known != getImpl().GenericSignatureBuilders.end())
+  auto arena = getArena(sig);
+  auto &genericSignatureBuilders =
+      getImpl().getArena(arena).GenericSignatureBuilders;
+  auto known = genericSignatureBuilders.find(sig);
+  if (known != genericSignatureBuilders.end())
     return known->second.get();
 
   // Create a new generic signature builder with the given signature.
   auto builder = new GenericSignatureBuilder(*this);
 
   // Store this generic signature builder (no generic environment yet).
-  getImpl().GenericSignatureBuilders[sig] =
+  genericSignatureBuilders[sig] =
     std::unique_ptr<GenericSignatureBuilder>(builder);
 
   builder->addGenericSignature(sig);
@@ -1525,12 +1543,16 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
                                               GenericSignatureBuilder *builder,
                                               GenericSignature *sig) {
-  auto known = getImpl().CanonicalGenericEnvironments.find(builder);
-  if (known != getImpl().CanonicalGenericEnvironments.end())
+  auto arena = getArena(sig);
+  auto &canonicalGenericEnvironments =
+      getImpl().getArena(arena).CanonicalGenericEnvironments;
+
+  auto known = canonicalGenericEnvironments.find(builder);
+  if (known != canonicalGenericEnvironments.end())
     return known->second;
 
   auto env = sig->createGenericEnvironment();
-  getImpl().CanonicalGenericEnvironments[builder] = env;
+  canonicalGenericEnvironments[builder] = env;
   return env;
 }
 
@@ -3774,10 +3796,14 @@ GenericSignature::get(TypeArrayView<GenericTypeParamType> params,
   llvm::FoldingSetNodeID ID;
   GenericSignature::Profile(ID, params, requirements);
 
+  auto arena = GenericSignature::hasTypeVariable(requirements)
+      ? AllocationArena::ConstraintSolver
+      : AllocationArena::Permanent;
+
   auto &ctx = getASTContext(params, requirements);
   void *insertPos;
-  if (auto *sig = ctx.getImpl().GenericSignatures.FindNodeOrInsertPos(ID,
-                                                                 insertPos)) {
+  if (auto *sig = ctx.getImpl().getArena(arena).GenericSignatures
+          .FindNodeOrInsertPos(ID, insertPos)) {
     if (isKnownCanonical)
       sig->CanonicalSignatureOrASTContext = &ctx;
 
@@ -3790,7 +3816,7 @@ GenericSignature::get(TypeArrayView<GenericTypeParamType> params,
   void *mem = ctx.Allocate(bytes, alignof(GenericSignature));
   auto newSig = new (mem) GenericSignature(params, requirements,
                                            isKnownCanonical);
-  ctx.getImpl().GenericSignatures.InsertNode(newSig, insertPos);
+  ctx.getImpl().getArena(arena).GenericSignatures.InsertNode(newSig, insertPos);
   return newSig;
 }
 
