@@ -1,8 +1,4 @@
-// RUN: %target-run-eager-swift
-//
-// Note: GPE testing is disabled because GPE does not interact well with
-// VJP-based AD. See SR-9638.
-//
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 //
 // Tensor indirect passing AD runtime tests.

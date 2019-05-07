@@ -1,8 +1,4 @@
-// RUN: %target-run-eager-swift
-//
-// Note: GPE testing is disabled because GPE does not interact well with
-// VJP-based AD. See SR-9638.
-//
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 //
 // Tensor AD runtime tests.
@@ -161,6 +157,36 @@ TensorADTests.testAllBackends("reshaped") {
   let reshapedPullback = pullback(at: input) { (a: Tensor<Float>) in a.reshaped(toShape: shapeTensor) }
   let reshaped = Tensor<Float>(ones: [2, 2, 2])
   expectEqual(input, reshapedPullback(reshaped))
+}
+
+TensorADTests.testAllBackends("concatenation (++)") {
+  let a1 = Tensor<Float>([1,2,3,4])
+  let b1 = Tensor<Float>([5,6,7,8,9,10])
+
+  let a2 = Tensor<Float>([1,1,1,1])
+  let b2 = Tensor<Float>([1,1,1,1,1,1])
+
+  let grads = gradient(at: a2, b2) { a, b in
+    return ((a1 * a) ++ (b1 * b)).sum()
+  }
+
+  expectEqual(a1, grads.0)
+  expectEqual(b1, grads.1)
+}
+
+TensorADTests.testAllBackends("concatenated") {
+  let a1 = Tensor<Float>([1,2,3,4])
+  let b1 = Tensor<Float>([5,6,7,8,9,10])
+
+  let a2 = Tensor<Float>([1,1,1,1])
+  let b2 = Tensor<Float>([1,1,1,1,1,1])
+
+  let grads = gradient(at: a2, b2) { a, b in
+    return (a1 * a).concatenated(with: b1 * b, alongAxis: -1).sum()
+  }
+
+  expectEqual(a1, grads.0)
+  expectEqual(b1, grads.1)
 }
 
 TensorADTests.testAllBackends("transposed") {

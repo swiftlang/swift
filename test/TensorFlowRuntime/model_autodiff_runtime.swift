@@ -1,4 +1,4 @@
-// RUN: %target-run-eager-swift
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 //
 // Machine learning API AD runtime tests.

@@ -1,6 +1,5 @@
-// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize
 
 // Tests on collective ops, as a building block for data/model parallel programs.
 
