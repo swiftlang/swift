@@ -110,9 +110,15 @@ simplifyAndReplace(SILInstruction *inst, CanonicalizeInstruction &pass) {
 //                        Canonicalize Memory Operations
 //===----------------------------------------------------------------------===//
 
-// Replace all uses of an original struct or tuple extract instruction, with the
+// Replace all uses of an original struct or tuple extract instruction with the
 // given load instruction. The caller ensures that the load only loads the
 // extracted field.
+//
+// \p extract has the form:
+// (struct_extract (load %base), #field)
+//
+// \p loadInst has the form:
+// (load (struct_element_addr %base, #field)
 static void replaceUsesOfExtract(SingleValueInstruction *extract,
                                  LoadInst *loadInst,
                                  CanonicalizeInstruction &pass) {
