@@ -114,25 +114,13 @@ void sourcekitd::set_interrupted_connection_handler(
 //===----------------------------------------------------------------------===//
 
 sourcekitd_response_t sourcekitd_send_request_sync(sourcekitd_object_t req) {
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs;
-  return sourcekitd_send_request_sync_with_filesystem(req, (void *)&vfs);
-}
-
-sourcekitd_response_t
-sourcekitd_send_request_sync_with_filesystem(sourcekitd_object_t req,
-                                             void *vfs) {
   Semaphore sema(0);
 
   sourcekitd_response_t ReturnedResp;
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem(
-      *(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> *)vfs);
-  sourcekitd::handleRequest(
-      req,
-      [&](sourcekitd_response_t resp) {
-        ReturnedResp = resp;
-        sema.signal();
-      },
-      FileSystem);
+  sourcekitd::handleRequest(req, [&](sourcekitd_response_t resp) {
+    ReturnedResp = resp;
+    sema.signal();
+  });
 
   sema.wait();
   return ReturnedResp;
@@ -146,14 +134,11 @@ void sourcekitd_send_request(sourcekitd_object_t req,
   sourcekitd_request_retain(req);
   receiver = Block_copy(receiver);
   WorkQueue::dispatchConcurrent([=] {
-    sourcekitd::handleRequest(
-        req,
-        [=](sourcekitd_response_t resp) {
-          // The receiver accepts ownership of the response.
-          receiver(resp);
-          Block_release(receiver);
-        },
-        nullptr);
+    sourcekitd::handleRequest(req, [=](sourcekitd_response_t resp) {
+      // The receiver accepts ownership of the response.
+      receiver(resp);
+      Block_release(receiver);
+    });
     sourcekitd_request_release(req);
   });
 }
