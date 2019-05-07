@@ -2576,12 +2576,29 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   }
 
   // If the nominal type is a function builder type, verify that D is a
-  // parameter of function type.
+  // function, storage with an explicit getter, or parameter of function type.
   if (nominal->getAttrs().hasAttribute<FunctionBuilderAttr>()) {
-    auto param = dyn_cast<ParamDecl>(D);
-    if (!param) {
+    ValueDecl *decl;
+    if (auto param = dyn_cast<ParamDecl>(D)) {
+      decl = param;
+    } else if (auto func = dyn_cast<FuncDecl>(D)) {
+      decl = func;
+    } else if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
+      decl = storage;
+      auto getter = storage->getGetter();
+      if (!getter || getter->isImplicit() || !getter->hasBody()) {
+        TC.diagnose(attr->getLocation(),
+                    diag::function_builder_attribute_on_storage_without_getter,
+                    nominal->getFullName(),
+                    isa<SubscriptDecl>(storage) ? 0
+                      : storage->getDeclContext()->isTypeContext() ? 1
+                      : cast<VarDecl>(storage)->isLet() ? 2 : 3);
+        attr->setInvalid();
+        return;
+      }
+    } else {
       TC.diagnose(attr->getLocation(),
-                  diag::function_builder_attribute_not_on_parameter,
+                  diag::function_builder_attribute_not_allowed_here,
                   nominal->getFullName());
       attr->setInvalid();
       return;
@@ -2594,9 +2611,10 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     }
 
     // Complain if this isn't the primary function-builder attribute.
-    auto attached = param->getAttachedFunctionBuilder();
+    auto attached = decl->getAttachedFunctionBuilder();
     if (attached != attr) {
-      TC.diagnose(attr->getLocation(), diag::function_builder_multiple);
+      TC.diagnose(attr->getLocation(), diag::function_builder_multiple,
+                  isa<ParamDecl>(decl));
       TC.diagnose(attached->getLocation(),
                   diag::previous_function_builder_here);
       attr->setInvalid();
@@ -2604,7 +2622,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     } else {
       // Force any diagnostics associated with computing the function-builder
       // type.
-      (void) param->getFunctionBuilderType();
+      (void) decl->getFunctionBuilderType();
     }
 
     return;

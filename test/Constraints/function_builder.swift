@@ -149,6 +149,25 @@ tuplify(true) {
   }
 }
 
+// CHECK: ("getterBuilder", 0, 4, 12)
+@TupleBuilder
+var globalBuilder: (String, Int, Int, Int) {
+  "getterBuilder"
+  0
+  4
+  12
+}
+print(globalBuilder)
+
+// CHECK: ("funcBuilder", 13, 45.0)
+@TupleBuilder
+func funcBuilder(d: Double) -> (String, Int, Double) {
+  "funcBuilder"
+  13
+  d
+}
+print(funcBuilder(d: 45))
+
 struct Tagged<Tag, Entity> {
   let tag: Tag
   let entity: Entity
