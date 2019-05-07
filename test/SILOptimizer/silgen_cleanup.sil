@@ -62,3 +62,56 @@ bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
   %6 = tuple (%1 : $(Builtin.Int8, Builtin.Int8), %5 : $Builtin.Int8)
   return %6 : $((Builtin.Int8, Builtin.Int8), Builtin.Int8)
 }
+
+// Handle a combination of trivial and nontrivial elements.
+
+struct X1 {
+  @_hasStorage @_hasInitialValue let a: Int { get }
+  @_hasStorage @_hasInitialValue var obj1: AnyObject { get set }
+  @_hasStorage @_hasInitialValue var obj2: AnyObject { get set }
+  init(a: Int, obj1: AnyObject, obj2: AnyObject)
+}
+
+// CHECK-LABEL: sil private [ossa] @testLoadNontrivial : $@convention(thin) (@inout_aliasable X1) -> (Int, @owned AnyObject, @owned AnyObject) {
+// CHECK-LABEL: bb0(%0 : $*X1):
+// CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] %0 : $*X1
+// CHECK: [[AA:%.*]] = struct_element_addr [[ACCESS]] : $*X1, #X1.a
+// CHECK: load [trivial] [[AA]] : $*Int
+// CHECK: [[OA1:%.*]] = struct_element_addr [[ACCESS]] : $*X1, #X1.obj1
+// CHECK: [[OV1:%.*]] = load [copy] [[OA1]] : $*AnyObject
+// CHECK: [[OA2:%.*]] = struct_element_addr [[ACCESS]] : $*X1, #X1.obj2
+// CHECK: [[OV2:%.*]] = load [copy] [[OA2]] : $*AnyObject
+// CHECK: end_access [[ACCESS]] : $*X1
+// CHECK: [[B1:%.*]] = begin_borrow [[OV1]] : $AnyObject
+// CHECK: copy_value [[B1]] : $AnyObject
+// CHECK: end_borrow [[B1]] : $AnyObject
+// CHECK: [[B2:%.*]] = begin_borrow [[OV2]] : $AnyObject
+// CHECK: copy_value [[B2]] : $AnyObject
+// CHECK: end_borrow [[B2]] : $AnyObject
+// CHECK: return
+// CHECK-LABEL: } // end sil function 'testLoadNontrivial'
+sil private [ossa] @testLoadNontrivial : $@convention(thin) (@inout_aliasable X1) -> (Int, @owned AnyObject, @owned AnyObject) {
+bb0(%0 : $*X1):
+  %access = begin_access [read] [unknown] %0 : $*X1
+  %load = load [copy] %access : $*X1
+  end_access %access : $*X1
+
+  %borrowa = begin_borrow %load : $X1
+  %a = struct_extract %borrowa : $X1, #X1.a
+  end_borrow %borrowa : $X1
+
+  %borrow1 = begin_borrow %load : $X1
+  %o1 = struct_extract %borrow1 : $X1, #X1.obj1
+  %copy1 = copy_value %o1 : $AnyObject
+  end_borrow %borrow1 : $X1
+
+  %borrow2 = begin_borrow %load : $X1
+  %o2 = struct_extract %borrow2 : $X1, #X1.obj2
+  %copy2 = copy_value %o2 : $AnyObject
+  end_borrow %borrow2 : $X1
+
+  destroy_value %load : $X1
+
+  %result = tuple (%a : $Int, %copy1 : $AnyObject, %copy2 : $AnyObject)
+  return %result : $(Int, AnyObject, AnyObject)
+}
