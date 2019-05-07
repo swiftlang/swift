@@ -767,6 +767,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
     newMember->setType(memberAssocContextualType);
     Pattern *memberPattern =
         new (C) NamedPattern(newMember, /*implicit*/ true);
+    memberPattern->setType(memberAssocContextualType);
     memberPattern = TypedPattern::createImplicit(
         C, memberPattern, memberAssocContextualType);
     memberPattern->setType(memberAssocContextualType);
