@@ -2066,10 +2066,11 @@ namespace {
     }
 
     Expr *handleStringLiteralExpr(LiteralExpr *expr) {
-      if (cs.getType(expr) && !cs.getType(expr)->hasTypeVariable())
+      auto stringLiteral = dyn_cast<StringLiteralExpr>(expr);
+      if (cs.getType(expr) && !cs.getType(expr)->hasTypeVariable()
+          && stringLiteral->getBuiltinInitializer())
         return expr;
       
-      auto stringLiteral = dyn_cast<StringLiteralExpr>(expr);
       auto magicLiteral = dyn_cast<MagicIdentifierLiteralExpr>(expr);
       assert(bool(stringLiteral) != bool(magicLiteral) &&
              "literal must be either a string literal or a magic literal");
