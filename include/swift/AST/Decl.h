@@ -4081,6 +4081,7 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
+  friend class RequirementSignatureRequest;
   friend class TypeChecker;
 
 public:
@@ -4302,22 +4303,19 @@ public:
   /// protocol. Requirements implied via any other protocol (e.g., inherited
   /// protocols of the inherited protocols) are not mentioned. The conformance
   /// requirements listed here become entries in the witness table.
-  ArrayRef<Requirement> getRequirementSignature() const {
-    assert(isRequirementSignatureComputed() &&
-           "getting requirement signature before computing it");
-    return llvm::makeArrayRef(RequirementSignature,
-                              Bits.ProtocolDecl.NumRequirementsInSignature);
-  }
+  ArrayRef<Requirement> getRequirementSignature() const;
 
   /// Has the requirement signature been computed yet?
   bool isRequirementSignatureComputed() const {
     return RequirementSignature != nullptr;
   }
 
-  void computeRequirementSignature();
-
   void setRequirementSignature(ArrayRef<Requirement> requirements);
 
+private:
+  ArrayRef<Requirement> getCachedRequirementSignature() const;
+
+public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Protocol;

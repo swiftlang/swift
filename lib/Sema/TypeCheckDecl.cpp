@@ -1384,6 +1384,35 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   return false;
 }
 
+llvm::Expected<ArrayRef<Requirement>>
+RequirementSignatureRequest::evaluate(Evaluator &evaluator, ProtocolDecl *proto) const {
+  GenericSignatureBuilder builder(proto->getASTContext());
+
+  // Add all of the generic parameters.
+  proto->createGenericParamsIfMissing();
+  for (auto gp : *proto->getGenericParams())
+    builder.addGenericParameter(gp);
+
+  // Add the conformance of 'self' to the protocol.
+  auto selfType =
+    proto->getSelfInterfaceType()->castTo<GenericTypeParamType>();
+  auto requirement =
+    Requirement(RequirementKind::Conformance, selfType,
+              proto->getDeclaredInterfaceType());
+
+  builder.addRequirement(
+          requirement,
+          GenericSignatureBuilder::RequirementSource::forRequirementSignature(
+                                                      builder, selfType, proto),
+          nullptr);
+
+  auto reqSignature = std::move(builder).computeGenericSignature(
+                        SourceLoc(),
+                        /*allowConcreteGenericPArams=*/false,
+                        /*allowBuilderToMove=*/false);
+  return reqSignature->getRequirements();
+}
+
 namespace {
   /// How to generate the raw value for each element of an enum that doesn't
   /// have one explicitly specified.
@@ -3014,6 +3043,9 @@ public:
 
     // Explicitly calculate this bit.
     (void) PD->existentialTypeSupported(&TC);
+
+    // Explicity compute the requirement signature to detect errors.
+    (void) PD->getRequirementSignature();
   }
 
   void visitVarDecl(VarDecl *VD) {

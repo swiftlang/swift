@@ -4569,20 +4569,14 @@ void ProtocolDecl::createGenericParamsIfMissing() {
   setGenericParams(result);
 }
 
-void ProtocolDecl::computeRequirementSignature() {
-  assert(!RequirementSignature && "already computed requirement signature");
-
-  // Compute and record the signature.
-  auto requirementSig =
-    GenericSignatureBuilder::computeRequirementSignature(this);
-  RequirementSignature = requirementSig->getRequirements().data();
-  assert(RequirementSignature != nullptr);
-  Bits.ProtocolDecl.NumRequirementsInSignature =
-    requirementSig->getRequirements().size();
+ArrayRef<Requirement> ProtocolDecl::getRequirementSignature() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+               RequirementSignatureRequest { const_cast<ProtocolDecl *>(this) },
+               None);
 }
 
 void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
-  assert(!RequirementSignature && "already computed requirement signature");
+  assert(!RequirementSignature && "requirement signature already set");
   if (requirements.empty()) {
     RequirementSignature = reinterpret_cast<Requirement *>(this + 1);
     Bits.ProtocolDecl.NumRequirementsInSignature = 0;
@@ -4590,6 +4584,13 @@ void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
     RequirementSignature = getASTContext().AllocateCopy(requirements).data();
     Bits.ProtocolDecl.NumRequirementsInSignature = requirements.size();
   }
+}
+
+ArrayRef<Requirement> ProtocolDecl::getCachedRequirementSignature() const {
+  assert(RequirementSignature &&
+         "getting requirement signature before computing it");
+  return llvm::makeArrayRef(RequirementSignature,
+                            Bits.ProtocolDecl.NumRequirementsInSignature);
 }
 
 void ProtocolDecl::computeKnownProtocolKind() const {

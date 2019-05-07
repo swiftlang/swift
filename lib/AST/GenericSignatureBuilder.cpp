@@ -7447,34 +7447,6 @@ GenericSignature *GenericSignatureBuilder::computeGenericSignature(
   return sig;
 }
 
-GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
-                                                     ProtocolDecl *proto) {
-  GenericSignatureBuilder builder(proto->getASTContext());
-
-  // Add all of the generic parameters.
-  proto->createGenericParamsIfMissing();
-  for (auto gp : *proto->getGenericParams())
-    builder.addGenericParameter(gp);
-
-  // Add the conformance of 'self' to the protocol.
-  auto selfType =
-    proto->getSelfInterfaceType()->castTo<GenericTypeParamType>();
-  auto requirement =
-    Requirement(RequirementKind::Conformance, selfType,
-                proto->getDeclaredInterfaceType());
-
-  builder.addRequirement(
-                 requirement,
-                 RequirementSource::forRequirementSignature(builder, selfType,
-                                                            proto),
-                 nullptr);
-
-  return std::move(builder).computeGenericSignature(
-           SourceLoc(),
-           /*allowConcreteGenericPArams=*/false,
-           /*allowBuilderToMove=*/false);
-}
-
 #pragma mark Generic signature verification
 
 void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
