@@ -2001,7 +2001,7 @@ namespace {
       }
 
       // Get the _MaxBuiltinFloatType decl, or look for it if it's not cached.
-      auto maxFloatTypeDecl = tc.Context.getMaxBuiltinFloatTypeDecl();
+      auto maxFloatTypeDecl = tc.Context.get_MaxBuiltinFloatTypeDecl();
 
       if (!maxFloatTypeDecl ||
           !maxFloatTypeDecl->hasInterfaceType() ||

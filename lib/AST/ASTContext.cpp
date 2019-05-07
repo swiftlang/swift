@@ -206,9 +206,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   //    -> Builtin.Int1
   FuncDecl *IsOSVersionAtLeastDecl = nullptr;
   
-  /// typealias Swift._MaxBuiltinFloatType
-  TypeAliasDecl *MaxBuiltinFloatTypeDecl = nullptr;
-
   /// The set of known protocols, lazily populated as needed.
   ProtocolDecl *KnownProtocols[NumKnownProtocols] = { };
 
@@ -1178,25 +1175,6 @@ FuncDecl *ASTContext::getIsOSVersionAtLeastDecl() const {
 
   getImpl().IsOSVersionAtLeastDecl = decl;
   return decl;
-}
-
-TypeAliasDecl *ASTContext::getMaxBuiltinFloatTypeDecl() const {
-  if (getImpl().MaxBuiltinFloatTypeDecl)
-    return getImpl().MaxBuiltinFloatTypeDecl;
-
-  // Go find '_MaxBuiltinFloatType' in the Swift module.
-  SmallVector<ValueDecl *, 1> results;
-  lookupInSwiftModule("_MaxBuiltinFloatType", results);
-
-  if (results.size() != 1)
-    return nullptr;
-
-  if (auto typeAlias = dyn_cast<TypeAliasDecl>(results.front())) {
-    getImpl().MaxBuiltinFloatTypeDecl = typeAlias;
-    return typeAlias;
-  }
-
-  return nullptr;
 }
 
 static bool isHigherPrecedenceThan(PrecedenceGroupDecl *a,
