@@ -298,7 +298,8 @@ void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
       for (ValueDecl *vd : member.second) {
         auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
         if (nominal && nominal->getName() == accessPath.front().first)
-          consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
+          consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
+                             DynamicLookupInfo::AnyObject);
       }
     }
     return;
@@ -311,7 +312,8 @@ void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
       continue;
 
     for (ValueDecl *vd : member.second)
-      consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
+      consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
+                         DynamicLookupInfo::AnyObject);
   }
 }
 
