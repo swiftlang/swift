@@ -340,17 +340,19 @@ static std::string getDifferentiationParametersClauseString(
       ->castTo<AnyFunctionType>();
   bool isInstanceMethod = function && function->isInstanceMember();
 
-  // If the number of specified parameters is equal to the number of inferred
-  // differentiation parameters, then return an empty string.
-  auto parameterCount =
-      indices ? indices->parameters.count() : parsedParams.size();
-  if (!prettyPrintInModule)
-    prettyPrintInModule = function->getModuleContext();
-  auto inferredParametersCount =
-      AutoDiffParameterIndicesBuilder::inferParameters(
-          functionType, prettyPrintInModule).count();
-  if (parameterCount == inferredParametersCount)
-    return "";
+  // If pretty-printing, and the number of specified parameters is equal to the
+  // number of inferred differentiation parameters, then return an empty
+  // string. Otherwise, return the explicit differentiation parameters clause
+  // string.
+  if (prettyPrintInModule) {
+    auto parameterCount =
+        indices ? indices->parameters.count() : parsedParams.size();
+    auto inferredParametersCount =
+        AutoDiffParameterIndicesBuilder::inferParameters(
+            functionType, prettyPrintInModule).count();
+    if (parameterCount == inferredParametersCount)
+      return "";
+  }
 
   std::string result;
   llvm::raw_string_ostream printer(result);

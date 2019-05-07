@@ -8,7 +8,7 @@
 // BCANALYZER-NOT: UnknownCode
 
 // CHECK: @differentiable(wrt: x, jvp: jvpAddWrtX)
-// CHECK-NEXT: @differentiable(vjp: vjpAdd)
+// CHECK-NEXT: @differentiable(wrt: (x, y), vjp: vjpAdd)
 func add(x: Float, y: Float) -> Float {
   return x + y
 }
@@ -21,7 +21,7 @@ func vjpAdd(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, F
   return (x + y, { ($0, $0) })
 }
 
-// CHECK: @differentiable(vjp: vjpGeneric where T : Differentiable)
+// CHECK: @differentiable(wrt: x, vjp: vjpGeneric where T : Differentiable)
 func generic<T : Numeric>(x: T) -> T {
   return x
 }
@@ -33,9 +33,9 @@ func vjpGeneric<T>(x: T) -> (value: T, pullback: (T.CotangentVector) -> T.Cotang
 }
 
 protocol InstanceMethod : Differentiable {
-  // CHECK: @differentiable(vjp: vjpFoo)
+  // CHECK: @differentiable(wrt: (self, x), vjp: vjpFoo)
   func foo(_ x: Self) -> Self
-  // CHECK: @differentiable(jvp: jvpBarWrt where T == T.TangentVector)
+  // CHECK: @differentiable(wrt: (self, x), jvp: jvpBarWrt where T == T.TangentVector)
   func bar<T : Differentiable>(_ x: T) -> Self
 }
 extension InstanceMethod {

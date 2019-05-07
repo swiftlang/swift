@@ -1,5 +1,5 @@
 // SWIFT_ENABLE_TENSORFLOW
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-swift-frontend -typecheck -verify -primary-file %s %S/Inputs/struct_differentiable_other_module.swift
 
 // Verify that a `Differentiable` type upholds `AllDifferentiableVariables == CotangentVector`.
 func assertAllDifferentiableVariablesEqualsCotangentVector<T>(_: T.Type)
@@ -12,7 +12,9 @@ func assertConformsToAdditiveArithmetic<T>(_: T.Type) where T : AdditiveArithmet
 func assertConformsToVectorNumeric<T>(_: T.Type) where T : VectorNumeric {}
 
 struct Empty : Differentiable {}
-assertConformsToAdditiveArithmetic(Empty.AllDifferentiableVariables.self)
+func testEmpty() {
+  assertConformsToAdditiveArithmetic(Empty.AllDifferentiableVariables.self)
+}
 
 // Test interaction with `AdditiveArithmetic` derived conformances.
 // Previously, this crashed due to duplicate memberwise initializer synthesis.
@@ -49,20 +51,24 @@ struct Simple : AdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
 }
-var simple = Simple(w: 1, b: 1)
-simple.allDifferentiableVariables = simple + simple
-assert(simple.moved(along: simple) == simple + simple)
-assert(simple.tangentVector(from: simple) == simple)
+func testSimple() {
+  var simple = Simple(w: 1, b: 1)
+  simple.allDifferentiableVariables = simple + simple
+  assert(simple.moved(along: simple) == simple + simple)
+  assert(simple.tangentVector(from: simple) == simple)
+}
 
 // Test type with mixed members.
 struct Mixed : AdditiveArithmetic, Differentiable {
   var simple: Simple
   var float: Float
 }
-var mixed = Mixed(simple: simple, float: 1)
-mixed.allDifferentiableVariables = Mixed(simple: simple, float: 2)
-assert(mixed.moved(along: mixed) == mixed + mixed)
-assert(mixed.tangentVector(from: mixed) == mixed)
+func testMixed(_ simple: Simple) {
+  var mixed = Mixed(simple: simple, float: 1)
+  mixed.allDifferentiableVariables = Mixed(simple: simple, float: 2)
+  assert(mixed.moved(along: mixed) == mixed + mixed)
+  assert(mixed.tangentVector(from: mixed) == mixed)
+}
 
 // Test type with manual definition of vector space types to `Self`.
 struct VectorSpacesEqualSelf : AdditiveArithmetic, Differentiable {
@@ -81,10 +87,12 @@ struct GenericVectorSpacesEqualSelf<T> : AdditiveArithmetic, Differentiable
   var w: T
   var b: T
 }
-var genericSame = GenericVectorSpacesEqualSelf<Double>(w: 1, b: 1)
-genericSame.allDifferentiableVariables = genericSame + genericSame
-assert(genericSame.moved(along: genericSame) == genericSame + genericSame)
-assert(genericSame.tangentVector(from: genericSame) == genericSame)
+func testGenericVectorSpacesEqualSelf() {
+  var genericSame = GenericVectorSpacesEqualSelf<Double>(w: 1, b: 1)
+  genericSame.allDifferentiableVariables = genericSame + genericSame
+  assert(genericSame.moved(along: genericSame) == genericSame + genericSame)
+  assert(genericSame.tangentVector(from: genericSame) == genericSame)
+}
 
 // Test nested type.
 struct Nested : AdditiveArithmetic, Differentiable {
@@ -92,12 +100,17 @@ struct Nested : AdditiveArithmetic, Differentiable {
   var mixed: Mixed
   var generic: GenericVectorSpacesEqualSelf<Double>
 }
-let nested = Nested(simple: simple, mixed: mixed, generic: genericSame)
-assert(nested.moved(along: nested) == nested + nested)
-assert(nested.tangentVector(from: nested) == nested)
+func testNested(
+  _ simple: Simple, _ mixed: Mixed,
+  _ genericSame: GenericVectorSpacesEqualSelf<Double>
+) {
+  let nested = Nested(simple: simple, mixed: mixed, generic: genericSame)
+  assert(nested.moved(along: nested) == nested + nested)
+  assert(nested.tangentVector(from: nested) == nested)
 
-_ = pullback(at: Nested(simple: simple, mixed: mixed, generic: genericSame)) { model in
-  model.simple + model.simple
+  _ = pullback(at: nested) { model in
+    model.simple + model.simple
+  }
 }
 
 // Test type that does not conform to `AdditiveArithmetic` but whose members do.
@@ -109,7 +122,9 @@ struct AllMembersAdditiveArithmetic : Differentiable {
   var w: Float
   var b: Float
 }
-assertAllDifferentiableVariablesEqualsCotangentVector(AllMembersAdditiveArithmetic.self)
+func testAllMembersAdditiveArithmetic() {
+  assertAllDifferentiableVariablesEqualsCotangentVector(AllMembersAdditiveArithmetic.self)
+}
 
 // Test type `AllMembersVectorNumeric` whose members conforms to `VectorNumeric`,
 // in which case we should make `TangentVector` and `CotangentVector` conform to
@@ -122,15 +137,19 @@ struct AllMembersVectorNumeric : Differentiable {
   var w: MyVector
   var b: MyVector
 }
-assertConformsToVectorNumeric(AllMembersVectorNumeric.TangentVector.self)
-assertConformsToVectorNumeric(AllMembersVectorNumeric.CotangentVector.self)
+func testAllMembersVectorNumeric() {
+  assertConformsToVectorNumeric(AllMembersVectorNumeric.TangentVector.self)
+  assertConformsToVectorNumeric(AllMembersVectorNumeric.CotangentVector.self)
+}
 
 // Test type with immutable, differentiable stored property.
 struct ImmutableStoredProperty : Differentiable {
   var w: Float
   let fixedBias: Float = .pi // expected-warning {{'let' properties with a default value do not have a derivative}} {{3-3=@noDerivative }}
 }
-_ = ImmutableStoredProperty.TangentVector(w: 1)
+func testImmutableStoredProperty() {
+  _ = ImmutableStoredProperty.TangentVector(w: 1)
+}
 
 // Test type whose properties are not all differentiable.
 struct DifferentiableSubset : Differentiable {
@@ -139,15 +158,17 @@ struct DifferentiableSubset : Differentiable {
   @noDerivative var flag: Bool
   @noDerivative let technicallyDifferentiable: Float = .pi
 }
-assertConformsToAdditiveArithmetic(DifferentiableSubset.AllDifferentiableVariables.self)
-assertConformsToVectorNumeric(DifferentiableSubset.AllDifferentiableVariables.self)
-assertAllDifferentiableVariablesEqualsCotangentVector(DifferentiableSubset.self)
-let tangentSubset = DifferentiableSubset.TangentVector(w: 1, b: 1)
-let cotangentSubset = DifferentiableSubset.CotangentVector(w: 1, b: 1)
-let allDiffVarsSubset = DifferentiableSubset.AllDifferentiableVariables(w: 1, b: 1)
+func testDifferentiableSubset() {
+  assertConformsToAdditiveArithmetic(DifferentiableSubset.AllDifferentiableVariables.self)
+  assertConformsToVectorNumeric(DifferentiableSubset.AllDifferentiableVariables.self)
+  assertAllDifferentiableVariablesEqualsCotangentVector(DifferentiableSubset.self)
+  _ = DifferentiableSubset.TangentVector(w: 1, b: 1)
+  _ = DifferentiableSubset.CotangentVector(w: 1, b: 1)
+  _ = DifferentiableSubset.AllDifferentiableVariables(w: 1, b: 1)
 
-_ = pullback(at: DifferentiableSubset(w: 1, b: 2, flag: false)) { model in
-  model.w + model.b
+  _ = pullback(at: DifferentiableSubset(w: 1, b: 2, flag: false)) { model in
+    model.w + model.b
+  }
 }
 
 // Test nested type whose properties are not all differentiable.
@@ -156,7 +177,9 @@ struct NestedDifferentiableSubset : Differentiable {
   var mixed: Mixed
   @noDerivative var technicallyDifferentiable: Float
 }
-assertAllDifferentiableVariablesEqualsCotangentVector(NestedDifferentiableSubset.self)
+func testNestedDifferentiableSubset() {
+  assertAllDifferentiableVariablesEqualsCotangentVector(NestedDifferentiableSubset.self)
+}
 
 // Test type that uses synthesized vector space types but provides custom
 // method.
@@ -317,3 +340,17 @@ struct ImplicitNoDerivativeWithSeparateTangent : Differentiable {
 struct InvalidInitializer : Differentiable {
   init(filterShape: (Int, Int, Int, Int), blah: NonExistentType) {} // expected-error {{use of undeclared type 'NonExistentType'}}
 }
+
+// Test derived conformances in disallowed contexts.
+
+// expected-error @+4 {{type 'OtherFileNonconforming' does not conform to protocol '__Differentiable'}}
+// expected-error @+3 {{type 'OtherFileNonconforming' does not conform to protocol '_Differentiable'}}
+// expected-error @+2 {{type 'OtherFileNonconforming' does not conform to protocol 'Differentiable'}}
+// expected-error @+1 {{implementation of '__Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
+extension OtherFileNonconforming : Differentiable {}
+
+// expected-error @+4 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol '__Differentiable'}}
+// expected-error @+3 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol '_Differentiable'}}
+// expected-error @+2 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'Differentiable'}}
+// expected-error @+1 {{implementation of '__Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
+extension GenericOtherFileNonconforming : Differentiable {}

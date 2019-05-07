@@ -360,7 +360,8 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
 }
 
 // Synthesize body for `moved(along:)`.
-static void deriveBodyDifferentiable_moved(AbstractFunctionDecl *funcDecl, void*) {
+static void deriveBodyDifferentiable_moved(AbstractFunctionDecl *funcDecl,
+                                           void *) {
   auto &C = funcDecl->getASTContext();
   deriveBodyDifferentiable_method(funcDecl, C.Id_moved,
                                   C.getIdentifier("along"));
@@ -368,7 +369,7 @@ static void deriveBodyDifferentiable_moved(AbstractFunctionDecl *funcDecl, void*
 
 // Synthesize body for `tangentVector(from:)`.
 static void
-deriveBodyDifferentiable_tangentVector(AbstractFunctionDecl *funcDecl, void*) {
+deriveBodyDifferentiable_tangentVector(AbstractFunctionDecl *funcDecl, void *) {
   auto &C = funcDecl->getASTContext();
   deriveBodyDifferentiable_method(funcDecl, C.Id_tangentVector,
                                   C.getIdentifier("from"));
@@ -488,8 +489,8 @@ static ValueDecl *getUnderlyingAllDiffableVariables(DeclContext *DC,
 }
 
 // Synthesize getter body for `allDifferentiableVariables` computed property.
-static void
-derivedBody_allDifferentiableVariablesGetter(AbstractFunctionDecl *getterDecl, void*) {
+static void derivedBody_allDifferentiableVariablesGetter(
+    AbstractFunctionDecl *getterDecl, void *) {
   auto *parentDC = getterDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -548,8 +549,8 @@ derivedBody_allDifferentiableVariablesGetter(AbstractFunctionDecl *getterDecl, v
 }
 
 // Synthesize setter body for `allDifferentiableVariables` computed property.
-static void
-derivedBody_allDifferentiableVariablesSetter(AbstractFunctionDecl *setterDecl, void*) {
+static void derivedBody_allDifferentiableVariablesSetter(
+    AbstractFunctionDecl *setterDecl, void *) {
   auto *parentDC = setterDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -705,7 +706,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   // members conform to `VectorNumeric` and share the same scalar type.
   Type sameScalarType;
   bool canDeriveVectorNumeric =
-      canDeriveAdditiveArithmetic && !diffProperties.empty() && 
+      canDeriveAdditiveArithmetic && !diffProperties.empty() &&
       llvm::all_of(diffProperties, [&](VarDecl *vd) {
         auto conf = TC.conformsToProtocol(getAssociatedType(vd, parentDC, id),
                                           vecNumProto, nominal,
@@ -1149,6 +1150,9 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
 }
 
 ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
+  // Diagnose conformances in disallowed contexts.
+  if (checkAndDiagnoseDisallowedContext(requirement))
+    return nullptr;
   if (requirement->getBaseName() == TC.Context.Id_moved)
     return deriveDifferentiable_moved(*this);
   if (requirement->getBaseName() == TC.Context.Id_tangentVector)
@@ -1160,6 +1164,9 @@ ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
 }
 
 Type DerivedConformance::deriveDifferentiable(AssociatedTypeDecl *requirement) {
+  // Diagnose conformances in disallowed contexts.
+  if (checkAndDiagnoseDisallowedContext(requirement))
+    return nullptr;
   if (requirement->getBaseName() == TC.Context.Id_TangentVector)
     return deriveDifferentiable_AssociatedStruct(
         *this, TC.Context.Id_TangentVector);
