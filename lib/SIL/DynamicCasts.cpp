@@ -307,6 +307,10 @@ swift::classifyDynamicCast(ModuleDecl *M,
                            bool isWholeModuleOpts) {
   if (source == target) return DynamicCastFeasibility::WillSucceed;
 
+  // Return a conservative answer for opaque archetypes for now.
+  if (source->hasOpaqueArchetype() || target->hasOpaqueArchetype())
+    return DynamicCastFeasibility::MaySucceed;
+
   auto sourceObject = source.getOptionalObjectType();
   auto targetObject = target.getOptionalObjectType();
 
