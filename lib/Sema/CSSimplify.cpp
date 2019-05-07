@@ -2087,6 +2087,14 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::ContextualType: {
+    auto purpose = getContextualTypePurpose();
+    if (rhs->isVoid() &&
+        (purpose == CTP_ReturnStmt || purpose == CTP_ReturnSingleExpr)) {
+      conversionsOrFixes.push_back(
+          RemoveReturn::create(*this, getConstraintLocator(locator)));
+      return true;
+    }
+
     // If both types are key path, the only differences
     // between them are mutability and/or root, value type mismatch.
     if (isKnownKeyPathType(lhs) && isKnownKeyPathType(rhs)) {
@@ -6482,6 +6490,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
 
   case FixKind::InsertCall:
+  case FixKind::RemoveReturn:
   case FixKind::RemoveAddressOf:
   case FixKind::SkipSameTypeRequirement:
   case FixKind::SkipSuperclassRequirement:

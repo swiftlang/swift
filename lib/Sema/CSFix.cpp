@@ -494,3 +494,13 @@ RemoveAddressOf *RemoveAddressOf::create(ConstraintSystem &cs,
                                          ConstraintLocator *locator) {
   return new (cs.getAllocator()) RemoveAddressOf(cs, locator);
 }
+
+bool RemoveReturn::diagnose(Expr *root, bool asNote) const {
+  ExtraneousReturnFailure failure(root, getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+RemoveReturn *RemoveReturn::create(ConstraintSystem &cs,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) RemoveReturn(cs, locator);
+}

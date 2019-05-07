@@ -1158,6 +1158,21 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an attempt return something from a function which
+/// doesn't have a return type specified e.g.
+///
+/// ```swift
+/// func foo() { return 42 }
+/// ```
+class ExtraneousReturnFailure final : public FailureDiagnostic {
+public:
+  ExtraneousReturnFailure(Expr *root, ConstraintSystem &cs,
+                          ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
