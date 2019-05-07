@@ -2769,7 +2769,7 @@ namespace {
   /// Visitor to classify the contents of the given closure.
   class BuilderClosureVisitor
       : public StmtVisitor<BuilderClosureVisitor, Expr *> {
-    ConstraintSystem &cs;
+    ConstraintSystem *cs;
     ASTContext &ctx;
     bool wantExpr;
     Type builderType;
@@ -2795,10 +2795,10 @@ namespace {
                       builderType->hasTypeVariable() ? Type() : builderType);
 
       auto typeExpr = new (ctx) TypeExpr(typeLoc);
-      cs.setType(typeExpr, builderType);
+      if (cs) cs->setType(typeExpr, builderType);
       typeExpr->setImplicit();
       auto memberRef = new (ctx) UnresolvedDotExpr(
-          typeExpr, loc, fnName, DeclNameLoc(), /*implicit=*/true);
+          typeExpr, loc, fnName, DeclNameLoc(loc), /*implicit=*/true);
       return CallExpr::createImplicit(ctx, memberRef, args, argLabels);
     }
 
@@ -2835,9 +2835,12 @@ namespace {
     }
 
   public:
-    BuilderClosureVisitor(ConstraintSystem &cs, bool wantExpr, Type builderType)
-        : cs(cs), ctx(cs.getASTContext()), wantExpr(wantExpr),
-          builderType(builderType) {
+    BuilderClosureVisitor(ASTContext &ctx, ConstraintSystem *cs,
+                          bool wantExpr, Type builderType)
+        : cs(cs), ctx(ctx), wantExpr(wantExpr), builderType(builderType) {
+      assert((cs || !builderType->hasTypeVariable()) &&
+             "cannot handle builder type with type variables without "
+             "constraint system");
       builder = builderType->getAnyNominal();
     }
 
@@ -3186,6 +3189,37 @@ static bool hasReturnStmt(Stmt *stmt) {
   return finder.hasReturnStmt;
 }
 
+bool TypeChecker::typeCheckFunctionBuilderFuncBody(FuncDecl *FD,
+                                                   Type builderType) {
+  // Try to build a single result expression.
+  BuilderClosureVisitor visitor(Context, nullptr,
+                                /*wantExpr=*/true, builderType);
+  Expr *returnExpr = visitor.visit(FD->getBody());
+  if (!returnExpr)
+    return true;
+
+  // Make sure we have a usable result type for the body.
+  Type returnType = AnyFunctionRef(FD).getBodyResultType();
+  if (!returnType || returnType->hasError())
+    return true;
+
+  // Type-check the single result expression.
+  Type returnExprType = typeCheckExpression(returnExpr, FD,
+                                            TypeLoc::withoutLoc(returnType),
+                                            CTP_ReturnStmt);
+  if (!returnExprType)
+    return true;
+  assert(returnExprType->isEqual(returnType));
+
+  auto returnStmt = new (Context) ReturnStmt(SourceLoc(), returnExpr);
+  auto origBody = FD->getBody();
+  auto fakeBody = BraceStmt::create(Context, origBody->getLBraceLoc(),
+                                    { returnStmt },
+                                    origBody->getRBraceLoc());
+  FD->setBody(fakeBody);
+  return false;
+}
+
 ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
     ClosureExpr *closure, Type builderType, ConstraintLocator *calleeLocator,
     ConstraintLocatorBuilder locator) {
@@ -3208,7 +3242,8 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
     }
 
     // Check whether we can apply this function builder.
-    BuilderClosureVisitor visitor(*this, /*wantExpr=*/false, builderType);
+    BuilderClosureVisitor visitor(getASTContext(), this,
+                                  /*wantExpr=*/false, builderType);
     (void)visitor.visit(closure->getBody());
 
 
@@ -3246,7 +3281,8 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
     assert(!builderType->hasTypeParameter());
   }
 
-  BuilderClosureVisitor visitor(*this, /*wantExpr=*/true, builderType);
+  BuilderClosureVisitor visitor(getASTContext(), this,
+                                /*wantExpr=*/true, builderType);
   Expr *singleExpr = visitor.visit(closure->getBody());
 
   if (TC.precheckedClosures.insert(closure).second &&

@@ -30,12 +30,12 @@
 namespace swift {
 
 class GenericParamList;
-class ParamDecl;
 struct PropertyWrapperBackingPropertyInfo;
 class RequirementRepr;
 class SpecializeAttr;
 class TypeAliasDecl;
 struct TypeLoc;
+class ValueDecl;
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -624,12 +624,12 @@ public:
 };
 
 /// Request the custom attribute which attaches a function builder to the
-/// given parameter.
+/// given declaration.
 class AttachedFunctionBuilderRequest :
     public SimpleRequest<AttachedFunctionBuilderRequest,
                          CacheKind::Cached,
                          CustomAttr *,
-                         ParamDecl *> {
+                         ValueDecl *> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -638,7 +638,7 @@ private:
 
   // Evaluation.
   llvm::Expected<CustomAttr *>
-  evaluate(Evaluator &evaluator, ParamDecl *) const;
+  evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Caching
@@ -649,14 +649,13 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
-/// Request the type spelled out in a custom attribute.
-///
-/// Different parameters cannot be used for the same attribute.
+/// Request the function builder type attached to the given declaration,
+/// if any.
 class FunctionBuilderTypeRequest :
     public SimpleRequest<FunctionBuilderTypeRequest,
                          CacheKind::Cached,
                          Type,
-                         ParamDecl *> {
+                         ValueDecl *> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -664,7 +663,7 @@ private:
   friend SimpleRequest;
 
   llvm::Expected<Type>
-  evaluate(Evaluator &evaluator, ParamDecl *param) const;
+  evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Caching

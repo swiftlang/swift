@@ -12,14 +12,17 @@ struct Maker {}
 @_functionBuilder
 class Inventor {}
 
-@Maker // expected-error {{function builder attribute 'Maker' can only be applied to a parameter}}
+@Maker // expected-error {{function builder attribute 'Maker' can only be applied to a variable if it defines a getter}}
 var global: Int
 
-@Maker // expected-error {{function builder attribute 'Maker' can only be applied to a parameter}}
-func globalFunction() {}
+@Make
+var globalWithGetter: Int {} // expected-error {{ype 'Maker' has no member 'buildBlock'}}
 
-@Maker // expected-error {{function builder attribute 'Maker' can only be applied to a parameter}}
-func globalFunctionWithFunctionParam(fn: () -> ()) {}
+@Maker
+func globalFunction() {} // expected-error {{ype 'Maker' has no member 'buildBlock'}}
+
+@Maker
+func globalFunctionWithFunctionParam(fn: () -> ()) {}  // expected-error {{ype 'Maker' has no member 'buildBlock'}}
 
 func makerParam(@Maker
                 fn: () -> ()) {}

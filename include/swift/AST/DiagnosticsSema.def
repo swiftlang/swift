@@ -4480,9 +4480,13 @@ NOTE(note_function_builder_control_flow, none,
       "builder %0", (DeclName))
 ERROR(function_builder_reserved_name, none,
       "function builder type name must start with an uppercase letter", ())
-ERROR(function_builder_attribute_not_on_parameter, none,
-      "function builder attribute %0 can only be applied to a parameter",
-      (DeclName))
+ERROR(function_builder_attribute_not_allowed_here, none,
+      "function builder attribute %0 can only be applied to a parameter, "
+      "function, or storage with a getter", (DeclName))
+ERROR(function_builder_attribute_on_storage_without_getter, none,
+      "function builder attribute %0 can only be applied to a "
+      "%select{subscript|property|constant|variable}1 if it defines a getter",
+      (DeclName, unsigned))
 ERROR(function_builder_parameter_not_of_function_type, none,
       "function builder attribute %0 can only be applied to a parameter of "
       "function type",
@@ -4492,7 +4496,8 @@ ERROR(function_builder_parameter_autoclosure, none,
       "parameter",
       (DeclName))
 ERROR(function_builder_multiple, none,
-      "only one function builder attribute can be attached to a parameter", ())
+      "only one function builder attribute can be attached to a "
+      "%select{declaration|parameter}0", (bool))
 NOTE(previous_function_builder_here, none,
      "previous function builder specified here", ())
 ERROR(function_builder_arguments, none,

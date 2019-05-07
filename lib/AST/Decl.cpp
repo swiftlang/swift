@@ -5740,25 +5740,25 @@ void ParamDecl::setStoredProperty(VarDecl *var) {
   DefaultValueAndFlags.getPointer()->DefaultArg = var;
 }
 
-Type ParamDecl::getFunctionBuilderType() const {
-  // Fast path: most parameters do not have any attributes at all,
-  // much less custom ones.
+Type ValueDecl::getFunctionBuilderType() const {
+  // Fast path: most declarations (especially parameters, which is where
+  // this is hottest) do not have any custom attributes at all.
   if (!getAttrs().hasAttribute<CustomAttr>()) return Type();
 
   auto &ctx = getASTContext();
-  auto mutableThis = const_cast<ParamDecl *>(this);
+  auto mutableThis = const_cast<ValueDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
                            FunctionBuilderTypeRequest{mutableThis},
                            Type());
 }
 
-CustomAttr *ParamDecl::getAttachedFunctionBuilder() const {
-  // Fast path: most parameters do not have any attributes at all,
-  // much less custom ones.
+CustomAttr *ValueDecl::getAttachedFunctionBuilder() const {
+  // Fast path: most declarations (especially parameters, which is where
+  // this is hottest) do not have any custom attributes at all.
   if (!getAttrs().hasAttribute<CustomAttr>()) return nullptr;
 
   auto &ctx = getASTContext();
-  auto mutableThis = const_cast<ParamDecl *>(this);
+  auto mutableThis = const_cast<ValueDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
                            AttachedFunctionBuilderRequest{mutableThis},
                            nullptr);

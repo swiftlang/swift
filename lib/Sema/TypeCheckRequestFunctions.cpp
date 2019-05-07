@@ -150,10 +150,10 @@ EnumRawTypeRequest::evaluate(Evaluator &evaluator, EnumDecl *enumDecl,
 
 llvm::Expected<CustomAttr *>
 AttachedFunctionBuilderRequest::evaluate(Evaluator &evaluator,
-                                         ParamDecl *param) const {
-  ASTContext &ctx = param->getASTContext();
-  auto dc = param->getDeclContext();
-  for (auto attr : param->getAttrs().getAttributes<CustomAttr>()) {
+                                         ValueDecl *decl) const {
+  ASTContext &ctx = decl->getASTContext();
+  auto dc = decl->getDeclContext();
+  for (auto attr : decl->getAttrs().getAttributes<CustomAttr>()) {
     auto mutableAttr = const_cast<CustomAttr *>(attr);
     // Figure out which nominal declaration this custom attribute refers to.
     auto nominal = evaluateOrDefault(ctx.evaluator,
@@ -174,14 +174,14 @@ AttachedFunctionBuilderRequest::evaluate(Evaluator &evaluator,
 
 llvm::Expected<Type>
 FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
-                                     ParamDecl *param) const {
+                                     ValueDecl *decl) const {
   // Look for a function-builder custom attribute.
-  auto attr = param->getAttachedFunctionBuilder();
+  auto attr = decl->getAttachedFunctionBuilder();
   if (!attr) return Type();
 
   // Resolve a type for the attribute.
   auto mutableAttr = const_cast<CustomAttr*>(attr);
-  auto dc = param->getDeclContext();
+  auto dc = decl->getDeclContext();
   auto &ctx = dc->getASTContext();
   Type type = resolveCustomAttrType(mutableAttr, dc,
                                     CustomAttrTypeKind::NonGeneric);
@@ -193,26 +193,30 @@ FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
     return Type();
   }
 
-  // The parameter had better already have an interface type.
-  Type paramType = param->getInterfaceType();
-  assert(paramType);
-  auto paramFnType = paramType->getAs<FunctionType>();
+  // Do some additional checking on parameters.
+  if (auto param = dyn_cast<ParamDecl>(decl)) {
+    // The parameter had better already have an interface type.
+    Type paramType = param->getInterfaceType();
+    assert(paramType);
+    auto paramFnType = paramType->getAs<FunctionType>();
 
-  // Require the parameter to be an interface type.
-  if (!paramFnType) {
-    ctx.Diags.diagnose(attr->getLocation(),
-                       diag::function_builder_parameter_not_of_function_type,
-                       nominal->getFullName());
-    mutableAttr->setInvalid();
-    return Type();
-  }
+    // Require the parameter to be an interface type.
+    if (!paramFnType) {
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::function_builder_parameter_not_of_function_type,
+                         nominal->getFullName());
+      mutableAttr->setInvalid();
+      return Type();
+    }
 
-  if (param->isAutoClosure()) {
-    ctx.Diags.diagnose(attr->getLocation(),
-                       diag::function_builder_parameter_autoclosure,
-                       nominal->getFullName());
-    mutableAttr->setInvalid();
-    return Type();
+    // Forbid the parameter to be an autoclosure.
+    if (param->isAutoClosure()) {
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::function_builder_parameter_autoclosure,
+                         nominal->getFullName());
+      mutableAttr->setInvalid();
+      return Type();
+    }
   }
 
   return type->mapTypeOutOfContext();
