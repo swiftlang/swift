@@ -159,6 +159,36 @@ TensorADTests.testAllBackends("reshaped") {
   expectEqual(input, reshapedPullback(reshaped))
 }
 
+TensorADTests.testAllBackends("concatenation (++)") {
+  let a1 = Tensor<Float>([1,2,3,4])
+  let b1 = Tensor<Float>([5,6,7,8,9,10])
+
+  let a2 = Tensor<Float>([1,1,1,1])
+  let b2 = Tensor<Float>([1,1,1,1,1,1])
+
+  let grads = gradient(at: a2, b2) { a, b in
+    return ((a1 * a) ++ (b1 * b)).sum()
+  }
+
+  expectEqual(a1, grads.0)
+  expectEqual(b1, grads.1)
+}
+
+TensorADTests.testAllBackends("concatenated") {
+  let a1 = Tensor<Float>([1,2,3,4])
+  let b1 = Tensor<Float>([5,6,7,8,9,10])
+
+  let a2 = Tensor<Float>([1,1,1,1])
+  let b2 = Tensor<Float>([1,1,1,1,1,1])
+
+  let grads = gradient(at: a2, b2) { a, b in
+    return (a1 * a).concatenated(with: b1 * b, alongAxis: -1).sum()
+  }
+
+  expectEqual(a1, grads.0)
+  expectEqual(b1, grads.1)
+}
+
 TensorADTests.testAllBackends("transposed") {
   let input = Tensor<Float>(ones: [2, 3])
   let transposed = Tensor<Float>(ones: [3, 2])
