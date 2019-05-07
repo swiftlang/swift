@@ -1078,12 +1078,11 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
         continue;
 
       if (argumentValue->getType().isObject()) {
-        SGF.B.createDestroyValue(loc, argumentValue);
+        SGF.B.emitDestroyValueOperation(loc, argumentValue);
         continue;
       }
 
-      if (false)
-        SGF.B.createDestroyAddr(loc, argumentValue);
+      SGF.B.createDestroyAddr(loc, argumentValue);
     }
   };
 
@@ -1096,7 +1095,8 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
     auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
         currentParameter, curryLevel->getNumParameters());
     auto applyResult = SGF.B.createApply(
-        loc, assocFn, SubstitutionMap(), curryLevelArgVals, /*isNonThrowing*/ false);
+        loc, assocFn, SubstitutionMap(), curryLevelArgVals,
+        /*isNonThrowing*/ false);
     currentParameter += curryLevel->getNumParameters();
 
     if (assocFnNeedsDestroy)
@@ -1125,8 +1125,8 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
         currentParameter);
     for (auto origFnArgVal : curryLevelArgVals)
       applyArgs.push_back(origFnArgVal);
-    auto differential = SGF.B.createApply(loc, assocFn, SubstitutionMap(), applyArgs,
-                                          /*isNonThrowing*/ false);
+    auto differential = SGF.B.createApply(
+        loc, assocFn, SubstitutionMap(), applyArgs, /*isNonThrowing*/ false);
 
     if (assocFnNeedsDestroy)
       SGF.B.createDestroyValue(loc, assocFn);
@@ -1143,8 +1143,9 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
   // Apply the last curry level, in the case where it only has direct results.
   auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
       currentParameter);
-  auto resultTuple = SGF.B.createApply(loc, assocFn, SubstitutionMap(), curryLevelArgVals,
-                                       /*isNonThrowing*/ false);
+  auto resultTuple = SGF.B.createApply(
+      loc, assocFn, SubstitutionMap(), curryLevelArgVals,
+      /*isNonThrowing*/ false);
 
   if (assocFnNeedsDestroy)
     SGF.B.createDestroyValue(loc, assocFn);

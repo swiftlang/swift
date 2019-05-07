@@ -3245,12 +3245,7 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
                                         CanAnyFunctionType outputSubstType) {
   // Applies a thunk to all the components by extracting them, applying thunks
   // to all of them, and then putting them back together.
-
   auto sourceType = fn.getType().castTo<SILFunctionType>();
-
-  // We're never going to pass `fn` into anything that consumes it, so get its
-  // value without disabling cleanup.
-  auto fnValue = fn.getValue();
 
   auto withoutDifferentiablePattern = [](AbstractionPattern pattern)
       -> AbstractionPattern {
@@ -3269,10 +3264,13 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
   auto outputOrigTypeNotDiff = withoutDifferentiablePattern(outputOrigType);
   auto &expectedTLNotDiff = SGF.getTypeLowering(outputOrigTypeNotDiff,
                                                 outputSubstTypeNotDiff);
-  SILValue original = SGF.B.createAutoDiffFunctionExtractOriginal(loc, fnValue);
-  auto managedOriginal = original->getType().isTrivial(SGF.F)
-                             ? ManagedValue::forTrivialObjectRValue(original)
-                             : ManagedValue::forBorrowedObjectRValue(original);
+  // `autodiff_function_extract` is consuming; copy `fn` before passing as
+  // operand.
+  auto copiedFnValue = fn.copy(SGF, loc);
+  auto *original = SGF.B.createAutoDiffFunctionExtractOriginal(
+      loc, copiedFnValue.forward(SGF));
+  auto managedOriginal = SGF.emitManagedRValueWithCleanup(original);
+
   ManagedValue originalThunk = createThunk(
       SGF, loc, managedOriginal, inputOrigTypeNotDiff, inputSubstTypeNotDiff,
       outputOrigTypeNotDiff, outputSubstTypeNotDiff, expectedTLNotDiff);
@@ -3309,12 +3307,12 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
                                                    kind);
     auto &assocFnExpectedTL = SGF.getTypeLowering(assocFnOutputOrigType,
                                                   assocFnOutputSubstType);
-    auto assocFn = SGF.B.createAutoDiffFunctionExtract(
-        loc, kind,
-        /*differentiationOrder*/ 1, fnValue);
-    auto managedAssocFn = assocFn->getType().isTrivial(SGF.F)
-                              ? ManagedValue::forTrivialObjectRValue(assocFn)
-                              : ManagedValue::forBorrowedObjectRValue(assocFn);
+    // `autodiff_function_extract` is consuming; copy `fn` before passing as
+    // operand.
+    auto copiedFnValue = fn.copy(SGF, loc);
+    auto *assocFn = SGF.B.createAutoDiffFunctionExtract(
+        loc, kind, /*differentiationOrder*/ 1, copiedFnValue.forward(SGF));
+    auto managedAssocFn = SGF.emitManagedRValueWithCleanup(assocFn);
     return createThunk(SGF, loc, managedAssocFn, assocFnInputOrigType,
                        assocFnInputSubstType, assocFnOutputOrigType,
                        assocFnOutputSubstType, assocFnExpectedTL);
