@@ -16,19 +16,19 @@ import Builtin
 // vector and returns vector-Jacobian products evaluated at the original
 // parameter.
 sil hidden @foo_adj : $@convention(thin) (Float, Float, Float) -> Float {
-bb0(%0 : @trivial $Float, %1 : @trivial $Float, %2 : @trivial $Float):
+bb0(%0 : $Float, %1 : $Float, %2 : $Float):
   return %2 : $Float
 }
 
 // The original function with an attribute that specifies the compiler-emitted pullback.
 sil hidden [differentiable source 0 wrt 0] @foo : $@convention(thin) (Float) -> Float {
-bb0(%0 : @trivial $Float):
+bb0(%0 : $Float):
   return %0 : $Float
 }
 
 // The vector-Jacobian product function, which returns the original result and a pullback.
 sil hidden @foo_vjp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
-bb0(%0 : @trivial $Float):
+bb0(%0 : $Float):
   %1 = function_ref @foo : $@convention(thin) (Float) -> Float
   %2 = apply %1(%0) : $@convention(thin) (Float) -> Float
   %3 = function_ref @foo_adj : $@convention(thin) (Float, Float, Float) -> Float
