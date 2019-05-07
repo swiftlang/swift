@@ -14,8 +14,9 @@
 #define LLVM_SOURCEKIT_CORE_CONTEXT_H
 
 #include "SourceKit/Core/LLVM.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringRef.h"
 #include <memory>
 #include <string>
 
@@ -24,13 +25,16 @@ namespace llvm {
 }
 
 namespace SourceKit {
-  class LangSupport;
-  class NotificationCenter;
+class FileSystemProvider;
+class LangSupport;
+class NotificationCenter;
 
 class Context {
   std::string RuntimeLibPath;
   std::unique_ptr<LangSupport> SwiftLang;
   std::shared_ptr<NotificationCenter> NotificationCtr;
+
+  llvm::StringMap<std::unique_ptr<FileSystemProvider>> FileSystemProviders;
 
 public:
   Context(StringRef RuntimeLibPath,
@@ -44,6 +48,8 @@ public:
   LangSupport &getSwiftLangSupport() { return *SwiftLang; }
 
   std::shared_ptr<NotificationCenter> getNotificationCenter() { return NotificationCtr; }
+
+  FileSystemProvider *getFileSystemProvider(StringRef Name);
 };
 
 } // namespace SourceKit

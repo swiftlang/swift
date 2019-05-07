@@ -18,6 +18,7 @@
 #include "sourcekitd/ExpressionTypeArray.h"
 
 #include "SourceKit/Core/Context.h"
+#include "SourceKit/Core/FileSystemProvider.h"
 #include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Core/NotificationCenter.h"
 #include "SourceKit/Support/Concurrency.h"
@@ -297,29 +298,24 @@ syntaxSerializationFormatFromUID(sourcekitd_uid_t UID) {
   }
 }
 
-static void
-handleRequestImpl(sourcekitd_object_t Req, ResponseReceiver Receiver,
-                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem);
+static void handleRequestImpl(sourcekitd_object_t Req,
+                              ResponseReceiver Receiver);
 
-void sourcekitd::handleRequest(
-    sourcekitd_object_t Req, ResponseReceiver Receiver,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
+void sourcekitd::handleRequest(sourcekitd_object_t Req,
+                               ResponseReceiver Receiver) {
   LOG_SECTION("handleRequest-before", InfoHighPrio) {
     sourcekitd::printRequestObject(Req, Log->getOS());
   }
 
-  handleRequestImpl(
-      Req,
-      [Receiver](sourcekitd_response_t Resp) {
-        LOG_SECTION("handleRequest-after", InfoHighPrio) {
-          // Responses are big, print them out with info medium priority.
-          if (Logger::isLoggingEnabledForLevel(Logger::Level::InfoMediumPrio))
-            sourcekitd::printResponse(Resp, Log->getOS());
-        }
+  handleRequestImpl(Req, [Receiver](sourcekitd_response_t Resp) {
+    LOG_SECTION("handleRequest-after", InfoHighPrio) {
+      // Responses are big, print them out with info medium priority.
+      if (Logger::isLoggingEnabledForLevel(Logger::Level::InfoMediumPrio))
+        sourcekitd::printResponse(Resp, Log->getOS());
+    }
 
-        Receiver(Resp);
-      },
-      FileSystem);
+    Receiver(Resp);
+  });
 }
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -363,9 +359,7 @@ static void handleSemanticRequest(
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem);
 
-void handleRequestImpl(
-    sourcekitd_object_t ReqObj, ResponseReceiver Rec,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
+void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
   // NOTE: if we had a connection context, these stats should move into it.
   static Statistic numRequests(UIdentFromSKDUID(KindStatNumRequests), "# of requests (total)");
   static Statistic numSemaRequests(UIdentFromSKDUID(KindStatNumSemaRequests), "# of semantic requests");
@@ -470,6 +464,28 @@ void handleRequestImpl(
   Optional<StringRef> SourceText = Req.getString(KeySourceText);
 
   llvm::SmallString<64> ErrBuf;
+
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem = nullptr;
+  if (Optional<StringRef> VFSName = Req.getString(KeyVFSName)) {
+    FileSystemProvider *Provider =
+        getGlobalContext().getFileSystemProvider(*VFSName);
+    if (!Provider) {
+      return Rec(createErrorRequestInvalid(
+          "'key.vfs.name' refers to a filesystem that does not exist"));
+    }
+
+    SmallVector<const char *, 8> VFSArgs;
+    bool Failed = Req.getStringArray(KeyVFSArgs, VFSArgs, /*isOptional=*/true);
+    if (Failed) {
+      return Rec(
+          createErrorRequestInvalid("'key.vfs.args' not an array of strings"));
+    }
+
+    FileSystem = Provider->getFileSystem(VFSArgs, ErrBuf);
+    if (!FileSystem) {
+      return Rec(createErrorRequestInvalid(ErrBuf.c_str()));
+    }
+  }
 
   SmallVector<const char *, 8> Args;
   bool Failed = Req.getStringArray(KeyCompilerArgs, Args, /*isOptional=*/true);

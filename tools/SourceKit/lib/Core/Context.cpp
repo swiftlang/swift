@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SourceKit/Core/Context.h"
+#include "SourceKit/Core/FileSystemProvider.h"
 #include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Core/NotificationCenter.h"
 
@@ -21,9 +22,17 @@ SourceKit::Context::Context(StringRef RuntimeLibPath,
     LangSupportFactoryFn,
     bool shouldDispatchNotificationsOnMain) : RuntimeLibPath(RuntimeLibPath),
     NotificationCtr(new NotificationCenter(shouldDispatchNotificationsOnMain)) {
+  makeAllFileSystemProviders(FileSystemProviders);
   // Should be called last after everything is initialized.
   SwiftLang = LangSupportFactoryFn(*this);
 }
 
 SourceKit::Context::~Context() {
+}
+
+FileSystemProvider *SourceKit::Context::getFileSystemProvider(StringRef Name) {
+  auto It = FileSystemProviders.find(Name);
+  if (It == FileSystemProviders.end())
+    return nullptr;
+  return It->second.get();
 }
