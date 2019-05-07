@@ -540,11 +540,13 @@ void SILInlineCloner::fixUp(SILFunction *calleeFunction) {
   assert(!Apply.getInstruction()->hasUsesOfAnyResult());
 
   auto deleteCallback = [this](SILInstruction *deletedI) {
+    if (NextIter == deletedI->getIterator())
+      ++NextIter;
     if (DeletionCallback)
       DeletionCallback(deletedI);
   };
-  NextIter = recursivelyDeleteTriviallyDeadInstructions(Apply.getInstruction(),
-                                                        true, deleteCallback);
+  recursivelyDeleteTriviallyDeadInstructions(Apply.getInstruction(), true,
+                                             deleteCallback);
 }
 
 SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
