@@ -1283,16 +1283,6 @@ bool ModuleDecl::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
   return true;
 }
 
-bool ModuleDecl::isSystemModule() const {
-  if (isStdlibModule())
-    return true;
-  for (auto F : getFiles()) {
-    if (auto LF = dyn_cast<LoadedFile>(F))
-      return LF->isSystemModule();
-  }
-  return false;
-}
-
 template<bool respectVisibility>
 static bool
 forAllImportedModules(ModuleDecl *topLevel, ModuleDecl::AccessPathTy thisPath,

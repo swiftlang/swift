@@ -1670,6 +1670,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     // but that's not correct for submodules.
     Identifier name = SwiftContext.getIdentifier((*clangModule).Name);
     result = ModuleDecl::create(name, SwiftContext);
+    result->setIsSystemModule(clangModule->IsSystem);
     // Silence error messages about testably importing a Clang module.
     result->setTestingEnabled();
     result->setHasResolvedImports();
@@ -1836,6 +1837,7 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   // FIXME: Handle hierarchical names better.
   Identifier name = SwiftContext.getIdentifier(underlying->Name);
   auto wrapper = ModuleDecl::create(name, SwiftContext);
+  wrapper->setIsSystemModule(underlying->IsSystem);
   // Silence error messages about testably importing a Clang module.
   wrapper->setTestingEnabled();
   wrapper->setHasResolvedImports();
