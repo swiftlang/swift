@@ -1,10 +1,5 @@
-// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
-
-// SR-9737: hanging tests in GPE GPU mode
-// UN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
-
+// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize
 //
 // Compiler-only testing for TPU graph lowering (e.g. shape requirements by XLA).
 // TODO: enable this after https://github.com/apple/swift/pull/18458 is submitted.
