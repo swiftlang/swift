@@ -3252,9 +3252,27 @@ class BeginBorrowInst
                                   SingleValueInstruction> {
   friend class SILBuilder;
 
+  /// Predicate used to filter EndBorrowRange.
+  struct UseToEndBorrow;
+
   BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue)
       : UnaryInstructionBase(DebugLoc, LValue,
                              LValue->getType().getObjectType()) {}
+
+public:
+  using EndBorrowRange =
+      OptionalTransformRange<use_range, UseToEndBorrow, use_iterator>;
+
+  /// Return a range over all EndBorrow instructions for this BeginBorrow.
+  EndBorrowRange getEndBorrows() const;
+
+  /// Return the single use of this BeginBorrowInst, not including any
+  /// EndBorrowInst uses, or return nullptr if the borrow is dead or has
+  /// multiple uses.
+  ///
+  /// Useful for matching common SILGen patterns that emit one borrow per use,
+  /// and simplifying pass logic.
+  Operand *getSingleNonEndingUse() const;
 };
 
 /// Represents a store of a borrowed value into an address. Returns the borrowed
@@ -3345,6 +3363,20 @@ public:
     originalValues.emplace_back(value);
   }
 };
+
+struct BeginBorrowInst::UseToEndBorrow {
+  Optional<EndBorrowInst *> operator()(Operand *use) const {
+    if (auto borrow = dyn_cast<EndBorrowInst>(use->getUser())) {
+      return borrow;
+    } else {
+      return None;
+    }
+  }
+};
+
+inline auto BeginBorrowInst::getEndBorrows() const -> EndBorrowRange {
+  return EndBorrowRange(getUses(), UseToEndBorrow());
+}
 
 /// Different kinds of access.
 enum class SILAccessKind : uint8_t {
