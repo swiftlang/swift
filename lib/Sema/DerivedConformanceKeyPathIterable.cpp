@@ -55,6 +55,23 @@ static ArraySliceType *computeAllKeyPathsType(NominalTypeDecl *nominal) {
   return ArraySliceType::get(partialKeyPathType);
 }
 
+// Mark the given `ValueDecl` as `@inlinable`, if the conformance context's
+// module is not resilient and the `ValueDecl` is effectively public.
+// TODO: Dedupe with DerivedConformanceRawRepresentable.cpp.
+static void maybeMarkAsInlinable(DerivedConformance &derived, ValueDecl *decl) {
+  ASTContext &C = derived.TC.Context;
+  auto parentDC = derived.getConformanceContext();
+  if (!parentDC->getParentModule()->isResilient()) {
+    auto access = decl->getFormalAccessScope(
+        nullptr, /*treatUsableFromInlineAsPublic*/ true);
+    if (access.isPublic()) {
+      decl->getAttrs().add(new (C) InlinableAttr(/*implicit*/ false));
+      if (auto *attr = decl->getAttrs().getAttribute<UsableFromInlineAttr>())
+        attr->setInvalid();
+    }
+  }
+}
+
 // Synthesize body for the `allKeyPaths` computed property getter.
 static void
 deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
@@ -108,9 +125,13 @@ deriveKeyPathIterable_allKeyPaths(DerivedConformance &derived) {
       C.Id_allKeyPaths, returnInterfaceTy, returnTy, /*isStatic*/ false,
       /*isFinal*/ true);
 
-  // Add `@inlinable` to the `allKeyPaths` declaration.
-  if (nominal->getEffectiveAccess() > AccessLevel::Internal)
-    allKeyPathsDecl->getAttrs().add(new (C) InlinableAttr(/*implicit*/ true));
+  // Maybe add `@inlinable` to the `allKeyPaths` declaration.
+  if (llvm::all_of(nominal->getStoredProperties(), [](VarDecl *vd) {
+    return vd->getFormalAccessScope(
+        nullptr, /*treatUsableFromInlineAsPublic*/ true).isPublic();
+  })) {
+    maybeMarkAsInlinable(derived, allKeyPathsDecl);
+  }
 
   // Create `allKeyPaths` getter.
   auto *getterDecl = derived.declareDerivedPropertyGetter(
