@@ -195,20 +195,21 @@ splitAggregateLoad(LoadInst *loadInst, CanonicalizeInstruction &pass) {
   for (auto *use : getNonDebugUses(loadInst)) {
     auto *user = use->getUser();
     if (needsBorrow) {
-      if (auto *borrow = dyn_cast<BeginBorrowInst>(user)) {
-        // The transformation below also assumes a single borrow use.
-        auto *borrowedOper = borrow->getSingleNonEndingUse();
-        if (!borrowedOper)
-          return nextII;
-
-        borrows.push_back(borrow);
-        user = borrowedOper->getUser();
-
-      } else if (auto *destroy = dyn_cast<DestroyValueInst>(user)) {
+      if (auto *destroy = dyn_cast<DestroyValueInst>(user)) {
         destroys.push_back(destroy);
         continue;
-      } else
+      }
+      auto *borrow = dyn_cast<BeginBorrowInst>(user);
+      if (!borrow)
         return nextII;
+
+      // The transformation below also assumes a single borrow use.
+      auto *borrowedOper = borrow->getSingleNonEndingUse();
+      if (!borrowedOper)
+        return nextII;
+
+      borrows.push_back(borrow);
+      user = borrowedOper->getUser();
     }
     // If we have any non SEI, TEI instruction, don't do anything here.
     if (!isa<StructExtractInst>(user) && !isa<TupleExtractInst>(user))
