@@ -33,7 +33,7 @@ func testOwnedVector(_ x: Vector) -> Vector {
 _ = pullback(at: Vector.zero, in: testOwnedVector)
 
 // CHECK-LABEL: struct {{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0 {
-// CHECK-NEXT:   @_hasStorage var pullback_0: (Vector) -> (Vector, Vector)
+// CHECK-NEXT:   @_hasStorage var pullback_0: (Vector) -> (Vector, Vector) { get set }
 // CHECK-NEXT: }
 
 // The primal should not release primal values.
