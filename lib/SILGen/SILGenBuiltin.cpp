@@ -1096,7 +1096,7 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
     auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
         currentParameter, curryLevel->getNumParameters());
     auto applyResult = SGF.B.createApply(
-        loc, assocFn, substitutions, curryLevelArgVals, /*isNonThrowing*/ false);
+        loc, assocFn, SubstitutionMap(), curryLevelArgVals, /*isNonThrowing*/ false);
     currentParameter += curryLevel->getNumParameters();
 
     if (assocFnNeedsDestroy)
@@ -1125,7 +1125,7 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
         currentParameter);
     for (auto origFnArgVal : curryLevelArgVals)
       applyArgs.push_back(origFnArgVal);
-    auto differential = SGF.B.createApply(loc, assocFn, substitutions, applyArgs,
+    auto differential = SGF.B.createApply(loc, assocFn, SubstitutionMap(), applyArgs,
                                           /*isNonThrowing*/ false);
 
     if (assocFnNeedsDestroy)
@@ -1143,7 +1143,7 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
   // Apply the last curry level, in the case where it only has direct results.
   auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
       currentParameter);
-  auto resultTuple = SGF.B.createApply(loc, assocFn, substitutions, curryLevelArgVals,
+  auto resultTuple = SGF.B.createApply(loc, assocFn, SubstitutionMap(), curryLevelArgVals,
                                        /*isNonThrowing*/ false);
 
   if (assocFnNeedsDestroy)
