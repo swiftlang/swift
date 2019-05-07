@@ -705,7 +705,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   // members conform to `VectorNumeric` and share the same scalar type.
   Type sameScalarType;
   bool canDeriveVectorNumeric =
-      canDeriveAdditiveArithmetic && !diffProperties.empty() && 
+      canDeriveAdditiveArithmetic && !diffProperties.empty() &&
       llvm::all_of(diffProperties, [&](VarDecl *vd) {
         auto conf = TC.conformsToProtocol(getAssociatedType(vd, parentDC, id),
                                           vecNumProto, nominal,
@@ -1136,6 +1136,9 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
 }
 
 ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
+  // Diagnose conformances in disallowed contexts.
+  if (checkAndDiagnoseDisallowedContext(requirement))
+    return nullptr;
   if (requirement->getBaseName() == TC.Context.Id_moved)
     return deriveDifferentiable_moved(*this);
   if (requirement->getBaseName() == TC.Context.Id_tangentVector)
@@ -1147,6 +1150,9 @@ ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
 }
 
 Type DerivedConformance::deriveDifferentiable(AssociatedTypeDecl *requirement) {
+  // Diagnose conformances in disallowed contexts.
+  if (checkAndDiagnoseDisallowedContext(requirement))
+    return nullptr;
   if (requirement->getBaseName() == TC.Context.Id_TangentVector)
     return deriveDifferentiable_AssociatedStruct(
         *this, TC.Context.Id_TangentVector);

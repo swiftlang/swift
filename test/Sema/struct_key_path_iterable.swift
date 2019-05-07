@@ -1,5 +1,5 @@
 // SWIFT_ENABLE_TENSORFLOW
-// RUN: %target-swift-frontend -typecheck -verify %s -verify-ignore-unknown
+// RUN: %target-swift-frontend -typecheck -verify -primary-file %s %S/Inputs/struct_key_path_iterable_other_module.swift
 // REQUIRES: tensorflow
 
 import TensorFlow
@@ -12,12 +12,14 @@ struct Parameters : KeyPathIterable {
   var w: Float
   var b: Float
 }
-var params = Parameters(w: 1, b: 2)
-assert(params.allKeyPaths.count == 2)
-assert(params.allKeyPaths(to: Float.self).count == 2)
-assert(params.allKeyPaths(to: Int.self).count == 0)
-for kp in params.allWritableKeyPaths(to: Float.self) {
-  params[keyPath: kp] *= 2
+func testParameters() {
+  var params = Parameters(w: 1, b: 2)
+  assert(params.allKeyPaths.count == 2)
+  assert(params.allKeyPaths(to: Float.self).count == 2)
+  assert(params.allKeyPaths(to: Int.self).count == 0)
+  for kp in params.allWritableKeyPaths(to: Float.self) {
+    params[keyPath: kp] *= 2
+  }
 }
 
 struct TensorParameters : KeyPathIterable {
@@ -54,15 +56,17 @@ struct HeterogeneousParameters : KeyPathIterable {
   var tensor: Tensor<Float>
   var params: Parameters
 }
-let hetero = HeterogeneousParameters(float: 0, double: 0,
-                                     tensor: Tensor(0), params: params)
-assert(hetero.allKeyPaths.count == 4)
-assert(hetero.recursivelyAllKeyPaths.count == 6)
-assert(hetero.allKeyPaths(to: Float.self).count == 1)
-assert(hetero.recursivelyAllKeyPaths(to: Float.self).count == 3)
-assert(hetero.allKeyPaths(to: Tensor<Float>.self).count == 1)
-assert(hetero.allKeyPaths(to: Parameters.self).count == 1)
-assert(hetero.allKeyPaths(to: Int.self).count == 0)
+func testHeterogenousParameters(_ params: Parameters) {
+  let hetero = HeterogeneousParameters(float: 0, double: 0,
+                                       tensor: Tensor(0), params: params)
+  assert(hetero.allKeyPaths.count == 4)
+  assert(hetero.recursivelyAllKeyPaths.count == 6)
+  assert(hetero.allKeyPaths(to: Float.self).count == 1)
+  assert(hetero.recursivelyAllKeyPaths(to: Float.self).count == 3)
+  assert(hetero.allKeyPaths(to: Tensor<Float>.self).count == 1)
+  assert(hetero.allKeyPaths(to: Parameters.self).count == 1)
+  assert(hetero.allKeyPaths(to: Int.self).count == 0)
+}
 
 // Test type in generic context.
 struct A<T> {
@@ -139,6 +143,18 @@ func testOptimizer<P : KeyPathIterable, Scalar : BinaryFloatingPoint>(
     print(parameters)
   }
 }
-var tensorParams = TensorParameters.zero
-let gradients = TensorParameters(w: Tensor(10), b: Tensor(10))
-testOptimizer(parameters: &tensorParams, withGradients: gradients)
+func testOptimizerTensorParameters() {
+  var tensorParams = TensorParameters.zero
+  let gradients = TensorParameters(w: Tensor(10), b: Tensor(10))
+  testOptimizer(parameters: &tensorParams, withGradients: gradients)
+}
+
+// Test derived conformances in disallowed contexts.
+
+// expected-error @+2 {{type 'OtherFileNonconforming' does not conform to protocol 'KeyPathIterable'}}
+// expected-error @+1 {{implementation of 'KeyPathIterable' cannot be automatically synthesized in an extension in a different file to the type}}
+extension OtherFileNonconforming : KeyPathIterable {}
+
+// expected-error @+2 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'KeyPathIterable'}}
+// expected-error @+1 {{implementation of 'KeyPathIterable' cannot be automatically synthesized in an extension in a different file to the type}}
+extension GenericOtherFileNonconforming : KeyPathIterable {}
