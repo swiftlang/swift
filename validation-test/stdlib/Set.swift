@@ -2861,7 +2861,9 @@ SetTestSuite.test("isSubsetOf.Set.Set") {
   let s2 = Set([1010, 2020, 3030])
   expectTrue(Set<Int>().isSubset(of: s1))
   expectFalse(s1.isSubset(of: Set<Int>()))
+  expectTrue(Set<Int>().isSubset(of: Set<Int>()))
   expectTrue(s1.isSubset(of: s1))
+  expectFalse(s1.isSubset(of: s2))
   expectTrue(s2.isSubset(of: s1))
 }
 
@@ -2874,9 +2876,13 @@ SetTestSuite.test("isSubsetOf.Set.Sequence") {
 
 SetTestSuite.test("isStrictSubsetOf.Set.Set") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
+  let s2 = Set([1010, 2020, 3030])
   expectTrue(Set<Int>().isStrictSubset(of: s1))
   expectFalse(s1.isStrictSubset(of: Set<Int>()))
+  expectFalse(Set<Int>().isStrictSubset(of: Set<Int>()))
   expectFalse(s1.isStrictSubset(of: s1))
+  expectFalse(s1.isStrictSubset(of: s2))
+  expectTrue(s2.isStrictSubset(of: s1))
 }
 
 SetTestSuite.test("isStrictSubsetOf.Set.Sequence") {
@@ -2891,9 +2897,10 @@ SetTestSuite.test("isSupersetOf.Set.Set") {
   let s2 = Set([1010, 2020, 3030])
   expectTrue(s1.isSuperset(of: Set<Int>()))
   expectFalse(Set<Int>().isSuperset(of: s1))
+  expectTrue(Set<Int>().isSuperset(of: Set<Int>()))
   expectTrue(s1.isSuperset(of: s1))
   expectTrue(s1.isSuperset(of: s2))
-  expectFalse(Set<Int>().isSuperset(of: s1))
+  expectFalse(s2.isSuperset(of: s1))
 }
 
 SetTestSuite.test("isSupersetOf.Set.Sequence") {
@@ -2906,13 +2913,15 @@ SetTestSuite.test("isSupersetOf.Set.Sequence") {
   expectFalse(Set<Int>().isSuperset(of: s1))
 }
 
-SetTestSuite.test("strictSuperset.Set.Set") {
+SetTestSuite.test("isStrictSuperset.Set.Set") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = Set([1010, 2020, 3030])
   expectTrue(s1.isStrictSuperset(of: Set<Int>()))
   expectFalse(Set<Int>().isStrictSuperset(of: s1))
+  expectFalse(Set<Int>().isStrictSuperset(of: Set<Int>()))
   expectFalse(s1.isStrictSuperset(of: s1))
   expectTrue(s1.isStrictSuperset(of: s2))
+  expectFalse(s2.isStrictSuperset(of: s1))
 }
 
 SetTestSuite.test("strictSuperset.Set.Sequence") {
