@@ -4646,7 +4646,9 @@ void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
 void ProtocolDecl::computeKnownProtocolKind() const {
   auto module = getModuleContext();
   if (module != module->getASTContext().getStdlibModule() &&
-      !module->getName().is("Foundation")) {
+      !module->getName().is("Foundation") &&
+      // SWIFT_ENABLE_TENSORFLOW
+      !module->getName().is("TensorFlow")) {
     const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
     return;
   }
