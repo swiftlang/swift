@@ -690,7 +690,8 @@ public:
   std::vector<SDKNode*> createParameterNodes(ParameterList *PL);
   SDKNode *constructTypeNode(Type T, TypeInitInfo Info = TypeInitInfo());
   void processValueDecl(ValueDecl *VD);
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override;
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                 DynamicLookupInfo dynamicLookupInfo = {}) override;
   void processDecl(Decl *D);
 public:
   void lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules);

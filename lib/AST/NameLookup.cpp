@@ -63,14 +63,15 @@ ValueDecl *LookupResultEntry::getBaseDecl() const {
 
 void DebuggerClient::anchor() {}
 
-void AccessFilteringDeclConsumer::foundDecl(ValueDecl *D,
-                                            DeclVisibilityKind reason) {
+void AccessFilteringDeclConsumer::foundDecl(
+    ValueDecl *D, DeclVisibilityKind reason,
+    DynamicLookupInfo dynamicLookupInfo) {
   if (D->isInvalid())
     return;
   if (!D->isAccessibleFrom(DC))
     return;
 
-  ChainedConsumer.foundDecl(D, reason);
+  ChainedConsumer.foundDecl(D, reason, dynamicLookupInfo);
 }
 
 
