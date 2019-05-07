@@ -3231,6 +3231,18 @@ public:
   }
 };
 
+class EndBorrowInst;
+
+struct UseToEndBorrow {
+  Optional<EndBorrowInst *> operator()(Operand *use) const {
+    if (auto endBorrow = dyn_cast<EndBorrowInst>(use->getUser())) {
+      return endBorrow;
+    } else {
+      return None;
+    }
+  }
+};
+
 /// Represents a load of a borrowed value. Must be paired with an end_borrow
 /// instruction in its use-def list.
 class LoadBorrowInst :
@@ -3238,12 +3250,21 @@ class LoadBorrowInst :
                                 SingleValueInstruction> {
   friend class SILBuilder;
 
+public:
   LoadBorrowInst(SILDebugLocation DebugLoc, SILValue LValue)
       : UnaryInstructionBase(DebugLoc, LValue,
                              LValue->getType().getObjectType()) {}
+
+  using EndBorrowRange =
+      OptionalTransformRange<use_range, UseToEndBorrow, use_iterator>;
+
+  /// Return a range over all EndBorrow instructions for this BeginBorrow.
+  EndBorrowRange getEndBorrows() const;
 };
 
-class EndBorrowInst;
+inline auto LoadBorrowInst::getEndBorrows() const -> EndBorrowRange {
+  return EndBorrowRange(getUses(), UseToEndBorrow());
+}
 
 /// Represents the begin scope of a borrowed value. Must be paired with an
 /// end_borrow instruction in its use-def list.
@@ -3251,9 +3272,6 @@ class BeginBorrowInst
     : public UnaryInstructionBase<SILInstructionKind::BeginBorrowInst,
                                   SingleValueInstruction> {
   friend class SILBuilder;
-
-  /// Predicate used to filter EndBorrowRange.
-  struct UseToEndBorrow;
 
   BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue)
       : UnaryInstructionBase(DebugLoc, LValue,
@@ -3274,6 +3292,10 @@ public:
   /// and simplifying pass logic.
   Operand *getSingleNonEndingUse() const;
 };
+
+inline auto BeginBorrowInst::getEndBorrows() const -> EndBorrowRange {
+  return EndBorrowRange(getUses(), UseToEndBorrow());
+}
 
 /// Represents a store of a borrowed value into an address. Returns the borrowed
 /// address. Must be paired with an end_borrow in its use-def list.
@@ -3363,20 +3385,6 @@ public:
     originalValues.emplace_back(value);
   }
 };
-
-struct BeginBorrowInst::UseToEndBorrow {
-  Optional<EndBorrowInst *> operator()(Operand *use) const {
-    if (auto borrow = dyn_cast<EndBorrowInst>(use->getUser())) {
-      return borrow;
-    } else {
-      return None;
-    }
-  }
-};
-
-inline auto BeginBorrowInst::getEndBorrows() const -> EndBorrowRange {
-  return EndBorrowRange(getUses(), UseToEndBorrow());
-}
 
 /// Different kinds of access.
 enum class SILAccessKind : uint8_t {
