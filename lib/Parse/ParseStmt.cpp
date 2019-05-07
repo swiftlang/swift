@@ -356,7 +356,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
 
     // If the previous statement didn't have a semicolon and this new
     // statement doesn't start a line, complain.
-    if (!PreviousHadSemi && !Tok.isAtStartOfLine()) {
+    const bool IsAtStartOfLineOrPreviousHadSemi =
+        PreviousHadSemi || Tok.isAtStartOfLine();
+    if (!IsAtStartOfLineOrPreviousHadSemi) {
       SourceLoc EndOfPreviousLoc = getEndOfPreviousLoc();
       diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
         .fixItInsert(EndOfPreviousLoc, ";");
@@ -410,6 +412,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       SmallVector<Decl*, 8> TmpDecls;
       ParserResult<Decl> DeclResult = 
           parseDecl(IsTopLevel ? PD_AllowTopLevel : PD_Default,
+                    IsAtStartOfLineOrPreviousHadSemi,
                     [&](Decl *D) {TmpDecls.push_back(D);});
       BraceItemsStatus |= DeclResult;
       if (DeclResult.isParseError()) {
