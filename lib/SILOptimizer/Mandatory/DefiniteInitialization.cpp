@@ -861,8 +861,7 @@ void LifetimeChecker::handleLoadForTypeOfSelfUse(const DIMemoryUse &Use) {
           valueMetatype->getLoc(), metatypeArgument,
           valueMetatype->getType());
     }
-    replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument,
-                                     [](SILInstruction*) { });
+    replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument);
   }
 }
 

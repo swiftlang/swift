@@ -3217,6 +3217,9 @@ class BeginBorrowInst
                                   SingleValueInstruction> {
   friend class SILBuilder;
 
+  /// Predicate used to filter EndBorrowRange.
+  struct UseToEndBorrow;
+
   BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue)
       : UnaryInstructionBase(DebugLoc, LValue,
                              LValue->getType().getObjectType()) {}
@@ -3229,22 +3232,17 @@ public:
   using EndBorrowRange =
       OptionalTransformRange<use_range, UseToEndBorrow, use_iterator>;
 
-  /// Find all associated end_borrow instructions for this begin_borrow.
+  /// Return a range over all EndBorrow instructions for this BeginBorrow.
   EndBorrowRange getEndBorrows() const;
-};
 
-struct BeginBorrowInst::UseToEndBorrow {
-  Optional<EndBorrowInst *> operator()(Operand *use) const {
-    if (auto *ebi = dyn_cast<EndBorrowInst>(use->getUser())) {
-      return ebi;
-    }
-    return None;
-  }
+  /// Return the single use of this BeginBorrowInst, not including any
+  /// EndBorrowInst uses, or return nullptr if the borrow is dead or has
+  /// multiple uses.
+  ///
+  /// Useful for matching common SILGen patterns that emit one borrow per use,
+  /// and simplifying pass logic.
+  Operand *getSingleNonEndingUse() const;
 };
-
-inline auto BeginBorrowInst::getEndBorrows() const -> EndBorrowRange {
-  return EndBorrowRange(getUses(), UseToEndBorrow());
-}
 
 /// Represents a store of a borrowed value into an address. Returns the borrowed
 /// address. Must be paired with an end_borrow in its use-def list.
@@ -3334,6 +3332,20 @@ public:
     originalValues.emplace_back(value);
   }
 };
+
+struct BeginBorrowInst::UseToEndBorrow {
+  Optional<EndBorrowInst *> operator()(Operand *use) const {
+    if (auto borrow = dyn_cast<EndBorrowInst>(use->getUser())) {
+      return borrow;
+    } else {
+      return None;
+    }
+  }
+};
+
+inline auto BeginBorrowInst::getEndBorrows() const -> EndBorrowRange {
+  return EndBorrowRange(getUses(), UseToEndBorrow());
+}
 
 /// Different kinds of access.
 enum class SILAccessKind : uint8_t {

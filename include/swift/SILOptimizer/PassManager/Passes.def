@@ -265,6 +265,8 @@ PASS(SideEffectsDumper, "side-effects-dump",
      "Print Side-Effect Information for all Functions")
 PASS(IRGenPrepare, "irgen-prepare",
      "Cleanup SIL in preparation for IRGen")
+PASS(SILGenCleanup, "silgen-cleanup",
+     "Cleanup SIL in preparation for diagnostics")
 PASS(SILCombine, "sil-combine",
      "Combine SIL Instructions via Peephole Optimization")
 PASS(SILDebugInfoGenerator, "sil-debuginfo-gen",
