@@ -505,8 +505,10 @@ func test_recovery_missing_name_2(let: Int) {} // expected-error {{'let' as a pa
 // expected-error @-1 {{expected parameter name followed by ':'}}
 
 // <rdar://problem/16792027> compiler infinite loops on a really really mutating function
-struct F { // expected-note 1 {{in declaration of 'F'}}
-  mutating mutating mutating f() { // expected-error 2 {{duplicate modifier}} expected-note 2 {{modifier already specified here}} expected-error {{expected declaration}}
+struct F {
+  mutating mutating mutating f() { // expected-error 2 {{duplicate modifier}}
+                                   // expected-note@-1 2 {{modifier already specified here}}
+                                   // expected-error@-2 {{expected 'func' keyword in function declaration}}
   }
   
   mutating nonmutating func g() {}  // expected-error {{method must not be declared both mutating and nonmutating}}
