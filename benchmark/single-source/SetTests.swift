@@ -517,7 +517,7 @@ func run_SetIntersectionBox(
   _ r: Int,
   _ n: Int) {
   for _ in 0 ..< n {
-    let and = a.intersection(b)
+    let and = a.intersection(identity(b))
     CheckResults(and.count == r)
   }
 }
@@ -529,7 +529,7 @@ func run_SetSubtractingBox(
   _ r: Int,
   _ n: Int) {
   for _ in 0 ..< n {
-    let and = a.subtracting(b)
+    let and = a.subtracting(identity(b))
     CheckResults(and.count == r)
   }
 }
