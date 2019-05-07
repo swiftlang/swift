@@ -407,7 +407,6 @@ void OpaqueSpecializerCloner::insertOpaqueToConcreteAddressCasts(
     auto substConv = apply.getSubstCalleeConv();
     unsigned idx = 0;
     for (auto &opd : apply.getArgumentOperands()) {
-      auto argConv = apply.getArgumentConvention(opd);
       auto argIdx = apply.getCalleeArgIndex(opd);
       auto argType = substConv.getSILArgumentType(argIdx);
       if (argType.getASTType() != opd.get()->getType().getASTType()) {
