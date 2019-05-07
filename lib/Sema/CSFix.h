@@ -149,6 +149,10 @@ enum class FixKind : uint8_t {
   /// Allow an invalid reference to a member declaration as part
   /// of a key path component.
   AllowInvalidRefInKeyPath,
+
+  /// Remove `return` or default last expression of single expression
+  /// function to `Void` to conform to expected result type.
+  RemoveReturn,
 };
 
 class ConstraintFix {
@@ -868,6 +872,18 @@ public:
 
   static RemoveAddressOf *create(ConstraintSystem &cs,
                                  ConstraintLocator *locator);
+};
+
+class RemoveReturn final : public ConstraintFix {
+  RemoveReturn(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RemoveReturn, locator) {}
+
+public:
+  std::string getName() const override { return "remove or omit return type"; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static RemoveReturn *create(ConstraintSystem &cs, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

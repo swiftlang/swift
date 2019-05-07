@@ -2733,3 +2733,9 @@ bool InvalidUseOfAddressOf::diagnoseAsError() {
   emitDiagnostic(anchor->getSrc()->getLoc(), diag::extraneous_address_of);
   return true;
 }
+
+bool ExtraneousReturnFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+  emitDiagnostic(anchor->getLoc(), diag::cannot_return_value_from_void_func);
+  return true;
+}
