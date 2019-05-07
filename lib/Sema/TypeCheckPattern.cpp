@@ -1438,6 +1438,10 @@ recur:
           }
         }
       }
+
+      if (!elt)
+        return true;
+
       enumTy = type;
     } else {
       // Check if the explicitly-written enum type matches the type we're
