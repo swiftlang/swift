@@ -5404,9 +5404,15 @@ namespace {
                             ArrayRef<Constraint<T>> constraints,
                             llvm::function_ref<bool(const Constraint<T> &)>
                                                    isSuitableRepresentative) {
+    Optional<Constraint<T>> fallbackConstraint;
+
     // Find a representative constraint.
     Optional<Constraint<T>> representativeConstraint;
     for (const auto &constraint : constraints) {
+      // Make sure we have a constraint to fall back on.
+      if (!fallbackConstraint)
+        fallbackConstraint = constraint;
+
       // If this isn't a suitable representative constraint, ignore it.
       if (!isSuitableRepresentative(constraint))
         continue;
@@ -5457,7 +5463,8 @@ namespace {
         representativeConstraint = constraint;
     }
 
-    return representativeConstraint;
+    return representativeConstraint ? representativeConstraint
+                                    : fallbackConstraint;
   }
 } // end anonymous namespace
 
@@ -6996,9 +7003,11 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
       if (concreteType->isEqual(equivClass->concreteType))
         return ConstraintRelation::Redundant;
 
-      // If either has a type parameter, call them unrelated.
+      // If either has a type parameter or type variable, call them unrelated.
       if (concreteType->hasTypeParameter() ||
-          equivClass->concreteType->hasTypeParameter())
+          equivClass->concreteType->hasTypeParameter() ||
+          concreteType->hasTypeVariable() ||
+          equivClass->concreteType->hasTypeVariable())
         return ConstraintRelation::Unrelated;
 
       return ConstraintRelation::Conflicting;
