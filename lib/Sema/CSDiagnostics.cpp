@@ -1688,6 +1688,33 @@ bool MissingCallFailure::diagnoseAsError() {
   if (isa<KeyPathExpr>(baseExpr))
     return false;
 
+  auto path = getLocator()->getPath();
+  if (!path.empty()) {
+    const auto &last = path.back();
+
+    switch (last.getKind()) {
+    case ConstraintLocator::ContextualType:
+    case ConstraintLocator::ApplyArgToParam: {
+      auto fnType = getType(baseExpr)->castTo<FunctionType>();
+      assert(fnType->getNumParams() == 0);
+      emitDiagnostic(baseExpr->getLoc(), diag::missing_nullary_call,
+                     fnType->getResult())
+          .fixItInsertAfter(baseExpr->getEndLoc(), "()");
+      return true;
+    }
+
+    case ConstraintLocator::AutoclosureResult: {
+      auto &cs = getConstraintSystem();
+      auto loc = cs.getConstraintLocator(getRawAnchor(), path.drop_back(),
+                                         /*summaryFlags=*/0);
+      AutoClosureForwardingFailure failure(cs, loc);
+      return failure.diagnoseAsError();
+    }
+    default:
+      break;
+    }
+  }
+
   if (auto *DRE = dyn_cast<DeclRefExpr>(baseExpr)) {
     emitDiagnostic(baseExpr->getLoc(), diag::did_not_call_function,
                    DRE->getDecl()->getBaseName().getIdentifier())
