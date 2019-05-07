@@ -729,10 +729,8 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
 
 void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
   if (auto *proto = dyn_cast<ProtocolDecl>(typeDecl)) {
-    // Compute the requirement signature first.
-    if (!proto->isRequirementSignatureComputed())
-      proto->computeRequirementSignature();
-
+    // The requirement signature is created lazily by
+    // ProtocolDecl::getRequirementSignature().
     // The generic signature and environment is created lazily by
     // GenericContext::getGenericSignature(), so there is nothing we
     // need to do.
