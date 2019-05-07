@@ -306,7 +306,7 @@ private:
     // reports back a size.
     while (isa<llvm::DIDerivedType>(Ty) && !Ty->getSizeInBits()) {
       auto *DT = cast<llvm::DIDerivedType>(Ty);
-      Ty = DT->getBaseType().resolve();
+      Ty = DT->getBaseType();
       if (!Ty)
         return 0;
     }
@@ -317,7 +317,7 @@ private:
 
   /// Return the size reported by the variable's type.
   static unsigned getSizeInBits(const llvm::DILocalVariable *Var) {
-    llvm::DIType *Ty = Var->getType().resolve();
+    llvm::DIType *Ty = Var->getType();
     return getSizeInBits(Ty);
   }
 
