@@ -4527,9 +4527,7 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
   // like the requirement signature have been set.
   if (auto PD = dyn_cast<ProtocolDecl>(nominal)) {
     (void)PD->getInheritedProtocols();
-    if (!PD->isRequirementSignatureComputed()) {
-      TC.validateDecl(PD);
-    }
+    TC.validateDecl(PD);
   }
 }
 
