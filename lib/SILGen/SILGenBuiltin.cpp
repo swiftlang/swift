@@ -1071,21 +1071,6 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
       assert(!isConsumedParameter(parameter.getConvention()));
 #endif
 
-  // Destroys all the values.
-  auto destroyValues = [&](ArrayRef<SILValue> argumentValues) {
-    for (auto argumentValue : argumentValues) {
-      if (argumentValue->getType().isTrivial(SGF.F))
-        continue;
-
-      if (argumentValue->getType().isObject()) {
-        SGF.B.emitDestroyValueOperation(loc, argumentValue);
-        continue;
-      }
-
-      SGF.B.createDestroyAddr(loc, argumentValue);
-    }
-  };
-
   // Apply all the curry levels except the last one, whose results we handle
   // specially. We overwrite `assocFn` with the application results.
   unsigned currentParameter = 0;
@@ -1099,10 +1084,7 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
         /*isNonThrowing*/ false);
     currentParameter += curryLevel->getNumParameters();
 
-    if (assocFnNeedsDestroy)
-      SGF.B.createDestroyValue(loc, assocFn);
     assocFn = applyResult;
-    destroyValues(curryLevelArgVals);
 
     // Our new `assocFn` needs to be released because it's an owned result from
     // a function call.
@@ -1128,10 +1110,7 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
     auto differential = SGF.B.createApply(
         loc, assocFn, SubstitutionMap(), applyArgs, /*isNonThrowing*/ false);
 
-    if (assocFnNeedsDestroy)
-      SGF.B.createDestroyValue(loc, assocFn);
     assocFn = SILValue();
-    destroyValues(curryLevelArgVals);
 
     SGF.B.createStore(loc, differential,
                       SGF.B.createTupleElementAddr(loc, indResBuffer, 1),
@@ -1147,10 +1126,7 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
       loc, assocFn, SubstitutionMap(), curryLevelArgVals,
       /*isNonThrowing*/ false);
 
-  if (assocFnNeedsDestroy)
-    SGF.B.createDestroyValue(loc, assocFn);
   assocFn = SILValue();
-  destroyValues(curryLevelArgVals);
 
   return SGF.emitManagedRValueWithCleanup(resultTuple);
 }
