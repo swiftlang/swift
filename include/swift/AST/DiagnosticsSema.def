@@ -2790,8 +2790,6 @@ ERROR(object_literal_broken_proto,none,
 ERROR(discard_expr_outside_of_assignment,none,
       "'_' can only appear in a pattern or on the left side of an assignment",
       ())
-ERROR(inout_expr_outside_of_call,none,
-      "'&' can only appear immediately in a call argument list", ())
 ERROR(collection_literal_heterogeneous,none,
       "heterogeneous collection literal could only be inferred to %0; add"
       " explicit type annotation if this is intentional", (Type))

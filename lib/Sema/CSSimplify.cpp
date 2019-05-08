@@ -938,7 +938,8 @@ public:
 // Match the argument of a call to the parameter.
 ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     ConstraintSystem &cs, ArrayRef<AnyFunctionType::Param> args,
-    ArrayRef<AnyFunctionType::Param> params, ConstraintLocatorBuilder locator) {
+    ArrayRef<AnyFunctionType::Param> params, ConstraintKind subKind,
+    ConstraintLocatorBuilder locator) {
   // Extract the parameters.
   ValueDecl *callee;
   bool hasCurriedSelf;
@@ -971,12 +972,6 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   // assignment operators.
   auto *anchor = locator.getAnchor();
   assert(anchor && "locator without anchor expression?");
-  bool isOperator = (isa<PrefixUnaryExpr>(anchor) ||
-                     isa<PostfixUnaryExpr>(anchor) || isa<BinaryExpr>(anchor));
-
-  ConstraintKind subKind = (isOperator
-                            ? ConstraintKind::OperatorArgumentConversion
-                            : ConstraintKind::ArgumentConversion);
 
   // Check whether argument of the call at given position refers to
   // parameter marked as `@autoclosure`. This function is used to
@@ -2218,7 +2213,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   auto desugar2 = type2->getDesugaredType();
 
   // If the types are obviously equivalent, we're done.
-  if (desugar1->isEqual(desugar2))
+  if (desugar1->isEqual(desugar2) &&
+      !isa<InOutType>(desugar2))
     return getTypeMatchSuccess();
 
   // Local function that should be used to produce the return value whenever
@@ -2527,11 +2523,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                           ConstraintLocator::LValueConversion));
     
     case TypeKind::InOut:
-      // If the RHS is an inout type, the LHS must be an @lvalue type.
-      if (kind == ConstraintKind::BindParam ||
-          kind >= ConstraintKind::OperatorArgumentConversion)
+      if (kind == ConstraintKind::BindParam)
         return getTypeMatchFailure(locator);
       
+      if (kind == ConstraintKind::OperatorArgumentConversion) {
+        conversionsOrFixes.push_back(
+            RemoveAddressOf::create(*this, getConstraintLocator(locator)));
+        break;
+      }
+
       return matchTypes(cast<InOutType>(desugar1)->getObjectType(),
                         cast<InOutType>(desugar2)->getObjectType(),
                         ConstraintKind::Bind, subflags,
@@ -2557,9 +2557,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto opaque1 = cast<OpaqueTypeArchetypeType>(desugar1);
       auto opaque2 = cast<OpaqueTypeArchetypeType>(desugar2);
       
-      assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
-      if (!type1->is<LValueType>()
-          && opaque1->getDecl() == opaque2->getDecl()) {
+      if (opaque1->getDecl() == opaque2->getDecl()) {
         conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
       }
       break;
@@ -2573,15 +2571,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto rootOpaque1 = dyn_cast<OpaqueTypeArchetypeType>(nested1->getRoot());
       auto rootOpaque2 = dyn_cast<OpaqueTypeArchetypeType>(nested2->getRoot());
       if (rootOpaque1 && rootOpaque2) {
-        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
         auto interfaceTy1 = nested1->getInterfaceType()
           ->getCanonicalType(rootOpaque1->getGenericEnvironment()
                                         ->getGenericSignature());
         auto interfaceTy2 = nested2->getInterfaceType()
           ->getCanonicalType(rootOpaque2->getGenericEnvironment()
                                         ->getGenericSignature());
-        if (!type1->is<LValueType>()
-            && interfaceTy1 == interfaceTy2
+        if (interfaceTy1 == interfaceTy2
             && rootOpaque1->getDecl() == rootOpaque2->getDecl()) {
           conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
           break;
@@ -2600,7 +2596,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     // T1 is convertible to T2 (by loading the value).  Note that we cannot get
     // a value of inout type as an lvalue though.
     if (type1->is<LValueType>() && !type2->is<InOutType>()) {
-      return matchTypes(type1->getRValueType(), type2,
+      return matchTypes(type1->getWithoutSpecifierType(), type2,
                         kind, subflags, locator);
     }
   }
@@ -2657,7 +2653,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // We can remove this special case when we implement operator hiding.
       if (!type1->is<LValueType>() &&
           kind != ConstraintKind::OperatorArgumentConversion) {
-        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
         conversionsOrFixes.push_back(
                               ConversionRestrictionKind::HashableToAnyHashable);
       }
@@ -2720,16 +2715,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     if (!type1->is<LValueType>() && kind >= ConstraintKind::Subtype) {
       // Array -> Array.
       if (isArrayType(desugar1) && isArrayType(desugar2)) {
-        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
         conversionsOrFixes.push_back(ConversionRestrictionKind::ArrayUpcast);
       // Dictionary -> Dictionary.
       } else if (isDictionaryType(desugar1) && isDictionaryType(desugar2)) {
-        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
         conversionsOrFixes.push_back(
           ConversionRestrictionKind::DictionaryUpcast);
       // Set -> Set.
       } else if (isSetType(desugar1) && isSetType(desugar2)) {
-        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
         conversionsOrFixes.push_back(
           ConversionRestrictionKind::SetUpcast);
       }
@@ -5649,9 +5641,26 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
-  // If the types are obviously equivalent, we're done.
-  if (type1.getPointer() == desugar2)
-    return SolutionKind::Solved;
+  SmallVector<LocatorPathElt, 2> parts;
+  Expr *anchor = locator.getLocatorParts(parts);
+  bool isOperator = (isa<PrefixUnaryExpr>(anchor) ||
+                     isa<PostfixUnaryExpr>(anchor) ||
+                     isa<BinaryExpr>(anchor));
+
+  auto hasInOut = [&]() {
+    for (auto param : func1->getParams())
+      if (param.isInOut())
+        return true;
+    return false;
+  };
+
+  // If the types are obviously equivalent, we're done. This optimization
+  // is not valid for operators though, where an inout parameter does not
+  // have an explicit inout argument.
+  if (type1.getPointer() == desugar2) {
+    if (!isOperator || !hasInOut())
+      return SolutionKind::Solved;
+  }
 
   // Local function to form an unsolved result.
   auto formUnsolved = [&] {
@@ -5684,8 +5693,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
   // Strip the 'ApplyFunction' off the locator.
   // FIXME: Perhaps ApplyFunction can go away entirely?
-  SmallVector<LocatorPathElt, 2> parts;
-  Expr *anchor = locator.getLocatorParts(parts);
   assert(!parts.empty() && "Nonsensical applicable-function locator");
   assert(parts.back().getKind() == ConstraintLocator::ApplyFunction);
   assert(parts.back().getNewSummaryFlags() == 0);
@@ -5714,9 +5721,13 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
   // For a function, bind the output and convert the argument to the input.
   if (auto func2 = dyn_cast<FunctionType>(desugar2)) {
+    ConstraintKind subKind = (isOperator
+                              ? ConstraintKind::OperatorArgumentConversion
+                              : ConstraintKind::ArgumentConversion);
+
     // The argument type must be convertible to the input type.
     if (::matchCallArguments(
-            *this, func1->getParams(), func2->getParams(),
+            *this, func1->getParams(), func2->getParams(), subKind,
             outerLocator.withPathElement(ConstraintLocator::ApplyArgument))
             .isFailure())
       return SolutionKind::Error;

@@ -7848,6 +7848,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   auto openedFuncType = openedType->castTo<FunctionType>();
   ::matchCallArguments(
       cs, args, openedFuncType->getParams(),
+      ConstraintKind::ArgumentConversion,
       cs.getConstraintLocator(call, ConstraintLocator::ApplyArgument));
 
   // Solve the system.
