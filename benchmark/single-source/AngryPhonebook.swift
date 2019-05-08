@@ -21,7 +21,7 @@ public let AngryPhonebook = BenchmarkInfo(
   tags: [.validation, .api, .String],
   legacyFactor: 7)
 
-var words = [
+let words = [
   "James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph",
   "Charles", "Thomas", "Christopher", "Daniel", "Matthew", "Donald", "Anthony",
   "Paul", "Mark", "George", "Steven", "Kenneth", "Andrew", "Edward", "Brian",

@@ -28,7 +28,7 @@ func IsPowerOfTwo(_ x: Int) -> Bool { return (x & (x - 1)) == 0 }
 func WalshTransform(_ data: inout [Double]) {
   assert(IsPowerOfTwo(data.count), "Not a power of two")
   var temp = [Double](repeating: 0, count: data.count)
-  var ret = WalshImpl(&data, &temp, 0, data.count)
+  let ret = WalshImpl(&data, &temp, 0, data.count)
   for i in 0..<data.count {
     data[i] = ret[i]
   }
@@ -59,11 +59,11 @@ func WalshImpl(_ data: inout [Double], _ temp: inout [Double], _ start: Int, _ s
 }
 
 func checkCorrectness() {
-  var In : [Double] = [1,0,1,0,0,1,1,0]
-  var Out : [Double] = [4,2,0,-2,0,2,0,2]
+  let In : [Double] = [1,0,1,0,0,1,1,0]
+  let Out : [Double] = [4,2,0,-2,0,2,0,2]
   var data : [Double] = In
   WalshTransform(&data)
-  var mid = data
+  let mid = data
   InverseWalshTransform(&data)
   for i in 0..<In.count {
     // Check encode.

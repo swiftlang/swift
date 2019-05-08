@@ -23,7 +23,7 @@ public let StringEdits = BenchmarkInfo(
   tags: [.validation, .api, .String],
   legacyFactor: 100)
 
-var editWords: [String] = [
+let editWords: [String] = [
   "woodshed",
   "lakism",
   "gastroperiodynia",
