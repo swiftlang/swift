@@ -805,9 +805,3 @@ public class NonObjCClass { }
   @objc func referenceSingleGenericClass(_: SingleImportedObjCGeneric<AnyObject>?) {}
 }
 // CHECK: @end
-
-// CHECK: SWIFT_WEAK_IMPORT
-// CHECK-NEXT: SWIFT_CLASS("_TtC7classes17WeakImportedClass")
-// CHECK-NEXT: @interface WeakImportedClass
-// CHECK-NEXT: @end
-@_weakLinked @objc class WeakImportedClass {}
