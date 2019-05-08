@@ -12,6 +12,9 @@ struct Maker {}
 @_functionBuilder
 class Inventor {}
 
+@Maker // expected-error {{function builder attribute 'Maker' can only be applied to a parameter, function, or computed property}}
+typealias typename = Inventor
+
 @Maker // expected-error {{function builder attribute 'Maker' can only be applied to a variable if it defines a getter}}
 var global: Int
 
