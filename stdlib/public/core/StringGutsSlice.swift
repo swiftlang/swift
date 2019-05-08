@@ -33,57 +33,43 @@ internal struct _StringGutsSlice {
     self._offsetRange = offsetRange
   }
 
-  @inlinable
-  internal var start: Int {
-    @inline(__always) get { return _offsetRange.lowerBound }
-  }
-  @inlinable
-  internal var end: Int {
-    @inline(__always) get { return _offsetRange.upperBound }
-  }
+  @inlinable @inline(__always)
+  internal var start: Int { _offsetRange.lowerBound }
 
-  @inlinable
-  internal var count: Int {
-    @inline(__always) get { return _offsetRange.count }
-  }
+  @inlinable @inline(__always)
+  internal var end: Int { _offsetRange.upperBound }
 
-  @inlinable
-  internal var isNFCFastUTF8: Bool {
-    @inline(__always) get { return _guts.isNFCFastUTF8 }
-  }
+  @inlinable @inline(__always)
+  internal var count: Int { _offsetRange.count }
 
-  @inlinable
-  internal var isASCII: Bool {
-    @inline(__always) get { return _guts.isASCII }
-  }
+  @inlinable @inline(__always)
+  internal var isNFCFastUTF8: Bool { _guts.isNFCFastUTF8 }
 
-  @inlinable
-  internal var isFastUTF8: Bool {
-    @inline(__always) get { return _guts.isFastUTF8 }
-  }
+  @inlinable @inline(__always)
+  internal var isASCII: Bool { _guts.isASCII }
 
+  @inlinable @inline(__always)
+  internal var isFastUTF8: Bool { _guts.isFastUTF8 }
+
+  @inline(__always)
   internal var utf8Count: Int {
-    @inline(__always) get {
-      if _fastPath(self.isFastUTF8) {
-        return _offsetRange.count
-      }
-      return Substring(self).utf8.count
+    if _fastPath(self.isFastUTF8) {
+      return _offsetRange.count
     }
+    return Substring(self).utf8.count
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var range: Range<String.Index> {
-    @inline(__always) get {
-      return String.Index(_encodedOffset: _offsetRange.lowerBound)
-         ..< String.Index(_encodedOffset: _offsetRange.upperBound)
-    }
+    String.Index(_encodedOffset: _offsetRange.lowerBound)
+      ..< String.Index(_encodedOffset: _offsetRange.upperBound)
   }
 
   @inline(__always)
   internal func withFastUTF8<R>(
     _ f: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R {
-    return try _guts.withFastUTF8(range: _offsetRange, f)
+    try _guts.withFastUTF8(range: _offsetRange, f)
   }
 
   @_effects(releasenone)
@@ -91,7 +77,7 @@ internal struct _StringGutsSlice {
     startingAt idx: String.Index
   ) -> (Unicode.Scalar, scalarLength: Int) {
     let (scalar, len) = _guts.foreignErrorCorrectedScalar(startingAt: idx)
-    if _slowPath(idx.encoded(offsetBy: len) > range.upperBound) { 
+    if _slowPath(idx.encoded(offsetBy: len) > range.upperBound) {
       return (Unicode.Scalar._replacementCharacter, 1)
     }
     return (scalar, len)

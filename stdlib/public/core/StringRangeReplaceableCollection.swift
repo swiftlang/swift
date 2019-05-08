@@ -325,14 +325,14 @@ extension String {
   // source compatibility issues when String becomes a collection
   @_transparent
   public func max<T : Comparable>(_ x: T, _ y: T) -> T {
-    return Swift.max(x,y)
+    Swift.max(x,y)
   }
 
   // This is needed because of the issue described in SR-4660 which causes
   // source compatibility issues when String becomes a collection
   @_transparent
   public func min<T : Comparable>(_ x: T, _ y: T) -> T {
-    return Swift.min(x,y)
+    Swift.min(x,y)
   }
 }
 

@@ -191,7 +191,7 @@ extension _StringObject {
 #else
   @inlinable @inline(__always)
   internal var rawBits: RawBitPattern {
-    return (_countAndFlagsBits, discriminatedObjectRawBits)
+    (_countAndFlagsBits, discriminatedObjectRawBits)
   }
 
   @inlinable @inline(__always)
@@ -270,9 +270,7 @@ extension _StringObject.CountAndFlags {
   internal typealias RawBitPattern = UInt64
 
   @inlinable @inline(__always)
-  internal var rawBits: RawBitPattern {
-   return _storage
-  }
+  internal var rawBits: RawBitPattern { _storage }
 
   @inlinable @inline(__always)
   internal init(rawUnchecked bits: RawBitPattern) {
@@ -296,7 +294,7 @@ extension _StringObject.Nibbles {
   // The canonical empty sting is an empty small string
   @inlinable @inline(__always)
   internal static var emptyString: UInt64 {
-    return _StringObject.Nibbles.small(isASCII: true)
+    _StringObject.Nibbles.small(isASCII: true)
   }
 }
 
@@ -348,18 +346,18 @@ extension _StringObject.Nibbles {
 extension _StringObject.Nibbles {
   // Mask for address bits, i.e. non-discriminator and non-extra high bits
   @inlinable @inline(__always)
-  static internal var largeAddressMask: UInt64 { return 0x0FFF_FFFF_FFFF_FFFF }
+  static internal var largeAddressMask: UInt64 { 0x0FFF_FFFF_FFFF_FFFF }
 
   // Mask for address bits, i.e. non-discriminator and non-extra high bits
   @inlinable @inline(__always)
-  static internal var discriminatorMask: UInt64 { return ~largeAddressMask }
+  static internal var discriminatorMask: UInt64 { ~largeAddressMask }
 }
 
 extension _StringObject.Nibbles {
   // Discriminator for small strings
   @inlinable @inline(__always)
   internal static func small(isASCII: Bool) -> UInt64 {
-    return isASCII ? 0xE000_0000_0000_0000 : 0xA000_0000_0000_0000
+    isASCII ? 0xE000_0000_0000_0000 : 0xA000_0000_0000_0000
   }
 
   // Discriminator for small strings
@@ -371,16 +369,14 @@ extension _StringObject.Nibbles {
 
   // Discriminator for large, immortal, swift-native strings
   @inlinable @inline(__always)
-  internal static func largeImmortal() -> UInt64 {
-    return 0x8000_0000_0000_0000
-  }
+  internal static func largeImmortal() -> UInt64 { 0x8000_0000_0000_0000 }
 
   // Discriminator for large, mortal (i.e. managed), swift-native strings
   @inlinable @inline(__always)
-  internal static func largeMortal() -> UInt64 { return 0x0000_0000_0000_0000 }
+  internal static func largeMortal() -> UInt64 { 0x0000_0000_0000_0000 }
 
   internal static func largeCocoa(providesFastUTF8: Bool) -> UInt64 {
-    return providesFastUTF8 ? 0x4000_0000_0000_0000 : 0x5000_0000_0000_0000
+    providesFastUTF8 ? 0x4000_0000_0000_0000 : 0x5000_0000_0000_0000
   }
 }
 
@@ -396,19 +392,19 @@ extension _StringObject {
 
   @inlinable @inline(__always)
   internal var isImmortal: Bool {
-    return (discriminatedObjectRawBits & 0x8000_0000_0000_0000) != 0
+    (discriminatedObjectRawBits & 0x8000_0000_0000_0000) != 0
   }
 
   @inlinable @inline(__always)
-  internal var isMortal: Bool { return !isImmortal }
+  internal var isMortal: Bool { !isImmortal }
 
   @inlinable @inline(__always)
   internal var isSmall: Bool {
-    return (discriminatedObjectRawBits & 0x2000_0000_0000_0000) != 0
+    (discriminatedObjectRawBits & 0x2000_0000_0000_0000) != 0
   }
 
   @inlinable @inline(__always)
-  internal var isLarge: Bool { return !isSmall }
+  internal var isLarge: Bool { !isSmall }
 
   // Whether this string can provide access to contiguous UTF-8 code units:
   //   - Small strings can by spilling to the stack
@@ -418,17 +414,17 @@ extension _StringObject {
   //     - Non-Cocoa shared strings
   @inlinable @inline(__always)
   internal var providesFastUTF8: Bool {
-    return (discriminatedObjectRawBits & 0x1000_0000_0000_0000) == 0
+    (discriminatedObjectRawBits & 0x1000_0000_0000_0000) == 0
   }
 
   @inlinable @inline(__always)
-  internal var isForeign: Bool { return !providesFastUTF8 }
+  internal var isForeign: Bool { !providesFastUTF8 }
 
   // Whether we are native or shared, i.e. we have a backing class which
   // conforms to `_AbstractStringStorage`
   @inline(__always)
   internal var hasStorage: Bool {
-    return (discriminatedObjectRawBits & 0xF000_0000_0000_0000) == 0
+    (discriminatedObjectRawBits & 0xF000_0000_0000_0000) == 0
   }
 
   // Whether we are a mortal, native (tail-allocated) string
@@ -444,7 +440,7 @@ extension _StringObject {
   }
 
   // Whether we are a mortal, shared string (managed by Swift runtime)
-  internal var hasSharedStorage: Bool { return hasStorage && !hasNativeStorage }
+  internal var hasSharedStorage: Bool { hasStorage && !hasNativeStorage }
 }
 
 // Queries conditional on being in a large or fast form.
@@ -459,7 +455,7 @@ extension _StringObject {
 
   // Whether this string is shared, presupposing it is both large and fast
   @inline(__always)
-  internal var largeFastIsShared: Bool { return !largeFastIsTailAllocated }
+  internal var largeFastIsShared: Bool { !largeFastIsTailAllocated }
 
   // Whether this string is a lazily-bridged NSString, presupposing it is large
   @inline(__always)
@@ -473,7 +469,7 @@ extension _StringObject {
   @_alwaysEmitIntoClient
   @inline(__always)
   internal var isPreferredRepresentation: Bool {
-    return _fastPath(isSmall || _countAndFlags.isTailAllocated)
+    _fastPath(isSmall || _countAndFlags.isTailAllocated)
   }
 }
 
@@ -534,7 +530,7 @@ extension _StringObject {
 
   @inlinable
   internal static func getSmallCount(fromRaw x: UInt64) -> Int {
-    return Int(truncatingIfNeeded: (x & 0x0F00_0000_0000_0000) &>> 56)
+    Int(truncatingIfNeeded: (x & 0x0F00_0000_0000_0000) &>> 56)
   }
 
   @inlinable @inline(__always)
@@ -545,7 +541,7 @@ extension _StringObject {
 
   @inlinable
   internal static func getSmallIsASCII(fromRaw x: UInt64) -> Bool {
-    return x & 0x4000_0000_0000_0000 != 0
+    x & 0x4000_0000_0000_0000 != 0
   }
   @inlinable @inline(__always)
   internal var smallIsASCII: Bool {
@@ -617,26 +613,22 @@ extension _StringObject {
 */
 extension _StringObject.CountAndFlags {
   @inlinable @inline(__always)
-  internal static var countMask: UInt64 { return 0x0000_FFFF_FFFF_FFFF }
+  internal static var countMask: UInt64 { 0x0000_FFFF_FFFF_FFFF }
 
   @inlinable @inline(__always)
-  internal static var flagsMask: UInt64 { return ~countMask }
+  internal static var flagsMask: UInt64 { ~countMask }
 
   @inlinable @inline(__always)
-  internal static var isASCIIMask: UInt64 { return 0x8000_0000_0000_0000 }
+  internal static var isASCIIMask: UInt64 { 0x8000_0000_0000_0000 }
 
   @inlinable @inline(__always)
-  internal static var isNFCMask: UInt64 { return 0x4000_0000_0000_0000 }
+  internal static var isNFCMask: UInt64 { 0x4000_0000_0000_0000 }
 
   @inlinable @inline(__always)
-  internal static var isNativelyStoredMask: UInt64 {
-    return 0x2000_0000_0000_0000
-  }
+  internal static var isNativelyStoredMask: UInt64 { 0x2000_0000_0000_0000 }
 
   @inlinable @inline(__always)
-  internal static var isTailAllocatedMask: UInt64 {
-    return 0x1000_0000_0000_0000
-  }
+  internal static var isTailAllocatedMask: UInt64 { 0x1000_0000_0000_0000 }
 
   // General purpose bottom initializer
   @inlinable @inline(__always)
@@ -724,30 +716,28 @@ extension _StringObject.CountAndFlags {
 
   @inlinable @inline(__always)
   internal var count: Int {
-    return Int(
+    Int(
       truncatingIfNeeded: _storage & _StringObject.CountAndFlags.countMask)
   }
 
   @inlinable @inline(__always)
-  internal var flags: UInt16 {
-    return UInt16(truncatingIfNeeded: _storage &>> 48)
-  }
+  internal var flags: UInt16 { UInt16(truncatingIfNeeded: _storage &>> 48) }
 
   @inlinable @inline(__always)
   internal var isASCII: Bool {
-    return 0 != _storage & _StringObject.CountAndFlags.isASCIIMask
+    0 != _storage & _StringObject.CountAndFlags.isASCIIMask
   }
   @inlinable @inline(__always)
   internal var isNFC: Bool {
-    return 0 != _storage & _StringObject.CountAndFlags.isNFCMask
+    0 != _storage & _StringObject.CountAndFlags.isNFCMask
   }
   @inlinable @inline(__always)
   internal var isNativelyStored: Bool {
-    return 0 != _storage & _StringObject.CountAndFlags.isNativelyStoredMask
+    0 != _storage & _StringObject.CountAndFlags.isNativelyStoredMask
   }
   @inlinable @inline(__always)
   internal var isTailAllocated: Bool {
-    return 0 != _storage & _StringObject.CountAndFlags.isTailAllocatedMask
+    0 != _storage & _StringObject.CountAndFlags.isTailAllocatedMask
   }
 
   #if !INTERNAL_CHECKS_ENABLED
@@ -864,7 +854,7 @@ extension _StringObject {
   //
   // TODO(String micro-performance): Check generated code
   @inlinable @inline(__always)
-  internal var count: Int { return isSmall ? smallCount : largeCount }
+  internal var count: Int { isSmall ? smallCount : largeCount }
 
   //
   // Whether the string is all ASCII
@@ -902,7 +892,7 @@ extension _StringObject {
   internal var hasObjCBridgeableObject: Bool {
     @_effects(releasenone) get {
       // Currently, all mortal objects can zero-cost bridge
-      return !self.isImmortal
+      !self.isImmortal
     }
   }
 

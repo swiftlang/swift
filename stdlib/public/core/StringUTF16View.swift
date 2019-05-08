@@ -129,14 +129,14 @@ extension String.UTF16View: BidirectionalCollection {
   /// The position of the first code unit if the `String` is
   /// nonempty; identical to `endIndex` otherwise.
   @inlinable @inline(__always)
-  public var startIndex: Index { return _guts.startIndex }
+  public var startIndex: Index { _guts.startIndex }
 
   /// The "past the end" position---that is, the position one greater than
   /// the last valid subscript argument.
   ///
   /// In an empty UTF-16 view, `endIndex` is equal to `startIndex`.
   @inlinable @inline(__always)
-  public var endIndex: Index { return _guts.endIndex }
+  public var endIndex: Index { _guts.endIndex }
 
   @inlinable @inline(__always)
   public func index(after i: Index) -> Index {
@@ -301,20 +301,18 @@ extension String.UTF16View {
     }
   }
   @inlinable
-  public __consuming func makeIterator() -> Iterator {
-    return Iterator(_guts)
-  }
+  public __consuming func makeIterator() -> Iterator { Iterator(_guts) }
 }
 
 
 extension String.UTF16View: CustomStringConvertible {
   @inlinable @inline(__always)
-  public var description: String { return String(_guts) }
+  public var description: String { String(_guts) }
 }
 
 extension String.UTF16View: CustomDebugStringConvertible {
   public var debugDescription: String {
-    return "StringUTF16(\(self.description.debugDescription))"
+    "StringUTF16(\(self.description.debugDescription))"
   }
 }
 
@@ -322,7 +320,7 @@ extension String {
   /// A UTF-16 encoding of `self`.
   @inlinable
   public var utf16: UTF16View {
-    @inline(__always) get { return UTF16View(_guts) }
+    @inline(__always) get { UTF16View(_guts) }
     @inline(__always) set { self = String(newValue._guts) }
   }
 
@@ -399,16 +397,14 @@ extension String.UTF16View.Index {
   public func samePosition(
     in unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarIndex? {
-    return String.UnicodeScalarIndex(self, within: unicodeScalars)
+    String.UnicodeScalarIndex(self, within: unicodeScalars)
   }
 }
 
 // Reflection
 extension String.UTF16View : CustomReflectable {
   /// Returns a mirror that reflects the UTF-16 view of a string.
-  public var customMirror: Mirror {
-    return Mirror(self, unlabeledChildren: self)
-  }
+  public var customMirror: Mirror { Mirror(self, unlabeledChildren: self) }
 }
 
 // Slicing
@@ -416,7 +412,7 @@ extension String.UTF16View {
   public typealias SubSequence = Substring.UTF16View
 
   public subscript(r: Range<Index>) -> Substring.UTF16View {
-    return Substring.UTF16View(self, _bounds: r)
+    Substring.UTF16View(self, _bounds: r)
   }
 }
 
@@ -493,7 +489,7 @@ extension String.Index {
 extension String.UTF16View {
   // A simple heuristic we can always tweak later. Not needed for correctness
   @inlinable @inline(__always)
-  internal var _shortHeuristic: Int { return 32 }
+  internal var _shortHeuristic: Int { 32 }
 
   @usableFromInline
   @_effects(releasenone)

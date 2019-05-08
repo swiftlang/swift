@@ -62,16 +62,15 @@ internal final class _StringBreadcrumbs {
 }
 
 extension _StringBreadcrumbs {
-  var stride: Int {
-    @inline(__always) get { return _StringBreadcrumbs.breadcrumbStride }
-  }
+  @inline(__always)
+  var stride: Int { _StringBreadcrumbs.breadcrumbStride }
 
   // Fetch the lower-bound index corresponding to the given offset, returning
   // the index and the remaining offset to adjust
   internal func getBreadcrumb(
     forOffset offset: Int
   ) -> (lowerBound: String.Index, remaining: Int) {
-    return (crumbs[offset / stride], offset % stride)
+    (crumbs[offset / stride], offset % stride)
   }
 
   // Fetch the lower-bound offset corresponding to the given index, returning

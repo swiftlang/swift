@@ -44,10 +44,8 @@ extension String {
   }
 
   /// A Boolean value indicating whether a string has no characters.
-  @inlinable
-  public var isEmpty: Bool {
-    @inline(__always) get { return _guts.isEmpty }
-  }
+  @inlinable @inline(__always)
+  public var isEmpty: Bool { _guts.isEmpty }
 }
 
 extension StringProtocol {
@@ -82,7 +80,7 @@ extension StringProtocol {
   /// - Returns: `true` if the string begins with `prefix`; otherwise, `false`.
   @inlinable
   public func hasPrefix<Prefix: StringProtocol>(_ prefix: Prefix) -> Bool {
-    return self.starts(with: prefix)
+    self.starts(with: prefix)
   }
 
   /// Returns a Boolean value indicating whether the string ends with the
@@ -116,7 +114,7 @@ extension StringProtocol {
   /// - Returns: `true` if the string ends with `suffix`; otherwise, `false`.
   @inlinable
   public func hasSuffix<Suffix: StringProtocol>(_ suffix: Suffix) -> Bool {
-    return self.reversed().starts(with: suffix.reversed())
+    self.reversed().starts(with: suffix.reversed())
   }
 }
 

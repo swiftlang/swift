@@ -20,26 +20,24 @@ extension Unicode.ASCII : Unicode.Encoding {
 
   @inlinable
   public static var encodedReplacementCharacter : EncodedScalar {
-    return EncodedScalar(0x1a) // U+001A SUBSTITUTE; best we can do for ASCII
+    EncodedScalar(0x1a) // U+001A SUBSTITUTE; best we can do for ASCII
   }
 
   /// Returns whether the given code unit represents an ASCII scalar
   @_alwaysEmitIntoClient
-  public static func isASCII(_ x: CodeUnit) -> Bool { return UTF8.isASCII(x) }
+  public static func isASCII(_ x: CodeUnit) -> Bool { UTF8.isASCII(x) }
 
   @inline(__always)
   @inlinable
-  public static func _isScalar(_ x: CodeUnit) -> Bool {
-    return true
-  }
+  public static func _isScalar(_ x: CodeUnit) -> Bool { true }
 
   @inline(__always)
   @inlinable
   public static func decode(_ source: EncodedScalar) -> Unicode.Scalar {
-    return Unicode.Scalar(_unchecked: UInt32(
+    Unicode.Scalar(_unchecked: UInt32(
         source.first._unsafelyUnwrappedUnchecked))
   }
-  
+
   @inline(__always)
   @inlinable
   public static func encode(
@@ -73,7 +71,7 @@ extension Unicode.ASCII : Unicode.Encoding {
     @inlinable
     public init() { }
   }
-  
+
   public typealias ForwardParser = Parser
   public typealias ReverseParser = Parser
 }

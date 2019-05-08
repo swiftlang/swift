@@ -133,7 +133,7 @@ extension String.Index {
   public func samePosition(
     in utf8: String.UTF8View
   ) -> String.UTF8View.Index? {
-    return String.UTF8View.Index(self, within: utf8)
+    String.UTF8View.Index(self, within: utf8)
   }
 
   /// Returns the position in the given UTF-16 view that corresponds exactly to
@@ -161,7 +161,7 @@ extension String.Index {
   public func samePosition(
     in utf16: String.UTF16View
   ) -> String.UTF16View.Index? {
-    return String.UTF16View.Index(self, within: utf16)
+    String.UTF16View.Index(self, within: utf16)
   }
 }
 

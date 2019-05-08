@@ -33,17 +33,17 @@ internal struct _SmallString {
   internal var _storage: RawBitPattern
 
   @inlinable @inline(__always)
-  internal var rawBits: RawBitPattern { return _storage }
+  internal var rawBits: RawBitPattern { _storage }
 
   @inlinable
   internal var leadingRawBits: UInt64 {
-    @inline(__always) get { return _storage.0 }
+    @inline(__always) get { _storage.0 }
     @inline(__always) set { _storage.0 = newValue }
   }
 
   @inlinable
   internal var trailingRawBits: UInt64 {
-    @inline(__always) get { return _storage.1 }
+    @inline(__always) get { _storage.1 }
     @inline(__always) set { _storage.1 = newValue }
   }
 
@@ -88,23 +88,23 @@ extension _SmallString {
   @inlinable @inline(__always)
   internal var rawDiscriminatedObject: UInt64 {
     // Reverse the bytes on big-endian systems.
-    return _storage.1.littleEndian
+    _storage.1.littleEndian
   }
 
   @inlinable @inline(__always)
-  internal var capacity: Int { return _SmallString.capacity }
+  internal var capacity: Int { _SmallString.capacity }
 
   @inlinable @inline(__always)
   internal var count: Int {
-    return _StringObject.getSmallCount(fromRaw: rawDiscriminatedObject)
+    _StringObject.getSmallCount(fromRaw: rawDiscriminatedObject)
   }
 
   @inlinable @inline(__always)
-  internal var unusedCapacity: Int { return capacity &- count }
+  internal var unusedCapacity: Int { capacity &- count }
 
   @inlinable @inline(__always)
   internal var isASCII: Bool {
-    return _StringObject.getSmallIsASCII(fromRaw: rawDiscriminatedObject)
+    _StringObject.getSmallIsASCII(fromRaw: rawDiscriminatedObject)
   }
 
   // Give raw, nul-terminated code units. This is only for limited internal
@@ -157,10 +157,10 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
   internal typealias SubSequence = _SmallString
 
   @inlinable @inline(__always)
-  internal var startIndex: Int { return 0 }
+  internal var startIndex: Int { 0 }
 
   @inlinable @inline(__always)
-  internal var endIndex: Int { return count }
+  internal var endIndex: Int { count }
 
   @inlinable
   internal subscript(_ idx: Int) -> UInt8 {
@@ -185,7 +185,7 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
   @inlinable  @inline(__always)
   internal subscript(_ bounds: Range<Index>) -> SubSequence {
     // TODO(String performance): In-vector-register operation
-    return self.withUTF8 { utf8 in
+    self.withUTF8 { utf8 in
       let rebased = UnsafeBufferPointer(rebasing: utf8[bounds])
       return _SmallString(rebased)._unsafelyUnwrappedUnchecked
     }

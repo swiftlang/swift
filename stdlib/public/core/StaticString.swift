@@ -97,9 +97,7 @@ public struct StaticString
   /// A Boolean value indicating whether the static string stores a pointer to
   /// ASCII or UTF-8 code units.
   @_transparent
-  public var hasPointerRepresentation: Bool {
-    return (UInt8(_flags) & 0x1) == 0
-  }
+  public var hasPointerRepresentation: Bool { (UInt8(_flags) & 0x1) == 0 }
 
   /// A Boolean value that is `true` if the static string stores a pointer to
   /// ASCII code units.
@@ -111,9 +109,7 @@ public struct StaticString
   /// - Warning: If the static string stores a single Unicode scalar value, the
   ///   value of `isASCII` is unspecified.
   @_transparent
-  public var isASCII: Bool {
-    return (UInt8(_flags) & 0x2) != 0
-  }
+  public var isASCII: Bool { (UInt8(_flags) & 0x2) != 0 }
 
   /// Invokes the given closure with a buffer containing the static string's
   /// UTF-8 code unit sequence.
@@ -253,17 +249,13 @@ public struct StaticString
 
   /// A string representation of the static string.
   public var description: String {
-    return withUTF8Buffer { String._uncheckedFromUTF8($0) }
+    withUTF8Buffer { String._uncheckedFromUTF8($0) }
   }
 
   /// A textual representation of the static string, suitable for debugging.
-  public var debugDescription: String {
-    return self.description.debugDescription
-  }
+  public var debugDescription: String { self.description.debugDescription }
 }
 
 extension StaticString {
-  public var customMirror: Mirror {
-    return Mirror(reflecting: description)
-  }
+  public var customMirror: Mirror { Mirror(reflecting: description) }
 }

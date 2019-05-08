@@ -595,7 +595,7 @@ extension Sequence where Element: StringProtocol {
   @_specialize(where Self == Array<Substring>)
   @_specialize(where Self == Array<String>)
   public func joined(separator: String = "") -> String {
-    return _joined(separator: separator)
+    _joined(separator: separator)
   }
 
   @inline(__always) // Pick up @_specialize and devirtualize from two callers
@@ -645,7 +645,7 @@ extension BidirectionalCollection where Element == String {
   /// - Returns: A single, concatenated string.
   @_specialize(where Self == Array<String>)
   public func joined(separator: String = "") -> String {
-    return _joined(separator: separator)
+    _joined(separator: separator)
   }
 }
 
@@ -836,7 +836,7 @@ extension String: CustomStringConvertible {
   /// Using this property directly is discouraged. Instead, use simple
   /// assignment to create a new constant or variable equal to this string.
   @inlinable
-  public var description: String { return self }
+  public var description: String { self }
 }
 
 extension String {
@@ -889,12 +889,12 @@ extension _StringGutsSlice {
     var outputBuffer = outputBuffer
     var icuInputBuffer = icuInputBuffer
     var icuOutputBuffer = icuOutputBuffer
-  
+
     var index = range.lowerBound
     let cachedEndIndex = range.upperBound
-  
+
     var hasBufferOwnership = false
-    
+
     defer {
       if hasBufferOwnership {
         outputBuffer.deallocate()
@@ -902,7 +902,7 @@ extension _StringGutsSlice {
         icuOutputBuffer.deallocate()
       }
     }
-    
+
     while index < cachedEndIndex {
       let result = _foreignNormalize(
         readIndex: index,
@@ -938,9 +938,9 @@ internal func _fastWithNormalizedCodeUnitsImpl(
 
   var index = String.Index(_encodedOffset: 0)
   let cachedEndIndex = String.Index(_encodedOffset: sourceBuffer.count)
-  
+
   var hasBufferOwnership = false
-  
+
   defer {
     if hasBufferOwnership {
       outputBuffer.deallocate()
@@ -948,7 +948,7 @@ internal func _fastWithNormalizedCodeUnitsImpl(
       icuOutputBuffer.deallocate()
     }
   }
-  
+
   while index < cachedEndIndex {
     let result = _fastNormalize(
       readIndex: index,

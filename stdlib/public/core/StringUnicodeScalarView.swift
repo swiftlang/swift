@@ -92,14 +92,14 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   ///
   /// If the string is empty, `startIndex` is equal to `endIndex`.
   @inlinable @inline(__always)
-  public var startIndex: Index { return _guts.startIndex }
+  public var startIndex: Index { _guts.startIndex }
 
   /// The "past the end" position---that is, the position one greater than
   /// the last valid subscript argument.
   ///
   /// In an empty Unicode scalars view, `endIndex` is equal to `startIndex`.
   @inlinable @inline(__always)
-  public var endIndex: Index { return _guts.endIndex }
+  public var endIndex: Index { _guts.endIndex }
 
   /// Returns the next consecutive location after `i`.
   ///
@@ -127,7 +127,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
 
     if _fastPath(_guts.isFastUTF8) {
       let len = _guts.withFastUTF8 { utf8 -> Int in
-        return _utf8ScalarLength(utf8, endingAt: i._encodedOffset)
+        _utf8ScalarLength(utf8, endingAt: i._encodedOffset)
       }
       _internalInvariant(len <= 4, "invalid UTF8")
       return i.encoded(offsetBy: -len)
@@ -189,19 +189,17 @@ extension String.UnicodeScalarView {
     }
   }
   @inlinable
-  public __consuming func makeIterator() -> Iterator {
-    return Iterator(_guts)
-  }
+  public __consuming func makeIterator() -> Iterator { Iterator(_guts) }
 }
 
 extension String.UnicodeScalarView: CustomStringConvertible {
  @inlinable @inline(__always)
- public var description: String { return String(_guts) }
+ public var description: String { String(_guts) }
 }
 
 extension String.UnicodeScalarView: CustomDebugStringConvertible {
  public var debugDescription: String {
-   return "StringUnicodeScalarView(\(self.description.debugDescription))"
+   "StringUnicodeScalarView(\(self.description.debugDescription))"
  }
 }
 
@@ -234,7 +232,7 @@ extension String {
   /// The string's value represented as a collection of Unicode scalar values.
   @inlinable
   public var unicodeScalars: UnicodeScalarView {
-    @inline(__always) get { return UnicodeScalarView(_guts) }
+    @inline(__always) get { UnicodeScalarView(_guts) }
     @inline(__always) set { _guts = newValue._guts }
   }
 }
@@ -371,16 +369,14 @@ extension String.UnicodeScalarIndex {
   ///   an attempt to convert the position of a UTF-8 continuation byte
   ///   returns `nil`.
   public func samePosition(in characters: String) -> String.Index? {
-    return String.Index(self, within: characters)
+    String.Index(self, within: characters)
   }
 }
 
 // Reflection
 extension String.UnicodeScalarView : CustomReflectable {
   /// Returns a mirror that reflects the Unicode scalars view of a string.
-  public var customMirror: Mirror {
-    return Mirror(self, unlabeledChildren: self)
-  }
+  public var customMirror: Mirror { Mirror(self, unlabeledChildren: self) }
 }
 
 

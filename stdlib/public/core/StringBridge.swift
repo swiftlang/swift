@@ -35,7 +35,7 @@ internal func _stdlib_binary_CFStringCreateCopy(
 internal func _stdlib_binary_CFStringGetLength(
   _ source: _CocoaString
 ) -> Int {
-  return _swift_stdlib_CFStringGetLength(source)
+  _swift_stdlib_CFStringGetLength(source)
 }
 
 @usableFromInline // @testable
@@ -43,7 +43,7 @@ internal func _stdlib_binary_CFStringGetLength(
 internal func _stdlib_binary_CFStringGetCharactersPtr(
   _ source: _CocoaString
 ) -> UnsafeMutablePointer<UTF16.CodeUnit>? {
-  return UnsafeMutablePointer(
+  UnsafeMutablePointer(
     mutating: _swift_stdlib_CFStringGetCharactersPtr(source))
 }
 
@@ -103,14 +103,14 @@ internal func _cocoaStringCompare(
 internal func _cocoaHashString(
   _ string: _CocoaString
 ) -> UInt {
-  return _swift_stdlib_CFStringHashNSString(string)
+  _swift_stdlib_CFStringHashNSString(string)
 }
 
 @_effects(readonly)
 internal func _cocoaHashASCIIBytes(
   _ bytes: UnsafePointer<UInt8>, length: Int
 ) -> UInt {
-  return _swift_stdlib_CFStringHashCString(bytes, length)
+  _swift_stdlib_CFStringHashCString(bytes, length)
 }
 
 // These "trampolines" are effectively objc_msgSend_super.
@@ -120,7 +120,7 @@ internal func _cocoaHashASCIIBytes(
 internal func _cocoaCStringUsingEncodingTrampoline(
   _ string: _CocoaString, _ encoding: UInt
 ) -> UnsafePointer<UInt8>? {
-  return _swift_stdlib_NSStringCStringUsingEncodingTrampoline(string, encoding)
+  _swift_stdlib_NSStringCStringUsingEncodingTrampoline(string, encoding)
 }
 
 @_effects(releasenone)
@@ -130,7 +130,7 @@ internal func _cocoaGetCStringTrampoline(
   _ maxLength: Int,
   _ encoding: UInt
 ) -> Int8 {
-  return Int8(_swift_stdlib_NSStringGetCStringTrampoline(
+  Int8(_swift_stdlib_NSStringGetCStringTrampoline(
     string, buffer, maxLength, encoding))
 }
 
@@ -138,13 +138,11 @@ internal func _cocoaGetCStringTrampoline(
 // Conversion from NSString to Swift's native representation.
 //
 
-private var kCFStringEncodingASCII : _swift_shims_CFStringEncoding {
-  @inline(__always) get { return 0x0600 }
-}
+@inline(__always)
+private var kCFStringEncodingASCII : _swift_shims_CFStringEncoding { 0x0600 }
 
-private var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
-  @inline(__always) get { return 0x8000100 }
-}
+@inline(__always)
+private var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding { 0x8000100 }
 
 internal enum _KnownCocoaString {
   case storage
@@ -153,17 +151,17 @@ internal enum _KnownCocoaString {
 #if !(arch(i386) || arch(arm))
   case tagged
 #endif
-  
+
   @inline(__always)
   init(_ str: _CocoaString) {
-    
+
 #if !(arch(i386) || arch(arm))
     if _isObjCTaggedPointer(str) {
       self = .tagged
       return
     }
 #endif
-    
+
     switch unsafeBitCast(_swift_classOfObjCHeapObject(str), to: UInt.self) {
     case unsafeBitCast(__StringStorage.self, to: UInt.self):
       self = .storage
@@ -252,13 +250,13 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
     //   3) If it's mutable with associated information, must make the call
     let immutableCopy
       = _stdlib_binary_CFStringCreateCopy(cocoaString) as AnyObject
-    
+
 #if !(arch(i386) || arch(arm))
     if _isObjCTaggedPointer(immutableCopy) {
       return _StringGuts(_SmallString(taggedCocoa: immutableCopy))
     }
 #endif
-    
+
     let (fastUTF8, isASCII): (Bool, Bool)
     switch _getCocoaStringPointer(immutableCopy) {
     case .ascii(_): (fastUTF8, isASCII) = (true, true)
@@ -266,7 +264,7 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
     default:  (fastUTF8, isASCII) = (false, false)
     }
     let length = _stdlib_binary_CFStringGetLength(immutableCopy)
-    
+
     return _StringGuts(
       cocoa: immutableCopy,
       providesFastUTF8: fastUTF8,
@@ -288,7 +286,7 @@ private func _createCFString(
   _ count: Int,
   _ encoding: UInt32
 ) -> AnyObject {
-  return _swift_stdlib_CFStringCreateWithBytes(
+  _swift_stdlib_CFStringCreateWithBytes(
     nil, //ignored in the shim for perf reasons
     ptr,
     count,
@@ -342,7 +340,7 @@ class __SwiftNativeNSString {
 // as an NSString.
 @_silgen_name("swift_stdlib_getDescription")
 public func _getDescription<T>(_ x: T) -> AnyObject {
-  return String(reflecting: x)._bridgeToObjectiveCImpl()
+  String(reflecting: x)._bridgeToObjectiveCImpl()
 }
 
 #else // !_runtime(_ObjC)
@@ -361,14 +359,14 @@ extension StringProtocol {
   @_specialize(where Self == Substring)
   public // SPI(Foundation)
   func _toUTF16Offset(_ idx: Index) -> Int {
-    return self.utf16.distance(from: self.utf16.startIndex, to: idx)
+    self.utf16.distance(from: self.utf16.startIndex, to: idx)
   }
 
   @_specialize(where Self == String)
   @_specialize(where Self == Substring)
   public // SPI(Foundation)
   func _toUTF16Index(_ offset: Int) -> Index {
-    return self.utf16.index(self.utf16.startIndex, offsetBy: offset)
+    self.utf16.index(self.utf16.startIndex, offsetBy: offset)
   }
 
   @_specialize(where Self == String)

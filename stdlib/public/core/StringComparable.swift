@@ -20,7 +20,7 @@ extension StringProtocol {
   @_specialize(where Self == Substring, RHS == Substring)
   @_effects(readonly)
   public static func == <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
-    return _stringCompare(
+    _stringCompare(
       lhs._wholeGuts, lhs._offsetRange,
       rhs._wholeGuts, rhs._offsetRange,
       expecting: .equal)
@@ -29,7 +29,7 @@ extension StringProtocol {
   @inlinable @inline(__always) // forward to other operator
   @_effects(readonly)
   public static func != <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
-    return !(lhs == rhs)
+    !(lhs == rhs)
   }
 
   @inlinable
@@ -39,7 +39,7 @@ extension StringProtocol {
   @_specialize(where Self == Substring, RHS == Substring)
   @_effects(readonly)
   public static func < <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
-    return _stringCompare(
+    _stringCompare(
       lhs._wholeGuts, lhs._offsetRange,
       rhs._wholeGuts, rhs._offsetRange,
       expecting: .less)
@@ -48,19 +48,19 @@ extension StringProtocol {
   @inlinable @inline(__always) // forward to other operator
   @_effects(readonly)
   public static func > <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
-    return rhs < lhs
+    rhs < lhs
   }
 
   @inlinable @inline(__always) // forward to other operator
   @_effects(readonly)
   public static func <= <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
-    return !(rhs < lhs)
+    !(rhs < lhs)
   }
 
   @inlinable @inline(__always) // forward to other operator
   @_effects(readonly)
   public static func >= <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
-    return !(lhs < rhs)
+    !(lhs < rhs)
   }
 }
 
@@ -69,7 +69,7 @@ extension String : Equatable {
   @_effects(readonly)
   @_semantics("string.equals")
   public static func == (lhs: String, rhs: String) -> Bool {
-    return _stringCompare(lhs._guts, rhs._guts, expecting: .equal)
+    _stringCompare(lhs._guts, rhs._guts, expecting: .equal)
   }
 }
 
@@ -77,7 +77,7 @@ extension String : Comparable {
   @inlinable @inline(__always) // For the bitwise comparision
   @_effects(readonly)
   public static func < (lhs: String, rhs: String) -> Bool {
-    return _stringCompare(lhs._guts, rhs._guts, expecting: .less)
+    _stringCompare(lhs._guts, rhs._guts, expecting: .less)
   }
 }
 

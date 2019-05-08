@@ -29,7 +29,7 @@ internal let _cocoaUTF8Encoding:UInt = 4 /* NSUTF8StringEncoding */
 
 @_effects(readonly)
 private func _isNSString(_ str:AnyObject) -> UInt8 {
-  return _swift_stdlib_isNSString(str)
+  _swift_stdlib_isNSString(str)
 }
 
 #else
@@ -143,9 +143,9 @@ extension _AbstractStringStorage {
       // one of ours.
 
       defer { _fixLifetime(other) }
-      
+
       let otherUTF16Length = _stdlib_binary_CFStringGetLength(other)
-      
+
       // CFString will only give us ASCII bytes here, but that's fine.
       // We already handled non-ASCII UTF8 strings earlier since they're Swift.
       if let otherStart = _cocoaUTF8Pointer(other) {
@@ -156,11 +156,11 @@ extension _AbstractStringStorage {
         return (start == otherStart ||
           (memcmp(start, otherStart, count) == 0)) ? 1 : 0
       }
-      
+
       if UTF16Length != otherUTF16Length {
         return 0
       }
-      
+
       /*
        The abstract implementation of -isEqualToString: falls back to -compare:
        immediately, so when we run out of fast options to try, do the same.
@@ -195,11 +195,11 @@ final internal class __StringStorage
   internal var _reserved: UInt16
 
   @inline(__always)
-  internal var count: Int { return _count }
+  internal var count: Int { _count }
 
   @inline(__always)
   internal var _countAndFlags: _StringObject.CountAndFlags {
-    return CountAndFlags(count: _count, flags: _flags)
+    CountAndFlags(count: _count, flags: _flags)
   }
 #else
   // The capacity of our allocation. Note that this includes the nul-terminator,
@@ -208,23 +208,23 @@ final internal class __StringStorage
   internal var _countAndFlags: _StringObject.CountAndFlags
 
   @inline(__always)
-  internal var count: Int { return _countAndFlags.count }
+  internal var count: Int { _countAndFlags.count }
 
   // The total allocated storage capacity. Note that this includes the required
   // nul-terminator.
   @inline(__always)
   internal var _realCapacity: Int {
-    return Int(truncatingIfNeeded:
+    Int(truncatingIfNeeded:
       _realCapacityAndFlags & CountAndFlags.countMask)
   }
 #endif
 
   @inline(__always)
-  final internal var isASCII: Bool { return _countAndFlags.isASCII }
+  final internal var isASCII: Bool { _countAndFlags.isASCII }
 
   final internal var asString: String {
     @_effects(readonly) @inline(__always) get {
-      return String(_StringGuts(self))
+      String(_StringGuts(self))
     }
   }
 
@@ -233,7 +233,7 @@ final internal class __StringStorage
   @objc(length)
   final internal var UTF16Length: Int {
     @_effects(readonly) @inline(__always) get {
-      return asString.utf16.count // UTF16View special-cases ASCII for us.
+      asString.utf16.count // UTF16View special-cases ASCII for us.
     }
   }
 
@@ -275,14 +275,12 @@ final internal class __StringStorage
 
   @objc(UTF8String)
   @_effects(readonly)
-  final internal func _utf8String() -> UnsafePointer<UInt8>? {
-    return start
-  }
+  final internal func _utf8String() -> UnsafePointer<UInt8>? { start }
 
   @objc(cStringUsingEncoding:)
   @_effects(readonly)
   final internal func cString(encoding: UInt) -> UnsafePointer<UInt8>? {
-    return _cString(encoding: encoding)
+    _cString(encoding: encoding)
   }
 
   @objc(getCString:maxLength:encoding:)
@@ -290,7 +288,7 @@ final internal class __StringStorage
   final internal func getCString(
     _ outputPtr: UnsafeMutablePointer<UInt8>, maxLength: Int, encoding: UInt
   ) -> Int8 {
-    return _getCString(outputPtr, maxLength, encoding)
+    _getCString(outputPtr, maxLength, encoding)
   }
 
   @objc
@@ -306,7 +304,7 @@ final internal class __StringStorage
   @objc(isEqualToString:)
   @_effects(readonly)
   final internal func isEqual(to other: AnyObject?) -> Int8 {
-    return _isEqual(other)
+    _isEqual(other)
   }
 
   @objc(copyWithZone:)
@@ -315,7 +313,7 @@ final internal class __StringStorage
     // mutations may only occur when instances are uniquely referenced.
     // Therefore, it is safe to return self here; any outstanding Objective-C
     // reference will make the instance non-unique.
-    return self
+    self
   }
 
 #endif // _runtime(_ObjC)
@@ -431,32 +429,24 @@ extension __StringStorage {
 extension __StringStorage {
   @inline(__always)
   private var mutableStart: UnsafeMutablePointer<UInt8> {
-    return UnsafeMutablePointer(Builtin.projectTailElems(self, UInt8.self))
+    UnsafeMutablePointer(Builtin.projectTailElems(self, UInt8.self))
   }
   @inline(__always)
-  private var mutableEnd: UnsafeMutablePointer<UInt8> {
-     return mutableStart + count
-  }
+  private var mutableEnd: UnsafeMutablePointer<UInt8> { mutableStart + count }
 
   @inline(__always)
-  internal var start: UnsafePointer<UInt8> {
-     return UnsafePointer(mutableStart)
-  }
+  internal var start: UnsafePointer<UInt8> { UnsafePointer(mutableStart) }
 
   @inline(__always)
-  private final var end: UnsafePointer<UInt8> {
-    return UnsafePointer(mutableEnd)
-  }
+  private final var end: UnsafePointer<UInt8> { UnsafePointer(mutableEnd) }
 
   // Point to the nul-terminator.
   @inline(__always)
-  private final var terminator: UnsafeMutablePointer<UInt8> {
-    return mutableEnd
-  }
+  private final var terminator: UnsafeMutablePointer<UInt8> { mutableEnd }
 
   @inline(__always)
   private var codeUnits: UnsafeBufferPointer<UInt8> {
-    return UnsafeBufferPointer(start: start, count: count)
+    UnsafeBufferPointer(start: start, count: count)
   }
 
   // @opaque
@@ -471,9 +461,7 @@ extension __StringStorage {
 
   // The total capacity available for code units. Note that this excludes the
   // required nul-terminator.
-  internal var capacity: Int {
-    return _realCapacity &- 1
-  }
+  internal var capacity: Int { _realCapacity &- 1 }
 
   // The unused capacity available for appending. Note that this excludes the
   // required nul-terminator.
@@ -481,13 +469,13 @@ extension __StringStorage {
   // NOTE: Callers who wish to mutate this storage should enfore nul-termination
   @inline(__always)
   private var unusedStorage: UnsafeMutableBufferPointer<UInt8> {
-    return UnsafeMutableBufferPointer(
+    UnsafeMutableBufferPointer(
       start: mutableEnd, count: unusedCapacity)
   }
 
   // The capacity available for appending. Note that this excludes the required
   // nul-terminator.
-  internal var unusedCapacity: Int { return _realCapacity &- count &- 1 }
+  internal var unusedCapacity: Int { _realCapacity &- count &- 1 }
 
   #if !INTERNAL_CHECKS_ENABLED
   @inline(__always) internal func _invariantCheck() {}
@@ -673,7 +661,7 @@ final internal class __SharedStringStorage
 
   @inline(__always)
   internal var _countAndFlags: _StringObject.CountAndFlags {
-    return CountAndFlags(count: _count, flags: _flags)
+    CountAndFlags(count: _count, flags: _flags)
   }
 #else
   internal var _countAndFlags: _StringObject.CountAndFlags
@@ -681,7 +669,7 @@ final internal class __SharedStringStorage
 
   internal var _breadcrumbs: _StringBreadcrumbs? = nil
 
-  internal var count: Int { return _countAndFlags.count }
+  internal var count: Int { _countAndFlags.count }
 
   internal init(
     immortal ptr: UnsafePointer<UInt8>,
@@ -700,11 +688,11 @@ final internal class __SharedStringStorage
   }
 
   @inline(__always)
-  final internal var isASCII: Bool { return _countAndFlags.isASCII }
+  final internal var isASCII: Bool { _countAndFlags.isASCII }
 
   final internal var asString: String {
     @_effects(readonly) @inline(__always) get {
-      return String(_StringGuts(self))
+      String(_StringGuts(self))
     }
   }
 
@@ -713,7 +701,7 @@ final internal class __SharedStringStorage
   @objc(length)
   final internal var UTF16Length: Int {
     @_effects(readonly) get {
-      return asString.utf16.count // UTF16View special-cases ASCII for us.
+      asString.utf16.count // UTF16View special-cases ASCII for us.
     }
   }
 
@@ -765,14 +753,12 @@ final internal class __SharedStringStorage
 
   @objc(UTF8String)
   @_effects(readonly)
-  final internal func _utf8String() -> UnsafePointer<UInt8>? {
-    return start
-  }
+  final internal func _utf8String() -> UnsafePointer<UInt8>? { start }
 
   @objc(cStringUsingEncoding:)
   @_effects(readonly)
   final internal func cString(encoding: UInt) -> UnsafePointer<UInt8>? {
-    return _cString(encoding: encoding)
+    _cString(encoding: encoding)
   }
 
   @objc(getCString:maxLength:encoding:)
@@ -780,14 +766,12 @@ final internal class __SharedStringStorage
   final internal func getCString(
     _ outputPtr: UnsafeMutablePointer<UInt8>, maxLength: Int, encoding: UInt
   ) -> Int8 {
-    return _getCString(outputPtr, maxLength, encoding)
+    _getCString(outputPtr, maxLength, encoding)
   }
 
   @objc(isEqualToString:)
   @_effects(readonly)
-  final internal func isEqual(to other:AnyObject?) -> Int8 {
-    return _isEqual(other)
-  }
+  final internal func isEqual(to other:AnyObject?) -> Int8 { _isEqual(other) }
 
   @objc(copyWithZone:)
   final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
@@ -795,7 +779,7 @@ final internal class __SharedStringStorage
     // mutations may only occur when instances are uniquely referenced.
     // Therefore, it is safe to return self here; any outstanding Objective-C
     // reference will make the instance non-unique.
-    return self
+    self
   }
 
 #endif // _runtime(_ObjC)

@@ -13,8 +13,8 @@
 import SwiftShims
 
 /// CR and LF are common special cases in grapheme breaking logic
-private var _CR: UInt8 { return 0x0d }
-private var _LF: UInt8 { return 0x0a }
+private var _CR: UInt8 { 0x0d }
+private var _LF: UInt8 { 0x0a }
 
 private func _hasGraphemeBreakBetween(
   _ lhs: Unicode.Scalar, _ rhs: Unicode.Scalar

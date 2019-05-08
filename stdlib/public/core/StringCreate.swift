@@ -91,7 +91,7 @@ extension String {
   internal static func _uncheckedFromUTF8(
     _ input: UnsafeBufferPointer<UInt8>
   ) -> String {
-    return _uncheckedFromUTF8(input, isASCII: _allASCII(input))
+    _uncheckedFromUTF8(input, isASCII: _allASCII(input))
   }
 
   @usableFromInline
@@ -176,7 +176,7 @@ extension String {
   static func _fromInvalidUTF16(
     _ utf16: UnsafeBufferPointer<UInt16>
   ) -> String {
-    return String._fromCodeUnits(utf16, encoding: UTF16.self, repair: true)!.0
+    String._fromCodeUnits(utf16, encoding: UTF16.self, repair: true)!.0
   }
 
   @usableFromInline
@@ -193,7 +193,7 @@ extension String {
   @_alwaysEmitIntoClient
   @inline(never) // slow-path
   internal static func _copying(_ str: String) -> String {
-    return String._copying(str[...])
+    String._copying(str[...])
   }
   @_alwaysEmitIntoClient
   @inline(never) // slow-path

@@ -38,9 +38,7 @@ struct _StringGuts {
 // Raw
 extension _StringGuts {
   @inlinable @inline(__always)
-  internal var rawBits: _StringObject.RawBitPattern {
-    return _object.rawBits
-  }
+  internal var rawBits: _StringObject.RawBitPattern { _object.rawBits }
 }
 
 // Creation
@@ -79,50 +77,40 @@ extension _StringGuts {
 extension _StringGuts {
   // The number of code units
   @inlinable @inline(__always)
-  internal var count: Int { return _object.count }
+  internal var count: Int { _object.count }
 
   @inlinable @inline(__always)
-  internal var isEmpty: Bool { return count == 0 }
+  internal var isEmpty: Bool { count == 0 }
 
   @inlinable @inline(__always)
-  internal var isSmall: Bool { return _object.isSmall }
+  internal var isSmall: Bool { _object.isSmall }
 
   @inline(__always)
-  internal var isSmallASCII: Bool {
-    return _object.isSmall && _object.smallIsASCII
-  }
+  internal var isSmallASCII: Bool { _object.isSmall && _object.smallIsASCII }
 
   @inlinable @inline(__always)
-  internal var asSmall: _SmallString {
-    return _SmallString(_object)
-  }
+  internal var asSmall: _SmallString { _SmallString(_object) }
 
   @inlinable @inline(__always)
-  internal var isASCII: Bool  {
-    return _object.isASCII
-  }
+  internal var isASCII: Bool  { _object.isASCII }
 
   @inlinable @inline(__always)
-  internal var isFastASCII: Bool  {
-    return isFastUTF8 && _object.isASCII
-  }
+  internal var isFastASCII: Bool  { isFastUTF8 && _object.isASCII }
 
   @inline(__always)
-  internal var isNFC: Bool { return _object.isNFC }
+  internal var isNFC: Bool { _object.isNFC }
 
   @inline(__always)
   internal var isNFCFastUTF8: Bool {
     // TODO(String micro-performance): Consider a dedicated bit for this
-    return _object.isNFC && isFastUTF8
+    _object.isNFC && isFastUTF8
   }
 
-  internal var hasNativeStorage: Bool { return _object.hasNativeStorage }
+  internal var hasNativeStorage: Bool { _object.hasNativeStorage }
 
-  internal var hasSharedStorage: Bool { return _object.hasSharedStorage }
+  internal var hasSharedStorage: Bool { _object.hasSharedStorage }
 
-  internal var hasBreadcrumbs: Bool {
-    return hasNativeStorage || hasSharedStorage
-  }
+  internal var hasBreadcrumbs: Bool { hasNativeStorage || hasSharedStorage }
 }
 
 //
@@ -130,13 +118,11 @@ extension _StringGuts {
   // Whether we can provide fast access to contiguous UTF-8 code units
   @_transparent
   @inlinable
-  internal var isFastUTF8: Bool { return _fastPath(_object.providesFastUTF8) }
+  internal var isFastUTF8: Bool { _fastPath(_object.providesFastUTF8) }
 
   // A String which does not provide fast access to contiguous UTF-8 code units
   @inlinable @inline(__always)
-  internal var isForeign: Bool {
-     return _slowPath(_object.isForeign)
-  }
+  internal var isForeign: Bool { _slowPath(_object.isForeign) }
 
   @inlinable @inline(__always)
   internal func withFastUTF8<R>(
@@ -155,8 +141,8 @@ extension _StringGuts {
     range: Range<Int>,
     _ f: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R {
-    return try self.withFastUTF8 { wholeUTF8 in
-      return try f(UnsafeBufferPointer(rebasing: wholeUTF8[range]))
+    try self.withFastUTF8 { wholeUTF8 in
+      try f(UnsafeBufferPointer(rebasing: wholeUTF8[range]))
     }
   }
 
@@ -164,7 +150,7 @@ extension _StringGuts {
   internal func withFastCChar<R>(
     _ f: (UnsafeBufferPointer<CChar>) throws -> R
   ) rethrows -> R {
-    return try self.withFastUTF8 { utf8 in
+    try self.withFastUTF8 { utf8 in
       let ptr = utf8.baseAddress._unsafelyUnwrappedUnchecked._asCChar
       return try f(UnsafeBufferPointer(start: ptr, count: utf8.count))
     }
@@ -267,33 +253,25 @@ extension _StringGuts {
   internal typealias Index = String.Index
 
   @inlinable @inline(__always)
-  internal var startIndex: String.Index {
-   return Index(_encodedOffset: 0)
-  }
+  internal var startIndex: String.Index { Index(_encodedOffset: 0) }
   @inlinable @inline(__always)
-  internal var endIndex: String.Index {
-    return Index(_encodedOffset: self.count)
-  }
+  internal var endIndex: String.Index { Index(_encodedOffset: self.count) }
 }
 
 // Old SPI(corelibs-foundation)
 extension _StringGuts {
   @available(*, deprecated)
   public // SPI(corelibs-foundation)
-  var _isContiguousASCII: Bool {
-    return !isSmall && isFastUTF8 && isASCII
-  }
+  var _isContiguousASCII: Bool { !isSmall && isFastUTF8 && isASCII }
 
   @available(*, deprecated)
   public // SPI(corelibs-foundation)
-  var _isContiguousUTF16: Bool {
-    return false
-  }
+  var _isContiguousUTF16: Bool { false }
 
   // FIXME: Remove. Still used by swift-corelibs-foundation
   @available(*, deprecated)
   public var startASCII: UnsafeMutablePointer<UInt8> {
-    return UnsafeMutablePointer(mutating: _object.fastUTF8.baseAddress!)
+    UnsafeMutablePointer(mutating: _object.fastUTF8.baseAddress!)
   }
 
   // FIXME: Remove. Still used by swift-corelibs-foundation

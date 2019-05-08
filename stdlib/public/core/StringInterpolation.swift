@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// Represents a string literal with interpolations while it is being built up.
-/// 
+///
 /// Do not create an instance of this type directly. It is used by the compiler
 /// when you create a string using string interpolation. Instead, use string
 /// interpolation to create a new string by including values, literals,
@@ -26,7 +26,7 @@
 ///                   """
 ///     print(message)
 ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
-/// 
+///
 /// When implementing an `ExpressibleByStringInterpolation` conformance,
 /// set the `StringInterpolation` associated type to
 /// `DefaultStringInterpolation` to get the same interpolation behavior as
@@ -34,15 +34,15 @@
 /// If you don't want the default behavior or don't want to construct a
 /// `String`, use a custom type conforming to `StringInterpolationProtocol`
 /// instead.
-/// 
+///
 /// Extending default string interpolation behavior
 /// ===============================================
-/// 
+///
 /// Code outside the standard library can extend string interpolation on
 /// `String` and many other common types by extending
 /// `DefaultStringInterpolation` and adding an `appendInterpolation(...)`
 /// method. For example:
-/// 
+///
 ///     extension DefaultStringInterpolation {
 ///         fileprivate mutating func appendInterpolation(
 ///                  escaped value: String, asASCII forceASCII: Bool = false) {
@@ -51,12 +51,12 @@
 ///             }
 ///         }
 ///     }
-///     
+///
 ///     print("Escaped string: \(escaped: string)")
-/// 
+///
 /// See `StringInterpolationProtocol` for details on `appendInterpolation`
 /// methods.
-/// 
+///
 /// `DefaultStringInterpolation` extensions should add only `mutating` members
 /// and should not copy `self` or capture it in an escaping closure.
 @_fixed_layout
@@ -64,10 +64,10 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   /// The string contents accumulated by this instance.
   @usableFromInline
   internal var _storage: String
-  
+
   /// Creates a string interpolation with storage pre-sized for a literal
   /// with the indicated attributes.
-  /// 
+  ///
   /// Do not call this initializer directly. It is used by the compiler when
   /// interpreting string interpolations.
   @inlinable
@@ -77,19 +77,19 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
       interpolationCount * capacityPerInterpolation
     _storage = String(_StringGuts(_initialCapacity: initialCapacity))
   }
-  
+
   /// Appends a literal segment of a string interpolation.
-  /// 
+  ///
   /// Do not call this method directly. It is used by the compiler when
   /// interpreting string interpolations.
   @inlinable
   public mutating func appendLiteral(_ literal: String) {
     literal.write(to: &self)
   }
-  
+
   /// Interpolates the given value's textual representation into the
   /// string literal being created.
-  /// 
+  ///
   /// Do not call this method directly. It is used by the compiler when
   /// interpreting string interpolations. Instead, use string
   /// interpolation to create a new string by including values, literals,
@@ -110,10 +110,10 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   {
     value.write(to: &self)
   }
-  
+
   /// Interpolates the given value's textual representation into the
   /// string literal being created.
-  /// 
+  ///
   /// Do not call this method directly. It is used by the compiler when
   /// interpreting string interpolations. Instead, use string
   /// interpolation to create a new string by including values, literals,
@@ -132,10 +132,10 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   {
     value.write(to: &self)
   }
-  
+
   /// Interpolates the given value's textual representation into the
   /// string literal being created.
-  /// 
+  ///
   /// Do not call this method directly. It is used by the compiler when
   /// interpreting string interpolations. Instead, use string
   /// interpolation to create a new string by including values, literals,
@@ -156,10 +156,10 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   {
     value.description.write(to: &self)
   }
-  
+
   /// Interpolates the given value's textual representation into the
   /// string literal being created.
-  /// 
+  ///
   /// Do not call this method directly. It is used by the compiler when
   /// interpreting string interpolations. Instead, use string
   /// interpolation to create a new string by including values, literals,
@@ -178,20 +178,16 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   public mutating func appendInterpolation<T>(_ value: T) {
     _print_unlocked(value, &self)
   }
-  
+
   /// Creates a string from this instance, consuming the instance in the
   /// process.
   @inlinable
-  internal __consuming func make() -> String {
-    return _storage
-  }
+  internal __consuming func make() -> String { _storage }
 }
 
 extension DefaultStringInterpolation: CustomStringConvertible {
   @inlinable
-  public var description: String {
-    return _storage
-  }
+  public var description: String { _storage }
 }
 
 extension DefaultStringInterpolation: TextOutputStream {
@@ -199,7 +195,7 @@ extension DefaultStringInterpolation: TextOutputStream {
   public mutating func write(_ string: String) {
     _storage.append(string)
   }
-  
+
   public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
     _storage._guts.append(_StringGuts(buffer, isASCII: true))
   }
@@ -209,7 +205,7 @@ extension DefaultStringInterpolation: TextOutputStream {
 // default implementation.
 extension String {
   /// Creates a new instance from an interpolated string literal.
-  /// 
+  ///
   /// Do not call this initializer directly. It is used by the compiler when
   /// you create a string using string interpolation. Instead, use string
   /// interpolation to create a new string by including values, literals,
@@ -233,7 +229,7 @@ extension String {
 
 extension Substring {
   /// Creates a new instance from an interpolated string literal.
-  /// 
+  ///
   /// Do not call this initializer directly. It is used by the compiler when
   /// you create a string using string interpolation. Instead, use string
   /// interpolation to create a new string by including values, literals,

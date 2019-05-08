@@ -50,16 +50,16 @@ extension String {
 
 extension String.Index {
   @inlinable @inline(__always)
-  internal var orderingValue: UInt64 { return _rawBits &>> 14 }
+  internal var orderingValue: UInt64 { _rawBits &>> 14 }
 
   // Whether this is at the canonical "start" position, that is encoded AND
   // transcoded offset of 0.
   @inlinable @inline(__always)
-  internal var isZeroPosition: Bool { return orderingValue == 0 }
+  internal var isZeroPosition: Bool { orderingValue == 0 }
 
   /// The UTF-16 code unit offset corresponding to this Index
   public func utf16Offset<S: StringProtocol>(in s: S) -> Int {
-    return s.utf16.distance(from: s.utf16.startIndex, to: self)
+    s.utf16.distance(from: s.utf16.startIndex, to: self)
   }
 
   /// The offset into a string's code units for this index.
@@ -68,16 +68,14 @@ extension String.Index {
     Use utf16Offset(in:) to achieve the same behavior.
     """)
   @inlinable
-  public var encodedOffset: Int { return _encodedOffset }
+  public var encodedOffset: Int { _encodedOffset }
 
   @inlinable @inline(__always)
-  internal var _encodedOffset: Int {
-    return Int(truncatingIfNeeded: _rawBits &>> 16)
-  }
+  internal var _encodedOffset: Int { Int(truncatingIfNeeded: _rawBits &>> 16) }
 
   @inlinable @inline(__always)
   internal var transcodedOffset: Int {
-    return Int(truncatingIfNeeded: orderingValue & 0x3)
+    Int(truncatingIfNeeded: orderingValue & 0x3)
   }
 
   @usableFromInline
@@ -159,7 +157,7 @@ extension String.Index {
 extension String.Index {
   @inlinable @inline(__always)
   internal var strippingTranscoding: String.Index {
-    return String.Index(_encodedOffset: self._encodedOffset)
+    String.Index(_encodedOffset: self._encodedOffset)
   }
 
   @inlinable @inline(__always)
@@ -176,14 +174,14 @@ extension String.Index {
 
   @inlinable @inline(__always)
   internal var nextTranscoded: String.Index {
-    return String.Index(
+    String.Index(
       encodedOffset: self._encodedOffset,
       transcodedOffset: self.transcodedOffset &+ 1)
   }
 
   @inlinable @inline(__always)
   internal var priorTranscoded: String.Index {
-    return String.Index(
+    String.Index(
       encodedOffset: self._encodedOffset,
       transcodedOffset: self.transcodedOffset &- 1)
   }
@@ -192,7 +190,7 @@ extension String.Index {
   // Note: strips any transcoded offset.
   @inlinable @inline(__always)
   internal func encoded(offsetBy n: Int) -> String.Index {
-    return String.Index(_encodedOffset: self._encodedOffset &+ n)
+    String.Index(_encodedOffset: self._encodedOffset &+ n)
   }
 
   @inlinable @inline(__always)
@@ -206,14 +204,14 @@ extension String.Index {
 extension String.Index: Equatable {
   @inlinable @inline(__always)
   public static func == (lhs: String.Index, rhs: String.Index) -> Bool {
-    return lhs.orderingValue == rhs.orderingValue
+    lhs.orderingValue == rhs.orderingValue
   }
 }
 
 extension String.Index: Comparable {
   @inlinable @inline(__always)
   public static func < (lhs: String.Index, rhs: String.Index) -> Bool {
-    return lhs.orderingValue < rhs.orderingValue
+    lhs.orderingValue < rhs.orderingValue
   }
 }
 

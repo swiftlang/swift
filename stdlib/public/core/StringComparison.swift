@@ -170,7 +170,7 @@ private func _stringCompareFastUTF8Abnormal(
 private func _stringCompareSlow(
   _ lhs: _StringGuts, _ rhs: _StringGuts, expecting: _StringComparisonResult
 ) -> Bool {
-  return _stringCompareSlow(
+  _stringCompareSlow(
     lhs, 0..<lhs.count, rhs, 0..<rhs.count, expecting: expecting)
 }
 
@@ -182,7 +182,7 @@ private func _stringCompareSlow(
 ) -> Bool {
   // TODO: Just call the normalizer directly with range
 
-  return _StringGutsSlice(lhs, lhsRange).compare(
+  _StringGutsSlice(lhs, lhsRange).compare(
     with: _StringGutsSlice(rhs, rhsRange),
     expecting: expecting)
 }
@@ -222,7 +222,7 @@ private func _findDiffIdx(
 private func _lexicographicalCompare<I: FixedWidthInteger>(
   _ lhs: I, _ rhs: I, expecting: _StringComparisonResult
 ) -> Bool {
-  return expecting == .equal ? lhs == rhs : lhs < rhs
+  expecting == .equal ? lhs == rhs : lhs < rhs
 }
 
 @_effects(readonly)
@@ -391,8 +391,8 @@ extension _StringGutsSlice {
         })
     }
   }
-  
-  
+
+
   @inline(__always) //Avoid unecessary overhead from the closures.
   internal func _normalizedCompareImpl(
     left_outputBuffer: UnsafeMutableBufferPointer<UInt8>,
@@ -421,7 +421,7 @@ extension _StringGutsSlice {
     var right_outputBuffer = right_outputBuffer
     var right_icuInputBuffer = right_icuInputBuffer
     var right_icuOutputBuffer = right_icuOutputBuffer
-  
+
     var leftNextReadPosition = left_range.lowerBound
     var rightNextReadPosition = right_range.lowerBound
     var leftOutputBufferIndex = 0
@@ -430,10 +430,10 @@ extension _StringGutsSlice {
     var rightOutputBufferCount = 0
     let leftEndIndex = left_range.upperBound
     let rightEndIndex = right_range.upperBound
-  
+
     var hasLeftBufferOwnership = false
     var hasRightBufferOwnership = false
-    
+
     if left_range.isEmpty && right_range.isEmpty {
       return expecting == .equal
     }
@@ -443,7 +443,7 @@ extension _StringGutsSlice {
     if right_range.isEmpty {
       return false
     }
-  
+
     defer {
       if hasLeftBufferOwnership {
         left_outputBuffer.deallocate()
@@ -456,7 +456,7 @@ extension _StringGutsSlice {
         right_icuOutputBuffer.deallocate()
       }
     }
-  
+
     repeat {
       if leftOutputBufferIndex == leftOutputBufferCount {
         let result = normalizeLeft(
@@ -505,10 +505,10 @@ extension _StringGutsSlice {
     || leftOutputBufferIndex < leftOutputBufferCount)
     && (rightNextReadPosition < rightEndIndex
     || rightOutputBufferIndex < rightOutputBufferCount)
-    
-  
+
+
     //At least one of them ran out of code units, whichever it was is the "smaller" string
-    if leftNextReadPosition < leftEndIndex 
+    if leftNextReadPosition < leftEndIndex
     || leftOutputBufferIndex < leftOutputBufferCount {
       return false
     } else if rightNextReadPosition < rightEndIndex

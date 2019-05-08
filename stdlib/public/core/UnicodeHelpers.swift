@@ -136,9 +136,7 @@ internal func _utf8ScalarLength(
 
 @inlinable
 @inline(__always)
-internal func _continuationPayload(_ x: UInt8) -> UInt32 {
-  return UInt32(x & 0x3F)
-}
+internal func _continuationPayload(_ x: UInt8) -> UInt32 { UInt32(x & 0x3F) }
 
 @inlinable @inline(__always)
 internal func _scalarAlign(

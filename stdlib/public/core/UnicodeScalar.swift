@@ -49,7 +49,7 @@ extension Unicode.Scalar :
     ExpressibleByUnicodeScalarLiteral {
   /// A numeric representation of the Unicode scalar.
   @inlinable
-  public var value: UInt32 { return _value }
+  public var value: UInt32 { _value }
 
   @_transparent
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
@@ -264,28 +264,22 @@ extension Unicode.Scalar :
   ///     // Prints "ó false 243"
   ///     // Prints "n true 110"
   @inlinable
-  public var isASCII: Bool {
-    return value <= 127
-  }
+  public var isASCII: Bool { value <= 127 }
 
   // FIXME: Unicode makes this interesting.
   internal var _isPrintableASCII: Bool {
-    return (self >= Unicode.Scalar(0o040) && self <= Unicode.Scalar(0o176))
+    (self >= Unicode.Scalar(0o040) && self <= Unicode.Scalar(0o176))
   }
 }
 
 extension Unicode.Scalar : CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the Unicode scalar.
   @inlinable
-  public var description: String {
-    return String(self)
-  }
+  public var description: String { String(self) }
 
   /// An escaped textual representation of the Unicode scalar, suitable for
   /// debugging.
-  public var debugDescription: String {
-    return "\"\(escaped(asASCII: true))\""
-  }
+  public var debugDescription: String { "\"\(escaped(asASCII: true))\"" }
 }
 
 extension Unicode.Scalar : LosslessStringConvertible {
@@ -374,14 +368,14 @@ extension UInt64 {
 extension Unicode.Scalar : Equatable {
   @inlinable
   public static func == (lhs: Unicode.Scalar, rhs: Unicode.Scalar) -> Bool {
-    return lhs.value == rhs.value
+    lhs.value == rhs.value
   }
 }
 
 extension Unicode.Scalar : Comparable {
   @inlinable
   public static func < (lhs: Unicode.Scalar, rhs: Unicode.Scalar) -> Bool {
-    return lhs.value < rhs.value
+    lhs.value < rhs.value
   }
 }
 
@@ -397,9 +391,7 @@ extension Unicode.Scalar {
   }
 
   @inlinable
-  public var utf16: UTF16View {
-    return UTF16View(value: self)
-  }
+  public var utf16: UTF16View { UTF16View(value: self) }
 }
 
 extension Unicode.Scalar.UTF16View : RandomAccessCollection {
@@ -408,18 +400,14 @@ extension Unicode.Scalar.UTF16View : RandomAccessCollection {
 
   /// The position of the first code unit.
   @inlinable
-  public var startIndex: Int {
-    return 0
-  }
+  public var startIndex: Int { 0 }
 
   /// The "past the end" position---that is, the position one
   /// greater than the last valid subscript argument.
   ///
   /// If the collection is empty, `endIndex` is equal to `startIndex`.
   @inlinable
-  public var endIndex: Int {
-    return 0 + UTF16.width(value)
-  }
+  public var endIndex: Int { 0 + UTF16.width(value) }
 
   /// Accesses the code unit at the specified position.
   ///
@@ -428,7 +416,7 @@ extension Unicode.Scalar.UTF16View : RandomAccessCollection {
   ///   `endIndex` property.
   @inlinable
   public subscript(position: Int) -> UTF16.CodeUnit {
-    return position == 0 ? (
+    position == 0 ? (
       endIndex == 1 ? UTF16.CodeUnit(value.value) : UTF16.leadSurrogate(value)
     ) : UTF16.trailSurrogate(value)
   }
@@ -448,7 +436,7 @@ extension Unicode.Scalar {
 
   @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
   @inlinable
-  public var utf8: UTF8View { return UTF8View(value: self) }
+  public var utf8: UTF8View { UTF8View(value: self) }
 }
 
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
@@ -457,14 +445,14 @@ extension Unicode.Scalar.UTF8View : RandomAccessCollection {
 
   /// The position of the first code unit.
   @inlinable
-  public var startIndex: Int { return 0 }
+  public var startIndex: Int { 0 }
 
   /// The "past the end" position---that is, the position one
   /// greater than the last valid subscript argument.
   ///
   /// If the collection is empty, `endIndex` is equal to `startIndex`.
   @inlinable
-  public var endIndex: Int { return 0 + UTF8.width(value) }
+  public var endIndex: Int { 0 + UTF8.width(value) }
 
   /// Accesses the code unit at the specified position.
   ///
@@ -481,7 +469,7 @@ extension Unicode.Scalar.UTF8View : RandomAccessCollection {
 
 extension Unicode.Scalar {
   internal static var _replacementCharacter: Unicode.Scalar {
-    return Unicode.Scalar(_value: UTF32._replacementCodeUnit)
+    Unicode.Scalar(_value: UTF32._replacementCodeUnit)
   }
 }
 

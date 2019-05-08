@@ -40,27 +40,24 @@ extension String {
     return self._classify()._capacity
   }
   var capacity: Int {
-    return self._classify()._capacity
+    self._classify()._capacity
   }
   var unusedCapacity: Int {
-    return Swift.max(0, self._classify()._capacity - self._classify()._count)
+    Swift.max(0, self._classify()._capacity - self._classify()._count)
   }
-  var bufferID: ObjectIdentifier? {
-    return _rawIdentifier()
-  }
+  var bufferID: ObjectIdentifier? { _rawIdentifier() }
+
   func _rawIdentifier() -> ObjectIdentifier? {
-    return self._classify()._objectIdentifier
+    self._classify()._objectIdentifier
   }
 
   var byteWidth: Int {
-    return _classify()._isASCII ? 1 : 2
+    _classify()._isASCII ? 1 : 2
   }
 }
 
 extension Substring {
-  var bufferID: ObjectIdentifier? {
-    return base.bufferID
-  }
+  var bufferID: ObjectIdentifier? { base.bufferID }
 }
 
 // A thin wrapper around _StringGuts implementing RangeReplaceableCollection
@@ -78,14 +75,14 @@ struct StringFauxUTF16Collection: RangeReplaceableCollection, RandomAccessCollec
   }
 
   var _str: String
-  var _guts: _StringGuts { return _str._guts }
+  var _guts: _StringGuts { _str._guts }
 
-  var startIndex: Index { return 0 }
-  var endIndex: Index { return _str.utf16.count }
-  var indices: Indices { return startIndex..<endIndex }
+  var startIndex: Index { 0 }
+  var endIndex: Index { _str.utf16.count }
+  var indices: Indices { startIndex..<endIndex }
 
   subscript(position: Index) -> Element {
-    return _str.utf16[_str._toUTF16Index(position)]
+    _str.utf16[_str._toUTF16Index(position)]
   }
 
   mutating func replaceSubrange<C>(

@@ -38,7 +38,7 @@ struct _StringRepresentation {
 
 extension String {
   public // @testable
-  func _classify() -> _StringRepresentation { return _guts._classify() }
+  func _classify() -> _StringRepresentation { _guts._classify() }
 }
 
 extension _StringGuts {

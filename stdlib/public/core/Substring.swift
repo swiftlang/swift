@@ -118,10 +118,10 @@ public struct Substring {
 extension Substring {
   /// Returns the underlying string from which this Substring was derived.
   @_alwaysEmitIntoClient
-  public var base: String { return _slice.base }
+  public var base: String { _slice.base }
 
   @inlinable @inline(__always)
-  internal var _wholeGuts: _StringGuts { return base._guts }
+  internal var _wholeGuts: _StringGuts { base._guts }
 
   @inlinable
   internal var _offsetRange: Range<Int> {
@@ -149,10 +149,10 @@ extension Substring: StringProtocol {
   public typealias SubSequence = Substring
 
   @inlinable @inline(__always)
-  public var startIndex: Index { return _slice.startIndex }
+  public var startIndex: Index { _slice.startIndex }
 
   @inlinable @inline(__always)
-  public var endIndex: Index { return _slice.endIndex }
+  public var endIndex: Index { _slice.endIndex }
 
   @inlinable @inline(__always)
   public func index(after i: Index) -> Index {
@@ -191,12 +191,10 @@ extension Substring: StringProtocol {
 
   @inlinable @inline(__always)
   public func distance(from start: Index, to end: Index) -> Int {
-    return _slice.distance(from: start, to: end)
+    _slice.distance(from: start, to: end)
   }
 
-  public subscript(i: Index) -> Character {
-    return _slice[i]
-  }
+  public subscript(i: Index) -> Character { _slice[i] }
 
   public mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
@@ -271,7 +269,7 @@ extension Substring: StringProtocol {
     _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
     // TODO(String performance): Detect when we cover the rest of a nul-
     // terminated String, and thus can avoid a copy.
-    return try String(self).withCString(body)
+    try String(self).withCString(body)
   }
 
   /// Calls the given closure with a pointer to the contents of the string,
@@ -297,21 +295,21 @@ extension Substring: StringProtocol {
   ) rethrows -> Result {
     // TODO(String performance): Detect when we cover the rest of a nul-
     // terminated String, and thus can avoid a copy.
-    return try String(self).withCString(encodedAs: targetEncoding, body)
+    try String(self).withCString(encodedAs: targetEncoding, body)
   }
 }
 
 extension Substring : CustomReflectable {
- public var customMirror: Mirror { return String(self).customMirror }
+ public var customMirror: Mirror { String(self).customMirror }
 }
 
 extension Substring : CustomStringConvertible {
   @inlinable @inline(__always)
-  public var description: String { return String(self) }
+  public var description: String { String(self) }
 }
 
 extension Substring : CustomDebugStringConvertible {
-  public var debugDescription: String { return String(self).debugDescription }
+  public var debugDescription: String { String(self).debugDescription }
 }
 
 extension Substring : LosslessStringConvertible {
@@ -347,19 +345,19 @@ extension Substring.UTF8View : BidirectionalCollection {
   // Plumb slice operations through
   //
   @inlinable
-  public var startIndex: Index { return _slice.startIndex }
+  public var startIndex: Index { _slice.startIndex }
 
   @inlinable
-  public var endIndex: Index { return _slice.endIndex }
+  public var endIndex: Index { _slice.endIndex }
 
   @inlinable
-  public subscript(index: Index) -> Element { return _slice[index] }
+  public subscript(index: Index) -> Element { _slice[index] }
 
   @inlinable
-  public var indices: Indices { return _slice.indices }
+  public var indices: Indices { _slice.indices }
 
   @inlinable
-  public func index(after i: Index) -> Index { return _slice.index(after: i) }
+  public func index(after i: Index) -> Index { _slice.index(after: i) }
 
   @inlinable
   public func formIndex(after i: inout Index) {
@@ -368,19 +366,19 @@ extension Substring.UTF8View : BidirectionalCollection {
 
   @inlinable
   public func index(_ i: Index, offsetBy n: Int) -> Index {
-    return _slice.index(i, offsetBy: n)
+    _slice.index(i, offsetBy: n)
   }
 
   @inlinable
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
-    return _slice.index(i, offsetBy: n, limitedBy: limit)
+    _slice.index(i, offsetBy: n, limitedBy: limit)
   }
 
   @inlinable
   public func distance(from start: Index, to end: Index) -> Int {
-    return _slice.distance(from: start, to: end)
+    _slice.distance(from: start, to: end)
   }
 
   @inlinable
@@ -395,7 +393,7 @@ extension Substring.UTF8View : BidirectionalCollection {
     _slice._failEarlyRangeCheck(range, bounds: bounds)
   }
 
-  public func index(before i: Index) -> Index { return _slice.index(before: i) }
+  public func index(before i: Index) -> Index { _slice.index(before: i) }
 
   public func formIndex(before i: inout Index) {
     _slice.formIndex(before: &i)
@@ -412,12 +410,8 @@ extension Substring.UTF8View : BidirectionalCollection {
 extension Substring {
   @inlinable
   public var utf8: UTF8View {
-    get {
-      return base.utf8[startIndex..<endIndex]
-    }
-    set {
-      self = Substring(newValue)
-    }
+    get { base.utf8[startIndex..<endIndex] }
+    set { self = Substring(newValue) }
   }
 
   /// Creates a Substring having the given content.
@@ -473,19 +467,19 @@ extension Substring.UTF16View : BidirectionalCollection {
   // Plumb slice operations through
   //
   @inlinable
-  public var startIndex: Index { return _slice.startIndex }
+  public var startIndex: Index { _slice.startIndex }
 
   @inlinable
-  public var endIndex: Index { return _slice.endIndex }
+  public var endIndex: Index { _slice.endIndex }
 
   @inlinable
-  public subscript(index: Index) -> Element { return _slice[index] }
+  public subscript(index: Index) -> Element { _slice[index] }
 
   @inlinable
-  public var indices: Indices { return _slice.indices }
+  public var indices: Indices { _slice.indices }
 
   @inlinable
-  public func index(after i: Index) -> Index { return _slice.index(after: i) }
+  public func index(after i: Index) -> Index { _slice.index(after: i) }
 
   @inlinable
   public func formIndex(after i: inout Index) {
@@ -494,19 +488,19 @@ extension Substring.UTF16View : BidirectionalCollection {
 
   @inlinable
   public func index(_ i: Index, offsetBy n: Int) -> Index {
-    return _slice.index(i, offsetBy: n)
+    _slice.index(i, offsetBy: n)
   }
 
   @inlinable
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
-    return _slice.index(i, offsetBy: n, limitedBy: limit)
+    _slice.index(i, offsetBy: n, limitedBy: limit)
   }
 
   @inlinable
   public func distance(from start: Index, to end: Index) -> Int {
-    return _slice.distance(from: start, to: end)
+    _slice.distance(from: start, to: end)
   }
 
   @inlinable
@@ -522,7 +516,7 @@ extension Substring.UTF16View : BidirectionalCollection {
   }
 
   @inlinable
-  public func index(before i: Index) -> Index { return _slice.index(before: i) }
+  public func index(before i: Index) -> Index { _slice.index(before: i) }
 
   @inlinable
   public func formIndex(before i: inout Index) {
@@ -531,19 +525,15 @@ extension Substring.UTF16View : BidirectionalCollection {
 
   @inlinable
   public subscript(r: Range<Index>) -> Substring.UTF16View {
-    return Substring.UTF16View(_slice.base, _bounds: r)
+    Substring.UTF16View(_slice.base, _bounds: r)
   }
 }
 
 extension Substring {
   @inlinable
   public var utf16: UTF16View {
-    get {
-      return base.utf16[startIndex..<endIndex]
-    }
-    set {
-      self = Substring(newValue)
-    }
+    get { base.utf16[startIndex..<endIndex] }
+    set { self = Substring(newValue) }
   }
 
   /// Creates a Substring having the given content.
@@ -599,19 +589,19 @@ extension Substring.UnicodeScalarView : BidirectionalCollection {
   // Plumb slice operations through
   //
   @inlinable
-  public var startIndex: Index { return _slice.startIndex }
+  public var startIndex: Index { _slice.startIndex }
 
   @inlinable
-  public var endIndex: Index { return _slice.endIndex }
+  public var endIndex: Index { _slice.endIndex }
 
   @inlinable
-  public subscript(index: Index) -> Element { return _slice[index] }
+  public subscript(index: Index) -> Element { _slice[index] }
 
   @inlinable
-  public var indices: Indices { return _slice.indices }
+  public var indices: Indices { _slice.indices }
 
   @inlinable
-  public func index(after i: Index) -> Index { return _slice.index(after: i) }
+  public func index(after i: Index) -> Index { _slice.index(after: i) }
 
   @inlinable
   public func formIndex(after i: inout Index) {
@@ -620,19 +610,19 @@ extension Substring.UnicodeScalarView : BidirectionalCollection {
 
   @inlinable
   public func index(_ i: Index, offsetBy n: Int) -> Index {
-    return _slice.index(i, offsetBy: n)
+    _slice.index(i, offsetBy: n)
   }
 
   @inlinable
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
-    return _slice.index(i, offsetBy: n, limitedBy: limit)
+    _slice.index(i, offsetBy: n, limitedBy: limit)
   }
 
   @inlinable
   public func distance(from start: Index, to end: Index) -> Int {
-    return _slice.distance(from: start, to: end)
+    _slice.distance(from: start, to: end)
   }
 
   @inlinable
@@ -648,7 +638,7 @@ extension Substring.UnicodeScalarView : BidirectionalCollection {
   }
 
   @inlinable
-  public func index(before i: Index) -> Index { return _slice.index(before: i) }
+  public func index(before i: Index) -> Index { _slice.index(before: i) }
 
   @inlinable
   public func formIndex(before i: inout Index) {
@@ -657,19 +647,15 @@ extension Substring.UnicodeScalarView : BidirectionalCollection {
 
   @inlinable
   public subscript(r: Range<Index>) -> Substring.UnicodeScalarView {
-    return Substring.UnicodeScalarView(_slice.base, _bounds: r)
+    Substring.UnicodeScalarView(_slice.base, _bounds: r)
   }
 }
 
 extension Substring {
   @inlinable
   public var unicodeScalars: UnicodeScalarView {
-    get {
-      return base.unicodeScalars[startIndex..<endIndex]
-    }
-    set {
-      self = Substring(newValue)
-    }
+    get { base.unicodeScalars[startIndex..<endIndex] }
+    set { self = Substring(newValue) }
   }
 
   /// Creates a Substring having the given content.
@@ -732,18 +718,14 @@ extension Substring : RangeReplaceableCollection {
 }
 
 extension Substring {
-  public func lowercased() -> String {
-    return String(self).lowercased()
-  }
+  public func lowercased() -> String { String(self).lowercased() }
 
-  public func uppercased() -> String {
-    return String(self).uppercased()
-  }
+  public func uppercased() -> String { String(self).uppercased() }
 
   public func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> String {
-    return try String(self.lazy.filter(isIncluded))
+    try String(self.lazy.filter(isIncluded))
   }
 }
 
@@ -793,9 +775,7 @@ extension String {
 extension Substring {
   @inlinable
   @available(swift, introduced: 4)
-  public subscript(r: Range<Index>) -> Substring {
-    return Substring(_slice[r])
-  }
+  public subscript(r: Range<Index>) -> Substring { Substring(_slice[r]) }
 }
 
 

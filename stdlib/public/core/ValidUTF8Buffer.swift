@@ -55,9 +55,7 @@ extension _ValidUTF8Buffer : Sequence {
   }
 
   @inlinable
-  public func makeIterator() -> Iterator {
-    return Iterator(self)
-  }
+  public func makeIterator() -> Iterator { Iterator(self) }
 }
 
 extension _ValidUTF8Buffer : Collection {
@@ -71,33 +69,27 @@ extension _ValidUTF8Buffer : Collection {
 
     @inlinable
     public static func == (lhs: Index, rhs: Index) -> Bool {
-      return lhs._biasedBits == rhs._biasedBits
+      lhs._biasedBits == rhs._biasedBits
     }
     @inlinable
     public static func < (lhs: Index, rhs: Index) -> Bool {
-      return lhs._biasedBits > rhs._biasedBits
+      lhs._biasedBits > rhs._biasedBits
     }
   }
 
   @inlinable
-  public var startIndex : Index {
-    return Index(_biasedBits: _biasedBits)
-  }
+  public var startIndex : Index { Index(_biasedBits: _biasedBits) }
 
   @inlinable
-  public var endIndex : Index {
-    return Index(_biasedBits: 0)
-  }
+  public var endIndex : Index { Index(_biasedBits: 0) }
 
   @inlinable
   public var count : Int {
-    return UInt32.bitWidth &>> 3 &- _biasedBits.leadingZeroBitCount &>> 3
+    UInt32.bitWidth &>> 3 &- _biasedBits.leadingZeroBitCount &>> 3
   }
 
   @inlinable
-  public var isEmpty : Bool {
-    return _biasedBits == 0
-  }
+  public var isEmpty : Bool { _biasedBits == 0 }
 
   @inlinable
   public func index(after i: Index) -> Index {
@@ -107,7 +99,7 @@ extension _ValidUTF8Buffer : Collection {
 
   @inlinable
   public subscript(i: Index) -> Element {
-    return Element(truncatingIfNeeded: i._biasedBits) &- 1
+    Element(truncatingIfNeeded: i._biasedBits) &- 1
   }
 }
 
@@ -151,14 +143,10 @@ extension _ValidUTF8Buffer : RangeReplaceableCollection {
   }
 
   @inlinable
-  public var capacity: Int {
-    return _ValidUTF8Buffer.capacity
-  }
+  public var capacity: Int { _ValidUTF8Buffer.capacity }
 
   @inlinable
-  public static var capacity: Int {
-    return UInt32.bitWidth / Element.bitWidth
-  }
+  public static var capacity: Int { UInt32.bitWidth / Element.bitWidth }
 
   @inlinable
   @inline(__always)
@@ -181,7 +169,7 @@ extension _ValidUTF8Buffer : RangeReplaceableCollection {
 
   @inlinable
   internal func _isValid(_ i: Index) -> Bool {
-    return i == endIndex || indices.contains(i)
+    i == endIndex || indices.contains(i)
   }
 
   @inlinable
@@ -212,7 +200,7 @@ extension _ValidUTF8Buffer {
 extension _ValidUTF8Buffer {
   @inlinable
   public static var encodedReplacementCharacter : _ValidUTF8Buffer {
-    return _ValidUTF8Buffer(_biasedBits: 0xBD_BF_EF &+ 0x01_01_01)
+    _ValidUTF8Buffer(_biasedBits: 0xBD_BF_EF &+ 0x01_01_01)
   }
 
   @inlinable

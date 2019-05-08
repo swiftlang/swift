@@ -129,7 +129,7 @@ extension StringProtocol {
   var _ephemeralString: String {
     @_specialize(where Self == String)
     @_specialize(where Self == Substring)
-    get { return String(self) }
+    get { String(self) }
   }
 
   internal var _gutsSlice: _StringGutsSlice {
@@ -146,15 +146,12 @@ extension StringProtocol {
     }
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var _offsetRange: Range<Int> {
-    @inline(__always) get {
-      let start = startIndex
-      let end = endIndex
-      _internalInvariant(
-        start.transcodedOffset == 0 && end.transcodedOffset == 0)
-      return Range(uncheckedBounds: (start._encodedOffset, end._encodedOffset))
-    }
+    let (start, end) = (startIndex, endIndex)
+    _internalInvariant(
+      start.transcodedOffset == 0 && end.transcodedOffset == 0)
+    return Range(uncheckedBounds: (start._encodedOffset, end._encodedOffset))
   }
 
   @inlinable
@@ -183,7 +180,7 @@ extension String {
   /// Contiguous strings also benefit from fast-paths and better optimizations.
   ///
   @_alwaysEmitIntoClient
-  public var isContiguousUTF8: Bool { return _guts.isFastUTF8 }
+  public var isContiguousUTF8: Bool { _guts.isFastUTF8 }
 
   /// If this string is not contiguous, make it so. If this mutates the string,
   /// it will invalidate any pre-existing indices.
@@ -228,7 +225,7 @@ extension Substring {
   /// Contiguous strings also benefit from fast-paths and better optimizations.
   ///
   @_alwaysEmitIntoClient
-  public var isContiguousUTF8: Bool { return self.base.isContiguousUTF8 }
+  public var isContiguousUTF8: Bool { self.base.isContiguousUTF8 }
 
   /// If this string is not contiguous, make it so. If this mutates the
   /// substring, it will invalidate any pre-existing indices.

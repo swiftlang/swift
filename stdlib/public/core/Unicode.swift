@@ -24,10 +24,10 @@ import SwiftShims
 public enum UnicodeDecodingResult : Equatable {
   /// A decoded Unicode scalar value.
   case scalarValue(Unicode.Scalar)
-  
+
   /// An indication that no more Unicode scalars are available in the input.
   case emptyInput
-  
+
   /// An indication of a decoding error.
   case error
 
@@ -296,21 +296,21 @@ extension Unicode.UTF8 : UnicodeCodec {
   /// - Returns: `true` if `byte` is a continuation byte; otherwise, `false`.
   @inlinable
   public static func isContinuation(_ byte: CodeUnit) -> Bool {
-    return byte & 0b11_00__0000 == 0b10_00__0000
+    byte & 0b11_00__0000 == 0b10_00__0000
   }
 
   @inlinable
   public static func _nullCodeUnitOffset(
     in input: UnsafePointer<CodeUnit>
   ) -> Int {
-    return Int(_swift_stdlib_strlen_unsigned(input))
+    Int(_swift_stdlib_strlen_unsigned(input))
   }
   // Support parsing C strings as-if they are UTF8 strings.
   @inlinable
   public static func _nullCodeUnitOffset(
     in input: UnsafePointer<CChar>
   ) -> Int {
-    return Int(_swift_stdlib_strlen(input))
+    Int(_swift_stdlib_strlen(input))
   }
 }
 
@@ -479,7 +479,7 @@ extension Unicode.UTF32 : UnicodeCodec {
     _ input: inout I
   ) -> UnicodeDecodingResult where I.Element == CodeUnit {
     var parser = ForwardParser()
-    
+
     switch parser.parseScalar(from: &input) {
     case .valid(let s): return .scalarValue(UTF32.decode(s))
     case .error:      return .error
@@ -600,14 +600,14 @@ extension UTF16.CodeUnit : _StringElement {
   @inlinable
   public // @testable
   static func _toUTF16CodeUnit(_ x: UTF16.CodeUnit) -> UTF16.CodeUnit {
-    return x
+    x
   }
   @inlinable
   public // @testable
   static func _fromUTF16CodeUnit(
     _ utf16: UTF16.CodeUnit
   ) -> UTF16.CodeUnit {
-    return utf16
+    utf16
   }
 }
 

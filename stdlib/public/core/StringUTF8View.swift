@@ -122,14 +122,14 @@ extension String.UTF8View: BidirectionalCollection {
   ///
   /// If the UTF-8 view is empty, `startIndex` is equal to `endIndex`.
   @inlinable @inline(__always)
-  public var startIndex: Index { return _guts.startIndex }
+  public var startIndex: Index { _guts.startIndex }
 
   /// The "past the end" position---that is, the position one
   /// greater than the last valid subscript argument.
   ///
   /// In an empty UTF-8 view, `endIndex` is equal to `startIndex`.
   @inlinable @inline(__always)
-  public var endIndex: Index { return _guts.endIndex }
+  public var endIndex: Index { _guts.endIndex }
 
   /// Returns the next consecutive position after `i`.
   ///
@@ -218,12 +218,12 @@ extension String.UTF8View: BidirectionalCollection {
 
 extension String.UTF8View: CustomStringConvertible {
   @inlinable @inline(__always)
-  public var description: String { return String(_guts) }
+  public var description: String { String(_guts) }
 }
 
 extension String.UTF8View: CustomDebugStringConvertible {
   public var debugDescription: String {
-    return "UTF8View(\(self.description.debugDescription))"
+    "UTF8View(\(self.description.debugDescription))"
   }
 }
 
@@ -232,7 +232,7 @@ extension String {
   /// A UTF-8 encoding of `self`.
   @inlinable
   public var utf8: UTF8View {
-    @inline(__always) get { return UTF8View(self._guts) }
+    @inline(__always) get { UTF8View(self._guts) }
     set { self = String(newValue._guts) }
   }
 
@@ -347,7 +347,7 @@ extension String.UTF8View.Index {
 extension String.UTF8View : CustomReflectable {
   /// Returns a mirror that reflects the UTF-8 view of a string.
   public var customMirror: Mirror {
-    return Mirror(self, unlabeledChildren: self)
+    Mirror(self, unlabeledChildren: self)
   }
 }
 
@@ -365,7 +365,7 @@ extension String.UTF8View {
   @inlinable
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> String.UTF8View.SubSequence {
-    return Substring.UTF8View(self, _bounds: r)
+    Substring.UTF8View(self, _bounds: r)
   }
 }
 

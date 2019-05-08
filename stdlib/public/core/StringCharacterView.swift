@@ -36,20 +36,18 @@ extension String: BidirectionalCollection {
   ///
   /// In an empty string, `startIndex` is equal to `endIndex`.
   @inlinable @inline(__always)
-  public var startIndex: Index { return _guts.startIndex }
+  public var startIndex: Index { _guts.startIndex }
 
   /// A string's "past the end" position---that is, the position one greater
   /// than the last valid subscript argument.
   ///
   /// In an empty string, `endIndex` is equal to `startIndex`.
   @inlinable @inline(__always)
-  public var endIndex: Index { return _guts.endIndex }
+  public var endIndex: Index { _guts.endIndex }
 
   /// The number of characters in a string.
   @inline(__always)
-  public var count: Int {
-    return distance(from: startIndex, to: endIndex)
-  }
+  public var count: Int { distance(from: startIndex, to: endIndex) }
 
   /// Returns the position immediately after the given index.
   ///
@@ -107,7 +105,7 @@ extension String: BidirectionalCollection {
   @inlinable @inline(__always)
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-    return _index(i, offsetBy: n)
+    _index(i, offsetBy: n)
   }
 
   /// Returns an index that is the specified distance from the given index,
@@ -152,7 +150,7 @@ extension String: BidirectionalCollection {
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-    return _index(i, offsetBy: n, limitedBy: limit)
+    _index(i, offsetBy: n, limitedBy: limit)
   }
 
   /// Returns the distance between two indices.
@@ -167,7 +165,7 @@ extension String: BidirectionalCollection {
   @inlinable @inline(__always)
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-    return _distance(from: start, to: end)
+    _distance(from: start, to: end)
   }
 
   /// Accesses the character at the given position.
@@ -245,8 +243,6 @@ extension String {
   }
 
   @inlinable
-  public __consuming func makeIterator() -> Iterator {
-    return Iterator(_guts)
-  }
+  public __consuming func makeIterator() -> Iterator { Iterator(_guts) }
 }
 
