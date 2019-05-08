@@ -1158,6 +1158,10 @@ public:
       : FailureDiagnostic(root, cs, locator) {}
 
   bool diagnoseAsError() override;
+
+protected:
+  /// Compute location of the failure for diagnostic.
+  SourceLoc getLoc() const;
 };
 
 /// Diagnose an attempt return something from a function which

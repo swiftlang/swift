@@ -2728,9 +2728,17 @@ bool InvalidMethodRefInKeyPath::diagnoseAsError() {
   return true;
 }
 
+SourceLoc InvalidUseOfAddressOf::getLoc() const {
+  auto *anchor = getAnchor();
+
+  if (auto *assign = dyn_cast<AssignExpr>(anchor))
+    anchor = assign->getSrc();
+
+  return anchor->getLoc();
+}
+
 bool InvalidUseOfAddressOf::diagnoseAsError() {
-  auto *anchor = cast<AssignExpr>(getAnchor());
-  emitDiagnostic(anchor->getSrc()->getLoc(), diag::extraneous_address_of);
+  emitDiagnostic(getLoc(), diag::extraneous_address_of);
   return true;
 }
 
