@@ -750,6 +750,12 @@ public:
   }
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+    // SWIFT_ENABLE_TENSORFLOW
+    // Suppress "sequenced" as a result, because it crashes completions.
+    // TODO(TF-315): Fix properly and then remove this.
+    if (isa<FuncDecl>(VD) && cast<FuncDecl>(VD)->getName().str() == "sequenced")
+      return;
+
     if (!AllFoundDecls.insert(VD).second)
       return;
 
