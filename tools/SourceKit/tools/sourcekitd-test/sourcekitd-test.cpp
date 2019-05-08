@@ -279,8 +279,9 @@ static void skt_main(skt_args *args) {
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
 
   sourcekitd_initialize();
-  SourceKit::setFileSystemProvider("testvfs",
-                                   llvm::make_unique<TestFileSystemProvider>());
+
+  TestFileSystemProvider testFileSystemProvider;
+  SourceKit::setFileSystemProvider("testvfs", &testFileSystemProvider);
 
   sourcekitd_set_notification_handler(^(sourcekitd_response_t resp) {
     notification_receiver(resp);

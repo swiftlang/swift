@@ -130,9 +130,9 @@ static SourceKit::Context &getGlobalContext() {
 }
 
 namespace SourceKit {
-void setFileSystemProvider(
-    StringRef Name, std::unique_ptr<FileSystemProvider> FileSystemProvider) {
-  getGlobalContext().setFileSystemProvider(Name, std::move(FileSystemProvider));
+void setFileSystemProvider(StringRef Name,
+                           FileSystemProvider *FileSystemProvider) {
+  getGlobalContext().setFileSystemProvider(Name, FileSystemProvider);
 }
 } // namespace SourceKit
 

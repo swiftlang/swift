@@ -34,7 +34,7 @@ class Context {
   std::unique_ptr<LangSupport> SwiftLang;
   std::shared_ptr<NotificationCenter> NotificationCtr;
 
-  llvm::StringMap<std::unique_ptr<FileSystemProvider>> FileSystemProviders;
+  llvm::StringMap<FileSystemProvider *> FileSystemProviders;
 
 public:
   Context(StringRef RuntimeLibPath,
@@ -49,11 +49,13 @@ public:
 
   std::shared_ptr<NotificationCenter> getNotificationCenter() { return NotificationCtr; }
 
+  /// Returns the FileSystemProvider registered under Name.
   FileSystemProvider *getFileSystemProvider(StringRef Name);
 
-  void
-  setFileSystemProvider(StringRef Name,
-                        std::unique_ptr<FileSystemProvider> FileSystemProvider);
+  /// Registers the given FileSystemProvider under Name. The caller is
+  /// responsible for keeping FileSystemProvider alive as long as this Context.
+  void setFileSystemProvider(StringRef Name,
+                             FileSystemProvider *FileSystemProvider);
 };
 
 } // namespace SourceKit

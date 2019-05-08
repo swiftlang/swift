@@ -21,9 +21,11 @@ namespace SourceKit {
 /// Registers a FileSystemProvider with the running sourcekitd. After this
 /// function is called, requests can use this FileSystemProvider by setting
 /// 'key.vfs.name' to Name.
-void setFileSystemProvider(
-    llvm::StringRef Name,
-    std::unique_ptr<SourceKit::FileSystemProvider> FileSystemProvider);
+///
+/// The caller is responsible for keeping FileSystemProvider alive as long as
+/// sourcekitd.
+void setFileSystemProvider(llvm::StringRef Name,
+                           SourceKit::FileSystemProvider *FileSystemProvider);
 
 } // namespace SourceKit
 
