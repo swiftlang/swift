@@ -129,9 +129,11 @@ static Type deriveKeyPathIterable_AllKeyPaths(DerivedConformance &derived) {
 }
 
 ValueDecl *DerivedConformance::deriveKeyPathIterable(ValueDecl *requirement) {
-  if (requirement->getBaseName() == TC.Context.Id_allKeyPaths) {
+  // Diagnose conformances in disallowed contexts.
+  if (checkAndDiagnoseDisallowedContext(requirement))
+    return nullptr;
+  if (requirement->getBaseName() == TC.Context.Id_allKeyPaths)
     return deriveKeyPathIterable_allKeyPaths(*this);
-  }
   TC.diagnose(requirement->getLoc(),
               diag::broken_key_path_iterable_requirement);
   return nullptr;
@@ -139,9 +141,11 @@ ValueDecl *DerivedConformance::deriveKeyPathIterable(ValueDecl *requirement) {
 
 Type DerivedConformance::deriveKeyPathIterable(
     AssociatedTypeDecl *requirement) {
-  if (requirement->getBaseName() == TC.Context.Id_AllKeyPaths) {
+  // Diagnose conformances in disallowed contexts.
+  if (checkAndDiagnoseDisallowedContext(requirement))
+    return nullptr;
+  if (requirement->getBaseName() == TC.Context.Id_AllKeyPaths)
     return deriveKeyPathIterable_AllKeyPaths(*this);
-  }
   TC.diagnose(requirement->getLoc(),
               diag::broken_key_path_iterable_requirement);
   return nullptr;

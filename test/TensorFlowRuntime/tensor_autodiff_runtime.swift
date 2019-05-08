@@ -1,8 +1,4 @@
-// RUN: %target-run-eager-swift
-//
-// Note: GPE testing is disabled because GPE does not interact well with
-// VJP-based AD. See SR-9638.
-//
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 //
 // Tensor AD runtime tests.
@@ -98,27 +94,40 @@ TensorADTests.testAllBackends("Abs") {
 TensorADTests.testAllBackends("sum") {
   let input = Tensor<Float>(repeating: 42, shape: [2, 2])
   let sumPullbackScalar = pullback(at: input) { (a: Tensor<Float>) in a.sum() }
+  let sumPullbackSqueezingAxes = pullback(at: input) { (a: Tensor<Float>) in a.sum(squeezingAxes: 0, 1) }
   let sumPullbackAlongAxes = pullback(at: input) { (a: Tensor<Float>) in a.sum(alongAxes: 0, 1) }
 
   let expected = Tensor<Float>(ones: [2, 2])
   expectEqual(expected, sumPullbackScalar(Tensor(1)))
-  // expectEqual(expected, sumPullbackSqueezingAxes(Tensor(1)))
+  expectEqual(expected, sumPullbackSqueezingAxes(Tensor(1)))
   expectEqual(expected, sumPullbackAlongAxes(Tensor(1)))
   expectEqual(expected * 3, sumPullbackScalar(Tensor(3)))
-  // expectEqual(expected * 3, sumPullbackSqueezingAxes(Tensor(3)))
+  expectEqual(expected * 3, sumPullbackSqueezingAxes(Tensor(3)))
   expectEqual(expected * 3, sumPullbackAlongAxes(Tensor(3)))
 }
 
 TensorADTests.testAllBackends("mean") {
   let meanGradScalar = gradient { (a: Tensor<Float>) in a.mean() }
-  // let meanGradSqueezingAxes = gradient { (a: Tensor<Float>) in a.mean(squeezingAxes: 0, 1) }
+  let meanGradSqueezingAxes = gradient { (a: Tensor<Float>) in a.mean(squeezingAxes: 0, 1) }
   let meanGradAlongAxes = gradient { (a: Tensor<Float>) in a.mean(alongAxes: 0, 1) }
 
   let input = Tensor<Float>(ones: [2, 2])
   let expected = Tensor<Float>(repeating: 0.25, shape: [2, 2])
   expectEqual(expected, meanGradScalar(input))
-  // expectEqual(expected, meanGradSqueezingAxes(input))
+  expectEqual(expected, meanGradSqueezingAxes(input))
   expectEqual(expected, meanGradAlongAxes(input))
+}
+
+TensorADTests.testAllBackends("variance") {
+  let varianceGradScalar = gradient { (a: Tensor<Float>) in a.variance() }
+  let varianceGradSqueezingAxes = gradient { (a: Tensor<Float>) in a.variance(squeezingAxes: 0, 1) }
+  let varianceGradAlongAxes = gradient { (a: Tensor<Float>) in a.variance(alongAxes: 0, 1) }
+
+  let input: Tensor<Float> = [[1, 2], [3, 4]]
+  let expected: Tensor<Float> = [[-0.75, -0.25], [0.25, 0.75]]
+  expectEqual(expected, varianceGradScalar(input))
+  expectEqual(expected, varianceGradSqueezingAxes(input))
+  expectEqual(expected, varianceGradAlongAxes(input))
 }
 
 TensorADTests.testAllBackends("expandingShape") {
@@ -148,6 +157,36 @@ TensorADTests.testAllBackends("reshaped") {
   let reshapedPullback = pullback(at: input) { (a: Tensor<Float>) in a.reshaped(toShape: shapeTensor) }
   let reshaped = Tensor<Float>(ones: [2, 2, 2])
   expectEqual(input, reshapedPullback(reshaped))
+}
+
+TensorADTests.testAllBackends("concatenation (++)") {
+  let a1 = Tensor<Float>([1,2,3,4])
+  let b1 = Tensor<Float>([5,6,7,8,9,10])
+
+  let a2 = Tensor<Float>([1,1,1,1])
+  let b2 = Tensor<Float>([1,1,1,1,1,1])
+
+  let grads = gradient(at: a2, b2) { a, b in
+    return ((a1 * a) ++ (b1 * b)).sum()
+  }
+
+  expectEqual(a1, grads.0)
+  expectEqual(b1, grads.1)
+}
+
+TensorADTests.testAllBackends("concatenated") {
+  let a1 = Tensor<Float>([1,2,3,4])
+  let b1 = Tensor<Float>([5,6,7,8,9,10])
+
+  let a2 = Tensor<Float>([1,1,1,1])
+  let b2 = Tensor<Float>([1,1,1,1,1,1])
+
+  let grads = gradient(at: a2, b2) { a, b in
+    return (a1 * a).concatenated(with: b1 * b, alongAxis: -1).sum()
+  }
+
+  expectEqual(a1, grads.0)
+  expectEqual(b1, grads.1)
 }
 
 TensorADTests.testAllBackends("transposed") {

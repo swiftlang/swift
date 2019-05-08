@@ -237,8 +237,6 @@ namespace {
         // is @differentiable?
         return asImpl().handleReference(type);
 
-      // SWIFT_ENABLE_TENSORFLOW
-      case AnyFunctionType::Representation::TensorFlow:
       case AnyFunctionType::Representation::CFunctionPointer:
       case AnyFunctionType::Representation::Thin:
         return asImpl().handleTrivial(type);
@@ -895,8 +893,7 @@ namespace {
       auto maxOrder = 1;
       auto numAssocFns = autodiff::getNumAutoDiffAssociatedFunctions(maxOrder);
       children.reserve(numAssocFns + 1);
-      auto origFnTy = fnTy->getWithExtInfo(
-          fnTy->getExtInfo().withDifferentiable(false));
+      auto origFnTy = fnTy->getWithoutDifferentiability();
       auto paramIndices = fnTy->getDifferentiationParameterIndices();
       children.push_back(Child{
         {AutoDiffFunctionExtractee::Original, 0},

@@ -44,7 +44,7 @@ public func softmax<T : FloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
 /// Specifically, computes `exp(x) / exp(x).sum(alongAxes: axis)`.
 @inlinable @inline(__always)
 public func softmax<T : TensorFlowFloatingPoint>(
-  _ x: Tensor<T>, alongAxis axis: Int32
+  _ x: Tensor<T>, alongAxis axis: Int
 ) -> Tensor<T> {
   let expx = exp(x)
   return expx / expx.sum(alongAxes: axis)

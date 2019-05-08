@@ -1,6 +1,4 @@
-public struct Empty {
-  public init() {}
-}
+public struct Empty : AdditiveArithmetic {}
 
 public protocol DifferentiableRequirement {
   @differentiable

@@ -1,4 +1,4 @@
-// RUN: %target-run-eager-swift
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 //
 // Machine learning API AD runtime tests.
@@ -47,10 +47,8 @@ public struct Dense<Scalar: TensorFlowFloatingPoint>: Layer {
 
 public extension Dense where Scalar.RawSignificand: FixedWidthInteger {
   init(inputSize: Int, outputSize: Int, activation: @escaping Activation) {
-    self.init(weight: Tensor(
-                glorotUniform: [Int32(inputSize), Int32(outputSize)]
-              ),
-              bias: Tensor(zeros: [Int32(outputSize)]),
+    self.init(weight: Tensor(glorotUniform: [inputSize, outputSize]),
+              bias: Tensor(zeros: [outputSize]),
               activation: activation)
   }
 }
@@ -61,7 +59,7 @@ public struct Conv2D<Scalar: TensorFlowFloatingPoint>: Layer {
   public var bias: Tensor<Scalar>
   public typealias Activation = @differentiable (Tensor<Scalar>) -> Tensor<Scalar>
   @noDerivative public let activation: Activation
-  @noDerivative public let strides: (Int32, Int32)
+  @noDerivative public let strides: (Int, Int)
   @noDerivative public let padding: Padding
 
   @differentiable
@@ -75,7 +73,7 @@ public struct Conv2D<Scalar: TensorFlowFloatingPoint>: Layer {
     self.filter = filter
     self.bias = bias
     self.activation = activation
-    self.strides = (Int32(strides.0), Int32(strides.1))
+    self.strides = strides
     self.padding = padding
   }
 
@@ -169,6 +167,41 @@ ModelADTests.testAllBackends("WithRespectToModel") {
   }
   expectEqual(Foo<Float>.AllDifferentiableVariables(bar: Tensor(1.0),
                                                     baz: Tensor(0.0)), d)
+}
+
+ModelADTests.testAllBackends("TF437") {
+  struct TF437Layer: Layer {
+    typealias Input = Tensor<Float>
+    typealias Output = Tensor<Float>
+
+    var weight: Tensor<Float>
+    var bias: Tensor<Float>
+
+    init(inputSize: Int, outputSize: Int) {
+      weight = Tensor<Float>(randomNormal: [inputSize, outputSize])
+      bias = Tensor<Float>(zeros: [outputSize])
+    }
+
+    @differentiable(wrt: (self, input))
+    func applied(to input: Tensor<Float>) -> Tensor<Float> {
+      let output = matmul(input, weight) + bias
+      return output
+    }
+  }
+
+  func tf437Step<Model: Layer>(_ model: inout Model,
+                               inputs: Model.Input) -> ()
+    where Model.AllDifferentiableVariables == Model.CotangentVector,
+          Model.Output == Tensor<Float> {
+    gradient(at: model) { model -> Model.Output in
+      let logits = model.applied(to: inputs)
+      return logits.mean()
+    }
+  }
+
+  var model = TF437Layer(inputSize: 1, outputSize: 1)
+  let inputs = Tensor<Float>(zeros: [1, 1])
+  tf437Step(&model, inputs: inputs)
 }
 
 runAllTests()

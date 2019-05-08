@@ -1,10 +1,12 @@
 // This test file has various test cases to check that unrollng the loop body
-// preserves the loop nesting.  Note that we use -Onone to preserve the
+// preserves the loop nesting.  Note that we use `@_optimize(none)` to preserve the
 // structure of control flow for tests.
-// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -Onone -emit-sil %s -verify | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify | %FileCheck %s
+// REQUIRES: deprecated_gpe_mode
 
 import TensorFlow
 
+@_optimize(none)
 public func testLoopMovementFromOutside(_ breakIndex: Int32) -> Tensor<Int32> {
   var i: Int32 = 1
   var sum = Tensor<Int32>(0)
@@ -57,6 +59,7 @@ public func testLoopMovementFromOutside(_ breakIndex: Int32) -> Tensor<Int32> {
 
 // This example checks that the loop structure is preserved when we unroll
 // the body of a loop during canonicalization.
+@_optimize(none)
 public func testLoopWithNestedLoopsRequiringUnrolling(
   _ breakIndex:Int32, _ repetitions: Int32) -> Tensor<Int32> {
 	var result = Tensor<Int32>(0)
@@ -145,6 +148,7 @@ public func testLoopWithNestedLoopsRequiringUnrolling(
 
 // This example checks that the loop structure is preserved when we unroll
 // the body of a loop during canonicalization.
+@_optimize(none)
 public func testLoopWithDoublyNestedLoopsRequiringUnrolling(
 	_ breakIndex:Int32, _ repetitions: Int32) -> Tensor<Int32> {
 	var result = Tensor<Int32>(0)

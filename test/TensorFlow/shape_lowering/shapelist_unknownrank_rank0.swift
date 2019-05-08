@@ -1,5 +1,6 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -emit-sil -Xllvm -tf-dump-graph %s
-// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -emit-sil -Xllvm -tf-dump-graph %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -emit-sil -Xllvm -tf-dump-graph -O %s
+// RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -emit-sil -Xllvm -tf-dump-graph -O %s | %FileCheck %s
+// REQUIRES: deprecated_gpe_mode
 
 // These tests are in separate files because functions appear in the GraphDef
 // in nondeterministic order.

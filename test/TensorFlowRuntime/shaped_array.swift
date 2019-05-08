@@ -1,7 +1,5 @@
-// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
-// RUN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize
 //
 // ShapedArray and ShapedArraySlice API tests.
 
@@ -41,14 +39,23 @@ ShapedArrayTests.test("Initializers") {
 ShapedArrayTests.test("Indexing") {
   let tensor = ShapedArray(shape: [3, 4, 5], scalars: Array(0..<60))
 
-  /// Test shapes
+  /// Test shapes.
   expectEqual([4, 5], tensor[0].shape)
   expectEqual([5], tensor[0][0].shape)
   expectEqual([], tensor[0][0][0].shape)
   expectEqual([2, 4, 5], tensor[0..<2].shape)
   expectEqual([3, 5], tensor[0][0..<3].shape)
+  expectEqual([4, 5], tensor[0..<3][0].shape)
 
-  /// Test element tensor scalars
+  /// Test indices.
+  expectEqual(0..<4, tensor[0].indices)
+  expectEqual(0..<5, tensor[0][0].indices)
+  expectEqual(0..<0, tensor[0][0][0].indices)
+  expectEqual(0..<2, tensor[0..<2].indices)
+  expectEqual(0..<3, tensor[0][0..<3].indices)
+  expectEqual(0..<4, tensor[0..<3][0].indices)
+
+  /// Test element tensor scalars.
   expectEqual(Array(0..<20), tensor[0].scalars)
   expectEqual(Array(40..<60), tensor[2].scalars)
   expectEqual(Array(0..<5), tensor[0][0].scalars)
@@ -56,7 +63,7 @@ ShapedArrayTests.test("Indexing") {
   expectEqual([43], tensor[2][0][3].scalars)
   expectEqual([37], tensor[1][3][2].scalars)
 
-  /// Test subtensor scalars
+  /// Test subtensor scalars.
   expectEqual(Array(20..<40), tensor[1..<2].scalars)
   expectEqual(Array(20..<30), tensor[1][0..<2].scalars)
   expectEqual(Array(45..<50), tensor[2][1..<2].scalars)
@@ -126,17 +133,6 @@ ShapedArrayTests.test("Hashable") {
   checkHashable([ShapedArraySlice(repeating: true, shape: [3, 4, 5])], equalityOracle: { $0 == $1 })
   checkHashable([ShapedArraySlice(repeating: Foo(), shape: [3, 4, 5])], equalityOracle: { $0 == $1 })
   checkHashable([ShapedArraySlice(shape: [2, 3], scalars: Array(0..<6))], equalityOracle: { $0 == $1 })
-}
-
-ShapedArrayTests.test("StringDescription") {
-  let scalar = ShapedArray(shape: [], scalars: [1.0])
-  expectEqual("1.0", scalar.description)
-
-  let x = ShapedArray(shape: [2, 3], scalars: [1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
-  expectEqual("[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]", x.description)
-
-  let y = ShapedArraySlice(shape: [2, 3], scalars: [1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
-  expectEqual("[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]", y.description)
 }
 
 runAllTests()

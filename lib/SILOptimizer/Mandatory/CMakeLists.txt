@@ -20,12 +20,4 @@ silopt_register_sources(
   ClosureLifetimeFixup.cpp
   RawSILInstLowering.cpp
   MandatoryOptUtils.cpp
-  # SWIFT_ENABLE_TENSORFLOW
-  TFCanonicalizeCFG.cpp
-  TFConstExpr.cpp
-  TFDeabstraction.cpp
-  TFDevicePartition.cpp
-  TFLowerGraph.cpp
-  TFPartition.cpp
-  TFUtilities.cpp
 )

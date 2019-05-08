@@ -1890,8 +1890,6 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     // Check the representation of the function type.
     bool isBlock = false;
     switch (functionType->getRepresentation()) {
-    // SWIFT_ENABLE_TENSORFLOW
-    case AnyFunctionType::Representation::TensorFlow:
     case AnyFunctionType::Representation::Thin:
       return failure();
 
@@ -4303,4 +4301,19 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   }
 
   return associatedFunction;
+}
+
+AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
+  SmallVector<Param, 8> newParams;
+  for (auto &param : getParams()) {
+    Param newParam(param.getPlainType(), param.getLabel(),
+                   param.getParameterFlags().withNonDifferentiable(false));
+    newParams.push_back(newParam);
+  }
+  auto nonDiffExtInfo = getExtInfo().withDifferentiable(false);
+  if (isa<FunctionType>(this))
+    return FunctionType::get(newParams, getResult(), nonDiffExtInfo);
+  assert(isa<GenericFunctionType>(this));
+  return GenericFunctionType::get(getOptGenericSignature(), newParams,
+                                  getResult(), nonDiffExtInfo);
 }

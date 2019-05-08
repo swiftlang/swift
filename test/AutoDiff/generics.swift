@@ -54,4 +54,26 @@ struct SupervisedTrainer<Model : Layer> {
   }
 }
 
+// Tests TF-440.
+struct TF_440_Input<Input: Differentiable, State: Differentiable>: Differentiable {
+    var input: Input
+    var state: State
+}
+struct TF_440<T : Differentiable> {
+    @differentiable
+    func applied(to input: TF_440_Input<Float, Float>) -> Float {
+        return input.state
+    }
+
+    @differentiable
+    func applied(to input: TF_440_Input<T, Float>) -> Float {
+        return input.state
+    }
+
+    @differentiable
+    func applied(to input: TF_440_Input<T, Float>) -> T {
+        return input.input
+    }
+}
+
 // TODO: add more tests.

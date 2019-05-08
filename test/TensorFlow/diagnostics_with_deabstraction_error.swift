@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s
+// REQUIRES: deprecated_gpe_mode
 
 // This file contains tests that used to be in ./diagnostics.swift that produced
 // expected errors in the deabstraction pass, which prevented partitioning from
@@ -11,8 +12,8 @@ import TensorFlow
 
 // Verify we reject multiple attempts to configure hardware.
 public func testDeviceInvalid() {
-  TensorFlow.enableTPU() // expected-note {{previous configuration is specified here}}
-  TensorFlow.enableTPU() // expected-error {{device configuration specified multiple times}}
+  TensorFlow.enableTPU() // expected-note 2 {{previous configuration is specified here}}
+  TensorFlow.enableTPU() // expected-error 2 {{device configuration specified multiple times}}
 }
 
 public func shapeError() {

@@ -226,7 +226,7 @@
                 "llvm": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "clang": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "swift": "tensorflow",
-                "lldb": "bdb96e8b352f7cb18e2b3b66f2d3f75d92f81dcd",
+                "lldb": "4cf2c810dd91795935181610fd406c96e0d6d957",
                 "cmark": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
@@ -240,9 +240,9 @@
                 "swift-xcode-playground-support": "swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a",
                 "ninja": "253e94c1fa511704baeb61cf69995bbf09ba435e",
                 "icu": "release-61-1",
-                "tensorflow": "7818652c950b1b1922efe5f4345886058d0ffba5",
-                "tensorflow-swift-bindings": "c852b63b6ac3c4b53199aab96c021501978b843d",
-                "tensorflow-swift-apis": "d87fab3a9b68c096a07a4331bcfbb2abd4e85be1"
+                "tensorflow": "447e512d332ab86172a3b13119900b4d021d0c65",
+                "tensorflow-swift-bindings": "ee5ded283a32b6fb5a17d99af6dd34ef7278a405",
+                "tensorflow-swift-apis": "cfefd63fa60a55d1da1e2a412ed561eb3448e691"
             }
         }
     }

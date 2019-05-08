@@ -40,8 +40,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/DynamicCasts.h"
-// SWIFT_ENABLE_TENSORFLOW
-#include "swift/SIL/GraphOperationBuilder.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -1599,7 +1597,7 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
                                  resultTy);
     case SILFunctionType::Representation::Block:
       llvm_unreachable("should not try block-to-block repr change");
-      // SWIFT_ENABLE_TENSORFLOW
+    // SWIFT_ENABLE_TENSORFLOW
     case SILFunctionType::Representation::TensorFlow:
     case SILFunctionType::Representation::Method:
     case SILFunctionType::Representation::Closure:
@@ -1614,9 +1612,6 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
     llvm_unreachable("should not do function conversion to thin");
   case AnyFunctionType::Representation::CFunctionPointer:
     llvm_unreachable("should not do C function pointer conversion here");
-  // SWIFT_ENABLE_TENSORFLOW
-  case AnyFunctionType::Representation::TensorFlow:
-    llvm_unreachable("should not do function conversion to TensorFlow");
   }
   llvm_unreachable("bad representation");
 }
@@ -1694,8 +1689,6 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   switch(srcRepTy->getRepresentation()) {
   case AnyFunctionType::Representation::Swift:
   case AnyFunctionType::Representation::Thin:
-  // SWIFT_ENABLE_TENSORFLOW
-  case AnyFunctionType::Representation::TensorFlow:
     // Source is native, so we can convert signature first.
     destTy = adjustFunctionType(destRepTy,
                                 srcTy->getRepresentation());
@@ -2469,17 +2462,6 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
   // Emit the closure body.
   SGF.SGM.emitClosure(e);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // Make sure that no values are captured if this a tensorflow function.
-  auto *closureType = e->getType()->castTo<AnyFunctionType>();
-  const auto &captureInfo = e->getCaptureInfo();
-  if (closureType->getExtInfo().getRepresentation() ==
-          FunctionTypeRepresentation::TensorFlow &&
-      (captureInfo.hasLocalCaptures() || captureInfo.hasDynamicSelfCapture())) {
-    SGF.SGM.diagnose(e, diag::tf_no_captures_in_tf_functions);
-    return RValue(SGF, e, SGF.emitUndef(e, e->getType()));
-  }
-
   SubstitutionMap subs;
   if (e->getCaptureInfo().hasGenericParamCaptures())
     subs = SGF.getForwardingSubstitutionMap();
@@ -2502,47 +2484,7 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
 
 RValue RValueEmitter::
 visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
-  // SWIFT_ENABLE_TENSORFLOW
-  if (!E->isTFOp())
-    return visit(E->getSemanticExpr(), C);
-
-  // If this is a tensorflow operation, we have a bit more work to do: we emit
-  // a GraphOperationInst.
-  auto tuple = dyn_cast<TupleExpr>(E->getArg());
-
-  auto opNameArg = tuple ? tuple->getElement(0) : E->getArg();
-  opNameArg = opNameArg->getSemanticsProvidingExpr();
-  auto opName = cast<StringLiteralExpr>(opNameArg)->getValue();
-  tf::GraphOperationBuilder opBuilder(opName);
-
-  if (tuple) {
-    for (unsigned i = 1, e = tuple->getNumElements(); i != e; ++i) {
-      // Arguments of this graph_op will be taken at +0 instead of +1, for
-      // consistency with the default calling convention of taking function
-      // parameters as @guaranteed instead of @owned.
-      // e.g. Say E represents #tfop("Add", x, x). x can be passed into this
-      // expression without having to do a strong_retain (or copy_value) first.
-      auto operand =
-          SGF.emitRValueAsSingleValue(tuple->getElement(i),
-                                      SGFContext::AllowGuaranteedPlusZero)
-             .getValue();
-      opBuilder.addArgument(operand, tuple->getElementName(i).str());
-    }
-  }
-
-  auto &resultTL = SGF.getTypeLowering(E->getType());
-  if (resultTL.isLoadable()) {
-    auto graphOpInst = opBuilder.build(SGF.B, SGF.getASTContext(), E,
-                                       resultTL.getLoweredType());
-    return RValue(SGF, E,
-                  SGF.emitManagedRValueWithCleanup(graphOpInst->getResult(0),
-                                                   resultTL));
-  } else {
-    auto address = SGF.getBufferForExprResult(E, resultTL.getLoweredType(), C);
-    opBuilder.addArgument(address, "$out");
-    opBuilder.build(SGF.B, SGF.getASTContext(), E, /*resultSilTypes=*/{});
-    return RValue(SGF, E, SGF.manageBufferForExprResult(address, resultTL, C));
-  }
+  return visit(E->getSemanticExpr(), C);
 }
 
 RValue RValueEmitter::
@@ -4009,8 +3951,6 @@ static bool isVerbatimNullableTypeInC(SILModule &M, Type ty) {
       // Was already bridged.
       case FunctionTypeRepresentation::Swift:
       case FunctionTypeRepresentation::Thin:
-      // SWIFT_ENABLE_TENSORFLOW
-      case FunctionType::Representation::TensorFlow:
         return false;
       }
     }
@@ -4133,8 +4073,6 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M, Expr *expr) {
       return true;
     case FunctionTypeRepresentation::Swift:
     case FunctionTypeRepresentation::Thin:
-    // SWIFT_ENABLE_TENSORFLOW
-    case FunctionTypeRepresentation::TensorFlow:
       return false;
     }
   }
@@ -5369,19 +5307,12 @@ RValue RValueEmitter::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
 // SWIFT_ENABLE_TENSORFLOW
 RValue RValueEmitter::visitAutoDiffFunctionExpr(AutoDiffFunctionExpr *E,
                                                 SGFContext C) {
-  std::function<unsigned(Type)> countParams;
-  countParams = [&](Type type) -> unsigned {
-    auto *fnTy = type->getAs<AnyFunctionType>();
-    if (!fnTy)
-      return 0;
-    return fnTy->getNumParams() + countParams(fnTy->getResult());
-  };
-
-  // TODO(rxwei): Use the parameter indices and order specified in E's function
-  // type.
   auto orig = SGF.emitRValueAsSingleValue(E->getSubExpr());
-  auto *diffFunc = SGF.B.createAutoDiffFunction(E,
-      SmallBitVector(countParams(E->getType()), true), 1, orig.forward(SGF));
+  auto destTy = SGF.getLoweredType(E->getType()).castTo<SILFunctionType>();
+  // TODO(rxwei): Use the order specified in E's function type.
+  auto *diffFunc = SGF.B.createAutoDiffFunction(
+      E, destTy->getDifferentiationParameterIndices(), /*order*/ 1,
+      orig.forward(SGF));
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
 }
 

@@ -1,14 +1,6 @@
-// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
-
-// SR-9737: hanging tests in GPE GPU mode
-// UN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
-
+// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize
 //
-// Compiler-only testing for TPU graph lowering (e.g. shape requirements by XLA).
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-target-tpu -O -emit-sil %s >/dev/null
-
 // Control flow related tests.
 
 import TensorFlow
@@ -105,11 +97,11 @@ public func testEnumWithPayload(_ x: EnumWithPayload, _ expectedVal: Float) {
     _hostOp(x)
   case .b(let x):
     _hostOp(x)
-    let tx = Tensor<Float>(x).toAccelerator(shape: [])
+    let tx = Tensor<Float>(x)
     val += tx
     val = _scalarTensorWithShape(val)
   case .c(let x, let y):
-    val *= x.toAccelerator(shape: []) + y.toAccelerator(shape: [])
+    val *= x + y
     val = _scalarTensorWithShape(val)
     _hostOp(x)
     _hostOp(y)
@@ -151,7 +143,7 @@ public func testSwitchEnum(_ a: Tensor<Float>?,
                            _ expectedVal: Float) {
   var b = Tensor<Float>(2.0)
   if let a = a {
-    b += a.toAccelerator(shape: [])
+    b += a
     b = _scalarTensorWithShape(b)
   }
   b -= 1.0

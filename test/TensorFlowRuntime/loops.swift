@@ -1,10 +1,5 @@
-// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
-// RUN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize
-//
-// Compiler-only testing for TPU graph lowering (e.g. shape requirements by XLA).
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-target-tpu -O -emit-sil %s >/dev/null
 //
 // Loop tests.
 
@@ -87,7 +82,7 @@ LoopsTests.testAllBackends("SR-8191") {
   var i = 0
   repeat {
     let y = t + t
-    _hostOp(y.toHost(shape: []))
+    _hostOp(y)
     i += 1
   } while i < 10
   // TODO: remove the extra code below once TPU execution supports 0 output

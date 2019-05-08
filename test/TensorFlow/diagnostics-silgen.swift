@@ -1,6 +1,7 @@
 // This test file captures the diagnostics related to TensorFlow that are
 // generated during the SILGen phase.
 // RUN: %target-swift-frontend -O -emit-sil -verify %s
+// REQUIRES: deprecated_gpe_mode
 
 import TensorFlow
 

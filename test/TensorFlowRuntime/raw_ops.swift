@@ -1,7 +1,5 @@
-// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
-// RUN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize
 // REQUIRES: tensorflow_swift_bindings
 //
 // TensorFlow Raw Ops API tests.
@@ -22,13 +20,12 @@ public func testPointwiseBinaryOp<T : TensorFlowScalar & Equatable>(
   swiftOp: (Float, Float) -> T) {
   let lhsScalars: [Float] = [3, 1, 4, 1, 5, 9, 2, 7]
   let rhsScalars: [Float] = [2, 7, 1, 8, 2, 8, 1, 7]
-  let shape = [2, 4]
-  let tensorShape: TensorShape = TensorShape(shape.map { Int32($0) })
-  let lhs = Tensor<Float>(shape: tensorShape, scalars: lhsScalars)
-  let rhs = Tensor<Float>(shape: tensorShape, scalars: rhsScalars)
+  let shape: TensorShape = [2, 4]
+  let lhs = Tensor<Float>(shape: shape, scalars: lhsScalars)
+  let rhs = Tensor<Float>(shape: shape, scalars: rhsScalars)
 
   let tfResult = tfOp(lhs, rhs)
-  expectEqual(ShapedArray(shape: shape,
+  expectEqual(ShapedArray(shape: shape.dimensions,
                           scalars: zip(lhsScalars, rhsScalars).map(swiftOp)),
               tfResult.array)
 }

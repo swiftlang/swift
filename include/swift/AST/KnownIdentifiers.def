@@ -31,6 +31,8 @@ IDENTIFIER(Any)
 IDENTIFIER(ArrayLiteralElement)
 IDENTIFIER(atIndexedSubscript)
 IDENTIFIER_(bridgeToObjectiveC)
+// SWIFT_ENABLE_TENSORFLOW
+IDENTIFIER(call)
 IDENTIFIER_WITH_NAME(code_, "_code")
 IDENTIFIER(CodingKeys)
 IDENTIFIER(combine)
@@ -126,6 +128,11 @@ IDENTIFIER(allKeyPaths)
 IDENTIFIER(recursivelyAllKeyPaths)
 IDENTIFIER(allWritableKeyPaths)
 IDENTIFIER(recursivelyAllWritableKeyPaths)
+// TensorArrayProtocol
+IDENTIFIER_(unpackTensorHandles)
+IDENTIFIER_(tensorHandleCount)
+// TensorGroup
+IDENTIFIER_(typeList)
 // AdditiveArithmetic, VectorNumeric
 IDENTIFIER(zero)
 IDENTIFIER(Scalar)

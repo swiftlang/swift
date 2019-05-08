@@ -547,7 +547,6 @@ public:
         theFunction));
   }
 
-
   AutoDiffFunctionExtractInst *createAutoDiffFunctionExtractOriginal(
       SILLocation loc, SILValue theFunction) {
     return insert(new (getModule()) AutoDiffFunctionExtractInst(
@@ -1478,16 +1477,6 @@ public:
   void emitShallowDestructureAddressOperation(
       SILLocation Loc, SILValue Operand,
       llvm::SmallVectorImpl<SILValue> &Result);
-
-  GraphOperationInst *
-  createGraphOperation(SILLocation loc, Identifier name,
-                       ArrayRef<SILValue> operands,
-                       ArrayRef<GraphOperationAttribute> attrs,
-                       bool noClustering, ArrayRef<SILType> resultTypes) {
-    return insert(
-        GraphOperationInst::create(getModule(), getSILDebugLocation(loc), name,
-                                   operands, attrs, noClustering, resultTypes));
-  }
 
   ClassMethodInst *createClassMethod(SILLocation Loc, SILValue Operand,
                                      SILDeclRef Member, SILType MethodTy) {

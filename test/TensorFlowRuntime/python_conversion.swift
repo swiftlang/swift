@@ -1,15 +1,13 @@
-// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
-// RUN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize
 // REQUIRES: tensorflow
 //
-// `numpy.ndarray` conversion tests.
+// Python conversion and `numpy.ndarray` tests.
 
 import TensorFlow
 import StdlibUnittest
 
-var NumpyConversionTests = TestSuite("NumpyConversion")
+var PythonConversionTests = TestSuite("PythonConversion")
 
 // TODO: Add `python` as a lit feature so this test can use "REQUIRE: python"
 // instead of `#if canImport(Python)`.
@@ -20,7 +18,7 @@ import Python
 let numpyModule = try? Python.attemptImport("numpy")
 let ctypesModule = try? Python.attemptImport("ctypes")
 
-NumpyConversionTests.test("shaped-array-conversion") {
+PythonConversionTests.test("shaped-array-conversion") {
   guard let np = numpyModule else { return }
 
   let numpyArrayEmpty = np.array([[]] as [[Float]], dtype: np.float32)
@@ -52,6 +50,18 @@ NumpyConversionTests.test("shaped-array-conversion") {
                 array)
   }
 
+  let reshaped = np.reshape(numpyArrayInt32, [2, 3] as TensorShape)
+  if let array = expectNotNil(ShapedArray<Int32>(numpy: reshaped)) {
+    expectEqual(ShapedArray(shape: [2, 3], scalars: [1, 2, 3, 4, 5, 6]),
+                array)
+  }
+
+  let numpyArray1D = np.ones(28)
+  let reshaped3D = np.reshape(numpyArray1D, [2, 7, 2] as TensorShape)
+  expectEqual(reshaped3D.shape, Python.tuple([2, 7, 2]))
+  let reshaped2D = np.reshape(reshaped3D, [14, 2] as TensorShape)
+  expectEqual(reshaped2D.shape, Python.tuple([14, 2]))
+
   let numpyArrayStrided = np.array([[1, 2], [1, 2]], dtype: np.int32)[
       Python.slice(Python.None), 1]
   // Assert that the array has a stride, so that we're certainly testing a
@@ -63,7 +73,7 @@ NumpyConversionTests.test("shaped-array-conversion") {
   }
 }
 
-NumpyConversionTests.test("tensor-conversion") {
+PythonConversionTests.test("tensor-conversion") {
   guard let np = numpyModule else { return }
 
   let numpyArrayEmpty = np.array([[]] as [[Float]], dtype: np.float32)
@@ -95,6 +105,12 @@ NumpyConversionTests.test("tensor-conversion") {
                 tensor.array)
   }
 
+  let reshaped = np.reshape(numpyArrayInt32, [2, 3] as TensorShape)
+  if let tensor = expectNotNil(Tensor<Int32>(numpy: reshaped)) {
+    expectEqual(ShapedArray(shape: [2, 3], scalars: [1, 2, 3, 4, 5, 6]),
+                tensor.array)
+  }
+
   let numpyArrayStrided = np.array([[1, 2], [1, 2]], dtype: np.int32)[
       Python.slice(Python.None), 1]
   // Assert that the array has a stride, so that we're certainly testing a
@@ -105,7 +121,7 @@ NumpyConversionTests.test("tensor-conversion") {
   }
 }
 
-NumpyConversionTests.test("tensor-round-trip") {
+PythonConversionTests.test("tensor-round-trip") {
   guard numpyModule != nil else { return }
   guard ctypesModule != nil else { return }
 
@@ -117,6 +133,11 @@ NumpyConversionTests.test("tensor-round-trip") {
 
   let t3 = Tensor<Int32>(repeating: 30, shape: [8,5,4])
   expectEqual(t3, Tensor<Int32>(numpy: t3.makeNumpyArray())!)
+}
+
+PythonConversionTests.test("tensor-shape") {
+  let pyArray = [2, 3].pythonObject
+  expectEqual(pyArray, TensorShape(2, 3).pythonObject)
 }
 #endif
 

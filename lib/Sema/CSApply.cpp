@@ -29,9 +29,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/TensorFlow.h" // SWIFT_ENABLE_TENSORFLOW
 #include "swift/Basic/StringExtras.h"
-#include "swift/SIL/GraphOperationInfo.h" // SWIFT_ENABLE_TENSORFLOW
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -425,9 +423,6 @@ namespace {
   /// \brief Rewrites an expression by applying the solution of a constraint
   /// system to that expression.
   class ExprRewriter : public ExprVisitor<ExprRewriter, Expr *> {
-  // SWIFT_ENABLE_TENSORFLOW
-  private:
-    tf::AttributeTypeClassifier atc;
   public:
     ConstraintSystem &cs;
     DeclContext *dc;
@@ -2303,156 +2298,8 @@ namespace {
 
     // SWIFT_ENABLE_TENSORFLOW
     Expr *visitTFOp(ObjectLiteralExpr *expr) {
-      auto &ctx = cs.TC.Context;
-
-      auto diagnose = [&](SourceLoc loc, const Twine &message) {
-        cs.TC.diagnose(loc, diag::invalid_tfop, message.str());
-      };
-
-      // All #tfop operands are RValues.
-      expr->setArg(cs.coerceToRValue(expr->getArg()));
-
-      // We do most of the typechecking for #tfop here in CSApply instead of
-      // generating constraints for #tfop in CSGen because #tfop allows many
-      // different types of arguments and results that are inconvenient or
-      // impossible to generate constraints for. For example:
-      // - NormalAttributes allow >10 different types, we would have to generate
-      //   a huge disjunction constraint to constraint all the different types,
-      //   and then we would have to add custom code to CSDiag that understands
-      //   how to create a nice error message for the disjunction constraint
-      //   failure.
-      // - Results can be arbitrary tuples of TensorFlow values, and there is
-      //   no nice way to constraint something to be an arbitrary tuple.
-      //
-      // It's much easier to check #tfop after we know what all the argument and
-      // result types are.
-
-      // Check arguments.
-      auto stringTy = ctx.getStringDecl()->getDeclaredInterfaceType();
-      auto *args = dyn_cast<TupleExpr>(expr->getArg());
-      if (!args) {
-        // CSGen has already ensured that the argument is a string in the
-        // single argument case.
-        assert(cs.getType(expr->getArg())->isEqual(stringTy) &&
-               "single argument should be string");
-      } else {
-        for (unsigned i = 0, e = args->getNumElements(); i != e; ++i) {
-          auto argExpr = args->getElement(i);
-          auto argType = cs.getType(argExpr);
-
-          // CSGen has already ensured that the first argument is a string, so skip
-          // the first argument.
-          if (i == 0) {
-            assert(argType->isEqual(stringTy) &&
-                   "first argument should be string");
-            continue;
-          }
-
-          auto argLoc = argExpr->getLoc();
-          auto argNameAndLowering = tf::GraphOperationInfo::decodeArgumentName(
-              args->getElementName(i).str());
-          if (!argNameAndLowering) {
-            diagnose(argLoc, "argument name has invalid modifier");
-            return nullptr;
-          }
-          auto argLowering = argNameAndLowering->second;
-          switch (argLowering) {
-          case tf::GraphOperationInfo::ArgumentLowering::Input:
-            // CSGen has already ensured that all inputs conform to
-            // TensorArrayProtocol.
-            break;
-          case tf::GraphOperationInfo::ArgumentLowering::NormalAttribute:
-            if (atc.classifyNormalAttribute(argType) ==
-                tf::AttributeTypeClassifier::Normal::Unsupported) {
-              diagnose(
-                  argLoc,
-                  StringRef("attribute requires ") +
-                      tf::AttributeTypeClassifier::normalSupportedTypesDesc +
-                      ", but got type '" + argType->getString() + "'");
-              return nullptr;
-            }
-            break;
-          case tf::GraphOperationInfo::ArgumentLowering::TensorAttribute:
-            // See the comment on the declaration of the enum case
-            // `GraphOperationInfo::ArgumentLowering::TensorAttribute` for more
-            // information on why these are not allowed in #tfop's.
-            diagnose(argLoc, "$tensor attributes are not allowed in #tfop's");
-            return nullptr;
-          case tf::GraphOperationInfo::ArgumentLowering::ShapeAttribute:
-            if (atc.classifyShapeAttribute(argType) ==
-                tf::AttributeTypeClassifier::Shape::Unsupported) {
-              diagnose(
-                  argLoc,
-                  StringRef("$shape attribute requires ")+
-                      tf::AttributeTypeClassifier::shapeSupportedTypesDesc +
-                      ", but got type '" + argType->getString() + "'");
-              return nullptr;
-            }
-            break;
-          case tf::GraphOperationInfo::ArgumentLowering::TFDataTypeAttribute:
-            if (atc.classifyTFDataTypeAttribute(argType) ==
-                tf::AttributeTypeClassifier::TFDataType::Unsupported) {
-              diagnose(
-                  argLoc,
-                  StringRef("$dtype attribute requires ") +
-                      tf::AttributeTypeClassifier::
-                          tfDataTypeSupportedTypesDesc +
-                      ", but got type '" + argType->getString() + "'");
-              return nullptr;
-            }
-            break;
-          case tf::GraphOperationInfo::ArgumentLowering::TFFunctionAttribute:
-            if (atc.classifyNormalAttribute(argType) !=
-                tf::AttributeTypeClassifier::Normal::String) {
-              diagnose(
-                  argLoc,
-                  StringRef("$func attribute requires ") +
-                      tf::AttributeTypeClassifier::tfFunctionSupportedTypesDesc +
-                      ", but got type '" + argType->getString() + "'");
-              return nullptr;
-            }
-            break;
-          case tf::GraphOperationInfo::ArgumentLowering::Out:
-            // SILGen generates $out attributes. It does not make sense to
-            // specify them in code.
-            diagnose(argLoc, "$out attributes are not allowed in #tfop's");
-            return nullptr;
-          }
-        }
-      }
-
-      // The result type must conform to TensorGroup or be a tuple of types that
-      // conform to TensorGroup.
-
-      auto tfModule = ctx.getLoadedModule(ctx.Id_TensorFlow);
-      assert(tfModule && "could not find TensorFlow module");
-      auto tensorGroupProto = ctx.getProtocol(KnownProtocolKind::TensorGroup);
-      assert(tensorGroupProto && "could not find TensorGroup protocol");
-
-      // Diagnoses and returns true if `type` does not conform to TensorGroup.
-      auto checkAndDiagnoseTensorGroup = [&](SourceLoc loc, Type type)
-          -> bool {
-        if (!tfModule->lookupConformance(type, tensorGroupProto)) {
-          diagnose(loc, "#tfop result must conform to TensorGroup or be "
-                        "a tuple of types that conform to TensorGroup");
-          return true;
-        }
-        return false;
-      };
-
-      // Check the result type.
-      auto resultType = cs.getType(expr);
-      if (auto *resultTupleType = resultType->getAs<TupleType>()) {
-        for (auto tupleTypeElt : resultTupleType->getElements())
-          if (checkAndDiagnoseTensorGroup(expr->getLoc(),
-                                          tupleTypeElt.getType()))
-            return nullptr;
-      } else {
-        if (checkAndDiagnoseTensorGroup(expr->getLoc(), resultType))
-          return nullptr;
-      }
-
-      return expr;
+      cs.TC.diagnose(expr->getLoc(), diag::invalid_tfop, "all tfops are now invalid");
+      return nullptr;
     }
 
     Expr *visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
@@ -6126,19 +5973,6 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
   Type fromType = cs.getType(expr);
   auto fromFnType = fromType->getAs<AnyFunctionType>();
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // If function types have different representations and one of them is
-  // @convention(tensorflow), reject it.
-  auto toTypeRepr = toType->getRepresentation();
-  auto fromTypeRepr = fromFnType->getRepresentation();
-  if (toTypeRepr != fromTypeRepr &&
-      (toTypeRepr == AnyFunctionType::Representation::TensorFlow ||
-       fromTypeRepr == AnyFunctionType::Representation::TensorFlow)) {
-    tc.diagnose(expr->getLoc(),
-                diag::invalid_tensorflow_fn_conversion);
-    return;
-  }
-
   // Conversions to C function pointer type are limited. Since a C function
   // pointer captures no context, we can only do the necessary thunking or
   // codegen if the original function is a direct reference to a global function
@@ -6778,25 +6612,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto fromEI = fromFunc->getExtInfo();
       // Handle implicit conversion from @differentiable.
       if (fromEI.isDifferentiable() && !toEI.isDifferentiable()) {
-        fromFunc = fromFunc->withExtInfo(fromEI.withDifferentiable(false))
-                ->castTo<FunctionType>();
+        fromFunc = fromFunc->getWithoutDifferentiability()
+            ->castTo<FunctionType>();
         expr = cs.cacheType(new (tc.Context)
             AutoDiffFunctionExtractOriginalExpr(expr, fromFunc));
-      }
-      // If we have a ClosureExpr, then we can safely propagate tensorflow
-      // convention to the closure expression.
-      // NOTE: we also need to check if the closure captures any values.
-      // However, capture information is not available at this point. Therefore,
-      // the check currently happens in the SILGen phase.
-      if (toEI.getRepresentation() ==
-              AnyFunctionType::Representation::TensorFlow &&
-          fromEI.getRepresentation() !=
-              AnyFunctionType::Representation::TensorFlow) {
-        auto newFromFuncType = fromFunc->withExtInfo(fromEI.withRepresentation(
-            AnyFunctionType::Representation::TensorFlow));
-        if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
-          fromFunc = newFromFuncType->castTo<FunctionType>();
-        }
       }
       // If we have a ClosureExpr, then we can safely propagate the 'no escape'
       // bit to the closure without invalidating prior analysis.
@@ -6831,9 +6650,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
 
       // SWIFT_ENABLE_TENSORFLOW
-      auto toEINoAdConversion =
+      auto toEINoADConversion =
           toEI.withDifferentiable(fromEI.isDifferentiable());
-      auto toFuncNoADConversion = toFunc->withExtInfo(toEINoAdConversion);
+      auto toFuncNoADConversion = toFunc->withExtInfo(toEINoADConversion);
+      if (toEI.isDifferentiable() && !fromEI.isDifferentiable())
+        toFuncNoADConversion =
+            toFuncNoADConversion->getWithoutDifferentiability();
       expr = cs.cacheType(new (tc.Context)
                               FunctionConversionExpr(expr,
                                                      toFuncNoADConversion));
@@ -6842,10 +6664,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // because some of the other conversions are not currently supported on
       // @differentiable functions. (e.g. escape_to_noescape).
       // After we do support those conversions, the order will no longer matter.
-      if (!fromEI.isDifferentiable() && toEI.isDifferentiable()) {
+      if (!fromEI.isDifferentiable() && toEI.isDifferentiable())
         expr = cs.cacheType(new (tc.Context)
-                            AutoDiffFunctionExpr(expr, toFunc));
-      }
+                                AutoDiffFunctionExpr(expr, toFunc));
 
       return expr;
     }
@@ -7547,6 +7368,11 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       llvm_unreachable("Unhandled DeclTypeCheckingSemantics in switch.");
     };
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // Save the original potentially lvalue function for rewriting call method
+  // applications.
+  auto *originalFn = fn;
+  // SWIFT_ENABLE_TENSORFLOW END
   // The function is always an rvalue.
   fn = cs.coerceToRValue(fn);
 
@@ -7756,6 +7582,58 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     // Tail-recur to actually call the constructor.
     return finishApply(apply, openedType, locator);
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Handle call method applications.
+  auto &ctx = cs.getASTContext();
+
+  TupleExpr *arg = dyn_cast<TupleExpr>(apply->getArg());
+  if (auto parenExpr = dyn_cast<ParenExpr>(apply->getArg()))
+    arg = TupleExpr::createImplicit(ctx, parenExpr->getSubExpr(), {});
+
+  // Get resolved call method and verify it.
+  auto loc = locator.withPathElement(ConstraintLocator::ApplyFunction);
+  auto selected = solution.getOverloadChoice(cs.getConstraintLocator(loc));
+  auto choice = selected.choice;
+  auto *callMethod = dyn_cast<FuncDecl>(selected.choice.getDecl());
+  if (callMethod && callMethod->isCallable()) {
+    auto methodType =
+        simplifyType(selected.openedType)->castTo<AnyFunctionType>();
+    auto selfParam = callMethod->getImplicitSelfDecl();
+    // Diagnose `mutating` method call on immutable value.
+    if (!cs.getType(originalFn)->hasLValueType() && selfParam->isInOut()) {
+      AssignmentFailure failure(originalFn, cs, originalFn->getLoc(),
+                                diag::cannot_pass_rvalue_mutating_subelement,
+                                diag::cannot_pass_rvalue_mutating);
+      failure.diagnose();
+      return nullptr;
+    }
+    // Create direct reference to call method.
+    bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
+    Expr *declRef = buildMemberRef(originalFn, selected.openedFullType,
+                                   /*dotLoc=*/SourceLoc(), choice,
+                                   DeclNameLoc(fn->getEndLoc()),
+                                   selected.openedType, loc, loc,
+                                   /*Implicit=*/true,
+                                   choice.getFunctionRefKind(),
+                                   AccessSemantics::Ordinary, isDynamic);
+    if (!declRef)
+      return nullptr;
+    declRef->setImplicit(apply->isImplicit());
+    apply->setFn(declRef);
+    // Coerce argument to input type of call method.
+    SmallVector<Identifier, 2> argLabelsScratch;
+    auto *arg = coerceCallArguments(apply->getArg(), methodType, apply,
+                                    apply->getArgumentLabels(argLabelsScratch),
+                                    apply->hasTrailingClosure(), loc);
+    if (!arg)
+      return nullptr;
+    apply->setArg(arg);
+    cs.setType(apply, methodType->getResult());
+    cs.cacheExprTypes(apply);
+    return apply;
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   // Handle @dynamicCallable applications.
   // At this point, all other ApplyExpr cases have been handled.

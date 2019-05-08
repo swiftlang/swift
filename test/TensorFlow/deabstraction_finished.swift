@@ -1,13 +1,14 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -O -emit-sil -Xllvm -tf-module-level-graph=false -verify %s | %FileCheck %s
+// REQUIRES: deprecated_gpe_mode
 import TensorFlow
 
 // FIXME: This should not build with -O.
 
 // CHECK-LABEL: --- TFDeabstraction Result: {{.*}}reproduceSR9365{{.*}}
-// CHECK: graph_op "Reproduce SR-9365"() {test: [$String: ], 
+// CHECK: graph_op "TensorSummary"({{.*}}) {labels: [$String: ], 
 @TensorFlowGraph
 func reproduceSR9365() {
-   let _: () = #tfop("Reproduce SR-9365", test: Array<String>())
+  let _: () = #tfop("TensorSummary", Tensor<Float>(0.0), labels: Array<String>())
 }
 
 public func trivialAdd(a: Tensor<Float>) -> Tensor<Float> {
@@ -90,12 +91,13 @@ CHECK-LABEL: ----
 
 public func stringAttributes() {
   let str = "abc"
-  // expected-error @+1 {{op named 'foo' is not registered in TensorFlow}}
-  let _ : TensorHandle<Float> = #tfop("foo", attr1: String(), attr2: str)
+  let _ : ResourceHandle =
+    #tfop(
+      "TensorSummary", Tensor<Float>(0.0), description: "", display_name: str)
 }
 /*
 CHECK-LABEL: --- INPUT FUNCTION {{.*}}stringAttributes
- CHECK: graph_op "foo"() {attr1: "", attr2: "abc", __device: "/job:localhost/replica:0/task:0/device:CPU:0"}
+ CHECK: graph_op "TensorSummary"({{.*}}) {description: "", display_name: "abc", __device: "/job:localhost/replica:0/task:0/device:CPU:0"}
 */
 
 public func tensorShape() -> Tensor<Float> {
@@ -115,15 +117,16 @@ public func test75407624() {
   let d = Tensor<Float>(shape: [2,2], scalars: [1,2,3,4])
   _ = a+b+c+d
 }
+// NOTE(TF-439): Test disabled after changing `Int32` to `Int` in TF APIs.
 /* CHECK-LABEL: ---- INPUT FUNCTION {{.*}}test75407624
  * CHECK: graph_op "Const"() {dtype$dtype: i32 1, value$tensor: [$Float: (f32 0x3F800000 /* 1 */)], shape$shape: [$Int32: i32 1]
- * CHECK: [[B1X:%.*]] = graph_op "Const"() {dtype$dtype: i32 3, value$tensor: [$Int32: (i32 1)], shape$shape: [$Int32: i32 1],
- * CHECK: [[BX2:%.*]] = graph_op "Const"() {dtype$dtype: i32 1, value$tensor: f32 0x3F800000 /* 1 */
- * CHECK:  graph_op "Fill"([[B1X]] : $TensorHandle<Int32>, [[BX2]] : $TensorHandle<Float>)
- * CHECK: [[C1X:%.*]] = graph_op "Const"() {dtype$dtype: i32 3, value$tensor: [$Int32: (i32 1)], shape$shape: [$Int32: i32 1],
- * CHECK: [[CX2:%.*]] = graph_op "Const"() {dtype$dtype: i32 1, value$tensor: f32 0x3F800000 /* 1 */
- * CHECK:  graph_op "Fill"([[C1X]] : $TensorHandle<Int32>, [[CX2]] : $TensorHandle<Float>)
- * CHECK: graph_op "Const"() {dtype$dtype: i32 1, value$tensor: [$Float: (f32 0x3F800000 /* 1 */), (f32 0x40000000 /* 2 */), (f32 0x40400000 /* 3 */), (f32 0x40800000 /* 4 */)], shape$shape: [$Int32: (i32 2), (i32 2)],
+ * HECK: [[B1X:%.*]] = graph_op "Const"() {dtype$dtype: i32 3, value$tensor: [$Int32: (i32 1)]
+ * HECK: [[BX2:%.*]] = graph_op "Const"() {dtype$dtype: i32 1, value$tensor: f32 0x3F800000 /* 1 */
+ * HECK:  graph_op "Fill"([[B1X]] : $TensorHandle<Int32>, [[BX2]] : $TensorHandle<Float>)
+ * HECK: [[C1X:%.*]] = graph_op "Const"() {dtype$dtype: i32 3, value$tensor: [$Int32: (i32 1)], shape$shape: [$Int32: i32 1],
+ * HECK: [[CX2:%.*]] = graph_op "Const"() {dtype$dtype: i32 1, value$tensor: f32 0x3F800000 /* 1 */
+ * HECK:  graph_op "Fill"([[C1X]] : $TensorHandle<Int32>, [[CX2]] : $TensorHandle<Float>)
+ * HECK: graph_op "Const"() {dtype$dtype: i32 1, value$tensor: [$Float: (f32 0x3F800000 /* 1 */), (f32 0x40000000 /* 2 */), (f32 0x40400000 /* 3 */), (f32 0x40800000 /* 4 */)], shape$shape: [$Int32: (i32 2), (i32 2)],
  * CHECK-LABEL: ---- END OF
 */
 
@@ -133,11 +136,11 @@ public func testConvolution(x: Tensor<Float>, filter: Tensor<Float>) -> Tensor<F
                                        strides: (1, 2, 3, 4), padding: .same)
 }
 
+// NOTE(TF-439): Test disabled after changing `Int32` to `Int` in TF APIs.
 /* CHECK-LABEL: ---- INPUT FUNCTION {{.*}}testConvolution
- * CHECK: graph_op "Conv2D"({{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>) {T$dtype: i32 1, strides: [$Int32: (i32 1), (i32 2), (i32 3), (i32 4)], use_cudnn_on_gpu: i1 -1, padding: "SAME", data_format: "NHWC", dilations: [$Int32: (i32 1), (i32 1), (i32 1), (i32 1)],
+ * HECK: graph_op "Conv2D"({{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>) {T$dtype: i32 1, strides: [$Int32: (i32 1), (i32 2), (i32 3), (i32 4)], use_cudnn_on_gpu: i1 -1, padding: "SAME", explicit_paddings: [$Int32: ], data_format: "NHWC", dilations: [$Int32: (i32 1), (i32 1), (i32 1), (i32 1)],
  * CHECK-LABEL: ---- END OF
 */
-
 
 // SR-8463: SimpleDataset itself is not a const, but the `elementShape` field
 // is, so it can be const-evaluated.
@@ -193,7 +196,7 @@ public func testShapeList2() {
 }
 
 // CHECK-LABEL: ---- INPUT FUNCTION {{.*}}testShapeList
-// CHECK: graph_op "AnonymousIterator"() {output_types$dtype: [$TensorDataType: (((i32 3)))], output_shapes: [$TensorShape: ([$Int32: ])]
+// CHECK: graph_op "AnonymousIterator"() {output_types$dtype: [$TensorDataType: (((i32 3)))], output_shapes: [$TensorShape: ([$Int: ])]
 
 @TensorFlowGraph
 func isZero(_ x: Tensor<Float>) -> Tensor<Bool> {

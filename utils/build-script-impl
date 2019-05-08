@@ -280,7 +280,7 @@ KNOWN_SETTINGS=(
     tensorflow-host-include-dir        ""        "Path to host TensorFlow headers"
     tensorflow-target-include-dir      ""        "Path to target Tensorflow headers"
     tensorflow-target-lib-dir          ""        "Path to target TensorFlow libraries"
-    tensorflow-swift-bindings          ""        "Path to TensorFlow Swift bindings file"
+    tensorflow-swift-bindings          ""        "Path to TensorFlow Swift bindings repository"
     tensorflow-swift-apis              ""        "Path to TensorFlow deep learning library repository"
 )
 
@@ -1222,8 +1222,8 @@ if [[ "${ENABLE_TENSORFLOW}" ]]; then
         echo "Couldn't find TensorFlow source directory."
         exit 1
     fi
-    if [[ "${TENSORFLOW_SWIFT_BINDINGS}" && ! -f "${TENSORFLOW_SWIFT_BINDINGS}" ]]; then
-        echo "Invalid TensorFlow Swift bindings file specified."
+    if [[ "${TENSORFLOW_SWIFT_BINDINGS}" && ! -d "${TENSORFLOW_SWIFT_BINDINGS}" ]]; then
+        echo "Invalid TensorFlow Swift bindings repository specified."
         exit 1
     fi
     if [[ "${TENSORFLOW_SWIFT_APIS}" && ! -d "${TENSORFLOW_SWIFT_APIS}" ]]; then
@@ -2011,7 +2011,7 @@ function set_lldb_xcodebuild_options() {
         lldb_xcodebuild_options=(
             "${lldb_xcodebuild_options[@]}"
             ENABLE_TENSORFLOW=1
-            EXTRA_OTHER_LDFLAGS="-L\$(LLDB_PATH_TO_SWIFT_BUILD)/lib/swift/\$(PLATFORM_NAME) ${RPATHS} -ltensorflow -ltensorflow_framework"
+            EXTRA_OTHER_LDFLAGS="-L\$(LLDB_PATH_TO_SWIFT_BUILD)/lib/swift/\$(PLATFORM_NAME) ${RPATHS} -ltensorflow"
         )
     fi
 }
@@ -2444,10 +2444,11 @@ for host in "${ALL_HOSTS[@]}"; do
                     # problematic for overwriting/stripping symbols. Thus, write
                     # permission is added here.
                     for lib_name in tensorflow tensorflow_framework; do
-                        lib="lib${lib_name}.so"
-                        rm -f "${TF_LIB_DIR}/${lib}"
-                        chmod +w "${TENSORFLOW_HOST_LIB_DIR}/${lib}"
-                        cp -p "${TENSORFLOW_HOST_LIB_DIR}/${lib}" "${TF_LIB_DIR}"
+                        lib=".*lib${lib_name}.so[0-9.]*"
+                        dylib=".*lib${lib_name}[0-9.]*.dylib"
+                        find "${TF_LIB_DIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec rm -f {} \;
+                        find "${TENSORFLOW_HOST_LIB_DIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec chmod +w {} +
+                        find "${TENSORFLOW_HOST_LIB_DIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec cp -p {} "${TF_LIB_DIR}" \;
                     done
 
                     if [[ ! "${TENSORFLOW_TARGET_LIB_DIR}" ]] ; then
@@ -2475,7 +2476,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                     # Handle TensorFlow Swift bindings file.
                     if [[ ! "${TENSORFLOW_SWIFT_BINDINGS}" && -d "${TENSORFLOW_SWIFT_BINDINGS_DIR}" ]] ; then
-                        TENSORFLOW_SWIFT_BINDINGS="${TENSORFLOW_SWIFT_BINDINGS_DIR}/RawOpsGenerated.swift"
+                        TENSORFLOW_SWIFT_BINDINGS="${TENSORFLOW_SWIFT_BINDINGS_DIR}"
                     fi
                     if [[ "${TENSORFLOW_SWIFT_BINDINGS}" ]] ; then
                         cmake_options=(
@@ -2992,7 +2993,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 # Configure TensorFlow and build using bazel.
                 echo yes "" | "${source_dir}/configure"
                 with_pushd "${source_dir}" \
-                    call bazel build -c opt "${TENSORFLOW_BAZEL_OPTIONS[@]}" //tensorflow:libtensorflow.so //tensorflow:libtensorflow_framework.so
+                    call bazel build -c opt "${TENSORFLOW_BAZEL_OPTIONS[@]}" --define framework_shared_object=false //tensorflow:libtensorflow.so //tensorflow:libtensorflow_framework.so
 
                 # Set TensorFlow include/lib directories.
                 TENSORFLOW_HOST_INCLUDE_DIR="${source_dir}"
@@ -3828,10 +3829,10 @@ for host in "${ALL_HOSTS[@]}"; do
                 mkdir -p "${TF_DEST_DIR}"
                 for lib_name in tensorflow tensorflow_framework
                 do
-                    lib="lib${lib_name}.so"
-                    echo "${TF_LIBDIR}/${lib} => ${TF_DEST_DIR}"
-                    rm -f "${TF_DEST_DIR}/${lib}"
-                    cp -a "${TF_LIBDIR}/${lib}" "${TF_DEST_DIR}"
+                    lib=".*lib${lib_name}.so[0-9.]*"
+                    dylib=".*lib${lib_name}[0-9.]*.dylib"
+                    find "${TF_LIBDIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec echo "{} => ${TF_DEST_DIR}" \;
+                    find "${TF_LIBDIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec cp -a {} "${TF_DEST_DIR}" \;
                 done
                 continue
                 ;;

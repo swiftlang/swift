@@ -25,18 +25,6 @@
 // we also define some helper function wrappers, e.g. to make things symmetric
 // and generally feel nice to use.
 //
-// The ops themselves are defined by the primitive #tfop(...) syntax, here are
-// some examples:
-//     result = #tfop("Add", lhs, rhs)
-//     result = #tfop("Const", dtype: Float.self, value$tensor: 4.0)
-//
-// The first parameter to this syntax is the TensorFlow op name as a string.
-// After that, the inputs are specified, and then attributes are specified
-// with their name as the keyword argument.
-//
-// Inputs and outputs must be of TensorHandle, ResourceHandle, or VariantHandle
-// type.  These are magic types known to the compiler.
-//
 
 infix operator ++ : AdditionPrecedence
 
@@ -635,7 +623,8 @@ public extension Tensor {
     wrt: self, vjp: _vjpTransposed(withPermutations:)
     where Scalar : TensorFlowFloatingPoint
   )
-  func transposed(withPermutations permutations: [Int32]) -> Tensor {
+  func transposed(withPermutations permutations: [Int]) -> Tensor {
+    let permutations = permutations.map(Int32.init)
     return transposed(withPermutations: Tensor<Int32>(permutations))
   }
 
@@ -646,7 +635,7 @@ public extension Tensor {
     wrt: self, vjp: _vjpTransposed(withPermutations:)
     where Scalar : TensorFlowFloatingPoint
   )
-  func transposed(withPermutations permutations: Int32...) -> Tensor {
+  func transposed(withPermutations permutations: Int...) -> Tensor {
     return transposed(withPermutations: permutations)
   }
 
@@ -658,22 +647,29 @@ public extension Tensor {
   )
   func transposed() -> Tensor {
     let defaultPermutations = rankTensor - 1 - Tensor<Int32>(
-      rangeFrom: 0, to: rank, stride: 1
+      rangeFrom: 0, to: Int32(rank), stride: 1
     )
     return transposed(withPermutations: Tensor<Int32>(defaultPermutations))
   }
 }
 
-
 public extension Tensor {
+  /// Returns a concatenated tensor of the given tensors.
+  /// - Precondition: The tensors must have the same dimensions, except for the
+  ///   specified axis.
+  /// - Precondition: The axis must be in the range `-rank..<rank`.
+  init(concatenating tensors: [Tensor<Scalar>], alongAxis axis: Int = 0) {
+    self = Raw.concatV2(tensors, axis: Tensor<Int32>(Int32(axis)))
+  }
+
   /// Concatenates tensors along the specified axis.
   /// - Precondition: The tensors must have the same dimensions, except for the
   ///   specified axis.
   /// - Precondition: The axis must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
   @differentiable(vjp: _vjpConcatenated where Scalar : TensorFlowFloatingPoint)
-  func concatenated(with other: Tensor, alongAxis axis: Int32 = 0) -> Tensor {
-    return Raw.concatV2([self, other], axis: Tensor<Int32>(axis))
+  func concatenated(with other: Tensor, alongAxis axis: Int = 0) -> Tensor {
+    return Raw.concatV2([self, other], axis: Tensor<Int32>(Int32(axis)))
   }
 
   /// Concatenation operator.
@@ -690,19 +686,17 @@ public extension Tensor {
 
 internal extension Tensor where Scalar : TensorFlowFloatingPoint {
   @inlinable @inline(__always)
-  func _vjpConcatenated(with other: Tensor, alongAxis axis: Int32)
+  func _vjpConcatenated(with other: Tensor, alongAxis axis: Int)
     -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
-    let idx = axis >= 0 ? axis : rank - axis
-    let splits = Tensor<Int32>([shapeTensor[idx], other.shapeTensor[idx]])
-    return (Raw.concatV2([self, other], axis: Tensor<Int32>(axis)), { result in
-      let ret: (TensorHandle<Scalar>, TensorHandle<Scalar>) = #tfop("SplitV",
-        result,
-        splits,
-        Tensor<Int32>(axis),
-        num_split: Int64(2),
-        T$dtype: Scalar.tensorFlowDataType,
-        Tlen$dtype: Int32.tensorFlowDataType)
-      return (Tensor(handle: ret.0), Tensor(handle: ret.1))
+    let posAxis = axis < 0 ? axis + rank: axis
+    let splits = Tensor<Int32>([shapeTensor[posAxis], other.shapeTensor[posAxis]])
+    return (concatenated(with: other, alongAxis: axis), { result in
+      let gradients = Raw.splitV(
+        value: result,
+        sizeSplits: splits,
+        splitDim: Tensor<Int32>(Int32(axis)),
+        numSplit: Int64(splits.shape[0]))
+      return (gradients[0], gradients[1])
     })
   }
 }
@@ -971,26 +965,6 @@ public func logSoftmax<T : FloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
 // Selection
 //===----------------------------------------------------------------------===//
 
-public extension Tensor where Scalar == Bool {
-  /// Returns a new tensor containing elements from either `left` or `right`,
-  /// depending on the elements of `self`.
-  ///
-  /// `self` acts as a mask that chooses, based on the value at each scalar,
-  ///  whether the corresponding scalar in the output should be taken from
-  /// `left` (if `true`) or `right` (if `false`).
-  ///
-  /// - Precondition: `left` and `right` must have the same shape. If
-  ///   `left` and `right` are scalar, then `self` must also be scalar. If
-  ///   `left` and `right` have rank greater than or equal to 1, then `self`
-  ///   must be either have the same shape as `left` or be a 1-D `Tensor` such
-  ///   that `self.scalarCount == left[0]`.
-  @available(*, deprecated, message: "Use '.replacing(with:mask:)' instead")
-  @inlinable
-  func selecting<T>(_ left: Tensor<T>, _ right: Tensor<T>) -> Tensor<T> {
-    return left.replacing(with: right, where: self)
-  }
-}
-
 public extension Tensor {
   /// Replaces elements of this tensor with `other` in the lanes where `mask` is
   /// `true`.
@@ -1032,7 +1006,7 @@ public extension Tensor where Scalar == Bool {
   // to the variadic method `all(squeezingAxes:)` with zero indices.
   @inlinable @inline(__always)
   func all() -> Bool {
-    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    let axes = Tensor<Int32>(rangeFrom: 0, to: Int32(rank), stride: 1)
     return _TFGetScalarOrDie(Raw.all(self, reductionIndices: axes).handle)
   }
 
@@ -1042,7 +1016,7 @@ public extension Tensor where Scalar == Bool {
   // to the variadic method `any(squeezingAxes:)` with zero indices.
   @inlinable @inline(__always)
   func any() -> Bool {
-    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    let axes = Tensor<Int32>(rangeFrom: 0, to: Int32(rank), stride: 1)
     return _TFGetScalarOrDie(Raw.any(self, reductionIndices: axes).handle)
   }
 
@@ -1051,7 +1025,8 @@ public extension Tensor where Scalar == Bool {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func all(squeezingAxes axes: Int32...) -> Tensor {
+  func all(squeezingAxes axes: Int...) -> Tensor {
+    let axes = axes.map(Int32.init)
     return Raw.all(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
   }
 
@@ -1060,7 +1035,8 @@ public extension Tensor where Scalar == Bool {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func any(squeezingAxes axes: Int32...) -> Tensor {
+  func any(squeezingAxes axes: Int...) -> Tensor {
+    let axes = axes.map(Int32.init)
     return Raw.any(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
   }
 
@@ -1069,7 +1045,8 @@ public extension Tensor where Scalar == Bool {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func all(alongAxes axes: Int32...) -> Tensor {
+  func all(alongAxes axes: Int...) -> Tensor {
+    let axes = axes.map(Int32.init)
     return Raw.all(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
 
@@ -1078,7 +1055,8 @@ public extension Tensor where Scalar == Bool {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func any(alongAxes axes: Int32...) -> Tensor {
+  func any(alongAxes axes: Int...) -> Tensor {
+    let axes = axes.map(Int32.init)
     return Raw.any(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
 }
@@ -1088,7 +1066,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   // to the variadic method `min(squeezingAxes:)` with zero indices.
   @inlinable @inline(__always)
   func min() -> Tensor {
-    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    let axes = Tensor<Int32>(rangeFrom: 0, to: Int32(rank), stride: 1)
     return Raw.min(self, reductionIndices: axes)
   }
 
@@ -1096,7 +1074,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   // to the variadic method `max(squeezingAxes:)` with zero indices.
   @inlinable @inline(__always)
   func max() -> Tensor {
-    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
+    let axes = Tensor<Int32>(rangeFrom: 0, to: Int32(rank), stride: 1)
     return Raw.max(self, reductionIndices: axes)
   }
 
@@ -1105,7 +1083,8 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func max(squeezingAxes axes: [Int32]) -> Tensor {
+  func max(squeezingAxes axes: [Int]) -> Tensor {
+    let axes = axes.map(Int32.init)
     return Raw.max(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
   }
 
@@ -1114,7 +1093,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func max(squeezingAxes axes: Int32...) -> Tensor {
+  func max(squeezingAxes axes: Int...) -> Tensor {
     return max(squeezingAxes: axes)
   }
 
@@ -1123,7 +1102,8 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func min(squeezingAxes axes: [Int32]) -> Tensor {
+  func min(squeezingAxes axes: [Int]) -> Tensor {
+    let axes = axes.map(Int32.init)
     return Raw.min(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
   }
 
@@ -1132,7 +1112,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func min(squeezingAxes axes: Int32...) -> Tensor {
+  func min(squeezingAxes axes: Int...) -> Tensor {
     return min(squeezingAxes: axes)
   }
 
@@ -1141,8 +1121,8 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func argmax(squeezingAxis axis: Int32) -> Tensor<Int32> {
-    return Raw.argMax(self, dimension: Tensor<Int32>(axis))
+  func argmax(squeezingAxis axis: Int) -> Tensor<Int32> {
+    return Raw.argMax(self, dimension: Tensor<Int32>(Int32(axis)))
   }
 
   /// Returns the indices of the minimum values along the specified axes. The
@@ -1150,8 +1130,8 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func argmin(squeezingAxis axis: Int32) -> Tensor<Int32> {
-    return Raw.argMin(self, dimension: Tensor<Int32>(axis))
+  func argmin(squeezingAxis axis: Int) -> Tensor<Int32> {
+    return Raw.argMin(self, dimension: Tensor<Int32>(Int32(axis)))
   }
 
   /// Returns the minimum along the specified axes. The reduced dimensions are
@@ -1159,7 +1139,8 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func min(alongAxes axes: [Int32]) -> Tensor {
+  func min(alongAxes axes: [Int]) -> Tensor {
+    let axes = axes.map(Int32.init)
     return Raw.min(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
 
@@ -1168,7 +1149,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func min(alongAxes axes: Int32...) -> Tensor {
+  func min(alongAxes axes: Int...) -> Tensor {
     return min(alongAxes: axes)
   }
 
@@ -1177,7 +1158,8 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func max(alongAxes axes: [Int32]) -> Tensor {
+  func max(alongAxes axes: [Int]) -> Tensor {
+    let axes = axes.map(Int32.init)
     return Raw.max(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
 
@@ -1186,7 +1168,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func max(alongAxes axes: Int32...) -> Tensor {
+  func max(alongAxes axes: Int...) -> Tensor {
     return max(alongAxes: axes)
   }
 
@@ -1203,64 +1185,21 @@ public extension Tensor where Scalar : Numeric & Comparable {
   }
 }
 
+// MARK: - Numeric reduction
+
 public extension Tensor where Scalar : Numeric {
-  // NOTE: This overload is necessary, otherwise `mean()` would refer
-  // to the variadic method `mean(squeezingAxes:)` with zero indices.
-  @differentiable(
-    wrt: self, vjp: _vjpMean()
-    where Scalar : TensorFlowFloatingPoint
-  )
-  @inlinable @inline(__always)
-  func mean() -> Tensor {
-    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.mean(self, reductionIndices: axes)
-  }
-
-  // NOTE: This overload is necessary, otherwise `sum()` would refer
-  // to the variadic method `sum(squeezingAxes:)` with zero indices.
-  @inlinable @inline(__always)
-  @differentiable(
-    wrt: self, vjp: _vjpSum()
-    where Scalar : TensorFlowFloatingPoint
-  )
-  func sum() -> Tensor {
-    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.sum(self, reductionIndices: axes)
-  }
-
-  // NOTE: This overload is necessary, otherwise `sum()` would refer
-  // to the variadic method `sum(squeezingAxes:)` with zero indices.
-  @inlinable @inline(__always)
-  func product() -> Tensor {
-    let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.prod(self, reductionIndices: axes)
-  }
-
-  /// Returns the arithmetic mean along the specified axes. The reduced
-  /// dimensions are removed.
-  /// - Parameter axes: The dimensions to reduce.
-  /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
-  @inlinable @inline(__always)
-  func mean(squeezingAxes axes: [Int32]) -> Tensor {
-    return Raw.mean(self, reductionIndices: Tensor<Int32>(axes),
-                    keepDims: false)
-  }
-
-  /// Returns the arithmetic mean along the specified axes. The reduced
-  /// dimensions are removed.
-  /// - Parameter axes: The dimensions to reduce.
-  /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
-  @inlinable @inline(__always)
-  func mean(squeezingAxes axes: Int32...) -> Tensor {
-    return mean(squeezingAxes: axes)
-  }
+  // MARK: - Sum
 
   /// Returns the sum along the specified axes. The reduced dimensions are
   /// removed.
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @inlinable @inline(__always)
-  func sum(squeezingAxes axes: [Int32]) -> Tensor {
+  @differentiable(
+    wrt: self, vjp: _vjpSum(squeezingAxes:)
+    where Scalar : TensorFlowFloatingPoint
+  )
+  func sum(squeezingAxes axes: Tensor<Int32>) -> Tensor {
     return Raw.sum(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
   }
 
@@ -1269,27 +1208,174 @@ public extension Tensor where Scalar : Numeric {
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @inlinable @inline(__always)
-  func sum(squeezingAxes axes: Int32...) -> Tensor {
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  func sum(squeezingAxes axes: [Int]) -> Tensor {
+    // TODO(TF-433): Remove workaround for differentiating `map`.
+    let axes = {axes.map(Int32.init)}()
+    return sum(squeezingAxes: Tensor<Int32>(axes))
+  }
+
+  /// Returns the sum along the specified axes. The reduced dimensions are
+  /// removed.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  func sum(squeezingAxes axes: Int...) -> Tensor {
     return sum(squeezingAxes: axes)
   }
 
+  @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  func sum() -> Tensor {
+    return flattened().sum(squeezingAxes: 0)
+  }
+
+  /// Returns the sum along the specified axes. The reduced dimensions are
+  /// retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  @differentiable(
+    wrt: self, vjp: _vjpSum(squeezingAxes:)
+    where Scalar : TensorFlowFloatingPoint
+  )
+  func sum(alongAxes axes: Tensor<Int32>) -> Tensor {
+    return Raw.sum(self, reductionIndices: axes, keepDims: true)
+  }
+
+  /// Returns the sum along the specified axes. The reduced dimensions are
+  /// retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  func sum(alongAxes axes: [Int]) -> Tensor {
+    // TODO(TF-433): Remove workaround for differentiating `map`.
+    let axes = {axes.map(Int32.init)}()
+    return sum(alongAxes: Tensor<Int32>(axes))
+  }
+
+  /// Returns the sum along the specified axes. The reduced dimensions are
+  /// retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  func sum(alongAxes axes: Int...) -> Tensor {
+    return sum(alongAxes: axes)
+  }
+
+  // MARK: - Product
+
   /// Returns the product along the specified axes. The reduced dimensions are
   /// removed.
+  ///
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
+  // TODO: Make this @differentiable.
   @inlinable @inline(__always)
-  func product(squeezingAxes axes: [Int32]) -> Tensor {
-    return Raw.prod(self, reductionIndices: Tensor<Int32>(axes),
-                    keepDims: false)
+  func product(squeezingAxes axes: Tensor<Int32>) -> Tensor {
+    return Raw.prod(self, reductionIndices: axes, keepDims: false)
   }
 
   /// Returns the product along the specified axes. The reduced dimensions are
   /// removed.
+  ///
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @inlinable @inline(__always)
-  func product(squeezingAxes axes: Int32...) -> Tensor {
+  func product(squeezingAxes axes: [Int]) -> Tensor {
+    // TODO(TF-433): Remove workaround for differentiating `map`.
+    let axes = {axes.map(Int32.init)}()
+    return product(squeezingAxes: Tensor<Int32>(axes))
+  }
+
+  /// Returns the product along the specified axes. The reduced dimensions are
+  /// removed.
+  ///
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
+  @inlinable @inline(__always)
+  func product(squeezingAxes axes: Int...) -> Tensor {
     return product(squeezingAxes: axes)
+  }
+
+  @inlinable @inline(__always)
+  func product() -> Tensor {
+    return flattened().product(squeezingAxes: 0)
+  }
+
+  /// Returns the product along the specified axes. The reduced dimensions are
+  /// retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  func product(alongAxes axes: Tensor<Int32>) -> Tensor {
+    return Raw.prod(self, reductionIndices: axes, keepDims: true)
+  }
+
+  /// Returns the product along the specified axes. The reduced dimensions are
+  /// retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  func product(alongAxes axes: [Int]) -> Tensor {
+    // TODO(TF-433): Remove workaround for differentiating `map`.
+    let axes = {axes.map(Int32.init)}()
+    return product(alongAxes: Tensor<Int32>(axes))
+  }
+
+  /// Returns the product along the specified axes. The reduced dimensions are
+  /// retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  func product(alongAxes axes: Int...) -> Tensor {
+    return product(alongAxes: axes)
+  }
+
+  // MARK: - Mean
+
+  /// Returns the arithmetic mean along the specified axes. The reduced
+  /// dimensions are removed.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
+  @inlinable @inline(__always)
+  @differentiable(
+    wrt: self, vjp: _vjpMean(squeezingAxes:)
+    where Scalar : TensorFlowFloatingPoint
+  )
+  func mean(squeezingAxes axes: Tensor<Int32>) -> Tensor {
+    return Raw.mean(self, reductionIndices: axes, keepDims: false)
+  }
+
+  /// Returns the arithmetic mean along the specified axes. The reduced
+  /// dimensions are removed.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  func mean(squeezingAxes axes: [Int]) -> Tensor {
+    // TODO(TF-433): Remove workaround for differentiating `map`.
+    let axes = {axes.map(Int32.init)}()
+    return mean(squeezingAxes: Tensor<Int32>(axes))
+  }
+
+  /// Returns the arithmetic mean along the specified axes. The reduced
+  /// dimensions are removed.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  func mean(squeezingAxes axes: Int...) -> Tensor {
+    return mean(squeezingAxes: axes)
+  }
+
+  @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  func mean() -> Tensor {
+    return flattened().mean(squeezingAxes: [0])
   }
 
   /// Returns the arithmetic mean along the specified axes. The reduced
@@ -1301,8 +1387,8 @@ public extension Tensor where Scalar : Numeric {
     wrt: self, vjp: _vjpMean(alongAxes:)
     where Scalar : TensorFlowFloatingPoint
   )
-  func mean(alongAxes axes: [Int32]) -> Tensor {
-    return Raw.mean(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
+  func mean(alongAxes axes: Tensor<Int32>) -> Tensor {
+    return Raw.mean(self, reductionIndices: axes, keepDims: true)
   }
 
   /// Returns the arithmetic mean along the specified axes. The reduced
@@ -1311,31 +1397,45 @@ public extension Tensor where Scalar : Numeric {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
   @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
-  func mean(alongAxes axes: Int32...) -> Tensor {
+  func mean(alongAxes axes: [Int]) -> Tensor {
+    // TODO(TF-433): Remove workaround for differentiating `map`.
+    let axes = {axes.map(Int32.init)}()
+    return mean(alongAxes: Tensor<Int32>(axes))
+  }
+
+  /// Returns the arithmetic mean along the specified axes. The reduced
+  /// dimensions are retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  func mean(alongAxes axes: Int...) -> Tensor {
     return mean(alongAxes: axes)
   }
 
-  /// Returns the sum along the specified axes. The reduced dimensions are
-  /// retained with value 1.
-  /// - Parameter axes: The dimensions to reduce.
-  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
-  @inlinable @inline(__always)
-  @differentiable(
-    wrt: self, vjp: _vjpSum(alongAxes:)
-    where Scalar : TensorFlowFloatingPoint
-  )
-  func sum(alongAxes axes: [Int32]) -> Tensor {
-    return Raw.sum(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
-  }
+  // MARK: - Variance
 
-  /// Returns the sum along the specified axes. The reduced dimensions are
-  /// retained with value 1.
+  /// Returns the variance along the specified axes. The reduced dimensions are
+  /// removed. Does not apply Bessel's correction.
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
   @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
-  func sum(alongAxes axes: Int32...) -> Tensor {
-    return sum(alongAxes: axes)
+  func variance(squeezingAxes axes: Tensor<Int32>) -> Tensor {
+    let squaredDiff = (self - mean(alongAxes: axes)).squared()
+    return squaredDiff.mean(squeezingAxes: axes)
+  }
+
+  /// Returns the variance along the specified axes. The reduced dimensions are
+  /// removed. Does not apply Bessel's correction.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  func variance(squeezingAxes axes: [Int]) -> Tensor {
+    // TODO(TF-433): Remove workaround for differentiating `map`.
+    let axes = {axes.map(Int32.init)}()
+    return variance(squeezingAxes: Tensor<Int32>(axes))
   }
 
   /// Returns the variance along the specified axes. The reduced dimensions are
@@ -1344,38 +1444,136 @@ public extension Tensor where Scalar : Numeric {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
   @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
-  func variance(alongAxes axes: Int32...) -> Tensor {
-    return variance(alongAxes: axes)
+  func variance(squeezingAxes axes: Int...) -> Tensor {
+    return variance(squeezingAxes: axes)
   }
 
-  /// Returns the variance along the specified axes. The reduced dimensions are
-  /// retained with value 1. Does not apply Bessel's correction.
-  /// - Parameter axes: The dimensions to reduce.
-  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
-  @inlinable @inline(__always)
   @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
-  func variance(alongAxes axes: [Int32]) -> Tensor {
-    let mean = self.mean(alongAxes: axes)
+  @inlinable @inline(__always)
+  func variance() -> Tensor {
+    let mean = self.mean()
     let squaredDiff = (self - mean).squared()
+    return squaredDiff.mean()
+  }
+
+  /// Returns the variance along the specified axes. The reduced dimensions are
+  /// retained with value 1. Does not apply Bessel's correction.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  func variance(alongAxes axes: Tensor<Int32>) -> Tensor {
+    let squaredDiff = (self - mean(alongAxes: axes)).squared()
     return squaredDiff.mean(alongAxes: axes)
   }
 
-  /// Returns the product along the specified axes. The reduced dimensions are
-  /// retained with value 1.
+  /// Returns the variance along the specified axes. The reduced dimensions are
+  /// retained with value 1. Does not apply Bessel's correction.
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func product(alongAxes axes: [Int32]) -> Tensor {
-    return Raw.prod(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  func variance(alongAxes axes: [Int]) -> Tensor {
+    // TODO(TF-433): Remove workaround for differentiating `map`.
+    let axes = {axes.map(Int32.init)}()
+    return variance(alongAxes: Tensor<Int32>(axes))
   }
 
-  /// Returns the product along the specified axes. The reduced dimensions are
-  /// retained with value 1.
+  /// Returns the variance along the specified axes. The reduced dimensions are
+  /// retained with value 1. Does not apply Bessel's correction.
   /// - Parameter axes: The dimensions to reduce.
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
-  func product(alongAxes axes: Int32...) -> Tensor {
-    return product(alongAxes: axes)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  func variance(alongAxes axes: Int...) -> Tensor {
+    return variance(alongAxes: axes)
+  }
+}
+
+// TODO: Consider making the return type be generic over `FloatingPoint` types
+// so that `self`'s scalar type can be any `Numeric` type.
+public extension Tensor where Scalar : TensorFlowFloatingPoint {
+  /// Returns the standard deviation of the elements along the specified axes.
+  /// The reduced dimensions are retained with value `1`. Does not apply
+  /// Bessel's correction.
+  ///
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self)
+  func standardDeviation(squeezingAxes axes: Tensor<Int32>) -> Tensor {
+    return sqrt(variance(squeezingAxes: axes))
+  }
+
+  /// Returns the standard deviation of the elements along the specified axes.
+  /// The reduced dimensions are retained with value `1`. Does not apply
+  /// Bessel's correction.
+  ///
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self)
+  func standardDeviation(squeezingAxes axes: [Int]) -> Tensor {
+    return sqrt(variance(squeezingAxes: axes))
+  }
+
+  /// Returns the standard deviation of the elements along the specified axes.
+  /// The reduced dimensions are retained with value `1`. Does not apply
+  /// Bessel's correction.
+  ///
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @differentiable(wrt: self)
+  func standardDeviation(squeezingAxes axes: Int...) -> Tensor {
+    return standardDeviation(squeezingAxes: axes)
+  }
+
+  /// Returns the standard deviation of the elements along the specified axes.
+  /// The reduced dimensions are retained with value `1`. Does not apply
+  /// Bessel's correction.
+  ///
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @differentiable(wrt: self)
+  func standardDeviation() -> Tensor {
+    // Reduce along all dimensions.
+    return standardDeviation(squeezingAxes: Array(0..<shape.rank))
+  }
+
+  /// Returns the standard deviation of the elements along the specified axes.
+  /// The reduced dimensions are retained with value `1`. Does not apply
+  /// Bessel's correction.
+  ///
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @differentiable(wrt: self)
+  func standardDeviation(alongAxes axes: Tensor<Int32>) -> Tensor {
+    return sqrt(variance(alongAxes: axes))
+  }
+
+  /// Returns the standard deviation of the elements along the specified axes.
+  /// The reduced dimensions are retained with value `1`. Does not apply
+  /// Bessel's correction.
+  ///
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @differentiable(wrt: self)
+  func standardDeviation(alongAxes axes: [Int]) -> Tensor {
+    // TODO(TF-433): Remove workaround for differentiating `map`.
+    let axes = {axes.map(Int32.init)}()
+    return standardDeviation(alongAxes: Tensor<Int32>(axes))
+  }
+
+  /// Returns the standard deviation of the elements along the specified axes.
+  /// The reduced dimensions are retained with value `1`. Does not apply
+  /// Bessel's correction.
+  ///
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self)
+  func standardDeviation(alongAxes axes: Int...) -> Tensor {
+    return sqrt(variance(alongAxes: axes))
   }
 }
 
@@ -1424,7 +1622,7 @@ public extension Tensor {
 
   @inlinable @inline(__always)
   func broadcast(to shape: TensorShape) -> Tensor {
-    return broadcast(toShape: Tensor<Int32>(shape.dimensions))
+    return broadcast(toShape: Tensor<Int32>(shape.dimensions.map(Int32.init)))
   }
 
   /// Broadcast to the same shape as the specified `Tensor`.
@@ -1455,7 +1653,7 @@ public extension Tensor where Scalar : Numeric {
 
   @inlinable @inline(__always)
   func unbroadcast(to shape: TensorShape) -> Tensor {
-    return unbroadcast(toShape: Tensor<Int32>(shape.dimensions))
+    return unbroadcast(toShape: Tensor<Int32>(shape.dimensions.map(Int32.init)))
   }
 
   @inlinable @inline(__always)
@@ -1472,12 +1670,12 @@ public extension Tensor where Scalar : Numeric {
   /// Returns a padded tensor according to the specified padding sizes.
   @inlinable
   func padded(
-    forSizes sizes: [(before: Int32, after: Int32)],
+    forSizes sizes: [(before: Int, after: Int)],
     with value: Scalar = 0
   ) -> Tensor {
     let paddings = Tensor<Int32>(
-      shape: [Int32(sizes.count), 2],
-      scalars: sizes.flatMap { [$0.before, $0.after] }
+      shape: [sizes.count, 2],
+      scalars: sizes.flatMap { [Int32($0.before), Int32($0.after)] }
     )
     return Raw.padV2(self, paddings: paddings, constantValues: Tensor(value))
   }
@@ -1487,241 +1685,297 @@ public extension Tensor where Scalar : Numeric {
 // Indexing and slicing
 //===----------------------------------------------------------------------===//
 
+// TODO: Negative indexing and strides syntax.
+
 public extension Tensor {
-  /// Access the element tensor specified by an index in the leading dimension.
-  /// - Parameter index: Index of the element tensor.
-  @inlinable
-  subscript(index: Int32) -> Tensor {
-    get {
-      // NOTE: Thought Gather exactly performs element indexing, it is an
-      // allocating operation. Slice is used here instead even though the
-      // implementation is more convoluted because it is non-allocating.
-      // Actual performance/memory tests should be done for some empirical
-      // comparison.
-      // Gather implementation is below:
-      // return #tfop("GatherV2", self, Tensor<Int32>(index), Tensor<Int32>(0),
-      //              Tindices: Int32.self)
-      let indexTensor = Tensor<Int32>(index).rankLifted()
-      let remainingZeros: Tensor<Int32> = Raw.fill(
-        dims: (rankTensor - 1).rankLifted(), value: Tensor<Int32>(0))
-      let startIndices = indexTensor.concatenated(with: remainingZeros)
-
-      let firstDimension: Tensor<Float> = Raw.gatherV2(
-        params: Tensor<Float>(shapeTensor),
-        indices: Tensor<Int32>(0),
-        axis: Tensor<Int32>(0)
-      )
-      let boundSize = Tensor<Float>([1]) - firstDimension
-      let scatterIndices: Tensor<Int32> = [[0]]
-      let offset: Tensor<Int32> = Tensor<Int32>(
-        Raw.scatterNd(
-          indices: scatterIndices,
-          updates: boundSize,
-          shape: rankTensor.rankLifted()
-        )
-      )
-      let boundSizes: Tensor<Int32> = shapeTensor + offset
-      let slice: Tensor = Raw.slice(self, begin: startIndices, size: boundSizes)
-      return slice.squeezingShape(at: 0)
-    }
-    set {
-      let left = self[0..<index]
-      let right = self[index+1..<_TFGetScalarOrDie(shapeTensor[0].handle)]
-      self = Raw.concatV2([left, newValue.rankLifted(), right], axis: Tensor<Int32>(0))
-    }
-  }
-
-  /// Access the subtensor specified by a contiguous range of indices.
-  /// - Parameter bounds: Contiguous range of indices.
-  @inlinable
-  subscript(bounds: Range<Int32>) -> Tensor {
-    // NOTE: Though `tf.slice` and `tf.strided_slice` are not easy to use
-    // because they require slice bounds for every dimension, they should be
-    // used because the are non-allocating. Other slice implementations (like
-    // combining Gather and Range) perform allocation and should not be used
-    // even though they are easier to write.
-
-    // Let (lo, hi) represent lower and upper bounds respectively.
-    // startIndices = [lo, 0, 0, ..., 0]
-    // boundSizes = [hi - lo, d1, d2, ..., dn] where di = shape[i]
-    // TODO: The horrendous mess of type-casting is necessary due to GPU ops
-    // (Gather, ScatterNd) not accepting Int32 for particular inputs. Refactor
-    // if possible.
-    let lowerBound = Tensor<Int32>(bounds.lowerBound).rankLifted()
-    let remainingZeros: Tensor<Int32> = Raw.fill(
-      dims: (rankTensor - 1).rankLifted(), value: Tensor<Int32>(0))
-    let startIndices = lowerBound.concatenated(with: remainingZeros)
-
-    let boundSize = Tensor<Int32>(bounds.upperBound).rankLifted()
-      - lowerBound - Tensor<Int32>(Tensor<Float>(shapeTensor)[0])
-    let scatterIndices: Tensor<Int32> = [[0]]
-    let offset: Tensor<Int32> = Tensor<Int32>(
-      Raw.scatterNd(
-        indices: scatterIndices,
-        updates: Tensor<Float>(boundSize),
-        shape: rankTensor.rankLifted()
-      )
-    )
-    let boundSizes: Tensor<Int32> = shapeTensor + offset
-    return Raw.slice(self, begin: startIndices, size: boundSizes)
-  }
-
-  // TODO(danielzheng): Add strided slices? (increment by something different
-  // than 1)
-  // Ideas for strided slice API: it could be another subscript method, or it
-  // be a top level `stride` function like Swift's `stride(from:to:by:)`.
-
   /// Extracts a slice from the tensor defined by lower and upper bounds for
   /// each dimension.
   ///
   /// - Parameter lowerBounds: The lower bounds at each dimension.
   /// - Parameter upperBounds: The upper bounds at each dimension.
-  @inlinable @inline(__always)
-  func slice(lowerBounds: [Int32], upperBounds: [Int32]) -> Tensor {
-    /// TODO: Precondition `lowerBounds.count == upperBounds.count`,
-    /// preferably in graph.
-    let lowerBoundsTensor = Tensor<Int32>(lowerBounds)
-    return Raw.slice(
-      self,
-      begin: lowerBoundsTensor,
-      size: Tensor<Int32>(upperBounds) - lowerBoundsTensor)
+  @inlinable
+  @differentiable(wrt: self)
+  func slice(lowerBounds: [Int], upperBounds: [Int]) -> Tensor {
+    // TODO: Precondition `lowerBounds.count == upperBounds.count`,
+    // preferably in graph.
+    // TODO: Differentiating control flow is not supported yet, thus the thunks.
+    let lowerBoundsTensor = Tensor<Int32>({lowerBounds.map(Int32.init)}())
+    let upperBoundsTensor = Tensor<Int32>({upperBounds.map(Int32.init)}())
+    return slice(
+      lowerBounds: lowerBoundsTensor,
+      sizes: upperBoundsTensor - lowerBoundsTensor)
+  }
+
+  @inlinable
+  @differentiable(wrt: self, vjp: _vjpSlice)
+  func slice(lowerBounds: Tensor<Int32>, sizes: Tensor<Int32>) -> Tensor {
+    return Raw.slice(self, begin: lowerBounds, size: sizes)
+  }
+
+  @inlinable
+  internal func _vjpSlice(
+    lowerBounds: Tensor<Int32>,
+    sizes: Tensor<Int32>
+  ) -> (Tensor, (Tensor) -> Tensor) {
+    let value = slice(lowerBounds: lowerBounds, sizes: sizes)
+    let afterPaddings = shapeTensor - value.shapeTensor - lowerBounds
+    return (value, { [after = afterPaddings] v in
+      let beforePaddings = lowerBounds.expandingShape(at: 1)
+      let afterPaddings = after.expandingShape(at: 1)
+      let paddings = Tensor<Int32>(
+        concatenating: [beforePaddings, afterPaddings], alongAxis: 1)
+      return Raw.pad(v, paddings: paddings)
+    })
   }
 }
 
-//===----------------------------------------------------------------------===//
-// Normalization
-//===----------------------------------------------------------------------===//
+public enum TensorRange : TensorRangeExpression {
+  case ellipsis
+  case newAxis
+  case squeezeAxis
+  case index(Int)
+  case range(Range<Int>, stride: Int)
+  case closedRange(ClosedRange<Int>, stride: Int)
+  case partialRangeFrom(PartialRangeFrom<Int>, stride: Int)
+  case partialRangeUpTo(PartialRangeUpTo<Int>, stride: Int)
+  case partialRangeThrough(PartialRangeThrough<Int>, stride: Int)
 
-public extension Tensor where Scalar : BinaryFloatingPoint {
-  /// Computes the batch normalized tensor along the specified axis.
-  ///
-  /// Specifically, returns `(self - mu)/(var + epsilon) * gamma + beta` where
-  /// `mu` and `var` are respectively the mean and variance of `self` along
-  /// `axis`.
-  ///
-  /// - Parameters:
-  ///   - axis: The batch dimension.
-  ///   - offset: The offset, also known as beta.
-  ///   - scale: The scale, also known as gamma.
-  ///   - epsilon: A small value added to the denominator for numerical
-  ///     stability.
-  @inlinable
-  @differentiable(
-    wrt: (self, offset, scale), vjp: _vjpBatchNormalized
-    where Scalar : TensorFlowFloatingPoint
-  )
-  func batchNormalized(
-    alongAxis axis: Int32,
-    offset: Tensor = Tensor(0),
-    scale: Tensor = Tensor(1),
-    epsilon: Scalar = 0.001
-  ) -> Tensor {
-    let mean = self.mean(alongAxes: axis)
-    let squaredDiff: Tensor = Raw.squaredDifference(self, mean)
-    let variance = squaredDiff.mean(alongAxes: axis)
-    let inv = rsqrt(variance + epsilon) * scale
-    return self * inv + offset - mean * inv
-  }
+  public var tensorRange: TensorRange { return self }
 }
 
-//===----------------------------------------------------------------------===//
-// Convolution and pooling
-//===----------------------------------------------------------------------===//
-
-/// A padding scheme. Used by padding, convolution, and pooling ops.
-// @_frozen // SR-9739
-public enum Padding {
-  /// The "valid" padding scheme.
-  case valid
-  /// The "same" padding scheme.
-  case same
-}
-
-internal extension Padding {
-  @inlinable
-  var raw: Raw.Padding {
-    switch self {
-    case .same: return .same
-    case .valid: return .valid
+extension TensorRange : Equatable {
+  public static func == (lhs: TensorRange, rhs: TensorRange) -> Bool {
+    switch (lhs, rhs) {
+    case (.ellipsis, .ellipsis),
+         (.newAxis, .newAxis),
+         (.squeezeAxis, .squeezeAxis):
+      return true
+    case (let .index(i1), let .index(i2)): return i1 == i2
+    case (let .range(r1, s1), let .range(r2, s2)): return r1 == r2 && s1 == s2
+    case (let .closedRange(r1, s1), let .closedRange(r2, s2)):
+      return r1 == r2 && s1 == s2
+    case (let .partialRangeFrom(r1, s1), let .partialRangeFrom(r2, s2)):
+      return r1.lowerBound == r2.lowerBound && s1 == s2
+    case (let .partialRangeUpTo(r1, s1), let .partialRangeUpTo(r2, s2)):
+      return r1.upperBound == r2.upperBound && s1 == s2
+    case (let .partialRangeThrough(r1, s1), let .partialRangeThrough(r2, s2)):
+      return r1.upperBound == r2.upperBound && s1 == s2
+    default: return false
     }
   }
 }
 
-public extension Tensor where Scalar : FloatingPoint {
-  /// Computes a 2-D convolution using `self` as input, with the specified
-  /// filter, strides, and padding.
-  ///
-  /// - Parameters:
-  ///   - filter: The convolution filter.
-  ///   - strides: The strides of the sliding filter for each dimension of the
-  ///     input.
-  ///   - padding: The padding for the operation.
-  /// - Precondition: `self` must have rank 4.
-  /// - Precondition: `filter` must have rank 4.
-  @inlinable @inline(__always)
-  @differentiable(
-    wrt: (self, filter), vjp: _vjpConvolved2D(filter:strides:padding:)
-    where Scalar : TensorFlowFloatingPoint
-  )
-  func convolved2D(
-    withFilter filter: Tensor,
-    strides: (Int32, Int32, Int32, Int32),
-    padding: Padding
-  ) -> Tensor {
-    return Raw.conv2D(
-      self,
-      filter: filter,
-      strides: [strides.0, strides.1, strides.2, strides.3],
-      padding: padding.raw)
+public protocol TensorRangeExpression {
+  var tensorRange: TensorRange { get }
+}
+
+// TODO: Cannot extend non-nominal type 'UnboundedRange'.
+// extension UnboundedRange : TensorRangeExpression {
+//   public var tensorRange: TensorRange { return .ellipsis }
+// }
+
+extension Int : TensorRangeExpression {
+  public var tensorRange: TensorRange { return .index(self) }
+}
+
+extension Range : TensorRangeExpression where Bound == Int {
+  public var tensorRange: TensorRange {
+    return .range(self, stride: 1)
+  }
+}
+
+extension ClosedRange : TensorRangeExpression where Bound == Int {
+  public var tensorRange: TensorRange {
+    return .closedRange(self, stride: 1)
+  }
+}
+
+extension PartialRangeFrom : TensorRangeExpression where Bound == Int {
+  public var tensorRange: TensorRange {
+    return .partialRangeFrom(self, stride: 1)
+  }
+}
+
+extension PartialRangeUpTo : TensorRangeExpression where Bound == Int {
+  public var tensorRange: TensorRange {
+    return .partialRangeUpTo(self, stride: 1)
+  }
+}
+
+extension PartialRangeThrough : TensorRangeExpression where Bound == Int {
+  public var tensorRange: TensorRange {
+    return .partialRangeThrough(self, stride: 1)
+  }
+}
+
+infix operator .. : StridedRangeFormationPrecedence
+precedencegroup StridedRangeFormationPrecedence {
+  associativity: left
+  higherThan: CastingPrecedence
+  lowerThan: RangeFormationPrecedence
+}
+
+public extension Range where Bound == Int {
+  static func .. (range: Range, stride: Int) -> TensorRange {
+    return .range(range, stride: stride)
+  }
+}
+
+public extension ClosedRange where Bound == Int {
+  static func .. (range: ClosedRange, stride: Int) -> TensorRange {
+    return .closedRange(range, stride: stride)
+  }
+}
+
+public extension PartialRangeFrom where Bound == Int {
+  static func .. (range: PartialRangeFrom, stride: Int) -> TensorRange {
+    return .partialRangeFrom(range, stride: stride)
+  }
+}
+
+public extension PartialRangeUpTo where Bound == Int {
+  static func .. (range: PartialRangeUpTo, stride: Int) -> TensorRange {
+    return .partialRangeUpTo(range, stride: stride)
+  }
+}
+
+public extension PartialRangeThrough where Bound == Int {
+  static func .. (range: PartialRangeThrough, stride: Int) -> TensorRange {
+    return .partialRangeThrough(range, stride: stride)
+  }
+}
+
+public extension Tensor {
+  @_fixed_layout @usableFromInline
+  internal struct IndexPath {
+    @usableFromInline
+    let begin, end, strides: Tensor<Int32>
+
+    @usableFromInline
+    let beginMask, endMask, ellipsisMask, newAxisMask, squeezeAxisMask: Int64
+
+    @inlinable
+    public init(
+      begin: Tensor<Int32>, end: Tensor<Int32>, strides: Tensor<Int32>,
+      beginMask: Int64, endMask: Int64, ellipsisMask: Int64, newAxisMask: Int64,
+      squeezeAxisMask: Int64
+    ) {
+      self.begin = begin
+      self.end = end
+      self.strides = strides
+      self.beginMask = beginMask
+      self.endMask = endMask
+      self.ellipsisMask = ellipsisMask
+      self.newAxisMask = newAxisMask
+      self.squeezeAxisMask = squeezeAxisMask
+    }
   }
 
-  /// Computes a 2-D max pooling, with the specified kernel sizes, strides, and
-  /// padding.
-  ///
-  /// - Parameters:
-  ///   - kernelSize: The dimensions of the pooling kernel.
-  ///   - strides: The strides of the sliding filter for each dimension of the
-  ///     input.
-  ///   - padding: The padding for the operation.
-  @inlinable @inline(__always)
-  @differentiable(
-    wrt: self, vjp: _vjpMaxPooled(kernelSize:strides:padding:)
-    where Scalar : TensorFlowFloatingPoint
-  )
-  func maxPooled(
-    kernelSize: (Int32, Int32, Int32, Int32),
-    strides: (Int32, Int32, Int32, Int32),
-    padding: Padding
-  ) -> Tensor {
-    return Raw.maxPoolV2(
-      self,
-      ksize: Tensor<Int32>(kernelSize),
-      strides: Tensor<Int32>(strides),
-      padding: padding.raw)
+  @inlinable
+  @differentiable(wrt: self, vjp: _vjpSubscript)
+  internal subscript(_ indexPath: IndexPath) -> Tensor {
+    get {
+      return Raw.stridedSlice(
+        self, begin: indexPath.begin, end: indexPath.end,
+        strides: indexPath.strides, beginMask: indexPath.beginMask,
+        endMask: indexPath.endMask, ellipsisMask: indexPath.ellipsisMask, 
+        newAxisMask: indexPath.newAxisMask,
+        shrinkAxisMask: indexPath.squeezeAxisMask)
+    }
+    set {
+      self = Raw.tensorStridedSliceUpdate(
+        self, begin: indexPath.begin, end: indexPath.end,
+        strides: indexPath.strides, value: newValue,
+        beginMask: indexPath.beginMask, endMask: indexPath.endMask,
+        ellipsisMask: indexPath.ellipsisMask,
+        newAxisMask: indexPath.newAxisMask,
+        shrinkAxisMask: indexPath.squeezeAxisMask)
+    }
   }
 
-  /// Computes a 2-D average pooling, with the specified kernel sizes, strides,
-  /// and padding.
-  ///
-  /// - Parameters:
-  ///   - kernelSize: The dimensions of the pooling kernel.
-  ///   - strides: The strides of the sliding filter for each dimension of the
-  ///     input.
-  ///   - padding: The padding for the operation.
-  @inlinable @inline(__always)
-  @differentiable(
-    wrt: self, vjp: _vjpAveragePooled(kernelSize:strides:padding:)
-    where Scalar : TensorFlowFloatingPoint
-  )
-  func averagePooled(
-    kernelSize: (Int32, Int32, Int32, Int32),
-    strides: (Int32, Int32, Int32, Int32),
-    padding: Padding
-  ) -> Tensor {
-    return Raw.avgPool(
-      value: self,
-      ksize: [kernelSize.0, kernelSize.1, kernelSize.2, kernelSize.3],
-      strides: [strides.0, strides.1, strides.2, strides.3],
-      padding: padding.raw)
+  @inlinable
+  // TODO: @differentiable(wrt: self)
+  subscript(_ ranges: TensorRangeExpression...) -> Tensor {
+    get {
+      return self[IndexPath(ranges.map { $0.tensorRange })]
+    }
+    set {
+      self[IndexPath(ranges.map { $0.tensorRange })] = newValue
+    }
+  }
+
+  @usableFromInline
+  internal func _vjpSubscript(
+    _ indexPath: IndexPath
+  ) -> (Tensor, (Tensor) -> Tensor) {
+    return (self[indexPath], { [shape = shapeTensor] v in
+      Raw.stridedSliceGrad(
+        shape: shape, begin: indexPath.begin, end: indexPath.end,
+        strides: indexPath.strides, dy: v, beginMask: indexPath.beginMask,
+        endMask: indexPath.endMask, ellipsisMask: indexPath.ellipsisMask,
+        newAxisMask: indexPath.newAxisMask,
+        shrinkAxisMask: indexPath.squeezeAxisMask)
+    })
+  }
+}
+
+internal extension Tensor.IndexPath {
+  @inlinable
+  init(_ ranges: [TensorRange]) {
+    precondition(!ranges.isEmpty, "The tensor range collection cannot be empty.")
+    precondition(ranges.count { $0 == TensorRange.ellipsis } < 2,
+                 "Only one ellipsis is allowed per tensor range collection.")
+
+    var begin = [Int32](repeating: 0, count: ranges.count)
+    var end = [Int32](repeating: 0, count: ranges.count)
+    var strides = [Int32](repeating: 1, count: ranges.count)
+    var beginMask: Int64 = 0
+    var endMask: Int64 = 0
+    var ellipsisMask: Int64 = 0
+    var newAxisMask: Int64 = 0
+    var squeezeAxisMask: Int64 = 0
+    for (i, index) in ranges.enumerated() {
+      switch index {
+      case .ellipsis: ellipsisMask |= 1 << i
+      case .newAxis: newAxisMask |= 1 << i
+      case .squeezeAxis: squeezeAxisMask |= 1 << i
+      case .index(let index):
+        begin[i] = Int32(index)
+        end[i] = Int32(index) + 1
+        squeezeAxisMask |= 1 << i
+      case .range(let range, let stride):
+        begin[i] = Int32(range.lowerBound)
+        end[i] = Int32(range.upperBound)
+        strides[i] = Int32(stride)
+      case .closedRange(let range, let stride):
+        begin[i] = Int32(range.lowerBound)
+        switch Int32(range.upperBound) {
+        case -1: endMask |= 1 << i
+        case let u: end[i] = u + 1
+        }
+        strides[i] = Int32(stride)
+      case .partialRangeFrom(let range, let stride):
+        begin[i] = Int32(range.lowerBound)
+        strides[i] = Int32(stride)
+        endMask |= 1 << i
+      case .partialRangeUpTo(let range, let stride):
+        end[i] = Int32(range.upperBound)
+        strides[i] = Int32(stride)
+        beginMask |= 1 << i
+      case .partialRangeThrough(let range, let stride):
+        end[i] = Int32(range.upperBound) + 1
+        strides[i] = Int32(stride)
+        beginMask |= 1 << i
+      }
+    }
+
+    self.begin = Tensor<Int32>(begin)
+    self.end = Tensor<Int32>(end)
+    self.strides = Tensor<Int32>(strides)
+    self.beginMask = beginMask
+    self.endMask = endMask
+    self.ellipsisMask = ellipsisMask
+    self.newAxisMask = newAxisMask
+    self.squeezeAxisMask = squeezeAxisMask
   }
 }

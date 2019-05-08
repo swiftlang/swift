@@ -509,7 +509,7 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
 
   @inlinable
   func _vjpTransposed(
-    withPermutations permutations: [Int32]
+    withPermutations permutations: [Int]
   ) -> (Tensor, (Tensor) -> Tensor) {
     let value = transposed(withPermutations: permutations)
     return (value, { $0.transposed(withPermutations: permutations) })
@@ -517,7 +517,7 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
 
   @inlinable
   func _vjpTransposed(
-    withPermutations permutations: Int32...
+    withPermutations permutations: Int...
   ) -> (Tensor, (Tensor) -> Tensor) {
     let value = transposed(withPermutations: permutations)
     return (value, { $0.transposed(withPermutations: permutations) })
@@ -545,7 +545,7 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   }
 
   @inlinable
-  func _vjpSqueezingShape(at axes: [Int32]) -> (Tensor, (Tensor) -> Tensor) {
+  func _vjpSqueezingShape(at axes: [Int]) -> (Tensor, (Tensor) -> Tensor) {
     let value = squeezingShape(at: axes)
     return (value, { [shape = shapeTensor] v in
       v.reshaped(toShape: shape)
@@ -553,12 +553,10 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   }
 
   @inlinable
-  func _vjpExpandingShape(
-    at shapeIndex: Int32
-  ) -> (Tensor, (Tensor) -> Tensor) {
-    let value = expandingShape(at: shapeIndex)
+  func _vjpExpandingShape(at axes: [Int]) -> (Tensor, (Tensor) -> Tensor) {
+    let value = self.expandingShape(at: axes)
     return (value, { v in
-      v.squeezingShape(at: shapeIndex)
+      v.squeezingShape(at: axes)
     })
   }
 }
@@ -569,222 +567,40 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
 
 extension Tensor where Scalar : TensorFlowFloatingPoint {
   @inlinable
-  func _vjpMean() -> (Tensor, (Tensor) -> Tensor) {
-    return (mean(), { [shape = shapeTensor, count = scalarCountTensor] in
-      ($0 / Tensor(count)).broadcast(toShape: shape)
-    })
-  }
-
-  @inlinable
-  func _vjpSum() -> (Tensor, (Tensor) -> Tensor) {
-    return (sum(), { [shape = shapeTensor] in $0.broadcast(toShape: shape) })
-  }
-
-  @inlinable
-  func _vjpMean(alongAxes axes: [Int32]) -> (Tensor, (Tensor) -> Tensor) {
-    let value = mean(alongAxes: axes)
-    return (value, { [shape = shapeTensor,
-                      count = axes.map { shape[$0] }.reduce(1, *)] in
-      $0.broadcast(toShape: shape) / Tensor(Scalar(count))
-    })
-  }
-
-  @inlinable
-  func _vjpSum(alongAxes axes: [Int32]) -> (Tensor, (Tensor) -> Tensor) {
+  func _vjpSum(alongAxes axes: Tensor<Int32>) -> (Tensor, (Tensor) -> Tensor) {
     let value = sum(alongAxes: axes)
     return (value, { [shape = shapeTensor] in $0.broadcast(toShape: shape) })
   }
-}
-
-//===----------------------------------------------------------------------===//
-// Normalization
-//===----------------------------------------------------------------------===//
-
-extension Tensor where Scalar : TensorFlowFloatingPoint {
-  // TODO: Verify that these calculations are correct.
-  @inlinable
-  func _vjpBatchNormalized(
-    alongAxis axis: Int32,
-    offset: Tensor,
-    scale: Tensor,
-    epsilon: Scalar
-  ) -> (Tensor, (Tensor) -> (Tensor, Tensor, Tensor)) {
-    let value = batchNormalized(alongAxis: axis, offset: offset, scale: scale,
-                                epsilon: epsilon)
-    return (value, { v in
-      let mean = self.mean(alongAxes: axis)
-      let squaredDiff: Tensor = Raw.squaredDifference(self, mean)
-      let variance = squaredDiff.mean(alongAxes: axis)
-
-      let diff = self - mean
-      let inv = rsqrt(variance + epsilon)
-      let norm = diff * inv
-
-      let dNorm = v * scale
-      let dVariance = -(dNorm * diff).sum(alongAxes: axis) / 2 * pow(inv, -3)
-      let dMean = (-dNorm * inv).sum(alongAxes: axis) +
-        dVariance * (-diff * 2).mean(alongAxes: axis)
-      let dOffset = v.sum(alongAxes: axis)
-      let dScale = (norm * v).sum(alongAxes: axis)
-      let dim = Tensor(Tensor<Int32>(self.shapeTensor[axis]))
-      let tmp = (dNorm * inv) + (dVariance * 2 * dMean / dim)
-      let dSelf = tmp + (dMean / dim)
-      return (dSelf, dOffset, dScale)
-    })
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// Convolution and pooling
-//===----------------------------------------------------------------------===//
-
-extension Tensor where Scalar : TensorFlowFloatingPoint {
-  /// TensorFlow builtin conv2d gradient helper for the input.
-  @inlinable
-  @differentiable(
-    wrt: (filter, backpropOutput),
-    vjp: _vjpTFConv2DBackpropInput(_:_:_:_:_:)
-  )
-  func _TFConv2DBackpropInput(
-    shape: Tensor<Int32>,
-    filter: Tensor,
-    backpropOutput: Tensor,
-    strides: (Int32, Int32, Int32, Int32),
-    padding: Padding
-  ) -> Tensor {
-    return Raw.conv2DBackpropInput(
-      inputSizes: shape,
-      filter: filter,
-      outBackprop: backpropOutput,
-      strides: [strides.0, strides.1, strides.2, strides.3],
-      padding: padding.raw)
-  }
-
-  /// TensorFlow builtin conv2d gradient helper for the filter.
-  @inlinable
-  @differentiable(
-    wrt: (input, backpropOutput),
-    vjp: _vjpTFConv2DBackpropFilter(_:_:_:_:_:)
-  )
-  func _TFConv2DBackpropFilter(
-    input: Tensor,
-    filterSizes: Tensor<Int32>,
-    backpropOutput: Tensor,
-    strides: (Int32, Int32, Int32, Int32),
-    padding: Padding
-  ) -> Tensor {
-    return Raw.conv2DBackpropFilter(
-      input,
-      filterSizes: filterSizes,
-      outBackprop: backpropOutput,
-      strides: [strides.0, strides.1, strides.2, strides.3],
-      padding: padding.raw)
-  }
 
   @inlinable
-  func _vjpTFConv2DBackpropInput(
-    _ shape: Tensor<Int32>,
-    _ filter: Tensor,
-    _ backpropOutput: Tensor,
-    _ strides: (Int32, Int32, Int32, Int32),
-    _ padding: Padding
-  ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
-    let value = _TFConv2DBackpropInput(shape: shape, filter: filter,
-                                       backpropOutput: backpropOutput,
-                                       strides: strides, padding: padding)
-    return (value, { v in
-      return (
-        self._TFConv2DBackpropFilter(input: v, filterSizes: shape,
-                                     backpropOutput: backpropOutput,
-                                     strides: strides, padding: padding),
-        v.convolved2D(withFilter: filter, strides: strides, padding: padding)
-      )
-    })
-  }
-
-  @inlinable
-  func _vjpTFConv2DBackpropFilter(
-    _ input: Tensor,
-    _ filterSizes: Tensor<Int32>,
-    _ backpropOutput: Tensor,
-    _ strides: (Int32, Int32, Int32, Int32),
-    _ padding: Padding
-  ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
-    let value = _TFConv2DBackpropFilter(input: input, filterSizes: filterSizes,
-                                        backpropOutput: backpropOutput,
-                                        strides: strides, padding: padding)
-    return (value, { v in
-      return (
-        self._TFConv2DBackpropInput(shape: filterSizes, filter: v,
-                                    backpropOutput: backpropOutput,
-                                    strides: strides, padding: padding),
-        input.convolved2D(withFilter: v, strides: strides, padding: padding)
-      )
-    })
-  }
-
-  @inlinable
-  func _vjpConvolved2D(
-    filter: Tensor,
-    strides: (Int32, Int32, Int32, Int32),
-    padding: Padding
-  ) -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
-    let value = convolved2D(withFilter: filter, strides: strides,
-                            padding: padding)
-    return (value, { v in
-      return (
-        self._TFConv2DBackpropInput(
-          shape: self.shapeTensor, filter: filter, backpropOutput: v,
-          strides: strides, padding: padding
-        ),
-        self._TFConv2DBackpropFilter(
-          input: self, filterSizes: filter.shapeTensor, backpropOutput: v,
-          strides: strides, padding: padding
-        )
-      )
-    })
-  }
-
-  @inlinable
-  func _vjpMaxPooled(
-    kernelSize: (Int32, Int32, Int32, Int32),
-    strides: (Int32, Int32, Int32, Int32),
-    padding: Padding
+  func _vjpSum(
+    squeezingAxes axes: Tensor<Int32>
   ) -> (Tensor, (Tensor) -> Tensor) {
-    // TODO: Currently this is not higher order differentiable. Redefine in
-    // closed form.
-    let value = maxPooled(kernelSize: kernelSize, strides: strides,
-                          padding: padding)
-    return (value, { v in
-      return Raw.maxPoolGradV2(
-        origInput: self,
-        origOutput: value,
-        grad: v,
-        ksize: Tensor<Int32>(kernelSize),
-        strides: Tensor<Int32>(strides),
-        padding: padding.raw
-      )
+    let value = sum(squeezingAxes: axes)
+    return (value, { [shape = shapeTensor] v in
+      let unsqueezed = v.expandingShape(at: axes.scalars.map { Int($0) })
+      return unsqueezed.broadcast(toShape: shape)
     })
   }
 
   @inlinable
-  func _vjpAveragePooled(
-    kernelSize: (Int32, Int32, Int32, Int32),
-    strides: (Int32, Int32, Int32, Int32),
-    padding: Padding
+  func _vjpMean(alongAxes axes: Tensor<Int32>) -> (Tensor, (Tensor) -> Tensor) {
+    let value = mean(alongAxes: axes)
+    let count = Raw.gather(params: shapeTensor, indices: axes).product()
+    return (value, { [shape = shapeTensor] in
+      $0.broadcast(toShape: shape) / Tensor(count)
+    })
+  }
+
+  @inlinable
+  func _vjpMean(
+    squeezingAxes axes: Tensor<Int32>
   ) -> (Tensor, (Tensor) -> Tensor) {
-    // TODO: Currently this is not higher order differentiable. Redefine in
-    // closed form.
-    let value = averagePooled(kernelSize: kernelSize, strides: strides,
-                              padding: padding)
-    return (value, { v in
-      return Raw.avgPoolGrad(
-        origInputShape: self.shapeTensor,
-        grad: v,
-        ksize: [kernelSize.0, kernelSize.1, kernelSize.2, kernelSize.3],
-        strides: [strides.0, strides.1, strides.2, strides.3],
-        padding: padding.raw
-      )
+    let value = mean(squeezingAxes: axes)
+    let count = Raw.gather(params: shapeTensor, indices: axes).product()
+    return (value, { [shape = shapeTensor] v in
+      let unsqueezed = v.expandingShape(at: axes.scalars.map { Int($0) })
+      return unsqueezed.broadcast(toShape: shape) / Tensor(count)
     })
   }
 }

@@ -1789,17 +1789,18 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
   }
 
   // If functionSource is a @differentiable function, just extract it.
-  if (auto autodiffFnType = original->getType().castTo<SILFunctionType>()) {
-    if (autodiffFnType->isDifferentiable()) {
+  if (auto diffableFnType = original->getType().castTo<SILFunctionType>()) {
+    if (diffableFnType->isDifferentiable()) {
+      auto paramIndices = diffableFnType->getDifferentiationParameterIndices();
+      for (auto i : desiredIndices.parameters.set_bits()) {
+        if (i >= paramIndices.size() || !paramIndices[i]) {
+          context.emitNondifferentiabilityError(original, parentTask,
+              diag::autodiff_function_nondiff_parameter_not_differentiable);
+          return None;
+        }
+      }
       SILValue assocFn = builder.createAutoDiffFunctionExtract(
           original.getLoc(), kind, /*differentiationOrder*/ 1, functionSource);
-      if (autodiffFnType->getDifferentiationParameterIndices().test(
-              desiredIndices.parameters)) {
-        context.emitNondifferentiabilityError(
-            original, parentTask,
-            diag::autodiff_function_subset_indices_not_differentiable);
-        return None;
-      }
       SILAutoDiffIndices indices(0, desiredIndices.parameters);
       return std::make_pair(assocFn, indices);
     }
@@ -2292,7 +2293,6 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
       auto indRes = *fromIndResultsIter++;
       auto *load = builder.createLoad(loc, indRes,
           getBufferLOQ(indRes->getType().getASTType(), *thunk));
-      builder.createRetainValue(loc, load, builder.getDefaultAtomicity());
       results.push_back(load);
       continue;
     }
@@ -4150,9 +4150,8 @@ public:
       else {
         auto origArg = ai->getArgument(origNumIndRes + selfParamIndex);
         if (cotanWrtSelf->getType().isAddress()) {
-          addToAdjointBuffer(origArg, ValueWithCleanup(
-              cotanWrtSelf,
-              makeCleanup(cotanWrtSelf, emitCleanup, {seed.getCleanup()})));
+          addToAdjointBuffer(origArg, cotanWrtSelf);
+          emitCleanup(builder, loc, cotanWrtSelf);
         } else {
           if (origArg->getType().isAddress()) {
             auto adjBuf = getAdjointBuffer(origArg);
@@ -4194,8 +4193,8 @@ public:
         continue;
       }
       if (cotan->getType().isAddress()) {
-        addToAdjointBuffer(origArg, ValueWithCleanup(
-            cotan, makeCleanup(cotan, emitCleanup, {seed.getCleanup()})));
+        addToAdjointBuffer(origArg, cotan);
+        emitCleanup(builder, loc, cotan);
       } else {
         if (origArg->getType().isAddress()) {
           auto adjBuf = getAdjointBuffer(origArg);
@@ -4218,10 +4217,8 @@ public:
       }
     }
     // Deallocate pullback indirect results.
-    for (auto *alloc : reversed(pullbackIndirectResults)) {
-      emitCleanup(builder, loc, alloc);
+    for (auto *alloc : reversed(pullbackIndirectResults))
       builder.createDeallocStack(loc, alloc);
-    }
   }
 
   /// Handle `struct` instruction.
@@ -4353,12 +4350,17 @@ public:
       case AdjointValueKind::Aggregate: {
         SmallVector<AdjointValue, 8> eltVals;
         for (auto *field : cotangentVectorDecl->getStoredProperties()) {
-          if (field == cotanField)
+          if (field == cotanField) {
             eltVals.push_back(av);
-          else
-            eltVals.push_back(makeZeroAdjointValue(
-                SILType::getPrimitiveObjectType(
-                    field->getType()->getCanonicalType())));
+          } else {
+            auto substMap = cotangentVectorTy->getMemberSubstitutionMap(
+                field->getModuleContext(), field);
+            auto fieldTy = field->getType().subst(substMap);
+            auto fieldSILTy =
+                getContext().getTypeConverter().getLoweredType(fieldTy);
+            assert(fieldSILTy.isObject());
+            eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
+          }
         }
         addAdjointValue(sei->getOperand(),
             makeAggregateAdjointValue(cotangentVectorSILTy, eltVals));

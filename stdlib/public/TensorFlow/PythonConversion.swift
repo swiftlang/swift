@@ -1,4 +1,4 @@
-//===-- NumpyConversion.swift ---------------------------------*- swift -*-===//
+//===-- PythonConversion.swift --------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines conversion initializers from `numpy.ndarray` to
-// `ShapedArray` and `Tensor`.
+// This file defines conversions between Python types & custom TensorFlow types.
 //
 //===----------------------------------------------------------------------===//
 
@@ -55,7 +54,7 @@ extension ShapedArray : ConvertibleFromNumpyArray
     }
 
     let pyShape = numpyArray.__array_interface__["shape"]
-    guard let shape = Array<Int>(pyShape) else {
+    guard let shape = [Int](pyShape) else {
       debugLogNumpyError("cannot access shape of 'numpy.ndarray' instance.")
       return nil
     }
@@ -120,7 +119,7 @@ extension Tensor : ConvertibleFromNumpyArray
     }
 
     let pyShape = numpyArray.__array_interface__["shape"]
-    guard let dimensions = Array<Int32>(pyShape) else {
+    guard let dimensions = [Int](pyShape) else {
       debugLogNumpyError("cannot access shape of 'numpy.ndarray' instance.")
       return nil
     }
@@ -162,6 +161,12 @@ extension Tensor where Scalar : NumpyScalarCompatible {
   ///
   /// - Precondition: The `numpy` Python package must be installed.
   public func makeNumpyArray() -> PythonObject { return array.makeNumpyArray() }
+}
+
+extension TensorShape : PythonConvertible {
+  public var pythonObject: PythonObject {
+    return dimensions.pythonObject
+  }
 }
 
 #endif // canImport(Python)

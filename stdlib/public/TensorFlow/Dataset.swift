@@ -46,10 +46,10 @@ func _tensorSeeds(_ seed: Tensor<Int64>) -> (Tensor<Int64>, Tensor<Int64>) {
 /// element tensors.
 @_fixed_layout
 public struct Dataset<Element : TensorGroup> {
-  @usableFromInline let _handle: VariantHandle
+  public let _handle: VariantHandle
 
-  @usableFromInline @inline(__always)
-  internal init(_handle: VariantHandle) {
+  @inlinable @inline(__always)
+  public init(_handle: VariantHandle) {
     self._handle = _handle
   }
 }
@@ -58,11 +58,11 @@ public extension Dataset {
   @inlinable @inline(__always)
   init(randomSeed: Int64) {
     let (seed1, seed2) = _tensorSeeds(Tensor(randomSeed))
-    self.init(
-      _handle: #tfop("RandomDataset", seed1, seed2,
-                     output_types$dtype: Element._typeList,
-                     output_shapes: Element._unknownShapeList)
-    )
+    self.init(_handle: Raw.experimentalRandomDataset(
+      seed: seed1,
+      seed2: seed2,
+      outputTypes: Element._typeList,
+      outputShapes: Element._unknownShapeList))
   }
 }
 
@@ -70,14 +70,9 @@ public extension Dataset {
   /// Creates a dataset from a batch of elements as a tensor.
   @inlinable @inline(__always)
   init(elements: Element) {
-    // A dataset creation op only runs on TF CPU.
-    self.init(
-      _handle: #tfop(
-        "TensorSliceDataset", [elements],
-        Toutput_types$dtype: Element._typeList,
-        output_shapes: Element._unknownShapeList
-      )
-    )
+    self.init(_handle: Raw.tensorSliceDataset(
+      components: [elements],
+      outputShapes: Element._unknownShapeList))
   }
 }
 
@@ -87,10 +82,10 @@ extension Dataset : Sequence {
   /// Returns an iterator over the elements of this dataset.
   @inlinable @inline(__always)
   public func makeIterator() -> DatasetIterator<Element> {
-    let resource: ResourceHandle =
-      #tfop("AnonymousIterator", output_types$dtype: Element._typeList,
-            output_shapes: Element._unknownShapeList)
-    #tfop("MakeIterator", _handle, resource) as Void
+    let resource = Raw.anonymousIterator(
+      outputTypes: Element._typeList,
+      outputShapes: Element._unknownShapeList)
+    Raw.makeIterator(dataset: _handle, iterator: resource)
     return DatasetIterator(_handle: resource)
   }
 }
@@ -102,57 +97,68 @@ public extension Dataset {
   func map<ResultElement : TensorGroup>(
     _ transform: (Element) -> ResultElement
   ) -> Dataset<ResultElement> {
-    return Dataset<ResultElement>(
-      _handle: #tfop(
-        "MapDataset", _handle, [Tensor<Int32>(0)],
-        f$func: _tffunc(transform),
-        Targuments$dtype: [Int32.tensorFlowDataType],
-        output_types$dtype: ResultElement._typeList,
-        output_shapes: ResultElement._unknownShapeList
-      )
-    )
+    return Dataset<ResultElement>(_handle: Raw.mapDataset(
+      inputDataset: _handle,
+      otherArguments: Tensor<Int32>(0),
+      f: transform,
+      outputTypes: ResultElement._typeList,
+      outputShapes: ResultElement._unknownShapeList,
+      useInterOpParallelism: true,
+      preserveCardinality: false))
+  }
+
+  @inlinable @inline(__always)
+  func map<ResultElement : TensorGroup>(
+    parallelCallCount: Int,
+    _ transform: (Element) -> ResultElement
+  ) -> Dataset<ResultElement> {
+    return Dataset<ResultElement>(_handle: Raw.parallelMapDataset(
+      inputDataset: _handle,
+      otherArguments: Tensor<Int32>(0),
+      numParallelCalls: Tensor<Int32>(Int32(parallelCallCount)),
+      f: transform,
+      outputTypes: ResultElement._typeList,
+      outputShapes: ResultElement._unknownShapeList,
+      useInterOpParallelism: true,
+      sloppy: false,
+      preserveCardinality: false))
   }
 
   @inlinable @inline(__always)
   func filter(
     _ isIncluded: (Element) -> Tensor<Bool>
   ) -> Dataset {
-    return Dataset(
-      _handle: #tfop(
-        "FilterDataset", _handle, [Tensor<Int32>(0)],
-        predicate$func: _tffunc(isIncluded),
-        Targuments$dtype: [Int32.tensorFlowDataType],
-        output_types$dtype: Element._typeList,
-        output_shapes: Element._unknownShapeList
-      )
-    )
+    return Dataset(_handle: Raw.filterDataset(
+      inputDataset: _handle,
+      otherArguments: Tensor<Int32>(0),
+      predicate: isIncluded,
+      outputTypes: Element._typeList,
+      outputShapes: Element._unknownShapeList))
   }
 }
 
 public extension Dataset {
   @inlinable @inline(__always)
   func shuffled(
-    sampleCount: Int64, randomSeed: Int64
+    sampleCount: Int, randomSeed: Int64
   ) -> Dataset {
     let (seed1, seed2) = _tensorSeeds(Tensor(randomSeed))
-    return Dataset(
-      _handle: #tfop(
-        "ShuffleDataset", _handle, Tensor<Int64>(sampleCount), seed1, seed2,
-        output_types$dtype: Element._typeList,
-        output_shapes: Element._unknownShapeList
-      )
-    )
+    return Dataset(_handle: Raw.shuffleDataset(
+      inputDataset: _handle,
+      bufferSize: Tensor(Int64(sampleCount)),
+      seed: seed1,
+      seed2: seed2,
+      outputTypes: Element._typeList,
+      outputShapes: Element._unknownShapeList))
   }
 
   @inlinable @inline(__always)
-  func batched(_ batchSize: Int64) -> Dataset {
-    return Dataset(
-      _handle: #tfop(
-        "BatchDataset", _handle, Tensor<Int64>(batchSize),
-        output_types$dtype: Element._typeList,
-        output_shapes: Element._unknownShapeList
-      )
-    )
+  func batched(_ batchSize: Int) -> Dataset {
+    return Dataset(_handle: Raw.batchDataset(
+      inputDataset: _handle,
+      batchSize: Tensor(Int64(batchSize)),
+      outputTypes: Element._typeList,
+      outputShapes: Element._unknownShapeList))
   }
 }
 
@@ -172,16 +178,29 @@ extension DatasetIterator : IteratorProtocol {
   /// exists.
   @inlinable @inline(__always)
   public mutating func next() -> Element? {
-    let optional: VariantHandle =
-      #tfop("IteratorGetNextAsOptional", _handle,
-            output_types$dtype: Element._typeList,
-            output_shapes: Element._unknownShapeList)
-    guard _TFGetScalarOrDie(#tfop("OptionalHasValue", optional)) else {
+    let optional = Raw.iteratorGetNextAsOptional(
+      iterator: _handle,
+      outputTypes: Element._typeList,
+      outputShapes: Element._unknownShapeList)
+    guard Raw.optionalHasValue(optional: optional).scalarized() else {
       return nil
     }
-    return #tfop("OptionalGetValue", optional,
-                 output_types$dtype: Element._typeList,
-                 output_shapes: Element._unknownShapeList) as Element
+    return Raw.optionalGetValue(
+      optional: optional,
+      outputShapes: Element._unknownShapeList)
+  }
+}
+
+/// A 2-tuple-like struct that conforms to TensorGroup that represents a tuple 
+/// of 2 types conforming to TensorGroup.
+@_fixed_layout
+public struct Zip2TensorGroup<T : TensorGroup, U : TensorGroup> : TensorGroup {
+  public var first: T
+  public var second: U
+
+  public init(_ first: T, _ second: U) {
+    self.first = first
+    self.second = second
   }
 }
 
@@ -189,10 +208,10 @@ extension DatasetIterator : IteratorProtocol {
 @inlinable @inline(__always)
 public func zip<T : TensorGroup, U : TensorGroup>(
   _ dataset1: Dataset<T>, _ dataset2: Dataset<U>
-) -> Dataset<TensorPair<T, U>> {
-  let handle: VariantHandle = #tfop(
-     "ZipDataset", TensorPair(dataset1._handle, dataset2._handle),
-     output_types$dtype: TensorPair<T, U>._typeList,
-     output_shapes: TensorPair<T, U>._unknownShapeList)
+) -> Dataset<Zip2TensorGroup<T, U>> {
+  let handle = Raw.zipDataset(
+    inputDatasets: [dataset1._handle, dataset2._handle],
+    outputTypes: Zip2TensorGroup<T, U>._typeList,
+    outputShapes: Zip2TensorGroup<T, U>._unknownShapeList)
   return Dataset(_handle: handle)
 }

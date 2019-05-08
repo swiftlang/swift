@@ -47,27 +47,6 @@ public struct Tensor<Scalar : TensorFlowScalar> : TensorProtocol {
 //===----------------------------------------------------------------------===//
 // Compiler intrinsics
 //===----------------------------------------------------------------------===//
-//
-// By default, when a `Tensor` value is implicitly passed between host and
-// tensor code, the partitioning pass will generate a warning. Users can
-// indicate that they are doing something intentionally by using these methods,
-// which silences the warning.
-//
-// TODO: These would be nicer defined as builtins rather than "well known
-// functions".
-
-@usableFromInline @inline(never)
-@_silgen_name("__tf_to_accel")
-func _TFToAcclerator<Scalar>(_ handle: TensorHandle<Scalar>) -> TensorHandle<Scalar> {
-  return handle
-}
-
-@usableFromInline @inline(never)
-@_silgen_name("__tf_to_host")
-func _TFToHost<Scalar>(_ handle: TensorHandle<Scalar>)
-  -> TensorHandle<Scalar> {
-  return handle
-}
 
 /// This function converts a `TensorHandle` that is known to have a 0-d value
 /// into the scalar that it produces. This is intended for use in op definitions
@@ -95,9 +74,9 @@ func _TFGetScalar<Scalar : TensorFlowScalar>(
 @usableFromInline @inline(never)
 @_silgen_name("__tf_tensor_from_scalars")
 func _TFTensorFromScalars<Scalar : TensorFlowScalar>(
-  _ scalars: [Scalar], shape: [Int32]
+  _ scalars: [Scalar], shape: [Int]
 ) -> TensorHandle<Scalar> {
-  let contiguousSize = shape.map(Int.init).reduce(1, *)
+  let contiguousSize = shape.reduce(1, *)
   precondition(scalars.count == contiguousSize,
                "The number of scalars does not match the shape.")
   return TensorHandle(
@@ -139,7 +118,7 @@ func _TFTensorFromScalar<Scalar : TensorFlowScalar>(
 @_silgen_name("__tf_tensor_from_scalars_1d")
 func _TFTensorFromScalars1D<Scalar : TensorFlowScalar>(_ scalars: [Scalar])
   -> TensorHandle<Scalar> {
-  return _TFTensorFromScalars(scalars, shape: [Int32(scalars.count)])
+  return _TFTensorFromScalars(scalars, shape: [scalars.count])
 }
 
 @inlinable @inline(__always)
@@ -149,65 +128,26 @@ func _TFHoistable<Scalar>(_ fn: () -> TensorHandle<Scalar>)
 }
 
 //===----------------------------------------------------------------------===//
-// Memory transfer markers
-//===----------------------------------------------------------------------===//
-
-public extension Tensor {
-  /// Mark memory transfer to accelerator.
-  /// - Parameters:
-  ///   - shape: When sending the tensor to a TF XLA device (including TPU),
-  ///   must specify the tensor shape as required by XLA compilation.
-  @inlinable @inline(__always)
-  func toAccelerator(shape: TensorShape) -> Tensor {
-    let tensor = toAccelerator()
-    // If the tensor is to be sent from host to TPU, the shape is specified on
-    // TF CPU first, before TF CPU sends the tensor to TPU.
-    let ret: TensorHandle<Scalar> = #tfop(
-      "Identity",
-      tensor,
-      T$dtype: Scalar.tensorFlowDataType,
-      __shapes: [shape],
-      __device: "/job:localhost/replica:0/task:0/device:CPU:0")
-    return Tensor(handle: ret)
-  }
-
-  /// Mark memory transfer to accelerator.
-  @inlinable @inline(__always)
-  func toAccelerator() -> Tensor {
-    return Tensor(handle: _TFToAcclerator(handle))
-  }
-
-  /// Mark memory transfer to host.
-  /// - Parameters:
-  ///   - shape: When sending the tensor to a TF XLA device (including TPU),
-  ///   must specify the tensor shape as required by XLA compilation.
-  @inlinable @inline(__always)
-  func toHost(shape: TensorShape) -> Tensor {
-    // If the `self` tensor resides on TPU, the shape is specified on that
-    // device first, before outfeeding the tensor to CPU, a required step for
-    // sending the tensor to the host.
-    let tensor: TensorHandle<Scalar> =
-      #tfop("Identity", self, T$dtype: Scalar.tensorFlowDataType,
-            __shapes: [shape])
-    return Tensor(handle: tensor).toHost()
-  }
-
-  /// Mark memory transfer to host.
-  @inlinable @inline(__always)
-  func toHost() -> Tensor {
-    return Tensor(handle: _TFToHost(handle))
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // Initialization
 //===----------------------------------------------------------------------===//
 
 public extension Tensor where Scalar : Numeric {
   /// Perform an element-wise conversion from another `Tensor`.
   @inlinable @inline(__always)
+  @differentiable(
+    vjp: _vjpCast where Scalar : TensorFlowFloatingPoint,
+                        OtherScalar: TensorFlowFloatingPoint)
   init<OtherScalar : Numeric>(_ other: Tensor<OtherScalar>) {
     self = Raw.cast(other)
+  }
+}
+
+internal extension Tensor where Scalar : TensorFlowFloatingPoint {
+  @inlinable
+  static func _vjpCast<OtherScalar : TensorFlowFloatingPoint>(
+    _ other: Tensor<OtherScalar>
+  ) -> (Tensor, (Tensor) -> Tensor<OtherScalar>) {
+    return (Tensor(other), { v in Tensor<OtherScalar>(v) })
   }
 }
 
@@ -254,7 +194,7 @@ public extension Tensor {
   init<C : RandomAccessCollection>(_ vector: C) where C.Element == Scalar {
     let handle = _TFHoistable {
       TensorHandle<Scalar>(
-        shape: [Int32(vector.count)],
+        shape: [vector.count],
         scalarsInitializer: { addr in
           var currentAddr = addr
           for scalar in vector {
@@ -300,7 +240,7 @@ public extension Tensor {
         shape: shape.dimensions,
         scalarsInitializer: { addr in
           addr.initialize(from: scalars.baseAddress!,
-                          count: Int(shape.contiguousSize))
+                          count: shape.contiguousSize)
         }
       )
     }
@@ -337,7 +277,8 @@ public extension Tensor {
 }
 
 public extension Tensor {
-  /// Creates a tensor with the specified shape and a single, repeated scalar value.
+  /// Creates a tensor with the specified shape and a single, repeated scalar
+  /// value.
   ///
   /// - Parameters:
   ///   - shape: The dimensions of the tensor.
@@ -357,7 +298,7 @@ public extension Tensor {
   @differentiable(vjp: _vjpInit(repeating:shape:)
                   where Scalar : TensorFlowFloatingPoint)
   init(repeating repeatedValue: Scalar, shape: TensorShape) {
-    self = Raw.fill(dims: Tensor<Int32>(shape.dimensions),
+    self = Raw.fill(dims: Tensor<Int32>(shape.dimensions.map(Int32.init)),
                     value: Tensor(repeatedValue))
   }
 }
@@ -378,7 +319,7 @@ public extension Tensor {
   /// all dimensions being 1.
   @inlinable @inline(__always)
   // @differentiable(where Scalar : TensorFlowFloatingPoint)
-  init(broadcasting scalar: Scalar, rank: Int32) {
+  init(broadcasting scalar: Scalar, rank: Int) {
     self = Tensor(scalar).reshaped(to: TensorShape(repeating: 1, count: rank))
   }
 
@@ -488,12 +429,7 @@ extension _TensorElementLiteral : ExpressibleByArrayLiteral {
   public typealias ArrayLiteralElement = _TensorElementLiteral<Scalar>
   @inlinable @inline(__always)
   public init(arrayLiteral elements: _TensorElementLiteral<Scalar>...) {
-    // Attr T (non-optional in the op definition) need not be specified when we
-    // run the op as part of a graph function, but need to be specified when we
-    // run it via eager C API.
-    let handle: TensorHandle<Scalar> = #tfop("Pack", elements,
-                                             T$dtype: Scalar.tensorFlowDataType)
-    tensor = Tensor(handle: handle)
+    tensor = Raw.pack(elements.map { $0.tensor })
   }
 }
 
@@ -508,8 +444,7 @@ extension Tensor : ExpressibleByArrayLiteral {
   internal init(
     _tensorElementLiterals elements: [_TensorElementLiteral<Scalar>]
   ) {
-    self.init(handle: #tfop("Pack", elements,
-                            T$dtype: Scalar.tensorFlowDataType))
+    self = Raw.pack(elements.map { $0.tensor })
   }
 
   /// Creates a tensor initialized with the given elements.
@@ -526,11 +461,11 @@ extension Tensor : ExpressibleByArrayLiteral {
 public extension Tensor {
   /// The number of dimensions of the `Tensor`.
   @inlinable
-  var rank: Int32 {
+  var rank: Int {
     @inline(__always)
     @_semantics("autodiff.nonvarying")
     get {
-      return _TFGetScalarOrDie(rankTensor.handle)
+      return Int(_TFGetScalarOrDie(rankTensor.handle))
     }
   }
 
@@ -540,16 +475,16 @@ public extension Tensor {
     @inline(__always)
     @_semantics("autodiff.nonvarying")
     get {
-      return TensorShape(shapeTensor.scalars)
+      return TensorShape(shapeTensor.scalars.map(Int.init))
     }
   }
 
   /// The number of scalars in the `Tensor`.
   @inlinable
-  var scalarCount: Int32 {
+  var scalarCount: Int {
     @inline(__always)
     get {
-      return _TFGetScalarOrDie(scalarCountTensor.handle)
+      return Int(_TFGetScalarOrDie(scalarCountTensor.handle))
     }
   }
 }
@@ -623,11 +558,11 @@ public extension Tensor where Scalar : Numeric {
   ///   - axis: The axis to fill. The default is `-1`, a new inner-most axis.
   ///
   @inlinable @inline(__always)
-  init(oneHotAtIndices indices: Tensor<Int32>, depth: Int32,
+  init(oneHotAtIndices indices: Tensor<Int32>, depth: Int,
        onValue: Scalar = 1, offValue: Scalar = 0, axis: Int = -1) {
     self = Raw.oneHot(
       indices: indices,
-      depth: Tensor<Int32>(depth),
+      depth: Tensor<Int32>(Int32(depth)),
       onValue: Tensor(onValue),
       offValue: Tensor(offValue),
       axis: Int64(axis)
@@ -643,10 +578,8 @@ public extension TensorFlowScalar {
   /// Convert to a tensor with the specified rank, with all dimensions equal to
   /// 1.
   @inlinable @inline(__always)
-  func makeTensor(rank: Int32) -> Tensor<Self> {
-    return Raw.fill(
-      dims: Tensor<Int32>(ones: TensorShape(rank)),
-      value: Tensor(self))
+  func makeTensor(rank: Int) -> Tensor<Self> {
+    return Tensor(repeating: self, shape: TensorShape(rank))
   }
 }
 
@@ -664,7 +597,8 @@ public extension Tensor {
   @inlinable @inline(__always)
   @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func reshaped(to newShape: TensorShape) -> Tensor {
-    return reshaped(toShape: Tensor<Int32>(newShape.dimensions))
+    // TODO(TF-433): Remove workaround for differentiating `map`.
+    return reshaped(toShape: Tensor<Int32>({newShape.dimensions.map(Int32.init)}()))
   }
 
   /// Reshape to the specified `Tensor` representing a shape.
@@ -694,14 +628,24 @@ public extension Tensor {
   }
 
   /// Returns a shape-expanded `Tensor`, with a dimension of 1 inserted at the
-  /// specified shape index.
+  /// specified shape indices.
+  @inlinable @inline(__always)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
+  func expandingShape(at axes: Int...) -> Tensor {
+    return expandingShape(at: axes)
+  }
+   
+  /// Returns a shape-expanded `Tensor`, with a dimension of 1 inserted at the
+  /// specified shape indices.
   @inlinable @inline(__always)
   @differentiable(
     wrt: self, vjp: _vjpExpandingShape(at:)
     where Scalar : TensorFlowFloatingPoint
   )
-  func expandingShape(at shapeIndex: Int32) -> Tensor {
-    return Raw.expandDims(self, dim: Tensor<Int32>(shapeIndex))
+  func expandingShape(at axes: [Int]) -> Tensor {
+    var res = self
+    for i in axes { res = Raw.expandDims(res, dim: Tensor<Int32>(Int32(i))) }
+    return res
   }
 
   /// Remove the specified dimensions of size 1 from the shape of a tensor. If
@@ -709,7 +653,7 @@ public extension Tensor {
   /// removed.
   @inlinable @inline(__always)
   @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
-  func squeezingShape(at axes: Int32...) -> Tensor {
+  func squeezingShape(at axes: Int...) -> Tensor {
     return squeezingShape(at: axes)
   }
 
@@ -721,8 +665,8 @@ public extension Tensor {
     wrt: self, vjp: _vjpSqueezingShape(at:)
     where Scalar : TensorFlowFloatingPoint
   )
-  func squeezingShape(at axes: [Int32]) -> Tensor {
-    return Raw.squeeze(self, squeezeDims: axes)
+  func squeezingShape(at axes: [Int]) -> Tensor {
+    return Raw.squeeze(self, squeezeDims: axes.map(Int32.init))
   }
 
   /// Reshape to scalar.
@@ -797,21 +741,52 @@ extension Tensor : Equatable where Scalar : Equatable {
 // Description and visualization
 //===----------------------------------------------------------------------===//
 
-/// String conversion.
+// String conversion.
 extension Tensor : CustomStringConvertible {
+  /// A textual representation of the tensor.
+  ///
+  /// - Note: use `fullDescription` for a non-pretty-printed description showing
+  ///   all scalars.
   public var description: String {
     return array.description
   }
 }
 
-/// Xcode Playground display conversion.
+public extension Tensor {
+  /// A textual representation of the tensor. Returns a summarized description
+  /// if `summarize` is true and the element count exceeds twice the
+  /// `edgeElementCount`.
+  ///
+  /// - Parameters:
+  ///   - lineWidth: The max line width for printing. Used to determine number
+  ///     of scalars to print per line.
+  ///   - edgeElementCount: The maximum number of elements to print before and
+  ///     after summarization via ellipses (`...`).
+  ///   - summarizing: If true, summarize description if element count exceeds
+  ///     twice `edgeElementCount`.
+  func description(
+    lineWidth: Int = 80, edgeElementCount: Int = 3, summarizing: Bool = false
+  ) -> String {
+    return array.description(
+      lineWidth: lineWidth, edgeElementCount: edgeElementCount,
+      summarizing: summarizing)
+  }
+
+  /// A full, non-pretty-printed textual representation of the tensor, showing
+  /// all scalars.
+  var fullDescription: String {
+    return array.fullDescription
+  }
+}
+
+// Xcode Playground display conversion.
 extension Tensor : CustomPlaygroundDisplayConvertible {
   public var playgroundDescription: Any {
     return description
   }
 }
 
-/// Mirror representation, used by debugger/REPL.
+// Mirror representation, used by debugger/REPL.
 extension Tensor : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: [], displayStyle: .struct)
@@ -828,11 +803,8 @@ public extension Tensor {
     @inline(__always)
     get {
       debugLog("Returning a host copy of array.")
-      internalConsistencyCheck(toHost().handle.isConcrete)
-
-      // This is considered to be a well known way to produce a copy to the
-      // host, so an "implicit copy to host" warning should not be produced.
-      return toHost().handle.makeHostCopy()
+      internalConsistencyCheck(handle.isConcrete)
+      return handle.makeHostCopy()
     }
   }
 

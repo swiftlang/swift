@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -O -emit-sil %s -verify -verify-ignore-unknown
+// REQUIRES: deprecated_gpe_mode
 // FIXME: Remove -verify-ignore-unknown when we fix the source location.
 
 import TensorFlow

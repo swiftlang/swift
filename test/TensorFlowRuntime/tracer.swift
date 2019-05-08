@@ -1,6 +1,5 @@
-// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize
 //
 // Tracer tests.
 
@@ -129,6 +128,16 @@ TracerTests.testAllBackends("TraceWithNoResult") {
   expectNearlyEqualWithScalarTensor(8.0, tracedAdd(Tensor<Float>(5.0), three))
 }
 
+TracerTests.testAllBackends("TracerWithInOut") {
+  func addOne(state: Tensor<Int32>) -> (Tensor<Int32>) {
+    return state + 1
+  }
+  let addOneGraph = _graph(addOne)
+  expectEqual(addOneGraph(Tensor<Int32>(5)), Tensor<Int32>(6))
+  expectEqual(addOneGraph(Tensor<Int32>(0)), Tensor<Int32>(1))
+  expectEqual(addOneGraph(Tensor<Int32>(-1)), Tensor<Int32>(0))
+}
+
 TracerTests.testAllBackends("Basic_IntermediateTensors") {
   func tracee(state: Tensor<Float>, data: Data) -> (Tensor<Float>, Result) {
     // Create an intermediate tensor value, which the tracing infra needs to
@@ -158,6 +167,17 @@ TracerTests.testAllBackends("Advanced") {
     var model: Model = [Tensor<Float>(1.0), Tensor<Float>(2.0)]
     var optimizer: Optimizer = [Tensor<Float>(1.0), Tensor<Float>(2.0)]
 
+    public init() {}
+
+    public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?, count: Int) {
+      self.model = [
+        Tensor<Float>(_owning: tensorHandles),
+        Tensor<Float>(_owning: tensorHandles?.advanced(by: 1))]
+      self.optimizer = [
+        Tensor<Float>(_owning: tensorHandles?.advanced(by: 2)),
+        Tensor<Float>(_owning: tensorHandles?.advanced(by: 3))]
+    }
+
     public func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?) {
       print("Calling State._unpackTensorHandles().")
       var ptr = address
@@ -165,8 +185,13 @@ TracerTests.testAllBackends("Advanced") {
       ptr = ptr!.advanced(by: Int(model._tensorHandleCount))
       optimizer._unpackTensorHandles(into: ptr)
     }
+
     public var _tensorHandleCount: Int32 {
       return model._tensorHandleCount + optimizer._tensorHandleCount
+    }
+
+    public var _typeList: [TensorDataType] {
+      return model._typeList + optimizer._typeList
     }
 
     func _makeInstance<C: Collection>(owning inputs: C) -> State

@@ -20,24 +20,24 @@
 // function.  We need to inline if a callee contains tensor ops, not only if
 // it takes and returns a TensorFlow value.
 @_transparent
+@available(*, deprecated)
 public func enableTPU(serverAddress: String? = nil, infeed: Bool = true) {
   _RuntimeConfig.executionMode = .tpu
   if let serverAddress = serverAddress {
     _RuntimeConfig.session = .remote(serverDef: serverAddress)
   }
-  #tfop("tfc.configureTPU", enableInfeed: infeed) as Void
 }
 
 // FIXME: Extend the interface to support multiple GPU devices, and unify it
 // with enableTPU() above.
+@available(*, deprecated)
 @_transparent
 public func enableGPU() {
-  #tfop("tfc.configureGPU") as Void
 }
 
 @_transparent
+@available(*, deprecated)
 public func enableCPU() {
-  #tfop("tfc.configureCPU") as Void
 }
 
 /// A TensorFlow device kind.

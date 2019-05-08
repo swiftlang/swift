@@ -26,7 +26,6 @@ set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
 list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
 list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
 list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-sil-ownership")
-list(APPEND swift_stdlib_compile_flags "-swift-version" "4")
 list(APPEND swift_stdlib_compile_flags "-force-single-frontend-invocation")
 # FIXME(SR-7972): Some tests fail when TensorFlow is optimized.
 list(APPEND swift_stdlib_compile_flags "-Onone")
@@ -46,20 +45,23 @@ set(SOURCES
   Tensor.swift
   TensorGroup.swift
   TensorHandle.swift
-  TensorPair.swift
   TensorProtocol.swift
   TensorShape.swift
   Utilities.swift
+  ArrayOps.swift
   Threading.swift
+  ExecuteOp.swift.gyb
   # NumPy bridging for `ShapedArray` and `Tensor`.
-  NumpyConversion.swift)
+  PythonConversion.swift)
 
 # Copy TensorFlow bindings file, if it exists.
 if (TENSORFLOW_SWIFT_BINDINGS)
-  list(APPEND SOURCES "${TENSORFLOW_SWIFT_BINDINGS}")
+  file(GLOB_RECURSE TENSORFLOW_SWIFT_BINDINGS_SOURCES
+    "${TENSORFLOW_SWIFT_BINDINGS}/*.swift")
+  list(APPEND SOURCES "${TENSORFLOW_SWIFT_BINDINGS_SOURCES}")
 endif()
 
-# Copy TensorFlow high-level API sources, if they exists.
+# Copy TensorFlow high-level API sources, if they exist.
 if (TENSORFLOW_SWIFT_APIS)
   file(GLOB_RECURSE TENSORFLOW_SWIFT_API_SOURCES
     "${TENSORFLOW_SWIFT_APIS}/Sources/*.swift")
@@ -67,7 +69,7 @@ if (TENSORFLOW_SWIFT_APIS)
   list(APPEND SOURCES "${TENSORFLOW_SWIFT_API_SOURCES}")
 endif()
 
-# When Python exists, NumpyConversion.swift imports it, so it must be
+# When Python exists, PythonConversion.swift imports it, so it must be
 # available at link time.
 set(TENSORFLOW_DEPENDS_PYTHON)
 if (SWIFT_PYTHON_EXISTS)

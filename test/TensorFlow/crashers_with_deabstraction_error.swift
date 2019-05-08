@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil %s -verify
+// REQUIRES: deprecated_gpe_mode
 
 // This file contains tests that used to be in ./crashers.swift that produced
 // expected errors in the deabstraction pass, which prevented partitioning from

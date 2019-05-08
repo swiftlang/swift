@@ -1,7 +1,5 @@
-// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
-// RUN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize
 
 import TensorFlow
 #if TPU
@@ -30,6 +28,10 @@ ControlFlowTests.testAllBackends("powerOfTwo") {
   expectNearlyEqualWithScalarTensor(1024.0, powerOfTwo(10))
 }
 
+// Disable this test in macos for now
+// https://bugs.swift.org/browse/SR-8986
+#if !os(macOS)
+
 func natSumWithBreak(_ breakIndex: Int32) -> Tensor<Int32> {
   var i: Int32 = 1
   var sum = Tensor<Int32>(0)
@@ -51,6 +53,8 @@ ControlFlowTests.testAllBackends("natSumWithBreak") {
   expectEqualWithScalarTensor(5050, natSumWithBreak(100))
   expectEqualWithScalarTensor(5050, natSumWithBreak(200))
 }
+
+#endif // !os(macOS)
 
 func sumOfProducts(_ M : Int32, _ N : Int32) -> Tensor<Float> {
   // Effectively computes natSum(M)*natSum(N)

@@ -35,10 +35,9 @@ public class _AnyTensorHandle {
   }
 }
 
-/// `TensorHandle` is the type used by ops and the `#tfop()` syntax
-/// specifically. It includes a `Scalar` type, which compiler internals use to
-/// determine the datatypes of parameters when they are extracted into a tensor
-/// program.
+/// `TensorHandle` is the type used by ops. It includes a `Scalar` type, which 
+/// compiler internals use to determine the datatypes of parameters when they 
+/// are extracted into a tensor program.
 @_fixed_layout // required because the compiler accesses _cTensorHandle directly.
 public final class TensorHandle<Scalar> : _AnyTensorHandle
   where Scalar : _TensorFlowDataTypeCompatible {
@@ -73,7 +72,7 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
   /// capacity. `bufferInitializer` must initialize the entire buffer.
   @usableFromInline
   convenience init(
-    shape: [Int32],
+    shape: [Int],
     byteCount: Int,
     bufferInitializer: (UnsafeMutableRawPointer) -> Void
   ) {
@@ -106,10 +105,10 @@ extension TensorHandle where Scalar : TensorFlowScalar {
   /// order.
   @usableFromInline
   convenience init(
-    shape: [Int32],
+    shape: [Int],
     scalarsInitializer: (UnsafeMutablePointer<Scalar>) -> Void
   ) {
-    let contiguousSize = shape.lazy.map(Int.init).reduce(1, *)
+    let contiguousSize = shape.reduce(1, *)
     let byteCount = contiguousSize * MemoryLayout<Scalar>.stride
     self.init(shape: shape, byteCount: byteCount) { buffer in
       scalarsInitializer(buffer.bindMemory(to: Scalar.self,
@@ -195,8 +194,8 @@ internal extension ShapedArray where Scalar : _TensorFlowDataTypeCompatible {
   }
 }
 
-/// `ResourceHandle` is the type used by ops and the `#tfop()` syntax to
-/// represent TensorFlow "resource" values.
+/// `ResourceHandle` is the type used by ops to represent TensorFlow "resource" 
+/// values.
 public final class ResourceHandle : _AnyTensorHandle {
   @usableFromInline
   init(owning cTensorHandle: CTensorHandle) {
@@ -248,8 +247,8 @@ extension ResourceHandle : TensorSendableReceivable {
   }
 }
 
-/// `VariantHandle` is the type used by ops and the `#tfop()` syntax to
-/// represent TensorFlow "variant" values.
+/// `VariantHandle` is the type used by ops to represent TensorFlow "variant" 
+/// values.
 public final class VariantHandle : _AnyTensorHandle {
   @usableFromInline
   init(owning cTensorHandle: CTensorHandle) {

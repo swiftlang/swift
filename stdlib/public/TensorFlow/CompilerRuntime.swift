@@ -84,6 +84,12 @@ private class TraceContext {
   /// concrete tensors produced within the trace function.
   ///
   /// For example, if the tracee is:
+  ///
+  /// struct TensorPair<T : TensorGroup, U : TensorGroup> : TensorGroup {
+  ///   public var first: T
+  ///   public var second: U
+  /// }
+  ///
   /// func foo(x: TensorPair) -> Tensor {
   ///   let y = Tensor<Float>(1.0)
   ///   return x.first + x.second + y
@@ -212,7 +218,8 @@ private class TraceContext {
 
   /// Execute the trace graph function, and return the list of output tensors
   /// from the trace execution. These output tensors are owned by the caller.
-  func execute(traceeInputs: [_AnyTensorHandle]) -> [CTensorHandle] {
+  func execute(
+    traceeInputs: [_AnyTensorHandle], useXLA: Bool = false) -> [CTensorHandle] {
     // We must be in the `notTracing` enum mode.
     internalConsistencyCheck(_RuntimeConfig.traceState.context == nil)
     internalConsistencyCheck(traceGraphFn != nil)
@@ -221,6 +228,7 @@ private class TraceContext {
     internalConsistencyCheck(tracedFunctionName != nil)
     let eagerContext = _TFCGetGlobalEagerContext()
     let op: CTFEOp! = TFE_NewOp(eagerContext, tracedFunctionName, status)
+    defer { TFE_DeleteOp(op) }
     checkOk(status)
 
     let deviceName = _ExecutionContext.global.currentDeviceName
@@ -228,6 +236,11 @@ private class TraceContext {
       debugLog("Placing the trace func on device \(deviceName).")
       TFE_OpSetDevice(op, deviceName, status)
       checkOk(status)
+    }
+
+    if useXLA {
+      debugLog("Enabling XLA compilation")
+      TFE_OpSetAttrBool(op, "_XlaCompile", 1)
     }
 
     debugLog("Adding \(traceeInputs.count) tracee input tensors.")
@@ -565,6 +578,14 @@ private func configureRuntimeFromEnvironment() {
     _RuntimeConfig.runMetadataOutputPath = path
     debugLog("Setting run metadata output path to \(path) from env.")
   }
+
+  if let value = getenv("SWIFT_TENSORFLOW_CPU_DEVICE_COUNT") {
+    guard let cpuDeviceCount = UInt32(String(cString: value)) else {
+      fatalError("SWIFT_TENSORFLOW_CPU_DEVICE_COUNT must take an int value.")
+    }
+    _RuntimeConfig.cpuDeviceCount = cpuDeviceCount
+    debugLog("Setting number of CPU devices to \(cpuDeviceCount) from env.")
+  }
 }
 
 /// Initialize the TPU system.
@@ -809,6 +830,20 @@ private extension TensorGroup {
     TF_DeleteStatus(status)
     self.init(_owning: buffer)
   }
+
+  init<C: Collection>(_owning input: C) where C.Element == CTensorHandle {
+    assert(Self._tensorHandleCount == input.count)
+    let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(
+      capacity: input.count)
+    let status = TF_NewStatus()
+    // copy input to buffer
+    for (i, inputTensorHandle) in input.enumerated() {
+      let address = buffer.advanced(by: i)
+      address.initialize(to: inputTensorHandle)
+    }
+    TF_DeleteStatus(status)
+    self.init(_owning: buffer)
+  }
 }
 
 // TODO: Fold this protocol into TensorArrayProtocol.
@@ -916,7 +951,7 @@ private func _graphInternal<State : _TensorArrayProtocolEnhanced,
     let newState = state._makeInstance(owning: returnValues.prefix(
                                          Int(state._tensorHandleCount)))
     let resultValues = returnValues.dropFirst(Int(state._tensorHandleCount))
-    let result = resultValues.isEmpty ? nil : Result(_copying: resultValues)
+    let result: Result? = resultValues.isEmpty ? nil : Result(_owning: resultValues)
     return (newState, result)
   }
 }
@@ -976,6 +1011,46 @@ public func _tffunc<State : _TensorArrayProtocolEnhanced,
   }
   return {
     data in traceContext.specializeTFFunction(with: data.cTensorHandles)
+  }
+}
+
+// Trace the given function to generate a TF graph and return a closure
+// that can be used to launch the graph.
+public func _graph<In : TensorGroup, Out : TensorGroup>(
+  _ fn: (In) -> Out, useXLA: Bool = false
+) -> (In) -> Out {
+  let traceContext: TraceContext = withoutActuallyEscaping(fn) { escapableFn in
+    let wrappedFn = { (inputs: [CTensorHandle]) -> [CTensorHandle] in
+      let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(
+        capacity: Int(inputs.count))
+      var ptr = buffer
+      for input in inputs {
+        ptr.initialize(to: input)
+        ptr = ptr.advanced(by: 1)
+      }
+      let symbolicIn = In(_owning: buffer)
+      let symbolicOut = escapableFn(symbolicIn)
+      return symbolicOut.cTensorHandles
+    }
+    let dtypes = In._typeList.map { $0._cDataType }
+    return _trace(with: dtypes, in: wrappedFn)
+  }
+  // The result is a closure that captures and executes the trace graph
+  // function in the trace context.
+  return { (input: In) -> (Out) in
+    debugLog("Running trace function over input \(input).")
+
+    debugLog("Getting input state tensor handles.")
+    let inputStateTensorHandles =  input.cTensorHandles
+    let inputTensors = inputStateTensorHandles.map {
+      _TFCCreateTensorHandleFromC($0)
+    }
+    debugLog("Executing trace graph function.")
+    let returnValues = traceContext.execute(
+      traceeInputs: inputTensors, useXLA: useXLA)
+
+    debugLog("Creating output model instance.")
+    return Out(_owning: returnValues)
   }
 }
 
@@ -1689,6 +1764,29 @@ func _TFCOpAddInputFromTensorGroup<T : TensorArrayProtocol>(
   return count
 }
 
+/// Special protocol for calling tensorflow operations that take heterogeneous
+/// arrays as input.
+public protocol AnyTensor {
+  var _rawTensorHandle: CTensorHandle { get }
+  var _tensorFlowDataType: TensorDataType { get }
+}
+
+extension Tensor : AnyTensor {
+  public var _rawTensorHandle: CTensorHandle { return handle._cTensorHandle }
+  public var _tensorFlowDataType: TensorDataType { return Scalar.tensorFlowDataType }
+}
+
+@usableFromInline
+func _TFCOpAddInputFromAnyTensors(
+  _ op: CTFEOp, _ tensors: [AnyTensor], _ status: CTFStatus
+) {
+  for tensor in tensors {
+    let handle = tensor._rawTensorHandle
+    TFE_OpAddInput(op, handle, status)
+    checkOk(status)
+  }
+}
+
 /// Initializes a TensorGroup value, taking ownership of all the tensor
 /// handles in `tensorHandles`.
 @usableFromInline
@@ -1850,7 +1948,7 @@ func _TFCOpSetAttrTensorShapeArray(_ op: CTFEOp,
                                    _ value: Array<TensorShape>,
                                    _ status: CTFStatus) {
   let flattenedDims = value.flatMap { $0.dimensions.map(Int64.init) }
-  let ranks = value.map { $0.rank }
+  let ranks = value.map { Int32($0.rank) }
   setAttrShapeList(op: op, attrName: attrName, flattenedDims: flattenedDims,
                    ranks: ranks, status: status)
 }
@@ -1867,26 +1965,22 @@ func _TFCOpSetAttrOptionalTensorShapeArray(_ op: CTFEOp,
     }
     return []
   }
-  let ranks = value.map { tensorShapeOpt -> Int32 in
-    if let tensorShape = tensorShapeOpt {
-      return tensorShape.rank
-    }
-    return -1
-  }
+  let ranks = value.map { shape in (shape?.rank).map(Int32.init) ?? -1 }
   setAttrShapeList(op: op, attrName: attrName, flattenedDims: flattenedDims,
                    ranks: ranks, status: status)
 }
 
 /// Given dimensions and ranks in the form described below, makes the
-/// appropriate call to TFE_OpSetAttrShapeList(op, attrName, ..., status).
+/// appropriate call to `TFE_OpSetAttrShapeList(op, attrName, ..., status)`.
 ///
 /// - Parameters
 ///   - flattenedDims: all the shapes' dimensions concatenated together in
 ///     order
 ///   - ranks: all the shapes' ranks (-1 denotes unknown rank)
-func setAttrShapeList(op: CTFEOp, attrName: UnsafePointer<Int8>,
-                      flattenedDims: Array<Int64>, ranks: Array<Int32>,
-                      status: CTFStatus) {
+fileprivate func setAttrShapeList(
+  op: CTFEOp, attrName: UnsafePointer<Int8>, flattenedDims: Array<Int64>,
+  ranks: Array<Int32>, status: CTFStatus
+) {
   flattenedDims.withUnsafeBufferPointer { flattenedDimsBuffer in
     var dimsPtr: UnsafePointer<Int64>? = flattenedDimsBuffer.baseAddress
     var dims: [UnsafePointer<Int64>?] = []

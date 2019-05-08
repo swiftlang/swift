@@ -2338,7 +2338,7 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
     printer << "@escaping ";
   // SWIFT_ENABLE_TENSORFLOW
   if (!options.excludeAttrKind(TAK_nondiff) && flags.isNonDifferentiable())
-    printer << "@nondiff";
+    printer << "@nondiff ";
 
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:

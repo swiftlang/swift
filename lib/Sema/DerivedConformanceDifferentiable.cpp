@@ -705,7 +705,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   // members conform to `VectorNumeric` and share the same scalar type.
   Type sameScalarType;
   bool canDeriveVectorNumeric =
-      canDeriveAdditiveArithmetic && !diffProperties.empty() && 
+      canDeriveAdditiveArithmetic && !diffProperties.empty() &&
       llvm::all_of(diffProperties, [&](VarDecl *vd) {
         auto conf = TC.conformsToProtocol(getAssociatedType(vd, parentDC, id),
                                           vecNumProto, nominal,
@@ -776,10 +776,22 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
     // call to the getter.
     if (member->getEffectiveAccess() > AccessLevel::Internal &&
         !member->getAttrs().hasAttribute<DifferentiableAttr>()) {
+      ArrayRef<Requirement> requirements;
+      // If the parent declaration context is an extension, the nominal type may
+      // conditionally conform to `Differentiable`. Use the conditional
+      // conformance requirements in getter `@differentiable` attributes.
+      if (auto *extDecl = dyn_cast<ExtensionDecl>(parentDC->getAsDecl()))
+        requirements = extDecl->getGenericRequirements();
       auto *diffableAttr = DifferentiableAttr::create(
           C, /*implicit*/ true, SourceLoc(), SourceLoc(), {}, None,
-          None, nullptr);
+          None, requirements);
       member->getAttrs().add(diffableAttr);
+      // If getter does not exist, trigger synthesis and compute type.
+      if (!member->getGetter())
+        addExpectedOpaqueAccessorsToStorage(TC, member);
+      if (!member->getGetter()->hasInterfaceType())
+        TC.resolveDeclSignature(member->getGetter());
+      // Compute getter parameter indices.
       auto *getterType =
           member->getGetter()->getInterfaceType()->castTo<AnyFunctionType>();
       AutoDiffParameterIndicesBuilder builder(getterType);
@@ -1124,6 +1136,9 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
 }
 
 ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
+  // Diagnose conformances in disallowed contexts.
+  if (checkAndDiagnoseDisallowedContext(requirement))
+    return nullptr;
   if (requirement->getBaseName() == TC.Context.Id_moved)
     return deriveDifferentiable_moved(*this);
   if (requirement->getBaseName() == TC.Context.Id_tangentVector)
@@ -1135,6 +1150,9 @@ ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
 }
 
 Type DerivedConformance::deriveDifferentiable(AssociatedTypeDecl *requirement) {
+  // Diagnose conformances in disallowed contexts.
+  if (checkAndDiagnoseDisallowedContext(requirement))
+    return nullptr;
   if (requirement->getBaseName() == TC.Context.Id_TangentVector)
     return deriveDifferentiable_AssociatedStruct(
         *this, TC.Context.Id_TangentVector);

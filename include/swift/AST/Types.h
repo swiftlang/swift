@@ -2625,12 +2625,8 @@ enum class FunctionTypeRepresentation : uint8_t {
   /// convention.
   CFunctionPointer,
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// A function that will be promoted to a TensorFlow Graph.
-  TensorFlow,
-
   /// The value of the greatest AST function representation.
-  Last = TensorFlow,
+  Last = CFunctionPointer,
 };
 
 /// The representation form of a SIL function.
@@ -2656,12 +2652,8 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   /// convention.
   CFunctionPointer = uint8_t(FunctionTypeRepresentation::CFunctionPointer),
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// A TensorFlow function pointer.
-  TensorFlow = uint8_t(FunctionTypeRepresentation::TensorFlow),
-
   /// The value of the greatest AST function representation.
-  LastAST = TensorFlow,
+  LastAST = CFunctionPointer,
 
   /// The value of the least SIL-only function representation.
   FirstSIL = 8,
@@ -2677,6 +2669,10 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   
   /// A closure invocation function that has not been bound to a context.
   Closure,
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// A TensorFlow function pointer.
+  TensorFlow,
 };
 
 /// Can this calling convention result in a function being called indirectly
@@ -3093,6 +3089,7 @@ public:
     return getExtInfo().getRepresentation();
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
   /// Given `indices`, `differentiationOrder`, and `kind`, calculates the type
   /// of the corresponding autodiff associated function.
   ///
@@ -3104,6 +3101,8 @@ public:
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
       LookupConformanceFn lookupConformance,
       GenericSignature *whereClauseGenericSignature = nullptr);
+
+  AnyFunctionType *getWithoutDifferentiability() const;
 
   /// \brief True if the parameter declaration it is attached to is guaranteed
   /// to not persist the closure for longer than the duration of the call.

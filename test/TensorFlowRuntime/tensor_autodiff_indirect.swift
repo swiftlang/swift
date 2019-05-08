@@ -1,8 +1,4 @@
-// RUN: %target-run-eager-swift
-//
-// Note: GPE testing is disabled because GPE does not interact well with
-// VJP-based AD. See SR-9638.
-//
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 //
 // Tensor indirect passing AD runtime tests.
@@ -92,10 +88,8 @@ public struct Dense<Scalar: TensorFlowFloatingPoint>: Layer {
 
 public extension Dense where Scalar.RawSignificand: FixedWidthInteger {
   init(inputSize: Int, outputSize: Int, activation: @escaping Activation) {
-    self.init(weight: Tensor(
-                glorotUniform: [Int32(inputSize), Int32(outputSize)]
-              ),
-              bias: Tensor(zeros: [Int32(outputSize)]),
+    self.init(weight: Tensor(glorotUniform: [inputSize, outputSize]),
+              bias: Tensor(zeros: [outputSize]),
               activation: activation)
   }
 }

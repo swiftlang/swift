@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -O -emit-sil %s -verify -enable-objc-interop -disable-objc-attr-requires-foundation-module -Xllvm -tf-dynamic-compilation=false | %FileCheck %s
+// REQUIRES: deprecated_gpe_mode
 
 import TensorFlow
 
@@ -78,7 +79,7 @@ public func weighPetOnlyDefault(pet: Pet) {
 
 // CHECK-LABEL: ---- ANALYSIS STATE FOR FUNCTION {{.*}}testCondBranch
 // CHECK:       bb0:
-// CHECK:       [Copy]    cond_br {{.*}}, bb1, bb2
+// CHECK:       [Copy]    cond_br {{.*}}, bb2, bb1
 // CHECK:       bb1:
 // CHECK:       [Copy]    br bb3
 // CHECK:       bb2:

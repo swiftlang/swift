@@ -1005,6 +1005,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   for (auto result : results) {
     if (auto protocol = dyn_cast<ProtocolDecl>(result)) {
       getImpl().KnownProtocols[index] = protocol;
+      protocol->setKnownProtocolKind(kind);
       return protocol;
     }
   }

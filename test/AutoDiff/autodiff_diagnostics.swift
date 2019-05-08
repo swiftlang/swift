@@ -254,3 +254,14 @@ func nonVariedResult(_ x: Float) -> Float {
   // expected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to add '.withoutDerivative()'?}} {{15-15=.withoutDerivative()}}
   return one()
 }
+
+//===----------------------------------------------------------------------===//
+// Subset parameters
+//===----------------------------------------------------------------------===//
+
+func nondiff(_ f: @differentiable (Float, @nondiff Float) -> Float) -> Float {
+  // expected-note @+3 {{expression is not differentiable}}
+  // expected-note @+2 {{cannot differentiate with respect to a '@nondiff' parameter}}
+  // expected-error @+1 {{function is not differentiable}}
+  return gradient(at: 2) { x in f(x * x, x) }
+}

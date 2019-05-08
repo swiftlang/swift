@@ -1,7 +1,5 @@
-// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
-// RUN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize
 //
 // String Tensor tests.
 
@@ -33,7 +31,7 @@ StringTensorTests.test("StringTFOP") {
   TensorFlow.enableCPU()
 
   let encoded = StringTensor("aGVsbG8gd29ybGQ=")
-  let decoded: StringTensor = #tfop("DecodeBase64", encoded)
+  let decoded: StringTensor = Raw.decodeBase64(encoded)
   let expectedDecoded = StringTensor("hello world")
   let comparison = expectedDecoded.elementsEqual(decoded)
   expectEqual(ShapedArray(shape: [], scalars: [true]), comparison.array)

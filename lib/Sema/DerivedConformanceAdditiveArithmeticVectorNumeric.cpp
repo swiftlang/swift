@@ -401,7 +401,7 @@ static void deriveBodyAdditiveArithmetic_zero(AbstractFunctionDecl *funcDecl) {
     memberZeroExprs.push_back(createMemberZeroExpr(member));
     memberNames.push_back(member->getName());
   }
-  // Call memberwise initialier with member zero expressions.
+  // Call memberwise initializer with member zero expressions.
   auto *callExpr =
       CallExpr::createImplicit(C, initExpr, memberZeroExprs, memberNames);
   ASTNode returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr, true);
@@ -449,32 +449,36 @@ static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
 
 ValueDecl *
 DerivedConformance::deriveAdditiveArithmetic(ValueDecl *requirement) {
-  if (requirement->getBaseName() == TC.Context.getIdentifier("+")) {
+  // Diagnose conformances in disallowed contexts.
+  if (checkAndDiagnoseDisallowedContext(requirement))
+    return nullptr;
+  if (requirement->getBaseName() == TC.Context.getIdentifier("+"))
     return deriveMathOperator(*this, Add);
-  }
-  if (requirement->getBaseName() == TC.Context.getIdentifier("-")) {
+  if (requirement->getBaseName() == TC.Context.getIdentifier("-"))
     return deriveMathOperator(*this, Subtract);
-  }
-  if (requirement->getBaseName() == TC.Context.Id_zero) {
+  if (requirement->getBaseName() == TC.Context.Id_zero)
     return deriveAdditiveArithmetic_zero(*this);
-  }
   TC.diagnose(requirement->getLoc(),
               diag::broken_additive_arithmetic_requirement);
   return nullptr;
 }
 
 ValueDecl *DerivedConformance::deriveVectorNumeric(ValueDecl *requirement) {
-  if (requirement->getBaseName() == TC.Context.getIdentifier("*")) {
+  // Diagnose conformances in disallowed contexts.
+  if (checkAndDiagnoseDisallowedContext(requirement))
+    return nullptr;
+  if (requirement->getBaseName() == TC.Context.getIdentifier("*"))
     return deriveMathOperator(*this, ScalarMultiply);
-  }
   TC.diagnose(requirement->getLoc(), diag::broken_vector_numeric_requirement);
   return nullptr;
 }
 
 Type DerivedConformance::deriveVectorNumeric(AssociatedTypeDecl *requirement) {
-  if (requirement->getBaseName() == TC.Context.Id_Scalar) {
+  // Diagnose conformances in disallowed contexts.
+  if (checkAndDiagnoseDisallowedContext(requirement))
+    return nullptr;
+  if (requirement->getBaseName() == TC.Context.Id_Scalar)
     return deriveVectorNumeric_Scalar(Nominal, getConformanceContext());
-  }
   TC.diagnose(requirement->getLoc(), diag::broken_vector_numeric_requirement);
   return nullptr;
 }

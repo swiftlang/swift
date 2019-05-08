@@ -1,7 +1,5 @@
-// RUN: %target-run-use-device-stack-swift %swift-tensorflow-test-run-extra-options
-// RUN: %target-run-gpe-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize
 
 // Tests on collective ops, as a building block for data/model parallel programs.
 
@@ -14,6 +12,12 @@ import TensorFlowUnittest
 import StdlibUnittest
 
 var WithDeviceTests = TestSuite("WithDevice")
+
+WithDeviceTests.testAllBackends("ConfigTest") {
+  // Run some tensor code to trigger runtime configuration.
+  _hostOp(Tensor<Float>(0.0) + Tensor<Float>(1.0))
+  expectEqual(3, _RuntimeConfig.cpuDeviceCount)
+}
 
 WithDeviceTests.testAllBackends("Basic") {
   func foo() {
@@ -35,5 +39,4 @@ WithDeviceTests.testAllBackends("Basic") {
   #endif
 }
 
-_RuntimeConfig.cpuDeviceCount = 3
 runAllTests()

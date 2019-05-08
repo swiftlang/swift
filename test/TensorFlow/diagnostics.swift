@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dynamic-compilation=false -Xllvm -tf-dump-intermediates -Xllvm -tf-warn-send-recv -O -emit-sil -verify %s
+// REQUIRES: deprecated_gpe_mode
 
 import TensorFlow
 
@@ -14,8 +15,12 @@ func testInferredElementResult() -> TensorHandle<Int32> {
 }
 
 class ClassTest {
-  var w = Tensor<Float>(zeros: [1, 2])  // expected-warning {{value implicitly copied to the host}}
-  let b = Tensor<Float>(zeros: [1, 2])  // expected-warning {{value implicitly copied to the host}}
+  // expected-warning @+2 {{value implicitly copied to the host}}
+  // expected-warning @+1 {{'Tensor<Float>' implicitly copied to the accelerator}}
+  var w = Tensor<Float>(zeros: [1, 2])
+  // expected-warning @+2 {{value implicitly copied to the host}}
+  // expected-warning @+1 {{'Tensor<Float>' implicitly copied to the accelerator}}
+  let b = Tensor<Float>(zeros: [1, 2])
 
   var c : Tensor<Float> { return w } // expected-warning {{properties in classes always cause a copy to the accelerator}}
 
@@ -26,7 +31,9 @@ class ClassTest {
 
 public func f() {
   let x = ClassTest()
+  // expected-warning @+1 {{'Tensor<Float>' implicitly copied to the accelerator}}
   let y = x.infer(input: Tensor<Float>(ones: [2, 1]))
+
   _ = y+y
   // expected-note @+1 {{value used here}}
   _ = x.c+x.b+x.w  // expected-warning 2 {{properties in classes always cause a copy to the accelerator}}
@@ -50,7 +57,7 @@ public func f() {
 // should be a single copy-to-host compiler warning.
 public func SR8412_CopyToHost() {
   for _ in 0...10 {
-    let x = Tensor(1)  // expected-warning {{value implicitly copied to the host}}
+    let x = Tensor(1)
     _hostOp(x)
   }
 }

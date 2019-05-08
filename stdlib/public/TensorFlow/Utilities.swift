@@ -22,17 +22,6 @@ import Glibc
 import CTensorFlow
 
 //===----------------------------------------------------------------------===//
-// Standard library extensions
-//===----------------------------------------------------------------------===//
-
-public extension Sequence {
-  /// Returns true if all elements satisfy the predicate.
-  func forAll(_ predicate: (Element) throws -> Bool) rethrows -> Bool {
-    return try first(where: { try !predicate($0) }) == nil
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // Runtime checkers
 //===----------------------------------------------------------------------===//
 
@@ -67,16 +56,16 @@ func checkOk(_ s: CTFStatus?, file: StaticString = #file, line: UInt = #line) {
 // should check that the pointer is not NULL.
 
 /// The `TF_Session *` type.
-typealias CTFSession = OpaquePointer
+@usableFromInline typealias CTFSession = OpaquePointer
 
 /// The `TF_Status *` type.
-typealias CTFStatus = OpaquePointer
+@usableFromInline typealias CTFStatus = OpaquePointer
 
 /// The `TF_Graph*` type.
-typealias CTFGraph = OpaquePointer
+@usableFromInline typealias CTFGraph = OpaquePointer
 
 /// The `TF_Function*` type.
-typealias CTFFunction = OpaquePointer
+@usableFromInline typealias CTFFunction = OpaquePointer
 
 /// The `TF_Tensor *` type.
 @usableFromInline typealias CTensor = OpaquePointer
@@ -91,13 +80,13 @@ public typealias CTensorHandle = OpaquePointer
 public typealias CTFEContext = OpaquePointer
 
 /// The `TFE_Op *` type.
-typealias CTFEOp = OpaquePointer
+@usableFromInline typealias CTFEOp = OpaquePointer
 
 /// The `TF_OperationDescription *` type.
-typealias CTFOperationDescription = OpaquePointer
+@usableFromInline typealias CTFOperationDescription = OpaquePointer
 
 /// The `TFE_TraceContext *` type.
-typealias CTFETraceContext = OpaquePointer
+@usableFromInline typealias CTFETraceContext = OpaquePointer
 
 //===----------------------------------------------------------------------===//
 // Logging
@@ -174,22 +163,16 @@ public func _hostOp<Scalar : TensorFlowScalar>(_ x: TensorHandle<Scalar>) {
 /// TODO: Remove these helper APIs, when we have a better shape
 /// inference/propagation design.
 @inlinable @inline(__always)
-public func _scalarTensorWithShape<Scalar>(
+public func _scalarTensorWithShape<Scalar: TensorFlowScalar>(
   _ x: Tensor<Scalar>
 ) -> Tensor<Scalar> {
-  let ret: TensorHandle<Scalar> =
-    #tfop("Identity", x, T$dtype: Scalar.tensorFlowDataType,
-          __shapes: [TensorShape()])
-  return Tensor<Scalar>(handle: ret)
+  return Raw.identity(x)
 }
 
 @inlinable @inline(__always)
-public func _addScalarTensorsWithShape<Scalar>(
+public func _addScalarTensorsWithShape<Scalar: TensorFlowNumeric>(
   _ x: Tensor<Scalar>,
   _ y: Tensor<Scalar>
 ) -> Tensor<Scalar> {
-  let ret: TensorHandle<Scalar> =
-    #tfop("Add", x, y, T$dtype: Scalar.tensorFlowDataType,
-          __shapes: [TensorShape()])
-  return Tensor<Scalar>(handle: ret)
+  return Raw.add(x, y)
 }

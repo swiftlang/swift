@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// REQUIRES: deprecated_gpe_mode
 
 import TensorFlow
 

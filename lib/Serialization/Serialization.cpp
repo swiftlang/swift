@@ -898,7 +898,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_TWO_OPERANDS_EXTRA_ATTR);
   // SWIFT_ENABLE_TENSORFLOW
   BLOCK_RECORD(sil_block, SIL_DIFFERENTIABLE_ATTR);
-  BLOCK_RECORD(sil_block, SIL_INST_GRAPH_OPERATION);
   BLOCK_RECORD(sil_block, SIL_INST_AUTODIFF_FUNCTION);
   BLOCK_RECORD(sil_block, SIL_INST_AUTODIFF_FUNCTION_EXTRACT);
 
@@ -3592,8 +3591,6 @@ static uint8_t getRawStableFunctionTypeRepresentation(
   SIMPLE_CASE(FunctionTypeRepresentation, Block)
   SIMPLE_CASE(FunctionTypeRepresentation, Thin)
   SIMPLE_CASE(FunctionTypeRepresentation, CFunctionPointer)
-  // SWIFT_ENABLE_TENSORFLOW
-  SIMPLE_CASE(FunctionTypeRepresentation, TensorFlow)
   }
   llvm_unreachable("bad calling convention");
 }

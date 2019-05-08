@@ -23,8 +23,6 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
-// SWIFT_ENABLE_TENSORFLOW
-#include "swift/AST/TensorFlow.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
@@ -3350,41 +3348,8 @@ void AttributeChecker::visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr) {
 
 // SWIFT_ENABLE_TENSORFLOW
 void AttributeChecker::visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr) {
-  FuncDecl *FD = cast<FuncDecl>(D);
-  // The function must be top-level.
-  if (FD->getImplicitSelfDecl()) {
-    diagnoseAndRemoveAttr(attr, diag::tf_graph_attr_top_level_only);
-    return;
-  }
-  // Generic functions are not supported.
-  if (FD->isGeneric()) {
-    diagnoseAndRemoveAttr(attr, diag::tf_graph_attr_no_generic_functions);
-    return;
-  }
-  // Only functions taking and returning TensorFlow values are permitted.
-  auto allParamsAreTFValues = llvm::all_of(FD->getParameters()->getArray(),
-      [&](ParamDecl *decl) {
-        return tf::isTensorFlowValueOrAggregate(decl->getInterfaceType());
-      });
-  if (!allParamsAreTFValues ||
-      !tf::isTensorFlowValueOrAggregate(FD->getResultInterfaceType())) {
-    diagnoseAndRemoveAttr(attr,
-                          diag::tf_graph_attr_function_tensorflow_value_only);
-    return;
-  }
-  // Only functions with no captures are permitted.
-  TC.computeCaptures(FD);
-  if (!FD->getCaptureInfo().isTrivial()) {
-    diagnoseAndRemoveAttr(attr,
-                          diag::tf_graph_attr_no_functions_with_captures);
-    return;
-  }
-  // Assign @convention(tensorflow).
-  AnyFunctionType *fnTy = FD->getInterfaceType()->castTo<AnyFunctionType>();
-  auto *newFnTy = fnTy->withExtInfo(
-    fnTy->getExtInfo().withRepresentation(
-      AnyFunctionType::Representation::TensorFlow));
-  FD->setInterfaceType(newFnTy);
+  diagnoseAndRemoveAttr(attr, diag::tf_graph_deprecated_please_remove);
+  return;
 }
 
 // SWIFT_ENABLE_TENSORFLOW

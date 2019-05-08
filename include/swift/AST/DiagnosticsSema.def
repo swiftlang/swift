@@ -2430,6 +2430,10 @@ ERROR(broken_decodable_requirement,none,
 // SWIFT_ENABLE_TENSORFLOW
 ERROR(broken_key_path_iterable_requirement,none,
       "KeyPathIterable protocol is broken: unexpected requirement", ())
+ERROR(broken_tensor_array_protocol_requirement,none,
+      "TensorArrayProtocol protocol is broken: unexpected requirement", ())
+ERROR(broken_tensor_group_requirement,none,
+      "TensorGroup protocol is broken: unexpected requirement", ())
 ERROR(parameterized_no_parameters_struct,none,
       "cannot automatically synthesize %0 because 'Parameters' struct does not "
       "exist", (Type))
@@ -2787,6 +2791,8 @@ ERROR(compiler_evaluable_ref_non_compiler_evaluable,none,
 // @TensorFlowGraph attribute
 ERROR(tf_graph_attr_top_level_only,none,
       "@TensorFlowGraph can only be applied to top-level functions", ())
+ERROR(tf_graph_deprecated_please_remove,none,
+      "@TensorFlowGraph has no effect and is deprecated. Please remove.", ())
 ERROR(tf_graph_attr_function_tensorflow_value_only,none,
       "@TensorFlowGraph can only be applied to functions whose parameters and "
       "return values are TensorFlow values or aggregates of TensorFlow "

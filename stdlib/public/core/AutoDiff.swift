@@ -678,6 +678,7 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
   }
 
   /// Creates a type-erased derivative from the given derivative.
+  @differentiable(vjp: _vjpInit(_:))
   public init<T>(_ base: T)
     where T : Differentiable, T.TangentVector == T,
           T.AllDifferentiableVariables == T,
@@ -686,6 +687,18 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
           T.CotangentVector == T.CotangentVector.AllDifferentiableVariables
   {
     self._box = _ConcreteDerivativeBox<T>(base)
+  }
+
+  @usableFromInline internal static func _vjpInit<T>(
+    _ base: T
+  ) -> (AnyDerivative, (AnyDerivative) -> T.CotangentVector)
+    where T : Differentiable, T.TangentVector == T,
+          T.AllDifferentiableVariables == T,
+          // NOTE: The requirement below should be defined on `Differentiable`.
+          // But it causes a crash due to generic signature minimization bug.
+          T.CotangentVector == T.CotangentVector.AllDifferentiableVariables
+  {
+    return (AnyDerivative(base), { v in v.base as! T.CotangentVector })
   }
 
   public typealias TangentVector = AnyDerivative
@@ -711,15 +724,33 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
     return AnyDerivative(
       _box: _ConcreteDerivativeBox<OpaqueZero>(OpaqueZero.zero))
   }
+
   public static func + (
     lhs: AnyDerivative, rhs: AnyDerivative
   ) -> AnyDerivative {
     return AnyDerivative(_box: lhs._box._adding(rhs._box))
   }
+
+  @differentiating(+)
+  @usableFromInline internal static func _vjpAdd(
+    lhs: AnyDerivative, rhs: AnyDerivative
+  ) -> (value: AnyDerivative,
+        pullback: (AnyDerivative) -> (AnyDerivative, AnyDerivative)) {
+    return (lhs + rhs, { v in (v, v) })
+  }
+
   public static func - (
     lhs: AnyDerivative, rhs: AnyDerivative
   ) -> AnyDerivative {
     return AnyDerivative(_box: lhs._box._subtracting(rhs._box))
+  }
+
+  @differentiating(-)
+  @usableFromInline internal static func _vjpSubtract(
+    lhs: AnyDerivative, rhs: AnyDerivative
+  ) -> (value: AnyDerivative,
+        pullback: (AnyDerivative) -> (AnyDerivative, AnyDerivative)) {
+    return (lhs - rhs, { v in (v, .zero - v) })
   }
 
   // `Differentiable` requirements.
