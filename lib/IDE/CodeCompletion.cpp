@@ -5568,8 +5568,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         TheModule->forAllVisibleModules(AccessPath, handleImport);
       }
     }
-    Lookup.RequestedCachedResults.clear();
   }
+  Lookup.RequestedCachedResults.clear();
 
   CompletionContext.typeContextKind = Lookup.typeContextKind();
 
