@@ -2169,7 +2169,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   auto desugar2 = type2->getDesugaredType();
 
   // If the types are obviously equivalent, we're done.
-  if (desugar1->isEqual(desugar2))
+  if (desugar1->isEqual(desugar2) &&
+      !isa<InOutType>(desugar2))
     return getTypeMatchSuccess();
 
   // Local function that should be used to produce the return value whenever
@@ -2478,11 +2479,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                           ConstraintLocator::LValueConversion));
     
     case TypeKind::InOut:
-      // If the RHS is an inout type, the LHS must be an @lvalue type.
-      if (kind == ConstraintKind::BindParam ||
-          kind >= ConstraintKind::OperatorArgumentConversion)
+      if (kind == ConstraintKind::BindParam)
         return getTypeMatchFailure(locator);
       
+      if (kind == ConstraintKind::OperatorArgumentConversion) {
+        conversionsOrFixes.push_back(
+            RemoveAddressOf::create(*this, getConstraintLocator(locator)));
+        break;
+      }
+
       return matchTypes(cast<InOutType>(desugar1)->getObjectType(),
                         cast<InOutType>(desugar2)->getObjectType(),
                         ConstraintKind::Bind, subflags,
@@ -5606,9 +5611,20 @@ ConstraintSystem::simplifyApplicableFnConstraint(
                      isa<PostfixUnaryExpr>(anchor) ||
                      isa<BinaryExpr>(anchor));
 
-  // If the types are obviously equivalent, we're done.
-  if (type1.getPointer() == desugar2)
-    return SolutionKind::Solved;
+  auto hasInOut = [&]() {
+    for (auto param : func1->getParams())
+      if (param.isInOut())
+        return true;
+    return false;
+  };
+
+  // If the types are obviously equivalent, we're done. This optimization
+  // is not valid for operators though, where an inout parameter does not
+  // have an explicit inout argument.
+  if (type1.getPointer() == desugar2) {
+    if (!isOperator || !hasInOut())
+      return SolutionKind::Solved;
+  }
 
   // Local function to form an unsolved result.
   auto formUnsolved = [&] {
