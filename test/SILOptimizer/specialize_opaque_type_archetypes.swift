@@ -478,3 +478,64 @@ extension PA {
     useP(p.1(5))
   }
 }
+
+public struct Foo {
+  var id : Int = 0
+  var p : Int64 = 1
+}
+
+struct Test : RandomAccessCollection {
+    struct Index : Comparable, Hashable {
+        var identifier: AnyHashable?
+        var offset: Int
+
+        static func < (lhs: Index, rhs: Index) -> Bool {
+            return lhs.offset < rhs.offset
+        }
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(identifier)
+            hasher.combine(offset)
+        }
+    }
+
+    let foos: [Foo]
+    let ids: [AnyHashable]
+
+    init(foos: [Foo]) {
+        self.foos = foos
+        self.ids = foos.map { $0.id }
+    }
+
+    func _index(atOffset n: Int) -> Index {
+        return Index(identifier: ids.isEmpty ? nil : ids[n], offset: n)
+    }
+
+    var startIndex: Index {
+        return _index(atOffset: 0)
+    }
+
+    var endIndex: Index {
+        return Index(identifier: nil, offset: ids.endIndex)
+    }
+
+    func index(after i: Index) -> Index {
+        return _index(atOffset: i.offset + 1)
+    }
+
+    func index(before i: Index) -> Index {
+        return _index(atOffset: i.offset - 1)
+    }
+
+    func distance(from start: Index, to end: Index) -> Int {
+        return end.offset - start.offset
+    }
+
+    func index(_ i: Index, offsetBy n: Int) -> Index {
+        return _index(atOffset: i.offset + n)
+    }
+
+   subscript(i: Index) -> some P {
+        return foos[i.offset].p
+    }
+}
