@@ -254,26 +254,21 @@ unsigned FixedTypeInfo::getSpareBitExtraInhabitantCount() const {
                   unsigned(ValueWitnessFlags::MaxNumExtraInhabitants));
 }
 
-void FixedTypeInfo::applyFixedSpareBitsMask(SpareBitVector &mask,
-                                            const SpareBitVector &spareBits) {
+void FixedTypeInfo::applyFixedSpareBitsMask(SpareBitVector &mask) const {
   // If the mask is no longer than the stored spare bits, we can just
   // apply the stored spare bits.
-  if (mask.size() <= spareBits.size()) {
+  if (mask.size() <= SpareBits.size()) {
     // Grow the mask out if necessary; the tail padding is all spare bits.
-    mask.extendWithSetBits(spareBits.size());
-    mask &= spareBits;
+    mask.extendWithSetBits(SpareBits.size());
+    mask &= SpareBits;
+    return;
+  }
 
   // Otherwise, we have to grow out the stored spare bits before we
   // can intersect.
-  } else {
-    auto paddedSpareBits = spareBits;
-    paddedSpareBits.extendWithSetBits(mask.size());
-    mask &= paddedSpareBits;
-  }
-}
-
-void FixedTypeInfo::applyFixedSpareBitsMask(SpareBitVector &mask) const {
-  return applyFixedSpareBitsMask(mask, SpareBits);
+  auto paddedSpareBits = SpareBits;
+  paddedSpareBits.extendWithSetBits(mask.size());
+  mask &= paddedSpareBits;
 }
 
 APInt
