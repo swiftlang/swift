@@ -4436,7 +4436,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
 
   // Unwrap curry levels.
   SmallVector<AnyFunctionType *, 2> curryLevels;
-  auto *currentLevel = this;
+  auto *currentLevel = this->eraseDynamicSelfType()->castTo<AnyFunctionType>();
   while (currentLevel != nullptr) {
     curryLevels.push_back(currentLevel);
     currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
