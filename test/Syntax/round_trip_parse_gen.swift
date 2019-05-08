@@ -596,4 +596,3 @@ func bazDerivative(_ x: Float, y: Float)
     -> (value: Float, pullback: (Float) -> (Float, Float)) {
   return (x, { v in v })
 }
-
