@@ -348,8 +348,31 @@ protected:
     }
   }
 
+  void replaceBlockArgumentType(SILLocation loc, SILBasicBlock *destBlock,
+                                SILType withType) {
+    assert(destBlock->getArguments().size() == 1);
+
+    auto origType = (*destBlock->args_begin())->getType();
+    auto origPhi = destBlock->getPhiArguments()[0];
+    SILValue undef = SILUndef::get(origType, getBuilder().getFunction());
+    SmallVector<Operand *, 8> useList(origPhi->use_begin(), origPhi->use_end());
+    for (auto *use : useList) {
+      use->set(undef);
+    }
+
+    auto *newPhi =
+        destBlock->replacePhiArgument(0, withType, origPhi->getOwnershipKind());
+
+    getBuilder().setInsertionPoint(destBlock->begin());
+    auto cast = createCast(loc, newPhi, origType);
+    for (auto *use : useList) {
+      use->set(cast);
+    }
+  }
+
   void fixUp(SILFunction *) {
-    for (auto &BB : getBuilder().getFunction()) {
+    auto &clonedFunction = getBuilder().getFunction();
+    for (auto &BB : clonedFunction) {
       for (auto &cloned : BB) {
         // Fix up the type of try_apply successor block arguments.
         if (auto *tryApply = dyn_cast<TryApplyInst>(&cloned)) {
@@ -360,22 +383,25 @@ protected:
           auto normalBBType = (*normalBB->args_begin())->getType();
           auto applyResultType = calleeConv.getSILResultType();
           if (normalBBType != calleeConv.getSILResultType()) {
-            auto origPhi = normalBB->getPhiArguments()[0];
-            SILValue undef =
-                SILUndef::get(normalBBType, getBuilder().getFunction());
-            SmallVector<Operand *, 8> useList(origPhi->use_begin(),
-                                              origPhi->use_end());
-            for (auto *use : useList) {
-              use->set(undef);
-            }
+            replaceBlockArgumentType(tryApply->getLoc(), normalBB, applyResultType);
+          }
+        }
+        // Fix up the type of switch_enum successor block arguments.
+        if (auto *switchEnum = dyn_cast<SwitchEnumInst>(&cloned)) {
+          SILType enumTy = switchEnum->getOperand()->getType();
+          for (unsigned i = 0, e = switchEnum->getNumCases(); i < e; ++i) {
+            EnumElementDecl *elt;
+            SILBasicBlock *dest;
+            std::tie(elt, dest) = switchEnum->getCase(i);
 
-            auto *newPhi = normalBB->replacePhiArgument(
-                0, applyResultType, origPhi->getOwnershipKind());
+            if (elt->hasAssociatedValues() &&
+                dest->getArguments().size() == 1) {
+              SILType eltArgTy =
+                  enumTy.getEnumElementType(elt, clonedFunction.getModule());
+              SILType bbArgTy = dest->getArguments()[0]->getType();
+              if (eltArgTy != bbArgTy)
+                replaceBlockArgumentType(switchEnum->getLoc(), dest, eltArgTy);
 
-            getBuilder().setInsertionPoint(normalBB->begin());
-            auto cast = createCast(tryApply->getLoc(), newPhi, normalBBType);
-            for (auto *use : useList) {
-              use->set(cast);
             }
           }
         }
