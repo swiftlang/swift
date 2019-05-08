@@ -1292,7 +1292,7 @@ namespace {
       AnyFunctionType::decomposeInput(constrParamType, params);
 
       ::matchCallArguments(
-          CS, args, params,
+          CS, args, params, ConstraintKind::ArgumentConversion,
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
 
       Type result = tv;

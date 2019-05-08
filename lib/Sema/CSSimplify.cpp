@@ -938,7 +938,8 @@ public:
 // Match the argument of a call to the parameter.
 ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     ConstraintSystem &cs, ArrayRef<AnyFunctionType::Param> args,
-    ArrayRef<AnyFunctionType::Param> params, ConstraintLocatorBuilder locator) {
+    ArrayRef<AnyFunctionType::Param> params, ConstraintKind subKind,
+    ConstraintLocatorBuilder locator) {
   // Extract the parameters.
   ValueDecl *callee;
   bool hasCurriedSelf;
@@ -971,12 +972,6 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   // assignment operators.
   auto *anchor = locator.getAnchor();
   assert(anchor && "locator without anchor expression?");
-  bool isOperator = (isa<PrefixUnaryExpr>(anchor) ||
-                     isa<PostfixUnaryExpr>(anchor) || isa<BinaryExpr>(anchor));
-
-  ConstraintKind subKind = (isOperator
-                            ? ConstraintKind::OperatorArgumentConversion
-                            : ConstraintKind::ArgumentConversion);
 
   // Check whether argument of the call at given position refers to
   // parameter marked as `@autoclosure`. This function is used to
@@ -5605,6 +5600,12 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
+  SmallVector<LocatorPathElt, 2> parts;
+  Expr *anchor = locator.getLocatorParts(parts);
+  bool isOperator = (isa<PrefixUnaryExpr>(anchor) ||
+                     isa<PostfixUnaryExpr>(anchor) ||
+                     isa<BinaryExpr>(anchor));
+
   // If the types are obviously equivalent, we're done.
   if (type1.getPointer() == desugar2)
     return SolutionKind::Solved;
@@ -5640,8 +5641,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
   // Strip the 'ApplyFunction' off the locator.
   // FIXME: Perhaps ApplyFunction can go away entirely?
-  SmallVector<LocatorPathElt, 2> parts;
-  Expr *anchor = locator.getLocatorParts(parts);
   assert(!parts.empty() && "Nonsensical applicable-function locator");
   assert(parts.back().getKind() == ConstraintLocator::ApplyFunction);
   assert(parts.back().getNewSummaryFlags() == 0);
@@ -5670,9 +5669,13 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
   // For a function, bind the output and convert the argument to the input.
   if (auto func2 = dyn_cast<FunctionType>(desugar2)) {
+    ConstraintKind subKind = (isOperator
+                              ? ConstraintKind::OperatorArgumentConversion
+                              : ConstraintKind::ArgumentConversion);
+
     // The argument type must be convertible to the input type.
     if (::matchCallArguments(
-            *this, func1->getParams(), func2->getParams(),
+            *this, func1->getParams(), func2->getParams(), subKind,
             outerLocator.withPathElement(ConstraintLocator::ApplyArgument))
             .isFailure())
       return SolutionKind::Error;
