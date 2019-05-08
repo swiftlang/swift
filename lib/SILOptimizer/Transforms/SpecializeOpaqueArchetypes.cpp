@@ -344,17 +344,18 @@ protected:
           loc, opd, type, /*withoutActuallyEscaping*/ false);
     } else if (opd->getType().isTrivial(CurFn)) {
       return getBuilder().createUncheckedTrivialBitCast(loc, opd, type);
-    } else if (opd->getType().isObject()) {
+    } else if (opd->getType().canRefCast(opd->getType(), type,
+                                         CurFn.getModule())) {
       return getBuilder().createUncheckedRefCast(loc, opd, type);
     } else {
       // This could be improved upon by recursively recomposing the type.
       auto *stackLoc = getBuilder().createAllocStack(loc, type);
-      auto *addr =
-          getBuilder().createUncheckedAddrCast(loc, stackLoc, opd->getType());
-      getBuilder().createTrivialStoreOr(loc, addr, opd,
-                                        StoreOwnershipQualifier::Init);
+      auto *addr = getBuilder().createUncheckedAddrCast(
+          loc, stackLoc, opd->getType().getAddressType());
+      getBuilder().createTrivialStoreOr(loc, opd, addr,
+                                        StoreOwnershipQualifier::Init, true);
       SILValue res = getBuilder().createTrivialLoadOr(
-          loc, addr, LoadOwnershipQualifier::Take);
+          loc, stackLoc, LoadOwnershipQualifier::Take, true);
       getBuilder().createDeallocStack(loc, stackLoc);
       return res;
     }
