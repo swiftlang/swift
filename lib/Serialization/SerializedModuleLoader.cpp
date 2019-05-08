@@ -33,7 +33,8 @@ using swift::version::Version;
 
 namespace {
 
-/// Apply \c body for each target-specific module file base name to search.
+/// Apply \c body for each target-specific module file base name to search from
+/// most to least desiable.
 void forEachTargetModuleBasename(const ASTContext &Ctx,
                                  llvm::function_ref<void(StringRef)> body) {
   auto normalizedTarget = getTargetSpecificModuleTriple(Ctx.LangOpts.Target);
@@ -373,8 +374,11 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
   ModuleFilenamePair fileNames(moduleName);
 
   SmallVector<ModuleFilenamePair, 4> targetFileNamePairs;
+  SmallString<32> primaryTargetSpecificName;
   forEachTargetModuleBasename(Ctx, [&](StringRef targetName) {
     targetFileNamePairs.emplace_back(targetName);
+    if (primaryTargetSpecificName.empty())
+      primaryTargetSpecificName = targetName;
   });
 
   auto &fs = *Ctx.SourceMgr.getFileSystem();
@@ -400,9 +404,8 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
 
     // We can only get here if all targetFileNamePairs failed with
     // 'std::errc::no_such_file_or_directory'.
-    auto normalizedTarget = getTargetSpecificModuleTriple(Ctx.LangOpts.Target);
     if (maybeDiagnoseTargetMismatch(moduleID.second, moduleName,
-                                    normalizedTarget.str(), currPath)) {
+                                    primaryTargetSpecificName, currPath)) {
       return false;
     } else {
       return None;
