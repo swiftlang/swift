@@ -28,7 +28,7 @@ extern "C" {
 // compatibility. Everywhere else, they are 64-bit so 32-bit processes can
 // potentially read from 64-bit processes.
 #if defined(__APPLE__) && defined(__MACH__)
-#include <Availability.h>
+#include <TargetConditionals.h>
 #if TARGET_OS_WATCH
 #define SWIFT_REFLECTION_NATIVE_POINTERS 1
 #endif
