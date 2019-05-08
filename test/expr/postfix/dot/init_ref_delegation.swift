@@ -273,12 +273,23 @@ func foo<T: C>(_ x: T, y: T.Type) where T: P {
   var ci1 = x.init(required: 0) // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{15-15=type(of: }} {{19-19=)}}
   var ci2 = x.init(x: 0) // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{15-15=type(of: }} {{19-19=)}}
   var ci3 = x.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{15-15=type(of: }} {{19-19=)}}
-  var ci4 = x.init(proto: "") // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{15-15=type(of: }} {{19-19=)}} 
-
-  var ci1a = x(required: 0) // expected-error{{cannot call value of non-function type 'T'}}
-  var ci2a = x(x: 0) // expected-error{{cannot call value of non-function type 'T'}}
-  var ci3a = x() // expected-error{{cannot call value of non-function type 'T'}}{{15-17=}}
-  var ci4a = x(proto: "") // expected-error{{cannot call value of non-function type 'T'}}
+  var ci4 = x.init(proto: "") // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{15-15=type(of: }} {{19-19=)}}
+  
+  var z = x
+  z.init(required: 0) // expected-error {{'init' is a member of the type; use assignment to initalize the value instead}} {{4-4= = }}
+  z.init(x: 0) // expected-error {{'init' is a member of the type; use assignment to initalize the value instead}} {{4-4= = }}
+  z.init() // expected-error {{'init' is a member of the type; use assignment to initalize the value instead}} {{4-4= = }}
+  z.init(proto: "") // expected-error {{'init' is a member of the type; use assignment to initalize the value instead}} {{4-4= = }}
+  
+  var ci1a = z.init(required: 0) // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{16-16=type(of: }} {{20-20=)}}
+  var ci2a = z.init(x: 0) // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{16-16=type(of: }} {{20-20=)}}
+  var ci3a = z.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{16-16=type(of: }} {{20-20=)}}
+  var ci4a = z.init(proto: "") // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{16-16=type(of: }} {{20-20=)}}
+  
+  var ci1b = x(required: 0) // expected-error{{cannot call value of non-function type 'T'}}
+  var ci2b = x(x: 0) // expected-error{{cannot call value of non-function type 'T'}}
+  var ci3b = x() // expected-error{{cannot call value of non-function type 'T'}}{{15-17=}}
+  var ci4b = x(proto: "") // expected-error{{cannot call value of non-function type 'T'}}
 
   var cm1 = y.init(required: 0)
   var cm2 = y.init(x: 0) // expected-error{{'required' initializer}}
@@ -497,5 +508,35 @@ class TestOptionalTrySub : TestOptionalTry {
   init(a: Int) { // expected-note {{propagate the failure with 'init?'}} {{7-7=?}}
     try? super.init() // expected-error {{a non-failable initializer cannot use 'try?' to chain to another initializer}}
     // expected-note@-1 {{force potentially-failing result with 'try!'}} {{5-9=try!}}
+  }
+}
+
+struct X { init() {} }
+
+struct Y {
+  func foo(_: X) {}
+  func asFunctionReturn() -> X {
+    var a = X()
+    return a.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{14-14=type(of: }} {{18-18=)}}
+  }
+  var x: X
+  init() {
+    x.init() // expected-error {{'init' is a member of the type; use assignment to initalize the value instead}} {{6-6= = }}
+    foo(x.init()) // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{11-11=type(of: }} {{15-15=)}}
+  }
+}
+
+struct Y2 {
+  var x: X
+  init() {
+    x = X()
+  }
+}
+
+struct MultipleMemberAccesses {
+  var y: Y
+  init() {
+    y = Y()
+    y.x.init() // expected-error {{'init' is a member of the type; use assignment to initalize the value instead}} {{8-8= = }}
   }
 }
