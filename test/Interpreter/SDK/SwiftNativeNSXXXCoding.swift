@@ -8,14 +8,12 @@ import StdlibUnittest
 
 let testSuite = TestSuite("SwiftNativeNSXXXCoding")
 
-// Ensure that T gracefully handles being decoded. It doesn't have to
-// work, just not crash.
-private func test<T: NSObject & NSCoding>(type: T.Type) {
+// Ensure that the class named `name`, subclass of T, gracefully handles
+// being decoded. It doesn't have to work, just not crash.
+private func test<T: NSObject & NSCoding>(type: T.Type, name: String) {
   if #available(macOS 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *) {
-    let swiftClassName = "__SwiftNative\(type)Base"
-    print(swiftClassName)
     let archiver = NSKeyedArchiver(requiringSecureCoding: true)
-    archiver.setClassName(swiftClassName, for: T.self)
+    archiver.setClassName(name, for: T.self)
     archiver.encode(T(), forKey: "key")
     archiver.finishEncoding()
     let d = archiver.encodedData
@@ -23,6 +21,10 @@ private func test<T: NSObject & NSCoding>(type: T.Type) {
     let unarchiver = try! NSKeyedUnarchiver(forReadingFrom: d)
     _ = unarchiver.decodeObject(of: T.self, forKey: "key")
   }
+}
+private func test<T: NSObject & NSCoding>(type: T.Type) {
+  test(type: type, name: "__SwiftNative\(type)Base")
+  test(type: type, name: "Swift.__SwiftNative\(type)")
 }
 
 
