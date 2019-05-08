@@ -309,6 +309,12 @@ public:
   /// caching.
   void clearCache() { cache.clear(); }
 
+  /// Is the given request, or an equivalent, currently being evaluated?
+  template <typename Request>
+  bool hasActiveRequest(const Request &request) const {
+    return activeRequests.count(AnyRequest(request));
+  }
+
 private:
   template <typename Request>
   const AnyRequest &getCanonicalRequest(const Request &request) {
