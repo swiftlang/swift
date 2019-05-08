@@ -106,11 +106,15 @@ public:
   /// Enumerate over all valid begin_access bases. Clients can use a covered
   /// switch to warn if findAccessedAddressBase ever adds a case.
   enum Kind : uint8_t {
-#define ACCESSED_STORAGE(Name) Name,
-#define ACCESSED_STORAGE_RANGE(Name, Start, End)                               \
-  First_##Name = Start, Last_##Name = End,
-#include "swift/SIL/AccessedStorage.def"
-    NumKindBits = countBitsUsed(unsigned(Last_AccessedStorageKind))
+    Box,
+    Stack,
+    Global,
+    Class,
+    Argument,
+    Yield,
+    Nested,
+    Unidentified,
+    NumKindBits = countBitsUsed(static_cast<unsigned>(Unidentified))
   };
 
   static const char *getKindName(Kind k);
@@ -322,26 +326,6 @@ private:
   bool operator==(const AccessedStorage &) const = delete;
   bool operator!=(const AccessedStorage &) const = delete;
 };
-
-template <class ImplTy, class ResultTy = void, typename... ArgTys>
-class AccessedStorageVisitor {
-  ImplTy &asImpl() { return static_cast<ImplTy &>(*this); }
-
-public:
-#define ACCESSED_STORAGE(Name)                                                 \
-  ResultTy visit##Name(const AccessedStorage &storage, ArgTys &&... args);
-#include "swift/SIL/AccessedStorage.def"
-
-  ResultTy visit(const AccessedStorage &storage, ArgTys &&... args) {
-    switch (storage.getKind()) {
-#define ACCESSED_STORAGE(Name)                                                 \
-  case AccessedStorage::Name:                                                  \
-    return asImpl().visit##Name(storage, std::forward<ArgTys>(args)...);
-#include "swift/SIL/AccessedStorage.def"
-    }
-  }
-};
-
 } // end namespace swift
 
 namespace llvm {

@@ -140,10 +140,22 @@ const ValueDecl *AccessedStorage::getDecl(SILFunction *F) const {
 
 const char *AccessedStorage::getKindName(AccessedStorage::Kind k) {
   switch (k) {
-#define ACCESSED_STORAGE(NAME)                                                 \
-  case AccessedStorage::NAME:                                                  \
-    return #NAME;
-#include "swift/SIL/AccessedStorage.def"
+  case Box:
+    return "Box";
+  case Stack:
+    return "Stack";
+  case Nested:
+    return "Nested";
+  case Unidentified:
+    return "Unidentified";
+  case Argument:
+    return "Argument";
+  case Yield:
+    return "Yield";
+  case Global:
+    return "Global";
+  case Class:
+    return "Class";
   }
   llvm_unreachable("unhandled kind");
 }
