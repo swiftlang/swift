@@ -168,6 +168,37 @@ func funcBuilder(d: Double) -> (String, Int, Double) {
 }
 print(funcBuilder(d: 45))
 
+struct MemberBuilders {
+  @TupleBuilder
+  func methodBuilder(_ i: Int) -> (String, Int) {
+    "methodBuilder"
+    i
+  }
+
+  @TupleBuilder
+  static func staticMethodBuilder(_ i: Int) -> (String, Int) {
+    "staticMethodBuilder"
+    i + 14
+  }
+
+  @TupleBuilder
+  var propertyBuilder: (String, Int) {
+    "propertyBuilder"
+    12
+  }
+}
+
+// CHECK: ("staticMethodBuilder", 27)
+print(MemberBuilders.staticMethodBuilder(13))
+
+let mbuilders = MemberBuilders()
+
+// CHECK: ("methodBuilder", 13)
+print(mbuilders.methodBuilder(13))
+
+// CHECK: ("propertyBuilder", 12)
+print(mbuilders.propertyBuilder)
+
 struct Tagged<Tag, Entity> {
   let tag: Tag
   let entity: Entity

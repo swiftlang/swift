@@ -4482,7 +4482,7 @@ ERROR(function_builder_reserved_name, none,
       "function builder type name must start with an uppercase letter", ())
 ERROR(function_builder_attribute_not_allowed_here, none,
       "function builder attribute %0 can only be applied to a parameter, "
-      "function, or storage with a getter", (DeclName))
+      "function, or computed property", (DeclName))
 ERROR(function_builder_attribute_on_storage_without_getter, none,
       "function builder attribute %0 can only be applied to a "
       "%select{subscript|property|constant|variable}1 if it defines a getter",
