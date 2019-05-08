@@ -838,16 +838,21 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
     auto selfDecl = getterDecl->getImplicitSelfDecl();
     Expr *expr = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                      /*implicit*/true);
+    expr->setType(selfDecl->getInterfaceType());
+
     expr = new (C) MemberRefExpr(expr, SourceLoc(), anonymousFieldDecl,
                                  DeclNameLoc(), /*implicit*/true);
+    expr->setType(anonymousFieldDecl->getInterfaceType());
 
     expr = new (C) MemberRefExpr(expr, SourceLoc(), anonymousInnerFieldDecl,
                                  DeclNameLoc(), /*implicit*/true);
+    expr->setType(anonymousInnerFieldDecl->getInterfaceType());
 
     auto ret = new (C) ReturnStmt(SourceLoc(), expr);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
                                   /*implicit*/ true);
     getterDecl->setBody(body);
+    getterDecl->setBodyTypeCheckedIfPresent();
     getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
     Impl.registerExternalDecl(getterDecl);
   }
@@ -857,22 +862,29 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
     auto selfDecl = setterDecl->getImplicitSelfDecl();
     Expr *lhs = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                      /*implicit*/true);
+    lhs->setType(LValueType::get(selfDecl->getInterfaceType()));
+
     lhs = new (C) MemberRefExpr(lhs, SourceLoc(), anonymousFieldDecl,
-                                 DeclNameLoc(), /*implicit*/true);
+                                DeclNameLoc(), /*implicit*/true);
+    lhs->setType(LValueType::get(anonymousFieldDecl->getInterfaceType()));
 
     lhs = new (C) MemberRefExpr(lhs, SourceLoc(), anonymousInnerFieldDecl,
                                 DeclNameLoc(), /*implicit*/true);
+    lhs->setType(LValueType::get(anonymousInnerFieldDecl->getInterfaceType()));
 
     auto newValueDecl = setterDecl->getParameters()->get(0);
 
     auto rhs = new (C) DeclRefExpr(newValueDecl, DeclNameLoc(),
                                    /*implicit*/ true);
+    rhs->setType(newValueDecl->getInterfaceType());
 
     auto assign = new (C) AssignExpr(lhs, SourceLoc(), rhs, /*implicit*/true);
+    assign->setType(TupleType::getEmpty(C));
 
     auto body = BraceStmt::create(C, SourceLoc(), { assign }, SourceLoc(),
                                   /*implicit*/ true);
     setterDecl->setBody(body);
+    setterDecl->setBodyTypeCheckedIfPresent();
     setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
     Impl.registerExternalDecl(setterDecl);
   }
@@ -922,18 +934,35 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
 
     auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                        /*implicit*/ true);
+    selfRef->setType(selfDecl->getInterfaceType());
+
     auto reinterpretCast = cast<FuncDecl>(getBuiltinValueDecl(
         C, C.getIdentifier("reinterpretCast")));
-    auto reinterpretCastRef
-      = new (C) DeclRefExpr(reinterpretCast, DeclNameLoc(), /*implicit*/ true);
-    auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
+
+    ConcreteDeclRef reinterpretCastRef(
+      reinterpretCast,
+      SubstitutionMap::get(reinterpretCast->getGenericSignature(),
+                           {selfDecl->getInterfaceType(),
+                            importedFieldDecl->getInterfaceType()},
+                           ArrayRef<ProtocolConformanceRef>()));
+    auto reinterpretCastRefExpr
+      = new (C) DeclRefExpr(reinterpretCastRef, DeclNameLoc(),
+                            /*implicit*/ true);
+    reinterpretCastRefExpr->setType(
+      FunctionType::get(
+        AnyFunctionType::Param(selfDecl->getInterfaceType()),
+        importedFieldDecl->getInterfaceType()));
+  
+    auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRefExpr,
                                                   { selfRef },
                                                   { Identifier() });
+    reinterpreted->setType(importedFieldDecl->getInterfaceType());
     reinterpreted->setThrows(false);
     auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
                                   /*implicit*/ true);
     getterDecl->setBody(body);
+    getterDecl->setBodyTypeCheckedIfPresent();
     getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
     Impl.registerExternalDecl(getterDecl);
   }
@@ -944,30 +973,56 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
 
     auto inoutSelfRef = new (C) DeclRefExpr(inoutSelfDecl, DeclNameLoc(),
                                             /*implicit*/ true);
+    inoutSelfRef->setType(LValueType::get(inoutSelfDecl->getInterfaceType()));
     auto inoutSelf = new (C) InOutExpr(SourceLoc(), inoutSelfRef,
       importedUnionDecl->getDeclaredType(), /*implicit*/ true);
+    inoutSelf->setType(InOutType::get(inoutSelfDecl->getInterfaceType()));
 
     auto newValueDecl = setterDecl->getParameters()->get(0);
 
     auto newValueRef = new (C) DeclRefExpr(newValueDecl, DeclNameLoc(),
                                            /*implicit*/ true);
+    newValueRef->setType(newValueDecl->getInterfaceType());
+
     auto addressofFn = cast<FuncDecl>(getBuiltinValueDecl(
       C, C.getIdentifier("addressof")));
-    auto addressofFnRef
-      = new (C) DeclRefExpr(addressofFn, DeclNameLoc(), /*implicit*/ true);
-    auto selfPointer = CallExpr::createImplicit(C, addressofFnRef,
+    ConcreteDeclRef addressofFnRef(addressofFn,
+        SubstitutionMap::get(addressofFn->getGenericSignature(),
+                             {inoutSelfDecl->getInterfaceType()},
+                             ArrayRef<ProtocolConformanceRef>()));
+    auto addressofFnRefExpr
+      = new (C) DeclRefExpr(addressofFnRef, DeclNameLoc(), /*implicit*/ true);
+    addressofFnRefExpr->setType(
+      FunctionType::get(AnyFunctionType::Param(inoutSelfDecl->getInterfaceType(),
+                                               Identifier(),
+                                               ParameterTypeFlags().withInOut(true)),
+                        C.TheRawPointerType));
+    auto selfPointer = CallExpr::createImplicit(C, addressofFnRefExpr,
                                                 { inoutSelf },
                                                 { Identifier() });
+    selfPointer->setType(C.TheRawPointerType);
+
     auto initializeFn = cast<FuncDecl>(getBuiltinValueDecl(
       C, C.getIdentifier("initialize")));
-    auto initializeFnRef
-      = new (C) DeclRefExpr(initializeFn, DeclNameLoc(), /*implicit*/ true);
-    auto initialize = CallExpr::createImplicit(C, initializeFnRef,
+    ConcreteDeclRef initializeFnRef(initializeFn,
+        SubstitutionMap::get(initializeFn->getGenericSignature(),
+                             {newValueDecl->getInterfaceType()},
+                             ArrayRef<ProtocolConformanceRef>()));
+    auto initializeFnRefExpr
+      = new (C) DeclRefExpr(initializeFnRef, DeclNameLoc(), /*implicit*/ true);
+    initializeFnRefExpr->setType(
+        FunctionType::get({AnyFunctionType::Param(newValueDecl->getInterfaceType()),
+                           AnyFunctionType::Param(C.TheRawPointerType)},
+                          TupleType::getEmpty(C)));
+    auto initialize = CallExpr::createImplicit(C, initializeFnRefExpr,
                                                { newValueRef, selfPointer },
                                                { Identifier(), Identifier() });
+    initialize->setType(TupleType::getEmpty(C));
+
     auto body = BraceStmt::create(C, SourceLoc(), { initialize }, SourceLoc(),
                                   /*implicit*/ true);
     setterDecl->setBody(body);
+    setterDecl->setBodyTypeCheckedIfPresent();
     setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
     Impl.registerExternalDecl(setterDecl);
   }
@@ -1833,6 +1888,8 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
 
   DeclRefExpr *domainDeclRef = new (C)
       DeclRefExpr(ConcreteDeclRef(swiftValueDecl), {}, isImplicit);
+  domainDeclRef->setType(swiftValueDecl->getInterfaceType());
+
   auto *params = ParameterList::createEmpty(C);
 
   auto getterDecl = AccessorDecl::create(C,
@@ -1864,6 +1921,8 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   auto ret = new (C) ReturnStmt(SourceLoc(), domainDeclRef);
   getterDecl->setBody(
       BraceStmt::create(C, SourceLoc(), {ret}, SourceLoc(), isImplicit));
+  getterDecl->setBodyTypeCheckedIfPresent();
+  
   importer.registerExternalDecl(getterDecl);
   return true;
 }
