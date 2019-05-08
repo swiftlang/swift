@@ -15,8 +15,20 @@ class Inventor {}
 @Maker // expected-error {{function builder attribute 'Maker' can only be applied to a variable if it defines a getter}}
 var global: Int
 
-@Make
-var globalWithGetter: Int {} // expected-error {{ype 'Maker' has no member 'buildBlock'}}
+// FIXME: should this be allowed?
+@Maker
+var globalWithEmptyImplicitGetter: Int {}
+// expected-error@-1 {{computed property must have accessors specified}}
+// expected-error@-3 {{function builder attribute 'Maker' can only be applied to a variable if it defines a getter}}
+
+@Maker
+var globalWithEmptyExplicitGetter: Int { get {} }  // expected-error {{ype 'Maker' has no member 'buildBlock'}}
+
+@Maker
+var globalWithSingleGetter: Int { 0 } // expected-error {{ype 'Maker' has no member 'buildBlock'}}
+
+@Maker
+var globalWithMultiGetter: Int { 0; 0 } // expected-error {{ype 'Maker' has no member 'buildBlock'}}
 
 @Maker
 func globalFunction() {} // expected-error {{ype 'Maker' has no member 'buildBlock'}}

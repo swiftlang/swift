@@ -2878,8 +2878,15 @@ namespace {
                                ctx.Id_buildBlock, expressions);
     }
 
-    Expr *visitReturnStmt(ReturnStmt *returnStmt) {
-      llvm_unreachable("Should not try visit bodies with return statements");
+    Expr *visitReturnStmt(ReturnStmt *stmt) {
+      // Allow implicit returns due to 'return' elision.
+      if (!stmt->isImplicit() || !stmt->hasResult()) {
+        if (!unhandledNode)
+          unhandledNode = stmt;
+        return nullptr;
+      }
+
+      return stmt->getResult();
     }
 
     Expr *visitDoStmt(DoStmt *doStmt) {
