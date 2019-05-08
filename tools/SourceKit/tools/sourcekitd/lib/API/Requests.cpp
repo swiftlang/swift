@@ -18,10 +18,10 @@
 #include "sourcekitd/ExpressionTypeArray.h"
 
 #include "SourceKit/Core/Context.h"
-#include "SourceKit/Core/FileSystemProvider.h"
 #include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Core/NotificationCenter.h"
 #include "SourceKit/Support/Concurrency.h"
+#include "SourceKit/Support/FileSystemProvider.h"
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/Statistic.h"
 #include "SourceKit/Support/Tracing.h"
@@ -128,6 +128,13 @@ static SourceKit::Context &getGlobalContext() {
   assert(GlobalCtx);
   return *GlobalCtx;
 }
+
+namespace SourceKit {
+void setFileSystemProvider(
+    StringRef Name, std::unique_ptr<FileSystemProvider> FileSystemProvider) {
+  getGlobalContext().setFileSystemProvider(Name, std::move(FileSystemProvider));
+}
+} // namespace SourceKit
 
 static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
                                            bool Simplified);

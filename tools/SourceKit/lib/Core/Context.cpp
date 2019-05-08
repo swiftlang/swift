@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "SourceKit/Core/Context.h"
-#include "SourceKit/Core/FileSystemProvider.h"
 #include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Core/NotificationCenter.h"
+#include "SourceKit/Support/FileSystemProvider.h"
 
 using namespace SourceKit;
 
@@ -22,7 +22,6 @@ SourceKit::Context::Context(StringRef RuntimeLibPath,
     LangSupportFactoryFn,
     bool shouldDispatchNotificationsOnMain) : RuntimeLibPath(RuntimeLibPath),
     NotificationCtr(new NotificationCenter(shouldDispatchNotificationsOnMain)) {
-  makeAllFileSystemProviders(FileSystemProviders);
   // Should be called last after everything is initialized.
   SwiftLang = LangSupportFactoryFn(*this);
 }
@@ -35,4 +34,11 @@ FileSystemProvider *SourceKit::Context::getFileSystemProvider(StringRef Name) {
   if (It == FileSystemProviders.end())
     return nullptr;
   return It->second.get();
+}
+
+void SourceKit::Context::setFileSystemProvider(
+    StringRef Name, std::unique_ptr<FileSystemProvider> FileSystemProvider) {
+  auto Result =
+      FileSystemProviders.try_emplace(Name, std::move(FileSystemProvider));
+  assert(Result.second && "tried to set existing FileSystemProvider");
 }

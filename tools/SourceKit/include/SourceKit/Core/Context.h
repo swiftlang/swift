@@ -50,6 +50,10 @@ public:
   std::shared_ptr<NotificationCenter> getNotificationCenter() { return NotificationCtr; }
 
   FileSystemProvider *getFileSystemProvider(StringRef Name);
+
+  void
+  setFileSystemProvider(StringRef Name,
+                        std::unique_ptr<FileSystemProvider> FileSystemProvider);
 };
 
 } // namespace SourceKit

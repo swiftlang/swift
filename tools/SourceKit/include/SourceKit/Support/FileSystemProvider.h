@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_SOURCEKIT_CORE_FILESYSTEMPROVIDER_H
-#define LLVM_SOURCEKIT_CORE_FILESYSTEMPROVIDER_H
+#ifndef LLVM_SOURCEKIT_SUPPORT_FILESYSTEMPROVIDER_H
+#define LLVM_SOURCEKIT_SUPPORT_FILESYSTEMPROVIDER_H
 
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallVector.h"
@@ -48,11 +48,6 @@ public:
   getFileSystem(const llvm::SmallVectorImpl<const char *> &Args,
                 llvm::SmallVectorImpl<char> &ErrBuf) = 0;
 };
-
-/// Inserts all the selectable FileSystemProviders into Providers. The key is
-/// the string specified in 'key.vfs.name' to select the FileSystemProvider.
-void makeAllFileSystemProviders(
-    llvm::StringMap<std::unique_ptr<FileSystemProvider>> &Providers);
 
 } // namespace SourceKit
 
