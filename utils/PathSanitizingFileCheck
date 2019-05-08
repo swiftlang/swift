@@ -72,7 +72,8 @@ constants.""")
         # We are replacing the Unix path separators in the paths passed as
         # arguments with a broader pattern to also allow forward slashes and
         # double escaped slashes in the result that we are checking. Sigh.
-        stdin = re.sub(re.sub(r'/', slashes_re, pattern), replacement, stdin)
+        # SWIFT_ENABLE_TENSORFLOW
+        stdin = re.sub(re.sub(r'\/', slashes_re, re.escape(pattern)), replacement, stdin)
 
     p = subprocess.Popen(
         [args.file_check_path] + unknown_args, stdin=subprocess.PIPE)
