@@ -138,18 +138,30 @@ protected:
   void visitEnumInst(EnumInst *Inst) {
     getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
     SILValue opd = SILValue();
+    auto newTy = getOpType(Inst->getType());
     if (Inst->hasOperand()) {
-      SILType caseTy = Inst->getType().getEnumElementType(
-          Inst->getElement(), getBuilder().getFunction().getModule());
       opd = getOpValue(Inst->getOperand());
-      if (opd->getType() != caseTy) {
-        opd = createCast(getOpLocation(Inst->getLoc()), opd, caseTy);
-      }
+      SILType newCaseTy = newTy.getEnumElementType(
+          Inst->getElement(), getBuilder().getFunction().getModule());
+      if (opd->getType() != newCaseTy)
+        opd = createCast(getOpLocation(Inst->getLoc()), opd, newCaseTy);
     }
     recordClonedInstruction(
         Inst, getBuilder().createEnum(getOpLocation(Inst->getLoc()), opd,
-                                      Inst->getElement(),
-                                      getOpType(Inst->getType())));
+                                      Inst->getElement(), newTy));
+  }
+
+  void visitInitEnumDataAddrInst(InitEnumDataAddrInst *Inst) {
+    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+    auto opd = getOpValue(Inst->getOperand());
+    auto caseTy = opd->getType().getEnumElementType(
+        Inst->getElement(), getBuilder().getFunction().getModule());
+    auto expectedTy = getOpType(Inst->getType());
+    if (expectedTy != caseTy)
+      expectedTy = caseTy;
+    recordClonedInstruction(Inst, getBuilder().createInitEnumDataAddr(
+                                      getOpLocation(Inst->getLoc()), opd,
+                                      Inst->getElement(), expectedTy));
   }
 
   /// Projections should not change the type if the type is not specialized.
