@@ -2513,9 +2513,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto opaque1 = cast<OpaqueTypeArchetypeType>(desugar1);
       auto opaque2 = cast<OpaqueTypeArchetypeType>(desugar2);
       
-      assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
-      if (!type1->is<LValueType>()
-          && opaque1->getDecl() == opaque2->getDecl()) {
+      if (opaque1->getDecl() == opaque2->getDecl()) {
         conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
       }
       break;
@@ -2529,15 +2527,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto rootOpaque1 = dyn_cast<OpaqueTypeArchetypeType>(nested1->getRoot());
       auto rootOpaque2 = dyn_cast<OpaqueTypeArchetypeType>(nested2->getRoot());
       if (rootOpaque1 && rootOpaque2) {
-        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
         auto interfaceTy1 = nested1->getInterfaceType()
           ->getCanonicalType(rootOpaque1->getGenericEnvironment()
                                         ->getGenericSignature());
         auto interfaceTy2 = nested2->getInterfaceType()
           ->getCanonicalType(rootOpaque2->getGenericEnvironment()
                                         ->getGenericSignature());
-        if (!type1->is<LValueType>()
-            && interfaceTy1 == interfaceTy2
+        if (interfaceTy1 == interfaceTy2
             && rootOpaque1->getDecl() == rootOpaque2->getDecl()) {
           conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
           break;
@@ -2556,7 +2552,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     // T1 is convertible to T2 (by loading the value).  Note that we cannot get
     // a value of inout type as an lvalue though.
     if (type1->is<LValueType>() && !type2->is<InOutType>()) {
-      return matchTypes(type1->getRValueType(), type2,
+      return matchTypes(type1->getWithoutSpecifierType(), type2,
                         kind, subflags, locator);
     }
   }
@@ -2613,7 +2609,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // We can remove this special case when we implement operator hiding.
       if (!type1->is<LValueType>() &&
           kind != ConstraintKind::OperatorArgumentConversion) {
-        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
         conversionsOrFixes.push_back(
                               ConversionRestrictionKind::HashableToAnyHashable);
       }
@@ -2676,16 +2671,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     if (!type1->is<LValueType>() && kind >= ConstraintKind::Subtype) {
       // Array -> Array.
       if (isArrayType(desugar1) && isArrayType(desugar2)) {
-        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
         conversionsOrFixes.push_back(ConversionRestrictionKind::ArrayUpcast);
       // Dictionary -> Dictionary.
       } else if (isDictionaryType(desugar1) && isDictionaryType(desugar2)) {
-        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
         conversionsOrFixes.push_back(
           ConversionRestrictionKind::DictionaryUpcast);
       // Set -> Set.
       } else if (isSetType(desugar1) && isSetType(desugar2)) {
-        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
         conversionsOrFixes.push_back(
           ConversionRestrictionKind::SetUpcast);
       }
