@@ -4305,6 +4305,9 @@ public:
   /// requirements listed here become entries in the witness table.
   ArrayRef<Requirement> getRequirementSignature() const;
 
+  /// Is the requirement signature currently being computed?
+  bool isComputingRequirementSignature() const;
+
   /// Has the requirement signature been computed yet?
   bool isRequirementSignatureComputed() const {
     return RequirementSignature != nullptr;

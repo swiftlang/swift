@@ -4107,7 +4107,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
   // Use the requirement signature to avoid rewalking the entire protocol.  This
   // cannot compute the requirement signature directly, because that may be
   // infinitely recursive: this code is also used to construct it.
-  if (proto->isRequirementSignatureComputed()) {
+  if (!proto->isComputingRequirementSignature()) {
     auto innerSource =
       FloatingRequirementSource::viaProtocolRequirement(source, proto,
                                                         /*inferred=*/false);

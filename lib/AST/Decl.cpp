@@ -4575,6 +4575,11 @@ ArrayRef<Requirement> ProtocolDecl::getRequirementSignature() const {
                None);
 }
 
+bool ProtocolDecl::isComputingRequirementSignature() const {
+  return getASTContext().evaluator.hasActiveRequest(
+                 RequirementSignatureRequest{const_cast<ProtocolDecl*>(this)});
+}
+
 void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
   assert(!RequirementSignature && "requirement signature already set");
   if (requirements.empty()) {
