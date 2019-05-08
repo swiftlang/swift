@@ -3793,6 +3793,17 @@ Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
 /// wasn't of one of the kinds listed above.
 Expr *getArgumentExpr(Expr *expr, unsigned index);
 
+// Check whether argument of the call at given position refers to
+// parameter marked as `@autoclosure`. This function is used to
+// maintain source compatibility with Swift versions < 5,
+// previously examples like following used to type-check:
+//
+// func foo(_ x: @autoclosure () -> Int) {}
+// func bar(_ y: @autoclosure () -> Int) {
+//   foo(y)
+// }
+bool isAutoClosureArgument(Expr *argExpr);
+
 class DisjunctionChoice {
   unsigned Index;
   Constraint *Choice;
