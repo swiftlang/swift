@@ -92,6 +92,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Hash
     single-source/Histogram
     single-source/InsertCharacter  
+    single-source/IntegerParsing
     single-source/Integrate
     single-source/IterateData
     single-source/Join
