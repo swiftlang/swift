@@ -41,7 +41,7 @@ add_swift_target_library(swiftStdlibStubs
                   INSTALL_IN_COMPONENT
                     stdlib)
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+if("${SWIFT_PRIMARY_VARIANT_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS)
   set_property(SOURCE
                  SwiftNativeNSXXXBaseARC.m
                APPEND_STRING PROPERTY COMPILE_FLAGS
