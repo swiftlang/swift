@@ -3053,15 +3053,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Set the checked differentiation parameter indices in the attribute.
   attr->setParameterIndices(checkedWrtParamIndices);
 
-  auto insertion =
-      ctx.DifferentiableAttrs.try_emplace({D, checkedWrtParamIndices}, attr);
-  // `@differentiable` attributes are uniqued by their parameter indices.
-  // Reject duplicate attributes for the same decl and parameter indices pair.
-  if (!insertion.second && insertion.first->getSecond() != attr) {
-    diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
-    return;
-  }
-
   // Check that original function's result type conforms to `Differentiable`.
   if (whereClauseGenEnv) {
     auto originalResultInterfaceType = !originalResultTy->hasTypeParameter()
@@ -3079,9 +3070,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   }
 
   // Checks that the `candidate` function type equals the `required` function
-  // type, disregarding parameter labels.
-  //
-  // Precondition: `required` has no parameter labels.
+  // type, disregarding parameter labels and tuple result labels.
   std::function<bool(CanAnyFunctionType, CanType)> checkFunctionSignature;
   checkFunctionSignature = [&](CanAnyFunctionType required,
                                CanType candidate) -> bool {
@@ -3105,12 +3094,28 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
           std::get<1>(paramPair).getPlainType()))
         return false;
 
-    // If required result type is non-function, check that result types match
-    // exactly.
+    // If required result type is non-function, check that result types match.
+    // If result types are tuple types, ignore labels.
     CanAnyFunctionType requiredResultFnTy =
         dyn_cast<AnyFunctionType>(required.getResult());
-    if (!requiredResultFnTy)
-      return required.getResult() == candidateFnTy.getResult();
+    if (!requiredResultFnTy) {
+      auto requiredResultTupleTy = required.getResult()->getAs<TupleType>();
+      auto candidateResultTupleTy =
+          candidateFnTy.getResult()->getAs<TupleType>();
+      if (!requiredResultTupleTy || !candidateResultTupleTy)
+        return required.getResult()->isEqual(candidateFnTy.getResult());
+      // If result types are tuple types, check that element types match,
+      // ignoring labels.
+      if (requiredResultTupleTy->getNumElements() !=
+          candidateResultTupleTy->getNumElements())
+        return false;
+      return llvm::all_of(llvm::zip(requiredResultTupleTy->getElementTypes(),
+                                    candidateResultTupleTy->getElementTypes()),
+                          [](std::tuple<Type, Type> pair) {
+                            return std::get<0>(pair)->isEqual(
+                                std::get<1>(pair));
+                          });
+    }
 
     // Required result type is a function. Recurse.
     return checkFunctionSignature(requiredResultFnTy,
@@ -3167,6 +3172,15 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     }
     // Memorize the vjp reference in the attribute.
     attr->setVJPFunction(vjp);
+  }
+
+  auto insertion =
+      ctx.DifferentiableAttrs.try_emplace({D, checkedWrtParamIndices}, attr);
+  // `@differentiable` attributes are uniqued by their parameter indices.
+  // Reject duplicate attributes for the same decl and parameter indices pair.
+  if (!insertion.second && insertion.first->getSecond() != attr) {
+    diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
+    return;
   }
 }
 
@@ -3489,33 +3503,50 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
         derivativeRequirements.push_back(req);
   }
 
-  // Add the derivative to a `@differentiable` attribute on the original
-  // function with the same differentiation parameters. If no such
-  // `@differentiable` attribute exists, create one.
+  // Try to find a `@differentiable` attribute on the original function with the
+  // same differentiation parameters.
   DifferentiableAttr *da = nullptr;
   for (auto *cda : originalFn->getAttrs().getAttributes<DifferentiableAttr>())
     if (checkedWrtParamIndices == cda->getParameterIndices())
       da = const_cast<DifferentiableAttr *>(cda);
+  // If the original function does not have a `@differentiable` attribute with
+  // the same differentiation parameters, create one.
   if (!da) {
     da = DifferentiableAttr::create(ctx, /*implicit*/ true, attr->AtLoc,
                                     attr->getRange(), checkedWrtParamIndices,
-                                    None, None, derivativeRequirements);
+                                    /*jvp*/ None, /*vjp*/ None,
+                                    derivativeRequirements);
+    switch (kind) {
+    case AutoDiffAssociatedFunctionKind::JVP:
+      da->setJVPFunction(derivative);
+      break;
+    case AutoDiffAssociatedFunctionKind::VJP:
+      da->setVJPFunction(derivative);
+      break;
+    }
     auto insertion = ctx.DifferentiableAttrs.try_emplace(
         {originalFn, checkedWrtParamIndices}, da);
-    // `@differentiable` attributes are uniqued by their parameter indices.
-    // Reject duplicate attributes for the same decl and parameter indices pair.
+    // Valid `@differentiable` attributes are uniqued by their parameter
+    // indices. Reject duplicate attributes for the same decl and parameter
+    // indices pair.
     if (!insertion.second && insertion.first->getSecond() != da) {
       diagnoseAndRemoveAttr(da, diag::differentiable_attr_duplicate);
       return;
     }
     originalFn->getAttrs().add(da);
+    return;
   }
-  // Check if the `@differentiable` attribute already has a registered
-  // derivative. If so, emit an error on the `@differentiating` attribute.
-  // Otherwise, register the derivative in the `@differentiable` attribute.
+  // If the original function has a `@differentiable` attribute with the same
+  // differentiation parameters, check if the `@differentiable` attribute
+  // already has a different registered derivative. If so, emit an error on the
+  // `@differentiating` attribute. Otherwise, register the derivative in the
+  // `@differentiable` attribute.
   switch (kind) {
   case AutoDiffAssociatedFunctionKind::JVP:
-    if (da->getJVP() || da->getJVPFunction()) {
+    // If there's a different registered derivative, emit an error.
+    if ((da->getJVP() &&
+         da->getJVP()->Name.getBaseName() != derivative->getBaseName()) ||
+        (da->getJVPFunction() && da->getJVPFunction() != derivative)) {
       diagnoseAndRemoveAttr(
           attr, diag::differentiating_attr_original_already_has_derivative,
           originalFn->getFullName());
@@ -3524,7 +3555,10 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     da->setJVPFunction(derivative);
     break;
   case AutoDiffAssociatedFunctionKind::VJP:
-    if (da->getVJP() || da->getVJPFunction()) {
+    // If there's a different registered derivative, emit an error.
+    if ((da->getVJP() &&
+         da->getVJP()->Name.getBaseName() != derivative->getBaseName()) ||
+        (da->getVJPFunction() && da->getVJPFunction() != derivative)) {
       diagnoseAndRemoveAttr(
           attr, diag::differentiating_attr_original_already_has_derivative,
           originalFn->getFullName());

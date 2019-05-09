@@ -505,6 +505,41 @@ func vjpWhere1<T : Differentiable>(x: T) -> (T, (T.CotangentVector) -> T.Cotange
   return (x, { v in v })
 }
 
+// Test derivative functions with result tuple type labels.
+@differentiable(jvp: jvpResultLabels, vjp: vjpResultLabels)
+func derivativeResultLabels(_ x: Float) -> Float {
+  return x
+}
+func jvpResultLabels(_ x: Float) -> (value: Float, differential: (Float) -> Float) {
+  return (x, { $0 })
+}
+func vjpResultLabels(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  return (x, { $0 })
+}
+struct ResultLabelTest {
+  @differentiable(jvp: jvpResultLabels, vjp: vjpResultLabels)
+  static func derivativeResultLabels(_ x: Float) -> Float {
+    return x
+  }
+  static func jvpResultLabels(_ x: Float) -> (value: Float, differential: (Float) -> Float) {
+    return (x, { $0 })
+  }
+  static func vjpResultLabels(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+    return (x, { $0 })
+  }
+
+  @differentiable(jvp: jvpResultLabels, vjp: vjpResultLabels)
+  func derivativeResultLabels(_ x: Float) -> Float {
+    return x
+  }
+  func jvpResultLabels(_ x: Float) -> (value: Float, differential: (Float) -> Float) {
+    return (x, { $0 })
+  }
+  func vjpResultLabels(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+    return (x, { $0 })
+  }
+}
+
 struct Tensor<Scalar> : AdditiveArithmetic {}
 extension Tensor : Differentiable where Scalar : Differentiable {
   typealias TangentVector = Tensor

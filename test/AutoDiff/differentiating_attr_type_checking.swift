@@ -280,3 +280,16 @@ extension InstanceMethodProto where Self : Differentiable {
     return (bar(), { _ in .zero })
   }
 }
+
+// Test consistent usages of `@differentiable` and `@differentiating` where
+// derivative functions are specified in both attributes.
+@differentiable(jvp: jvpConsistent, vjp: vjpConsistent)
+func consistentSpecifiedDerivatives(_ x: Float) -> Float {
+  return x
+}
+func jvpConsistent(_ x: Float) -> (value: Float, differential: (Float) -> Float) {
+  return (x, { $0 })
+}
+func vjpConsistent(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  return (x, { $0 })
+}
