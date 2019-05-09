@@ -514,29 +514,28 @@ class TestOptionalTrySub : TestOptionalTry {
 struct X { init() {} }
 
 struct Y {
+  var x: X
+  let x2: X
+  
+  init() {
+    x.init() // expected-error {{'init' is a member of the type; use assignment to initalize the value instead}} {{6-6= = }}
+    foo(x.init()) // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{11-11=type(of: }} {{15-15=)}}
+  }
+  
   func foo(_: X) {}
   func asFunctionReturn() -> X {
     var a = X()
     return a.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{14-14=type(of: }} {{18-18=)}}
   }
-  var x: X
-  init() {
-    x.init() // expected-error {{'init' is a member of the type; use assignment to initalize the value instead}} {{6-6= = }}
-    foo(x.init()) // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{11-11=type(of: }} {{15-15=)}}
-  }
-}
-
-struct Y2 {
-  var x: X
-  init() {
-    x = X()
-  }
 }
 
 struct MultipleMemberAccesses {
   var y: Y
+  let y2: Y
   init() {
     y = Y()
+    y2 = Y()
     y.x.init() // expected-error {{'init' is a member of the type; use assignment to initalize the value instead}} {{8-8= = }}
+    y2.x2.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{11-11=type(of: }} {{15-15=)}}
   }
 }
