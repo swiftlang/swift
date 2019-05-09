@@ -1312,9 +1312,11 @@ if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
 fi
 if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" foundation)
-     if [[ -z "${SKIP_BUILD_STATIC_FOUNDATION}" ]] ; then
-       PRODUCTS=("${PRODUCTS[@]}" foundation_static)
-     fi
+     # SWIFT_ENABLE_TENSORFLOW
+     # TODO(TF-490): Reenable this.
+     # if [[ -z "${SKIP_BUILD_STATIC_FOUNDATION}" ]] ; then
+     #   PRODUCTS=("${PRODUCTS[@]}" foundation_static)
+     # fi
 fi
 if [[ ! "${SKIP_BUILD_LLBUILD}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" llbuild)
