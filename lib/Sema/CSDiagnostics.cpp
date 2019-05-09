@@ -106,18 +106,18 @@ Optional<SelectedOverload> FailureDiagnostic::getChoiceFor(Expr *expr) {
   auto &cs = getConstraintSystem();
   ConstraintLocator *locator = nullptr;
 
-  if (auto *call = dyn_cast<CallExpr>(expr)) {
-    auto *fnExpr = call->getFn();
-    return getChoiceFor(fnExpr);
+  if (auto *AE = dyn_cast<ApplyExpr>(expr)) {
+    if (auto *TE = dyn_cast<TypeExpr>(AE->getFn())) {
+      locator = cs.getConstraintLocator(AE,
+                                        {ConstraintLocator::ApplyFunction,
+                                         ConstraintLocator::ConstructorMember},
+                                        /*summaryFlags=*/0);
+    }
+    return getChoiceFor(AE->getFn());
   } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
     locator = cs.getConstraintLocator(UDE, ConstraintLocator::Member);
   } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(expr)) {
     locator = cs.getConstraintLocator(UME, ConstraintLocator::UnresolvedMember);
-  } else if (auto *TE = dyn_cast<TypeExpr>(expr)) {
-    locator = cs.getConstraintLocator(call,
-                                      {ConstraintLocator::ApplyFunction,
-                                       ConstraintLocator::ConstructorMember},
-                                      /*summaryFlags=*/0);
   } else if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
     locator = cs.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
   } else {
@@ -2077,8 +2077,8 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         auto argExpr = cs.getParentExpr(expr);
         if (!argExpr)
           return false;
-        auto possibleCallExpr = cs.getParentExpr(expr);
-        return possibleCallExpr && isa<CallExpr>(possibleCallExpr);
+        auto possibleApplyExpr = cs.getParentExpr(expr);
+        return possibleApplyExpr && isa<ApplyExpr>(possibleApplyExpr);
       };
 
       auto *initCall = cs.getParentExpr(cs.getParentExpr(ctorRef));
@@ -2092,7 +2092,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
 
       auto selection = getChoiceFor(ctorRef->getBase());
       if (selection) {
-        OverloadChoice choice = selection.getValue().choice;
+        OverloadChoice choice = selection->choice;
         if (choice.isDecl() && isMutable(choice.getDecl()) &&
             !isCallArgument(initCall) &&
             cs.getContextualTypePurpose() == CTP_Unused) {

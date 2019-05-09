@@ -2646,6 +2646,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   auto contextualPurpose = CTP_Unused;
   TypeCheckExprOptions flags = TypeCheckExprFlags::ConvertTypeIsOnlyAHint;
 
+  // Set the contextual purpose even if the pattern doesn't have a type so
+  // if there's an error we can use that information to inform diagnostics.
   contextualPurpose = CTP_Initialization;
 
   if (pattern->hasType()) {
