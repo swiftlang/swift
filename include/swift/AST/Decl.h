@@ -5323,6 +5323,8 @@ public:
   
   SourceRange getSourceRange() const;
 
+  AnyFunctionType::Param toFunctionParam(Type type = Type()) const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
     return D->getKind() == DeclKind::Param;
