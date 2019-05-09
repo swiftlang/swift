@@ -45,6 +45,7 @@ for filename in os.listdir(sdk_overlay_dir):
         continue
 
     # SWIFT_ENABLE_TENSORFLOW
+    # FIXME(TF-489): Re-enable this test after fixing `.swiftinterface` errors.
     if module_name in ["Swift", "SwiftLang", "DifferentiationUnittest", "Python", "TensorFlow"]:
         continue
 
