@@ -640,46 +640,29 @@ bool swift::splitAllCondBrCriticalEdgesWithNonTrivialArgs(SILFunction &Fn,
   return true;
 }
 
-namespace {
-  class RemoveUnreachable {
-    SILFunction &Fn;
-    llvm::SmallSet<SILBasicBlock *, 8> Visited;
-  public:
-    RemoveUnreachable(SILFunction &Fn) : Fn(Fn) { }
-    void visit(SILBasicBlock *BB);
-    bool run();
-  };
-} // end anonymous namespace
+bool swift::removeUnreachableBlocks(SILFunction &Fn) {
+  // All reachable blocks, but does not include the entry block.
+  llvm::SmallPtrSet<SILBasicBlock *, 8> Visited;
 
-void RemoveUnreachable::visit(SILBasicBlock *BB) {
-  if (!Visited.insert(BB).second)
-    return;
+  // Walk over the CFG, starting at the entry block, until all reachable blocks are visited.
+  llvm::SmallVector<SILBasicBlock *, 8> Worklist(1, Fn.getEntryBlock());
+  while (!Worklist.empty()) {
+    SILBasicBlock *BB = Worklist.pop_back_val();
+    for (auto &Succ : BB->getSuccessors()) {
+      if (Visited.insert(Succ).second)
+        Worklist.push_back(Succ);
+    }
+  }
 
-  for (auto &Succ : BB->getSuccessors())
-    visit(Succ);
-}
-
-bool RemoveUnreachable::run() {
+  // Remove the blocks we never reached. Exclude the entry block from the iteration because it's
+  // not included in the Visited set.
   bool Changed = false;
-
-  // Clear each time we run so that we can run multiple times.
-  Visited.clear();
-
-  // Visit all blocks reachable from the entry block of the function.
-  visit(&*Fn.begin());
-
-  // Remove the blocks we never reached.
-  for (auto It = Fn.begin(), End = Fn.end(); It != End; ) {
+  for (auto It = std::next(Fn.begin()), End = Fn.end(); It != End; ) {
     auto *BB = &*It++;
     if (!Visited.count(BB)) {
       removeDeadBlock(BB);
       Changed = true;
     }
   }
-
   return Changed;
-}
-
-bool swift::removeUnreachableBlocks(SILFunction &Fn) {
-  return RemoveUnreachable(Fn).run();
 }
