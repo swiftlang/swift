@@ -569,11 +569,6 @@ public:
   /// from the \c DeclsToFinalize set.
   unsigned NextDeclToFinalize = 0;
 
-  /// The list of protocols that need their requirement signatures computed,
-  /// because they were first validated by validateDeclForNameLookup(),
-  /// which skips this step.
-  llvm::SetVector<ProtocolDecl *> DelayedRequirementSignatures;
-
   /// The list of types whose circularity checks were delayed.
   SmallVector<NominalTypeDecl*, 8> DelayedCircularityChecks;
 
