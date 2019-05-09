@@ -334,7 +334,7 @@
                 "llvm": "swift-DEVELOPMENT-SNAPSHOT-2019-05-02-a",
                 "clang": "swift-DEVELOPMENT-SNAPSHOT-2019-05-02-a",
                 "swift": "tensorflow",
-                "lldb": "4cf2c810dd91795935181610fd406c96e0d6d957",
+                "lldb": "22487a4a0a71f60b0060bc7459e933b584de4f2b",
                 "cmark": "swift-DEVELOPMENT-SNAPSHOT-2019-05-02-a",
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2019-05-02-a",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2019-05-02-a",
