@@ -2083,18 +2083,17 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
 
       auto *initCall = cs.getParentExpr(cs.getParentExpr(ctorRef));
 
-      auto isImmutable = [&DC](ValueDecl *decl) {
+      auto isMutable = [&DC](ValueDecl *decl) {
         if (auto *storage = dyn_cast<AbstractStorageDecl>(decl))
-          return !storage->isSettable(DC) ||
-                 !storage->isSetterAccessibleFrom(DC);
+          return storage->isSettable(DC) && storage->isSetterAccessibleFrom(DC);
 
-        return false;
+        return true;
       };
 
       auto selection = getChoiceFor(ctorRef->getBase());
       if (selection) {
         OverloadChoice choice = selection.getValue().choice;
-        if (choice.isDecl() && !isImmutable(choice.getDecl()) &&
+        if (choice.isDecl() && isMutable(choice.getDecl()) &&
             !isCallArgument(initCall) &&
             cs.getContextualTypePurpose() == CTP_Unused) {
           auto fixItLoc = ctorRef->getBase()->getSourceRange().End;
