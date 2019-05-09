@@ -513,6 +513,14 @@ class TestOptionalTrySub : TestOptionalTry {
 
 struct X { init() {} }
 
+func +(lhs: X, rhs: X) -> X { return lhs }
+func testInsideOperator(x: X) {
+  x.init() + x // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{5-5=type(of: }} {{9-9=)}}
+  x + x.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{9-9=type(of: }} {{13-13=)}}
+  x.init() + x.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{5-5=type(of: }} {{9-9=)}}
+  // expected-error@-1 {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{16-16=type(of: }} {{20-20=)}}
+}
+
 struct Y {
   var x: X
   let x2: X
