@@ -1188,8 +1188,9 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
   
   // Create an assignment into the storage or call to superclass setter.
   auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, DeclNameLoc(), true);
-  createPropertyStoreOrCallSuperclassSetter(Set, ValueDRE, VD, target,
-                                            SetterBody, Ctx);
+  auto setterStorage = storageToUse ? cast<VarDecl>(storageToUse) : VD;
+  createPropertyStoreOrCallSuperclassSetter(Set, ValueDRE, setterStorage,
+                                            target, SetterBody, Ctx);
 
   // Create:
   //   (call_expr (dot_syntax_call_expr (decl_ref_expr(didSet)),
