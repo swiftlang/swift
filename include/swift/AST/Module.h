@@ -325,6 +325,15 @@ public:
     Bits.ModuleDecl.RawResilienceStrategy = unsigned(strategy);
   }
 
+  /// \returns true if this module is a system module; note that the StdLib is
+  /// considered a system module.
+  bool isSystemModule() const {
+    return Bits.ModuleDecl.IsSystemModule;
+  }
+  void setIsSystemModule(bool flag = true) {
+    Bits.ModuleDecl.IsSystemModule = flag;
+  }
+
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
   }
@@ -552,10 +561,6 @@ public:
 
   /// \returns true if this module is the "SwiftOnoneSupport" module;
   bool isOnoneSupportModule() const;
-
-  /// \returns true if this module is a system module; note that the StdLib is
-  /// considered a system module.
-  bool isSystemModule() const;
 
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(ASTWalker &Walker);
