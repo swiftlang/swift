@@ -4,9 +4,9 @@
 // Top-level (before primal/adjoint synthesis)
 //===----------------------------------------------------------------------===//
 
-// expected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}
+// expected-note @+2 {{opaque non-'@differentiable' function is not differentiable}}
+// expected-error @+1 {{expression is not differentiable}}
 func foo(_ f: (Float) -> Float) -> Float {
-  // expected-error @+1 {{function is not differentiable}}
   return gradient(at: 0, in: f)
 }
 
@@ -74,7 +74,7 @@ _ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) {
 func uses_optionals(_ x: Float) -> Float {
   var maybe: Float? = 10
   maybe = x
-  // xpected-note @+1 {{differentiating control flow is not supported yet}}
+  // xpected-note @+1 {{differentiating control flow is not yet supported}}
   return maybe!
 }
 
@@ -187,15 +187,15 @@ class Foo {
 }
 
 // Nested call case.
-@differentiable // expected-error 2 {{function is not differentiable}}
-// expected-note @+1 2 {{when differentiating this function definition}}
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
 func triesToDifferentiateClassMethod(x: Float) -> Float {
-  // expected-note @+2 {{expression is not differentiable}}
-  // expected-note @+1 {{differentiating class members is not supported yet}}
+  // expected-note @+1 {{differentiating class members is not yet supported}}
   return Foo().class_method(x)
 }
 
-// expected-error @+2 {{function is not differentiable}}
+// expected-error @+2 {{expression is not differentiable}}
 // expected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}
 _ = gradient(at: .zero, in: Foo().class_method)
 
@@ -206,16 +206,15 @@ _ = gradient(at: .zero, in: Foo().class_method)
 // expected-error @+1 {{function is not differentiable}}
 let no_return: @differentiable (Float) -> Float = { x in
   let _ = x + 1
-// expected-note @+2 {{missing return for differentiation}}
-// expected-error @+1 {{missing return in a closure expected to return 'Float'}}
+// expected-error @+2 {{missing return in a closure expected to return 'Float'}}
+// expected-note @+1 {{missing return for differentiation}}
 }
 
-// expected-error @+1 2 {{function is not differentiable}}
+// expected-error @+1 {{function is not differentiable}}
 @differentiable
-// expected-note @+1 2 {{when differentiating this function definition}}
+// expected-note @+1 {{when differentiating this function definition}}
 func roundingGivesError(x: Float) -> Float {
-  // expected-note @+2 {{cannot differentiate through a non-differentiable result; do you want to add '.withoutDerivative()'?}}
-  // expected-note @+1 {{expression is not differentiable}}
+  // expected-note @+1 {{cannot differentiate through a non-differentiable result; do you want to add '.withoutDerivative()'?}}
   return Float(Int(x))
 }
 
@@ -260,7 +259,6 @@ func nonVariedResult(_ x: Float) -> Float {
 //===----------------------------------------------------------------------===//
 
 func nondiff(_ f: @differentiable (Float, @nondiff Float) -> Float) -> Float {
-  // expected-note @+3 {{expression is not differentiable}}
   // expected-note @+2 {{cannot differentiate with respect to a '@nondiff' parameter}}
   // expected-error @+1 {{function is not differentiable}}
   return gradient(at: 2) { x in f(x * x, x) }
