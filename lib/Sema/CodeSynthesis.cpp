@@ -1154,7 +1154,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
   VarDecl *OldValue = nullptr;
   if (VD->getDidSetFunc()) {
     Expr *OldValueExpr = createPropertyLoadOrCallSuperclassGetter(
-        Set, Set->getStorage(), target, Ctx);
+        Set, VD, target, Ctx);
 
     OldValue = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
                                  /*IsCaptureList*/false, SourceLoc(),
