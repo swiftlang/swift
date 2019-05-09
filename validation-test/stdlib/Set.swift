@@ -2868,13 +2868,14 @@ SetTestSuite.test("isSubsetOf.Set.Set") {
 }
 
 SetTestSuite.test("isSubsetOf.Set.Sequence") {
+  typealias Seq = Array<Int>
   let s1 = Set([1010, 2020, 3030])
-  expectTrue(Set<Int>().isSubset(of: [1010]))
-  expectFalse(s1.isSubset(of: []))
-  expectTrue(Set<Int>().isSubset(of: []))
-  expectTrue(s1.isSubset(of: [1010, 2020, 3030]))
-  expectFalse(s1.isSubset(of: [1010, 2020]))
-  expectTrue(s1.isSubset(of: [1010, 2020, 3030, 4040]))
+  expectTrue(Set<Int>().isSubset(of: [1010] as Seq))
+  expectFalse(s1.isSubset(of: [] as Seq))
+  expectTrue(Set<Int>().isSubset(of: [] as Seq))
+  expectTrue(s1.isSubset(of: [1010, 2020, 3030] as Seq))
+  expectFalse(s1.isSubset(of: [1010, 2020] as Seq))
+  expectTrue(s1.isSubset(of: [1010, 2020, 3030, 4040] as Seq))
 }
 
 SetTestSuite.test("isStrictSubsetOf.Set.Set") {
@@ -2889,13 +2890,14 @@ SetTestSuite.test("isStrictSubsetOf.Set.Set") {
 }
 
 SetTestSuite.test("isStrictSubsetOf.Set.Sequence") {
+  typealias Seq = Array<Int>
   let s1 = Set([1010, 2020, 3030])
-  expectTrue(Set<Int>().isStrictSubset(of: [1010]))
-  expectFalse(s1.isStrictSubset(of: []))
-  expectFalse(Set<Int>().isStrictSubset(of: []))
-  expectFalse(s1.isStrictSubset(of: [1010, 2020, 3030]))
-  expectFalse(s1.isStrictSubset(of: [1010, 2020]))
-  expectTrue(s1.isStrictSubset(of: [1010, 2020, 3030, 4040]))
+  expectTrue(Set<Int>().isStrictSubset(of: [1010] as Seq))
+  expectFalse(s1.isStrictSubset(of: [] as Seq))
+  expectFalse(Set<Int>().isStrictSubset(of: [] as Seq))
+  expectFalse(s1.isStrictSubset(of: [1010, 2020, 3030] as Seq))
+  expectFalse(s1.isStrictSubset(of: [1010, 2020] as Seq))
+  expectTrue(s1.isStrictSubset(of: [1010, 2020, 3030, 4040] as Seq))
 }
 
 SetTestSuite.test("isSupersetOf.Set.Set") {
@@ -2910,13 +2912,14 @@ SetTestSuite.test("isSupersetOf.Set.Set") {
 }
 
 SetTestSuite.test("isSupersetOf.Set.Sequence") {
+  typealias Seq = Array<Int>
   let s1 = Set([1010, 2020, 3030])
-  expectTrue(s1.isSuperset(of: Set<Int>()))
-  expectFalse(Set<Int>().isSuperset(of: [1010]))
-  expectTrue(Set<Int>().isSuperset(of: []))
-  expectTrue(s1.isSuperset(of: [1010, 2020, 3030]))
-  expectTrue(s1.isSuperset(of: [1010, 2020]))
-  expectFalse(s1.isSuperset(of: [1010, 2020, 3030, 4040]))
+  expectTrue(s1.isSuperset(of: [] as Seq))
+  expectFalse(Set<Int>().isSuperset(of: [1010] as Seq))
+  expectTrue(Set<Int>().isSuperset(of: [] as Seq))
+  expectTrue(s1.isSuperset(of: [1010, 2020, 3030] as Seq))
+  expectTrue(s1.isSuperset(of: [1010, 2020] as Seq))
+  expectFalse(s1.isSuperset(of: [1010, 2020, 3030, 4040] as Seq))
 }
 
 SetTestSuite.test("isStrictSuperset.Set.Set") {
@@ -2931,13 +2934,14 @@ SetTestSuite.test("isStrictSuperset.Set.Set") {
 }
 
 SetTestSuite.test("isStrictSuperset.Set.Sequence") {
+  typealias Seq = Array<Int>
   let s1 = Set([1010, 2020, 3030])
-  expectTrue(s1.isStrictSuperset(of: []))
-  expectFalse(Set<Int>().isStrictSuperset(of: [1010]))
-  expectFalse(Set<Int>().isStrictSuperset(of: []))
-  expectFalse(s1.isStrictSuperset(of: [1010, 2020, 3030]))
-  expectTrue(s1.isStrictSuperset(of: [1010, 2020]))
-  expectFalse(s1.isStrictSuperset(of: [1010, 2020, 3030, 4040]))
+  expectTrue(s1.isStrictSuperset(of: [] as Seq))
+  expectFalse(Set<Int>().isStrictSuperset(of: [1010] as Seq))
+  expectFalse(Set<Int>().isStrictSuperset(of: [] as Seq))
+  expectFalse(s1.isStrictSuperset(of: [1010, 2020, 3030] as Seq))
+  expectTrue(s1.isStrictSuperset(of: [1010, 2020] as Seq))
+  expectFalse(s1.isStrictSuperset(of: [1010, 2020, 3030, 4040] as Seq))
 }
 
 SetTestSuite.test("Equatable.Native.Native") {
