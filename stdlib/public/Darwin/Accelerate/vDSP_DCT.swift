@@ -60,7 +60,6 @@ extension vDSP {
         /// - Parameter input: Real input vector.
         /// - Returns: Real output vector.
         @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-        @inline(__always)
         public func transform<U>(_ vector: U) -> [Float]
             where
             U: AccelerateBuffer,
@@ -83,7 +82,6 @@ extension vDSP {
         /// - Parameter input: Real input vector.
         /// - Parameter output: Real output vector.
         @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-        @inline(__always)
         public func transform<U, V>(_ vector: U, result: inout V)
             where
             U: AccelerateBuffer,
@@ -115,12 +113,10 @@ extension Float: vDSP_FloatingPointDiscreteCosineTransformable {
 fileprivate protocol vDSP_DCTFunctions {
     associatedtype Scalar
     
-    @inline(__always)
     static func makeDCTSetup(previous: vDSP.DCT?,
                              count: Int,
                              transformType: vDSP.DCTTransformType) -> OpaquePointer?
     
-    @inline(__always)
     static func transform<U, V>(dctSetup: OpaquePointer,
                                 source: U,
                                 destination: inout V)
@@ -134,7 +130,6 @@ fileprivate protocol vDSP_DCTFunctions {
 extension vDSP.VectorizableFloat: vDSP_DCTFunctions {
     
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    @inline(__always)
     fileprivate static func makeDCTSetup(previous: vDSP.DCT? = nil,
                                     count: Int,
                                     transformType: vDSP.DCTTransformType) -> OpaquePointer? {
@@ -145,7 +140,6 @@ extension vDSP.VectorizableFloat: vDSP_DCTFunctions {
     }
     
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-    @inline(__always)
     fileprivate static func transform<U, V>(dctSetup: OpaquePointer,
                                        source: U,
                                        destination: inout V)
