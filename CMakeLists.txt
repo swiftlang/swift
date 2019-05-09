@@ -1051,6 +1051,12 @@ endif()
 # https://bugs.swift.org/browse/SR-5975
 if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stdlib)
+else()
+  # Some tools (e.g. swift-reflection-dump) rely on a host swiftReflection, so
+  # ensure we build that when building tools.
+  if(SWIFT_INCLUDE_TOOLS)
+    add_subdirectory(stdlib/public/Reflection)
+  endif()
 endif()
 
 if(SWIFT_INCLUDE_APINOTES)
