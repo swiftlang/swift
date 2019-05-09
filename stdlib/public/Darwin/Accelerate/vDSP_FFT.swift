@@ -51,7 +51,6 @@ extension vDSP {
         ///
         /// - Parameter log2n: The base-two logarithm of the maximum number of elements to be transformed.
         /// - Parameter radix: Specifies radix options.
-        @inline(__always)
         public init?(log2n: vDSP_Length,
                      radix: Radix,
                      ofType: T.Type) {
@@ -67,7 +66,6 @@ extension vDSP {
             fftSetup = setup
         }
         
-        @inline(__always)
         /// Computes an out-of-place single-precision real forward or inverse fast Fourier transform.
         ///
         /// - Parameter input: Complex input vector.
@@ -126,7 +124,6 @@ extension vDSP {
         /// - Parameter width: The width of the matrix to be transformed.
         /// - Parameter height: The width of the matrix to be transformed.
         @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
-        @inline(__always)
         required public init?(width: Int,
                               height: Int,
                               ofType: T.Type) {
@@ -145,7 +142,6 @@ extension vDSP {
         /// - Parameter input: Complex input vector.
         /// - Parameter output: Complex output vector.
         /// - Parameter direction: Specifies transform direction.
-        @inline(__always)
         override public func transform<T: vDSP_FourierTransformable>(input: T,
                                                                      output: inout T,
                                                                      direction: vDSP.FourierTransformDirection) {
@@ -194,7 +190,6 @@ public struct vDSP_SplitComplexFloat: vDSP_FourierTransformFunctions {
     public typealias SplitComplex = DSPSplitComplex
     
     /// Returns a setup structure to perform a fast Fourier transform.
-    @inline(__always)
     public static func makeFFTSetup(log2n: vDSP_Length,
                                     radix: vDSP.Radix) -> OpaquePointer? {
         
@@ -204,7 +199,6 @@ public struct vDSP_SplitComplexFloat: vDSP_FourierTransformFunctions {
     }
     
     /// Performs a 1D fast Fourier transform.
-    @inline(__always)
     public static func transform(fftSetup: OpaquePointer,
                                  log2n: vDSP_Length,
                                  source: UnsafePointer<SplitComplex>,
@@ -233,7 +227,6 @@ public struct vDSP_SplitComplexFloat: vDSP_FourierTransformFunctions {
     }
     
     /// Releases an FFT setup object.
-    @inline(__always)
     public static func destroySetup(_ setup: OpaquePointer) {
         vDSP_destroy_fftsetup(setup)
     }
@@ -244,7 +237,6 @@ public struct vDSP_SplitComplexDouble: vDSP_FourierTransformFunctions {
     public typealias SplitComplex = DSPDoubleSplitComplex
     
     /// Returns a setup structure to perform a fast Fourier transform.
-    @inline(__always)
     public static func makeFFTSetup(log2n: vDSP_Length,
                                     radix: vDSP.Radix) -> OpaquePointer? {
         
@@ -254,7 +246,6 @@ public struct vDSP_SplitComplexDouble: vDSP_FourierTransformFunctions {
     }
     
     /// Performs a 1D fast Fourier transform.
-    @inline(__always)
     public static func transform(fftSetup: OpaquePointer,
                                  log2n: vDSP_Length,
                                  source: UnsafePointer<SplitComplex>,
@@ -283,7 +274,6 @@ public struct vDSP_SplitComplexDouble: vDSP_FourierTransformFunctions {
     }
     
     /// Releases an FFT setup object.
-    @inline(__always)
     public static func destroySetup(_ setup: OpaquePointer) {
         vDSP_destroy_fftsetupD(setup)
     }

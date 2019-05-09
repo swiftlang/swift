@@ -23,7 +23,7 @@ extension vDSP {
     ///
     /// - Parameter vector: The vector to fill.
     /// - Parameter value: The fill value.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func fill<V>(_ vector: inout V,
                                with value: Float)
@@ -45,7 +45,7 @@ extension vDSP {
     ///
     /// - Parameter vector: The vector to fill.
     /// - Parameter value: The fill value.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func fill<V>(_ vector: inout V,
                                with value: Double)
@@ -66,7 +66,7 @@ extension vDSP {
     /// Fill vector with zeros, single-precision.
     ///
     /// - Parameter vector: The vector to fill.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func clear<V>(_ vector: inout V)
         where V: AccelerateMutableBuffer,
@@ -83,7 +83,7 @@ extension vDSP {
     /// Fill vector with zeros, double-precision.
     ///
     /// - Parameter vector: The vector to fill.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func clear<V>(_ vector: inout V)
         where V: AccelerateMutableBuffer,
@@ -120,7 +120,7 @@ extension vDSP {
     /// - Parameter count: The number of elements in the array.
     /// - Parameter isHalfWindow: When true, creates a window with only the first `(N+1)/2` points.
     /// - Returns: An array containing the specified window.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func window<T: vDSP_FloatingPointGeneratable>(ofType: T.Type,
                                                                 usingSequence sequence: WindowSequence,
@@ -165,7 +165,6 @@ extension vDSP {
     /// - Parameter sequence: Specifies the window sequence.
     /// - Parameter result: Output values.
     /// - Parameter isHalfWindow: When true, creates a window with only the first `(N+1)/2` points.
-    @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func formWindow<V>(usingSequence sequence: WindowSequence,
                                      result: inout V,
@@ -204,7 +203,6 @@ extension vDSP {
     /// - Parameter sequence: Specifies the window sequence.
     /// - Parameter result: Output values.
     /// - Parameter isHalfWindow: When true, creates a window with only the first `(N+1)/2` points.
-    @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func formWindow<V>(usingSequence sequence: WindowSequence,
                                      result: inout V,
@@ -250,7 +248,7 @@ extension vDSP {
     /// - Parameter increment: The increment (or decrement if negative) between consecutive elements.
     /// - Parameter count: The number of elements in the array.
     /// - Returns: An array containing the specified ramp.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func ramp(withInitialValue initialValue: Float,
                             increment: Float,
@@ -276,7 +274,7 @@ extension vDSP {
     /// - Parameter initialValue: Specifies the initial value.
     /// - Parameter increment: The increment (or decrement if negative) between consecutive elements.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func formRamp<V>(withInitialValue initialValue: Float,
                                    increment: Float,
@@ -304,7 +302,7 @@ extension vDSP {
     /// - Parameter increment: The increment (or decrement if negative) between consecutive elements.
     /// - Parameter count: The number of elements in the array.
     /// - Returns: An array containing the specified ramp.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func ramp(withInitialValue initialValue: Double,
                             increment: Double,
@@ -330,7 +328,7 @@ extension vDSP {
     /// - Parameter initialValue: Specifies the initial value.
     /// - Parameter increment: The increment (or decrement if negative) between consecutive elements.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func formRamp<V>(withInitialValue initialValue: Double,
                                    increment: Double,
@@ -361,7 +359,7 @@ extension vDSP {
     /// - Parameter range: Specifies range of the ramp..
     /// - Parameter count: The number of elements in the array.
     /// - Returns: An array containing the specified ramp.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func ramp(in range: ClosedRange<Float>,
                             count: Int) -> [Float] {
@@ -384,7 +382,7 @@ extension vDSP {
     ///
     /// - Parameter range: Specifies range of the ramp.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func formRamp<V>(in range: ClosedRange<Float>,
                                    result: inout V)
@@ -410,7 +408,7 @@ extension vDSP {
     /// - Parameter range: Specifies range of the ramp..
     /// - Parameter count: The number of elements in the array.
     /// - Returns: An array containing the specified ramp.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func ramp(in range: ClosedRange<Double>,
                             count: Int) -> [Double] {
@@ -433,7 +431,7 @@ extension vDSP {
     ///
     /// - Parameter range: Specifies range of the ramp.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func formRamp<V>(in range: ClosedRange<Double>,
                                    result: inout V)
@@ -465,7 +463,7 @@ extension vDSP {
     /// - Parameter increment: The increment (or decrement if negative) between consecutive elements
     /// - Parameter count: The number of elements in the array.
     /// - Returns: An array containing the specified ramp.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func ramp<U>(withInitialValue initialValue: inout Float,
                                multiplyingBy vector: U,
@@ -494,7 +492,7 @@ extension vDSP {
     /// - Parameter multiplyingBy: Input values multiplied by the ramp function.
     /// - Parameter increment: The increment (or decrement if negative) between consecutive elements.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func formRamp<U,V>(withInitialValue initialValue: inout Float,
                                      multiplyingBy vector: U,
@@ -528,7 +526,7 @@ extension vDSP {
     /// - Parameter increment: The increment (or decrement if negative) between consecutive elements
     /// - Parameter count: The number of elements in the array.
     /// - Returns: An array containing the specified ramp.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func ramp<U>(withInitialValue initialValue: inout Double,
                                multiplyingBy vector: U,
@@ -557,7 +555,7 @@ extension vDSP {
     /// - Parameter multiplyingBy: Input values multiplied by the ramp function.
     /// - Parameter increment: The increment (or decrement if negative) between consecutive elements.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func formRamp<U,V>(withInitialValue initialValue: inout Double,
                                      multiplyingBy vector: U,
@@ -595,7 +593,7 @@ extension vDSP {
     /// - Parameter multiplierTwo: Input values multiplied by the ramp function.
     /// - Parameter increment: The increment (or decrement if negative) between consecutive elements.
     /// - Returns: A tuple of two arrays containing the specified ramps.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func stereoRamp<U>(withInitialValue initialValue: inout Float,
                                      multiplyingBy multiplierOne: U, _ multiplierTwo: U,
@@ -637,7 +635,7 @@ extension vDSP {
     /// - Parameter increment: The increment (or decrement if negative) between consecutive elements.
     /// - Parameter resultOne: Output values.
     /// - Parameter resultTwo: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func formStereoRamp<U,V>(withInitialValue initialValue: inout Float,
                                            multiplyingBy multiplierOne: U, _ multiplierTwo: U,
@@ -679,7 +677,7 @@ extension vDSP {
     /// - Parameter multiplierTwo: Input values multiplied by the ramp function.
     /// - Parameter increment: The increment (or decrement if negative) between consecutive elements.
     /// - Returns: A tuple of two arrays containing the specified ramps.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func stereoRamp<U>(withInitialValue initialValue: inout Double,
                                      multiplyingBy multiplierOne: U, _ multiplierTwo: U,
@@ -721,7 +719,7 @@ extension vDSP {
     /// - Parameter increment: The increment (or decrement if negative) between consecutive elements.
     /// - Parameter resultOne: Output values.
     /// - Parameter resultTwo: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func formStereoRamp<U,V>(withInitialValue initialValue: inout Double,
                                            multiplyingBy multiplierOne: U, _ multiplierTwo: U,

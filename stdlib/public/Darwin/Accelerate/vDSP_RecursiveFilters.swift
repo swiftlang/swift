@@ -30,7 +30,7 @@ extension vDSP {
     ///
     /// Where `A` is the input vector, `B` is the filter coefficients, and `C`
     /// is the output vector. Note that outputs start with C[2].
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func twoPoleTwoZeroFilter<U>(_ source: U,
                                                   coefficients: (Float, Float, Float, Float, Float)) -> [Float]
@@ -72,7 +72,7 @@ extension vDSP {
     ///
     /// Where `A` is the input vector, `B` is the filter coefficients, and `C`
     /// is the output vector. Note that outputs start with C[2].
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func twoPoleTwoZeroFilter<U, V>(_ source: U,
                                                   coefficients: (Float, Float, Float, Float, Float),
@@ -117,7 +117,7 @@ extension vDSP {
     ///
     /// Where `A` is the input vector, `B` is the filter coefficients, and `C`
     /// is the output vector. Note that outputs start with C[2].
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func twoPoleTwoZeroFilter<U>(_ source: U,
                                                   coefficients: (Double, Double, Double, Double, Double)) -> [Double]
@@ -159,7 +159,7 @@ extension vDSP {
     ///
     /// Where `A` is the input vector, `B` is the filter coefficients, and `C`
     /// is the output vector. Note that outputs start with C[2].
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func twoPoleTwoZeroFilter<U, V>(_ source: U,
                                                   coefficients: (Double, Double, Double, Double, Double),
