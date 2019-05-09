@@ -33,6 +33,7 @@
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Syntax/SyntaxKind.h"
+#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -1755,35 +1756,21 @@ public:
   }
 
   void addImportModuleNames() {
-    // FIXME: Add user-defined swift modules
-    SmallVector<StringRef, 20> ModuleNames;
-
-    // Collect clang module names.
-    {
-      SmallVector<clang::Module*, 20> ClangModules;
-      Ctx.getVisibleTopLevelClangModules(ClangModules);
-      for (auto *M : ClangModules) {
-        if (!M->isAvailable())
-          continue;
-        if (M->getTopLevelModuleName().startswith("_"))
-          continue;
-        if (M->getTopLevelModuleName() == Ctx.SwiftShimsModuleName.str())
-          continue;
-
-        ModuleNames.push_back(M->getTopLevelModuleName());
-      }
-    }
-
-    std::sort(ModuleNames.begin(), ModuleNames.end(),
-              [](StringRef LHS, StringRef RHS) {
-                return LHS.compare_lower(RHS) < 0;
-              });
+    SmallVector<Identifier, 0> ModuleNames;
+    Ctx.getVisibleTopLevelModuleNames(ModuleNames);
 
     llvm::StringSet<> ImportedModules;
     collectImportedModules(ImportedModules);
 
+    auto mainModuleName = CurrDeclContext->getParentModule()->getName();
     for (auto ModuleName : ModuleNames) {
-      auto MD = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx);
+      if (ModuleName.str().startswith("_") ||
+          ModuleName == mainModuleName ||
+          ModuleName == Ctx.SwiftShimsModuleName ||
+          ModuleName.str() == SWIFT_ONONE_SUPPORT)
+        continue;
+
+      auto MD = ModuleDecl::create(ModuleName, Ctx);
       CodeCompletionResultBuilder Builder(
           Sink,
           CodeCompletionResult::ResultKind::Declaration,
