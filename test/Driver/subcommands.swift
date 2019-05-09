@@ -1,7 +1,4 @@
 // REQUIRES: shell
-// SWIFT_ENABLE_TENSORFLOW: This test is unsupported because moving Swift executables without the TensorFlow libraries causes dynamic linking to fail.
-// UNSUPPORTED: tensorflow
-
 // Check that 'swift' and 'swift repl' invoke the REPL.
 
 // RUN: rm -rf %t.dir
