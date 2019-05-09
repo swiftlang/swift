@@ -88,6 +88,7 @@ namespace swift {
   class UnboundGenericType;
   class ValueDecl;
   class VarDecl;
+  class OpaqueReturnTypeRepr;
 
 enum class DeclKind : uint8_t {
 #define DECL(Id, Parent) Id,
@@ -2677,7 +2678,10 @@ public:
   
   /// Get the decl for this value's opaque result type, if it has one.
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const;
-  
+
+  /// Get the representative for this value's opaque result type, if it has one.
+  OpaqueReturnTypeRepr *getOpaqueResultTypeRepr() const;
+
   /// Set the opaque return type decl for this decl.
   ///
   /// `this` must be of a decl type that supports opaque return types, and

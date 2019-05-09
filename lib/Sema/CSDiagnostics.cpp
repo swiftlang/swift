@@ -278,18 +278,9 @@ bool RequirementFailure::diagnoseAsError() {
         anchor->getLoc(), diag::type_does_not_conform_in_opaque_return,
         namingDecl->getDescriptiveKind(), namingDecl->getFullName(), lhs, rhs);
 
-    TypeLoc returnLoc;
-    if (auto *VD = dyn_cast<VarDecl>(namingDecl)) {
-      returnLoc = VD->getTypeLoc();
-    } else if (auto *FD = dyn_cast<FuncDecl>(namingDecl)) {
-      returnLoc = FD->getBodyResultTypeLoc();
-    } else if (auto *SD = dyn_cast<SubscriptDecl>(namingDecl)) {
-      returnLoc = SD->getElementTypeLoc();
-    }
-
-    if (returnLoc.hasLocation()) {
-      emitDiagnostic(returnLoc.getLoc(), diag::opaque_return_type_declared_here)
-          .highlight(returnLoc.getSourceRange());
+    if (auto *repr = namingDecl->getOpaqueResultTypeRepr()) {
+      emitDiagnostic(repr->getLoc(), diag::opaque_return_type_declared_here)
+          .highlight(repr->getSourceRange());
     }
     return true;
   }
@@ -1697,6 +1688,33 @@ bool MissingCallFailure::diagnoseAsError() {
   if (isa<KeyPathExpr>(baseExpr))
     return false;
 
+  auto path = getLocator()->getPath();
+  if (!path.empty()) {
+    const auto &last = path.back();
+
+    switch (last.getKind()) {
+    case ConstraintLocator::ContextualType:
+    case ConstraintLocator::ApplyArgToParam: {
+      auto fnType = getType(baseExpr)->castTo<FunctionType>();
+      assert(fnType->getNumParams() == 0);
+      emitDiagnostic(baseExpr->getLoc(), diag::missing_nullary_call,
+                     fnType->getResult())
+          .fixItInsertAfter(baseExpr->getEndLoc(), "()");
+      return true;
+    }
+
+    case ConstraintLocator::AutoclosureResult: {
+      auto &cs = getConstraintSystem();
+      auto loc = cs.getConstraintLocator(getRawAnchor(), path.drop_back(),
+                                         /*summaryFlags=*/0);
+      AutoClosureForwardingFailure failure(cs, loc);
+      return failure.diagnoseAsError();
+    }
+    default:
+      break;
+    }
+  }
+
   if (auto *DRE = dyn_cast<DeclRefExpr>(baseExpr)) {
     emitDiagnostic(baseExpr->getLoc(), diag::did_not_call_function,
                    DRE->getDecl()->getBaseName().getIdentifier())
@@ -2677,5 +2695,17 @@ bool InvalidMemberWithMutatingGetterInKeyPath::diagnoseAsError() {
 bool InvalidMethodRefInKeyPath::diagnoseAsError() {
   emitDiagnostic(getLoc(), diag::expr_keypath_not_property, getKind(),
                  getName(), isForKeyPathDynamicMemberLookup());
+  return true;
+}
+
+bool InvalidUseOfAddressOf::diagnoseAsError() {
+  auto *anchor = cast<AssignExpr>(getAnchor());
+  emitDiagnostic(anchor->getSrc()->getLoc(), diag::extraneous_address_of);
+  return true;
+}
+
+bool ExtraneousReturnFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+  emitDiagnostic(anchor->getLoc(), diag::cannot_return_value_from_void_func);
   return true;
 }
