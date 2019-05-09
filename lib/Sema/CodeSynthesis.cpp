@@ -1419,8 +1419,10 @@ void swift::completeLazyVarImplementation(VarDecl *VD) {
   auto &Context = VD->getASTContext();
 
   assert(VD->getAttrs().hasAttribute<LazyAttr>());
-  // assert(VD->getReadImpl() == ReadImplKind::Get);
-  // assert(VD->getWriteImpl() == WriteImplKind::Set);
+  assert(VD->getReadImpl() == ReadImplKind::Get ||
+         VD->getReadImpl() == ReadImplKind::Stored);
+  assert(VD->getWriteImpl() == WriteImplKind::Set ||
+         VD->getWriteImpl() == WriteImplKind::StoredWithObservers);
   assert(!VD->isStatic() && "Static vars are already lazy on their own");
 
   // Create the storage property as an optional of VD's type.
