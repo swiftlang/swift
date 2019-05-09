@@ -4,13 +4,11 @@
 // due to direct differentiation of reabstraction thunks, which emits errors
 // with unknown location.
 
-// expected-error @+1 2 {{function is not differentiable}}
-@differentiable()
-// expected-note @+2 {{when differentiating this function definition}}
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
 // expected-note @+1 {{when differentiating this function definition}}
 func generic<T: Differentiable & FloatingPoint>(_ x: T) -> T {
-  // expected-note @+2 {{member is not differentiable because the corresponding protocol requirement is not '@differentiable'}}
-  // expected-note @+1 {{expression is not differentiable}}
+  // expected-note @+1 {{member is not differentiable because the corresponding protocol requirement is not '@differentiable'}}
   return x + 1
 }
 _ = gradient(at: 1.0, in: generic) // expected-error {{function is not differentiable}}
