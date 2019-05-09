@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-inliner"
 
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
@@ -325,6 +326,8 @@ protected:
 std::pair<SILBasicBlock::iterator, SILBasicBlock *>
 SILInliner::inlineFunction(SILFunction *calleeFunction, FullApplySite apply,
                            ArrayRef<SILValue> appliedArgs) {
+  PrettyStackTraceSILFunction calleeTraceRAII("inlining", calleeFunction);
+  PrettyStackTraceSILFunction callerTraceRAII("...into", apply.getFunction());
   assert(canInlineApplySite(apply)
          && "Asked to inline function that is unable to be inlined?!");
 
