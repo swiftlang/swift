@@ -245,7 +245,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   // Register the defaulted type variables.
-  DefaultedConstraints.append(solution.DefaultedConstraints.begin(),
+  DefaultedConstraints.insert(DefaultedConstraints.end(),
+                              solution.DefaultedConstraints.begin(),
                               solution.DefaultedConstraints.end());
 
   // Add the node types back.
@@ -338,6 +339,12 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
 }
 
 namespace {
+
+template<typename T>
+void truncate(std::vector<T> &vec, unsigned newSize) {
+  assert(newSize <= vec.size() && "Not a truncation!");
+  vec.erase(vec.begin() + newSize, vec.end());
+}
 
 /// Truncate the given small vector to the given new size.
 template<typename T>

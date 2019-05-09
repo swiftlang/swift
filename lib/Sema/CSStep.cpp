@@ -99,8 +99,8 @@ void SplitterStep::computeFollowupSteps(
   // FIXME: We're seeding typeVars with TypeVariables so that the
   // connected-components algorithm only considers those type variables within
   // our component. There are clearly better ways to do this.
-  SmallVector<TypeVariableType *, 16> typeVars(CS.TypeVariables);
-  SmallVector<unsigned, 16> components;
+  std::vector<TypeVariableType *> typeVars(CS.TypeVariables);
+  std::vector<unsigned> components;
   unsigned numComponents = CG.computeConnectedComponents(typeVars, components);
   if (numComponents < 2) {
     componentSteps.push_back(llvm::make_unique<ComponentStep>(
