@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# TODO(TF-491): reenable
+# TODO(TF-491): Re-enable.
 # RUN: echo "disabled"
 # UN: ${python} %s %target-swiftmodule-name %platform-sdk-overlay-dir \
 # UN:     %target-sil-opt -sdk %sdk -enable-sil-verify-all \
@@ -9,7 +9,8 @@
 # REQUIRES: long_test
 # REQUIRES: nonexecutable_test
 
-# XFAIL: OS=macosx
+# TODO(TF-491): Re-enable XFAIL.
+# XFAI: OS=macosx
 # https://bugs.swift.org/browse/SR-9847
 
 from __future__ import print_function
