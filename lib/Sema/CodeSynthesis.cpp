@@ -1131,8 +1131,7 @@ static void
 synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
                              ASTContext &Ctx,
                              AbstractStorageDecl *storageToUse = nullptr) {
-  auto VD = storageToUse ? cast<VarDecl>(storageToUse)
-                         : cast<VarDecl>(Set->getStorage());
+  auto VD = cast<VarDecl>(Set->getStorage());
 
   SourceLoc Loc = VD->getLoc();
 
@@ -1142,7 +1141,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
   // Okay, the getter is done, create the setter now.  Start by finding the
   // decls for 'self' and 'value'.
   auto *SelfDecl = Set->getImplicitSelfDecl();
-  VarDecl *ValueDecl = getFirstParamDecl(Set);
+  VarDecl *ValueDecl = Set->getParameters()->get(0);
 
   // The setter loads the oldValue, invokes willSet with the incoming value,
   // does a direct store, then invokes didSet with the oldValue.
@@ -1153,9 +1152,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
   // TODO: check the body of didSet to only do this load (which may call the
   // superclass getter) if didSet takes an argument.
   VarDecl *OldValue = nullptr;
-  AccessorDecl *didSetFunc =
-      storageToUse ? Set->getStorage()->getDidSetFunc() : VD->getDidSetFunc();
-  if (didSetFunc) {
+  if (VD->getDidSetFunc()) {
     Expr *OldValueExpr = createPropertyLoadOrCallSuperclassGetter(
         Set, Set->getStorage(), target, Ctx);
 
@@ -1176,11 +1173,8 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
   //              (declrefexpr(value)))
   // or:
   //   (call_expr (decl_ref_expr(willSet)), (declrefexpr(value)))
-  AccessorDecl *willSetFunc =
-      storageToUse ? Set->getStorage()->getWillSetFunc() : VD->getWillSetFunc();
-  if (willSetFunc) {
-    Expr *Callee =
-        new (Ctx) DeclRefExpr(willSetFunc, DeclNameLoc(), /*imp*/ true);
+  if (auto willSet = VD->getWillSetFunc()) {
+    Expr *Callee = new (Ctx) DeclRefExpr(willSet, DeclNameLoc(), /*imp*/ true);
     auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, DeclNameLoc(),
                                            /*imp*/true);
     if (SelfDecl) {
@@ -1203,11 +1197,10 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
   //              (decl_ref_expr(tmp)))
   // or:
   //   (call_expr (decl_ref_expr(didSet)), (decl_ref_expr(tmp)))
-  if (didSetFunc) {
+  if (auto didSet = VD->getDidSetFunc()) {
     auto *OldValueExpr = new (Ctx) DeclRefExpr(OldValue, DeclNameLoc(),
                                                /*impl*/true);
-    Expr *Callee =
-        new (Ctx) DeclRefExpr(didSetFunc, DeclNameLoc(), /*imp*/ true);
+    Expr *Callee = new (Ctx) DeclRefExpr(didSet, DeclNameLoc(), /*imp*/ true);
     if (SelfDecl) {
       auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, DeclNameLoc(),
                                             /*imp*/true);

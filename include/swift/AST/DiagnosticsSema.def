@@ -2611,8 +2611,6 @@ ERROR(lazy_requires_single_var,none,
 
 ERROR(lazy_must_be_property,none,
       "lazy is only valid for members of a struct or class", ())
-ERROR(lazy_not_observable,none,
-      "lazy properties must not have observers", ())
 ERROR(lazy_not_strong,none,
       "lazy properties cannot be %0", (ReferenceOwnership))
 
