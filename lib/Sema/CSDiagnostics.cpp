@@ -101,6 +101,35 @@ Expr *FailureDiagnostic::getArgumentExprFor(Expr *anchor) const {
   return nullptr;
 }
 
+// TODO: Replace duplications of this logic with calls to this.
+Optional<SelectedOverload> FailureDiagnostic::getChoiceFor(Expr *expr) {
+  auto &cs = getConstraintSystem();
+  ConstraintLocator *locator = nullptr;
+
+  if (auto *AE = dyn_cast<ApplyExpr>(expr)) {
+    if (auto *TE = dyn_cast<TypeExpr>(AE->getFn())) {
+      locator = cs.getConstraintLocator(AE,
+                                        {ConstraintLocator::ApplyFunction,
+                                         ConstraintLocator::ConstructorMember},
+                                        /*summaryFlags=*/0);
+    }
+    return getChoiceFor(AE->getFn());
+  } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+    locator = cs.getConstraintLocator(UDE, ConstraintLocator::Member);
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(expr)) {
+    locator = cs.getConstraintLocator(UME, ConstraintLocator::UnresolvedMember);
+  } else if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
+    locator = cs.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
+  } else {
+    locator = cs.getConstraintLocator(expr);
+  }
+
+  if (!locator)
+    return None;
+
+  return getOverloadChoiceIfAvailable(locator);
+}
+
 Type RequirementFailure::getOwnerType() const {
   return getType(getRawAnchor())
       ->getInOutObjectType()
@@ -2019,6 +2048,7 @@ bool MissingMemberFailure::diagnoseAsError() {
 bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   auto loc = getAnchor()->getLoc();
   auto &cs = getConstraintSystem();
+  auto *DC = getDC();
   auto locator = getLocator();
 
   if (loc.isInvalid()) {
@@ -2076,11 +2106,43 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         emitDiagnostic(loc, diag::super_initializer_not_in_initializer);
         return true;
       }
-      SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
-      emitDiagnostic(loc, diag::init_not_instance_member)
-          .fixItInsert(fixItRng.Start, "type(of: ")
-          .fixItInsertAfter(fixItRng.End, ")");
-      return true;
+
+      auto isCallArgument = [this](Expr *expr) {
+        auto &cs = getConstraintSystem();
+        auto argExpr = cs.getParentExpr(expr);
+        if (!argExpr)
+          return false;
+        auto possibleApplyExpr = cs.getParentExpr(expr);
+        return possibleApplyExpr && isa<ApplyExpr>(possibleApplyExpr);
+      };
+
+      auto *initCall = cs.getParentExpr(cs.getParentExpr(ctorRef));
+
+      auto isMutable = [&DC](ValueDecl *decl) {
+        if (auto *storage = dyn_cast<AbstractStorageDecl>(decl))
+          return storage->isSettable(DC) && storage->isSetterAccessibleFrom(DC);
+
+        return true;
+      };
+
+      auto selection = getChoiceFor(ctorRef->getBase());
+      if (selection) {
+        OverloadChoice choice = selection->choice;
+        if (choice.isDecl() && isMutable(choice.getDecl()) &&
+            !isCallArgument(initCall) &&
+            cs.getContextualTypePurpose() == CTP_Unused) {
+          auto fixItLoc = ctorRef->getBase()->getSourceRange().End;
+          emitDiagnostic(loc, diag::init_not_instance_member_use_assignment)
+              .fixItInsertAfter(fixItLoc, " = ");
+          return true;
+        }
+
+        SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
+        emitDiagnostic(loc, diag::init_not_instance_member)
+            .fixItInsert(fixItRng.Start, "type(of: ")
+            .fixItInsertAfter(fixItRng.End, ")");
+        return true;
+      }
     }
   }
 
