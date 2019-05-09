@@ -116,15 +116,15 @@ Optional<SelectedOverload> FailureDiagnostic::getChoiceFor(Expr *expr) {
   } else if (auto *TE = dyn_cast<TypeExpr>(expr)) {
     locator = cs.getConstraintLocator(call,
                                       {ConstraintLocator::ApplyFunction,
-                                        ConstraintLocator::ConstructorMember},
+                                       ConstraintLocator::ConstructorMember},
                                       /*summaryFlags=*/0);
   } else if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
     locator = cs.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
   } else {
     locator = cs.getConstraintLocator(expr);
   }
-  
-  if(!locator)
+
+  if (!locator)
     return None;
 
   return getOverloadChoiceIfAvailable(locator);
@@ -2071,8 +2071,8 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         emitDiagnostic(loc, diag::super_initializer_not_in_initializer);
         return true;
       }
-      
-      auto isInsideCall = [this](Expr *expr) {
+
+      auto isCallArgument = [this](Expr *expr) {
         auto &cs = getConstraintSystem();
         auto argExpr = cs.getParentExpr(expr);
         if (!argExpr)
@@ -2086,15 +2086,16 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
       auto isImmutable = [&DC](ValueDecl *decl) {
         if (auto *storage = dyn_cast<AbstractStorageDecl>(decl))
           return !storage->isSettable(DC) ||
-                !storage->isSetterAccessibleFrom(DC);
+                 !storage->isSetterAccessibleFrom(DC);
 
         return false;
       };
-      
+
       auto selection = getChoiceFor(ctorRef->getBase());
       if (selection) {
         OverloadChoice choice = selection.getValue().choice;
-        if (choice.isDecl() && !isImmutable(choice.getDecl()) && !isInsideCall(initCall) &&
+        if (choice.isDecl() && !isImmutable(choice.getDecl()) &&
+            !isCallArgument(initCall) &&
             cs.getContextualTypePurpose() == CTP_Unused) {
           auto fixItLoc = ctorRef->getBase()->getSourceRange().End;
           emitDiagnostic(loc, diag::init_not_instance_member_use_assignment)

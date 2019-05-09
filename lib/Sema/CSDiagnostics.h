@@ -154,7 +154,7 @@ protected:
   /// \returns An argument expression if given anchor is a call, member
   /// reference or subscript, nullptr otherwise.
   Expr *getArgumentExprFor(Expr *anchor) const;
-  
+
   Optional<SelectedOverload> getChoiceFor(Expr *);
 
 private:
