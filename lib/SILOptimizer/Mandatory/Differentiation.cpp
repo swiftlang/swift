@@ -114,7 +114,8 @@ static SILLinkage getAutoDiffFunctionLinkage(SILLinkage originalLinkage,
   // associated function. Make the associated function public unless
   // differentiation is not explicitly requested.
   if (originalLinkage == SILLinkage::Public ||
-      originalLinkage == SILLinkage::PublicNonABI)
+      originalLinkage == SILLinkage::PublicNonABI ||
+      originalLinkage == SILLinkage::Shared)
     return isExported ? originalLinkage : SILLinkage::Hidden;
 
   // Otherwise, the original function is defined and used only in the current
