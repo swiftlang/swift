@@ -249,8 +249,8 @@ public:
   /// one component for each of the constraints produced by
   /// \c getOrphanedConstraints().
   unsigned computeConnectedComponents(
-             SmallVectorImpl<TypeVariableType *> &typeVars,
-             SmallVectorImpl<unsigned> &components);
+             std::vector<TypeVariableType *> &typeVars,
+             std::vector<unsigned> &components);
 
   /// Retrieve the set of "orphaned" constraints, which are known to the
   /// constraint graph but have no type variables to anchor them.

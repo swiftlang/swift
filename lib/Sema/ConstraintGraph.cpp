@@ -528,7 +528,7 @@ void ConstraintGraph::gatherConstraints(
 static void connectedComponentsDFS(ConstraintGraph &cg,
                                    ConstraintGraphNode &node,
                                    unsigned component,
-                                   SmallVectorImpl<unsigned> &components) {
+                                   std::vector<unsigned> &components) {
   // Local function that recurses on the given set of type variables.
   auto visitAdjacencies = [&](ArrayRef<TypeVariableType *> typeVars) {
     for (auto adj : typeVars) {
@@ -562,8 +562,8 @@ static void connectedComponentsDFS(ConstraintGraph &cg,
 }
 
 unsigned ConstraintGraph::computeConnectedComponents(
-           SmallVectorImpl<TypeVariableType *> &typeVars,
-           SmallVectorImpl<unsigned> &components) {
+           std::vector<TypeVariableType *> &typeVars,
+           std::vector<unsigned> &components) {
   // Track those type variables that the caller cares about.
   llvm::SmallPtrSet<TypeVariableType *, 4> typeVarSubset(typeVars.begin(),
                                                          typeVars.end());
@@ -871,9 +871,9 @@ void ConstraintGraph::dump() {
 }
 
 void ConstraintGraph::printConnectedComponents(llvm::raw_ostream &out) {
-  SmallVector<TypeVariableType *, 16> typeVars;
-  typeVars.append(TypeVariables.begin(), TypeVariables.end());
-  SmallVector<unsigned, 16> components;
+  std::vector<TypeVariableType *> typeVars;
+  typeVars.insert(typeVars.end(), TypeVariables.begin(), TypeVariables.end());
+  std::vector<unsigned> components;
   unsigned numComponents = computeConnectedComponents(typeVars, components);
   for (unsigned component = 0; component != numComponents; ++component) {
     out.indent(2);
