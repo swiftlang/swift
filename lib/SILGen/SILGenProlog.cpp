@@ -127,7 +127,7 @@ public:
 
     // This can happen if the value is resilient in the calling convention
     // but not resilient locally.
-    if (argType.isLoadable(SGF.SGM.M) && argType.isAddress()) {
+    if (argType.isLoadable(SGF.F) && argType.isAddress()) {
       if (mv.isPlusOne(SGF))
         mv = SGF.B.createLoadTake(loc, mv);
       else
@@ -354,8 +354,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
       closure.getGenericEnvironment(), interfaceType);
   };
 
-  // FIXME: Expansion
-  auto expansion = ResilienceExpansion::Minimal;
+  auto expansion = SGF.F.getResilienceExpansion();
   switch (SGF.SGM.Types.getDeclCaptureKind(capture, expansion)) {
   case CaptureKind::None:
     break;
@@ -455,7 +454,24 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
       SILValue val = F.begin()->createFunctionArgument(ty);
       (void) val;
 
-      return;
+      continue;
+    }
+
+    if (capture.isOpaqueValue()) {
+      OpaqueValueExpr *opaqueValue = capture.getOpaqueValue();
+      Type type = opaqueValue->getType()->mapTypeOutOfContext();
+      type = GenericEnvironment::mapTypeIntoContext(
+          TheClosure.getGenericEnvironment(), type);
+      auto &lowering = getTypeLowering(type);
+      SILType ty = lowering.getLoweredType();
+      SILValue val = F.begin()->createFunctionArgument(ty);
+      OpaqueValues[opaqueValue] = ManagedValue::forUnmanaged(val);
+
+      // Opaque values are always passed 'owned', so add a clean up if needed.
+      if (!lowering.isTrivial())
+        enterDestroyCleanup(val);
+
+      continue;
     }
 
     emitCaptureArguments(*this, TheClosure, capture, ++ArgNo);

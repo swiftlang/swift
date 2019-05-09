@@ -983,10 +983,6 @@ private:
   /// If not, we can fast-path module checks.
   bool HasImplementationOnlyImports = false;
 
-  /// The list of protocol conformances that were "used" within this
-  /// source file.
-  llvm::SetVector<NormalProtocolConformance *> UsedConformances;
-
   /// The scope map that describes this source file.
   ASTScope *Scope = nullptr;
 
@@ -1145,17 +1141,6 @@ public:
   Identifier getPrivateDiscriminator() const { return PrivateDiscriminator; }
 
   virtual bool walk(ASTWalker &walker) override;
-
-  /// Note that the given conformance was used by this source file.
-  void addUsedConformance(NormalProtocolConformance *conformance) {
-    UsedConformances.insert(conformance);
-  }
-
-  /// Retrieve the set of conformances that were used in this source
-  /// file.
-  ArrayRef<NormalProtocolConformance *> getUsedConformances() const {
-    return UsedConformances.getArrayRef();
-  }
 
   /// @{
 

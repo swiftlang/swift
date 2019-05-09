@@ -2646,7 +2646,10 @@ public:
     if (auto *overridden = ctor->getOverriddenDecl()) {
       if (!attributeChainContains<RequiredAttr>(DAttrs) ||
           !overridden->isRequired()) {
-        AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
+        // FIXME: why is a convenience init considered overridden when the
+        // overriding init can't be marked overriding in source?
+        if (!overridden->isConvenienceInit())
+          AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
       }
     }
 
@@ -5408,10 +5411,10 @@ ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
   }
 }
 
-TypeLoc
+Type
 ModuleFile::loadAssociatedTypeDefault(const swift::AssociatedTypeDecl *ATD,
                                       uint64_t contextData) {
-  return TypeLoc::withoutLoc(getType(contextData));
+  return getType(contextData);
 }
 
 void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,

@@ -1243,9 +1243,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
     
-    Identifier name = Context.getIdentifier(Tok.getText());
-    
-    consumeToken(tok::identifier);
+    Identifier name;
+    consumeIdentifier(&name);
     
     auto range = SourceRange(Loc, Tok.getRange().getStart());
 
@@ -1712,6 +1711,18 @@ bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
   return false;
 }
 
+/// Check whether the attributes have already established an initializer
+/// context within the given set of attributes.
+static PatternBindingInitializer *findAttributeInitContent(
+    DeclAttributes &Attributes) {
+  for (auto custom : Attributes.getAttributes<CustomAttr>()) {
+    if (auto initContext = custom->getInitContext())
+      return initContext;
+  }
+
+  return nullptr;
+}
+
 /// \verbatim
 ///   attribute:
 ///     '_silgen_name' '(' identifier ')'
@@ -1854,7 +1865,10 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
       // DeclContexts for any closures that may live inside of initializers.
       Optional<ParseFunctionBody> initParser;
       if (!CurDeclContext->isLocalContext()) {
-        initContext = new (Context) PatternBindingInitializer(CurDeclContext);
+        initContext = findAttributeInitContent(Attributes);
+        if (!initContext)
+          initContext = new (Context) PatternBindingInitializer(CurDeclContext);
+
         initParser.emplace(*this, initContext);
       }
 
@@ -4251,8 +4265,7 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
         EndLoc = StartLoc;
     } else {
       // We have a name.
-      Name = P.Context.getIdentifier(P.Tok.getText());
-      NameLoc = P.consumeToken();
+      NameLoc = P.consumeIdentifier(&Name);
 
       auto DiagID =
          Kind == AccessorKind::Set ? diag::expected_rparen_set_name :
@@ -4502,20 +4515,30 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
 
       if (Tok.is(tok::code_complete)) {
         if (CodeCompletion) {
+          CodeCompletionExpr *CCE = nullptr;
           if (IsFirstAccessor && !parsingLimitedSyntax) {
             // If CC token is the first token after '{', it might be implicit
             // getter. Set up dummy accessor as the decl context to populate
             // 'self' decl.
+
+            // FIXME: if there is already code inside the body, we should fall
+            // through to parseImplicitGetter and handle the completion there so
+            // that we can differentiate a single-expression body from the first
+            // expression in a multi-statement body.
             auto getter = createAccessorFunc(
                 accessors.LBLoc, /*ValueNamePattern*/ nullptr, GenericParams,
                 Indices, ElementTy, StaticLoc, Flags, AccessorKind::Get,
                 storage, this, /*AccessorKeywordLoc*/ SourceLoc());
+            CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
+            getter->setBody(BraceStmt::create(Context, Tok.getLoc(),
+                                              ASTNode(CCE), Tok.getLoc(),
+                                              /*implicit*/ true));
             accessors.add(getter);
             CodeCompletion->setParsedDecl(getter);
           } else {
             CodeCompletion->setParsedDecl(storage);
           }
-          CodeCompletion->completeAccessorBeginning();
+          CodeCompletion->completeAccessorBeginning(CCE);
         }
         consumeToken(tok::code_complete);
         accessorHasCodeCompletion = true;
@@ -5244,10 +5267,14 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       }
     });
 
+    // Check whether we have already established an initializer context.
+    PatternBindingInitializer *initContext =
+      findAttributeInitContent(Attributes);
+
     // Remember this pattern/init pair for our ultimate PatternBindingDecl. The
     // Initializer will be added later when/if it is parsed.
     PBDEntries.push_back({pattern, /*EqualLoc*/ SourceLoc(), /*Init*/ nullptr,
-                          /*InitContext*/ nullptr});
+                          initContext});
 
     Expr *PatternInit = nullptr;
     
@@ -5257,7 +5284,6 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       // If we're not in a local context, we'll need a context to parse initializers
       // into (should we have one).  This happens for properties and global
       // variables in libraries.
-      PatternBindingInitializer *initContext = nullptr;
 
       // Record the variables that we're trying to initialize.  This allows us
       // to cleanly reject "var x = x" when "x" isn't bound to an enclosing
@@ -5322,7 +5348,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
 
       // If the attributes include @lazy, flag that on each initializer.
       if (Attributes.hasAttribute<LazyAttr>()) {
-        PBDEntries.back().setInitializerLazy();
+        PBDEntries.back().setInitializerSubsumed();
       }
 
       if (init.hasCodeCompletion()) {
@@ -5655,8 +5681,60 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
     Context.Stats->getFrontendCounters().NumFunctionsParsed++;
 
   ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
-  if (!Body.isNull())
-    AFD->setBody(Body.get());
+  if (!Body.isNull()) {
+    BraceStmt * BS = Body.get();
+    AFD->setBody(BS);
+
+    // If the body consists of a single expression, turn it into a return
+    // statement.
+    //
+    // But don't do this transformation during code completion, as the source
+    // may be incomplete and the type mismatch in return statement will just
+    // confuse the type checker.
+    if (!Body.hasCodeCompletion() && BS->getNumElements() == 1) {
+      auto Element = BS->getElement(0);
+      if (auto *stmt = Element.dyn_cast<Stmt *>()) {
+        auto kind = AFD->getKind();
+        if (kind == DeclKind::Var || kind == DeclKind::Subscript ||
+            kind == DeclKind::Func ) {
+          if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
+            if (!returnStmt->hasResult()) {
+              auto returnExpr = TupleExpr::createEmpty(Context,
+                                                       SourceLoc(),
+                                                       SourceLoc(),
+                                                       /*implicit*/true);
+              returnStmt->setResult(returnExpr);
+              AFD->setHasSingleExpressionBody();
+              AFD->setSingleExpressionBody(returnExpr);
+            }
+          }
+        }
+      } else if (auto *E = Element.dyn_cast<Expr *>()) {
+        if (auto SE = dyn_cast<SequenceExpr>(E->getSemanticsProvidingExpr())) {
+          if (SE->getNumElements() > 1 && isa<AssignExpr>(SE->getElement(1))) {
+            // This is an assignment.  We don't want to implicitly return 
+            // it.
+            return;
+          }
+        }
+        if (auto F = dyn_cast<FuncDecl>(AFD)) {
+          auto RS = new (Context) ReturnStmt(SourceLoc(), E);
+          BS->setElement(0, RS); 
+          AFD->setHasSingleExpressionBody();
+          AFD->setSingleExpressionBody(E);
+        } else if (auto *F = dyn_cast<ConstructorDecl>(AFD)) {
+          if (F->getFailability() != OTK_None && isa<NilLiteralExpr>(E)) {
+            // If it's a nil literal, just insert return.  This is the only 
+            // legal thing to return.
+            auto RS = new (Context) ReturnStmt(E->getStartLoc(), E);
+            BS->setElement(0, RS); 
+            AFD->setHasSingleExpressionBody();
+            AFD->setSingleExpressionBody(E);
+          }
+        }
+      }
+    }
+  }
 }
 
 bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
@@ -6734,15 +6812,17 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
         SyntaxParsingContext GroupCtxt(SyntaxContext,
                                        SyntaxKind::IdentifierList);
 
-        identifiers.push_back(Context.getIdentifier(Tok.getText()));
-        identifierLocs.push_back(consumeToken(tok::identifier));
+        Identifier name;
+        identifierLocs.push_back(consumeIdentifier(&name));
+        identifiers.push_back(name);
 
         while (Tok.is(tok::comma)) {
           auto comma = consumeToken();
 
           if (Tok.is(tok::identifier)) {
-            identifiers.push_back(Context.getIdentifier(Tok.getText()));
-            identifierLocs.push_back(consumeToken(tok::identifier));
+            Identifier name;
+            identifierLocs.push_back(consumeIdentifier(&name));
+            identifiers.push_back(name);
           } else {
             if (Tok.isNot(tok::eof)) {
               auto otherTokLoc = consumeToken();
@@ -7034,8 +7114,9 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
           diagnose(Tok, diag::expected_precedencegroup_relation, attrName);
           return abortBody();
         }
-        auto name = Context.getIdentifier(Tok.getText());
-        relations.push_back({consumeToken(), name, nullptr});
+        Identifier name;
+        SourceLoc nameLoc = consumeIdentifier(&name);
+        relations.push_back({nameLoc, name, nullptr});
 
         if (skipUnspacedCodeCompleteToken())
           return abortBody(/*hasCodeCompletion*/true);

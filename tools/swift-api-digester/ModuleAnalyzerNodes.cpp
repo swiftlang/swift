@@ -1158,6 +1158,16 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       IsImplicit(D->isImplicit()),
       IsDeprecated(D->getAttrs().getDeprecated(D->getASTContext())),
       IsABIPlaceholder(isABIPlaceholderRecursive(D)) {
+
+  // Force some attributes that are lazily computed.
+  // FIXME: we should use these AST predicates directly instead of looking at
+  // the attributes rdar://50217247.
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    (void) VD->isObjC();
+    (void) VD->isFinal();
+    (void) VD->isDynamic();
+  }
+
   // Capture all attributes.
   auto AllAttrs = D->getAttrs();
   std::transform(AllAttrs.begin(), AllAttrs.end(), std::back_inserter(DeclAttrs),

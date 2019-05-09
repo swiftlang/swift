@@ -364,6 +364,10 @@ protected:
     NumElements : 32
   );
 
+  SWIFT_INLINE_BITFIELD(OpaqueValueExpr, Expr, 1,
+    IsPlaceholder : 1
+  );
+
   } Bits;
 
 private:
@@ -3778,8 +3782,15 @@ class OpaqueValueExpr : public Expr {
   SourceLoc Loc;
 
 public:
-  explicit OpaqueValueExpr(SourceLoc Loc, Type Ty)
-    : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Loc(Loc) { }
+  explicit OpaqueValueExpr(SourceLoc Loc, Type Ty, bool isPlaceholder = false)
+    : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Loc(Loc) {
+    Bits.OpaqueValueExpr.IsPlaceholder = isPlaceholder;
+  }
+
+  /// Whether this opaque value expression represents a placeholder that
+  /// is injected before type checking to act as a placeholder for some
+  /// value to be specified later.
+  bool isPlaceholder() const { return Bits.OpaqueValueExpr.IsPlaceholder; }
 
   SourceRange getSourceRange() const { return Loc; }
   

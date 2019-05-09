@@ -1309,6 +1309,14 @@ public:
     *this << getIDAndType(AI->getDest());
   }
 
+  void visitAssignByDelegateInst(AssignByDelegateInst *AI) {
+    *this << getIDAndType(AI->getSrc()) << " to ";
+    printAssignOwnershipQualifier(AI->getOwnershipQualifier());
+    *this << getIDAndType(AI->getDest())
+          << ", init " << getIDAndType(AI->getInitializer())
+          << ", set " << getIDAndType(AI->getSetter());
+  }
+
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {
     switch (MU->getKind()) {
     case MarkUninitializedInst::Var: *this << "[var] "; break;

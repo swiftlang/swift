@@ -334,10 +334,8 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
         TC.checkFunctionErrorHandling(AFD);
         continue;
       }
-      if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-        (void)nominal->getAllConformances();
+      if (isa<NominalTypeDecl>(decl))
         continue;
-      }
       if (isa<VarDecl>(decl))
         continue;
       llvm_unreachable("Unhandled external definition kind");

@@ -827,8 +827,8 @@ public:
   loadAllConformances(const Decl *D, uint64_t contextData,
                     SmallVectorImpl<ProtocolConformance*> &Conforms) override;
 
-  virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
-                                            uint64_t contextData) override;
+  virtual Type loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
+                                         uint64_t contextData) override;
 
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;

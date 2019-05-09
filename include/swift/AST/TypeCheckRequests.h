@@ -16,10 +16,12 @@
 #ifndef SWIFT_TYPE_CHECK_REQUESTS_H
 #define SWIFT_TYPE_CHECK_REQUESTS_H
 
+#include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/TypeResolutionStage.h"
+#include "swift/Basic/AnyValue.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
@@ -28,6 +30,7 @@
 namespace swift {
 
 class GenericParamList;
+struct PropertyDelegateBackingPropertyInfo;
 class RequirementRepr;
 class SpecializeAttr;
 struct TypeLoc;
@@ -414,6 +417,146 @@ private:
   SourceFile *getSourceFile() const;
   Type &getCache() const;
 };
+
+/// Retrieve information about a property delegate type.
+class PropertyDelegateTypeInfoRequest
+  : public SimpleRequest<PropertyDelegateTypeInfoRequest,
+                         CacheKind::Cached,
+                         PropertyDelegateTypeInfo,
+                         NominalTypeDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<PropertyDelegateTypeInfo>
+      evaluate(Evaluator &eval, NominalTypeDecl *nominal) const;
+
+public:
+  // Caching
+  bool isCached() const;
+
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+/// Request the nominal type declaration to which the given custom attribute
+/// refers.
+class AttachedPropertyDelegateRequest :
+    public SimpleRequest<AttachedPropertyDelegateRequest,
+                         CacheKind::Cached,
+                         CustomAttr *,
+                         VarDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<CustomAttr *>
+  evaluate(Evaluator &evaluator, VarDecl *) const;
+
+public:
+  // Caching
+  bool isCached() const;
+
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+/// Request the raw (possibly unbound generic) type of the property delegate
+/// that is attached to the given variable.
+class AttachedPropertyDelegateTypeRequest :
+    public SimpleRequest<AttachedPropertyDelegateTypeRequest,
+                         CacheKind::Cached,
+                         Type,
+                         VarDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type>
+  evaluate(Evaluator &evaluator, VarDecl *var) const;
+
+public:
+  // Caching
+  bool isCached() const;
+
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+/// Request the nominal type declaration to which the given custom attribute
+/// refers.
+class PropertyDelegateBackingPropertyTypeRequest :
+    public SimpleRequest<PropertyDelegateBackingPropertyTypeRequest,
+                         CacheKind::Cached,
+                         Type,
+                         VarDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type>
+  evaluate(Evaluator &evaluator, VarDecl *var) const;
+
+public:
+  // Caching
+  bool isCached() const;
+
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+/// Request information about the backing property for properties that have
+/// attached property delegates.
+class PropertyDelegateBackingPropertyInfoRequest :
+    public SimpleRequest<PropertyDelegateBackingPropertyInfoRequest,
+                         CacheKind::Cached,
+                         PropertyDelegateBackingPropertyInfo,
+                         VarDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<PropertyDelegateBackingPropertyInfo>
+  evaluate(Evaluator &evaluator, VarDecl *var) const;
+
+public:
+  // Caching
+  bool isCached() const;
+
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+// Allow AnyValue to compare two Type values, even though Type doesn't
+// support ==.
+template<>
+inline bool AnyValue::Holder<Type>::equals(const HolderBase &other) const {
+  assert(typeID == other.typeID && "Caller should match type IDs");
+  return value.getPointer() ==
+      static_cast<const Holder<Type> &>(other).value.getPointer();
+}
+
+void simple_display(llvm::raw_ostream &out, const Type &type);
 
 /// The zone number for the type checker.
 #define SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE 10

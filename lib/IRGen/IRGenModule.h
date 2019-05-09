@@ -245,6 +245,7 @@ private:
   struct LazyOpaqueInfo {
     bool IsLazy = false;
     bool IsDescriptorUsed = false;
+    bool IsDescriptorEmitted = false;
   };
   /// The set of opaque types enqueued for lazy emission.
   llvm::DenseMap<OpaqueTypeDecl*, LazyOpaqueInfo> LazyOpaqueTypes;
@@ -579,6 +580,7 @@ public:
   };
   llvm::StructType *OffsetPairTy;      /// { iSize, iSize }
   llvm::StructType *FullTypeLayoutTy;  /// %swift.full_type_layout = { ... }
+  llvm::StructType *TypeLayoutTy;  /// %swift.type_layout = { ... }
   llvm::PointerType *TupleTypeMetadataPtrTy; /// %swift.tuple_type*
   llvm::StructType *FullHeapMetadataStructTy; /// %swift.full_heapmetadata = type { ... }
   llvm::PointerType *FullHeapMetadataPtrTy;/// %swift.full_heapmetadata*

@@ -1156,7 +1156,8 @@ ConstraintSystem::solveImpl(Expr *&expr,
   if (convertType) {
     auto constraintKind = ConstraintKind::Conversion;
     
-    if (getContextualTypePurpose() == CTP_ReturnStmt
+    if ((getContextualTypePurpose() == CTP_ReturnStmt ||
+         getContextualTypePurpose() == CTP_ReturnSingleExpr)
         && Options.contains(ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType))
       constraintKind = ConstraintKind::OpaqueUnderlyingType;
     
@@ -1169,7 +1170,9 @@ ConstraintSystem::solveImpl(Expr *&expr,
       constraintKind = ConstraintKind::Bind;
 
     auto *convertTypeLocator = getConstraintLocator(
-        getConstraintLocator(expr), ConstraintLocator::ContextualType);
+        expr, getContextualTypePurpose() == CTP_ReturnSingleExpr
+                  ? ConstraintLocator::SingleExprFuncResultType
+                  : ConstraintLocator::ContextualType);
 
     if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
       convertType = convertType.transform([&](Type type) -> Type {

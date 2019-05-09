@@ -4282,7 +4282,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
         source->kind == RequirementSource::RequirementSignatureSelf &&
         !assocTypeDecl->getAttrs().hasAttribute<NonOverrideAttr>() &&
         !assocTypeDecl->getAttrs().hasAttribute<OverrideAttr>() &&
-        assocTypeDecl->getDefaultDefinitionLoc().isNull() &&
+        !assocTypeDecl->hasDefaultDefinitionType() &&
         (!assocTypeDecl->getInherited().empty() ||
          assocTypeDecl->getTrailingWhereClause() ||
          getASTContext().LangOpts.WarnImplicitOverrides);

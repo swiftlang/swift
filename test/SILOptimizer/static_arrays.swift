@@ -5,6 +5,7 @@
 // RUN: %target-build-swift -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 // REQUIRES: executable_test,swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: CPU=arm64 || CPU=x86_64
 
 // Check if the optimizer is able to convert array literals to statically initialized arrays.
 

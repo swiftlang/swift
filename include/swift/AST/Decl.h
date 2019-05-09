@@ -78,6 +78,8 @@ namespace swift {
   class ParameterTypeFlags;
   class Pattern;
   struct PrintOptions;
+  struct PropertyDelegateBackingPropertyInfo;
+  struct PropertyDelegateTypeInfo;
   class ProtocolDecl;
   class ProtocolType;
   struct RawComment;
@@ -232,11 +234,14 @@ struct OverloadSignature {
   /// Whether this signature is of a member defined in an extension of a generic
   /// type.
   unsigned InExtensionOfGenericType : 1;
+  
+  /// Whether this declaration has an opaque return type.
+  unsigned HasOpaqueReturnType : 1;
 
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
         IsVariable(false), IsFunction(false), InProtocolExtension(false),
-        InExtensionOfGenericType(false) {}
+        InExtensionOfGenericType(false), HasOpaqueReturnType(false) {}
 };
 
 /// Determine whether two overload signatures conflict.
@@ -364,7 +369,7 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 4+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 4+1+1+1+1+1,
     /// The specifier associated with this variable or parameter.  This
     /// determines the storage semantics of the value e.g. mutability.
     Specifier : 4,
@@ -383,7 +388,10 @@ protected:
 
     /// Whether this is a property defined in the debugger's REPL.
     /// FIXME: Remove this once LLDB has proper support for resilience.
-    IsREPLVar : 1
+    IsREPLVar : 1,
+
+    /// Whether this is the backing storage for a property delegate.
+    IsPropertyDelegateBackingProperty : 1
   );
 
   SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1 + NumDefaultArgumentKindBits,
@@ -401,8 +409,7 @@ protected:
   SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
     StaticSpelling : 2
   );
-
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
 
@@ -426,7 +433,10 @@ protected:
 
     /// Whether this member was synthesized as part of a derived
     /// protocol conformance.
-    Synthesized : 1
+    Synthesized : 1,
+
+    /// Whether this member's body consists of a single expression.
+    HasSingleExpressionBody : 1
   );
 
   SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+2+1+1+2,
@@ -1886,7 +1896,10 @@ class PatternBindingEntry {
   enum class Flags {
     Checked = 1 << 0,
     Removed = 1 << 1,
-    Lazy    = 1 << 2
+    /// Whether the contents of this initializer were subsumed by
+    /// some other initialization, e.g., a lazy property's initializer
+    /// gets subsumed by the getter body.
+    Subsumed    = 1 << 2
   };
   llvm::PointerIntPair<Pattern *, 3, OptionSet<Flags>> PatternAndFlags;
 
@@ -1921,14 +1934,20 @@ public:
 
   Pattern *getPattern() const { return PatternAndFlags.getPointer(); }
   void setPattern(Pattern *P) { PatternAndFlags.setPointer(P); }
+
+  /// Whether the given pattern binding entry is initialized.
+  bool isInitialized() const;
+
   Expr *getInit() const {
     if (PatternAndFlags.getInt().contains(Flags::Removed) ||
         InitContextAndIsText.getInt())
       return nullptr;
     return InitExpr.Node;
   }
-  Expr *getNonLazyInit() const {
-    return isInitializerLazy() ? nullptr : getInit();
+  /// Retrieve the initializer if it should be executed to initialize this
+  /// particular pattern binding.
+  Expr *getExecutableInit() const {
+    return isInitializerSubsumed() ? nullptr : getInit();
   }
   SourceRange getOrigInitRange() const;
   void setInit(Expr *E);
@@ -1972,11 +1991,11 @@ public:
     PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Checked);
   }
 
-  bool isInitializerLazy() const {
-    return PatternAndFlags.getInt().contains(Flags::Lazy);
+  bool isInitializerSubsumed() const {
+    return PatternAndFlags.getInt().contains(Flags::Subsumed);
   }
-  void setInitializerLazy() {
-    PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Lazy);
+  void setInitializerSubsumed() {
+    PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Subsumed);
   }
 
   // Return the first variable initialized by this pattern.
@@ -2068,11 +2087,16 @@ public:
     getMutablePatternList()[i].setInitStringRepresentation(str);
   }
 
+  /// Whether the given pattern entry is initialized.
+  bool isInitialized(unsigned i) const {
+    return getPatternList()[i].isInitialized();
+  }
+
   Expr *getInit(unsigned i) const {
     return getPatternList()[i].getInit();
   }
-  Expr *getNonLazyInit(unsigned i) const {
-    return getPatternList()[i].getNonLazyInit();
+  Expr *getExecutableInit(unsigned i) const {
+    return getPatternList()[i].getExecutableInit();
   }
   
   SourceRange getOrigInitRange(unsigned i) const {
@@ -2113,12 +2137,12 @@ public:
     getMutablePatternList()[i].setInitializerChecked();
   }
 
-  bool isInitializerLazy(unsigned i) const {
-    return getPatternList()[i].isInitializerLazy();
+  bool isInitializerSubsumed(unsigned i) const {
+    return getPatternList()[i].isInitializerSubsumed();
   }
 
-  void setInitializerLazy(unsigned i) {
-    getMutablePatternList()[i].setInitializerLazy();
+  void setInitializerSubsumed(unsigned i) {
+    getMutablePatternList()[i].setInitializerSubsumed();
   }
   
   /// Does this binding declare something that requires storage?
@@ -2126,11 +2150,7 @@ public:
 
   /// Determines whether this binding either has an initializer expression, or is
   /// default initialized, without performing any type checking on it.
-  ///
-  /// This is only valid to check for bindings which have storage.
   bool isDefaultInitializable() const {
-    assert(hasStorage());
-
     for (unsigned i = 0, e = getNumPatternEntries(); i < e; ++i)
       if (!isDefaultInitializable(i))
         return false;
@@ -3038,14 +3058,22 @@ public:
     return cast<ProtocolDecl>(getDeclContext());
   }
 
-  /// Retrieve the default definition type.
-  Type getDefaultDefinitionType() const {
-    return getDefaultDefinitionLoc().getType();
+  /// Check if we have a default definition type.
+  bool hasDefaultDefinitionType() const {
+    // If we have a TypeRepr, return true immediately without kicking off
+    // a request.
+    return !DefaultDefinition.isNull() || getDefaultDefinitionType();
   }
 
-  TypeLoc &getDefaultDefinitionLoc();
+  /// Retrieve the default definition type.
+  Type getDefaultDefinitionType() const;
+
+  TypeLoc &getDefaultDefinitionLoc() {
+    return DefaultDefinition;
+  }
+
   const TypeLoc &getDefaultDefinitionLoc() const {
-    return const_cast<AssociatedTypeDecl *>(this)->getDefaultDefinitionLoc();
+    return DefaultDefinition;
   }
 
   /// Retrieve the trailing where clause for this associated type, if any.
@@ -3056,7 +3084,7 @@ public:
     TrailingWhere = trailingWhereClause;
   }
 
-  /// Set the interface type of this associated type declaration to a dependen
+  /// Set the interface type of this associated type declaration to a dependent
   /// member type of 'Self'.
   void computeType();
 
@@ -3357,6 +3385,9 @@ public:
 
   /// Is this a key path type?
   Optional<KeyPathTypeKind> getKeyPathTypeKind() const;
+
+  /// Retrieve information about this type as a property delegate.
+  PropertyDelegateTypeInfo getPropertyDelegateTypeInfo() const;
 
 private:
   /// Predicate used to filter StoredPropertyRange.
@@ -4704,6 +4735,17 @@ public:
   }
 };
 
+/// Describes which synthesized property for a property with an attached
+/// delegate is being referenced.
+enum class PropertyDelegateSynthesizedPropertyKind {
+  /// The backing storage property, which is a stored property of the
+  /// delegate type.
+  Backing,
+  /// A storage delegate (e.g., `$foo`), which is a wrapper over the
+  /// delegate instance's `delegateValue` property.
+  StorageDelegate,
+};
+
 /// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public AbstractStorageDecl {
 public:
@@ -4734,6 +4776,7 @@ protected:
     Bits.VarDecl.IsDebuggerVar = false;
     Bits.VarDecl.IsREPLVar = false;
     Bits.VarDecl.HasNonPatternBindingInit = false;
+    Bits.VarDecl.IsPropertyDelegateBackingProperty = false;
   }
 
   /// This is the type specified, including location information.
@@ -4900,12 +4943,19 @@ public:
     return nullptr;
   }
 
+  /// Whether there exists an initializer for this \c VarDecl.
+  bool isParentInitialized() const {
+    if (auto *PBD = getParentPatternBinding())
+      return PBD->getPatternEntryForVarDecl(this).isInitialized();
+    return false;
+  }
+
   // Return whether this VarDecl has an initial value, either by checking
   // if it has an initializer in its parent pattern binding or if it has
   // the @_hasInitialValue attribute.
   bool hasInitialValue() const {
     return getAttrs().hasAttribute<HasInitialValueAttr>() ||
-           getParentInitializer();
+           isParentInitialized();
   }
 
   VarDecl *getOverriddenDecl() const {
@@ -5020,6 +5070,65 @@ public:
   void setREPLVar(bool IsREPLVar) {
     Bits.VarDecl.IsREPLVar = IsREPLVar;
   }
+
+  /// Retrieve the custom attribute that attaches a property delegate to this
+  /// property.
+  CustomAttr *getAttachedPropertyDelegate() const;
+
+  /// Retrieve the type of the attached property delegate as a contextual
+  /// type.
+  ///
+  /// \returns a NULL type for properties without attached delegates,
+  /// an error type when the property delegate type itself is erroneous,
+  /// or the delegate type itself, which may involve unbound generic
+  /// types.
+  Type getAttachedPropertyDelegateType() const;
+
+  /// Retrieve information about the attached property delegate type.
+  PropertyDelegateTypeInfo getAttachedPropertyDelegateTypeInfo() const;
+
+  /// Retrieve the fully resolved attached property delegate type.
+  ///
+  /// This type will be the fully-resolved form of
+  /// \c getAttachedPropertyDelegateType(), which will not contain any
+  /// unbound generic types. It will be the type of the backing property.
+  Type getPropertyDelegateBackingPropertyType() const;
+
+  /// Retrieve information about the backing properties of the attached
+  /// property delegate.
+  PropertyDelegateBackingPropertyInfo
+      getPropertyDelegateBackingPropertyInfo() const;
+
+  /// Retrieve the backing storage property for a property that has an
+  /// attached property delegate.
+  ///
+  /// The backing storage property will be a stored property of the
+  /// delegate's type. This will be equivalent to
+  /// \c getAttachedPropertyDelegateType() when it is fully-specified;
+  /// if \c getAttachedPropertyDelegateType() involves an unbound
+  /// generic type, the backing storage property will be the appropriate
+  /// bound generic version.
+  VarDecl *getPropertyDelegateBackingProperty() const;
+
+  /// Whether this is a property with a property delegate that was initialized
+  /// via a value of the original type, e.g.,
+  ///
+  /// \code
+  /// @Lazy var i = 17
+  /// \end
+  bool isPropertyDelegateInitializedWithInitialValue() const;
+
+  /// If this property is the backing storage for a property with an attached
+  /// property delegate, return the original property.
+  ///
+  /// \param kind If not \c None, only returns the original property when
+  /// \c this property is the specified synthesized property.
+  VarDecl *getOriginalDelegatedProperty(
+      Optional<PropertyDelegateSynthesizedPropertyKind> kind = None) const;
+
+  /// Set the property that delegates to this property as it's backing
+  /// property.
+  void setOriginalDelegatedProperty(VarDecl *originalProperty);
 
   /// Return the Objective-C runtime name for this property.
   Identifier getObjCPropertyName() const;
@@ -5433,6 +5542,7 @@ protected:
     Bits.AbstractFunctionDecl.NeedsNewVTableEntry = false;
     Bits.AbstractFunctionDecl.HasComputedNeedsNewVTableEntry = false;
     Bits.AbstractFunctionDecl.Synthesized = false;
+    Bits.AbstractFunctionDecl.HasSingleExpressionBody = false;
   }
 
   void setBodyKind(BodyKind K) {
@@ -5440,6 +5550,17 @@ protected:
   }
 
 public:
+  void setHasSingleExpressionBody(bool Has = true) { 
+    Bits.AbstractFunctionDecl.HasSingleExpressionBody = Has;
+  }
+
+  bool hasSingleExpressionBody() const {
+    return Bits.AbstractFunctionDecl.HasSingleExpressionBody;
+  }
+
+  Expr *getSingleExpressionBody() const;
+  void setSingleExpressionBody(Expr *NewBody);
+
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
     assert(!getFullName().isSpecial() && "Cannot get string for special names");

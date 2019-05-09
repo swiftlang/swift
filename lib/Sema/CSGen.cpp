@@ -2100,9 +2100,12 @@ namespace {
         // will avoid exponential typecheck behavior in the case of
         // tuples, nested arrays, and dictionary literals.
         //
+        // FIXME: This should be handled in the solver, not here.
+        //
         // Otherwise, create a new type variable.
         auto ty = Type();
-        if (!var->hasNonPatternBindingInit()) {
+        if (!var->hasNonPatternBindingInit() &&
+            !var->getAttachedPropertyDelegate()) {
           if (auto boundExpr = locator.trySimplifyToExpr()) {
             if (!boundExpr->isSemanticallyInOutExpr())
               ty = CS.getType(boundExpr)->getRValueType();
@@ -2487,7 +2490,8 @@ namespace {
     }
 
     Type visitOpaqueValueExpr(OpaqueValueExpr *expr) {
-      llvm_unreachable("Already type checked");
+      assert(expr->isPlaceholder() && "Already type checked");
+      return expr->getType();
     }
 
     Type visitDefaultArgumentExpr(DefaultArgumentExpr *expr) {
@@ -3084,7 +3088,9 @@ namespace {
       } else {
         // The type of key path depends on the overloads chosen for the key
         // path components.
-        kpTy = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
+        auto typeLoc =
+            CS.getConstraintLocator(locator, ConstraintLocator::KeyPathType);
+        kpTy = CS.createTypeVariable(typeLoc, TVO_CanBindToNoEscape);
         CS.addKeyPathConstraint(kpTy, root, rvalueBase, locator);
       }
       return kpTy;
@@ -3285,7 +3291,7 @@ namespace {
             expr = value->second;
             continue;
           } else {
-            assert(eraseOpenExistentialsOnly &&
+            assert((eraseOpenExistentialsOnly || OVE->isPlaceholder()) &&
                    "Didn't see this OVE in a containing OpenExistentialExpr?");
             // NOTE: In 'eraseOpenExistentialsOnly' mode, ASTWalker may walk
             // into other kind of expressions holding OVE.

@@ -6,6 +6,7 @@ import AppKit
 import AVFoundation
 
 import Newtype
+import NewtypeSystem
 import objc_ext
 import TestProtocols
 import TypeAndValue
@@ -682,4 +683,14 @@ func testErrorNewtype() {
   // works.
   testErrorDictionary(3) // expected-error {{cannot convert value of type 'Int' to expected argument type '[AnyHashable : String]'}}
   testErrorDictionaryNewtype(3) // expected-error {{cannot convert value of type 'Int' to expected argument type '[AnyHashable : String]'}}
+}
+
+func testNSUIntegerNewtype() {
+  let _: NSUIntegerNewType = NSUIntegerNewType(4)
+  let _: UInt = NSUIntegerNewType(4).rawValue
+  let _: NSUIntegerNewType = NSUIntegerNewType.constant
+
+  let _: NSUIntegerSystemNewType = NSUIntegerSystemNewType(4)
+  let _: Int = NSUIntegerSystemNewType(4).rawValue
+  let _: NSUIntegerSystemNewType = NSUIntegerSystemNewType.constant
 }

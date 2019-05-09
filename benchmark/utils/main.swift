@@ -31,6 +31,7 @@ import BinaryFloatingPointConversionFromBinaryInteger
 import BinaryFloatingPointProperties
 import BitCount
 import Breadcrumbs
+import BucketSort
 import ByteSwap
 import COWTree
 import COWArrayGuaranteedParameterOverhead
@@ -73,6 +74,7 @@ import Exclusivity
 import ExistentialPerformance
 import Fibonacci
 import FlattenList
+import FloatingPointParsing
 import FloatingPointPrinting
 import Hanoi
 import Hash
@@ -198,6 +200,7 @@ registerBenchmark(BinaryFloatingPointPropertiesNextUp)
 registerBenchmark(BinaryFloatingPointPropertiesUlp)
 registerBenchmark(BitCount)
 registerBenchmark(Breadcrumbs)
+registerBenchmark(BucketSort)
 registerBenchmark(ByteSwap)
 registerBenchmark(COWTree)
 registerBenchmark(COWArrayGuaranteedParameterOverhead)
@@ -244,6 +247,7 @@ registerBenchmark(ExistentialPerformance)
 registerBenchmark(Fibonacci)
 registerBenchmark(FlattenListLoop)
 registerBenchmark(FlattenListFlatMap)
+registerBenchmark(FloatingPointParsing)
 registerBenchmark(FloatingPointPrinting)
 registerBenchmark(Hanoi)
 registerBenchmark(HashTest)

@@ -31,6 +31,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/PropertyDelegates.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -282,6 +283,13 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// KnownProtocolKind.
   llvm::DenseMap<SourceFile *, std::array<Type, NumKnownProtocols>>
       DefaultTypeRequestCaches;
+
+  /// Mapping from property declarations to the backing variable types.
+  llvm::DenseMap<const VarDecl *, Type> PropertyDelegateBackingVarTypes;
+
+  /// A mapping from the backing storage of a property that has a delegate
+  /// to the original property with the delegate.
+  llvm::DenseMap<const VarDecl *, VarDecl *> OriginalDelegatedProperties;
 
   /// Structure that captures data that is segregated into different
   /// arenas.
@@ -3938,6 +3946,12 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
       addTrivial(getIdentifier("DarwinBoolean"), darwin);
     }
 
+    if (auto winsdk = getLoadedModule(Id_WinSDK)) {
+      // NOTE: WindowsBool is odd because it is bridged to Bool in APIs, but can
+      // also be trivially bridged.
+      addTrivial(getIdentifier("WindowsBool"), winsdk);
+    }
+
     if (auto objectiveC = getLoadedModule(Id_ObjectiveC)) {
       addTrivial(Id_Selector, objectiveC, true);
 
@@ -3995,6 +4009,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
     }
   };
   conditionallyAddTrivial(nominal, getIdentifier("DarwinBoolean") , Id_Darwin);
+  conditionallyAddTrivial(nominal, getIdentifier("WindowsBool"), Id_WinSDK);
   conditionallyAddTrivial(nominal, Id_Selector, Id_ObjectiveC, true);
   conditionallyAddTrivial(nominal, getIdentifier("ObjCBool"), Id_ObjectiveC);
   conditionallyAddTrivial(nominal, getSwiftId(KnownFoundationEntity::NSZone), Id_ObjectiveC, true);
@@ -4349,4 +4364,44 @@ LayoutConstraint LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind
 Type &ASTContext::getDefaultTypeRequestCache(SourceFile *SF,
                                              KnownProtocolKind kind) {
   return getImpl().DefaultTypeRequestCaches[SF][size_t(kind)];
+}
+
+Type ASTContext::getSideCachedPropertyDelegateBackingPropertyType(
+    VarDecl *var) const {
+  return getImpl().PropertyDelegateBackingVarTypes[var];
+}
+
+void ASTContext::setSideCachedPropertyDelegateBackingPropertyType(
+    VarDecl *var, Type type) {
+  assert(!getImpl().PropertyDelegateBackingVarTypes[var] ||
+         getImpl().PropertyDelegateBackingVarTypes[var]->isEqual(type));
+  getImpl().PropertyDelegateBackingVarTypes[var] = type;
+}
+
+VarDecl *VarDecl::getOriginalDelegatedProperty(
+    Optional<PropertyDelegateSynthesizedPropertyKind> kind) const {
+  if (!Bits.VarDecl.IsPropertyDelegateBackingProperty)
+    return nullptr;
+
+  ASTContext &ctx = getASTContext();
+  assert(ctx.getImpl().OriginalDelegatedProperties.count(this) > 0);
+  auto original = ctx.getImpl().OriginalDelegatedProperties[this];
+  if (!kind)
+    return original;
+
+  auto delegateInfo = original->getPropertyDelegateBackingPropertyInfo();
+  switch (*kind) {
+  case PropertyDelegateSynthesizedPropertyKind::Backing:
+    return this == delegateInfo.backingVar ? original : nullptr;
+
+  case PropertyDelegateSynthesizedPropertyKind::StorageDelegate:
+    return this == delegateInfo.storageDelegateVar ? original : nullptr;
+  }
+}
+
+void VarDecl::setOriginalDelegatedProperty(VarDecl *originalProperty) {
+  Bits.VarDecl.IsPropertyDelegateBackingProperty = true;
+  ASTContext &ctx = getASTContext();
+  assert(ctx.getImpl().OriginalDelegatedProperties.count(this) == 0);
+  ctx.getImpl().OriginalDelegatedProperties[this] = originalProperty;
 }

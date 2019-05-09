@@ -1127,6 +1127,7 @@ struct IRLinkage {
   static const IRLinkage Internal;
 
   static const IRLinkage ExternalImport;
+  static const IRLinkage ExternalWeakImport;
   static const IRLinkage ExternalExport;
 };
 

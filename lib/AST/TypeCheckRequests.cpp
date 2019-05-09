@@ -14,6 +14,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PropertyDelegates.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
@@ -545,4 +546,109 @@ bool DefaultTypeRequest::getPerformLocalLookup(const KnownProtocolKind knownProt
       
     default: return false;
   }
+}
+
+bool PropertyDelegateTypeInfoRequest::isCached() const {
+  auto nominal = std::get<0>(getStorage());
+  return nominal->getAttrs().hasAttribute<PropertyDelegateAttr>();;
+}
+
+void PropertyDelegateTypeInfoRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void PropertyDelegateTypeInfoRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}
+
+bool AttachedPropertyDelegateRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty();
+}
+
+void AttachedPropertyDelegateRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void AttachedPropertyDelegateRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}
+
+bool AttachedPropertyDelegateTypeRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty();
+}
+
+void AttachedPropertyDelegateTypeRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void AttachedPropertyDelegateTypeRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}
+
+bool PropertyDelegateBackingPropertyTypeRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty();
+}
+
+void PropertyDelegateBackingPropertyTypeRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void PropertyDelegateBackingPropertyTypeRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}
+bool PropertyDelegateBackingPropertyInfoRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty();
+}
+
+void PropertyDelegateBackingPropertyInfoRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void PropertyDelegateBackingPropertyInfoRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}
+
+void swift::simple_display(
+    llvm::raw_ostream &out, const PropertyDelegateTypeInfo &propertyDelegate) {
+  out << "{ ";
+  if (propertyDelegate.valueVar)
+    out << propertyDelegate.valueVar->printRef();
+  else
+    out << "null";
+  out << ", ";
+  if (propertyDelegate.initialValueInit)
+    out << propertyDelegate.initialValueInit->printRef();
+  else
+    out << "null";
+  out << " }";
+}
+
+void swift::simple_display(
+    llvm::raw_ostream &out,
+    const PropertyDelegateBackingPropertyInfo &backingInfo) {
+  out << "{ ";
+  if (backingInfo.backingVar)
+    backingInfo.backingVar->dumpRef(out);
+  out << " }";
+}
+
+void swift::simple_display(llvm::raw_ostream &out, const Type &type) {
+  if (type)
+    type.print(out);
+  else
+    out << "null";
 }

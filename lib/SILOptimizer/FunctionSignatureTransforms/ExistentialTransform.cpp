@@ -475,7 +475,7 @@ void ExistentialTransform::populateThunkBody() {
     Builder.setInsertionPoint(NormalBlock);
   } else {
     /// Create the Apply with substitutions
-    ReturnValue = Builder.createApply(Loc, FRI, SubMap, ApplyArgs, false);
+    ReturnValue = Builder.createApply(Loc, FRI, SubMap, ApplyArgs);
   }
 
   /// Set up the return results.

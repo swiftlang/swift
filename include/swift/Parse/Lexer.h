@@ -189,6 +189,11 @@ public:
     return CodeCompletionPtr != nullptr;
   }
 
+  /// Whether we are lexing a Swift interface file.
+  bool isSwiftInterface() const {
+    return LexMode == LexerMode::SwiftInterface;
+  }
+
   /// Lex a token. If \c TriviaRetentionMode is \c WithTrivia, passed pointers
   /// to trivias are populated.
   void lex(Token &Result, ParsedTrivia &LeadingTriviaResult,

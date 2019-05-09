@@ -1371,6 +1371,14 @@ bool ContextualFailure::diagnoseAsError() {
     break;
   }
 
+  case ConstraintLocator::ContextualType: {
+    if (isKnownKeyPathType(FromType) && isKnownKeyPathType(ToType)) {
+      diagnostic = diag::cannot_convert_initializer_value;
+      break;
+    }
+
+    LLVM_FALLTHROUGH;
+  }
   default:
     return false;
   }
@@ -1473,6 +1481,10 @@ void ContextualFailure::tryComputedPropertyFixIts(Expr *expr) const {
 
         if (VD->isLet()) {
           diag.fixItReplace(PBD->getStartLoc(), getTokenText(tok::kw_var));
+        }
+
+        if (auto lazyAttr = VD->getAttrs().getAttribute<LazyAttr>()) {
+          diag.fixItRemove(lazyAttr->getRange());
         }
       }
     }
