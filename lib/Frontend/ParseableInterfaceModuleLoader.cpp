@@ -1253,3 +1253,10 @@ bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
   return builder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
                                   /*ModuleBuffer*/nullptr);
 }
+
+void ParseableInterfaceModuleLoader::collectVisibleTopLevelModuleNames(
+    SmallVectorImpl<Identifier> &names) const {
+  collectVisibleTopLevelModuleNamesImpl(
+      names,
+      file_types::getExtension(file_types::TY_SwiftParseableInterfaceFile));
+}
