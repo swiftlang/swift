@@ -278,6 +278,14 @@ static ReturnInst *getSingleReturn(SILFunction *f) {
   return cast<ReturnInst>(f->findReturnBB()->getTerminator());
 }
 
+/// Given an `autodiff_function` instruction, find the corresponding
+/// differential operator used in the AST. If no differential operator is found,
+/// return nullptr.
+static AutoDiffFunctionExpr *
+findDifferentialOperator(AutoDiffFunctionInst *inst) {
+  return inst->getLoc().getAsASTNode<AutoDiffFunctionExpr>();
+}
+
 //===----------------------------------------------------------------------===//
 // Auxiliary data structures
 //===----------------------------------------------------------------------===//
@@ -1031,47 +1039,64 @@ InFlightDiagnostic
 ADContext::emitNondifferentiabilityError(SILValue value,
                                          const DifferentiationTask *task,
                                          Optional<Diag<>> diag) {
-  auto *inst = value->getDefiningInstruction();
-  if (!inst) {
-    return diagnose(value.getLoc().getSourceLoc(),
-        diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
-  }
-  return emitNondifferentiabilityError(inst, task, diag);
+  LLVM_DEBUG({
+    auto &s = getADDebugStream()
+        << "Diagnosing non-differentiability for value \n\t" << value
+        << "\nwhile performing differentiation task\n\t";
+    task->print(s);
+    s << '\n';
+  });
+  auto valueLoc = value.getLoc().getSourceLoc();
+  return emitNondifferentiabilityError(valueLoc, task, diag);
 }
 
 InFlightDiagnostic
 ADContext::emitNondifferentiabilityError(SILInstruction *inst,
                                          const DifferentiationTask *task,
                                          Optional<Diag<>> diag) {
-  // Location of the instruction.
-  auto opLoc = inst->getLoc().getSourceLoc();
-  if (!task) {
-    return diagnose(opLoc,
-        diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
-  }
   LLVM_DEBUG({
     auto &s = getADDebugStream()
-        << "Diagnosing non-differentiability for inst \n\t" << *inst
+        << "Diagnosing non-differentiability for inst \n\t" << inst
         << "\nwhile performing differentiation task\n\t";
     task->print(s);
     s << '\n';
   });
-  return emitNondifferentiabilityError(opLoc, task, diag);
+  auto instLoc = inst->getLoc().getSourceLoc();
+  return emitNondifferentiabilityError(instLoc, task, diag);
 }
 
 InFlightDiagnostic
 ADContext::emitNondifferentiabilityError(SourceLoc loc,
                                          const DifferentiationTask *task,
                                          Optional<Diag<>> diag) {
+  if (!task) {
+    diagnose(loc, diag::autodiff_expression_not_differentiable_error);
+    return diagnose(loc,
+        diag.getValueOr(diag::autodiff_expression_not_differentiable_note));
+  }
   auto invoker = task->getInvoker();
   switch (invoker.getKind()) {
-  // For a `autodiff_function` instruction or a `[differentiable]` attribute
-  // that is not associated with any source location, we emit a diagnostic at
-  // the instruction source location.
-  case DifferentiationInvoker::Kind::AutoDiffFunctionInst:
-    // FIXME: This will not report an error to the user.
+  // For `autodiff_function` instructions: if the `autodiff_function`
+  // instruction comes from a differential operator, emit an error on the
+  // expression and a note on the non-differentiable operation. Otherwise, emit
+  // both an error and note on the non-differentiation operation.
+  case DifferentiationInvoker::Kind::AutoDiffFunctionInst: {
+    auto *inst = invoker.getAutoDiffFunctionInst();
+    if (auto *expr = findDifferentialOperator(inst)) {
+      diagnose(expr->getLoc(), diag::autodiff_function_not_differentiable_error)
+          .highlight(expr->getSubExpr()->getSourceRange());
+      return diagnose(loc,
+          diag.getValueOr(diag::autodiff_expression_not_differentiable_note));
+    }
+    diagnose(loc, diag::autodiff_expression_not_differentiable_error);
     return diagnose(loc,
-        diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
+        diag.getValueOr(diag::autodiff_expression_not_differentiable_note));
+  }
+
+  // For `[differentiable]` attributes, try to find an AST function declaration
+  // and `@differentiable` attribute. If they are found, emit an error on the
+  // `@differentiable` attribute; otherwise, emit an error on the SIL function.
+  // Emit a note at the non-differentiable operation.
   case DifferentiationInvoker::Kind::SILDifferentiableAttribute: {
     auto attr = invoker.getSILDifferentiableAttribute();
     bool foundAttr = false;
@@ -1080,7 +1105,7 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
         if (auto *diffAttr =
                 fnDecl->getAttrs().getAttribute<DifferentiableAttr>()) {
           diagnose(diffAttr->getLocation(),
-                   diag::autodiff_function_not_differentiable)
+                   diag::autodiff_function_not_differentiable_error)
               .highlight(diffAttr->getRangeWithAt());
           diagnose(attr.second->getLocation().getSourceLoc(),
                    diag::autodiff_when_differentiating_function_definition);
@@ -1088,13 +1113,12 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
         }
       }
     }
-    if (!foundAttr) {
-      // Fallback if we cannot find the expected attribute.
+    // Fallback if we cannot find the expected attribute.
+    if (!foundAttr)
       diagnose(attr.second->getLocation().getSourceLoc(),
-               diag::autodiff_function_not_differentiable);
-    }
+               diag::autodiff_function_not_differentiable_error);
     return diagnose(loc,
-        diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
+        diag.getValueOr(diag::autodiff_expression_not_differentiable_note));
   }
 
   // For indirect differentiation, emit a "not differentiable" note on the
@@ -1113,10 +1137,10 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
   // attribute first and a note on the non-differentiable operation.
   case DifferentiationInvoker::Kind::FunctionConversion: {
     auto *expr = invoker.getFunctionConversion();
-    diagnose(expr->getLoc(), diag::autodiff_function_not_differentiable)
+    diagnose(expr->getLoc(), diag::autodiff_function_not_differentiable_error)
         .highlight(expr->getSubExpr()->getSourceRange());
     return diagnose(loc,
-        diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
+        diag.getValueOr(diag::autodiff_expression_not_differentiable_note));
   }
   }
 }
@@ -1781,13 +1805,10 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
   // the given kind and desired differentiation parameter indices, simply
   // extract the associated function of its function operand, retain the
   // associated function, and return it.
-  if (auto *inst = original->getDefiningInstruction()) {
-    if (auto *adfei = dyn_cast<AutoDiffFunctionExtractInst>(inst)) {
-      if (adfei->getExtractee() == AutoDiffFunctionExtractee::Original) {
+  if (auto *inst = original->getDefiningInstruction())
+    if (auto *adfei = dyn_cast<AutoDiffFunctionExtractInst>(inst))
+      if (adfei->getExtractee() == AutoDiffFunctionExtractee::Original)
         functionSource = adfei->getFunctionOperand();
-      }
-    }
-  }
 
   // If functionSource is a @differentiable function, just extract it.
   if (auto diffableFnType = original->getType().castTo<SILFunctionType>()) {
@@ -2629,8 +2650,7 @@ public:
   }
 
   void visitSILInstruction(SILInstruction *inst) {
-    getContext().emitNondifferentiabilityError(inst, getDifferentiationTask(),
-        diag::autodiff_expression_is_not_differentiable);
+    getContext().emitNondifferentiabilityError(inst, getDifferentiationTask());
     errorOccurred = true;
   }
 
@@ -2967,7 +2987,6 @@ public:
           primalGen.schedulePrimalSynthesisIfNeeded(newTask);
         });
     if (!vjpAndVJPIndices) {
-      context.emitNondifferentiabilityError(ai, synthesis.task);
       errorOccurred = true;
       return;
     }
@@ -4026,8 +4045,7 @@ public:
   void visitSILInstruction(SILInstruction *inst) {
     LLVM_DEBUG(getADDebugStream()
                << "Unhandled instruction in adjoint emitter: " << *inst);
-    getContext().emitNondifferentiabilityError(inst, getDifferentiationTask(),
-        diag::autodiff_expression_is_not_differentiable);
+    getContext().emitNondifferentiabilityError(inst, getDifferentiationTask());
     errorOccurred = true;
   }
 
@@ -5703,14 +5721,6 @@ void DifferentiationTask::createVJP(bool isExported) {
 // Differentiation pass implementation
 //===----------------------------------------------------------------------===//
 
-/// Given an `autodiff_function` instruction, find the corresponding
-/// differential operator used in the AST. If no differential operator is found,
-/// return nullptr.
-static AutoDiffFunctionExpr *findDifferentialOperator(
-    AutoDiffFunctionInst *inst) {
-  return inst->getLoc().getAsASTNode<AutoDiffFunctionExpr>();
-}
-
 /// The automatic differentiation pass.
 namespace {
 class Differentiation : public SILModuleTransform {
@@ -5795,13 +5805,10 @@ SILValue ADContext::promoteToDifferentiableFunction(
     auto assocFnAndIndices = emitAssociatedFunctionReference(
         *this, builder, /*parentTask*/ nullptr, desiredIndices, assocFnKind,
         origFnOperand, invoker, [](DifferentiationTask *newTask) {});
-    if (!assocFnAndIndices) {
-      // Show an error at the operator, highlight the argument, and show a note
-      // at the definition site of the argument.
-      auto loc = invoker.getLocation();
-      diagnose(loc, diag::autodiff_function_not_differentiable).highlight(loc);
+    // If `emitAssociatedFunctionReference` fails, it produces a diagnostic.
+    // Return nullptr.
+    if (!assocFnAndIndices)
       return nullptr;
-    }
     assert(assocFnAndIndices->second == desiredIndices &&
            "FIXME: We could emit a thunk that converts the VJP to have the "
            "desired indices.");
