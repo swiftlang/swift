@@ -23,7 +23,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func ceil<U>(_ vector: U)  -> [Float]
         where
@@ -46,7 +46,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func ceil<U, V>(_ vector: U,
                                   result: inout V)
@@ -72,7 +72,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func ceil<U>(_ vector: U)  -> [Double]
         where
@@ -95,7 +95,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func ceil<U, V>(_ vector: U,
                                   result: inout V)
@@ -123,7 +123,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func floor<U>(_ vector: U) -> [Float]
         where
@@ -146,7 +146,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func floor<U, V>(_ vector: U,
                                    result: inout V)
@@ -172,7 +172,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func floor<U>(_ vector: U) -> [Double]
         where
@@ -195,7 +195,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func floor<U, V>(_ vector: U,
                                    result: inout V)
@@ -224,7 +224,7 @@ extension vForce {
     /// - Parameter magnitudes: Input magnitudes.
     /// - Parameter signs: Input signs.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func copysign<U, V>(magnitudes: U,
                                       signs: V) -> [Float]
@@ -253,7 +253,7 @@ extension vForce {
     /// - Parameter magnitudes: Input magnitudes.
     /// - Parameter signs: Input signs.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func copysign<T, U, V>(magnitudes: T,
                                          signs: U,
@@ -285,7 +285,7 @@ extension vForce {
     /// - Parameter magnitudes: Input magnitudes.
     /// - Parameter signs: Input signs.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func copysign<U, V>(magnitudes: U,
                                       signs: V) -> [Double]
@@ -314,7 +314,7 @@ extension vForce {
     /// - Parameter magnitudes: Input magnitudes.
     /// - Parameter signs: Input signs.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func copysign<T, U, V>(magnitudes: T,
                                          signs: U,
@@ -355,7 +355,7 @@ extension vForce {
     /// For each corresponding `a` from `dividends` and `b` from `divisors`, the result `r` satisfies:
     ///     a = bq + r
     /// where q is the integer formed by rounding `a/b` towards zero, so `abs(r) < abs(b)` and `r` has the same sign as `a`.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func truncatingRemainder<U, V>(dividends: U,
                                                  divisors: V) -> [Float]
@@ -389,7 +389,7 @@ extension vForce {
     /// For each corresponding `a` from `dividends` and `b` from `divisors`, the result `r` satisfies:
     ///     a = bq + r
     /// where q is the integer formed by rounding `a/b` towards zero, so `abs(r) < abs(b)` and `r` has the same sign as `a`.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func truncatingRemainder<T, U, V>(dividends: T,
                                                     divisors: U,
@@ -425,7 +425,7 @@ extension vForce {
     /// For each corresponding `a` from `dividends` and `b` from `divisors`, the result `r` satisfies:
     ///     a = bq + r
     /// where q is the integer formed by rounding `a/b` towards zero, so `abs(r) < abs(b)` and `r` has the same sign as `a`.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func truncatingRemainder<U, V>(dividends: U,
                                                  divisors: V) -> [Double]
@@ -459,7 +459,7 @@ extension vForce {
     /// For each corresponding `a` from `dividends` and `b` from `divisors`, the result `r` satisfies:
     ///     a = bq + r
     /// where q is the integer formed by rounding `a/b` towards zero, so `abs(r) < abs(b)` and `r` has the same sign as `a`.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func truncatingRemainder<T, U, V>(dividends: T,
                                                     divisors: U,
@@ -497,7 +497,7 @@ extension vForce {
     /// For each corresponding `a` from `dividends` and `b` from `divisors`, the result `r` satisfies:
     ///     a = bq + r
     /// where q is `a/b` rounded to the nearest integer, so `abs(r) <= abs(b/2)`.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func remainder<U, V>(dividends: U,
                                        divisors: V) -> [Float]
@@ -530,7 +530,7 @@ extension vForce {
     /// For each corresponding `a` from `dividends` and `b` from `divisors`, the result `r` satisfies:
     ///     a = bq + r
     /// where q is `a/b` rounded to the nearest integer, so `abs(r) <= abs(b/2)`.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func remainder<T, U, V>(dividends: T,
                                           divisors: U,
@@ -566,7 +566,7 @@ extension vForce {
     /// For each corresponding `a` from `dividends` and `b` from `divisors`, the result `r` satisfies:
     ///     a = bq + r
     /// where q is `a/b` rounded to the nearest integer, so `abs(r) <= abs(b/2)`.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func remainder<U, V>(dividends: U,
                                        divisors: V) -> [Double]
@@ -599,7 +599,7 @@ extension vForce {
     /// For each corresponding `a` from `dividends` and `b` from `divisors`, the result `r` satisfies:
     ///     a = bq + r
     /// where q is `a/b` rounded to the nearest integer, so `abs(r) <= abs(b/2)`.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func remainder<T, U, V>(dividends: T,
                                           divisors: U,
@@ -632,7 +632,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func trunc<U>(_ vector: U)  -> [Float]
         where
@@ -655,7 +655,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func trunc<U, V>(_ vector: U,
                                    result: inout V)
@@ -681,7 +681,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func trunc<U>(_ vector: U)  -> [Double]
         where
@@ -704,7 +704,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func trunc<U, V>(_ vector: U,
                                    result: inout V)
@@ -732,7 +732,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func nearestInteger<U>(_ vector: U)  -> [Float]
         where
@@ -755,7 +755,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func nearestInteger<U, V>(_ vector: U,
                                             result: inout V)
@@ -781,7 +781,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func nearestInteger<U>(_ vector: U)  -> [Double]
         where
@@ -804,7 +804,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func nearestInteger<U, V>(_ vector: U,
                                             result: inout V)
@@ -832,7 +832,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func rsqrt<U>(_ vector: U)  -> [Float]
         where
@@ -855,7 +855,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func rsqrt<U, V>(_ vector: U,
                                    result: inout V)
@@ -881,7 +881,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func rsqrt<U>(_ vector: U)  -> [Double]
         where
@@ -904,7 +904,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func rsqrt<U, V>(_ vector: U,
                                    result: inout V)
@@ -932,7 +932,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sqrt<U>(_ vector: U)  -> [Float]
         where
@@ -955,7 +955,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sqrt<U, V>(_ vector: U,
                                   result: inout V)
@@ -982,7 +982,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sqrt<U>(_ vector: U)  -> [Double]
         where
@@ -1005,7 +1005,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sqrt<U, V>(_ vector: U,
                                   result: inout V)
@@ -1033,7 +1033,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func reciprocal<U>(_ vector: U)  -> [Float]
         where
@@ -1056,7 +1056,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func reciprocal<U, V>(_ vector: U,
                                         result: inout V)
@@ -1082,7 +1082,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func reciprocal<U>(_ vector: U)  -> [Double]
         where
@@ -1105,7 +1105,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func reciprocal<U, V>(_ vector: U,
                                         result: inout V)
@@ -1138,7 +1138,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func exp<U>(_ vector: U)  -> [Float]
         where
@@ -1161,7 +1161,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func exp<U, V>(_ vector: U,
                                  result: inout V)
@@ -1187,7 +1187,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func expm1<U>(_ vector: U)  -> [Float]
         where
@@ -1210,7 +1210,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func expm1<U, V>(_ vector: U,
                                    result: inout V)
@@ -1236,7 +1236,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func exp2<U>(_ vector: U)  -> [Float]
         where
@@ -1259,7 +1259,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func exp2<U, V>(_ vector: U,
                                   result: inout V)
@@ -1285,7 +1285,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func exp<U>(_ vector: U)  -> [Double]
         where
@@ -1308,7 +1308,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func exp<U, V>(_ vector: U,
                                  result: inout V)
@@ -1334,7 +1334,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func expm1<U>(_ vector: U)  -> [Double]
         where
@@ -1357,7 +1357,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func expm1<U, V>(_ vector: U,
                                    result: inout V)
@@ -1383,7 +1383,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func exp2<U>(_ vector: U)  -> [Double]
         where
@@ -1406,7 +1406,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func exp2<U, V>(_ vector: U,
                                   result: inout V)
@@ -1434,7 +1434,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func log2<U>(_ vector: U)  -> [Float]
         where
@@ -1457,7 +1457,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func log2<U, V>(_ vector: U,
                                   result: inout V)
@@ -1483,7 +1483,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func log10<U>(_ vector: U)  -> [Float]
         where
@@ -1506,7 +1506,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func log10<U, V>(_ vector: U,
                                    result: inout V)
@@ -1532,7 +1532,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func log2<U>(_ vector: U)  -> [Double]
         where
@@ -1555,7 +1555,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func log2<U, V>(_ vector: U,
                                   result: inout V)
@@ -1581,7 +1581,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func log10<U>(_ vector: U)  -> [Double]
         where
@@ -1604,7 +1604,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func log10<U, V>(_ vector: U,
                                    result: inout V)
@@ -1632,7 +1632,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func logb<U>(_ vector: U)  -> [Float]
         where
@@ -1657,7 +1657,7 @@ extension vForce {
     /// - Parameter result: Output values.
     ///
     /// This function calculates `floor(log2(vector))`.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func logb<U, V>(_ vector: U,
                                   result: inout V)
@@ -1683,7 +1683,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func logb<U>(_ vector: U)  -> [Double]
         where
@@ -1708,7 +1708,7 @@ extension vForce {
     /// - Parameter result: Output values.
     ///
     /// This function calculates `floor(log2(vector))`.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func logb<U, V>(_ vector: U,
                                   result: inout V)
@@ -1742,7 +1742,7 @@ extension vForce {
     /// - Parameter bases: Input base values.
     /// - Parameter exponents: Input exponents.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func pow<U, V>(bases: U,
                                  exponents: V) -> [Float]
@@ -1771,7 +1771,7 @@ extension vForce {
     /// - Parameter bases: Input base values.
     /// - Parameter exponents: Input exponents.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func pow<T, U, V>(bases: T,
                                     exponents: U,
@@ -1803,7 +1803,7 @@ extension vForce {
     /// - Parameter bases: Input base values.
     /// - Parameter exponents: Input exponents.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func pow<U, V>(bases: U,
                                  exponents: V) -> [Double]
@@ -1832,7 +1832,7 @@ extension vForce {
     /// - Parameter bases: Input base values.
     /// - Parameter exponents: Input exponents.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func pow<T, U, V>(bases: T,
                                     exponents: U,
@@ -1874,7 +1874,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sin<U>(_ vector: U)  -> [Float]
         where
@@ -1897,7 +1897,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sin<U, V>(_ vector: U,
                                  result: inout V)
@@ -1923,7 +1923,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sin<U>(_ vector: U)  -> [Double]
         where
@@ -1946,7 +1946,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sin<U, V>(_ vector: U,
                                  result: inout V)
@@ -1972,7 +1972,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinPi<U>(_ vector: U)  -> [Float]
         where
@@ -1995,7 +1995,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinPi<U, V>(_ vector: U,
                                    result: inout V)
@@ -2021,7 +2021,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinPi<U>(_ vector: U)  -> [Double]
         where
@@ -2044,7 +2044,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinPi<U, V>(_ vector: U,
                                    result: inout V)
@@ -2072,7 +2072,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cos<U>(_ vector: U)  -> [Float]
         where
@@ -2095,7 +2095,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cos<U, V>(_ vector: U,
                                  result: inout V)
@@ -2121,7 +2121,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cos<U>(_ vector: U)  -> [Double]
         where
@@ -2144,7 +2144,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cos<U, V>(_ vector: U,
                                  result: inout V)
@@ -2170,7 +2170,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cosPi<U>(_ vector: U)  -> [Float]
         where
@@ -2193,7 +2193,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cosPi<U, V>(_ vector: U,
                                    result: inout V)
@@ -2219,7 +2219,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cosPi<U>(_ vector: U)  -> [Double]
         where
@@ -2242,7 +2242,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cosPi<U, V>(_ vector: U,
                                    result: inout V)
@@ -2271,7 +2271,7 @@ extension vForce {
     /// - Parameter vector: Input values.
     /// - Parameter sinresult: Output sine values.
     /// - Parameter cosresult: Output cosine values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sincos<T, U, V>(_ vector: T,
                                        sinResult: inout U,
@@ -2303,7 +2303,7 @@ extension vForce {
     /// - Parameter vector: Input values.
     /// - Parameter sinresult: Output sine values.
     /// - Parameter cosresult: Output cosine values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sincos<T, U, V>(_ vector: T,
                                        sinResult: inout U,
@@ -2336,7 +2336,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tan<U>(_ vector: U)  -> [Float]
         where
@@ -2359,7 +2359,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tan<U, V>(_ vector: U,
                                  result: inout V)
@@ -2385,7 +2385,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tan<U>(_ vector: U)  -> [Double]
         where
@@ -2409,7 +2409,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tan<U, V>(_ vector: U,
                                  result: inout V)
@@ -2435,7 +2435,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tanPi<U>(_ vector: U)  -> [Float]
         where
@@ -2458,7 +2458,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tanPi<U, V>(_ vector: U,
                                    result: inout V)
@@ -2484,7 +2484,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tanPi<U>(_ vector: U)  -> [Double]
         where
@@ -2507,7 +2507,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tanPi<U, V>(_ vector: U,
                                    result: inout V)
@@ -2535,7 +2535,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func asin<U>(_ vector: U)  -> [Float]
         where
@@ -2558,7 +2558,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func asin<U, V>(_ vector: U,
                                   result: inout V)
@@ -2584,7 +2584,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func asin<U>(_ vector: U)  -> [Double]
         where
@@ -2607,7 +2607,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func asin<U, V>(_ vector: U,
                                   result: inout V)
@@ -2635,7 +2635,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func acos<U>(_ vector: U)  -> [Float]
         where
@@ -2658,7 +2658,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func acos<U, V>(_ vector: U,
                                   result: inout V)
@@ -2684,7 +2684,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func acos<U>(_ vector: U)  -> [Double]
         where
@@ -2707,7 +2707,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func acos<U, V>(_ vector: U,
                                   result: inout V)
@@ -2735,7 +2735,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func atan<U>(_ vector: U)  -> [Float]
         where
@@ -2758,7 +2758,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func atan<U, V>(_ vector: U,
                                   result: inout V)
@@ -2784,7 +2784,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func atan<U>(_ vector: U)  -> [Double]
         where
@@ -2807,7 +2807,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func atan<U, V>(_ vector: U,
                                   result: inout V)
@@ -2840,7 +2840,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinh<U>(_ vector: U)  -> [Float]
         where
@@ -2863,7 +2863,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinh<U, V>(_ vector: U,
                                   result: inout V)
@@ -2889,7 +2889,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinh<U>(_ vector: U)  -> [Double]
         where
@@ -2912,7 +2912,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sinh<U, V>(_ vector: U,
                                   result: inout V)
@@ -2940,7 +2940,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cosh<U>(_ vector: U)  -> [Float]
         where
@@ -2963,7 +2963,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cosh<U, V>(_ vector: U,
                                   result: inout V)
@@ -2989,7 +2989,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cosh<U>(_ vector: U)  -> [Double]
         where
@@ -3012,7 +3012,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func cosh<U, V>(_ vector: U,
                                   result: inout V)
@@ -3040,7 +3040,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tanh<U>(_ vector: U)  -> [Float]
         where
@@ -3063,7 +3063,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tanh<U, V>(_ vector: U,
                                   result: inout V)
@@ -3089,7 +3089,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tanh<U>(_ vector: U)  -> [Double]
         where
@@ -3112,7 +3112,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func tanh<U, V>(_ vector: U,
                                   result: inout V)
@@ -3140,7 +3140,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func asinh<U>(_ vector: U)  -> [Float]
         where
@@ -3163,7 +3163,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func asinh<U, V>(_ vector: U,
                                    result: inout V)
@@ -3189,7 +3189,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func asinh<U>(_ vector: U)  -> [Double]
         where
@@ -3212,7 +3212,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func asinh<U, V>(_ vector: U,
                                    result: inout V)
@@ -3240,7 +3240,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func acosh<U>(_ vector: U)  -> [Float]
         where
@@ -3263,7 +3263,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func acosh<U, V>(_ vector: U,
                                    result: inout V)
@@ -3289,7 +3289,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func acosh<U>(_ vector: U)  -> [Double]
         where
@@ -3312,7 +3312,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func acosh<U, V>(_ vector: U,
                                    result: inout V)
@@ -3340,7 +3340,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func atanh<U>(_ vector: U)  -> [Float]
         where
@@ -3363,7 +3363,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func atanh<U, V>(_ vector: U,
                                    result: inout V)
@@ -3389,7 +3389,7 @@ extension vForce {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func atanh<U>(_ vector: U)  -> [Double]
         where
@@ -3412,7 +3412,7 @@ extension vForce {
     ///
     /// - Parameter vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func atanh<U, V>(_ vector: U,
                                    result: inout V)
