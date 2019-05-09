@@ -221,10 +221,9 @@ _Block_release(void) { }\n")
       OUTPUT_NAME BlocksRuntime)
     list(APPEND test_dependencies BlocksRuntimeStub${VARIANT_SUFFIX})
 
-    list(APPEND test_dependencies
-        "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
-
     if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
+      list(APPEND test_dependencies
+          "swift-test-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
       list(APPEND test_dependencies
           "swift-reflection-test${VARIANT_SUFFIX}_signed")
     endif()
