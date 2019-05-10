@@ -230,15 +230,13 @@ function(_add_variant_c_compile_flags)
 
   if("${CFLAGS_SDK}" STREQUAL "WINDOWS")
     # MSVC doesn't support -Xclang. We don't need to manually specify
-    # -D_MD or D_MDd either, as CMake does this automatically.
+    # the dependent libraries as `cl` does so.
     if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
       list(APPEND result -Xclang;--dependent-lib=oldnames)
       # TODO(compnerd) handle /MT, /MTd
       if("${CFLAGS_BUILD_TYPE}" STREQUAL "Debug")
-        list(APPEND result "-D_MDd")
         list(APPEND result -Xclang;--dependent-lib=msvcrtd)
       else()
-        list(APPEND result "-D_MD")
         list(APPEND result -Xclang;--dependent-lib=msvcrt)
       endif()
     endif()
@@ -260,6 +258,7 @@ function(_add_variant_c_compile_flags)
     if("${CFLAGS_ARCH}" MATCHES arm)
       list(APPEND result "-D_ARM_WINAPI_PARTITION_DESKTOP_SDK_AVAILABLE")
     endif()
+    list(APPEND result "-D_MT")
     # TODO(compnerd) handle /MT
     list(APPEND result "-D_DLL")
     # NOTE: We assume that we are using VS 2015 U2+
@@ -399,6 +398,12 @@ function(_add_variant_swift_compile_flags
 
   if(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
     list(APPEND result "-D" "SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS")
+  endif()
+
+  if(sdk STREQUAL WINDOWS)
+    list(APPEND result "-Xcc" "-D_MT")
+    # TODO(compnerd) handle /MT /MTd
+    list(APPEND result "-Xcc" "-D_DLL")
   endif()
 
   set("${result_var_name}" "${result}" PARENT_SCOPE)
