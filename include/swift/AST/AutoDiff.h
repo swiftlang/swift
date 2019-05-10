@@ -74,6 +74,7 @@ public:
 };
 
 class AnyFunctionType;
+class AutoDiffIndexSubset;
 class AutoDiffParameterIndicesBuilder;
 class Type;
 
@@ -174,7 +175,8 @@ public:
   ///   ==> returns 1110
   ///   (because the lowered SIL type is (A, B, C, D) -> R)
   ///
-  llvm::SmallBitVector getLowered(AnyFunctionType *functionType) const;
+  AutoDiffIndexSubset *getLowered(ASTContext &ctx,
+                                  AnyFunctionType *functionType) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
     ID.AddInteger(parameters.size());
@@ -224,7 +226,10 @@ class AutoDiffIndexSubset : public llvm::FoldingSetNode {
 private:
   using BitWord = uint64_t;
 
+  /// The total capacity of the index subset, which is `1` less than the largest
+  /// index.
   unsigned capacity;
+  /// The number of bit words in the index subset. in the index subset.
   unsigned numBitWords;
 
   static std::pair<unsigned, unsigned> getBitWordIndexAndOffset(unsigned index);
@@ -272,6 +277,8 @@ public:
                                   IntRange<> range);
   static AutoDiffIndexSubset *get(ASTContext &ctx, unsigned capacity,
                                   ArrayRef<unsigned> indices);
+  template<typename TBool>
+  static AutoDiffIndexSubset *get(ASTContext &ctx, ArrayRef<TBool> bits);
 
   unsigned getCapacity() const {
     return capacity;
@@ -400,38 +407,33 @@ struct SILAutoDiffIndices {
   ///   Function type: (A, B) -> (C, D) -> R
   ///   Bits: [C][D][A][B]
   ///
-  llvm::SmallBitVector parameters;
+  AutoDiffIndexSubset *parameters;
 
   /// Creates a set of AD indices from the given source index and a bit vector
   /// representing parameter indices.
   /*implicit*/ SILAutoDiffIndices(unsigned source,
-                                  llvm::SmallBitVector parameters)
+                                  AutoDiffIndexSubset *parameters)
       : source(source), parameters(parameters) {}
-
-  /// Creates a set of AD indices from the given source index and an array of
-  /// parameter indices. Elements in `parameters` must be ascending integers.
-  /*implicit*/ SILAutoDiffIndices(unsigned source,
-                                  ArrayRef<unsigned> parameters);
 
   bool operator==(const SILAutoDiffIndices &other) const;
 
   /// Queries whether the function's parameter with index `parameterIndex` is
   /// one of the parameters to differentiate with respect to.
   bool isWrtParameter(unsigned parameterIndex) const {
-    return parameterIndex < parameters.size() &&
-           parameters.test(parameterIndex);
+    return parameterIndex < parameters->getCapacity() &&
+           parameters->contains(parameterIndex);
   }
 
   void print(llvm::raw_ostream &s = llvm::outs()) const {
     s << "(source=" << source << " parameters=(";
-    interleave(parameters.set_bits(),
+    interleave(parameters->getIndices(),
                [&s](unsigned p) { s << p; }, [&s]{ s << ' '; });
     s << "))";
   }
 
   std::string mangle() const {
     std::string result = "src_" + llvm::utostr(source) + "_wrt_";
-    interleave(parameters.set_bits(),
+    interleave(parameters->getIndices(),
                [&](unsigned idx) { result += llvm::utostr(idx); },
                [&] { result += '_'; });
     return result;
@@ -481,6 +483,10 @@ public:
   AutoDiffParameterIndices *getParameterIndices() const {
     return parameterIndices;
   }
+
+  static AutoDiffAssociatedFunctionIdentifier *get(
+      AutoDiffAssociatedFunctionKind kind, unsigned differentiationOrder,
+      AutoDiffParameterIndices *parameterIndices, ASTContext &C);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     ID.AddInteger(kind);
@@ -603,19 +609,18 @@ template<typename T> struct DenseMapInfo;
 
 template<> struct DenseMapInfo<SILAutoDiffIndices> {
   static SILAutoDiffIndices getEmptyKey() {
-    return { DenseMapInfo<unsigned>::getEmptyKey(), SmallBitVector() };
+    return { DenseMapInfo<unsigned>::getEmptyKey(), nullptr };
   }
 
   static SILAutoDiffIndices getTombstoneKey() {
-    return { DenseMapInfo<unsigned>::getTombstoneKey(),
-             SmallBitVector(sizeof(intptr_t), true) };
+    return { DenseMapInfo<unsigned>::getTombstoneKey(), nullptr };
   }
 
   static unsigned getHashValue(const SILAutoDiffIndices &Val) {
-    auto params = Val.parameters.set_bits();
     unsigned combinedHash =
       hash_combine(~1U, DenseMapInfo<unsigned>::getHashValue(Val.source),
-                   hash_combine_range(params.begin(), params.end()));
+                   hash_combine_range(Val.parameters->begin(),
+                                      Val.parameters->end()));
     return combinedHash;
   }
 

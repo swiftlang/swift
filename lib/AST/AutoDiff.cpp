@@ -20,33 +20,8 @@
 
 using namespace swift;
 
-SILAutoDiffIndices::SILAutoDiffIndices(
-    unsigned source, ArrayRef<unsigned> parameters) : source(source) {
-  if (parameters.empty())
-    return;
-
-  auto max = *std::max_element(parameters.begin(), parameters.end());
-  this->parameters.resize(max + 1);
-  int last = -1;
-  for (auto paramIdx : parameters) {
-    assert((int)paramIdx > last && "Parameter indices must be ascending");
-    last = paramIdx;
-    this->parameters.set(paramIdx);
-  }
-}
-
-bool SILAutoDiffIndices::operator==(
-    const SILAutoDiffIndices &other) const {
-  if (source != other.source)
-    return false;
-
-  // The parameters are the same when they have exactly the same set bit
-  // indices, even if they have different sizes.
-  llvm::SmallBitVector buffer(std::max(parameters.size(),
-                                       other.parameters.size()));
-  buffer ^= parameters;
-  buffer ^= other.parameters;
-  return buffer.none();
+bool SILAutoDiffIndices::operator==(const SILAutoDiffIndices &other) const {
+  return source == other.source && parameters == other.parameters;
 }
 
 AutoDiffAssociatedFunctionKind::
@@ -222,8 +197,9 @@ static unsigned countNumFlattenedElementTypes(Type type) {
 ///   ==> returns 1110
 ///   (because the lowered SIL type is (A, B, C, D) -> R)
 ///
-llvm::SmallBitVector
-AutoDiffParameterIndices::getLowered(AnyFunctionType *functionType) const {
+AutoDiffIndexSubset *
+AutoDiffParameterIndices::getLowered(ASTContext &ctx,
+                                     AnyFunctionType *functionType) const {
   SmallVector<AnyFunctionType *, 2> curryLevels;
   unwrapCurryLevels(functionType, curryLevels);
 
@@ -241,16 +217,18 @@ AutoDiffParameterIndices::getLowered(AnyFunctionType *functionType) const {
 
   // Construct the result by setting each range of bits that corresponds to each
   // "on" parameter.
-  llvm::SmallBitVector result(totalLoweredSize);
+  llvm::SmallVector<unsigned, 8> loweredIndices;
   unsigned currentBitIndex = 0;
   for (unsigned i : range(parameters.size())) {
     auto paramLoweredSize = paramLoweredSizes[i];
-    if (parameters[i])
-      result.set(currentBitIndex, currentBitIndex + paramLoweredSize);
+    if (parameters[i]) {
+      auto indices = range(currentBitIndex, currentBitIndex + paramLoweredSize);
+      loweredIndices.append(indices.begin(), indices.end());
+    }
     currentBitIndex += paramLoweredSize;
   }
 
-  return result;
+  return AutoDiffIndexSubset::get(ctx, totalLoweredSize, loweredIndices);
 }
 
 static unsigned getNumAutoDiffParameterIndices(AnyFunctionType *fnTy) {
@@ -386,6 +364,17 @@ AutoDiffIndexSubset::get(ASTContext &ctx, unsigned capacity, bool includeAll) {
              SmallVector<unsigned, 8>(capacity, (unsigned)includeAll));
 }
 
+template<typename TBool>
+AutoDiffIndexSubset *
+AutoDiffIndexSubset::get(ASTContext &ctx, ArrayRef<TBool> bits) {
+  SmallVector<unsigned, 8> indices;
+  indices.reserve(bits.size());
+  for (auto i : indices(bits))
+    if (bits[i])
+      indices.push_back(i);
+  return get(ctx, bits.size(), indices);
+}
+
 AutoDiffIndexSubset *AutoDiffIndexSubset::get(ASTContext &ctx,
                                               unsigned capacity,
                                               IntRange<> range) {
@@ -445,9 +434,17 @@ isSupersetOf(const AutoDiffIndexSubset *other) const {
 AutoDiffIndexSubset *
 AutoDiffIndexSubset::adding(unsigned index, ASTContext &ctx) const {
   assert(index < getCapacity());
-  SmallVector<unsigned, 8> newIndices(begin(), end());
-  newIndices.push_back(index);
-  llvm::sort(newIndices.begin(), newIndices.end());
+  SmallVector<unsigned, 8> newIndices;
+  newIndices.reserve(capacity + 1);
+  bool inserted = false;
+  for (auto it = begin(); it != end(); ++it) {
+    auto curIndex = *it;
+    if (inserted && curIndex > index) {
+      newIndices.push_back(index);
+      inserted = false;
+    }
+    newIndices.push_back(curIndex);
+  }
   return get(ctx, capacity, newIndices);
 }
 

@@ -148,10 +148,9 @@ CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
 }
 
 CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
-    const SmallBitVector &parameterIndices, unsigned resultIndex,
-    unsigned differentiationOrder,
-    AutoDiffAssociatedFunctionKind kind, SILModule &module,
-    LookupConformanceFn lookupConformance,
+    AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
+    unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
+    SILModule &module, LookupConformanceFn lookupConformance,
     GenericSignature *whereClauseGenSig) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))

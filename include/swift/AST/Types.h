@@ -4159,7 +4159,7 @@ public:
   /// Returns the type of a differentiation function that is associated with
   /// a function of this type.
   CanSILFunctionType getAutoDiffAssociatedFunctionType(
-      const SmallBitVector &parameterIndices, unsigned resultIndex,
+      AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
       SILModule &module, LookupConformanceFn lookupConformance,
       GenericSignature *whereClauseGenericSignature = nullptr);
