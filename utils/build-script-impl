@@ -2551,6 +2551,20 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 if [[ "${ENABLE_TENSORFLOW}" ]] ; then
                     # Verify TensorFlow include/library directories.
+                    if [[ ! "${TENSORFLOW_HOST_INCLUDE_DIR}" ]] ; then
+                       TENSORFLOW_HOST_INCLUDE_DIR="$TENSORFLOW_SOURCE_DIR"
+                    fi
+                    if [[ ! "${TENSORFLOW_HOST_LIB_DIR}" ]] ; then
+                       TENSORFLOW_HOST_LIB_DIR="$TENSORFLOW_SOURCE_DIR/bazel-bin/tensorflow"
+                    fi
+
+                    if [[ ! "${TENSORFLOW_TARGET_LIB_DIR}" ]] ; then
+                        TENSORFLOW_TARGET_LIB_DIR="${TENSORFLOW_HOST_LIB_DIR}"
+                    fi
+                    if [[ ! "${TENSORFLOW_TARGET_INCLUDE_DIR}" ]] ; then
+                        TENSORFLOW_TARGET_INCLUDE_DIR="${TENSORFLOW_HOST_INCLUDE_DIR}"
+                    fi
+
                     verify_tensorflow_directories
 
                     # Copy TensorFlow libraries to correct destination.
@@ -2569,12 +2583,6 @@ for host in "${ALL_HOSTS[@]}"; do
                         find "${TENSORFLOW_HOST_LIB_DIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec cp -p {} "${TF_LIB_DIR}" \;
                     done
 
-                    if [[ ! "${TENSORFLOW_TARGET_LIB_DIR}" ]] ; then
-                        TENSORFLOW_TARGET_LIB_DIR="${TENSORFLOW_HOST_LIB_DIR}"
-                    fi
-                    if [[ ! "${TENSORFLOW_TARGET_INCLUDE_DIR}" ]] ; then
-                        TENSORFLOW_TARGET_INCLUDE_DIR="${TENSORFLOW_HOST_INCLUDE_DIR}"
-                    fi
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_ENABLE_TENSORFLOW:BOOL=TRUE
@@ -3027,12 +3035,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 echo yes "" | "${source_dir}/configure"
                 with_pushd "${source_dir}" \
                     call bazel build -c opt "${TENSORFLOW_BAZEL_OPTIONS[@]}" --define framework_shared_object=false //tensorflow:libtensorflow.so //tensorflow:libtensorflow_framework.so
-
-                # Set TensorFlow include/lib directories.
-                TENSORFLOW_HOST_INCLUDE_DIR="${source_dir}"
-                TENSORFLOW_HOST_LIB_DIR="${source_dir}/bazel-bin/tensorflow"
-                TENSORFLOW_TARGET_INCLUDE_DIR="${source_dir}"
-                TENSORFLOW_TARGET_LIB_DIR="${source_dir}/bazel-bin/tensorflow"
 
                 # TensorFlow builds itself and doesn't use CMake.
                 continue
