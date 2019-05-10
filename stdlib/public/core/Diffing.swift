@@ -54,7 +54,7 @@ extension CollectionDifference {
 }
 
 extension RangeReplaceableCollection {
-  /// Applies a difference to a collection.
+  /// Applies the given difference to this collection.
   ///
   /// - Parameter difference: The difference to be applied.
   ///
