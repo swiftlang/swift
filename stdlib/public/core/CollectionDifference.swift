@@ -226,6 +226,7 @@ public struct CollectionDifference<ChangeElement> {
 extension CollectionDifference: Collection {
   public typealias Element = Change
 
+  /// The position of a collection difference.
   @_fixed_layout
   public struct Index {
     // Opaque index type is isomorphic to Int
@@ -313,12 +314,12 @@ extension CollectionDifference: Hashable where ChangeElement: Hashable {}
 
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
 extension CollectionDifference where ChangeElement: Hashable {
-  /// Infers which `ChangeElement`s have been both inserted and removed only
-  /// once and returns a new difference with those associations.
+  /// Returns a new collection difference with associations between individual
+  /// elements that have been removed and inserted only once.
   ///
-  /// - Returns: an instance with all possible moves inferred.
+  /// - Returns: An collection difference with all possible moves inferred.
   ///
-  /// - Complexity: O(*n*) where *n* is `self.count`
+  /// - Complexity: O(*n*) where *n* is the number of collection differences.
   public func inferringMoves() -> CollectionDifference<ChangeElement> {
     let uniqueRemovals: [ChangeElement:Int?] = {
       var result = [ChangeElement:Int?](minimumCapacity: Swift.min(removals.count, insertions.count))
