@@ -109,12 +109,14 @@ static void fixupReferenceCounts(
       continue;
     }
 
+    auto *f = applySite->getFunction();
+
     // See if we have a trivial value. In such a case, just continue. We do not
     // need to fix up anything.
-    if (v->getType().isTrivial(pai->getModule()))
+    if (v->getType().isTrivial(*f))
       continue;
 
-    bool hasOwnership = applySite->getFunction()->hasOwnership();
+    bool hasOwnership = f->hasOwnership();
 
     switch (convention) {
     case ParameterConvention::Indirect_In:

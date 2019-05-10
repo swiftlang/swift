@@ -53,7 +53,7 @@ Optionals can be unwrapped with `!`, which triggers a trap on nil. Alternatively
 
 ### Builtins
 
-#### `_fastPath` and `_slowPath` (also, `_branchHint`)
+#### `_fastPath` and `_slowPath`
 
 `_fastPath` returns its argument, wrapped in a Builtin.expect. This informs the optimizer that the vast majority of the time, the branch will be taken (i.e. the then branch is “hot”). The SIL optimizer may alter heuristics for anything dominated by the then branch. But the real performance impact comes from the fact that the SIL optimizer will consider anything dominated by the else branch to be infrequently executed (i.e. “cold”). This means that transformations that may increase code size have very conservative heuristics to keep the rarely executed code small.
 
@@ -61,7 +61,7 @@ The probabilities are passed through to LLVM as branch weight metadata, to lever
 
 `_fastPath` probabilities are compounding, see the example below. For this reason, it can actually degrade performance in non-intuitive ways as it marks all other code (including subsequent `_fastPath`s) as being cold. Consider `_fastPath` as basically spraying the rest of the code with a Mr. Freeze-style ice gun.
 
-`_slowPath` is the same as `_fastPath`, just with the branches swapped. Both are just wrappers around `_branchHint`, which is otherwise never called directly.
+`_slowPath` is the same as `_fastPath`, just with the branches swapped.
 
 *Example:*
 
@@ -83,8 +83,6 @@ if _fastPath(...) {
 ...
 return
 ```
-
-*NOTE: these are due for a rename and possibly a redesign. They conflate multiple notions that don’t match the average standard library programmer’s intuition.*
 
 
 #### `_onFastPath`

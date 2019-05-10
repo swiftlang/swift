@@ -322,14 +322,29 @@ private:
   void visitClassDecl(ClassDecl *CD) {
     printDocumentationComment(CD);
 
+    // This is just for testing, so we check explicitly for the attribute instead
+    // of asking if the class is weak imported. If the class has availablility,
+    // we'll print a SWIFT_AVAIALBLE() which implies __attribute__((weak_imported))
+    // already.
+    if (CD->getAttrs().hasAttribute<WeakLinkedAttr>())
+      os << "SWIFT_WEAK_IMPORT\n";
+
+    bool hasResilientAncestry =
+      CD->checkAncestry().contains(AncestryFlags::ResilientOther);
+    if (hasResilientAncestry) {
+      os << "SWIFT_RESILIENT_CLASS";
+    } else {
+      os << "SWIFT_CLASS";
+    }
+
     StringRef customName = getNameForObjC(CD, CustomNamesOnly);
     if (customName.empty()) {
       llvm::SmallString<32> scratch;
-      os << "SWIFT_CLASS(\"" << CD->getObjCRuntimeName(scratch) << "\")";
+      os << "(\"" << CD->getObjCRuntimeName(scratch) << "\")";
       printAvailability(CD);
       os << "\n@interface " << CD->getName();
     } else {
-      os << "SWIFT_CLASS_NAMED(\"" << CD->getName() << "\")";
+      os << "_NAMED(\"" << CD->getName() << "\")";
       printAvailability(CD);
       os << "\n@interface " << customName;
     }
@@ -2640,6 +2655,20 @@ public:
              "SWIFT_CLASS_EXTRA\n"
            "# endif\n"
            "#endif\n"
+           "#if !defined(SWIFT_RESILIENT_CLASS)\n"
+           "# if __has_attribute(objc_class_stub)\n"
+           "#  define SWIFT_RESILIENT_CLASS(SWIFT_NAME) SWIFT_CLASS(SWIFT_NAME) "
+             "__attribute__((objc_class_stub))\n"
+           "#  define SWIFT_RESILIENT_CLASS_NAMED(SWIFT_NAME) "
+             "__attribute__((objc_class_stub)) "
+             "SWIFT_CLASS_NAMED(SWIFT_NAME)\n"
+           "# else\n"
+           "#  define SWIFT_RESILIENT_CLASS(SWIFT_NAME) "
+             "SWIFT_CLASS(SWIFT_NAME)\n"
+           "#  define SWIFT_RESILIENT_CLASS_NAMED(SWIFT_NAME) "
+             "SWIFT_CLASS_NAMED(SWIFT_NAME)\n"
+           "# endif\n"
+           "#endif\n"
            "\n"
            "#if !defined(SWIFT_PROTOCOL)\n"
            "# define SWIFT_PROTOCOL(SWIFT_NAME) SWIFT_RUNTIME_NAME(SWIFT_NAME) "
@@ -2694,6 +2723,9 @@ public:
            "#endif\n"
            "#if !defined(SWIFT_AVAILABILITY)\n"
            "# define SWIFT_AVAILABILITY(plat, ...) __attribute__((availability(plat, __VA_ARGS__)))\n"
+           "#endif\n"
+           "#if !defined(SWIFT_WEAK_IMPORT)\n"
+           "# define SWIFT_WEAK_IMPORT __attribute__((weak_import))\n"
            "#endif\n"
            "#if !defined(SWIFT_DEPRECATED)\n"
            "# define SWIFT_DEPRECATED __attribute__((deprecated))\n"

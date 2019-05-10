@@ -1,5 +1,8 @@
 // RUN: %target-typecheck-verify-swift
 // UNSUPPORTED: OS=windows-msvc
+// In Android jmp_buf is int[16], which doesn't convert to &Int (SR-9136)
+// XFAIL: OS=linux-androideabi
+// XFAIL: OS=linux-android
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   import Darwin

@@ -24,10 +24,12 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/DWARFImporter/DWARFImporter.h"
+#include "swift/Frontend/ParseableInterfaceModuleLoader.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
@@ -122,9 +124,8 @@ CompilerInvocation::getParseableInterfaceOutputPathForWholeModule() const {
       .SupplementaryOutputs.ParseableInterfaceOutputPath;
 }
 
-SerializationOptions
-CompilerInvocation::computeSerializationOptions(const SupplementaryOutputPaths &outs,
-                                                bool moduleIsPublic) {
+SerializationOptions CompilerInvocation::computeSerializationOptions(
+    const SupplementaryOutputPaths &outs, bool moduleIsPublic) {
   const FrontendOptions &opts = getFrontendOptions();
 
   SerializationOptions serializationOpts;
@@ -285,23 +286,23 @@ bool CompilerInstance::setUpModuleLoaders() {
   if (hasSourceImport()) {
     bool immediate = FrontendOptions::isActionImmediate(
         Invocation.getFrontendOptions().RequestedAction);
-    bool enableResilience = Invocation.getFrontendOptions().EnableResilience;
+    bool enableLibraryEvolution =
+      Invocation.getFrontendOptions().EnableLibraryEvolution;
     Context->addModuleLoader(SourceLoader::create(*Context,
                                                   !immediate,
-                                                  enableResilience,
+                                                  enableLibraryEvolution,
                                                   getDependencyTracker()));
   }
-  auto MLM = ModuleLoadingMode::OnlySerialized;
-  if (Invocation.getFrontendOptions().EnableParseableModuleInterface) {
-    MLM = ModuleLoadingMode::PreferSerialized;
-  }
+  auto MLM = ModuleLoadingMode::PreferSerialized;
   if (auto forceModuleLoadingMode =
       llvm::sys::Process::GetEnv("SWIFT_FORCE_MODULE_LOADING")) {
-    if (*forceModuleLoadingMode == "prefer-parseable")
+    if (*forceModuleLoadingMode == "prefer-interface" ||
+        *forceModuleLoadingMode == "prefer-parseable")
       MLM = ModuleLoadingMode::PreferParseable;
     else if (*forceModuleLoadingMode == "prefer-serialized")
       MLM = ModuleLoadingMode::PreferSerialized;
-    else if (*forceModuleLoadingMode == "only-parseable")
+    else if (*forceModuleLoadingMode == "only-interface" ||
+             *forceModuleLoadingMode == "only-parseable")
       MLM = ModuleLoadingMode::OnlyParseable;
     else if (*forceModuleLoadingMode == "only-serialized")
       MLM = ModuleLoadingMode::OnlySerialized;
@@ -311,6 +312,13 @@ bool CompilerInstance::setUpModuleLoaders() {
                            *forceModuleLoadingMode);
       return true;
     }
+  }
+
+  if (Invocation.getLangOptions().EnableMemoryBufferImporter) {
+    auto MemoryBufferLoader = MemoryBufferSerializedModuleLoader::create(
+        *Context, getDependencyTracker());
+    this->MemoryBufferLoader = MemoryBufferLoader.get();
+    Context->addModuleLoader(std::move(MemoryBufferLoader));
   }
 
   std::unique_ptr<SerializedModuleLoader> SML =
@@ -331,13 +339,11 @@ bool CompilerInstance::setUpModuleLoaders() {
   if (MLM != ModuleLoadingMode::OnlySerialized) {
     auto const &Clang = clangImporter->getClangInstance();
     std::string ModuleCachePath = getModuleCachePathFromClang(Clang);
-    StringRef PrebuiltModuleCachePath =
-        Invocation.getFrontendOptions().PrebuiltModuleCachePath;
-    auto PIML = ParseableInterfaceModuleLoader::create(*Context,
-                                                       ModuleCachePath,
-                                                       PrebuiltModuleCachePath,
-                                                       getDependencyTracker(),
-                                                       MLM);
+    auto &FEOpts = Invocation.getFrontendOptions();
+    StringRef PrebuiltModuleCachePath = FEOpts.PrebuiltModuleCachePath;
+    auto PIML = ParseableInterfaceModuleLoader::create(
+        *Context, ModuleCachePath, PrebuiltModuleCachePath,
+        getDependencyTracker(), MLM, FEOpts.RemarkOnRebuildFromModuleInterface);
     Context->addModuleLoader(std::move(PIML));
   }
   Context->addModuleLoader(std::move(SML));
@@ -530,7 +536,7 @@ ModuleDecl *CompilerInstance::getMainModule() {
     if (Invocation.getFrontendOptions().EnableImplicitDynamic)
       MainModule->setImplicitDynamicEnabled();
 
-    if (Invocation.getFrontendOptions().EnableResilience)
+    if (Invocation.getFrontendOptions().EnableLibraryEvolution)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
   }
   return MainModule;
@@ -868,7 +874,8 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
   for (auto &PM : PartialModules) {
     assert(PM.ModuleBuffer);
     if (!SML->loadAST(*MainModule, SourceLoc(), std::move(PM.ModuleBuffer),
-                      std::move(PM.ModuleDocBuffer)))
+                      std::move(PM.ModuleDocBuffer), /*isFramework*/false,
+                      /*treatAsPartialModule*/true))
       hadLoadError = true;
   }
 
@@ -1064,6 +1071,7 @@ void CompilerInstance::freeASTContext() {
   Context.reset();
   MainModule = nullptr;
   SML = nullptr;
+  MemoryBufferLoader = nullptr;
   PrimaryBufferIDs.clear();
   PrimarySourceFiles.clear();
 }
@@ -1110,6 +1118,14 @@ static void performSILOptimizations(CompilerInvocation &Invocation,
     runSILOptimizationPassesWithFileSpecification(*SM, CustomPipelinePath);
   } else {
     runSILOptimizationPasses(*SM);
+  }
+  // When building SwiftOnoneSupport.o verify all expected ABI symbols.
+  if (Invocation.getFrontendOptions().CheckOnoneSupportCompleteness
+       // TODO: handle non-ObjC based stdlib builds, e.g. on linux.
+      && Invocation.getLangOptions().EnableObjCInterop
+      && Invocation.getFrontendOptions().RequestedAction
+             == FrontendOptions::ActionType::EmitObject) {
+    checkCompletenessOfPrespecializations(*SM);
   }
 }
 

@@ -93,6 +93,7 @@ _$S3foo3barC3bas3zimyAaEC_tFTo ---> {T:_$S3foo3barC3bas3zimyAaEC_tF,C} @objc foo
 _$SSC3fooyS2d_SdtFTO ---> {T:_$SSC3fooyS2d_SdtF} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double
 _$S3foo3barC3bas3zimyAaEC_tFTo ---> {T:_$S3foo3barC3bas3zimyAaEC_tF,C} @objc foo.bar.bas(zim: foo.zim) -> ()
 _$SSC3fooyS2d_SdtFTO ---> {T:_$SSC3fooyS2d_SdtF} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double
+_$sTA.123 ---> {T:} partial apply forwarder with unmangled suffix ".123"
 _TTDFC3foo3bar3basfT3zimCS_3zim_T_ ---> dynamic foo.bar.bas(zim: foo.zim) -> ()
 _TFC3foo3bar3basfT3zimCS_3zim_T_ ---> foo.bar.bas(zim: foo.zim) -> ()
 _TF3foooi1pFTCS_3barVS_3bas_OS_3zim ---> foo.+ infix(foo.bar, foo.bas) -> foo.zim
@@ -173,9 +174,9 @@ _TtGSaGSqC5sugar7MyClass__ ---> [sugar.MyClass?]
 _TtaC9typealias5DWARF9DIEOffset ---> typealias.DWARF.DIEOffset
 _Tta1t5Alias ---> t.Alias
 _Ttas3Int ---> Swift.Int
-_TTRXFo_dSc_dSb_XFo_iSc_iSb_ ---> reabstraction thunk helper from @callee_owned (@unowned Swift.UnicodeScalar) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.UnicodeScalar) -> (@out Swift.Bool)
-_TTRXFo_dSi_dGSqSi__XFo_iSi_iGSqSi__ ---> reabstraction thunk helper from @callee_owned (@unowned Swift.Int) -> (@unowned Swift.Int?) to @callee_owned (@in Swift.Int) -> (@out Swift.Int?)
-_TTRGrXFo_iV18switch_abstraction1A_ix_XFo_dS0__ix_ ---> reabstraction thunk helper <A> from @callee_owned (@in switch_abstraction.A) -> (@out A) to @callee_owned (@unowned switch_abstraction.A) -> (@out A)
+_TTRXFo_dSc_dSb_XFo_iSc_iSb_ ---> reabstraction thunk helper from @callee_owned (@in Swift.UnicodeScalar) -> (@out Swift.Bool) to @callee_owned (@unowned Swift.UnicodeScalar) -> (@unowned Swift.Bool)
+_TTRXFo_dSi_dGSqSi__XFo_iSi_iGSqSi__ ---> reabstraction thunk helper from @callee_owned (@in Swift.Int) -> (@out Swift.Int?) to @callee_owned (@unowned Swift.Int) -> (@unowned Swift.Int?)
+_TTRGrXFo_iV18switch_abstraction1A_ix_XFo_dS0__ix_ ---> reabstraction thunk helper <A> from @callee_owned (@unowned switch_abstraction.A) -> (@out A) to @callee_owned (@in switch_abstraction.A) -> (@out A)
 _TFCF5types1gFT1bSb_T_L0_10Collection3zimfT_T_ ---> zim() -> () in Collection #2 in types.g(b: Swift.Bool) -> ()
 _TFF17capture_promotion22test_capture_promotionFT_FT_SiU_FT_Si_promote0 ---> closure #1 () -> Swift.Int in capture_promotion.test_capture_promotion() -> () -> Swift.Int with unmangled suffix "_promote0"
 _TFIVs8_Processi10_argumentsGSaSS_U_FT_GSaSS_ ---> _arguments : [Swift.String] in variable initialization expression of Swift._Process with unmangled suffix "U_FT_GSaSS_"
@@ -200,8 +201,9 @@ _TTSgSiS_ ---> _TTSgSiS_
 _TTSgSi__xyz ---> _TTSgSi__xyz
 _TTSr5Si___TF4test7genericurFxx ---> generic not re-abstracted specialization <Swift.Int> of test.generic<A>(A) -> A
 _TTSrq5Si___TF4test7genericurFxx ---> generic not re-abstracted specialization <serialized, Swift.Int> of test.generic<A>(A) -> A
-_TPA__TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_ ---> {T:_TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_} partial apply forwarder for reabstraction thunk helper from @callee_owned (@owned Swift.String, @owned Swift.String) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.String, @in Swift.String) -> (@unowned Swift.Bool)
-_TPAo__TTRGrXFo_dGSPx__dGSPx_zoPs5Error__XFo_iGSPx__iGSPx_zoPS___ ---> {T:_TTRGrXFo_dGSPx__dGSPx_zoPs5Error__XFo_iGSPx__iGSPx_zoPS___} partial apply ObjC forwarder for reabstraction thunk helper <A> from @callee_owned (@unowned Swift.UnsafePointer<A>) -> (@unowned Swift.UnsafePointer<A>, @error @owned Swift.Error) to @callee_owned (@in Swift.UnsafePointer<A>) -> (@out Swift.UnsafePointer<A>, @error @owned Swift.Error)
+_TPA__TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_ ---> {T:_TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_} partial apply forwarder for reabstraction thunk helper from @callee_owned (@in Swift.String, @in Swift.String) -> (@unowned Swift.Bool) to @callee_owned (@owned Swift.String, @owned Swift.String) -> (@unowned Swift.Bool)
+to @callee_owned (@in Swift.String, @in Swift.String) -> (@unowned Swift.Bool)
+_TPAo__TTRGrXFo_dGSPx__dGSPx_zoPs5Error__XFo_iGSPx__iGSPx_zoPS___ ---> {T:_TTRGrXFo_dGSPx__dGSPx_zoPs5Error__XFo_iGSPx__iGSPx_zoPS___} partial apply ObjC forwarder for reabstraction thunk helper <A> from @callee_owned (@in Swift.UnsafePointer<A>) -> (@out Swift.UnsafePointer<A>, @error @owned Swift.Error) to @callee_owned (@unowned Swift.UnsafePointer<A>) -> (@unowned Swift.UnsafePointer<A>, @error @owned Swift.Error)
 _T0S2SSbIxxxd_S2SSbIxiid_TRTA ---> {T:_T0S2SSbIxxxd_S2SSbIxiid_TR} partial apply forwarder for reabstraction thunk helper from @callee_owned (@owned Swift.String, @owned Swift.String) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.String, @in Swift.String) -> (@unowned Swift.Bool)
 _T0SPyxGAAs5Error_pIxydzo_A2AsAB_pIxirzo_lTRTa ---> {T:_T0SPyxGAAs5Error_pIxydzo_A2AsAB_pIxirzo_lTR} partial apply ObjC forwarder for reabstraction thunk helper <A> from @callee_owned (@unowned Swift.UnsafePointer<A>) -> (@unowned Swift.UnsafePointer<A>, @error @owned Swift.Error) to @callee_owned (@in Swift.UnsafePointer<A>) -> (@out Swift.UnsafePointer<A>, @error @owned Swift.Error)
 _TiC4Meow5MyCls9subscriptFT1iSi_Sf ---> Meow.MyCls.subscript(i: Swift.Int) -> Swift.Float
@@ -223,8 +225,8 @@ _TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiS
 _TTSfq1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <serialized, Arg[0] = [Closure Propagated : closure #1 (Swift.Int, Swift.Int) -> () in specgen.caller(Swift.Int) -> (), Argument Types : [Swift.Int]> of specgen.take_closure((Swift.Int, Swift.Int) -> ()) -> ()
 _TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TTSg5Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <Arg[0] = [Closure Propagated : closure #1 (Swift.Int, Swift.Int) -> () in specgen.caller(Swift.Int) -> (), Argument Types : [Swift.Int]> of generic specialization <Swift.Int> of specgen.take_closure((Swift.Int, Swift.Int) -> ()) -> ()
 _TTSg5Si___TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> generic specialization <Swift.Int> of function signature specialization <Arg[0] = [Closure Propagated : closure #1 (Swift.Int, Swift.Int) -> () in specgen.caller(Swift.Int) -> (), Argument Types : [Swift.Int]> of specgen.take_closure((Swift.Int, Swift.Int) -> ()) -> ()
-_TTSf1cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_dT__XFo_iSi_dT__ ---> function signature specialization <Arg[0] = [Constant Propagated Function : capturep.helper(Swift.Int) -> ()]> of reabstraction thunk helper from @callee_owned (@unowned Swift.Int) -> (@unowned ()) to @callee_owned (@in Swift.Int) -> (@unowned ())
-_TTSf1cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_DT__XFo_iSi_DT__ ---> function signature specialization <Arg[0] = [Constant Propagated Function : capturep.helper(Swift.Int) -> ()]> of reabstraction thunk helper from @callee_owned (@unowned Swift.Int) -> (@unowned_inner_pointer ()) to @callee_owned (@in Swift.Int) -> (@unowned_inner_pointer ())
+_TTSf1cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_dT__XFo_iSi_dT__ ---> function signature specialization <Arg[0] = [Constant Propagated Function : capturep.helper(Swift.Int) -> ()]> of reabstraction thunk helper from @callee_owned (@in Swift.Int) -> (@unowned ()) to @callee_owned (@unowned Swift.Int) -> (@unowned ())
+_TTSf1cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_DT__XFo_iSi_DT__ ---> function signature specialization <Arg[0] = [Constant Propagated Function : capturep.helper(Swift.Int) -> ()]> of reabstraction thunk helper from @callee_owned (@in Swift.Int) -> (@unowned_inner_pointer ()) to @callee_owned (@unowned Swift.Int) -> (@unowned_inner_pointer ())
 _TTSf1cpi0_cpfl0_cpse0v4u123_cpg53globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8_cpfr36_TFtest_capture_propagation2_closure___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <Arg[0] = [Constant Propagated Integer : 0], Arg[1] = [Constant Propagated Float : 0], Arg[2] = [Constant Propagated String : u8'u123'], Arg[3] = [Constant Propagated Global : globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8], Arg[4] = [Constant Propagated Function : _TFtest_capture_propagation2_closure]> of specgen.take_closure((Swift.Int, Swift.Int) -> ()) -> ()
 _TTSf0gs___TFVs17_LegacyStringCore15_invariantCheckfT_T_ ---> function signature specialization <Arg[0] = Owned To Guaranteed and Exploded> of Swift._LegacyStringCore._invariantCheck() -> ()
 _TTSf2g___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Owned To Guaranteed> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore
@@ -241,7 +243,7 @@ _TTWurGV23interface_type_mangling18GenericTypeContextx_S_18GenericWitnessTestS_F
 _TFC3red11BaseClassEHcfzT1aSi_S0_ ---> red.BaseClassEH.init(a: Swift.Int) throws -> red.BaseClassEH
 _TFe27mangling_generic_extensionsRxS_8RunciblerVS_3Foog1aSi ---> (extension in mangling_generic_extensions):mangling_generic_extensions.Foo<A where A: mangling_generic_extensions.Runcible>.a.getter : Swift.Int
 _TFe27mangling_generic_extensionsRxS_8RunciblerVS_3Foog1bx ---> (extension in mangling_generic_extensions):mangling_generic_extensions.Foo<A where A: mangling_generic_extensions.Runcible>.b.getter : A
-_TTRXFo_iT__iT_zoPs5Error__XFo__dT_zoPS___ ---> reabstraction thunk helper from @callee_owned (@in ()) -> (@out (), @error @owned Swift.Error) to @callee_owned () -> (@unowned (), @error @owned Swift.Error)
+_TTRXFo_iT__iT_zoPs5Error__XFo__dT_zoPS___ ---> reabstraction thunk helper from @callee_owned () -> (@unowned (), @error @owned Swift.Error) to @callee_owned (@in ()) -> (@out (), @error @owned Swift.Error)
 _TFE1a ---> _TFE1a
 _TF21$__lldb_module_for_E0au3$E0Ps5Error_ ---> $__lldb_module_for_E0.$E0.unsafeMutableAddressor : Swift.Error
 _TMps10Comparable ---> protocol descriptor for Swift.Comparable
@@ -324,6 +326,7 @@ _$S3BBBBf0602365061_ ---> _$S3BBBBf0602365061_
 _$S3BBBBi0602365061_ ---> _$S3BBBBi0602365061_
 _$S3BBBBv0602365061_ ---> _$S3BBBBv0602365061_
 _T0lxxxmmmTk ---> _T0lxxxmmmTk
+$s4test3fooV4blahyAA1SV1fQryFQOy_Qo_AHF ---> test.foo.blah(<<opaque return type of test.S.f() -> some>>.0) -> <<opaque return type of test.S.f() -> some>>.0
 $S3nix8MystructV1xACyxGx_tcfc7MyaliasL_ayx__GD ---> Myalias #1 in nix.Mystruct<A>.init(x: A) -> nix.Mystruct<A>
 $S3nix7MyclassCfd7MyaliasL_ayx__GD ---> Myalias #1 in nix.Myclass<A>.deinit
 $S3nix8MystructVyS2icig7MyaliasL_ayx__GD ---> Myalias #1 in nix.Mystruct<A>.subscript.getter : (Swift.Int) -> Swift.Int

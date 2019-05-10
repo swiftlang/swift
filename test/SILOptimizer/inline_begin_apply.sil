@@ -185,23 +185,22 @@ cont:
 // CHECK-NEXT:   %2 = function_ref @marker
 // CHECK-NEXT:   %3 = integer_literal $Builtin.Int32, 1000
 // CHECK-NEXT:   %4 = apply %2(%3)
+// CHECK-NEXT:   destroy_value %1
 // CHECK-NEXT:   cond_br %0, bb1, bb2
 // CHECK:      bb1:
 // CHECK-NEXT:   [[T0:%.*]] = integer_literal $Builtin.Int32, 2000
 // CHECK-NEXT:   apply %2([[T0]])
-// CHECK-NEXT:   destroy_value %1 : $SomeClass
 // CHECK-NEXT:   tuple ()
 // CHECK-NEXT:   br bb3
 // CHECK:      bb2:
 // CHECK-NEXT:   [[T1:%.*]] = integer_literal $Builtin.Int32, 3000
 // CHECK-NEXT:   apply %2([[T1]])
-// CHECK-NEXT:   destroy_value %1 : $SomeClass
 // CHECK-NEXT:   br bb3
 // CHECK:      bb3:
 // CHECK-NEXT:   [[T0:%.*]] = tuple ()
 // CHECK-NEXT:   return [[T0]] : $()
 
-sil [transparent] [ossa] [ossa] @yield_owned : $@yield_once(@owned SomeClass) -> (@yields @owned SomeClass) {
+sil [transparent] [ossa] @yield_owned : $@yield_once(@owned SomeClass) -> (@yields @owned SomeClass) {
 entry(%0 : @owned $SomeClass):
   %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
   %1000 = integer_literal $Builtin.Int32, 1000
@@ -211,14 +210,12 @@ entry(%0 : @owned $SomeClass):
 resume:
   %2000 = integer_literal $Builtin.Int32, 2000
   apply %marker(%2000) : $@convention(thin) (Builtin.Int32) -> ()
-  destroy_value %0: $SomeClass
   %ret = tuple ()
   return %ret : $()
 
 unwind:
   %3000 = integer_literal $Builtin.Int32, 3000
   apply %marker(%3000) : $@convention(thin) (Builtin.Int32) -> ()
-  destroy_value %0: $SomeClass
   unwind
 }
 
@@ -226,6 +223,7 @@ sil [ossa] @test_simple_call_yield_owned : $(Builtin.Int1, @owned SomeClass) -> 
 entry(%flag : $Builtin.Int1, %c: @owned $SomeClass):
   %0 = function_ref @yield_owned : $@convention(thin) @yield_once(@owned SomeClass) -> (@yields @owned SomeClass)
   (%value, %token) = begin_apply %0(%c) : $@convention(thin) @yield_once(@owned SomeClass) -> (@yields @owned SomeClass)
+  destroy_value %value : $SomeClass
   cond_br %flag, yes, no
 
 yes:
@@ -494,8 +492,6 @@ bb0:
 // CHECK:   dealloc_stack [[A32]] : $*Builtin.Int32
 // CHECK:   unreachable
 // CHECK: bb2:
-// CHECK:   dealloc_stack [[A32]] : $*Builtin.Int32
-// CHECK:   dealloc_stack [[A16]] : $*Builtin.Int16
 // CHECK:   unreachable
 // CHECK: bb3:
 // CHECK:   dealloc_stack [[A32]] : $*Builtin.Int32

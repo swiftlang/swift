@@ -3,8 +3,8 @@
 // RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_struct.swiftmodule %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_class.swiftmodule %S/../Inputs/resilient_class.swift
 
-// Note: we build fixed_layout_class without -enable-resilience, since with
-// -enable-resilience even @_fixed_layout classes have resilient metadata, and
+// Note: we build fixed_layout_class without -enable-library-evolution, since with
+// -enable-library-evolution even @_fixed_layout classes have resilient metadata, and
 // we want to test the fragile access pattern here.
 
 // RUN: %target-swift-frontend -emit-module -I %t -o %t %S/../Inputs/fixed_layout_class.swift
@@ -126,6 +126,7 @@ public class ChildToResilientParent : ResilientOutsideParent {
     // CHECK:   [[FUNC:%.*]] = super_method [[METASELF]] : $@thick ChildToResilientParent.Type, #ResilientOutsideParent.classMethod!1 : (ResilientOutsideParent.Type) -> () -> ()
     // CHECK:   apply [[FUNC]]([[UPCAST_CAST_METASELF]])
     // CHECK: unreachable
+    _ = 0
     super.classMethod()
   }
   // CHECK: } // end sil function '$s5super22ChildToResilientParentC11returnsSelfACXDyFZ'
@@ -164,6 +165,7 @@ public class ChildToFixedParent : OutsideParent {
     // CHECK:   [[FUNC:%.*]] = super_method [[SELF]] : $@thick ChildToFixedParent.Type, #OutsideParent.classMethod!1 : (OutsideParent.Type) -> () -> ()
     // CHECK:   apply [[FUNC]]([[SECOND_CAST]])
     // CHECK:   unreachable
+    _ = 0
     super.classMethod()
   }
   // CHECK: } // end sil function '$s5super18ChildToFixedParentC11returnsSelfACXDyFZ'

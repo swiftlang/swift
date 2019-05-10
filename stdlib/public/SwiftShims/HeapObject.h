@@ -93,8 +93,6 @@ __swift_size_t swift_weakRetainCount(HeapObject *obj);
 #endif
 
 #ifdef __cplusplus
-static_assert(swift::IsTriviallyConstructible<HeapObject>::value,
-              "HeapObject must be trivially initializable");
 static_assert(std::is_trivially_destructible<HeapObject>::value,
               "HeapObject must be trivially destructible");
 

@@ -162,6 +162,10 @@ typedef SInt32 OSStatus;
 
 // Types from stdint.h.
 #include <stdint.h>
+#if defined(_WIN32)
+typedef __INTPTR_TYPE__ intptr_t;
+typedef __UINTPTR_TYPE__ uintptr_t;
+#endif
 STDLIB_TEST(__UINT8_TYPE__, uint8_t);
 STDLIB_TEST(__UINT16_TYPE__, uint16_t);
 STDLIB_TEST(__UINT32_TYPE__, uint32_t);

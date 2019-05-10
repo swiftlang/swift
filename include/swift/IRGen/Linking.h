@@ -49,12 +49,16 @@ public:
   /// True iff are multiple llvm modules.
   bool HasMultipleIGMs;
 
+  /// When this is true, the linkage for forward-declared private symbols will
+  /// be promoted to public external. Used by the LLDB expression evaluator.
+  bool ForcePublicDecls;
+
   bool IsWholeModule;
 
   explicit UniversalLinkageInfo(IRGenModule &IGM);
 
   UniversalLinkageInfo(const llvm::Triple &triple, bool hasMultipleIGMs,
-                       bool isWholeModule);
+                       bool forcePublicDecls, bool isWholeModule);
 
   /// In case of multiple llvm modules (in multi-threaded compilation) all
   /// private decls must be visible from other files.
@@ -66,6 +70,12 @@ public:
   /// IRGen into different object files and the linker would complain about
   /// duplicate symbols.
   bool needLinkerToMergeDuplicateSymbols() const { return HasMultipleIGMs; }
+
+  /// This  is used  by  the  LLDB expression  evaluator  since an  expression's
+  /// llvm::Module  may   need  to  access   private  symbols  defined   in  the
+  /// expression's  context.  This  flag  ensures  that  private  accessors  are
+  /// forward-declared as public external in the expression's module.
+  bool forcePublicDecls() const { return ForcePublicDecls; }
 };
 
 /// Selector for type metadata symbol kinds.
@@ -96,7 +106,7 @@ class LinkEntity {
     // This field appears in the ValueWitness kind.
     ValueWitnessShift = 8, ValueWitnessMask = 0xFF00,
 
-    // This field appears in the TypeMetadata kind.
+    // This field appears in the TypeMetadata and ObjCResilientClassStub kinds.
     MetadataAddressShift = 8, MetadataAddressMask = 0x0300,
 
     // This field appears in associated type access functions.
@@ -164,6 +174,12 @@ class LinkEntity {
     /// ClassMetadataStrategy::Update or ::FixedOrUpdate.
     ObjCMetadataUpdateFunction,
 
+    /// A stub that we emit to allow Clang-generated code to statically refer
+    /// to Swift classes with resiliently-sized metadata, since the metadata
+    /// is not statically-emitted. Used when getClassMetadataStrategy() is
+    /// equal to ClassMetadataStrategy::Resilient.
+    ObjCResilientClassStub,
+
     /// A class metadata base offset global variable.  This stores the offset
     /// of the immediate members of a class (generic parameters, field offsets,
     /// vtable offsets) in the class's metadata.  The immediate members begin
@@ -179,6 +195,28 @@ class LinkEntity {
     /// The nominal type descriptor for a nominal type.
     /// The pointer is a NominalTypeDecl*.
     NominalTypeDescriptor,
+    
+    /// The descriptor for an opaque type.
+    /// The pointer is an OpaqueTypeDecl*.
+    OpaqueTypeDescriptor,
+
+    /// The descriptor accessor for an opaque type used for dynamic functions.
+    /// The pointer is an OpaqueTypeDecl*.
+    OpaqueTypeDescriptorAccessor,
+
+    /// The descriptor accessor implementation for an opaque type used for
+    /// dynamic functions.
+    /// The pointer is an OpaqueTypeDecl*.
+    OpaqueTypeDescriptorAccessorImpl,
+
+    /// The descriptor accessor key of dynamic replacements for an opaque type.
+    /// The pointer is an OpaqueTypeDecl*.
+    OpaqueTypeDescriptorAccessorKey,
+
+    /// The descriptor accessor variable of dynamic replacements for an opaque
+    /// type.
+    /// The pointer is an OpaqueTypeDecl*.
+    OpaqueTypeDescriptorAccessorVar,
 
     /// The metadata pattern for a generic nominal type.
     /// The pointer is a NominalTypeDecl*.
@@ -329,10 +367,6 @@ class LinkEntity {
     /// A lazy cache variable for type metadata.
     /// The pointer is a canonical TypeBase*.
     TypeMetadataLazyCacheVariable,
-
-    /// A foreign type metadata candidate.
-    /// The pointer is a canonical TypeBase*.
-    ForeignTypeMetadataCandidate,
 
     /// A reflection metadata descriptor for a builtin or imported type.
     ReflectionBuiltinDescriptor,
@@ -613,13 +647,19 @@ public:
     return entity;
   }
 
+  static LinkEntity forObjCResilientClassStub(ClassDecl *decl,
+                                              TypeMetadataAddress addr) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ObjCResilientClassStub, decl);
+    entity.Data |= LINKENTITY_SET_FIELD(MetadataAddress, unsigned(addr));
+    return entity;
+  }
+
   static LinkEntity forTypeMetadata(CanType concreteType,
                                     TypeMetadataAddress addr) {
     LinkEntity entity;
-    entity.Pointer = concreteType.getPointer();
-    entity.SecondaryPointer = nullptr;
-    entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::TypeMetadata))
-                | LINKENTITY_SET_FIELD(MetadataAddress, unsigned(addr));
+    entity.setForType(Kind::TypeMetadata, concreteType);
+    entity.Data |= LINKENTITY_SET_FIELD(MetadataAddress, unsigned(addr));
     return entity;
   }
 
@@ -666,12 +706,6 @@ public:
     return entity;
   }
 
-  static LinkEntity forForeignTypeMetadataCandidate(CanType type) {
-    LinkEntity entity;
-    entity.setForType(Kind::ForeignTypeMetadataCandidate, type);
-    return entity;
-  }
-
   static LinkEntity forClassMetadataBaseOffset(ClassDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::ClassMetadataBaseOffset, decl);
@@ -681,6 +715,36 @@ public:
   static LinkEntity forNominalTypeDescriptor(NominalTypeDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::NominalTypeDescriptor, decl);
+    return entity;
+  }
+
+  static LinkEntity forOpaqueTypeDescriptor(OpaqueTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::OpaqueTypeDescriptor, decl);
+    return entity;
+  }
+
+  static LinkEntity forOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::OpaqueTypeDescriptorAccessor, decl);
+    return entity;
+  }
+
+  static LinkEntity forOpaqueTypeDescriptorAccessorImpl(OpaqueTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::OpaqueTypeDescriptorAccessorImpl, decl);
+    return entity;
+  }
+
+  static LinkEntity forOpaqueTypeDescriptorAccessorKey(OpaqueTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::OpaqueTypeDescriptorAccessorKey, decl);
+    return entity;
+  }
+
+  static LinkEntity forOpaqueTypeDescriptorAccessorVar(OpaqueTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::OpaqueTypeDescriptorAccessorVar, decl);
     return entity;
   }
 
@@ -706,9 +770,10 @@ public:
     return entity;
   }
 
-  static LinkEntity forAnonymousDescriptor(DeclContext *dc) {
+  static LinkEntity forAnonymousDescriptor(
+                                    PointerUnion<DeclContext *, VarDecl *> dc) {
     LinkEntity entity;
-    entity.Pointer = const_cast<void*>(static_cast<const void*>(dc));
+    entity.Pointer = dc.getOpaqueValue();
     entity.SecondaryPointer = nullptr;
     entity.Data =
       LINKENTITY_SET_FIELD(Kind, unsigned(Kind::AnonymousDescriptor));
@@ -951,9 +1016,10 @@ public:
     return reinterpret_cast<ExtensionDecl*>(Pointer);
   }
 
-  const DeclContext *getDeclContext() const {
+  const PointerUnion<DeclContext *, VarDecl *> getAnonymousDeclContext() const {
     assert(getKind() == Kind::AnonymousDescriptor);
-    return reinterpret_cast<DeclContext*>(Pointer);
+    return PointerUnion<DeclContext *, VarDecl *>
+      ::getFromOpaqueValue(reinterpret_cast<void*>(Pointer));
   }
 
   SILFunction *getSILFunction() const {
@@ -1021,17 +1087,18 @@ public:
     return ValueWitness(LINKENTITY_GET_FIELD(Data, ValueWitness));
   }
   TypeMetadataAddress getMetadataAddress() const {
-    assert(getKind() == Kind::TypeMetadata);
+    assert(getKind() == Kind::TypeMetadata ||
+           getKind() == Kind::ObjCResilientClassStub);
     return (TypeMetadataAddress)LINKENTITY_GET_FIELD(Data, MetadataAddress);
-  }
-  bool isForeignTypeMetadataCandidate() const {
-    return getKind() == Kind::ForeignTypeMetadataCandidate;
   }
   bool isObjCClassRef() const {
     return getKind() == Kind::ObjCClassRef;
   }
   bool isSILFunction() const {
     return getKind() == Kind::SILFunction;
+  }
+  bool isNominalTypeDescriptor() const {
+    return getKind() == Kind::NominalTypeDescriptor;
   }
 
   /// Determine whether this entity will be weak-imported.
@@ -1062,6 +1129,7 @@ struct IRLinkage {
   static const IRLinkage Internal;
 
   static const IRLinkage ExternalImport;
+  static const IRLinkage ExternalWeakImport;
   static const IRLinkage ExternalExport;
 };
 

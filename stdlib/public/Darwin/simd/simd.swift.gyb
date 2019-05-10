@@ -18,6 +18,7 @@ import Darwin
 
 public extension SIMD {
   @available(swift, deprecated:5, renamed: "init(repeating:)")
+  @_transparent
   init(_ scalar: Scalar) { self.init(repeating: scalar) }
 }
 
@@ -35,6 +36,7 @@ internal extension SIMD4 {
 
 public extension SIMD where Scalar : FixedWidthInteger {
   @available(swift, deprecated:5, message: "use 0 &- rhs")
+  @_transparent
   static prefix func -(rhs: Self) -> Self { return 0 &- rhs }
 }
 
@@ -42,23 +44,19 @@ public extension SIMD where Scalar : FixedWidthInteger {
 component = ['x','y','z','w']
 scalar_types = ['Float','Double','Int32','UInt32']
 ctype = { 'Float':'float', 'Double':'double', 'Int32':'int', 'UInt32':'uint'}
-llvm_type = { 'Float':'FPIEEE32', 'Double':'FPIEEE64', 'Int32':'Int32', 'UInt32':'Int32' }
 floating_types = ['Float','Double']
-cardinal = { 2:'two', 3:'three', 4:'four'}
 }%
 
 %for scalar in scalar_types:
 % for count in [2, 3, 4]:
 %  vectype = ctype[scalar] + str(count)
-%  llvm_vectype = "Vec" + str(count) + "x" + llvm_type[scalar]
 %  vecsize = (8 if scalar == 'Double' else 4) * (4 if count == 3 else count)
 %  vecalign = (16 if vecsize > 16 else vecsize)
-%  extractelement = "extractelement_" + llvm_vectype + "_Int32"
-%  insertelement = "insertelement_" + llvm_vectype + "_" + llvm_type[scalar] + "_Int32"
 %  is_floating = scalar in floating_types
 %  is_signed = scalar[0] != 'U'
 %  wrap = "" if is_floating else "&"
 
+@available(swift, deprecated: 5.1, message: "Use SIMD${count}<${scalar}>")
 public typealias ${vectype} = SIMD${count}<${scalar}>
 
 %  if is_signed:
@@ -88,14 +86,14 @@ public func max(_ x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
 /// corresponding element of the input vector and the scalar.
 @_transparent
 public func min(_ vector: ${vectype}, _ scalar: ${scalar}) -> ${vectype} {
-  return min(vector, ${vectype}(scalar))
+  return min(vector, ${vectype}(repeating: scalar))
 }
 
 /// Vector-scalar maximum.  Each component of the result is the maximum of the
 /// corresponding element of the input vector and the scalar.
 @_transparent
 public func max(_ vector: ${vectype}, _ scalar: ${scalar}) -> ${vectype} {
-  return max(vector, ${vectype}(scalar))
+  return max(vector, ${vectype}(repeating: scalar))
 }
 
 /// Each component of the result is the corresponding element of `x` clamped to
@@ -372,7 +370,7 @@ extension ${mattype} {
 
   /// Initialize matrix to have `scalar` on main diagonal, zeros elsewhere.
   public init(_ scalar: ${type}) {
-    self.init(diagonal: ${diagtype}(scalar))
+    self.init(diagonal: ${diagtype}(repeating: scalar))
   }
 
   /// Initialize matrix to have specified `diagonal`, and zeros elsewhere.

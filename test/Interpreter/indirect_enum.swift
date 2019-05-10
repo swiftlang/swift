@@ -1,8 +1,12 @@
 // RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=address -o %t_asan-binary
 // RUN: %target-codesign %t_asan-binary
 // RUN: env ASAN_OPTIONS=detect_leaks=0 %target-run %t_asan-binary
+
 // REQUIRES: executable_test
 // REQUIRES: asan_runtime
+
+// rdar://problem/47367694 tracks re-enabling this test for backward deployment.
+// UNSUPPORTED: remote_run
 
 // Make sure that we do not use-after-free here.
 

@@ -155,8 +155,20 @@ static inline locale_t getCLocale() {
   // as C locale.
   return nullptr;
 }
-#elif defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__)
+#elif defined(__CYGWIN__) || defined(__HAIKU__)
 // In Cygwin, getCLocale() is not used.
+#elif defined(_WIN32)
+static _locale_t makeCLocale() {
+  _locale_t CLocale = _create_locale(LC_ALL, "C");
+  if (!CLocale) {
+    swift::crash("makeCLocale: _create_locale() returned a null pointer");
+  }
+  return CLocale;
+}
+
+static _locale_t getCLocale() {
+  return SWIFT_LAZY_CONSTANT(makeCLocale());
+}
 #else
 static locale_t makeCLocale() {
   locale_t CLocale = newlocale(LC_ALL_MASK, "C", nullptr);
@@ -373,7 +385,7 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
 
 #if defined(_WIN32)
 template <>
-static const char *
+const char *
 _swift_stdlib_strtoX_clocale_impl<float>(const char *str, float *result) {
   if (swift_stringIsSignalingNaN(str)) {
     *result = std::numeric_limits<float>::signaling_NaN();
@@ -381,12 +393,12 @@ _swift_stdlib_strtoX_clocale_impl<float>(const char *str, float *result) {
   }
 
   char *end;
-  *result = std::strtof(str, &end);
+  *result = _strtof_l(str, &end, getCLocale());
   return end;
 }
 
 template <>
-static const char *
+const char *
 _swift_stdlib_strtoX_clocale_impl<double>(const char *str, double *result) {
   if (swift_stringIsSignalingNaN(str)) {
     *result = std::numeric_limits<double>::signaling_NaN();
@@ -394,12 +406,12 @@ _swift_stdlib_strtoX_clocale_impl<double>(const char *str, double *result) {
   }
 
   char *end;
-  *result = std::strtod(str, &end);
+  *result = _strtod_l(str, &end, getCLocale());
   return end;
 }
 
 template <>
-static const char *
+const char *
 _swift_stdlib_strtoX_clocale_impl<long double>(const char *str, long double *result) {
   if (swift_stringIsSignalingNaN(str)) {
     *result = std::numeric_limits<long double>::signaling_NaN();
@@ -407,7 +419,7 @@ _swift_stdlib_strtoX_clocale_impl<long double>(const char *str, long double *res
   }
 
   char *end;
-  *result = std::strtold(str, &end);
+  *result = _strtod_l(str, &end, getCLocale());
   return end;
 }
 #endif

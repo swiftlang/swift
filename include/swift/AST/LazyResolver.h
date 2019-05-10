@@ -159,8 +159,8 @@ public:
                       SmallVectorImpl<ProtocolConformance *> &Conformances) = 0;
 
   /// Returns the default definition type for \p ATD.
-  virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
-                                            uint64_t contextData) = 0;
+  virtual Type loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
+                                         uint64_t contextData) = 0;
 
   /// Returns the generic environment.
   virtual GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,

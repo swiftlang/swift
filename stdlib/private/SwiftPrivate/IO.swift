@@ -161,6 +161,9 @@ public struct _Stderr : TextOutputStream {
 #if os(Windows)
 public struct _FDOutputStream : TextOutputStream {
   public var handle: HANDLE
+  public var isClosed: Bool {
+    return handle == INVALID_HANDLE_VALUE
+  }
 
   public init(handle: HANDLE) {
     self.handle = handle
@@ -172,9 +175,9 @@ public struct _FDOutputStream : TextOutputStream {
       var dwOffset: DWORD = 0
       while dwOffset < dwLength {
         var dwBytesWritten: DWORD = 0
-        if WriteFile(handle,
-                     UnsafeRawPointer(buffer.baseAddress! + Int(dwOffset)),
-                     dwLength - dwOffset, &dwBytesWritten, nil) == FALSE {
+        if !WriteFile(handle,
+                      UnsafeRawPointer(buffer.baseAddress! + Int(dwOffset)),
+                      dwLength - dwOffset, &dwBytesWritten, nil) {
           fatalError("WriteFile() failed")
         }
         dwOffset += dwBytesWritten

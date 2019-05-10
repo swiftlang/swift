@@ -21,7 +21,7 @@ internal protocol _AbstractStringStorage : _NSCopying {
   var count: Int { get }
   var isASCII: Bool { get }
   var start: UnsafePointer<UInt8> { get }
-  var length: Int { get } // In UTF16 code units.
+  var UTF16Length: Int { get }
 }
 
 internal let _cocoaASCIIEncoding:UInt = 1 /* NSASCIIStringEncoding */
@@ -141,16 +141,26 @@ extension _AbstractStringStorage {
       }
       // At this point we've proven that it is an NSString of some sort, but not
       // one of ours.
-      if length != _stdlib_binary_CFStringGetLength(other) {
-        return 0
-      }
+
       defer { _fixLifetime(other) }
+      
+      let otherUTF16Length = _stdlib_binary_CFStringGetLength(other)
+      
       // CFString will only give us ASCII bytes here, but that's fine.
       // We already handled non-ASCII UTF8 strings earlier since they're Swift.
       if let otherStart = _cocoaUTF8Pointer(other) {
+        //We know that otherUTF16Length is also its byte count at this point
+        if count != otherUTF16Length {
+          return 0
+        }
         return (start == otherStart ||
           (memcmp(start, otherStart, count) == 0)) ? 1 : 0
       }
+      
+      if UTF16Length != otherUTF16Length {
+        return 0
+      }
+      
       /*
        The abstract implementation of -isEqualToString: falls back to -compare:
        immediately, so when we run out of fast options to try, do the same.
@@ -221,7 +231,7 @@ final internal class __StringStorage
 #if _runtime(_ObjC)
 
   @objc(length)
-  final internal var length: Int {
+  final internal var UTF16Length: Int {
     @_effects(readonly) @inline(__always) get {
       return asString.utf16.count // UTF16View special-cases ASCII for us.
     }
@@ -423,8 +433,9 @@ extension __StringStorage {
   private var mutableStart: UnsafeMutablePointer<UInt8> {
     return UnsafeMutablePointer(Builtin.projectTailElems(self, UInt8.self))
   }
+  @inline(__always)
   private var mutableEnd: UnsafeMutablePointer<UInt8> {
-    @inline(__always) get { return mutableStart + count }
+     return mutableStart + count
   }
 
   @inline(__always)
@@ -432,19 +443,20 @@ extension __StringStorage {
      return UnsafePointer(mutableStart)
   }
 
+  @inline(__always)
   private final var end: UnsafePointer<UInt8> {
-    @inline(__always) get { return UnsafePointer(mutableEnd) }
+    return UnsafePointer(mutableEnd)
   }
 
   // Point to the nul-terminator.
+  @inline(__always)
   private final var terminator: UnsafeMutablePointer<UInt8> {
-    @inline(__always) get { return mutableEnd }
+    return mutableEnd
   }
 
+  @inline(__always)
   private var codeUnits: UnsafeBufferPointer<UInt8> {
-    @inline(__always) get {
-      return UnsafeBufferPointer(start: start, count: count)
-    }
+    return UnsafeBufferPointer(start: start, count: count)
   }
 
   // @opaque
@@ -467,18 +479,15 @@ extension __StringStorage {
   // required nul-terminator.
   //
   // NOTE: Callers who wish to mutate this storage should enfore nul-termination
+  @inline(__always)
   private var unusedStorage: UnsafeMutableBufferPointer<UInt8> {
-    @inline(__always) get {
-      return UnsafeMutableBufferPointer(
-        start: mutableEnd, count: unusedCapacity)
-    }
+    return UnsafeMutableBufferPointer(
+      start: mutableEnd, count: unusedCapacity)
   }
 
   // The capacity available for appending. Note that this excludes the required
   // nul-terminator.
-  internal var unusedCapacity: Int {
-    get { return _realCapacity &- count &- 1 }
-  }
+  internal var unusedCapacity: Int { return _realCapacity &- count &- 1 }
 
   #if !INTERNAL_CHECKS_ENABLED
   @inline(__always) internal func _invariantCheck() {}
@@ -491,6 +500,8 @@ extension __StringStorage {
     _internalInvariant(rawSelf + Int(_StringObject.nativeBias) == rawStart)
     _internalInvariant(self._realCapacity > self.count, "no room for nul-terminator")
     _internalInvariant(self.terminator.pointee == 0, "not nul terminated")
+    let str = asString
+    _internalInvariant(str._guts._object.isPreferredRepresentation)
 
     _countAndFlags._invariantCheck()
     if isASCII {
@@ -700,7 +711,7 @@ final internal class __SharedStringStorage
 #if _runtime(_ObjC)
 
   @objc(length)
-  final internal var length: Int {
+  final internal var UTF16Length: Int {
     @_effects(readonly) get {
       return asString.utf16.count // UTF16View special-cases ASCII for us.
     }
@@ -803,6 +814,8 @@ extension __SharedStringStorage {
     _countAndFlags._invariantCheck()
     _internalInvariant(!_countAndFlags.isNativelyStored)
     _internalInvariant(!_countAndFlags.isTailAllocated)
+    let str = asString
+    _internalInvariant(!str._guts._object.isPreferredRepresentation)
   }
 #endif // INTERNAL_CHECKS_ENABLED
 }

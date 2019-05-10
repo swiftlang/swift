@@ -805,6 +805,7 @@ const TypeContextDescriptor *swift_getTypeContextDescriptor(const Metadata *type
 SWIFT_RUNTIME_EXPORT
 const HeapObject *swift_getKeyPath(const void *pattern, const void *arguments);
 
+#if defined(swiftCore_EXPORTS)
 /// Given a pointer to a borrowed value of type `Root` and a
 /// `KeyPath<Root, Value>`, project a pointer to a borrowed value of type
 /// `Value`.
@@ -826,6 +827,7 @@ swift_modifyAtWritableKeyPath;
 SWIFT_RUNTIME_EXPORT
 YieldOnceCoroutine<OpaqueValue* (const OpaqueValue *root, void *keyPath)>::type
 swift_modifyAtReferenceWritableKeyPath;
+#endif
 
 SWIFT_RUNTIME_EXPORT
 void swift_enableDynamicReplacementScope(const DynamicReplacementScope *scope);

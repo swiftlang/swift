@@ -394,6 +394,78 @@ struct MyStruct : Foo {
   return getName(u) == "MyStruct" ? 0 : 1
 }
 
+protocol RP {
+  var val:Int32 {get set}
+}
+class RC: RP {
+  var val:Int32
+  init(val:Int32) { self.val = val }
+}
+
+// Note: The checks below must ensure that the function signature "@inline(never) func find(base:Int32, mult:Int32, Obj1: RP) -> Bool" has been turned into a protocol-constrained generic function via existential  specialization, i.e., "function_ref @$s21existential_transform4find4base4mult4Obj1Sbs5Int32V_AgA2RP_ptFTf4nne_n : $@convention(thin) <τ_0_0 where τ_0_0 : RP> (Int32, Int32, @in_guaranteed τ_0_0) -> Bool". Same is true for the recursive function call for "return find (base: base, mult: mult+1, Obj1: Obj1)". Please refer to existential_specializer_soletype.sil test for SIL level testing. This test makes sure that nothing else breaks when we run end-to-end.
+// CHECK-LABEL: sil shared [noinline] @$s21existential_transform4find4base4mult4Obj1Sbs5Int32V_AgA2RP_ptFTf4nne_n : $@convention(thin) <τ_0_0 where τ_0_0 : RP> (Int32, Int32, @in_guaranteed τ_0_0) -> Bool {
+// CHECK: bb0
+// CHECK:   alloc_stack $RP
+// CHECK:   init_existential_addr
+// CHECK:   copy_addr
+// CHECK:   debug_value
+// CHECK:   debug_value
+// CHECK:   debug_value_addr
+// CHECK:   struct_extract
+// CHECK:   struct_extract
+// CHECK:   integer_literal
+// CHECK:   builtin
+// CHECK:   tuple_extract
+// CHECK:   tuple_extract
+// CHECK:   cond_fail
+// CHECK:   open_existential_addr
+// CHECK:   witness_method
+// CHECK:   apply
+// CHECK:   struct_extract
+// CHECK:   builtin
+// CHECK:   cond_br
+// CHECK: bb1:
+// CHECK:   integer_literal
+// CHECK:   struct
+// CHECK:   br
+// CHECK: bb2:
+// CHECK:   open_existential_addr
+// CHECK:   witness_method
+// CHECK:   apply
+// CHECK:   struct_extract
+// CHECK:   builtin
+// CHECK:   cond_br
+// CHECK: bb3
+// CHECK:   dealloc_stack
+// CHECK:   return
+// CHECK: bb4:
+// CHECK:   struct
+// CHECK:   br
+// CHECK: bb5:
+// CHECK:   integer_literal
+// CHECK:   builtin
+// CHECK:   tuple_extract
+// CHECK:   tuple_extract
+// CHECK:   cond_fail
+// CHECK:   struct
+// CHECK:   function_ref @$s21existential_transform4find4base4mult4Obj1Sbs5Int32V_AgA2RP_ptFTf4nne_n : $@convention(thin) <τ_0_0 where τ_0_0 : RP> (Int32, Int32, @in_guaranteed τ_0_0) -> Bool
+// CHECK:   open_existential_addr
+// CHECK:   apply
+// CHECK:   br 
+// CHECK-LABEL: } // end sil function '$s21existential_transform4find4base4mult4Obj1Sbs5Int32V_AgA2RP_ptFTf4nne_n'
+@inline(never) func find(base:Int32, mult:Int32, Obj1: RP) -> Bool {
+  if base * mult > Obj1.val {
+    return false
+  } else if base * mult == Obj1.val {
+    return true
+  } else {
+    return find (base: base, mult: mult+1, Obj1: Obj1)
+  }
+}
+@inline(never) func find_wrapper() -> Bool {
+  let ab = RC(val: 100)
+  return find(base: 3, mult: 1, Obj1: ab) 
+}
 @_optimize(none) public func foo() -> Int {
 cp()
 ncp()
@@ -408,5 +480,6 @@ let y:Int = gcp(GC())
 var a:Array<GC> = [GC()]
 let z:Int = gcp_arch(GC(), &a) 
 let zz:Int32 = getName_wrapper()
+let _ = find_wrapper()
 return x + y + z + Int(zz)
 }

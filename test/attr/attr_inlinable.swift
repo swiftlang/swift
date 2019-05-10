@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-testing
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-resilience
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-resilience -enable-testing
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -enable-testing
 @inlinable struct TestInlinableStruct {}
 // expected-error@-1 {{'@inlinable' attribute cannot be applied to this declaration}}
 
@@ -210,7 +210,7 @@ class Derived2 : Middle2 {
 
 // Stored property initializer expressions.
 //
-// Note the behavior here does not depend on the state of the -enable-resilience
+// Note the behavior here does not depend on the state of the -enable-library-evolution
 // flag; the test runs with both the flag on and off. Only the explicit
 // presence of a '@_fixed_layout' attribute determines the behavior here.
 

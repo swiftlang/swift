@@ -6,6 +6,7 @@ import AppKit
 import AVFoundation
 
 import Newtype
+import NewtypeSystem
 import objc_ext
 import TestProtocols
 import TypeAndValue
@@ -178,7 +179,7 @@ func keyedSubscripting(_ b: B, idx: A, a: A) {
   dict[NSString()] = a
   let value = dict[NSString()]
 
-  dict[nil] = a // expected-error {{cannot assign value of type 'A' to type 'Any?'}}
+  dict[nil] = a // expected-error {{ambiguous subscript with base type 'NSMutableDictionary' and index type '_'}}
   let q = dict[nil]  // expected-error {{ambiguous subscript}}
   _ = q
 }
@@ -682,4 +683,14 @@ func testErrorNewtype() {
   // works.
   testErrorDictionary(3) // expected-error {{cannot convert value of type 'Int' to expected argument type '[AnyHashable : String]'}}
   testErrorDictionaryNewtype(3) // expected-error {{cannot convert value of type 'Int' to expected argument type '[AnyHashable : String]'}}
+}
+
+func testNSUIntegerNewtype() {
+  let _: NSUIntegerNewType = NSUIntegerNewType(4)
+  let _: UInt = NSUIntegerNewType(4).rawValue
+  let _: NSUIntegerNewType = NSUIntegerNewType.constant
+
+  let _: NSUIntegerSystemNewType = NSUIntegerSystemNewType(4)
+  let _: Int = NSUIntegerSystemNewType(4).rawValue
+  let _: NSUIntegerSystemNewType = NSUIntegerSystemNewType.constant
 }

@@ -150,7 +150,6 @@ NO_OPERAND_INST(Unwind)
         ValueOwnershipKind::OWNERSHIP,                                         \
         UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
   }
-CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, IsEscapingClosure)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, RefElementAddr)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialValue)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialBoxValue)
@@ -162,8 +161,8 @@ CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DestroyValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, ReleaseValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, ReleaseValueAddr)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, StrongRelease)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialRef)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndLifetime)
+CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialRef)
 CONSTANT_OWNERSHIP_INST(Any, MustBeLive, AbortApply)
 CONSTANT_OWNERSHIP_INST(Any, MustBeLive, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(Any, MustBeLive, BeginAccess)
@@ -266,6 +265,7 @@ ACCEPTS_ANY_OWNERSHIP_INST(ExistentialMetatype)
 ACCEPTS_ANY_OWNERSHIP_INST(ValueMetatype)
 ACCEPTS_ANY_OWNERSHIP_INST(UncheckedOwnershipConversion)
 ACCEPTS_ANY_OWNERSHIP_INST(ValueToBridgeObject)
+ACCEPTS_ANY_OWNERSHIP_INST(IsEscapingClosure)
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 
 // Trivial if trivial typed, otherwise must accept owned?
@@ -467,10 +467,10 @@ OperandOwnershipKindClassifier::visitCondBranchInst(CondBranchInst *cbi) {
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitSwitchEnumInst(SwitchEnumInst *sei) {
   auto opTy = sei->getOperand()->getType();
-  auto &mod = sei->getModule();
+
   // If our passed in type is trivial, we shouldn't have any non-trivial
   // successors. Just bail early returning trivial.
-  if (opTy.isTrivial(mod))
+  if (opTy.isTrivial(*sei->getFunction()))
     return Map::allLive();
 
   // Otherwise, go through the ownership constraints of our successor arguments
@@ -534,22 +534,23 @@ OperandOwnershipKindClassifier::visitCheckedCastBranchInst(
 //// FIX THIS HERE
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitReturnInst(ReturnInst *ri) {
+  auto *f =ri->getFunction();
+
   // If we have a trivial value, return allLive().
-  bool isTrivial = ri->getOperand()->getType().isTrivial(mod);
+  bool isTrivial = ri->getOperand()->getType().isTrivial(*f);
   if (isTrivial) {
     return Map::allLive();
   }
 
-  SILFunctionConventions fnConv = ri->getFunction()->getConventions();
+  SILFunctionConventions fnConv = f->getConventions();
 
   auto results = fnConv.getDirectSILResults();
   if (results.empty())
     return Map();
 
-  CanGenericSignature sig = fnConv.funcTy->getGenericSignature();
   auto ownershipKindRange = makeTransformRange(results,
                                                [&](const SILResultInfo &info) {
-                                                 return info.getOwnershipKind(mod, sig);
+                                                 return info.getOwnershipKind(*f);
                                                });
 
   // Then merge all of our ownership kinds. If we fail to merge, return an empty
@@ -718,6 +719,10 @@ OperandOwnershipKindClassifier::visitFullApply(FullApplySite apply) {
     return Map::allLive();
   }
 
+  // If we have a type dependent operand, return an empty map.
+  if (apply.getInstruction()->isTypeDependentOperand(op))
+    return Map();
+
   unsigned argIndex = apply.getCalleeArgIndex(op);
   auto conv = apply.getSubstCalleeConv();
   SILParameterInfo paramInfo = conv.getParamInfoForSILArg(argIndex);
@@ -827,6 +832,16 @@ OperandOwnershipKindClassifier::visitYieldInst(YieldInst *i) {
 
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitAssignInst(AssignInst *i) {
+  if (getValue() != i->getSrc()) {
+    return Map::allLive();
+  }
+
+  return Map::compatibilityMap(ValueOwnershipKind::Owned,
+                               UseLifetimeConstraint::MustBeInvalidated);
+}
+
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitAssignByDelegateInst(AssignByDelegateInst *i) {
   if (getValue() != i->getSrc()) {
     return Map::allLive();
   }

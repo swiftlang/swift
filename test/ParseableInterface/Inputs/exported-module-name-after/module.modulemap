@@ -1,0 +1,5 @@
+module CoreKit {
+  header "CoreKit.h"
+  header "ExportAsCoreKit.h"
+  export *
+}

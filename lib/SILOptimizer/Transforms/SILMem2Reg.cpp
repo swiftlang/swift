@@ -188,7 +188,8 @@ static bool isAddressForLoad(SILInstruction *I, SILBasicBlock *&singleBlock) {
   if (isa<LoadInst>(I))
     return true;
 
-  if (!isa<StructElementAddrInst>(I) && !isa<TupleElementAddrInst>(I))
+  if (!isa<UncheckedAddrCastInst>(I) && !isa<StructElementAddrInst>(I) &&
+      !isa<TupleElementAddrInst>(I))
     return false;
   
   // Recursively search for other (non-)loads in the instruction's uses.
@@ -205,7 +206,8 @@ static bool isAddressForLoad(SILInstruction *I, SILBasicBlock *&singleBlock) {
 
 /// Returns true if \p I is a dead struct_element_addr or tuple_element_addr.
 static bool isDeadAddrProjection(SILInstruction *I) {
-  if (!isa<StructElementAddrInst>(I) && !isa<TupleElementAddrInst>(I))
+  if (!isa<UncheckedAddrCastInst>(I) && !isa<StructElementAddrInst>(I) &&
+      !isa<TupleElementAddrInst>(I))
     return false;
 
   // Recursively search for uses which are dead themselves.
@@ -247,7 +249,7 @@ static bool isCaptured(AllocStackInst *ASI, bool &inSingleBlock) {
     // Destroys of loadable types can be rewritten as releases, so
     // they are fine.
     if (auto *DAI = dyn_cast<DestroyAddrInst>(II))
-      if (DAI->getOperand()->getType().isLoadable(DAI->getModule()))
+      if (DAI->getOperand()->getType().isLoadable(*DAI->getFunction()))
         continue;
 
     // Other instructions are assumed to capture the AllocStack.
@@ -294,7 +296,7 @@ bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI) {
 /// Promote a DebugValueAddr to a DebugValue of the given value.
 static void
 promoteDebugValueAddr(DebugValueAddrInst *DVAI, SILValue Value, SILBuilder &B) {
-  assert(DVAI->getOperand()->getType().isLoadable(DVAI->getModule()) &&
+  assert(DVAI->getOperand()->getType().isLoadable(*DVAI->getFunction()) &&
          "Unexpected promotion of address-only type!");
   assert(Value && "Expected valid value");
   B.setInsertionPoint(DVAI);
@@ -311,7 +313,8 @@ static bool isLoadFromStack(SILInstruction *I, AllocStackInst *ASI) {
   // Skip struct and tuple address projections.
   ValueBase *op = I->getOperand(0);
   while (op != ASI) {
-    if (!isa<StructElementAddrInst>(op) && !isa<TupleElementAddrInst>(op))
+    if (!isa<UncheckedAddrCastInst>(op) && !isa<StructElementAddrInst>(op) &&
+        !isa<TupleElementAddrInst>(op))
       return false;
     
     op = cast<SingleValueInstruction>(op)->getOperand(0);
@@ -325,7 +328,8 @@ static void collectLoads(SILInstruction *I, SmallVectorImpl<LoadInst *> &Loads) 
     Loads.push_back(load);
     return;
   }
-  if (!isa<StructElementAddrInst>(I) && !isa<TupleElementAddrInst>(I))
+  if (!isa<UncheckedAddrCastInst>(I) && !isa<StructElementAddrInst>(I) &&
+      !isa<TupleElementAddrInst>(I))
     return;
   
   // Recursively search for other loads in the instruction's uses.
@@ -339,7 +343,8 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
   ProjectionPath projections(val->getType());
   SILValue op = LI->getOperand();
   while (op != ASI) {
-    assert(isa<StructElementAddrInst>(op) || isa<TupleElementAddrInst>(op));
+    assert(isa<UncheckedAddrCastInst>(op) || isa<StructElementAddrInst>(op) ||
+           isa<TupleElementAddrInst>(op));
     auto *Inst = cast<SingleValueInstruction>(op);
     projections.push_back(Projection(Inst));
     op = Inst->getOperand(0);
@@ -353,7 +358,8 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
   LI->replaceAllUsesWith(val);
   LI->eraseFromParent();
   while (op != ASI && op->use_empty()) {
-    assert(isa<StructElementAddrInst>(op) || isa<TupleElementAddrInst>(op));
+    assert(isa<UncheckedAddrCastInst>(op) || isa<StructElementAddrInst>(op) ||
+           isa<TupleElementAddrInst>(op));
     auto *Inst = cast<SingleValueInstruction>(op);
     SILValue next = Inst->getOperand(0);
     Inst->eraseFromParent();
@@ -362,7 +368,9 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
 }
 
 static void replaceDestroy(DestroyAddrInst *DAI, SILValue NewValue) {
-  assert(DAI->getOperand()->getType().isLoadable(DAI->getModule()) &&
+  SILFunction *F = DAI->getFunction();
+
+  assert(DAI->getOperand()->getType().isLoadable(*F) &&
          "Unexpected promotion of address-only type!");
 
   assert(NewValue && "Expected a value to release!");
@@ -370,7 +378,7 @@ static void replaceDestroy(DestroyAddrInst *DAI, SILValue NewValue) {
   SILBuilderWithScope Builder(DAI);
 
   auto Ty = DAI->getOperand()->getType();
-  auto &TL = DAI->getModule().getTypeLowering(Ty);
+  auto &TL = F->getTypeLowering(Ty);
 
   bool expand = shouldExpand(DAI->getModule(),
                              DAI->getOperand()->getType().getObjectType());
@@ -487,7 +495,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
       if (!RunningVal) {
         // Loading without a previous store is only acceptable if the type is
         // Void (= empty tuple) or a tuple of Voids.
-        RunningVal = SILUndef::get(ASI->getElementType(), ASI->getModule());
+        RunningVal = SILUndef::get(ASI->getElementType(), *ASI->getFunction());
       }
       replaceLoad(cast<LoadInst>(Inst), RunningVal, ASI);
       NumInstRemoved++;
@@ -541,7 +549,8 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
     // Remove dead address instructions that may be uses of the allocation.
     SILNode *Node = Inst;
     while (isa<StructElementAddrInst>(Node) ||
-           isa<TupleElementAddrInst>(Node)) {
+           isa<TupleElementAddrInst>(Node) ||
+           isa<UncheckedAddrCastInst>(Node)) {
       auto *I = cast<SingleValueInstruction>(Node);
       if (!I->use_empty()) break;
       Node = I->getOperand(0);
@@ -587,7 +596,7 @@ StackAllocationPromoter::getLiveOutValue(BlockSet &PhiBlocks,
     LLVM_DEBUG(llvm::dbgs() << "*** Walking up the iDOM.\n");
   }
   LLVM_DEBUG(llvm::dbgs() << "*** Could not find a Def. Using Undef.\n");
-  return SILUndef::get(ASI->getElementType(), ASI->getModule());
+  return SILUndef::get(ASI->getElementType(), *ASI->getFunction());
 }
 
 SILValue
@@ -603,7 +612,7 @@ StackAllocationPromoter::getLiveInValue(BlockSet &PhiBlocks,
   }
 
   if (BB->pred_empty() || !DT->getNode(BB))
-    return SILUndef::get(ASI->getElementType(), ASI->getModule());
+    return SILUndef::get(ASI->getElementType(), *ASI->getFunction());
 
   // No phi for this value in this block means that the value flowing
   // out of the immediate dominator reaches here.

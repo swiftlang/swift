@@ -419,7 +419,7 @@ extension Float80 : CVarArg, _CVarArgAligned {
 }
 #endif
 
-#if arch(x86_64) || arch(s390x) || (arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(Windows)))
+#if (arch(x86_64) && !os(Windows)) || arch(s390x) || (arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(Windows)))
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.

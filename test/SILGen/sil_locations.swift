@@ -261,7 +261,7 @@ func tuple_element(_ x: (Int, Float)) {
 func containers() -> ([Int], Dictionary<String, Int>) {
   return ([1, 2, 3], ["Ankeny": 1, "Burnside": 2, "Couch": 3])
   // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations10containers{{[_0-9a-zA-Z]*}}F
-  // CHECK: apply {{%.*}}<(String, Int)>({{%.*}}), loc "{{.*}}":[[@LINE-2]]:22
+  // CHECK: apply {{%.*}}<(String, Int)>({{%.*}}), loc "{{.*}}":[[@LINE-2]]:23
   
   // CHECK: string_literal utf8 "Ankeny", loc "{{.*}}":[[@LINE-4]]:23
 

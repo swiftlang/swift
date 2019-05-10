@@ -27,8 +27,10 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/PropertyDelegates.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
@@ -183,11 +185,8 @@ Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
   Expr *anchor = getLocatorParts(pathBuffer);
   ArrayRef<LocatorPathElt> path = pathBuffer;
 
-  Expr *targetAnchor;
-  SmallVector<LocatorPathElt, 4> targetPathBuffer;
   SourceRange range;
-
-  simplifyLocator(anchor, path, targetAnchor, targetPathBuffer, range);
+  simplifyLocator(anchor, path, range);
   return (path.empty() ? anchor : nullptr);
 }
 
@@ -551,6 +550,18 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     };
 
     if (!isConfused) {
+      if (Name == Context.Id_Self) {
+        if (DeclContext *typeContext = DC->getInnermostTypeContext()){
+          Type SelfType = typeContext->getSelfInterfaceType();
+
+          if (typeContext->getSelfClassDecl())
+            SelfType = DynamicSelfType::get(SelfType, Context);
+          SelfType = DC->mapTypeIntoContext(SelfType);
+          return new (Context) TypeExpr(TypeLoc(new (Context)
+                                                FixedTypeRepr(SelfType, Loc)));
+        }
+      }
+
       TypoCorrectionResults corrections(*this, Name, nameLoc);
       performTypoCorrection(DC, UDRE->getRefKind(), Type(),
                             lookupOptions, corrections);
@@ -2066,6 +2077,9 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
     csOptions |= ConstraintSystemFlags::AllowUnresolvedTypeVariables;
 
+  if (options.contains(TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType))
+    csOptions |= ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType;
+
   ConstraintSystem cs(*this, dc, csOptions, expr);
   cs.baseCS = baseCS;
 
@@ -2106,7 +2120,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
     assert(!convertTo && "convertType and type check options conflict");
     auto *convertTypeLocator = cs.getConstraintLocator(
         cs.getConstraintLocator(expr), ConstraintLocator::ContextualType);
-    Type var = cs.createTypeVariable(convertTypeLocator);
+    Type var = cs.createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
     convertTo = getOptionalType(expr->getLoc(), var);
   }
 
@@ -2446,21 +2460,42 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
   /// Type checking listener for pattern binding initializers.
   class BindingListener : public ExprTypeCheckListener {
+    TypeChecker &tc;
     Pattern *&pattern;
     Expr *&initializer;
 
     /// The locator we're using.
     ConstraintLocator *Locator;
 
+    /// The context in which we are performing type checking.
+    DeclContext *dc;
+
     /// The type of the initializer.
     Type initType;
 
-  public:
-    explicit BindingListener(Pattern *&pattern, Expr *&initializer)
-      : pattern(pattern), initializer(initializer),
-        Locator(nullptr) { }
+    /// Whether we applied a property delegate to the initializer expression.
+    PropertyDelegateTypeInfo appliedPropertyDelegate;
 
-    Type getInitType() const { return initType; }
+  public:
+    explicit BindingListener(TypeChecker &tc, Pattern *&pattern,
+                             Expr *&initializer, DeclContext *dc)
+      : tc(tc), pattern(pattern), initializer(initializer),
+        Locator(nullptr), dc(dc) {
+      maybeApplyPropertyDelegate();
+    }
+
+    /// Retrieve the type to which the pattern should be coerced.
+    Type getPatternInitType() const {
+      if (!appliedPropertyDelegate || initType->hasError())
+        return initType;
+
+      // We applied a property delegate, so dig the pattern initialization
+      // type out of the value property of the delegate.
+      return initType->getTypeOfMember(
+          dc->getParentModule(),
+          appliedPropertyDelegate.valueVar,
+          appliedPropertyDelegate.valueVar->getValueInterfaceType());
+    }
 
     bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       assert(!expr->isSemanticallyInOutExpr());
@@ -2470,13 +2505,27 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
           cs.getConstraintLocator(expr, ConstraintLocator::ContextualType);
 
       // Collect constraints from the pattern.
-      initType = cs.generateConstraints(pattern, Locator);
-      if (!initType)
+      Type patternType = cs.generateConstraints(pattern, Locator);
+      if (!patternType)
         return true;
 
-      // Add a conversion constraint between the types.
-      cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
-                       initType, Locator, /*isFavored*/true);
+      if (appliedPropertyDelegate) {
+        // When we have applied a property delegate, the initializer type
+        // is the initialization of the property delegate instance.
+        initType = cs.getType(expr);
+
+        // Add a conversion constraint between the pattern type and the
+        // property delegate's "value" type.
+        cs.addConstraint(ConstraintKind::Conversion, patternType,
+                         getPatternInitType(), Locator, /*isFavored*/true);
+      } else {
+        // The initializer type is the type of the pattern.
+        initType = patternType;
+
+        // Add a conversion constraint between the types.
+        cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
+                         patternType, Locator, /*isFavored*/true);
+      }
 
       // The expression has been pre-checked; save it in case we fail later.
       initializer = expr;
@@ -2501,21 +2550,108 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
       assert(solution.getConstraintSystem().getType(expr)->isEqual(initType));
 
+      // Record the property delegate type and note that the initializer has
+      // been subsumed by the backing property.
+      if (appliedPropertyDelegate) {
+        auto var = pattern->getSingleVar();
+        var->getParentPatternBinding()->setInitializerSubsumed(0);
+        tc.Context.setSideCachedPropertyDelegateBackingPropertyType(
+            var, initType->mapTypeOutOfContext());
+
+        // Record the semantic initializer.
+        var->getAttachedPropertyDelegate()->setSemanticInit(expr);
+      }
+
       initializer = expr;
       return expr;
     }
+
+  private:
+    // If the pattern contains a single variable that has an attached
+    // property delegate, set up the initializer expression to initialize
+    // the backing storage.
+    void maybeApplyPropertyDelegate() {
+      auto singleVar = pattern->getSingleVar();
+      if (!singleVar)
+        return;
+
+      auto delegateAttr = singleVar->getAttachedPropertyDelegate();
+      if (!delegateAttr)
+        return;
+
+      auto delegateNominal = evaluateOrDefault(
+          tc.Context.evaluator, CustomAttrNominalRequest{delegateAttr, dc},
+          nullptr);
+      if (!delegateNominal)
+        return;
+
+      auto delegateInfo = delegateNominal->getPropertyDelegateTypeInfo();
+      if (!delegateInfo)
+        return;
+
+      Type delegateType = singleVar->getAttachedPropertyDelegateType();
+      if (!delegateType)
+        return;
+
+      // If the property delegate is directly initialized, form the
+      // call.
+      auto &ctx = singleVar->getASTContext();
+      auto typeExpr =
+          TypeExpr::createImplicitHack(delegateAttr->getTypeLoc().getLoc(),
+                                       Type(delegateType), ctx);
+      if (delegateAttr->getArg() != nullptr) {
+        if (initializer) {
+          singleVar->diagnose(diag::property_delegate_and_normal_init,
+                              singleVar->getFullName())
+            .highlight(delegateAttr->getRange())
+            .highlight(initializer->getSourceRange());
+        }
+
+        initializer = CallExpr::create(
+            ctx, typeExpr, delegateAttr->getArg(),
+            delegateAttr->getArgumentLabels(),
+            delegateAttr->getArgumentLabelLocs(), /*hasTrailingClosure=*/false,
+            /*implicit=*/false);
+      } else if (delegateInfo.initialValueInit) {
+        // FIXME: we want to use the initialValueInit we found.
+        assert(initializer);
+        initializer = CallExpr::createImplicit(
+            ctx, typeExpr, {initializer}, {ctx.Id_initialValue});
+      } else {
+        singleVar->diagnose(diag::property_delegate_init_without_initial_value,
+                            singleVar->getFullName(), delegateType)
+          .highlight(initializer->getSourceRange());
+        ctx.Diags.diagnose(delegateAttr->getLocation(),
+                           diag::property_delegate_direct_init)
+          .fixItInsertAfter(initializer->getSourceRange().End,
+                            "(<# initializer args #>)");
+        delegateNominal->diagnose(diag::kind_declname_declared_here,
+                                  delegateNominal->getDescriptiveKind(),
+                                  delegateNominal->getFullName());
+        return;
+      }
+
+      // Note that we have applied to property delegate, so we can adjust
+      // the initializer type later.
+      appliedPropertyDelegate = delegateInfo;
+    }
+
   };
 
-  assert(initializer && "type-checking an uninitialized binding?");
-  BindingListener listener(pattern, initializer);
+  BindingListener listener(*this, pattern, initializer, DC);
+  if (!initializer)
+    return true;
 
   TypeLoc contextualType;
   auto contextualPurpose = CTP_Unused;
   TypeCheckExprOptions flags = TypeCheckExprFlags::ConvertTypeIsOnlyAHint;
 
+  // Set the contextual purpose even if the pattern doesn't have a type so
+  // if there's an error we can use that information to inform diagnostics.
+  contextualPurpose = CTP_Initialization;
+
   if (pattern->hasType()) {
     contextualType = TypeLoc::withoutLoc(pattern->getType());
-    contextualPurpose = CTP_Initialization;
 
     // If we already had an error, don't repeat the problem.
     if (contextualType.getType()->hasError())
@@ -2545,7 +2681,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     // FIXME: initTy should be the same as resultTy; now that typeCheckExpression()
     // returns a Type and not bool, we should be able to simplify the listener
     // implementation here.
-    auto initTy = listener.getInitType();
+    auto initTy = listener.getPatternInitType();
     if (initTy->hasDependentMember())
       return true;
 
@@ -2586,11 +2722,6 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   Pattern *pattern = PBD->getPattern(patternNumber);
   Expr *init = PBD->getInit(patternNumber);
 
-  if (!init) {
-    PBD->setInvalid();
-    return true;
-  }
-
   // Enter an initializer context if necessary.
   PatternBindingInitializer *initContext = nullptr;
   DeclContext *DC = PBD->getDeclContext();
@@ -2601,6 +2732,11 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   }
 
   bool hadError = typeCheckBinding(pattern, init, DC);
+  if (!init) {
+    PBD->setInvalid();
+    return true;
+  }
+
   PBD->setPattern(patternNumber, pattern, initContext);
   PBD->setInit(patternNumber, init);
 
@@ -2641,7 +2777,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         return true;
       }
 
-      SequenceType = cs.createTypeVariable(Locator);
+      SequenceType = cs.createTypeVariable(Locator, TVO_CanBindToNoEscape);
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        SequenceType, Locator);
       cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
@@ -2714,7 +2850,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       }
 
       if (elementType.isNull()) {
-        elementType = cs.createTypeVariable(elementLocator);
+        elementType = cs.createTypeVariable(elementLocator,
+                                            TVO_CanBindToNoEscape);
       }
 
       // Add a conversion constraint between the element type of the sequence
@@ -2952,13 +3089,18 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
 
       if (auto archetypeType = dyn_cast<ArchetypeType>(origType)) {
         auto root = archetypeType->getRoot();
+        // We leave opaque types and their nested associated types alone here.
+        // They're globally available.
+        if (isa<OpaqueTypeArchetypeType>(root))
+          return origType;
         // For other nested types, fail here so the default logic in subst()
         // for nested types applies.
-        if (root != archetypeType)
+        else if (root != archetypeType)
           return Type();
         
         auto locator = cs.getConstraintLocator(nullptr);
-        auto replacement = cs.createTypeVariable(locator);
+        auto replacement = cs.createTypeVariable(locator,
+                                                 TVO_CanBindToNoEscape);
 
         if (auto superclass = archetypeType->getSuperclass()) {
           cs.addConstraint(ConstraintKind::Subtype, replacement,
@@ -2975,7 +3117,8 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
       // FIXME: Remove this case
       assert(cast<GenericTypeParamType>(origType));
       auto locator = cs.getConstraintLocator(nullptr);
-      auto replacement = cs.createTypeVariable(locator);
+      auto replacement = cs.createTypeVariable(locator,
+                                               TVO_CanBindToNoEscape);
       types[origType] = replacement;
       return replacement;
     },
@@ -3122,15 +3265,11 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
     return FVE;
   }
 
-  // Load lvalues.
-  if (exprTy->is<LValueType>())
-    return addImplicitLoadExpr(expr, getType, setType);
-
   // Walk into parenthesized expressions to update the subexpression.
   if (auto paren = dyn_cast<IdentityExpr>(expr)) {
     auto sub =  coerceToRValue(paren->getSubExpr(), getType, setType);
     paren->setSubExpr(sub);
-    setType(paren, getType(sub));
+    setType(paren, ParenType::get(Context, getType(sub)));
     return paren;
   }
 
@@ -3173,6 +3312,10 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
 
     return tuple;
   }
+
+  // Load lvalues.
+  if (exprTy->is<LValueType>())
+    return addImplicitLoadExpr(expr, getType, setType);
 
   // Nothing to do.
   return expr;
@@ -3299,6 +3442,7 @@ void Solution::dump(raw_ostream &out) const {
       break;
 
     case OverloadChoiceKind::DynamicMemberLookup:
+    case OverloadChoiceKind::KeyPathDynamicMemberLookup:
       out << "dynamic member lookup root "
           << choice.getBaseType()->getString()
           << " name='" << choice.getName() << "'\n";
@@ -3380,6 +3524,10 @@ void ConstraintSystem::dump() {
 }
 
 void ConstraintSystem::dump(Expr *E) {
+  print(llvm::errs(), E);
+}
+
+void ConstraintSystem::print(raw_ostream &out, Expr *E) {
   auto getTypeOfExpr = [&](const Expr *E) -> Type {
     if (hasType(E))
       return getType(E);
@@ -3390,8 +3538,14 @@ void ConstraintSystem::dump(Expr *E) {
       return getType(TL);
     return Type();
   };
+  auto getTypeOfKeyPathComponent =
+      [&](const KeyPathExpr *KP, unsigned I) -> Type {
+    if (hasType(KP, I))
+      return getType(KP, I);
+    return Type();
+  };
 
-  E->dump(llvm::errs(), getTypeOfExpr, getTypeOfTypeLoc);
+  E->dump(out, getTypeOfExpr, getTypeOfTypeLoc, getTypeOfKeyPathComponent);
 }
 
 void ConstraintSystem::print(raw_ostream &out) {
@@ -3418,6 +3572,8 @@ void ConstraintSystem::print(raw_ostream &out) {
       out << " [lvalue allowed]";
     if (tv->getImpl().canBindToInOut())
       out << " [inout allowed]";
+    if (tv->getImpl().canBindToNoEscape())
+      out << " [noescape allowed]";
     auto rep = getRepresentative(tv);
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {
@@ -3492,6 +3648,7 @@ void ConstraintSystem::print(raw_ostream &out) {
         break;
 
       case OverloadChoiceKind::DynamicMemberLookup:
+      case OverloadChoiceKind::KeyPathDynamicMemberLookup:
         out << "dynamic member lookup:"
             << choice.getBaseType()->getString() << "  name="
             << choice.getName() << "\n";
@@ -3896,6 +4053,53 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
+  assert(!toType->isAny() && "casts to 'Any' should've been handled above");
+  assert(!toType->isAnyObject() &&
+         "casts to 'AnyObject' should've been handled above");
+
+  // A cast from a function type to an existential type (except `Any`)
+  // or an archetype type (with constraints) cannot succeed
+  auto toArchetypeType = toType->is<ArchetypeType>();
+  auto fromFunctionType = fromType->is<FunctionType>();
+  auto toExistentialType = toType->isAnyExistentialType();
+
+  auto toConstrainedArchetype = false;
+  if (toArchetypeType) {
+    auto archetype = toType->castTo<ArchetypeType>();
+    toConstrainedArchetype = !archetype->getConformsTo().empty();
+  }
+
+  if (fromFunctionType &&
+      (toExistentialType || (toArchetypeType && toConstrainedArchetype))) {
+    switch (contextKind) {
+    case CheckedCastContextKind::ConditionalCast:
+    case CheckedCastContextKind::ForcedCast:
+      diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
+          .highlight(diagFromRange)
+          .highlight(diagToRange);
+
+      // If we're referring to a function with a return value (not Void) then
+      // emit a fix-it suggesting to add `()` to call the function
+      if (auto DRE = dyn_cast<DeclRefExpr>(fromExpr)) {
+        if (auto FD = dyn_cast<FuncDecl>(DRE->getDecl())) {
+          if (!FD->getResultInterfaceType()->isVoid()) {
+            diagnose(diagLoc, diag::downcast_to_unrelated_fixit, FD->getName())
+                .fixItInsertAfter(fromExpr->getEndLoc(), "()");
+          }
+        }
+      }
+
+      return CheckedCastKind::ValueCast;
+      break;
+
+    case CheckedCastContextKind::IsPattern:
+    case CheckedCastContextKind::EnumElementPattern:
+    case CheckedCastContextKind::IsExpr:
+    case CheckedCastContextKind::None:
+      break;
+    }
+  }
+
   // If we can bridge through an Objective-C class, do so.
   if (Type bridgedToClass = getDynamicBridgedThroughObjCClass(dc, fromType,
                                                               toType)) {
@@ -3980,6 +4184,33 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     // Cast to and from AnyObject always succeed.
     if (toType->isAnyObject() || fromType->isAnyObject())
       return CheckedCastKind::ValueCast;
+
+    // A cast from an existential type to a concrete type does not succeed. For
+    // example:
+    //
+    // struct S {}
+    // enum FooError: Error { case bar }
+    //
+    // func foo() {
+    //   do {
+    //     throw FooError.bar
+    //   } catch is X { /* Will always fail */
+    //     print("Caught bar error")
+    //   }
+    // }
+    if (fromExistential) {
+      if (auto NTD = toType->getAnyNominal()) {
+        if (!isa<ProtocolDecl>(NTD)) {
+          auto protocolDecl =
+              dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
+          if (protocolDecl &&
+              !conformsToProtocol(toType, protocolDecl, dc,
+                                  ConformanceCheckFlags::InExpression)) {
+            return failed();
+          }
+        }
+      }
+    }
 
     bool toRequiresClass;
     if (toType->isExistentialType())

@@ -52,6 +52,7 @@
 namespace swift {
 
 class SerializedModuleLoader;
+class MemoryBufferSerializedModuleLoader;
 class SILModule;
 
 /// The abstract configuration of the compiler, including:
@@ -184,9 +185,7 @@ public:
 
   void setRuntimeResourcePath(StringRef Path);
 
-  void setSDKPath(const std::string &Path) {
-    SearchPathOpts.SDKPath = Path;
-  }
+  void setSDKPath(const std::string &Path);
 
   StringRef getSDKPath() const {
     return SearchPathOpts.SDKPath;
@@ -374,6 +373,7 @@ class CompilerInstance {
 
   ModuleDecl *MainModule = nullptr;
   SerializedModuleLoader *SML = nullptr;
+  MemoryBufferSerializedModuleLoader *MemoryBufferLoader = nullptr;
 
   /// Contains buffer IDs for input source code files.
   std::vector<unsigned> InputSourceCodeBufferIDs;
@@ -467,7 +467,10 @@ public:
 
   ModuleDecl *getMainModule();
 
-  SerializedModuleLoader *getSerializedModuleLoader() const { return SML; }
+  MemoryBufferSerializedModuleLoader *
+  getMemoryBufferSerializedModuleLoader() const {
+    return MemoryBufferLoader;
+  }
 
   ArrayRef<unsigned> getInputBufferIDs() const {
     return InputSourceCodeBufferIDs;

@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend %s -sdk %S/Inputs -Fsystem %S/Inputs/System/Library/Frameworks -enable-objc-interop -I %S/Inputs/custom-modules -emit-ir -o - | %FileCheck %s
 
-// RUN: %target-swift-frontend -emit-module %S/Inputs/adapter.swift -sdk %S/Inputs -module-link-name SwiftAdapter -module-name ClangModuleWithAdapter -I %S/Inputs/custom-modules -o %t
+// RUN: %target-swift-frontend -emit-module %S/Inputs/overlay.swift -sdk %S/Inputs -module-link-name SwiftOverlay -module-name ClangModuleWithOverlay -I %S/Inputs/custom-modules -o %t
 
 // RUN: %target-swift-frontend %s -sdk %S/Inputs -Fsystem %S/Inputs/System/Library/Frameworks -enable-objc-interop -I %S/Inputs/custom-modules -I %t -emit-ir -o %t/with-adapter.ll
 // RUN: %FileCheck %s < %t/with-adapter.ll
@@ -14,10 +14,7 @@
 
 // Linux uses a different autolinking mechanism, based on
 // swift-autolink-extract. This file tests the Darwin mechanism.
-// UNSUPPORTED: OS=linux-gnu
-// UNSUPPORTED: OS=linux-gnueabihf
-// UNSUPPORTED: OS=freebsd
-// UNSUPPORTED: OS=linux-androideabi
+// UNSUPPORTED: autolink-extract
 
 import LinkMusket
 import LinkFramework
@@ -38,7 +35,7 @@ UsesSubmodule.useSomethingFromSubmodule()
 // CHECK-DAG: !{{[0-9]+}} = !{!"-framework", !"Indirect"}
 // CHECK-DAG: !{{[0-9]+}} = !{!"-framework", !"HasSubmodule"}
 
-// CHECK-WITH-SWIFT: !{{[0-9]+}} = !{!{{"-lSwiftAdapter"|"/DEFAULTLIB:SwiftAdapter.lib"}}}
+// CHECK-WITH-SWIFT: !{{[0-9]+}} = !{!{{"-lSwiftOverlay"|"/DEFAULTLIB:SwiftOverlay.lib"}}}
 
 // CHECK-WITH-DISABLED-DAG: !{!"-framework", !"Barrel"}
 // CHECK-WITH-DISABLED-DAG: !{!"-framework", !"Indirect"}

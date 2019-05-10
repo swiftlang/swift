@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-resilience -enable-nonfrozen-enum-exhaustivity-diagnostics -debugger-support
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-resilience -enable-nonfrozen-enum-exhaustivity-diagnostics -playground
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -enable-nonfrozen-enum-exhaustivity-diagnostics -debugger-support
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -enable-nonfrozen-enum-exhaustivity-diagnostics -playground
 
 public enum NonExhaustive {
   case a, b

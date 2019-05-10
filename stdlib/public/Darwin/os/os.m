@@ -87,8 +87,8 @@ _swift_os_log(
   if (_os_log_encode(buf, fmt, args, saved_errno, &ob)) {
     if (os_log_pack_send) {
       size_t sz = _os_log_pack_size(ob.ob_len);
-      uint8_t _Alignas(os_log_pack_s) buf[sz];
-      os_log_pack_t p = (os_log_pack_t)buf;
+      uint8_t _Alignas(os_log_pack_s) pack[sz];
+      os_log_pack_t p = (os_log_pack_t)pack;
       /*
        * _os_log_encode has already packed `saved_errno` into a
        * OSLF_CMD_TYPE_SCALAR command as the OSLF_CMD_TYPE_ERRNO does not
@@ -136,8 +136,8 @@ _swift_os_signpost_with_format(
       _os_log_encode(buf, fmt, args, saved_errno, &ob);
   if (encoded) {
     size_t sz = _os_log_pack_size(ob.ob_len);
-    uint8_t _Alignas(os_log_pack_s) buf[sz];
-    os_log_pack_t p = (os_log_pack_t)buf;
+    uint8_t _Alignas(os_log_pack_s) pack[sz];
+    os_log_pack_t p = (os_log_pack_t)pack;
     uint8_t *ptr = _os_signpost_pack_fill(p, sz, saved_errno, dso,
         fmt, spnm, spid);
     p->olp_pc = ra;

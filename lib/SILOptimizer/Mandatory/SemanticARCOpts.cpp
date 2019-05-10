@@ -40,36 +40,75 @@ STATISTIC(NumLoadCopyConvertedToLoadBorrow,
 ///
 /// Semantically this implies that a value is never passed off as +1 to memory
 /// or another function implying it can be used everywhere at +0.
-static bool isConsumed(SILValue v,
-                       SmallVectorImpl<DestroyValueInst *> &destroys) {
+static bool isConsumed(
+    SILValue v, SmallVectorImpl<DestroyValueInst *> &destroys,
+    NullablePtr<SmallVectorImpl<SILInstruction *>> forwardingInsts = nullptr) {
   assert(v.getOwnershipKind() == ValueOwnershipKind::Owned);
-  return !all_of(v->getUses(), [&destroys](Operand *op) {
-    // We know that a copy_value produces an @owned value. Look
-    // through all of our uses and classify them as either
-    // invalidating or not invalidating. Make sure that all of the
-    // invalidating ones are destroy_value since otherwise the
-    // live_range is not complete.
+  SmallVector<Operand *, 32> worklist(v->use_begin(), v->use_end());
+  while (!worklist.empty()) {
+    auto *op = worklist.pop_back_val();
+
+    // Skip type dependent operands.
+    if (op->isTypeDependent())
+      continue;
+
+    auto *user = op->getUser();
+
+    // We know that a copy_value produces an @owned value. Look through all of
+    // our uses and classify them as either invalidating or not
+    // invalidating. Make sure that all of the invalidating ones are
+    // destroy_value since otherwise the live_range is not complete.
     auto map = op->getOwnershipKindMap();
     auto constraint = map.getLifetimeConstraint(ValueOwnershipKind::Owned);
     switch (constraint) {
     case UseLifetimeConstraint::MustBeInvalidated: {
       // See if we have a destroy value. If we don't we have an
       // unknown consumer. Return false, we need this live range.
-      auto *dvi = dyn_cast<DestroyValueInst>(op->getUser());
-      if (!dvi)
-        return false;
+      if (auto *dvi = dyn_cast<DestroyValueInst>(user)) {
+        destroys.push_back(dvi);
+        continue;
+      }
 
-      // Otherwise, return true and stash this destroy value.
-      destroys.push_back(dvi);
+      // Otherwise, see if we have a forwarding value that has a single
+      // non-trivial operand that can accept a guaranteed value. If so, at its
+      // users to the worklist and continue.
+      //
+      // DISCUSSION: For now we do not support forwarding instructions with
+      // multiple non-trivial arguments since we would need to optimize all of
+      // the non-trivial arguments at the same time.
+      //
+      // NOTE: Today we do not support TermInsts for simplicity... we /could/
+      // support it though if we need to.
+      if (forwardingInsts.isNonNull() && !isa<TermInst>(user) &&
+          isGuaranteedForwardingInst(user) &&
+          1 == count_if(user->getOperandValues(
+                            true /*ignore type dependent operands*/),
+                        [&](SILValue v) {
+                          return v.getOwnershipKind() ==
+                                 ValueOwnershipKind::Owned;
+                        })) {
+        forwardingInsts.get()->push_back(user);
+        for (SILValue v : user->getResults()) {
+          if (v.getOwnershipKind() != ValueOwnershipKind::Owned)
+            continue;
+          copy(v->getUses(), std::back_inserter(worklist));
+        }
+        continue;
+      }
+
+      // Otherwise be conservative and assume that we /may consume/ the value.
       return true;
     }
     case UseLifetimeConstraint::MustBeLive:
       // Ok, this constraint can take something owned as live. Lets
       // see if it can also take something that is guaranteed. If it
       // can not, then we bail.
-      return map.canAcceptKind(ValueOwnershipKind::Guaranteed);
+      map.canAcceptKind(ValueOwnershipKind::Guaranteed);
+      continue;
     }
-  });
+  }
+
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -168,13 +207,14 @@ static bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
   if (!canHandleOperand(cvi->getOperand(), borrowIntroducers))
     return false;
 
-  // Then go over all of our uses. Find our destroying instructions
-  // and make sure all of them are destroy_value. For our
-  // non-destroying instructions, make sure that they accept a
-  // guaranteed value. After that, make sure that our destroys are
-  // within the lifetime of our borrowed values.
+  // Then go over all of our uses. Find our destroying instructions (ignoring
+  // forwarding instructions that can forward both owned and guaranteed) and
+  // make sure all of them are destroy_value. For our non-destroying
+  // instructions, make sure that they accept a guaranteed value. After that,
+  // make sure that our destroys are within the lifetime of our borrowed values.
   SmallVector<DestroyValueInst *, 16> destroys;
-  if (isConsumed(cvi, destroys))
+  SmallVector<SILInstruction *, 16> guaranteedForwardingInsts;
+  if (isConsumed(cvi, destroys, &guaranteedForwardingInsts))
     return false;
 
   // If we reached this point, then we know that all of our users can
@@ -189,8 +229,8 @@ static bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
   assert(all_of(borrowIntroducers,
                 [](SILValue v) { return isa<SILFunctionArgument>(v); }));
 
-  // Otherwise, we know that our copy_value/destroy_values are all
-  // completely within the guaranteed value scope.
+  // Otherwise, we know that our copy_value/destroy_values are all completely
+  // within the guaranteed value scope. First delete the destroys/copies.
   while (!destroys.empty()) {
     auto *dvi = destroys.pop_back_val();
     dvi->eraseFromParent();
@@ -198,6 +238,47 @@ static bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
   }
   cvi->replaceAllUsesWith(cvi->getOperand());
   cvi->eraseFromParent();
+
+  // Then change all of our guaranteed forwarding insts to have guaranteed
+  // ownership kind instead of what ever they previously had (ignoring trivial
+  // results);
+  while (!guaranteedForwardingInsts.empty()) {
+    auto *i = guaranteedForwardingInsts.pop_back_val();
+
+    assert(i->hasResults());
+
+    for (SILValue result : i->getResults()) {
+      if (auto *svi = dyn_cast<OwnershipForwardingSingleValueInst>(result)) {
+        if (svi->getOwnershipKind() == ValueOwnershipKind::Owned) {
+          svi->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+        }
+        continue;
+      }
+
+      if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(result)) {
+        if (ofci->getOwnershipKind() == ValueOwnershipKind::Owned) {
+          ofci->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+        }
+        continue;
+      }
+
+      if (auto *sei = dyn_cast<OwnershipForwardingSelectEnumInstBase>(result)) {
+        if (sei->getOwnershipKind() == ValueOwnershipKind::Owned) {
+          sei->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+        }
+        continue;
+      }
+
+      if (auto *mvir = dyn_cast<MultipleValueInstructionResult>(result)) {
+        if (mvir->getOwnershipKind() == ValueOwnershipKind::Owned) {
+          mvir->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+        }
+        continue;
+      }
+
+      llvm_unreachable("unhandled forwarding instruction?!");
+    }
+  }
   ++NumEliminatedInsts;
   return true;
 }
@@ -258,56 +339,29 @@ bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
 //                         load [copy] Optimizations
 //===----------------------------------------------------------------------===//
 
-/// A flow insensitive analysis that tells the load [copy] analysis if the
-/// storage has 0, 1, >1 writes to it.
-///
-/// In the case of 0 writes, we return CanOptimizeLoadCopyResult::Always.
-///
-/// In the case of 1 write, we return OnlyIfStorageIsLocal. We are taking
-/// advantage of definite initialization implying that an alloc_stack must be
-/// written to once before any loads from the memory location. Thus if we are
-/// local and see 1 write, we can still change to load_borrow if all other uses
-/// check out.
-///
-/// If there is 2+ writes, we can not optimize = (.
-namespace {
+// A flow insensitive analysis that tells the load [copy] analysis if the
+// storage has 0, 1, >1 writes to it.
+//
+// In the case of 0 writes, we return CanOptimizeLoadCopyResult::Always.
+//
+// In the case of 1 write, we return OnlyIfStorageIsLocal. We are taking
+// advantage of definite initialization implying that an alloc_stack must be
+// written to once before any loads from the memory location. Thus if we are
+// local and see 1 write, we can still change to load_borrow if all other uses
+// check out.
+//
+// If there is 2+ writes, we can not optimize = (.
 
-struct CanOptimizeLoadCopyFromAccessVisitor
-    : AccessedStorageVisitor<CanOptimizeLoadCopyFromAccessVisitor, bool> {
-  SILFunction &f;
-
-  CanOptimizeLoadCopyFromAccessVisitor(SILFunction &f) : f(f) {}
-
-  // Stubs
-  bool visitBox(const AccessedStorage &boxStorage) { return false; }
-  bool visitStack(const AccessedStorage &stackStorage) { return false; }
-  bool visitGlobal(const AccessedStorage &globalStorage) { return false; }
-  bool visitClass(const AccessedStorage &classStorage) { return false; }
-  bool visitYield(const AccessedStorage &yieldStorage) { return false; }
-  bool visitUnidentified(const AccessedStorage &unidentifiedStorage) {
-    return false;
-  }
-  bool visitNested(const AccessedStorage &nested) {
-    llvm_unreachable("Visitor should never see nested since we lookup our "
-                     "address storage using lookup non nested");
-  }
-
-  bool visitArgument(const AccessedStorage &argumentStorage);
-};
-
-} // namespace
-
-bool CanOptimizeLoadCopyFromAccessVisitor::visitArgument(
-    const AccessedStorage &storage) {
+bool mayFunctionMutateArgument(const AccessedStorage &storage, SILFunction &f) {
   auto *arg = cast<SILFunctionArgument>(storage.getArgument(&f));
 
   // Then check if we have an in_guaranteed argument. In this case, we can
   // always optimize load [copy] from this.
   if (arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed))
-    return true;
+    return false;
 
   // For now just return false.
-  return false;
+  return true;
 }
 
 static bool isWrittenTo(SILFunction &f, SILValue value) {
@@ -321,7 +375,19 @@ static bool isWrittenTo(SILFunction &f, SILValue value) {
   // way (ignoring stores that are obviously the only initializer to
   // memory). We have to do this since load_borrow assumes that the
   // underlying memory is never written to.
-  return !CanOptimizeLoadCopyFromAccessVisitor(f).visit(storage);
+  switch (storage.getKind()) {
+  case AccessedStorage::Box:
+  case AccessedStorage::Stack:
+  case AccessedStorage::Global:
+  case AccessedStorage::Class:
+  case AccessedStorage::Yield:
+  case AccessedStorage::Nested:
+  case AccessedStorage::Unidentified:
+    return true;
+
+  case AccessedStorage::Argument:
+    return mayFunctionMutateArgument(storage, f);
+  }
 }
 
 // Convert a load [copy] from unique storage [read] that has all uses that can
@@ -350,6 +416,11 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   // load_borrow.
   auto *lbi =
       SILBuilderWithScope(li).createLoadBorrow(li->getLoc(), li->getOperand());
+
+  // Since we are looking through forwarding uses that can accept guaranteed
+  // parameters, we can have multiple destroy_value along the same path. We need
+  // to find the post-dominating block set of these destroy value to ensure that
+  // we do not insert multiple end_borrow.
   while (!destroyValues.empty()) {
     auto *dvi = destroyValues.pop_back_val();
     SILBuilderWithScope(dvi).createEndBorrow(dvi->getLoc(), lbi);
@@ -378,7 +449,7 @@ struct SemanticARCOpts : SILFunctionTransform {
     SILFunction &f = *getFunction();
 
     // Make sure we are running with ownership verification enabled.
-    assert(f.getModule().getOptions().EnableSILOwnership &&
+    assert(f.getModule().getOptions().VerifySILOwnership &&
            "Can not perform semantic arc optimization unless ownership "
            "verification is enabled");
 

@@ -1527,6 +1527,10 @@ static bool isValidCmpXChgOrdering(StringRef SuccessString,
 }
 
 ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
+  #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+    return nullptr; // not needed for the parser library.
+  #endif
+
   SmallVector<Type, 4> Types;
   StringRef OperationName = getBuiltinBaseName(Context, Id.str(), Types);
 

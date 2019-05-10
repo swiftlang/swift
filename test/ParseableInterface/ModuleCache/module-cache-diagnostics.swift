@@ -23,9 +23,9 @@
 // RUN: %{python} %S/Inputs/make-old.py %t/leaf.swift %t/other.swift
 // RUN: %target-swift-frontend -I %t -emit-parseable-module-interface-path %t/LeafModule.swiftinterface -module-name LeafModule %t/leaf.swift -emit-module -o /dev/null
 // RUN: %{python} %S/Inputs/make-old.py %t/LeafModule.swiftinterface
-// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-parseable-module-interface-path %t/OtherModule.swiftinterface -module-name OtherModule %t/other.swift -emit-module -o /dev/null
+// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-parseable-module-interface-path %t/OtherModule.swiftinterface -module-name OtherModule %t/other.swift -emit-module -o /dev/null
 // RUN: %{python} %S/Inputs/make-old.py %t/modulecache/LeafModule-*.swiftmodule %t/OtherModule.swiftinterface
-// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
+// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
 // RUN: %{python} %S/Inputs/make-old.py %t/modulecache/OtherModule-*.swiftmodule
 //
 //
@@ -38,7 +38,7 @@
 // RUN: %{python} %S/Inputs/make-old.py %t/LeafModule.swiftinterface
 // RUN: %{python} %S/Inputs/check-is-old.py %t/LeafModule.swiftinterface
 // RUN: rm %t/TestModule.swiftmodule
-// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s >%t/warn.txt 2>&1
+// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s >%t/warn.txt 2>&1
 // RUN: %{python} %S/Inputs/check-is-new.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
 // "check warn.txt exists and is empty"
 // RUN: test -e %t/warn.txt -a ! -s %t/warn.txt
@@ -53,7 +53,7 @@
 // RUN: %{python} %S/Inputs/make-old.py %t/LeafModule.swiftinterface
 // RUN: %{python} %S/Inputs/check-is-old.py %t/LeafModule.swiftinterface
 // RUN: rm %t/TestModule.swiftmodule
-// RUN: not %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s >%t/err.txt 2>&1
+// RUN: not %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s >%t/err.txt 2>&1
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
 // RUN: %FileCheck %s -check-prefix=CHECK-ERROR <%t/err.txt
 // CHECK-ERROR: LeafModule.swiftinterface:7:8: error: no such module 'NotAModule'
@@ -64,7 +64,7 @@
 //
 // RUN: %{python} %S/Inputs/check-is-old.py %t/OtherModule.swiftinterface %t/LeafModule.swiftinterface
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
-// RUN: not %target-swift-frontend -I %t -module-cache-path %t/modulecache -serialize-diagnostics -serialize-diagnostics-path %t/err.dia -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
+// RUN: not %target-swift-frontend -I %t -module-cache-path %t/modulecache -serialize-diagnostics -serialize-diagnostics-path %t/err.dia -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
 // RUN: c-index-test -read-diagnostics %t/err.dia 2>&1 | %FileCheck %s -check-prefix=CHECK-ERROR
 //
@@ -76,7 +76,7 @@
 // RUN: %{python} %S/Inputs/make-old.py %t/LeafModule.swiftinterface
 // RUN: %{python} %S/Inputs/check-is-old.py %t/OtherModule.swiftinterface %t/LeafModule.swiftinterface
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
-// RUN: not %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s >%t/err-inline.txt 2>&1
+// RUN: not %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s >%t/err-inline.txt 2>&1
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
 // RUN: %FileCheck %s -check-prefix=CHECK-ERROR-INLINE <%t/err-inline.txt
 // CHECK-ERROR-INLINE: LeafModule.swiftinterface:6:33: error: use of unresolved identifier 'unresolved'
@@ -87,7 +87,7 @@
 //
 // RUN: %{python} %S/Inputs/check-is-old.py %t/OtherModule.swiftinterface %t/LeafModule.swiftinterface
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
-// RUN: not %target-swift-frontend -I %t -module-cache-path %t/modulecache -serialize-diagnostics -serialize-diagnostics-path %t/err-inline.dia -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
+// RUN: not %target-swift-frontend -I %t -module-cache-path %t/modulecache -serialize-diagnostics -serialize-diagnostics-path %t/err-inline.dia -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
 // RUN: c-index-test -read-diagnostics %t/err-inline.dia 2>&1 | %FileCheck %s -check-prefix=CHECK-ERROR-INLINE
 

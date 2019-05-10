@@ -365,7 +365,9 @@ computeNewArgInterfaceTypes(SILFunction *F,
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");
     auto paramBoxedTy = paramBoxTy->getFieldType(F->getModule(), 0);
-    auto &paramTL = Types.getTypeLowering(paramBoxedTy);
+    // FIXME: Expansion
+    auto &paramTL = Types.getTypeLowering(paramBoxedTy,
+                                          ResilienceExpansion::Minimal);
     ParameterConvention convention;
     if (paramTL.isFormallyPassedIndirectly()) {
       convention = ParameterConvention::Indirect_In;
@@ -544,8 +546,7 @@ ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
     if (I != BoxArgumentMap.end()) {
       // Releases of the box arguments get replaced with ReleaseValue of the new
       // object type argument.
-      SILFunction &F = getBuilder().getFunction();
-      auto &typeLowering = F.getModule().getTypeLowering(I->second->getType());
+      auto &typeLowering = getBuilder().getTypeLowering(I->second->getType());
       SILBuilderWithPostProcess<ClosureCloner, 1> B(this, Inst);
       typeLowering.emitDestroyValue(B, Inst->getLoc(), I->second);
       return;
@@ -567,7 +568,7 @@ void ClosureCloner::visitDestroyValueInst(DestroyValueInst *Inst) {
       // Releases of the box arguments get replaced with an end_borrow,
       // destroy_value of the new object type argument.
       SILFunction &F = getBuilder().getFunction();
-      auto &typeLowering = F.getModule().getTypeLowering(I->second->getType());
+      auto &typeLowering = F.getTypeLowering(I->second->getType());
       SILBuilderWithPostProcess<ClosureCloner, 1> B(this, Inst);
 
       SILValue Value = I->second;
@@ -966,6 +967,7 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
   }
 
   SILModule &M = PAI->getModule();
+  SILFunction *F = PAI->getFunction();
   auto closureType = PAI->getType().castTo<SILFunctionType>();
   SILFunctionConventions closureConv(closureType, M);
 
@@ -986,10 +988,11 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
   // For now, return false is the address argument is an address-only type,
   // since we currently handle loadable types only.
   // TODO: handle address-only types
+  // FIXME: Expansion
   auto BoxTy = BoxArg->getType().castTo<SILBoxType>();
   assert(BoxTy->getLayout()->getFields().size() == 1 &&
          "promoting compound box not implemented yet");
-  if (BoxTy->getFieldType(M, 0).isAddressOnly(M)) {
+  if (BoxTy->getFieldType(M, 0).isAddressOnly(*F)) {
     LLVM_DEBUG(llvm::dbgs() << "        FAIL! Box is an address only "
                                "argument!\n");
     return false;
@@ -1223,7 +1226,7 @@ mapMarkDependenceArguments(SingleValueInstruction *root,
         MD->setBase(iter->second);
       }
       // Remove mark_dependence on trivial values.
-      if (MD->getBase()->getType().isTrivial(MD->getModule())) {
+      if (MD->getBase()->getType().isTrivial(*MD->getFunction())) {
         MD->replaceAllUsesWith(MD->getValue());
         Delete.push_back(MD);
       }
@@ -1240,6 +1243,7 @@ static SILFunction *
 processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
                         PartialApplyInst *PAI, IndicesSet &PromotableIndices,
                         SmallVectorImpl<SILFunction*> &Worklist) {
+  SILFunction *F = PAI->getFunction();
   SILModule &M = PAI->getModule();
 
   auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
@@ -1284,7 +1288,7 @@ processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
     SILValue Box = PAI->getOperand(OpNo);
     SILValue Addr = getOrCreateProjectBoxHelper(Box);
 
-    auto &typeLowering = M.getTypeLowering(Addr->getType());
+    auto &typeLowering = F->getTypeLowering(Addr->getType());
     auto newCaptured =
         typeLowering.emitLoadOfCopy(B, PAI->getLoc(), Addr, IsNotTake);
     Args.push_back(newCaptured);

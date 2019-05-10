@@ -226,6 +226,38 @@ bool SILFunction::isNoReturnFunction() const {
       .isNoReturnFunction();
 }
 
+const TypeLowering &
+SILFunction::getTypeLowering(AbstractionPattern orig, Type subst) {
+  return getModule().Types.getTypeLowering(orig, subst,
+                                           getResilienceExpansion());
+}
+
+const TypeLowering &SILFunction::getTypeLowering(Type t) const {
+  return getModule().Types.getTypeLowering(t, getResilienceExpansion());
+}
+
+SILType
+SILFunction::getLoweredType(AbstractionPattern orig, Type subst) const {
+  return getModule().Types.getLoweredType(orig, subst,
+                                          getResilienceExpansion());
+}
+
+SILType SILFunction::getLoweredType(Type t) const {
+  return getModule().Types.getLoweredType(t, getResilienceExpansion());
+}
+
+SILType SILFunction::getLoweredLoadableType(Type t) const {
+  return getModule().Types.getLoweredLoadableType(t, getResilienceExpansion());
+}
+
+const TypeLowering &SILFunction::getTypeLowering(SILType type) const {
+  return getModule().Types.getTypeLowering(type, getResilienceExpansion());
+}
+
+bool SILFunction::isTypeABIAccessible(SILType type) const {
+  return getModule().isTypeABIAccessible(type, getResilienceExpansion());
+}
+
 SILBasicBlock *SILFunction::createBasicBlock() {
   return new (getModule()) SILBasicBlock(this, nullptr, false);
 }

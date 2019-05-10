@@ -1,6 +1,6 @@
 // This test verifies that we add the function attributes used by TSan.
 
-// RUN: %target-swift-frontend -emit-ir -disable-llvm-optzns -sanitize=thread %s | %FileCheck %s -check-prefix=TSAN
+// RUN: %target-swift-frontend -emit-ir -sanitize=thread %s | %FileCheck %s -check-prefix=TSAN
 
 // TSan is currently only supported on 64 bit mac and simulators.
 // (We do not test the simulators here.)
@@ -22,5 +22,5 @@ public var x: Int {
 // TSAN-SAME: }
 
 // TSAN: attributes [[COROUTINE_ATTRS]] =
-// TSAN-NOT: sanitize_address
+// TSAN-SAME: sanitize_thread
 // TSAN-SAME: }

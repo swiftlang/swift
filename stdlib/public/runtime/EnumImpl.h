@@ -170,14 +170,14 @@ inline void storeEnumTagSinglePayloadImpl(
 
     // Store into the value.
 #if defined(__BIG_ENDIAN__)
-  unsigned numPayloadTagBytes = std::min(size_t(4), payloadSize);
-  if (numPayloadTagBytes)
-    small_memcpy(valueAddr,
-                 reinterpret_cast<uint8_t *>(&payloadIndex) + 4 -
-                     numPayloadTagBytes,
-                 numPayloadTagBytes, true);
-  if (payloadSize > 4)
-	    memset(valueAddr + 4, 0, payloadSize - 4);
+  uint64_t payloadIndexBuf = static_cast<uint64_t>(payloadIndex);
+  if (payloadSize >= 8) {
+    memcpy(valueAddr, &payloadIndexBuf, 8);
+    memset(valueAddr + 8, 0, payloadSize - 8);
+  } else if (payloadSize > 0) {
+    payloadIndexBuf <<= (8 - payloadSize) * 8;
+    memcpy(valueAddr, &payloadIndexBuf, payloadSize);
+  }
   if (numExtraTagBytes)
     small_memcpy(extraTagBitAddr,
                  reinterpret_cast<uint8_t *>(&extraTagIndex) + 4 -

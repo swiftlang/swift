@@ -19,7 +19,6 @@
 #define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/Config.h"
-#include "swift/Basic/CycleDiagnosticKind.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -104,6 +103,10 @@ namespace swift {
     /// Enable features useful for running in the debugger.
     bool DebuggerSupport = false;
 
+    /// Enable the MemoryBufferSerializedModuleImporter.
+    /// Only used by lldb-moduleimport-test.
+    bool EnableMemoryBufferImporter = false;
+
     /// Enable the DWARFImporter. Only used by lldb-moduleimport-test.
     bool EnableDWARFImporter = false;
     
@@ -137,8 +140,10 @@ namespace swift {
     bool EnableObjCInterop = true;
 
     /// On Darwin platforms, use the pre-stable ABI's mark bit for Swift
-    /// classes instead of the stable ABI's bit.
-    bool UseDarwinPreStableABIBit = !bool(SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT);
+    /// classes instead of the stable ABI's bit. This is needed when
+    /// targeting OSes prior to macOS 10.14.4 and iOS 12.2, where
+    /// libobjc does not support the stable ABI's marker bit.
+    bool UseDarwinPreStableABIBit = false;
 
     /// Enables checking that uses of @objc require importing
     /// the Foundation module.
@@ -164,6 +169,10 @@ namespace swift {
     /// solver should be debugged.
     unsigned DebugConstraintSolverAttempt = 0;
 
+    /// Line numbers to activate the constraint solver debugger.
+    /// Should be stored sorted.
+    llvm::SmallVector<unsigned, 4> DebugConstraintSolverOnLines;
+
     /// Enable named lazy member loading.
     bool NamedLazyMemberLoading = true;
 
@@ -175,9 +184,8 @@ namespace swift {
     /// This is for testing purposes.
     std::string DebugForbidTypecheckPrefix;
 
-    /// How to diagnose cycles encountered
-    CycleDiagnosticKind EvaluatorCycleDiagnostics =
-        CycleDiagnosticKind::NoDiagnose;
+    /// Whether to dump debug info for request evaluator cycles.
+    bool DebugDumpCycles = false;
 
     /// The path to which we should emit GraphViz output for the complete
     /// request-evaluator graph.
@@ -274,12 +282,6 @@ namespace swift {
     std::shared_ptr<llvm::Regex> OptimizationRemarkPassedPattern;
     std::shared_ptr<llvm::Regex> OptimizationRemarkMissedPattern;
 
-    /// When a conversion from String to Substring fails, emit a fix-it to append
-    /// the void subscript '[]'.
-    /// FIXME: Remove this flag when void subscripts are implemented.
-    /// This is used to guard preemptive testing for the fix-it.
-    bool FixStringToSubstringConversions = false;
-
     /// Whether collect tokens during parsing for syntax coloring.
     bool CollectParsedToken = false;
 
@@ -294,11 +296,19 @@ namespace swift {
     /// Scaffolding to permit experimentation with finer-grained dependencies
     /// and faster rebuilds.
     bool EnableExperimentalDependencies = false;
+    
+    /// Enable the experimental opaque result types feature.
+    bool EnableOpaqueResultTypes = true;
 
     /// To mimic existing system, set to false.
     /// To experiment with including file-private and private dependency info,
     /// set to true.
     bool ExperimentalDependenciesIncludeIntrafileOnes = false;
+
+    /// Enable experimental support for emitting Objective-C resilient class
+    /// stubs. This is a language option since it also determines if we admit
+    /// @objc members in extensions of classes with resilient ancestry.
+    bool EnableObjCResilientClassStubs = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -374,6 +384,24 @@ namespace swift {
     bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
     }
+
+    // The following deployment targets ship an Objective-C runtime supporting
+    // the class metadata update callback mechanism:
+    //
+    // - macOS 10.14.4
+    // - iOS 12.2
+    // - tvOS 12.2
+    // - watchOS 5.2
+    bool doesTargetSupportObjCMetadataUpdateCallback() const;
+
+    // The following deployment targets ship an Objective-C runtime supporting
+    // the objc_getClass() hook:
+    //
+    // - macOS 10.14.4
+    // - iOS 12.2
+    // - tvOS 12.2
+    // - watchOS 5.2
+    bool doesTargetSupportObjCGetClassHook() const;
 
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.

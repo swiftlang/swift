@@ -31,6 +31,7 @@ import BinaryFloatingPointConversionFromBinaryInteger
 import BinaryFloatingPointProperties
 import BitCount
 import Breadcrumbs
+import BucketSort
 import ByteSwap
 import COWTree
 import COWArrayGuaranteedParameterOverhead
@@ -65,7 +66,6 @@ import DictionaryOfAnyHashableStrings
 import DictionaryRemove
 import DictionarySubscriptDefault
 import DictionarySwap
-import DoubleWidthDivision
 import DropFirst
 import DropLast
 import DropWhile
@@ -74,11 +74,13 @@ import Exclusivity
 import ExistentialPerformance
 import Fibonacci
 import Flatten
+import FloatingPointParsing
 import FloatingPointPrinting
 import Hanoi
 import Hash
 import Histogram
 import InsertCharacter
+import IntegerParsing
 import Integrate
 import IterateData
 import Join
@@ -93,7 +95,9 @@ import MonteCarloPi
 import NibbleSort
 import NSDictionaryCastToSwift
 import NSError
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import NSStringConversion
+#endif
 import NopDeinit
 import ObjectAllocation
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
@@ -128,6 +132,7 @@ import RandomShuffle
 import RandomValues
 import RangeAssignment
 import RangeIteration
+import RangeOverlaps
 import RangeReplaceableCollectionPlusDefault
 import RecursiveOwnedParameter
 import ReduceInto
@@ -196,13 +201,12 @@ registerBenchmark(BinaryFloatingPointPropertiesNextUp)
 registerBenchmark(BinaryFloatingPointPropertiesUlp)
 registerBenchmark(BitCount)
 registerBenchmark(Breadcrumbs)
+registerBenchmark(BucketSort)
 registerBenchmark(ByteSwap)
 registerBenchmark(COWTree)
 registerBenchmark(COWArrayGuaranteedParameterOverhead)
 registerBenchmark(CString)
 registerBenchmark(CSVParsing)
-registerBenchmark(CSVParsingAlt)
-registerBenchmark(CSVParsingAltIndices)
 registerBenchmark(Calculator)
 registerBenchmark(CaptureProp)
 registerBenchmark(ChainedFilterMap)
@@ -235,7 +239,6 @@ registerBenchmark(DictionaryOfAnyHashableStrings)
 registerBenchmark(DictionaryRemove)
 registerBenchmark(DictionarySubscriptDefault)
 registerBenchmark(DictionarySwap)
-registerBenchmark(DoubleWidthDivision)
 registerBenchmark(DropFirst)
 registerBenchmark(DropLast)
 registerBenchmark(DropWhile)
@@ -244,11 +247,13 @@ registerBenchmark(Exclusivity)
 registerBenchmark(ExistentialPerformance)
 registerBenchmark(Fibonacci)
 registerBenchmark(Flatten)
+registerBenchmark(FloatingPointParsing)
 registerBenchmark(FloatingPointPrinting)
 registerBenchmark(Hanoi)
 registerBenchmark(HashTest)
 registerBenchmark(Histogram)
 registerBenchmark(InsertCharacter)
+registerBenchmark(IntegerParsing)
 registerBenchmark(IntegrateTest)
 registerBenchmark(IterateData)
 registerBenchmark(Join)
@@ -262,7 +267,9 @@ registerBenchmark(MonteCarloE)
 registerBenchmark(MonteCarloPi)
 registerBenchmark(NSDictionaryCastToSwift)
 registerBenchmark(NSErrorTest)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 registerBenchmark(NSStringConversion)
+#endif
 registerBenchmark(NibbleSort)
 registerBenchmark(NopDeinit)
 registerBenchmark(ObjectAllocation)
@@ -299,6 +306,7 @@ registerBenchmark(RandomShuffle)
 registerBenchmark(RandomValues)
 registerBenchmark(RangeAssignment)
 registerBenchmark(RangeIteration)
+registerBenchmark(RangeOverlaps)
 registerBenchmark(RangeReplaceableCollectionPlusDefault)
 registerBenchmark(RecursiveOwnedParameter)
 registerBenchmark(ReduceInto)

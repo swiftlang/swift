@@ -109,10 +109,10 @@ void ExistentialSpecializerCloner::cloneAndPopulateFunction() {
     if (iter != ArgToGenericTypeMap.end()) {
       auto GenericParam = iter->second;
       SILType GenericSILType =
-          M.Types.getLoweredType(NewF.mapTypeIntoContext(GenericParam));
+          NewF.getLoweredType(NewF.mapTypeIntoContext(GenericParam));
       NewArg = ClonedEntryBB->createFunctionArgument(GenericSILType);
       NewArg->setOwnershipKind(ValueOwnershipKind(
-          M, GenericSILType, ArgDesc.Arg->getArgumentConvention()));
+          NewF, GenericSILType, ArgDesc.Arg->getArgumentConvention()));
       /// Determine the Conformances.
       SmallVector<ProtocolConformanceRef, 1> NewConformances;
       auto ContextTy = NewF.mapTypeIntoContext(GenericParam);
@@ -173,11 +173,11 @@ void ExistentialSpecializerCloner::cloneAndPopulateFunction() {
     } else {
       /// Arguments that are not rewritten.
       auto Ty = params[ArgDesc.Index].getType();
-      auto LoweredTy = M.Types.getLoweredType(NewF.mapTypeIntoContext(Ty));
+      auto LoweredTy = NewF.getLoweredType(NewF.mapTypeIntoContext(Ty));
       auto MappedTy = LoweredTy.getCategoryType(ArgDesc.Arg->getType().getCategory());
       NewArg = ClonedEntryBB->createFunctionArgument(MappedTy, ArgDesc.Decl);
       NewArg->setOwnershipKind(ValueOwnershipKind(
-          M, MappedTy, ArgDesc.Arg->getArgumentConvention()));
+          NewF, MappedTy, ArgDesc.Arg->getArgumentConvention()));
       entryArgs.push_back(NewArg);
     }
   }
@@ -389,7 +389,7 @@ void ExistentialTransform::populateThunkBody() {
       auto SwiftType = ArgDesc.Arg->getType().getASTType();
       auto OpenedType =
           SwiftType->openAnyExistentialType(Opened)->getCanonicalType();
-      auto OpenedSILType = NewF->getModule().Types.getLoweredType(OpenedType);
+      auto OpenedSILType = NewF->getLoweredType(OpenedType);
       SILValue archetypeValue;
       auto ExistentialRepr =
           ArgDesc.Arg->getType().getPreferredExistentialRepresentation(M);
@@ -475,7 +475,7 @@ void ExistentialTransform::populateThunkBody() {
     Builder.setInsertionPoint(NormalBlock);
   } else {
     /// Create the Apply with substitutions
-    ReturnValue = Builder.createApply(Loc, FRI, SubMap, ApplyArgs, false);
+    ReturnValue = Builder.createApply(Loc, FRI, SubMap, ApplyArgs);
   }
 
   /// Set up the return results.

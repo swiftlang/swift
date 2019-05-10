@@ -57,3 +57,10 @@ func testArgumentLabels(in class: Int, _ case: (_ default: Int) -> Void) -> (in:
 
 // https://bugs.swift.org/browse/SR-9576
 func someFunc(input :Int?, completion: () throws -> Void) rethrows {}
+
+// https://bugs.swift.org/browse/SR-9740
+enum A {
+    case noArguments
+    case namedArguments(param1: String, param2: Int)
+    case mutedArguments(String, Int)
+}

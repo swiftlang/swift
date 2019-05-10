@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-inliner"
 
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
@@ -214,7 +215,7 @@ public:
       // Replace all the yielded values in the callee with undef.
       for (auto calleeYield : BeginApply->getYieldedValues()) {
         calleeYield->replaceAllUsesWith(
-            SILUndef::get(calleeYield->getType(), Builder->getModule()));
+            SILUndef::get(calleeYield->getType(), Builder->getFunction()));
       }
     }
 
@@ -325,6 +326,8 @@ protected:
 std::pair<SILBasicBlock::iterator, SILBasicBlock *>
 SILInliner::inlineFunction(SILFunction *calleeFunction, FullApplySite apply,
                            ArrayRef<SILValue> appliedArgs) {
+  PrettyStackTraceSILFunction calleeTraceRAII("inlining", calleeFunction);
+  PrettyStackTraceSILFunction callerTraceRAII("...into", apply.getFunction());
   assert(canInlineApplySite(apply)
          && "Asked to inline function that is unable to be inlined?!");
 
@@ -332,6 +335,28 @@ SILInliner::inlineFunction(SILFunction *calleeFunction, FullApplySite apply,
                          OpenedArchetypesTracker, DeletionCallback);
   auto nextI = cloner.cloneInline(appliedArgs);
   return std::make_pair(nextI, cloner.getLastClonedBB());
+}
+
+std::pair<SILBasicBlock::iterator, SILBasicBlock *>
+SILInliner::inlineFullApply(FullApplySite apply,
+                            SILInliner::InlineKind inlineKind,
+                            SILOptFunctionBuilder &funcBuilder) {
+  SmallVector<SILValue, 8> appliedArgs;
+  for (const auto &arg : apply.getArguments())
+    appliedArgs.push_back(arg);
+
+  SILFunction *caller = apply.getFunction();
+  SILOpenedArchetypesTracker OpenedArchetypesTracker(caller);
+  caller->getModule().registerDeleteNotificationHandler(
+      &OpenedArchetypesTracker);
+  // The callee only needs to know about opened archetypes used in
+  // the substitution list.
+  OpenedArchetypesTracker.registerUsedOpenedArchetypes(apply.getInstruction());
+
+  SILInliner Inliner(funcBuilder, inlineKind, apply.getSubstitutionMap(),
+                     OpenedArchetypesTracker);
+  return Inliner.inlineFunction(apply.getReferencedFunction(), apply,
+                                appliedArgs);
 }
 
 SILInlineCloner::SILInlineCloner(
@@ -518,11 +543,13 @@ void SILInlineCloner::fixUp(SILFunction *calleeFunction) {
   assert(!Apply.getInstruction()->hasUsesOfAnyResult());
 
   auto deleteCallback = [this](SILInstruction *deletedI) {
+    if (NextIter == deletedI->getIterator())
+      ++NextIter;
     if (DeletionCallback)
       DeletionCallback(deletedI);
   };
-  NextIter = recursivelyDeleteTriviallyDeadInstructions(Apply.getInstruction(),
-                                                        true, deleteCallback);
+  recursivelyDeleteTriviallyDeadInstructions(Apply.getInstruction(), true,
+                                             deleteCallback);
 }
 
 SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
@@ -731,6 +758,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::ValueMetatypeInst:
   case SILInstructionKind::WitnessMethodInst:
   case SILInstructionKind::AssignInst:
+  case SILInstructionKind::AssignByDelegateInst:
   case SILInstructionKind::BranchInst:
   case SILInstructionKind::CheckedCastBranchInst:
   case SILInstructionKind::CheckedCastValueBranchInst:

@@ -51,16 +51,13 @@ add_swift_host_library(swiftIRGen STATIC
   TypeLayoutDumper.cpp
   TypeLayoutVerifier.cpp
 
-  INTERFACE_LINK_LIBRARIES
-    # Clang dependencies.
-    # FIXME: Clang should really export these in some reasonable manner.
-    clangCodeGen
-    clangAST
-
-  LLVM_COMPONENT_DEPENDS
+  LLVM_LINK_COMPONENTS
     target
     transformutils
 )
+target_link_libraries(swiftIRGen INTERFACE
+  clangCodeGen
+  clangAST)
 target_link_libraries(swiftIRGen PRIVATE
   swiftAST
   swiftLLVMPasses

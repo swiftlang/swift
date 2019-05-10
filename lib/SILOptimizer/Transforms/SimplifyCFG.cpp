@@ -81,6 +81,10 @@ namespace {
 
     ConstantFolder ConstFolder;
 
+    // True if the function has a large amount of blocks. In this case we turn off some expensive
+    // optimizations.
+    bool isVeryLargeFunction = false;
+
     void constFoldingCallback(SILInstruction *I) {
       // If a terminal instruction gets constant folded (like cond_br), it
       // enables further simplify-CFG optimizations.
@@ -192,6 +196,7 @@ namespace {
     bool simplifyArgument(SILBasicBlock *BB, unsigned i);
     bool simplifyArgs(SILBasicBlock *BB);
     void findLoopHeaders();
+    bool simplifySwitchEnumOnObjcClassOptional(SwitchEnumInst *SEI);
   };
 
 } // end anonymous namespace
@@ -207,7 +212,7 @@ static bool isUsedOutsideOfBlock(SILValue V, SILBasicBlock *BB) {
 /// Helper function to perform SSA updates in case of jump threading.
 void swift::updateSSAAfterCloning(BasicBlockCloner &Cloner,
                                   SILBasicBlock *SrcBB, SILBasicBlock *DestBB) {
-  SILSSAUpdater SSAUp(SrcBB->getParent()->getModule());
+  SILSSAUpdater SSAUp;
   for (auto AvailValPair : Cloner.AvailVals) {
     ValueBase *Inst = AvailValPair.first;
     if (Inst->use_empty())
@@ -1225,11 +1230,13 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
       if (DestBB->getArgument(i) != BI->getArg(i)) {
         SILValue Val = BI->getArg(i);
         DestBB->getArgument(i)->replaceAllUsesWith(Val);
-        if (auto *I = dyn_cast<SingleValueInstruction>(Val)) {
-          // Replacing operands may trigger constant folding which then could
-          // trigger other simplify-CFG optimizations.
-          ConstFolder.addToWorklist(I);
-          ConstFolder.processWorkList();
+        if (!isVeryLargeFunction) {
+          if (auto *I = dyn_cast<SingleValueInstruction>(Val)) {
+            // Replacing operands may trigger constant folding which then could
+            // trigger other simplify-CFG optimizations.
+            ConstFolder.addToWorklist(I);
+            ConstFolder.processWorkList();
+          }
         }
       } else {
         // We must be processing an unreachable part of the cfg with a cycle.
@@ -1289,7 +1296,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   // If this unconditional branch has BBArgs, check to see if duplicating the
   // destination would allow it to be simplified.  This is a simple form of jump
   // threading.
-  if (!BI->getArgs().empty() &&
+  if (!isVeryLargeFunction && !BI->getArgs().empty() &&
       tryJumpThreading(BI))
     return true;
 
@@ -1731,6 +1738,212 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
   return true;
 }
 
+/// Checks that the someBB only contains obj_method calls (possibly chained) on
+/// the optional value.
+///
+/// switch_enum %optionalValue, case #Optional.some!enumelt.1: someBB
+///
+/// someBB(%optionalPayload):
+///    %1 = objc_method %optionalPayload
+///    %2 = apply %1(..., %optionalPayload) // self position
+///    %3 = unchecked_ref_cast %2
+///    %4 = objc_method %3
+///    %... = apply %4(..., %3)
+///    br mergeBB(%...)
+static bool containsOnlyObjMethodCallOnOptional(SILValue optionalValue,
+                                                SILBasicBlock *someBB,
+                                                SILValue &outBranchArg,
+                                                SILValue &outOptionalPayload) {
+  SILValue optionalPayload;
+  SmallVector<SILValue, 4> optionalPayloads;
+  if (someBB->getNumArguments() == 1) {
+    optionalPayload = someBB->getArgument(0);
+    optionalPayloads.push_back(optionalPayload);
+  } else if (someBB->getNumArguments() != 0)
+    return false;
+
+  SmallVector<SILValue, 4> objCApplies;
+  for (auto &i : *someBB) {
+    SILInstruction *inst = &i;
+    if (onlyAffectsRefCount(inst))
+      continue;
+    if (inst->isDebugInstruction())
+      continue;
+    // An objc_method has no sideffects.
+    if (isa<ObjCMethodInst>(inst))
+      continue;
+
+    // An uncheckedEnumData has no sideeffects.
+    if (auto *uncheckedEnumData = dyn_cast<UncheckedEnumDataInst>(inst)) {
+      if (uncheckedEnumData->getOperand() != optionalValue)
+        continue;
+      optionalPayload = uncheckedEnumData;
+      optionalPayloads.push_back(uncheckedEnumData);
+      continue;
+    }
+
+    // An unchecked_ref_cast is safe.
+    if (auto *refCast = dyn_cast<UncheckedRefCastInst>(inst)) {
+      // An unchecked_ref_cast on a safe objc_method apply behaves like the
+      // optional (it is null if the optional was null).
+      if (refCast->getType().getClassOrBoundGenericClass() &&
+          std::find(objCApplies.begin(), objCApplies.end(),
+                    refCast->getOperand()) != objCApplies.end())
+        optionalPayloads.push_back(refCast);
+      continue;
+    }
+
+    // Applies on objc_methods where self is either the optional payload or the
+    // result of another 'safe' apply are safe.
+    if (auto *objcMethod = dyn_cast<ApplyInst>(inst)) {
+      if (!isa<ObjCMethodInst>(objcMethod->getCallee()))
+        return false;
+      if (std::find(optionalPayloads.begin(), optionalPayloads.end(),
+                    objcMethod->getSelfArgument()) == optionalPayloads.end())
+        return false;
+      objCApplies.push_back(objcMethod);
+      continue;
+    }
+
+    // The branch should forward one of the objc_method call.
+    if (auto *br = dyn_cast<BranchInst>(inst)) {
+      if (br->getNumArgs() == 0 || br->getNumArgs() > 1)
+        return false;
+      auto branchArg = br->getArg(0);
+      if (std::find(objCApplies.begin(), objCApplies.end(), branchArg) ==
+          objCApplies.end())
+        return false;
+      outBranchArg = branchArg;
+      continue;
+    }
+    // Unexpected instruction.
+    return false;
+  }
+  if (!optionalPayload)
+    return false;
+  outOptionalPayload = optionalPayload;
+  return true;
+}
+
+/// Check that all that noneBB does is forwarding none.
+/// The only other allowed operation are ref count operations.
+static bool onlyForwardsNone(SILBasicBlock *noneBB, SILBasicBlock *someBB,
+                             SwitchEnumInst *SEI) {
+  // It all the basic blocks leading up to the ultimate block we only expect
+  // reference count instructions.
+  while (noneBB->getSingleSuccessorBlock() != someBB->getSingleSuccessorBlock()) {
+    for (auto &i : *noneBB) {
+      auto *inst = &i;
+      if (isa<BranchInst>(inst) || onlyAffectsRefCount(inst) ||
+          inst->isDebugInstruction())
+        continue;
+      return false;
+    }
+    noneBB = noneBB->getSingleSuccessorBlock();
+  }
+  // The ultimate block forwards the Optional<...>.none value.
+  SILValue optionalNone;
+  for (auto &i : *noneBB) {
+    auto *inst = &i;
+    if (onlyAffectsRefCount(inst) || inst->isDebugInstruction())
+      continue;
+    if (auto *none = dyn_cast<EnumInst>(inst)) {
+      if (none->getElement() !=
+          SEI->getModule().getASTContext().getOptionalNoneDecl())
+        return false;
+      optionalNone = none;
+      continue;
+    }
+    if (auto *noneBranch = dyn_cast<BranchInst>(inst)) {
+      if (noneBranch->getNumArgs() != 1 ||
+          (noneBranch->getArg(0) != SEI->getOperand() &&
+           noneBranch->getArg(0) != optionalNone))
+        return false;
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
+/// Check whether \p noneBB has the same ultimate successor as the successor to someBB.
+///  someBB       noneBB
+///   \             |
+///    \            ... (more bbs?)
+///     \           /
+///       ulimateBB
+static bool hasSameUlitmateSuccessor(SILBasicBlock *noneBB, SILBasicBlock *someBB) {
+  auto *someSuccessorBB = someBB->getSingleSuccessorBlock();
+  if (!someSuccessorBB)
+    return false;
+  auto *noneSuccessorBB = noneBB->getSingleSuccessorBlock();
+  while (noneSuccessorBB != nullptr && noneSuccessorBB != someSuccessorBB)
+    noneSuccessorBB = noneSuccessorBB->getSingleSuccessorBlock();
+  return noneSuccessorBB == someSuccessorBB;
+}
+
+/// Simplify switch_enums on class enums that branch to objc_method calls on
+/// that optional on the #Optional.some side to always branch to the some side.
+///
+/// switch_enum %optionalValue, case #Optional.some!enumelt.1: someBB,
+///                             case #Optional.none: noneBB
+///
+/// someBB(%optionalPayload):
+///    %1 = objc_method %optionalPayload
+///    %2 = apply %1(..., %optionalPayload) // self position
+///    br mergeBB(%2)
+///
+/// noneBB:
+///    %4 = enum #Optional.none
+///    br mergeBB(%4)
+bool SimplifyCFG::simplifySwitchEnumOnObjcClassOptional(SwitchEnumInst *SEI) {
+  auto optional = SEI->getOperand();
+  auto optionalPayloadType = optional->getType().getOptionalObjectType();
+  if (!optionalPayloadType ||
+      !optionalPayloadType.getClassOrBoundGenericClass())
+    return false;
+
+  if (SEI->getNumCases() != 2)
+    return false;
+
+  auto *noneBB = SEI->getCase(0).second;
+  auto *someBB = SEI->getCase(1).second;
+  if (noneBB == someBB)
+    return false;
+  auto someDecl = SEI->getModule().getASTContext().getOptionalSomeDecl();
+  if (SEI->getCaseDestination(someDecl) != someBB)
+    std::swap(someBB, noneBB);
+
+  if (!hasSameUlitmateSuccessor(noneBB, someBB))
+    return false;
+
+  if (!onlyForwardsNone(noneBB, someBB, SEI))
+    return false;
+
+  SILValue branchArg;
+  SILValue optionalPayload;
+  if (!containsOnlyObjMethodCallOnOptional(optional, someBB, branchArg,
+                                           optionalPayload))
+    return false;
+
+  SILBuilderWithScope Builder(SEI);
+  auto *payloadCast = Builder.createUncheckedRefCast(SEI->getLoc(), optional,
+                                                     optionalPayloadType);
+  optionalPayload->replaceAllUsesWith(payloadCast);
+  auto *switchBB = SEI->getParent();
+  if (someBB->getNumArguments())
+    Builder.createBranch(SEI->getLoc(), someBB, SILValue(payloadCast));
+  else
+    Builder.createBranch(SEI->getLoc(), someBB);
+
+  SEI->eraseFromParent();
+  addToWorklist(switchBB);
+  simplifyAfterDroppingPredecessor(noneBB);
+  addToWorklist(someBB);
+  ++NumConstantFolded;
+  return true;
+}
+
 /// simplifySwitchEnumBlock - Simplify a basic block that ends with a
 /// switch_enum instruction that gets its operand from an enum
 /// instruction.
@@ -1936,23 +2149,23 @@ bool SimplifyCFG::simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI) {
   bool MadeChange = false;
   CastOptimizer CastOpt(
       FuncBuilder, nullptr /*SILBuilderContext*/,
-      /* ReplaceValueUsesAction */
+      /* replaceValueUsesAction */
       [&MadeChange](SILValue oldValue, SILValue newValue) {
         MadeChange = true;
       },
-      /* ReplaceInstUsesAction */
+      /* replaceInstUsesAction */
       [&MadeChange](SILInstruction *I, ValueBase *V) { MadeChange = true; },
-      /* EraseInstAction */
+      /* eraseInstAction */
       [&MadeChange](SILInstruction *I) {
         MadeChange = true;
         I->eraseFromParent();
       },
-      /* WillSucceedAction */
+      /* willSucceedAction */
       [&]() {
         MadeChange |= removeIfDead(FailureBB);
         addToWorklist(ThisBB);
       },
-      /* WillFailAction */
+      /* willFailAction */
       [&]() {
         MadeChange |= removeIfDead(SuccessBB);
         addToWorklist(ThisBB);
@@ -1971,23 +2184,23 @@ bool SimplifyCFG::simplifyCheckedCastValueBranchBlock(
   bool MadeChange = false;
   CastOptimizer CastOpt(
       FuncBuilder, nullptr /*SILBuilderContext*/,
-      /* ReplaceValueUsesAction */
+      /* replaceValueUsesAction */
       [&MadeChange](SILValue oldValue, SILValue newValue) {
         MadeChange = true;
       },
-      /* ReplaceInstUsesAction */
+      /* replaceInstUsesAction */
       [&MadeChange](SILInstruction *I, ValueBase *V) { MadeChange = true; },
-      /* EraseInstAction */
+      /* eraseInstAction */
       [&MadeChange](SILInstruction *I) {
         MadeChange = true;
         I->eraseFromParent();
       },
-      /* WillSucceedAction */
+      /* willSucceedAction */
       [&]() {
         MadeChange |= removeIfDead(FailureBB);
         addToWorklist(ThisBB);
       },
-      /* WillFailAction */
+      /* willFailAction */
       [&]() {
         MadeChange |= removeIfDead(SuccessBB);
         addToWorklist(ThisBB);
@@ -2007,21 +2220,21 @@ simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI) {
   bool MadeChange = false;
   CastOptimizer CastOpt(
       FuncBuilder, nullptr /*SILBuilderContext*/,
-      /* ReplaceValueUsesAction */
+      /* replaceValueUsesAction */
       [&MadeChange](SILValue, SILValue) { MadeChange = true; },
-      /* ReplaceInstUsesAction */
+      /* replaceInstUsesAction */
       [&MadeChange](SILInstruction *I, ValueBase *V) { MadeChange = true; },
-      /* EraseInstAction */
+      /* eraseInstAction */
       [&MadeChange](SILInstruction *I) {
         MadeChange = true;
         I->eraseFromParent();
       },
-      /* WillSucceedAction */
+      /* willSucceedAction */
       [&]() {
         MadeChange |= removeIfDead(FailureBB);
         addToWorklist(ThisBB);
       },
-      /* WillFailAction */
+      /* willFailAction */
       [&]() {
         MadeChange |= removeIfDead(SuccessBB);
         addToWorklist(ThisBB);
@@ -2316,7 +2529,9 @@ bool SimplifyCFG::simplifyBlocks() {
     case TermKind::SwitchEnumInst: {
       auto *SEI = cast<SwitchEnumInst>(TI);
       if (simplifySwitchEnumBlock(SEI)) {
-        Changed = false;
+        Changed = true;
+      } else if (simplifySwitchEnumOnObjcClassOptional(SEI)) {
+        Changed = true;
       } else {
         Changed |= simplifySwitchEnumUnreachableBlocks(SEI);
       }
@@ -2493,12 +2708,12 @@ bool SimplifyCFG::tailDuplicateObjCMethodCallSuccessorBlocks() {
 
 static void
 deleteTriviallyDeadOperandsOfDeadArgument(MutableArrayRef<Operand> TermOperands,
-                                          unsigned DeadArgIndex, SILModule &M) {
+                                          unsigned DeadArgIndex) {
   Operand &Op = TermOperands[DeadArgIndex];
   auto *I = Op.get()->getDefiningInstruction();
   if (!I)
     return;
-  Op.set(SILUndef::get(Op.get()->getType(), M));
+  Op.set(SILUndef::get(Op.get()->getType(), *I->getFunction()));
   recursivelyDeleteTriviallyDeadInstructions(I);
 }
 
@@ -2520,14 +2735,12 @@ static void removeArgumentFromTerminator(SILBasicBlock *BB, SILBasicBlock *Dest,
       FalseArgs.push_back(A);
 
     if (Dest == CBI->getTrueBB()) {
-      deleteTriviallyDeadOperandsOfDeadArgument(CBI->getTrueOperands(), idx,
-                                                BB->getModule());
+      deleteTriviallyDeadOperandsOfDeadArgument(CBI->getTrueOperands(), idx);
       TrueArgs.erase(TrueArgs.begin() + idx);
     }
 
     if (Dest == CBI->getFalseBB()) {
-      deleteTriviallyDeadOperandsOfDeadArgument(CBI->getFalseOperands(), idx,
-                                                BB->getModule());
+      deleteTriviallyDeadOperandsOfDeadArgument(CBI->getFalseOperands(), idx);
       FalseArgs.erase(FalseArgs.begin() + idx);
     }
 
@@ -2545,8 +2758,7 @@ static void removeArgumentFromTerminator(SILBasicBlock *BB, SILBasicBlock *Dest,
     for (auto A : BI->getArgs())
       Args.push_back(A);
 
-    deleteTriviallyDeadOperandsOfDeadArgument(BI->getAllOperands(), idx,
-                                              BB->getModule());
+    deleteTriviallyDeadOperandsOfDeadArgument(BI->getAllOperands(), idx);
     Args.erase(Args.begin() + idx);
     Builder.createBranch(BI->getLoc(), BI->getDestBB(), Args);
     Branch->eraseFromParent();
@@ -2660,7 +2872,8 @@ void ArgumentSplitter::replaceIncomingArgs(
 }
 
 bool ArgumentSplitter::createNewArguments() {
-  SILModule &Mod = Arg->getModule();
+  auto *F = Arg->getFunction();
+  SILModule &Mod = F->getModule();
   SILBasicBlock *ParentBB = Arg->getParent();
 
   // Grab the incoming values. Return false if we can't find them.
@@ -2682,7 +2895,7 @@ bool ArgumentSplitter::createNewArguments() {
   // We do not want to split arguments that have less than 2 non-trivial
   // projections.
   if (count_if(Projections, [&](const Projection &P) {
-        return !P.getType(Ty, Mod).isTrivial(Mod);
+        return !P.getType(Ty, Mod).isTrivial(*F);
       }) < 2)
     return false;
 
@@ -2859,6 +3072,9 @@ static bool splitBBArguments(SILFunction &Fn) {
 bool SimplifyCFG::run() {
 
   LLVM_DEBUG(llvm::dbgs() << "### Run SimplifyCFG on " << Fn.getName() << '\n');
+
+  // Disable some expensive optimizations if the function is huge.
+  isVeryLargeFunction = (Fn.size() > 10000);
 
   // First remove any block not reachable from the entry.
   bool Changed = removeUnreachableBlocks(Fn);
@@ -3468,7 +3684,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   // Okay, we'll replace the BB arg with one with the right type, replace
   // the uses in this block, and then rewrite the branch operands.
   LLVM_DEBUG(llvm::dbgs() << "unwrap argument:" << *A);
-  A->replaceAllUsesWith(SILUndef::get(A->getType(), BB->getModule()));
+  A->replaceAllUsesWith(SILUndef::get(A->getType(), *BB->getParent()));
   auto *NewArg =
       BB->replacePhiArgument(i, proj->getType(), ValueOwnershipKind::Owned);
   proj->replaceAllUsesWith(NewArg);

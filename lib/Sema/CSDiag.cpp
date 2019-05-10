@@ -40,25 +40,6 @@ using namespace swift;
 using namespace constraints;
 
 namespace swift {
-  std::string getTypeListString(Type type) {
-    std::string result;
-    
-    // Always make sure to have at least one set of parens
-    bool forceParens =
-    !type->is<TupleType>() && !type->hasParenSugar();
-    if (forceParens)
-      result.push_back('(');
-    
-    llvm::raw_string_ostream OS(result);
-    type->print(OS);
-    OS.flush();
-    
-    if (forceParens)
-      result.push_back(')');
-    
-    return result;
-  }
-
   Type replaceTypeParametersWithUnresolved(Type ty) {
     if (!ty) return ty;
     
@@ -103,29 +84,10 @@ static unsigned recomputeSummaryFlags(ConstraintLocator *oldLocator,
 
 ConstraintLocator *
 constraints::simplifyLocator(ConstraintSystem &cs, ConstraintLocator *locator,
-                             SourceRange &range,
-                             ConstraintLocator **targetLocator) {
-  // Clear out the target locator result.
-  if (targetLocator)
-    *targetLocator = nullptr;
-
-  // The path to be tacked on to the target locator to identify the specific
-  // target.
-  Expr *targetAnchor;
-  SmallVector<LocatorPathElt, 4> targetPath;
-
+                             SourceRange &range) {
   auto path = locator->getPath();
   auto anchor = locator->getAnchor();
-  simplifyLocator(anchor, path, targetAnchor, targetPath, range);
-
-
-  // If we have a target anchor, build and simplify the target locator.
-  if (targetLocator && targetAnchor) {
-    SourceRange targetRange;
-    unsigned targetFlags = recomputeSummaryFlags(locator, targetPath);
-    auto loc = cs.getConstraintLocator(targetAnchor, targetPath, targetFlags);
-    *targetLocator = simplifyLocator(cs, loc, targetRange);
-  }
+  simplifyLocator(anchor, path, range);
 
   // If we didn't simplify anything, just return the input.
   if (anchor == locator->getAnchor() &&
@@ -141,42 +103,32 @@ constraints::simplifyLocator(ConstraintSystem &cs, ConstraintLocator *locator,
 
 void constraints::simplifyLocator(Expr *&anchor,
                                   ArrayRef<LocatorPathElt> &path,
-                                  Expr *&targetAnchor,
-                                  SmallVectorImpl<LocatorPathElt> &targetPath,
                                   SourceRange &range) {
   range = SourceRange();
-  targetAnchor = nullptr;
 
   while (!path.empty()) {
     switch (path[0].getKind()) {
     case ConstraintLocator::ApplyArgument: {
       // Extract application argument.
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
-        // The target anchor is the function being called.
-        targetAnchor = applyExpr->getFn();
-        targetPath.push_back(path[0]);
-
         anchor = applyExpr->getArg();
         path = path.slice(1);
         continue;
       }
 
-      if (auto objectLiteralExpr = dyn_cast<ObjectLiteralExpr>(anchor)) {
-        targetAnchor = nullptr;
-        targetPath.clear();
+      if (auto subscriptExpr = dyn_cast<SubscriptExpr>(anchor)) {
+        anchor = subscriptExpr->getIndex();
+        path = path.slice(1);
+        continue;
+      }
 
+      if (auto objectLiteralExpr = dyn_cast<ObjectLiteralExpr>(anchor)) {
         anchor = objectLiteralExpr->getArg();
         path = path.slice(1);
         continue;
       }
 
       if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
-        // The target anchor is the method being called,
-        // no additional information could be retrieved
-        // about this call.
-        targetAnchor = nullptr;
-        targetPath.clear();
-
         anchor = UME->getArgument();
         path = path.slice(1);
         continue;
@@ -187,11 +139,14 @@ void constraints::simplifyLocator(Expr *&anchor,
     case ConstraintLocator::ApplyFunction:
       // Extract application function.
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
-        // No additional target locator information.
-        targetAnchor = nullptr;
-        targetPath.clear();
-
         anchor = applyExpr->getFn();
+        path = path.slice(1);
+        continue;
+      }
+
+      // The subscript itself is the function.
+      if (auto subscriptExpr = dyn_cast<SubscriptExpr>(anchor)) {
+        anchor = subscriptExpr;
         path = path.slice(1);
         continue;
       }
@@ -199,10 +154,6 @@ void constraints::simplifyLocator(Expr *&anchor,
       // The unresolved member itself is the function.
       if (auto unresolvedMember = dyn_cast<UnresolvedMemberExpr>(anchor)) {
         if (unresolvedMember->getArgument()) {
-          // No additional target locator information.
-          targetAnchor = nullptr;
-          targetPath.clear();
-
           anchor = unresolvedMember;
           path = path.slice(1);
           continue;
@@ -222,33 +173,32 @@ void constraints::simplifyLocator(Expr *&anchor,
       continue;
 
     case ConstraintLocator::NamedTupleElement:
-    case ConstraintLocator::TupleElement:
+    case ConstraintLocator::TupleElement: {
       // Extract tuple element.
+      unsigned index = path[0].getValue();
       if (auto tupleExpr = dyn_cast<TupleExpr>(anchor)) {
-        unsigned index = path[0].getValue();
         if (index < tupleExpr->getNumElements()) {
-          // Append this extraction to the target locator path.
-          if (targetAnchor) {
-            targetPath.push_back(path[0]);
-          }
-
           anchor = tupleExpr->getElement(index);
           path = path.slice(1);
           continue;
         }
       }
+
+      if (auto *CE = dyn_cast<CollectionExpr>(anchor)) {
+        if (index < CE->getNumElements()) {
+          anchor = CE->getElement(index);
+          path = path.slice(1);
+          continue;
+        }
+      }
       break;
+    }
 
     case ConstraintLocator::ApplyArgToParam:
       // Extract tuple element.
       if (auto tupleExpr = dyn_cast<TupleExpr>(anchor)) {
         unsigned index = path[0].getValue();
         if (index < tupleExpr->getNumElements()) {
-          // Append this extraction to the target locator path.
-          if (targetAnchor) {
-            targetPath.push_back(path[0]);
-          }
-
           anchor = tupleExpr->getElement(index);
           path = path.slice(1);
           continue;
@@ -258,11 +208,6 @@ void constraints::simplifyLocator(Expr *&anchor,
       // Extract subexpression in parentheses.
       if (auto parenExpr = dyn_cast<ParenExpr>(anchor)) {
         assert(path[0].getValue() == 0);
-
-        // Append this extraction to the target locator path.
-        if (targetAnchor) {
-          targetPath.push_back(path[0]);
-        }
 
         anchor = parenExpr->getSubExpr();
         path = path.slice(1);
@@ -274,8 +219,6 @@ void constraints::simplifyLocator(Expr *&anchor,
       if (auto typeExpr = dyn_cast<TypeExpr>(anchor)) {
         // This is really an implicit 'init' MemberRef, so point at the base,
         // i.e. the TypeExpr.
-        targetAnchor = nullptr;
-        targetPath.clear();
         range = SourceRange();
         anchor = typeExpr;
         path = path.slice(1);
@@ -286,10 +229,6 @@ void constraints::simplifyLocator(Expr *&anchor,
     case ConstraintLocator::Member:
     case ConstraintLocator::MemberRefBase:
       if (auto UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
-        // No additional target locator information.
-        targetAnchor = nullptr;
-        targetPath.clear();
-        
         range = UDE->getNameLoc().getSourceRange();
         anchor = UDE->getBase();
         path = path.slice(1);
@@ -299,8 +238,6 @@ void constraints::simplifyLocator(Expr *&anchor,
 
     case ConstraintLocator::SubscriptMember:
       if (isa<SubscriptExpr>(anchor)) {
-        targetAnchor = nullptr;
-        targetPath.clear();
         path = path.slice(1);
         continue;
       }
@@ -309,8 +246,6 @@ void constraints::simplifyLocator(Expr *&anchor,
     case ConstraintLocator::ClosureResult:
       if (auto CE = dyn_cast<ClosureExpr>(anchor)) {
         if (CE->hasSingleExpressionBody()) {
-          targetAnchor = nullptr;
-          targetPath.clear();
           anchor = CE->getSingleExpressionBody();
           path = path.slice(1);
           continue;
@@ -791,15 +726,19 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
   // Otherwise, we have at least one (and potentially many) viable candidates
   // sort them out.  If all of the candidates have the same problem (commonly
   // because there is exactly one candidate!) diagnose this.
-  bool sameProblem = true;
-  auto firstProblem = result.UnviableCandidates[0].second;
+  auto firstProblem = result.UnviableReasons[0];
+  bool sameProblem = llvm::all_of(
+      result.UnviableReasons,
+      [&firstProblem](const MemberLookupResult::UnviableReason &problem) {
+        return problem == firstProblem;
+      });
+
   ValueDecl *member = nullptr;
   for (auto cand : result.UnviableCandidates) {
     if (member == nullptr)
-      member = cand.first.getDecl();
-    sameProblem &= cand.second == firstProblem;
+      member = cand.getDecl();
   }
-  
+
   auto instanceTy = baseObjTy;
   if (auto *MTT = instanceTy->getAs<AnyMetatypeType>())
     instanceTy = MTT->getInstanceType();
@@ -807,6 +746,9 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
   if (sameProblem) {
     switch (firstProblem) {
     case MemberLookupResult::UR_LabelMismatch:
+    case MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember:
+    case MemberLookupResult::UR_ReferenceWritableKeyPathOnMutatingMember:
+    case MemberLookupResult::UR_KeyPathWithAnyObjectRootType:
       break;
     case MemberLookupResult::UR_UnavailableInExistential:
       diagnose(loc, diag::could_not_use_member_on_existential,
@@ -842,7 +784,7 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
     }
         
     case MemberLookupResult::UR_Inaccessible: {
-      auto decl = result.UnviableCandidates[0].first.getDecl();
+      auto decl = result.UnviableCandidates[0].getDecl();
       // FIXME: What if the unviable candidates have different levels of access?
       //
       // If we found an inaccessible member of a protocol extension, it might
@@ -850,11 +792,17 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
       // visible to us, but the conforming type is. In this case, we need to
       // clamp the formal access for diagnostics purposes to the formal access
       // of the protocol itself.
-      diagnose(nameLoc, diag::candidate_inaccessible, decl->getBaseName(),
-               decl->getFormalAccessScope().accessLevelForDiagnostics());
-      for (auto cand : result.UnviableCandidates)
-        diagnose(cand.first.getDecl(), diag::decl_declared_here, memberName);
-        
+      InaccessibleMemberFailure failure(expr, CS, decl,
+                                        CS.getConstraintLocator(E));
+      auto diagnosed = failure.diagnoseAsError();
+      assert(diagnosed && "failed to produce expected diagnostic");
+      for (auto cand : result.UnviableCandidates) {
+        auto *choice = cand.getDecl();
+        // failure is going to highlight candidate given to it,
+        // we just need to handle the rest here.
+        if (choice != decl)
+          diagnose(choice, diag::decl_declared_here, choice->getFullName());
+      }
       return;
     }
     }
@@ -2055,34 +2003,9 @@ bool FailureDiagnosis::diagnoseNonEscapingParameterToEscaping(
   if (!srcFT || !dstFT || !srcFT->isNoEscape() || dstFT->isNoEscape())
     return false;
 
-  // Pick a specific diagnostic for the specific use
-  auto paramDecl = cast<ParamDecl>(declRef->getDecl());
-  switch (dstPurpose) {
-  case CTP_CallArgument:
-    CS.TC.diagnose(declRef->getLoc(), diag::passing_noescape_to_escaping,
-                   paramDecl->getName());
-    break;
-  case CTP_AssignSource:
-    CS.TC.diagnose(declRef->getLoc(), diag::assigning_noescape_to_escaping,
-                   paramDecl->getName());
-    break;
-
-  default:
-    CS.TC.diagnose(declRef->getLoc(), diag::general_noescape_to_escaping,
-                   paramDecl->getName());
-    break;
-  }
-
-  // Give a note and fixit
-  InFlightDiagnostic note = CS.TC.diagnose(
-      paramDecl->getLoc(), diag::noescape_parameter, paramDecl->getName());
-
-  if (!paramDecl->isAutoClosure()) {
-    note.fixItInsert(paramDecl->getTypeLoc().getSourceRange().Start,
-                     "@escaping ");
-  } // TODO: add in a fixit for autoclosure
-
-  return true;
+  NoEscapeFuncToTypeConversionFailure failure(
+      expr, CS, CS.getConstraintLocator(expr), dstType);
+  return failure.diagnoseAsError();
 }
 
 bool FailureDiagnosis::diagnoseContextualConversionError(
@@ -2163,6 +2086,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
       }
     };
     break;
+  case CTP_ReturnSingleExpr:
   case CTP_ReturnStmt:
     // Special case the "conversion to void" case.
     if (contextualType->isVoid()) {
@@ -2305,16 +2229,21 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
       exprType->isEqual(contextualType)) {
     return false;
   }
-  
+
   // If we're trying to convert something of type "() -> T" to T, then we
   // probably meant to call the value.
   if (auto srcFT = exprType->getAs<AnyFunctionType>()) {
     if (srcFT->getParams().empty() &&
         !isUnresolvedOrTypeVarType(srcFT->getResult()) &&
         CS.TC.isConvertibleTo(srcFT->getResult(), contextualType, CS.DC)) {
-      diagnose(expr->getLoc(), diag::missing_nullary_call, srcFT->getResult())
-        .highlight(expr->getSourceRange())
-        .fixItInsertAfter(expr->getEndLoc(), "()");
+
+      auto locator =
+          CS.getConstraintLocator(expr, ConstraintLocator::ContextualType);
+      ContextualFailure failure =
+          ContextualFailure(nullptr, CS, srcFT, contextualType, locator);
+      auto diagnosed = failure.diagnoseAsError();
+      assert(diagnosed && "Failed to produce contextual failure diagnostic");
+      (void)diagnosed;
       return true;
     }
   }
@@ -3369,8 +3298,6 @@ class ArgumentMatcher : public MatchCallArgumentListener {
   // Stores parameter bindings determined by call to matchCallArguments.
   SmallVector<ParamBinding, 4> Bindings;
 
-  unsigned NumLabelFailures = 0;
-
 public:
   ArgumentMatcher(Expr *fnExpr, Expr *argExpr,
                   ArrayRef<AnyFunctionType::Param> &params,
@@ -3524,8 +3451,6 @@ public:
               CS.getType(ArgExpr)->hasParenSugar()) &&
              "unexpected argument expression type");
       insertLoc = ArgExpr->getLoc();
-
-      // Can't be TupleShuffleExpr because this argExpr is not yet resolved.
     }
 
     assert(insertLoc.isValid() && "missing argument after trailing closure?");
@@ -3547,130 +3472,23 @@ public:
   }
 
   bool missingLabel(unsigned paramIdx) override {
-    ++NumLabelFailures;
     return false;
   }
 
   bool extraneousLabel(unsigned paramIdx) override {
-    ++NumLabelFailures;
     return false;
   }
 
   bool incorrectLabel(unsigned paramIdx) override {
-    ++NumLabelFailures;
     return false;
   }
 
-  void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
-    auto tuple = cast<TupleExpr>(ArgExpr);
-    Identifier first = tuple->getElementName(argIdx);
-    Identifier second = tuple->getElementName(prevArgIdx);
-
-    // If we've seen label failures and now there is an out-of-order
-    // parameter (or even worse - OoO parameter with label re-naming),
-    // we most likely have no idea what would be the best
-    // diagnostic for this situation, so let's just try to re-label.
-    auto shouldDiagnoseOoO = [&](Identifier newLabel, Identifier oldLabel) {
-      if (NumLabelFailures > 0)
-        return false;
-
-      unsigned actualIndex = prevArgIdx;
-      for (; actualIndex != argIdx; ++actualIndex) {
-        // Looks like new position (excluding defaulted parameters),
-        // has a valid label.
-        if (newLabel == Parameters[actualIndex].getLabel())
-          break;
-
-        // If we are moving the the position with a different label
-        // and there is no default value for it, can't diagnose the
-        // problem as a simple re-ordering.
-        if (!DefaultMap.test(actualIndex))
-          return false;
-      }
-
-      for (unsigned i = actualIndex + 1, n = Parameters.size(); i != n; ++i) {
-        if (oldLabel == Parameters[i].getLabel())
-          break;
-
-        if (!DefaultMap.test(i))
-          return false;
-      }
-
-      return true;
-    };
-
-    if (!shouldDiagnoseOoO(first, second)) {
-      SmallVector<Identifier, 8> paramLabels;
-      llvm::transform(Parameters, std::back_inserter(paramLabels),
-                      [](const AnyFunctionType::Param &param) {
-                        return param.getLabel();
-                      });
-      relabelArguments(paramLabels);
-      return;
-    }
-
-    // Build a mapping from arguments to parameters.
-    SmallVector<unsigned, 4> argBindings(tuple->getNumElements());
-    for (unsigned paramIdx = 0; paramIdx != Bindings.size(); ++paramIdx) {
-      for (auto argIdx : Bindings[paramIdx])
-        argBindings[argIdx] = paramIdx;
-    }
-
-    auto argRange = [&](unsigned argIdx, Identifier label) -> SourceRange {
-      auto range = tuple->getElement(argIdx)->getSourceRange();
-      if (!label.empty())
-        range.Start = tuple->getElementNameLoc(argIdx);
-
-      unsigned paramIdx = argBindings[argIdx];
-      if (Bindings[paramIdx].size() > 1)
-        range.End = tuple->getElement(Bindings[paramIdx].back())->getEndLoc();
-
-      return range;
-    };
-
-    auto firstRange = argRange(argIdx, first);
-    auto secondRange = argRange(prevArgIdx, second);
-
-    SourceLoc diagLoc = firstRange.Start;
-
-    auto addFixIts = [&](InFlightDiagnostic diag) {
-      diag.highlight(firstRange).highlight(secondRange);
-
-      // Move the misplaced argument by removing it from one location and
-      // inserting it in another location. To maintain argument comma
-      // separation, since the argument is always moving to an earlier index
-      // the preceding comma and whitespace is removed and a new trailing
-      // comma and space is inserted with the moved argument.
-      auto &SM = TC.Context.SourceMgr;
-      auto text = SM.extractText(
-          Lexer::getCharSourceRangeFromSourceRange(SM, firstRange));
-
-      auto removalRange =
-          SourceRange(Lexer::getLocForEndOfToken(
-                          SM, tuple->getElement(argIdx - 1)->getEndLoc()),
-                      firstRange.End);
-      diag.fixItRemove(removalRange);
-      diag.fixItInsert(secondRange.Start, text.str() + ", ");
-    };
-
-    // There are 4 diagnostic messages variations depending on
-    // labeled/unlabeled arguments.
-    if (first.empty() && second.empty()) {
-      addFixIts(TC.diagnose(diagLoc,
-                            diag::argument_out_of_order_unnamed_unnamed,
-                            argIdx + 1, prevArgIdx + 1));
-    } else if (first.empty() && !second.empty()) {
-      addFixIts(TC.diagnose(diagLoc, diag::argument_out_of_order_unnamed_named,
-                            argIdx + 1, second));
-    } else if (!first.empty() && second.empty()) {
-      addFixIts(TC.diagnose(diagLoc, diag::argument_out_of_order_named_unnamed,
-                            first, prevArgIdx + 1));
-    } else {
-      addFixIts(TC.diagnose(diagLoc, diag::argument_out_of_order_named_named,
-                            first, second));
-    }
-
-    Diagnosed = true;
+  bool outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
+    auto &cs = CandidateInfo.CS;
+    OutOfOrderArgumentFailure failure(nullptr, cs, argIdx, prevArgIdx, Bindings,
+                                      cs.getConstraintLocator(ArgExpr));
+    Diagnosed = failure.diagnoseAsError();
+    return true;
   }
 
   bool relabelArguments(ArrayRef<Identifier> newNames) override {
@@ -3679,6 +3497,28 @@ public:
     // Let's diagnose labeling problem but only related to corrected ones.
     if (diagnoseArgumentLabelError(TC.Context, ArgExpr, newNames, IsSubscript))
       Diagnosed = true;
+
+    return true;
+  }
+
+  bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx) override {
+    Expr *arg = ArgExpr;
+
+    auto tuple = dyn_cast<TupleExpr>(ArgExpr);
+    if (tuple)
+      arg = tuple->getElement(argIdx);
+
+    auto &param = Parameters[paramIdx];
+    TC.diagnose(arg->getLoc(), diag::trailing_closure_bad_param,
+                param.getPlainType())
+      .highlight(arg->getSourceRange());
+
+    auto candidate = CandidateInfo[0];
+    if (candidate.getDecl())
+      TC.diagnose(candidate.getDecl(), diag::decl_declared_here,
+                  candidate.getDecl()->getFullName());
+
+    Diagnosed = true;
 
     return true;
   }
@@ -4175,7 +4015,8 @@ namespace {
       auto resultLocator =
         cs.getConstraintLocator(expr, ConstraintLocator::FunctionResult);
       auto resultType = cs.createTypeVariable(resultLocator,
-                                              TVO_CanBindToLValue);
+                                              TVO_CanBindToLValue |
+                                              TVO_CanBindToNoEscape);
 
       auto locator = cs.getConstraintLocator(expr);
       cs.addConstraint(ConstraintKind::FunctionResult,
@@ -4315,7 +4156,7 @@ bool FailureDiagnosis::diagnoseMethodAttributeFailures(
 
   SmallVector<OverloadChoice, 2> choices;
   for (auto &unviable : results.UnviableCandidates)
-    choices.push_back(OverloadChoice(baseType, unviable.first.getDecl(),
+    choices.push_back(OverloadChoice(baseType, unviable.getDecl(),
                                      UDE->getFunctionRefKind()));
 
   CalleeCandidateInfo unviableCandidates(baseType, choices, hasTrailingClosure,
@@ -4473,8 +4314,11 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
                     overloadName, CS.getType(ArgExpr));
       } else {
         bool isInitializer = isa<ConstructorDecl>(Candidate);
+
+        SmallVector<AnyFunctionType::Param, 8> Params;
+        AnyFunctionType::decomposeInput(CS.getType(ArgExpr), Params);
         TC.diagnose(ArgExpr->getLoc(), diag::cannot_call_with_params,
-                    overloadName, getTypeListString(CS.getType(ArgExpr)),
+                    overloadName, AnyFunctionType::getParamListAsString(Params),
                     isInitializer);
       }
 
@@ -4628,7 +4472,8 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
       } else if (auto *typeVar = resultType->getAs<TypeVariableType>()) {
         auto tv = cs.createTypeVariable(cs.getConstraintLocator(expr),
                                         TVO_CanBindToLValue |
-                                        TVO_PrefersSubtypeBinding);
+                                        TVO_PrefersSubtypeBinding |
+                                        TVO_CanBindToNoEscape);
 
         auto extInfo = FunctionType::ExtInfo().withThrows();
 
@@ -5185,9 +5030,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
 
     // If we have multiple candidates that we fail to match, just say we have
     // the wrong labels and list the candidates out.
-    
-    // TODO: It would be nice to use an analog of getTypeListString that
-    // doesn't include the argument types.
     diagnose(callExpr->getLoc(), diag::wrong_argument_labels_overload,
              getParamListAsString(args))
       .highlight(argExpr->getSourceRange());
@@ -5375,7 +5217,9 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (diagnoseRawRepresentableMismatch(calleeInfo, argExpr, argLabels))
     return true;
 
-  std::string argString = getTypeListString(CS.getType(argExpr));
+  SmallVector<AnyFunctionType::Param, 8> params;
+  AnyFunctionType::decomposeInput(CS.getType(argExpr), params);
+  auto argString = AnyFunctionType::getParamListAsString(params);
 
   // If we couldn't get the name of the callee, then it must be something of a
   // more complex "value of function type".
@@ -5775,8 +5619,8 @@ bool FailureDiagnosis::diagnoseClosureExpr(
   // If we have a contextual type available for this closure, apply it to the
   // ParamDecls in our parameter list.  This ensures that any uses of them get
   // appropriate types.
-  if (contextualType && contextualType->is<AnyFunctionType>()) {
-    auto fnType = contextualType->getAs<AnyFunctionType>();
+  if (contextualType && contextualType->is<FunctionType>()) {
+    auto fnType = contextualType->getAs<FunctionType>();
     auto *params = CE->getParameters();
     auto inferredArgs = fnType->getParams();
     
@@ -5791,36 +5635,6 @@ bool FailureDiagnosis::diagnoseClosureExpr(
     unsigned inferredArgCount = inferredArgs.size();
 
     if (actualArgCount != inferredArgCount) {
-      // If the closure didn't specify any arguments and it is in a context that
-      // needs some, produce a fixit to turn "{...}" into "{ _,_ in ...}".
-      if (actualArgCount == 0 && CE->getInLoc().isInvalid()) {
-        auto diag =
-          diagnose(CE->getStartLoc(), diag::closure_argument_list_missing,
-                   inferredArgCount);
-        std::string fixText; // Let's provide fixits for up to 10 args.
-
-        if (inferredArgCount <= 10) {
-          fixText += " _";
-          for (unsigned i = 0; i < inferredArgCount - 1; i ++) {
-            fixText += ",_";
-          }
-          fixText += " in ";
-        }
-
-        if (!fixText.empty()) {
-          // Determine if there is already a space after the { in the closure to
-          // make sure we introduce the right whitespace.
-          auto afterBrace = CE->getStartLoc().getAdvancedLoc(1);
-          auto text = CS.TC.Context.SourceMgr.extractText({afterBrace, 1});
-          if (text.size() == 1 && text == " ")
-            fixText = fixText.erase(fixText.size() - 1);
-          else
-            fixText = fixText.erase(0, 1);
-          diag.fixItInsertAfter(CE->getStartLoc(), fixText);
-        }
-        return true;
-      }
-
       if (inferredArgCount == 1 && actualArgCount > 1) {
         auto *argTupleTy = inferredArgs.front().getOldType()->getAs<TupleType>();
         // Let's see if inferred argument is actually a tuple inside of Paren.
@@ -5830,180 +5644,44 @@ bool FailureDiagnosis::diagnoseClosureExpr(
           // error about an attempt to make use of tuple splat or tuple
           // destructuring and provide a proper fix-it.
           if (argTupleTy->getNumElements() == actualArgCount) {
-            // In case of implicit parameters e.g. $0, $1 we
-            // can't really provide good fix-it because
-            // structure of parameter type itself is unclear.
-            for (auto *param : params->getArray()) {
-              if (param->isImplicit()) {
-                diagnose(params->getStartLoc(),
-                         diag::closure_tuple_parameter_destructuring_implicit,
-                         argTupleTy);
-                return true;
-              }
-            }
-
-            auto diag = diagnose(params->getStartLoc(),
-                                 diag::closure_tuple_parameter_destructuring,
-                                 argTupleTy);
-
-            auto *closureBody = CE->getBody();
-            if (!closureBody)
-              return true;
-
-            auto &sourceMgr = CS.getASTContext().SourceMgr;
-            auto bodyStmts = closureBody->getElements();
-
-            SourceLoc bodyLoc;
-            // If the body is empty let's put the cursor
-            // right after "in", otherwise make it start
-            // location of the first statement in the body.
-            if (bodyStmts.empty())
-              bodyLoc = Lexer::getLocForEndOfToken(sourceMgr, CE->getInLoc());
-            else
-              bodyLoc = bodyStmts.front().getStartLoc();
-
-            SmallString<64> fixIt;
-            llvm::raw_svector_ostream OS(fixIt);
-
-            // If this is multi-line closure we'd have to insert new lines
-            // in the suggested 'let' to keep the structure of the code intact,
-            // otherwise just use ';' to keep everything on the same line.
-            auto inLine = sourceMgr.getLineNumber(CE->getInLoc());
-            auto bodyLine = sourceMgr.getLineNumber(bodyLoc);
-            auto isMultiLineClosure = bodyLine > inLine;
-            auto indent = bodyStmts.empty() ? "" : Lexer::getIndentationForLine(
-                                                       sourceMgr, bodyLoc);
-
-            SmallString<16> parameter;
-            llvm::raw_svector_ostream parameterOS(parameter);
-
-            parameterOS << "(";
-            interleave(params->getArray(),
-                       [&](const ParamDecl *param) {
-                         parameterOS << param->getNameStr();
-                       },
-                       [&] { parameterOS << ", "; });
-            parameterOS << ")";
-
-            // Check if there are any explicit types associated
-            // with parameters, if there are, we'll have to add
-            // type information to the replacement argument.
-            bool explicitTypes = false;
-            for (auto *param : params->getArray()) {
-              if (param->getTypeLoc().getTypeRepr()) {
-                explicitTypes = true;
-                break;
-              }
-            }
-
-            if (isMultiLineClosure)
-              OS << '\n' << indent;
-
-            // Let's form 'let <name> : [<type>]? = arg' expression.
-            OS << "let " << parameterOS.str() << " = arg"
-               << (isMultiLineClosure ? "\n" + indent : "; ");
-
-            SmallString<64> argName;
-            llvm::raw_svector_ostream nameOS(argName);
-            if (explicitTypes) {
-              nameOS << "(arg: " << argTupleTy->getString() << ")";
-            } else {
-              nameOS << "(arg)";
-            }
-
-            if (CE->hasSingleExpressionBody()) {
-              // Let's see if we need to add result type to the argument/fix-it:
-              //  - if the there is a result type associated with the closure;
-              //  - and it's not a void type;
-              //  - and it hasn't been explicitly written.
-              auto resultType = fnType->getResult();
-              auto hasResult = [](Type resultType) -> bool {
-                return resultType && !resultType->isVoid();
-              };
-
-              auto isValidType = [](Type resultType) -> bool {
-                return resultType && !resultType->hasUnresolvedType() &&
-                       !resultType->hasTypeVariable();
-              };
-
-              // If there an expected result type but it hasn't been explicitly
-              // provided, let's add it to the argument.
-              if (hasResult(resultType) && !CE->hasExplicitResultType()) {
-                nameOS << " -> ";
-                if (isValidType(resultType))
-                  nameOS << resultType->getString();
-                else
-                  nameOS << "<#Result#>";
-              }
-
-              if (auto stmt = bodyStmts.front().get<Stmt *>()) {
-                // If the body is a single expression with implicit return.
-                if (isa<ReturnStmt>(stmt) && stmt->isImplicit()) {
-                  // And there is non-void expected result type,
-                  // because we add 'let' expression to the body
-                  // we need to make such 'return' explicit.
-                  if (hasResult(resultType))
-                    OS << "return ";
-                }
-              }
-            }
-
-            diag.fixItReplace(params->getSourceRange(), nameOS.str())
-                .fixItInsert(bodyLoc, OS.str());
-
-            return true;
+            ClosureParamDestructuringFailure failure(
+                expr, CS, fnType, CS.getConstraintLocator(CE));
+            return failure.diagnoseAsError();
           }
         }
       }
 
-      bool onlyAnonymousParams =
-      std::all_of(params->begin(), params->end(), [](ParamDecl *param) {
-        return !param->hasName();
-      });
+      // Extraneous arguments.
+      if (inferredArgCount < actualArgCount) {
+        auto diag = diagnose(
+            params->getStartLoc(), diag::closure_argument_list_tuple, fnType,
+            inferredArgCount, actualArgCount, (actualArgCount == 1));
 
-      // Okay, the wrong number of arguments was used, complain about that.
-      // Before doing so, strip attributes off the function type so that they
-      // don't confuse the issue.
-      fnType = FunctionType::get(fnType->getParams(), fnType->getResult(),
-                                 fnType->getExtInfo());
-      auto diag = diagnose(
-          params->getStartLoc(), diag::closure_argument_list_tuple, fnType,
-          inferredArgCount, actualArgCount, (actualArgCount == 1));
+        bool onlyAnonymousParams =
+            std::all_of(params->begin(), params->end(),
+                        [](ParamDecl *param) { return !param->hasName(); });
 
-      // If closure expects no parameters but N was given,
-      // and all of them are anonymous let's suggest removing them.
-      if (inferredArgCount == 0 && onlyAnonymousParams) {
-        auto inLoc = CE->getInLoc();
-        auto &sourceMgr = CS.getASTContext().SourceMgr;
+        // If closure expects no parameters but N was given,
+        // and all of them are anonymous let's suggest removing them.
+        if (inferredArgCount == 0 && onlyAnonymousParams) {
+          auto inLoc = CE->getInLoc();
+          auto &sourceMgr = CS.getASTContext().SourceMgr;
 
-        if (inLoc.isValid())
-          diag.fixItRemoveChars(params->getStartLoc(),
-                                Lexer::getLocForEndOfToken(sourceMgr, inLoc));
+          if (inLoc.isValid())
+            diag.fixItRemoveChars(params->getStartLoc(),
+                                  Lexer::getLocForEndOfToken(sourceMgr, inLoc));
+        }
         return true;
       }
 
-      // If the number of parameters is less than number of inferred
-      // and all of the parameters are anonymous, let's suggest a fix-it
-      // with the rest of the missing parameters.
-      if (actualArgCount < inferredArgCount) {
-        SmallString<32> fixIt;
-        llvm::raw_svector_ostream OS(fixIt);
-
-        OS << ",";
-        auto numMissing = inferredArgCount - actualArgCount;
-        for (unsigned i = 0; i != numMissing; ++i) {
-          OS << ((onlyAnonymousParams) ? "_" : "<#arg#>");
-          OS << ((i == numMissing - 1) ? " " : ",");
-        }
-
-        diag.fixItInsertAfter(params->getEndLoc(), OS.str());
-      }
-      return true;
+      MissingArgumentsFailure failure(
+          expr, CS, fnType, inferredArgCount - actualArgCount,
+          CS.getConstraintLocator(CE, ConstraintLocator::ContextualType));
+      return failure.diagnoseAsError();
     }
 
     // Coerce parameter types here only if there are no unresolved
-    if (CS.TC.coerceParameterListToType(params, CE, fnType))
-      return true;
+    CS.TC.coerceParameterListToType(params, CE, fnType);
     expectedResultType = fnType->getResult();
   }
 
@@ -6104,28 +5782,6 @@ bool FailureDiagnosis::diagnoseClosureExpr(
   }
 
   // Otherwise, we can't produce a specific diagnostic.
-  return false;
-}
-
-static bool diagnoseKeyPathUnsupportedOperations(TypeChecker &TC,
-                                                 KeyPathExpr *KPE) {
-  if (KPE->isObjC())
-    return false;
-
-  using ComponentKind = KeyPathExpr::Component::Kind;
-  const auto components = KPE->getComponents();
-
-  if (auto *rootType = KPE->getRootType()) {
-    if (isa<TupleTypeRepr>(rootType)) {
-      auto first = components.front();
-      if (first.getKind() == ComponentKind::UnresolvedProperty) {
-        TC.diagnose(first.getLoc(),
-                    diag::unsupported_keypath_tuple_element_reference);
-        return true;
-      }
-    }
-  }
-
   return false;
 }
 
@@ -6326,6 +5982,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
     case KeyPathExpr::Component::Kind::OptionalWrap:
     case KeyPathExpr::Component::Kind::Property:
     case KeyPathExpr::Component::Kind::Subscript:
+    case KeyPathExpr::Component::Kind::TupleElement:
       llvm_unreachable("already resolved!");
     }
 
@@ -6359,18 +6016,13 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
                                corrections);
 
       if (currentType) {
-        if (currentType->is<TupleType>()) {
-          TC.diagnose(KPE->getLoc(), diag::expr_keypath_unimplemented_tuple);
-          isInvalid = true;
-          break;
-        }
-        else
-          TC.diagnose(componentNameLoc, diag::could_not_find_type_member,
-                      currentType, componentName);
-      } else
+        TC.diagnose(componentNameLoc, diag::could_not_find_type_member,
+                    currentType, componentName);
+      } else {
         TC.diagnose(componentNameLoc, diag::use_unresolved_identifier,
                     componentName, false);
-
+      }
+        
       // Note all the correction candidates.
       corrections.noteAllCandidates();
       corrections.addAllCandidatesToLookup(lookup);
@@ -6482,9 +6134,6 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
 }
 
 bool FailureDiagnosis::visitKeyPathExpr(KeyPathExpr *KPE) {
-  if (diagnoseKeyPathUnsupportedOperations(CS.TC, KPE))
-    return true;
-
   auto contextualType = CS.getContextualType();
 
   auto components = KPE->getComponents();
@@ -6542,7 +6191,7 @@ bool FailureDiagnosis::visitKeyPathExpr(KeyPathExpr *KPE) {
 
       bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
         auto *locator = cs.getConstraintLocator(expr);
-        auto valueType = cs.createTypeVariable(locator);
+        auto valueType = cs.createTypeVariable(locator, TVO_CanBindToNoEscape);
 
         auto keyPathType =
             BoundGenericClassType::get(Decl, ParentType, {RootType, valueType});

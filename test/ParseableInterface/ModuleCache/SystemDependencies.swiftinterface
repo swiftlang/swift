@@ -1,0 +1,55 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name SystemDependencies
+
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/mock-sdk %t/mock-sdk
+
+// RUN: echo 'import SystemDependencies' | %target-swift-frontend -typecheck - -I %S -sdk %t/mock-sdk -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d
+// RUN: test -f %t/MCP/SystemDependencies*.swiftmodule
+// RUN: %FileCheck -check-prefix NEGATIVE %s < %t/dummy.d
+// RUN: %{python} %S/Inputs/make-old.py %t/MCP/SystemDependencies*.swiftmodule
+
+// Baseline: running the same command again doesn't rebuild the cached module.
+// RUN: echo 'import SystemDependencies' | %target-swift-frontend -typecheck - -I %S -sdk %t/mock-sdk -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d
+// RUN: %{python} %S/Inputs/check-is-old.py %t/MCP/SystemDependencies*.swiftmodule
+
+// Now try changing the contents.
+// RUN: echo "// size change" >> %t/mock-sdk/usr/include/SomeCModule.h
+// RUN: echo 'import SystemDependencies' | %target-swift-frontend -typecheck - -I %S -sdk %t/mock-sdk -module-cache-path %t/MCP -emit-dependencies-path %t/dummy.d
+// RUN: %{python} %S/Inputs/check-is-old.py %t/MCP/SystemDependencies*.swiftmodule
+
+// Okay, now let's try again with system dependency tracking on.
+// RUN: echo 'import SystemDependencies' | %target-swift-frontend -typecheck - -I %S -sdk %t/mock-sdk -module-cache-path %t/MCP-system -emit-dependencies-path %t/dummy.d -track-system-dependencies
+// RUN: test -f %t/MCP-system/SystemDependencies*.swiftmodule
+// RUN: %FileCheck -check-prefix CHECK %s < %t/dummy.d
+// RUN: llvm-bcanalyzer -dump %t/MCP-system/SystemDependencies*.swiftmodule | %FileCheck -check-prefix CHECK-DUMP %s
+// RUN: %{python} %S/Inputs/make-old.py %t/MCP-system/SystemDependencies*.swiftmodule
+
+// Baseline: running the same command again doesn't rebuild the cached module.
+// RUN: echo 'import SystemDependencies' | %target-swift-frontend -typecheck - -I %S -sdk %t/mock-sdk -module-cache-path %t/MCP-system -emit-dependencies-path %t/dummy.d -track-system-dependencies
+// RUN: %{python} %S/Inputs/check-is-old.py %t/MCP-system/SystemDependencies*.swiftmodule
+
+// Now try changing the contents.
+// RUN: echo "// size change" >> %t/mock-sdk/usr/include/SomeCModule.h
+// RUN: echo 'import SystemDependencies' | %target-swift-frontend -typecheck - -I %S -sdk %t/mock-sdk -module-cache-path %t/MCP-system -emit-dependencies-path %t/dummy.d -track-system-dependencies
+// RUN: %{python} %S/Inputs/check-is-new.py %t/MCP-system/SystemDependencies*.swiftmodule
+
+// Check that it picked a different cache key.
+// RUN: %empty-directory(%t/MCP-combined)
+// RUN: cp %t/MCP/SystemDependencies*.swiftmodule %t/MCP-combined
+// RUN: cp %t/MCP-system/SystemDependencies*.swiftmodule %t/MCP-combined
+// RUN: ls -1 %t/MCP-combined | %FileCheck %s -check-prefix=MODULECACHE
+
+// NEGATIVE-NOT: SomeCModule.h
+// CHECK: SomeCModule.h
+
+// CHECK-DUMP-NOT: usr{{[/\\]}}include
+// CHECK-DUMP: DEPENDENCY_DIRECTORY{{.+}}'usr{{[/\\]}}include'
+// CHECK-DUMP-NEXT: FILE_DEPENDENCY{{.+}}'module.modulemap'
+// CHECK-DUMP-NOT: FILE_DEPENDENCY{{.+}}'SomeCModule.h'
+// CHECK-DUMP: FILE_DEPENDENCY{{.+}}'SomeCModule.h'
+// CHECK-DUMP-NOT: usr{{[/\\]}}include
+
+// MODULECACHE-COUNT-2: SystemDependencies-{{[^ ]+}}.swiftmodule
+
+import SomeCModule

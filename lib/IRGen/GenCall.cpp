@@ -1514,6 +1514,17 @@ void CallEmission::emitToUnmappedExplosion(Explosion &out) {
     result = emitObjCRetainAutoreleasedReturnValue(IGF, result);
   }
 
+  auto origFnType = getCallee().getOrigFunctionType();
+
+  // Specially handle noreturn c function which would return a 'Never' SIL result
+  // type.
+  if (origFnType->getLanguage() == SILFunctionLanguage::C &&
+      origFnType->isNoReturnFunction()) {
+    auto clangResultTy = result->getType();
+    extractScalarResults(IGF, clangResultTy, result, out);
+    return;
+  }
+
   // Get the natural IR type in the body of the function that makes
   // the call. This may be different than the IR type returned by the
   // call itself due to ABI type coercion.
@@ -1527,7 +1538,6 @@ void CallEmission::emitToUnmappedExplosion(Explosion &out) {
   // for methods that have covariant ABI-compatible overrides.
   auto expectedNativeResultType = nativeSchema.getExpandedType(IGF.IGM);
   if (result->getType() != expectedNativeResultType) {
-    auto origFnType = getCallee().getOrigFunctionType();
     assert(origFnType->getLanguage() == SILFunctionLanguage::C ||
            origFnType->getRepresentation() == SILFunctionTypeRepresentation::Method);
     result =
@@ -1783,9 +1793,23 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
   auto &substResultTI =
     cast<LoadableTypeInfo>(IGF.getTypeInfo(substResultType));
 
+  auto origFnType = getCallee().getOrigFunctionType();
+  auto isNoReturnCFunction =
+      origFnType->getLanguage() == SILFunctionLanguage::C &&
+      origFnType->isNoReturnFunction();
+
   // If the call is naturally to memory, emit it that way and then
   // explode that temporary.
   if (LastArgWritten == 1) {
+    if (isNoReturnCFunction) {
+      auto fnType = getCallee().getFunctionPointer().getFunctionType();
+      assert(fnType->getNumParams() > 0);
+      auto resultTy = fnType->getParamType(0)->getPointerElementType();
+      auto temp = IGF.createAlloca(resultTy, Alignment(0), "indirect.result");
+      emitToMemory(temp, substResultTI, isOutlined);
+      return;
+    }
+
     StackAddress ctemp = substResultTI.allocateStack(IGF, substResultType,
                                                      "call.aggresult");
     Address temp = ctemp.getAddress();
@@ -1801,6 +1825,13 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
   // Okay, we're naturally emitting to an explosion.
   Explosion temp;
   emitToUnmappedExplosion(temp);
+
+  // Specially handle noreturn c function which would return a 'Never' SIL result
+  // type: there is no need to cast the result.
+  if (isNoReturnCFunction) {
+    temp.transferInto(out, temp.size());
+    return;
+  }
 
   // We might need to bitcast the results.
   emitCastToSubstSchema(IGF, temp, substResultTI.getSchema(), out);

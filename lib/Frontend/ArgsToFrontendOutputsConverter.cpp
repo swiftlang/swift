@@ -295,7 +295,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_loaded_module_trace_path);
   auto TBD = getSupplementaryFilenamesFromArguments(options::OPT_emit_tbd_path);
   auto parseableInterfaceOutput = getSupplementaryFilenamesFromArguments(
-      options::OPT_emit_parseable_module_interface_path);
+      options::OPT_emit_module_interface_path);
 
   if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
@@ -401,7 +401,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   ID emitModuleOption;
   std::string moduleExtension;
   std::string mainOutputIfUsableForModule;
-  deriveModulePathParameters(emitModuleOption, moduleExtension,
+  deriveModulePathParameters(outputFile, emitModuleOption, moduleExtension,
                              mainOutputIfUsableForModule);
 
   auto moduleOutputPath = determineSupplementaryOutputFilename(
@@ -458,7 +458,7 @@ SupplementaryOutputPathsComputer::determineSupplementaryOutputFilename(
 };
 
 void SupplementaryOutputPathsComputer::deriveModulePathParameters(
-    options::ID &emitOption, std::string &extension,
+    StringRef mainOutputFile, options::ID &emitOption, std::string &extension,
     std::string &mainOutputIfUsable) const {
 
   bool isSIB = RequestedAction == FrontendOptions::ActionType::EmitSIB ||
@@ -477,7 +477,7 @@ void SupplementaryOutputPathsComputer::deriveModulePathParameters(
       isSIB ? file_types::TY_SIB : file_types::TY_SwiftModuleFile);
 
   mainOutputIfUsable =
-      canUseMainOutputForModule && !OutputFiles.empty() ? OutputFiles[0] : "";
+      canUseMainOutputForModule && !OutputFiles.empty() ? mainOutputFile : "";
 }
 
 static SupplementaryOutputPaths
@@ -515,7 +515,7 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
         options::OPT_emit_reference_dependencies_path,
         options::OPT_serialize_diagnostics_path,
         options::OPT_emit_loaded_module_trace_path,
-        options::OPT_emit_parseable_module_interface_path,
+        options::OPT_emit_module_interface_path,
         options::OPT_emit_tbd_path)) {
     Diags.diagnose(SourceLoc(),
                    diag::error_cannot_have_supplementary_outputs,

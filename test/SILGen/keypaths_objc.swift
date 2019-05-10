@@ -96,3 +96,9 @@ func externalObjCProperty() {
   // CHECK-NOT: external #NSObject.description
   _ = \NSObject.description
 }
+
+func sharedCProperty() {
+  // CHECK:  keypath $WritableKeyPath<c_union, some_struct>
+  // CHECK-NOT: external #c_union.some_field
+  let dataKeyPath: WritableKeyPath<c_union, some_struct>? = \c_union.some_field
+}

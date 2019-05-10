@@ -738,7 +738,7 @@ bool SILParser::parseGlobalName(Identifier &Name) {
 SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
                                   SILLocation Loc, SILBuilder &B) {
   if (Name.isUndef())
-    return SILUndef::get(Type, &SILMod);
+    return SILUndef::get(Type, B.getFunction());
 
   // Check to see if this is already defined.
   ValueBase *&Entry = LocalValues[Name.Name];
@@ -2326,6 +2326,19 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
     
     component = KeyPathPatternComponent::forOptional(kind, ty);
     return false;
+  } else if (componentKind.str() == "tuple_element") {
+    unsigned tupleIndex;
+    CanType ty;
+
+    if (P.parseToken(tok::pound, diag::expected_sil_constant)
+        || parseInteger(tupleIndex, diag::expected_sil_tuple_index)
+        || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
+        || P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$")
+        || parseASTType(ty, patternEnv))
+      return true;
+      
+    component = KeyPathPatternComponent::forTupleElement(tupleIndex, ty);
+    return false;
   } else {
     P.diagnose(componentLoc, diag::sil_keypath_unknown_component_kind,
                componentKind);
@@ -3524,6 +3537,34 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
                                 AddrVal, AssignQualifier);
     }
 
+    break;
+  }
+
+  case SILInstructionKind::AssignByDelegateInst: {
+    SILValue Src, DestAddr, InitFn, SetFn;
+    SourceLoc DestLoc;
+    AssignOwnershipQualifier AssignQualifier;
+    if (parseTypedValueRef(Src,  B) ||
+        parseVerbatim("to") ||
+        parseAssignOwnershipQualifier(AssignQualifier, *this) ||
+        parseTypedValueRef(DestAddr, DestLoc, B) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseVerbatim("init") ||
+        parseTypedValueRef(InitFn, B) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseVerbatim("set") ||
+        parseTypedValueRef(SetFn, B) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    if (!DestAddr->getType().isAddress()) {
+      P.diagnose(DestLoc, diag::sil_operand_not_address, "destination",
+                 OpcodeName);
+      return true;
+    }
+
+    ResultVal = B.createAssignByDelegate(InstLoc, Src, DestAddr, InitFn, SetFn,
+                                         AssignQualifier);
     break;
   }
 
@@ -4754,8 +4795,9 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       = OpenedArchetypeType::get(Val->getType().getASTType())
         ->getCanonicalType();
     
-    SILType LoweredTy = SILMod.Types.getLoweredType(
-                                    Lowering::AbstractionPattern(archetype), Ty)
+    auto &F = B.getFunction();
+    SILType LoweredTy = F.getLoweredType(
+        Lowering::AbstractionPattern(archetype), Ty)
       .getAddressType();
     
     // Collect conformances for the type.

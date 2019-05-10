@@ -14,6 +14,8 @@
 #define SWIFT_SIL_OWNERSHIPUTILS_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -147,7 +149,7 @@ LinearLifetimeError valueHasLinearLifetime(
     SmallVectorImpl<SILBasicBlock *> *leakingBlocks = nullptr);
 
 /// Returns true if v is an address or trivial.
-bool isValueAddressOrTrivial(SILValue v, SILModule &m);
+bool isValueAddressOrTrivial(SILValue v);
 
 /// These operations forward both owned and guaranteed ownership.
 bool isOwnershipForwardingValueKind(SILNodeKind kind);

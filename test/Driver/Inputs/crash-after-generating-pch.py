@@ -10,13 +10,17 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 import os
+import platform
 import signal
 import sys
 
 assert sys.argv[1] == '-frontend'
 
 if '-emit-pch' not in sys.argv:
-    os.kill(os.getpid(), signal.SIGKILL)
+    if platform.system() == 'Windows':
+        exit(-2)
+    else:
+        os.kill(os.getpid(), signal.SIGKILL)
 
 outputFile = sys.argv[sys.argv.index('-o') + 1]
 

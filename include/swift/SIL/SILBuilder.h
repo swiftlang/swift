@@ -198,7 +198,13 @@ public:
   SILModule &getModule() const { return C.Module; }
   ASTContext &getASTContext() const { return getModule().getASTContext(); }
   const Lowering::TypeLowering &getTypeLowering(SILType T) const {
-    return getModule().getTypeLowering(T);
+    auto expansion = ResilienceExpansion::Maximal;
+    // If there's no current SILFunction, we're inserting into a global
+    // variable initializer.
+    if (F)
+      expansion = F->getResilienceExpansion();
+
+    return getModule().Types.getTypeLowering(T, expansion);
   }
 
   void setOpenedArchetypesTracker(SILOpenedArchetypesTracker *Tracker) {
@@ -450,20 +456,11 @@ public:
 
   ApplyInst *createApply(
       SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
-      ArrayRef<SILValue> Args, bool isNonThrowing,
+      ArrayRef<SILValue> Args, bool isNonThrowing = false,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     return insert(ApplyInst::create(getSILDebugLocation(Loc), Fn, Subs, Args,
                                     isNonThrowing, C.silConv, *F,
                                     C.OpenedArchetypes, SpecializationInfo));
-  }
-
-  ApplyInst *createApply(
-      SILLocation Loc, SILValue Fn, ArrayRef<SILValue> Args, bool isNonThrowing,
-      const GenericSpecializationInformation *SpecializationInfo = nullptr) {
-    SILFunctionConventions conventions(Fn->getType().castTo<SILFunctionType>(),
-                                       getModule());
-    return createApply(Loc, Fn, SubstitutionMap(), Args, isNonThrowing,
-                       SpecializationInfo);
   }
 
   TryApplyInst *createTryApply(
@@ -488,7 +485,7 @@ public:
 
   BeginApplyInst *createBeginApply(
       SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
-      ArrayRef<SILValue> Args, bool isNonThrowing,
+      ArrayRef<SILValue> Args, bool isNonThrowing = false,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     return insert(BeginApplyInst::create(
         getSILDebugLocation(Loc), Fn, Subs, Args, isNonThrowing, C.silConv, *F,
@@ -669,7 +666,7 @@ public:
       return createLoad(Loc, LV, LoadOwnershipQualifier::Unqualified);
     }
 
-    if (LV->getType().isTrivial(getModule())) {
+    if (LV->getType().isTrivial(getFunction())) {
       return createLoad(Loc, LV, LoadOwnershipQualifier::Trivial);
     }
     return createLoad(Loc, LV, Qualifier);
@@ -762,7 +759,7 @@ public:
       return createStore(Loc, Src, DestAddr,
                          StoreOwnershipQualifier::Unqualified);
     }
-    if (Src->getType().isTrivial(getModule())) {
+    if (Src->getType().isTrivial(getFunction())) {
       return createStore(Loc, Src, DestAddr, StoreOwnershipQualifier::Trivial);
     }
     return createStore(Loc, Src, DestAddr, Qualifier);
@@ -838,6 +835,16 @@ public:
     return insert(new (getModule())
                       AssignInst(getSILDebugLocation(Loc), Src, DestAddr,
                                  Qualifier));
+  }
+
+  AssignByDelegateInst *createAssignByDelegate(SILLocation Loc,
+                                               SILValue Src, SILValue Dest,
+                                               SILValue Initializer,
+                                               SILValue Setter,
+                                          AssignOwnershipQualifier Qualifier) {
+    return insert(new (getModule())
+                  AssignByDelegateInst(getSILDebugLocation(Loc), Src, Dest,
+                                       Initializer, Setter, Qualifier));
   }
 
   StoreBorrowInst *createStoreBorrow(SILLocation Loc, SILValue Src,
@@ -918,8 +925,10 @@ public:
   } \
   Copy##Name##ValueInst *createCopy##Name##Value(SILLocation Loc, \
                                                  SILValue operand) { \
+    auto type = getFunction().getLoweredType( \
+      operand->getType().getASTType().getReferenceStorageReferent()); \
     return insert(new (getModule()) \
-      Copy##Name##ValueInst(getSILDebugLocation(Loc), operand, getModule())); \
+      Copy##Name##ValueInst(getSILDebugLocation(Loc), operand, type)); \
   }
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
@@ -1091,7 +1100,7 @@ public:
   }
 
   CopyValueInst *createCopyValue(SILLocation Loc, SILValue operand) {
-    assert(!operand->getType().isTrivial(getModule()) &&
+    assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
            "emitCopyValueOperation");
     return insert(new (getModule())
@@ -1100,7 +1109,7 @@ public:
 
   DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand) {
     assert(isLoadableOrOpaque(operand->getType()));
-    assert(!operand->getType().isTrivial(getModule()) &&
+    assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
            "emitDestroyValueOperation");
     return insert(new (getModule())
@@ -1394,13 +1403,13 @@ public:
   DestructureStructInst *createDestructureStruct(SILLocation Loc,
                                                  SILValue Operand) {
     return insert(DestructureStructInst::create(
-        getModule(), getSILDebugLocation(Loc), Operand));
+        getFunction(), getSILDebugLocation(Loc), Operand));
   }
 
   DestructureTupleInst *createDestructureTuple(SILLocation Loc,
                                                SILValue Operand) {
     return insert(DestructureTupleInst::create(
-        getModule(), getSILDebugLocation(Loc), Operand));
+        getFunction(), getSILDebugLocation(Loc), Operand));
   }
 
   MultipleValueInstruction *emitDestructureValueOperation(SILLocation loc,
@@ -2153,13 +2162,7 @@ private:
     if (!SILModuleConventions(M).useLoweredAddresses())
       return true;
 
-    auto expansion = ResilienceExpansion::Maximal;
-    // If there's no current SILFunction, we're inserting into a global
-    // variable initializer.
-    if (F)
-      expansion = F->getResilienceExpansion();
-
-    return M.getTypeLowering(Ty, expansion).isLoadable();
+    return getTypeLowering(Ty).isLoadable();
   }
 
   void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {
@@ -2255,18 +2258,45 @@ public:
 };
 
 class SavedInsertionPointRAII {
-  SILBuilder &Builder;
-  PointerUnion<SILInstruction *, SILBasicBlock *> SavedIP;
+  SILBuilder &builder;
+  PointerUnion<SILInstruction *, SILBasicBlock *> savedInsertionPoint;
 
 public:
-  SavedInsertionPointRAII(SILBuilder &B, SILInstruction *NewIP)
-      : Builder(B), SavedIP(&*B.getInsertionPoint()) {
-    Builder.setInsertionPoint(NewIP);
+  /// Constructor that saves a Builder's insertion point without changing the
+  /// builder's underlying insertion point.
+  SavedInsertionPointRAII(SILBuilder &B) : builder(B), savedInsertionPoint() {
+    // If our builder does not have a valid insertion point, just put nullptr
+    // into SavedIP.
+    if (!builder.hasValidInsertionPoint()) {
+      savedInsertionPoint = static_cast<SILBasicBlock *>(nullptr);
+      return;
+    }
+
+    // If we are inserting into the end of the block, stash the insertion block.
+    if (builder.insertingAtEndOfBlock()) {
+      savedInsertionPoint = builder.getInsertionBB();
+      return;
+    }
+
+    // Otherwise, stash the instruction.
+    SILInstruction *i = &*builder.getInsertionPoint();
+    savedInsertionPoint = i;
   }
 
-  SavedInsertionPointRAII(SILBuilder &B, SILBasicBlock *NewIP)
-      : Builder(B), SavedIP(B.getInsertionBB()) {
-    Builder.setInsertionPoint(NewIP);
+  SavedInsertionPointRAII(SILBuilder &b, SILInstruction *insertionPoint)
+      : SavedInsertionPointRAII(b) {
+    builder.setInsertionPoint(insertionPoint);
+  }
+
+  SavedInsertionPointRAII(SILBuilder &b, SILBasicBlock *block,
+                          SILBasicBlock::iterator iter)
+      : SavedInsertionPointRAII(b) {
+    builder.setInsertionPoint(block, iter);
+  }
+
+  SavedInsertionPointRAII(SILBuilder &b, SILBasicBlock *insertionBlock)
+      : SavedInsertionPointRAII(b) {
+    builder.setInsertionPoint(insertionBlock);
   }
 
   SavedInsertionPointRAII(const SavedInsertionPointRAII &) = delete;
@@ -2275,12 +2305,12 @@ public:
   SavedInsertionPointRAII &operator=(SavedInsertionPointRAII &&) = delete;
 
   ~SavedInsertionPointRAII() {
-    if (SavedIP.isNull()) {
-      Builder.clearInsertionPoint();
-    } else if (SavedIP.is<SILInstruction *>()) {
-      Builder.setInsertionPoint(SavedIP.get<SILInstruction *>());
+    if (savedInsertionPoint.isNull()) {
+      builder.clearInsertionPoint();
+    } else if (savedInsertionPoint.is<SILInstruction *>()) {
+      builder.setInsertionPoint(savedInsertionPoint.get<SILInstruction *>());
     } else {
-      Builder.setInsertionPoint(SavedIP.get<SILBasicBlock *>());
+      builder.setInsertionPoint(savedInsertionPoint.get<SILBasicBlock *>());
     }
   }
 };

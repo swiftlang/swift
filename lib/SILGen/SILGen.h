@@ -58,7 +58,7 @@ public:
   /// Mapping from SILDeclRefs to emitted SILFunctions.
   llvm::DenseMap<SILDeclRef, SILFunction*> emittedFunctions;
   /// Mapping from ProtocolConformances to emitted SILWitnessTables.
-  llvm::DenseMap<ProtocolConformance*, SILWitnessTable*> emittedWitnessTables;
+  llvm::DenseMap<NormalProtocolConformance*, SILWitnessTable*> emittedWitnessTables;
 
   struct DelayedFunction {
     /// Insert the entity after the given function when it's emitted.
@@ -78,7 +78,12 @@ public:
   SILDeclRef lastEmittedFunction;
 
   /// Set of used conformances for which witness tables need to be emitted.
-  llvm::DenseSet<NormalProtocolConformance *> usedConformances;
+  llvm::DenseSet<RootProtocolConformance *> usedConformances;
+
+  /// Bookkeeping to ensure that useConformancesFrom{ObjectiveC,}Type() is
+  /// only called once for each unique type, as an optimization.
+  llvm::DenseSet<TypeBase *> usedConformancesFromTypes;
+  llvm::DenseSet<TypeBase *> usedConformancesFromObjectiveCTypes;
 
   struct DelayedWitnessTable {
     NormalProtocolConformance *insertAfter;
@@ -118,6 +123,8 @@ public:
   Optional<SILDeclRef> DarwinBooleanToBoolFn;
   Optional<SILDeclRef> NSErrorToErrorFn;
   Optional<SILDeclRef> ErrorToNSErrorFn;
+  Optional<SILDeclRef> BoolToWindowsBoolFn;
+  Optional<SILDeclRef> WindowsBoolToBoolFn;
 
   Optional<ProtocolDecl*> PointerProtocol;
 
@@ -166,11 +173,6 @@ public:
 
   /// True if a function has been emitted for a given SILDeclRef.
   bool hasFunction(SILDeclRef constant);
-  
-  /// Get the lowered type for a Swift type.
-  SILType getLoweredType(Type t) {
-    return Types.getTypeLowering(t).getLoweredType();
-  }
 
   /// Get or create the declaration of a reabstraction thunk with the
   /// given signature.
@@ -178,7 +180,7 @@ public:
                                            CanSILFunctionType thunkType,
                                            CanSILFunctionType fromType,
                                            CanSILFunctionType toType,
-                                           IsSerialized_t Serialized);
+                                           CanType dynamicSelfType);
 
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.
@@ -201,6 +203,7 @@ public:
   void visitOperatorDecl(OperatorDecl *d) {}
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *d) {}
   void visitTypeAliasDecl(TypeAliasDecl *d) {}
+  void visitOpaqueTypeDecl(OpaqueTypeDecl *d) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *d) {}
   void visitSubscriptDecl(SubscriptDecl *d) {}
   void visitConstructorDecl(ConstructorDecl *d) {}
@@ -245,8 +248,7 @@ public:
   void emitEnumConstructor(EnumElementDecl *decl);
 
   /// Emits the default argument generator with the given expression.
-  void emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
-                               DefaultArgumentKind kind, DeclContext *DC);
+  void emitDefaultArgGenerator(SILDeclRef constant, ParamDecl *param);
 
   /// Emits the stored property initializer for the given pattern.
   void emitStoredPropertyInitialization(PatternBindingDecl *pd, unsigned i);
@@ -278,7 +280,7 @@ public:
   void emitExternalDefinition(Decl *d);
 
   /// Emit SIL related to a Clang-imported declaration.
-  void emitExternalWitnessTable(ProtocolConformance *d);
+  void emitExternalWitnessTable(NormalProtocolConformance *d);
 
   /// Emit the ObjC-compatible entry point for a method.
   void emitObjCMethodThunk(FuncDecl *method);
@@ -293,7 +295,7 @@ public:
   void emitObjCDestructorThunk(DestructorDecl *destructor);
 
   /// Get or emit the witness table for a protocol conformance.
-  SILWitnessTable *getWitnessTable(ProtocolConformance *conformance);
+  SILWitnessTable *getWitnessTable(NormalProtocolConformance *conformance);
 
   /// Emit a protocol witness entry point.
   SILFunction *
@@ -372,6 +374,8 @@ public:
   SILDeclRef getObjCBoolToBoolFn();
   SILDeclRef getBoolToDarwinBooleanFn();
   SILDeclRef getDarwinBooleanToBoolFn();
+  SILDeclRef getBoolToWindowsBoolFn();
+  SILDeclRef getWindowsBoolToBoolFn();
   SILDeclRef getNSErrorToErrorFn();
   SILDeclRef getErrorToNSErrorFn();
 
@@ -433,22 +437,31 @@ public:
   SILGlobalVariable *getSILGlobalVariable(VarDecl *gDecl,
                                           ForDefinition_t forDef);
 
+  /// Emit all lazy conformances referenced from this function body.
+  void emitLazyConformancesForFunction(SILFunction *F);
+
+  /// Emit all lazy conformances referenced from this type's signature and
+  /// stored properties (or in the case of enums, associated values).
+  void emitLazyConformancesForType(NominalTypeDecl *NTD);
+
   /// Mark a protocol conformance as used, so we know we need to emit it if
   /// it's in our TU.
   void useConformance(ProtocolConformanceRef conformance);
 
+  /// Mark protocol conformances from the given type as used.
+  void useConformancesFromType(CanType type);
+
   /// Mark protocol conformances from the given set of substitutions as used.
   void useConformancesFromSubstitutions(SubstitutionMap subs);
+
+  /// Mark _ObjectiveCBridgeable conformances as used for any imported types
+  /// mentioned by the given type.
+  void useConformancesFromObjectiveCType(CanType type);
 
   /// Emit a `mark_function_escape` instruction for top-level code when a
   /// function or closure at top level refers to script globals.
   void emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
                                                 const CaptureInfo &captureInfo);
-
-  /// Get the substitutions necessary to invoke a non-member (global or local)
-  /// property.
-  SubstitutionMap
-  getNonMemberVarDeclSubstitutions(VarDecl *var);
 
   /// Map the substitutions for the original declaration to substitutions for
   /// the overridden declaration.

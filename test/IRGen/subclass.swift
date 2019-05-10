@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-objc-interop -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -enable-objc-interop -primary-file %s -emit-ir | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-import-type
 
 // REQUIRES: CPU=x86_64
 
@@ -13,28 +13,33 @@
 // CHECK: @_DATA__TtC8subclass1A = private constant {{.* } }}{
 // CHECK: @"$s8subclass1ACMf" = internal global [[A_METADATA:<{.* }>]] <{
 // CHECK-SAME:   void ([[A]]*)* @"$s8subclass1ACfD",
-// CHECK-SAME:   i8** {{@"\$sBoWV"|null}},
+// CHECK-DIRECT-SAME:   i8** @"$sBoWV",
+// CHECK-INDIRECT-SAME:   i8** null,
 // CHECK-SAME:   i64 ptrtoint ([[OBJC_CLASS]]* @"$s8subclass1ACMm" to i64),
-// CHECK-SAME:   [[OBJC_CLASS]]* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
+// CHECK-DIRECT-SAME:   [[OBJC_CLASS]]* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
+// CHECK-INDIRECT-SAME:   [[TYPE]]* null,
 // CHECK-SAME:   [[OPAQUE]]* @_objc_empty_cache,
 // CHECK-SAME:   [[OPAQUE]]* null,
-// CHECK-SAME:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1A to i64), i64 1),
+// CHECK-SAME:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1A to i64), i64 [[IS_SWIFT_BIT:1|2]]),
 // CHECK-SAME:   i64 ([[A]]*)* @"$s8subclass1AC1fSiyF",
 // CHECK-SAME:   [[A]]* ([[TYPE]]*)* @"$s8subclass1AC1gACyFZ"
 // CHECK-SAME: }>
 // CHECK: @_DATA__TtC8subclass1B = private constant {{.* } }}{
 // CHECK: @"$s8subclass1BCMf" = internal global <{ {{.*}} }> <{
 // CHECK-SAME:   void ([[B]]*)* @"$s8subclass1BCfD",
-// CHECK-SAME:   i8** {{@"\$sBoWV"|null}},
+// CHECK-DIRECT-SAME:   i8** @"$sBoWV",
+// CHECK-INDIRECT-SAME:   i8** null,
 // CHECK-SAME:   i64 ptrtoint ([[OBJC_CLASS]]* @"$s8subclass1BCMm" to i64),
-// CHECK-SAME:   [[TYPE]]* {{.*}} @"$s8subclass1ACMf",
+// CHECK-DIRECT-SAME:   [[TYPE]]* {{.*}} @"$s8subclass1ACMf",
+// CHECK-INDIRECT-SAME:   [[TYPE]]* null,
 // CHECK-SAME:   [[OPAQUE]]* @_objc_empty_cache,
 // CHECK-SAME:   [[OPAQUE]]* null,
-// CHECK-SAME:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1B to i64), i64 1),
+// CHECK-SAME:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1B to i64), i64 [[IS_SWIFT_BIT]]),
 // CHECK-SAME:   i64 ([[B]]*)* @"$s8subclass1BC1fSiyF",
 // CHECK-SAME:   [[A]]* ([[TYPE]]*)* @"$s8subclass1AC1gACyFZ"
 // CHECK-SAME: }>
-// CHECK: @objc_classes = internal global [2 x i8*] [i8* {{.*}} @"$s8subclass1ACN" {{.*}}, i8* {{.*}} @"$s8subclass1BCN" {{.*}}]
+
+// CHECK-DIRECT: @objc_classes = internal global [2 x i8*] [i8* {{.*}} @"$s8subclass1ACN" {{.*}}, i8* {{.*}} @"$s8subclass1BCN" {{.*}}]
 
 class A {
   var x = 0

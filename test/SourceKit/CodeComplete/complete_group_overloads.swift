@@ -71,8 +71,8 @@ func test004() {
 }
 // RUN: %complete-test -group=overloads -tok=FOO_SUBSCRIPT_0 %s | %FileCheck -check-prefix=FOO_SUBSCRIPT_0 %s
 // FOO_SUBSCRIPT_0-LABEL: [:
-// FOO_SUBSCRIPT_0-NEXT:   [A]
-// FOO_SUBSCRIPT_0-NEXT:   [B]
+// FOO_SUBSCRIPT_0-NEXT:   [x: A]
+// FOO_SUBSCRIPT_0-NEXT:   [x: B]
 
 struct Bar {
   init() {}

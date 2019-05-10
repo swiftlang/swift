@@ -18,14 +18,16 @@ bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32):
   return %2 : $()
 }
 
-// CHECK-LABEL: sil [serialized] [ossa] @non_trivial_assign : $@convention(thin) (@in Builtin.NativeObject, Builtin.NativeObject) -> () {
-// CHECK: bb0([[ARG1:%[0-9]+]] : $*Builtin.NativeObject, [[ARG2:%[0-9]+]] : @unowned $Builtin.NativeObject):
-// CHECK: assign [[ARG2]] to [reassign] [[ARG1]] : $*Builtin.NativeObject
+// CHECK-LABEL: sil [serialized] [ossa] @non_trivial_assign : $@convention(thin) (@in Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG1:%[0-9]+]] : $*Builtin.NativeObject, [[ARG2:%[0-9]+]] : @owned $Builtin.NativeObject):
+// CHECK: [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
+// CHECK: assign [[ARG2_COPY]] to [reassign] [[ARG1]] : $*Builtin.NativeObject
 // CHECK: assign [[ARG2]] to [reinit] [[ARG1]] : $*Builtin.NativeObject
-sil [serialized] [ossa] @non_trivial_assign : $@convention(thin) (@in Builtin.NativeObject, Builtin.NativeObject) -> () {
-bb0(%0 : $*Builtin.NativeObject, %1 : @unowned $Builtin.NativeObject):
-  assign %1 to [reassign] %0 : $*Builtin.NativeObject
+sil [serialized] [ossa] @non_trivial_assign : $@convention(thin) (@in Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %2 = copy_value %1 : $Builtin.NativeObject
+  assign %2 to [reassign] %0 : $*Builtin.NativeObject
   assign %1 to [reinit] %0 : $*Builtin.NativeObject
-  %2 = tuple()
-  return %2 : $()
+  %9999 = tuple()
+  return %9999 : $()
 }

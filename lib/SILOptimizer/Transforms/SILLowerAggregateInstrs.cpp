@@ -72,11 +72,12 @@ STATISTIC(NumExpand, "Number of instructions expanded");
 ///     store %new to %1 : $*T
 static bool expandCopyAddr(CopyAddrInst *CA) {
   SILModule &M = CA->getModule();
+  SILFunction *F = CA->getFunction();
   SILValue Source = CA->getSrc();
 
   // If we have an address only type don't do anything.
   SILType SrcType = Source->getType();
-  if (SrcType.isAddressOnly(M))
+  if (SrcType.isAddressOnly(*F))
     return false;
 
   bool expand = shouldExpand(M, SrcType.getObjectType());
@@ -95,7 +96,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
   // If our object type is not trivial, we may need to release the old value and
   // retain the new one.
 
-  auto &TL = M.getTypeLowering(SrcType);
+  auto &TL = F->getTypeLowering(SrcType);
 
   // If we have a non-trivial type...
   if (!TL.isTrivial()) {
@@ -136,6 +137,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
 }
 
 static bool expandDestroyAddr(DestroyAddrInst *DA) {
+  SILFunction *F = DA->getFunction();
   SILModule &Module = DA->getModule();
   SILBuilderWithScope Builder(DA);
 
@@ -145,17 +147,17 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
 
   // If we have an address only type, do nothing.
   SILType Type = Addr->getType();
-  if (Type.isAddressOnly(Module))
+  if (Type.isAddressOnly(*F))
     return false;
 
   bool expand = shouldExpand(Module, Type.getObjectType());
 
   // If we have a non-trivial type...
-  if (!Type.isTrivial(Module)) {
+  if (!Type.isTrivial(*F)) {
     // If we have a type with reference semantics, emit a load/strong release.
     LoadInst *LI = Builder.createLoad(DA->getLoc(), Addr,
                                       LoadOwnershipQualifier::Unqualified);
-    auto &TL = Module.getTypeLowering(Type);
+    auto &TL = F->getTypeLowering(Type);
     using TypeExpansionKind = Lowering::TypeLowering::TypeExpansionKind;
     auto expansionKind = expand ? TypeExpansionKind::MostDerivedDescendents
                                 : TypeExpansionKind::None;
@@ -167,6 +169,7 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
 }
 
 static bool expandReleaseValue(ReleaseValueInst *DV) {
+  SILFunction *F = DV->getFunction();
   SILModule &Module = DV->getModule();
   SILBuilderWithScope Builder(DV);
 
@@ -177,13 +180,13 @@ static bool expandReleaseValue(ReleaseValueInst *DV) {
   // If we have an address only type, do nothing.
   SILType Type = Value->getType();
   assert(!SILModuleConventions(Module).useLoweredAddresses()
-         || Type.isLoadable(Module) &&
+         || Type.isLoadable(*F) &&
          "release_value should never be called on a non-loadable type.");
 
   if (!shouldExpand(Module, Type.getObjectType()))
     return false;
 
-  auto &TL = Module.getTypeLowering(Type);
+  auto &TL = F->getTypeLowering(Type);
   TL.emitLoweredDestroyValueMostDerivedDescendents(Builder, DV->getLoc(),
                                                    Value);
 
@@ -194,6 +197,7 @@ static bool expandReleaseValue(ReleaseValueInst *DV) {
 }
 
 static bool expandRetainValue(RetainValueInst *CV) {
+  SILFunction *F = CV->getFunction();
   SILModule &Module = CV->getModule();
   SILBuilderWithScope Builder(CV);
 
@@ -204,13 +208,13 @@ static bool expandRetainValue(RetainValueInst *CV) {
   // If we have an address only type, do nothing.
   SILType Type = Value->getType();
   assert(!SILModuleConventions(Module).useLoweredAddresses()
-         || Type.isLoadable(Module) &&
+         || Type.isLoadable(*F) &&
          "Copy Value can only be called on loadable types.");
 
   if (!shouldExpand(Module, Type.getObjectType()))
     return false;
 
-  auto &TL = Module.getTypeLowering(Type);
+  auto &TL = F->getTypeLowering(Type);
   TL.emitLoweredCopyValueMostDerivedDescendents(Builder, CV->getLoc(), Value);
 
   LLVM_DEBUG(llvm::dbgs() << "    Expanding Copy Value: " << *CV);

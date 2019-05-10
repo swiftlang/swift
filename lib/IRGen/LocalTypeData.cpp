@@ -332,17 +332,19 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   if (key.Kind != LocalTypeDataKind::forFormalTypeMetadata())
     return;
 
-  // Only for archetypes, and not for opened archetypes.
+  // Only for archetypes, and not for opened/opaque archetypes.
   auto type = dyn_cast<ArchetypeType>(key.Type);
   if (!type)
     return;
-  if (isa<OpenedArchetypeType>(type))
+  if (!isa<PrimaryArchetypeType>(type))
     return;
+
+  auto *typeParam = type->getInterfaceType()->castTo<GenericTypeParamType>();
+  auto name = typeParam->getName().str();
 
   llvm::Value *data = value.getMetadata();
 
   // At -O0, create an alloca to keep the type alive.
-  auto name = type->getFullName();
   if (!IGF.IGM.IRGen.Opts.shouldOptimize()) {
     auto alloca =
         IGF.createAlloca(data->getType(), IGF.IGM.getPointerAlignment(), name);
@@ -354,19 +356,10 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   if (!IGF.IGM.DebugInfo)
     return;
 
-  // Emit debug info for the metadata.
-  llvm::SmallString<8> AssocType;
-  auto *oocTy = type->mapTypeOutOfContext().getPointer();
-  {
-    llvm::raw_svector_ostream OS(AssocType);
-    while (auto *dependentMemberType = dyn_cast<DependentMemberType>(oocTy)) {
-      OS << '.' << dependentMemberType->getName();
-      oocTy = dependentMemberType->getBase().getPointer();
-    }
-  }
-  auto *typeParam = cast<GenericTypeParamType>(oocTy);
-  IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data, typeParam->getDepth(),
-                                      typeParam->getIndex(), name, AssocType);
+  IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data,
+                                      typeParam->getDepth(),
+                                      typeParam->getIndex(),
+                                      name);
 }
 
 void

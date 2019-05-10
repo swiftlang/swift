@@ -609,3 +609,38 @@ switch x {
 @unknown default: // expected-error {{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
   break
 }
+
+func testReturnBeforeUnknownDefault() {
+  switch x { // expected-error {{switch must be exhaustive}}
+  case 1:
+    return
+  @unknown default: // expected-note {{remove '@unknown' to handle remaining values}}
+    break
+  }
+}
+
+func testReturnBeforeIncompleteUnknownDefault() {
+  switch x { // expected-error {{switch must be exhaustive}}
+  case 1:
+    return
+  @unknown default // expected-error {{expected ':' after 'default'}}
+  // expected-note@-1 {{remove '@unknown' to handle remaining values}}
+  }
+}
+
+func testReturnBeforeIncompleteUnknownDefault2() {
+  switch x { // expected-error {{switch must be exhaustive}} expected-note {{do you want to add a default clause?}}
+  case 1:
+    return
+  @unknown // expected-error {{unknown attribute 'unknown'}}
+  } // expected-error {{expected declaration}}
+}
+
+func testIncompleteArrayLiteral() {
+  switch x { // expected-error {{switch must be exhaustive}}
+  case 1:
+    _ = [1 // expected-error {{expected ']' in container literal expression}} expected-note {{to match this opening '['}}
+  @unknown default: // expected-note {{remove '@unknown' to handle remaining values}}
+    ()
+  }
+}

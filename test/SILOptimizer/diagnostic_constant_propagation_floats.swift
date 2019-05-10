@@ -171,6 +171,14 @@ func testHexFloatImprecision() {
   // Smallest non-zero number representable in Double.
   let d2: Double = 0x0.0000000000001p-1022
   _blackHole(d2)
+  let d3: Double = 0x1p-1074
+  _blackHole(d3)
+
+  // Test the case where conversion results in subnormality in the destination.
+  let d4: Float = 0x1p-149
+  _blackHole(d4)
+  let d5: Float = 0x1.8p-149 // expected-warning {{'0x1.8p-149' loses precision during conversion to 'Float}}
+  _blackHole(d5)
 
   // All warnings are disabled during explict conversions.
   _blackHole(Float(0x1.000002p-126))

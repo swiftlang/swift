@@ -293,6 +293,7 @@ void ProvidesEmitter::emitTopLevelDecl(const Decl *const D,
   case DeclKind::Var:
   case DeclKind::Func:
   case DeclKind::Accessor:
+  case DeclKind::OpaqueType:
     emitValueDecl(cast<ValueDecl>(D));
     break;
 
@@ -436,7 +437,8 @@ void ProvidesEmitter::emitDynamicLookupMembers() const {
       SmallVector<DeclBaseName, 16> names;
 
     public:
-      void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+      void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                     DynamicLookupInfo) override {
         names.push_back(VD->getBaseName());
       }
       ArrayRef<DeclBaseName> getNames() {

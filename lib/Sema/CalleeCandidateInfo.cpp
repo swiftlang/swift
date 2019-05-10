@@ -16,6 +16,7 @@
 
 #include "ConstraintSystem.h"
 #include "CSDiag.h"
+#include "CSDiagnostics.h"
 #include "CalleeCandidateInfo.h"
 #include "TypeCheckAvailability.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -346,11 +347,16 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
       result = CC_ArgumentLabelMismatch;
       return true;
     }
-    void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
+    bool outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
       result = CC_ArgumentLabelMismatch;
+      return true;
     }
     bool relabelArguments(ArrayRef<Identifier> newNames) override {
       result = CC_ArgumentLabelMismatch;
+      return true;
+    }
+    bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx) override {
+      result = CC_ArgumentMismatch;
       return true;
     }
   } listener;
@@ -934,19 +940,31 @@ operator=(const CalleeCandidateInfo &CCI) {
 void CalleeCandidateInfo::
 suggestPotentialOverloads(SourceLoc loc, bool isResult) {
   std::set<std::string> sorted;
-  
-  // FIXME2: For (T,T) & (Self, Self), emit this as two candidates, one using
-  // the LHS and one using the RHS type for T's.
-  for (auto cand : candidates) {
-    auto type = isResult ? cand.getResultType()
-                         : cand.getArgumentType(CS.getASTContext());
-    if (type.isNull())
-      continue;
-    
-    // If we've already seen this (e.g. decls overridden on the result type),
-    // ignore this one.
-    auto name = isResult ? type->getString() : getTypeListString(type);
-    sorted.insert(name);
+
+  if (isResult) {
+    for (auto cand : candidates) {
+      auto type = cand.getResultType();
+      if (type.isNull())
+        continue;
+      
+      // If we've already seen this (e.g. decls overridden on the result type),
+      // ignore this one.
+      auto name = type->getString();
+      sorted.insert(name);
+    }
+  } else {
+    // FIXME2: For (T,T) & (Self, Self), emit this as two candidates, one using
+    // the LHS and one using the RHS type for T's.
+    for (auto cand : candidates) {
+      auto type = cand.getFunctionType();
+      if (type == nullptr)
+        continue;
+      
+      // If we've already seen this (e.g. decls overridden on the result type),
+      // ignore this one.
+      auto name = AnyFunctionType::getParamListAsString(type->getParams());
+      sorted.insert(name);
+    }
   }
 
   if (sorted.empty())
@@ -1107,18 +1125,17 @@ bool CalleeCandidateInfo::diagnoseSimpleErrors(const Expr *E) {
   if (closeness == CC_Inaccessible) {
     auto decl = candidates[0].getDecl();
     assert(decl && "Only decl-based candidates may be marked inaccessible");
-    if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
-      CS.TC.diagnose(loc, diag::init_candidate_inaccessible,
-                     CD->getResultInterfaceType(), decl->getFormalAccess());
-      
-    } else {
-      CS.TC.diagnose(loc, diag::candidate_inaccessible, decl->getBaseName(),
-                     decl->getFormalAccess());
-    }
+
+    InaccessibleMemberFailure failure(
+        nullptr, CS, decl, CS.getConstraintLocator(const_cast<Expr *>(E)));
+    auto diagnosed = failure.diagnoseAsError();
+    assert(diagnosed && "failed to produce expected diagnostic");
+
     for (auto cand : candidates) {
-      if (auto decl = cand.getDecl()) {
-        CS.TC.diagnose(decl, diag::decl_declared_here, decl->getFullName());
-      }
+      auto *candidate = cand.getDecl();
+      if (candidate && candidate != decl)
+        CS.TC.diagnose(candidate, diag::decl_declared_here,
+                       candidate->getFullName());
     }
     
     return true;

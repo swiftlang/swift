@@ -13,12 +13,9 @@
 @_exported import Foundation // Clang module
 
 extension NSRange : Hashable {
-    public var hashValue: Int {
-#if arch(i386) || arch(arm)
-        return Int(bitPattern: (UInt(bitPattern: location) | (UInt(bitPattern: length) << 16)))
-#elseif arch(x86_64) || arch(arm64)
-        return Int(bitPattern: (UInt(bitPattern: location) | (UInt(bitPattern: length) << 32)))
-#endif
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(location)
+        hasher.combine(length)
     }
 
     public static func==(lhs: NSRange, rhs: NSRange) -> Bool {
@@ -175,16 +172,32 @@ extension Range where Bound == Int {
 }
 
 extension Range where Bound == String.Index {
-  public init?(_ range: NSRange, in string: __shared String) {
+  private init?<S: StringProtocol>(
+    _ range: NSRange, _genericIn string: __shared S
+  ) {
+    // Corresponding stdlib version
+    guard #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) else {
+      fatalError()
+    }
     let u = string.utf16
     guard range.location != NSNotFound,
-      let start = u.index(u.startIndex, offsetBy: range.location, limitedBy: u.endIndex),
-      let end = u.index(u.startIndex, offsetBy: range.location + range.length, limitedBy: u.endIndex),
+      let start = u.index(
+        u.startIndex, offsetBy: range.location, limitedBy: u.endIndex),
+      let end = u.index(
+        start, offsetBy: range.length, limitedBy: u.endIndex),
       let lowerBound = String.Index(start, within: string),
       let upperBound = String.Index(end, within: string)
     else { return nil }
-    
+
     self = lowerBound..<upperBound
+  }
+
+  public init?(_ range: NSRange, in string: __shared String) {
+    self.init(range, _genericIn: string)
+  }
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  public init?<S: StringProtocol>(_ range: NSRange, in string: __shared S) {
+    self.init(range, _genericIn: string)
   }
 }
 

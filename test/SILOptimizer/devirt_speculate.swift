@@ -54,7 +54,7 @@ class Sub7 : Base {
 // YAML-NEXT:   - String:          'Partially devirtualized call with run-time checks for '
 // YAML-NEXT:   - NumSubTypesChecked: '6'
 // YAML-NEXT:   - String:          ' subclasses of '
-// YAML-NEXT:   - ClassType:       '$Base'
+// YAML-NEXT:   - ClassType:       Base
 // YAML-NEXT:   - String:          ', number of subclasses not devirtualized: '
 // YAML-NEXT:   - NotHandledSubsNum: '1'
 // YAML-NEXT: ...

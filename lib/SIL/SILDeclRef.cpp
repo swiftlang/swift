@@ -301,6 +301,11 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   // serialized bodies, but no public symbol in the generated binary.
   if (d->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
     limit = Limit::AlwaysEmitIntoClient;
+  if (auto accessor = dyn_cast<AccessorDecl>(d)) {
+    auto *storage = accessor->getStorage();
+    if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+      limit = Limit::AlwaysEmitIntoClient;
+  }
 
   // ivar initializers and destroyers are completely contained within the class
   // from which they come, and never get seen externally.
@@ -330,8 +335,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     d = cast<NominalTypeDecl>(d->getDeclContext());
 
     // FIXME: This should always be true.
-    if (d->getDeclContext()->getParentModule()->getResilienceStrategy() ==
-        ResilienceStrategy::Resilient)
+    if (d->getModuleContext()->isResilient())
       limit = Limit::NeverPublic;
   }
 
@@ -477,19 +481,13 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   // Default argument generators are serialized if the containing
   // declaration is public.
   if (isDefaultArgGenerator()) {
-    ResilienceExpansion expansion;
-    if (auto *EED = dyn_cast<EnumElementDecl>(d)) {
-      expansion = EED->getDefaultArgumentResilienceExpansion();
-    } else {
-      expansion = cast<AbstractFunctionDecl>(d)
-                    ->getDefaultArgumentResilienceExpansion();
-    }
-    switch (expansion) {
-    case ResilienceExpansion::Minimal:
+    auto scope =
+      d->getFormalAccessScope(/*useDC=*/nullptr,
+                              /*treatUsableFromInlineAsPublic=*/true);
+
+    if (scope.isPublic())
       return IsSerialized;
-    case ResilienceExpansion::Maximal:
-      return IsNotSerialized;
-    }
+    return IsNotSerialized;
   }
 
   // Stored property initializers are inlinable if the type is explicitly
@@ -596,10 +594,6 @@ bool SILDeclRef::isNoinline() const {
       if (attr->getKind() == InlineKind::Never)
         return true;
   }
-
-  if (auto *attr = decl->getAttrs().getAttribute<SemanticsAttr>())
-    if (attr->Value.equals("keypath.entry"))
-      return true;
 
   return false;
 }
@@ -944,21 +938,32 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   if (!hasDecl())
     return SubclassScope::NotApplicable;
 
+  auto *decl = getDecl();
+
+  if (!isa<AbstractFunctionDecl>(decl))
+    return SubclassScope::NotApplicable;
+
   // If this declaration is a function which goes into a vtable, then it's
   // symbol must be as visible as its class, because derived classes have to put
   // all less visible methods of the base class into their vtables.
 
-  if (auto *CD = dyn_cast<ConstructorDecl>(getDecl()))
-    if (!CD->isRequired())
+  if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
+    // Initializing entry points do not appear in the vtable.
+    if (kind == SILDeclRef::Kind::Initializer)
       return SubclassScope::NotApplicable;
-
-  auto *FD = dyn_cast<FuncDecl>(getDecl());
-  if (!FD)
+    // Non-required convenience inits do not apper in the vtable.
+    if (!CD->isRequired() && !CD->isDesignatedInit())
+      return SubclassScope::NotApplicable;
+  } else if (isa<DestructorDecl>(decl)) {
+    // Detructors do not appear in the vtable.
     return SubclassScope::NotApplicable;
+  } else {
+    assert(isa<FuncDecl>(decl));
+  }
 
-  DeclContext *context = FD->getDeclContext();
+  DeclContext *context = decl->getDeclContext();
 
-  // Methods from extensions don't go into vtables (yet).
+  // Methods from extensions don't go in the vtable.
   if (isa<ExtensionDecl>(context))
     return SubclassScope::NotApplicable;
 
@@ -966,25 +971,29 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   if (isThunk() || isForeign)
     return SubclassScope::NotApplicable;
 
-  // Default arg generators are not visible.
+  // Default arg generators don't go in the vtable.
   if (isDefaultArgGenerator())
     return SubclassScope::NotApplicable;
 
+  // Only non-final methods in non-final classes go in the vtable.
   auto *classType = context->getSelfClassDecl();
   if (!classType || classType->isFinal())
     return SubclassScope::NotApplicable;
 
-  if (FD->isFinal())
+  if (decl->isFinal())
     return SubclassScope::NotApplicable;
 
-  assert(FD->getEffectiveAccess() <= classType->getEffectiveAccess() &&
+  assert(decl->getEffectiveAccess() <= classType->getEffectiveAccess() &&
          "class must be as visible as its members");
 
   // FIXME: This is too narrow. Any class with resilient metadata should
   // probably have this, at least for method overrides that don't add new
   // vtable entries.
-  if (classType->isResilient())
+  if (classType->isResilient()) {
+    if (isa<ConstructorDecl>(decl))
+      return SubclassScope::NotApplicable;
     return SubclassScope::Resilient;
+  }
 
   switch (classType->getEffectiveAccess()) {
   case AccessLevel::Private:
@@ -1027,7 +1036,8 @@ static bool isDesignatedConstructorForClass(ValueDecl *decl) {
 }
 
 bool SILDeclRef::canBeDynamicReplacement() const {
-  if (kind == SILDeclRef::Kind::Destroyer)
+  if (kind == SILDeclRef::Kind::Destroyer ||
+      kind == SILDeclRef::Kind::DefaultArgGenerator)
     return false;
   if (kind == SILDeclRef::Kind::Initializer)
     return isDesignatedConstructorForClass(getDecl());
@@ -1037,6 +1047,8 @@ bool SILDeclRef::canBeDynamicReplacement() const {
 }
 
 bool SILDeclRef::isDynamicallyReplaceable() const {
+  if (kind == SILDeclRef::Kind::DefaultArgGenerator)
+    return false;
   if (isStoredPropertyInitializer())
     return false;
 

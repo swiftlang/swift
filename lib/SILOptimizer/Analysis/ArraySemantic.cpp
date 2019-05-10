@@ -55,7 +55,7 @@ bool swift::ArraySemanticsCall::isValidSignature() {
   case ArrayCallKind::kCheckIndex: {
     // Int, @guaranteed/@owned Self
     if (SemanticsCall->getNumArguments() != 2 ||
-        !SemanticsCall->getArgument(0)->getType().isTrivial(Mod))
+        !SemanticsCall->getArgument(0)->getType().isTrivial(*F))
       return false;
     auto SelfConvention = FnTy->getSelfParameter().getConvention();
     return SelfConvention == ParameterConvention::Direct_Guaranteed ||
@@ -64,9 +64,9 @@ bool swift::ArraySemanticsCall::isValidSignature() {
   case ArrayCallKind::kCheckSubscript: {
     // Int, Bool, Self
     if (SemanticsCall->getNumArguments() != 3 ||
-        !SemanticsCall->getArgument(0)->getType().isTrivial(Mod))
+        !SemanticsCall->getArgument(0)->getType().isTrivial(*F))
       return false;
-    if (!SemanticsCall->getArgument(1)->getType().isTrivial(Mod))
+    if (!SemanticsCall->getArgument(1)->getType().isTrivial(*F))
       return false;
     auto SelfConvention = FnTy->getSelfParameter().getConvention();
     return SelfConvention == ParameterConvention::Direct_Guaranteed ||
@@ -168,7 +168,7 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
         llvm::StringSwitch<ArrayCallKind>(Attrs)
             .Case("array.props.isNativeTypeChecked",
                   ArrayCallKind::kArrayPropsIsNativeTypeChecked)
-            .Case("array.init", ArrayCallKind::kArrayInit)
+            .StartsWith("array.init", ArrayCallKind::kArrayInit)
             .Case("array.uninitialized", ArrayCallKind::kArrayUninitialized)
             .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
             .Case("array.check_index", ArrayCallKind::kCheckIndex)
@@ -683,7 +683,7 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
   assert(getKind() == ArrayCallKind::kGetElement &&
          "Must be a get_element call");
   // We only handle loadable types.
-  if (!V->getType().isLoadable(SemanticsCall->getModule()))
+  if (!V->getType().isLoadable(*SemanticsCall->getFunction()))
    return false;
 
   // Expect a check_subscript call or the empty dependence.
@@ -694,7 +694,7 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
     return false;
 
   SILBuilderWithScope Builder(SemanticsCall);
-  auto &ValLowering = Builder.getModule().getTypeLowering(V->getType());
+  auto &ValLowering = Builder.getTypeLowering(V->getType());
   if (hasGetElementDirectResult()) {
     ValLowering.emitCopyValue(Builder, SemanticsCall->getLoc(), V);
     SemanticsCall->replaceAllUsesWith(V);
@@ -715,15 +715,17 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
 }
 
 bool swift::ArraySemanticsCall::replaceByAppendingValues(
-    SILModule &M, SILFunction *AppendFn, SILFunction *ReserveFn,
+    SILFunction *AppendFn, SILFunction *ReserveFn,
     const SmallVectorImpl<SILValue> &Vals, SubstitutionMap Subs) {
   assert(getKind() == ArrayCallKind::kAppendContentsOf &&
          "Must be an append_contentsOf call");
   assert(AppendFn && "Must provide an append SILFunction");
 
+  auto *F = SemanticsCall->getFunction();
+
   // We only handle loadable types.
-  if (any_of(Vals, [&M](SILValue V) -> bool {
-        return !V->getType().isLoadable(M);
+  if (any_of(Vals, [F](SILValue V) -> bool {
+        return !V->getType().isLoadable(*F);
       }))
     return false;
   
@@ -751,12 +753,12 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
       Builder.createIntegerLiteral(Loc, BuiltinIntTy, Vals.size());
     StructInst *Capacity = Builder.createStruct(Loc,
         SILType::getPrimitiveObjectType(CanType(IntType)), {CapacityLiteral});
-    Builder.createApply(Loc, ReserveFnRef, Subs, {Capacity, ArrRef}, false);
+    Builder.createApply(Loc, ReserveFnRef, Subs, {Capacity, ArrRef});
   }
 
   for (SILValue V : Vals) {
     auto SubTy = V->getType();
-    auto &ValLowering = Builder.getModule().getTypeLowering(SubTy);
+    auto &ValLowering = Builder.getTypeLowering(SubTy);
     auto CopiedVal = ValLowering.emitCopyValue(Builder, Loc, V);
     auto *AllocStackInst = Builder.createAllocStack(Loc, SubTy);
 
@@ -764,7 +766,7 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
                                 IsInitialization_t::IsInitialization);
 
     SILValue Args[] = {AllocStackInst, ArrRef};
-    Builder.createApply(Loc, FnRef, Subs, Args, false);
+    Builder.createApply(Loc, FnRef, Subs, Args);
     Builder.createDeallocStack(Loc, AllocStackInst);
     if (!isConsumedParameter(AppendFnTy->getParameters()[0].getConvention())) {
       ValLowering.emitDestroyValue(Builder, Loc, CopiedVal);

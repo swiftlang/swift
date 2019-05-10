@@ -327,7 +327,8 @@ getFieldAt(const Metadata *base, unsigned index) {
   
   const FieldDescriptor &descriptor = *fields;
   auto &field = descriptor.getFields()[index];
-  auto name = field.getFieldName(0);
+  // Bounds are always valid as the offset is constant.
+  auto name = field.getFieldName(0, 0, std::numeric_limits<uint64_t>::max());
 
   // Enum cases don't always have types.
   if (!field.hasMangledTypeName())
@@ -337,8 +338,14 @@ getFieldAt(const Metadata *base, unsigned index) {
 
   SubstGenericParametersFromMetadata substitutions(base);
   auto typeInfo = swift_getTypeByMangledName(MetadataState::Complete,
-                                             typeName, substitutions,
-                                             substitutions);
+   typeName,
+   substitutions.getGenericArgs(),
+   [&substitutions](unsigned depth, unsigned index) {
+     return substitutions.getMetadata(depth, index);
+   },
+   [&substitutions](const Metadata *type, unsigned index) {
+     return substitutions.getWitnessTable(type, index);
+   });
 
   // If demangling the type failed, pretend it's an empty type instead with
   // a log message.

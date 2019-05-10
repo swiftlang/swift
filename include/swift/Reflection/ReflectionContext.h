@@ -18,8 +18,10 @@
 #ifndef SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 #define SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 
+#include "llvm/BinaryFormat/COFF.h"
 #include "llvm/BinaryFormat/MachO.h"
 #include "llvm/BinaryFormat/ELF.h"
+#include "llvm/Object/COFF.h"
 
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
@@ -200,7 +202,7 @@ public:
                                                RangeEnd - RangeStart);
 
     auto findMachOSectionByName = [&](std::string Name)
-        -> std::pair<std::pair<const char *, const char *>, uint32_t> {
+        -> std::pair<const char *, const char *> {
       for (unsigned I = 0; I < NumSect; ++I) {
         auto S = reinterpret_cast<typename T::Section *>(
             SectionsBuf + (I * sizeof(typename T::Section)));
@@ -211,9 +213,9 @@ public:
         auto LocalSectStart =
             reinterpret_cast<const char *>(SectBufData + RemoteSecStart - RangeStart);
         auto LocalSectEnd = reinterpret_cast<const char *>(LocalSectStart + S->size);
-        return {{LocalSectStart, LocalSectEnd}, 0};
+        return {LocalSectStart, LocalSectEnd};
       }
-      return {{nullptr, nullptr}, 0};
+      return {nullptr, nullptr};
     };
 
     auto FieldMdSec = findMachOSectionByName("__swift5_fieldmd");
@@ -223,24 +225,24 @@ public:
     auto TypeRefMdSec = findMachOSectionByName("__swift5_typeref");
     auto ReflStrMdSec = findMachOSectionByName("__swift5_reflstr");
 
-    if (FieldMdSec.first.first == nullptr &&
-        AssocTySec.first.first == nullptr &&
-        BuiltinTySec.first.first == nullptr &&
-        CaptureSec.first.first == nullptr &&
-        TypeRefMdSec.first.first == nullptr &&
-        ReflStrMdSec.first.first == nullptr)
+    if (FieldMdSec.first == nullptr &&
+        AssocTySec.first == nullptr &&
+        BuiltinTySec.first == nullptr &&
+        CaptureSec.first == nullptr &&
+        TypeRefMdSec.first == nullptr &&
+        ReflStrMdSec.first == nullptr)
       return false;
 
-    auto LocalStartAddress = reinterpret_cast<uintptr_t>(SectBuf.get());
-    auto RemoteStartAddress = static_cast<uintptr_t>(RangeStart);
+    auto LocalStartAddress = reinterpret_cast<uint64_t>(SectBuf.get());
+    auto RemoteStartAddress = static_cast<uint64_t>(RangeStart);
 
     ReflectionInfo info = {
-        {{FieldMdSec.first.first, FieldMdSec.first.second}, 0},
-        {{AssocTySec.first.first, AssocTySec.first.second}, 0},
-        {{BuiltinTySec.first.first, BuiltinTySec.first.second}, 0},
-        {{CaptureSec.first.first, CaptureSec.first.second}, 0},
-        {{TypeRefMdSec.first.first, TypeRefMdSec.first.second}, 0},
-        {{ReflStrMdSec.first.first, ReflStrMdSec.first.second}, 0},
+        {{FieldMdSec.first, FieldMdSec.second}, 0},
+        {{AssocTySec.first, AssocTySec.second}, 0},
+        {{BuiltinTySec.first, BuiltinTySec.second}, 0},
+        {{CaptureSec.first, CaptureSec.second}, 0},
+        {{TypeRefMdSec.first, TypeRefMdSec.second}, 0},
+        {{ReflStrMdSec.first, ReflStrMdSec.second}, 0},
         LocalStartAddress,
         RemoteStartAddress};
 
@@ -283,6 +285,122 @@ public:
     if (*HeaderMagic == llvm::MachO::MH_MAGIC_64)
       return readMachOSections<MachOTraits<8>>(ImageStart);
     return false;
+  }
+
+#elif defined(_WIN32)
+  bool readPECOFFSections(RemoteAddress ImageStart) {
+    auto DOSHdrBuf = this->getReader().readBytes(
+        ImageStart, sizeof(llvm::object::dos_header));
+    auto DOSHdr =
+        reinterpret_cast<const llvm::object::dos_header *>(DOSHdrBuf.get());
+    auto COFFFileHdrAddr = ImageStart.getAddressData() +
+                           DOSHdr->AddressOfNewExeHeader +
+                           sizeof(llvm::COFF::PEMagic);
+
+    auto COFFFileHdrBuf = this->getReader().readBytes(
+        RemoteAddress(COFFFileHdrAddr), sizeof(llvm::object::coff_file_header));
+    auto COFFFileHdr = reinterpret_cast<const llvm::object::coff_file_header *>(
+        COFFFileHdrBuf.get());
+
+    auto SectionTableAddr = COFFFileHdrAddr +
+                            sizeof(llvm::object::coff_file_header) +
+                            COFFFileHdr->SizeOfOptionalHeader;
+    auto SectionTableBuf = this->getReader().readBytes(
+        RemoteAddress(SectionTableAddr),
+        sizeof(llvm::object::coff_section) * COFFFileHdr->NumberOfSections);
+
+    auto findCOFFSectionByName = [&](llvm::StringRef Name)
+        -> std::pair<const char *, const char *> {
+      for (size_t i = 0; i < COFFFileHdr->NumberOfSections; ++i) {
+        const llvm::object::coff_section *COFFSec =
+            reinterpret_cast<const llvm::object::coff_section *>(
+                SectionTableBuf.get()) +
+            i;
+        llvm::StringRef SectionName =
+            (COFFSec->Name[llvm::COFF::NameSize - 1] == 0)
+                ? COFFSec->Name
+                : llvm::StringRef(COFFSec->Name, llvm::COFF::NameSize);
+        if (SectionName != Name)
+          continue;
+        auto Addr = ImageStart.getAddressData() + COFFSec->VirtualAddress;
+        auto Buf = this->getReader().readBytes(RemoteAddress(Addr),
+                                               COFFSec->VirtualSize);
+        const char *Begin = reinterpret_cast<const char *>(Buf.get());
+        const char *End = Begin + COFFSec->VirtualSize;
+        savedBuffers.push_back(std::move(Buf));
+
+        // FIXME: This code needs to be cleaned up and updated
+        // to make it work for 32 bit platforms.
+        if (SectionName != ".sw5cptr" && SectionName != ".sw5bltn") {
+          Begin += 8;
+          End -= 8;
+        }
+
+        return {Begin, End};
+      }
+      return {nullptr, nullptr};
+    };
+
+    std::pair<const char *, const char *> CaptureSec =
+        findCOFFSectionByName(".sw5cptr");
+    std::pair<const char *, const char *> TypeRefMdSec =
+        findCOFFSectionByName(".sw5tyrf");
+    std::pair<const char *, const char *> FieldMdSec =
+        findCOFFSectionByName(".sw5flmd");
+    std::pair<const char *, const char *> AssocTySec =
+        findCOFFSectionByName(".sw5asty");
+    std::pair<const char *, const char *> BuiltinTySec =
+        findCOFFSectionByName(".sw5bltn");
+    std::pair<const char *, const char *> ReflStrMdSec =
+        findCOFFSectionByName(".sw5rfst");
+
+    if (FieldMdSec.first == nullptr &&
+        AssocTySec.first == nullptr &&
+        BuiltinTySec.first == nullptr &&
+        CaptureSec.first == nullptr &&
+        TypeRefMdSec.first == nullptr &&
+        ReflStrMdSec.first == nullptr)
+      return false;
+
+    auto LocalStartAddress = reinterpret_cast<uintptr_t>(DOSHdrBuf.get());
+    auto RemoteStartAddress =
+        static_cast<uintptr_t>(ImageStart.getAddressData());
+
+    ReflectionInfo Info = {
+        {{FieldMdSec.first, FieldMdSec.second}, 0},
+        {{AssocTySec.first, AssocTySec.second}, 0},
+        {{BuiltinTySec.first, BuiltinTySec.second}, 0},
+        {{CaptureSec.first, CaptureSec.second}, 0},
+        {{TypeRefMdSec.first, TypeRefMdSec.second}, 0},
+        {{ReflStrMdSec.first, ReflStrMdSec.second}, 0},
+        LocalStartAddress,
+        RemoteStartAddress};
+    this->addReflectionInfo(Info);
+    return true;
+  }
+
+  bool addImage(RemoteAddress ImageStart) {
+    auto Buf = this->getReader().readBytes(ImageStart,
+                                           sizeof(llvm::object::dos_header));
+    if (!Buf)
+      return false;
+
+    auto DOSHdr = reinterpret_cast<const llvm::object::dos_header *>(Buf.get());
+    if (!(DOSHdr->Magic[0] == 'M' && DOSHdr->Magic[1] == 'Z'))
+      return false;
+
+    auto PEHeaderAddress =
+        ImageStart.getAddressData() + DOSHdr->AddressOfNewExeHeader;
+
+    Buf = this->getReader().readBytes(RemoteAddress(PEHeaderAddress),
+                                      sizeof(llvm::COFF::PEMagic));
+    if (!Buf)
+      return false;
+
+    if (memcmp(Buf.get(), llvm::COFF::PEMagic, sizeof(llvm::COFF::PEMagic)))
+      return false;
+
+    return readPECOFFSections(ImageStart);
   }
 #else // ELF platforms.
   template <typename T> bool readELFSections(RemoteAddress ImageStart) {
@@ -330,7 +448,7 @@ public:
     auto StrTab = reinterpret_cast<const char *>(StrTabBuf.get());
 
     auto findELFSectionByName = [&](std::string Name)
-        -> std::pair<std::pair<const char *, const char *>, uint32_t> {
+        -> std::pair<const char *, const char *> {
       // Now for all the sections, find their name.
       for (const typename T::Section *Hdr : SecHdrVec) {
         uint32_t Offset = Hdr->sh_name;
@@ -338,14 +456,13 @@ public:
         if (SecName != Name)
           continue;
         auto SecStart =
-            RemoteAddress(ImageStart.getAddressData() + Hdr->sh_offset);
+            RemoteAddress(ImageStart.getAddressData() + Hdr->sh_addr);
         auto SecSize = Hdr->sh_size;
         auto SecBuf = this->getReader().readBytes(SecStart, SecSize);
         auto SecContents = reinterpret_cast<const char *>(SecBuf.get());
-        return {{SecContents, SecContents + SecSize},
-                Hdr->sh_addr - Hdr->sh_offset};
+        return {SecContents, SecContents + SecSize};
       }
-      return {{nullptr, nullptr}, 0};
+      return {nullptr, nullptr};
     };
 
     auto FieldMdSec = findELFSectionByName("swift5_fieldmd");
@@ -357,28 +474,25 @@ public:
 
     // We succeed if at least one of the sections is present in the
     // ELF executable.
-    if (FieldMdSec.first.first == nullptr &&
-        AssocTySec.first.first == nullptr &&
-        BuiltinTySec.first.first == nullptr &&
-        CaptureSec.first.first == nullptr &&
-        TypeRefMdSec.first.first == nullptr &&
-        ReflStrMdSec.first.first == nullptr)
+    if (FieldMdSec.first == nullptr &&
+        AssocTySec.first == nullptr &&
+        BuiltinTySec.first == nullptr &&
+        CaptureSec.first == nullptr &&
+        TypeRefMdSec.first == nullptr &&
+        ReflStrMdSec.first == nullptr)
       return false;
 
-    auto LocalStartAddress = reinterpret_cast<uintptr_t>(Buf.get());
+    auto LocalStartAddress = reinterpret_cast<uint64_t>(Buf.get());
     auto RemoteStartAddress =
-        static_cast<uintptr_t>(ImageStart.getAddressData());
+        static_cast<uint64_t>(ImageStart.getAddressData());
 
     ReflectionInfo info = {
-        {{FieldMdSec.first.first, FieldMdSec.first.second}, FieldMdSec.second},
-        {{AssocTySec.first.first, AssocTySec.first.second}, AssocTySec.second},
-        {{BuiltinTySec.first.first, BuiltinTySec.first.second},
-         BuiltinTySec.second},
-        {{CaptureSec.first.first, CaptureSec.first.second}, CaptureSec.second},
-        {{TypeRefMdSec.first.first, TypeRefMdSec.first.second},
-         TypeRefMdSec.second},
-        {{ReflStrMdSec.first.first, ReflStrMdSec.first.second},
-         ReflStrMdSec.second},
+        {{FieldMdSec.first, FieldMdSec.second}, 0},
+        {{AssocTySec.first, AssocTySec.second}, 0},
+        {{BuiltinTySec.first, BuiltinTySec.second}, 0},
+        {{CaptureSec.first, CaptureSec.second}, 0},
+        {{TypeRefMdSec.first, TypeRefMdSec.second}, 0},
+        {{ReflStrMdSec.first, ReflStrMdSec.second}, 0},
         LocalStartAddress,
         RemoteStartAddress};
 

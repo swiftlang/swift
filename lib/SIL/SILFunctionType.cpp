@@ -315,7 +315,8 @@ public:
       return;
     }
 
-    auto &substResultTL = M.Types.getTypeLowering(origType, substType);
+    auto &substResultTL = M.Types.getTypeLowering(origType, substType,
+                                                  ResilienceExpansion::Minimal);
 
     // Determine the result convention.
     ResultConvention convention;
@@ -369,10 +370,8 @@ public:
 
     // Otherwise, query specifically for the original type.
     } else {
-      // FIXME: Get expansion from SILDeclRef
       return SILType::isFormallyReturnedIndirectly(
-          origType.getType(), M, origType.getGenericSignature(),
-          ResilienceExpansion::Minimal);
+          origType.getType(), M, origType.getGenericSignature());
     }
   }
 };
@@ -452,10 +451,8 @@ static bool isFormallyPassedIndirectly(SILModule &M,
 
   // Otherwise, query specifically for the original type.
   } else {
-    // FIXME: Get expansion from SILDeclRef
     return SILType::isFormallyPassedIndirectly(
-        origType.getType(), M, origType.getGenericSignature(),
-        ResilienceExpansion::Minimal);
+        origType.getType(), M, origType.getGenericSignature());
   }
 }
 
@@ -590,7 +587,8 @@ private:
 
     unsigned origParamIndex = NextOrigParamIndex++;
 
-    auto &substTL = M.Types.getTypeLowering(origType, substType);
+    auto &substTL = M.Types.getTypeLowering(origType, substType,
+                                            ResilienceExpansion::Minimal);
     ParameterConvention convention;
     if (ownership == ValueOwnership::InOut) {
       convention = ParameterConvention::Indirect_Inout;
@@ -627,10 +625,10 @@ private:
       return false;
 
     auto foreignErrorTy =
-      M.Types.getLoweredType(Foreign.Error->getErrorParameterType());
+      M.Types.getLoweredRValueType(Foreign.Error->getErrorParameterType());
 
     // Assume the error parameter doesn't have interesting lowering.
-    Inputs.push_back(SILParameterInfo(foreignErrorTy.getASTType(),
+    Inputs.push_back(SILParameterInfo(foreignErrorTy,
                                       ParameterConvention::Direct_Unowned));
     NextOrigParamIndex++;
     return true;
@@ -716,6 +714,7 @@ static std::pair<AbstractionPattern, CanType> updateResultTypeForForeignError(
 static void
 lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
                               CanGenericSignature genericSig,
+                              ResilienceExpansion expansion,
                               SmallVectorImpl<SILParameterInfo> &inputs) {
 
   // NB: The generic signature may be elided from the lowered function type
@@ -744,14 +743,36 @@ lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
       continue;
     }
 
+    if (capture.isOpaqueValue()) {
+      OpaqueValueExpr *opaqueValue = capture.getOpaqueValue();
+      auto canType = opaqueValue->getType()->mapTypeOutOfContext()
+          ->getCanonicalType(origGenericSig);
+      auto &loweredTL =
+          Types.getTypeLowering(AbstractionPattern(genericSig, canType),
+                                canType, expansion);
+      auto loweredTy = loweredTL.getLoweredType();
+
+      ParameterConvention convention;
+      if (loweredTL.isAddressOnly()) {
+        convention = ParameterConvention::Indirect_In;
+      } else {
+        convention = ParameterConvention::Direct_Owned;
+      }
+      SILParameterInfo param(loweredTy.getASTType(), convention);
+      inputs.push_back(param);
+
+      continue;
+    }
+
     auto *VD = capture.getDecl();
     auto type = VD->getInterfaceType();
     auto canType = type->getCanonicalType(origGenericSig);
 
     auto &loweredTL =
-        Types.getTypeLowering(AbstractionPattern(genericSig, canType), canType);
+        Types.getTypeLowering(AbstractionPattern(genericSig, canType), canType,
+                              expansion);
     auto loweredTy = loweredTL.getLoweredType();
-    switch (Types.getDeclCaptureKind(capture)) {
+    switch (Types.getDeclCaptureKind(capture, expansion)) {
     case CaptureKind::None:
       break;
     case CaptureKind::Constant: {
@@ -806,7 +827,8 @@ static void destructureYieldsForReadAccessor(SILModule &M,
     return;
   }
 
-  auto &tl = M.Types.getTypeLowering(origType, valueType);
+  auto &tl = M.Types.getTypeLowering(origType, valueType,
+                                     ResilienceExpansion::Minimal);
   auto convention = [&] {
     if (isFormallyPassedIndirectly(M, origType, valueType, tl))
       return ParameterConvention::Indirect_In_Guaranteed;
@@ -857,8 +879,8 @@ static void destructureYieldsForCoroutine(SILModule &M,
 
   // 'modify' yields an inout of the target type.
   if (accessor->getAccessorKind() == AccessorKind::Modify) {
-    auto loweredValueTy = M.Types.getLoweredType(origType, canValueType);
-    yields.push_back(SILYieldInfo(loweredValueTy.getASTType(),
+    auto loweredValueTy = M.Types.getLoweredRValueType(origType, canValueType);
+    yields.push_back(SILYieldInfo(loweredValueTy,
                                   ParameterConvention::Indirect_Inout));
     return;
   }
@@ -983,7 +1005,11 @@ static CanSILFunctionType getSILFunctionType(
   // from the function to which the argument is attached.
   if (constant && !constant->isDefaultArgGenerator()) {
     if (auto function = constant->getAnyFunctionRef()) {
-      lowerCaptureContextParameters(M, *function, genericSig, inputs);
+      auto expansion = ResilienceExpansion::Maximal;
+      if (constant->isSerialized())
+        expansion = ResilienceExpansion::Minimal;
+      lowerCaptureContextParameters(M, *function, genericSig, expansion,
+                                    inputs);
     }
   }
   
@@ -2151,9 +2177,8 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
       auto baseParams = baseFunc.getParams();
       assert(derivedParams.size() == baseParams.size());
       for (unsigned i = 0, e = derivedParams.size(); i < e; i++) {
-        // FIXME: Why are 'escaping' flags set inconsistently?
-        assert(derivedParams[i].getParameterFlags().withEscaping(false) ==
-               baseParams[i].getParameterFlags().withEscaping(false));
+        assert(derivedParams[i].getParameterFlags() ==
+               baseParams[i].getParameterFlags());
 
         params.emplace_back(
           copyOptionalityFromDerivedToBase(
@@ -2271,17 +2296,21 @@ class SILTypeSubstituter :
   // context signature.
   CanGenericSignature Sig;
 
+  bool shouldSubstituteOpaqueArchetypes;
+
   ASTContext &getASTContext() { return TheSILModule.getASTContext(); }
 
 public:
   SILTypeSubstituter(SILModule &silModule,
                      TypeSubstitutionFn Subst,
                      LookupConformanceFn Conformances,
-                     CanGenericSignature Sig)
+                     CanGenericSignature Sig,
+                     bool shouldSubstituteOpaqueArchetypes)
     : TheSILModule(silModule),
       Subst(Subst),
       Conformances(Conformances),
-      Sig(Sig)
+      Sig(Sig),
+      shouldSubstituteOpaqueArchetypes(shouldSubstituteOpaqueArchetypes)
   {}
 
   // SIL type lowering only does special things to tuples and functions.
@@ -2402,7 +2431,13 @@ public:
   CanType visitType(CanType origType) {
     assert(!isa<AnyFunctionType>(origType));
     assert(!isa<LValueType>(origType) && !isa<InOutType>(origType));
-    auto substType = origType.subst(Subst, Conformances)->getCanonicalType();
+
+    SubstOptions substOptions(None);
+    if (shouldSubstituteOpaqueArchetypes)
+      substOptions = SubstFlags::SubstituteOpaqueArchetypes |
+                     SubstFlags::AllowLoweredTypes;
+    auto substType =
+        origType.subst(Subst, Conformances, substOptions)->getCanonicalType();
 
     // If the substitution didn't change anything, we know that the
     // original type was a lowered type, so we're good.
@@ -2411,30 +2446,30 @@ public:
     }
 
     AbstractionPattern abstraction(Sig, origType);
-    return TheSILModule.Types.getLoweredType(abstraction, substType)
-             .getASTType();
+    return TheSILModule.Types.getLoweredRValueType(abstraction, substType);
   }
 };
 
 } // end anonymous namespace
 
-SILType SILType::subst(SILModule &silModule,
-                       TypeSubstitutionFn subs,
+SILType SILType::subst(SILModule &silModule, TypeSubstitutionFn subs,
                        LookupConformanceFn conformances,
-                       CanGenericSignature genericSig) const {
-  if (!hasArchetype() && !hasTypeParameter())
+                       CanGenericSignature genericSig,
+                       bool shouldSubstituteOpaqueArchetypes) const {
+  if (!hasArchetype() && !hasTypeParameter() &&
+      (!shouldSubstituteOpaqueArchetypes ||
+       !getASTType()->hasOpaqueArchetype()))
     return *this;
 
   if (!genericSig)
     genericSig = silModule.Types.getCurGenericContext();
   SILTypeSubstituter STST(silModule, subs, conformances,
-                          genericSig);
+                          genericSig, shouldSubstituteOpaqueArchetypes);
   return STST.subst(*this);
 }
 
 SILType SILType::subst(SILModule &silModule, SubstitutionMap subs) const{
-  return subst(silModule,
-               QuerySubstitutionMap{subs},
+  return subst(silModule, QuerySubstitutionMap{subs},
                LookUpConformanceInSubstitutionMap(subs));
 }
 
@@ -2463,7 +2498,8 @@ SILFunctionType::substGenericArgs(SILModule &silModule,
                                   LookupConformanceFn conformances) {
   if (!isPolymorphic()) return CanSILFunctionType(this);
   SILTypeSubstituter substituter(silModule, subs, conformances,
-                                 getGenericSignature());
+                                 getGenericSignature(),
+                                 /*shouldSubstituteOpaqueTypes*/ false);
   return substituter.substSILFunctionType(CanSILFunctionType(this));
 }
 
@@ -2684,7 +2720,8 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
 // match exactly.
 // TODO: More sophisticated param and return ABI compatibility rules could
 // diverge.
-static bool areABICompatibleParamsOrReturns(SILType a, SILType b) {
+static bool areABICompatibleParamsOrReturns(SILType a, SILType b,
+                                            SILFunction *inFunction) {
   // Address parameters are all ABI-compatible, though the referenced
   // values may not be. Assume whoever's doing this knows what they're
   // doing.
@@ -2722,6 +2759,25 @@ static bool areABICompatibleParamsOrReturns(SILType a, SILType b) {
     if (aa == bb)
       continue;
 
+    // Opaque types are compatible with their substitution.
+    if (inFunction) {
+      auto opaqueTypesSubsituted = aa;
+      ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+          inFunction->getModule().getSwiftModule(),
+          inFunction->getResilienceExpansion());
+      if (aa.getASTType()->hasOpaqueArchetype())
+        opaqueTypesSubsituted = aa.subst(inFunction->getModule(), replacer,
+                                         replacer, CanGenericSignature(), true);
+
+      auto opaqueTypesSubsituted2 = bb;
+      if (bb.getASTType()->hasOpaqueArchetype())
+        opaqueTypesSubsituted2 =
+            bb.subst(inFunction->getModule(), replacer, replacer,
+                     CanGenericSignature(), true);
+      if (opaqueTypesSubsituted == opaqueTypesSubsituted2)
+        continue;
+    }
+
     // FIXME: If one or both types are dependent, we can't accurately assess
     // whether they're ABI-compatible without a generic context. We can
     // do a better job here when dependent types are related to their
@@ -2736,7 +2792,8 @@ static bool areABICompatibleParamsOrReturns(SILType a, SILType b) {
     // Optional and IUO are interchangeable if their elements are.
     auto aObject = aa.getOptionalObjectType();
     auto bObject = bb.getOptionalObjectType();
-    if (aObject && bObject && areABICompatibleParamsOrReturns(aObject, bObject))
+    if (aObject && bObject &&
+        areABICompatibleParamsOrReturns(aObject, bObject, inFunction))
       continue;
     // Optional objects are ABI-interchangeable with non-optionals;
     // None is represented by a null pointer.
@@ -2768,7 +2825,7 @@ static bool areABICompatibleParamsOrReturns(SILType a, SILType b) {
         // *NOTE* We swallow the specific error here for now. We will still get
         // that the function types are incompatible though, just not more
         // specific information.
-        return aFunc->isABICompatibleWith(bFunc).isCompatible();
+        return aFunc->isABICompatibleWith(bFunc, inFunction).isCompatible();
       }
     }
 
@@ -2793,7 +2850,8 @@ using ABICompatibilityCheckResult =
 } // end anonymous namespace
 
 ABICompatibilityCheckResult
-SILFunctionType::isABICompatibleWith(CanSILFunctionType other) const {
+SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
+                                     SILFunction *context) const {
   // The calling convention and function representation can't be changed.
   if (getRepresentation() != other->getRepresentation())
     return ABICompatibilityCheckResult::DifferentFunctionRepresentations;
@@ -2810,7 +2868,8 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other) const {
       return ABICompatibilityCheckResult::DifferentReturnValueConventions;
 
     if (!areABICompatibleParamsOrReturns(result1.getSILStorageType(),
-                                         result2.getSILStorageType())) {
+                                         result2.getSILStorageType(),
+                                         context)) {
       return ABICompatibilityCheckResult::ABIIncompatibleReturnValues;
     }
   }
@@ -2825,7 +2884,7 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other) const {
       return ABICompatibilityCheckResult::DifferentErrorResultConventions;
 
     if (!areABICompatibleParamsOrReturns(error1.getSILStorageType(),
-                                         error2.getSILStorageType()))
+                                         error2.getSILStorageType(), context))
       return ABICompatibilityCheckResult::ABIIncompatibleErrorResults;
   }
 
@@ -2842,7 +2901,7 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other) const {
     if (param1.getConvention() != param2.getConvention())
       return {ABICompatibilityCheckResult::DifferingParameterConvention, i};
     if (!areABICompatibleParamsOrReturns(param1.getSILStorageType(),
-                                         param2.getSILStorageType()))
+                                         param2.getSILStorageType(), context))
       return {ABICompatibilityCheckResult::ABIIncompatibleParameterType, i};
   }
 

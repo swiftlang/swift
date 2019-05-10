@@ -362,6 +362,9 @@ public:
     bool isBridged = false;
 
     auto Meta = readMetadata(*MetadataAddress);
+    if (!Meta)
+      return None;
+
     if (auto ClassMeta = dyn_cast<TargetClassMetadata<Runtime>>(Meta)) {
       if (ClassMeta->isPureObjC()) {
         // If we can determine the Objective-C class name, this is probably an
@@ -410,11 +413,15 @@ public:
     StoredPointer InstanceAddress =
         InstanceMetadataAddressAddress + 2 * sizeof(StoredPointer);
 
+    // When built with Objective-C interop, the runtime also stores a conformance
+    // to Hashable and the base type introducing the Hashable conformance.
+    if (isObjC)
+      InstanceAddress += 2 * sizeof(StoredPointer);
+
     // Round up to alignment, and we have the start address of the
     // instance payload.
     auto AlignmentMask = VWT->getAlignmentMask();
-    auto Offset = (sizeof(HeapObject) + AlignmentMask) & ~AlignmentMask;
-    InstanceAddress += Offset;
+    InstanceAddress = (InstanceAddress + AlignmentMask) & ~AlignmentMask;
 
     return RemoteExistential(
         RemoteAddress(*InstanceMetadataAddress),
@@ -432,7 +439,7 @@ public:
     if (!Reader->readBytes(RemoteAddress(ExistentialAddress),
                            (uint8_t *)&Container, sizeof(Container)))
       return None;
-    auto MetadataAddress = reinterpret_cast<StoredPointer>(Container.Type);
+    auto MetadataAddress = static_cast<StoredPointer>(Container.Type);
     auto Metadata = readMetadata(MetadataAddress);
     if (!Metadata)
       return None;
@@ -716,6 +723,35 @@ public:
     if (!context)
       return nullptr;
     return buildContextMangling(context, Dem);
+  }
+  
+  /// Read the mangled underlying type from an opaque type descriptor.
+  BuiltType
+  readUnderlyingTypeForOpaqueTypeDescriptor(StoredPointer contextAddr,
+                                            unsigned ordinal) {
+    auto context = readContextDescriptor(contextAddr);
+    if (!context)
+      return BuiltType();
+    if (context->getKind() != ContextDescriptorKind::OpaqueType)
+      return BuiltType();
+    
+    auto opaqueType =
+      reinterpret_cast<const TargetOpaqueTypeDescriptor<Runtime> *>(
+                                                      context.getLocalBuffer());
+
+    if (ordinal >= opaqueType->getNumUnderlyingTypeArguments())
+      return BuiltType();
+    
+    auto nameAddr = resolveRelativeField(context,
+                     opaqueType->getUnderlyingTypeArgumentMangledName(ordinal));
+    
+    Demangle::Demangler Dem;
+    auto node = readMangledName(RemoteAddress(nameAddr),
+                                MangledNameKind::Type, Dem);
+    if (!node)
+      return BuiltType();
+    
+    return decodeMangledType(node);
   }
 
   bool isTaggedPointer(StoredPointer objectAddress) {
@@ -1389,6 +1425,12 @@ private:
     case ContextDescriptorKind::Protocol:
       baseSize = sizeof(TargetProtocolDescriptor<Runtime>);
       break;
+    case ContextDescriptorKind::OpaqueType:
+      baseSize = sizeof(TargetOpaqueTypeDescriptor<Runtime>);
+      metadataInitSize =
+        sizeof(typename Runtime::template RelativeDirectPointer<const char>)
+          * flags.getKindSpecificFlags();
+      break;
     default:
       // We don't know about this kind of context.
       return nullptr;
@@ -1646,6 +1688,11 @@ private:
           remoteAddress, innerDemangler);
 
         return cloneDemangleNode(result, dem);
+      }
+      case Demangle::SymbolicReferenceKind::AccessorFunctionReference: {
+        // The symbolic reference points at a resolver function, but we can't
+        // execute code in the target process to resolve it from here.
+        return nullptr;
       }
       }
 
@@ -2064,6 +2111,29 @@ private:
       // contexts; just create the node directly here and return.
       return dem.createNode(nodeKind, std::move(moduleName));
     }
+        
+    case ContextDescriptorKind::OpaqueType: {
+      // The opaque type may have a named anonymous context for us to map
+      // back to its defining decl.
+      if (!parentDescriptorResult)
+        return nullptr;
+      auto anonymous =
+        dyn_cast_or_null<TargetAnonymousContextDescriptor<Runtime>>(
+                                    parentDescriptorResult->getLocalBuffer());
+      if (!anonymous)
+        return nullptr;
+      
+      auto mangledNode =
+                    demangleAnonymousContextName(*parentDescriptorResult, dem);
+      if (!mangledNode)
+        return nullptr;
+      if (mangledNode->getKind() == Node::Kind::Global)
+        mangledNode = mangledNode->getChild(0);
+      
+      auto opaqueNode = dem.createNode(Node::Kind::OpaqueReturnTypeOf);
+      opaqueNode->addChild(mangledNode, dem);
+      return opaqueNode;
+    }
     
     default:
       // Not a kind of context we know about.
@@ -2447,6 +2517,12 @@ private:
       tryFindSymbol(_address, symbolName);                   \
       tryReadSymbol(_address, dest);                         \
     } while (0)
+#   define tryFindAndReadSymbolWithDefault(dest, symbolName, default) do { \
+      dest = default;                                                      \
+      auto _address = Reader->getSymbolAddress(symbolName);                \
+      if (_address)                                                        \
+        tryReadSymbol(_address, dest);                                     \
+    } while (0)
 
     tryFindAndReadSymbol(TaggedPointerMask,
                          "objc_debug_taggedpointer_mask");
@@ -2459,25 +2535,34 @@ private:
     if (!TaggedPointerClassesAddr)
       finish(TaggedPointerEncodingKind::Error);
     TaggedPointerClasses = TaggedPointerClassesAddr.getAddressData();
-    tryFindAndReadSymbol(TaggedPointerExtendedMask,
-                         "objc_debug_taggedpointer_ext_mask");
-    tryFindAndReadSymbol(TaggedPointerExtendedSlotShift,
-                         "objc_debug_taggedpointer_ext_slot_shift");
-    tryFindAndReadSymbol(TaggedPointerExtendedSlotMask,
-                         "objc_debug_taggedpointer_ext_slot_mask");
-    tryFindSymbol(TaggedPointerExtendedClassesAddr,
-                  "objc_debug_taggedpointer_ext_classes");
-    if (!TaggedPointerExtendedClassesAddr)
-      finish(TaggedPointerEncodingKind::Error);
-    TaggedPointerExtendedClasses =
-        TaggedPointerExtendedClassesAddr.getAddressData();
+    
+    // Extended tagged pointers don't exist on older OSes. Handle those
+    // by setting the variables to zero.
+    tryFindAndReadSymbolWithDefault(TaggedPointerExtendedMask,
+                                    "objc_debug_taggedpointer_ext_mask",
+                                    0);
+    tryFindAndReadSymbolWithDefault(TaggedPointerExtendedSlotShift,
+                                    "objc_debug_taggedpointer_ext_slot_shift",
+                                    0);
+    tryFindAndReadSymbolWithDefault(TaggedPointerExtendedSlotMask,
+                                    "objc_debug_taggedpointer_ext_slot_mask",
+                                    0);
+    auto TaggedPointerExtendedClassesAddr =
+      Reader->getSymbolAddress("objc_debug_taggedpointer_ext_classes");
+    if (TaggedPointerExtendedClassesAddr)
+      TaggedPointerExtendedClasses =
+          TaggedPointerExtendedClassesAddr.getAddressData();
 
-    tryFindAndReadSymbol(TaggedPointerObfuscator,
-                         "objc_debug_taggedpointer_obfuscator");
-
+    // The tagged pointer obfuscator is not present on older OSes, in
+    // which case we can treat it as zero.
+    tryFindAndReadSymbolWithDefault(TaggedPointerObfuscator,
+                                    "objc_debug_taggedpointer_obfuscator",
+                                    0);
+    
 #   undef tryFindSymbol
 #   undef tryReadSymbol
 #   undef tryFindAndReadSymbol
+#   undef tryFindAndReadSymbolWithDefault
 
     return finish(TaggedPointerEncodingKind::Extended);
   }

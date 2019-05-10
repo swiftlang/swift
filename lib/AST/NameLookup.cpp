@@ -63,25 +63,17 @@ ValueDecl *LookupResultEntry::getBaseDecl() const {
 
 void DebuggerClient::anchor() {}
 
-void AccessFilteringDeclConsumer::foundDecl(ValueDecl *D,
-                                            DeclVisibilityKind reason) {
+void AccessFilteringDeclConsumer::foundDecl(
+    ValueDecl *D, DeclVisibilityKind reason,
+    DynamicLookupInfo dynamicLookupInfo) {
   if (D->isInvalid())
     return;
   if (!D->isAccessibleFrom(DC))
     return;
 
-  ChainedConsumer.foundDecl(D, reason);
+  ChainedConsumer.foundDecl(D, reason, dynamicLookupInfo);
 }
 
-
-template <typename Fn>
-static void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
-  DeclContext *moduleScope = DC->getModuleScopeContext();
-  if (auto file = dyn_cast<FileUnit>(moduleScope))
-    file->forAllVisibleModules(fn);
-  else
-    cast<ModuleDecl>(moduleScope)->forAllVisibleModules(ModuleDecl::AccessPathTy(), fn);
-}
 
 bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
   if (decls.size() < 2)
@@ -334,7 +326,7 @@ static void recordShadowedDeclsAfterSignatureMatch(
 /// Look through the given set of declarations (that all have the same name),
 /// recording those that are shadowed by another declaration in the
 /// \c shadowed set.
-static void recordShadowDeclsAfterObjCInitMatch(
+static void recordShadowedDeclsForImportedInits(
                                 ArrayRef<ConstructorDecl *> ctors,
                                 llvm::SmallPtrSetImpl<ValueDecl *> &shadowed) {
   assert(ctors.size() > 1 && "No collisions");
@@ -372,18 +364,21 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
   llvm::SmallDenseMap<CanType, llvm::TinyPtrVector<ValueDecl *>> collisions;
   llvm::SmallVector<CanType, 2> collisionTypes;
   llvm::SmallDenseMap<NominalTypeDecl *, llvm::TinyPtrVector<ConstructorDecl *>>
-    objCInitializerCollisions;
-  llvm::TinyPtrVector<NominalTypeDecl *> objCInitializerCollisionNominals;
+    importedInitializerCollisions;
+  llvm::TinyPtrVector<NominalTypeDecl *> importedInitializerCollectionTypes;
 
   for (auto decl : decls) {
-    // Specifically keep track of Objective-C initializers, which can come from
-    // either init methods or factory methods.
-    if (decl->hasClangNode()) {
+    // Specifically keep track of imported initializers, which can come from
+    // Objective-C init methods, Objective-C factory methods, renamed C
+    // functions, or be synthesized by the importer.
+    if (decl->hasClangNode() ||
+        (isa<NominalTypeDecl>(decl->getDeclContext()) &&
+         cast<NominalTypeDecl>(decl->getDeclContext())->hasClangNode())) {
       if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
         auto nominal = ctor->getDeclContext()->getSelfNominalTypeDecl();
-        auto &knownInits = objCInitializerCollisions[nominal];
+        auto &knownInits = importedInitializerCollisions[nominal];
         if (knownInits.size() == 1) {
-          objCInitializerCollisionNominals.push_back(nominal);
+          importedInitializerCollectionTypes.push_back(nominal);
         }
         knownInits.push_back(ctor);
       }
@@ -431,9 +426,9 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
                                            shadowed);
   }
 
-  // Check whether we have shadowing for Objective-C initializer collisions.
-  for (auto nominal : objCInitializerCollisionNominals) {
-    recordShadowDeclsAfterObjCInitMatch(objCInitializerCollisions[nominal],
+  // Check whether we have shadowing for imported initializer collisions.
+  for (auto nominal : importedInitializerCollectionTypes) {
+    recordShadowedDeclsForImportedInits(importedInitializerCollisions[nominal],
                                         shadowed);
   }
 }
@@ -521,8 +516,10 @@ matchDiscriminator(Identifier discriminator,
 }
 
 template <typename Result>
-static void filterForDiscriminator(SmallVectorImpl<Result> &results,
-                                   DebuggerClient *debugClient) {
+void namelookup::filterForDiscriminator(SmallVectorImpl<Result> &results,
+                                        DebuggerClient *debugClient) {
+  if (debugClient == nullptr)
+    return;
   Identifier discriminator = debugClient->getPreferredPrivateDiscriminator();
   if (discriminator.empty())
     return;
@@ -546,9 +543,11 @@ static void filterForDiscriminator(SmallVectorImpl<Result> &results,
   results.push_back(lastMatch);
 }
 
-static void recordLookupOfTopLevelName(DeclContext *topLevelContext,
-                                       DeclName name,
-                                       bool isCascading) {
+template void namelookup::filterForDiscriminator<LookupResultEntry>(
+    SmallVectorImpl<LookupResultEntry> &results, DebuggerClient *debugClient);
+
+void namelookup::recordLookupOfTopLevelName(DeclContext *topLevelContext,
+                                            DeclName name, bool isCascading) {
   auto SF = dyn_cast<SourceFile>(topLevelContext);
   if (!SF)
     return;
@@ -558,48 +557,6 @@ static void recordLookupOfTopLevelName(DeclContext *topLevelContext,
   nameTracker->addTopLevelName(name.getBaseName(), isCascading);
 }
 
-/// Determine the local declaration visibility key for an \c ASTScope in which
-/// name lookup successfully resolved.
-static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
-  switch (scope->getKind()) {
-  case ASTScopeKind::Preexpanded:
-  case ASTScopeKind::SourceFile:
-  case ASTScopeKind::TypeDecl:
-  case ASTScopeKind::AbstractFunctionDecl:
-  case ASTScopeKind::TypeOrExtensionBody:
-  case ASTScopeKind::AbstractFunctionBody:
-  case ASTScopeKind::DefaultArgument:
-  case ASTScopeKind::PatternBinding:
-  case ASTScopeKind::IfStmt:
-  case ASTScopeKind::GuardStmt:
-  case ASTScopeKind::RepeatWhileStmt:
-  case ASTScopeKind::ForEachStmt:
-  case ASTScopeKind::DoCatchStmt:
-  case ASTScopeKind::SwitchStmt:
-  case ASTScopeKind::Accessors:
-  case ASTScopeKind::TopLevelCode:
-    llvm_unreachable("no local declarations?");
-
-  case ASTScopeKind::ExtensionGenericParams:
-  case ASTScopeKind::GenericParams:
-    return DeclVisibilityKind::GenericParameter;
-
-  case ASTScopeKind::AbstractFunctionParams:
-  case ASTScopeKind::Closure:
-  case ASTScopeKind::PatternInitializer:  // lazy var 'self'
-    return DeclVisibilityKind::FunctionParameter;
-
-  case ASTScopeKind::AfterPatternBinding:
-  case ASTScopeKind::ConditionalClause:
-  case ASTScopeKind::ForEachPattern:
-  case ASTScopeKind::BraceStmt:
-  case ASTScopeKind::CatchStmt:
-  case ASTScopeKind::CaseStmt:
-    return DeclVisibilityKind::LocalVariable;
-  }
-
-  llvm_unreachable("Unhandled ASTScopeKind in switch.");
-}
 
 /// Retrieve the set of type declarations that are directly referenced from
 /// the given parsed type representation.
@@ -694,25 +651,6 @@ SelfBounds swift::getSelfBoundsFromWhereClause(
                            SelfBoundsFromWhereClauseRequest{decl}, {});
 }
 
-static void
-populateLookupDeclsFromContext(DeclContext *dc,
-                               SmallVectorImpl<NominalTypeDecl *> &lookupDecls) {
-  auto nominal = dc->getSelfNominalTypeDecl();
-  if (!nominal)
-    return;
-
-  lookupDecls.push_back(nominal);
-
-  // For a protocol extension, check whether there are additional "Self"
-  // constraints that can affect name lookup.
-  if (dc->getExtendedProtocolDecl()) {
-    auto ext = cast<ExtensionDecl>(dc);
-    auto bounds = getSelfBoundsFromWhereClause(ext);
-    for (auto bound : bounds.decls)
-      lookupDecls.push_back(bound);
-  }
-}
-
 TinyPtrVector<TypeDecl *>
 TypeDeclsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
                                           ExtensionDecl *ext) const {
@@ -750,551 +688,8 @@ TypeDeclsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
   return result;
 }
 
-namespace {
 
-/// Determine whether unqualified lookup should look at the members of the
-/// given nominal type or extension, vs. only looking at type parameters.
-template<typename D>
-bool shouldLookupMembers(D *decl, SourceLoc loc) {
-  // Only look at members of this type (or its inherited types) when
-  // inside the body or a protocol's top-level 'where' clause. (Why the
-  // 'where' clause? Because that's where you put constraints on
-  // inherited associated types.)
 
-  // When we have no source-location information, we have to perform member
-  // lookup.
-  if (loc.isInvalid() || decl->getBraces().isInvalid())
-    return true;
-
-  // Within the braces, always look for members.
-  auto &ctx = decl->getASTContext();
-  if (ctx.SourceMgr.rangeContainsTokenLoc(decl->getBraces(), loc))
-    return true;
-
-  // Within 'where' clause, we can also look for members.
-  if (auto *whereClause = decl->getTrailingWhereClause()) {
-    SourceRange whereClauseRange = whereClause->getSourceRange();
-    if (whereClauseRange.isValid() &&
-        ctx.SourceMgr.rangeContainsTokenLoc(whereClauseRange, loc)) {
-      return true;
-    }
-  }
-
-  // Don't look at the members.
-  return false;
-}
-} // end anonymous namespace
-
-UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
-                                     LazyResolver *TypeResolver, SourceLoc Loc,
-                                     Options options)
-  : IndexOfFirstOuterResult(0)
-{
-  ModuleDecl &M = *DC->getParentModule();
-  ASTContext &Ctx = M.getASTContext();
-  if (!TypeResolver) TypeResolver = Ctx.getLazyResolver();
-  const SourceManager &SM = Ctx.SourceMgr;
-  DebuggerClient *DebugClient = M.getDebugClient();
-
-  auto isOriginallyTypeLookup = options.contains(Flags::TypeLookup);
-  NamedDeclConsumer Consumer(Name, Results, isOriginallyTypeLookup);
-
-  NLOptions baseNLOptions = NL_UnqualifiedDefault;
-  if (options.contains(Flags::AllowProtocolMembers))
-    baseNLOptions |= NL_ProtocolMembers;
-  if (isOriginallyTypeLookup)
-    baseNLOptions |= NL_OnlyTypes;
-  if (options.contains(Flags::IgnoreAccessControl))
-    baseNLOptions |= NL_IgnoreAccessControl;
-
-  Optional<bool> isCascadingUse;
-  if (options.contains(Flags::KnownPrivate))
-    isCascadingUse = false;
-
-  SmallVector<LookupResultEntry, 4> UnavailableInnerResults;
-
-  auto shouldReturnBasedOnResults = [&](bool noMoreOuterResults = false) {
-    if (Results.empty())
-      return false;
-
-    if (IndexOfFirstOuterResult == 0)
-      IndexOfFirstOuterResult = Results.size();
-
-    return !options.contains(Flags::IncludeOuterResults) || noMoreOuterResults;
-  };
-
-  if (Loc.isValid() &&
-      DC->getParentSourceFile() &&
-      DC->getParentSourceFile()->Kind != SourceFileKind::REPL &&
-      Ctx.LangOpts.EnableASTScopeLookup) {
-    // Find the source file in which we are performing the lookup.
-    SourceFile &sourceFile = *DC->getParentSourceFile();
-
-    // Find the scope from which we will initiate unqualified name lookup.
-    const ASTScope *lookupScope
-      = sourceFile.getScope().findInnermostEnclosingScope(Loc);
-
-    // Operator lookup is always at module scope.
-    if (Name.isOperator()) {
-      if (!isCascadingUse.hasValue()) {
-        DeclContext *innermostDC =
-          lookupScope->getInnermostEnclosingDeclContext();
-        isCascadingUse =
-          innermostDC->isCascadingContextForLookup(
-            /*functionsAreNonCascading=*/true);
-      }
-
-      lookupScope = &sourceFile.getScope();
-    }
-  
-    // Walk scopes outward from the innermost scope until we find something.
-    DeclContext *selfDC = nullptr;
-    for (auto currentScope = lookupScope; currentScope;
-         currentScope = currentScope->getParent()) {
-      // Perform local lookup within this scope.
-      auto localBindings = currentScope->getLocalBindings();
-      for (auto local : localBindings) {
-        Consumer.foundDecl(local,
-                           getLocalDeclVisibilityKind(currentScope));
-      }
-
-      // If we found anything, we're done.
-      if (shouldReturnBasedOnResults())
-        return;
-
-      // When we are in the body of a method, get the 'self' declaration.
-      if (currentScope->getKind() == ASTScopeKind::AbstractFunctionBody &&
-          currentScope->getAbstractFunctionDecl()->getDeclContext()
-            ->isTypeContext()) {
-        selfDC = currentScope->getAbstractFunctionDecl();
-        continue;
-      }
-
-      // If there is a declaration context associated with this scope, we might
-      // want to look in it.
-      if (auto dc = currentScope->getDeclContext()) {
-        // If we haven't determined whether we have a cascading use, do so now.
-        if (!isCascadingUse.hasValue()) {
-          isCascadingUse =
-            dc->isCascadingContextForLookup(/*functionsAreNonCascading=*/false);
-        }
-
-        // Pattern binding initializers are only interesting insofar as they
-        // affect lookup in an enclosing nominal type or extension thereof.
-        if (auto *bindingInit = dyn_cast<PatternBindingInitializer>(dc)) {
-          // Lazy variable initializer contexts have a 'self' parameter for
-          // instance member lookup.
-          if (bindingInit->getImplicitSelfDecl())
-            selfDC = bindingInit;
-
-          continue;
-        }
-
-        // Default arguments only have 'static' access to the members of the
-        // enclosing type, if there is one.
-        if (isa<DefaultArgumentInitializer>(dc)) continue;
-
-        // Functions/initializers/deinitializers are only interesting insofar as
-        // they affect lookup in an enclosing nominal type or extension thereof.
-        if (isa<AbstractFunctionDecl>(dc)) continue;
-
-        // Subscripts have no lookup of their own.
-        if (isa<SubscriptDecl>(dc)) continue;
-
-        // Closures have no lookup of their own.
-        if (isa<AbstractClosureExpr>(dc)) continue;
-
-        // Top-level declarations have no lookup of their own.
-        if (isa<TopLevelCodeDecl>(dc)) continue;
-
-        // Typealiases have no lookup of their own.
-        if (isa<TypeAliasDecl>(dc)) continue;
-
-        // Lookup in the source file's scope marks the end.
-        if (isa<SourceFile>(dc)) {
-          // FIXME: A bit of a hack.
-          DC = dc;
-          break;
-        }
-
-        // We have a nominal type or an extension thereof. Perform lookup into
-        // the nominal type.
-        auto nominal = dc->getSelfNominalTypeDecl();
-        if (!nominal) continue;
-
-        // Dig out the type we're looking into.
-        SmallVector<NominalTypeDecl *, 2> lookupDecls;
-        populateLookupDeclsFromContext(dc, lookupDecls);
-
-        NLOptions options = baseNLOptions;
-        // Perform lookup into the type.
-        if (isCascadingUse.getValue())
-          options |= NL_KnownCascadingDependency;
-        else
-          options |= NL_KnownNonCascadingDependency;
-
-        SmallVector<ValueDecl *, 4> lookup;
-        dc->lookupQualified(lookupDecls, Name, options, lookup);
-
-        auto startIndex = Results.size();
-        for (auto result : lookup) {
-          auto *baseDC = dc;
-          if (!isa<TypeDecl>(result) && selfDC) baseDC = selfDC;
-          Results.push_back(LookupResultEntry(baseDC, result));
-        }
-
-        if (!Results.empty()) {
-          // Predicate that determines whether a lookup result should
-          // be unavailable except as a last-ditch effort.
-          auto unavailableLookupResult =
-              [&](const LookupResultEntry &result) {
-            auto &effectiveVersion = Ctx.LangOpts.EffectiveLanguageVersion;
-            return result.getValueDecl()->getAttrs()
-                .isUnavailableInSwiftVersion(effectiveVersion);
-          };
-
-          // If all of the results we just found are unavailable, keep looking.
-          auto begin = Results.begin() + startIndex;
-          if (std::all_of(begin, Results.end(), unavailableLookupResult)) {
-            UnavailableInnerResults.append(begin, Results.end());
-            Results.erase(begin, Results.end());
-          } else {
-            if (DebugClient)
-              filterForDiscriminator(Results, DebugClient);
-
-            if (shouldReturnBasedOnResults())
-              return;
-          }
-        }
-
-        // Forget the 'self' declaration.
-        selfDC = nullptr;
-      }
-    }
-  } else {
-    // Never perform local lookup for operators.
-    if (Name.isOperator()) {
-      if (!isCascadingUse.hasValue()) {
-        isCascadingUse =
-          DC->isCascadingContextForLookup(/*functionsAreNonCascading=*/true);
-      }
-      DC = DC->getModuleScopeContext();
-
-    } else {
-      // If we are inside of a method, check to see if there are any ivars in
-      // scope, and if so, whether this is a reference to one of them.
-      // FIXME: We should persist this information between lookups.
-      while (!DC->isModuleScopeContext()) {
-        DeclContext *BaseDC = nullptr;
-        DeclContext *MetaBaseDC = nullptr;
-        GenericParamList *GenericParams = nullptr;
-
-        SmallVector<NominalTypeDecl *, 2> lookupDecls;
-
-        if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC)) {
-          auto *PBD = PBI->getBinding();
-          assert(PBD);
-
-          // Lazy variable initializer contexts have a 'self' parameter for
-          // instance member lookup.
-          if (auto *selfParam = PBI->getImplicitSelfDecl()) {
-            Consumer.foundDecl(selfParam,
-                               DeclVisibilityKind::FunctionParameter);
-            if (shouldReturnBasedOnResults())
-              return;
-
-            DC = DC->getParent();
-
-            populateLookupDeclsFromContext(DC, lookupDecls);
-            MetaBaseDC = DC;
-            BaseDC = PBI;
-          }
-          // Initializers for stored properties of types perform static
-          // lookup into the surrounding context.
-          else if (PBD->getDeclContext()->isTypeContext()) {
-            DC = DC->getParent();
-
-            populateLookupDeclsFromContext(DC, lookupDecls);
-            MetaBaseDC = DC;
-            BaseDC = MetaBaseDC;
-
-            isCascadingUse = DC->isCascadingContextForLookup(false);
-          }
-          // Otherwise, we have an initializer for a global or local property.
-          // There's not much to find here, we'll keep going up to a parent
-          // context.
-
-          if (!isCascadingUse.hasValue())
-            isCascadingUse = DC->isCascadingContextForLookup(false);
-        } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
-          // Look for local variables; normally, the parser resolves these
-          // for us, but it can't do the right thing inside local types.
-          // FIXME: when we can parse and typecheck the function body partially
-          // for code completion, AFD->getBody() check can be removed.
-          if (Loc.isValid() && AFD->getBody()) {
-            if (!isCascadingUse.hasValue()) {
-              isCascadingUse =
-                  !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc);
-            }
-
-            namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-            localVal.visit(AFD->getBody());
-            if (shouldReturnBasedOnResults())
-              return;
-
-            if (auto *P = AFD->getImplicitSelfDecl())
-              localVal.checkValueDecl(P, DeclVisibilityKind::FunctionParameter);
-            localVal.checkParameterList(AFD->getParameters());
-            if (shouldReturnBasedOnResults())
-              return;
-          }
-          if (!isCascadingUse.hasValue() || isCascadingUse.getValue())
-            isCascadingUse = AFD->isCascadingContextForLookup(false);
-
-          if (AFD->getDeclContext()->isTypeContext()) {
-            populateLookupDeclsFromContext(AFD->getDeclContext(),
-                                           lookupDecls);
-            BaseDC = AFD;
-            MetaBaseDC = AFD->getDeclContext();
-            DC = DC->getParent();
-
-            // If we're not in the body of the function (for example, we
-            // might be type checking a default argument expression and
-            // performing name lookup from there), the base declaration
-            // is the nominal type, not 'self'.
-            if (!AFD->isImplicit() &&
-                Loc.isValid() &&
-                AFD->getBodySourceRange().isValid() &&
-                !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc)) {
-              BaseDC = MetaBaseDC;
-            }
-          }
-
-          // Look in the generic parameters after checking our local declaration.
-          GenericParams = AFD->getGenericParams();
-        } else if (auto *ACE = dyn_cast<AbstractClosureExpr>(DC)) {
-          // Look for local variables; normally, the parser resolves these
-          // for us, but it can't do the right thing inside local types.
-          if (Loc.isValid()) {
-            if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
-              namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-              if (auto body = CE->getBody())
-                localVal.visit(body);
-              if (shouldReturnBasedOnResults())
-                return;
-              if (auto params = CE->getParameters())
-                localVal.checkParameterList(params);
-              if (shouldReturnBasedOnResults())
-                return;
-            }
-          }
-          if (!isCascadingUse.hasValue())
-            isCascadingUse = ACE->isCascadingContextForLookup(false);
-        } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
-          if (shouldLookupMembers(ED, Loc))
-            populateLookupDeclsFromContext(ED, lookupDecls);
-
-          BaseDC = ED;
-          MetaBaseDC = ED;
-          if (!isCascadingUse.hasValue())
-            isCascadingUse = ED->isCascadingContextForLookup(false);
-        } else if (auto *ND = dyn_cast<NominalTypeDecl>(DC)) {
-          if (shouldLookupMembers(ND, Loc))
-            populateLookupDeclsFromContext(ND, lookupDecls);
-          BaseDC = DC;
-          MetaBaseDC = DC;
-          if (!isCascadingUse.hasValue())
-            isCascadingUse = ND->isCascadingContextForLookup(false);
-        } else if (auto I = dyn_cast<DefaultArgumentInitializer>(DC)) {
-          // In a default argument, skip immediately out of both the
-          // initializer and the function.
-          isCascadingUse = false;
-          DC = I->getParent()->getParent();
-          continue;
-        } else {
-          assert(isa<TopLevelCodeDecl>(DC) || isa<Initializer>(DC) ||
-                 isa<TypeAliasDecl>(DC) || isa<SubscriptDecl>(DC));
-          if (!isCascadingUse.hasValue())
-            isCascadingUse = DC->isCascadingContextForLookup(false);
-        }
-
-        // If we're inside a function context, we've already moved to
-        // the parent DC, so we have to check the function's generic
-        // parameters first.
-        if (GenericParams) {
-          namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-          localVal.checkGenericParams(GenericParams);
-
-          if (shouldReturnBasedOnResults())
-            return;
-        }
-
-        // Check the generic parameters of our context.
-        GenericParamList *dcGenericParams = nullptr;
-        if (auto nominal = dyn_cast<NominalTypeDecl>(DC))
-          dcGenericParams = nominal->getGenericParams();
-        else if (auto ext = dyn_cast<ExtensionDecl>(DC))
-          dcGenericParams = ext->getGenericParams();
-        else if (auto subscript = dyn_cast<SubscriptDecl>(DC))
-          dcGenericParams = subscript->getGenericParams();
-
-        while (dcGenericParams) {
-          namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-          localVal.checkGenericParams(dcGenericParams);
-
-          if (shouldReturnBasedOnResults())
-            return;
-
-          dcGenericParams = dcGenericParams->getOuterParameters();
-        }
-
-        if (BaseDC && !lookupDecls.empty()) {
-          NLOptions options = baseNLOptions;
-          if (isCascadingUse.getValue())
-            options |= NL_KnownCascadingDependency;
-          else
-            options |= NL_KnownNonCascadingDependency;
-
-          SmallVector<ValueDecl *, 4> Lookup;
-          DC->lookupQualified(lookupDecls, Name, options, Lookup);
-          bool FoundAny = false;
-          auto startIndex = Results.size();
-          for (auto Result : Lookup) {
-            // Classify this declaration.
-            FoundAny = true;
-
-            // Types are formally members of the metatype.
-            if (auto TD = dyn_cast<TypeDecl>(Result)) {
-              Results.push_back(LookupResultEntry(MetaBaseDC, Result));
-              continue;
-            }
-
-            Results.push_back(LookupResultEntry(BaseDC, Result));
-          }
-
-          if (FoundAny) {
-            // Predicate that determines whether a lookup result should
-            // be unavailable except as a last-ditch effort.
-            auto unavailableLookupResult =
-              [&](const LookupResultEntry &result) {
-              auto &effectiveVersion = Ctx.LangOpts.EffectiveLanguageVersion;
-              return result.getValueDecl()->getAttrs()
-                  .isUnavailableInSwiftVersion(effectiveVersion);
-            };
-
-            // If all of the results we found are unavailable, keep looking.
-            auto begin = Results.begin() + startIndex;
-            if (std::all_of(begin, Results.end(), unavailableLookupResult)) {
-              UnavailableInnerResults.append(begin, Results.end());
-              Results.erase(begin, Results.end());
-            } else {
-              if (DebugClient)
-                filterForDiscriminator(Results, DebugClient);
-
-              if (shouldReturnBasedOnResults())
-                return;
-            }
-          }
-        }
-
-        DC = DC->getParentForLookup();
-      }
-
-      if (!isCascadingUse.hasValue())
-        isCascadingUse = true;
-    }
-
-    if (auto SF = dyn_cast<SourceFile>(DC)) {
-      if (Loc.isValid()) {
-        // Look for local variables in top-level code; normally, the parser
-        // resolves these for us, but it can't do the right thing for
-        // local types.
-        namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-        localVal.checkSourceFile(*SF);
-        if (shouldReturnBasedOnResults())
-          return;
-      }
-    }
-  }
-
-  // TODO: Does the debugger client care about compound names?
-  if (Name.isSimpleName() && DebugClient &&
-      DebugClient->lookupOverrides(Name.getBaseName(), DC, Loc,
-                                   isOriginallyTypeLookup, Results))
-    return;
-
-  recordLookupOfTopLevelName(DC, Name, isCascadingUse.getValue());
-
-  // Add private imports to the extra search list.
-  SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
-  if (auto FU = dyn_cast<FileUnit>(DC))
-    FU->getImportedModules(extraImports, ModuleDecl::ImportFilter::Private);
-
-  using namespace namelookup;
-  SmallVector<ValueDecl *, 8> CurModuleResults;
-  auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
-                                               : ResolutionKind::Overloadable;
-  lookupInModule(&M, {}, Name, CurModuleResults, NLKind::UnqualifiedLookup,
-                 resolutionKind, TypeResolver, DC, extraImports);
-
-  // Always perform name shadowing for type lookup.
-  if (options.contains(Flags::TypeLookup)) {
-    removeShadowedDecls(CurModuleResults, &M);
-  }
-
-  for (auto VD : CurModuleResults)
-    Results.push_back(LookupResultEntry(VD));
-
-  if (DebugClient)
-    filterForDiscriminator(Results, DebugClient);
-
-  // Now add any names the DebugClient knows about to the lookup.
-  if (Name.isSimpleName() && DebugClient)
-    DebugClient->lookupAdditions(Name.getBaseName(), DC, Loc,
-                                 isOriginallyTypeLookup, Results);
-
-  // If we've found something, we're done.
-  if (shouldReturnBasedOnResults(/*noMoreOuterResults=*/true))
-    return;
-
-  // If we still haven't found anything, but we do have some
-  // declarations that are "unavailable in the current Swift", drop
-  // those in.
-  Results = std::move(UnavailableInnerResults);
-  if (shouldReturnBasedOnResults(/*noMoreOuterResults=*/true))
-    return;
-
-  if (!Name.isSimpleName())
-    return;
-
-  // Look for a module with the given name.
-  if (Name.isSimpleName(M.getName())) {
-    Results.push_back(LookupResultEntry(&M));
-    if (shouldReturnBasedOnResults(/*noMoreOuterResults=*/true))
-      return;
-  }
-
-  ModuleDecl *desiredModule = Ctx.getLoadedModule(Name.getBaseIdentifier());
-  if (!desiredModule && Name == Ctx.TheBuiltinModule->getName())
-    desiredModule = Ctx.TheBuiltinModule;
-  if (desiredModule) {
-    forAllVisibleModules(DC, [&](const ModuleDecl::ImportedModule &import) -> bool {
-      if (import.second == desiredModule) {
-        Results.push_back(LookupResultEntry(import.second));
-        return false;
-      }
-      return true;
-    });
-  }
-  // Make sure we've recorded the inner-result-boundary.
-  (void)shouldReturnBasedOnResults(/*noMoreOuterResults=*/true);
-}
-
-TypeDecl* UnqualifiedLookup::getSingleTypeResult() {
-  if (Results.size() != 1)
-    return nullptr;
-  return dyn_cast<TypeDecl>(Results.back().getValueDecl());
-}
 
 #pragma mark Member lookup table
 
@@ -1863,21 +1258,19 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method,
   bool isInstanceMethod = method->isObjCInstanceMethod();
   auto &vec = (*ObjCMethodLookup)[{selector, isInstanceMethod}].Methods;
 
-  // In a non-empty vector, we could have duplicates or conflicts.
-  if (!vec.empty()) {
-    // Check whether we have a duplicate. This only checks more than one
-    // element in ill-formed code, so the linear search is acceptable.
-    if (std::find(vec.begin(), vec.end(), method) != vec.end())
-      return;
+  // Check whether we have a duplicate. This only checks more than one
+  // element in ill-formed code, so the linear search is acceptable.
+  if (std::find(vec.begin(), vec.end(), method) != vec.end())
+    return;
 
+  if (auto *sf = method->getParentSourceFile()) {
     if (vec.size() == 1) {
       // We have a conflict.
-      getASTContext().recordObjCMethodConflict(this, selector,
-                                               isInstanceMethod);
+      sf->ObjCMethodConflicts.push_back(std::make_tuple(this, selector,
+                                                        isInstanceMethod));
+    } if (vec.empty()) {
+      sf->ObjCMethodList.push_back(method);
     }
-  } else {
-    // Record the first method that has this selector.
-    getASTContext().recordObjCMethod(method);
   }
 
   vec.push_back(method);
@@ -1962,10 +1355,8 @@ static bool isAcceptableLookupResult(const DeclContext *dc,
   return true;
 }
 
-/// Only name lookup has gathered a set of results, perform any necessary
-/// steps to prune the result set before returning it to the caller.
-static bool finishLookup(const DeclContext *dc, NLOptions options,
-                         SmallVectorImpl<ValueDecl *> &decls) {
+void namelookup::pruneLookupResultSet(const DeclContext *dc, NLOptions options,
+                                      SmallVectorImpl<ValueDecl *> &decls) {
   // If we're supposed to remove overridden declarations, do so now.
   if (options & NL_RemoveOverridden)
     removeOverriddenDecls(decls);
@@ -1975,11 +1366,7 @@ static bool finishLookup(const DeclContext *dc, NLOptions options,
   if (options & NL_RemoveNonVisible)
     removeShadowedDecls(decls, M);
 
-  if (auto *debugClient = M->getDebugClient())
-    filterForDiscriminator(decls, debugClient);
-
-  // We're done. Report success/failure.
-  return !decls.empty();
+  filterForDiscriminator(decls, M->getDebugClient());
 }
 
 /// Inspect the given type to determine which nominal type declarations it
@@ -2183,7 +1570,13 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
     }
   }
 
-  return finishLookup(this, options, decls);
+  pruneLookupResultSet(this, options, decls);
+  if (auto *debugClient = this->getParentModule()->getDebugClient()) {
+    debugClient->finishLookupInNominals(this, typeDecls, member, options,
+                                        decls);
+  }
+  // We're done. Report success/failure.
+  return !decls.empty();
 }
 
 bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
@@ -2235,7 +1628,13 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
     return !knownDecls.insert(vd).second;
   }), decls.end());
 
-  return finishLookup(this, options, decls);
+  pruneLookupResultSet(this, options, decls);
+
+  if (auto *debugClient = this->getParentModule()->getDebugClient()) {
+    debugClient->finishLookupInModule(this, module, member, options, decls);
+  }
+  // We're done. Report success/failure.
+  return !decls.empty();
 }
 
 bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
@@ -2290,7 +1689,12 @@ bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
       decls.push_back(decl);
   }
 
-  return finishLookup(this, options, decls);
+  pruneLookupResultSet(this, options, decls);
+  if (auto *debugClient = this->getParentModule()->getDebugClient()) {
+    debugClient->finishLookupInAnyObject(this, member, options, decls);
+  }
+  // We're done. Report success/failure.
+  return !decls.empty();
 }
 
 void DeclContext::lookupAllObjCMethods(
@@ -2550,6 +1954,9 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Shared:
   case TypeReprKind::SILBox:
     return { };
+      
+  case TypeReprKind::OpaqueReturn:
+    return { };
 
   case TypeReprKind::Fixed:
     llvm_unreachable("Cannot get fixed TypeReprs in name lookup");
@@ -2700,6 +2107,31 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
     = resolveTypeDeclsToNominal(evaluator, ctx, referenced, modulesFound,
                                 anyObject);
   return nominalTypes.empty() ? nullptr : nominalTypes.front();
+}
+
+llvm::Expected<NominalTypeDecl *>
+CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
+                                   CustomAttr *attr, DeclContext *dc) const {
+  // Find the types referenced by the custom attribute.
+  auto &ctx = dc->getASTContext();
+  TypeLoc &typeLoc = attr->getTypeLoc();
+  DirectlyReferencedTypeDecls decls;
+  if (auto typeRepr = typeLoc.getTypeRepr()) {
+    decls = directReferencesForTypeRepr(
+        evaluator, ctx, typeRepr, dc);
+  } else if (Type type = typeLoc.getType()) {
+    decls = directReferencesForType(type);
+  }
+
+  // Dig out the nominal type declarations.
+  SmallVector<ModuleDecl *, 2> modulesFound;
+  bool anyObject = false;
+  auto nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls,
+                                            modulesFound, anyObject);
+  if (nominals.size() == 1 && !isa<ProtocolDecl>(nominals.front()))
+    return nominals.front();
+
+  return nullptr;
 }
 
 void swift::getDirectlyInheritedNominalTypeDecls(
@@ -2931,8 +2363,12 @@ void FindLocalVal::visitCaseStmt(CaseStmt *S) {
       }
     }
   }
-  if (!inPatterns && !items.empty())
-    checkPattern(items[0].getPattern(), DeclVisibilityKind::LocalVariable);
+
+  if (!inPatterns && !items.empty()) {
+    for (auto *vd : S->getCaseBodyVariablesOrEmptyArray()) {
+      checkValueDecl(vd, DeclVisibilityKind::LocalVariable);
+    }
+  }
   visit(S->getBody());
 }
 

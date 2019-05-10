@@ -29,8 +29,12 @@ else()
     set(CMAKE_C_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang")
   endif()
 
-  set(CMAKE_C_COMPILER_LAUNCHER "")
-  set(CMAKE_CXX_COMPILER_LAUNCHER "")
+  if(CMAKE_C_COMPILER_LAUNCHER MATCHES ".*distcc")
+    set(CMAKE_C_COMPILER_LAUNCHER "")
+  endif()
+  if(CMAKE_CXX_COMPILER_LAUNCHER MATCHES ".*distcc")
+    set(CMAKE_CXX_COMPILER_LAUNCHER "")
+  endif()
 
   # The sanitizers require using the same version of the compiler for
   # everything and there are various places where we link runtime code with
@@ -102,9 +106,11 @@ function(swift_create_stdlib_targets name variant define_all_alias)
 endfunction()
 
 swift_create_stdlib_targets("swift-stdlib" "" TRUE)
-swift_create_stdlib_targets("swift-stdlib" "sib" TRUE)
-swift_create_stdlib_targets("swift-stdlib" "sibopt" TRUE)
-swift_create_stdlib_targets("swift-stdlib" "sibgen" TRUE)
+if(SWIFT_STDLIB_ENABLE_SIB_TARGETS)
+  swift_create_stdlib_targets("swift-stdlib" "sib" TRUE)
+  swift_create_stdlib_targets("swift-stdlib" "sibopt" TRUE)
+  swift_create_stdlib_targets("swift-stdlib" "sibgen" TRUE)
+endif()
 swift_create_stdlib_targets("swift-test-stdlib" "" FALSE)
 
 foreach(sdk ${SWIFT_SDKS})
@@ -137,9 +143,9 @@ foreach(sdk ${SWIFT_SDKS})
         "swift-stdlib-${platform}-${arch}"
         "copy-legacy-layouts-${platform}-${arch}")
 
-      swift_install_in_component(stdlib
-          FILES ${input}
-          DESTINATION "lib/swift/${platform}/")
+      swift_install_in_component(FILES ${input}
+                                 DESTINATION "lib/swift/${platform}/"
+                                 COMPONENT compiler)
     else()
       # Add a dummy target that does nothing so we can still depend on it
       # later without checking if the input files exist.

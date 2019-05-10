@@ -25,6 +25,7 @@
 #include "swift/Basic/Dwarf.h"
 #include "llvm/Object/ELFObjectFile.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "llvm/Object/COFF.h"
 #include "llvm/Object/MachO.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Support/CommandLine.h"
@@ -133,6 +134,7 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
     auto *Obj = OF->getBinary();
     auto *MachO = llvm::dyn_cast<llvm::object::MachOObjectFile>(Obj);
     auto *ELF = llvm::dyn_cast<llvm::object::ELFObjectFileBase>(Obj);
+    auto *COFF = llvm::dyn_cast<llvm::object::COFFObjectFile>(Obj);
 
     if (MachO) {
       for (auto &Symbol : Obj->symbols()) {
@@ -164,7 +166,8 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
       llvm::StringRef Name;
       Section.getName(Name);
       if ((MachO && Name == swift::MachOASTSectionName) ||
-          (ELF && Name == swift::ELFASTSectionName)) {
+          (ELF && Name == swift::ELFASTSectionName) ||
+          (COFF && Name == swift::COFFASTSectionName)) {
         uint64_t Size = Section.getSize();
         StringRef ContentsReference;
         Section.getContents(ContentsReference);
@@ -279,6 +282,7 @@ int main(int argc, char **argv) {
 
   Invocation.setModuleName("lldbtest");
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
+  Invocation.getLangOptions().EnableMemoryBufferImporter = true;
   Invocation.getLangOptions().EnableDWARFImporter = EnableDWARFImporter;
 
   if (!ResourceDir.empty()) {
@@ -289,7 +293,7 @@ int main(int argc, char **argv) {
     return 1;
 
   for (auto &Module : Modules)
-    if (!parseASTSection(CI.getSerializedModuleLoader(),
+    if (!parseASTSection(*CI.getMemoryBufferSerializedModuleLoader(),
                          StringRef(Module.first, Module.second), modules))
       return 1;
 

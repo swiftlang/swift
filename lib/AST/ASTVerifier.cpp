@@ -629,12 +629,17 @@ public:
 
       bool foundError = type->getCanonicalType().findIf([&](Type type) -> bool {
         if (auto archetype = type->getAs<ArchetypeType>()) {
+          auto root = archetype->getRoot();
+          
+          // Opaque archetypes are globally available. We don't need to check
+          // them here.
+          if (isa<OpaqueTypeArchetypeType>(root))
+            return false;
+          
           // Only visit each archetype once.
           if (!visitedArchetypes.insert(archetype).second)
             return false;
           
-          auto root = archetype->getRoot();
-
           // We should know about archetypes corresponding to opened
           // existential archetypes.
           if (auto opened = dyn_cast<OpenedArchetypeType>(root)) {
@@ -761,6 +766,7 @@ public:
     FUNCTION_LIKE(DestructorDecl)
     FUNCTION_LIKE(FuncDecl)
     FUNCTION_LIKE(EnumElementDecl)
+    FUNCTION_LIKE(SubscriptDecl)
     SCOPE_LIKE(NominalTypeDecl)
     SCOPE_LIKE(ExtensionDecl)
 
@@ -818,6 +824,26 @@ public:
     void cleanup(MakeTemporarilyEscapableExpr *expr) {
       assert(OpaqueValues.count(expr->getOpaqueValue()));
       OpaqueValues.erase(expr->getOpaqueValue());
+    }
+
+    // Register the OVEs in a DestructureTupleExpr.
+    bool shouldVerify(DestructureTupleExpr *expr) {
+      if (!shouldVerify(cast<Expr>(expr)))
+        return false;
+
+      for (auto *opaqueElt : expr->getDestructuredElements()) {
+        assert(!OpaqueValues.count(opaqueElt));
+        OpaqueValues[opaqueElt] = 0;
+      }
+
+      return true;
+    }
+
+    void cleanup(DestructureTupleExpr *expr) {
+      for (auto *opaqueElt : expr->getDestructuredElements()) {
+        assert(OpaqueValues.count(opaqueElt));
+        OpaqueValues.erase(opaqueElt);
+      }
     }
 
     // Keep a stack of the currently-live optional evaluations.
@@ -1709,12 +1735,6 @@ public:
         }
       };
 
-      // If we have a tuple_shuffle, strip it off. We want to visit the
-      // underlying paren or tuple expr.
-      if (auto *TupleShuffle = dyn_cast<TupleShuffleExpr>(Arg)) {
-        Arg = TupleShuffle->getSubExpr();
-      }
-
       if (auto *ParentExprArg = dyn_cast<ParenExpr>(Arg)) {
         return handleSubExpr(ParentExprArg->getSubExpr());
       }
@@ -1763,7 +1783,7 @@ public:
                "\nArgument type: ";
         InputExprTy.print(Out);
         Out << "\nParameter types: ";
-        FT->printParams(Out);
+        AnyFunctionType::printParams(FT->getParams(), Out);
         Out << "\n";
         E->dump(Out);
         Out << "\n";
@@ -1804,7 +1824,7 @@ public:
       
       // The base of a member reference cannot be an existential type.
       if (E->getBase()->getType()->getWithoutSpecifierType()
-            ->isAnyExistentialType()) {
+            ->isExistentialType()) {
         Out << "Member reference into an unopened existential type\n";
         E->dump(Out);
         Out << "\n";
@@ -1988,65 +2008,38 @@ public:
       verifyCheckedBase(E);
     }
 
-    void verifyChecked(TupleShuffleExpr *E) {
-      PrettyStackTraceExpr debugStack(Ctx, "verifying TupleShuffleExpr", E);
+    void verifyChecked(DestructureTupleExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying DestructureTupleExpr", E);
 
-      auto getSubElementType = [&](unsigned i) {
-        if (E->isSourceScalar()) {
-          assert(i == 0);
-          return E->getSubExpr()->getType();
-        } else {
-          return (E->getSubExpr()->getType()->castTo<TupleType>()
-                   ->getElementType(i));
-        }
+      auto getInputElementType = [&](unsigned i) {
+        return (E->getSubExpr()->getType()->castTo<TupleType>()
+                 ->getElementType(i));
       };
 
-      /// Retrieve the ith element type from the resulting tuple type.
-      auto getOuterElementType = [&](unsigned i) -> Type {
-        if (E->isResultScalar()) {
-          assert(i == 0);
-          return E->getType()->getWithoutParens();
-        } else {
-          return E->getType()->castTo<TupleType>()->getElementType(i);
-        }
+      auto getOpaqueElementType = [&](unsigned i) -> Type {
+        return E->getDestructuredElements()[i]->getType();
       };
 
-      Type varargsType;
-      unsigned callerDefaultArgIndex = 0;
-      for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
-        int subElem = E->getElementMapping()[i];
-        if (subElem == TupleShuffleExpr::DefaultInitialize)
-          continue;
-        if (subElem == TupleShuffleExpr::Variadic) {
-          varargsType = (E->getType()->castTo<TupleType>()
-                          ->getElement(i).getVarargBaseTy());
-          break;
-        }
-        if (subElem == TupleShuffleExpr::CallerDefaultInitialize) {
-          auto init = E->getCallerDefaultArgs()[callerDefaultArgIndex++];
-          if (!getOuterElementType(i)->isEqual(init->getType())) {
-            Out << "Type mismatch in TupleShuffleExpr\n";
-            abort();
-          }
-          continue;
-        }
-        if (!getOuterElementType(i)->isEqual(getSubElementType(subElem))) {
-          Out << "Type mismatch in TupleShuffleExpr\n";
+      for (unsigned i = 0, e = E->getDestructuredElements().size(); i != e; ++i) {
+        Type inputType = getInputElementType(i);
+        Type opaqueType = getOpaqueElementType(i);
+        if (!inputType->isEqual(opaqueType)) {
+          Out << "Input type mismatch in DestructureTupleExpr\n";
+          inputType->dump(Out);
+          opaqueType->dump(Out);
           abort();
         }
       }
-      if (varargsType) {
-        for (auto sourceIdx : E->getVariadicArgs()) {
-          if (!getSubElementType(sourceIdx)->isEqual(varargsType)) {
-            Out << "Vararg type mismatch in TupleShuffleExpr\n";
-            abort();
-          }
-        }
+
+      if (!E->getResultExpr()->getType()->isEqual(E->getType())) {
+        Out << "Result type mismatch in DestructureTupleExpr\n";
+        E->getResultExpr()->getType()->dump(Out);
+        E->getType()->dump(Out);
       }
 
       verifyCheckedBase(E);
     }
-    
+
     void verifyChecked(DynamicTypeExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying DynamicTypeExpr", E);
 
@@ -2508,6 +2501,20 @@ public:
         if (!varTy->getOptionalObjectType()) {
           Out << "implicitly unwrapped optional attribute should only be set on VarDecl "
                  "with optional type\n";
+          abort();
+        }
+      }
+
+      if (auto *caseStmt =
+	    dyn_cast_or_null<CaseStmt>(var->getRecursiveParentPatternStmt())) {
+        // In a type checked AST, a case stmt that is a recursive parent pattern
+        // stmt of a var decl, must have bound decls. This is because we
+        // guarantee that all case label items bind corresponding patterns and
+        // the case body var decls of a case stmt are created from the var decls
+        // of the first case label items.
+        if (!caseStmt->hasBoundDecls()) {
+          Out << "parent CaseStmt of VarDecl does not have any case body "
+                 "decls?!\n";
           abort();
         }
       }

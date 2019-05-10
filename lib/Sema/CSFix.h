@@ -57,6 +57,8 @@ enum class FixKind : uint8_t {
 
   /// Introduce a '&' to take the address of an lvalue.
   AddressOf,
+  /// Remove extraneous use of `&`.
+  RemoveAddressOf,
 
   /// Replace a coercion ('as') with a forced checked cast ('as!').
   CoerceToCheckedCast,
@@ -105,7 +107,7 @@ enum class FixKind : uint8_t {
   /// fix this issue by pretending that member exists and matches
   /// given arguments/result types exactly.
   DefineMemberBasedOnUse,
-	
+
   /// Allow access to type member on instance or instance member on type
   AllowTypeOrInstanceMember,
 
@@ -122,6 +124,35 @@ enum class FixKind : uint8_t {
   /// derived (rather than an arbitrary value of metatype type) or the
   /// referenced constructor must be required.
   AllowInvalidInitRef,
+
+  /// If there are fewer arguments than parameters, let's fix that up
+  /// by adding new arguments to the list represented as type variables.
+  AddMissingArguments,
+
+  /// Allow single tuple closure parameter destructuring into N arguments.
+  AllowClosureParameterDestructuring,
+
+  /// If there is out-of-order argument, let's fix that by re-ordering.
+  MoveOutOfOrderArgument,
+
+  /// If there is a matching inaccessible member - allow it as if there
+  /// no access control.
+  AllowInaccessibleMember,
+
+  /// Allow KeyPaths to use AnyObject as root type
+  AllowAnyObjectKeyPathRoot,
+
+  /// Using subscript references in the keypath requires that each
+  /// of the index arguments to be Hashable.
+  TreatKeyPathSubscriptIndexAsHashable,
+
+  /// Allow an invalid reference to a member declaration as part
+  /// of a key path component.
+  AllowInvalidRefInKeyPath,
+
+  /// Remove `return` or default last expression of single expression
+  /// function to `Void` to conform to expected result type.
+  RemoveReturn,
 };
 
 class ConstraintFix {
@@ -433,6 +464,31 @@ public:
                                     ConstraintLocator *locator);
 };
 
+/// Detect situations where key path doesn't have capability required
+/// by the context e.g. read-only vs. writable, or either root or value
+/// types are incorrect e.g.
+///
+/// ```swift
+/// struct S { let foo: Int }
+/// let _: WritableKeyPath<S, Int> = \.foo
+/// ```
+///
+/// Here context requires a writable key path but `foo` property is
+/// read-only.
+class KeyPathContextualMismatch final : public ContextualMismatch {
+  KeyPathContextualMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
+                            ConstraintLocator *locator)
+      : ContextualMismatch(cs, lhs, rhs, locator) {}
+
+public:
+  std::string getName() const override {
+    return "fix key path contextual mismatch";
+  }
+
+  static KeyPathContextualMismatch *
+  create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
+};
+
 /// Detect situations when argument of the @autoclosure parameter is itself
 /// marked as @autoclosure and is not applied. Form a fix which suggests a
 /// proper way to forward such arguments, e.g.:
@@ -612,6 +668,222 @@ private:
                                      bool isStaticallyDerived,
                                      SourceRange baseRange,
                                      ConstraintLocator *locator);
+};
+
+class AllowClosureParamDestructuring final : public ConstraintFix {
+  FunctionType *ContextualType;
+
+  AllowClosureParamDestructuring(ConstraintSystem &cs,
+                                 FunctionType *contextualType,
+                                 ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowClosureParameterDestructuring, locator),
+        ContextualType(contextualType) {}
+
+public:
+  std::string getName() const override {
+    return "allow closure parameter destructuring";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowClosureParamDestructuring *create(ConstraintSystem &cs,
+                                                FunctionType *contextualType,
+                                                ConstraintLocator *locator);
+};
+
+class AddMissingArguments final
+    : public ConstraintFix,
+      private llvm::TrailingObjects<AddMissingArguments,
+                                    AnyFunctionType::Param> {
+  friend TrailingObjects;
+
+  using Param = AnyFunctionType::Param;
+
+  FunctionType *Fn;
+  unsigned NumSynthesized;
+
+  AddMissingArguments(ConstraintSystem &cs, FunctionType *funcType,
+                      llvm::ArrayRef<AnyFunctionType::Param> synthesizedArgs,
+                      ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AddMissingArguments, locator), Fn(funcType),
+        NumSynthesized(synthesizedArgs.size()) {
+    std::uninitialized_copy(synthesizedArgs.begin(), synthesizedArgs.end(),
+                            getSynthesizedArgumentsBuf().begin());
+  }
+
+public:
+  std::string getName() const override { return "synthesize missing argument(s)"; }
+
+  ArrayRef<Param> getSynthesizedArguments() const {
+    return {getTrailingObjects<Param>(), NumSynthesized};
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AddMissingArguments *create(ConstraintSystem &cs, FunctionType *fnType,
+                                     llvm::ArrayRef<Param> synthesizedArgs,
+                                     ConstraintLocator *locator);
+
+private:
+  MutableArrayRef<Param> getSynthesizedArgumentsBuf() {
+    return {getTrailingObjects<Param>(), NumSynthesized};
+  }
+};
+
+class MoveOutOfOrderArgument final : public ConstraintFix {
+  using ParamBinding = SmallVector<unsigned, 1>;
+
+  unsigned ArgIdx;
+  unsigned PrevArgIdx;
+
+  SmallVector<ParamBinding, 4> Bindings;
+
+  MoveOutOfOrderArgument(ConstraintSystem &cs, unsigned argIdx,
+                         unsigned prevArgIdx, ArrayRef<ParamBinding> bindings,
+                         ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::MoveOutOfOrderArgument, locator),
+        ArgIdx(argIdx), PrevArgIdx(prevArgIdx),
+        Bindings(bindings.begin(), bindings.end()) {}
+
+public:
+  std::string getName() const override {
+    return "move out-of-order argument to correct position";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static MoveOutOfOrderArgument *create(ConstraintSystem &cs,
+                                        unsigned argIdx,
+                                        unsigned prevArgIdx,
+                                        ArrayRef<ParamBinding> bindings,
+                                        ConstraintLocator *locator);
+};
+
+class AllowInaccessibleMember final : public ConstraintFix {
+  ValueDecl *Member;
+
+  AllowInaccessibleMember(ConstraintSystem &cs, ValueDecl *member,
+                          ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInaccessibleMember, locator),
+        Member(member) {}
+
+public:
+  std::string getName() const override {
+    return "allow inaccessible member reference";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowInaccessibleMember *create(ConstraintSystem &cs,
+                                         ValueDecl *member,
+                                         ConstraintLocator *locator);
+};
+
+class AllowAnyObjectKeyPathRoot final : public ConstraintFix {
+
+  AllowAnyObjectKeyPathRoot(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowAnyObjectKeyPathRoot, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow anyobject as root type for a keypath";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowAnyObjectKeyPathRoot *create(ConstraintSystem &cs,
+                                           ConstraintLocator *locator);
+};
+
+class TreatKeyPathSubscriptIndexAsHashable final : public ConstraintFix {
+  Type NonConformingType;
+
+  TreatKeyPathSubscriptIndexAsHashable(ConstraintSystem &cs, Type type,
+                                       ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::TreatKeyPathSubscriptIndexAsHashable,
+                      locator),
+        NonConformingType(type) {}
+
+public:
+  std::string getName() const override {
+    return "treat keypath subscript index as conforming to Hashable";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static TreatKeyPathSubscriptIndexAsHashable *
+  create(ConstraintSystem &cs, Type type, ConstraintLocator *locator);
+};
+
+class AllowInvalidRefInKeyPath final : public ConstraintFix {
+  enum RefKind {
+    // Allow a reference to a static member as a key path component.
+    StaticMember,
+    // Allow a reference to a declaration with mutating getter as
+    // a key path component.
+    MutatingGetter,
+    // Allow a reference to a method (instance or static) as
+    // a key path component.
+    Method,
+  } Kind;
+
+  ValueDecl *Member;
+
+  AllowInvalidRefInKeyPath(ConstraintSystem &cs, RefKind kind,
+                           ValueDecl *member, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInvalidRefInKeyPath, locator),
+        Kind(kind), Member(member) {}
+
+public:
+  std::string getName() const override {
+    switch (Kind) {
+    case RefKind::StaticMember:
+      return "allow reference to a static member as a key path component";
+    case RefKind::MutatingGetter:
+      return "allow reference to a member with mutating getter as a key "
+             "path component";
+    case RefKind::Method:
+      return "allow reference to a method as a key path component";
+    }
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  /// Determine whether give reference requires a fix and produce one.
+  static AllowInvalidRefInKeyPath *
+  forRef(ConstraintSystem &cs, ValueDecl *member, ConstraintLocator *locator);
+
+private:
+  static AllowInvalidRefInKeyPath *create(ConstraintSystem &cs, RefKind kind,
+                                          ValueDecl *member,
+                                          ConstraintLocator *locator);
+};
+
+class RemoveAddressOf final : public ConstraintFix {
+  RemoveAddressOf(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RemoveAddressOf, locator) {}
+
+public:
+  std::string getName() const override {
+    return "remove extraneous use of `&`";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static RemoveAddressOf *create(ConstraintSystem &cs,
+                                 ConstraintLocator *locator);
+};
+
+class RemoveReturn final : public ConstraintFix {
+  RemoveReturn(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RemoveReturn, locator) {}
+
+public:
+  std::string getName() const override { return "remove or omit return type"; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static RemoveReturn *create(ConstraintSystem &cs, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

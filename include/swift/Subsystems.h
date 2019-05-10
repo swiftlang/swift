@@ -264,6 +264,18 @@ namespace swift {
   void serialize(ModuleOrSourceFile DC, const SerializationOptions &options,
                  const SILModule *M = nullptr);
 
+  /// Serializes a module or single source file to the given output file and
+  /// returns back the file's contents as a memory buffer.
+  ///
+  /// Use this if you intend to immediately load the serialized module, as that
+  /// will both avoid extra filesystem traffic and will ensure you read back
+  /// exactly what was written.
+  void serializeToBuffers(ModuleOrSourceFile DC,
+                          const SerializationOptions &opts,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+                          const SILModule *M = nullptr);
+
   /// Get the CPU, subtarget feature options, and triple to use when emitting code.
   std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>,
              std::string>

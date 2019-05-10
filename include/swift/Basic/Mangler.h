@@ -78,6 +78,14 @@ protected:
     }
   };
 
+  void addSubstWordsInIdent(const WordReplacement &repl) {
+    SubstWordsInIdent.push_back(repl);
+  }
+
+  void addWord(const SubstitutionWord &word) {
+    Words.push_back(word);
+  }
+
   /// Returns the buffer as a StringRef, needed by mangleIdentifier().
   StringRef getBufferStr() const {
     return StringRef(Storage.data(), Storage.size());

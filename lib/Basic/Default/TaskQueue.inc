@@ -29,6 +29,12 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Signals.h"
 
+#if defined(_WIN32)
+#define NOMINMAX
+#include <Windows.h>
+#include <psapi.h>
+#endif
+
 using namespace llvm::sys;
 
 namespace swift {
@@ -46,12 +52,15 @@ public:
   /// the current process's environment will be used instead.
   ArrayRef<const char *> Env;
 
+  /// True if the errors of the Task should be stored in Errors instead of Output.
+  bool SeparateErrors;
+
   /// Context associated with this Task.
   void *Context;
 
   Task(const char *ExecPath, ArrayRef<const char *> Args,
-       ArrayRef<const char *> Env = llvm::None, void *Context = nullptr)
-      : ExecPath(ExecPath), Args(Args), Env(Env), Context(Context) {}
+       ArrayRef<const char *> Env = llvm::None, void *Context = nullptr, bool SeparateErrors = false)
+      : ExecPath(ExecPath), Args(Args), Env(Env), Context(Context), SeparateErrors(SeparateErrors) {}
 };
 
 } // end namespace sys
@@ -75,10 +84,7 @@ unsigned TaskQueue::getNumberOfParallelTasks() const {
 void TaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
                         ArrayRef<const char *> Env, void *Context,
                         bool SeparateErrors) {
-  // This implementation of TaskQueue ignores SeparateErrors.
-  // We need to reference SeparateErrors to avoid warnings, though.
-  (void)SeparateErrors;
-  std::unique_ptr<Task> T(new Task(ExecPath, Args, Env, Context));
+  std::unique_ptr<Task> T(new Task(ExecPath, Args, Env, Context, SeparateErrors));
   QueuedTasks.push(std::move(T));
 }
 
@@ -104,16 +110,18 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
                        : decltype(Envp)(llvm::toStringRefArray(T->Env.data()));
 
     llvm::SmallString<64> stdoutPath;
-    llvm::SmallString<64> stderrPath;
-    if (fs::createTemporaryFile("stdout", "tmp",  stdoutPath)
-        || fs::createTemporaryFile("stderr", "tmp",  stderrPath)) {
+    if (fs::createTemporaryFile("stdout", "tmp",  stdoutPath))
       return true;
+    llvm::sys::RemoveFileOnSignal(stdoutPath);
+
+    llvm::SmallString<64> stderrPath;
+    if (T->SeparateErrors) {
+      if (fs::createTemporaryFile("stderr", "tmp", stdoutPath))
+        return true;
+      llvm::sys::RemoveFileOnSignal(stderrPath);
     }
 
-    llvm::sys::RemoveFileOnSignal(stdoutPath);
-    llvm::sys::RemoveFileOnSignal(stderrPath);
-
-    Optional<StringRef> redirects[] = {None, {stdoutPath}, {stderrPath}};
+    Optional<StringRef> redirects[] = {None, {stdoutPath}, {T->SeparateErrors ? stderrPath : stdoutPath}};
 
     bool ExecutionFailed = false;
     ProcessInfo PI = ExecuteNoWait(T->ExecPath,
@@ -133,17 +141,50 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
     int ReturnCode = PI.ReturnCode;
 
     auto stdoutBuffer = llvm::MemoryBuffer::getFile(stdoutPath);
-    auto stderrBuffer = llvm::MemoryBuffer::getFile(stderrPath);
-
     StringRef stdoutContents = stdoutBuffer.get()->getBuffer();
-    StringRef stderrContents = stderrBuffer.get()->getBuffer();
 
-    if (ReturnCode == -2) {
+    StringRef stderrContents;
+    if (T->SeparateErrors) {
+      auto stderrBuffer = llvm::MemoryBuffer::getFile(stderrPath);
+      stderrContents = stderrBuffer.get()->getBuffer();
+    }
+
+#if defined(_WIN32)
+    // Wait() sets the upper two bits of the return code to indicate warnings
+    // (10) and errors (11).
+    //
+    // This isn't a true signal on Windows, but we'll treat it as such so that
+    // we clean up after it properly
+    bool crashed = ReturnCode & 0xC0000000;
+
+    FILETIME creationTime;
+    FILETIME exitTime;
+    FILETIME utimeTicks;
+    FILETIME stimeTicks;
+    PROCESS_MEMORY_COUNTERS counters = {};
+    GetProcessTimes(PI.Process, &creationTime, &exitTime, &stimeTicks,
+                    &utimeTicks);
+    // Each tick is 100ns
+    uint64_t utime =
+        ((uint64_t)utimeTicks.dwHighDateTime << 32 | utimeTicks.dwLowDateTime) /
+        10;
+    uint64_t stime =
+        ((uint64_t)stimeTicks.dwHighDateTime << 32 | stimeTicks.dwLowDateTime) /
+        10;
+    GetProcessMemoryInfo(PI.Process, &counters, sizeof(counters));
+
+    TaskProcessInformation tpi(PI.Pid, utime, stime,
+                               counters.PeakWorkingSetSize);
+#else
       // Wait() returning a return code of -2 indicates the process received
       // a signal during execution.
+    bool crashed = ReturnCode == -2;
+    TaskProcessInformation tpi(PI.Pid);
+#endif
+    if (crashed) {
       if (Signalled) {
         TaskFinishedResponse Response =
-            Signalled(PI.Pid, ErrMsg, stdoutContents, stderrContents, T->Context, None, TaskProcessInformation(PI.Pid));
+            Signalled(PI.Pid, ErrMsg, stdoutContents, stderrContents, T->Context, ReturnCode, tpi);
         ContinueExecution = Response != TaskFinishedResponse::StopExecution;
       } else {
         // If we don't have a Signalled callback, unconditionally stop.
@@ -154,14 +195,15 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
       // finished.
       if (Finished) {
         TaskFinishedResponse Response = Finished(PI.Pid, PI.ReturnCode,
-        stdoutContents, stderrContents, TaskProcessInformation(PI.Pid), T->Context);
+        stdoutContents, stderrContents, tpi, T->Context);
         ContinueExecution = Response != TaskFinishedResponse::StopExecution;
       } else if (PI.ReturnCode != 0) {
         ContinueExecution = false;
       }
     }
     llvm::sys::fs::remove(stdoutPath);
-    llvm::sys::fs::remove(stderrPath);
+    if (T->SeparateErrors)
+      llvm::sys::fs::remove(stderrPath);
   }
 
   return !ContinueExecution;

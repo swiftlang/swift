@@ -183,17 +183,14 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
     ParserResult<Expr> Primary =
       parseExprSequenceElement(Message, isExprBasic);
 
-    HasCodeCompletion |= Primary.hasCodeCompletion();
-    if (Primary.isNull()) {
-      if (Primary.hasCodeCompletion()) {
-        if (CodeCompletion) {
-          CodeCompletion->setLeadingSequenceExprs(SequencedExprs);
-        }
-        return Primary;
-      } else {
-        return nullptr;
-      }
+    if (Primary.hasCodeCompletion()) {
+      HasCodeCompletion = true;
+      if (CodeCompletion)
+        CodeCompletion->setLeadingSequenceExprs(SequencedExprs);
     }
+    if (Primary.isNull())
+      return Primary;
+
     SequencedExprs.push_back(Primary.get());
 
     // We know we can make a syntax node for ternary expression.
@@ -1338,7 +1335,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       }
       // Eat the code completion token because we handled it.
       consumeToken(tok::code_complete);
-      return makeParserCodeCompletionResult<Expr>();
+      Result.setHasCodeCompletion();
+      return Result;
     }
 
     // If we end up with an unknown token on this line, return an ErrorExpr
@@ -1550,7 +1548,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         // call pattern.
         peekToken().isNot(tok::period, tok::period_prefix, tok::l_paren)) {
       Identifier name;
-      SourceLoc loc = consumeIdentifier(&name);
+      SourceLoc loc = consumeIdentifier(&name, /*allowDollarIdentifier=*/true);
       auto specifier = (InVarOrLetPattern != IVOLP_InVar)
                      ? VarDecl::Specifier::Let
                      : VarDecl::Specifier::Var;
@@ -1900,7 +1898,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                         /*isPostfix=*/false, /*isExprBasic=*/true,
                         lParen, args, argLabels, argLabelLocs, rParen,
                         trailingClosureNeverPresent,
-                        SyntaxKind::Unknown);
+                        SyntaxKind::FunctionCallArgumentList);
       assert(!trailingClosureNeverPresent);
 
       Status |= S;
@@ -2134,8 +2132,10 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
   DeclBaseName baseName;
   SourceLoc baseNameLoc;
   if (Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_self)) {
-    baseName = Context.getIdentifier(Tok.getText());
-    baseNameLoc = consumeToken();
+    Identifier baseNameId;
+    baseNameLoc = consumeIdentifier(
+        &baseNameId, /*allowDollarIdentifier=*/true);
+    baseName = baseNameId;
   } else if (allowOperators && Tok.isAnyOperator()) {
     baseName = Context.getIdentifier(Tok.getText());
     baseNameLoc = consumeToken();
@@ -2645,13 +2645,17 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
           break;
         }
 
-        Identifier name = Tok.is(tok::identifier) ?
-            Context.getIdentifier(Tok.getText()) : Identifier();
+        Identifier name;
+        SourceLoc nameLoc;
+        if (Tok.is(tok::identifier)) {
+          nameLoc = consumeIdentifier(&name);
+        } else {
+          nameLoc = consumeToken(tok::kw__);
+        }
         auto var = new (Context)
             ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                      Identifier(), Tok.getLoc(), name, nullptr);
+                      Identifier(), nameLoc, name, nullptr);
         elements.push_back(var);
-        consumeToken();
 
         // Consume a comma to continue.
         HasNext = consumeIf(tok::comma);

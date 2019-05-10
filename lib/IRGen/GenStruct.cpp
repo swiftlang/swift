@@ -871,16 +871,27 @@ Optional<unsigned> irgen::getPhysicalStructFieldIndex(IRGenModule &IGM,
 }
 
 void IRGenModule::emitStructDecl(StructDecl *st) {
-  if (!IRGen.tryEnableLazyTypeMetadata(st))
+  if (!IRGen.hasLazyMetadata(st)) {
     emitStructMetadata(*this, st);
+    emitFieldDescriptor(st);
+  }
 
   emitNestedTypeDecls(st->getMembers());
+}
 
-  if (shouldEmitOpaqueTypeMetadataRecord(st)) {
-    emitOpaqueTypeMetadataRecord(st);
-  } else {
-    emitFieldMetadataRecord(st);
-  }  
+void IRGenModule::maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque) {
+  if (IRGen.Opts.EnableAnonymousContextMangledNames) {
+    // If we're emitting anonymous context mangled names for debuggability,
+    // then emit all opaque type descriptors and make them runtime-discoverable
+    // so that remote ast/mirror can recover them.
+    addRuntimeResolvableType(opaque);
+    if (IRGen.hasLazyMetadata(opaque))
+      IRGen.noteUseOfOpaqueTypeDescriptor(opaque);
+    else
+      emitOpaqueTypeDecl(opaque);
+  } else if (!IRGen.hasLazyMetadata(opaque)) {
+    emitOpaqueTypeDecl(opaque);
+  }
 }
 
 namespace {

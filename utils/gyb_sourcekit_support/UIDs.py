@@ -168,8 +168,7 @@ UID_KEYS = [
     KEY('ExpressionTypeList', 'key.expression_type_list'),
     KEY('ExpressionOffset', 'key.expression_offset'),
     KEY('ExpressionLength', 'key.expression_length'),
-    KEY('TypeOffset', 'key.type_offset'),
-    KEY('TypeLength', 'key.type_length'),
+    KEY('ExpressionType', 'key.expression_type'),
 ]
 
 
@@ -323,6 +322,8 @@ UID_KINDS = [
     KIND('DeclExtensionProtocol', 'source.lang.swift.decl.extension.protocol'),
     KIND('DeclAssociatedType', 'source.lang.swift.decl.associatedtype'),
     KIND('RefAssociatedType', 'source.lang.swift.ref.associatedtype'),
+    KIND('DeclOpaqueType', 'source.lang.swift.decl.opaquetype'),
+    KIND('RefOpaqueType', 'source.lang.swift.ref.opaquetype'),
     KIND('DeclTypeAlias', 'source.lang.swift.decl.typealias'),
     KIND('RefTypeAlias', 'source.lang.swift.ref.typealias'),
     KIND('DeclGenericTypeParam', 'source.lang.swift.decl.generic_type_param'),

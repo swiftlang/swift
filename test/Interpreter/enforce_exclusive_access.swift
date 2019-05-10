@@ -1,9 +1,12 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -swift-version 4 %s -o %t/a.out -enforce-exclusivity=checked -Onone
+// RUN: %target-build-swift  -swift-version 4 %s -o %t/a.out -enforce-exclusivity=checked -Onone
 //
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
+
+// Requires explicit swift-version 4.
+// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
 
 // Tests for traps at run time when enforcing exclusive access.
 

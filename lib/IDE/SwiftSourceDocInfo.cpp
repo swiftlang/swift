@@ -79,11 +79,19 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
   if (!D->hasName())
     return false;
 
-  if (Loc == LocToResolve) {
-    CursorInfo.setValueRef(D, CtorTyRef, ExtTyRef, IsRef, Ty, ContainerType);
-    return true;
+  if (Loc != LocToResolve)
+    return false;
+
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    // Handle references to the implicitly generated vars in case statements
+    // matching multiple patterns
+    if (VD->isImplicit()) {
+      if (auto * Parent = VD->getParentVarDecl())
+        D = Parent;
+    }
   }
-  return false;
+  CursorInfo.setValueRef(D, CtorTyRef, ExtTyRef, IsRef, Ty, ContainerType);
+  return true;
 }
 
 bool CursorInfoResolver::tryResolve(ModuleEntity Mod, SourceLoc Loc) {
@@ -110,12 +118,12 @@ bool CursorInfoResolver::tryResolve(Stmt *St) {
   return false;
 }
 
-bool CursorInfoResolver::visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
-                                                 Optional<AccessKind> AccKind,
+bool CursorInfoResolver::visitSubscriptReference(ValueDecl *D,
+                                                 CharSourceRange Range,
+                                                 ReferenceMetaData Data,
                                                  bool IsOpenBracket) {
   // We should treat both open and close brackets equally
-  return visitDeclReference(D, Range, nullptr, nullptr, Type(),
-                    ReferenceMetaData(SemaReferenceKind::SubscriptRef, AccKind));
+  return visitDeclReference(D, Range, nullptr, nullptr, Type(), Data);
 }
 
 ResolvedCursorInfo CursorInfoResolver::resolve(SourceLoc Loc) {
@@ -182,6 +190,8 @@ bool CursorInfoResolver::visitDeclReference(ValueDecl *D,
                                             ReferenceMetaData Data) {
   if (isDone())
     return false;
+  if (Data.isImplicit)
+    return true;
   return !tryResolve(D, CtorTyRef, ExtTyRef, Range.getStart(), /*IsRef=*/true, T);
 }
 
@@ -1415,7 +1425,7 @@ public:
     if (Data.Kind != SemaReferenceKind::DeclRef)
       return;
 
-    if (!isContainedInSelection(CharSourceRange(Start, 0)))
+    if (Data.isImplicit || !isContainedInSelection(CharSourceRange(Start, 0)))
       return;
 
     // If the VD is declared outside of current file, exclude such decl.

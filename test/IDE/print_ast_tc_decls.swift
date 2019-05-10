@@ -172,6 +172,13 @@ struct d0100_FooStruct {
     }
   }
 // PASS_COMMON-NEXT: {{^}}  subscript(i: Int, j: Int) -> Double { get }{{$}}
+  
+  static subscript(i: Int) -> Double {
+    get {
+      return Double(i)
+    }
+  }
+// PASS_COMMON-NEXT: {{^}}  static subscript(i: Int) -> Double { get }{{$}}
 
   func bodyNameVoidFunc1(a: Int, b x: Float) {}
 // PASS_COMMON-NEXT: {{^}}  func bodyNameVoidFunc1(a: Int, b x: Float){{$}}
@@ -234,7 +241,7 @@ struct d0100_FooStruct {
   static func overloadedStaticFunc2(x: Double) -> Int { return 0 }
 // PASS_COMMON-NEXT: {{^}}  static func overloadedStaticFunc2(x: Double) -> Int{{$}}
 }
-// PASS_COMMON-NEXT: {{^}}  init(instanceVar1: Int){{$}}
+// PASS_COMMON-NEXT: {{^}}  init(instanceVar1: Int = 0){{$}}
 // PASS_COMMON-NEXT: {{^}}  init(){{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 
@@ -615,7 +622,7 @@ struct d0200_EscapedIdentifiers {
 // PASS_COMMON-NEXT: {{^}}  @_hasInitialValue var `var`: {{(d0200_EscapedIdentifiers.)?}}`struct`{{$}}
 
   var tupleType: (`var`: Int, `let`: `struct`)
-// PASS_COMMON-NEXT: {{^}}  var tupleType: (`var`: Int, `let`: {{(d0200_EscapedIdentifiers.)?}}`struct`){{$}}
+// PASS_COMMON-NEXT: {{^}}  var tupleType: (var: Int, let: {{(d0200_EscapedIdentifiers.)?}}`struct`){{$}}
 
   var accessors1: Int {
     get { return 0 }
@@ -626,7 +633,7 @@ struct d0200_EscapedIdentifiers {
   static func `static`(protocol: Int) {}
 // PASS_COMMON-NEXT: {{^}}  static func `static`(protocol: Int){{$}}
 
-// PASS_COMMON-NEXT: {{^}}  init(`var`: {{(d0200_EscapedIdentifiers.)?}}`struct`, tupleType: (`var`: Int, `let`: {{(d0200_EscapedIdentifiers.)?}}`struct`)){{$}}
+// PASS_COMMON-NEXT: {{^}}  init(var: {{(d0200_EscapedIdentifiers.)?}}`struct` = {{(d0200_EscapedIdentifiers.)?}}`struct`(), tupleType: (var: Int, let: {{(d0200_EscapedIdentifiers.)?}}`struct`)){{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 }
 
@@ -1375,5 +1382,5 @@ public typealias MyPairI<B> = MyPair<Int, B>
 // PASS_PRINT_AST: public typealias MyPairI<B> = MyPair<Int, B>
 public typealias MyPairAlias<T, U> = MyPair<T, U>
 // PASS_PRINT_AST: public typealias MyPairAlias<T, U> = MyPair<T, U>
-public typealias MyPairAlias2<T: FooProtocol, U> = MyPair<T, U> where U: BarProtocol
-// PASS_PRINT_AST: public typealias MyPairAlias2<T, U> = MyPair<T, U> where T : FooProtocol, U : BarProtocol
+typealias MyPairAlias2<T: FooProtocol, U> = MyPair<T, U> where U: BarProtocol
+// PASS_PRINT_AST: typealias MyPairAlias2<T, U> = MyPair<T, U> where T : FooProtocol, U : BarProtocol

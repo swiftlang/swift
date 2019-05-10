@@ -58,6 +58,85 @@ enum class UnknownReason {
 
   /// Unspecified trap detected.
   Trap,
+
+  /// An operation was applied over operands whose symbolic values were
+  /// constants but were not valid for the operation.
+  InvalidOperandValue,
+
+  /// Encountered an instruction not supported by the interpreter.
+  UnsupportedInstruction,
+
+  /// Encountered a function call where the body of the called function is
+  /// not available.
+  CalleeImplementationUnknown,
+
+  /// Attempted to load from/store into a SIL value that was not tracked by
+  /// the interpreter.
+  UntrackedSILValue,
+
+  /// Attempted to find a concrete protocol conformance for a witness method
+  /// and failed.
+  UnknownWitnessMethodConformance,
+
+  /// Attempted to determine the SIL function of a witness method (based on a
+  /// concrete protocol conformance) and failed.
+  UnresolvableWitnessMethod,
+
+  /// The value of a top-level variable cannot be determined to be a constant.
+  /// This is only relevant in the backward evaluation mode, which is used by
+  /// #assert.
+  NotTopLevelConstant,
+
+  /// A top-level value has multiple writers. This is only relevant in the
+  /// non-flow-sensitive evaluation mode,  which is used by #assert.
+  MutipleTopLevelWriters,
+
+  /// Indicates the return value of an instruction that was not evaluated during
+  /// interpretation.
+  ReturnedByUnevaluatedInstruction,
+
+  /// Indicates that the value was possibly modified by an instruction
+  /// that was not evaluated during the interpretation.
+  MutatedByUnevaluatedInstruction,
+};
+
+/// An abstract class that exposes functions for allocating symbolic values.
+/// The implementors of this class have to determine where to allocate them and
+/// and manage the lifetime of the allocated symbolic values.
+class SymbolicValueAllocator {
+public:
+  virtual ~SymbolicValueAllocator() {}
+
+  /// Allocate raw bytes.
+  /// \param byteSize number of bytes to allocate.
+  /// \param alignment alignment for the allocated bytes.
+  virtual void *allocate(unsigned long byteSize, unsigned alignment) = 0;
+
+  /// Allocate storage for a given number of elements of a specific type
+  /// provided as a template parameter. Precondition: \c T must have an
+  /// accesible zero argument constructor.
+  /// \param numElts number of elements of the type to allocate.
+  template <typename T> T *allocate(unsigned numElts) {
+    T *res = (T *)allocate(sizeof(T) * numElts, alignof(T));
+    for (unsigned i = 0; i != numElts; ++i)
+      new (res + i) T();
+    return res;
+  }
+};
+
+/// A class that allocates symbolic values in a local bump allocator. The
+/// lifetime of the bump allocator is same as the lifetime of \c this object.
+class SymbolicValueBumpAllocator : public SymbolicValueAllocator {
+private:
+  llvm::BumpPtrAllocator bumpAllocator;
+
+public:
+  SymbolicValueBumpAllocator() {}
+  ~SymbolicValueBumpAllocator() {}
+
+  void *allocate(unsigned long byteSize, unsigned alignment) {
+    return bumpAllocator.Allocate(byteSize, alignment);
+  }
 };
 
 /// This is the symbolic value tracked for each SILValue in a scope.  We
@@ -225,7 +304,7 @@ public:
 
   static SymbolicValue getUnknown(SILNode *node, UnknownReason reason,
                                   llvm::ArrayRef<SourceLoc> callStack,
-                                  ASTContext &astContext);
+                                  SymbolicValueAllocator &allocator);
 
   /// Return true if this represents an unknown result.
   bool isUnknown() const { return getKind() == Unknown; }
@@ -272,22 +351,22 @@ public:
 
   static SymbolicValue getInteger(int64_t value, unsigned bitWidth);
   static SymbolicValue getInteger(const APInt &value,
-                                  ASTContext &astContext);
+                                  SymbolicValueAllocator &allocator);
 
   APInt getIntegerValue() const;
   unsigned getIntegerValueBitWidth() const;
 
   /// Returns a SymbolicValue representing a UTF-8 encoded string.
   static SymbolicValue getString(StringRef string,
-                                 ASTContext &astContext);
+                                 SymbolicValueAllocator &allocator);
 
   /// Returns the UTF-8 encoded string underlying a SymbolicValue.
   StringRef getStringValue() const;
 
   /// This returns an aggregate value with the specified elements in it.  This
-  /// copies the elements into the specified ASTContext.
+  /// copies the elements into the specified Allocator.
   static SymbolicValue getAggregate(ArrayRef<SymbolicValue> elements,
-                                    ASTContext &astContext);
+                                    SymbolicValueAllocator &allocator);
 
   ArrayRef<SymbolicValue> getAggregateValue() const;
 
@@ -304,7 +383,7 @@ public:
   /// `payload` must be a constant.
   static SymbolicValue getEnumWithPayload(EnumElementDecl *decl,
                                           SymbolicValue payload,
-                                          ASTContext &astContext);
+                                          SymbolicValueAllocator &allocator);
 
   EnumElementDecl *getEnumValue() const;
 
@@ -322,7 +401,7 @@ public:
   /// indexed by a path.
   static SymbolicValue getAddress(SymbolicValueMemoryObject *memoryObject,
                                   ArrayRef<unsigned> indices,
-                                  ASTContext &astContext);
+                                  SymbolicValueAllocator &allocator);
 
   /// Return the memory object of this reference along with any access path
   /// indices involved.
@@ -345,9 +424,11 @@ public:
   /// reason, we fall back to using the specified location.
   void emitUnknownDiagnosticNotes(SILLocation fallbackLoc);
 
-  /// Clone this SymbolicValue into the specified ASTContext and return the new
-  /// version.  This only works for valid constants.
-  SymbolicValue cloneInto(ASTContext &astContext) const;
+  bool isUnknownDueToUnevaluatedInstructions();
+
+  /// Clone this SymbolicValue into the specified Allocator and return the new
+  /// version. This only works for valid constants.
+  SymbolicValue cloneInto(SymbolicValueAllocator &allocator) const;
 
   void print(llvm::raw_ostream &os, unsigned indent = 0) const;
   void dump() const;
@@ -374,7 +455,7 @@ struct SymbolicValueMemoryObject {
 
   /// Create a new memory object whose overall type is as specified.
   static SymbolicValueMemoryObject *create(Type type, SymbolicValue value,
-                                           ASTContext &astContext);
+                                           SymbolicValueAllocator &allocator);
 
   /// Given that this memory object contains an aggregate value like
   /// {{1, 2}, 3}, and given an access path like [0,1], return the indexed
@@ -392,7 +473,8 @@ struct SymbolicValueMemoryObject {
   ///
   /// Precondition: The access path must be valid for this memory object's type.
   void setIndexedElement(ArrayRef<unsigned> accessPath,
-                         SymbolicValue newElement, ASTContext &astCtx);
+                         SymbolicValue newElement,
+                         SymbolicValueAllocator &allocator);
 
 private:
   const Type type;

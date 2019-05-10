@@ -254,26 +254,21 @@ unsigned FixedTypeInfo::getSpareBitExtraInhabitantCount() const {
                   unsigned(ValueWitnessFlags::MaxNumExtraInhabitants));
 }
 
-void FixedTypeInfo::applyFixedSpareBitsMask(SpareBitVector &mask,
-                                            const SpareBitVector &spareBits) {
+void FixedTypeInfo::applyFixedSpareBitsMask(SpareBitVector &mask) const {
   // If the mask is no longer than the stored spare bits, we can just
   // apply the stored spare bits.
-  if (mask.size() <= spareBits.size()) {
+  if (mask.size() <= SpareBits.size()) {
     // Grow the mask out if necessary; the tail padding is all spare bits.
-    mask.extendWithSetBits(spareBits.size());
-    mask &= spareBits;
+    mask.extendWithSetBits(SpareBits.size());
+    mask &= SpareBits;
+    return;
+  }
 
   // Otherwise, we have to grow out the stored spare bits before we
   // can intersect.
-  } else {
-    auto paddedSpareBits = spareBits;
-    paddedSpareBits.extendWithSetBits(mask.size());
-    mask &= paddedSpareBits;
-  }
-}
-
-void FixedTypeInfo::applyFixedSpareBitsMask(SpareBitVector &mask) const {
-  return applyFixedSpareBitsMask(mask, SpareBits);
+  auto paddedSpareBits = SpareBits;
+  paddedSpareBits.extendWithSetBits(mask.size());
+  mask &= paddedSpareBits;
 }
 
 APInt
@@ -1147,45 +1142,19 @@ static bool doesPlatformUseLegacyLayouts(StringRef platformName,
   return false;
 }
 
-// The following Apple platforms ship an Objective-C runtime supporting
-// the class metadata update hook:
-//
-// - macOS 10.14.4
-// - iOS 12.2
-// - tvOS 12.2
-// - watchOS 5.2
-static bool doesPlatformSupportObjCMetadataUpdateCallback(
-    const llvm::Triple &triple) {
-  if (triple.isMacOSX())
-    return !triple.isMacOSXVersionLT(10, 14, 4);
-  if (triple.isiOS()) // also returns true on tvOS
-    return !triple.isOSVersionLT(12, 2);
-  if (triple.isWatchOS())
-    return !triple.isOSVersionLT(5, 2);
-
-  return false;
-}
-
 TypeConverter::TypeConverter(IRGenModule &IGM)
   : IGM(IGM),
     FirstType(invalidTypeInfo()) {
-  // FIXME: In LLDB, everything is completely fragile, so that IRGen can query
-  // the size of resilient types. Of course this is not the right long term
-  // solution, because it won't work once the swiftmodule file is not in
-  // sync with the binary module. Once LLDB can calculate type layouts at
-  // runtime (using remote mirrors or some other mechanism), we can remove this.
-  if (IGM.IRGen.Opts.EnableResilienceBypass)
-    LoweringMode = Mode::CompletelyFragile;
-
-  const auto &Triple = IGM.Context.LangOpts.Target;
-
-  SupportsObjCMetadataUpdateCallback =
-    ::doesPlatformSupportObjCMetadataUpdateCallback(Triple);
+  // Whether the Objective-C runtime is guaranteed to invoke the class
+  // metadata update callback when realizing a Swift class referenced from
+  // Objective-C.
+  bool supportsObjCMetadataUpdateCallback =
+    IGM.Context.LangOpts.doesTargetSupportObjCMetadataUpdateCallback();
 
   // If our deployment target allows us to rely on the metadata update
   // callback being called, we don't have to emit a legacy layout for a
   // class with resiliently-sized fields.
-  if (SupportsObjCMetadataUpdateCallback)
+  if (supportsObjCMetadataUpdateCallback)
     return;
 
   // We have a bunch of -parse-stdlib tests that pass a -target in the test
@@ -1199,6 +1168,8 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
 
   StringRef path = IGM.IRGen.Opts.ReadLegacyTypeInfoPath;
   if (path.empty()) {
+    const auto &Triple = IGM.Context.LangOpts.Target;
+
     // If the flag was not explicitly specified, look for a file in a
     // platform-specific location, if this platform is known to require
     // one.
@@ -1433,13 +1404,26 @@ const TypeInfo &IRGenFunction::getTypeInfo(SILType T) {
 }
 
 /// Return the SIL-lowering of the given type.
-SILType IRGenModule::getLoweredType(AbstractionPattern orig, Type subst) {
-  return getSILTypes().getLoweredType(orig, subst);
+SILType IRGenModule::getLoweredType(AbstractionPattern orig, Type subst) const {
+  return getSILTypes().getLoweredType(orig, subst,
+                                      ResilienceExpansion::Maximal);
 }
 
 /// Return the SIL-lowering of the given type.
-SILType IRGenModule::getLoweredType(Type subst) {
-  return getSILTypes().getLoweredType(subst);
+SILType IRGenModule::getLoweredType(Type subst) const {
+  return getSILTypes().getLoweredType(subst,
+                                      ResilienceExpansion::Maximal);
+}
+
+/// Return the SIL-lowering of the given type.
+const Lowering::TypeLowering &IRGenModule::getTypeLowering(SILType type) const {
+  return getSILTypes().getTypeLowering(type,
+                                       ResilienceExpansion::Maximal);
+}
+
+bool IRGenModule::isTypeABIAccessible(SILType type) const {
+  return getSILModule().isTypeABIAccessible(type,
+                                            ResilienceExpansion::Maximal);
 }
 
 /// Get a pointer to the storage type for the given type.  Note that,
@@ -1456,7 +1440,7 @@ llvm::PointerType *IRGenModule::getStoragePointerTypeForLowered(CanType T) {
 }
 
 llvm::Type *IRGenModule::getStorageTypeForUnlowered(Type subst) {
-  return getStorageType(getSILTypes().getLoweredType(subst));
+  return getStorageType(getLoweredType(subst));
 }
 
 llvm::Type *IRGenModule::getStorageType(SILType T) {
@@ -1486,7 +1470,7 @@ IRGenModule::getTypeInfoForUnlowered(AbstractionPattern orig, Type subst) {
 /// have yet undergone SIL type lowering.
 const TypeInfo &
 IRGenModule::getTypeInfoForUnlowered(AbstractionPattern orig, CanType subst) {
-  return getTypeInfo(getSILTypes().getLoweredType(orig, subst));
+  return getTypeInfo(getLoweredType(orig, subst));
 }
 
 /// Get the fragile type information for the given type, which is known
@@ -1772,6 +1756,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
   case TypeKind::NestedArchetype:
+  case TypeKind::OpaqueTypeArchetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));
   case TypeKind::Class:
   case TypeKind::Enum:
@@ -2169,32 +2154,27 @@ SpareBitVector IRGenModule::getSpareBitsForType(llvm::Type *scalarTy, Size size)
   if (it != SpareBitsForTypes.end())
     return it->second;
 
-  assert(DataLayout.getTypeAllocSizeInBits(scalarTy) <= size.getValueInBits() &&
+  assert(!isa<llvm::StructType>(scalarTy));
+
+  unsigned allocBits = size.getValueInBits();
+  assert(allocBits >= DataLayout.getTypeAllocSizeInBits(scalarTy) &&
          "using a size that's smaller than LLVM's alloc size?");
-  
-  {
-    // FIXME: Currently we only implement spare bits for primitive integer
-    // types.
-    assert(!isa<llvm::StructType>(scalarTy));
 
-    auto *intTy = dyn_cast<llvm::IntegerType>(scalarTy);
-    if (!intTy)
-      goto no_spare_bits;
+  // Allocate a new cache entry.
+  SpareBitVector &result = SpareBitsForTypes[scalarTy];
 
-    // Round Integer-Of-Unusual-Size types up to their allocation size.
-    unsigned allocBits = size.getValueInBits();
-    assert(allocBits >= intTy->getBitWidth());
-        
-    // FIXME: Endianness.
-    SpareBitVector &result = SpareBitsForTypes[scalarTy];
-    result.appendClearBits(intTy->getBitWidth());
-    result.extendWithSetBits(allocBits);
+  // FIXME: Currently we only implement spare bits for primitive integer
+  // types.
+  if (auto *intTy = dyn_cast<llvm::IntegerType>(scalarTy)) {
+    // Pad integers with spare bits up to their allocation size.
+    auto v = llvm::APInt::getBitsSetFrom(allocBits, intTy->getBitWidth());
+    // FIXME: byte swap v on big-endian platforms.
+    result = SpareBitVector::fromAPInt(v);
     return result;
   }
-  
-no_spare_bits:
-  SpareBitVector &result = SpareBitsForTypes[scalarTy];
-  result.appendClearBits(size.getValueInBits());
+
+  // No spare bits.
+  result = SpareBitVector::getConstant(allocBits, false);
   return result;
 }
 

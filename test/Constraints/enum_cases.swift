@@ -19,17 +19,17 @@ enum G_E<T> {
 let arr: [String] = []
 let _ = arr.map(E.foo) // Ok
 let _ = arr.map(E.bar) // Ok
-let _ = arr.map(E.two) // expected-error {{cannot invoke 'map' with an argument list of type '((Int, Int) -> E)'}}
+let _ = arr.map(E.two) // expected-error {{cannot invoke 'map' with an argument list of type '(@escaping (Int, Int) -> E)'}}
 // expected-note@-1{{expected an argument list of type '((Self.Element) throws -> T)'}}
 
-let _ = arr.map(E.tuple) // expected-error {{cannot invoke 'map' with an argument list of type '(((x: Int, y: Int)) -> E)'}}
+let _ = arr.map(E.tuple) // expected-error {{cannot invoke 'map' with an argument list of type '(@escaping ((x: Int, y: Int)) -> E)'}}
 // expected-note@-1{{expected an argument list of type '((Self.Element) throws -> T)'}}
 
 let _ = arr.map(G_E<String>.foo) // Ok
 let _ = arr.map(G_E<String>.bar) // Ok
-let _ = arr.map(G_E<String>.two) // expected-error {{cannot invoke 'map' with an argument list of type '((String, String) -> G_E<String>)'}}
+let _ = arr.map(G_E<String>.two) // expected-error {{cannot invoke 'map' with an argument list of type '(@escaping (String, String) -> G_E<String>)'}}
 // expected-note@-1{{expected an argument list of type '((Self.Element) throws -> T)'}}
-let _ = arr.map(G_E<Int>.tuple) // expected-error {{cannot invoke 'map' with an argument list of type '(((x: Int, y: Int)) -> G_E<Int>)'}}
+let _ = arr.map(G_E<Int>.tuple) // expected-error {{cannot invoke 'map' with an argument list of type '(@escaping ((x: Int, y: Int)) -> G_E<Int>)'}}
 // expected-note@-1{{expected an argument list of type '((Self.Element) throws -> T)'}}
 
 let _ = E.foo("hello") // expected-error {{missing argument label 'bar:' in call}}
@@ -122,5 +122,36 @@ func rdar34583132() {
     // expected-error@-1 {{enum type 'E' has no case 'timeout'; did you mean 'timeOut'}}
       fatalError()
     }
+  }
+}
+
+func rdar_49159472() {
+  struct A {}
+  struct B {}
+  struct C {}
+
+  enum E {
+  case foo(a: A, b: B?)
+
+    var foo: C? {
+      return nil
+    }
+  }
+
+  class Test {
+    var e: E
+
+    init(_ e: E) {
+      self.e = e
+    }
+
+    func bar() {
+      e = .foo(a: A(), b: nil)   // Ok
+      e = E.foo(a: A(), b: nil)  // Ok
+      baz(e: .foo(a: A(), b: nil))  // Ok
+      baz(e: E.foo(a: A(), b: nil)) // Ok
+    }
+
+    func baz(e: E) {}
   }
 }

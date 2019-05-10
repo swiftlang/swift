@@ -31,6 +31,7 @@
 #include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -59,6 +60,24 @@ using swift::index::SymbolRoleSet;
 
 #define REFACTORING(KIND, NAME, ID) static UIdent Kind##Refactoring##KIND("source.refactoring.kind."#ID);
 #include "swift/IDE/RefactoringKinds.def"
+
+static UIdent Attr_IBAction("source.decl.attribute.ibaction");
+static UIdent Attr_IBOutlet("source.decl.attribute.iboutlet");
+static UIdent Attr_IBDesignable("source.decl.attribute.ibdesignable");
+static UIdent Attr_IBInspectable("source.decl.attribute.ibinspectable");
+static UIdent Attr_GKInspectable("source.decl.attribute.gkinspectable");
+static UIdent Attr_Objc("source.decl.attribute.objc");
+static UIdent Attr_ObjcNamed("source.decl.attribute.objc.name");
+static UIdent Attr_Private("source.decl.attribute.private");
+static UIdent Attr_FilePrivate("source.decl.attribute.fileprivate");
+static UIdent Attr_Internal("source.decl.attribute.internal");
+static UIdent Attr_Public("source.decl.attribute.public");
+static UIdent Attr_Open("source.decl.attribute.open");
+static UIdent Attr_Setter_Private("source.decl.attribute.setter_access.private");
+static UIdent Attr_Setter_FilePrivate("source.decl.attribute.setter_access.fileprivate");
+static UIdent Attr_Setter_Internal("source.decl.attribute.setter_access.internal");
+static UIdent Attr_Setter_Public("source.decl.attribute.setter_access.public");
+static UIdent Attr_Setter_Open("source.decl.attribute.setter_access.open");
 
 std::unique_ptr<LangSupport>
 SourceKit::createSwiftLangSupport(SourceKit::Context &SKCtx) {
@@ -99,6 +118,7 @@ public:
   UID_FOR(Constructor)
   UID_FOR(Destructor)
   UID_FOR(Subscript)
+  UID_FOR(OpaqueType)
 #undef UID_FOR
 };
 
@@ -262,6 +282,10 @@ UIdent SwiftLangSupport::getUIDForAccessor(const ValueDecl *D,
 
 SourceKit::UIdent SwiftLangSupport::getUIDForModuleRef() {
   return KindRefModule;
+}
+
+SourceKit::UIdent SwiftLangSupport::getUIDForObjCAttr() {
+  return Attr_Objc;
 }
 
 UIdent SwiftLangSupport::getUIDForRefactoringKind(ide::RefactoringKind Kind){
@@ -639,28 +663,21 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
   // Check special-case names first.
   switch (Attr->getKind()) {
     case DAK_IBAction: {
-      static UIdent Attr_IBAction("source.decl.attribute.ibaction");
       return Attr_IBAction;
     }
     case DAK_IBOutlet: {
-      static UIdent Attr_IBOutlet("source.decl.attribute.iboutlet");
       return Attr_IBOutlet;
     }
     case DAK_IBDesignable: {
-      static UIdent Attr_IBDesignable("source.decl.attribute.ibdesignable");
       return Attr_IBDesignable;
     }
     case DAK_IBInspectable: {
-      static UIdent Attr_IBInspectable("source.decl.attribute.ibinspectable");
       return Attr_IBInspectable;
     }
     case DAK_GKInspectable: {
-      static UIdent Attr_GKInspectable("source.decl.attribute.gkinspectable");
       return Attr_GKInspectable;
     }
     case DAK_ObjC: {
-      static UIdent Attr_Objc("source.decl.attribute.objc");
-      static UIdent Attr_ObjcNamed("source.decl.attribute.objc.name");
       if (cast<ObjCAttr>(Attr)->hasName()) {
         return Attr_ObjcNamed;
       } else {
@@ -668,12 +685,6 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
       }
     }
     case DAK_AccessControl: {
-      static UIdent Attr_Private("source.decl.attribute.private");
-      static UIdent Attr_FilePrivate("source.decl.attribute.fileprivate");
-      static UIdent Attr_Internal("source.decl.attribute.internal");
-      static UIdent Attr_Public("source.decl.attribute.public");
-      static UIdent Attr_Open("source.decl.attribute.open");
-
       switch (cast<AbstractAccessControlAttr>(Attr)->getAccess()) {
         case AccessLevel::Private:
           return Attr_Private;
@@ -688,23 +699,17 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
       }
     }
     case DAK_SetterAccess: {
-      static UIdent Attr_Private("source.decl.attribute.setter_access.private");
-      static UIdent Attr_FilePrivate("source.decl.attribute.setter_access.fileprivate");
-      static UIdent Attr_Internal("source.decl.attribute.setter_access.internal");
-      static UIdent Attr_Public("source.decl.attribute.setter_access.public");
-      static UIdent Attr_Open("source.decl.attribute.setter_access.open");
-
       switch (cast<AbstractAccessControlAttr>(Attr)->getAccess()) {
         case AccessLevel::Private:
-          return Attr_Private;
+          return Attr_Setter_Private;
         case AccessLevel::FilePrivate:
-          return Attr_FilePrivate;
+          return Attr_Setter_FilePrivate;
         case AccessLevel::Internal:
-          return Attr_Internal;
+          return Attr_Setter_Internal;
         case AccessLevel::Public:
-          return Attr_Public;
+          return Attr_Setter_Public;
         case AccessLevel::Open:
-          return Attr_Open;
+          return Attr_Setter_Open;
       }
     }
 
@@ -845,18 +850,28 @@ std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
 
   return InputPath;
 #else
-  char full_path[MAX_PATH];
+  wchar_t full_path[MAX_PATH] = {0};
+  llvm::SmallVector<llvm::UTF16, 50> utf16Path;
+  llvm::convertUTF8ToUTF16String(InputPath.c_str(), utf16Path);
 
-  HANDLE fileHandle = CreateFileA(
-      InputPath.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING,
-      FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+  HANDLE fileHandle = CreateFileW(
+      (LPCWSTR)utf16Path.data(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+      OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
 
   if (fileHandle == INVALID_HANDLE_VALUE)
     return InputPath;
 
-  DWORD success = GetFinalPathNameByHandleA(
-      fileHandle, full_path, sizeof(full_path), FILE_NAME_NORMALIZED);
-  return (success ? full_path : InputPath);
+  DWORD numChars = GetFinalPathNameByHandleW(fileHandle, full_path, MAX_PATH,
+                                            FILE_NAME_NORMALIZED);
+  CloseHandle(fileHandle);
+  std::string utf8Path;
+  if (numChars > 0 && numChars <= MAX_PATH) {
+    llvm::ArrayRef<char> pathRef((const char *)full_path,
+                                 (const char *)(full_path + numChars));
+    return llvm::convertUTF16ToUTF8String(pathRef, utf8Path) ? utf8Path
+                                                             : InputPath;
+  }
+  return InputPath;
 #endif
 }
 

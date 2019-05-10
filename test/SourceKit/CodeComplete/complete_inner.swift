@@ -170,7 +170,7 @@ func test005(x: FooBar) {
 // RUN: %complete-test %s -group=none -no-inner-results -inner-operators -tok=FOOBAR_INSTANCE_POSTFIX | %FileCheck %s -check-prefix=FOOBAR_INSTANCE_POSTFIX_OP
 // FOOBAR_INSTANCE_POSTFIX_OP: .
 // FIXME: We should probably just have '[' here - rdar://22702955
-// FOOBAR_INSTANCE_POSTFIX_OP: [Foo]
+// FOOBAR_INSTANCE_POSTFIX_OP: [x: Foo]
 
 func test005(x: Base?) {
   x#^OPTIONAL_POSTFIX^#

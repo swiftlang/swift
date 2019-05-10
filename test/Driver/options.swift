@@ -27,7 +27,7 @@
 
 // RUN: not %swiftc_driver -import-objc-header fake.h -emit-parseable-module-interface %s 2>&1 | %FileCheck -check-prefix=BRIDGING_HEADER_SWIFTINTERFACE %s
 // RUN: not %swiftc_driver -import-objc-header fake.h -emit-parseable-module-interface-path fake.swiftinterface %s 2>&1 | %FileCheck -check-prefix=BRIDGING_HEADER_SWIFTINTERFACE %s
-// BRIDGING_HEADER_SWIFTINTERFACE: error: using bridging headers with parseable module interfaces is unsupported
+// BRIDGING_HEADER_SWIFTINTERFACE: error: using bridging headers with module interfaces is unsupported
 
 // RUN: %swift_driver -### | %FileCheck -check-prefix=DEFAULT_REPL %s
 // DEFAULT_REPL: -repl
@@ -35,7 +35,7 @@
 // DEFAULT_EXEC_ERR: error: no input files
 // RUN: %swiftc_driver %s -### 2>&1 | %FileCheck -check-prefix=DEFAULT_EXEC  %s
 // DEFAULT_EXEC: -c
-// DEFAULT_EXEC: ld
+// DEFAULT_EXEC: {{ld|clang\+\+}}
 
 // RUN: %swift_driver -repl -### 2>&1 | %FileCheck -check-prefix=REPL %s
 // REPL: warning: unnecessary option '-repl'

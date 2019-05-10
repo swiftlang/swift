@@ -111,7 +111,7 @@ func protocol_concrete_casts(_ p1: P1, p2: P2, p12: P1 & P2) {
 
   _ = p1 as! P1 & P2
 
-  _ = p2 as! S1
+  _ = p2 as! S1 // expected-warning {{cast from 'P2' to unrelated type 'S1' always fails}}
 
   _ = p12 as! S1
   _ = p12 as! S2
@@ -126,7 +126,7 @@ func protocol_concrete_casts(_ p1: P1, p2: P2, p12: P1 & P2) {
 
   var _:Bool = p1 is P1 & P2
 
-  var _:Bool = p2 is S1
+  var _:Bool = p2 is S1 // expected-warning {{cast from 'P2' to unrelated type 'S1' always fails}}
 
   var _:Bool = p12 is S1
   var _:Bool = p12 is S2

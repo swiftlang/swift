@@ -48,6 +48,9 @@ enum class OverloadChoiceKind : int {
   KeyPathApplication,
   /// The member is looked up using @dynamicMemberLookup.
   DynamicMemberLookup,
+  /// The member with KeyPath parameter is looked up using
+  /// @dynamicMemberLookup.
+  KeyPathDynamicMemberLookup,
   /// The overload choice selects a particular declaration that
   /// was found by bridging the base value type to its Objective-C
   /// class type.
@@ -97,21 +100,26 @@ class OverloadChoice {
   ///
   llvm::PointerUnion<ValueDecl*, OverloadChoiceKindWithTupleIndex> DeclOrKind;
 
+  /// If this OverloadChoice represents a DynamicMemberLookup result,
+  /// then this holds the identifier for the original member being
+  /// looked up, as well as 1 bit tag which identifies whether this
+  /// choice represents a key-path based dynamic lookup.
+  llvm::PointerIntPair<Identifier, 1, unsigned> DynamicMember;
+
   /// This holds the kind of function reference (Unapplied, SingleApply,
-  /// DoubleApply, Compound).  If this OverloadChoice represents a
-  /// DynamicMemberLookup result, then this holds the identifier for the
-  /// original member being looked up.
-  llvm::PointerIntPair<Identifier, 2, FunctionRefKind> DynamicNameAndFRK;
-  
+  /// DoubleApply, Compound).
+  /// FIXME: This needs two bits. Can we pack them somewhere?
+  FunctionRefKind TheFunctionRefKind;
+
 public:
   OverloadChoice()
     : BaseAndDeclKind(nullptr, 0), DeclOrKind(),
-      DynamicNameAndFRK(Identifier(), FunctionRefKind::Unapplied) {}
+      TheFunctionRefKind(FunctionRefKind::Unapplied) {}
 
   OverloadChoice(Type base, ValueDecl *value,
                  FunctionRefKind functionRefKind)
     : BaseAndDeclKind(base, 0),
-      DynamicNameAndFRK(Identifier(), functionRefKind) {
+      TheFunctionRefKind(functionRefKind) {
     assert(!base || !base->hasTypeParameter());
     assert((reinterpret_cast<uintptr_t>(value) & (uintptr_t)0x03) == 0 &&
            "Badly aligned decl");
@@ -121,7 +129,7 @@ public:
 
   OverloadChoice(Type base, OverloadChoiceKind kind)
       : BaseAndDeclKind(base, 0), DeclOrKind(uint32_t(kind)),
-        DynamicNameAndFRK(Identifier(), FunctionRefKind::Unapplied) {
+        TheFunctionRefKind(FunctionRefKind::Unapplied) {
     assert(base && "Must have a base type for overload choice");
     assert(!base->hasTypeParameter());
     assert(kind != OverloadChoiceKind::Decl &&
@@ -134,7 +142,7 @@ public:
   OverloadChoice(Type base, unsigned index)
       : BaseAndDeclKind(base, 0),
         DeclOrKind(uint32_t(OverloadChoiceKind::TupleIndex)+index),
-        DynamicNameAndFRK(Identifier(), FunctionRefKind::Unapplied) {
+        TheFunctionRefKind(FunctionRefKind::Unapplied) {
     assert(base->getRValueType()->is<TupleType>() && "Must have tuple type");
   }
 
@@ -142,7 +150,7 @@ public:
     return BaseAndDeclKind.getPointer().isNull() &&
            BaseAndDeclKind.getInt() == 0 &&
            DeclOrKind.isNull() &&
-           DynamicNameAndFRK.getInt() == FunctionRefKind::Unapplied;
+           TheFunctionRefKind == FunctionRefKind::Unapplied;
   }
 
   /// Retrieve an overload choice for a declaration that was found via
@@ -153,7 +161,7 @@ public:
     result.BaseAndDeclKind.setPointer(base);
     result.BaseAndDeclKind.setInt(IsDeclViaDynamic);
     result.DeclOrKind = value;
-    result.DynamicNameAndFRK.setInt(functionRefKind);
+    result.TheFunctionRefKind = functionRefKind;
     return result;
   }
 
@@ -165,7 +173,7 @@ public:
     result.BaseAndDeclKind.setPointer(base);
     result.BaseAndDeclKind.setInt(IsDeclViaBridge);
     result.DeclOrKind = value;
-    result.DynamicNameAndFRK.setInt(functionRefKind);
+    result.TheFunctionRefKind = functionRefKind;
     return result;
   }
 
@@ -178,7 +186,7 @@ public:
     result.BaseAndDeclKind.setPointer(base);
     result.BaseAndDeclKind.setInt(IsDeclViaUnwrappedOptional);
     result.DeclOrKind = value;
-    result.DynamicNameAndFRK.setInt(functionRefKind);
+    result.TheFunctionRefKind = functionRefKind;
     return result;
   }
   
@@ -186,12 +194,14 @@ public:
   /// dynamic member lookup. The `ValueDecl` is a `subscript(dynamicMember:)`
   /// method.
   static OverloadChoice getDynamicMemberLookup(Type base, ValueDecl *value,
-                                               Identifier name) {
+                                               Identifier name,
+                                               bool isKeyPathBased) {
     OverloadChoice result;
     result.BaseAndDeclKind.setPointer(base);
     result.DeclOrKind = value;
-    result.DynamicNameAndFRK.setPointer(name);
-    result.DynamicNameAndFRK.setInt(FunctionRefKind::SingleApply);
+    result.DynamicMember.setPointer(name);
+    result.DynamicMember.setInt(isKeyPathBased);
+    result.TheFunctionRefKind = FunctionRefKind::SingleApply;
     return result;
   }
 
@@ -202,8 +212,11 @@ public:
   
   /// Determines the kind of overload choice this is.
   OverloadChoiceKind getKind() const {
-    if (!DynamicNameAndFRK.getPointer().empty())
-      return OverloadChoiceKind::DynamicMemberLookup;
+    if (!DynamicMember.getPointer().empty()) {
+      return DynamicMember.getInt()
+                 ? OverloadChoiceKind::KeyPathDynamicMemberLookup
+                 : OverloadChoiceKind::DynamicMemberLookup;
+    }
     
     if (DeclOrKind.is<ValueDecl*>()) {
       switch (BaseAndDeclKind.getInt()) {
@@ -255,7 +268,7 @@ public:
 
   FunctionRefKind getFunctionRefKind() const {
     assert(isDecl() && "only makes sense for declaration choices");
-    return DynamicNameAndFRK.getInt();
+    return TheFunctionRefKind;
   }
 };
 

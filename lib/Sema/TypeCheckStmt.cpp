@@ -17,6 +17,7 @@
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
+#include "ConstraintSystem.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
@@ -49,6 +50,26 @@ using namespace swift;
 
 #define DEBUG_TYPE "TypeCheckStmt"
 
+#ifndef NDEBUG
+/// Determine whether the given context is for the backing property of a
+/// property delegate.
+static bool isPropertyDelegateBackingInitContext(DeclContext *dc) {
+  auto initContext = dyn_cast<Initializer>(dc);
+  if (!initContext) return false;
+
+  auto patternInitContext = dyn_cast<PatternBindingInitializer>(initContext);
+  if (!patternInitContext) return false;
+
+  auto binding = patternInitContext->getBinding();
+  if (!binding) return false;
+
+  auto singleVar = binding->getSingleVar();
+  if (!singleVar) return false;
+
+  return singleVar->getOriginalDelegatedProperty() != nullptr;
+}
+#endif
+
 namespace {
   class ContextualizeClosures : public ASTWalker {
     DeclContext *ParentDC;
@@ -58,13 +79,6 @@ namespace {
     ContextualizeClosures(DeclContext *parent,
                           unsigned nextDiscriminator = 0)
       : ParentDC(parent), NextDiscriminator(nextDiscriminator) {}
-
-    /// Change the context we're contextualizing to.  This is
-    /// basically only reasonable when processing all the different
-    /// top-level code declarations.
-    void setContext(TopLevelCodeDecl *parent) {
-      ParentDC = parent;
-    }
 
     bool hasAutoClosures() const {
       return NextDiscriminator != 0;
@@ -116,8 +130,9 @@ namespace {
               ParentDC->getContextKind() != DeclContextKind::TopLevelCodeDecl) {
             // If a closure is nested within an auto closure, we'll need to update
             // its parent to the auto closure parent.
-            assert(ParentDC->getContextKind() ==
-                   DeclContextKind::AbstractClosureExpr &&
+            assert((ParentDC->getContextKind() ==
+                      DeclContextKind::AbstractClosureExpr ||
+                    isPropertyDelegateBackingInitContext(ParentDC)) &&
                    "Incorrect parent decl context for closure");
             CE->setParent(ParentDC);
           }
@@ -216,15 +231,10 @@ bool TypeChecker::contextualizeInitializer(Initializer *DC, Expr *E) {
 }
 
 void TypeChecker::contextualizeTopLevelCode(TopLevelContext &TLC,
-                                            ArrayRef<Decl*> topLevel) {
+                                            TopLevelCodeDecl *TLCD) {
   unsigned nextDiscriminator = TLC.NextAutoClosureDiscriminator;
-  ContextualizeClosures CC(nullptr, nextDiscriminator);
-  for (auto decl : topLevel) {
-    auto topLevelCode = dyn_cast<TopLevelCodeDecl>(decl);
-    if (!topLevelCode) continue;
-    CC.setContext(topLevelCode);
-    topLevelCode->getBody()->walk(CC);
-  }
+  ContextualizeClosures CC(TLCD, nextDiscriminator);
+  TLCD->getBody()->walk(CC);
   assert(nextDiscriminator == TLC.NextAutoClosureDiscriminator &&
          "reentrant/concurrent invocation of contextualizeTopLevelCode?");
   TLC.NextAutoClosureDiscriminator = CC.NextDiscriminator;
@@ -437,7 +447,7 @@ public:
     // In an initializer, the only expression allowed is "nil", which indicates
     // failure from a failable initializer.
     if (auto ctor = dyn_cast_or_null<ConstructorDecl>(
-                      TheFunc->getAbstractFunctionDecl())) {
+                                          TheFunc->getAbstractFunctionDecl())) {
       // The only valid return expression in an initializer is the literal
       // 'nil'.
       auto nilExpr = dyn_cast<NilLiteralExpr>(E->getSemanticsProvidingExpr());
@@ -463,20 +473,52 @@ public:
       return new (TC.Context) FailStmt(RS->getReturnLoc(), nilExpr->getLoc(),
                                        RS->isImplicit());
     }
+    
+    TypeCheckExprOptions options = {};
+    
+    // If the result type is an opaque type, this is an opportunity to resolve
+    // the underlying type.
+    auto isOpaqueReturnTypeOfCurrentFunc = [&](OpaqueTypeDecl *opaque) -> bool {
+      // Closures currently don't support having opaque types.
+      auto funcDecl = TheFunc->getAbstractFunctionDecl();
+      if (!funcDecl)
+        return false;
+      // Either the function is declared with its own opaque return type...
+      if (opaque->getNamingDecl() == funcDecl)
+        return true;
+      // ...or the function is a getter for a property or subscript with an
+      // opaque return type.
+      if (auto accessor = dyn_cast<AccessorDecl>(funcDecl)) {
+        return accessor->isGetter()
+          && opaque->getNamingDecl() == accessor->getStorage();
+      }
+      return false;
+    };
+    
+    if (auto opaque = ResultTy->getAs<OpaqueTypeArchetypeType>()) {
+      if (isOpaqueReturnTypeOfCurrentFunc(opaque->getDecl())) {
+        options |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
+      }
+    }
+
+    ContextualTypePurpose ctp = CTP_ReturnStmt;
+    if (auto func =
+            dyn_cast_or_null<FuncDecl>(TheFunc->getAbstractFunctionDecl())) {
+      if (func->hasSingleExpressionBody()) {
+        ctp = CTP_ReturnSingleExpr;
+      }
+    }
 
     auto exprTy = TC.typeCheckExpression(E, DC, TypeLoc::withoutLoc(ResultTy),
-                                         CTP_ReturnStmt);
+                                         ctp,
+                                         options);
     RS->setResult(E);
 
     if (!exprTy) {
       tryDiagnoseUnnecessaryCastOverOptionSet(TC.Context, E, ResultTy,
                                               DC->getParentModule());
     }
-    while (auto ICE = dyn_cast<ImplicitConversionExpr>(E))
-      E = ICE->getSubExpr();
-    if (auto DRE = dyn_cast<DeclRefExpr>(E))
-      if (auto FD = dyn_cast<FuncDecl>(DRE->getDecl()))
-        TC.addEscapingFunctionAsReturnValue(FD, RS);
+
     return RS;
   }
 
@@ -545,6 +587,12 @@ public:
   }
   
   Stmt *visitThrowStmt(ThrowStmt *TS) {
+    // If the throw is in a defer, then it isn't valid.
+    if (isInDefer()) {
+      TC.diagnose(TS->getThrowLoc(), diag::jump_out_of_defer, "throw");
+      return nullptr;
+    }
+
     // Coerce the operand to the exception type.
     auto E = TS->getSubExpr();
 
@@ -917,7 +965,7 @@ public:
         .fixItReplace(SourceRange(targetLoc),
                       corrections.begin()->Value->getLabelInfo().Name.str());
       tc.diagnose(corrections.begin()->Value->getLabelInfo().Loc,
-                  diag::identifier_declared_here,
+                  diag::decl_declared_here,
                   corrections.begin()->Value->getLabelInfo().Name);
     } else {
       // If we have multiple corrections or none, produce a generic diagnostic
@@ -946,29 +994,241 @@ public:
     PreviousFallthrough = S;
     return S;
   }
-  
-  Stmt *visitSwitchStmt(SwitchStmt *S) {
+
+  void checkCaseLabelItemPattern(CaseStmt *caseBlock, CaseLabelItem &labelItem,
+                                 bool &limitExhaustivityChecks,
+                                 Type subjectType,
+                                 SmallVectorImpl<VarDecl *> **prevCaseDecls,
+                                 SmallVectorImpl<VarDecl *> **nextCaseDecls) {
+    Pattern *pattern = labelItem.getPattern();
+    auto *newPattern = TC.resolvePattern(pattern, DC,
+                                         /*isStmtCondition*/ false);
+    if (!newPattern) {
+      pattern->collectVariables(**nextCaseDecls);
+      std::swap(*prevCaseDecls, *nextCaseDecls);
+      return;
+    }
+
+    pattern = newPattern;
+    // Coerce the pattern to the subject's type.
+    TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
+    if (!subjectType ||
+        TC.coercePatternToType(pattern, TypeResolution::forContextual(DC),
+                               subjectType, patternOptions)) {
+      limitExhaustivityChecks = true;
+
+      // If that failed, mark any variables binding pieces of the pattern
+      // as invalid to silence follow-on errors.
+      pattern->forEachVariable([&](VarDecl *VD) { VD->markInvalid(); });
+    }
+    labelItem.setPattern(pattern);
+
+    // If we do not have decls from the previous case that we need to match,
+    // just return. This only happens with the first case label item.
+    if (!*prevCaseDecls) {
+      pattern->collectVariables(**nextCaseDecls);
+      std::swap(*prevCaseDecls, *nextCaseDecls);
+      return;
+    }
+
+    // Otherwise for each variable in the pattern, make sure its type is
+    // identical to the initial case decl and stash the previous case decl as
+    // the parent of the decl.
+    pattern->forEachVariable([&](VarDecl *vd) {
+      if (!vd->hasName())
+        return;
+
+      // We know that prev var decls matches the initial var decl. So if we can
+      // match prevVarDecls, we can also match initial var decl... So for each
+      // decl in prevVarDecls...
+      for (auto *expected : **prevCaseDecls) {
+        // If we do not match the name of vd, continue.
+        if (!expected->hasName() || expected->getName() != vd->getName())
+          continue;
+
+        // Ok, we found a match! Before we leave, mark expected as the parent of
+        // vd and add vd to the next case decl list for the next iteration.
+        SWIFT_DEFER {
+          vd->setParentVarDecl(expected);
+          (*nextCaseDecls)->push_back(vd);
+        };
+
+        // Then we check for errors.
+        //
+        // NOTE: We emit the diagnostics against the initial case label item var
+        // decl associated with expected to ensure that we always emit
+        // diagnostics against a single reference var decl. If we used expected
+        // instead, we would emit confusing diagnostics since a correct var decl
+        // after an incorrect var decl will be marked as incorrect. For instance
+        // given the following case statement.
+        //
+        //   case .a(let x), .b(var x), .c(let x):
+        //
+        // if we use expected, we will emit errors saying that .b(var x) needs
+        // to be a let and .c(let x) needs to be a var. Thus if one
+        // automatically applied both fix-its, one would still get an error
+        // producing program:
+        //
+        //   case .a(let x), .b(let x), .c(var x):
+        //
+        // More complex case label item lists could cause even longer fixup
+        // sequences. Thus, we emit errors against the VarDecl associated with
+        // expected in the initial case label item list.
+        //
+        // Luckily, it is easy for us to compute this since we only change the
+        // parent field of the initial case label item's VarDecls /after/ we
+        // finish updating the parent pointers of the VarDecls associated with
+        // all other CaseLabelItems. So that initial group of VarDecls are
+        // guaranteed to still have a parent pointer pointing at our
+        // CaseStmt. Since we have setup the parent pointer VarDecl linked list
+        // for all other CaseLabelItem var decls that we have already processed,
+        // we can use our VarDecl linked list to find that initial case label
+        // item VarDecl.
+        auto *initialCaseVarDecl = expected;
+        while (auto *prev = initialCaseVarDecl->getParentVarDecl()) {
+          initialCaseVarDecl = prev;
+        }
+        assert(isa<CaseStmt>(initialCaseVarDecl->getParentPatternStmt()));
+
+        if (vd->hasType() && initialCaseVarDecl->hasType() &&
+            !initialCaseVarDecl->isInvalid() &&
+            !vd->getType()->isEqual(initialCaseVarDecl->getType())) {
+          TC.diagnose(vd->getLoc(), diag::type_mismatch_multiple_pattern_list,
+                      vd->getType(), initialCaseVarDecl->getType());
+          vd->markInvalid();
+          initialCaseVarDecl->markInvalid();
+        }
+
+        if (initialCaseVarDecl->isLet() == vd->isLet()) {
+          return;
+        }
+
+        auto diag = TC.diagnose(vd->getLoc(),
+                                diag::mutability_mismatch_multiple_pattern_list,
+                                vd->isLet(), initialCaseVarDecl->isLet());
+
+        VarPattern *foundVP = nullptr;
+        vd->getParentPattern()->forEachNode([&](Pattern *P) {
+          if (auto *VP = dyn_cast<VarPattern>(P))
+            if (VP->getSingleVar() == vd)
+              foundVP = VP;
+        });
+        if (foundVP)
+          diag.fixItReplace(foundVP->getLoc(),
+                            initialCaseVarDecl->isLet() ? "let" : "var");
+        vd->markInvalid();
+        initialCaseVarDecl->markInvalid();
+      }
+    });
+
+    // Clear our previous case decl list and the swap in the new decls for the
+    // next iteration.
+    (*prevCaseDecls)->clear();
+    std::swap(*prevCaseDecls, *nextCaseDecls);
+  }
+
+  void checkUnknownAttrRestrictions(CaseStmt *caseBlock,
+                                    bool &limitExhaustivityChecks) {
+    if (caseBlock->getCaseLabelItems().size() != 1) {
+      assert(!caseBlock->getCaseLabelItems().empty() &&
+             "parser should not produce case blocks with no items");
+      TC.diagnose(caseBlock->getLoc(), diag::unknown_case_multiple_patterns)
+          .highlight(caseBlock->getCaseLabelItems()[1].getSourceRange());
+      limitExhaustivityChecks = true;
+    }
+
+    if (FallthroughDest != nullptr) {
+      if (!caseBlock->isDefault())
+        TC.diagnose(caseBlock->getLoc(), diag::unknown_case_must_be_last);
+      limitExhaustivityChecks = true;
+    }
+
+    const auto &labelItem = caseBlock->getCaseLabelItems().front();
+    if (labelItem.getGuardExpr() && !labelItem.isDefault()) {
+      TC.diagnose(labelItem.getStartLoc(), diag::unknown_case_where_clause)
+          .highlight(labelItem.getGuardExpr()->getSourceRange());
+    }
+
+    const Pattern *pattern =
+        labelItem.getPattern()->getSemanticsProvidingPattern();
+    if (!isa<AnyPattern>(pattern)) {
+      TC.diagnose(labelItem.getStartLoc(), diag::unknown_case_must_be_catchall)
+          .highlight(pattern->getSourceRange());
+    }
+  }
+
+  void checkFallthroughPatternBindingsAndTypes(CaseStmt *caseBlock,
+                                               CaseStmt *previousBlock) {
+    auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
+    SmallVector<VarDecl *, 4> vars;
+    firstPattern->collectVariables(vars);
+
+    // We know that the typechecker has already guaranteed that all of
+    // the case label items in the fallthrough have the same var
+    // decls. So if we match against the case body var decls,
+    // transitively we will match all of the other case label items in
+    // the fallthrough destination as well.
+    auto previousVars = previousBlock->getCaseBodyVariablesOrEmptyArray();
+    for (auto *expected : vars) {
+      bool matched = false;
+      if (!expected->hasName())
+        continue;
+
+      for (auto *previous : previousVars) {
+        if (!previous->hasName() ||
+            expected->getName() != previous->getName()) {
+          continue;
+        }
+
+        if (!previous->getType()->isEqual(expected->getType())) {
+          TC.diagnose(previous->getLoc(),
+                      diag::type_mismatch_fallthrough_pattern_list,
+                      previous->getType(), expected->getType());
+          previous->markInvalid();
+          expected->markInvalid();
+        }
+
+        // Ok, we found our match. Make the previous fallthrough statement var
+        // decl our parent var decl.
+        expected->setParentVarDecl(previous);
+        matched = true;
+        break;
+      }
+
+      if (!matched) {
+        TC.diagnose(PreviousFallthrough->getLoc(),
+                    diag::fallthrough_into_case_with_var_binding,
+                    expected->getName());
+      }
+    }
+  }
+
+  Stmt *visitSwitchStmt(SwitchStmt *switchStmt) {
     // Type-check the subject expression.
-    Expr *subjectExpr = S->getSubjectExpr();
+    Expr *subjectExpr = switchStmt->getSubjectExpr();
     auto resultTy = TC.typeCheckExpression(subjectExpr, DC);
     auto limitExhaustivityChecks = !resultTy;
     if (Expr *newSubjectExpr = TC.coerceToRValue(subjectExpr))
       subjectExpr = newSubjectExpr;
-    S->setSubjectExpr(subjectExpr);
-    Type subjectType = S->getSubjectExpr()->getType();
+    switchStmt->setSubjectExpr(subjectExpr);
+    Type subjectType = switchStmt->getSubjectExpr()->getType();
 
     // Type-check the case blocks.
     AddSwitchNest switchNest(*this);
-    AddLabeledStmt labelNest(*this, S);
+    AddLabeledStmt labelNest(*this, switchStmt);
 
     // Pre-emptively visit all Decls (#if/#warning/#error) that still exist in
     // the list of raw cases.
-    for (auto node : S->getRawCases()) {
-      if (!node.is<Decl*>()) continue;
-      TC.typeCheckDecl(node.get<Decl*>());
+    for (auto &node : switchStmt->getRawCases()) {
+      if (!node.is<Decl *>())
+        continue;
+      TC.typeCheckDecl(node.get<Decl *>());
     }
 
-    auto cases = S->getCases();
+    SmallVector<VarDecl *, 8> scratchMemory1;
+    SmallVector<VarDecl *, 8> scratchMemory2;
+
+    auto cases = switchStmt->getCases();
     CaseStmt *previousBlock = nullptr;
     for (auto i = cases.begin(), e = cases.end(); i != e; ++i) {
       auto *caseBlock = *i;
@@ -977,66 +1237,31 @@ public:
       FallthroughSource = caseBlock;
       FallthroughDest = std::next(i) == e ? nullptr : *std::next(i);
 
-      for (auto &labelItem : caseBlock->getMutableCaseLabelItems()) {
-        // Resolve the pattern in the label.
-        Pattern *pattern = labelItem.getPattern();
-        if (auto *newPattern = TC.resolvePattern(pattern, DC,
-                                                 /*isStmtCondition*/false)) {
-          pattern = newPattern;
-          // Coerce the pattern to the subject's type.
-          TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
-          if (!subjectType ||
-              TC.coercePatternToType(pattern, TypeResolution::forContextual(DC),
-                                     subjectType, patternOptions)) {
-            limitExhaustivityChecks = true;
+      scratchMemory1.clear();
+      scratchMemory2.clear();
 
-            // If that failed, mark any variables binding pieces of the pattern
-            // as invalid to silence follow-on errors.
-            pattern->forEachVariable([&](VarDecl *VD) {
-              VD->markInvalid();
-            });
-          }
-          labelItem.setPattern(pattern);
-          
-          // For each variable in the pattern, make sure its type is identical to what it
-          // was in the first label item's pattern.
-          auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
-          SmallVector<VarDecl *, 4> vars;
-          firstPattern->collectVariables(vars);
-          pattern->forEachVariable([&](VarDecl *VD) {
-            if (!VD->hasName())
-              return;
-            for (auto *expected : vars) {
-              if (expected->hasName() && expected->getName() == VD->getName()) {
-                if (VD->hasType() && expected->hasType() && !expected->isInvalid() &&
-                    !VD->getType()->isEqual(expected->getType())) {
-                  TC.diagnose(VD->getLoc(), diag::type_mismatch_multiple_pattern_list,
-                              VD->getType(), expected->getType());
-                  VD->markInvalid();
-                  expected->markInvalid();
-                }
-                if (expected->isLet() != VD->isLet()) {
-                  auto diag = TC.diagnose(VD->getLoc(),
-                                          diag::mutability_mismatch_multiple_pattern_list,
-                                          VD->isLet(), expected->isLet());
+      SmallVectorImpl<VarDecl *> *prevCaseDecls = nullptr;
+      SmallVectorImpl<VarDecl *> *nextCaseDecls = &scratchMemory1;
 
-                  VarPattern *foundVP = nullptr;
-                  VD->getParentPattern()->forEachNode([&](Pattern *P) {
-                    if (auto *VP = dyn_cast<VarPattern>(P))
-                      if (VP->getSingleVar() == VD)
-                        foundVP = VP;
-                  });
-                  if (foundVP)
-                    diag.fixItReplace(foundVP->getLoc(),
-                                      expected->isLet() ? "let" : "var");
-                  VD->markInvalid();
-                  expected->markInvalid();
-                }
-                return;
-              }
-            }
-          });
-        }
+      auto caseLabelItemArray = caseBlock->getMutableCaseLabelItems();
+      {
+        // Peel off the first iteration so we handle the first case label
+        // especially since we use it to begin the validation chain.
+        auto &labelItem = caseLabelItemArray.front();
+
+        // Resolve the pattern in our case label if it has not been resolved and
+        // check that our var decls follow invariants.
+        checkCaseLabelItemPattern(caseBlock, labelItem, limitExhaustivityChecks,
+                                  subjectType, &prevCaseDecls, &nextCaseDecls);
+
+        // After this is complete, prevCaseDecls will be pointing at
+        // scratchMemory1 which contains the initial case block's var decls and
+        // nextCaseDecls will be a nullptr. Set nextCaseDecls to point at
+        // scratchMemory2 for the next iterations.
+        assert(prevCaseDecls == &scratchMemory1);
+        assert(nextCaseDecls == nullptr);
+        nextCaseDecls = &scratchMemory2;
+
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
           limitExhaustivityChecks |= TC.typeCheckCondition(guard, DC);
@@ -1044,74 +1269,71 @@ public:
         }
       }
 
+      // Setup the types of our case body var decls.
+      for (auto *expected : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
+        assert(expected->hasName());
+        for (auto *prev : *prevCaseDecls) {
+          if (!prev->hasName() || expected->getName() != prev->getName()) {
+            continue;
+          }
+          if (prev->hasType())
+            expected->setType(prev->getType());
+          if (prev->hasInterfaceType())
+            expected->setInterfaceType(prev->getInterfaceType());
+          break;
+        }
+      }
+
+      // Then check the rest.
+      for (auto &labelItem : caseLabelItemArray.drop_front()) {
+        // Resolve the pattern in our case label if it has not been resolved
+        // and check that our var decls follow invariants.
+        checkCaseLabelItemPattern(caseBlock, labelItem, limitExhaustivityChecks,
+                                  subjectType, &prevCaseDecls, &nextCaseDecls);
+        // Check the guard expression, if present.
+        if (auto *guard = labelItem.getGuardExpr()) {
+          limitExhaustivityChecks |= TC.typeCheckCondition(guard, DC);
+          labelItem.setGuardExpr(guard);
+        }
+      }
+
+      // Our last CaseLabelItem's VarDecls are now in
+      // prevCaseDecls. Wire them up as parents of our case body var
+      // decls.
+      //
+      // NOTE: We know that the two lists of var decls must be in sync. Remember
+      // that we constructed our case body VarDecls from the first
+      // CaseLabelItems var decls. Just now we proved that all other
+      // CaseLabelItems have matching var decls of the first meaning
+      // transitively that our last case label item must have matching var decls
+      // for our case stmts CaseBodyVarDecls.
+      //
+      // NOTE: We do not check that we matched everything here. That is because
+      // the check has already been done by comparing the 1st CaseLabelItem var
+      // decls. If we insert a check here, we will emit the same error multiple
+      // times.
+      for (auto *expected : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
+        assert(expected->hasName());
+        for (auto *prev : *prevCaseDecls) {
+          if (!prev->hasName() || expected->getName() != prev->getName()) {
+            continue;
+          }
+          expected->setParentVarDecl(prev);
+          break;
+        }
+      }
+
       // Check restrictions on '@unknown'.
       if (caseBlock->hasUnknownAttr()) {
-        if (caseBlock->getCaseLabelItems().size() != 1) {
-          assert(!caseBlock->getCaseLabelItems().empty() &&
-                 "parser should not produce case blocks with no items");
-          TC.diagnose(caseBlock->getLoc(),
-                      diag::unknown_case_multiple_patterns)
-            .highlight(caseBlock->getCaseLabelItems()[1].getSourceRange());
-          limitExhaustivityChecks = true;
-        }
-
-        if (FallthroughDest != nullptr) {
-          if (!caseBlock->isDefault())
-            TC.diagnose(caseBlock->getLoc(), diag::unknown_case_must_be_last);
-          limitExhaustivityChecks = true;
-        }
-
-        const CaseLabelItem &labelItem = caseBlock->getCaseLabelItems().front();
-        if (labelItem.getGuardExpr() && !labelItem.isDefault()) {
-          TC.diagnose(labelItem.getStartLoc(),
-                      diag::unknown_case_where_clause)
-            .highlight(labelItem.getGuardExpr()->getSourceRange());
-        }
-
-        const Pattern *pattern =
-            labelItem.getPattern()->getSemanticsProvidingPattern();
-        if (!isa<AnyPattern>(pattern)) {
-          TC.diagnose(labelItem.getStartLoc(),
-                      diag::unknown_case_must_be_catchall)
-            .highlight(pattern->getSourceRange());
-        }
+        checkUnknownAttrRestrictions(caseBlock, limitExhaustivityChecks);
       }
 
       // If the previous case fellthrough, similarly check that that case's bindings
       // includes our first label item's pattern bindings and types.
       if (PreviousFallthrough && previousBlock) {
-        auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
-        SmallVector<VarDecl *, 4> Vars;
-        firstPattern->collectVariables(Vars);
-
-        for (auto &labelItem : previousBlock->getCaseLabelItems()) {
-          const Pattern *pattern = labelItem.getPattern();
-          SmallVector<VarDecl *, 4> PreviousVars;
-          pattern->collectVariables(PreviousVars);
-          for (auto expected : Vars) {
-            bool matched = false;
-            if (!expected->hasName())
-              continue;
-            for (auto previous: PreviousVars) {
-              if (previous->hasName() && expected->getName() == previous->getName()) {
-                if (!previous->getType()->isEqual(expected->getType())) {
-                  TC.diagnose(previous->getLoc(), diag::type_mismatch_fallthrough_pattern_list,
-                              previous->getType(), expected->getType());
-                  previous->markInvalid();
-                  expected->markInvalid();
-                }
-                matched = true;
-                break;
-              }
-            }
-            if (!matched) {
-              TC.diagnose(PreviousFallthrough->getLoc(),
-                          diag::fallthrough_into_case_with_var_binding, expected->getName());
-            }
-          }
-        }
+        checkFallthroughPatternBindingsAndTypes(caseBlock, previousBlock);
       }
-      
+
       // Type-check the body statements.
       PreviousFallthrough = nullptr;
       Stmt *body = caseBlock->getBody();
@@ -1120,11 +1342,11 @@ public:
       previousBlock = caseBlock;
     }
 
-    if (!S->isImplicit()) {
-      TC.checkSwitchExhaustiveness(S, DC, limitExhaustivityChecks);
+    if (!switchStmt->isImplicit()) {
+      TC.checkSwitchExhaustiveness(switchStmt, DC, limitExhaustivityChecks);
     }
 
-    return S;
+    return switchStmt;
   }
 
   Stmt *visitCaseStmt(CaseStmt *S) {
@@ -1561,31 +1783,58 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   return BS;
 }
 
+static Optional<unsigned>
+getParamIndex(const ParameterList *paramList, const ParamDecl *decl) {
+  ArrayRef<ParamDecl *> params = paramList->getArray();
+  for (unsigned i = 0; i < params.size(); ++i) {
+    if (params[i] == decl) return i;
+  }
+  return None;
+}
+
+static void
+checkInheritedDefaultValueRestrictions(TypeChecker &TC, ParamDecl *PD) {
+  if (PD->getDefaultArgumentKind() != DefaultArgumentKind::Inherited)
+    return;
+
+  auto *DC = PD->getInnermostDeclContext();
+  const SourceFile *SF = DC->getParentSourceFile();
+  assert((SF && SF->Kind == SourceFileKind::Interface || PD->isImplicit()) &&
+         "explicit inherited default argument outside of a module interface?");
+
+  // The containing decl should be a designated initializer.
+  auto ctor = dyn_cast<ConstructorDecl>(DC);
+  if (!ctor || ctor->isConvenienceInit()) {
+    TC.diagnose(
+        PD, diag::inherited_default_value_not_in_designated_constructor);
+    return;
+  }
+
+  // The decl it overrides should also be a designated initializer.
+  auto overridden = ctor->getOverriddenDecl();
+  if (!overridden || overridden->isConvenienceInit()) {
+    TC.diagnose(
+        PD, diag::inherited_default_value_used_in_non_overriding_constructor);
+    if (overridden)
+      TC.diagnose(overridden, diag::overridden_here);
+    return;
+  }
+
+  // The corresponding parameter should have a default value.
+  Optional<unsigned> idx = getParamIndex(ctor->getParameters(), PD);
+  assert(idx && "containing decl does not contain param?");
+  ParamDecl *equivalentParam = overridden->getParameters()->get(*idx);
+  if (equivalentParam->getDefaultArgumentKind() == DefaultArgumentKind::None) {
+    TC.diagnose(PD, diag::corresponding_param_not_defaulted);
+    TC.diagnose(equivalentParam, diag::inherited_default_param_here);
+  }
+}
+
 /// Check the default arguments that occur within this pattern.
 void TypeChecker::checkDefaultArguments(ParameterList *params,
                                         ValueDecl *VD) {
-  auto access =
-    VD->getFormalAccessScope(/*useDC=*/nullptr,
-                             /*treatUsableFromInlineAsPublic=*/true);
-
-  // In Swift 4 mode, default argument bodies are inlined into the
-  // caller.
-  if (auto *func = dyn_cast<AbstractFunctionDecl>(VD)) {
-    auto expansion = func->getResilienceExpansion();
-    if (access.isPublic())
-      expansion = ResilienceExpansion::Minimal;
-
-    func->setDefaultArgumentResilienceExpansion(expansion);
-  } else {
-    auto *EED = cast<EnumElementDecl>(VD);
-    auto expansion = ResilienceExpansion::Maximal;
-    if (access.isPublic())
-      expansion = ResilienceExpansion::Minimal;
-
-    EED->setDefaultArgumentResilienceExpansion(expansion);
-  }
-
   for (auto *param : *params) {
+    checkInheritedDefaultValueRestrictions(*this, param);
     if (!param->getDefaultValue() ||
         !param->hasInterfaceType() ||
         param->getInterfaceType()->hasError())
@@ -1673,9 +1922,36 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
   BraceStmt *BS = FD->getBody();
   assert(BS && "Should have a body");
 
+  if (FD->hasSingleExpressionBody()) {
+    auto resultTypeLoc = FD->getBodyResultTypeLoc();
+    auto E = FD->getSingleExpressionBody();
+
+    if (resultTypeLoc.isNull() || resultTypeLoc.getType()->isVoid()) {
+      // The function returns void.  We don't need an explicit return, no matter
+      // what the type of the expression is.  Take the inserted return back out.
+      BS->setElement(0, E);
+    }
+  }
+
   StmtChecker SC(*this, static_cast<AbstractFunctionDecl *>(FD));
   SC.EndTypeCheckLoc = EndTypeCheckLoc;
   bool HadError = SC.typeCheckBody(BS);
+
+  // If this was a function with a single expression body, let's see
+  // if implicit return statement came out to be `Never` which means
+  // that we have eagerly converted something like `{ fatalError() }`
+  // into `{ return fatalError() }` that has to be corrected here.
+  if (FD->hasSingleExpressionBody()) {
+    if (auto *stmt = BS->getElement(0).dyn_cast<Stmt *>()) {
+      if (auto *RS = dyn_cast<ReturnStmt>(stmt)) {
+        if (RS->isImplicit() && RS->hasResult()) {
+          auto returnType = RS->getResult()->getType();
+          if (returnType && returnType->isUninhabited())
+            BS->setElement(0, RS->getResult());
+        }
+      }
+    }
+  }
 
   FD->setBody(BS);
   return HadError;
@@ -1906,6 +2182,8 @@ bool TypeChecker::typeCheckDestructorBodyUntil(DestructorDecl *DD,
 }
 
 bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
+  checkParameterAttributes(closure->getParameters());
+
   BraceStmt *body = closure->getBody();
 
   Optional<FunctionBodyTimer> timer;

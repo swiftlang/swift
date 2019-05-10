@@ -56,7 +56,8 @@ if '-supplementary-output-file-map' in sys.argv:
     supplementaryOutputMapFile = \
         sys.argv[sys.argv.index('-supplementary-output-file-map') + 1]
     with open(supplementaryOutputMapFile, 'r') as f:
-        lines = f.readlines()
+        # The output is in DenseMap order, which is unstable, therefore sort.
+        lines = sorted(f.readlines())
         for line in lines:
             print("Supplementary", line.rstrip())
 

@@ -752,7 +752,7 @@ bb0:
 }
 
 // Generic call to "branchHint" for use in specialized @slowPath
-sil public_external [transparent] [_semantics "branchhint"] @_TFs11_branchHintUs7Boolean__FTQ_Sb_Sb : $@convention(thin)(Bool, Bool) -> Bool {
+sil public_external [transparent] @_TFs11_branchHintUs7Boolean__FTQ_Sb_Sb : $@convention(thin)(Bool, Bool) -> Bool {
 bb0(%0 : $Bool, %1 : $Bool):
   return %0 : $Bool
 }

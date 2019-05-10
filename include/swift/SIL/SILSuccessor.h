@@ -113,6 +113,12 @@ public:
       return *this;
     }
 
+    pred_iterator operator++(int) {
+      auto old = *this;
+      ++*this;
+      return old;
+    }
+
     pred_iterator operator+(unsigned distance) const {
       auto copy = *this;
       if (distance == 0)

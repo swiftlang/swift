@@ -10,15 +10,15 @@ func inFunction() {
 }
 
 struct S0 {
-  func f() -> Self { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'S0'?}}{{15-19=S0}}
+  func f() -> Self { }
 
-  func g(_ ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'S0'?}}{{16-20=S0}}
+  func g(_ ds: Self) { }
 }
 
 enum E0 {
-  func f() -> Self { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'E0'?}}{{15-19=E0}}
+  func f() -> Self { }
 
-  func g(_ ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'E0'?}}{{16-20=E0}}
+  func g(_ ds: Self) { }
 }
 
 class C0 {
@@ -85,11 +85,11 @@ class C1 {
     var x: Int = self // expected-error{{cannot convert value of type 'Self.Type' to specified type 'Int'}}
 
     // Can't utter Self within the body of a method.
-    var c1 = C1(int: 5) as Self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}} {{28-32=C1}}
+    var c1 = C1(int: 5) as Self // expected-error{{'C1' is not convertible to 'Self'; did you mean to use 'as!' to force downcast?}}
 
     if b { return self.init(int: 5) }
 
-    return Self() // expected-error{{use of unresolved identifier 'Self'; did you mean 'self'?}}
+    return Self() // expected-error{{non-nominal type 'Self' does not support explicit initialization}}
   }
 
   // This used to crash because metatype construction went down a
@@ -320,18 +320,24 @@ func testOptionalSelf(_ y : Y) {
 // Conformance lookup on Self
 
 protocol Runcible {
+  associatedtype Runcer
 }
 
 extension Runcible {
   func runce() {}
+
+  func runced(_: Runcer) {}
 }
 
 func wantsRuncible<T : Runcible>(_: T) {}
 
 class Runce : Runcible {
+  typealias Runcer = Int
+
   func getRunced() -> Self {
     runce()
     wantsRuncible(self)
+    runced(3)
     return self
   }
 }

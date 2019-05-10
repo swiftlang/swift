@@ -1,4 +1,4 @@
-// XFAIL: freebsd, linux, win32
+// XFAIL: freebsd, linux, windows
 
 // Test SDK detection for immediate mode.
 // RUN: %empty-directory(%t)

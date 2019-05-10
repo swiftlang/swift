@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all=0 %s -o /dev/null
+// RUN: %target-sil-opt -enable-sil-verify-all=0 %s -o /dev/null
 // REQUIRES: asserts
 
 sil_stage canonical

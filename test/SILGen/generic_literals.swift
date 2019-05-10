@@ -19,13 +19,13 @@ func genericIntegerLiteral<T : ExpressibleByIntegerLiteral>(x: T) {
 // CHECK-LABEL: sil hidden [ossa] @$s16generic_literals0A15FloatingLiteral1xyx_ts018ExpressibleByFloatD0RzlF : $@convention(thin) <T where T : ExpressibleByFloatLiteral> (@in_guaranteed T) -> () {
 func genericFloatingLiteral<T : ExpressibleByFloatLiteral>(x: T) {
   var x = x
-  // CHECK: [[TVAL:%.*]] = alloc_stack $T
-  // CHECK: [[TMETA:%.*]] = metatype $@thick T.Type
-  // CHECK: [[FLT_VAL:%.*]] = alloc_stack $T.FloatLiteralType
-  // CHECK: [[TFLT_META:%.*]] = metatype $@thick T.FloatLiteralType.Type
   // CHECK: [[LIT_VALUE:%.*]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0x4004000000000000|0x4000A000000000000000}}
+  // CHECK: [[TFLT_META:%.*]] = metatype $@thick T.FloatLiteralType.Type
+  // CHECK: [[FLT_VAL:%.*]] = alloc_stack $T.FloatLiteralType
   // CHECK: [[BUILTIN_CONV:%.*]] = witness_method $T.FloatLiteralType, #_ExpressibleByBuiltinFloatLiteral.init!allocator.1
   // CHECK: apply [[BUILTIN_CONV]]<T.FloatLiteralType>([[FLT_VAL]], [[LIT_VALUE]], [[TFLT_META]]) : $@convention(witness_method: _ExpressibleByBuiltinFloatLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinFloatLiteral> (Builtin.FPIEEE{{64|80}}, @thick τ_0_0.Type) -> @out τ_0_0
+  // CHECK: [[TMETA:%.*]] = metatype $@thick T.Type
+  // CHECK: [[TVAL:%.*]] = alloc_stack $T
   // CHECK: [[CONV:%.*]] = witness_method $T, #ExpressibleByFloatLiteral.init!allocator.1
   // CHECK: apply [[CONV]]<T>([[TVAL]], [[FLT_VAL]], [[TMETA]]) : $@convention(witness_method: ExpressibleByFloatLiteral) <τ_0_0 where τ_0_0 : ExpressibleByFloatLiteral> (@in τ_0_0.FloatLiteralType, @thick τ_0_0.Type) -> @out τ_0_0
 

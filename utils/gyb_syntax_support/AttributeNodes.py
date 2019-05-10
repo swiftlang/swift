@@ -10,6 +10,23 @@ ATTRIBUTE_NODES = [
     Node('NonEmptyTokenList', kind='SyntaxCollection',
          element='Token', omit_when_empty=True),
 
+    Node('CustomAttribute', kind='Syntax',
+         description='''
+         A custom `@` attribute.
+         ''',
+         children=[
+             Child('AtSignToken', kind='AtSignToken',
+                   description='The `@` sign.'),
+             Child('AttributeName', kind='Type', classification='Attribute',
+                   description='The name of the attribute.'),
+             Child('LeftParen', kind='LeftParenToken',
+                   is_optional=True),
+             Child('ArgumentList', kind='FunctionCallArgumentList',
+                   collection_element_name='Argument', is_optional=True),
+             Child('RightParen', kind='RightParenToken',
+                   is_optional=True),
+         ]),
+
     # attribute -> '@' identifier '('?
     #              ( identifier
     #                | string-literal
@@ -56,12 +73,17 @@ ATTRIBUTE_NODES = [
                    '''),
              # TokenList to gather remaining tokens of invalid attributes
              # FIXME: Remove this recovery option entirely
-             Child('TokenList', kind='TokenList', is_optional=True),
+             Child('TokenList', kind='TokenList',
+                   collection_element_name='Token', is_optional=True),
          ]),
 
     # attribute-list -> attribute attribute-list?
     Node('AttributeList', kind='SyntaxCollection',
-         element='Attribute'),
+         element='Syntax', element_name='Attribute',
+         element_choices=[
+             'Attribute',
+             'CustomAttribute',
+         ]),
 
     # The argument of '@_specialize(...)'
     # specialize-attr-spec-list -> labeled-specialize-entry
@@ -72,7 +94,7 @@ ATTRIBUTE_NODES = [
          description='''
          A collection of arguments for the `@_specialize` attribute
          ''',
-         element='Syntax',
+         element='Syntax', element_name='SpecializeAttribute',
          element_choices=[
              'LabeledSpecializeEntry',
              'GenericWhereClause',

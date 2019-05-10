@@ -15,20 +15,24 @@
 
 using namespace swift;
 
-static ValueOwnershipKind getOwnershipKindForUndef(SILType type, SILModule &m) {
-  if (type.isTrivial(m))
+static ValueOwnershipKind getOwnershipKindForUndef(SILType type, const SILFunction &f) {
+  if (type.isTrivial(f))
     return ValueOwnershipKind::Any;
   return ValueOwnershipKind::Owned;
 }
 
-SILUndef::SILUndef(SILType type, SILModule &m)
+SILUndef::SILUndef(SILType type, ValueOwnershipKind ownershipKind)
     : ValueBase(ValueKind::SILUndef, type, IsRepresentative::Yes),
-      ownershipKind(getOwnershipKindForUndef(type, m)) {}
+      ownershipKind(ownershipKind) {}
 
-SILUndef *SILUndef::get(SILType ty, SILModule &m) {
-  // Unique these.
-  SILUndef *&entry = m.UndefValues[ty];
+SILUndef *SILUndef::get(SILType ty, SILModule &m, ValueOwnershipKind ownershipKind) {
+  SILUndef *&entry = m.UndefValues[std::make_pair(ty, unsigned(ownershipKind))];
   if (entry == nullptr)
-    entry = new (m) SILUndef(ty, m);
+    entry = new (m) SILUndef(ty, ownershipKind);
   return entry;
+}
+
+SILUndef *SILUndef::get(SILType ty, const SILFunction &f) {
+  auto ownershipKind = getOwnershipKindForUndef(ty, f);
+  return SILUndef::get(ty, f.getModule(), ownershipKind);
 }

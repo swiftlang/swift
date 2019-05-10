@@ -435,6 +435,51 @@ extension Unicode.Scalar.UTF16View : RandomAccessCollection {
 }
 
 extension Unicode.Scalar {
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @_fixed_layout
+  public struct UTF8View {
+    @inlinable
+    internal init(value: Unicode.Scalar) {
+      self.value = value
+    }
+    @usableFromInline
+    internal var value: Unicode.Scalar
+  }
+
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @inlinable
+  public var utf8: UTF8View { return UTF8View(value: self) }
+}
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+extension Unicode.Scalar.UTF8View : RandomAccessCollection {
+  public typealias Indices = Range<Int>
+
+  /// The position of the first code unit.
+  @inlinable
+  public var startIndex: Int { return 0 }
+
+  /// The "past the end" position---that is, the position one
+  /// greater than the last valid subscript argument.
+  ///
+  /// If the collection is empty, `endIndex` is equal to `startIndex`.
+  @inlinable
+  public var endIndex: Int { return 0 + UTF8.width(value) }
+
+  /// Accesses the code unit at the specified position.
+  ///
+  /// - Parameter position: The position of the element to access. `position`
+  ///   must be a valid index of the collection that is not equal to the
+  ///   `endIndex` property.
+  @inlinable
+  public subscript(position: Int) -> UTF8.CodeUnit {
+    _precondition(position >= startIndex && position < endIndex,
+      "Unicode.Scalar.UTF8View index is out of bounds")
+    return value.withUTF8CodeUnits { $0[position] }
+  }
+}
+
+extension Unicode.Scalar {
   internal static var _replacementCharacter: Unicode.Scalar {
     return Unicode.Scalar(_value: UTF32._replacementCodeUnit)
   }

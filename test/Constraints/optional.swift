@@ -333,3 +333,27 @@ func sr_9893_2(cString: UnsafePointer<CChar>) {
     }
   }
 }
+
+// rdar://problem/47776586 - Diagnostic refers to '&' which is not present in the source code
+func rdar47776586() {
+  func foo(_: inout Int) {}
+  var x: Int? = 0
+  foo(&x) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{7-7=(}} {{9-9=)!}}
+
+  var dict = [1: 2]
+  dict[1] += 1 // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{10-10=!}}
+}
+
+struct S {
+  var foo: Optional<() -> Int?> = nil
+  var bar: Optional<() -> Int?> = nil
+
+  mutating func test(_ clj: @escaping () -> Int) {
+    if let fn = foo {
+      bar = fn  // Ok
+      bar = clj // Ok
+    }
+  }
+}

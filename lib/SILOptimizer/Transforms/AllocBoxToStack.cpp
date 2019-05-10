@@ -452,8 +452,8 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
 
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "promoting multi-field box not implemented");
-  auto &Lowering = ABI->getModule()
-    .getTypeLowering(ABI->getBoxType()->getFieldType(ABI->getModule(), 0));
+  auto &Lowering = ABI->getFunction()
+    ->getTypeLowering(ABI->getBoxType()->getFieldType(ABI->getModule(), 0));
   auto Loc = CleanupLocation::get(ABI->getLoc());
 
   for (auto LastRelease : FinalReleases) {

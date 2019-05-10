@@ -26,6 +26,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/IRGen/ValueWitness.h"
+#include "swift/SIL/TypeLowering.h"
 
 #include "Callee.h"
 #include "Explosion.h"
@@ -342,11 +343,9 @@ llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
   return witness;
 }
 
-/// Given a value witness table, load one of the value witnesses.
-/// The result has the appropriate type for the witness.
-static llvm::Value *emitLoadOfValueWitnessValue(IRGenFunction &IGF,
-                                                llvm::Value *table,
-                                                ValueWitness witness) {
+static Address emitAddressOfValueWitnessTableValue(IRGenFunction &IGF,
+                                                   llvm::Value *table,
+                                                   ValueWitness witness) {
   assert(!isValueWitnessFunction(witness));
   assert(unsigned(witness) <= unsigned(ValueWitness::ExtraInhabitantCount) &&
          "extraInhabitantCount not the last non-function value witness");
@@ -367,7 +366,15 @@ static llvm::Value *emitLoadOfValueWitnessValue(IRGenFunction &IGF,
   Address addr = Address(table, IGF.IGM.getPointerAlignment());
   addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.getValueWitnessTablePtrTy());
   addr = IGF.Builder.CreateStructGEP(addr, unsigned(witness), offset);
+  return addr;
+}
 
+/// Given a value witness table, load one of the value witnesses.
+/// The result has the appropriate type for the witness.
+static llvm::Value *emitLoadOfValueWitnessValue(IRGenFunction &IGF,
+                                                llvm::Value *table,
+                                                ValueWitness witness) {
+  auto addr = emitAddressOfValueWitnessTableValue(IGF, table, witness);
   auto load = IGF.Builder.CreateLoad(addr, getValueWitnessLabel(witness));
   IGF.setInvariantLoad(load);
   return load;
@@ -719,7 +726,7 @@ void irgen::emitDestroyArrayCall(IRGenFunction &IGF,
                                  Address object,
                                  llvm::Value *count) {
   // If T is a trivial/POD type, nothing needs to be done.
-  if (T.getObjectType().isTrivial(IGF.getSILModule()))
+  if (IGF.IGM.getTypeLowering(T).isTrivial())
     return;
 
   auto metadata = IGF.emitTypeMetadataRefForLayout(T);
@@ -911,6 +918,15 @@ llvm::Value *irgen::emitLoadOfExtraInhabitantCount(IRGenFunction &IGF,
   return IGF.emitValueWitnessValue(T, ValueWitness::ExtraInhabitantCount);
 }
 
+void irgen::emitStoreOfExtraInhabitantCount(IRGenFunction &IGF,
+                                            llvm::Value *value,
+                                            llvm::Value *metadata) {
+  auto vwTable = IGF.emitValueWitnessTableRefForMetadata(metadata);
+  auto addr = emitAddressOfValueWitnessTableValue(
+      IGF, vwTable, ValueWitness::ExtraInhabitantCount);
+  IGF.Builder.CreateStore(value, addr);
+}
+
 std::pair<llvm::Value *, llvm::Value *>
 irgen::emitLoadOfIsInline(IRGenFunction &IGF, llvm::Value *metadata) {
   auto *flags = emitLoadOfValueWitnessValueFromMetadata(IGF, metadata,
@@ -994,7 +1010,7 @@ void irgen::emitDestroyCall(IRGenFunction &IGF,
                             SILType T,
                             Address object) {
   // If T is a trivial/POD type, nothing needs to be done.
-  if (T.getObjectType().isTrivial(IGF.getSILModule()))
+  if (IGF.IGM.getTypeLowering(T).isTrivial())
     return;
   llvm::Value *metadata;
   auto fn = IGF.emitValueWitnessFunctionRef(T, metadata,

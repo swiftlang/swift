@@ -55,7 +55,7 @@ func inoutToSharedConversions() {
 // Autoclosure
 func f1(f: @autoclosure () -> Int) { }
 func f2() -> Int { }
-f1(f: f2) // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}}{{9-9=()}}
+f1(f: f2) // expected-error{{add () to forward @autoclosure parameter}}{{9-9=()}}
 f1(f: 5)
 
 // Ternary in closure
@@ -187,7 +187,7 @@ func testMap() {
 }
 
 // <rdar://problem/22414757> "UnresolvedDot" "in wrong phase" assertion from verifier
-[].reduce { $0 + $1 }  // expected-error {{cannot invoke 'reduce' with an argument list of type '((_, _) -> _)'}}
+[].reduce { $0 + $1 }  // expected-error {{cannot invoke 'reduce' with an argument list of type '(@escaping (_, _) -> _)'}}
 
 
 
@@ -268,7 +268,7 @@ func someFunc(_ foo: ((String) -> String)?,
 
 func verify_NotAC_to_AC_failure(_ arg: () -> ()) {
   func takesAC(_ arg: @autoclosure () -> ()) {}
-  takesAC(arg) // expected-error {{function produces expected type '()'; did you mean to call it with '()'?}}
+  takesAC(arg) // expected-error {{add () to forward @autoclosure parameter}} {{14-14=()}}
 }
 
 // SR-1069 - Error diagnostic refers to wrong argument
@@ -416,11 +416,11 @@ func r20789423() {
   
 }
 
-// Make sure that behavior related to allowing trailing closures to match functions
-// with Any as a final parameter is the same after the changes made by SR-2505, namely:
-// that we continue to select function that does _not_ have Any as a final parameter in
-// presence of other possibilities.
-
+// In the example below, SR-2505 started preferring C_SR_2505.test(_:) over
+// test(it:). Prior to Swift 5.1, we emulated the old behavior. However,
+// that behavior is inconsistent with the typical approach of preferring
+// overloads from the concrete type over one from a protocol, so we removed
+// the hack.
 protocol SR_2505_Initable { init() }
 struct SR_2505_II : SR_2505_Initable {}
 
@@ -442,10 +442,9 @@ class C_SR_2505 : P_SR_2505 {
   }
 
   func call(_ c: C_SR_2505) -> Bool {
-    // Note: no diagnostic about capturing 'self', because this is a
-    // non-escaping closure -- that's how we know we have selected
-    // test(it:) and not test(_)
-    return c.test { o in test(o) }
+    // Note: the diagnostic about capturing 'self', indicates that we have
+    // selected test(_) rather than test(it:)
+    return c.test { o in test(o) } // expected-error{{call to method 'test' in closure requires explicit 'self.' to make capture semantics explicit}}
   }
 }
 
@@ -875,3 +874,35 @@ struct rdar43866352<Options> {
     callback = { (options: Options) in } // expected-error {{cannot assign value of type '(inout Options) -> ()' to type '(inout _) -> Void'}}
   }
 }
+
+extension Hashable {
+  var self_: Self {
+    return self
+  }
+}
+
+do {
+  struct S<
+      C : Collection,
+      I : Hashable,
+      R : Numeric
+  > {
+    init(_ arr: C,
+         id: KeyPath<C.Element, I>,
+         content: @escaping (C.Element) -> R) {}
+  }
+
+  func foo(_ arr: [Int]) {
+    _ = S(arr, id: \.self_) {
+      // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{30-30=_ in }}
+      return 42
+    }
+  }
+}
+
+// Don't allow result type of a closure to end up as a noescape type
+
+// The funny error is because we infer the type of badResult as () -> ()
+// via the 'T -> U => T -> ()' implicit conversion.
+let badResult = { (fn: () -> ()) in fn }
+// expected-error@-1 {{expression resolves to an unused function}}

@@ -10,7 +10,7 @@
 // CHECK-BASIC-LABEL: - :
 // CHECK-BASIC: Inputs/empty\ file.swift
 // CHECK-BASIC: Swift.swiftmodule
-// CHECK-BASIC-NOT: {{[^\\]}}:
+// CHECK-BASIC-NOT: {{ }}:{{ }}
 
 // CHECK-BASIC-YAML-LABEL: depends-external:
 // CHECK-BASIC-YAML-NOT: empty\ file.swift
@@ -37,7 +37,7 @@
 // CHECK-MULTIPLE-OUTPUTS-LABEL: empty\ file.h :
 // CHECK-MULTIPLE-OUTPUTS: Inputs/empty\ file.swift
 // CHECK-MULTIPLE-OUTPUTS: Swift.swiftmodule
-// CHECK-MULTIPLE-OUTPUTS-NOT: {{[^\\]}}:
+// CHECK-MULTIPLE-OUTPUTS-NOT: {{ }}:{{ }}
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-dependencies-path - -resolve-imports %s | %FileCheck -check-prefix=CHECK-IMPORT %s
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/dependencies/extra-header.h -track-system-dependencies -emit-dependencies-path - -resolve-imports %s | %FileCheck -check-prefix=CHECK-IMPORT-TRACK-SYSTEM %s

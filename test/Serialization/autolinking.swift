@@ -13,7 +13,7 @@
 // RUN: %target-swift-frontend -emit-module -parse-stdlib -o %t -module-name someModule -module-link-name module %S/../Inputs/empty.swift -autolink-force-load
 // RUN: %target-swift-frontend -emit-ir -lmagic %s -I %t > %t/force-load.txt
 // RUN: %FileCheck %s < %t/force-load.txt
-// RUN: %FileCheck -check-prefix=FORCE-LOAD-CLIENT %s < %t/force-load.txt
+// RUN: %FileCheck -check-prefix FORCE-LOAD-CLIENT -check-prefix FORCE-LOAD-CLIENT-%target-object-format %s < %t/force-load.txt
 
 // RUN: %target-swift-frontend -emit-ir -parse-stdlib -module-name someModule -module-link-name module %S/../Inputs/empty.swift | %FileCheck --check-prefix=NO-FORCE-LOAD %s
 // RUN: %target-swift-frontend -emit-ir -parse-stdlib -module-name someModule -module-link-name module %S/../Inputs/empty.swift -autolink-force-load | %FileCheck --check-prefix=FORCE-LOAD %s
@@ -21,10 +21,7 @@
 
 // Linux uses a different autolinking mechanism, based on
 // swift-autolink-extract. This file tests the Darwin mechanism.
-// UNSUPPORTED: OS=linux-gnu
-// UNSUPPORTED: OS=linux-gnueabihf
-// UNSUPPORTED: OS=freebsd
-// UNSUPPORTED: OS=linux-androideabi
+// UNSUPPORTED: autolink-extract
 
 import someModule
 
@@ -49,5 +46,6 @@ import someModule
 // FORCE-LOAD-CLIENT: @llvm.used = appending global [{{[0-9]+}} x i8*] [
 // FORCE-LOAD-CLIENT: i8* bitcast (void ()** @"_swift_FORCE_LOAD_$_module_$_autolinking" to i8*)
 // FORCE-LOAD-CLIENT: ], section "llvm.metadata"
-// FORCE-LOAD-CLIENT: declare {{(dllimport )?}}void @"_swift_FORCE_LOAD_$_module"()
+// FORCE-LOAD-CLIENT-MACHO: declare extern_weak {{(dllimport )?}}void @"_swift_FORCE_LOAD_$_module"()
+// FORCE-LOAD-CLIENT-COFF: declare extern {{(dllimport )?}}void @"_swift_FORCE_LOAD_$_module"()
 

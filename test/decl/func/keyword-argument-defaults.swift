@@ -108,7 +108,7 @@ func testSubscripts(_ i: Int, s: String, x: Y) {
   var i2 = x[i]
   var i3 = x[x: i] // expected-error{{extraneous argument label 'x:' in subscript}}
   var s2 = x[y: s]
-  var s3 = x[s]  // expected-error{{missing argument label 'y:' in subscript}}
+  var s3 = x[s]  // expected-error{{cannot convert value of type 'String' to expected argument type 'Int'}}
 }
 
 // Operators

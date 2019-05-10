@@ -8,7 +8,7 @@
   case Zim, Zang, Zung
 }
 
-@objc(EnumRuntimeName) enum RuntimeNamed: Int {
+@objc(EnumRuntimeName) enum RuntimeNamed: Int32 {
   case Zim, Zang, Zung
 }
 

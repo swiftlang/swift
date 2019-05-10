@@ -630,7 +630,7 @@ let arr = [BottleLayout]()
 let layout = BottleLayout(count:1)
 let ix = arr.firstIndex(of:layout) // expected-error {{argument type 'BottleLayout' does not conform to expected type 'Equatable'}}
 
-let _: () -> UInt8 = { .init("a" as Unicode.Scalar) } // expected-error {{missing argument label 'ascii:' in call}}
+let _: () -> UInt8 = { .init("a" as Unicode.Scalar) } // expected-error {{initializer 'init(_:)' requires that 'Unicode.Scalar' conform to 'BinaryInteger'}}
 
 // https://bugs.swift.org/browse/SR-9068
 func compare<C: Collection, Key: Hashable, Value: Equatable>(c: C)
@@ -672,7 +672,7 @@ protocol SR_7984_P {
 struct A<T: String> {} // expected-error {{type 'T' constrained to non-protocol, non-class type 'String'}}
 struct B<T> where T: String {} // expected-error {{type 'T' constrained to non-protocol, non-class type 'String'}}
 protocol C {
-  associatedtype Foo: String // expected-error {{inheritance from non-protocol, non-class type 'String'}} expected-error {{type 'Self.Foo' constrained to non-protocol, non-class type 'String'}}
+  associatedtype Foo: String // expected-error {{type 'Self.Foo' constrained to non-protocol, non-class type 'String'}}
 }
 protocol D {
   associatedtype Foo where Foo: String // expected-error {{type 'Self.Foo' constrained to non-protocol, non-class type 'String'}}

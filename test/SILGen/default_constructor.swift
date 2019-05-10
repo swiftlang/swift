@@ -19,8 +19,8 @@ struct D {
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Int.Type
 // CHECK:      [[FN:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK-NEXT: [[LEFT:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
-// CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Double.Type
 // CHECK-NEXT: [[VALUE:%.*]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0x400C000000000000|0x4000E000000000000000}}
+// CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Double.Type
 // CHECK:      [[FN:%.*]] = function_ref @$sSd20_builtinFloatLiteralSdBf{{64|80}}__tcfC : $@convention(method) (Builtin.FPIEEE{{64|80}}, @thin Double.Type) -> Double
 // CHECK-NEXT: [[RIGHT:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.FPIEEE{{64|80}}, @thin Double.Type) -> Double
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ([[LEFT]] : $Int, [[RIGHT]] : $Double)
@@ -120,4 +120,16 @@ struct I {
   // CHECK: [[X_ADDR:%[0-9]+]] = struct_element_addr {{.*}} : $*I, #I.x
   // CHECK: assign [[RESULT]] to [[X_ADDR]] : $*Int
   init<T>(_: T) {}
+}
+
+// https://bugs.swift.org/browse/SR-10075
+func defaultValue<T>() -> T {
+    fatalError()
+}
+
+struct S<T> {
+  let value1: T = defaultValue()
+  let value2: Int
+
+  // CHECK-LABEL: sil hidden [ossa] @$s19default_constructor1SV6value2ACyxGSi_tcfC : $@convention(method) <T> (Int, @thin S<T>.Type) -> @out S<T>
 }

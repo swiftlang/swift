@@ -468,7 +468,8 @@ extension String {
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {
-    return try self._withUTF8 { utf8 in
+    var copy = self
+    return try copy.withUTF8 { utf8 in
       var arg = Array<TargetEncoding.CodeUnit>()
       arg.reserveCapacity(1 &+ self._guts.count / 4)
       let repaired = transcode(
@@ -570,7 +571,7 @@ extension String {
 
   // String append
   @inlinable // Forward inlinability to append
-  @_semantics("string.append")
+  @_semantics("string.plusequals")
   public static func += (lhs: inout String, rhs: String) {
     lhs.append(rhs)
   }

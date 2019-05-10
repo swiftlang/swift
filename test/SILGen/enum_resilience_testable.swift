@@ -1,7 +1,7 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift -enable-testing
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift -enable-testing
 // RUN: %target-swift-emit-silgen -module-name enum_resilience_testable -I %t -enable-nonfrozen-enum-exhaustivity-diagnostics -swift-version 5 %s | %FileCheck %s
 
 // This is mostly testing the same things as enum_resilienc.swift, just in a
@@ -17,6 +17,7 @@
 // CHECK-LABEL: sil hidden [ossa] @$s24enum_resilience_testable15resilientSwitchyy0d1_A06MediumOF : $@convention(thin) (@in_guaranteed Medium) -> ()
 // CHECK:         [[BOX:%.*]] = alloc_stack $Medium
 // CHECK-NEXT:    copy_addr %0 to [initialization] [[BOX]]
+// CHECK-NEXT:    [[METATYPE:%.+]] = value_metatype $@thick Medium.Type, [[BOX]] : $*Medium
 // CHECK-NEXT:    switch_enum_addr [[BOX]] : $*Medium, case #Medium.Paper!enumelt: bb1, case #Medium.Canvas!enumelt: bb2, case #Medium.Pamphlet!enumelt.1: bb3, case #Medium.Postcard!enumelt.1: bb4, default bb5
 // CHECK:       bb1:
 // CHECK-NEXT:    dealloc_stack [[BOX]]
@@ -37,7 +38,6 @@
 // CHECK-NEXT:    dealloc_stack [[BOX]]
 // CHECK-NEXT:    br bb6
 // CHECK:       bb5:
-// CHECK-NEXT:    [[METATYPE:%.+]] = value_metatype $@thick Medium.Type, [[BOX]] : $*Medium
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[DIAGNOSE:%.+]] = function_ref @$ss27_diagnoseUnexpectedEnumCase
 // CHECK-NEXT:    = apply [[DIAGNOSE]]<Medium>([[METATYPE]]) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> Never

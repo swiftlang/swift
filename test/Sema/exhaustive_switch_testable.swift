@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -swift-version 5 -enable-resilience -enable-testing %S/Inputs/exhaustive_switch_testable_helper.swift -emit-module -o %t
+// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -enable-testing %S/Inputs/exhaustive_switch_testable_helper.swift -emit-module -o %t
 // RUN: %target-swift-frontend -typecheck %s -swift-version 5 -I %t -DTESTABLE -verify
 // RUN: %target-swift-frontend -typecheck %s -swift-version 5 -I %t 2>&1 | %FileCheck -check-prefix=VERIFY-NON-FROZEN %s
 

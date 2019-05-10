@@ -56,30 +56,14 @@ def exit_rejecting_arguments(message, parser=None):
     sys.exit(2)  # 2 is the same as `argparse` error exit code.
 
 
-def call_without_sleeping(command, env=None, dry_run=False, echo=False):
-    """
-    Execute a command during which system sleep is disabled.
-
-    By default, this ignores the state of the `shell.dry_run` flag.
-    """
-
-    # Disable system sleep, if possible.
-    if platform.system() == 'Darwin':
-        # Don't mutate the caller's copy of the arguments.
-        command = ["caffeinate"] + list(command)
-
-    shell.call(command, env=env, dry_run=dry_run, echo=echo)
-
-
 class HostSpecificConfiguration(object):
 
     """Configuration information for an individual host."""
 
-    def __init__(self, host_target, invocation):
+    def __init__(self, host_target, args):
         """Initialize for the given `host_target`."""
 
         # Compute the set of deployment targets to configure/build.
-        args = invocation.args
         if host_target == args.host_target:
             # This host is the user's desired product, so honor the requested
             # set of targets to configure/build.
@@ -95,6 +79,17 @@ class HostSpecificConfiguration(object):
             # cross-compiling, so we only need the target itself.
             stdlib_targets_to_configure = [host_target]
             stdlib_targets_to_build = set(stdlib_targets_to_configure)
+
+        # Compute derived information from the arguments.
+        #
+        # FIXME: We should move the platform-derived arguments to be entirely
+        # data driven, so that we can eliminate this code duplication and just
+        # iterate over all supported platforms.
+        platforms_to_skip_build = self.__platforms_to_skip_build(args)
+        platforms_to_skip_test = self.__platforms_to_skip_test(args)
+        platforms_archs_to_skip_test = \
+            self.__platforms_archs_to_skip_test(args)
+        platforms_to_skip_test_host = self.__platforms_to_skip_test_host(args)
 
         # Compute the lists of **CMake** targets for each use case (configure
         # vs. build vs. run) and the SDKs to configure with.
@@ -122,9 +117,9 @@ class HostSpecificConfiguration(object):
 
             # Compute which actions are desired.
             build = (
-                deployment_platform not in invocation.platforms_to_skip_build)
+                deployment_platform not in platforms_to_skip_build)
             test = (
-                deployment_platform not in invocation.platforms_to_skip_test)
+                deployment_platform not in platforms_to_skip_test)
             test_host_only = None
             dt_supports_benchmark = deployment_target.supports_benchmark
             build_benchmarks = build and dt_supports_benchmark
@@ -137,19 +132,14 @@ class HostSpecificConfiguration(object):
             # For platforms which normally require a connected device to
             # test, the default behavior is to run tests that only require
             # the host (i.e., they do not attempt to execute).
-            if deployment_platform.is_darwin and \
-               deployment_platform.is_embedded and \
-               not deployment_platform.is_simulator:
-                if deployment_platform not in \
-                        invocation.platforms_to_skip_test_host:
-                    test_host_only = True
-                    test = True
-                else:
-                    test = False
+            if deployment_platform.uses_host_tests and \
+                    deployment_platform not in \
+                    platforms_to_skip_test_host:
+                test_host_only = True
 
             name = deployment_target.name
 
-            for skip_test_arch in invocation.platforms_archs_to_skip_test:
+            for skip_test_arch in platforms_archs_to_skip_test:
                 if deployment_target.name == skip_test_arch.name:
                     test = False
 
@@ -181,7 +171,7 @@ class HostSpecificConfiguration(object):
                         "check-swift-benchmark-{}-external".format(name))
             if test:
                 if test_host_only:
-                    suffix = "-non-executable"
+                    suffix = "-only_non_executable"
                 else:
                     suffix = ""
                 subset_suffix = ""
@@ -206,6 +196,95 @@ class HostSpecificConfiguration(object):
                     self.swift_test_run_targets.append(
                         "check-swift{}-optimize_size-{}".format(
                             subset_suffix, name))
+                if args.test_optimize_none_implicit_dynamic and \
+                        not test_host_only:
+                    self.swift_test_run_targets.append(
+                        "check-swift{}-optimize_none_implicit_dynamic-{}"
+                        .format(subset_suffix, name))
+
+    def __platforms_to_skip_build(self, args):
+        platforms_to_skip_build = set()
+        if not args.build_linux:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.Linux)
+        if not args.build_freebsd:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.FreeBSD)
+        if not args.build_cygwin:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.Cygwin)
+        if not args.build_osx:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.OSX)
+        if not args.build_ios_device:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.iOS)
+        if not args.build_ios_simulator:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.iOSSimulator)
+        if not args.build_tvos_device:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.AppleTV)
+        if not args.build_tvos_simulator:
+            platforms_to_skip_build.add(
+                StdlibDeploymentTarget.AppleTVSimulator)
+        if not args.build_watchos_device:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.AppleWatch)
+        if not args.build_watchos_simulator:
+            platforms_to_skip_build.add(
+                StdlibDeploymentTarget.AppleWatchSimulator)
+        if not args.build_android:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.Android)
+        return platforms_to_skip_build
+
+    def __platforms_to_skip_test(self, args):
+        platforms_to_skip_test = set()
+        if not args.test_linux:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.Linux)
+        if not args.test_freebsd:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.FreeBSD)
+        if not args.test_cygwin:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.Cygwin)
+        if not args.test_osx:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.OSX)
+        if not args.test_ios_host:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.iOS)
+        else:
+            exit_rejecting_arguments("error: iOS device tests are not " +
+                                     "supported in open-source Swift.")
+        if not args.test_ios_simulator:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.iOSSimulator)
+        if not args.test_tvos_host:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTV)
+        else:
+            exit_rejecting_arguments("error: tvOS device tests are not " +
+                                     "supported in open-source Swift.")
+        if not args.test_tvos_simulator:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTVSimulator)
+        if not args.test_watchos_host:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.AppleWatch)
+        else:
+            exit_rejecting_arguments("error: watchOS device tests are not " +
+                                     "supported in open-source Swift.")
+        if not args.test_watchos_simulator:
+            platforms_to_skip_test.add(
+                StdlibDeploymentTarget.AppleWatchSimulator)
+        if not args.test_android:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.Android)
+
+        return platforms_to_skip_test
+
+    def __platforms_archs_to_skip_test(self, args):
+        platforms_archs_to_skip_test = set()
+        if not args.test_ios_32bit_simulator:
+            platforms_archs_to_skip_test.add(
+                StdlibDeploymentTarget.iOSSimulator.i386)
+        return platforms_archs_to_skip_test
+
+    def __platforms_to_skip_test_host(self, args):
+        platforms_to_skip_test_host = set()
+        if not args.test_android_host:
+            platforms_to_skip_test_host.add(StdlibDeploymentTarget.Android)
+        if not args.test_ios_host:
+            platforms_to_skip_test_host.add(StdlibDeploymentTarget.iOS)
+        if not args.test_tvos_host:
+            platforms_to_skip_test_host.add(StdlibDeploymentTarget.AppleTV)
+        if not args.test_watchos_host:
+            platforms_to_skip_test_host.add(StdlibDeploymentTarget.AppleWatch)
+        return platforms_to_skip_test_host
 
 
 class BuildScriptInvocation(object):
@@ -259,11 +338,17 @@ class BuildScriptInvocation(object):
                     "--android-icu-i18n-include, and --android-icu-data "
                     "must be specified")
 
-        if args.legacy_impl and (args.build_indexstoredb or
-                                 args.build_sourcekitlsp):
+        targets_needing_toolchain = [
+            'build_indexstoredb',
+            'build_sourcekitlsp',
+            'build_toolchainbenchmarks',
+        ]
+        has_target_needing_toolchain = \
+            bool(sum(getattr(args, x) for x in targets_needing_toolchain))
+        if args.legacy_impl and has_target_needing_toolchain:
             diagnostics.fatal(
                 "--legacy-impl is incompatible with building packages needing "
-                "a toolchain (indexstore-db or sourcekit-lsp)")
+                "a toolchain (%s)" % ", ".join(targets_needing_toolchain))
 
     @staticmethod
     def apply_default_arguments(toolchain, args):
@@ -332,89 +417,6 @@ class BuildScriptInvocation(object):
             source_root=SWIFT_SOURCE_ROOT,
             build_root=os.path.join(SWIFT_BUILD_ROOT, args.build_subdir))
 
-        # Compute derived information from the arguments.
-        #
-        # FIXME: We should move the platform-derived arguments to be entirely
-        # data driven, so that we can eliminate this code duplication and just
-        # iterate over all supported platforms.
-
-        self.platforms_to_skip_build = set()
-        if not args.build_linux:
-            self.platforms_to_skip_build.add(StdlibDeploymentTarget.Linux)
-        if not args.build_freebsd:
-            self.platforms_to_skip_build.add(StdlibDeploymentTarget.FreeBSD)
-        if not args.build_cygwin:
-            self.platforms_to_skip_build.add(StdlibDeploymentTarget.Cygwin)
-        if not args.build_osx:
-            self.platforms_to_skip_build.add(StdlibDeploymentTarget.OSX)
-        if not args.build_ios_device:
-            self.platforms_to_skip_build.add(StdlibDeploymentTarget.iOS)
-        if not args.build_ios_simulator:
-            self.platforms_to_skip_build.add(
-                StdlibDeploymentTarget.iOSSimulator)
-        if not args.build_tvos_device:
-            self.platforms_to_skip_build.add(StdlibDeploymentTarget.AppleTV)
-        if not args.build_tvos_simulator:
-            self.platforms_to_skip_build.add(
-                StdlibDeploymentTarget.AppleTVSimulator)
-        if not args.build_watchos_device:
-            self.platforms_to_skip_build.add(StdlibDeploymentTarget.AppleWatch)
-        if not args.build_watchos_simulator:
-            self.platforms_to_skip_build.add(
-                StdlibDeploymentTarget.AppleWatchSimulator)
-        if not args.build_android:
-            self.platforms_to_skip_build.add(StdlibDeploymentTarget.Android)
-
-        self.platforms_to_skip_test = set()
-        self.platforms_archs_to_skip_test = set()
-        if not args.test_linux:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.Linux)
-        if not args.test_freebsd:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.FreeBSD)
-        if not args.test_cygwin:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.Cygwin)
-        if not args.test_osx:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.OSX)
-        if not args.test_ios_host:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.iOS)
-        else:
-            exit_rejecting_arguments("error: iOS device tests are not " +
-                                     "supported in open-source Swift.")
-        if not args.test_ios_simulator:
-            self.platforms_to_skip_test.add(
-                StdlibDeploymentTarget.iOSSimulator)
-        if not args.test_ios_32bit_simulator:
-            self.platforms_archs_to_skip_test.add(
-                StdlibDeploymentTarget.iOSSimulator.i386)
-        if not args.test_tvos_host:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTV)
-        else:
-            exit_rejecting_arguments("error: tvOS device tests are not " +
-                                     "supported in open-source Swift.")
-        if not args.test_tvos_simulator:
-            self.platforms_to_skip_test.add(
-                StdlibDeploymentTarget.AppleTVSimulator)
-        if not args.test_watchos_host:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleWatch)
-        else:
-            exit_rejecting_arguments("error: watchOS device tests are not " +
-                                     "supported in open-source Swift.")
-        if not args.test_watchos_simulator:
-            self.platforms_to_skip_test.add(
-                StdlibDeploymentTarget.AppleWatchSimulator)
-
-        if not args.test_android_host:
-            self.platforms_to_skip_test.add(StdlibDeploymentTarget.Android)
-
-        self.platforms_to_skip_test_host = set()
-        if not args.test_ios_host:
-            self.platforms_to_skip_test_host.add(StdlibDeploymentTarget.iOS)
-        if not args.test_tvos_host:
-            self.platforms_to_skip_test_host.add(
-                StdlibDeploymentTarget.AppleTV)
-        if not args.test_watchos_host:
-            self.platforms_to_skip_test_host.add(
-                StdlibDeploymentTarget.AppleWatch)
         self.build_libparser_only = args.build_libparser_only
 
     def initialize_runtime_environment(self):
@@ -447,7 +449,7 @@ class BuildScriptInvocation(object):
             toolchain=self.toolchain,
             source_dir=self.workspace.source_dir("ninja"),
             build_dir=self.workspace.build_dir("build", "ninja"))
-        ninja_build.do_build()
+        ninja_build.build()
         self.toolchain.ninja = ninja_build.ninja_bin_path
 
     def convert_to_impl_arguments(self):
@@ -704,6 +706,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-watchos-host"]
         if not args.test_watchos_simulator:
             impl_args += ["--skip-test-watchos-simulator"]
+        if not args.test_android:
+            impl_args += ["--skip-test-android"]
         if not args.test_android_host:
             impl_args += ["--skip-test-android-host"]
         if args.build_runtime_with_host_compiler:
@@ -720,6 +724,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-optimized"]
         if not args.test_optimize_for_size:
             impl_args += ["--skip-test-optimize-for-size"]
+        if not args.test_optimize_none_implicit_dynamic:
+            impl_args += ["--skip-test-optimize-none-implicit-dynamic"]
         if args.build_libparser_only:
             impl_args += ["--build-libparser-only"]
         if args.android:
@@ -757,8 +763,8 @@ class BuildScriptInvocation(object):
         # add them as one command.
         if args.extra_swift_args:
             impl_args += [
-                "--extra-swift-args",
-                ";".join(args.extra_swift_args)]
+                "--extra-swift-args=%s" % ';'.join(args.extra_swift_args)
+            ]
 
         # If we have extra_cmake_options, combine all of them together and then
         # add them as one command.
@@ -830,7 +836,7 @@ class BuildScriptInvocation(object):
         options = {}
         for host_target in [args.host_target] + args.cross_compile_hosts:
             # Compute the host specific configuration.
-            config = HostSpecificConfiguration(host_target, self)
+            config = HostSpecificConfiguration(host_target, args)
 
             # Convert into `build-script-impl` style variables.
             options[host_target] = {
@@ -888,40 +894,25 @@ class BuildScriptInvocation(object):
             product_classes.append(products.IndexStoreDB)
         if self.args.build_sourcekitlsp:
             product_classes.append(products.SourceKitLSP)
+        if self.args.build_toolchainbenchmarks:
+            product_classes.append(products.Benchmarks)
         return product_classes
 
     def execute(self):
         """Execute the invocation with the configured arguments."""
 
         # Convert to a build-script-impl invocation.
-        (impl_env, impl_args) = self.convert_to_impl_arguments()
+        (self.impl_env, self.impl_args) = self.convert_to_impl_arguments()
 
         # If using the legacy implementation, delegate all behavior to
         # `build-script-impl`.
         if self.args.legacy_impl:
             # Execute the underlying build script implementation.
-            call_without_sleeping([build_script_impl] + impl_args,
-                                  env=impl_env, echo=True)
+            shell.call_without_sleeping([build_script_impl] + self.impl_args,
+                                        env=self.impl_env, echo=True)
             return
 
         # Otherwise, we compute and execute the individual actions ourselves.
-
-        def execute_one_impl_action(host=None, product_class=None, name=None):
-            if host is None:
-                assert (product_class is None and
-                        name == "merged-hosts-lipo"), "invalid action"
-                action_name = name
-            elif product_class is None:
-                assert name in ("package", "extractsymbols"), "invalid action"
-                action_name = "{}-{}".format(host.name, name)
-            else:
-                assert name is not None, "invalid action"
-                action_name = "{}-{}-{}".format(
-                    host.name, product_class.product_name(), name)
-            call_without_sleeping(
-                [build_script_impl] + impl_args + [
-                    "--only-execute", action_name],
-                env=impl_env, echo=self.args.verbose_build)
 
         # Compute the list of hosts to operate on.
         all_host_names = [
@@ -943,7 +934,7 @@ class BuildScriptInvocation(object):
         # Build...
         for host_target in all_hosts:
             # FIXME: We should only compute these once.
-            config = HostSpecificConfiguration(host_target.name, self)
+            config = HostSpecificConfiguration(host_target.name, self.args)
             print("Building the standard library for: {}".format(
                 " ".join(config.swift_stdlib_build_targets)))
             if config.swift_test_run_targets and (
@@ -955,17 +946,17 @@ class BuildScriptInvocation(object):
                     " ".join(config.swift_benchmark_run_targets)))
 
             for product_class in impl_product_classes:
-                execute_one_impl_action(host_target, product_class, "build")
+                self._execute_build_action(host_target, product_class)
 
         # Test...
         for host_target in all_hosts:
             for product_class in impl_product_classes:
-                execute_one_impl_action(host_target, product_class, "test")
+                self._execute_test_action(host_target, product_class)
 
         # Install...
         for host_target in all_hosts:
             for product_class in impl_product_classes:
-                execute_one_impl_action(host_target, product_class, "install")
+                self._execute_install_action(host_target, product_class)
 
         # Non-build-script-impl products...
         # Note: currently only supports building for the host.
@@ -981,19 +972,51 @@ class BuildScriptInvocation(object):
                     source_dir=self.workspace.source_dir(product_source),
                     build_dir=self.workspace.build_dir(
                         host_target, product_name))
-                product.do_build(host_target)
-                product.do_test(host_target)
+                product.build(host_target)
+                product.test(host_target)
 
         # Extract symbols...
         for host_target in all_hosts:
-            execute_one_impl_action(host_target, name="extractsymbols")
+            self._execute_extract_symbols_action(host_target)
 
         # Package...
         for host_target in all_hosts:
-            execute_one_impl_action(host_target, name="package")
+            self._execute_package_action(host_target)
 
         # Lipo...
-        execute_one_impl_action(name="merged-hosts-lipo")
+        self._execute_merged_host_lipo_action()
+
+    def _execute_build_action(self, host_target, product_class):
+        action_name = "{}-{}-build".format(host_target.name,
+                                           product_class.product_name())
+        self._execute_action(action_name)
+
+    def _execute_test_action(self, host_target, product_class):
+        action_name = "{}-{}-test".format(host_target.name,
+                                          product_class.product_name())
+        self._execute_action(action_name)
+
+    def _execute_install_action(self, host_target, product_class):
+        action_name = "{}-{}-install".format(host_target.name,
+                                             product_class.product_name())
+        self._execute_action(action_name)
+
+    def _execute_extract_symbols_action(self, host_target):
+        action_name = "{}-extractsymbols".format(host_target.name)
+        self._execute_action(action_name)
+
+    def _execute_package_action(self, host_target):
+        action_name = "{}-package".format(host_target.name)
+        self._execute_action(action_name)
+
+    def _execute_merged_host_lipo_action(self):
+        self._execute_action("merged-hosts-lipo")
+
+    def _execute_action(self, action_name):
+        shell.call_without_sleeping(
+            [build_script_impl] + self.impl_args +
+            ["--only-execute", action_name],
+            env=self.impl_env, echo=self.args.verbose_build)
 
 
 # Provide a short delay so accidentally invoked clean builds can be canceled.
@@ -1036,6 +1059,14 @@ def main_preset():
         "--distcc",
         help="use distcc",
         action=arguments.action.optional_bool)
+    parser.add_argument(
+        "--cmake-c-launcher",
+        help="the absolute path to set CMAKE_C_COMPILER_LAUNCHER",
+        metavar="PATH")
+    parser.add_argument(
+        "--cmake-cxx-launcher",
+        help="the absolute path to set CMAKE_CXX_COMPILER_LAUNCHER",
+        metavar="PATH")
     parser.add_argument(
         "-j", "--jobs",
         help="the number of parallel build jobs to use",
@@ -1098,6 +1129,11 @@ def main_preset():
 
     preset_args = migrate_swift_sdks(preset.format_args())
 
+    if args.distcc and (args.cmake_c_launcher or args.cmake_cxx_launcher):
+        diagnostics.fatal(
+            '--distcc can not be used with' +
+            ' --cmake-c-launcher or --cmake-cxx-launcher')
+
     build_script_args = [sys.argv[0]]
     if args.dry_run:
         build_script_args += ["--dry-run"]
@@ -1113,6 +1149,10 @@ def main_preset():
                               args.swiftsyntax_install_prefix]
     if args.build_dir:
         build_script_args += ["--build-dir", args.build_dir]
+    if args.cmake_c_launcher:
+        build_script_args += ["--cmake-c-launcher", args.cmake_c_launcher]
+    if args.cmake_cxx_launcher:
+        build_script_args += ["--cmake-cxx-launcher", args.cmake_cxx_launcher]
 
     diagnostics.note('using preset "{}", which expands to \n\n{}\n'.format(
         args.preset, shell.quote_command(build_script_args)))
@@ -1120,7 +1160,7 @@ def main_preset():
     if args.expand_build_script_invocation:
         return 0
 
-    call_without_sleeping(build_script_args)
+    shell.call_without_sleeping(build_script_args)
     return 0
 
 

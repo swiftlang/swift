@@ -11,6 +11,9 @@
 // RUN: %target-codesign %t/Set && %line-directive %t/main.swift -- %target-run %t/Set
 // REQUIRES: executable_test
 
+// Requires swift-version 4
+// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
+
 import StdlibUnittest
 import StdlibCollectionUnittest
 
@@ -1980,7 +1983,8 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 }
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
-  do {
+  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    // Identity of empty sets changed in https://github.com/apple/swift/pull/22527
     var s = getBridgedNonverbatimSet([])
     expectTrue(isNativeSet(s))
     expectEqual(0, s.count)
@@ -2171,6 +2175,10 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
 }
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+    // Identity of empty sets changed in https://github.com/apple/swift/pull/22527
+    return
+  }
   let s1 = getBridgedNonverbatimSet([])
   let identity1 = s1._rawIdentifier()
   expectTrue(isNativeSet(s1))
@@ -2230,7 +2238,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfSets") {
         getAsNSSet([1 + i,  2 + i, 3 + i]))
   }
 
-  var a = nsa as [AnyObject] as! [Set<NSObject>]
+  let a = nsa as [AnyObject] as! [Set<NSObject>]
   for i in 0..<3 {
     let s = a[i]
     var iter = s.makeIterator()
@@ -2251,7 +2259,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfSets") {
         getAsNSSet([1 + i, 2 + i, 3 + i]))
   }
 
-  var a = nsa as [AnyObject] as! [Set<TestBridgedKeyTy>]
+  let a = nsa as [AnyObject] as! [Set<TestBridgedKeyTy>]
   for i in 0..<3 {
     let d = a[i]
     var iter = d.makeIterator()
@@ -2858,29 +2866,43 @@ SetTestSuite.test("isSubsetOf.Set.Set") {
   let s2 = Set([1010, 2020, 3030])
   expectTrue(Set<Int>().isSubset(of: s1))
   expectFalse(s1.isSubset(of: Set<Int>()))
+  expectTrue(Set<Int>().isSubset(of: Set<Int>()))
   expectTrue(s1.isSubset(of: s1))
+  expectFalse(s1.isSubset(of: s2))
   expectTrue(s2.isSubset(of: s1))
 }
 
 SetTestSuite.test("isSubsetOf.Set.Sequence") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  expectTrue(Set<Int>().isSubset(of: s1))
-  expectFalse(s1.isSubset(of: Set<Int>()))
-  expectTrue(s1.isSubset(of: s1))
+  typealias Seq = Array<Int>
+  let s1 = Set([1010, 2020, 3030])
+  expectTrue(Set<Int>().isSubset(of: [1010] as Seq))
+  expectFalse(s1.isSubset(of: [] as Seq))
+  expectTrue(Set<Int>().isSubset(of: [] as Seq))
+  expectTrue(s1.isSubset(of: [1010, 2020, 3030] as Seq))
+  expectFalse(s1.isSubset(of: [1010, 2020] as Seq))
+  expectTrue(s1.isSubset(of: [1010, 2020, 3030, 4040] as Seq))
 }
 
 SetTestSuite.test("isStrictSubsetOf.Set.Set") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
+  let s2 = Set([1010, 2020, 3030])
   expectTrue(Set<Int>().isStrictSubset(of: s1))
   expectFalse(s1.isStrictSubset(of: Set<Int>()))
+  expectFalse(Set<Int>().isStrictSubset(of: Set<Int>()))
   expectFalse(s1.isStrictSubset(of: s1))
+  expectFalse(s1.isStrictSubset(of: s2))
+  expectTrue(s2.isStrictSubset(of: s1))
 }
 
 SetTestSuite.test("isStrictSubsetOf.Set.Sequence") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  expectTrue(Set<Int>().isStrictSubset(of: s1))
-  expectFalse(s1.isStrictSubset(of: Set<Int>()))
-  expectFalse(s1.isStrictSubset(of: s1))
+  typealias Seq = Array<Int>
+  let s1 = Set([1010, 2020, 3030])
+  expectTrue(Set<Int>().isStrictSubset(of: [1010] as Seq))
+  expectFalse(s1.isStrictSubset(of: [] as Seq))
+  expectFalse(Set<Int>().isStrictSubset(of: [] as Seq))
+  expectFalse(s1.isStrictSubset(of: [1010, 2020, 3030] as Seq))
+  expectFalse(s1.isStrictSubset(of: [1010, 2020] as Seq))
+  expectTrue(s1.isStrictSubset(of: [1010, 2020, 3030, 4040] as Seq))
 }
 
 SetTestSuite.test("isSupersetOf.Set.Set") {
@@ -2888,37 +2910,43 @@ SetTestSuite.test("isSupersetOf.Set.Set") {
   let s2 = Set([1010, 2020, 3030])
   expectTrue(s1.isSuperset(of: Set<Int>()))
   expectFalse(Set<Int>().isSuperset(of: s1))
+  expectTrue(Set<Int>().isSuperset(of: Set<Int>()))
   expectTrue(s1.isSuperset(of: s1))
   expectTrue(s1.isSuperset(of: s2))
-  expectFalse(Set<Int>().isSuperset(of: s1))
+  expectFalse(s2.isSuperset(of: s1))
 }
 
 SetTestSuite.test("isSupersetOf.Set.Sequence") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
-  expectTrue(s1.isSuperset(of: Set<Int>()))
-  expectFalse(Set<Int>().isSuperset(of: s1))
-  expectTrue(s1.isSuperset(of: s1))
-  expectTrue(s1.isSuperset(of: s2))
-  expectFalse(Set<Int>().isSuperset(of: s1))
+  typealias Seq = Array<Int>
+  let s1 = Set([1010, 2020, 3030])
+  expectTrue(s1.isSuperset(of: [] as Seq))
+  expectFalse(Set<Int>().isSuperset(of: [1010] as Seq))
+  expectTrue(Set<Int>().isSuperset(of: [] as Seq))
+  expectTrue(s1.isSuperset(of: [1010, 2020, 3030] as Seq))
+  expectTrue(s1.isSuperset(of: [1010, 2020] as Seq))
+  expectFalse(s1.isSuperset(of: [1010, 2020, 3030, 4040] as Seq))
 }
 
-SetTestSuite.test("strictSuperset.Set.Set") {
+SetTestSuite.test("isStrictSuperset.Set.Set") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let s2 = Set([1010, 2020, 3030])
   expectTrue(s1.isStrictSuperset(of: Set<Int>()))
   expectFalse(Set<Int>().isStrictSuperset(of: s1))
+  expectFalse(Set<Int>().isStrictSuperset(of: Set<Int>()))
   expectFalse(s1.isStrictSuperset(of: s1))
   expectTrue(s1.isStrictSuperset(of: s2))
+  expectFalse(s2.isStrictSuperset(of: s1))
 }
 
-SetTestSuite.test("strictSuperset.Set.Sequence") {
-  let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let s2 = AnySequence([1010, 2020, 3030])
-  expectTrue(s1.isStrictSuperset(of: Set<Int>()))
-  expectFalse(Set<Int>().isStrictSuperset(of: s1))
-  expectFalse(s1.isStrictSuperset(of: s1))
-  expectTrue(s1.isStrictSuperset(of: s2))
+SetTestSuite.test("isStrictSuperset.Set.Sequence") {
+  typealias Seq = Array<Int>
+  let s1 = Set([1010, 2020, 3030])
+  expectTrue(s1.isStrictSuperset(of: [] as Seq))
+  expectFalse(Set<Int>().isStrictSuperset(of: [1010] as Seq))
+  expectFalse(Set<Int>().isStrictSuperset(of: [] as Seq))
+  expectFalse(s1.isStrictSuperset(of: [1010, 2020, 3030] as Seq))
+  expectTrue(s1.isStrictSuperset(of: [1010, 2020] as Seq))
+  expectFalse(s1.isStrictSuperset(of: [1010, 2020, 3030, 4040] as Seq))
 }
 
 SetTestSuite.test("Equatable.Native.Native") {
@@ -4097,6 +4125,38 @@ SetTestSuite.test("SetAlgebra.IsSupersetOf.EmptySet") {
   expectTrue(s1.isSuperset(of: s3))
 }
 
+// Test filter(_:)
+
+SetTestSuite.test("SetAlgebra.Filter.SingleEntry") {
+  var s = Set<Int>([1010])
+
+  expectTrue(s.contains(1010))
+
+  let filter = s.filter { $0 > 1000 }
+
+  expectTrue(s.contains(1010))
+  expectTrue(filter.contains(1010))
+}
+
+SetTestSuite.test("SetAlgebra.Filter.MultipleEntries") {
+  var s: Set<Int> = [1010, 1020, 1030]
+
+  let filter = s.filter { $0 > 1010 }
+
+  expectFalse(filter.contains(1010))
+  expectTrue(filter.contains(1020))
+  expectTrue(filter.contains(1030))
+}
+
+SetTestSuite.test("SetAlgebra.Filter.EmptySet") {
+  var s: Set<Int> = []
+
+  let filter = s.filter { $0 > 1000 }
+
+  expectFalse(filter.contains(1010))
+  expectTrue(filter.isEmpty)
+}
+
 // Test remove()
 
 SetTestSuite.test("SetAlgebra.Remove.SingleEntry") {
@@ -4612,5 +4672,228 @@ SetTestSuite.test("IndexValidation.RemoveAt.AfterGrow") {
   expectCrashLater()
   s.remove(at: i)
 }
+
+#if _runtime(_ObjC)
+if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  // https://github.com/apple/swift/pull/23174
+  SetTestSuite.test("ForcedNonverbatimBridge.Trap.String")
+  .skip(.custom(
+      { _isFastAssertConfiguration() },
+      reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+    let s1: NSSet = [
+      "Gordon" as NSString,
+      "William" as NSString,
+      "Katherine" as NSString,
+      "Lynn" as NSString,
+      "Brian" as NSString,
+      1756 as NSNumber]
+
+    expectCrashLater()
+    _ = s1 as! Set<String>
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  // https://github.com/apple/swift/pull/23174
+  SetTestSuite.test("ForcedNonverbatimBridge.Trap.Int")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+    let s1: NSSet = [
+      4 as NSNumber,
+      8 as NSNumber,
+      15 as NSNumber,
+      16 as NSNumber,
+      23 as NSNumber,
+      42 as NSNumber,
+      "John" as NSString]
+
+    expectCrashLater()
+    _ = s1 as! Set<Int>
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+SetTestSuite.test("ForcedVerbatimBridge.Trap.NSString")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+
+  let s1: NSSet = [
+    "Gordon" as NSString,
+    "William" as NSString,
+    "Katherine" as NSString,
+    "Lynn" as NSString,
+    "Brian" as NSString,
+    1756 as NSNumber]
+
+  // With the ObjC runtime, the verbatim downcast is O(1); it performs no
+  // runtime checks.
+  let s2 = s1 as! Set<NSString>
+  // Element access goes through the bridged path and performs forced downcasts.
+  // This is where the odd numeric value is caught.
+  expectCrashLater()
+  for string in s2 {
+    _ = string
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+SetTestSuite.test("ForcedVerbatimBridge.Trap.NSNumber")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+  let s1: NSSet = [
+    4 as NSNumber,
+    8 as NSNumber,
+    15 as NSNumber,
+    16 as NSNumber,
+    23 as NSNumber,
+    42 as NSNumber,
+    "John" as NSString]
+  // With the ObjC runtime, the verbatim downcast is O(1); it performs no
+  // runtime checks.
+  let s2 = s1 as! Set<NSNumber>
+  // Element access goes through the bridged path and performs forced downcasts.
+  // This is where the odd numeric value is caught.
+  expectCrashLater()
+  for string in s2 {
+    _ = string
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+SetTestSuite.test("ForcedVerbatimDowncast.Trap.String")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+  let s1: Set<NSObject> = [
+    "Gordon" as NSString,
+    "William" as NSString,
+    "Katherine" as NSString,
+    "Lynn" as NSString,
+    "Brian" as NSString,
+    1756 as NSNumber]
+  // With the ObjC runtime, the verbatim downcast is O(1); it performs no
+  // runtime checks.
+  let s2 = s1 as! Set<NSString>
+  // Element access goes through the bridged path and performs forced downcasts.
+  // This is where the odd numeric value is caught.
+  expectCrashLater()
+  for string in s2 {
+    _ = string
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+SetTestSuite.test("ForcedVerbatimDowncast.Trap.Int")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+  let s1: Set<NSObject> = [
+    4 as NSNumber,
+    8 as NSNumber,
+    15 as NSNumber,
+    16 as NSNumber,
+    23 as NSNumber,
+    42 as NSNumber,
+    "John" as NSString]
+  // With the ObjC runtime, the verbatim downcast is O(1); it performs no
+  // runtime checks.
+  let s2 = s1 as! Set<NSNumber>
+  expectCrashLater()
+  // Element access goes through the bridged path and performs forced downcasts.
+  // This is where the odd string value is caught.
+  for string in s2 {
+    _ = string
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  // https://github.com/apple/swift/pull/23174
+  SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.String")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+    let s1: Set<NSObject> = [
+      "Gordon" as NSString,
+      "William" as NSString,
+      "Katherine" as NSString,
+      "Lynn" as NSString,
+      "Brian" as NSString,
+      1756 as NSNumber]
+    expectCrashLater()
+    // Nonverbatim downcasts are greedy and they trap immediately.
+    let s2 = s1 as! Set<String>
+    _ = s2.contains("Gordon")
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  // https://github.com/apple/swift/pull/23174
+  SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.Int")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Could not cast value of type")
+  .code {
+    let s1: Set<NSObject> = [
+      4 as NSNumber,
+      8 as NSNumber,
+      15 as NSNumber,
+      16 as NSNumber,
+      23 as NSNumber,
+      42 as NSNumber,
+      "John" as NSString]
+    expectCrashLater()
+    // Nonverbatim downcasts are greedy and they trap immediately.
+    let s2 = s1 as! Set<Int>
+    _ = s2.contains(23)
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  // https://github.com/apple/swift/pull/23683
+  SetTestSuite.test("Upcast.StringEqualityMismatch") {
+    // Upcasting from NSString to String keys changes their concept of equality,
+    // resulting in two equal keys, one of which should be discarded by the
+    // downcast. (Along with its associated value.)
+    // rdar://problem/35995647
+    let s: Set<NSString> = [
+      "cafe\u{301}",
+      "café"
+    ]
+    expectEqual(s.count, 2)
+    let s2 = s as Set<String>
+    expectEqual(s2.count, 1)
+  }
+}
+#endif
 
 runAllTests()

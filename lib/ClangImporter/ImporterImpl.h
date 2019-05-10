@@ -248,14 +248,19 @@ enum class FactoryAsInitKind {
 
 namespace importer {
 struct PlatformAvailability {
-  /// A predicate that indicates if the given platform should be
-  /// considered for availability.
-  std::function<bool(StringRef PlatformName)> filter;
+private:
+  PlatformKind platformKind;
 
-  /// A predicate that indicates if the given platform version should
-  /// should be included in the cutoff of deprecated APIs marked unavailable.
-  std::function<bool(unsigned major, llvm::Optional<unsigned> minor)>
-      deprecatedAsUnavailableFilter;
+public:
+  /// Returns true when the given platform should be considered for
+  /// availabilityon imported declarations.
+  bool isPlatformRelevant(StringRef platform) const;
+
+  /// Returns true when the given declaration with the given deprecation
+  /// should be inlucded in the cutoff of imported deprecated APIs marked
+  /// unavailable.
+  bool treatDeprecatedAsUnavailable(const clang::Decl *clangDecl,
+                                    const llvm::VersionTuple &version) const;
 
   /// The message to embed for implicitly unavailability if a deprecated
   /// API is now unavailable.
@@ -329,7 +334,7 @@ public:
   const bool InferImportAsMember;
   const bool DisableSwiftBridgeAttr;
   const bool BridgingHeaderExplicitlyRequested;
-  const bool DisableAdapterModules;
+  const bool DisableOverlayModules;
 
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
@@ -515,7 +520,7 @@ private:
   Type NSObjectTy;
 
   /// A pair containing a ClangModuleUnit,
-  /// and whether the adapters of its re-exported modules have all been forced
+  /// and whether the overlays of its re-exported modules have all been forced
   /// to load already.
   using ModuleInitPair = llvm::PointerIntPair<ClangModuleUnit *, 1, bool>;
 
@@ -883,19 +888,13 @@ public:
   /// into the ASTContext.
   ModuleDecl *tryLoadFoundationModule();
 
-  /// Returns the "SIMD" module, if it can be loaded.
-  ///
-  /// After this has been called, the SIMD module will or won't be loaded
-  /// into the ASTContext.
-  ModuleDecl *tryLoadSIMDModule();
-
   /// Retrieves the Swift wrapper for the given Clang module, creating
   /// it if necessary.
   ClangModuleUnit *getWrapperForModule(const clang::Module *underlying);
 
   /// Constructs a Swift module for the given Clang module.
   ModuleDecl *finishLoadingClangModule(const clang::Module *clangModule,
-                                       bool preferAdapter);
+                                       bool preferOverlay);
 
   /// Call finishLoadingClangModule on each deferred import collected
   /// while scanning a bridging header or PCH.
@@ -1262,8 +1261,8 @@ public:
                                uint64_t unused) override;
   
   /// Returns the default definition type for \p ATD.
-  TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
-                                            uint64_t contextData) override {
+  Type loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
+                                 uint64_t contextData) override {
     llvm_unreachable("unimplemented for ClangImporter");
   }
   

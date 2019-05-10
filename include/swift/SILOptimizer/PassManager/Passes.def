@@ -110,6 +110,8 @@ PASS(ComputeLoopInfo, "compute-loop-info",
      "Compute Loop Information for Testing")
 PASS(ConditionForwarding, "condition-forwarding",
      "Conditional Branch Forwarding to Fold SIL switch_enum")
+PASS(ConstantEvaluatorTester, "test-constant-evaluator",
+      "Test constant evaluator")
 PASS(CopyForwarding, "copy-forwarding",
      "Copy Forwarding to Remove Redundant Copies")
 PASS(CopyPropagation, "copy-propagation",
@@ -134,6 +136,8 @@ PASS(Devirtualizer, "devirtualizer",
      "Indirect Call Devirtualization")
 PASS(DiagnoseInfiniteRecursion, "diagnose-infinite-recursion",
      "Diagnose Infinitely-Recursive Code")
+PASS(DiagnoseInvalidEscapingCaptures, "diagnose-invalid-escaping-captures",
+     "Diagnose Invalid Escaping Captures")
 PASS(DiagnoseStaticExclusivity, "diagnose-static-exclusivity",
      "Static Enforcement of Law of Exclusivity")
 PASS(DiagnoseUnreachable, "diagnose-unreachable",
@@ -222,6 +226,8 @@ PASS(NoReturnFolding, "noreturn-folding",
      "Prune Control Flow at No-Return Calls Using SIL unreachable")
 PASS(ObjectOutliner, "object-outliner",
      "Outlining of Global Objects")
+PASS(OpaqueArchetypeSpecializer, "opaque-archetype-specializer",
+     "Opaque archetype specializer")
 PASS(Outliner, "outliner",
      "Function Outlining Optimization")
 PASS(OwnershipModelEliminator, "ownership-model-eliminator",
@@ -261,6 +267,8 @@ PASS(SideEffectsDumper, "side-effects-dump",
      "Print Side-Effect Information for all Functions")
 PASS(IRGenPrepare, "irgen-prepare",
      "Cleanup SIL in preparation for IRGen")
+PASS(SILGenCleanup, "silgen-cleanup",
+     "Cleanup SIL in preparation for diagnostics")
 PASS(SILCombine, "sil-combine",
      "Combine SIL Instructions via Peephole Optimization")
 PASS(SILDebugInfoGenerator, "sil-debuginfo-gen",
@@ -289,8 +297,8 @@ PASS(UnsafeGuaranteedPeephole, "unsafe-guaranteed-peephole",
      "SIL retain/release Peephole Removal for Builtin.unsafeGuaranteed")
 PASS(UsePrespecialized, "use-prespecialized",
      "Use Pre-Specialized Functions")
-PASS(ValueOwnershipKindDumper, "value-ownership-kind-dumper",
-     "Print Value Ownership Kind for Testing")
+PASS(OwnershipDumper, "ownership-dumper",
+     "Print Ownership information for Testing")
 PASS(SemanticARCOpts, "semantic-arc-opts",
      "Semantic ARC Optimization")
 PASS(MarkUninitializedFixup, "mark-uninitialized-fixup",

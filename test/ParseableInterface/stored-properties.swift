@@ -3,14 +3,14 @@
 // RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path %t.swiftinterface %s
 // RUN: %FileCheck %s < %t.swiftinterface --check-prefix CHECK --check-prefix COMMON
 
-// RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path %t-resilient.swiftinterface -enable-resilience %s
+// RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path %t-resilient.swiftinterface -enable-library-evolution %s
 // RUN: %FileCheck %s < %t-resilient.swiftinterface --check-prefix RESILIENT --check-prefix COMMON
 
 // RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule %t.swiftinterface -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -module-name Test -emit-parseable-module-interface-path - | %FileCheck %s --check-prefix CHECK --check-prefix COMMON
 
-// RUN: %target-swift-frontend -emit-module -o %t/TestResilient.swiftmodule -enable-resilience %t-resilient.swiftinterface -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/TestResilient.swiftmodule -module-name TestResilient -enable-resilience -emit-parseable-module-interface-path - | %FileCheck %s --check-prefix RESILIENT --check-prefix COMMON
+// RUN: %target-swift-frontend -emit-module -o %t/TestResilient.swiftmodule -enable-library-evolution %t-resilient.swiftinterface -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/TestResilient.swiftmodule -module-name TestResilient -enable-library-evolution -emit-parseable-module-interface-path - | %FileCheck %s --check-prefix RESILIENT --check-prefix COMMON
 
 // COMMON: public struct HasStoredProperties {
 public struct HasStoredProperties {
@@ -49,7 +49,8 @@ public struct HasStoredProperties {
   // COMMON-NEXT: }
   public private(set) var storedPrivateSet: Int
 
-  // CHECK: private var _: [[BOOL]]
+  // CHECK: private var privateVar: [[BOOL]]
+  // RESILIENT-NOT: private var privateVar: [[BOOL]]
   private var privateVar: Bool
 
   // CHECK: @_hasStorage @_hasInitialValue public var storedWithObserversInitialValue: [[INT]] {
@@ -76,6 +77,9 @@ public struct HasStoredProperties {
 // COMMON: @_fixed_layout public struct BagOfVariables {
 @_fixed_layout
 public struct BagOfVariables {
+  // COMMON: private let hidden: [[INT]] = 0
+  private let hidden: Int = 0
+
   // COMMON: public let a: [[INT]] = 0
   public let a: Int = 0
 

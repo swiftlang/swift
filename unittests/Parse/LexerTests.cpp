@@ -747,10 +747,12 @@ TEST_F(LexerTest, NestedPlaceholder) {
 
 class StringCaptureDiagnosticConsumer : public DiagnosticConsumer {
 public:
-  virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                                DiagnosticKind Kind, StringRef FormatString,
-                                ArrayRef<DiagnosticArgument> FormatArgs,
-                                const swift::DiagnosticInfo &Info) override {
+  virtual void
+  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+                   StringRef FormatString,
+                   ArrayRef<DiagnosticArgument> FormatArgs,
+                   const swift::DiagnosticInfo &Info,
+                   SourceLoc bufferIndirectlyCausingDiagnostic) override {
     std::string DiagMsg;
     llvm::raw_string_ostream DiagOS(DiagMsg);
     DiagnosticEngine::formatDiagnosticText(DiagOS, FormatString, FormatArgs);

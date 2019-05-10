@@ -58,11 +58,11 @@ unwind
 sil @testPartialReturnWithoutYield : $@yield_once @convention(thin) (TestYield) -> @yields Int64 {
 bb0(%0 : $TestYield):
 %1 = struct_extract %0 : $TestYield, #TestYield.flag
-cond_br %1, bb1, bb3
+cond_br %1, bb1, bb3					   // expected-note {{missing yield when the condition is false}}
 
 bb1:
 %5 = struct_extract %0 : $TestYield, #TestYield.stored
-yield %5 : $Int64, resume bb2, unwind bb5   // expected-note {{yield along one path is here}}
+yield %5 : $Int64, resume bb2, unwind bb5
 
 bb2:
 br bb4
@@ -86,14 +86,14 @@ bb0(%0 : $TestYield):
 %5 = builtin "cmp_slt_Int64"(%3 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1
 %6 = struct $Bool (%5 : $Builtin.Int1)
 %7 = struct_extract %6 : $Bool, #Bool._value
-cond_br %7, bb1, bb2
+cond_br %7, bb1, bb2						// expected-note {{missing yield when the condition is true}}
 
 bb1:
 br bb4
 
 bb2:
 %10 = struct_extract %0 : $TestYield, #TestYield.stored
-yield %10 : $Int64, resume bb3, unwind bb5    // expected-note {{yield along one path is here}}
+yield %10 : $Int64, resume bb3, unwind bb5
 
 bb3:
 br bb4

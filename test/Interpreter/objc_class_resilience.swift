@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-clang -fobjc-arc %S/Inputs/ObjCClasses/ObjCClasses.m -c -o %t/ObjCClasses.o
-// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_struct)) -Xfrontend -enable-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_struct)) -enable-library-evolution %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct
 // RUN: %target-codesign %t/%target-library-name(resilient_struct)
 
 // RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -I %S/Inputs/ObjCClasses/ -Xlinker %t/ObjCClasses.o -o %t/main %target-rpath(%t)
@@ -36,7 +36,10 @@ func takesMyProtocol(_ p: MyProtocol) -> Int {
   return p.myMethod()
 }
 
-ResilientClassTestSuite.test("Category") {
+ResilientClassTestSuite.test("Category")
+  .xfail(.osxMinor(10, 9, reason:
+         "Category attachment with ARCLite on 10.9 doesn't work currently"))
+  .code {
   expectEqual(42, takesMyProtocol(ResilientFieldWithCategory()))
 }
 

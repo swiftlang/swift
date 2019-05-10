@@ -16,6 +16,8 @@ if(SWIFT_BUILD_SDK_OVERLAY)
   # the correct order for Windows.
   add_subdirectory(StdlibUnittest)
 
+  add_subdirectory(OSLog)
+
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     add_subdirectory(StdlibUnittestFoundationExtras)
     if (SWIFT_INCLUDE_TESTS)

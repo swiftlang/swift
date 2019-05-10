@@ -16,11 +16,11 @@
 //
 // Phase 2: build OtherModule into a .swiftinterface file with -target x86_64-macosx-10.10:
 //
-// RUN: %swift -target x86_64-apple-macosx10.10 -I %t -module-cache-path %t/modulecache -emit-parseable-module-interface-path %t/OtherModule.swiftinterface -module-name OtherModule %t/other.swift -enable-parseable-module-interface -typecheck
+// RUN: %swift -target x86_64-apple-macosx10.10 -I %t -module-cache-path %t/modulecache -emit-parseable-module-interface-path %t/OtherModule.swiftinterface -module-name OtherModule %t/other.swift -typecheck
 //
 // Phase 3: build TestModule in -target x86_64-apple-macosx10.11 and import both of these:
 //
-// RUN: %swift -target x86_64-apple-macosx10.11  -I %t -module-cache-path %t/modulecache -module-name TestModule %s -enable-parseable-module-interface -typecheck
+// RUN: %swift -target x86_64-apple-macosx10.11  -I %t -module-cache-path %t/modulecache -module-name TestModule %s -typecheck
 //
 // Phase 4: make sure we only compiled LeafModule and OtherModule one time:
 //

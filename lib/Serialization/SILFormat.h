@@ -81,6 +81,7 @@ enum CastConsumptionKindEncoding : uint8_t {
 
 enum class KeyPathComponentKindEncoding : uint8_t {
   StoredProperty,
+  TupleElement,
   GettableProperty,
   SettableProperty,
   OptionalChain,

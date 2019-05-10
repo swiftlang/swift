@@ -37,7 +37,7 @@
 //      Note that semantic components will generally preserve the
 //      syntactic order of their children because doing something else
 //      could illegally change order of evaluation.  This is why, for
-//      example, shuffling a TupleExpr creates a TupleShuffleExpr
+//      example, shuffling a TupleExpr creates a DestructureTupleExpr
 //      instead of just making a new TupleExpr with the elements in
 //      different order.
 //
@@ -121,7 +121,32 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   bool visit(ParameterList *PL) {
     return inherited::visit(PL);
   }
-  
+
+  //===--------------------------------------------------------------------===//
+  //                               Attributes
+  //===--------------------------------------------------------------------===//
+  bool visitCustomAttributes(Decl *D) {
+    for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr>()) {
+      CustomAttr *mutableCustomAttr = const_cast<CustomAttr *>(customAttr);
+      if (doIt(mutableCustomAttr->getTypeLoc()))
+        return true;
+
+      if (auto semanticInit = customAttr->getSemanticInit()) {
+        if (auto newSemanticInit = doIt(semanticInit))
+          mutableCustomAttr->setSemanticInit(newSemanticInit);
+        else
+          return true;
+      } else if (auto arg = customAttr->getArg()) {
+        if (auto newArg = doIt(arg))
+          mutableCustomAttr->setArg(newArg);
+        else
+          return true;
+      }
+    }
+
+    return false;
+  }
+
   //===--------------------------------------------------------------------===//
   //                                 Decls
   //===--------------------------------------------------------------------===//
@@ -151,6 +176,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitPatternBindingDecl(PatternBindingDecl *PBD) {
+    // If there is a single variable, walk it's attributes.
+    bool isPropertyDelegateBackingProperty = false;
+    if (auto singleVar = PBD->getSingleVar()) {
+      if (visitCustomAttributes(singleVar))
+        return true;
+
+      isPropertyDelegateBackingProperty =
+        singleVar->getOriginalDelegatedProperty() != nullptr;
+    }
+
     unsigned idx = 0U-1;
     for (auto entry : PBD->getPatternList()) {
       ++idx;
@@ -159,7 +194,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       else
         return true;
       if (entry.getInit() &&
-          (!entry.isInitializerLazy() ||
+          !isPropertyDelegateBackingProperty &&
+          (!entry.isInitializerSubsumed() ||
            Walker.shouldWalkIntoLazyInitializers())) {
 #ifndef NDEBUG
         PrettyStackTraceDecl debugStack("walking into initializer for", PBD);
@@ -212,6 +248,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
 
     return doIt(TAD->getUnderlyingTypeLoc());
+  }
+  
+  bool visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
+    if (OTD->getGenericParams() &&
+        Walker.shouldWalkIntoGenericParams()) {
+      if (visitGenericParamList(OTD->getGenericParams()))
+        return true;
+    }
+    return false;
   }
 
   bool visitAbstractTypeParamDecl(AbstractTypeParamDecl *TPD) {
@@ -443,6 +488,17 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) { return E; }
 
+  Expr *visitDefaultArgumentExpr(DefaultArgumentExpr *E) { return E; }
+
+  Expr *visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *E) {
+    if (auto subExpr = doIt(E->getSubExpr())) {
+      E->setSubExpr(subExpr);
+      return E;
+    }
+
+    return nullptr;
+  }
+
   Expr *visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
     HANDLE_SEMANTIC_EXPR(E);
 
@@ -639,18 +695,17 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
   
-  Expr *visitTupleShuffleExpr(TupleShuffleExpr *E) {
-    if (Expr *E2 = doIt(E->getSubExpr())) {
-      E->setSubExpr(E2);
+  Expr *visitDestructureTupleExpr(DestructureTupleExpr *E) {
+    if (auto *src = doIt(E->getSubExpr())) {
+      E->setSubExpr(src);
     } else {
       return nullptr;
     }
 
-    for (auto &defaultArg : E->getCallerDefaultArgs()) {
-      if (Expr *newDefaultArg = doIt(defaultArg))
-        defaultArg = newDefaultArg;
-      else
-        return nullptr;
+    if (auto *dst = doIt(E->getResultExpr())) {
+      E->setResultExpr(dst);
+    } else {
+      return nullptr;
     }
 
     return E;
@@ -744,6 +799,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
       return nullptr;
     }
+
+    if (!Walker.shouldWalkIntoNonSingleExpressionClosure())
+      return expr;
 
     // Handle other closures.
     if (BraceStmt *body = cast_or_null<BraceStmt>(doIt(expr->getBody()))) {
@@ -1034,6 +1092,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       case KeyPathExpr::Component::Kind::UnresolvedProperty:
       case KeyPathExpr::Component::Kind::Invalid:
       case KeyPathExpr::Component::Kind::Identity:
+      case KeyPathExpr::Component::Kind::TupleElement:
         // No subexpr to visit.
         break;
       }
@@ -1054,11 +1113,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (auto oldSubExpr = E->getSubExpr()) {
       if (auto subExpr = doIt(oldSubExpr)) {
         E->setSubExpr(subExpr);
-      }
-      else {
+      } else {
         return nullptr;
       }
     }
+
+    if (!Walker.shouldWalkIntoNonSingleExpressionClosure())
+      return E;
 
     if (auto oldBody = E->getBody()) {
       if (auto body = doIt(oldBody)) {
@@ -1757,6 +1818,10 @@ bool Traversal::visitSharedTypeRepr(SharedTypeRepr *T) {
 
 bool Traversal::visitOwnedTypeRepr(OwnedTypeRepr *T) {
   return doIt(T->getBase());
+}
+
+bool Traversal::visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *T) {
+  return doIt(T->getConstraint());
 }
 
 bool Traversal::visitFixedTypeRepr(FixedTypeRepr *T) {

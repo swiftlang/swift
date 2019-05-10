@@ -355,7 +355,7 @@ private:
 // Record a store into this object.
 void DeadObjectAnalysis::
 addStore(StoreInst *Store, IndexTrieNode *AddressNode) {
-  if (Store->getSrc()->getType().isTrivial(Store->getModule()))
+  if (Store->getSrc()->getType().isTrivial(*Store->getFunction()))
     return;
 
   // SSAUpdater cannot handle multiple defs in the same blocks. Therefore, we
@@ -568,7 +568,7 @@ static bool removeAndReleaseArray(SingleValueInstruction *NewArrayValue,
   if (!ArrayDef)
     return false; // No Array object to delete.
 
-  assert(!ArrayDef->getType().isTrivial(ArrayDef->getModule()) &&
+  assert(!ArrayDef->getType().isTrivial(*ArrayDef->getFunction()) &&
          "Array initialization should produce the proper tuple type.");
 
   // Analyze the array object uses.
@@ -588,7 +588,7 @@ static bool removeAndReleaseArray(SingleValueInstruction *NewArrayValue,
     removeInstructions(DeadArray.getAllUsers());
     return true;
   }
-  assert(StorageAddress->getType().isTrivial(ArrayDef->getModule()) &&
+  assert(StorageAddress->getType().isTrivial(*ArrayDef->getFunction()) &&
          "Array initialization should produce the proper tuple type.");
 
   // Analyze the array storage uses.
@@ -605,7 +605,7 @@ static bool removeAndReleaseArray(SingleValueInstruction *NewArrayValue,
       return false;
   }
   // For each store location, insert releases.
-  SILSSAUpdater SSAUp(ArrayDef->getModule());
+  SILSSAUpdater SSAUp;
   ValueLifetimeAnalysis::Frontier ArrayFrontier;
   if (!VLA.computeFrontier(ArrayFrontier,
                            ValueLifetimeAnalysis::UsersMustPostDomDef,
@@ -732,7 +732,7 @@ bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
 
 bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
   // Trivial types don't have destructors.
-  bool isTrivialType = ASI->getElementType().isTrivial(ASI->getModule());
+  bool isTrivialType = ASI->getElementType().isTrivial(*ASI->getFunction());
   UserList UsersToRemove;
   if (hasUnremovableUsers(ASI, UsersToRemove, /*acceptRefCountInsts=*/ true,
       /*onlyAcceptTrivialStores*/!isTrivialType)) {

@@ -54,7 +54,8 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
     return gv;
   }
 
-  SILType silTy = M.Types.getLoweredTypeOfGlobal(gDecl);
+  SILType silTy = SILType::getPrimitiveObjectType(
+    M.Types.getLoweredTypeOfGlobal(gDecl));
 
   auto *silGlobal = SILGlobalVariable::create(M, silLinkage, IsNotSerialized,
                                               mangledName, silTy,
@@ -74,13 +75,7 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var) {
                             SILDeclRef(var, SILDeclRef::Kind::GlobalAccessor),
                                                   NotForDefinition);
     SILValue accessor = B.createFunctionRefFor(loc, accessorFn);
-    auto accessorTy = accessor->getType().castTo<SILFunctionType>();
-    (void)accessorTy;
-    assert(!accessorTy->isPolymorphic()
-           && "generic global variable accessors not yet implemented");
-    SILValue addr = B.createApply(
-        loc, accessor, accessor->getType(),
-        accessorFn->getConventions().getSingleSILResultType(), {}, {});
+    SILValue addr = B.createApply(loc, accessor, SubstitutionMap(), {});
     // FIXME: It'd be nice if the result of the accessor was natively an
     // address.
     addr = B.createPointerToAddress(
@@ -92,7 +87,7 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var) {
   // Global variables can be accessed directly with global_addr.  Emit this
   // instruction into the prolog of the function so we can memoize/CSE it in
   // VarLocs.
-  auto entryBB = getFunction().begin();
+  auto *entryBB = &*getFunction().begin();
   SILGenBuilder prologueB(*this, entryBB, entryBB->begin());
   prologueB.setTrackingList(B.getTrackingList());
 

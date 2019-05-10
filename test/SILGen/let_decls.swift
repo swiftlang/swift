@@ -407,22 +407,26 @@ struct StructMemberTest {
   }
   // CHECK-LABEL: sil hidden [ossa] @$s9let_decls16StructMemberTestV016testRecursiveIntD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $StructMemberTest):
-  // CHECK:  debug_value %0 : $StructMemberTest, let, name "self"
-  // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.s
-  // CHECK:  %3 = struct_extract %2 : $AnotherStruct, #AnotherStruct.i
-  // CHECK-NOT:  destroy_value %0 : $StructMemberTest
-  // CHECK:  return %3 : $Int
+  // CHECK:  [[EXT_1:%.*]] = struct_extract [[ARG]] : $StructMemberTest, #StructMemberTest.s
+  // CHECK:  [[EXT_1_COPY:%.*]] = copy_value [[EXT_1]]
+  // CHECK:  [[EXT_1_COPY_BORROW:%.*]] = begin_borrow [[EXT_1_COPY]]
+  // CHECK:  [[EXT_2:%.*]] = struct_extract [[EXT_1_COPY_BORROW]] : $AnotherStruct, #AnotherStruct.i
+  // CHECK:  destroy_value [[EXT_1_COPY]]
+  // CHECK:  return [[EXT_2]] : $Int
+  // CHECK: } // end sil function '$s9let_decls16StructMemberTestV016testRecursiveIntD4LoadSiyF'
   
   func testTupleMemberLoad() -> Int {
     return t.1.i
   }
   // CHECK-LABEL: sil hidden [ossa] @$s9let_decls16StructMemberTestV09testTupleD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
-  // CHECK: bb0(%0 : @guaranteed $StructMemberTest):
-  // CHECK-NEXT:   debug_value %0 : $StructMemberTest, let, name "self"
-  // CHECK-NEXT:   [[T0:%.*]] = struct_extract %0 : $StructMemberTest, #StructMemberTest.t
-  // CHECK-NEXT:   ({{%.*}}, [[T2:%.*]]) = destructure_tuple [[T0]]
-  // CHECK-NEXT:   [[T3:%.*]] = struct_extract [[T2]] : $AnotherStruct, #AnotherStruct.i
-  // CHECK-NEXT:   return [[T3]] : $Int
+  // CHECK: bb0([[ARG]] : @guaranteed $StructMemberTest):
+  // CHECK:   [[T0:%.*]] = struct_extract [[ARG]] : $StructMemberTest, #StructMemberTest.t
+  // CHECK:   [[T0_COPY:%.*]] = copy_value [[T0]]
+  // CHECK:   ({{%.*}}, [[T2:%.*]]) = destructure_tuple [[T0_COPY]]
+  // CHECK:   [[T2_BORROW:%.*]] = begin_borrow [[T2]]
+  // CHECK:   [[T3:%.*]] = struct_extract [[T2_BORROW]] : $AnotherStruct, #AnotherStruct.i
+  // CHECK:   return [[T3]] : $Int
+  // CHECK: } // end sil function '$s9let_decls16StructMemberTestV09testTupleD4LoadSiyF'
 
 }
 

@@ -356,7 +356,12 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
             getElementCountRec(Module, FieldType, false);
         if (Element < NumFieldElements) {
           Result += '.';
-          Result += VD->getName().str();
+          auto originalProperty = VD->getOriginalDelegatedProperty();
+          if (originalProperty) {
+            Result += originalProperty->getName().str();
+          } else {
+            Result += VD->getName().str();
+          }
           getPathStringToElementRec(Module, FieldType, Element, Result);
           return VD;
         }
@@ -415,10 +420,15 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
 //===----------------------------------------------------------------------===//
 
 /// onlyTouchesTrivialElements - Return true if all of the accessed elements
-/// have trivial type.
+/// have trivial type and the access itself is a trivial instruction.
 bool DIMemoryUse::onlyTouchesTrivialElements(
     const DIMemoryObjectInfo &MI) const {
-  auto &Module = Inst->getModule();
+  // assign_by_delegate calls functions to assign a value. This is not
+  // considered as trivial.
+  if (isa<AssignByDelegateInst>(Inst))
+    return false;
+
+  auto *F = Inst->getFunction();
 
   for (unsigned i = FirstElement, e = i + NumElements; i != e; ++i) {
     // Skip 'super.init' bit
@@ -426,7 +436,7 @@ bool DIMemoryUse::onlyTouchesTrivialElements(
       return false;
 
     auto EltTy = MI.getElementType(i);
-    if (!EltTy.isTrivial(Module))
+    if (!EltTy.isTrivial(*F))
       return false;
   }
   return true;
@@ -741,9 +751,12 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 #include "swift/AST/ReferenceStorage.def"
 
     // Stores *to* the allocation are writes.
-    if ((isa<StoreInst>(User) || isa<AssignInst>(User)) &&
+    if ((isa<StoreInst>(User) || isa<AssignInst>(User) ||
+         isa<AssignByDelegateInst>(User)) &&
         Op->getOperandNumber() == 1) {
       if (PointeeType.is<TupleType>()) {
+        assert(!isa<AssignByDelegateInst>(User) &&
+               "cannot assign a typle with assign_by_delegate");
         UsesToScalarize.push_back(User);
         continue;
       }
@@ -753,9 +766,9 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       DIUseKind Kind;
       if (InStructSubElement)
         Kind = DIUseKind::PartialStore;
-      else if (isa<AssignInst>(User))
+      else if (isa<AssignInst>(User) || isa<AssignByDelegateInst>(User))
         Kind = DIUseKind::InitOrAssign;
-      else if (PointeeType.isTrivial(User->getModule()))
+      else if (PointeeType.isTrivial(*User->getFunction()))
         Kind = DIUseKind::InitOrAssign;
       else
         Kind = DIUseKind::Initialization;
@@ -988,6 +1001,11 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
     if (isa<DeallocStackInst>(User)) {
       continue;
+    }
+
+    if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
+      if (onlyUsedByAssignByDelegate(PAI))
+        continue;
     }
 
     // Sanitizer instrumentation is not user visible, so it should not
@@ -1466,8 +1484,11 @@ void ElementUseCollector::collectClassSelfUses(
 
     // If this is a partial application of self, then this is an escape point
     // for it.
-    if (isa<PartialApplyInst>(User))
+    if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
+      if (onlyUsedByAssignByDelegate(PAI))
+        continue;
       Kind = DIUseKind::Escape;
+    }
 
     trackUse(DIMemoryUse(User, Kind, 0, TheMemory.NumElements));
   }

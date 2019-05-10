@@ -46,22 +46,22 @@ hashValue
 // Check that we handle unmatched parentheses in REPL.
 1+1)
 
-var z = 44
+var z = 46
 +z
-// CHECK: Int = 44{{$}}
+// CHECK: Int = 46{{$}}
 
-+44
-// CHECK: Int = 44{{$}}
++48
+// CHECK: Int = 48{{$}}
 
 typealias Foo = Int
 
 var f1 : Foo = 1
-var f44 : Foo = 44
+var f50 : Foo = 50
 f1 +
-  f44
-// CHECK: Foo = 45{{$}}
-+(f44)
-// CHECK: Foo = 44{{$}}
+  f50
+// CHECK: Foo = 51{{$}}
++(f50)
+// CHECK: Foo = 50{{$}}
 
 1.5
 // CHECK: Double = 1.5{{$}}

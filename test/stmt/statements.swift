@@ -177,6 +177,7 @@ return 42 // expected-error {{return invalid outside of a func}}
 return // expected-error {{return invalid outside of a func}}
 
 func NonVoidReturn1() -> Int {
+  _ = 0
   return // expected-error {{non-void function should return a value}}
 }
 
@@ -356,11 +357,44 @@ func test_defer(_ a : Int) {
 
 class SomeTestClass {
   var x = 42
-  
+ 
   func method() {
     defer { x = 97 }  // self. not required here!
     // expected-warning@-1 {{'defer' statement before end of scope always executes immediately}}{{5-10=do}}
   }
+}
+
+enum DeferThrowError: Error {
+  case someError
+}
+
+func throwInDefer() {
+  defer { throw DeferThrowError.someError } // expected-error {{'throw' cannot transfer control out of a defer statement}}
+  print("Foo")
+}
+
+func throwingFuncInDefer1() throws {
+  defer { try throwingFunctionCalledInDefer() } // expected-error {{errors cannot be thrown out of a defer body}}
+  print("Bar")
+}
+
+func throwingFuncInDefer2() throws {
+  defer { throwingFunctionCalledInDefer() } // expected-error {{errors cannot be thrown out of a defer body}}
+  print("Bar")
+}
+
+func throwingFuncInDefer3() {
+  defer { try throwingFunctionCalledInDefer() } // expected-error {{errors cannot be thrown out of a defer body}}
+  print("Bar")
+}
+
+func throwingFuncInDefer4() {
+  defer { throwingFunctionCalledInDefer() } // expected-error {{errors cannot be thrown out of a defer body}}
+  print("Bar")
+}
+
+func throwingFunctionCalledInDefer() throws {
+  throw DeferThrowError.someError
 }
 
 class SomeDerivedClass: SomeTestClass {

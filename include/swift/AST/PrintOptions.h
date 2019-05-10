@@ -135,6 +135,9 @@ struct PrintOptions {
   /// Whether to print *any* accessors on properties.
   bool PrintPropertyAccessors = true;
 
+  /// Whether to print *any* accessors on subscript.
+  bool PrintSubscriptAccessors = true;
+
   /// Whether to print the accessors of a property abstractly,
   /// i.e. always as:
   /// ```
@@ -167,8 +170,15 @@ struct PrintOptions {
   /// Whether to print variable initializers.
   bool VarInitializers = false;
 
+  /// Choices for how to print enum raw values.
+  enum class EnumRawValueMode {
+    Skip,
+    PrintObjCOnly,
+    Print
+  };
+
   /// Whether to print enum raw value expressions.
-  bool EnumRawValues = false;
+  EnumRawValueMode EnumRawValues = EnumRawValueMode::Skip;
 
   /// Whether to prefer printing TypeReprs instead of Types,
   /// if a TypeRepr is available.  This allows us to print the original
@@ -184,6 +194,12 @@ struct PrintOptions {
   /// Print fully qualified types if our heuristics say that a certain
   /// type might be ambiguous.
   bool FullyQualifiedTypesIfAmbiguous = false;
+
+  /// If true, printed module names will use the "exported" name, which may be
+  /// different from the regular name.
+  ///
+  /// \see FileUnit::getExportedModuleName
+  bool UseExportedModuleNames = false;
 
   /// Print Swift.Array and Swift.Optional with sugared syntax
   /// ([] and ?), even if there are no sugar type nodes.
@@ -254,6 +270,21 @@ struct PrintOptions {
   /// Whether to skip keywords with a prefix of underscore such as __consuming.
   bool SkipUnderscoredKeywords = false;
 
+  /// How to print opaque return types.
+  enum class OpaqueReturnTypePrintingMode {
+    /// 'some P1 & P2'.
+    WithOpaqueKeyword,
+    /// 'P1 & P2'.
+    WithoutOpaqueKeyword,
+    /// Stable parsable internal syntax.
+    StableReference,
+    /// Description suitable for debugging.
+    Description
+  };
+
+  OpaqueReturnTypePrintingMode OpaqueReturnTypePrinting =
+      OpaqueReturnTypePrintingMode::WithOpaqueKeyword;
+
   /// Whether to print decl attributes that are only used internally,
   /// such as _silgen_name, transparent, etc.
   bool PrintUserInaccessibleAttrs = true;
@@ -274,6 +305,9 @@ struct PrintOptions {
   /// Whether to print storage representation attributes on types, e.g.
   /// '@sil_weak', '@sil_unmanaged'.
   bool PrintStorageRepresentationAttrs = false;
+
+  /// Whether to print 'static' or 'class' on static decls.
+  bool PrintStaticKeyword = true;
 
   /// Whether to print 'override' keyword on overridden decls.
   bool PrintOverrideKeyword = true;
@@ -450,6 +484,7 @@ struct PrintOptions {
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::Always;
     result.PrintDocumentationComments = true;
+    result.SkipUnderscoredKeywords = true;
     return result;
   }
 
@@ -507,6 +542,8 @@ struct PrintOptions {
     result.PrintInSILBody = true;
     result.PreferTypeRepr = false;
     result.PrintIfConfig = false;
+    result.OpaqueReturnTypePrinting =
+        OpaqueReturnTypePrintingMode::StableReference;
     return result;
   }
 
@@ -534,7 +571,8 @@ struct PrintOptions {
   /// Print in the style of quick help declaration.
   static PrintOptions printQuickHelpDeclaration() {
     PrintOptions PO;
-    PO.EnumRawValues = true;
+    PO.SkipUnderscoredKeywords = true;
+    PO.EnumRawValues = EnumRawValueMode::Print;
     PO.PrintImplicitAttrs = false;
     PO.PrintFunctionRepresentationAttrs = false;
     PO.PrintDocumentationComments = false;
@@ -543,6 +581,7 @@ struct PrintOptions {
     PO.ExplodeEnumCaseDecls = true;
     PO.ShouldQualifyNestedDeclarations = QualifyNestedDeclarations::TypesOnly;
     PO.PrintParameterSpecifiers = true;
+    PO.SkipImplicit = true;
     return PO;
   }
 };

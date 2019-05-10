@@ -27,11 +27,10 @@ using namespace swift;
 
 /// Create a new empty function with the correct arguments and a unique name.
 SILFunction *GenericCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
-				       SILFunction *Orig,
-                                       IsSerialized_t Serialized,
+				                               SILFunction *Orig,
                                        const ReabstractionInfo &ReInfo,
                                        StringRef NewName) {
-  assert((!Serialized || Orig->isSerialized())
+  assert((!ReInfo.isSerialized() || Orig->isSerialized())
          && "Specialization cannot make body more resilient");
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");
@@ -43,10 +42,11 @@ SILFunction *GenericCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
   SILFunction *NewF = FunctionBuilder.createFunction(
       getSpecializedLinkage(Orig, Orig->getLinkage()), NewName,
       ReInfo.getSpecializedType(), ReInfo.getSpecializedGenericEnvironment(),
-      Orig->getLocation(), Orig->isBare(), Orig->isTransparent(), Serialized,
-      IsNotDynamic, Orig->getEntryCount(), Orig->isThunk(),
-      Orig->getClassSubclassScope(), Orig->getInlineStrategy(),
-      Orig->getEffectsKind(), Orig, Orig->getDebugScope());
+      Orig->getLocation(), Orig->isBare(), Orig->isTransparent(),
+      ReInfo.isSerialized(), IsNotDynamic, Orig->getEntryCount(),
+      Orig->isThunk(), Orig->getClassSubclassScope(),
+      Orig->getInlineStrategy(), Orig->getEffectsKind(),
+      Orig, Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     NewF->addSemanticsAttr(Attr);
   }
@@ -190,4 +190,13 @@ const SILDebugScope *GenericCloner::remapScope(const SILDebugScope *DS) {
                             remapScope(DS->InlinedCallSite));
   RemappedScopeCache.insert({DS, RemappedScope});
   return RemappedScope;
+}
+
+void GenericCloner::fixUp(SILFunction *f) {
+  for (auto *apply : noReturnApplies) {
+    auto applyBlock = apply->getParent();
+    applyBlock->split(std::next(SILBasicBlock::iterator(apply)));
+    getBuilder().setInsertionPoint(applyBlock);
+    getBuilder().createUnreachable(apply->getLoc());
+  }
 }

@@ -367,10 +367,34 @@ static void writeDeclCommentTable(
       return StringRef(Mem, String.size());
     }
 
+    bool shouldSerializeDoc(Decl *D) {
+      if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        // Skip the decl if it's not visible to clients. The use of
+        // getEffectiveAccess is unusual here; we want to take the testability
+        // state into account and emit documentation if and only if they are
+        // visible to clients (which means public ordinarily, but
+        // public+internal when testing enabled).
+        if (VD->getEffectiveAccess() < swift::AccessLevel::Public)
+          return false;
+      }
+
+      // When building the stdlib we intend to serialize unusual comments.
+      // This situation is represented by GroupContext.isEnable().  In that
+      // case, we perform more serialization to keep track of source order.
+      if (GroupContext.isEnable())
+        return true;
+
+      // Skip the decl if it cannot have a comment.
+      if (!D->canHaveComment())
+        return false;
+
+      // Skip the decl if it does not have a comment.
+      if (D->getRawComment().Comments.empty())
+        return false;
+      return true;
+    }
+
     void writeDocForExtensionDecl(ExtensionDecl *ED) {
-      RawComment Raw = ED->getRawComment();
-      if (Raw.Comments.empty() && !GroupContext.isEnable())
-        return;
       // Compute USR.
       {
         USRBuffer.clear();
@@ -379,12 +403,14 @@ static void writeDeclCommentTable(
           return;
       }
       generator.insert(copyString(USRBuffer.str()),
-                       { ED->getBriefComment(), Raw,
+                       { ED->getBriefComment(), ED->getRawComment(),
                          GroupContext.getGroupSequence(ED),
                          SourceOrder++ });
     }
 
     bool walkToDeclPre(Decl *D) override {
+      if (!shouldSerializeDoc(D))
+        return true;
       if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
         writeDocForExtensionDecl(ED);
         return true;
@@ -393,29 +419,6 @@ static void writeDeclCommentTable(
       auto *VD = dyn_cast<ValueDecl>(D);
       if (!VD)
         return true;
-
-      RawComment Raw = VD->getRawComment();
-      // When building the stdlib we intend to serialize unusual comments.
-      // This situation is represented by GroupContext.isEnable().  In that
-      // case, we perform fewer serialization checks.
-      if (!GroupContext.isEnable()) {
-        // Skip the decl if it cannot have a comment.
-        if (!VD->canHaveComment()) {
-          return true;
-        }
-
-        // Skip the decl if it does not have a comment.
-        if (Raw.Comments.empty())
-          return true;
-
-        // Skip the decl if it's not visible to clients. The use of
-        // getEffectiveAccess is unusual here; we want to take the testability
-        // state into account and emit documentation if and only if they are
-        // visible to clients (which means public ordinarily, but
-        // public+internal when testing enabled).
-        if (VD->getEffectiveAccess() < swift::AccessLevel::Public)
-          return true;
-      }
 
       // Compute USR.
       {
@@ -426,7 +429,7 @@ static void writeDeclCommentTable(
       }
 
       generator.insert(copyString(USRBuffer.str()),
-                       { VD->getBriefComment(), Raw,
+                       { VD->getBriefComment(), D->getRawComment(),
                          GroupContext.getGroupSequence(VD),
                          SourceOrder++ });
       return true;

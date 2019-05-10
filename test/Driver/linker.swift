@@ -1,4 +1,5 @@
-// UNSUPPORTED: win32
+// Must be able to run xcrun-return-self.sh
+// REQUIRES: shell
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck %s < %t.simple.txt
 // RUN: %FileCheck -check-prefix SIMPLE %s < %t.simple.txt

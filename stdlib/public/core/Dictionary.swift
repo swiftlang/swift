@@ -856,7 +856,7 @@ extension Dictionary {
   ///
   /// When a dictionary's `Value` type has value semantics, you can use this
   /// subscript to perform in-place operations on values in the dictionary.
-  /// The following example uses this subscript while counting the occurences
+  /// The following example uses this subscript while counting the occurrences
   /// of each letter in a string:
   ///
   ///     let message = "Hello, Elle!"

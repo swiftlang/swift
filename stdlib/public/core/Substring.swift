@@ -116,14 +116,12 @@ public struct Substring {
 }
 
 extension Substring {
-  @inlinable
-  internal var _wholeGuts: _StringGuts {
-    @inline(__always) get { return _slice.base._guts }
-  }
-  @inlinable
-  internal var _wholeString: String {
-    @inline(__always) get { return String(self._wholeGuts) }
-  }
+  /// Returns the underlying string from which this Substring was derived.
+  @_alwaysEmitIntoClient
+  public var base: String { return _slice.base }
+
+  @inlinable @inline(__always)
+  internal var _wholeGuts: _StringGuts { return base._guts }
 
   @inlinable
   internal var _offsetRange: Range<Int> {
@@ -141,7 +139,7 @@ extension Substring {
   #else
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-    self._wholeString._invariantCheck()
+    self.base._invariantCheck()
   }
   #endif // INTERNAL_CHECKS_ENABLED
 }
@@ -150,14 +148,11 @@ extension Substring: StringProtocol {
   public typealias Index = String.Index
   public typealias SubSequence = Substring
 
-  @inlinable
-  public var startIndex: Index {
-    @inline(__always) get { return _slice.startIndex }
-  }
-  @inlinable
-  public var endIndex: Index {
-    @inline(__always) get { return _slice.endIndex }
-  }
+  @inlinable @inline(__always)
+  public var startIndex: Index { return _slice.startIndex }
+
+  @inlinable @inline(__always)
+  public var endIndex: Index { return _slice.endIndex }
 
   @inlinable @inline(__always)
   public func index(after i: Index) -> Index {
@@ -311,10 +306,8 @@ extension Substring : CustomReflectable {
 }
 
 extension Substring : CustomStringConvertible {
-  @inlinable
-  public var description: String {
-    @inline(__always) get { return String(self) }
-  }
+  @inlinable @inline(__always)
+  public var description: String { return String(self) }
 }
 
 extension Substring : CustomDebugStringConvertible {
@@ -420,7 +413,7 @@ extension Substring {
   @inlinable
   public var utf8: UTF8View {
     get {
-      return _wholeString.utf8[startIndex..<endIndex]
+      return base.utf8[startIndex..<endIndex]
     }
     set {
       self = Substring(newValue)
@@ -546,7 +539,7 @@ extension Substring {
   @inlinable
   public var utf16: UTF16View {
     get {
-      return _wholeString.utf16[startIndex..<endIndex]
+      return base.utf16[startIndex..<endIndex]
     }
     set {
       self = Substring(newValue)
@@ -672,7 +665,7 @@ extension Substring {
   @inlinable
   public var unicodeScalars: UnicodeScalarView {
     get {
-      return _wholeString.unicodeScalars[startIndex..<endIndex]
+      return base.unicodeScalars[startIndex..<endIndex]
     }
     set {
       self = Substring(newValue)

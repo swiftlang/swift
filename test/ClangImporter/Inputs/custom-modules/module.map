@@ -22,7 +22,7 @@ module ClangModuleUser {
   export *
 }
 
-module ClangModuleWithAdapter {
+module ClangModuleWithOverlay {
   link "UnderlyingClangLibrary"
 }
 
@@ -85,6 +85,10 @@ module MoreSwiftNewtypes {
 
 module Newtype {
   header "Newtype.h"
+}
+
+module NewtypeSystem [system] {
+  header "NewtypeSystem.h"
 }
 
 module ImportAsMember {

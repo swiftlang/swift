@@ -17,11 +17,12 @@ public let ArrayInClass = [
     runFunction: run_ArrayInClass,
     tags: [.validation, .api, .Array],
     setUpFunction: { ac = ArrayContainer() },
-    tearDownFunction: { ac = nil }),
+    tearDownFunction: { ac = nil },
+    legacyFactor: 5),
   BenchmarkInfo(name: "DistinctClassFieldAccesses",
     runFunction: run_DistinctClassFieldAccesses,
-    tags: [.unstable, .api, .Array],
-    setUpFunction: { workload = ClassWithArrs(N: 100_000) },
+    tags: [.validation, .api, .Array],
+    setUpFunction: { workload = ClassWithArrs(N: 10_000) },
     tearDownFunction: { workload = nil }),
 ]
 
@@ -31,7 +32,7 @@ class ArrayContainer {
   final var arr : [Int]
 
   init() {
-    arr = [Int] (repeating: 0, count: 100_000)
+    arr = [Int] (repeating: 0, count: 20_000)
   }
 
   func runLoop(_ N: Int) {

@@ -18,8 +18,9 @@ set(swiftDriver_sources
 set(swiftDriver_targetDefines)
 
 add_swift_host_library(swiftDriver STATIC
-  ${swiftDriver_sources}
-  DEPENDS SwiftOptions)
+  ${swiftDriver_sources})
+add_dependencies(swiftDriver
+  SwiftOptions)
 target_link_libraries(swiftDriver PRIVATE
   swiftAST
   swiftBasic
@@ -55,9 +56,9 @@ if(SWIFT_BUILD_STATIC_STDLIB)
           "${SWIFT_SOURCE_DIR}/utils/gen-static-stdlib-link-args")
 
       list(APPEND static_stdlib_lnk_file_list ${swift_static_stdlib_${sdk}_args})
-      swift_install_in_component(stdlib
-        FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
-        DESTINATION "lib/swift_static/${lowercase_sdk}")
+      swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
+                                 DESTINATION "lib/swift_static/${lowercase_sdk}"
+                                 COMPONENT stdlib)
     endif()
   endforeach()
   add_custom_target(swift_static_lnk_args ALL DEPENDS ${static_stdlib_lnk_file_list})

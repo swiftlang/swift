@@ -218,7 +218,7 @@ protected:
 
   void recordDisjunctionChoice(ConstraintLocator *disjunctionLocator,
                                unsigned index) const {
-    CS.DisjunctionChoices.push_back({disjunctionLocator, index});
+    CS.recordDisjunctionChoice(disjunctionLocator, index);
   }
 
   Score getCurrentScore() const { return CS.CurrentScore; }

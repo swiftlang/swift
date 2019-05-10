@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all %s -devirtualizer -inline  | %FileCheck %s --check-prefix=CHECK-DEVIRT
-// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all %s -mandatory-inlining  | %FileCheck %s --check-prefix=CHECK-MANDATORY-INLINING
+// RUN: %target-sil-opt -enable-sil-verify-all %s -devirtualizer -inline  | %FileCheck %s --check-prefix=CHECK-DEVIRT
+// RUN: %target-sil-opt -enable-sil-verify-all %s -mandatory-inlining  | %FileCheck %s --check-prefix=CHECK-MANDATORY-INLINING
 
 sil_stage canonical
 

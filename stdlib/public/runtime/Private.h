@@ -278,7 +278,7 @@ public:
 
     /// Information about the generic context descriptors that make up \c
     /// descriptor, from the outermost to the innermost.
-    mutable std::vector<PathElement> descriptorPath;
+    mutable llvm::SmallVector<PathElement, 8> descriptorPath;
 
     /// The number of key generic parameters.
     mutable unsigned numKeyGenericParameters = 0;
@@ -317,9 +317,12 @@ public:
                const void * const *arguments)
       : sourceIsMetadata(false), environment(environment),
         genericArgs(arguments) { }
+    
+    const void * const *getGenericArgs() const { return genericArgs; }
 
-    const Metadata *operator()(unsigned depth, unsigned index) const;
-    const WitnessTable *operator()(const Metadata *type, unsigned index) const;
+    const Metadata *getMetadata(unsigned depth, unsigned index) const;
+    const WitnessTable *getWitnessTable(const Metadata *type,
+                                        unsigned index) const;
   };
 
   /// Retrieve the type metadata described by the given demangled type name.
@@ -333,6 +336,7 @@ public:
                                MetadataRequest request,
                                Demangler &demangler,
                                Demangle::NodePointer node,
+                               const void * const *arguments,
                                SubstGenericParameterFn substGenericParam,
                                SubstDependentWitnessTableFn substWitnessTable);
 
@@ -346,6 +350,7 @@ public:
   TypeInfo swift_getTypeByMangledName(
                                MetadataRequest request,
                                StringRef typeName,
+                               const void * const *arguments,
                                SubstGenericParameterFn substGenericParam,
                                SubstDependentWitnessTableFn substWitnessTable);
 
@@ -356,10 +361,10 @@ public:
   /// Use with \c _getTypeByMangledName to decode potentially-generic types.
   class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromWrittenArgs {
     /// The complete set of generic arguments.
-    const std::vector<const Metadata *> &allGenericArgs;
+    const SmallVectorImpl<const Metadata *> &allGenericArgs;
 
     /// The counts of generic parameters at each level.
-    const std::vector<unsigned> &genericParamCounts;
+    const SmallVectorImpl<unsigned> &genericParamCounts;
 
   public:
     /// Initialize a new function object to handle substitutions. Both
@@ -373,20 +378,21 @@ public:
     /// \param genericParamCounts The count of generic parameters at each
     /// generic level, typically gathered by _gatherGenericParameterCounts.
     explicit SubstGenericParametersFromWrittenArgs(
-        const std::vector<const Metadata *> &allGenericArgs,
-        const std::vector<unsigned> &genericParamCounts)
+        const SmallVectorImpl<const Metadata *> &allGenericArgs,
+        const SmallVectorImpl<unsigned> &genericParamCounts)
       : allGenericArgs(allGenericArgs), genericParamCounts(genericParamCounts) {
     }
 
-    const Metadata *operator()(unsigned depth, unsigned index) const;
-    const WitnessTable *operator()(const Metadata *type, unsigned index) const;
+    const Metadata *getMetadata(unsigned depth, unsigned index) const;
+    const WitnessTable *getWitnessTable(const Metadata *type,
+                                        unsigned index) const;
   };
 
   /// Gather generic parameter counts from a context descriptor.
   ///
   /// \returns true if the innermost descriptor is generic.
   bool _gatherGenericParameterCounts(const ContextDescriptor *descriptor,
-                                     std::vector<unsigned> &genericParamCounts,
+                                     llvm::SmallVectorImpl<unsigned> &genericParamCounts,
                                      Demangler &BorrowFrom);
 
   /// Map depth/index to a flat index.
@@ -407,7 +413,7 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool _checkGenericRequirements(
                     llvm::ArrayRef<GenericRequirementDescriptor> requirements,
-                    std::vector<const void *> &extraArguments,
+                    llvm::SmallVectorImpl<const void *> &extraArguments,
                     SubstGenericParameterFn substGenericParam,
                     SubstDependentWitnessTableFn substWitnessTable);
 
@@ -452,7 +458,7 @@ public:
   /// \endcode
   void gatherWrittenGenericArgs(const Metadata *metadata,
                                 const TypeContextDescriptor *description,
-                                std::vector<const Metadata *> &allGenericArgs,
+                                llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
                                 Demangler &BorrowFrom);
 
   Demangle::NodePointer

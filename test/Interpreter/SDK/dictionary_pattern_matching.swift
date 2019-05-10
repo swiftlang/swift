@@ -11,7 +11,7 @@ struct State {
   let abbrev: String
 }
 
-func stateFromPlistLame(_ plist: Dictionary<String, Any>) -> State? {
+func stateFromPlistVerbose(_ plist: Dictionary<String, Any>) -> State? {
   if let name = plist["name"] as? NSString {
     if let population = plist["population"] as? NSNumber {
       if let abbrev = plist["abbrev"] as? NSString {
@@ -62,22 +62,22 @@ let invalidStatePlist3: Dictionary<String, Any> = [
 // CHECK:         name: "California"
 // CHECK:         population: 38040000
 // CHECK:         abbrev: "CA"
-dump(stateFromPlistLame(goodStatePlist))
+dump(stateFromPlistVerbose(goodStatePlist))
 // CHECK-LABEL: some:
 // CHECK:         name: "California"
 // CHECK:         population: 38040000
 // CHECK:         abbrev: "CA"
 dump(stateFromPlistCool(goodStatePlist))
 // CHECK-LABEL: nil
-dump(stateFromPlistLame(invalidStatePlist1))
+dump(stateFromPlistVerbose(invalidStatePlist1))
 // CHECK-LABEL: nil
 dump(stateFromPlistCool(invalidStatePlist1))
 // CHECK-LABEL: nil
-dump(stateFromPlistLame(invalidStatePlist2))
+dump(stateFromPlistVerbose(invalidStatePlist2))
 // CHECK-LABEL: nil
 dump(stateFromPlistCool(invalidStatePlist2))
 // CHECK-LABEL: nil
-dump(stateFromPlistLame(invalidStatePlist3))
+dump(stateFromPlistVerbose(invalidStatePlist3))
 // CHECK-LABEL: nil
 dump(stateFromPlistCool(invalidStatePlist3))
 

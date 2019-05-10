@@ -3,8 +3,17 @@ if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
   set(EXTRA_AST_FLAGS "FORCE_BUILD_OPTIMIZED")
 endif()
 
+if(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
+  set(SWIFTAST_LLVM_LINK_COMPONENTS)
+else()
+  set(SWIFTAST_LLVM_LINK_COMPONENTS
+    bitreader bitwriter coroutines coverage irreader debuginfoDWARF
+    profiledata instrumentation object objcarcopts mc mcparser
+    bitreader bitwriter lto ipo option core support ${LLVM_TARGETS_TO_BUILD}
+  )
+endif()
+
 add_swift_host_library(swiftAST STATIC
-  AccessScopeChecker.cpp
   AccessRequests.cpp
   ASTContext.cpp
   ASTDemangler.cpp
@@ -58,15 +67,21 @@ add_swift_host_library(swiftAST STATIC
   SwiftNameTranslation.cpp
   Type.cpp
   TypeCheckRequests.cpp
+  TypeDeclFinder.cpp
   TypeJoinMeet.cpp
   TypeRefinementContext.cpp
   TypeRepr.cpp
   TypeWalker.cpp
+  UnqualifiedLookup.cpp
   USRGeneration.cpp
 
-  INTERFACE_LINK_LIBRARIES
-    # Clang dependencies.
-    # FIXME: Clang should really export these in some reasonable manner.
+  LLVM_LINK_COMPONENTS
+  ${SWIFTAST_LLVM_LINK_COMPONENTS}
+
+  ${EXTRA_AST_FLAGS}
+  )
+if(NOT SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
+  target_link_libraries(swiftAST INTERFACE
     clangCodeGen
     clangIndex
     clangFormat
@@ -84,19 +99,29 @@ add_swift_host_library(swiftAST STATIC
     clangAST
     clangLex
     clangAPINotes
-    clangBasic
+    clangBasic)
+endif()
 
-  LLVM_COMPONENT_DEPENDS
-    bitreader bitwriter coroutines coverage irreader debuginfoDWARF
-    profiledata instrumentation object objcarcopts mc mcparser
-    bitreader bitwriter lto ipo option core support ${LLVM_TARGETS_TO_BUILD}
-
-  ${EXTRA_AST_FLAGS}
-  )
-target_link_libraries(swiftAST PRIVATE
-  swiftBasic
-  swiftMarkup
-  swiftSyntax)
+if(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
+  # Add clangBasic as a single direct dependency to avoid bringing along some
+  # llvm libraries that we don't need.
+  if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
+    set(clangBasicDep "${LLVM_LIBRARY_OUTPUT_INTDIR}/clangBasic.lib")
+  else()
+    set(clangBasicDep "${LLVM_LIBRARY_OUTPUT_INTDIR}/libclangBasic.a")
+  endif()
+  target_link_libraries(swiftAST PRIVATE
+    swiftBasic
+    swiftSyntax
+    ${clangBasicDep})
+  target_compile_definitions(swiftAST PRIVATE
+    SWIFT_BUILD_ONLY_SYNTAXPARSERLIB=1)
+else()
+  target_link_libraries(swiftAST PRIVATE
+    swiftBasic
+    swiftMarkup
+    swiftSyntax)
+endif()
 
 # intrinsics_gen is the LLVM tablegen target that generates the include files
 # where intrinsics and attributes are declared. swiftAST depends on these
@@ -111,6 +136,6 @@ else()
   set(swift_ast_verifier_flag " -DSWIFT_DISABLE_AST_VERIFIER=1")
 endif()
 
-set_property(SOURCE Verifier.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
+set_property(SOURCE ASTVerifier.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
   "${swift_ast_verifier_flag}")
 

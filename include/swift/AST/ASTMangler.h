@@ -38,6 +38,10 @@ protected:
   /// Optimize out protocol names if a type only conforms to one protocol.
   bool OptimizeProtocolNames = true;
 
+  /// If enabled, use Objective-C runtime names when mangling @objc Swift
+  /// protocols.
+  bool UseObjCProtocolNames = false;
+
   /// If enabled, non-canonical types are allowed and type alias types get a
   /// special mangling.
   bool DWARFMangling;
@@ -55,12 +59,18 @@ protected:
 
 public:
   using SymbolicReferent = llvm::PointerUnion<const NominalTypeDecl *,
-                                              const ProtocolConformance *>;
+                                              const OpaqueTypeDecl *>;
 protected:
 
   /// If set, the mangler calls this function to determine whether to symbolic
-  /// reference a given entity. Defaults to always returning true.
+  /// reference a given entity. If null, the mangler acts as if it's set to
+  /// always return true.
   std::function<bool (SymbolicReferent)> CanSymbolicReference;
+  
+  bool canSymbolicReference(SymbolicReferent referent) {
+    return AllowSymbolicReferences
+      && (!CanSymbolicReference || CanSymbolicReference(referent));
+  }
 
   std::vector<std::pair<SymbolicReferent, unsigned>> SymbolicReferences;
   
@@ -139,6 +149,7 @@ public:
 
   std::string mangleReabstractionThunkHelper(CanSILFunctionType ThunkType,
                                              Type FromType, Type ToType,
+                                             Type SelfType,
                                              ModuleDecl *Module);
   
   std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
@@ -160,6 +171,8 @@ public:
 
   std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
 
+  std::string mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl);
+  
   std::string mangleDeclType(const ValueDecl *decl);
   
   std::string mangleObjCRuntimeName(const NominalTypeDecl *Nominal);
@@ -187,7 +200,7 @@ public:
   };
   
   static Optional<SpecialContext>
-  getSpecialManglingContext(const ValueDecl *decl);
+  getSpecialManglingContext(const ValueDecl *decl, bool useObjCProtocolNames);
 
   static const clang::NamedDecl *
   getClangDeclForMangling(const ValueDecl *decl);
@@ -196,7 +209,7 @@ protected:
 
   void appendSymbolKind(SymbolKind SKind);
 
-  void appendType(Type type);
+  void appendType(Type type, const ValueDecl *forDecl = nullptr);
   
   void appendDeclName(const ValueDecl *decl);
 
@@ -209,6 +222,15 @@ protected:
   void bindGenericParameters(const DeclContext *DC);
 
   void bindGenericParameters(CanGenericSignature sig);
+
+  /// Mangles a sugared type iff we are mangling for the debugger.
+  template <class T> void appendSugaredType(Type type,
+                                            const ValueDecl *forDecl) {
+    assert(DWARFMangling &&
+           "sugared types are only legal when mangling for the debugger");
+    auto *BlandTy = cast<T>(type.getPointer())->getSinglyDesugaredType();
+    appendType(BlandTy, forDecl);
+  }
 
   void appendBoundGenericArgs(Type type, bool &isFirstArgList);
 
@@ -223,7 +245,8 @@ protected:
 
   /// Append any retroactive conformances.
   void appendRetroactiveConformances(Type type);
-
+  void appendRetroactiveConformances(SubstitutionMap subMap,
+                                     ModuleDecl *fromModule);
   void appendImplFunctionType(SILFunctionType *fn);
 
   void appendContextOf(const ValueDecl *decl);
@@ -237,17 +260,23 @@ protected:
 
   void appendAnyGenericType(const GenericTypeDecl *decl);
 
-  void appendFunction(AnyFunctionType *fn, bool isFunctionMangling = false);
-  void appendFunctionType(AnyFunctionType *fn, bool isAutoClosure = false);
+  void appendFunction(AnyFunctionType *fn, bool isFunctionMangling = false,
+                      const ValueDecl *forDecl = nullptr);
+  void appendFunctionType(AnyFunctionType *fn, bool isAutoClosure = false,
+                          const ValueDecl *forDecl = nullptr);
 
-  void appendFunctionSignature(AnyFunctionType *fn);
+  void appendFunctionSignature(AnyFunctionType *fn,
+                               const ValueDecl *forDecl = nullptr);
 
-  void appendFunctionInputType(ArrayRef<AnyFunctionType::Param> params);
-  void appendFunctionResultType(Type resultType);
+  void appendFunctionInputType(ArrayRef<AnyFunctionType::Param> params,
+                               const ValueDecl *forDecl = nullptr);
+  void appendFunctionResultType(Type resultType,
+                                const ValueDecl *forDecl = nullptr);
 
-  void appendTypeList(Type listTy);
+  void appendTypeList(Type listTy, const ValueDecl *forDecl = nullptr);
   void appendTypeListElement(Identifier name, Type elementType,
-                             ParameterTypeFlags flags);
+                             ParameterTypeFlags flags,
+                             const ValueDecl *forDecl = nullptr);
 
   /// Append a generic signature to the mangling.
   ///
@@ -314,6 +343,8 @@ protected:
   void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
   
   void appendSymbolicReference(SymbolicReferent referent);
+  
+  void appendOpaqueDeclName(const OpaqueTypeDecl *opaqueDecl);
 };
 
 } // end namespace Mangle

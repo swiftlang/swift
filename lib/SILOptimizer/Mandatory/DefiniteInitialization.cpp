@@ -376,6 +376,7 @@ namespace {
   /// LifetimeChecker - This is the main heavy lifting for definite
   /// initialization checking of a memory object.
   class LifetimeChecker {
+    SILFunction &F;
     SILModule &Module;
 
     /// TheMemory - This holds information about the memory object being
@@ -507,8 +508,11 @@ namespace {
 
 LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
                                  DIElementUseInfo &UseInfo)
-    : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory),
-      Uses(UseInfo.Uses), StoresToSelf(UseInfo.StoresToSelf),
+    : F(*TheMemory.MemoryInst->getFunction()),
+      Module(TheMemory.MemoryInst->getModule()),
+      TheMemory(TheMemory),
+      Uses(UseInfo.Uses),
+      StoresToSelf(UseInfo.StoresToSelf),
       Destroys(UseInfo.Releases) {
 
   // The first step of processing an element is to collect information about the
@@ -788,7 +792,7 @@ void LifetimeChecker::doIt() {
   // memory object will destruct the memory.  If the memory (or some element
   // thereof) is not initialized on some path, the bad things happen.  Process
   // releases to adjust for this.
-  if (!TheMemory.MemorySILType.isTrivial(Module)) {
+  if (!TheMemory.MemorySILType.isTrivial(F)) {
     for (unsigned i = 0, e = Destroys.size(); i != e; ++i)
       processNonTrivialRelease(i);
   }
@@ -857,8 +861,7 @@ void LifetimeChecker::handleLoadForTypeOfSelfUse(const DIMemoryUse &Use) {
           valueMetatype->getLoc(), metatypeArgument,
           valueMetatype->getType());
     }
-    replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument,
-                                     [](SILInstruction*) { });
+    replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument);
   }
 }
 
@@ -974,6 +977,8 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
     if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst))
       addr = copyAddr->getDest();
     else if (auto *assign = dyn_cast<AssignInst>(inst))
+      addr = assign->getDest();
+    else if (auto *assign = dyn_cast<AssignByDelegateInst>(inst))
       addr = assign->getDest();
     else
       return false;
@@ -1819,7 +1824,7 @@ void LifetimeChecker::handleSelfInitUse(unsigned UseID) {
     assert(TheMemory.NumElements == 1 && "delegating inits have a single elt");
 
     // Lower Assign instructions if needed.
-    if (isa<AssignInst>(Use.Inst))
+    if (isa<AssignInst>(Use.Inst) || isa<AssignByDelegateInst>(Use.Inst))
       NeedsUpdateForInitState.push_back(UseID);
   } else {
     // super.init also requires that all ivars are initialized before the
@@ -1891,6 +1896,24 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
       AI->setOwnershipQualifier((InitKind == IsInitialization
                                 ? AssignOwnershipQualifier::Init
                                 : AssignOwnershipQualifier::Reassign));
+    }
+
+    return;
+  }
+  if (auto *AI = dyn_cast<AssignByDelegateInst>(Inst)) {
+    // Remove this instruction from our data structures, since we will be
+    // removing it.
+    Use.Inst = nullptr;
+    NonLoadUses.erase(Inst);
+
+    if (TheMemory.isClassInitSelf() &&
+        Use.Kind == DIUseKind::SelfInit) {
+      assert(InitKind == IsInitialization);
+      AI->setOwnershipQualifier(AssignOwnershipQualifier::Reinit);
+    } else {
+      AI->setOwnershipQualifier((InitKind == IsInitialization
+                                 ? AssignOwnershipQualifier::Init
+                                 : AssignOwnershipQualifier::Reassign));
     }
 
     return;

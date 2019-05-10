@@ -3,12 +3,13 @@
 
 // CHECK: [
 // CHECK:     [
-// CHECK:         "Prespecialization",
-// CHECK-NEXT:         ["UsePrespecialized","use-prespecialized"]
+// CHECK:         "Serialization",
+// CHECK:         ["SerializeSILPass","serialize-sil"]
 // CHECK:     ],
 // CHECK:     [
 // CHECK:         "Rest of Onone",
-// CHECK-NEXT:         ["AssumeSingleThreaded","sil-assume-single-threaded"],
-// CHECK-NEXT:         ["SILDebugInfoGenerator","sil-debuginfo-gen"]
+// CHECK:         ["UsePrespecialized","use-prespecialized"],
+// CHECK:         ["AssumeSingleThreaded","sil-assume-single-threaded"],
+// CHECK:         ["SILDebugInfoGenerator","sil-debuginfo-gen"]
 // CHECK:     ]
 // CHECK: ]

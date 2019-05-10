@@ -62,32 +62,34 @@ macro(swift_common_standalone_build_config_llvm product)
     set(${product}_NATIVE_LLVM_TOOLS_PATH "${LLVM_TOOLS_BINARY_DIR}")
   endif()
 
-  if(CMAKE_CROSSCOMPILING)
-    set(LLVM_NATIVE_BUILD "${LLVM_BINARY_DIR}/NATIVE")
-    if(NOT EXISTS "${LLVM_NATIVE_BUILD}")
-      message(FATAL_ERROR
-        "Attempting to cross-compile swift standalone but no native LLVM build
-        found.  Please cross-compile LLVM as well.")
-    endif()
+  if(SWIFT_INCLUDE_TOOLS)
+    if(CMAKE_CROSSCOMPILING)
+      set(LLVM_NATIVE_BUILD_DIR "${LLVM_BINARY_DIR}/NATIVE")
+      if(NOT EXISTS "${LLVM_NATIVE_BUILD_DIR}")
+        message(FATAL_ERROR
+          "Attempting to cross-compile swift standalone but no native LLVM build
+          found.  Please cross-compile LLVM as well.")
+      endif()
 
-    if(CMAKE_HOST_SYSTEM_NAME MATCHES Windows)
-      set(HOST_EXECUTABLE_SUFFIX ".exe")
-    endif()
+      if(CMAKE_HOST_SYSTEM_NAME MATCHES Windows)
+        set(HOST_EXECUTABLE_SUFFIX ".exe")
+      endif()
 
-    if(NOT CMAKE_CONFIGURATION_TYPES)
-      set(LLVM_TABLEGEN_EXE
-        "${LLVM_NATIVE_BUILD_DIR}/bin/llvm-tblgen${HOST_EXECUTABLE_SUFFIX}")
+      if(NOT CMAKE_CONFIGURATION_TYPES)
+        set(LLVM_TABLEGEN_EXE
+          "${LLVM_NATIVE_BUILD_DIR}/bin/llvm-tblgen${HOST_EXECUTABLE_SUFFIX}")
+      else()
+        # NOTE: LLVM NATIVE build is always built Release, as is specified in
+        # CrossCompile.cmake
+        set(LLVM_TABLEGEN_EXE
+          "${LLVM_NATIVE_BUILD_DIR}/Release/bin/llvm-tblgen${HOST_EXECUTABLE_SUFFIX}")
+      endif()
     else()
-      # NOTE: LLVM NATIVE build is always built Release, as is specified in
-      # CrossCompile.cmake
-      set(LLVM_TABLEGEN_EXE
-        "${LLVM_NATIVE_BUILD_DIR}/Release/bin/llvm-tblgen${HOST_EXECUTABLE_SUFFIX}")
-    endif()
-  else()
-    find_program(LLVM_TABLEGEN_EXE "llvm-tblgen" HINTS ${LLVM_TOOLS_BINARY_DIR}
-      NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
-    if(LLVM_TABLEGEN_EXE STREQUAL "LLVM_TABLEGEN_EXE-NOTFOUND")
-      message(FATAL_ERROR "Failed to find tablegen in ${LLVM_TOOLS_BINARY_DIR}")
+      find_program(LLVM_TABLEGEN_EXE "llvm-tblgen" HINTS ${LLVM_TOOLS_BINARY_DIR}
+        NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+      if(LLVM_TABLEGEN_EXE STREQUAL "LLVM_TABLEGEN_EXE-NOTFOUND")
+        message(FATAL_ERROR "Failed to find tablegen in ${LLVM_TOOLS_BINARY_DIR}")
+      endif()
     endif()
   endif()
 
@@ -194,13 +196,12 @@ endmacro()
 #   product
 #     The product name, e.g. Swift or SourceKit. Used as prefix for some
 #     cmake variables.
-#
-#   is_cross_compiling
-#     Whether this is cross-compiling host tools.
 macro(swift_common_standalone_build_config product)
   swift_common_standalone_build_config_llvm(${product})
-  swift_common_standalone_build_config_clang(${product})
-  swift_common_standalone_build_config_cmark(${product})
+  if(SWIFT_INCLUDE_TOOLS)
+    swift_common_standalone_build_config_clang(${product})
+    swift_common_standalone_build_config_cmark(${product})
+  endif()
 
   # Enable groups for IDE generators (Xcode and MSVC).
   set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -213,10 +214,7 @@ endmacro()
 #     The product name, e.g. Swift or SourceKit. Used as prefix for some
 #     cmake variables.
 macro(swift_common_unified_build_config product)
-  set(PATH_TO_LLVM_SOURCE "${CMAKE_SOURCE_DIR}")
-  set(PATH_TO_LLVM_BUILD "${CMAKE_BINARY_DIR}")
   set(${product}_PATH_TO_CLANG_BUILD "${CMAKE_BINARY_DIR}")
-  set(PATH_TO_CLANG_BUILD "${CMAKE_BINARY_DIR}")
   set(CLANG_MAIN_INCLUDE_DIR "${LLVM_EXTERNAL_CLANG_SOURCE_DIR}/include")
   set(CLANG_BUILD_INCLUDE_DIR "${CMAKE_BINARY_DIR}/tools/clang/include")
   set(${product}_NATIVE_LLVM_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")

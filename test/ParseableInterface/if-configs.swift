@@ -3,14 +3,8 @@
 // RUN: %target-swift-frontend -merge-modules -emit-module -o %t/Test.swiftmodule %t/Test~partial.swiftmodule
 // RUN: %target-swift-ide-test -print-module -module-to-print=Test -source-filename=x -I %t | %FileCheck %s
 
-// RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path %t.swiftinterface -enable-resilience %s
+// RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path %t.swiftinterface -enable-library-evolution %s
 // RUN: %FileCheck %s < %t.swiftinterface
-
-// CHECK: func hasClosureDefaultArg(_ x: () -> Void = {
-// CHECK-NEXT: })
-public func hasClosureDefaultArg(_ x: () -> Void = {
-}) {
-}
 
 // CHECK: func hasClosureDefaultArgWithComplexNestedPoundIfs(_ x: () -> Void = {
 // CHECK-NOT: #if NOT_PROVIDED
@@ -114,8 +108,4 @@ public func hasClosureDefaultArgWithSinglePoundIf(_ x: () -> Void = {
   print("false")
   #endif
 }) {
-}
-
-// CHECK: func hasSimpleDefaultArgs(_ x: Int = 0, b: Int = 1)
-public func hasSimpleDefaultArgs(_ x: Int = 0, b: Int = 1) {
 }

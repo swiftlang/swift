@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_protocol)) -Xfrontend -enable-resilience %S/../Inputs/resilient_protocol.swift -emit-module -emit-module-path %t/resilient_protocol.swiftmodule -module-name resilient_protocol
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_protocol)) -enable-library-evolution %S/../Inputs/resilient_protocol.swift -emit-module -emit-module-path %t/resilient_protocol.swiftmodule -module-name resilient_protocol
 // RUN: %target-codesign %t/%target-library-name(resilient_protocol)
 
 // RUN: %target-build-swift %s -lresilient_protocol -I %t -L %t -o %t/main %target-rpath(%t)
@@ -8,7 +8,7 @@
 
 // RUN: %target-run %t/main %t/%target-library-name(resilient_protocol)
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_protocol_wmo)) -Xfrontend -enable-resilience %S/../Inputs/resilient_protocol.swift -emit-module -emit-module-path %t/resilient_protocol.swiftmodule -module-name resilient_protocol -whole-module-optimization
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_protocol_wmo)) -enable-library-evolution %S/../Inputs/resilient_protocol.swift -emit-module -emit-module-path %t/resilient_protocol.swiftmodule -module-name resilient_protocol -whole-module-optimization
 // RUN: %target-codesign %t/%target-library-name(resilient_protocol_wmo)
 
 // RUN: %target-build-swift %s -lresilient_protocol_wmo -I %t -L %t -o %t/main2 %target-rpath(%t)

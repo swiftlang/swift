@@ -1,4 +1,5 @@
 #include "llvm/ADT/STLExtras.h"
+#include "swift/SIL/SILDeclRef.h"
 #include <ModuleAnalyzerNodes.h>
 #include <algorithm>
 
@@ -86,7 +87,7 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
         IsProtocolReq(Info.IsProtocolReq),
         IsOverriding(Info.IsOverriding),
         IsOpen(Info.IsOpen),
-        IsInternal(Info.IsInternal),
+        IsInternal(Info.IsInternal), IsABIPlaceholder(Info.IsABIPlaceholder),
         ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
         GenericSig(Info.GenericSig), FixedBinaryOrder(Info.FixedBinaryOrder) {}
 
@@ -110,7 +111,8 @@ SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info):
   EnumRawTypeName(Info.EnumRawTypeName) {}
 
 SDKNodeConformance::SDKNodeConformance(SDKNodeInitInfo Info):
-  SDKNode(Info, SDKNodeKind::Conformance) {}
+  SDKNode(Info, SDKNodeKind::Conformance),
+  IsABIPlaceholder(Info.IsABIPlaceholder) {}
 
 SDKNodeTypeWitness::SDKNodeTypeWitness(SDKNodeInitInfo Info):
   SDKNode(Info, SDKNodeKind::TypeWitness) {}
@@ -128,6 +130,7 @@ SDKNodeDeclVar::SDKNodeDeclVar(SDKNodeInitInfo Info):
 
 SDKNodeDeclAbstractFunc::SDKNodeDeclAbstractFunc(SDKNodeInitInfo Info,
   SDKNodeKind Kind): SDKNodeDecl(Info, Kind), IsThrowing(Info.IsThrowing),
+                     ReqNewWitnessTableEntry(Info.ReqNewWitnessTableEntry),
                      SelfIndex(Info.SelfIndex) {}
 
 SDKNodeDeclFunction::SDKNodeDeclFunction(SDKNodeInitInfo Info):
@@ -158,14 +161,20 @@ StringRef SDKNodeDecl::getHeaderName() const {
 }
 
 SDKNodeDeclGetter *SDKNodeDeclVar::getGetter() const {
-  if (getChildrenCount() > 1)
-    return cast<SDKNodeDeclGetter>(childAt(1));
+  auto children = getChildren();
+  for (unsigned I = 1, N = children.size(); I < N; I ++) {
+    if (auto *getter = dyn_cast<SDKNodeDeclGetter>(children[I]))
+      return getter;
+  }
   return nullptr;
 }
 
 SDKNodeDeclSetter *SDKNodeDeclVar::getSetter() const {
-  if (getChildrenCount() > 2)
-    return cast<SDKNodeDeclSetter>(childAt(2));
+  auto children = getChildren();
+  for (unsigned I = 1, N = children.size(); I < N; I ++) {
+    if (auto *getter = dyn_cast<SDKNodeDeclSetter>(children[I]))
+      return getter;
+  }
   return nullptr;
 }
 
@@ -477,7 +486,7 @@ SDKNodeType *SDKNodeDeclType::getRawValueType() const {
   return nullptr;
 }
 
-bool SDKNodeDeclType::isConformingTo(KnownProtocolKind Kind) const {
+bool SDKNodeDeclType::isConformingTo(swift::ide::api::KnownProtocolKind Kind) const {
   switch (Kind) {
 #define KNOWN_PROTOCOL(NAME)                                                \
     case KnownProtocolKind::NAME:                                           \
@@ -754,6 +763,8 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
       auto Right = R.getAs<SDKNodeDeclAbstractFunc>();
       if (Left->isThrowing() ^ Right->isThrowing())
         return false;
+      if (Left->reqNewWitnessTableEntry() != Right->reqNewWitnessTableEntry())
+        return false;
       LLVM_FALLTHROUGH;
     }
     case SDKNodeKind::DeclVar: {
@@ -936,45 +947,47 @@ static bool isFunctionTypeNoEscape(Type Ty) {
   return false;
 }
 
-/// Converts a DeclBaseName to a string by assigning special names strings and
-/// escaping identifiers that would clash with these strings using '`'
-static StringRef getEscapedName(DeclBaseName name) {
-  switch (name.getKind()) {
-  case DeclBaseName::Kind::Subscript:
-    return "subscript";
-  case DeclBaseName::Kind::Constructor:
-    return "init";
-  case DeclBaseName::Kind::Destructor:
-    return "deinit";
-  case DeclBaseName::Kind::Normal:
-    return llvm::StringSwitch<StringRef>(name.getIdentifier().str())
+static StringRef getSimpleName(ValueDecl *VD) {
+  if (VD->hasName()) {
+    auto name = VD->getBaseName();
+    switch (name.getKind()) {
+      case DeclBaseName::Kind::Subscript:
+        return "subscript";
+      case DeclBaseName::Kind::Constructor:
+        return "init";
+      case DeclBaseName::Kind::Destructor:
+        return "deinit";
+      case DeclBaseName::Kind::Normal:
+        return llvm::StringSwitch<StringRef>(name.getIdentifier().str())
         .Case("subscript", "`subscript`")
         .Case("init", "`init`")
         .Case("deinit", "`deinit`")
         .Default(name.getIdentifier().str());
+    }
   }
+  if (auto *AD = dyn_cast<AccessorDecl>(VD)) {
+    switch(AD->getAccessorKind()) {
+#define ACCESSOR(ID) \
+case AccessorKind::ID: return #ID;
+#include "swift/AST/AccessorKinds.def"
+    }
+  }
+  return "_";
 }
 
 static StringRef getPrintedName(SDKContext &Ctx, ValueDecl *VD) {
-  llvm::SmallString<32> Result;
-  DeclName DM = VD->getFullName();
   if (isa<AbstractFunctionDecl>(VD) || isa<SubscriptDecl>(VD)) {
-    if (DM.getBaseName().empty()) {
-      Result.append("_");
-    } else {
-      Result.append(getEscapedName(DM.getBaseName()));
-    }
-
+    llvm::SmallString<32> Result;
+    Result.append(getSimpleName(VD));
     Result.append("(");
-    for (auto Arg : DM.getArgumentNames()) {
+    for (auto Arg : VD->getFullName().getArgumentNames()) {
       Result.append(Arg.empty() ? "_" : Arg.str());
       Result.append(":");
     }
     Result.append(")");
     return Ctx.buffer(Result.str());
   }
-  Result.append(getEscapedName(DM.getBaseName()));
-  return Ctx.buffer(Result.str());
+  return getSimpleName(VD);
 }
 
 static bool isFuncThrowing(ValueDecl *VD) {
@@ -1011,27 +1024,34 @@ Requirement getCanonicalRequirement(Requirement &Req) {
   }
 }
 
+static
+StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs) {
+  llvm::SmallString<32> Result;
+  llvm::raw_svector_ostream OS(Result);
+  if (AllReqs.empty())
+    return StringRef();
+  OS << "<";
+  bool First = true;
+  for (auto Req: AllReqs) {
+    if (!First) {
+      OS << ", ";
+    } else {
+      First = false;
+    }
+    if (Ctx.checkingABI())
+      getCanonicalRequirement(Req).print(OS, PrintOptions::printInterface());
+    else
+      Req.print(OS, PrintOptions::printInterface());
+  }
+  OS << ">";
+  return Ctx.buffer(OS.str());
+}
+
 static StringRef printGenericSignature(SDKContext &Ctx, Decl *D) {
   llvm::SmallString<32> Result;
   llvm::raw_svector_ostream OS(Result);
   if (auto *PD = dyn_cast<ProtocolDecl>(D)) {
-    if (PD->getRequirementSignature().empty())
-      return StringRef();
-    OS << "<";
-    bool First = true;
-    for (auto Req: PD->getRequirementSignature()) {
-      if (!First) {
-        OS << ", ";
-      } else {
-        First = false;
-      }
-      if (Ctx.checkingABI())
-        getCanonicalRequirement(Req).print(OS, PrintOptions::printInterface());
-      else
-        Req.print(OS, PrintOptions::printInterface());
-    }
-    OS << ">";
-    return Ctx.buffer(OS.str());
+    return printGenericSignature(Ctx, PD->getRequirementSignature());
   }
 
   if (auto *GC = D->getAsGenericContext()) {
@@ -1044,6 +1064,11 @@ static StringRef printGenericSignature(SDKContext &Ctx, Decl *D) {
     }
   }
   return StringRef();
+}
+
+static
+StringRef printGenericSignature(SDKContext &Ctx, ProtocolConformance *Conf) {
+  return printGenericSignature(Ctx, Conf->getConditionalRequirements());
 }
 
 static Optional<uint8_t> getSimilarMemberCount(NominalTypeDecl *NTD,
@@ -1090,6 +1115,28 @@ Optional<uint8_t> SDKContext::getFixedBinaryOrder(ValueDecl *VD) const {
   }
 }
 
+// check for if it has @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+static bool isABIPlaceHolder(Decl *D) {
+  llvm::SmallSet<PlatformKind, 4> Platforms;
+  for (auto *ATT: D->getAttrs()) {
+    if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
+      if (AVA->Platform != PlatformKind::none && AVA->Introduced &&
+          AVA->Introduced->getMajor() == 9999) {
+        Platforms.insert(AVA->Platform);
+      }
+    }
+  }
+  return Platforms.size() == 4;
+}
+
+static bool isABIPlaceholderRecursive(Decl *D) {
+  for (auto *CD = D; CD; CD = CD->getDeclContext()->getAsDecl()) {
+    if (isABIPlaceHolder(CD))
+      return true;
+  }
+  return false;
+}
+
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info) :
     Ctx(Ctx), Name(getTypeName(Ctx, Ty, Info.IsImplicitlyUnwrappedOptional)),
     PrintedName(getPrintedName(Ctx, Ty, Info.IsImplicitlyUnwrappedOptional)),
@@ -1109,7 +1156,18 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       ModuleName(D->getModuleContext()->getName().str()),
       GenericSig(printGenericSignature(Ctx, D)),
       IsImplicit(D->isImplicit()),
-      IsDeprecated(D->getAttrs().getDeprecated(D->getASTContext())) {
+      IsDeprecated(D->getAttrs().getDeprecated(D->getASTContext())),
+      IsABIPlaceholder(isABIPlaceholderRecursive(D)) {
+
+  // Force some attributes that are lazily computed.
+  // FIXME: we should use these AST predicates directly instead of looking at
+  // the attributes rdar://50217247.
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    (void) VD->isObjC();
+    (void) VD->isFinal();
+    (void) VD->isDynamic();
+  }
+
   // Capture all attributes.
   auto AllAttrs = D->getAttrs();
   std::transform(AllAttrs.begin(), AllAttrs.end(), std::back_inserter(DeclAttrs),
@@ -1122,20 +1180,53 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, OperatorDecl *OD):
   PrintedName = OD->getName().str();
 }
 
+
+SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformance *Conform):
+    SDKNodeInitInfo(Ctx, Conform->getProtocol()) {
+  // The conformance can be conditional. The generic signature keeps track of
+  // the requirements.
+  GenericSig = printGenericSignature(Ctx, Conform);
+  // Whether this conformance is ABI placeholder depends on the decl context
+  // of this conformance.
+  IsABIPlaceholder = isABIPlaceholderRecursive(Conform->getDeclContext()->
+                                               getAsDecl());
+}
+
+static bool isProtocolRequirement(ValueDecl *VD) {
+  if (isa<ProtocolDecl>(VD->getDeclContext()) && VD->isProtocolRequirement())
+    return true;
+  // If the VD is an accessor of the property declaration that is a protocol
+  // requirement, we consider this accessor as a protocol requirement too.
+  if (auto *AD = dyn_cast<AccessorDecl>(VD)) {
+    if (auto *ST = AD->getStorage()) {
+      return isProtocolRequirement(ST);
+    }
+  }
+  return false;
+}
+
+static bool requireWitnessTableEntry(ValueDecl *VD) {
+  if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD)) {
+    return SILDeclRef::requiresNewWitnessTableEntry(FD);
+  }
+  return false;
+}
+
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
     : SDKNodeInitInfo(Ctx, cast<Decl>(VD)) {
-  Name = VD->hasName() ? getEscapedName(VD->getBaseName()) : Ctx.buffer("_");
+  Name = getSimpleName(VD);
   PrintedName = getPrintedName(Ctx, VD);
   Usr = calculateUsr(Ctx, VD);
   IsThrowing = isFuncThrowing(VD);
   IsStatic = VD->isStatic();
   IsOverriding = VD->getOverriddenDecl();
-  IsProtocolReq = isa<ProtocolDecl>(VD->getDeclContext()) && VD->isProtocolRequirement();
+  IsProtocolReq = isProtocolRequirement(VD);
   IsOpen = Ctx.getAccessLevel(VD) == AccessLevel::Open;
   IsInternal = Ctx.getAccessLevel(VD) < AccessLevel::Public;
   SelfIndex = getSelfIndex(VD);
   FixedBinaryOrder = Ctx.getFixedBinaryOrder(VD);
   ReferenceOwnership = getReferenceOwnership(VD);
+  ReqNewWitnessTableEntry = IsProtocolReq && requireWitnessTableEntry(VD);
 
   // Calculate usr for its super class.
   if (auto *CD = dyn_cast_or_null<ClassDecl>(VD)) {
@@ -1484,7 +1575,7 @@ SwiftDeclCollector::constructConformanceNode(ProtocolConformance *Conform) {
   if (Ctx.checkingABI())
     Conform = Conform->getCanonicalConformance();
   auto ConfNode = cast<SDKNodeConformance>(SDKNodeInitInfo(Ctx,
-    Conform->getProtocol()).createSDKNode(SDKNodeKind::Conformance));
+    Conform).createSDKNode(SDKNodeKind::Conformance));
   Conform->forEachTypeWitness(nullptr,
     [&](AssociatedTypeDecl *assoc, Type ty, TypeDecl *typeDecl) -> bool {
       ConfNode->addChild(constructTypeWitnessNode(assoc, ty));
@@ -1496,9 +1587,12 @@ SwiftDeclCollector::constructConformanceNode(ProtocolConformance *Conform) {
 void swift::ide::api::
 SwiftDeclCollector::addConformancesToTypeDecl(SDKNodeDeclType *Root,
                                               NominalTypeDecl *NTD) {
+  // Avoid adding the same conformance twice.
+  SmallPtrSet<ProtocolConformance*, 4> Seen;
   for (auto &Conf: NTD->getAllConformances()) {
-    if (!Ctx.shouldIgnore(Conf->getProtocol()))
+    if (!Ctx.shouldIgnore(Conf->getProtocol()) && !Seen.count(Conf))
       Root->addConformance(constructConformanceNode(Conf));
+    Seen.insert(Conf);
   }
 }
 
@@ -1519,7 +1613,8 @@ void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
         continue;
       KnownDecls.insert(D);
       if (auto VD = dyn_cast<ValueDecl>(D))
-        foundDecl(VD, DeclVisibilityKind::DynamicLookup);
+        foundDecl(VD, DeclVisibilityKind::DynamicLookup,
+                  DynamicLookupInfo::AnyObject);
       else
         processDecl(D);
     }
@@ -1582,7 +1677,8 @@ void SwiftDeclCollector::processValueDecl(ValueDecl *VD) {
   }
 }
 
-void SwiftDeclCollector::foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) {
+void SwiftDeclCollector::foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                                   DynamicLookupInfo) {
   if (VD->getClangMacro()) {
     // Collect macros, we will sort them afterwards.
     ClangMacros.push_back(VD);
@@ -1610,6 +1706,11 @@ void SDKNode::jsonize(json::Output &out) {
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_children).data(), Children);
 }
 
+void SDKNodeConformance::jsonize(json::Output &out) {
+  SDKNode::jsonize(out);
+  output(out, KeyKind::KK_isABIPlaceholder, IsABIPlaceholder);
+}
+
 void SDKNodeDecl::jsonize(json::Output &out) {
   SDKNode::jsonize(out);
   out.mapRequired(getKeyContent(Ctx, KeyKind::KK_declKind).data(), DKind);
@@ -1624,6 +1725,7 @@ void SDKNodeDecl::jsonize(json::Output &out) {
   output(out, KeyKind::KK_implicit, IsImplicit);
   output(out, KeyKind::KK_isOpen, IsOpen);
   output(out, KeyKind::KK_isInternal, IsInternal);
+  output(out, KeyKind::KK_isABIPlaceholder, IsABIPlaceholder);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_declAttributes).data(), DeclAttributes);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_fixedbinaryorder).data(), FixedBinaryOrder);
   // Strong reference is implied, no need for serialization.
@@ -1636,6 +1738,7 @@ void SDKNodeDecl::jsonize(json::Output &out) {
 void SDKNodeDeclAbstractFunc::jsonize(json::Output &out) {
   SDKNodeDecl::jsonize(out);
   output(out, KeyKind::KK_throwing, IsThrowing);
+  output(out, KeyKind::KK_reqNewWitnessTableEntry, ReqNewWitnessTableEntry);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_selfIndex).data(), SelfIndex);
 }
 

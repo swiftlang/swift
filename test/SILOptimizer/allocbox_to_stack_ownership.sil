@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all %s -allocbox-to-stack | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -allocbox-to-stack | %FileCheck %s
 
 import Builtin
 
@@ -814,8 +814,6 @@ bb0(%0 : $Int):
 // CHECK-NEXT:   [[STACK1:%[0-9]+]] = alloc_stack $Bool
 // CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
 // CHECK:      bb1:
-// CHECK-NEXT:   dealloc_stack [[BOX]]
-// CHECK-NEXT:   dealloc_stack [[STACK1]]
 // CHECK-NEXT:   [[STACK2:%[0-9]+]] = alloc_stack $Bool
 // CHECK-NEXT:   dealloc_stack [[STACK2]]
 // CHECK-NEXT:   unreachable
@@ -854,7 +852,6 @@ bb2:
 // CHECK-NEXT:   [[STACK2:%[0-9]+]] = alloc_stack $Bool
 // CHECK-NEXT:   dealloc_stack [[STACK2]]
 // CHECK-NEXT:   dealloc_stack [[BOX]]
-// CHECK-NEXT:   dealloc_stack [[STACK1]]
 // CHECK-NEXT:   unreachable
 // CHECK:      bb2:
 // CHECK:        store
@@ -889,8 +886,6 @@ bb2:
 // CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
 // CHECK-NEXT:   [[STACK:%[0-9]+]] = alloc_stack $Bool
 // CHECK:      bb1:
-// CHECK-NEXT:   dealloc_stack [[STACK]]
-// CHECK-NEXT:   dealloc_stack [[BOX]]
 // CHECK-NEXT:   unreachable
 // CHECK:      bb2:
 // CHECK:        store
@@ -949,7 +944,6 @@ bb2:
 // CHECK:      bb0(%0 : $Int):
 // CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
 // CHECK:      bb1:
-// CHECK-NEXT:   dealloc_stack [[BOX]]
 // CHECK-NEXT:   {{.*}} = alloc_stack $Bool
 // CHECK-NEXT:   {{.*}} = alloc_stack $Bool
 // CHECK-NEXT:   unreachable
@@ -983,24 +977,19 @@ bb2:
 // CHECK-NEXT:   [[STACK1:%[0-9]+]] = alloc_stack $Bool
 // CHECK-NEXT:   cond_br
 // CHECK:      bb1:
-// CHECK-NEXT:   dealloc_stack [[STACK1]]
-// CHECK-NEXT:   br bb5
-// CHECK:      bb2:
 // CHECK-NEXT:   [[STACK2:%[0-9]+]] = alloc_stack $Bool
 // CHECK-NEXT:   cond_br
-// CHECK:      bb3:
+// CHECK:      bb2:
 // CHECK-NEXT:   dealloc_stack [[STACK2]]
-// CHECK-NEXT:   dealloc_stack [[STACK1]]
-// CHECK-NEXT:   br bb5
-// CHECK:      bb4:
+// CHECK-NEXT:   br bb4
+// CHECK:      bb3:
 // CHECK:        store
 // CHECK:        dealloc_stack [[STACK2]]
 // CHECK-NEXT:   dealloc_stack [[STACK1]]
 // CHECK-NEXT:   dealloc_stack [[BOX]]
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
-// CHECK:      bb5:
-// CHECK-NEXT:   dealloc_stack [[BOX]]
+// CHECK:      bb4:
 // CHECK-NEXT:   unreachable
 sil [ossa] @nesting_and_unreachable_critical_edge : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):

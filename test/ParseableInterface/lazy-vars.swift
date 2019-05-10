@@ -5,7 +5,7 @@
 // RUN: %target-swift-frontend -build-module-from-parseable-interface %t/Test.swiftinterface -o %t/Test.swiftmodule
 // RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules -emit-parseable-module-interface-path - %t/Test.swiftmodule -module-name Test | %FileCheck %s --check-prefix CHECK --check-prefix NONRESILIENT
 
-// RUN: %target-swift-frontend -typecheck -module-name TestResilient -emit-parseable-module-interface-path %t/TestResilient.swiftinterface -enable-resilience %s
+// RUN: %target-swift-frontend -typecheck -module-name TestResilient -emit-parseable-module-interface-path %t/TestResilient.swiftinterface -enable-library-evolution %s
 // RUN: %FileCheck %s < %t/TestResilient.swiftinterface --check-prefix CHECK --check-prefix RESILIENT
 
 // RUN: %target-swift-frontend -build-module-from-parseable-interface %t/TestResilient.swiftinterface -o %t/TestResilient.swiftmodule

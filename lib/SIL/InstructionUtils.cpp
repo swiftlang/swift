@@ -352,7 +352,10 @@ bool swift::isSanitizerInstrumentation(SILInstruction *Instruction) {
 }
 
 SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
-  if (PAI->getNumArguments() != 1)
+  // A partial_apply of a reabstraction thunk either has a single capture
+  // (a function) or two captures (function and dynamic Self type).
+  if (PAI->getNumArguments() != 1 &&
+      PAI->getNumArguments() != 2)
     return SILValue();
 
   auto *Fun = PAI->getReferencedFunction();
@@ -372,6 +375,21 @@ SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
     return SILValue();
 
   return Arg;
+}
+
+bool swift::onlyUsedByAssignByDelegate(PartialApplyInst *PAI) {
+  bool usedByAssignByDelegate = false;
+  for (Operand *Op : PAI->getUses()) {
+    SILInstruction *User = Op->getUser();
+    if (isa<AssignByDelegateInst>(User) && Op->getOperandNumber() >= 2) {
+      usedByAssignByDelegate = true;
+      continue;
+    }
+    if (isa<DestroyValueInst>(User))
+      continue;
+    return false;
+  }
+  return usedByAssignByDelegate;
 }
 
 /// Given a block used as a noescape function argument, attempt to find all
@@ -532,7 +550,7 @@ struct OwnershipQualifiedKindVisitor : SILInstructionVisitor<OwnershipQualifiedK
   QUALIFIED_INST(LoadBorrowInst)
   QUALIFIED_INST(CopyValueInst)
   QUALIFIED_INST(DestroyValueInst)
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   QUALIFIED_INST(Copy##Name##ValueInst)
 #include "swift/AST/ReferenceStorage.def"
 #undef QUALIFIED_INST

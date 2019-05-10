@@ -25,7 +25,6 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/StringExtras.h"
@@ -240,6 +239,9 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
 static bool validateInputBlock(
     llvm::BitstreamCursor &cursor, SmallVectorImpl<uint64_t> &scratch,
     SmallVectorImpl<SerializationOptions::FileDependency> &dependencies) {
+  SmallVector<StringRef, 4> dependencyDirectories;
+  SmallString<256> dependencyFullPathBuffer;
+
   while (!cursor.AtEndOfStream()) {
     auto entry = cursor.advance();
     if (entry.Kind == llvm::BitstreamEntry::EndBlock)
@@ -252,9 +254,33 @@ static bool validateInputBlock(
     StringRef blobData;
     unsigned kind = cursor.readRecord(entry.ID, scratch, &blobData);
     switch (kind) {
-    case input_block::FILE_DEPENDENCY:
-      dependencies.push_back(SerializationOptions::FileDependency{
-          scratch[0], scratch[1], blobData});
+    case input_block::FILE_DEPENDENCY: {
+      bool isHashBased = scratch[2] != 0;
+      bool isSDKRelative = scratch[3] != 0;
+
+      StringRef path = blobData;
+      size_t directoryIndex = scratch[4];
+      if (directoryIndex != 0) {
+        if (directoryIndex > dependencyDirectories.size())
+          return true;
+        dependencyFullPathBuffer = dependencyDirectories[directoryIndex-1];
+        llvm::sys::path::append(dependencyFullPathBuffer, blobData);
+        path = dependencyFullPathBuffer;
+      }
+
+      if (isHashBased) {
+        dependencies.push_back(
+          SerializationOptions::FileDependency::hashBased(
+            path, isSDKRelative, scratch[0], scratch[1]));
+      } else {
+        dependencies.push_back(
+          SerializationOptions::FileDependency::modTimeBased(
+            path, isSDKRelative, scratch[0], scratch[1]));
+      }
+      break;
+    }
+    case input_block::DEPENDENCY_DIRECTORY:
+      dependencyDirectories.push_back(blobData);
       break;
     default:
       // Unknown metadata record, possibly for use by a future version of the
@@ -888,6 +914,9 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
       case index_block::LOCAL_TYPE_DECLS:
         LocalTypeDecls = readLocalDeclTable(scratch, blobData);
         break;
+      case index_block::OPAQUE_RETURN_TYPE_DECLS:
+        OpaqueReturnTypeDecls = readLocalDeclTable(scratch, blobData);
+        break;
       case index_block::NESTED_TYPE_DECLS:
         NestedTypeDecls = readNestedTypeDeclsTable(scratch, blobData);
         break;
@@ -1084,6 +1113,22 @@ static Optional<swift::LibraryKind> getActualLibraryKind(unsigned rawKind) {
   return None;
 }
 
+static Optional<ModuleDecl::ImportFilterKind>
+getActualImportControl(unsigned rawValue) {
+  // We switch on the raw value rather than the enum in order to handle future
+  // values.
+  switch (rawValue) {
+  case static_cast<unsigned>(serialization::ImportControl::Normal):
+    return ModuleDecl::ImportFilterKind::Private;
+  case static_cast<unsigned>(serialization::ImportControl::Exported):
+    return ModuleDecl::ImportFilterKind::Public;
+  case static_cast<unsigned>(serialization::ImportControl::ImplementationOnly):
+    return ModuleDecl::ImportFilterKind::ImplementationOnly;
+  default:
+    return None;
+  }
+}
+
 static bool areCompatibleArchitectures(const llvm::Triple &moduleTarget,
                                        const llvm::Triple &ctxTarget) {
   if (moduleTarget.getArch() == ctxTarget.getArch())
@@ -1258,10 +1303,18 @@ ModuleFile::ModuleFile(
         unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
         switch (kind) {
         case input_block::IMPORTED_MODULE: {
-          bool exported, scoped;
+          unsigned rawImportControl;
+          bool scoped;
           input_block::ImportedModuleLayout::readRecord(scratch,
-                                                        exported, scoped);
-          Dependencies.push_back({blobData, exported, scoped});
+                                                        rawImportControl,
+                                                        scoped);
+          auto importKind = getActualImportControl(rawImportControl);
+          if (!importKind) {
+            // We don't know how to import this dependency.
+            error();
+            return;
+          }
+          Dependencies.push_back({blobData, importKind.getValue(), scoped});
           break;
         }
         case input_block::LINK_LIBRARY: {
@@ -1296,6 +1349,11 @@ ModuleFile::ModuleFile(
           input_block::SearchPathLayout::readRecord(scratch, isFramework,
                                                     isSystem);
           SearchPaths.push_back({blobData, isFramework, isSystem});
+          break;
+        }
+        case input_block::PARSEABLE_INTERFACE_PATH: {
+          if (extInfo)
+            extInfo->setParseableInterface(blobData);
           break;
         }
         default:
@@ -1428,7 +1486,8 @@ ModuleFile::ModuleFile(
 }
 
 Status ModuleFile::associateWithFileContext(FileUnit *file,
-                                            SourceLoc diagLoc) {
+                                            SourceLoc diagLoc,
+                                            bool treatAsPartialModule) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
   assert(getStatus() == Status::Valid && "invalid module file");
@@ -1447,7 +1506,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
     return error(Status::TargetIncompatible);
   }
   if (ctx.LangOpts.EnableTargetOSChecking &&
-      M->getResilienceStrategy() != ResilienceStrategy::Resilient &&
+      !M->isResilient() &&
       isTargetTooNew(moduleTarget, ctx.LangOpts.Target)) {
     return error(Status::TargetTooNew);
   }
@@ -1481,6 +1540,17 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       continue;
     }
 
+    if (dependency.isImplementationOnly() &&
+        !(treatAsPartialModule || ctx.LangOpts.DebuggerSupport)) {
+      // When building normally (and not merging partial modules), we don't
+      // want to bring in the implementation-only module, because that might
+      // change the set of visible declarations. However, when debugging we
+      // want to allow getting at the internals of this module when possible,
+      // and so we'll try to reference the implementation-only module if it's
+      // available.
+      continue;
+    }
+
     StringRef modulePathStr = dependency.RawPath;
     StringRef scopePath;
     if (dependency.isScoped()) {
@@ -1508,7 +1578,8 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
 
       // Otherwise, continue trying to load dependencies, so that we can list
       // everything that's missing.
-      missingDependency = true;
+      if (!(dependency.isImplementationOnly() && ctx.LangOpts.DebuggerSupport))
+        missingDependency = true;
       continue;
     }
 
@@ -1615,6 +1686,19 @@ TypeDecl *ModuleFile::lookupLocalType(StringRef MangledName) {
   return cast<TypeDecl>(getDecl(*iter));
 }
 
+OpaqueTypeDecl *ModuleFile::lookupOpaqueResultType(StringRef MangledName) {
+  PrettyStackTraceModuleFile stackEntry(*this);
+
+  if (!OpaqueReturnTypeDecls)
+    return nullptr;
+  
+  auto iter = OpaqueReturnTypeDecls->find(MangledName);
+  if (iter == OpaqueReturnTypeDecls->end())
+    return nullptr;
+  
+  return cast<OpaqueTypeDecl>(getDecl(*iter));
+}
+
 TypeDecl *ModuleFile::lookupNestedType(Identifier name,
                                        const NominalTypeDecl *parent) {
   PrettyStackTraceModuleFile stackEntry(*this);
@@ -1687,24 +1771,22 @@ void ModuleFile::getImportedModules(
   PrettyStackTraceModuleFile stackEntry(*this);
 
   for (auto &dep : Dependencies) {
-    switch (filter) {
-    case ModuleDecl::ImportFilter::All:
-      // We're including all imports.
-      break;
-
-    case ModuleDecl::ImportFilter::Private:
-      // Skip @_exported imports.
-      if (dep.isExported())
+    if (dep.isExported()) {
+      if (!filter.contains(ModuleDecl::ImportFilterKind::Public))
         continue;
 
-      break;
-
-    case ModuleDecl::ImportFilter::Public:
-      // Only include @_exported imports.
-      if (!dep.isExported())
+    } else if (dep.isImplementationOnly()) {
+      if (!filter.contains(ModuleDecl::ImportFilterKind::ImplementationOnly))
         continue;
+      if (!dep.isLoaded()) {
+        // Pretend we didn't have this import if we weren't originally asked to
+        // load it.
+        continue;
+      }
 
-      break;
+    } else {
+      if (!filter.contains(ModuleDecl::ImportFilterKind::Private))
+        continue;
     }
 
     assert(dep.isLoaded());
@@ -1833,17 +1915,8 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
   }
 
   if (nominal->getParent()->isModuleScopeContext()) {
-    auto parentModule = nominal->getParentModule();
-    StringRef moduleName = parentModule->getName().str();
-
-    // If the originating module is a private module whose interface is
-    // re-exported via public module, check the name of the public module.
-    std::string exportedModuleName;
-    if (auto clangModuleUnit =
-            dyn_cast<ClangModuleUnit>(parentModule->getFiles().front())) {
-      exportedModuleName = clangModuleUnit->getExportedModuleName();
-      moduleName = exportedModuleName;
-    }
+    auto parentFile = cast<FileUnit>(nominal->getParent());
+    StringRef moduleName = parentFile->getExportedModuleName();
 
     for (auto item : *iter) {
       if (item.first != moduleName)
@@ -2029,7 +2102,8 @@ void ModuleFile::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
           dc = dc->getParent();
         if (auto nominal = dc->getSelfNominalTypeDecl())
           if (nominal->getName() == accessPath.front().first)
-            consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
+            consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
+                               DynamicLookupInfo::AnyObject);
       }
     }
     return;
@@ -2038,7 +2112,8 @@ void ModuleFile::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
   for (const auto &list : ClassMembersForDynamicLookup->data()) {
     for (auto item : list)
       consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
-                         DeclVisibilityKind::DynamicLookup);
+                         DeclVisibilityKind::DynamicLookup,
+                         DynamicLookupInfo::AnyObject);
   }
 }
 
@@ -2102,6 +2177,19 @@ ModuleFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl *> &results) {
 
   for (auto DeclID : LocalTypeDecls->data()) {
     auto TD = cast<TypeDecl>(getDecl(DeclID));
+    results.push_back(TD);
+  }
+}
+
+void
+ModuleFile::getOpaqueReturnTypeDecls(SmallVectorImpl<OpaqueTypeDecl *> &results)
+{
+  PrettyStackTraceModuleFile stackEntry(*this);
+  if (!OpaqueReturnTypeDecls)
+    return;
+
+  for (auto DeclID : OpaqueReturnTypeDecls->data()) {
+    auto TD = cast<OpaqueTypeDecl>(getDecl(DeclID));
     results.push_back(TD);
   }
 }

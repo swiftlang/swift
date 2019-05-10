@@ -829,7 +829,7 @@ func inoutTests(_ arr: inout Int) {
   inoutTests(&x)
   
   // <rdar://problem/17489894> inout not rejected as operand to assignment operator
-  &x += y  // expected-error {{'&' can only appear immediately in a call argument list}}
+  &x += y  // expected-error {{use of extraneous '&'}}
 
   // <rdar://problem/23249098>
   func takeAny(_ x: Any) {}
@@ -844,7 +844,7 @@ func inoutTests(_ arr: inout Int) {
 
 // <rdar://problem/20802757> Compiler crash in default argument & inout expr
 var g20802757 = 2
-func r20802757(_ z: inout Int = &g20802757) { // expected-error {{use of extraneous '&'}}
+func r20802757(_ z: inout Int = &g20802757) { // expected-error {{cannot provide default value to inout parameter 'z'}}
   print(z)
 }
 

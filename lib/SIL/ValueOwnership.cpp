@@ -77,6 +77,13 @@ CONSTANT_OWNERSHIP_INST(Owned, KeyPath)
 CONSTANT_OWNERSHIP_INST(Owned, InitExistentialValue)
 CONSTANT_OWNERSHIP_INST(Owned, GlobalValue) // TODO: is this correct?
 
+// NOTE: Even though init_existential_ref from a reference counting perspective
+// is not considered to be "owned" since it doesn't affect reference counts,
+// conceptually we want to treat it as an owned value that produces owned
+// things, rather than a forwarding thing since initialization is generally a
+// consuming operation.
+CONSTANT_OWNERSHIP_INST(Owned, InitExistentialRef)
+
 // One would think that these /should/ be unowned. In truth they are owned since
 // objc metatypes do not go through the retain/release fast path. In their
 // implementations of retain/release nothing happens, so this is safe.
@@ -149,7 +156,7 @@ CONSTANT_OWNERSHIP_INST(Unowned, ValueToBridgeObject)
 #define CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(OWNERSHIP, INST)                    \
   ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
       INST##Inst *I) {                                                         \
-    if (I->getType().isTrivial(I->getModule())) {                              \
+    if (I->getType().isTrivial(*I->getFunction())) {                           \
       return ValueOwnershipKind::Any;                                          \
     }                                                                          \
     return ValueOwnershipKind::OWNERSHIP;                                      \
@@ -216,7 +223,7 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
     // If we have mismatched SILOwnership and sil ownership is not enabled,
     // just return Any for staging purposes. If SILOwnership is enabled, then
     // we must assert!
-    if (!i->getModule().getOptions().EnableSILOwnership) {
+    if (!i->getModule().getOptions().VerifySILOwnership) {
       return ValueOwnershipKind::Any;
     }
     llvm_unreachable("Forwarding inst with mismatching ownership kinds?!");
@@ -232,7 +239,6 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
   }
 FORWARDING_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARDING_OWNERSHIP_INST(ConvertFunction)
-FORWARDING_OWNERSHIP_INST(InitExistentialRef)
 FORWARDING_OWNERSHIP_INST(OpenExistentialRef)
 FORWARDING_OWNERSHIP_INST(RefToBridgeObject)
 FORWARDING_OWNERSHIP_INST(SelectValue)
@@ -290,23 +296,22 @@ ValueOwnershipKindClassifier::visitMarkDependenceInst(MarkDependenceInst *MDI) {
 }
 
 ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {
-  SILModule &m = ai->getModule();
-  bool isTrivial = ai->getType().isTrivial(m);
+  auto *f = ai->getFunction();
+  bool isTrivial = ai->getType().isTrivial(*f);
   // Quick is trivial check.
   if (isTrivial)
     return ValueOwnershipKind::Any;
 
-  SILFunctionConventions fnConv(ai->getSubstCalleeType(), m);
+  SILFunctionConventions fnConv(ai->getSubstCalleeType(), f->getModule());
   auto results = fnConv.getDirectSILResults();
   // No results => Any.
   if (results.empty())
     return ValueOwnershipKind::Any;
 
   // Otherwise, map our results to their ownership kinds and then merge them!
-  CanGenericSignature sig = ai->getSubstCalleeType()->getGenericSignature();
   auto resultOwnershipKinds =
       makeTransformRange(results, [&](const SILResultInfo &info) {
-        return info.getOwnershipKind(m, sig);
+        return info.getOwnershipKind(*f);
       });
   auto mergedOwnershipKind = ValueOwnershipKind::merge(resultOwnershipKinds);
   if (!mergedOwnershipKind) {
@@ -493,7 +498,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Any, PoundAssert)
 #define UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(ID)                             \
   ValueOwnershipKind ValueOwnershipKindBuiltinVisitor::visit##ID(              \
       BuiltinInst *BI, StringRef Attr) {                                       \
-    if (BI->getType().isTrivial(BI->getModule())) {                            \
+    if (BI->getType().isTrivial(*BI->getFunction())) {                         \
       return ValueOwnershipKind::Any;                                          \
     }                                                                          \
     return ValueOwnershipKind::Unowned;                                        \

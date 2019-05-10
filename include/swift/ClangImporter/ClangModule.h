@@ -34,7 +34,7 @@ class ModuleLoader;
 class ClangModuleUnit final : public LoadedFile {
   ClangImporter::Implementation &owner;
   const clang::Module *clangModule;
-  llvm::PointerIntPair<ModuleDecl *, 1, bool> adapterModule;
+  llvm::PointerIntPair<ModuleDecl *, 1, bool> overlayModule;
   mutable ArrayRef<ModuleDecl::ImportedModule> importedModulesForLookup;
   /// The metadata of the underlying Clang module.
   clang::ExternalASTSource::ASTSourceDescriptor ASTSourceDescriptor;
@@ -57,12 +57,12 @@ public:
   bool isTopLevel() const;
 
   /// Returns the Swift module that overlays this Clang module.
-  ModuleDecl *getAdapterModule() const override;
+  ModuleDecl *getOverlayModule() const override;
 
   /// Retrieve the "exported" name of the module, which is usually the module
   /// name, but might be the name of the public module through which this
   /// (private) module is re-exported.
-  std::string getExportedModuleName() const;
+  StringRef getExportedModuleName() const override;
 
   virtual bool isSystemModule() const override;
 

@@ -897,7 +897,6 @@ public:
 ///
 /// \returns the result of performing the match.
 RequirementMatch matchWitness(
-             TypeChecker &tc,
              DeclContext *dc, ValueDecl *req, ValueDecl *witness,
              llvm::function_ref<
                      std::tuple<Optional<RequirementMatch>, Type, Type>(void)>
@@ -937,16 +936,6 @@ Type adjustInferredAssociatedType(Type type, bool &noescapeToEscaping);
 llvm::TinyPtrVector<ValueDecl *> findWitnessedObjCRequirements(
                                      const ValueDecl *witness,
                                      bool anySingleRequirement = false);
-
-/// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
-void useObjectiveCBridgeableConformances(
-                      DeclContext *dc, Type type);
-
-/// If this bound-generic type is bridged, mark any
-/// _ObjectiveCBridgeable conformances in the generic arguments of
-/// the given type as "used".
-void useObjectiveCBridgeableConformancesOfArgs(
-                      DeclContext *dc, BoundGenericType *bound);
 
 }
 

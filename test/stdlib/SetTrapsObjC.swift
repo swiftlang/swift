@@ -8,6 +8,7 @@
 // RUN: %target-run %t/a.out_Release
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: rdar49026133
 
 import StdlibUnittest
 import Foundation

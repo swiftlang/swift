@@ -31,7 +31,9 @@
 using namespace swift;
 
 #ifndef NDEBUG
-template <> void ProtocolDescriptor::dump() const {
+template <>
+LLVM_ATTRIBUTE_USED
+void ProtocolDescriptor::dump() const {
   printf("TargetProtocolDescriptor.\n"
          "Name: \"%s\".\n",
          Name.get());
@@ -67,7 +69,7 @@ template<> void ProtocolConformanceDescriptor::dump() const {
     int ok = lookupSymbol(addr, &info);
     if (!ok)
       return "<unknown addr>";
-    return info.symbolName;
+    return info.symbolName.get();
   };
 
   switch (auto kind = getTypeKind()) {
@@ -93,7 +95,9 @@ template<> void ProtocolConformanceDescriptor::dump() const {
 #endif
 
 #ifndef NDEBUG
-template<> void ProtocolConformanceDescriptor::verify() const {
+template<>
+LLVM_ATTRIBUTE_USED
+void ProtocolConformanceDescriptor::verify() const {
   auto typeKind = unsigned(getTypeKind());
   assert(((unsigned(TypeReferenceKind::First_Kind) <= typeKind) &&
           (unsigned(TypeReferenceKind::Last_Kind) >= typeKind)) &&
@@ -162,12 +166,17 @@ template<>
 const WitnessTable *
 ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
   // If needed, check the conditional requirements.
-  std::vector<const void *> conditionalArgs;
+  SmallVector<const void *, 8> conditionalArgs;
   if (hasConditionalRequirements()) {
     SubstGenericParametersFromMetadata substitutions(type);
     bool failed =
       _checkGenericRequirements(getConditionalRequirements(), conditionalArgs,
-                                substitutions, substitutions);
+        [&substitutions](unsigned depth, unsigned index) {
+          return substitutions.getMetadata(depth, index);
+        },
+        [&substitutions](const Metadata *type, unsigned index) {
+          return substitutions.getWitnessTable(type, index);
+        });
     if (failed) return nullptr;
   }
 
@@ -626,7 +635,7 @@ swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
 
 bool swift::_checkGenericRequirements(
                       llvm::ArrayRef<GenericRequirementDescriptor> requirements,
-                      std::vector<const void *> &extraArguments,
+                      SmallVectorImpl<const void *> &extraArguments,
                       SubstGenericParameterFn substGenericParam,
                       SubstDependentWitnessTableFn substWitnessTable) {
   for (const auto &req : requirements) {
@@ -636,8 +645,9 @@ bool swift::_checkGenericRequirements(
     // Resolve the subject generic parameter.
     const Metadata *subjectType =
       swift_getTypeByMangledName(MetadataState::Abstract,
-                                 req.getParam(), substGenericParam,
-                                 substWitnessTable).getMetadata();
+                                 req.getParam(),
+                                 extraArguments.data(),
+                                 substGenericParam, substWitnessTable).getMetadata();
     if (!subjectType)
       return true;
 
@@ -662,8 +672,9 @@ bool swift::_checkGenericRequirements(
       // Demangle the second type under the given substitutions.
       auto otherType =
         swift_getTypeByMangledName(MetadataState::Abstract,
-                                   req.getMangledTypeName(), substGenericParam,
-                                   substWitnessTable).getMetadata();
+                                   req.getMangledTypeName(),
+                                   extraArguments.data(),
+                                   substGenericParam, substWitnessTable).getMetadata();
       if (!otherType) return true;
 
       assert(!req.getFlags().hasExtraArgument());
@@ -690,8 +701,9 @@ bool swift::_checkGenericRequirements(
       // Demangle the base type under the given substitutions.
       auto baseType =
         swift_getTypeByMangledName(MetadataState::Abstract,
-                                   req.getMangledTypeName(), substGenericParam,
-                                   substWitnessTable).getMetadata();
+                                   req.getMangledTypeName(),
+                                   extraArguments.data(),
+                                   substGenericParam, substWitnessTable).getMetadata();
       if (!baseType) return true;
 
       // Check whether it's dynamically castable, which works as a superclass

@@ -1,3 +1,8 @@
 add_swift_unittest(SwiftFrontendTests
-  FrontendToolTests.cpp)
-target_link_libraries(SwiftFrontendTests PRIVATE swiftFrontendTool)
+  FrontendToolTests.cpp
+  ModuleLoadingTests.cpp)
+
+target_link_libraries(SwiftFrontendTests
+  PRIVATE
+    swiftFrontend
+    swiftFrontendTool)

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/generic_vtable.swift
-// RUN: %target-swift-frontend %t/generic_vtable.swift -emit-ir | %FileCheck %t/generic_vtable.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend %t/generic_vtable.swift -emit-ir | %FileCheck %t/generic_vtable.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize -check-prefix CHECK-%target-import-type -check-prefix CHECK-%target-abi
 
 public class Base {
   public func m1() {}
@@ -22,7 +22,8 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: @"$s14generic_vtable4BaseCMn" = {{(dllexport )?}}{{(protected )?}}constant
 // -- flags: has vtable, is class, is unique
-// CHECK-SAME: <i32 0x8000_0050>,
+// CHECK-DIRECT-SAME: <i32 0x8000_0050>,
+// CHECK-INDIRECT-SAME: <i32 0x8001_0050>,
 // -- vtable offset
 // CHECK-32-SAME: i32 16,
 // CHECK-64-SAME: i32 10,
@@ -68,11 +69,13 @@ public class Concrete : Derived<Int> {
 // CHECK-SAME: i32 2,
 // -- override for m2()
 // CHECK-SAME: @"$s14generic_vtable4BaseCMn"
-// CHECK-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 14
+// CHECK-SYSV-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 14
+// CHECK-WIN-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 17
 // CHECK-SAME: @"$s14generic_vtable7DerivedC2m2yyF"
 // -- override for constructor
 // CHECK-SAME: @"$s14generic_vtable4BaseCMn"
-// CHECK-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 15
+// CHECK-SYSV-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 15
+// CHECK-WIN-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 18
 // CHECK-SAME: @"$s14generic_vtable7DerivedCACyxGycfC"
 // CHECK-SAME: section "{{.*}}", align 4
 
@@ -106,7 +109,8 @@ public class Concrete : Derived<Int> {
 // CHECK-SAME: @"$s14generic_vtable8ConcreteC2m3yyF"
 // -- override for constructor
 // CHECK-SAME: @"$s14generic_vtable4BaseCMn"
-// CHECK-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 15
+// CHECK-SYSV-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 15
+// CHECK-WIN-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 18
 // CHECK-SAME: @"$s14generic_vtable8ConcreteCACycfC"
 // --
 // CHECK-SAME: section "{{.*}}", align 4
@@ -136,9 +140,9 @@ public class Concrete : Derived<Int> {
 
 //// Method descriptors
 
-// CHECK-LABEL: @"$s14generic_vtable4BaseC2m1yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}>* @"$s14generic_vtable4BaseCMn", i32 0, i32 13)
-// CHECK-LABEL: @"$s14generic_vtable4BaseC2m2yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}* @"$s14generic_vtable4BaseCMn", i32 0, i32 14)
-// CHECK-LABEL: @"$s14generic_vtable4BaseCACycfCTq" = hidden alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}* @"$s14generic_vtable4BaseCMn", i32 0, i32 15)
+// CHECK-LABEL: @"$s14generic_vtable4BaseC2m1yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}>* @"$s14generic_vtable4BaseCMn", i32 0, i32 {{(13|16)}})
+// CHECK-LABEL: @"$s14generic_vtable4BaseC2m2yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}* @"$s14generic_vtable4BaseCMn", i32 0, i32 {{(14|17)}})
+// CHECK-LABEL: @"$s14generic_vtable4BaseCACycfCTq" = hidden alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}* @"$s14generic_vtable4BaseCMn", i32 0, i32 {{(15|18)}})
 
 // CHECK-LABEL: @"$s14generic_vtable7DerivedC2m3yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}>* @"$s14generic_vtable7DerivedCMn", i32 0, i32 23)
 

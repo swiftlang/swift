@@ -67,7 +67,8 @@ enum: uint32_t {
 using namespace swift;
 
 #if SWIFT_SUPPORTS_BACKTRACE_REPORTING
-static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
+static bool getSymbolNameAddr(llvm::StringRef libraryName,
+                              const SymbolInfo &syminfo,
                               std::string &symbolName, uintptr_t &addrOut) {
   // If we failed to find a symbol and thus dlinfo->dli_sname is nullptr, we
   // need to use the hex address.
@@ -96,7 +97,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
 
   {
     std::lock_guard<std::mutex> lock(mutex);
-    dwResult = UnDecorateSymbolName(syminfo.symbolName, szUndName,
+    dwResult = UnDecorateSymbolName(syminfo.symbolName.get(), szUndName,
                                     sizeof(szUndName), dwFlags);
   }
 
@@ -106,7 +107,8 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
   }
 #else
   int status;
-  char *demangled = abi::__cxa_demangle(syminfo.symbolName, 0, 0, &status);
+  char *demangled =
+      abi::__cxa_demangle(syminfo.symbolName.get(), 0, 0, &status);
   if (status == 0) {
     assert(demangled != nullptr &&
            "If __cxa_demangle succeeds, demangled should never be nullptr");
@@ -121,7 +123,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, SymbolInfo syminfo,
   // Otherwise, try to demangle with swift. If swift fails to demangle, it will
   // just pass through the original output.
   symbolName = demangleSymbolAsString(
-      syminfo.symbolName, strlen(syminfo.symbolName),
+      syminfo.symbolName.get(), strlen(syminfo.symbolName.get()),
       Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
   return true;
 }

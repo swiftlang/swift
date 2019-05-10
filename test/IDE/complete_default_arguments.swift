@@ -67,16 +67,16 @@ func testDefaultArgs2() {
   freeFuncWithDefaultArgs1#^DEFAULT_ARGS_2^#
 }
 // DEFAULT_ARGS_2: Begin completions
-// DEFAULT_ARGS_2-DAG: Pattern/CurrModule:      ({#(a): Int#})[#Void#]{{; name=.+$}}
-// DEFAULT_ARGS_2-DAG: Pattern/CurrModule:      ({#(a): Int#}, {#b: Int#})[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_2-DAG: Decl[FreeFunction]/CurrModule:      ({#(a): Int#})[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_2-DAG: Decl[FreeFunction]/CurrModule:      ({#(a): Int#}, {#b: Int#})[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_2: End completions
 
 func testDefaultArgs3() {
   freeFuncWithDefaultArgs3#^DEFAULT_ARGS_3^#
 }
 // DEFAULT_ARGS_3: Begin completions
-// DEFAULT_ARGS_3-DAG: Pattern/CurrModule:      ()[#Void#]{{; name=.+$}}
-// DEFAULT_ARGS_3-DAG: Pattern/CurrModule:      ({#a: Int#})[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_3-DAG: Decl[FreeFunction]/CurrModule:      ()[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_3-DAG: Decl[FreeFunction]/CurrModule:      ({#a: Int#})[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_3: End completions
 
 func testDefaultArgs4(_ x: A) {
@@ -91,8 +91,8 @@ func testDefaultArgs5(_ x: A) {
   x.methodWithDefaultArgs1#^DEFAULT_ARGS_5^#
 }
 // DEFAULT_ARGS_5: Begin completions
-// DEFAULT_ARGS_5-DAG: Pattern/CurrModule:      ()[#Void#]{{; name=.+$}}
-// DEFAULT_ARGS_5-DAG: Pattern/CurrModule:      ({#a: Int#})[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_5-DAG: Decl[InstanceMethod]/CurrNominal:      ()[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_5-DAG: Decl[InstanceMethod]/CurrNominal:      ({#a: Int#})[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_5: End completions
 
 func testDefaultArgs6() {
@@ -101,7 +101,7 @@ func testDefaultArgs6() {
 // DEFAULT_ARGS_6: Begin completions
 // DEFAULT_ARGS_6-DAG: Decl[StaticMethod]/CurrNominal:      staticMethodWithDefaultArgs1()[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_6-DAG: Decl[StaticMethod]/CurrNominal:      staticMethodWithDefaultArgs1({#a: Int#})[#Void#]{{; name=.+$}}
-// DEFAULT_ARGS_6-DAG: Decl[InstanceMethod]/CurrNominal:   methodWithDefaultArgs1({#self: A#})[#(a: Int) -> Void#]{{; name=.+$}}
+// DEFAULT_ARGS_6-DAG: Decl[InstanceMethod]/CurrNominal:   methodWithDefaultArgs1({#(self): A#})[#(a: Int) -> Void#]{{; name=.+$}}
 // DEFAULT_ARGS_6: End completions
 
 func testDefaultArgs7() {

@@ -336,9 +336,17 @@ void SILSerializer::processSILFunctionWorklist() {
 /// We enumerate all values in a SILFunction beforehand to correctly
 /// handle forward references of values.
 ValueID SILSerializer::addValueRef(const ValueBase *Val) {
-  if (!Val || isa<SILUndef>(Val))
+  if (!Val)
     return 0;
 
+  if (auto *Undef = dyn_cast<SILUndef>(Val)) {
+    // The first two IDs are reserved for SILUndef.
+    if (Undef->getOwnershipKind() == ValueOwnershipKind::Any)
+      return 0;
+
+    assert(Undef->getOwnershipKind() == ValueOwnershipKind::Owned);
+    return 1;
+  }
   ValueID id = ValueIDs[Val];
   assert(id != 0 && "We should have assigned a value ID to each value.");
   return id;
@@ -425,7 +433,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   // FIXME: Add reverse iteration to SILSuccessor and convert this to a "stable"
   // RPO order. Currently, the serializer inverts the order of successors each
   // time they are processed.
-  unsigned ValueID = 0;
+  //
+  // The first valid value ID is 2. 0 and 1 are reserved for SILUndef.
+  unsigned ValueID = 2;
   llvm::ReversePostOrderTraversal<SILFunction *> RPOT(
       const_cast<SILFunction *>(&F));
   for (auto Iter = RPOT.begin(), E = RPOT.end(); Iter != E; ++Iter) {
@@ -433,11 +443,11 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
     BasicBlockMap.insert(std::make_pair(&BB, BasicID++));
 
     for (auto I = BB.args_begin(), E = BB.args_end(); I != E; ++I)
-      ValueIDs[static_cast<const ValueBase*>(*I)] = ++ValueID;
+      ValueIDs[static_cast<const ValueBase*>(*I)] = ValueID++;
 
     for (const SILInstruction &SI : BB)
       for (auto result : SI.getResults())
-        ValueIDs[result] = ++ValueID;
+        ValueIDs[result] = ValueID++;
   }
 
   // Write SIL basic blocks in the RPOT order
@@ -683,6 +693,10 @@ SILSerializer::writeKeyPathPatternComponent(
     break;
   case KeyPathPatternComponent::Kind::OptionalWrap:
     handleComponentCommon(KeyPathComponentKindEncoding::OptionalWrap);
+    break;
+  case KeyPathPatternComponent::Kind::TupleElement:
+    handleComponentCommon(KeyPathComponentKindEncoding::TupleElement);
+    ListOfValues.push_back((unsigned)component.getTupleIndex());
     break;
   }
 }
@@ -1691,6 +1705,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                   addValueRef(operand));
     break;
   }
+  case SILInstructionKind::AssignByDelegateInst:
+    llvm_unreachable("not supported");
   case SILInstructionKind::BindMemoryInst: {
     auto *BI = cast<BindMemoryInst>(&SI);
     SILValue baseOperand = BI->getBase();

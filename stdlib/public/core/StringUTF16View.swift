@@ -128,19 +128,15 @@ extension String.UTF16View: BidirectionalCollection {
 
   /// The position of the first code unit if the `String` is
   /// nonempty; identical to `endIndex` otherwise.
-  @inlinable
-  public var startIndex: Index {
-    @inline(__always) get { return _guts.startIndex }
-  }
+  @inlinable @inline(__always)
+  public var startIndex: Index { return _guts.startIndex }
 
   /// The "past the end" position---that is, the position one greater than
   /// the last valid subscript argument.
   ///
   /// In an empty UTF-16 view, `endIndex` is equal to `startIndex`.
-  @inlinable
-  public var endIndex: Index {
-    @inline(__always) get { return _guts.endIndex }
-  }
+  @inlinable @inline(__always)
+  public var endIndex: Index { return _guts.endIndex }
 
   @inlinable @inline(__always)
   public func index(after i: Index) -> Index {
@@ -242,22 +238,20 @@ extension String.UTF16View: BidirectionalCollection {
   ///
   /// - Parameter position: A valid index of the view. `position` must be
   ///   less than the view's end index.
-  @inlinable
+  @inlinable @inline(__always)
   public subscript(i: Index) -> UTF16.CodeUnit {
-    @inline(__always) get {
-      String(_guts)._boundsCheck(i)
+    String(_guts)._boundsCheck(i)
 
-      if _fastPath(_guts.isFastUTF8) {
-        let scalar = _guts.fastUTF8Scalar(
-          startingAt: _guts.scalarAlign(i)._encodedOffset)
-        if scalar.value <= 0xFFFF {
-          return UInt16(truncatingIfNeeded: scalar.value)
-        }
-        return scalar.utf16[i.transcodedOffset]
+    if _fastPath(_guts.isFastUTF8) {
+      let scalar = _guts.fastUTF8Scalar(
+        startingAt: _guts.scalarAlign(i)._encodedOffset)
+      if scalar.value <= 0xFFFF {
+        return UInt16(truncatingIfNeeded: scalar.value)
       }
-
-      return _foreignSubscript(position: i)
+      return scalar.utf16[i.transcodedOffset]
     }
+
+    return _foreignSubscript(position: i)
   }
 }
 
@@ -314,10 +308,8 @@ extension String.UTF16View {
 
 
 extension String.UTF16View: CustomStringConvertible {
-  @inlinable
-  public var description: String {
-    @inline(__always) get { return String(_guts) }
-  }
+  @inlinable @inline(__always)
+  public var description: String { return String(_guts) }
 }
 
 extension String.UTF16View: CustomDebugStringConvertible {
@@ -500,8 +492,8 @@ extension String.Index {
 // Breadcrumb-aware acceleration
 extension String.UTF16View {
   // A simple heuristic we can always tweak later. Not needed for correctness
-  @inlinable
-  internal var _shortHeuristic: Int {  @inline(__always) get { return 32 } }
+  @inlinable @inline(__always)
+  internal var _shortHeuristic: Int { return 32 }
 
   @usableFromInline
   @_effects(releasenone)

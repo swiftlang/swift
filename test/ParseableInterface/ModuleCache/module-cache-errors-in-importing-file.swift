@@ -14,7 +14,7 @@
 
 // Actual test: compile and verify the import succeeds (i.e. we only report the error in this file)
 //
-// RUN: %target-swift-frontend -typecheck -verify -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface %s
+// RUN: %target-swift-frontend -typecheck -verify -I %t -module-cache-path %t/modulecache %s
 
 unresolved // expected-error {{use of unresolved identifier 'unresolved'}}
 

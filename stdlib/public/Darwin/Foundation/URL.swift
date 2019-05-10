@@ -537,26 +537,16 @@ public struct URL : ReferenceConvertible, Equatable {
     ///
     /// Returns `nil` if a `URL` cannot be formed with the string (for example, if the string contains characters that are illegal in a URL, or is an empty string).
     public init?(string: __shared String) {
-        guard !string.isEmpty else { return nil }
-        
-        if let inner = NSURL(string: string) {
-            _url = URL._converted(from: inner)
-        } else {
-            return nil
-        }
+        guard !string.isEmpty, let inner = NSURL(string: string) else { return nil }
+        _url = URL._converted(from: inner)
     }
     
     /// Initialize with string, relative to another URL.
     ///
     /// Returns `nil` if a `URL` cannot be formed with the string (for example, if the string contains characters that are illegal in a URL, or is an empty string).
     public init?(string: __shared String, relativeTo url: __shared URL?) {
-        guard !string.isEmpty else { return nil }
-        
-        if let inner = NSURL(string: string, relativeTo: url) {
-            _url = URL._converted(from: inner)
-        } else {
-            return nil
-        }
+        guard !string.isEmpty, let inner = NSURL(string: string, relativeTo: url) else { return nil }
+        _url = URL._converted(from: inner)
     }
     
     /// Initializes a newly created file URL referencing the local file or directory at path, relative to a base URL.
@@ -631,11 +621,11 @@ public struct URL : ReferenceConvertible, Equatable {
     public init(fileURLWithFileSystemRepresentation path: UnsafePointer<Int8>, isDirectory: Bool, relativeTo baseURL: __shared URL?) {
         _url = URL._converted(from: NSURL(fileURLWithFileSystemRepresentation: path, isDirectory: isDirectory, relativeTo: baseURL))
     }
-    
-    public var hashValue: Int {
-        return _url.hash
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(_url)
     }
-    
+
     // MARK: -
     
     /// Returns the data representation of the URL's relativeString. 
@@ -885,15 +875,8 @@ public struct URL : ReferenceConvertible, Equatable {
     /// If the URL has an empty path (e.g., `http://www.example.com`), then this function will return the URL unchanged.
     public func deletingLastPathComponent() -> URL {
         // This is a slight behavior change from NSURL, but better than returning "http://www.example.com../".
-        if path.isEmpty {
-            return self
-        }
-        
-        if let result = _url.deletingLastPathComponent.map({ URL(reference: $0 as NSURL) }) {
-            return result
-        } else {
-            return self
-        }
+        guard !path.isEmpty, let result = _url.deletingLastPathComponent.map({ URL(reference: $0 as NSURL) }) else { return self }
+        return result
     }
     
     /// Returns a URL constructed by appending the given path extension to self.
@@ -903,30 +886,16 @@ public struct URL : ReferenceConvertible, Equatable {
     /// Certain special characters (for example, Unicode Right-To-Left marks) cannot be used as path extensions. If any of those are contained in `pathExtension`, the function will return the URL unchanged.
     /// - parameter pathExtension: The extension to append.
     public func appendingPathExtension(_ pathExtension: String) -> URL {
-        if path.isEmpty {
-            return self
-        }
-        
-        if let result = _url.appendingPathExtension(pathExtension) {
-            return result
-        } else {
-            return self
-        }
+        guard !path.isEmpty, let result = _url.appendingPathExtension(pathExtension) else { return self }
+        return result
     }
     
     /// Returns a URL constructed by removing any path extension.
     ///
     /// If the URL has an empty path (e.g., `http://www.example.com`), then this function will return the URL unchanged.
     public func deletingPathExtension() -> URL {
-        if path.isEmpty {
-            return self
-        }
-
-        if let result = _url.deletingPathExtension.map({ URL(reference: $0 as NSURL) }) {
-            return result
-        } else {
-            return self
-        }
+        guard !path.isEmpty, let result = _url.deletingPathExtension.map({ URL(reference: $0 as NSURL) }) else { return self }
+        return result
     }
 
     /// Appends a path component to the URL.
@@ -974,11 +943,8 @@ public struct URL : ReferenceConvertible, Equatable {
     /// Returns a `URL` with any instances of ".." or "." removed from its path.
     public var standardized : URL {
         // The NSURL API can only return nil in case of file reference URL, which we should not be
-        if let result = _url.standardized.map({ URL(reference: $0 as NSURL) }) {
-            return result
-        } else {
-            return self
-        }
+        guard let result = _url.standardized.map({ URL(reference: $0 as NSURL) }) else { return self }
+        return result
     }
     
     /// Standardizes the path of a file URL.
@@ -993,11 +959,8 @@ public struct URL : ReferenceConvertible, Equatable {
     /// If the `isFileURL` is false, this method returns `self`.
     public var standardizedFileURL : URL {
         // NSURL should not return nil here unless this is a file reference URL, which should be impossible
-        if let result = _url.standardizingPath.map({ URL(reference: $0 as NSURL) }) {
-            return result
-        } else {
-            return self
-        }
+        guard let result = _url.standardizingPath.map({ URL(reference: $0 as NSURL) }) else { return self }
+        return result
     }
     
     /// Resolves any symlinks in the path of a file URL.
@@ -1005,11 +968,8 @@ public struct URL : ReferenceConvertible, Equatable {
     /// If the `isFileURL` is false, this method returns `self`.
     public func resolvingSymlinksInPath() -> URL {
         // NSURL should not return nil here unless this is a file reference URL, which should be impossible
-        if let result = _url.resolvingSymlinksInPath.map({ URL(reference: $0 as NSURL) }) {
-            return result
-        } else {
-            return self
-        }
+        guard let result = _url.resolvingSymlinksInPath.map({ URL(reference: $0 as NSURL) }) else { return self }
+        return result
     }
 
     /// Resolves any symlinks in the path of a file URL.

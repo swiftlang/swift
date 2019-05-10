@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -enable-sil-ownership %s -o /dev/null -verify
+// RUN: %target-swift-emit-sil %s -o /dev/null -verify
 
 //===--- Function declaration with uninhabited parameter type
                                    

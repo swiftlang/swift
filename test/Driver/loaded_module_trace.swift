@@ -9,9 +9,9 @@
 // CHECK: "name":"loaded_module_trace"
 // CHECK: "arch":"{{[^"]*}}"
 // CHECK: "swiftmodules":[
-// CHECK: "{{[^"]*\\[/\\]}}Module2.swiftmodule"
-// CHECK: "{{[^"]*\\[/\\]}}Swift.swiftmodule{{(\\[/\\][^"]+[.]swiftmodule)?}}"
-// CHECK: "{{[^"]*\\[/\\]}}SwiftOnoneSupport.swiftmodule{{(\\[/\\][^"]+[.]swiftmodule)?}}"
+// CHECK-DAG: "{{[^"]*\\[/\\]}}Module2.swiftmodule"
+// CHECK-DAG: "{{[^"]*\\[/\\]}}Swift.swiftmodule{{(\\[/\\][^"]+[.]swiftmodule)?}}"
+// CHECK-DAG: "{{[^"]*\\[/\\]}}SwiftOnoneSupport.swiftmodule{{(\\[/\\][^"]+[.]swiftmodule)?}}"
 // CHECK: ]
 // CHECK: }
 

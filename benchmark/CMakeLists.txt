@@ -43,6 +43,7 @@ set(SWIFT_BENCH_MODULES
     single-source/BinaryFloatingPointProperties
     single-source/BitCount
     single-source/Breadcrumbs
+    single-source/BucketSort
     single-source/ByteSwap
     single-source/COWTree
     single-source/COWArrayGuaranteedParameterOverhead
@@ -77,7 +78,6 @@ set(SWIFT_BENCH_MODULES
     single-source/DictionaryRemove
     single-source/DictionarySubscriptDefault
     single-source/DictionarySwap
-    single-source/DoubleWidthDivision
     single-source/DropFirst
     single-source/DropLast
     single-source/DropWhile
@@ -86,11 +86,13 @@ set(SWIFT_BENCH_MODULES
     single-source/ExistentialPerformance
     single-source/Fibonacci
     single-source/Flatten
+    single-source/FloatingPointParsing
     single-source/FloatingPointPrinting
     single-source/Hanoi
     single-source/Hash
     single-source/Histogram
     single-source/InsertCharacter
+    single-source/IntegerParsing
     single-source/Integrate
     single-source/IterateData
     single-source/Join
@@ -135,6 +137,7 @@ set(SWIFT_BENCH_MODULES
     single-source/RandomValues
     single-source/RangeAssignment
     single-source/RangeIteration
+    single-source/RangeOverlaps
     single-source/RangeReplaceableCollectionPlusDefault
     single-source/RecursiveOwnedParameter
     single-source/ReduceInto
@@ -253,6 +256,10 @@ set(BENCHOPTS_MULTITHREADED
     "-whole-module-optimization" "-num-threads" "4")
 set(BENCHOPTS_SINGLEFILE "")
 
+option(SWIFT_BENCHMARK_USE_OS_LIBRARIES
+  "Runtime link against the Swift libraries on the target (/usr/lib/swift)."
+  FALSE)
+
 configure_build()
 
 #===-----------------------------------------------------------------------===#
@@ -268,10 +275,18 @@ configure_sdks()
 message("--")
 message("-- Swift Benchmark Suite:")
 message("--   SWIFT_BENCHMARK_BUILT_STANDALONE = ${SWIFT_BENCHMARK_BUILT_STANDALONE}")
-message("--   SWIFT_EXEC = ${SWIFT_EXEC}")
-message("--   SWIFT_BENCHMARK_EXTRA_FLAGS = ${SWIFT_BENCHMARK_EXTRA_FLAGS}")
+message("--   SWIFT_BENCHMARK_USE_OS_LIBRARIES = ${SWIFT_BENCHMARK_USE_OS_LIBRARIES}")
+message("--   SWIFT_EXEC         = ${SWIFT_EXEC}")
 message("--   SWIFT_LIBRARY_PATH = ${SWIFT_LIBRARY_PATH}")
-message("--   CLANG_EXEC = ${CLANG_EXEC}")
+if (SWIFT_RPATH_BASE)
+message("--   SWIFT_RPATH_BASE   = ${SWIFT_RPATH_BASE}")
+endif()
+if (SWIFT_RPATH)
+message("--   SWIFT_RPATH        = ${SWIFT_RPATH}")
+message("---  ** WARNING ** Benchmarking against Swift-in-the-OS")
+endif()
+message("--   CLANG_EXEC         = ${CLANG_EXEC}")
+message("--   SWIFT_BENCHMARK_EXTRA_FLAGS = ${SWIFT_BENCHMARK_EXTRA_FLAGS}")
 message("--   SWIFT_OPTIMIZATION_LEVELS = ${SWIFT_OPTIMIZATION_LEVELS}")
 message("--   ONLY_PLATFORMS = ${ONLY_PLATFORMS}")
 message("--   PAGE_ALIGNMENT_OPTION = ${PAGE_ALIGNMENT_OPTION}")

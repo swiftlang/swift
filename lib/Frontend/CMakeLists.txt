@@ -7,11 +7,12 @@ add_swift_host_library(swiftFrontend STATIC
   Frontend.cpp
   FrontendInputsAndOutputs.cpp
   FrontendOptions.cpp
+  ParseableInterfaceModuleLoader.cpp
   ParseableInterfaceSupport.cpp
   PrintingDiagnosticConsumer.cpp
-  SerializedDiagnosticConsumer.cpp
-  DEPENDS
-    SwiftOptions)
+  SerializedDiagnosticConsumer.cpp)
+add_dependencies(swiftFrontend
+  SwiftOptions)
 target_link_libraries(swiftFrontend PRIVATE
   swiftSIL
   swiftMigrator
