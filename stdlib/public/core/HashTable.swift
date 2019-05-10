@@ -127,7 +127,6 @@ extension _HashTable {
     @inlinable
     @inline(__always)
     internal init(offset: Int) {
-      _internalInvariant(offset >= 0)
       self.offset = offset
     }
 
@@ -406,7 +405,7 @@ extension _HashTable {
   @_effects(releasenone)
   internal func copyContents(of other: _HashTable) {
     _internalInvariant(bucketCount == other.bucketCount)
-    self.words.assign(from: other.words, count: bucketCount)
+    self.words.assign(from: other.words, count: wordCount)
   }
 
   /// Insert a new entry with the specified hash value into the table.

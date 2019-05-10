@@ -71,11 +71,12 @@ class GenericGrandchild<A> : GenericChild<A> {
 }
 
 class ConcreteChild : GenericParent<String> {
-  // CHECK-LABEL: sil hidden @$s12super_method13ConcreteChildC1aACSS_tcfc : $@convention(method) (@owned String, @owned ConcreteChild) -> @owned ConcreteChild
+  // CHECK-LABEL: sil hidden @$s12super_method13ConcreteChildC1aACSS_tcfc : $@convention(method) (@owned String, @owned ConcreteChild) -> @owned ConcreteChild {
   override init(a: String) {
     // CHECK-NOT: super_method {{%[0-9]+}} : $ConcreteChild, #GenericParent.init!initializer.1
-    // CHECK: [[INIT_FN_REF:%[0-9]+]] = function_ref @$s12super_method13GenericParentC1aACyxGx_tcfc : $@convention(method) <τ_0_0> (@in τ_0_0, @owned GenericParent<τ_0_0>) -> @owned GenericParent<τ_0_0>{{.*}} // user: %10
+    // CHECK: [[INIT_FN_REF:%[0-9]+]] = function_ref @$s12super_method13GenericParentC1aACyxGx_tcfc : $@convention(method) <τ_0_0> (@in τ_0_0, @owned GenericParent<τ_0_0>) -> @owned GenericParent<τ_0_0>{{.*}}
     // CHECK: apply [[INIT_FN_REF]]
+    // CHECK: } // end sil function '$s12super_method13ConcreteChildC1aACSS_tcfc'
     super.init(a: a)
   }
 }

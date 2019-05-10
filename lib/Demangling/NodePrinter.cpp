@@ -50,8 +50,7 @@ DemanglerPrinter &DemanglerPrinter::operator<<(long long n) & {
   return *this;
 }
 
-std::string Demangle::archetypeName(Node::IndexType index,
-                                    Node::IndexType depth) {
+std::string Demangle::genericParameterName(uint64_t depth, uint64_t index) {
   DemanglerPrinter name;
   do {
     name << (char)('A' + (index % 26));
@@ -212,7 +211,7 @@ private:
   NodePointer getFirstChildOfKind(NodePointer Node, Node::Kind kind) {
     if (!Node)
       return nullptr;
-    for (NodePointer &child : *Node) {
+    for (NodePointer child : *Node) {
       if (child && child->getKind() == kind)
         return child;
     }
@@ -303,6 +302,10 @@ private:
     case Node::Kind::TypeList:
     case Node::Kind::LabelList:
     case Node::Kind::TypeSymbolicReference:
+    case Node::Kind::SugaredOptional:
+    case Node::Kind::SugaredArray:
+    case Node::Kind::SugaredDictionary:
+    case Node::Kind::SugaredParen:
       return true;
 
     case Node::Kind::ProtocolList:
@@ -312,6 +315,7 @@ private:
       return Node->getChild(0)->getChild(0)->getNumChildren() == 0;
 
     case Node::Kind::ProtocolListWithClass:
+    case Node::Kind::AccessorFunctionReference:
     case Node::Kind::Allocator:
     case Node::Kind::ArgumentTuple:
     case Node::Kind::AssociatedConformanceDescriptor:
@@ -319,6 +323,8 @@ private:
     case Node::Kind::AssociatedTypeMetadataAccessor:
     case Node::Kind::AssociatedTypeWitnessTableAccessor:
     case Node::Kind::AutoClosureType:
+    case Node::Kind::BaseConformanceDescriptor:
+    case Node::Kind::BaseWitnessTableAccessor:
     case Node::Kind::ClassMetadataBaseOffset:
     case Node::Kind::CFunctionPointer:
     case Node::Kind::Constructor:
@@ -348,10 +354,12 @@ private:
     case Node::Kind::Extension:
     case Node::Kind::EnumCase:
     case Node::Kind::FieldOffset:
+    case Node::Kind::FullObjCResilientClassStub:
     case Node::Kind::FullTypeMetadata:
     case Node::Kind::Function:
     case Node::Kind::FunctionSignatureSpecialization:
     case Node::Kind::FunctionSignatureSpecializationParam:
+    case Node::Kind::FunctionSignatureSpecializationReturn:
     case Node::Kind::FunctionSignatureSpecializationParamKind:
     case Node::Kind::FunctionSignatureSpecializationParamPayload:
     case Node::Kind::FunctionType:
@@ -405,6 +413,12 @@ private:
     case Node::Kind::ObjCAttribute:
     case Node::Kind::ObjCBlock:
     case Node::Kind::ObjCMetadataUpdateFunction:
+    case Node::Kind::ObjCResilientClassStub:
+    case Node::Kind::OpaqueTypeDescriptor:
+    case Node::Kind::OpaqueTypeDescriptorAccessor:
+    case Node::Kind::OpaqueTypeDescriptorAccessorImpl:
+    case Node::Kind::OpaqueTypeDescriptorAccessorKey:
+    case Node::Kind::OpaqueTypeDescriptorAccessorVar:
     case Node::Kind::Owned:
     case Node::Kind::OwningAddressor:
     case Node::Kind::OwningMutableAddressor:
@@ -427,6 +441,7 @@ private:
     case Node::Kind::ProtocolWitnessTablePattern:
     case Node::Kind::ReabstractionThunk:
     case Node::Kind::ReabstractionThunkHelper:
+    case Node::Kind::ReabstractionThunkHelperWithSelf:
     case Node::Kind::ReadAccessor:
     case Node::Kind::RelatedEntityDeclName:
     case Node::Kind::RetroactiveConformance:
@@ -495,13 +510,28 @@ private:
     case Node::Kind::DependentProtocolConformanceAssociated:
     case Node::Kind::DependentProtocolConformanceInherited:
     case Node::Kind::DependentProtocolConformanceRoot:
-    case Node::Kind::ProtocolConformanceRef:
+    case Node::Kind::ProtocolConformanceRefInTypeModule:
+    case Node::Kind::ProtocolConformanceRefInProtocolModule:
+    case Node::Kind::ProtocolConformanceRefInOtherModule:
     case Node::Kind::DynamicallyReplaceableFunctionKey:
     case Node::Kind::DynamicallyReplaceableFunctionImpl:
     case Node::Kind::DynamicallyReplaceableFunctionVar:
+    case Node::Kind::OpaqueType:
+    case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
+    case Node::Kind::OpaqueReturnType:
+    case Node::Kind::OpaqueReturnTypeOf:
       return false;
     }
     printer_unreachable("bad node kind");
+  }
+
+  void printWithParens(NodePointer type) {
+    bool needs_parens = !isSimpleType(type);
+    if (needs_parens)
+      Printer << "(";
+    print(type);
+    if (needs_parens)
+      Printer << ")";
   }
 
   SugarType findSugar(NodePointer Node) {
@@ -591,12 +621,7 @@ private:
       case SugarType::Optional:
       case SugarType::ImplicitlyUnwrappedOptional: {
         NodePointer type = Node->getChild(1)->getChild(0);
-        bool needs_parens = !isSimpleType(type);
-        if (needs_parens)
-          Printer << "(";
-        print(type);
-        if (needs_parens)
-          Printer << ")";
+        printWithParens(type);
         Printer << (sugarType == SugarType::Optional ? "?" : "!");
         break;
       }
@@ -743,8 +768,7 @@ private:
     Printer << ')';
   }
 
-  unsigned printFunctionSigSpecializationParam(NodePointer Node,
-                                               unsigned Idx);
+  void printFunctionSigSpecializationParams(NodePointer Node);
 
   void printSpecializationPrefix(NodePointer node, StringRef Description,
                                  StringRef ParamPrefix = StringRef());
@@ -796,83 +820,83 @@ static bool isExistentialType(NodePointer node) {
 }
 
 /// Print the relevant parameters and return the new index.
-unsigned NodePrinter::printFunctionSigSpecializationParam(NodePointer Node,
-                                                          unsigned Idx) {
-  NodePointer firstChild = Node->getChild(Idx);
-  unsigned V = firstChild->getIndex();
-  auto K = FunctionSigSpecializationParamKind(V);
-  switch (K) {
-  case FunctionSigSpecializationParamKind::BoxToValue:
-  case FunctionSigSpecializationParamKind::BoxToStack:
-    print(Node->getChild(Idx++));
-    return Idx;
-  case FunctionSigSpecializationParamKind::ConstantPropFunction:
-  case FunctionSigSpecializationParamKind::ConstantPropGlobal: {
-    Printer << "[";
-    print(Node->getChild(Idx++));
-    Printer << " : ";
-    const auto &text = Node->getChild(Idx++)->getText();
-    std::string demangledName = demangleSymbolAsString(text);
-    if (demangledName.empty()) {
-      Printer << text;
-    } else {
-      Printer << demangledName;
+void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node) {
+  unsigned Idx = 0;
+  unsigned End = Node->getNumChildren();
+  while (Idx < End) {
+    NodePointer firstChild = Node->getChild(Idx);
+    unsigned V = firstChild->getIndex();
+    auto K = FunctionSigSpecializationParamKind(V);
+    switch (K) {
+    case FunctionSigSpecializationParamKind::BoxToValue:
+    case FunctionSigSpecializationParamKind::BoxToStack:
+      print(Node->getChild(Idx++));
+      break;
+    case FunctionSigSpecializationParamKind::ConstantPropFunction:
+    case FunctionSigSpecializationParamKind::ConstantPropGlobal: {
+      Printer << "[";
+      print(Node->getChild(Idx++));
+      Printer << " : ";
+      const auto &text = Node->getChild(Idx++)->getText();
+      std::string demangledName = demangleSymbolAsString(text);
+      if (demangledName.empty()) {
+        Printer << text;
+      } else {
+        Printer << demangledName;
+      }
+      Printer << "]";
+      break;
     }
-    Printer << "]";
-    return Idx;
-  }
-  case FunctionSigSpecializationParamKind::ConstantPropInteger:
-  case FunctionSigSpecializationParamKind::ConstantPropFloat:
-    Printer << "[";
-    print(Node->getChild(Idx++));
-    Printer << " : ";
-    print(Node->getChild(Idx++));
-    Printer << "]";
-    return Idx;
-  case FunctionSigSpecializationParamKind::ConstantPropString:
-    Printer << "[";
-    print(Node->getChild(Idx++));
-    Printer << " : ";
-    print(Node->getChild(Idx++));
-    Printer << "'";
-    print(Node->getChild(Idx++));
-    Printer << "'";
-    Printer << "]";
-    return Idx;
-  case FunctionSigSpecializationParamKind::ClosureProp:
-    Printer << "[";
-    print(Node->getChild(Idx++));
-    Printer << " : ";
-    print(Node->getChild(Idx++));
-    Printer << ", Argument Types : [";
-    for (unsigned e = Node->getNumChildren(); Idx < e;) {
-      NodePointer child = Node->getChild(Idx);
-      // Until we no longer have a type node, keep demangling.
-      if (child->getKind() != Node::Kind::Type)
-        break;
-      print(child);
-      ++Idx;
+    case FunctionSigSpecializationParamKind::ConstantPropInteger:
+    case FunctionSigSpecializationParamKind::ConstantPropFloat:
+      Printer << "[";
+      print(Node->getChild(Idx++));
+      Printer << " : ";
+      print(Node->getChild(Idx++));
+      Printer << "]";
+      break;
+    case FunctionSigSpecializationParamKind::ConstantPropString:
+      Printer << "[";
+      print(Node->getChild(Idx++));
+      Printer << " : ";
+      print(Node->getChild(Idx++));
+      Printer << "'";
+      print(Node->getChild(Idx++));
+      Printer << "'";
+      Printer << "]";
+      break;
+    case FunctionSigSpecializationParamKind::ClosureProp:
+      Printer << "[";
+      print(Node->getChild(Idx++));
+      Printer << " : ";
+      print(Node->getChild(Idx++));
+      Printer << ", Argument Types : [";
+      for (unsigned e = Node->getNumChildren(); Idx < e;) {
+        NodePointer child = Node->getChild(Idx);
+        // Until we no longer have a type node, keep demangling.
+        if (child->getKind() != Node::Kind::Type)
+          break;
+        print(child);
+        ++Idx;
 
-      // If we are not done, print the ", ".
-      if (Idx < e && Node->getChild(Idx)->hasText())
-        Printer << ", ";
+        // If we are not done, print the ", ".
+        if (Idx < e && Node->getChild(Idx)->hasText())
+          Printer << ", ";
+      }
+      Printer << "]";
+      break;
+    default:
+      assert(
+       ((V & unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed)) ||
+        (V & unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned)) ||
+        (V & unsigned(FunctionSigSpecializationParamKind::SROA)) ||
+        (V & unsigned(FunctionSigSpecializationParamKind::Dead))||
+        (V & unsigned(
+                  FunctionSigSpecializationParamKind::ExistentialToGeneric))) &&
+       "Invalid OptionSet");
+      print(Node->getChild(Idx++));
     }
-    Printer << "]";
-    return Idx;
-  default:
-    break;
   }
-
-  assert(
-      ((V & unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed)) ||
-       (V & unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned)) ||
-       (V & unsigned(FunctionSigSpecializationParamKind::SROA)) ||
-       (V & unsigned(FunctionSigSpecializationParamKind::Dead))||
-       (V & unsigned(
-                FunctionSigSpecializationParamKind::ExistentialToGeneric))) &&
-      "Invalid OptionSet");
-  print(Node->getChild(Idx++));
-  return Idx;
 }
 
 void NodePrinter::printSpecializationPrefix(NodePointer node,
@@ -887,8 +911,9 @@ void NodePrinter::printSpecializationPrefix(NodePointer node,
   }
   Printer << Description << " <";
   const char *Separator = "";
-  for (unsigned i = 0, e = node->getNumChildren(); i < e; ++i) {
-    switch (node->getChild(i)->getKind()) {
+  int argNum = 0;
+  for (NodePointer child : *node) {
+    switch (child->getKind()) {
       case Node::Kind::SpecializationPassID:
         // We skip the SpecializationPassID since it does not contain any
         // information that is useful to our users.
@@ -897,16 +922,28 @@ void NodePrinter::printSpecializationPrefix(NodePointer node,
       case Node::Kind::IsSerialized:
         Printer << Separator;
         Separator = ", ";
-        print(node->getChild(i));
+        print(child);
         break;
 
       default:
         // Ignore empty specializations.
-        if (node->getChild(i)->hasChildren()) {
+        if (child->hasChildren()) {
           Printer << Separator << ParamPrefix;
           Separator = ", ";
-          print(node->getChild(i));
+          switch (child->getKind()) {
+          case Node::Kind::FunctionSignatureSpecializationParam:
+            Printer << "Arg[" << argNum << "] = ";
+            printFunctionSigSpecializationParams(child);
+            break;
+          case Node::Kind::FunctionSignatureSpecializationReturn:
+            Printer << "Return = ";
+            printFunctionSigSpecializationParams(child);
+            break;
+          default:
+            print(child);
+          }
         }
+        argNum++;
         break;
     }
   }
@@ -955,6 +992,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::ObjCMetadataUpdateFunction:
     Printer << "ObjC metadata update function for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::ObjCResilientClassStub:
+    Printer << "ObjC resilient class stub for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::FullObjCResilientClassStub:
+    Printer << "full ObjC resilient class stub for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::OutlinedBridgedMethod:
@@ -1009,8 +1054,11 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::AnonymousContext:
     if (Options.QualifyEntities && Options.DisplayExtensionContexts) {
       print(Node->getChild(1));
-      Printer << ".(unknown context at " << Node->getChild(0)->getText() << ")";
-      if (Node->getChild(2)->getNumChildren() > 0) {
+      Printer << ".(unknown context at ";
+      print(Node->getChild(0));
+      Printer << ")";
+      if (Node->getNumChildren() >= 3 &&
+          Node->getChild(2)->getNumChildren() > 0) {
         Printer << '<';
         print(Node->getChild(2));
         Printer << '>';
@@ -1112,8 +1160,8 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     }
     return nullptr;
   case Node::Kind::RelatedEntityDeclName:
-    Printer << "related decl '" << Node->getText() << "' for ";
-    print(Node->getChild(0));
+    Printer << "related decl '" << Node->getFirstChild()->getText() << "' for ";
+    print(Node->getChild(1));
     return nullptr;
   case Node::Kind::Module:
     if (Options.DisplayModuleNames)
@@ -1251,20 +1299,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       print(Node->getChild(i));
     }
     return nullptr;
-  case Node::Kind::FunctionSignatureSpecializationParam: {
-    uint64_t argNum = Node->getIndex();
-
-    Printer << "Arg[" << argNum << "] = ";
-
-    unsigned Idx = printFunctionSigSpecializationParam(Node, 0);
-
-    for (unsigned e = Node->getNumChildren(); Idx < e;) {
-      Printer << " and ";
-      Idx = printFunctionSigSpecializationParam(Node, Idx);
-    }
-
-    return nullptr;
-  }
+  case Node::Kind::FunctionSignatureSpecializationReturn:
+  case Node::Kind::FunctionSignatureSpecializationParam:
+    printer_unreachable("should be handled in printSpecializationPrefix");
   case Node::Kind::FunctionSignatureSpecializationParamPayload: {
     std::string demangledName = demangleSymbolAsString(Node->getText());
     if (demangledName.empty()) {
@@ -1510,22 +1547,40 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::ReabstractionThunkHelper: {
     if (Options.ShortenThunk) {
       Printer << "thunk for ";
-      print(Node->getChild(Node->getNumChildren() - 2));
+      print(Node->getChild(Node->getNumChildren() - 1));
       return nullptr;
     }
     Printer << "reabstraction thunk ";
     if (Node->getKind() == Node::Kind::ReabstractionThunkHelper)
       Printer << "helper ";
-    auto generics = getFirstChildOfKind(Node, Node::Kind::DependentGenericSignature);
-    assert(Node->getNumChildren() == 2 + unsigned(generics != nullptr));
-    if (generics) {
+    unsigned idx = 0;
+    if (Node->getNumChildren() == 3) {
+      auto generics = Node->getChild(0);
+      idx = 1;
       print(generics);
       Printer << " ";
     }
     Printer << "from ";
-    print(Node->getChild(Node->getNumChildren() - 2));
+    print(Node->getChild(idx + 1));
     Printer << " to ";
-    print(Node->getChild(Node->getNumChildren() - 1));
+    print(Node->getChild(idx));
+    return nullptr;
+  }
+  case Node::Kind::ReabstractionThunkHelperWithSelf: {
+    Printer << "reabstraction thunk ";
+    unsigned idx = 0;
+    if (Node->getNumChildren() == 4) {
+      auto generics = Node->getChild(0);
+      idx = 1;
+      print(generics);
+      Printer << " ";
+    }
+    Printer << "from ";
+    print(Node->getChild(idx + 2));
+    Printer << " to ";
+    print(Node->getChild(idx + 1));
+    Printer << " self ";
+    print(Node->getChild(idx));
     return nullptr;
   }
   case Node::Kind::MergedFunction:
@@ -1535,6 +1590,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::TypeSymbolicReference:
     Printer << "type symbolic reference 0x";
+    Printer.writeHex(Node->getIndex());
+    return nullptr;
+  case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
+    Printer << "opaque type symbolic reference 0x";
     Printer.writeHex(Node->getIndex());
     return nullptr;
   case Node::Kind::DynamicallyReplaceableFunctionKey:
@@ -1638,6 +1697,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << " in ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::BaseConformanceDescriptor:
+    Printer << "base conformance descriptor for ";
+    print(Node->getChild(0));
+    Printer << ": ";
+    print(Node->getChild(1));
+    return nullptr;
   case Node::Kind::DefaultAssociatedTypeMetadataAccessor:
     Printer << "default associated type metadata accessor for ";
     print(Node->getChild(0));
@@ -1647,6 +1712,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(Node->getChild(1));
     Printer << " : ";
     print(Node->getChild(2));
+    Printer << " in ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::BaseWitnessTableAccessor:
+    Printer << "base witness table accessor for ";
+    print(Node->getChild(1));
     Printer << " in ";
     print(Node->getChild(0));
     return nullptr;
@@ -1662,15 +1733,35 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "nominal type descriptor for ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::OpaqueTypeDescriptor:
+    Printer << "opaque type descriptor for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::OpaqueTypeDescriptorAccessor:
+    Printer << "opaque type descriptor accessor for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::OpaqueTypeDescriptorAccessorImpl:
+    Printer << "opaque type descriptor accessor impl for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::OpaqueTypeDescriptorAccessorKey:
+    Printer << "opaque type descriptor accessor key for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::OpaqueTypeDescriptorAccessorVar:
+    Printer << "opaque type descriptor accessor var for ";
+    print(Node->getChild(0));
+    return nullptr;
   case Node::Kind::CoroutineContinuationPrototype:
     Printer << "coroutine continuation prototype for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::ValueWitness:
-    Printer << toString(ValueWitnessKind(Node->getIndex()));
+    Printer << toString(ValueWitnessKind(Node->getFirstChild()->getIndex()));
     if (Options.ShortenValueWitness) Printer << " for ";
     else Printer << " value witness for ";
-    print(Node->getFirstChild());
+    print(Node->getChild(1));
     return nullptr;
   case Node::Kind::ValueWitnessTable:
     Printer << "value witness table for ";
@@ -1712,12 +1803,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       Idx++;
     }
     NodePointer type = Node->getChild(Idx)->getChild(0);
-    bool needs_parens = !isSimpleType(type);
-    if (needs_parens)
-      Printer << "(";
-    print(type);
-    if (needs_parens)
-      Printer << ")";
+    printWithParens(type);
     if (isExistentialType(type)) {
       Printer << ".Protocol";
     } else {
@@ -1935,7 +2021,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
         }
         // FIXME: Depth won't match when a generic signature applies to a
         // method in generic type context.
-        Printer << archetypeName(index, depth);
+        Printer << Options.GenericParameterName(depth, index);
       }
     }
     
@@ -2011,7 +2097,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   }
   case Node::Kind::DependentGenericParamType: {
-    Printer << Node->getText();
+    unsigned index = Node->getChild(1)->getIndex();
+    unsigned depth = Node->getChild(0)->getIndex();
+    Printer << Options.GenericParameterName(depth, index);
     return nullptr;
   }
   case Node::Kind::DependentGenericType: {
@@ -2032,7 +2120,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   }
   case Node::Kind::DependentAssociatedTypeRef: {
-    Printer << Node->getText();
+    Printer << Node->getFirstChild()->getText();
     return nullptr;
   }
   case Node::Kind::ReflectionMetadataBuiltinDescriptor:
@@ -2158,8 +2246,54 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       << " ";
     printChildren(Node);
     return nullptr;
-  case Node::Kind::ProtocolConformanceRef:
+  case Node::Kind::ProtocolConformanceRefInTypeModule:
+    Printer << "protocol conformance ref (type's module) ";
     printChildren(Node);
+    return nullptr;
+  case Node::Kind::ProtocolConformanceRefInProtocolModule:
+    Printer << "protocol conformance ref (protocol's module) ";
+    printChildren(Node);
+    return nullptr;
+  case Node::Kind::ProtocolConformanceRefInOtherModule:
+    Printer << "protocol conformance ref (retroactive) ";
+    printChildren(Node);
+    return nullptr;
+  case Node::Kind::SugaredOptional:
+    printWithParens(Node->getChild(0));
+    Printer << "?";
+    return nullptr;
+  case Node::Kind::SugaredArray:
+    Printer << "[";
+    print(Node->getChild(0));
+    Printer << "]";
+    return nullptr;
+  case Node::Kind::SugaredDictionary:
+    Printer << "[";
+    print(Node->getChild(0));
+    Printer << " : ";
+    print(Node->getChild(1));
+    Printer << "]";
+    return nullptr;
+  case Node::Kind::SugaredParen:
+    Printer << "(";
+    print(Node->getChild(0));
+    Printer << ")";
+    return nullptr;
+  case Node::Kind::OpaqueReturnType:
+    Printer << "some";
+    return nullptr;
+  case Node::Kind::OpaqueReturnTypeOf:
+    Printer << "<<opaque return type of ";
+    printChildren(Node);
+    Printer << ">>";
+    return nullptr;
+  case Node::Kind::OpaqueType:
+    print(Node->getChild(0));
+    Printer << '.';
+    print(Node->getChild(1));
+    return nullptr;
+  case Node::Kind::AccessorFunctionReference:
+    Printer << "accessor function at " << Node->getIndex();
     return nullptr;
   }
   printer_unreachable("bad node kind!");

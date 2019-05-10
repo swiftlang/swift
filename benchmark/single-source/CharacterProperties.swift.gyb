@@ -24,25 +24,29 @@ public let CharacterPropertiesFetch = BenchmarkInfo(
   name: "CharacterPropertiesFetch",
   runFunction: run_CharacterPropertiesFetch,
   tags: [.validation, .api, .String],
-  setUpFunction: { blackHole(workload) })
+  setUpFunction: { blackHole(workload) },
+  legacyFactor: 10)
 
 public let CharacterPropertiesStashed = BenchmarkInfo(
   name: "CharacterPropertiesStashed",
   runFunction: run_CharacterPropertiesStashed,
   tags: [.validation, .api, .String],
-  setUpFunction: { setupStash() })
+  setUpFunction: { setupStash() },
+  legacyFactor: 10)
 
 public let CharacterPropertiesStashedMemo = BenchmarkInfo(
   name: "CharacterPropertiesStashedMemo",
   runFunction: run_CharacterPropertiesStashedMemo,
   tags: [.validation, .api, .String],
-  setUpFunction: { setupMemo() })
+  setUpFunction: { setupMemo() },
+  legacyFactor: 10)
 
 public let CharacterPropertiesPrecomputed = BenchmarkInfo(
   name: "CharacterPropertiesPrecomputed",
   runFunction: run_CharacterPropertiesPrecomputed,
   tags: [.validation, .api, .String],
-  setUpFunction: { setupPrecomputed() })
+  setUpFunction: { setupPrecomputed() },
+  legacyFactor: 10)
 
 extension Character {
   var firstScalar: UnicodeScalar { return unicodeScalars.first! }
@@ -104,8 +108,8 @@ func setupMemo() {
 }
 
 // Precompute whole scalar set
-func precompute(_ charSet: CharacterSet) -> Set<UInt32> {
-  var result = Set<UInt32>()
+func precompute(_ charSet: CharacterSet, capacity: Int) -> Set<UInt32> {
+  var result = Set<UInt32>(minimumCapacity: capacity)
   for plane in 0...0x10 {
     guard charSet.hasMember(inPlane: UInt8(plane)) else { continue }
     let offset = plane &* 0x1_0000
@@ -118,8 +122,17 @@ func precompute(_ charSet: CharacterSet) -> Set<UInt32> {
   }
   return result
 }
+%{  #// Reduce wide memory range. Capacities from `print("${Set}:…` below.
+  precomputed_capacity = dict(
+    controlCharacters=24951, alphanumerics=122647, lowercaseLetters=2063,
+    punctuationCharacters=770, whitespaces=19, letters=121145,
+    uppercaseLetters=1733, decimalDigits=590, newlines=7,
+    capitalizedLetters=31
+  )
+}%
 % for Property, Set in Properties.items():
-var ${Set}Precomputed: Set<UInt32> = precompute(${Set})
+var ${Set}Precomputed: Set<UInt32> =
+  precompute(${Set}, capacity: ${precomputed_capacity[Set]})
 func is${Property}Precomputed(_ c: Character) -> Bool {
   return ${Set}Precomputed.contains(c.firstScalar.value)
 }
@@ -129,6 +142,7 @@ func setupPrecomputed() {
   blackHole(workload)
 % for Property, Set in Properties.items():
     blackHole(${Set}Precomputed)
+%#//    print("${Set}: \(${Set}Precomputed.count)")
 % end
 }
 
@@ -155,7 +169,7 @@ let workload = """
 
 @inline(never)
 public func run_CharacterPropertiesFetch(_ N: Int) {
-  for _ in 1...N*10 {
+  for _ in 1...N {
     for c in workload {
     % for Property, Set in Properties.items():
         blackHole(is${Property}(c))
@@ -166,7 +180,7 @@ public func run_CharacterPropertiesFetch(_ N: Int) {
 
 @inline(never)
 public func run_CharacterPropertiesStashed(_ N: Int) {
-  for _ in 1...N*10 {
+  for _ in 1...N {
     for c in workload {
     % for Property, Set in Properties.items():
         blackHole(is${Property}Stashed(c))
@@ -177,7 +191,7 @@ public func run_CharacterPropertiesStashed(_ N: Int) {
 
 @inline(never)
 public func run_CharacterPropertiesStashedMemo(_ N: Int) {
-  for _ in 1...N*10 {
+  for _ in 1...N {
     for c in workload {
     % for Property, Set in Properties.items():
         blackHole(is${Property}StashedMemo(c))
@@ -188,7 +202,7 @@ public func run_CharacterPropertiesStashedMemo(_ N: Int) {
 
 @inline(never)
 public func run_CharacterPropertiesPrecomputed(_ N: Int) {
-  for _ in 1...N*10 {
+  for _ in 1...N {
     for c in workload {
     % for Property, Set in Properties.items():
         blackHole(is${Property}Precomputed(c))

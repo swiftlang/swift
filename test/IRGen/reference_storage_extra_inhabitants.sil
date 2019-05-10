@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-objc-interop -emit-ir -primary-file %s | %FileCheck %s -DWORD=i%target-ptrsize
+// RUN: %target-swift-frontend -disable-objc-interop -emit-ir -primary-file %s | %FileCheck %s -DWORD=i%target-ptrsize
 
 sil_stage canonical
 

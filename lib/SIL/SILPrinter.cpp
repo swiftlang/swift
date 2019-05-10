@@ -212,6 +212,10 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     // FIXME
     Buffer << "<subscript>";
     return;
+  case DeclContextKind::EnumElementDecl:
+    // FIXME
+    Buffer << "<enum element>";
+    return;
   }
   llvm_unreachable("bad decl context");
 }
@@ -479,7 +483,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
     if (!i.Type)
       return *this;
     *this << " : ";
-    if (i.OwnershipKind) {
+    if (i.OwnershipKind && *i.OwnershipKind != ValueOwnershipKind::Any) {
       *this << "@" << i.OwnershipKind.getValue() << " ";
     }
     return *this << i.Type;
@@ -578,7 +582,7 @@ public:
 
     // If SIL ownership is enabled and the given function has not had ownership
     // stripped out, print out ownership of SILArguments.
-    if (BB->getParent()->hasQualifiedOwnership()) {
+    if (BB->getParent()->hasOwnership()) {
       *this << getIDAndTypeAndOwnership(Args[0]);
       for (SILArgument *Arg : Args.drop_front()) {
         *this << ", " << getIDAndTypeAndOwnership(Arg);
@@ -1140,6 +1144,8 @@ public:
     case ParameterConvention::Indirect_InoutAliasable:
       llvm_unreachable("unexpected callee convention!");
     }
+    if (CI->isOnStack())
+      *this << "[on_stack] ";
     visitApplyInstBase(CI);
   }
 
@@ -1324,6 +1330,22 @@ public:
     }
   }
 
+  void printAssignOwnershipQualifier(AssignOwnershipQualifier Qualifier) {
+    switch (Qualifier) {
+    case AssignOwnershipQualifier::Unknown:
+      return;
+    case AssignOwnershipQualifier::Init:
+      *this << "[init] ";
+      return;
+    case AssignOwnershipQualifier::Reassign:
+      *this << "[reassign] ";
+      return;
+    case AssignOwnershipQualifier::Reinit:
+      *this << "[reinit] ";
+      return;
+    }
+  }
+
   void visitStoreInst(StoreInst *SI) {
     *this << Ctx.getID(SI->getSrc()) << " to ";
     printStoreOwnershipQualifier(SI->getOwnershipQualifier());
@@ -1340,7 +1362,17 @@ public:
   }
 
   void visitAssignInst(AssignInst *AI) {
-    *this << Ctx.getID(AI->getSrc()) << " to " << getIDAndType(AI->getDest());
+    *this << Ctx.getID(AI->getSrc()) << " to ";
+    printAssignOwnershipQualifier(AI->getOwnershipQualifier());
+    *this << getIDAndType(AI->getDest());
+  }
+
+  void visitAssignByDelegateInst(AssignByDelegateInst *AI) {
+    *this << getIDAndType(AI->getSrc()) << " to ";
+    printAssignOwnershipQualifier(AI->getOwnershipQualifier());
+    *this << getIDAndType(AI->getDest())
+          << ", init " << getIDAndType(AI->getInitializer())
+          << ", set " << getIDAndType(AI->getSetter());
   }
 
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {
@@ -1355,20 +1387,14 @@ public:
       *this << "[derivedselfonly] ";
       break;
     case MarkUninitializedInst::DelegatingSelf: *this << "[delegatingself] ";break;
+    case MarkUninitializedInst::DelegatingSelfAllocated:
+      *this << "[delegatingselfallocated] ";
+      break;
     }
     
     *this << getIDAndType(MU->getOperand());
   }
-  void visitMarkUninitializedBehaviorInst(MarkUninitializedBehaviorInst *MU) {
-    *this << Ctx.getID(MU->getInitStorageFunc());
-    printSubstitutions(MU->getInitStorageSubstitutions());
-    *this << '(' << Ctx.getID(MU->getStorage())
-          << ") : " << MU->getInitStorageFunc()->getType() << ", "
-          << Ctx.getID(MU->getSetterFunc());
-    printSubstitutions(MU->getSetterSubstitutions());
-    *this << '(' << Ctx.getID(MU->getSelf())
-          << ") : " << MU->getSetterFunc()->getType();
-  }
+
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
     interleave(MFE->getElements(),
                [&](SILValue Var) { *this << getIDAndType(Var); },
@@ -1385,7 +1411,7 @@ public:
     printDebugVar(DVAI->getVarInfo());
   }
 
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   void visitLoad##Name##Inst(Load##Name##Inst *LI) { \
     if (LI->isTake()) \
       *this << "[take] "; \
@@ -1397,8 +1423,6 @@ public:
       *this << "[initialization] "; \
     *this << getIDAndType(SI->getDest()); \
   }
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
 #include "swift/AST/ReferenceStorage.def"
 
   void visitCopyAddrInst(CopyAddrInst *CI) {
@@ -1481,7 +1505,6 @@ public:
   }
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
     *this << (CI->isLifetimeGuaranteed() ? "" : "[not_guaranteed] ")
-          << (CI->isEscapedByUser() ? "[escaped] " : "")
           << getIDAndType(CI->getOperand()) << " to " << CI->getType();
   }
   void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
@@ -2199,6 +2222,11 @@ public:
       *this << component.getComponentType();
       break;
     }
+    case KeyPathPatternComponent::Kind::TupleElement: {
+      *this << "tuple_element #" << component.getTupleIndex();
+      *this << " : $" << component.getComponentType();
+      break;
+    }
     }
   }
 };
@@ -2416,6 +2444,11 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   // this attribute.
   if (WasDeserializedCanonical && getModule().getStage() == SILStage::Raw)
     OS << "[canonical] ";
+
+  // If this function is not an external declaration /and/ is in ownership ssa
+  // form, print [ossa].
+  if (!isExternalDeclaration() && hasOwnership())
+    OS << "[ossa] ";
 
   printName(OS);
   OS << " : $";

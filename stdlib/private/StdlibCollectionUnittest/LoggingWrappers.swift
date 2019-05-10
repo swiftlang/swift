@@ -83,6 +83,7 @@ public class SequenceLog {
   public static var prefixWhile = TypeIndexed(0)
   public static var prefixMaxLength = TypeIndexed(0)
   public static var suffixMaxLength = TypeIndexed(0)
+  public static var withContiguousStorageIfAvailable = TypeIndexed(0)
   public static var _customContainsEquatableElement = TypeIndexed(0)
   public static var _copyToContiguousArray = TypeIndexed(0)
   public static var _copyContents = TypeIndexed(0)  
@@ -111,6 +112,9 @@ public class SequenceLog {
   public static var partitionBy = TypeIndexed(0)
   public static var _withUnsafeMutableBufferPointerIfSupported = TypeIndexed(0)
   public static var _withUnsafeMutableBufferPointerIfSupportedNonNilReturns =
+    TypeIndexed(0)
+  public static var withContiguousMutableStorageIfAvailable = TypeIndexed(0)
+  public static var withContiguousMutableStorageIfAvailableNonNilReturns =
     TypeIndexed(0)
   // RangeReplaceableCollection
   public static var init_ = TypeIndexed(0)
@@ -209,6 +213,13 @@ extension LoggingSequence: Sequence {
   public var underestimatedCount: Int {
     SequenceLog.underestimatedCount[selfType] += 1
     return base.underestimatedCount
+  }
+  
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    SequenceLog.withContiguousStorageIfAvailable[selfType] += 1
+    return try base.withContiguousStorageIfAvailable(body)
   }
 
   public func _customContainsEquatableElement(_ element: Element) -> Bool? {
@@ -385,6 +396,17 @@ extension LoggingMutableCollection: MutableCollection {
     return result
   }
 
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    MutableCollectionLog.withContiguousMutableStorageIfAvailable[selfType] += 1
+    let result = try base.withContiguousMutableStorageIfAvailable(body)
+    if result != nil {
+      Log.withContiguousMutableStorageIfAvailable[selfType] += 1
+    }
+    return result
+  }
+
 }
 
 public typealias LoggingMutableBidirectionalCollection<
@@ -501,10 +523,10 @@ public typealias LoggingRangeReplaceableRandomAccessCollection<
 > = LoggingRangeReplaceableCollection<Base>
 
 //===----------------------------------------------------------------------===//
-// Collections that count calls to `_withUnsafeMutableBufferPointerIfSupported`
+// Collections that count calls to `withContiguousMutableStorageIfAvailable`
 //===----------------------------------------------------------------------===//
 
-/// Interposes between `_withUnsafeMutableBufferPointerIfSupported` method calls
+/// Interposes between `withContiguousMutableStorageIfAvailable` method calls
 /// to increment a counter. Calls to this method from within dispatched methods
 /// are uncounted by the standard logging collection wrapper.
 public struct BufferAccessLoggingMutableCollection<
@@ -584,6 +606,17 @@ extension BufferAccessLoggingMutableCollection: MutableCollection {
     let result = try base._withUnsafeMutableBufferPointerIfSupported(body)
     if result != nil {
       Log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[selfType] += 1
+    }
+    return result
+  }
+  
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    Log.withContiguousMutableStorageIfAvailable[selfType] += 1
+    let result = try base.withContiguousMutableStorageIfAvailable(body)
+    if result != nil {
+      Log.withContiguousMutableStorageIfAvailable[selfType] += 1
     }
     return result
   }

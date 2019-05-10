@@ -796,4 +796,28 @@ tests.test("String.UTF32View/BidirectionalCollection")
     test.unicodeScalars, test.string.unicodeScalars) { $0 == $1 }
 }
 
+tests.test("String View Setters") {
+  var string = "abcd🤠👨‍👨‍👦‍👦efg"
+
+  string.utf8 = winter.utf8
+  expectEqual(winter, string)
+  string.utf8 = summer.utf8
+  expectEqual(summer, string)
+
+  string.utf16 = winter.utf16
+  expectEqual(winter, string)
+  string.utf16 = summer.utf16
+  expectEqual(summer, string)
+
+  string.unicodeScalars = winter.unicodeScalars
+  expectEqual(winter, string)
+  string.unicodeScalars = summer.unicodeScalars
+  expectEqual(summer, string)
+
+  string = winter
+  expectEqual(winter, string)
+  string = summer
+  expectEqual(summer, string)
+}
+
 runAllTests()

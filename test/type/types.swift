@@ -19,8 +19,8 @@ var d3 : () -> Float = { 4 }
 var d4 : () -> Int = { d2 }  // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}} {{26-26=()}}
 
 var e0 : [Int]
-e0[] // expected-error {{cannot subscript a value of type '[Int]' with an index of type '()'}}
-  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Int), (Range<Int>),}}
+e0[] // expected-error {{cannot subscript a value of type '[Int]' with an argument of type '()'}}
+  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: ((UnboundedRange_) -> ()), (Int), (R), (Range<Int>), (Range<Self.Index>)}}
 
 var f0 : [Float]
 var f1 : [(Int,Int)]

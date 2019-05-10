@@ -21,6 +21,8 @@ import Foundation
 // CHECK-LABEL: @"$sSo8NSNumberC31extension_type_metadata_linkingE6StructVMn" = constant
 // CHECK-LABEL: @"$sSo8NSNumberC31extension_type_metadata_linkingE6StructVMf" = internal constant
 
+// CHECK-LABEL: "$sSo18NSComparisonResultVMn" = linkonce_odr hidden
+
 // CHECK-LABEL: @"$sSo8NSNumberC31extension_type_metadata_linkingE4BaseCN" = alias
 // CHECK-LABEL: @"$sSo8NSNumberC31extension_type_metadata_linkingE7DerivedCN" = alias
 // CHECK-LABEL: @"$sSo8NSNumberC31extension_type_metadata_linkingE6StructVN" = alias
@@ -47,3 +49,22 @@ extension NSNumber {
   public struct Struct {}
 }
 
+// SR-9397: not emitting metadata for NSComparisonResult
+protocol CommandTypes {
+    associatedtype Result
+    associatedtype Message
+}
+
+struct EnumCommand: CommandTypes {
+    typealias Result = ComparisonResult
+    typealias Message = String
+}
+
+struct Command<T: CommandTypes> {
+    var result: T.Result?
+    var message: T.Message?
+}
+
+func createCommandArray() -> Any {
+  return [Command<EnumCommand>]()
+}

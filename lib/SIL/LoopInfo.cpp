@@ -98,6 +98,12 @@ bool SILLoop::canDuplicate(SILInstruction *I) const {
   if (isa<BeginAccessInst>(I))
     return false;
 
+  if (isa<DynamicMethodBranchInst>(I))
+    return false;
+
+  if (auto *PA = dyn_cast<PartialApplyInst>(I))
+    return !PA->isOnStack();
+
   assert(I->isTriviallyDuplicatable() &&
     "Code here must match isTriviallyDuplicatable in SILInstruction");
   return true;

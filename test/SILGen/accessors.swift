@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name accessors -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name accessors -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 // Hold a reference to do to magically become non-POD.
 class Reference {}
@@ -26,7 +26,7 @@ func someValidPointer<T>() -> UnsafeMutablePointer<T> { fatalError() }
 func test0(_ ref: A) {
   ref.array[index0()] = ref.array[index1()]
 }
-// CHECK: sil hidden @$s9accessors5test0yyAA1ACF : $@convention(thin) (@guaranteed A) -> () {
+// CHECK: sil hidden [ossa] @$s9accessors5test0yyAA1ACF : $@convention(thin) (@guaranteed A) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $A):
 // CHECK-NEXT: debug_value
 //   Formal evaluation of LHS.
@@ -69,7 +69,7 @@ class B { var array = MutatingSub() }
 func test1(_ ref: B) {
   ref.array[index0()] = ref.array[index1()]
 }
-// CHECK-LABEL: sil hidden @$s9accessors5test1yyAA1BCF : $@convention(thin) (@guaranteed B) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s9accessors5test1yyAA1BCF : $@convention(thin) (@guaranteed B) -> () {
 // CHECK:    bb0([[ARG:%.*]] : @guaranteed $B):
 // CHECK-NEXT: debug_value
 //   Formal evaluation of LHS.
@@ -112,7 +112,7 @@ func test_rec(_ outer: inout RecOuter) -> Int {
   return outer.inner[0]
 }
 // This uses the immutable addressor.
-// CHECK: sil hidden @$s9accessors8test_recySiAA8RecOuterVzF : $@convention(thin) (@inout RecOuter) -> Int {
+// CHECK: sil hidden [ossa] @$s9accessors8test_recySiAA8RecOuterVzF : $@convention(thin) (@inout RecOuter) -> Int {
 // CHECK:   function_ref @$s9accessors8RecOuterV5innerAA0B5InnerVvlu : $@convention(method) (RecOuter) -> UnsafePointer<RecInner>
 
 struct Rec2Inner {
@@ -130,39 +130,39 @@ func test_rec2(_ outer: inout Rec2Outer) -> Int {
   return outer.inner[0]
 }
 // This uses the mutable addressor.
-// CHECK: sil hidden @$s9accessors9test_rec2ySiAA9Rec2OuterVzF : $@convention(thin) (@inout Rec2Outer) -> Int {
+// CHECK: sil hidden [ossa] @$s9accessors9test_rec2ySiAA9Rec2OuterVzF : $@convention(thin) (@inout Rec2Outer) -> Int {
 // CHECK:   function_ref @$s9accessors9Rec2OuterV5innerAA0B5InnerVvau : $@convention(method) (@inout Rec2Outer) -> UnsafeMutablePointer<Rec2Inner>
 
 struct Foo {
   private subscript(privateSubscript x: Void) -> Void {
-    // CHECK-DAG: sil private @$s9accessors3FooV16privateSubscriptyyt_tc33_D7F31B09EE737C687DC580B2014D759CLlig : $@convention(method) (Foo) -> () {
+    // CHECK-DAG: sil private [ossa] @$s9accessors3FooV16privateSubscriptyyt_tc33_D7F31B09EE737C687DC580B2014D759CLlig : $@convention(method) (Foo) -> () {
     get {}
   }
   private(set) subscript(withPrivateSet x: Void) -> Void {
-    // CHECK-DAG: sil hidden @$s9accessors3FooV14withPrivateSetyyt_tcig : $@convention(method) (Foo) -> () {
+    // CHECK-DAG: sil hidden [ossa] @$s9accessors3FooV14withPrivateSetyyt_tcig : $@convention(method) (Foo) -> () {
     get {}
-    // CHECK-DAG: sil hidden @$s9accessors3FooV14withPrivateSetyyt_tcis : $@convention(method) (@inout Foo) -> () {
+    // CHECK-DAG: sil hidden [ossa] @$s9accessors3FooV14withPrivateSetyyt_tcis : $@convention(method) (@inout Foo) -> () {
     set {}
   }
   subscript(withNestedClass x: Void) -> Void {
     // Check for initializer of NestedClass
-    // CHECK-DAG: sil private @$s9accessors3FooV15withNestedClassyyt_tcig0dE0L_CAFycfc : $@convention(method) (@owned NestedClass) -> @owned NestedClass {
+    // CHECK-DAG: sil private [ossa] @$s9accessors3FooV15withNestedClassyyt_tcig0dE0L_CAFycfc : $@convention(method) (@owned NestedClass) -> @owned NestedClass {
     class NestedClass {}
   }
 
-  // CHECK-DAG: sil private @$s9accessors3FooV15privateVariable33_D7F31B09EE737C687DC580B2014D759CLLytvg : $@convention(method) (Foo) -> () {
+  // CHECK-DAG: sil private [ossa] @$s9accessors3FooV15privateVariable33_D7F31B09EE737C687DC580B2014D759CLLytvg : $@convention(method) (Foo) -> () {
   private var privateVariable: Void {
     return
   }
   private(set) var variableWithPrivateSet: Void {
-    // CHECK-DAG: sil hidden @$s9accessors3FooV22variableWithPrivateSetytvg : $@convention(method) (Foo) -> () {
+    // CHECK-DAG: sil hidden [ossa] @$s9accessors3FooV22variableWithPrivateSetytvg : $@convention(method) (Foo) -> () {
     get {}
-    // CHECK-DAG: sil hidden @$s9accessors3FooV22variableWithPrivateSetytvs : $@convention(method) (@inout Foo) -> () {
+    // CHECK-DAG: sil hidden [ossa] @$s9accessors3FooV22variableWithPrivateSetytvs : $@convention(method) (@inout Foo) -> () {
     set {}
   }
   var propertyWithNestedClass: Void {
     // Check for initializer of NestedClass
-    // CHECK-DAG: sil private @$s9accessors3FooV23propertyWithNestedClassytvg0eF0L_CAFycfc : $@convention(method) (@owned NestedClass) -> @owned NestedClass {
+    // CHECK-DAG: sil private [ossa] @$s9accessors3FooV23propertyWithNestedClassytvg0eF0L_CAFycfc : $@convention(method) (@owned NestedClass) -> @owned NestedClass {
     class NestedClass {}
   }
 }

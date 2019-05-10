@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-silgen | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen | %FileCheck %s
 
 // Check that all reference counting instructions can take the [nonatomic]
 // attribute. SIL parser should be able to parse this attribute and

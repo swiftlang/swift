@@ -11,6 +11,9 @@ func printType(_: Any.Type)
 @_silgen_name("printHeapMetadataType")
 func printDynamicType(_: AnyObject)
 
+@_silgen_name("stopRemoteAST")
+func stopRemoteAST()
+
 printType(NSString.self)
 // CHECK: NSString
 
@@ -42,3 +45,5 @@ printType(OurObjCProtocol.self)
 
 printType(Optional<OurObjCProtocol>.self)
 // CHECK: Optional<OurObjCProtocol & AnyObject>
+
+stopRemoteAST()

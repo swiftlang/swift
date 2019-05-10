@@ -55,6 +55,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_IIFE_2 | %FileCheck %s -check-prefix=IN_IIFE_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_IIFE_3 | %FileCheck %s -check-prefix=IN_IIFE_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_IIFE_4 | %FileCheck %s -check-prefix=IN_IIFE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ERROR_IN_CLOSURE_IN_INITIALIZER | %FileCheck %s -check-prefix=ERROR_IN_CLOSURE_IN_INITIALIZER
 
 // ERROR_COMMON: found code completion token
 // ERROR_COMMON-NOT: Begin completions
@@ -70,7 +71,7 @@ struct FooStruct {
 // FOO_OBJECT_DOT: Begin completions
 // FOO_OBJECT_DOT-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Identical\])?}}: instanceFunc0()[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: End completions
 
 // WITH_GLOBAL_DECLS: Begin completions
@@ -369,3 +370,22 @@ func testIIFE() {
 // IN_IIFE_1: Begin completions
 // IN_IIFE_1-DAG: Decl[EnumElement]/ExprSpecific: north[#SomeEnum#]
 // IN_IIFE_1-DAG: Decl[EnumElement]/ExprSpecific: south[#SomeEnum#]
+
+extension Error {
+  var myErrorNumber: Int { return 0 }
+}
+
+class C {
+  var foo: String = {
+    do {
+    } catch {
+      error.#^ERROR_IN_CLOSURE_IN_INITIALIZER^#
+// ERROR_IN_CLOSURE_IN_INITIALIZER: Begin completions
+// ERROR_IN_CLOSURE_IN_INITIALIZER-DAG: Keyword[self]/CurrNominal:          self[#Error#]; name=self
+// ERROR_IN_CLOSURE_IN_INITIALIZER-DAG: Decl[InstanceVar]/CurrNominal:      myErrorNumber[#Int#]; name=myErrorNumber
+// ERROR_IN_CLOSURE_IN_INITIALIZER: End completions
+    }
+    return ""
+  }()
+}
+

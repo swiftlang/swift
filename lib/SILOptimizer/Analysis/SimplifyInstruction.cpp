@@ -492,18 +492,6 @@ static SILValue simplifyBuiltin(BuiltinInst *BI) {
         return Result;
     }
 
-    // trunc(tuple_extract(conversion(extOrBitCast(x))))) -> x
-    if (match(Op, m_TupleExtractInst(
-                   m_CheckedConversion(
-                     m_ExtOrBitCast(m_SILValue(Result))), 0))) {
-      // If the top bit of Result is known to be 0, then
-      // it is safe to replace the whole pattern by original bits of x
-      if (Result->getType() == BI->getType()) {
-        if (auto signBit = computeSignBit(Result))
-          if (!signBit.getValue())
-            return Result;
-      }
-    }
     return SILValue();
   }
 
@@ -550,7 +538,7 @@ SILValue InstSimplifier::visitBuiltinInst(BuiltinInst *BI) {
   return simplifyBuiltin(BI);
 }
 
-/// \brief Simplify arithmetic intrinsics with overflow and known identity
+/// Simplify arithmetic intrinsics with overflow and known identity
 /// constants such as 0 and 1.
 /// If this returns a value other than SILValue() then the instruction was
 /// simplified to a value which doesn't overflow.  The overflow case is handled
@@ -639,23 +627,6 @@ SILValue InstSimplifier::simplifyOverflowBuiltin(BuiltinInst *BI) {
   switch (Builtin.ID) {
   default: break;
 
-  case BuiltinValueKind::SUCheckedConversion:
-  case BuiltinValueKind::USCheckedConversion: {
-    OperandValueArrayRef Args = BI->getArguments();
-    const SILValue &Op = Args[0];
-    if (auto signBit = computeSignBit(Op))
-      if (!signBit.getValue())
-        return Op;
-    SILValue Result;
-    // CheckedConversion(ExtOrBitCast(x)) -> x
-    if (match(BI, m_CheckedConversion(m_ExtOrBitCast(m_SILValue(Result)))))
-      if (Result->getType() == BI->getType().getTupleElementType(0)) {
-        assert (!computeSignBit(Result).getValue() && "Sign bit should be 0");
-        return Result;
-      }
-    }
-    break;
-
   case BuiltinValueKind::UToSCheckedTrunc:
   case BuiltinValueKind::UToUCheckedTrunc:
   case BuiltinValueKind::SToUCheckedTrunc:
@@ -682,7 +653,7 @@ case BuiltinValueKind::id:
   return SILValue();
 }
 
-/// \brief Try to simplify the specified instruction, performing local
+/// Try to simplify the specified instruction, performing local
 /// analysis of the operands of the instruction, without looking at its uses
 /// (e.g. constant folding).  If a simpler result can be found, it is
 /// returned, otherwise a null SILValue is returned.

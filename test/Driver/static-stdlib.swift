@@ -1,7 +1,5 @@
 // Statically link a "hello world" program
-// SWIFT_ENABLE_TENSORFLOW: This test is unsupported because TensorFlow currently doesn't work with static-stdlib.
-// UNSUPPORTED: tensorflow
-// XFAIL: linux
+// XFAIL: linux, win32
 // REQUIRES: static_stdlib
 // REQUIRES: executable_test
 

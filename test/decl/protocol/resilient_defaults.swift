@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-resilience
+// RUN: %target-typecheck-verify-swift -enable-library-evolution
 
 public struct Wrapper<T: P>: P { }
 extension Wrapper: Q where T: Q { }

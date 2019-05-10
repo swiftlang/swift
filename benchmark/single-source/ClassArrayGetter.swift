@@ -17,7 +17,8 @@ public let ClassArrayGetter = BenchmarkInfo(
   runFunction: run_ClassArrayGetter,
   tags: [.validation, .api, .Array],
   setUpFunction: { blackHole(inputArray) },
-  tearDownFunction: { inputArray = nil })
+  tearDownFunction: { inputArray = nil },
+  legacyFactor: 10)
 
 class Box {
   var v: Int
@@ -34,7 +35,7 @@ func sumArray(_ a: [Box]) -> Int {
 }
 
 var inputArray: [Box]! = {
-  let aSize = 100_000
+  let aSize = 10_000
   var a: [Box] = []
   a.reserveCapacity(aSize)
   for i in 1...aSize {

@@ -15,15 +15,18 @@ import TestsUtils
 public let StringInterpolation = BenchmarkInfo(
   name: "StringInterpolation",
   runFunction: run_StringInterpolation,
-  tags: [.validation, .api, .String])
+  tags: [.validation, .api, .String],
+  legacyFactor: 100)
 public let StringInterpolationSmall = BenchmarkInfo(
   name: "StringInterpolationSmall",
   runFunction: run_StringInterpolationSmall,
-  tags: [.validation, .api, .String])
+  tags: [.validation, .api, .String],
+  legacyFactor: 10)
 public let StringInterpolationManySmallSegments = BenchmarkInfo(
   name: "StringInterpolationManySmallSegments",
   runFunction: run_StringInterpolationManySmallSegments,
-  tags: [.validation, .api, .String])
+  tags: [.validation, .api, .String],
+  legacyFactor: 100)
 
 class RefTypePrintable : CustomStringConvertible {
   var description: String {
@@ -38,7 +41,7 @@ public func run_StringInterpolation(_ N: Int) {
   let anInt: Int64 = 0x1234567812345678
   let aRefCountedObject = RefTypePrintable()
 
-  for _ in 1...100*N {
+  for _ in 1...N {
     var result = 0
     for _ in 1...reps {
       let s: String = getString(
@@ -61,7 +64,7 @@ public func run_StringInterpolationSmall(_ N: Int) {
   let refResult = reps
   let anInt: Int64 = 0x42
 
-  for _ in 1...100*N {
+  for _ in 1...10*N {
     var result = 0
     for _ in 1...reps {
       let s: String = getString(
@@ -95,7 +98,7 @@ public func run_StringInterpolationManySmallSegments(_ N: Int) {
   }
 
   let reps = 100
-  for _ in 1...100*N {
+  for _ in 1...N {
     for _ in 1...reps {
       blackHole("""
         \(getSegment(0)) \(getSegment(1))/\(getSegment(2))_\(getSegment(3))

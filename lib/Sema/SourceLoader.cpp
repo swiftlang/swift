@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief A simple module loader that loads .swift source files.
+/// A simple module loader that loads .swift source files.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -125,7 +125,7 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
     bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(inputFile));
 
   auto *importMod = ModuleDecl::create(moduleID.first, Ctx);
-  if (EnableResilience)
+  if (EnableLibraryEvolution)
     importMod->setResilienceStrategy(ResilienceStrategy::Resilient);
   Ctx.LoadedModules[moduleID.first] = importMod;
 

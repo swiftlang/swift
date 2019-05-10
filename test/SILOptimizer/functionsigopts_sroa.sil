@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -enable-expand-all -inline -function-signature-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all -enable-expand-all -inline -function-signature-opts %s | %FileCheck %s
 
 import Builtin
 

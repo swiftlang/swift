@@ -50,8 +50,10 @@ void swift::changeBranchTarget(TermInst *T, unsigned edgeIdx,
   case TermKind::BranchInst: {
     auto *BI = cast<BranchInst>(T);
     SmallVector<SILValue, 8> args;
-    for (auto arg : BI->getArgs())
-      args.push_back(arg);
+    if (preserveArgs) {
+      for (auto arg : BI->getArgs())
+        args.push_back(arg);
+    }
     B.createBranch(T->getLoc(), newDest, args);
     BI->dropAllReferences();
     BI->eraseFromParent();
@@ -218,7 +220,7 @@ SILBasicBlock *swift::splitEdge(TermInst *T, unsigned edgeIdx,
   SmallVector<SILValue, 16> args;
   getEdgeArgs(T, edgeIdx, edgeBB, args);
 
-  SILBuilder(edgeBB).createBranch(T->getLoc(), destBB, args);
+  SILBuilderWithScope(edgeBB, T).createBranch(T->getLoc(), destBB, args);
 
   // Strip the arguments and rewire the branch in the source block.
   changeBranchTarget(T, edgeIdx, edgeBB, /*PreserveArgs=*/false);

@@ -6,12 +6,12 @@
 // CHECK: "name":"loaded_module_trace_foundation"
 // CHECK: "arch":"{{[^"]*}}"
 // CHECK: "swiftmodules":[
-// CHECK: "{{[^"]*}}/ObjectiveC.swiftmodule"
-// CHECK: "{{[^"]*}}/Dispatch.swiftmodule"
-// CHECK: "{{[^"]*}}/Darwin.swiftmodule"
-// CHECK: "{{[^"]*}}/Foundation.swiftmodule"
-// CHECK: "{{[^"]*}}/Swift.swiftmodule"
-// CHECK: "{{[^"]*}}/SwiftOnoneSupport.swiftmodule"
+// CHECK: "{{[^"]*}}/ObjectiveC.swiftmodule{{(\\/[^"]+[.]swiftmodule)?}}"
+// CHECK: "{{[^"]*}}/Dispatch.swiftmodule{{(\\/[^"]+[.]swiftmodule)?}}"
+// CHECK: "{{[^"]*}}/Darwin.swiftmodule{{(\\/[^"]+[.]swiftmodule)?}}"
+// CHECK: "{{[^"]*}}/Foundation.swiftmodule{{(\\/[^"]+[.]swiftmodule)?}}"
+// CHECK: "{{[^"]*}}/Swift.swiftmodule{{(\\/[^"]+[.]swiftmodule)?}}"
+// CHECK: "{{[^"]*}}/SwiftOnoneSupport.swiftmodule{{(\\/[^"]+[.]swiftmodule)?}}"
 // CHECK: ]
 // CHECK: }
 

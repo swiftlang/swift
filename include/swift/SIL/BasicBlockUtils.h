@@ -25,7 +25,7 @@ class TermInst;
 class DominanceInfo;
 class SILLoopInfo;
 
-/// \brief Replace a branch target.
+/// Replace a branch target.
 ///
 /// \param T The terminating instruction to modify.
 /// \param edgeIdx The successor edges index that will be replaced.
@@ -39,7 +39,7 @@ void changeBranchTarget(TermInst *T, unsigned edgeIdx, SILBasicBlock *newDest,
 void getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
                  llvm::SmallVectorImpl<SILValue> &args);
 
-/// \brief Splits the edge from terminator.
+/// Splits the edge from terminator.
 ///
 /// Also updates dominance and loop information if not null.
 ///
@@ -48,7 +48,7 @@ SILBasicBlock *splitEdge(TermInst *T, unsigned edgeIdx,
                          DominanceInfo *DT = nullptr,
                          SILLoopInfo *LI = nullptr);
 
-/// \brief Merge a basic block ending in a branch with its successor
+/// Merge a basic block ending in a branch with its successor
 /// if possible.
 void mergeBasicBlockWithSingleSuccessor(SILBasicBlock *BB,
                                         SILBasicBlock *succBB);

@@ -130,13 +130,6 @@ void getLocationInfoForClangNode(ClangNode ClangNode,
 
 Optional<std::pair<unsigned, unsigned>> parseLineCol(StringRef LineCol);
 
-Decl *getDeclFromUSR(ASTContext &context, StringRef USR, std::string &error);
-Decl *getDeclFromMangledSymbolName(ASTContext &context, StringRef mangledName,
-                                   std::string &error);
-
-Type getTypeFromMangledSymbolname(ASTContext &Ctx, StringRef mangledName,
-                                  std::string &error);
-
 class XMLEscapingPrinter : public StreamPrinter {
   public:
   XMLEscapingPrinter(raw_ostream &OS) : StreamPrinter(OS){};
@@ -238,7 +231,7 @@ private:
   bool tryResolve(ModuleEntity Mod, SourceLoc Loc);
   bool tryResolve(Stmt *St);
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
-                               Optional<AccessKind> AccKind,
+                               ReferenceMetaData Data,
                                bool IsOpenBracket) override;
 };
 
@@ -598,6 +591,7 @@ enum class LabelRangeEndAt: int8_t {
 struct CallArgInfo {
   Expr *ArgExp;
   CharSourceRange LabelRange;
+  bool IsTrailingClosure;
   CharSourceRange getEntireCharRange(const SourceManager &SM) const;
 };
 
@@ -605,6 +599,8 @@ std::vector<CallArgInfo>
 getCallArgInfo(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind);
 
 // Get the ranges of argument labels from an Arg, either tuple or paren.
+// This includes empty ranges for any unlabelled arguments, and excludes
+// trailing closures.
 std::vector<CharSourceRange>
 getCallArgLabelRanges(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind);
 

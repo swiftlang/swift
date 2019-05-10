@@ -52,6 +52,7 @@ class C {
     _ = ["a": bar3(a:1), "b": bar3(a:1), "c": bar3(a:1), "d": bar3(a:1)]
     foo(nil, nil, nil)
     _ = type(of: a).self
+    _ = a.`self`
     _ = A -> B.C<Int>
     _ = [(A) throws -> B]()
   }
@@ -433,11 +434,12 @@ extension ext where A == Int, B: Numeric {}
 extension ext.a.b {}
 
 func foo() {
-  var a = "abc \(foo()) def \(a + b + "a \(3)") gh"
+  var a = "abc \(foo()) def \(a + b + "a \(3)") gh \(bar, default: 1)"
   var a = """
   abc \( foo() + bar() )
   de \(3 + 3 + "abc \(foo()) def")
   fg
+  \(bar, default: 1)
   """
 }
 
@@ -532,7 +534,7 @@ struct S : Q, Equatable {
   @_implements(P, x)
   var y: String
   @_implements(P, g())
-  func h() {}
+  func h() { _ = \.self }
 
   @available(*, deprecated: 1.2, message: "ABC")
   fileprivate(set) var x: String
@@ -562,6 +564,10 @@ func foo() {}
 #assert(true)
 #assert(false)
 #assert(true, "hello world")
+
+public func anyFoo() -> some Foo {}
+public func qoo() -> some O & O2 {}
+func zlop() -> some C & AnyObject & P {}
 
 // SWIFT_ENABLE_TENSORFLOW
 @differentiable(jvp: foo(_:_:))

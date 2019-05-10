@@ -232,15 +232,14 @@ Condition SILGenFunction::emitCondition(Expr *E, bool invertValue,
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
 
-  // Sema forces conditions to have Builtin.i1 type, which guarantees this.
+  // Sema forces conditions to have Bool type, which guarantees this.
   SILValue V;
   {
     FullExpr Scope(Cleanups, CleanupLocation(E));
     V = emitRValue(E).forwardAsSingleValue(*this, E);
   }
-  assert(V->getType().castTo<BuiltinIntegerType>()->isFixedWidth(1));
-
-  return emitCondition(V, E, invertValue, contArgs, NumTrueTaken,
+  auto i1Value = emitUnwrapIntegerResult(E, V);
+  return emitCondition(i1Value, E, invertValue, contArgs, NumTrueTaken,
                        NumFalseTaken);
 }
 
@@ -318,6 +317,16 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
       } else {
         diagnose(getASTContext(), ESD.getStartLoc(),
                  diag::unreachable_code);
+        if (!S->getElements().empty()) {
+          for (auto *arg : SGF.getFunction().getArguments()) {
+            if (arg->getType().getASTType()->isStructurallyUninhabited()) {
+              diagnose(getASTContext(), S->getStartLoc(),
+                       diag::unreachable_code_uninhabited_param_note,
+                       arg->getDecl()->getBaseName().userFacingName());
+              break;
+            }
+          }
+        }
       }
       return;
     }
@@ -416,22 +425,22 @@ prepareIndirectResultInit(SILGenFunction &SGF, CanType resultType,
 ///   components of the result
 /// \param cleanups - will be filled (after initialization completes)
 ///   with all the active cleanups managing the result values
-static std::unique_ptr<Initialization>
-prepareIndirectResultInit(SILGenFunction &SGF, CanType formalResultType,
-                          SmallVectorImpl<SILValue> &directResultsBuffer,
-                          SmallVectorImpl<CleanupHandle> &cleanups) {
-  auto fnConv = SGF.F.getConventions();
+std::unique_ptr<Initialization>
+SILGenFunction::prepareIndirectResultInit(CanType formalResultType,
+                                 SmallVectorImpl<SILValue> &directResultsBuffer,
+                                 SmallVectorImpl<CleanupHandle> &cleanups) {
+  auto fnConv = F.getConventions();
 
   // Make space in the direct-results array for all the entries we need.
   directResultsBuffer.append(fnConv.getNumDirectSILResults(), SILValue());
 
   ArrayRef<SILResultInfo> allResults = fnConv.funcTy->getResults();
   MutableArrayRef<SILValue> directResults = directResultsBuffer;
-  ArrayRef<SILArgument*> indirectResultAddrs = SGF.F.getIndirectResults();
+  ArrayRef<SILArgument*> indirectResultAddrs = F.getIndirectResults();
 
-  auto init = prepareIndirectResultInit(SGF, formalResultType, allResults,
-                                        directResults, indirectResultAddrs,
-                                        cleanups);
+  auto init = ::prepareIndirectResultInit(*this, formalResultType, allResults,
+                                          directResults, indirectResultAddrs,
+                                          cleanups);
 
   assert(allResults.empty());
   assert(directResults.empty());
@@ -451,7 +460,7 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
     // Build an initialization which recursively destructures the tuple.
     SmallVector<CleanupHandle, 4> resultCleanups;
     InitializationPtr resultInit =
-      prepareIndirectResultInit(*this, ret->getType()->getCanonicalType(),
+      prepareIndirectResultInit(ret->getType()->getCanonicalType(),
                                 directResults, resultCleanups);
 
     // Emit the result expression into the initialization.
@@ -515,8 +524,8 @@ void StmtEmitter::visitPoundAssertStmt(PoundAssertStmt *stmt) {
         SGF.emitRValueAsSingleValue(stmt->getCondition()).getUnmanagedValue();
   }
 
-  // Sema forces conditions to have Builtin.i1 type.
-  assert(condition->getType().castTo<BuiltinIntegerType>()->isFixedWidth(1));
+  // Extract the i1 from the Bool struct.
+  auto i1Value = SGF.emitUnwrapIntegerResult(stmt, condition);
 
   SILValue message = SGF.B.createStringLiteral(
       stmt, stmt->getMessage(), StringLiteralInst::Encoding::UTF8);
@@ -524,7 +533,7 @@ void StmtEmitter::visitPoundAssertStmt(PoundAssertStmt *stmt) {
   auto resultType = SGF.getASTContext().TheEmptyTupleType;
   SGF.B.createBuiltin(
       stmt, SGF.getASTContext().getIdentifier("poundAssert"),
-      SGF.getLoweredType(resultType), {}, {condition, message});
+      SGF.getLoweredType(resultType), {}, {i1Value, message});
 }
 
 namespace {

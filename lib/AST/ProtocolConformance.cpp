@@ -16,6 +16,7 @@
 
 #include "ConformanceLookupTable.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -24,7 +25,6 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -94,18 +94,28 @@ ProtocolConformanceRef::subst(Type origType,
 ProtocolConformanceRef
 ProtocolConformanceRef::subst(Type origType,
                               TypeSubstitutionFn subs,
-                              LookupConformanceFn conformances) const {
+                              LookupConformanceFn conformances,
+                              SubstOptions options) const {
   if (isInvalid())
     return *this;
 
   // If we have a concrete conformance, we need to substitute the
   // conformance to apply to the new type.
   if (isConcrete())
-    return ProtocolConformanceRef(getConcrete()->subst(subs, conformances));
+    return ProtocolConformanceRef(getConcrete()->subst(subs, conformances,
+                                                       options));
+  // If the type is an opaque archetype, the conformance will remain abstract,
+  // unless we're specifically substituting opaque types.
+  if (auto origArchetype = origType->getAs<ArchetypeType>()) {
+    if (!options.contains(SubstFlags::SubstituteOpaqueArchetypes)
+        && isa<OpaqueTypeArchetypeType>(origArchetype->getRoot())) {
+      return *this;
+    }
+  }
 
   // Otherwise, compute the substituted type.
   auto substType = origType.subst(subs, conformances,
-                                  SubstFlags::UseErrorType);
+                                  options | SubstFlags::UseErrorType);
 
   // Opened existentials trivially conform and do not need to go through
   // substitution map lookup.
@@ -376,22 +386,37 @@ SubstitutionMap ProtocolConformance::getSubstitutions(ModuleDecl *M) const {
   return normalC->getType()->getContextSubstitutionMap(M, DC);
 }
 
-bool ProtocolConformance::isBehaviorConformance() const {
-  return getRootConformance()->isBehaviorConformance();
-}
-
-AbstractStorageDecl *ProtocolConformance::getBehaviorDecl() const {
-  if (auto normal = dyn_cast<NormalProtocolConformance>(getRootConformance()))
-    return normal->getBehaviorDecl();
-  return nullptr;
-}
-
 bool RootProtocolConformance::isInvalid() const {
   ROOT_CONFORMANCE_SUBCLASS_DISPATCH(isInvalid, ())
 }
 
 SourceLoc RootProtocolConformance::getLoc() const {
   ROOT_CONFORMANCE_SUBCLASS_DISPATCH(getLoc, ())
+}
+
+bool
+RootProtocolConformance::isWeakImported(ModuleDecl *fromModule,
+                                        AvailabilityContext fromContext) const {
+  auto *dc = getDeclContext();
+  if (dc->getParentModule() == fromModule)
+    return false;
+
+  // If the protocol is weak imported, so are any conformances to it.
+  if (getProtocol()->isWeakImported(fromModule, fromContext))
+    return true;
+
+  // If the conforming type is weak imported, so are any of its conformances.
+  if (auto *nominal = getType()->getAnyNominal())
+    if (nominal->isWeakImported(fromModule, fromContext))
+      return true;
+
+  // If the conformance is declared in an extension with the @_weakLinked
+  // attribute, it is weak imported.
+  if (auto *ext = dyn_cast<ExtensionDecl>(dc))
+    if (ext->isWeakImported(fromModule, fromContext))
+      return true;
+
+  return false;
 }
 
 bool RootProtocolConformance::hasWitness(ValueDecl *requirement) const {
@@ -414,12 +439,10 @@ bool NormalProtocolConformance::isRetroactive() const {
 
     // Consider the overlay module to be the "home" of a nominal type
     // defined in a Clang module.
-    if (auto nominalClangModule =
-          dyn_cast<ClangModuleUnit>(nominal->getModuleScopeContext())) {
-      if (auto clangLoader = nominal->getASTContext().getClangModuleLoader()) {
-        if (auto overlayModule = nominalClangModule->getAdapterModule())
-          nominalModule = overlayModule;
-      }
+    if (auto nominalLoadedModule =
+          dyn_cast<LoadedFile>(nominal->getModuleScopeContext())) {
+      if (auto overlayModule = nominalLoadedModule->getAdapterModule())
+        nominalModule = overlayModule;
     }
 
     if (module == nominalModule)
@@ -431,7 +454,9 @@ bool NormalProtocolConformance::isRetroactive() const {
 }
 
 bool NormalProtocolConformance::isSynthesizedNonUnique() const {
-  return isa<ClangModuleUnit>(getDeclContext()->getModuleScopeContext());
+  if (auto *file = dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext()))
+    return file->getKind() == FileUnitKind::ClangModule;
+  return false;
 }
 
 bool NormalProtocolConformance::isResilient() const {
@@ -443,12 +468,7 @@ bool NormalProtocolConformance::isResilient() const {
   if (!getType()->getAnyNominal()->isResilient())
     return false;
 
-  switch (getDeclContext()->getParentModule()->getResilienceStrategy()) {
-  case ResilienceStrategy::Resilient:
-    return true;
-  case ResilienceStrategy::Default:
-    return false;
-  }
+  return getDeclContext()->getParentModule()->isResilient();
 }
 
 Optional<ArrayRef<Requirement>>
@@ -1045,12 +1065,12 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
 
   // Local function to determine whether we will end up referring to a
   // tentative witness that may not be chosen.
-  auto normal = GenericConformance->getRootNormalConformance();
+  auto root = GenericConformance->getRootConformance();
   auto isTentativeWitness = [&] {
-    if (normal->getState() != ProtocolConformanceState::CheckingTypeWitnesses)
+    if (root->getState() != ProtocolConformanceState::CheckingTypeWitnesses)
       return false;
 
-    return !normal->hasTypeWitness(assocType, nullptr);
+    return !root->hasTypeWitness(assocType, nullptr);
   };
 
   auto genericWitnessAndDecl
@@ -1192,7 +1212,8 @@ ProtocolConformance::subst(SubstitutionMap subMap) const {
 
 ProtocolConformance *
 ProtocolConformance::subst(TypeSubstitutionFn subs,
-                           LookupConformanceFn conformances) const {
+                           LookupConformanceFn conformances,
+                           SubstOptions options) const {
   switch (getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto origType = getType();
@@ -1202,7 +1223,7 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
 
     auto subMap = SubstitutionMap::get(getGenericSignature(),
                                        subs, conformances);
-    auto substType = origType.subst(subMap, SubstFlags::UseErrorType);
+    auto substType = origType.subst(subMap, options | SubstFlags::UseErrorType);
     if (substType->isEqual(origType))
       return const_cast<ProtocolConformance *>(this);
 
@@ -1228,11 +1249,12 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
     if (origBaseType->hasTypeParameter() ||
         origBaseType->hasArchetype()) {
       // Substitute into the superclass.
-      inheritedConformance = inheritedConformance->subst(subs, conformances);
+      inheritedConformance = inheritedConformance->subst(subs, conformances,
+                                                         options);
     }
 
     auto substType = origType.subst(subs, conformances,
-                                    SubstFlags::UseErrorType);
+                                    options | SubstFlags::UseErrorType);
     return substType->getASTContext()
       .getInheritedConformance(substType, inheritedConformance);
   }
@@ -1244,10 +1266,10 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
 
     auto origType = getType();
     auto substType = origType.subst(subs, conformances,
-                                    SubstFlags::UseErrorType);
+                                    options | SubstFlags::UseErrorType);
     return substType->getASTContext()
       .getSpecializedConformance(substType, genericConformance,
-                                 subMap.subst(subs, conformances));
+                                 subMap.subst(subs, conformances, options));
   }
   }
   llvm_unreachable("bad ProtocolConformanceKind");
@@ -1274,7 +1296,8 @@ void NominalTypeDecl::prepareConformanceTable() const {
   // via the Clang importer, don't add any synthesized conformances.
   auto *file = cast<FileUnit>(getModuleScopeContext());
   if (file->getKind() != FileUnitKind::Source &&
-      file->getKind() != FileUnitKind::ClangModule) {
+      file->getKind() != FileUnitKind::ClangModule &&
+      file->getKind() != FileUnitKind::DWARFModule) {
     return;
   }
 
@@ -1305,7 +1328,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
     }
 
     // Enumerations with a raw type conform to RawRepresentable.
-    if (theEnum->hasRawType()) {
+    if (theEnum->hasRawType() && !theEnum->getRawType()->hasError()) {
       addSynthesized(KnownProtocolKind::RawRepresentable);
     }
   }
@@ -1368,8 +1391,7 @@ NominalTypeDecl::getSatisfiedProtocolRequirementsForMember(
 SmallVector<ProtocolDecl *, 2>
 DeclContext::getLocalProtocols(
   ConformanceLookupKind lookupKind,
-  SmallVectorImpl<ConformanceDiagnostic> *diagnostics,
-  bool sorted) const
+  SmallVectorImpl<ConformanceDiagnostic> *diagnostics) const
 {
   SmallVector<ProtocolDecl *, 2> result;
 
@@ -1388,19 +1410,13 @@ DeclContext::getLocalProtocols(
     nullptr,
     diagnostics);
 
-  // Sort if required.
-  if (sorted) {
-    llvm::array_pod_sort(result.begin(), result.end(), TypeDecl::compare);
-  }
-
   return result;
 }
 
 SmallVector<ProtocolConformance *, 2>
 DeclContext::getLocalConformances(
   ConformanceLookupKind lookupKind,
-  SmallVectorImpl<ConformanceDiagnostic> *diagnostics,
-  bool sorted) const
+  SmallVectorImpl<ConformanceDiagnostic> *diagnostics) const
 {
   SmallVector<ProtocolConformance *, 2> result;
 
@@ -1409,9 +1425,12 @@ DeclContext::getLocalConformances(
   if (!nominal)
     return result;
 
-  // Protocols don't have conformances.
-  if (isa<ProtocolDecl>(nominal))
+  // Protocols only have self-conformances.
+  if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
+    if (protocol->requiresSelfConformanceWitnessTable())
+      return { protocol->getASTContext().getSelfConformance(protocol) };
     return { };
+  }
 
   // Update to record all potential conformances.
   nominal->prepareConformanceTable();
@@ -1422,12 +1441,6 @@ DeclContext::getLocalConformances(
     nullptr,
     &result,
     diagnostics);
-
-  // If requested, sort the results.
-  if (sorted) {
-    llvm::array_pod_sort(result.begin(), result.end(),
-                         &ConformanceLookupTable::compareProtocolConformances);
-  }
 
   return result;
 }

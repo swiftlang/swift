@@ -10,16 +10,23 @@
 #
 # ----------------------------------------------------------------------------
 
+from .benchmarks import Benchmarks
 from .cmark import CMark
 from .foundation import Foundation
+from .indexstoredb import IndexStoreDB
+from .libcxx import LibCXX
 from .libdispatch import LibDispatch
 from .libicu import LibICU
 from .llbuild import LLBuild
 from .lldb import LLDB
 from .llvm import LLVM
 from .ninja import Ninja
+from .skstresstester import SKStressTester
+from .sourcekitlsp import SourceKitLSP
 from .swift import Swift
+from .swiftevolve import SwiftEvolve
 from .swiftpm import SwiftPM
+from .swiftsyntax import SwiftSyntax
 from .xctest import XCTest
 # SWIFT_ENABLE_TENSORFLOW
 from .tensorflow import TensorFlow
@@ -28,6 +35,7 @@ __all__ = [
     'CMark',
     'Ninja',
     'Foundation',
+    'LibCXX',
     'LibDispatch',
     'LibICU',
     'LLBuild',
@@ -37,6 +45,12 @@ __all__ = [
     'Swift',
     'SwiftPM',
     'XCTest',
+    'SwiftSyntax',
+    'SKStressTester',
+    'SwiftEvolve',
+    'IndexStoreDB',
+    'SourceKitLSP',
+    'Benchmarks',
     # SWIFT_ENABLE_TENSORFLOW
     'TensorFlow',
 ]

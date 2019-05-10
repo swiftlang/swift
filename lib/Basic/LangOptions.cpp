@@ -275,3 +275,20 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
 
   return { false, false };
 }
+
+bool LangOptions::doesTargetSupportObjCMetadataUpdateCallback() const {
+  if (Target.isMacOSX())
+    return !Target.isMacOSXVersionLT(10, 14, 4);
+  if (Target.isiOS()) // also returns true on tvOS
+    return !Target.isOSVersionLT(12, 2);
+  if (Target.isWatchOS())
+    return !Target.isOSVersionLT(5, 2);
+
+  // If we're running on a non-Apple platform, we still want to allow running
+  // tests that -enable-objc-interop.
+  return false;
+}
+
+bool LangOptions::doesTargetSupportObjCGetClassHook() const {
+  return doesTargetSupportObjCMetadataUpdateCallback();
+}

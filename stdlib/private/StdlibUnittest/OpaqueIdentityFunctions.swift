@@ -71,7 +71,7 @@ public func getFloat32(_ x: Float32) -> Float32 { return _opaqueIdentity(x) }
 @inline(never)
 public func getFloat64(_ x: Float64) -> Float64 { return _opaqueIdentity(x) }
 
-#if arch(i386) || arch(x86_64)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 @inline(never)
 public func getFloat80(_ x: Float80) -> Float80 { return _opaqueIdentity(x) }
 #endif

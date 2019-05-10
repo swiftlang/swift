@@ -193,7 +193,8 @@ removeInstructions(ArrayRef<SILInstruction*> UsersToRemove) {
 
 /// Returns false if Inst is an instruction that would require us to keep the
 /// alloc_ref alive.
-static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts) {
+static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
+                              bool onlyAcceptTrivialStores) {
   if (isa<SetDeallocatingInst>(Inst) || isa<FixLifetimeInst>(Inst))
     return true;
 
@@ -203,6 +204,24 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts) {
       // dealloc_partial_ref invokes releases implicitly
       isa<DeallocPartialRefInst>(Inst))
     return acceptRefCountInsts;
+
+  if (isa<InjectEnumAddrInst>(Inst))
+    return true;
+
+  // We know that the destructor has no side effects so we can remove the
+  // deallocation instruction too.
+  if (isa<DeallocationInst>(Inst) || isa<AllocationInst>(Inst))
+    return true;
+
+  // Much like deallocation, destroy addr is safe.
+  if (isa<DestroyAddrInst>(Inst))
+    return true;
+
+  // The only store instructions which is guaranteed to store a trivial value
+  // is an inject_enum_addr witout a payload (i.e. without init_enum_data_addr).
+  // There can also be a 'store [trivial]', but we don't handle that yet.
+  if (onlyAcceptTrivialStores)
+    return false;
 
   // If we see a store here, we have already checked that we are storing into
   // the pointer before we added it to the worklist, so we can skip it.
@@ -215,15 +234,6 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts) {
       !isa<TermInst>(Inst))
     return true;
 
-  // We know that the destructor has no side effects so we can remove the
-  // deallocation instruction too.
-  if (isa<DeallocationInst>(Inst))
-    return true;
-
-  // Much like deallocation, destroy addr is safe.
-  if (isa<DestroyAddrInst>(Inst))
-    return true;
-
   // Otherwise we do not know how to handle this instruction. Be conservative
   // and don't zap it.
   return false;
@@ -233,7 +243,7 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts) {
 /// zapping it completely.
 static bool
 hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users,
-                    bool acceptRefCountInsts) {
+                    bool acceptRefCountInsts, bool onlyAcceptTrivialStores) {
   SmallVector<SILInstruction *, 16> Worklist;
   Worklist.push_back(AllocRef);
 
@@ -252,7 +262,7 @@ hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users,
     }
 
     // If we can't zap this instruction... bail...
-    if (!canZapInstruction(I, acceptRefCountInsts)) {
+    if (!canZapInstruction(I, acceptRefCountInsts, onlyAcceptTrivialStores)) {
       LLVM_DEBUG(llvm::dbgs() << "        Found instruction we can't zap...\n");
       return true;
     }
@@ -345,7 +355,7 @@ private:
 // Record a store into this object.
 void DeadObjectAnalysis::
 addStore(StoreInst *Store, IndexTrieNode *AddressNode) {
-  if (Store->getSrc()->getType().isTrivial(Store->getModule()))
+  if (Store->getSrc()->getType().isTrivial(*Store->getFunction()))
     return;
 
   // SSAUpdater cannot handle multiple defs in the same blocks. Therefore, we
@@ -558,7 +568,7 @@ static bool removeAndReleaseArray(SingleValueInstruction *NewArrayValue,
   if (!ArrayDef)
     return false; // No Array object to delete.
 
-  assert(!ArrayDef->getType().isTrivial(ArrayDef->getModule()) &&
+  assert(!ArrayDef->getType().isTrivial(*ArrayDef->getFunction()) &&
          "Array initialization should produce the proper tuple type.");
 
   // Analyze the array object uses.
@@ -578,7 +588,7 @@ static bool removeAndReleaseArray(SingleValueInstruction *NewArrayValue,
     removeInstructions(DeadArray.getAllUsers());
     return true;
   }
-  assert(StorageAddress->getType().isTrivial(ArrayDef->getModule()) &&
+  assert(StorageAddress->getType().isTrivial(*ArrayDef->getFunction()) &&
          "Array initialization should produce the proper tuple type.");
 
   // Analyze the array storage uses.
@@ -667,6 +677,10 @@ class DeadObjectElimination : public SILFunctionTransform {
   }
 
   void run() override {
+    // FIXME: We should support ownership eventually.
+    if (getFunction()->hasOwnership())
+      return;
+
     if (processFunction(*getFunction())) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
@@ -701,7 +715,8 @@ bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
   // escape, then we can completely remove the use graph of this alloc_ref.
   UserList UsersToRemove;
   if (hasUnremovableUsers(ARI, UsersToRemove,
-                          /*acceptRefCountInsts=*/ !HasSideEffects)) {
+                          /*acceptRefCountInsts=*/ !HasSideEffects,
+                          /*onlyAcceptTrivialStores*/false)) {
     LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
   }
@@ -716,12 +731,11 @@ bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
 }
 
 bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
-  // Trivial types don't have destructors. Let's try to zap this AllocStackInst.
-  if (!ASI->getElementType().isTrivial(ASI->getModule()))
-    return false;
-
+  // Trivial types don't have destructors.
+  bool isTrivialType = ASI->getElementType().isTrivial(*ASI->getFunction());
   UserList UsersToRemove;
-  if (hasUnremovableUsers(ASI, UsersToRemove, /*acceptRefCountInsts=*/ true)) {
+  if (hasUnremovableUsers(ASI, UsersToRemove, /*acceptRefCountInsts=*/ true,
+      /*onlyAcceptTrivialStores*/!isTrivialType)) {
     LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
   }

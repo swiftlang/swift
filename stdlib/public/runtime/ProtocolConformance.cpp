@@ -31,7 +31,9 @@
 using namespace swift;
 
 #ifndef NDEBUG
-template <> void ProtocolDescriptor::dump() const {
+template <>
+LLVM_ATTRIBUTE_USED
+void ProtocolDescriptor::dump() const {
   printf("TargetProtocolDescriptor.\n"
          "Name: \"%s\".\n",
          Name.get());
@@ -67,7 +69,7 @@ template<> void ProtocolConformanceDescriptor::dump() const {
     int ok = lookupSymbol(addr, &info);
     if (!ok)
       return "<unknown addr>";
-    return info.symbolName;
+    return info.symbolName.get();
   };
 
   switch (auto kind = getTypeKind()) {
@@ -93,7 +95,9 @@ template<> void ProtocolConformanceDescriptor::dump() const {
 #endif
 
 #ifndef NDEBUG
-template<> void ProtocolConformanceDescriptor::verify() const {
+template<>
+LLVM_ATTRIBUTE_USED
+void ProtocolConformanceDescriptor::verify() const {
   auto typeKind = unsigned(getTypeKind());
   assert(((unsigned(TypeReferenceKind::First_Kind) <= typeKind) &&
           (unsigned(TypeReferenceKind::Last_Kind) >= typeKind)) &&
@@ -162,12 +166,17 @@ template<>
 const WitnessTable *
 ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
   // If needed, check the conditional requirements.
-  std::vector<const void *> conditionalArgs;
+  SmallVector<const void *, 8> conditionalArgs;
   if (hasConditionalRequirements()) {
     SubstGenericParametersFromMetadata substitutions(type);
     bool failed =
       _checkGenericRequirements(getConditionalRequirements(), conditionalArgs,
-                                substitutions, substitutions);
+        [&substitutions](unsigned depth, unsigned index) {
+          return substitutions.getMetadata(depth, index);
+        },
+        [&substitutions](const Metadata *type, unsigned index) {
+          return substitutions.getWitnessTable(type, index);
+        });
     if (failed) return nullptr;
   }
 
@@ -200,14 +209,14 @@ namespace {
   private:
     const void *Type; 
     const ProtocolDescriptor *Proto;
-    std::atomic<const WitnessTable *> Table;
+    std::atomic<const ProtocolConformanceDescriptor *> Description;
     std::atomic<size_t> FailureGeneration;
 
   public:
     ConformanceCacheEntry(ConformanceCacheKey key,
-                          const WitnessTable *table,
+                          const ProtocolConformanceDescriptor *description,
                           size_t failureGeneration)
-      : Type(key.Type), Proto(key.Proto), Table(table),
+      : Type(key.Type), Proto(key.Proto), Description(description),
         FailureGeneration(failureGeneration) {
     }
 
@@ -227,22 +236,22 @@ namespace {
     }
 
     bool isSuccessful() const {
-      return Table.load(std::memory_order_relaxed) != nullptr;
+      return Description.load(std::memory_order_relaxed) != nullptr;
     }
 
-    void makeSuccessful(const WitnessTable *table) {
-      Table.store(table, std::memory_order_release);
+    void makeSuccessful(const ProtocolConformanceDescriptor *description) {
+      Description.store(description, std::memory_order_release);
     }
 
     void updateFailureGeneration(size_t failureGeneration) {
       assert(!isSuccessful());
       FailureGeneration.store(failureGeneration, std::memory_order_relaxed);
     }
-    
-    /// Get the cached witness table, if successful.
-    const WitnessTable *getWitnessTable() const {
+
+    /// Get the cached conformance descriptor, if successful.
+    const ProtocolConformanceDescriptor *getDescription() const {
       assert(isSuccessful());
-      return Table.load(std::memory_order_acquire);
+      return Description.load(std::memory_order_acquire);
     }
     
     /// Get the generation in which this lookup failed.
@@ -263,21 +272,22 @@ struct ConformanceState {
   }
 
   void cacheSuccess(const void *type, const ProtocolDescriptor *proto,
-                    const WitnessTable *witness) {
+                    const ProtocolConformanceDescriptor *description) {
     auto result = Cache.getOrInsert(ConformanceCacheKey(type, proto),
-                                    witness, 0);
+                                    description, 0);
 
     // If the entry was already present, we may need to update it.
     if (!result.second) {
-      result.first->makeSuccessful(witness);
+      result.first->makeSuccessful(description);
     }
   }
 
   void cacheFailure(const void *type, const ProtocolDescriptor *proto,
                     size_t failureGeneration) {
-    auto result = Cache.getOrInsert(ConformanceCacheKey(type, proto),
-                                    (const WitnessTable *) nullptr,
-                                    failureGeneration);
+    auto result =
+      Cache.getOrInsert(ConformanceCacheKey(type, proto),
+                        (const ProtocolConformanceDescriptor *) nullptr,
+                        failureGeneration);
 
     // If the entry was already present, we may need to update it.
     if (!result.second) {
@@ -344,21 +354,22 @@ swift::swift_registerProtocolConformances(const ProtocolConformanceRecord *begin
 
 
 struct ConformanceCacheResult {
-  // true if witnessTable is an authoritative result as-is.
+  // true if description is an authoritative result as-is.
   // false if more searching is required (for example, because a cached
   // failure was returned in failureEntry but it is out-of-date.
   bool isAuthoritative;
 
-  // The matching witness table, or null if no cached conformance was found.
-  const WitnessTable *witnessTable;
+  // The matching conformance descriptor, or null if no cached conformance
+  // was found.
+  const ProtocolConformanceDescriptor *description;
 
   // If the search fails, this may be the negative cache entry for the
   // queried type itself. This entry may be null or out-of-date.
   ConformanceCacheEntry *failureEntry;
 
   static ConformanceCacheResult
-  cachedSuccess(const WitnessTable *table) {
-    return ConformanceCacheResult { true, table, nullptr };
+  cachedSuccess(const ProtocolConformanceDescriptor *description) {
+    return ConformanceCacheResult { true, description, nullptr };
   }
 
   static ConformanceCacheResult
@@ -381,7 +392,7 @@ static const void *getConformanceCacheTypeKey(const Metadata *type) {
   return type;
 }
 
-/// Search for a witness table in the ConformanceCache.
+/// Search for a conformance descriptor in the ConformanceCache.
 static
 ConformanceCacheResult
 searchInConformanceCache(const Metadata *type,
@@ -396,7 +407,7 @@ recur:
     if (auto *Value = C.findCached(type, protocol)) {
       if (Value->isSuccessful()) {
         // Found a conformance on the type or some superclass. Return it.
-        return ConformanceCacheResult::cachedSuccess(Value->getWitnessTable());
+        return ConformanceCacheResult::cachedSuccess(Value->getDescription());
       }
 
       // Found a negative cache entry.
@@ -438,7 +449,7 @@ recur:
     // Hash and lookup the type-protocol pair in the cache.
     if (auto *Value = C.findCached(typeKey, protocol)) {
       if (Value->isSuccessful())
-        return ConformanceCacheResult::cachedSuccess(Value->getWitnessTable());
+        return ConformanceCacheResult::cachedSuccess(Value->getDescription());
 
       // We don't try to cache negative responses for generic
       // patterns.
@@ -530,9 +541,10 @@ namespace {
   };
 }
 
-static const WitnessTable *
-swift_conformsToProtocolImpl(const Metadata * const type,
-                             const ProtocolDescriptor *protocol) {
+static const ProtocolConformanceDescriptor *
+swift_conformsToSwiftProtocolImpl(const Metadata * const type,
+                                  const ProtocolDescriptor *protocol,
+                                  StringRef module) {
   auto &C = Conformances.get();
 
   // See if we have a cached conformance. The ConcurrentMap data structure
@@ -540,7 +552,7 @@ swift_conformsToProtocolImpl(const Metadata * const type,
   auto FoundConformance = searchInConformanceCache(type, protocol);
   // If the result (positive or negative) is authoritative, return it.
   if (FoundConformance.isAuthoritative)
-    return FoundConformance.witnessTable;
+    return FoundConformance.description;
 
   auto failureEntry = FoundConformance.failureEntry;
 
@@ -560,16 +572,6 @@ swift_conformsToProtocolImpl(const Metadata * const type,
     return nullptr;
   }
 
-  /// Local function to retrieve the witness table and record the result.
-  auto recordWitnessTable = [&](const ProtocolConformanceDescriptor &descriptor,
-                                const Metadata *type) {
-    auto witnessTable = descriptor.getWitnessTable(type);
-    if (witnessTable)
-      C.cacheSuccess(type, protocol, witnessTable);
-    else
-      C.cacheFailure(type, protocol, snapshot.count());
-  };
-
   // Really scan conformance records.
   for (size_t i = startIndex; i < endIndex; i++) {
     auto &section = snapshot.Start[i];
@@ -588,21 +590,32 @@ swift_conformsToProtocolImpl(const Metadata * const type,
         if (!matchingType)
           matchingType = type;
 
-        recordWitnessTable(descriptor, matchingType);
+        C.cacheSuccess(matchingType, protocol, &descriptor);
       }
     }
   }
   
   // Conformance scan is complete.
-  // Search the cache once more, and this time update the cache if necessary.
 
+  // Search the cache once more, and this time update the cache if necessary.
   FoundConformance = searchInConformanceCache(type, protocol);
   if (FoundConformance.isAuthoritative) {
-    return FoundConformance.witnessTable;
+    return FoundConformance.description;
   } else {
     C.cacheFailure(type, protocol, snapshot.count());
     return nullptr;
   }
+}
+
+static const WitnessTable *
+swift_conformsToProtocolImpl(const Metadata * const type,
+                             const ProtocolDescriptor *protocol) {
+  auto description =
+    swift_conformsToSwiftProtocol(type, protocol, StringRef());
+  if (!description)
+    return nullptr;
+
+  return description->getWitnessTable(type);
 }
 
 const ContextDescriptor *
@@ -622,7 +635,7 @@ swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
 
 bool swift::_checkGenericRequirements(
                       llvm::ArrayRef<GenericRequirementDescriptor> requirements,
-                      std::vector<const void *> &extraArguments,
+                      SmallVectorImpl<const void *> &extraArguments,
                       SubstGenericParameterFn substGenericParam,
                       SubstDependentWitnessTableFn substWitnessTable) {
   for (const auto &req : requirements) {
@@ -631,8 +644,10 @@ bool swift::_checkGenericRequirements(
 
     // Resolve the subject generic parameter.
     const Metadata *subjectType =
-      swift_getTypeByMangledName(req.getParam(), substGenericParam,
-                                 substWitnessTable);
+      swift_getTypeByMangledName(MetadataState::Abstract,
+                                 req.getParam(),
+                                 extraArguments.data(),
+                                 substGenericParam, substWitnessTable).getMetadata();
     if (!subjectType)
       return true;
 
@@ -656,8 +671,10 @@ bool swift::_checkGenericRequirements(
     case GenericRequirementKind::SameType: {
       // Demangle the second type under the given substitutions.
       auto otherType =
-        swift_getTypeByMangledName(req.getMangledTypeName(), substGenericParam,
-                                   substWitnessTable);
+        swift_getTypeByMangledName(MetadataState::Abstract,
+                                   req.getMangledTypeName(),
+                                   extraArguments.data(),
+                                   substGenericParam, substWitnessTable).getMetadata();
       if (!otherType) return true;
 
       assert(!req.getFlags().hasExtraArgument());
@@ -683,8 +700,10 @@ bool swift::_checkGenericRequirements(
     case GenericRequirementKind::BaseClass: {
       // Demangle the base type under the given substitutions.
       auto baseType =
-        swift_getTypeByMangledName(req.getMangledTypeName(), substGenericParam,
-                                   substWitnessTable);
+        swift_getTypeByMangledName(MetadataState::Abstract,
+                                   req.getMangledTypeName(),
+                                   extraArguments.data(),
+                                   substGenericParam, substWitnessTable).getMetadata();
       if (!baseType) return true;
 
       // Check whether it's dynamically castable, which works as a superclass

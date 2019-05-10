@@ -1,4 +1,7 @@
-// RUN: %target-run-simple-parse-stdlib-swift
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift %s -parse-stdlib -o %t/Builtins
+// RUN: %target-codesign %t/Builtins
+// RUN: %target-run %t/Builtins
 // REQUIRES: executable_test
 
 import Swift

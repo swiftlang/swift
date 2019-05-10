@@ -17,4 +17,4 @@ public extension P {
 
 // CHECK: ![[SELFMETA]] = !DILocalVariable(name: "$\CF\84_0_0",
 // CHECK-SAME: type: ![[SELFTY:[0-9]+]], flags: DIFlagArtificial)
-// CHECK: ![[SELFTY]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$swift.type"
+// CHECK: ![[SELFTY]] = !DIDerivedType(tag: DW_TAG_typedef, name: "Self"

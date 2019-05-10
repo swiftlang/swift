@@ -30,13 +30,9 @@
 
 #if SWIFT_OBJC_INTEROP
 
-#if SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
 // Source code: "SwiftObject"
 // Real class name: mangled "Swift._SwiftObject"
 #define SwiftObject _TtCs12_SwiftObject
-#else
-// Pre-stable ABI uses un-mangled name for SwiftObject
-#endif
 
 #if __has_attribute(objc_root_class)
 __attribute__((__objc_root_class__))
@@ -87,12 +83,5 @@ NSString *getDescription(OpaqueValue *value, const Metadata *type);
 }
 
 #endif
-
-namespace swift {
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
-HeapObject *_swift_reallocObject(HeapObject *obj, size_t size);
-
-}
 
 #endif

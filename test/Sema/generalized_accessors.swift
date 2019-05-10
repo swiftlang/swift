@@ -94,13 +94,13 @@ struct Modify {
 
   var getAndNonMutatingModifyAndSet: Int {
     get {}
-    nonmutating _modify {} // expected-error {{'modify' accessor cannot be nonmutating when the setter is mutating}}
+    nonmutating _modify {} // expected-error {{'modify' accessor cannot be 'nonmutating' when the setter is 'mutating'}}
     set {} // expected-note {{setter defined here}}
   }
 
   var getAndModifyAndNonMutatingSet: Int {
     get {}
-    _modify {}// expected-error {{'modify' accessor cannot be mutating when the setter is nonmutating}}
+    _modify {}// expected-error {{'modify' accessor cannot be 'mutating' when the setter is 'nonmutating'}}
     nonmutating set {} // expected-note {{setter defined here}}
   }
 }

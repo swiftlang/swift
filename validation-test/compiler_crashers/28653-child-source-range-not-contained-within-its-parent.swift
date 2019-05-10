@@ -8,4 +8,6 @@
 // TODO: Remove REQUIRES in https://github.com/apple/swift/pull/22440#issuecomment-461300284 is resolved.
 // REQUIRES: swift_ast_verifier
 // RUN: not --crash %target-swift-frontend %s -emit-ir
+// REQUIRES: swift_ast_verifier
+
 switch{case.b(u){

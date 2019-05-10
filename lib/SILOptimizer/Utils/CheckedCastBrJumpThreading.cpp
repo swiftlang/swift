@@ -233,8 +233,8 @@ void CheckedCastBrJumpThreading::Edit::modifyCFGForUnknownPreds() {
   if (auto *CMI = dyn_cast<ClassMethodInst>(Inst)) {
     if (CMI->getOperand() == stripClassCasts(CCBI->getOperand())) {
       // Replace checked_cast_br by branch to FailureBB.
-      SILBuilder(CCBI->getParent()).createBranch(CCBI->getLoc(),
-                                                 CCBI->getFailureBB());
+      SILBuilderWithScope(CCBI).createBranch(CCBI->getLoc(),
+                                             CCBI->getFailureBB());
       CCBI->eraseFromParent();
     }
   }
@@ -275,8 +275,8 @@ modifyCFGForSuccessPreds(Optional<BasicBlockCloner> &Cloner) {
   auto *CCBI = cast<CheckedCastBranchInst>(CCBBlock->getTerminator());
 
   if (InvertSuccess) {
-    SILBuilder B(CCBBlock);
-    B.createBranch(CCBI->getLoc(), CCBI->getFailureBB());
+    SILBuilderWithScope(CCBI).createBranch(CCBI->getLoc(),
+                                           CCBI->getFailureBB());
     CCBI->eraseFromParent();
     return;
   }
@@ -313,8 +313,8 @@ modifyCFGForSuccessPreds(Optional<BasicBlockCloner> &Cloner) {
 
   // Add an unconditional jump at the end of the block.
   // Take argument value from the dominating BB
-  SILBuilder(CCBBlock).createBranch(CCBI->getLoc(), CCBI->getSuccessBB(),
-                              {SuccessArg});
+  SILBuilderWithScope(CCBI).createBranch(CCBI->getLoc(), CCBI->getSuccessBB(),
+                                         {SuccessArg});
   CCBI->eraseFromParent();
 }
 

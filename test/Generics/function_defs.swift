@@ -166,7 +166,7 @@ protocol StaticEq {
 }
 
 func staticEqCheck<T : StaticEq, U : StaticEq>(_ t: T, u: U) {
-  if t.isEqual(t, t) { return } // expected-error{{static member 'isEqual' cannot be used on instance of type 'T'}}
+  if t.isEqual(t, t) { return } // expected-error{{static member 'isEqual' cannot be used on instance of type 'T'}} // expected-error {{missing argument label 'y:' in call}}
 
   if T.isEqual(t, y: t) { return }
   if U.isEqual(u, y: u) { return }

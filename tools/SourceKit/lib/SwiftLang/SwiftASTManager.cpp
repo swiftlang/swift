@@ -46,11 +46,12 @@ class StreamDiagConsumer : public DiagnosticConsumer {
 public:
   StreamDiagConsumer(llvm::raw_ostream &OS) : OS(OS) {}
 
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info) override {
+  void
+  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+                   StringRef FormatString,
+                   ArrayRef<DiagnosticArgument> FormatArgs,
+                   const DiagnosticInfo &Info,
+                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
     // FIXME: Print location info if available.
     switch (Kind) {
       case DiagnosticKind::Error: OS << "error: "; break;
@@ -438,14 +439,21 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   Args.push_back(Impl.RuntimeResourcePath.c_str());
   Args.append(OrigArgs.begin(), OrigArgs.end());
 
+  SmallString<32> ErrStr;
+  llvm::raw_svector_ostream ErrOS(ErrStr);
+  StreamDiagConsumer DiagConsumer(ErrOS);
+  Diags.addConsumer(DiagConsumer);
+
   bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
       Args, Diags, [&](ArrayRef<const char *> FrontendArgs) {
     return Invocation.parseArgs(FrontendArgs, Diags);
   });
 
+  // Remove the StreamDiagConsumer as it's no longer needed.
+  Diags.removeConsumer(DiagConsumer);
+
   if (HadError) {
-    // FIXME: Get the actual diagnostic.
-    Error = "error when parsing the compiler arguments";
+    Error = ErrOS.str();
     return true;
   }
 
@@ -493,20 +501,9 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &CompInvok,
                                              ArrayRef<const char *> OrigArgs,
                                              StringRef PrimaryFile,
                                              std::string &Error) {
-
-  SmallString<32> ErrStr;
-  llvm::raw_svector_ostream ErrOS(ErrStr);
   DiagnosticEngine Diagnostics(Impl.SourceMgr);
-  StreamDiagConsumer DiagConsumer(ErrOS);
-  Diagnostics.addConsumer(DiagConsumer);
-
-  if (initCompilerInvocation(CompInvok, OrigArgs, Diagnostics, PrimaryFile,
-                             Error)) {
-    if (!ErrOS.str().empty())
-      Error = ErrOS.str();
-    return true;
-  }
-  return false;
+  return initCompilerInvocation(CompInvok, OrigArgs, Diagnostics, PrimaryFile,
+                                Error);
 }
 
 bool SwiftASTManager::initCompilerInvocationNoInputs(
@@ -792,8 +789,16 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
     return;
 
   auto ClangModuleLoader = TopMod->getASTContext().getClangModuleLoader();
+
+  ModuleDecl::ImportFilter ImportFilter;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+  if (Visited.empty()) {
+    // Only collect implementation-only dependencies from the main module.
+    ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  }
   SmallVector<ModuleDecl::ImportedModule, 8> Imports;
-  TopMod->getImportedModules(Imports, ModuleDecl::ImportFilter::All);
+  TopMod->getImportedModules(Imports, ImportFilter);
 
   for (auto Import : Imports) {
     ModuleDecl *Mod = Import.second;

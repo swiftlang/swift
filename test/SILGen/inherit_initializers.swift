@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s -verify
+// RUN: %target-swift-emit-silgen %s -verify
 
 // We just want to SILGen this and ensure it doesn't crash. Don't particularly
 // care about the generated SIL.

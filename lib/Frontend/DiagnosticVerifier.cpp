@@ -199,7 +199,7 @@ static std::string renderFixits(ArrayRef<llvm::SMFixIt> fixits,
   return OS.str();
 }
 
-/// \brief After the file has been processed, check to see if we got all of
+/// After the file has been processed, check to see if we got all of
 /// the expected diagnostics and check to see if there were any unexpected
 /// ones.
 bool DiagnosticVerifier::verifyFile(unsigned BufferID,
@@ -663,6 +663,23 @@ void DiagnosticVerifier::autoApplyFixes(unsigned BufferID,
               return lhs.getRange().Start.getPointer()
                    < rhs.getRange().Start.getPointer();
             });
+  // Coalesce identical fix-its. This happens most often with "expected-error 2"
+  // syntax.
+  FixIts.erase(std::unique(FixIts.begin(), FixIts.end(),
+                           [](const llvm::SMFixIt &lhs,
+                              const llvm::SMFixIt &rhs) -> bool {
+                 return lhs.getRange().Start == rhs.getRange().Start &&
+                        lhs.getRange().End == rhs.getRange().End &&
+                        lhs.getText() == rhs.getText();
+               }), FixIts.end());
+  // Filter out overlapping fix-its. This allows the compiler to apply changes
+  // to the easy parts of the file, and leave in the tricky cases for the
+  // developer to handle manually.
+  FixIts.erase(swift::removeAdjacentIf(FixIts.begin(), FixIts.end(),
+                                       [](const llvm::SMFixIt &lhs,
+                                          const llvm::SMFixIt &rhs) {
+    return lhs.getRange().End.getPointer() > rhs.getRange().Start.getPointer();
+  }), FixIts.end());
 
   // Get the contents of the original source file.
   auto memBuffer = SM.getLLVMSourceMgr().getMemoryBuffer(BufferID);

@@ -210,8 +210,9 @@ func func_with_unknown_attr7(x: @unknown (Int) () -> Int) {} // expected-error {
 
 func func_type_attribute_with_space(x: @convention (c) () -> Int) {} // OK. Known attributes can have space before its paren.
 
-// @thin is not supported except in SIL.
-var thinFunc : @thin () -> () // expected-error {{attribute is not supported}}
+// @thin and @pseudogeneric are not supported except in SIL.
+var thinFunc : @thin () -> () // expected-error {{unknown attribute 'thin'}}
+var pseudoGenericFunc : @pseudogeneric () -> () // expected-error {{unknown attribute 'pseudogeneric'}}
 
 @inline(never) func nolineFunc() {}
 @inline(never) var noinlineVar : Int { return 0 }
@@ -273,3 +274,12 @@ class HasStorage {
 @_invalid_attribute_ // expected-error {{unknown attribute '_invalid_attribute_'}}
 @inline(__always)
 public func sillyFunction() {}
+
+// rdar://problem/45732251: unowned/unowned(unsafe) optional lets are permitted
+func unownedOptionals(x: C) {
+  unowned let y: C? = x
+  unowned(unsafe) let y2: C? = x
+
+  _ = y
+  _ = y2
+}

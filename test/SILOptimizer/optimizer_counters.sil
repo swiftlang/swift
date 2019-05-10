@@ -1,9 +1,9 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -O -sil-stats-modules 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-MODULES %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -O -sil-stats-functions 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-FUNCTIONS %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -O -sil-stats-dump-all 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-ALL %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -O -sil-stats-modules -sil-stats-only-instructions=integer_literal,builtin 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-ONLY-INSTRUCTIONS %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -O -sil-stats-functions -sil-stats-only-function=test_simple 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-ONLY-FUNCTION %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -O -sil-stats-functions -sil-stats-only-functions=test 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-ONLY-FUNCTIONS %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -O -sil-stats-modules 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-MODULES %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -O -sil-stats-functions 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-FUNCTIONS %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -O -sil-stats-dump-all 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-ALL %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -O -sil-stats-modules -sil-stats-only-instructions=integer_literal,builtin 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-ONLY-INSTRUCTIONS %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -O -sil-stats-functions -sil-stats-only-function=test_simple 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-ONLY-FUNCTION %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -O -sil-stats-functions -sil-stats-only-functions=test 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-ONLY-FUNCTIONS %s
 
 
 // Test different modes of optimizer counters statistics collection.

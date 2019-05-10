@@ -42,7 +42,12 @@ struct SomeStructure: Hashable {
     }
 
     // FIXME: we don't care about this, but Any only finds == on Hashables
-    var hashValue: Int { return i }
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(i)
+        hasher.combine(str)
+        hasher.combine(sub.i)
+        hasher.combine(sub.str)
+    }
 }
 
 /*
@@ -130,12 +135,16 @@ class TestUserInfo : TestUserInfoSuper {
     func test_classForCoder() {
         // confirm internal bridged impl types are not exposed to archival machinery
         // we have to be circuitous here, as bridging makes it very difficult to confirm this
-        let note = Notification(name: Notification.Name(rawValue: "TestSwiftNotification"), userInfo: [AnyHashable("key"):"value"])
-        let archivedNote = NSKeyedArchiver.archivedData(withRootObject: note)
-        let noteAsPlist = try! PropertyListSerialization.propertyList(from: archivedNote, options: [], format: nil)
-        let plistAsData = try! PropertyListSerialization.data(fromPropertyList: noteAsPlist, format: .xml, options: 0)
-        let xml = NSString(data: plistAsData, encoding: String.Encoding.utf8.rawValue)!
-        expectEqual(xml.range(of: "_NSUserInfoDictionary").location, NSNotFound)
+        //
+        // Gated on the availability of NSKeyedArchiver.archivedData(withRootObject:).
+        if #available(macOS 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
+            let note = Notification(name: Notification.Name(rawValue: "TestSwiftNotification"), userInfo: [AnyHashable("key"):"value"])
+            let archivedNote = NSKeyedArchiver.archivedData(withRootObject: note)
+            let noteAsPlist = try! PropertyListSerialization.propertyList(from: archivedNote, options: [], format: nil)
+            let plistAsData = try! PropertyListSerialization.data(fromPropertyList: noteAsPlist, format: .xml, options: 0)
+            let xml = NSString(data: plistAsData, encoding: String.Encoding.utf8.rawValue)!
+            expectEqual(xml.range(of: "_NSUserInfoDictionary").location, NSNotFound)
+        }
     }
 
     func test_AnyHashableContainingNotification() {

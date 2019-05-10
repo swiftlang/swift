@@ -169,8 +169,8 @@ class H : G {
 
   @objc func manyA(_: AnyObject, _: AnyObject) {}
   @objc func manyB(_ a: AnyObject, b: AnyObject) {}
-  @objc func manyC(var a: AnyObject,  // expected-error {{'var' as a parameter attribute is not allowed}}
-                   var b: AnyObject) {} // expected-error {{'var' as a parameter attribute is not allowed}}
+  @objc func manyC(var a: AnyObject,  // expected-warning {{'var' in this position is interpreted as an argument label}} {{20-23=`var`}}
+                   var b: AnyObject) {} // expected-warning {{'var' in this position is interpreted as an argument label}} {{20-23=`var`}}
 
   @objc func result() -> AnyObject? { return nil }
   @objc func both(_ x: AnyObject) -> AnyObject? { return x }
@@ -316,7 +316,6 @@ class GenericSubscriptDerived : GenericSubscriptBase {
 
 
 // @escaping
-
 class CallbackBase {
   func perform(handler: @escaping () -> Void) {} // expected-note * {{here}}
   func perform(optHandler: (() -> Void)?) {} // expected-note * {{here}}
@@ -337,6 +336,31 @@ class CallbackSubC : CallbackBase {
   override func perform(handler: @escaping () -> Void) {}
   override func perform(optHandler: @escaping () -> Void) {} // expected-error {{cannot override instance method parameter of type '(() -> Void)?' with non-optional type '() -> Void'}}
   override func perform(nonescapingHandler: @escaping () -> Void) {} // expected-error {{method does not override any method from its superclass}}
+}
+
+// inout, varargs
+class HasFlagsBase {
+  func modify(x: inout B) {} // expected-note 2{{potential overridden instance method 'modify(x:)' here}}
+  func tweak(x: inout A) {} // expected-note 2{{potential overridden instance method 'tweak(x:)' here}}
+  func collect(x: B...) {} // expected-note 2{{potential overridden instance method 'collect(x:)' here}}
+}
+
+class HasFlagsDerivedGood : HasFlagsBase {
+  override func modify(x: inout B) {}
+  override func tweak(x: inout A) {}
+  override func collect(x: B...) {}
+}
+
+class HasFlagsDerivedBad1 : HasFlagsBase {
+  override func modify(x: inout A) {} // expected-error {{method does not override any method from its superclass}}
+  override func tweak(x: inout B) {} // expected-error {{method does not override any method from its superclass}}
+  override func collect(x: A...) {} // expected-error {{method does not override any method from its superclass}}
+}
+
+class HasFlagsDerivedBad2 : HasFlagsBase {
+  override func modify(x: B) {} // expected-error {{method does not override any method from its superclass}}
+  override func tweak(x: A) {} // expected-error {{method does not override any method from its superclass}}
+  override func collect(x: [B]) {} // expected-error {{method does not override any method from its superclass}}
 }
 
 // Issues with overrides of internal(set) and fileprivate(set) members
@@ -362,10 +386,9 @@ class DerivedWithFilePrivateSetter: BaseWithFilePrivateSetter {
     }
 }
 
-// Issues with final overrides of open members
 open class OpenBase {
-  open func instanceMethod() {} // expected-note {{overridden declaration is here}}
-  open class func classMethod() {} // expected-note {{overridden declaration is here}}
+  open func instanceMethod() {}
+  open class func classMethod() {}
 }
 
 public class PublicDerived : OpenBase {
@@ -379,8 +402,8 @@ open class OpenDerived : OpenBase {
 }
 
 open class OpenDerivedPublic : OpenBase {
-  override public func instanceMethod() {} // expected-error {{overriding instance method must be as accessible as the declaration it overrides}}
-  override public class func classMethod() {} // expected-error {{overriding class method must be as accessible as the declaration it overrides}}
+  override public func instanceMethod() {} // Ok
+  override public class func classMethod() {} // Ok
 }
 
 open class OpenDerivedFinal : OpenBase {

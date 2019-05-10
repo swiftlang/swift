@@ -265,8 +265,8 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
       OrigF->getEntryCount(), OrigF->isThunk(), OrigF->getClassSubclassScope(),
       OrigF->getInlineStrategy(), OrigF->getEffectsKind(),
       /*InsertBefore*/ OrigF, OrigF->getDebugScope());
-  if (!OrigF->hasQualifiedOwnership()) {
-    NewF->setUnqualifiedOwnership();
+  if (!OrigF->hasOwnership()) {
+    NewF->setOwnershipEliminated();
   }
   LLVM_DEBUG(llvm::dbgs() << "  Specialize callee as ";
              NewF->printName(llvm::dbgs());
@@ -296,6 +296,11 @@ void CapturePropagation::rewritePartialApply(PartialApplyInst *OrigPAI,
   auto *T2TF = Builder.createThinToThickFunction(OrigPAI->getLoc(), FuncRef,
                                                  OrigPAI->getType());
   OrigPAI->replaceAllUsesWith(T2TF);
+  // Remove any dealloc_stack users.
+  SmallVector<Operand*, 16> Uses(T2TF->getUses());
+  for (auto *Use : Uses)
+    if (auto *DS = dyn_cast<DeallocStackInst>(Use->getUser()))
+      DS->eraseFromParent();
   recursivelyDeleteTriviallyDeadInstructions(OrigPAI, true);
   LLVM_DEBUG(llvm::dbgs() << "  Rewrote caller:\n" << *T2TF);
 }
@@ -342,7 +347,6 @@ static SILFunction *getSpecializedWithDeadParams(
     std::pair<SILFunction *, SILFunction *> &GenericSpecialized) {
   SILBasicBlock &EntryBB = *Orig->begin();
   unsigned NumArgs = EntryBB.getNumArguments();
-  SILModule &M = Orig->getModule();
 
   // Check if all dead parameters have trivial types. We don't support non-
   // trivial types because it's very hard to find places where we can release
@@ -350,7 +354,7 @@ static SILFunction *getSpecializedWithDeadParams(
   // TODO: maybe we can skip this restriction when we have semantic ARC.
   for (unsigned Idx = NumArgs - numDeadParams; Idx < NumArgs; ++Idx) {
     SILType ArgTy = EntryBB.getArgument(Idx)->getType();
-    if (!ArgTy.isTrivial(M))
+    if (!ArgTy.isTrivial(*Orig))
       return nullptr;
   }
   SILFunction *Specialized = nullptr;
@@ -419,11 +423,12 @@ static SILFunction *getSpecializedWithDeadParams(
     // Perform a generic specialization of the Specialized function.
     ReabstractionInfo ReInfo(ApplySite(), Specialized,
                              PAI->getSubstitutionMap(),
+                             Specialized->isSerialized(),
                              /* ConvertIndirectToDirect */ false);
     GenericFuncSpecializer FuncSpecializer(FuncBuilder,
                                            Specialized,
                                            ReInfo.getClonerParamSubstitutionMap(),
-                                           Specialized->isSerialized(), ReInfo);
+                                           ReInfo);
 
     SILFunction *GenericSpecializedFunc = FuncSpecializer.trySpecialization();
     if (!GenericSpecializedFunc)

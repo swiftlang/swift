@@ -26,9 +26,11 @@ To build from source you will need 2 GB of disk space for the source code and ov
 macOS, Ubuntu Linux LTS 14.04, and Ubuntu Linux LTS 16.04 are the current
 supported host development operating systems.
 
+Please make sure you use Python 2.x. Python 3.x is not supported currently.
+
 #### macOS
 
-To build for macOS, you need [Xcode 10.0](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 10.2 beta](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document for the current required version.
 
@@ -289,6 +291,7 @@ Swift for TensorFlow adds the following new test suites:
 - [test/TensorFlow](test/TensorFlow): TensorFlow infrastructure tests that don't
   depend on the TensorFlow runtime.
 - [test/TensorFlowRuntime](test/TensorFlowRuntime): TensorFlow runtime tests.
+
 
 Before submitting pull requests involving large code changes, please run the
 command above locally to ensure all tests pass.

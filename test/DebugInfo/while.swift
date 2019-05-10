@@ -9,5 +9,5 @@ while let val = yieldValues() {
 }
 while let val = yieldValues() {
 // CHECK: !DILocalVariable(name: "val", scope: ![[SCOPE2:[0-9]+]]
-// CHECK: ![[SCOPE2]] = distinct !DILexicalBlock(scope: ![[MAIN]]
+// CHECK: ![[SCOPE2]] = distinct !DILexicalBlock(scope: ![[MAIN2:[0-9]+]]
 }

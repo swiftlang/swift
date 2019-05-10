@@ -17,6 +17,7 @@
 #define SWIFT_NAME_LOOKUP_REQUESTS_H
 
 #include "swift/AST/SimpleRequest.h"
+#include "swift/AST/ASTTypeIDs.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
@@ -133,7 +134,7 @@ public:
 /// Request the superclass declaration for the given class.
 class SuperclassDeclRequest :
     public SimpleRequest<SuperclassDeclRequest,
-                         CacheKind::Uncached, // FIXME: Cache these
+                         CacheKind::SeparatelyCached,
                          ClassDecl *,
                          NominalTypeDecl *> {
 public:
@@ -149,6 +150,8 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
+  Optional<ClassDecl *> getCachedResult() const;
+  void cacheResult(ClassDecl *value) const;
 
   // Cycle handling
   void diagnoseCycle(DiagnosticEngine &diags) const;
@@ -232,6 +235,33 @@ private:
 public:
   // Cycle handling
   DirectlyReferencedTypeDecls breakCycle() const { return { }; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+/// Request the nominal type declaration to which the given custom attribute
+/// refers.
+class CustomAttrNominalRequest :
+    public SimpleRequest<CustomAttrNominalRequest,
+                         CacheKind::Cached,
+                         NominalTypeDecl *,
+                         CustomAttr *,
+                         DeclContext *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<NominalTypeDecl *>
+  evaluate(Evaluator &evaluator, CustomAttr *attr, DeclContext *dc) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+
+  // Cycle handling
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 };

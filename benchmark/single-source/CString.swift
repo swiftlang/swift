@@ -20,7 +20,7 @@ import Darwin
 public let CString = [
   BenchmarkInfo(name: "CStringLongAscii", runFunction: run_CStringLongAscii, tags: [.validation, .api, .String, .bridging]),
   BenchmarkInfo(name: "CStringLongNonAscii", runFunction: run_CStringLongNonAscii, tags: [.validation, .api, .String, .bridging]),
-  BenchmarkInfo(name: "CStringShortAscii", runFunction: run_CStringShortAscii, tags: [.validation, .api, .String, .bridging]),
+  BenchmarkInfo(name: "CStringShortAscii", runFunction: run_CStringShortAscii, tags: [.validation, .api, .String, .bridging], legacyFactor: 10),
   BenchmarkInfo(name: "StringWithCString2", runFunction: run_StringWithCString, tags: [.validation, .api, .String, .bridging],
       setUpFunction: { blackHole(repeatedStr) }, tearDownFunction: { repeatedStr = nil })
 ]
@@ -86,7 +86,7 @@ public func run_CStringShortAscii(_ N: Int) {
   }
 
   var res = Int.max
-  for _ in 1...100*N {
+  for _ in 1...10*N {
     let strings = input.map {
       $0.withCString(String.init(cString:))
     }

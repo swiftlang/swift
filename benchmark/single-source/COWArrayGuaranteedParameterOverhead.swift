@@ -18,7 +18,9 @@ import TestsUtils
 public let COWArrayGuaranteedParameterOverhead = BenchmarkInfo(
   name: "COWArrayGuaranteedParameterOverhead",
   runFunction: run_COWArrayGuaranteedParameterOverhead,
-  tags: [.regression, .abstraction, .refcount])
+  tags: [.regression, .abstraction, .refcount],
+  legacyFactor: 50
+)
 
 @inline(never)
 func caller() {
@@ -36,7 +38,7 @@ func callee(_ x: [Int]) -> [Int] {
 
 @inline(never)
 public func run_COWArrayGuaranteedParameterOverhead(_ N: Int) {
-  for _ in 0..<N*20000 {
+  for _ in 0..<N*400 {
     caller()
   }
 }

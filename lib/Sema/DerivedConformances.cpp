@@ -418,7 +418,6 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
                                                  VarDecl *property,
                                                  Type propertyContextType) {
   bool isStatic = property->isStatic();
-  bool isFinal = property->isFinal();
 
   auto &C = tc.Context;
   auto parentDC = property->getDeclContext();
@@ -435,11 +434,6 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
     TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
-
-  // If this is supposed to be a final method, mark it as such.
-  assert(isFinal || !parentDC->getSelfClassDecl());
-  if (isFinal && parentDC->getSelfClassDecl() && !getterDecl->isFinal())
-    getterDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
   // Compute the interface type of the getter.
   if (auto env = parentDC->getGenericEnvironmentOfContext())
@@ -515,11 +509,6 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
   propDecl->setValidationToChecked();
-
-  // If this is supposed to be a final property, mark it as such.
-  assert(isFinal || !parentDC->getSelfClassDecl());
-  if (isFinal && parentDC->getSelfClassDecl() && !propDecl->isFinal())
-    propDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
   Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);
   propPat->setType(propertyContextType);

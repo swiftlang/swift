@@ -17,7 +17,7 @@ private struct Expressible
   }
 }
 
-private func string(_ characters: UInt32...) -> String {
+public func string(_ characters: UInt32...) -> String {
   return String(characters.map { Character(UnicodeScalar($0)!) })
 }
 private func expressible<T>(_ literal: Expressible<T>, as type: T.Type)

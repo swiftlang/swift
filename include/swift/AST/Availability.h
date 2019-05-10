@@ -240,6 +240,10 @@ public:
   /// Creates a context that requires certain versions of the target OS.
   explicit AvailabilityContext(VersionRange OSVersion) : OSVersion(OSVersion) {}
 
+  /// Creates a context that imposes the constraints of the ASTContext's
+  /// deployment target.
+  static AvailabilityContext forDeploymentTarget(ASTContext &Ctx);
+
   /// Creates a context that imposes no constraints.
   ///
   /// \see isAlwaysAvailable
@@ -329,11 +333,11 @@ public:
 
   static AvailabilityContext inferForType(Type t);
 
-  /// \brief Returns the context where a declaration is available
+  /// Returns the context where a declaration is available
   ///  We assume a declaration without an annotation is always available.
   static AvailabilityContext availableRange(const Decl *D, ASTContext &C);
 
-  /// \brief Returns the context for which the declaration
+  /// Returns the context for which the declaration
   /// is annotated as available, or None if the declaration
   /// has no availability annotation.
   static Optional<AvailabilityContext> annotatedAvailableRange(const Decl *D,

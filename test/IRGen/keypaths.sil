@@ -13,7 +13,7 @@ public struct S: Hashable {
   public var z: C
   public var reabstracted: () -> ()
 
-  public var hashValue: Int { get }
+  public func hash(into hasher: inout Hasher)
   public static func ==(_: S, _: S) -> Bool
 }
 public class C: Hashable {
@@ -24,7 +24,7 @@ public class C: Hashable {
 
   public init()
 
-  public var hashValue: Int { get }
+  public func hash(into hasher: inout Hasher)
   public static func ==(_: C, _: C) -> Bool
 }
 
@@ -37,6 +37,17 @@ public class C1: C { }
 public class C2: C1 {
   public var reabstracted: () -> ()
 }
+
+public struct T {
+  public var a: (Int, String)
+  public let b: (f: String, g: Int)
+}
+
+public struct TG<T, U, V> {
+  public var a: (T, U, V)
+}
+
+typealias TGA<T, U> = (a: T, b: U)
 
 sil_vtable C {}
 sil_vtable C1 {}
@@ -78,6 +89,17 @@ sil_vtable C2 {}
 
 // -- %d: C.x
 // CHECK: [[KP_D:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]]* @keypath_once
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
+//               -- instantiable in-line, size 4
+// CHECK-SAME: <i32 0x8000_0004>,
+// -- 0x0300_0000 (class) + mutable + offset of C.x
+// CHECK-32-SAME: <i32 0x0380_0008> }>
+// CHECK-64-SAME: <i32 0x0380_0010> }>
+
+// -- %d1: C1.x
+// CHECK: [[KP_D1:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]]* @keypath_once
 // CHECK-SAME: @"symbolic
 // CHECK-SAME: @"symbolic
@@ -146,7 +168,7 @@ sil_vtable C2 {}
 // CHECK-SAME: <i32 0x8000_000c>,
 // -- computed, get-only, identified by (indirected) function pointer, no args
 // CHECK-SAME: <i32 0x0200_0002>,
-// CHECK-SAME: @got.k_id
+// CHECK-SAME: @{{got.|__imp_}}k_id
 // CHECK-SAME: void (%TSi*, %T8keypaths1SV*)* @k_get
 
 // -- %l: computed
@@ -158,7 +180,7 @@ sil_vtable C2 {}
 // CHECK-SAME: <i32 0x8000_0010>,
 // -- computed, settable, nonmutating, identified by indirect pointer, no args
 // CHECK-SAME: <i32 0x0240_0002>,
-// CHECK-SAME: @"got.$s8keypaths1CC1wSivgTq"
+// CHECK-SAME: @"{{got.|__imp_}}$s8keypaths1CC1wSivgTq"
 // CHECK-SAME: void (%TSi*, %T8keypaths1CC**)* @l_get
 // CHECK-SAME: void (%TSi*, %T8keypaths1CC**)* @l_set
 
@@ -179,6 +201,34 @@ sil_vtable C2 {}
 // Note: the contents here aren't interesting. The test triggered infinite
 // looping in the compiler at one point.
 // CHECK: [[KP_M:@keypath.*]] = private global <{ {{.*}} }> <{
+
+// -- %t0: T.a.0
+// CHECK: [[KP_T0:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]]* @keypath_once
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
+//                  -- instantiable in-line, size 12
+// CHECK-SAME: <i32 0x8000_000c>,
+// -- offset of T.a, mutable
+// CHECK-SAME: <i32 0x0180_0000>,
+// CHECK: @"symbolic
+// -- tuple element #0 of T.a
+// CHECK-SAME: <i32 0x0180_0000> }>
+
+// -- %t1: T.b.g
+// CHECK: [[KP_T1:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]]* @keypath_once
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
+//                  -- instantiable in-line, size 12
+// CHECK-SAME: <i32 0x8000_000c>,
+// -- offset of T.b
+// CHECK-32-SAME: <i32 0x0100_0010>,
+// CHECK-64-SAME: <i32 0x0100_0018>,
+// CHECK: @"symbolic
+// -- tuple element #1 of T.b
+// CHECK-32-SAME: <i32 0x0180_000c> }>
+// CHECK-64-SAME: <i32 0x0180_0010> }>
 
 // -- %i: Gen<A>.x
 // CHECK: [[KP_I:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
@@ -206,6 +256,49 @@ sil_vtable C2 {}
 // CHECK-32-SAME: i32 20 }>
 // CHECK-64-SAME: i32 36 }>
 
+// -- %tg0: TG<T,U,V>.a.0
+// CHECK: [[KP_TG0:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: @"generic environment r1_l"
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
+//             -- struct with runtime-resolved offset, mutable
+// CHECK-SAME: <i32 0x01ff_fffe>,
+// -- offset of TG.a
+// CHECK-32-SAME: i32 20
+// CHECK-64-SAME: i32 40
+// CHECK-SAME: @"symbolic
+//             -- tuple element with compile-time known offset, mutable
+// -- tuple element #0 of TG.a
+// CHECK-SAME: <i32 0x0180_0000> }>
+
+// -- %tg1: TG<T,U,V>.a.2
+// CHECK: [[KP_TG1:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: @"generic environment r1_l"
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
+//             -- struct with runtime-resolved offset, mutable
+// CHECK-SAME: <i32 0x01ff_fffe>,
+// -- offset of TG.a
+// CHECK-32-SAME: i32 20
+// CHECK-64-SAME: i32 40
+// CHECK-SAME: @"symbolic
+//             -- tuple element with runtime-resolved offset, mutable
+// CHECK-SAME: <i32 0x01ff_fffe>,
+// -- tuple element #2 of TG.a
+// CHECK-32-SAME: i32 32 }>
+// CHECK-64-SAME: i32 64 }>
+
+// -- %tg2: TGA<T,U>.1
+// CHECK: [[KP_TG2:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: @"generic environment r0_l"
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
+//             -- tuple element with runtime-resolved offset, mutable
+// CHECK-SAME: <i32 0x01ff_fffe>,
+// -- tuple element #1 of TGA
+// CHECK-32-SAME: i32 24 }>
+// CHECK-64-SAME: i32 48 }>
+
 // CHECK-LABEL: @"generic environment SHRzSHR_r0_l" = linkonce_odr hidden constant
 // CHECK-SAME: i32 8193, i16 2, i8 -128, i8 -128, i32 128
 
@@ -218,9 +311,10 @@ entry:
   %b = keypath $KeyPath<S, String>, (root $S; stored_property #S.y : $String)
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_C]] to i8*), i8* undef)
   %c = keypath $KeyPath<S, C>, (root $S; stored_property #S.z : $C)
-
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_D]] to i8*), i8* undef)
   %d = keypath $KeyPath<C, Int>, (root $C; stored_property #C.x : $Int)
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_D1]] to i8*), i8* undef)
+  %d1 = keypath $KeyPath<C1, Int>, (root $C1; stored_property #C.x : $Int)
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_E]] to i8*), i8* undef)
   %e = keypath $KeyPath<C, String>, (root $C; stored_property #C.y : $String)
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_F]] to i8*), i8* undef)
@@ -236,32 +330,38 @@ entry:
   %m = keypath $KeyPath<S, () -> ()>, (root $S; settable_property $() -> (), id ##S.reabstracted, getter @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed () -> @out (), setter @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed () -> @out (), @inout S) -> ())
   %m2 = keypath $KeyPath<C2, () -> ()>, (root $C2; settable_property $() -> (), id ##C2.reabstracted, getter @m2_get : $@convention(thin) (@in_guaranteed C2) -> @out @callee_guaranteed () -> @out (), setter @m2_set : $@convention(thin) (@in_guaranteed @callee_guaranteed () -> @out (), @inout C2) -> ())
 
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_T0]] to i8*), i8* undef)
+  %t0 = keypath $KeyPath<T, Int>, (root $T; stored_property #T.a : $(Int, String); tuple_element #0 : $Int)
+
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_T1]] to i8*), i8* undef)
+  %t1 = keypath $KeyPath<T, Int>, (root $T; stored_property #T.b : $(f: String, g: Int); tuple_element #1 : $Int)
+
   return undef : $()
 }
 
 sil @k_id : $@convention(thin) () -> ()
 sil @k_get : $@convention(thin) (@in_guaranteed S) -> @out Int {
-bb0(%0 : @trivial $*Int, %1 : @trivial $*S):
+bb0(%0 : $*Int, %1 : $*S):
   unreachable
 }
 
 sil @l_get : $@convention(thin) (@in_guaranteed C) -> @out Int {
-bb0(%0 : @trivial $*Int, %1 : @trivial $*C):
+bb0(%0 : $*Int, %1 : $*C):
   unreachable
 }
 
 sil @l_set : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> () {
-bb0(%0 : @trivial $*Int, %1 : @trivial $*C):
+bb0(%0 : $*Int, %1 : $*C):
   unreachable
 }
 
 sil @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed () -> @out () {
-bb0(%0 : @trivial $*@callee_guaranteed () -> @out (), %1 : @trivial $*S):
+bb0(%0 : $*@callee_guaranteed () -> @out (), %1 : $*S):
   unreachable
 }
 
 sil @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed () -> @out (), @inout S) -> () {
-bb0(%0 : @trivial $*@callee_guaranteed () -> @out (), %1 : @trivial $*S):
+bb0(%0 : $*@callee_guaranteed () -> @out (), %1 : $*S):
   unreachable
 }
 
@@ -300,6 +400,27 @@ entry:
   return undef : $()
 }
 
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @tuple_generics(%swift.type* %T, %swift.type* %U, %swift.type* %V)
+sil @tuple_generics : $@convention(thin) <T, U, V> () -> () {
+entry:
+  // CHECK: [[PTR:%.*]] = bitcast i8* [[ARGS:%.*]] to
+  // CHECK: store %swift.type* %T, %swift.type** [[PTR]]
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_TG0]] to i8*), i8* [[ARGS]])
+  %tg0 = keypath $KeyPath<TG<T,U,V>, T>, <A,B,C> (root $TG<A,B,C>; stored_property #TG.a : $(A,B,C); tuple_element #0 : $A) <T,U,V>
+
+  // CHECK: [[PTR:%.*]] = bitcast i8* [[ARGS:%.*]] to
+  // CHECK: store %swift.type* %T, %swift.type** [[PTR]]
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_TG1]] to i8*), i8* [[ARGS]])
+  %tg1 = keypath $KeyPath<TG<T,U,V>, V>, <A,B,C> (root $TG<A,B,C>; stored_property #TG.a : $(A,B,C); tuple_element #2 : $C) <T,U,V>
+
+  // CHECK: [[PTR:%.*]] = bitcast i8* [[ARGS:%.*]] to
+  // CHECK: store %swift.type* %T, %swift.type** [[PTR]]
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_TG2]] to i8*), i8* [[ARGS]])
+  %tg2 = keypath $KeyPath<TGA<T,U>, U>, <A,B> (root $TGA<A,B>; tuple_element #1 : $B) <T,U>
+
+  return undef : $()
+}
+
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @computed_property_generics
 sil @computed_property_generics : $@convention(thin) <T, U> () -> () {
 entry:
@@ -312,7 +433,7 @@ sil @n_get : $@convention(thin) <UU, TT> (@in_guaranteed TT) -> @out UU
 sil @n_set : $@convention(thin) <UU, TT> (@in_guaranteed UU, @in_guaranteed TT) -> ()
 
 sil @computed_property_indices : $@convention(thin) (C, S, C, S, C, S) -> () {
-entry(%0 : @unowned $C, %1 : @unowned $S, %2 : @unowned $C, %3 : @unowned $S, %4 : @unowned $C, %5 : @unowned $S):
+entry(%0 : $C, %1 : $S, %2 : $C, %3 : $S, %4 : $C, %5 : $S):
   %o = keypath $WritableKeyPath<S, C>, (
     root $S;
     settable_property $C,
@@ -363,7 +484,7 @@ sil @r_get : $@convention(thin) (@in_guaranteed C, UnsafeRawPointer) -> @out S
 sil @r_set : $@convention(thin) (@in_guaranteed S, @in_guaranteed C, UnsafeRawPointer) -> ()
 
 sil @generic_computed_property_indices : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed A, @in_guaranteed B, @in_guaranteed A, @in_guaranteed B, @in_guaranteed A, @in_guaranteed B) -> () {
-entry(%0 : @trivial $*A, %1 : @trivial $*B, %2 : @trivial $*A, %3 : @trivial $*B, %4 : @trivial $*A, %5 : @trivial $*B):
+entry(%0 : $*A, %1 : $*B, %2 : $*A, %3 : $*B, %4 : $*A, %5 : $*B):
   %s = keypath $WritableKeyPath<A, B>, <X: Hashable, Y: Hashable> (
     root $X;
     settable_property $Y,

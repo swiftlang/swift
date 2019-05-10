@@ -23,7 +23,7 @@ sil_vtable Purebred {}
 // CHECK:         [[VTABLE:%.*]] = bitcast %swift.type* [[ISA]]
 // CHECK:         getelementptr inbounds {{.*}} [[VTABLE]]
 sil @purebred_method : $@convention(thin) (@owned Purebred) -> () {
-entry(%0 : @owned $Purebred):
+entry(%0 : $Purebred):
   %m = class_method %0 : $Purebred, #Purebred.method!1 : (Purebred) -> () -> (), $@convention(method) (@guaranteed Purebred) -> ()
   %z = apply %m(%0) : $@convention(method) (@guaranteed Purebred) -> ()
   return %z : $()
@@ -47,7 +47,7 @@ sil_vtable Mongrel {}
 // CHECK:         [[VTABLE:%.*]] = bitcast %swift.type* [[ISA]]
 // CHECK:         getelementptr inbounds {{.*}} [[VTABLE]]
 sil @mongrel_method : $@convention(thin) (@owned Mongrel) -> () {
-entry(%0 : @owned $Mongrel):
+entry(%0 : $Mongrel):
   %m = class_method %0 : $Mongrel, #Mongrel.method!1 : (Mongrel) -> () -> (), $@convention(method) (@guaranteed Mongrel) -> ()
   %z = apply %m(%0) : $@convention(method) (@guaranteed Mongrel) -> ()
   return %z : $()
@@ -56,14 +56,14 @@ entry(%0 : @owned $Mongrel):
 // ObjC stubs expected by ObjC metadata emission
 
 sil private @$s18class_isa_pointers7MongrelC6methodyyFTo : $@convention(objc_method) (Purebred) -> () {
-entry(%0 : @unowned $Purebred):
+entry(%0 : $Purebred):
   unreachable
 }
 sil private @$s18class_isa_pointers7MongrelC7bellsOnACSgSi_tcfcTo : $@convention(objc_method) (Int, Purebred) -> () {
-entry(%0 : @trivial $Int, %1 : @unowned $Purebred):
+entry(%0 : $Int, %1 : $Purebred):
   unreachable
 }
 sil private @$s18class_isa_pointers7MongrelCACycfcTo : $@convention(objc_method) (Purebred) -> () {
-entry(%0 : @unowned $Purebred):
+entry(%0 : $Purebred):
   unreachable
 }

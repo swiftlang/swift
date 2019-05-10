@@ -43,7 +43,9 @@ static inline int
 _stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
                           __swift_thread_key_destructor _Nullable destructor) {
   *key = FlsAlloc(destroyTLS_CCAdjustmentThunk);
-  return *key != FLS_OUT_OF_INDEXES;
+  if (*key == FLS_OUT_OF_INDEXES)
+    return GetLastError();
+  return 0;
 }
 
 #endif

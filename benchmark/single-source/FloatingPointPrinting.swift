@@ -19,47 +19,56 @@ public let FloatingPointPrinting = [
   BenchmarkInfo(
     name: "FloatingPointPrinting_Float_description_small",
     runFunction: run_FloatingPointPrinting_Float_description_small,
-    tags: [.validation, .api, .runtime, .String]),
+    tags: [.validation, .api, .runtime, .String],
+    legacyFactor: 108),
 
   BenchmarkInfo(
     name: "FloatingPointPrinting_Double_description_small",
     runFunction: run_FloatingPointPrinting_Double_description_small,
-    tags: [.validation, .api, .runtime, .String]),
+    tags: [.validation, .api, .runtime, .String],
+    legacyFactor: 100),
 
   BenchmarkInfo(
     name: "FloatingPointPrinting_Float80_description_small",
     runFunction: run_FloatingPointPrinting_Float80_description_small,
-    tags: [.validation, .api, .runtime, .String]),
+    tags: [.validation, .api, .runtime, .String],
+    legacyFactor: 108),
 
   BenchmarkInfo(
     name: "FloatingPointPrinting_Float_description_uniform",
     runFunction: run_FloatingPointPrinting_Float_description_uniform,
-    tags: [.validation, .api, .runtime, .String]),
+    tags: [.validation, .api, .runtime, .String],
+    legacyFactor: 100),
 
   BenchmarkInfo(
     name: "FloatingPointPrinting_Double_description_uniform",
     runFunction: run_FloatingPointPrinting_Double_description_uniform,
-    tags: [.validation, .api, .runtime, .String]),
+    tags: [.validation, .api, .runtime, .String],
+    legacyFactor: 100),
 
   BenchmarkInfo(
     name: "FloatingPointPrinting_Float80_description_uniform",
     runFunction: run_FloatingPointPrinting_Float80_description_uniform,
-    tags: [.validation, .api, .runtime, .String]),
+    tags: [.validation, .api, .runtime, .String],
+    legacyFactor: 100),
 
   BenchmarkInfo(
     name: "FloatingPointPrinting_Float_interpolated",
     runFunction: run_FloatingPointPrinting_Float_interpolated,
-    tags: [.validation, .api, .runtime, .String]),
+    tags: [.validation, .api, .runtime, .String],
+    legacyFactor: 200),
 
   BenchmarkInfo(
     name: "FloatingPointPrinting_Double_interpolated",
     runFunction: run_FloatingPointPrinting_Double_interpolated,
-    tags: [.validation, .api, .runtime, .String]),
+    tags: [.validation, .api, .runtime, .String],
+    legacyFactor: 200),
 
   BenchmarkInfo(
     name: "FloatingPointPrinting_Float80_interpolated",
     runFunction: run_FloatingPointPrinting_Float80_interpolated,
-    tags: [.validation, .api, .runtime, .String])
+    tags: [.validation, .api, .runtime, .String],
+    legacyFactor: 200)
 ]
 
 // Generate descriptions for 100,000 values around 1.0.
@@ -75,7 +84,7 @@ public let FloatingPointPrinting = [
 
 @inline(never)
 public func run_FloatingPointPrinting_Float_description_small(_ N: Int) {
-  let count = 100_000
+  let count = 1_000
   for _ in 0..<N {
     for i in 1...count {
       let f = Float(i) / 101.0
@@ -86,7 +95,7 @@ public func run_FloatingPointPrinting_Float_description_small(_ N: Int) {
 
 @inline(never)
 public func run_FloatingPointPrinting_Double_description_small(_ N: Int) {
-  let count = 100_000
+  let count = 1_000
   for _ in 0..<N {
     for i in 1...count {
       let f = Double(i) / 101.0
@@ -101,7 +110,7 @@ public func run_FloatingPointPrinting_Float80_description_small(_ N: Int) {
 // On Darwin, long double is Float80 on x86, and Double otherwise.
 // On Linux, Float80 is at aleast available on x86.
 #if arch(x86_64) || arch(i386)
-  let count = 100_000
+  let count = 1_000
   for _ in 0..<N {
     for i in 1...count {
       let f = Float80(i) / 101.0
@@ -117,7 +126,7 @@ public func run_FloatingPointPrinting_Float80_description_small(_ N: Int) {
 
 @inline(never)
 public func run_FloatingPointPrinting_Float_description_uniform(_ N: Int) {
-  let count = 100_000
+  let count = 1_000
   let step = UInt32.max / UInt32(count)
   for _ in 0..<N {
     for i in 0..<count {
@@ -130,7 +139,7 @@ public func run_FloatingPointPrinting_Float_description_uniform(_ N: Int) {
 
 @inline(never)
 public func run_FloatingPointPrinting_Double_description_uniform(_ N: Int) {
-  let count = 100_000
+  let count = 1_000
   let step = UInt64.max / UInt64(count)
   for _ in 0..<N {
     for i in 0..<count {
@@ -147,7 +156,7 @@ public func run_FloatingPointPrinting_Float80_description_uniform(_ N: Int) {
 // On Darwin, long double is Float80 on x86, and Double otherwise.
 // On Linux, Float80 is at aleast available on x86.
 #if arch(x86_64) || arch(i386)
-  let count = 100_000
+  let count = 1_000
   let step = UInt64.max / UInt64(count)
   for _ in 0..<N {
     for i in 0..<count {
@@ -167,7 +176,7 @@ public func run_FloatingPointPrinting_Float80_description_uniform(_ N: Int) {
 
 @inline(never)
 public func run_FloatingPointPrinting_Float_interpolated(_ N: Int) {
-  let count = 100_000
+  let count = 500
   let step = UInt32.max / UInt32(count)
   for _ in 0..<N {
     for i in 0..<count {
@@ -180,7 +189,7 @@ public func run_FloatingPointPrinting_Float_interpolated(_ N: Int) {
 
 @inline(never)
 public func run_FloatingPointPrinting_Double_interpolated(_ N: Int) {
-  let count = 100_000
+  let count = 500
   let step = UInt64.max / UInt64(count)
   for _ in 0..<N {
     for i in 0..<count {
@@ -197,7 +206,7 @@ public func run_FloatingPointPrinting_Float80_interpolated(_ N: Int) {
 // On Darwin, long double is Float80 on x86, and Double otherwise.
 // On Linux, Float80 is at aleast available on x86.
 #if arch(x86_64) || arch(i386)
-  let count = 100_000
+  let count = 500
   let step = UInt64.max / UInt64(count)
   for _ in 0..<N {
     for i in 0..<count {
@@ -210,4 +219,3 @@ public func run_FloatingPointPrinting_Float80_interpolated(_ N: Int) {
 #endif // x86
 #endif // Darwin/Linux
 }
-

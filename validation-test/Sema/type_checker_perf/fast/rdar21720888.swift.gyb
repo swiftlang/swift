@@ -4,6 +4,6 @@
 
 _ = [
 %for i in range(0, N):
-  (label: "string"),
+  (label: "string", another: 123),
 %end
 ]

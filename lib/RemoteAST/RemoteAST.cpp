@@ -104,7 +104,9 @@ public:
   getDeclForRemoteNominalTypeDescriptor(RemoteAddress descriptor) = 0;
   virtual Result<RemoteAddress>
   getHeapMetadataForObject(RemoteAddress object) = 0;
-  virtual Result<std::pair<Type, RemoteAddress>>
+  virtual Result<OpenedExistential>
+  getDynamicTypeAndAddressForError(RemoteAddress object) = 0;
+  virtual Result<OpenedExistential>
   getDynamicTypeAndAddressForExistential(RemoteAddress object,
                                          Type staticType) = 0;
 
@@ -222,7 +224,7 @@ private:
   getOffsetOfFieldFromIRGen(irgen::IRGenModule &IGM, Type type,
                             NominalTypeDecl *typeDecl,
                             RemoteAddress optMetadata, VarDecl *member) {
-    SILType loweredTy = IGM.getSILTypes().getLoweredType(type);
+    SILType loweredTy = IGM.getLoweredType(type);
 
     MemberAccessStrategy strategy =
       (isa<StructDecl>(typeDecl)
@@ -325,14 +327,20 @@ private:
       return fail<uint64_t>(Failure::TypeHasNoSuchMember, memberName);
 
     // Fast path: element 0 is always at offset 0.
-    if (targetIndex == 0) return uint64_t(0);
+    if (targetIndex == 0)
+      return uint64_t(0);
 
     // Create an IRGen instance.
     auto irgen = getIRGen();
-    if (!irgen) return Result<uint64_t>::emplaceFailure(Failure::Unknown);
+    if (!irgen)
+      return Result<uint64_t>::emplaceFailure(Failure::Unknown);
     auto &IGM = irgen->IGM;
+    SILType loweredTy = IGM.getLoweredType(type);
 
-    SILType loweredTy = IGM.getSILTypes().getLoweredType(type);
+    // Only the runtime metadata knows the offsets of resilient members.
+    auto &typeInfo = IGM.getTypeInfo(loweredTy);
+    if (!isa<irgen::FixedTypeInfo>(&typeInfo))
+      return Result<uint64_t>::emplaceFailure(Failure::NotFixedLayout);
 
     // If the type has a statically fixed offset, return that.
     if (auto offset =
@@ -442,7 +450,7 @@ public:
   getDeclForRemoteNominalTypeDescriptor(RemoteAddress descriptor) override {
     if (auto result =
           Reader.readNominalTypeFromDescriptor(descriptor.getAddressData()))
-      return result;
+      return dyn_cast<NominalTypeDecl>((GenericTypeDecl *) result);
     return getFailure<NominalTypeDecl*>();
   }
 
@@ -476,58 +484,89 @@ public:
     return getFailure<RemoteAddress>();
   }
 
-  Result<std::pair<Type, RemoteAddress>>
+  Result<OpenedExistential>
   getDynamicTypeAndAddressClassExistential(RemoteAddress object) {
     auto pointerval = Reader.readPointerValue(object.getAddressData());
     if (!pointerval)
-      return getFailure<std::pair<Type, RemoteAddress>>();
+      return getFailure<OpenedExistential>();
     auto result = Reader.readMetadataFromInstance(*pointerval);
     if (!result)
-      return getFailure<std::pair<Type, RemoteAddress>>();
+      return getFailure<OpenedExistential>();
     auto typeResult = Reader.readTypeFromMetadata(result.getValue());
     if (!typeResult)
-      return getFailure<std::pair<Type, RemoteAddress>>();
-    return std::make_pair<Type, RemoteAddress>(std::move(typeResult),
-                                               RemoteAddress(*pointerval));
+      return getFailure<OpenedExistential>();
+    return OpenedExistential(std::move(typeResult),
+                             RemoteAddress(*pointerval));
   }
 
-  Result<std::pair<Type, RemoteAddress>>
-  getDynamicTypeAndAddressErrorExistential(RemoteAddress object) {
-    auto pointerval = Reader.readPointerValue(object.getAddressData());
-    if (!pointerval)
-      return getFailure<std::pair<Type, RemoteAddress>>();
+  Result<OpenedExistential>
+  getDynamicTypeAndAddressErrorExistential(RemoteAddress object,
+                                           bool dereference=true) {
+    if (dereference) {
+      auto pointerval = Reader.readPointerValue(object.getAddressData());
+      if (!pointerval)
+        return getFailure<OpenedExistential>();
+      object = RemoteAddress(*pointerval);
+    }
+
     auto result =
-        Reader.readMetadataAndValueErrorExistential(RemoteAddress(*pointerval));
+        Reader.readMetadataAndValueErrorExistential(object);
     if (!result)
-      return getFailure<std::pair<Type, RemoteAddress>>();
-    RemoteAddress metadataAddress = result->first;
-    RemoteAddress valueAddress = result->second;
+      return getFailure<OpenedExistential>();
 
     auto typeResult =
-        Reader.readTypeFromMetadata(metadataAddress.getAddressData());
+        Reader.readTypeFromMetadata(result->MetadataAddress.getAddressData());
     if (!typeResult)
-      return getFailure<std::pair<Type, RemoteAddress>>();
-    return std::make_pair<Type, RemoteAddress>(std::move(typeResult),
-                                               std::move(valueAddress));
+      return getFailure<OpenedExistential>();
+
+
+    // When the existential wraps a class type, LLDB expects that the
+    // address returned is the class instance itself and not the address
+    // of the reference.
+    auto payloadAddress = result->PayloadAddress;
+    if (!result->IsBridgedError &&
+        typeResult->getClassOrBoundGenericClass()) {
+      auto pointerval = Reader.readPointerValue(
+          payloadAddress.getAddressData());
+      if (!pointerval)
+        return getFailure<OpenedExistential>();
+
+      payloadAddress = RemoteAddress(*pointerval);
+    }
+
+    return OpenedExistential(std::move(typeResult),
+                             std::move(payloadAddress));
   }
 
-  Result<std::pair<Type, RemoteAddress>>
+  Result<OpenedExistential>
   getDynamicTypeAndAddressOpaqueExistential(RemoteAddress object) {
     auto result = Reader.readMetadataAndValueOpaqueExistential(object);
     if (!result)
-      return getFailure<std::pair<Type, RemoteAddress>>();
-    RemoteAddress metadataAddress = result->first;
-    RemoteAddress valueAddress = result->second;
+      return getFailure<OpenedExistential>();
 
     auto typeResult =
-        Reader.readTypeFromMetadata(metadataAddress.getAddressData());
+        Reader.readTypeFromMetadata(result->MetadataAddress.getAddressData());
     if (!typeResult)
-      return getFailure<std::pair<Type, RemoteAddress>>();
-    return std::make_pair<Type, RemoteAddress>(std::move(typeResult),
-                                               std::move(valueAddress));
+      return getFailure<OpenedExistential>();
+
+    // When the existential wraps a class type, LLDB expects that the
+    // address returned is the class instance itself and not the address
+    // of the reference.
+    auto payloadAddress = result->PayloadAddress;
+    if (typeResult->getClassOrBoundGenericClass()) {
+      auto pointerval = Reader.readPointerValue(
+          payloadAddress.getAddressData());
+      if (!pointerval)
+        return getFailure<OpenedExistential>();
+
+      payloadAddress = RemoteAddress(*pointerval);
+    }
+
+    return OpenedExistential(std::move(typeResult),
+                             std::move(payloadAddress));
   }
 
-  Result<std::pair<Type, RemoteAddress>>
+  Result<OpenedExistential>
   getDynamicTypeAndAddressExistentialMetatype(RemoteAddress object) {
     // The value of the address is just the input address.
     // The type is obtained through the following sequence of steps:
@@ -536,27 +575,36 @@ public:
     // 3) Wrapping the resolved type in an existential metatype.
     auto pointerval = Reader.readPointerValue(object.getAddressData());
     if (!pointerval)
-      return getFailure<std::pair<Type, RemoteAddress>>();
+      return getFailure<OpenedExistential>();
     auto typeResult = Reader.readTypeFromMetadata(*pointerval);
     if (!typeResult)
-      return getFailure<std::pair<Type, RemoteAddress>>();
+      return getFailure<OpenedExistential>();
     auto wrappedType = ExistentialMetatypeType::get(typeResult);
     if (!wrappedType)
-      return getFailure<std::pair<Type, RemoteAddress>>();
-    return std::make_pair<Type, RemoteAddress>(std::move(wrappedType),
-                                               std::move(object));
+      return getFailure<OpenedExistential>();
+    return OpenedExistential(std::move(wrappedType),
+                             std::move(object));
+  }
+
+  /// Resolve the dynamic type and the value address of an error existential
+  /// object, Unlike getDynamicTypeAndAddressForExistential(), this function
+  /// takes the address of the instance and not the address of the reference.
+  Result<OpenedExistential>
+  getDynamicTypeAndAddressForError(RemoteAddress object) override {
+    return getDynamicTypeAndAddressErrorExistential(object,
+                                                    /*dereference=*/false);
   }
 
   /// Resolve the dynamic type and the value address of an existential,
   /// given its address and its static type. For class and error existentials,
   /// this API takes a pointer to the instance reference rather than the
   /// instance reference itself.
-  Result<std::pair<Type, RemoteAddress>>
+  Result<OpenedExistential>
   getDynamicTypeAndAddressForExistential(RemoteAddress object,
                                          Type staticType) override {
     // If this is not an existential, give up.
     if (!staticType->isAnyExistentialType())
-      return getFailure<std::pair<Type, RemoteAddress>>();
+      return getFailure<OpenedExistential>();
 
     // Handle the case where this is an ExistentialMetatype.
     if (!staticType->isExistentialType())
@@ -632,7 +680,13 @@ RemoteASTContext::getHeapMetadataForObject(remote::RemoteAddress address) {
   return asImpl(Impl)->getHeapMetadataForObject(address);
 }
 
-Result<std::pair<Type, remote::RemoteAddress>>
+Result<OpenedExistential>
+RemoteASTContext::getDynamicTypeAndAddressForError(
+    remote::RemoteAddress address) {
+  return asImpl(Impl)->getDynamicTypeAndAddressForError(address);
+}
+
+Result<OpenedExistential>
 RemoteASTContext::getDynamicTypeAndAddressForExistential(
     remote::RemoteAddress address, Type staticType) {
   return asImpl(Impl)->getDynamicTypeAndAddressForExistential(address,

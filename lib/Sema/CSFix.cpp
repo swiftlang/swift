@@ -20,8 +20,10 @@
 #include "CSDiagnostics.h"
 #include "ConstraintLocator.h"
 #include "ConstraintSystem.h"
+#include "OverloadChoice.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
@@ -64,14 +66,17 @@ ForceDowncast *ForceDowncast::create(ConstraintSystem &cs, Type toType,
 }
 
 bool ForceOptional::diagnose(Expr *root, bool asNote) const {
-  MissingOptionalUnwrapFailure failure(root, getConstraintSystem(),
-                                       getLocator());
+  MissingOptionalUnwrapFailure failure(root, getConstraintSystem(), BaseType,
+                                       UnwrappedType, getLocator());
   return failure.diagnose(asNote);
 }
 
-ForceOptional *ForceOptional::create(ConstraintSystem &cs,
+ForceOptional *ForceOptional::create(ConstraintSystem &cs, Type baseType,
+                                     Type unwrappedType,
                                      ConstraintLocator *locator) {
-  return new (cs.getAllocator()) ForceOptional(cs, locator);
+  return new (cs.getAllocator()) ForceOptional(
+      cs, baseType, unwrappedType,
+      cs.getConstraintLocator(simplifyLocatorToAnchor(cs, locator)));
 }
 
 bool UnwrapOptionalBase::diagnose(Expr *root, bool asNote) const {
@@ -140,7 +145,8 @@ MarkExplicitlyEscaping::create(ConstraintSystem &cs, ConstraintLocator *locator,
 }
 
 bool RelabelArguments::diagnose(Expr *root, bool asNote) const {
-  LabelingFailure failure(getConstraintSystem(), getLocator(), getLabels());
+  LabelingFailure failure(root, getConstraintSystem(), getLocator(),
+                          getLabels());
   return failure.diagnose(asNote);
 }
 
@@ -212,4 +218,269 @@ bool AutoClosureForwarding::diagnose(Expr *root, bool asNote) const {
 AutoClosureForwarding *AutoClosureForwarding::create(ConstraintSystem &cs,
                                                      ConstraintLocator *locator) {
   return new (cs.getAllocator()) AutoClosureForwarding(cs, locator);
+}
+
+bool RemoveUnwrap::diagnose(Expr *root, bool asNote) const {
+  auto failure = NonOptionalUnwrapFailure(root, getConstraintSystem(), BaseType,
+                                          getLocator());
+  return failure.diagnose(asNote);
+}
+
+RemoveUnwrap *RemoveUnwrap::create(ConstraintSystem &cs, Type baseType,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) RemoveUnwrap(cs, baseType, locator);
+}
+
+bool InsertExplicitCall::diagnose(Expr *root, bool asNote) const {
+  auto failure = MissingCallFailure(root, getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+InsertExplicitCall *InsertExplicitCall::create(ConstraintSystem &cs,
+                                               ConstraintLocator *locator) {
+  return new (cs.getAllocator()) InsertExplicitCall(cs, locator);
+}
+
+bool UseSubscriptOperator::diagnose(Expr *root, bool asNote) const {
+  auto failure = SubscriptMisuseFailure(root, getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+UseSubscriptOperator *UseSubscriptOperator::create(ConstraintSystem &cs,
+                                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) UseSubscriptOperator(cs, locator);
+}
+
+bool DefineMemberBasedOnUse::diagnose(Expr *root, bool asNote) const {
+  auto failure = MissingMemberFailure(root, getConstraintSystem(), BaseType,
+                                      Name, getLocator());
+  return failure.diagnose(asNote);
+}
+
+DefineMemberBasedOnUse *
+DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
+                               DeclName member, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      DefineMemberBasedOnUse(cs, baseType, member, locator);
+}
+
+bool AllowTypeOrInstanceMember::diagnose(Expr *root, bool asNote) const {
+  auto failure = AllowTypeOrInstanceMemberFailure(root, getConstraintSystem(),
+                                                  BaseType, Name, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowTypeOrInstanceMember *AllowTypeOrInstanceMember::create(ConstraintSystem &cs,
+                                                             Type baseType,
+                                                             DeclName member,
+                                                             ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowTypeOrInstanceMember(cs, baseType, member, locator);
+}
+bool AllowInvalidPartialApplication::diagnose(Expr *root, bool asNote) const {
+  auto failure = PartialApplicationFailure(root, isWarning(),
+                                           getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowInvalidPartialApplication *
+AllowInvalidPartialApplication::create(bool isWarning, ConstraintSystem &cs,
+                                       ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInvalidPartialApplication(isWarning, cs, locator);
+}
+
+bool AllowInvalidInitRef::diagnose(Expr *root, bool asNote) const {
+  switch (Kind) {
+  case RefKind::DynamicOnMetatype: {
+    InvalidDynamicInitOnMetatypeFailure failure(
+        root, getConstraintSystem(), BaseType, Init, BaseRange, getLocator());
+    return failure.diagnose(asNote);
+  }
+
+  case RefKind::ProtocolMetatype: {
+    InitOnProtocolMetatypeFailure failure(root, getConstraintSystem(), BaseType,
+                                          Init, IsStaticallyDerived, BaseRange,
+                                          getLocator());
+    return failure.diagnose(asNote);
+  }
+
+  case RefKind::NonConstMetatype: {
+    ImplicitInitOnNonConstMetatypeFailure failure(root, getConstraintSystem(),
+                                                  BaseType, Init, getLocator());
+    return failure.diagnose(asNote);
+  }
+  }
+}
+
+AllowInvalidInitRef *AllowInvalidInitRef::dynamicOnMetatype(
+    ConstraintSystem &cs, Type baseTy, ConstructorDecl *init,
+    SourceRange baseRange, ConstraintLocator *locator) {
+  return create(RefKind::DynamicOnMetatype, cs, baseTy, init,
+                /*isStaticallyDerived=*/false, baseRange, locator);
+}
+
+AllowInvalidInitRef *AllowInvalidInitRef::onProtocolMetatype(
+    ConstraintSystem &cs, Type baseTy, ConstructorDecl *init,
+    bool isStaticallyDerived, SourceRange baseRange,
+    ConstraintLocator *locator) {
+  return create(RefKind::ProtocolMetatype, cs, baseTy, init,
+                isStaticallyDerived, baseRange, locator);
+}
+
+AllowInvalidInitRef *
+AllowInvalidInitRef::onNonConstMetatype(ConstraintSystem &cs, Type baseTy,
+                                        ConstructorDecl *init,
+                                        ConstraintLocator *locator) {
+  return create(RefKind::NonConstMetatype, cs, baseTy, init,
+                /*isStaticallyDerived=*/false, SourceRange(), locator);
+}
+
+AllowInvalidInitRef *
+AllowInvalidInitRef::create(RefKind kind, ConstraintSystem &cs, Type baseTy,
+                            ConstructorDecl *init, bool isStaticallyDerived,
+                            SourceRange baseRange, ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowInvalidInitRef(
+      cs, kind, baseTy, init, isStaticallyDerived, baseRange, locator);
+}
+
+bool AllowClosureParamDestructuring::diagnose(Expr *root, bool asNote) const {
+  ClosureParamDestructuringFailure failure(root, getConstraintSystem(),
+                                           ContextualType, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowClosureParamDestructuring *
+AllowClosureParamDestructuring::create(ConstraintSystem &cs,
+                                       FunctionType *contextualType,
+                                       ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowClosureParamDestructuring(cs, contextualType, locator);
+}
+
+bool AddMissingArguments::diagnose(Expr *root, bool asNote) const {
+  MissingArgumentsFailure failure(root, getConstraintSystem(), Fn,
+                                  NumSynthesized, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AddMissingArguments *
+AddMissingArguments::create(ConstraintSystem &cs, FunctionType *funcType,
+                            llvm::ArrayRef<Param> synthesizedArgs,
+                            ConstraintLocator *locator) {
+  unsigned size = totalSizeToAlloc<Param>(synthesizedArgs.size());
+  void *mem = cs.getAllocator().Allocate(size, alignof(AddMissingArguments));
+  return new (mem) AddMissingArguments(cs, funcType, synthesizedArgs, locator);
+}
+
+bool MoveOutOfOrderArgument::diagnose(Expr *root, bool asNote) const {
+  OutOfOrderArgumentFailure failure(root, getConstraintSystem(), ArgIdx,
+                                    PrevArgIdx, Bindings, getLocator());
+  return failure.diagnose(asNote);
+}
+
+MoveOutOfOrderArgument *MoveOutOfOrderArgument::create(
+    ConstraintSystem &cs, unsigned argIdx, unsigned prevArgIdx,
+    ArrayRef<ParamBinding> bindings, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      MoveOutOfOrderArgument(cs, argIdx, prevArgIdx, bindings, locator);
+}
+
+bool AllowInaccessibleMember::diagnose(Expr *root, bool asNote) const {
+  InaccessibleMemberFailure failure(root, getConstraintSystem(), Member,
+                                    getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowInaccessibleMember *
+AllowInaccessibleMember::create(ConstraintSystem &cs, ValueDecl *member,
+                                ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowInaccessibleMember(cs, member, locator);
+}
+
+bool AllowAnyObjectKeyPathRoot::diagnose(Expr *root, bool asNote) const {
+  AnyObjectKeyPathRootFailure failure(root, getConstraintSystem(),
+                                      getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowAnyObjectKeyPathRoot *
+AllowAnyObjectKeyPathRoot::create(ConstraintSystem &cs,
+                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowAnyObjectKeyPathRoot(cs, locator);
+}
+
+bool TreatKeyPathSubscriptIndexAsHashable::diagnose(Expr *root,
+                                                    bool asNote) const {
+  KeyPathSubscriptIndexHashableFailure failure(root, getConstraintSystem(),
+                                               NonConformingType, getLocator());
+  return failure.diagnose(asNote);
+}
+
+TreatKeyPathSubscriptIndexAsHashable *
+TreatKeyPathSubscriptIndexAsHashable::create(ConstraintSystem &cs, Type type,
+                                             ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      TreatKeyPathSubscriptIndexAsHashable(cs, type, locator);
+}
+
+bool AllowInvalidRefInKeyPath::diagnose(Expr *root, bool asNote) const {
+  switch (Kind) {
+  case RefKind::StaticMember: {
+    InvalidStaticMemberRefInKeyPath failure(root, getConstraintSystem(), Member,
+                                            getLocator());
+    return failure.diagnose(asNote);
+  }
+
+  case RefKind::MutatingGetter: {
+    InvalidMemberWithMutatingGetterInKeyPath failure(
+        root, getConstraintSystem(), Member, getLocator());
+    return failure.diagnose(asNote);
+  }
+
+  case RefKind::Method: {
+    InvalidMethodRefInKeyPath failure(root, getConstraintSystem(), Member,
+                                      getLocator());
+    return failure.diagnose(asNote);
+  }
+  }
+}
+
+AllowInvalidRefInKeyPath *
+AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, ValueDecl *member,
+                                 ConstraintLocator *locator) {
+  // Referencing (instance or static) methods in key path is
+  // not currently allowed.
+  if (isa<FuncDecl>(member))
+    return AllowInvalidRefInKeyPath::create(cs, RefKind::Method, member,
+                                            locator);
+
+  // Referencing static members in key path is not currently allowed.
+  if (member->isStatic())
+    return AllowInvalidRefInKeyPath::create(cs, RefKind::StaticMember, member,
+                                            locator);
+
+  if (auto *storage = dyn_cast<AbstractStorageDecl>(member)) {
+    // Referencing members with mutating getters in key path is not
+    // currently allowed.
+    if (storage->isGetterMutating())
+      return AllowInvalidRefInKeyPath::create(cs, RefKind::MutatingGetter,
+                                              member, locator);
+  }
+
+  return nullptr;
+}
+
+AllowInvalidRefInKeyPath *
+AllowInvalidRefInKeyPath::create(ConstraintSystem &cs, RefKind kind,
+                                 ValueDecl *member,
+                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInvalidRefInKeyPath(cs, kind, member, locator);
+}
+
+KeyPathContextualMismatch *
+KeyPathContextualMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      KeyPathContextualMismatch(cs, lhs, rhs, locator);
 }

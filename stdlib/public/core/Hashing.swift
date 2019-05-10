@@ -71,7 +71,10 @@ internal struct _UnmanagedAnyObjectArray {
 #if _runtime(_ObjC)
 /// An NSEnumerator implementation returning zero elements. This is useful when
 /// a concrete element type is not recoverable from the empty singleton.
-final internal class _SwiftEmptyNSEnumerator
+// NOTE: older runtimes called this class _SwiftEmptyNSEnumerator. The two
+// must coexist without conflicting ObjC class names, so it was
+// renamed. The old name must not be used in the new runtime.
+final internal class __SwiftEmptyNSEnumerator
   : __SwiftNativeNSEnumerator, _NSEnumerator {
   internal override required init() {}
 
@@ -107,8 +110,11 @@ final internal class _SwiftEmptyNSEnumerator
 ///
 /// Using a dedicated class for this rather than a _BridgingBuffer makes it easy
 /// to recognize these in heap dumps etc.
-internal final class _BridgingHashBuffer
-  : ManagedBuffer<_BridgingHashBuffer.Header, AnyObject> {
+// NOTE: older runtimes called this class _BridgingHashBuffer.
+// The two must coexist without a conflicting ObjC class name, so it
+// was renamed. The old name must not be used in the new runtime.
+internal final class __BridgingHashBuffer
+  : ManagedBuffer<__BridgingHashBuffer.Header, AnyObject> {
   struct Header {
     internal var owner: AnyObject
     internal var hashTable: _HashTable
@@ -122,11 +128,11 @@ internal final class _BridgingHashBuffer
   internal static func allocate(
     owner: AnyObject,
     hashTable: _HashTable
-  ) -> _BridgingHashBuffer {
+  ) -> __BridgingHashBuffer {
     let buffer = self.create(minimumCapacity: hashTable.bucketCount) { _ in
       Header(owner: owner, hashTable: hashTable)
     }
-    return unsafeDowncast(buffer, to: _BridgingHashBuffer.self)
+    return unsafeDowncast(buffer, to: __BridgingHashBuffer.self)
   }
 
   deinit {

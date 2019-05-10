@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -mem2reg | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -mem2reg | %FileCheck %s
 
 import Builtin
 import Swift
@@ -449,3 +449,19 @@ bb0:
   return %16 : $((), ())
 }
 
+// CHECK-LABEL: sil @unchecked_ref_cast
+// CHECK-NOT: alloc_stack
+// CHECK: [[CAST:%.*]] = unchecked_bitwise_cast %0 : $Optional<Klass> to $Klass
+// CHECK: release_value [[CAST]]
+// CHECK: return
+sil @unchecked_ref_cast : $@convention(thin) (@owned Optional<Klass>) -> () {
+bb0(%0 : $Optional<Klass>):
+  %1 = alloc_stack $Optional<Klass>
+  store %0 to %1 : $*Optional<Klass>
+  %2 = unchecked_addr_cast %1 : $*Optional<Klass> to $*Klass
+  %3 = load %2 : $*Klass
+  release_value %3 : $Klass
+  dealloc_stack %1 : $*Optional<Klass>
+  %4 = tuple()
+  return %4 : $()
+}

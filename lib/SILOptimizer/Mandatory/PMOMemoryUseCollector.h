@@ -70,24 +70,15 @@ class SILBuilder;
 /// not super.init() has been called or not.
 class PMOMemoryObjectInfo {
 public:
-  /// This is the instruction that represents the memory.  It is either an
-  /// allocation (alloc_box, alloc_stack) or a mark_uninitialized.
-  SingleValueInstruction *MemoryInst;
+  /// This is the instruction that represents the memory. It is either an
+  /// alloc_box or alloc_stack.
+  AllocationInst *MemoryInst;
 
   /// This is the base type of the memory allocation.
   SILType MemorySILType;
 
-  /// True if the memory object being analyzed represents a 'let', which is
-  /// initialize-only (reassignments are not allowed).
-  bool IsLet = false;
-
-  /// This is the count of elements being analyzed.  For memory objects that are
-  /// tuples, this is the flattened element count.  For 'self' members in init
-  /// methods, this is the local field count (+1 for derive classes).
-  unsigned NumElements;
-
 public:
-  PMOMemoryObjectInfo(SingleValueInstruction *MemoryInst);
+  PMOMemoryObjectInfo(AllocationInst *MemoryInst);
 
   SILLocation getLoc() const { return MemoryInst->getLoc(); }
   SILFunction &getFunction() const { return *MemoryInst->getFunction(); }
@@ -107,24 +98,6 @@ public:
   AllocBoxInst *getContainer() const {
     return dyn_cast<AllocBoxInst>(MemoryInst);
   }
-
-  /// getNumMemoryElements - Return the number of elements, without the extra
-  /// "super.init" tracker in initializers of derived classes.
-  unsigned getNumMemoryElements() const {
-    return NumElements - unsigned(false);
-  }
-
-  /// getElementType - Return the swift type of the specified element.
-  SILType getElementType(unsigned EltNo) const;
-
-  /// Push the symbolic path name to the specified element number onto the
-  /// specified std::string.  If the actual decl (or a subelement thereof) can
-  /// be determined, return it.  Otherwise, return null.
-  ValueDecl *getPathStringToElement(unsigned Element,
-                                    std::string &Result) const;
-
-  /// If the specified value is a 'let' property in an initializer, return true.
-  bool isElementLetProperty(unsigned Element) const;
 };
 
 enum PMOUseKind {
@@ -143,9 +116,6 @@ enum PMOUseKind {
   /// value.
   Assign,
 
-  /// The instruction is a store to a member of a larger struct value.
-  PartialStore,
-
   /// An indirect 'inout' parameter of an Apply instruction.
   InOutUse,
 
@@ -155,13 +125,6 @@ enum PMOUseKind {
   /// This instruction is a general escape of the value, e.g. a call to a
   /// closure that captures it.
   Escape,
-
-  /// This instruction is a call to 'super.init' in a 'self' initializer of a
-  /// derived class.
-  SuperInit,
-
-  /// This instruction is a call to 'self.init' in a delegating initializer.
-  SelfInit
 };
 
 /// This struct represents a single classified access to the memory object
@@ -173,36 +136,13 @@ struct PMOMemoryUse {
   /// This is what kind of access it is, load, store, escape, etc.
   PMOUseKind Kind;
 
-  /// For memory objects of (potentially recursive) tuple type, this keeps
-  /// track of which tuple elements are affected.
-  unsigned short FirstElement, NumElements;
-
-  PMOMemoryUse(SILInstruction *Inst, PMOUseKind Kind, unsigned FE, unsigned NE)
-      : Inst(Inst), Kind(Kind), FirstElement(FE), NumElements(NE) {
-    assert(FE == FirstElement && NumElements == NE &&
-           "more than 64K elements not supported yet");
-  }
+  PMOMemoryUse(SILInstruction *Inst, PMOUseKind Kind)
+      : Inst(Inst), Kind(Kind) {}
 
   PMOMemoryUse() : Inst(nullptr) {}
 
   bool isInvalid() const { return Inst == nullptr; }
   bool isValid() const { return Inst != nullptr; }
-
-  bool usesElement(unsigned i) const {
-    return i >= FirstElement &&
-           i < static_cast<unsigned>(FirstElement + NumElements);
-  }
-
-  /// onlyTouchesTrivialElements - Return true if all of the accessed elements
-  /// have trivial type.
-  bool onlyTouchesTrivialElements(const PMOMemoryObjectInfo &MemoryInfo) const;
-
-  /// getElementBitmask - Return a bitmask with the touched tuple elements
-  /// set.
-  APInt getElementBitmask(unsigned NumMemoryTupleElements) const {
-    return APInt::getBitsSet(NumMemoryTupleElements, FirstElement,
-                             FirstElement + NumElements);
-  }
 };
 
 /// collectPMOElementUsesFrom - Analyze all uses of the specified allocation

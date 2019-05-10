@@ -107,7 +107,7 @@ enum Voluntary<T> : Equatable {
     }
 
     switch foo {
-    case .Naught: // expected-error{{pattern cannot match values of type 'Foo'}}
+    case .Naught: // expected-error{{type 'Foo' has no member 'Naught'}}
       ()
     case .A, .B, .C:
       ()
@@ -152,7 +152,7 @@ case .Twain,
 var notAnEnum = 0
 
 switch notAnEnum {
-case .Foo: // expected-error{{pattern cannot match values of type 'Int'}}
+case .Foo: // expected-error{{type 'Int' has no member 'Foo'}}
   ()
 }
 

@@ -31,9 +31,26 @@ class Product(object):
         return cls.product_name()
 
     @classmethod
-    def get_build_directory_name(cls, host_target):
-        return "{}-{}".format(cls.product_name(),
-                              host_target.name)
+    def is_build_script_impl_product(cls):
+        """is_build_script_impl_product -> bool
+
+        Whether this product is produced by build-script-impl.
+        """
+        return True
+
+    def build(self, host_target):
+        """build() -> void
+
+        Perform the build, for a non-build-script-impl product.
+        """
+        raise NotImplementedError
+
+    def test(self, host_target):
+        """test() -> void
+
+        Run the tests, for a non-build-script-impl product.
+        """
+        raise NotImplementedError
 
     def __init__(self, args, toolchain, source_dir, build_dir):
         self.args = args

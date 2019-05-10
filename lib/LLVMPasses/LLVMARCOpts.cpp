@@ -413,7 +413,7 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB,
   BasicBlock::iterator BBI = Retain.getIterator(),
                        BBE = BB.getTerminator()->getIterator();
 
-  bool isObjCRetain = Retain.getCalledFunction()->getName() == "objc_retain";
+  bool isObjCRetain = Retain.getIntrinsicID() == llvm::Intrinsic::objc_retain;
 
   bool MadeProgress = false;
 
@@ -718,7 +718,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
       // it is perfectly fine to delete this instruction if all uses of the
       // instruction are also eliminable.
 
-      if (I->mayHaveSideEffects() || isa<TerminatorInst>(I))
+      if (I->mayHaveSideEffects() || I->isTerminator())
         return false;
       break;
 

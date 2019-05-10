@@ -1,4 +1,4 @@
-RUN: %utils/remote-run -n --remote-dir /xyz-REMOTE --output-prefix %t some_user@some_host:12345 cp %t/nested/input %t/nested/output 2>&1 >/dev/null | %FileCheck %s
+RUN: %remote-run -n --remote-dir /xyz-REMOTE --output-prefix %/t some_user@some_host:12345 cp %/t/nested/input %/t/nested/output 2>&1 >/dev/null | %FileCheck %s
 
 CHECK: /usr/bin/ssh -n -p 12345 some_user@some_host -- '/usr/bin/env' '/bin/mkdir' '-p' '{{.+}}-REMOTE/output/nested'
 CHECK-NEXT: /usr/bin/sftp

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil %s | %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop %s | %target-sil-opt -enable-objc-interop | %FileCheck %s
 sil_stage raw
 
 import Builtin

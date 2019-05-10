@@ -1,11 +1,6 @@
 set(swift_runtime_compile_flags ${SWIFT_RUNTIME_CORE_CXX_FLAGS})
 set(swift_runtime_linker_flags ${SWIFT_RUNTIME_CORE_LINK_FLAGS})
 
-if(SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT)
-  list(APPEND swift_runtime_compile_flags
-      "-DSWIFT_DARWIN_ENABLE_STABLE_ABI_BIT=1")
-endif()
-
 if(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
   list(APPEND swift_runtime_compile_flags
       "-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=1")
@@ -23,9 +18,6 @@ if(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   set(swift_runtime_leaks_sources Leaks.mm)
 endif()
 
-list(APPEND swift_runtime_compile_flags
-     "-D__SWIFT_CURRENT_DYLIB=swiftCore")
-
 set(swift_runtime_objc_sources
     ErrorObject.mm
     SwiftObject.mm
@@ -34,7 +26,6 @@ set(swift_runtime_objc_sources
     ObjCRuntimeGetImageNameFromClass.mm
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldRemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
-    "${SWIFT_SOURCE_DIR}/lib/Demangling/TypeDecoder.cpp"
     )
 
 set(swift_runtime_sources
@@ -42,6 +33,7 @@ set(swift_runtime_sources
     Array.cpp
     # SWIFT_ENABLE_TENSORFLOW
     AutoDiff.cpp
+    BackDeployment.cpp
     Casting.cpp
     CompatibilityOverride.cpp
     CygwinPort.cpp
@@ -125,9 +117,9 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
         "${LibraryLocation}/${CMAKE_STATIC_LIBRARY_PREFIX}swiftImageInspectionShared${CMAKE_STATIC_LIBRARY_SUFFIX}"
       DEPENDS
          ${FragileSupportLibrary})
-    swift_install_in_component(stdlib
-      FILES $<TARGET_FILE:${FragileSupportLibrary}>
-      DESTINATION "lib/swift_static/${lowercase_sdk}/${arch}")
+    swift_install_in_component(FILES $<TARGET_FILE:${FragileSupportLibrary}>
+                               DESTINATION "lib/swift_static/${lowercase_sdk}/${arch}"
+                               COMPONENT stdlib)
   endforeach()
 
   set(FragileSupportLibraryPrimary swiftImageInspectionShared-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${SWIFT_PRIMARY_VARIANT_ARCH})
@@ -139,9 +131,9 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
       "${LibraryLocationPrimary}/${CMAKE_STATIC_LIBRARY_PREFIX}swiftImageInspectionShared${CMAKE_STATIC_LIBRARY_SUFFIX}"
       DEPENDS
          ${FragileSupportLibraryPrimary})
-    swift_install_in_component(stdlib
-      FILES $<TARGET_FILE:${FragileSupportLibraryPrimary}>
-      DESTINATION "lib/swift_static/${lowercase_sdk}")
+    swift_install_in_component(FILES $<TARGET_FILE:${FragileSupportLibraryPrimary}>
+                               DESTINATION "lib/swift_static/${lowercase_sdk}"
+                               COMPONENT stdlib)
 
   # Generate the static-executable-args.lnk file used for ELF systems (eg linux)
   set(linkfile "${lowercase_sdk}/static-executable-args.lnk")
@@ -156,9 +148,9 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
       "${SWIFT_SOURCE_DIR}/utils/static-executable-args.lnk")
 
   list(APPEND static_binary_lnk_file_list ${swift_static_binary_${sdk}_args})
-  swift_install_in_component(stdlib
-    FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
-    DESTINATION "lib/swift_static/${lowercase_sdk}")
+  swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
+                             DESTINATION "lib/swift_static/${lowercase_sdk}"
+                             COMPONENT stdlib)
   add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
   foreach(arch IN LISTS SWIFT_SDK_LINUX_ARCHITECTURES)
     add_dependencies(static_binary_magic ${swift_image_inspection_${arch}_static})
@@ -218,8 +210,15 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
       # to a version which supports it.
       # set(swiftrtObject "$<TARGET_OBJECTS:swiftImageRegistrationObject${SWIFT_SDK_${sdk}_OBJECT_FORMAT}-${arch_suffix}>")
       set(swiftrtObject ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/swiftImageRegistrationObject${SWIFT_SDK_${sdk}_OBJECT_FORMAT}-${arch_suffix}.dir/SwiftRT-${SWIFT_SDK_${sdk}_OBJECT_FORMAT}.cpp${CMAKE_C_OUTPUT_EXTENSION})
-      set(shared_runtime_registrar "${SWIFTLIB_DIR}/${arch_subdir}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
-      set(static_runtime_registrar "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
+
+      if(sdk STREQUAL WINDOWS)
+        set(extension .obj)
+      else()
+        set(extension .o)
+      endif()
+
+      set(shared_runtime_registrar "${SWIFTLIB_DIR}/${arch_subdir}/swiftrt${extension}")
+      set(static_runtime_registrar "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swiftrt${extension}")
 
       add_custom_command_target(swiftImageRegistration-${arch_suffix}
                                 COMMAND
@@ -232,18 +231,20 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
                                 DEPENDS
                                   "${swiftrtObject}")
       if(SWIFT_BUILD_DYNAMIC_STDLIB)
-        swift_install_in_component(stdlib
-                                   FILES
+        swift_install_in_component(FILES
                                      "${shared_runtime_registrar}"
                                    DESTINATION
-                                     "lib/swift/${arch_subdir}")
+                                     "lib/swift/${arch_subdir}"
+                                   COMPONENT
+                                     stdlib)
       endif()
       if(SWIFT_BUILD_STATIC_STDLIB)
-        swift_install_in_component(stdlib
-                                   FILES
+        swift_install_in_component(FILES
                                      "${static_runtime_registrar}"
                                    DESTINATION
-                                     "lib/swift_static/${arch_subdir}")
+                                     "lib/swift_static/${arch_subdir}"
+                                   COMPONENT
+                                     stdlib)
       endif()
 
       add_dependencies(swift-stdlib-${arch_suffix} ${swiftImageRegistration-${arch_suffix}})

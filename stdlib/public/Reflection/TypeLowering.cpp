@@ -1076,10 +1076,12 @@ public:
         // Dynamic multi-payload enums use the tag representations not assigned
         // to cases for extra inhabitants.
         if (tagCounts.numTagBytes >= 32) {
-          NumExtraInhabitants = INT_MAX;
+          NumExtraInhabitants = ValueWitnessFlags::MaxNumExtraInhabitants;
         } else {
           NumExtraInhabitants =
             (1 << (tagCounts.numTagBytes * 8)) - tagCounts.numTags;
+          NumExtraInhabitants = std::min(NumExtraInhabitants,
+                           unsigned(ValueWitnessFlags::MaxNumExtraInhabitants));
         }
       }
     }

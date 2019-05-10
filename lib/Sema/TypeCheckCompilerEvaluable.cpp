@@ -108,7 +108,6 @@ public:
     ALWAYS_ALLOWED(DotSyntaxCall)
     ALWAYS_ALLOWED(ConstructorRefCall)
     ALWAYS_ALLOWED(Load)
-    ALWAYS_ALLOWED(TupleShuffle)
     ALWAYS_ALLOWED(InjectIntoOptional)
     ALWAYS_ALLOWED(Coerce)
     ALWAYS_ALLOWED(If)

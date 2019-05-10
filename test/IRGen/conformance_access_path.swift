@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir > %t.ll
+// RUN: %target-swift-frontend -primary-file %s -emit-ir > %t.ll
 // RUN: %FileCheck %s < %t.ll
 
 

@@ -72,7 +72,7 @@ struct Delegate {
 }
 
 extension Array {
-  subscript(safe safe: Int) -> Element? { // expected-note {{found this candidate}}
+  subscript(safe safe: Int) -> Element? {
     get { }
     set { }
   }
@@ -84,6 +84,4 @@ struct ShellTask {
 
 let delegate = Delegate(shellTasks: [])
 _ = delegate.shellTasks[safe: 0]?.commandLine.compactMap({ $0.asString.hasPrefix("") ? $0 : nil }).count ?? 0
-// expected-error@-1 {{ambiguous reference to member 'subscript'}}
-
-// FIXME: Horrible diagnostic, but at least we no longer crash
+// expected-error@-1 {{value of type 'String' has no member 'asString'}}

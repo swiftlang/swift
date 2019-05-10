@@ -1,24 +1,35 @@
-set(swift_platform_name)
-set(swift_platform_flags)
 set(swift_platform_sources
     Platform.swift
-    TiocConstants.swift
+    TiocConstants.swift)
+set(swift_platform_gyb_sources
     tgmath.swift.gyb)
 
 add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
-    Darwin.swift.gyb
     ${swift_platform_sources}
     POSIXError.swift
     MachError.swift
 
+    "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
+
+    GYB_SOURCES
+      ${swift_platform_gyb_sources}
+      Darwin.swift.gyb
+
     SWIFT_COMPILE_FLAGS -Xfrontend -disable-objc-attr-requires-foundation-module "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS ALL_APPLE_PLATFORMS
-    API_NOTES_NON_OVERLAY)
+
+    # This is overly conservative, but we have so few API notes files that
+    # haven't migrated to the Swift repo that it's probably fine in practice.
+    DEPENDS copy_apinotes)
 
 add_swift_target_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
-    Glibc.swift.gyb
     ${swift_platform_sources}
+    POSIXError.swift
+
+    GYB_SOURCES
+      ${swift_platform_gyb_sources}
+      Glibc.swift.gyb
 
     SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
@@ -28,6 +39,10 @@ add_swift_target_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_O
 add_swift_target_library(swiftMSVCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     msvcrt.swift
     ${swift_platform_sources}
+    POSIXError.swift
+
+    GYB_SOURCES
+      ${swift_platform_gyb_sources}
 
     SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
@@ -114,10 +129,11 @@ foreach(sdk ${SWIFT_SDKS})
     #        It is not relocatable to the target platform itself.
     #        This affects any cross-comipled targets that use glibc.modulemap.
 
-    swift_install_in_component(sdk-overlay
-        FILES "${glibc_modulemap_out}"
-        DESTINATION "lib/swift/${arch_subdir}")
+    swift_install_in_component(FILES "${glibc_modulemap_out}"
+                               DESTINATION "lib/swift/${arch_subdir}"
+                               COMPONENT sdk-overlay)
 
   endforeach()
 endforeach()
 add_custom_target(glibc_modulemap DEPENDS ${glibc_modulemap_target_list})
+set_property(TARGET glibc_modulemap PROPERTY FOLDER "Miscellaneous")

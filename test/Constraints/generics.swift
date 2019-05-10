@@ -52,7 +52,7 @@ func generic_metatypes<T : SomeProtocol>(_ x: T)
 }
 
 // Inferring a variable's type from a call to a generic.
-struct Pair<T, U> { } // expected-note 4 {{'T' declared as parameter to type 'Pair'}} expected-note {{'U' declared as parameter to type 'Pair'}}
+struct Pair<T, U> { } // expected-note 3 {{'T' declared as parameter to type 'Pair'}} expected-note 2 {{'U' declared as parameter to type 'Pair'}}
 
 func pair<T, U>(_ x: T, _ y: U) -> Pair<T, U> { }
 
@@ -364,7 +364,7 @@ func testFixItCasting(x: Any) {
 
 func testFixItContextualKnowledge() {
   // FIXME: These could propagate backwards.
-  let _: Int = Pair().first // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<Any, Any>}}
+  let _: Int = Pair().first // expected-error {{generic parameter 'U' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<Any, Any>}}
   let _: Int = Pair().second // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<Any, Any>}}
 }
 
@@ -622,7 +622,7 @@ func rdar40537858() {
   let _: E = .bar([s]) // expected-error {{enum case 'bar' requires that 'S' conform to 'P'}}
 }
 
-// SR-8934
+// https://bugs.swift.org/browse/SR-8934
 struct BottleLayout {
     let count : Int
 }
@@ -631,3 +631,59 @@ let layout = BottleLayout(count:1)
 let ix = arr.firstIndex(of:layout) // expected-error {{argument type 'BottleLayout' does not conform to expected type 'Equatable'}}
 
 let _: () -> UInt8 = { .init("a" as Unicode.Scalar) } // expected-error {{initializer 'init(_:)' requires that 'Unicode.Scalar' conform to 'BinaryInteger'}}
+
+// https://bugs.swift.org/browse/SR-9068
+func compare<C: Collection, Key: Hashable, Value: Equatable>(c: C)
+  -> Bool where C.Element == (key: Key, value: Value)
+{
+  _ = Dictionary(uniqueKeysWithValues: Array(c))
+}
+
+// https://bugs.swift.org/browse/SR-7984
+struct SR_7984<Bar> {
+  func doSomething() {}
+}
+
+extension SR_7984 where Bar: String {} // expected-error {{type 'Bar' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{28-29= ==}}
+
+protocol SR_7984_Proto {
+  associatedtype Bar
+}
+
+extension SR_7984_Proto where Bar: String {} // expected-error {{type 'Self.Bar' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{34-35= ==}}
+
+protocol SR_7984_HasFoo {
+  associatedtype Foo
+}
+protocol SR_7984_HasAssoc {
+  associatedtype Assoc: SR_7984_HasFoo
+}
+
+struct SR_7984_X<T: SR_7984_HasAssoc> {}
+extension SR_7984_X where T.Assoc.Foo: String {} // expected-error {{type 'T.Assoc.Foo' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Assoc.Foo == String' to require 'T.Assoc.Foo' to be 'String'}} {{38-39= ==}}
+
+struct SR_7984_S<T: Sequence> where T.Element: String {} // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{46-47= ==}}
+func SR_7984_F<T: Sequence>(foo: T) where T.Element: String {} // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{52-53= ==}}
+
+protocol SR_7984_P {
+  func S<T : Sequence>(bar: T) where T.Element: String // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{47-48= ==}}
+}
+
+struct A<T: String> {} // expected-error {{type 'T' constrained to non-protocol, non-class type 'String'}}
+struct B<T> where T: String {} // expected-error {{type 'T' constrained to non-protocol, non-class type 'String'}}
+protocol C {
+  associatedtype Foo: String // expected-error {{type 'Self.Foo' constrained to non-protocol, non-class type 'String'}}
+}
+protocol D {
+  associatedtype Foo where Foo: String // expected-error {{type 'Self.Foo' constrained to non-protocol, non-class type 'String'}}
+}
+
+func member_ref_with_explicit_init() {
+  struct S<T: P> { // expected-note {{where 'T' = 'Int'}}
+    init(_: T) {}
+    init(_: T, _ other: Int = 42) {}
+  }
+
+  _ = S.init(42)
+  // expected-error@-1 {{generic struct 'S' requires that 'Int' conform to 'P'}}
+}

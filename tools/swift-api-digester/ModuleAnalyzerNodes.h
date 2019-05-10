@@ -38,6 +38,7 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/DiagnosticsModuleDiffer.h"
 #include "swift/Basic/ColorUtils.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/LLVMInitialize.h"
@@ -195,6 +196,7 @@ public:
   bool shouldIgnore(Decl *D, const Decl* Parent = nullptr) const;
   ArrayRef<BreakingAttributeInfo> getBreakingAttributeInfo() const { return BreakingAttrs; }
   Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) const;
+
   template<class YAMLNodeTy, typename ...ArgTypes>
   void diagnose(YAMLNodeTy node, Diag<ArgTypes...> ID,
                 typename detail::PassArgument<ArgTypes>::type... args) {
@@ -298,6 +300,7 @@ class SDKNodeDecl: public SDKNode {
   bool IsOverriding;
   bool IsOpen;
   bool IsInternal;
+  bool IsABIPlaceholder;
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
   Optional<uint8_t> FixedBinaryOrder;
@@ -322,6 +325,7 @@ public:
   StringRef getFullyQualifiedName() const;
   bool isDeprecated() const { return IsDeprecated; };
   bool isProtocolRequirement() const { return IsProtocolReq; }
+  bool isNonOptionalProtocolRequirement() const;
   bool hasDeclAttribute(DeclAttrKind DAKind) const;
   bool isImplicit() const { return IsImplicit; };
   bool isStatic() const { return IsStatic; };
@@ -329,12 +333,26 @@ public:
   bool isOptional() const { return hasDeclAttribute(DeclAttrKind::DAK_Optional); }
   bool isOpen() const { return IsOpen; }
   bool isInternal() const { return IsInternal; }
+  bool isABIPlaceholder() const { return IsABIPlaceholder; }
   StringRef getGenericSignature() const { return GenericSig; }
   StringRef getScreenInfo() const;
   bool hasFixedBinaryOrder() const { return FixedBinaryOrder.hasValue(); }
   uint8_t getFixedBinaryOrder() const { return *FixedBinaryOrder; }
   virtual void jsonize(json::Output &Out) override;
   virtual void diagnose(SDKNode *Right) override;
+
+  // The first argument of the diag is always screening info.
+  template<typename ...ArgTypes>
+  void emitDiag(Diag<StringRef, ArgTypes...> ID,
+                typename detail::PassArgument<ArgTypes>::type... Args) const {
+    // Don't emit objc decls if we care about swift exclusively
+    if (Ctx.getOpts().SwiftOnly) {
+      if (isObjc())
+        return;
+    }
+    Ctx.getDiags().diagnose(SourceLoc(), ID, getScreenInfo(),
+                            std::move(Args)...);
+  }
 };
 
 class SDKNodeRoot: public SDKNode {
@@ -483,10 +501,13 @@ public:
 class SDKNodeConformance: public SDKNode {
   SDKNodeDeclType *TypeDecl;
   friend class SDKNodeDeclType;
+  bool IsABIPlaceholder;
 public:
   SDKNodeConformance(SDKNodeInitInfo Info);
   ArrayRef<SDKNode*> getTypeWitnesses() const { return Children; }
   SDKNodeDeclType *getNominalTypeDecl() const { return TypeDecl; }
+  bool isABIPlaceholder() const { return IsABIPlaceholder; }
+  void jsonize(json::Output &out) override;
   static bool classof(const SDKNode *N);
 };
 
@@ -549,6 +570,7 @@ public:
 
 class SDKNodeDeclAbstractFunc : public SDKNodeDecl {
   bool IsThrowing;
+  bool ReqNewWitnessTableEntry;
   Optional<uint8_t> SelfIndex;
 
 protected:
@@ -556,6 +578,7 @@ protected:
   virtual ~SDKNodeDeclAbstractFunc() = default;
 public:
   bool isThrowing() const { return IsThrowing; }
+  bool reqNewWitnessTableEntry() const { return ReqNewWitnessTableEntry; }
   uint8_t getSelfIndex() const { return SelfIndex.getValue(); }
   Optional<uint8_t> getSelfIndexOptional() const { return SelfIndex; }
   bool hasSelfIndex() const { return SelfIndex.hasValue(); }
@@ -647,6 +670,8 @@ public:
 
   void printTopLevelNames();
 
+  /// Adds all conformances from the provided NominalTypeDecl to the provided
+  /// SDK node for that type decl.
   void addConformancesToTypeDecl(SDKNodeDeclType *Root, NominalTypeDecl* NTD);
   void addMembersToRoot(SDKNode *Root, IterableDeclContext *Context);
 

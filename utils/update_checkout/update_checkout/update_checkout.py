@@ -223,20 +223,24 @@ def obtain_additional_swift_sources(pool_args):
         print("Cloning '" + repo_name + "'")
 
         if skip_history:
-            shell.run(['git', 'clone', '--recursive', '--depth', '1', 
-                       '--branch', repo_branch, remote, repo_name],
+            shell.run(['env', 'GIT_TERMINAL_PROMPT=0', 'git', 'clone',
+                       '--recursive', '--depth', '1', '--branch',
+                       repo_branch, remote, repo_name],
                       echo=True)
         else:
-            shell.run(['git', 'clone', '--recursive', remote,
-                       repo_name], echo=True)
+            shell.run(['env', 'GIT_TERMINAL_PROMPT=0', 'git', 'clone',
+                       '--recursive', remote, repo_name],
+                      echo=True)
         if scheme_name:
             src_path = os.path.join(SWIFT_SOURCE_ROOT, repo_name, ".git")
-            shell.run(['git', '--git-dir', src_path, '--work-tree',
+            shell.run(['env', 'GIT_TERMINAL_PROMPT=0', 'git', '--git-dir',
+                       src_path, '--work-tree',
                        os.path.join(SWIFT_SOURCE_ROOT, repo_name),
                        'checkout', repo_branch], echo=False)
     with shell.pushd(os.path.join(SWIFT_SOURCE_ROOT, repo_name),
                      dry_run=False, echo=False):
-        shell.run(["git", "submodule", "update", "--recursive"],
+        shell.run(['env', 'GIT_TERMINAL_PROMPT=0', "git", "submodule",
+                   "update", "--recursive"],
                   echo=False)
 
 
@@ -536,7 +540,7 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
 
     # Quick check whether somebody is calling update in an empty directory
     directory_contents = os.listdir(SWIFT_SOURCE_ROOT)
-    if not ('cmark' in directory_contents or 
+    if not ('cmark' in directory_contents or
             'llvm' in directory_contents or
             'clang' in directory_contents):
         print("You don't have all swift sources. "

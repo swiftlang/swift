@@ -68,6 +68,27 @@ public:
   }
 };
 
+/// A base conformance of a protocol.
+class BaseConformance {
+  ProtocolDecl *Source;
+  ProtocolDecl *Requirement;
+
+public:
+  explicit BaseConformance(ProtocolDecl *source,
+                                 ProtocolDecl *requirement)
+      : Source(source), Requirement(requirement) {
+    assert(source && requirement);
+  }
+
+  ProtocolDecl *getSourceProtocol() const {
+    return Source;
+  }
+
+  ProtocolDecl *getBaseRequirement() const {
+    return Requirement;
+  }
+};
+
 /// A conformance associated with a protocol.
 class AssociatedConformance {
   ProtocolDecl *Source;

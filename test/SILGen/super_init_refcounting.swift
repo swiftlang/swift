@@ -7,7 +7,7 @@ class Foo {
 }
 
 class Bar: Foo {
-  // CHECK-LABEL: sil hidden @$s22super_init_refcounting3BarC{{[_0-9a-zA-Z]*}}fc
+  // CHECK-LABEL: sil hidden [ossa] @$s22super_init_refcounting3BarC{{[_0-9a-zA-Z]*}}fc
   // CHECK: bb0([[INPUT_SELF:%.*]] : @owned $Bar):
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box ${ var Bar }
   // CHECK:         [[MARKED_SELF_BOX:%.*]] =  mark_uninitialized [derivedself] [[SELF_BOX]]
@@ -27,7 +27,7 @@ class Bar: Foo {
 }
 
 extension Foo {
-  // CHECK-LABEL: sil hidden @$s22super_init_refcounting3FooC{{[_0-9a-zA-Z]*}}fC
+  // CHECK-LABEL: sil hidden [ossa] @$s22super_init_refcounting3FooC{{[_0-9a-zA-Z]*}}fC
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box ${ var Foo }
   // CHECK:         [[MARKED_SELF_BOX:%.*]] =  mark_uninitialized [delegatingself] [[SELF_BOX]]
   // CHECK:         [[PB_SELF_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
@@ -41,7 +41,7 @@ extension Foo {
 
 class Zim: Foo {
   var foo = Foo()
-  // CHECK-LABEL: sil hidden @$s22super_init_refcounting3ZimC{{[_0-9a-zA-Z]*}}fc
+  // CHECK-LABEL: sil hidden [ossa] @$s22super_init_refcounting3ZimC{{[_0-9a-zA-Z]*}}fc
   // CHECK-NOT:     copy_value
   // CHECK-NOT:     destroy_value
   // CHECK:         function_ref @$s22super_init_refcounting3FooCACycfc : $@convention(method) (@owned Foo) -> @owned Foo
@@ -54,7 +54,7 @@ class Zang: Foo {
     foo = Foo()
     super.init()
   }
-  // CHECK-LABEL: sil hidden @$s22super_init_refcounting4ZangC{{[_0-9a-zA-Z]*}}fc
+  // CHECK-LABEL: sil hidden [ossa] @$s22super_init_refcounting4ZangC{{[_0-9a-zA-Z]*}}fc
   // CHECK-NOT:     copy_value
   // CHECK-NOT:     destroy_value
   // CHECK:         function_ref @$s22super_init_refcounting3FooCACycfc : $@convention(method) (@owned Foo) -> @owned Foo
@@ -71,7 +71,7 @@ class Bad: Foo {
 class Good: Foo {
   let x: Int
 
-  // CHECK-LABEL: sil hidden @$s22super_init_refcounting4GoodC{{[_0-9a-zA-Z]*}}fc
+  // CHECK-LABEL: sil hidden [ossa] @$s22super_init_refcounting4GoodC{{[_0-9a-zA-Z]*}}fc
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box ${ var Good }
   // CHECK:         [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [derivedself] [[SELF_BOX]]
   // CHECK:         [[PB_SELF_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]

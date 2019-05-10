@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief API Symbol
+/// API Symbol
 ///
 //===----------------------------------------------------------------------===//
 
@@ -65,7 +65,7 @@ public:
 
   void print(raw_ostream &os) const;
 
-  /// \brief Print APISymbol in human readable format.
+  /// Print APISymbol in human readable format.
   void dump(raw_ostream &os) const;
   void dump() const { dump(llvm::errs()); }
 

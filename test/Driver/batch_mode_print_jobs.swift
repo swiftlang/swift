@@ -15,5 +15,5 @@
 // RUN: %FileCheck %s -allow-empty -check-prefix=NEGATIVE-CHECK-COMBINED <%t/stderr1
 // RUN: %FileCheck %s -allow-empty -check-prefix=NEGATIVE-CHECK-COMBINED <%t/stderr2
 //
-// CHECK-COMBINED: -primary-file {{.*}}/file-01.swift -primary-file {{.*}}/file-02.swift {{.*}}/file-03.swift {{.*}}/main.swift
-// NEGATIVE-CHECK-COMBINED-NOT: -primary-file {{.*}}/file-01.swift -primary-file {{.*}}/file-02.swift {{.*}}/file-03.swift {{.*}}/main.swift
+// CHECK-COMBINED: -primary-file {{.*(/|\\)}}file-01.swift{{"?}} -primary-file {{.*(/|\\)}}file-02.swift{{"?}} {{.*(/|\\)}}file-03.swift{{"?}} {{.*(/|\\)}}main.swift{{"?}}
+// NEGATIVE-CHECK-COMBINED-NOT: -primary-file {{.*(/|\\)}}file-01.swift{{"?}} -primary-file {{.*(/|\\)}}file-02.swift{{"?}} {{.*(/|\\)}}file-03.swift{{"?}} {{.*(/|\\)}}main.swift{{"?}}

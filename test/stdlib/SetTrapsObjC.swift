@@ -8,6 +8,7 @@
 // RUN: %target-run %t/a.out_Release
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: rdar49026133
 
 import StdlibUnittest
 import Foundation
@@ -18,8 +19,8 @@ struct NotBridgedKeyTy : Equatable, Hashable {
   init(_ value: Int) {
     self.value = value
   }
-  var hashValue: Int {
-    return value
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
   }
   var value: Int
 }
@@ -38,8 +39,8 @@ class BridgedVerbatimRefTy : Equatable, Hashable {
   init(_ value: Int) {
     self.value = value
   }
-  var hashValue: Int {
-    return value
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
   }
   var value: Int
 }
@@ -83,7 +84,9 @@ class TestObjCKeyTy : NSObject {
 struct TestBridgedKeyTy : Hashable, _ObjectiveCBridgeable {
   init(_ value: Int) { self.value = value }
 
-  var hashValue: Int { return value }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+  }
 
   func _bridgeToObjectiveC() -> TestObjCKeyTy {
     return TestObjCKeyTy(value)

@@ -15,6 +15,9 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// Requires explicit swift-version 4.
+// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
+
 import StdlibUnittest
 import Foundation
 
@@ -22,7 +25,7 @@ var DeprecatedObjCInferenceTestSuite = TestSuite("DeprecatedObjCInferenceTestSui
 
 class MyClass : NSObject {
   // The line numbers of the next two methods are mentioned in the CHECK lines
-  // below. Please keep them as 26 and 27.
+  // below. Please keep them as 29 and 30.
   func foo() { }
   class func bar() { }
 }
@@ -42,15 +45,15 @@ DeprecatedObjCInferenceTestSuite.test("messagingObjCInference") {
 	// CHECK_CRASH: ---Begin 
 	fputs("---Begin\n", stderr)
 
-	// CHECK_WARNINGS: .swift:26:3: implicit Objective-C entrypoint -[a.MyClass foo]
-	// CHECK_CRASH: .swift:26:3: implicit Objective-C entrypoint -[a.MyClass foo]
+	// CHECK_WARNINGS: .swift:29:3: implicit Objective-C entrypoint -[a.MyClass foo]
+	// CHECK_CRASH: .swift:29:3: implicit Objective-C entrypoint -[a.MyClass foo]
 	x.perform(Selector(fooSel))
-	// CHECK_WARNINGS-NOT: .swift:26:3: implicit Objective-C entrypoint -[a.MyClass foo]
+	// CHECK_WARNINGS-NOT: .swift:29:3: implicit Objective-C entrypoint -[a.MyClass foo]
 	x.perform(Selector(fooSel))
 
-	// CHECK_WARNINGS: .swift:27:3: implicit Objective-C entrypoint +[a.MyClass bar]
+	// CHECK_WARNINGS: .swift:30:3: implicit Objective-C entrypoint +[a.MyClass bar]
 	type(of: x).perform(Selector(barSel))
-	// CHECK_WARNINGS-NOT: .swift:27:3: implicit Objective-C entrypoint +[a.MyClass bar]
+	// CHECK_WARNINGS-NOT: .swift:30:3: implicit Objective-C entrypoint +[a.MyClass bar]
 	type(of: x).perform(Selector(barSel))
 
 	// CHECK_NOTHING-NEXT: ---End 

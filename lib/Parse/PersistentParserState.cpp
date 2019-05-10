@@ -83,6 +83,7 @@ void PersistentParserState::delayDeclList(IterableDeclContext* D,
 
 void PersistentParserState::parseAllDelayedDeclLists() {
   std::vector<IterableDeclContext*> AllDelayed;
+  AllDelayed.reserve(DelayedDeclListStates.size());
   for (auto &P: DelayedDeclListStates) {
     AllDelayed.push_back(P.first);
   }

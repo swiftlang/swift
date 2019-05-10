@@ -419,6 +419,18 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::OCLClkEvent:
     case clang::BuiltinType::OCLQueue:
     case clang::BuiltinType::OCLReserveID:
+    case clang::BuiltinType::OCLIntelSubgroupAVCMcePayload:
+    case clang::BuiltinType::OCLIntelSubgroupAVCImePayload:
+    case clang::BuiltinType::OCLIntelSubgroupAVCRefPayload:
+    case clang::BuiltinType::OCLIntelSubgroupAVCSicPayload:
+    case clang::BuiltinType::OCLIntelSubgroupAVCMceResult:
+    case clang::BuiltinType::OCLIntelSubgroupAVCImeResult:
+    case clang::BuiltinType::OCLIntelSubgroupAVCRefResult:
+    case clang::BuiltinType::OCLIntelSubgroupAVCSicResult:
+    case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleRefStreamout:
+    case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualRefStreamout:
+    case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleRefStreamin:
+    case clang::BuiltinType::OCLIntelSubgroupAVCImeDualRefStreamin:
       return OmissionTypeName();
 
     // OpenMP types that don't have Swift equivalents.
@@ -706,19 +718,17 @@ bool importer::isUnavailableInSwift(
     if (attr->getPlatform()->getName() == "swift")
       return true;
 
-    if (platformAvailability.filter &&
-        !platformAvailability.filter(attr->getPlatform()->getName())) {
+    if (!platformAvailability.isPlatformRelevant(
+            attr->getPlatform()->getName())) {
       continue;
     }
 
-    if (platformAvailability.deprecatedAsUnavailableFilter) {
-      llvm::VersionTuple version = attr->getDeprecated();
-      if (version.empty())
-        continue;
-      if (platformAvailability.deprecatedAsUnavailableFilter(
-            version.getMajor(), version.getMinor())) {
-        return true;
-      }
+
+    llvm::VersionTuple version = attr->getDeprecated();
+    if (version.empty())
+      continue;
+    if (platformAvailability.treatDeprecatedAsUnavailable(decl, version)) {
+      return true;
     }
   }
 

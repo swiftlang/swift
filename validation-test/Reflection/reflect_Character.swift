@@ -34,12 +34,10 @@ reflect(object: obj)
 // CHECK-64-NEXT:           (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
 // CHECK-64-NEXT:             (field name=_object offset=0
 // CHECK-64-NEXT:               (struct size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647 bitwise_takable=1
-// CHECK-64-NEXT:                 (field name=_countAndFlags offset=0
+// CHECK-64-NEXT:                 (field name=_countAndFlagsBits offset=0
 // CHECK-64-NEXT:                   (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64-NEXT:                     (field name=_storage offset=0
-// CHECK-64-NEXT:                       (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
-// CHECK-64-NEXT:                         (field name=_value offset=0
-// CHECK-64-NEXT:                           (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))))
+// CHECK-64-NEXT:                     (field name=_value offset=0
+// CHECK-64-NEXT:                       (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK-64-NEXT:                 (field name=_object offset=8
 // CHECK-64-NEXT:                   (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647 bitwise_takable=1)))))))))))
 

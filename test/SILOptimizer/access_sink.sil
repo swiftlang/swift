@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -access-enforcement-release -assume-parsing-unqualified-ownership-sil %s -enable-sil-verify-all | %FileCheck %s
+// RUN: %target-sil-opt -access-enforcement-release %s -enable-sil-verify-all | %FileCheck %s
 //
 // Test the AccessEnforcementReleaseSinking pass in isolation.
 // This ensures that no upstream passes have removed SIL-level access markers

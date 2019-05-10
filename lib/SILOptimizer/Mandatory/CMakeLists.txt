@@ -6,9 +6,10 @@ silopt_register_sources(
   DefiniteInitialization.cpp
   # SWIFT_ENABLE_TENSORFLOW
   Differentiation.cpp
-  DIMemoryUseCollectorOwnership.cpp
+  DIMemoryUseCollector.cpp
   DataflowDiagnostics.cpp
   DiagnoseInfiniteRecursion.cpp
+  DiagnoseInvalidEscapingCaptures.cpp
   DiagnoseStaticExclusivity.cpp
   DiagnoseUnreachable.cpp
   GuaranteedARCOpts.cpp
@@ -19,5 +20,5 @@ silopt_register_sources(
   SemanticARCOpts.cpp
   ClosureLifetimeFixup.cpp
   RawSILInstLowering.cpp
-  MandatoryOptUtils.cpp
+  YieldOnceCheck.cpp
 )

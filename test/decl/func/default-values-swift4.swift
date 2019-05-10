@@ -8,18 +8,18 @@ fileprivate func fileprivateFunction() {}
 func internalFunction() {}
 // expected-note@-1 2{{global function 'internalFunction()' is not public}}
 @usableFromInline func versionedFunction() {}
-// expected-note@-1 5{{global function 'versionedFunction()' is not public}}
+// expected-note@-1 4{{global function 'versionedFunction()' is not public}}
 public func publicFunction() {}
 
 func internalIntFunction() -> Int {}
 // expected-note@-1 {{global function 'internalIntFunction()' is not public}}
 
 private func privateFunction2() {}
-// expected-note@-1 2{{global function 'privateFunction2()' is not '@usableFromInline' or public}}
+// expected-note@-1 {{global function 'privateFunction2()' is not '@usableFromInline' or public}}
 fileprivate func fileprivateFunction2() {}
-// expected-note@-1 2{{global function 'fileprivateFunction2()' is not '@usableFromInline' or public}}
+// expected-note@-1 {{global function 'fileprivateFunction2()' is not '@usableFromInline' or public}}
 func internalFunction2() {}
-// expected-note@-1 2{{global function 'internalFunction2()' is not '@usableFromInline' or public}}
+// expected-note@-1 {{global function 'internalFunction2()' is not '@usableFromInline' or public}}
 
 func internalIntFunction2() -> Int {}
 // expected-note@-1 {{global function 'internalIntFunction2()' is not '@usableFromInline' or public}}
@@ -56,11 +56,11 @@ func internalFunctionWithDefaultValue(
       versionedFunction()
       // OK
       internalFunction2()
-      // expected-error@-1 2{{global function 'internalFunction2()' is internal and cannot be referenced from a default argument value}}
+      // expected-error@-1 {{global function 'internalFunction2()' is internal and cannot be referenced from a default argument value}}
       fileprivateFunction2()
-      // expected-error@-1 2{{global function 'fileprivateFunction2()' is fileprivate and cannot be referenced from a default argument value}}
+      // expected-error@-1 {{global function 'fileprivateFunction2()' is fileprivate and cannot be referenced from a default argument value}}
       privateFunction2()
-      // expected-error@-1 2{{global function 'privateFunction2()' is private and cannot be referenced from a default argument value}}
+      // expected-error@-1 {{global function 'privateFunction2()' is private and cannot be referenced from a default argument value}}
 
       return 0
     }(),
@@ -77,16 +77,16 @@ public func publicFunctionWithDefaultValue(
       publicFunction()
 
       versionedFunction()
-      // expected-error@-1 2{{global function 'versionedFunction()' is internal and cannot be referenced from a default argument value}}
+      // expected-error@-1 {{global function 'versionedFunction()' is internal and cannot be referenced from a default argument value}}
 
       internalFunction()
-      // expected-error@-1 2{{global function 'internalFunction()' is internal and cannot be referenced from a default argument value}}
+      // expected-error@-1 {{global function 'internalFunction()' is internal and cannot be referenced from a default argument value}}
 
       fileprivateFunction()
-      // expected-error@-1 2{{global function 'fileprivateFunction()' is fileprivate and cannot be referenced from a default argument value}}
+      // expected-error@-1 {{global function 'fileprivateFunction()' is fileprivate and cannot be referenced from a default argument value}}
 
       privateFunction()
-      // expected-error@-1 2{{global function 'privateFunction()' is private and cannot be referenced from a default argument value}}
+      // expected-error@-1 {{global function 'privateFunction()' is private and cannot be referenced from a default argument value}}
 
       return 0
     }(),
@@ -102,7 +102,7 @@ public func evilCode(
   x: Int = {
     let _ = publicFunction()
     let _ = versionedFunction()
-    // expected-error@-1 2{{global function 'versionedFunction()' is internal and cannot be referenced from a default argument value}}
+    // expected-error@-1 {{global function 'versionedFunction()' is internal and cannot be referenced from a default argument value}}
 
     func localFunction() {
       publicFunction()
@@ -111,3 +111,37 @@ public func evilCode(
     }
     return 0
   }()) {}
+
+private func privateIntFunction() -> Int {} // expected-note {{global function 'privateIntFunction()' is not public}}
+
+public struct HasSubscript {
+  public subscript(x: Int = {
+    struct Nested {}
+    // expected-error@-1 {{type 'Nested' cannot be nested inside a default argument value}}
+
+    publicFunction()
+
+    versionedFunction()
+    // expected-error@-1 {{global function 'versionedFunction()' is internal and cannot be referenced from a default argument value}}
+
+    internalFunction()
+    // expected-error@-1 {{global function 'internalFunction()' is internal and cannot be referenced from a default argument value}}
+
+    fileprivateFunction()
+    // expected-error@-1 {{global function 'fileprivateFunction()' is fileprivate and cannot be referenced from a default argument value}}
+
+    privateFunction()
+    // expected-error@-1 {{global function 'privateFunction()' is private and cannot be referenced from a default argument value}}
+
+    return 0
+  }()) -> Int {
+    get {}
+    set {}
+  }
+
+  public subscript(y y: Int = privateIntFunction()) -> Int {
+    // expected-error@-1 {{global function 'privateIntFunction()' is private and cannot be referenced from a default argument value}}
+    get {}
+    set {}
+  }
+}

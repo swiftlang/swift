@@ -4,23 +4,27 @@
 import StdlibUnittest
 
 
-#if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
-import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Windows)
-import Glibc
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
+#elseif os(Windows)
+  import MSVCRT
+#else
+#error("Unsupported platform")
 #endif
 
 func simple_getline() -> [UInt8]? {
   var result = [UInt8]()
   while true {
     let c = getchar()
-    result.append(UInt8(c))
     if c == EOF {
       if result.count == 0 {
         return nil
       }
       return result
     }
+    result.append(UInt8(c))
     if c == CInt(UnicodeScalar("\n").value) {
       return result
     }

@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -diagnostic-constant-propagation | %FileCheck %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -performance-constant-propagation | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnostic-constant-propagation | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-constant-propagation | %FileCheck %s
 
 import Swift
 import Builtin
@@ -47,6 +47,36 @@ bb0:
 // CHECK-NOT: integer_literal $Builtin.Int1, 0
 // CHECK-NOT: builtin
 // CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 62
+// CHECK-NEXT: return [[RES]] : $Builtin.Int64
+}
+
+sil @count_trailing_zeros_corner_case : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+ %zero64 = integer_literal $Builtin.Int64, 0
+ %zero1 = integer_literal $Builtin.Int1, 0
+ %cttz = builtin "int_cttz_Int64"(%zero64 : $Builtin.Int64, %zero1 : $Builtin.Int1) : $Builtin.Int64
+ return %cttz : $Builtin.Int64
+
+// CHECK-LABEL: sil @count_trailing_zeros_corner_case
+// CHECK-NOT: integer_literal $Builtin.Int64, 0
+// CHECK-NOT: integer_literal $Builtin.Int1, 0
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 64
+// CHECK-NEXT: return [[RES]] : $Builtin.Int64
+}
+
+sil @count_trailing_zeros : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+ %zero64 = integer_literal $Builtin.Int64, 2
+ %zero1 = integer_literal $Builtin.Int1, 0
+ %cttz = builtin "int_cttz_Int64"(%zero64 : $Builtin.Int64, %zero1 : $Builtin.Int1) : $Builtin.Int64
+ return %cttz : $Builtin.Int64
+
+// CHECK-LABEL: sil @count_trailing_zeros
+// CHECK-NOT: integer_literal $Builtin.Int64, 2
+// CHECK-NOT: integer_literal $Builtin.Int1, 0
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 1
 // CHECK-NEXT: return [[RES]] : $Builtin.Int64
 }
 

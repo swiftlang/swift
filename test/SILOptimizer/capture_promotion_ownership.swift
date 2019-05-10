@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -enable-sil-ownership -emit-sil -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-sil -o - | %FileCheck %s
 
 class Foo {
   func foo() -> Int {

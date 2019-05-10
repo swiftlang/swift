@@ -2,6 +2,8 @@
 ; RUN: llc -mtriple x86_64--windows-gnu -filetype obj -o - %s | %target-swift-autolink-extract -o - - | %FileCheck %s
 ; RUN: llc -mtriple x86_64--windows-cygnus -filetype obj -o - %s | %target-swift-autolink-extract -o - - | %FileCheck %s
 ; REQUIRES: autolink-extract
+; REQUIRES: CODEGENERATOR=ARM
+; REQUIRES: CODEGENERATOR=X86
 
 ; Ensure that the options in the object file preserve ordering.  The linker
 ; options are order dependent, and we would accidentally reorder them because we

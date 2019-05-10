@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief This file includes the appropriate platform-specific TaskQueue
+/// This file includes the appropriate platform-specific TaskQueue
 /// implementation (or the default serial fallback if one is not available),
 /// as well as any platform-agnostic TaskQueue functionality.
 ///

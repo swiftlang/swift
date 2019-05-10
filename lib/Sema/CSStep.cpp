@@ -430,7 +430,9 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
 bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   auto &ctx = CS.getASTContext();
 
-  if (choice.isDisabled()) {
+  bool attemptFixes = CS.shouldAttemptFixes();
+  // Enable "fixed" overload choices in "diagnostic" mode.
+  if (!(attemptFixes && choice.hasFix()) && choice.isDisabled()) {
     if (isDebugMode()) {
       auto &log = getDebugLogger();
       log << "(skipping ";
@@ -442,7 +444,7 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   }
 
   // Skip unavailable overloads unless solver is in the "diagnostic" mode.
-  if (!CS.shouldAttemptFixes() && choice.isUnavailable())
+  if (!attemptFixes && choice.isUnavailable())
     return true;
 
   if (ctx.LangOpts.DisableConstraintSolverPerformanceHacks)
@@ -490,6 +492,27 @@ bool DisjunctionStep::shouldStopAt(const DisjunctionChoice &choice) const {
           shortCircuitDisjunctionAt(choice, lastChoice));
 }
 
+bool swift::isSIMDOperator(ValueDecl *value) {
+  if (!value)
+    return false;
+
+  auto func = dyn_cast<FuncDecl>(value);
+  if (!func)
+    return false;
+
+  if (!func->isOperator())
+    return false;
+
+  auto nominal = func->getDeclContext()->getSelfNominalTypeDecl();
+  if (!nominal)
+    return false;
+
+  if (nominal->getName().empty())
+    return false;
+
+  return nominal->getName().str().startswith_lower("simd");
+}
+
 bool DisjunctionStep::shortCircuitDisjunctionAt(
     Constraint *currentChoice, Constraint *lastSuccessfulChoice) const {
   auto &ctx = CS.getASTContext();
@@ -534,6 +557,16 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
   // Implicit conversions are better than checked casts.
   if (currentChoice->getKind() == ConstraintKind::CheckedCast)
     return true;
+
+  // If we have a SIMD operator, and the prior choice was not a SIMD
+  // Operator, we're done.
+  if (currentChoice->getKind() == ConstraintKind::BindOverload &&
+      isSIMDOperator(currentChoice->getOverloadChoice().getDecl()) &&
+      lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload &&
+      !isSIMDOperator(lastSuccessfulChoice->getOverloadChoice().getDecl()) &&
+      !ctx.LangOpts.SolverEnableOperatorDesignatedTypes) {
+    return true;
+  }
 
   return false;
 }

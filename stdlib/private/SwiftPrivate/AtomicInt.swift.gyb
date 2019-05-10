@@ -12,6 +12,8 @@
 
 import Swift
 
+// This type intentionally shadows the stdlib one
+@available(swift, introduced: 5.0)
 public final class _stdlib_AtomicInt {
   internal var _value: Int
 
@@ -47,7 +49,7 @@ public final class _stdlib_AtomicInt {
 
   public func compareExchange(expected: inout Int, desired: Int) -> Bool {
     var expectedVar = expected
-    let result = _stdlib_atomicCompareExchangeStrongInt(
+    let result = _swift_stdlib_atomicCompareExchangeStrongInt(
       object: _valuePtr,
       expected: &expectedVar,
       desired: desired)
@@ -55,75 +57,4 @@ public final class _stdlib_AtomicInt {
     return result
   }
 }
-
-public func _swift_stdlib_atomicLoadInt(
-  object target: UnsafeMutablePointer<Int>) -> Int {
-#if arch(i386) || arch(arm)
-  let value = Builtin.atomicload_seqcst_Int32(target._rawValue)
-  return Int(value)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  let value = Builtin.atomicload_seqcst_Int64(target._rawValue)
-  return Int(value)
-#endif
-}
-
-public func _swift_stdlib_atomicStoreInt(
-  object target: UnsafeMutablePointer<Int>,
-  desired: Int) {
-#if arch(i386) || arch(arm)
-  Builtin.atomicstore_seqcst_Int32(target._rawValue, desired._value)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  Builtin.atomicstore_seqcst_Int64(target._rawValue, desired._value)
-#endif
-}
-
-public func _stdlib_atomicCompareExchangeStrongInt(
-  object target: UnsafeMutablePointer<Int>,
-  expected: UnsafeMutablePointer<Int>,
-  desired: Int) -> Bool {
-#if arch(i386) || arch(arm)
-  let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Int32(
-    target._rawValue, expected.pointee._value, desired._value)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Int64(
-    target._rawValue, expected.pointee._value, desired._value)
-#endif
-  expected.pointee._value = oldValue
-  return Bool(won)
-}
-
-% for operation in ['Add', 'And', 'Or', 'Xor']:
-// Warning: no overflow checking.
-public func _swift_stdlib_atomicFetch${operation}Int(
-  object target: UnsafeMutablePointer<Int>,
-  operand: Int) -> Int {
-  let rawTarget = UnsafeMutableRawPointer(target)
-#if arch(i386) || arch(arm)
-  let value = _swift_stdlib_atomicFetch${operation}Int32(
-    object: rawTarget.assumingMemoryBound(to: Int32.self),
-    operand: Int32(operand))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  let value = _swift_stdlib_atomicFetch${operation}Int64(
-    object: rawTarget.assumingMemoryBound(to: Int64.self),
-    operand: Int64(operand))
-#endif
-  return Int(value)
-}
-
-%   for bits in [ 32, 64 ]:
-
-// Warning: no overflow checking.
-public func _swift_stdlib_atomicFetch${operation}Int${bits}(
-  object target: UnsafeMutablePointer<Int${bits}>,
-  operand: Int${bits}) -> Int${bits} {
-
-  let value = Builtin.atomicrmw_${operation.lower()}_seqcst_Int${bits}(
-    target._rawValue, operand._value)
-
-  return Int${bits}(value)
-}
-
-%   end
-
-% end
 

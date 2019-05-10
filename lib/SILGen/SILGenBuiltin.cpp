@@ -12,6 +12,7 @@
 
 #include "SpecializedEmitter.h"
 
+#include "ArgumentSource.h"
 #include "Cleanup.h"
 #include "Initialization.h"
 #include "LValue.h"
@@ -30,57 +31,29 @@
 using namespace swift;
 using namespace Lowering;
 
-static bool isTrivialShuffle(TupleShuffleExpr *shuffle) {
-  // Each element must be mapped to the corresponding element of the input.
-  auto mapping = shuffle->getElementMapping();
-  for (auto index : indices(mapping)) {
-    if (mapping[index] < 0 || unsigned(mapping[index]) != index)
-      return false;
-  }
-  return true;
-}
-
 /// Break down an expression that's the formal argument expression to
 /// a builtin function, returning its individualized arguments.
 ///
 /// Because these are builtin operations, we can make some structural
 /// assumptions about the expression used to call them.
-static ArrayRef<Expr*> decomposeArguments(SILGenFunction &SGF,
-                                          Expr *arg,
-                                          unsigned expectedCount) {
-  assert(expectedCount >= 2);
-  assert(arg->getType()->is<TupleType>());
-  assert(arg->getType()->castTo<TupleType>()->getNumElements()
-           == expectedCount);
+static Optional<SmallVector<Expr*, 2>>
+decomposeArguments(SILGenFunction &SGF,
+                   SILLocation loc,
+                   PreparedArguments &&args,
+                   unsigned expectedCount) {
+  SmallVector<Expr*, 2> result;
+  auto sources = std::move(args).getSources();
 
-  // The use of owned parameters can trip up CSApply enough to introduce
-  // a trivial tuple shuffle here.
-  arg = arg->getSemanticsProvidingExpr();
-  if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg)) {
-    if (isTrivialShuffle(shuffle))
-      arg = shuffle->getSubExpr();
+  if (sources.size() == expectedCount) {
+    for (auto &&source : sources)
+      result.push_back(std::move(source).asKnownExpr());
+    return result;
   }
 
-  auto tuple = dyn_cast<TupleExpr>(arg);
-  if (tuple && tuple->getElements().size() == expectedCount) {
-    return tuple->getElements();
-  }
-
-  SGF.SGM.diagnose(arg, diag::invalid_sil_builtin,
+  SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
                    "argument to builtin should be a literal tuple");
 
-  auto tupleTy = arg->getType()->castTo<TupleType>();
-
-  // This is well-typed but may cause code to be emitted redundantly.
-  auto &ctxt = SGF.getASTContext();
-  SmallVector<Expr*, 4> args;
-  for (auto index : indices(tupleTy->getElementTypes())) {
-    Expr *projection = new (ctxt) TupleElementExpr(arg, SourceLoc(),
-                                                   index, SourceLoc(),
-                                          tupleTy->getElementType(index));
-    args.push_back(projection);
-  }
-  return ctxt.AllocateCopy(args);
+  return None;
 }
 
 static ManagedValue emitBuiltinRetain(SILGenFunction &SGF,
@@ -252,9 +225,13 @@ static ManagedValue emitBuiltinAssign(SILGenFunction &SGF,
 static ManagedValue emitBuiltinInit(SILGenFunction &SGF,
                                     SILLocation loc,
                                     SubstitutionMap substitutions,
-                                    Expr *tuple,
+                                    PreparedArguments &&preparedArgs,
                                     SGFContext C) {
-  auto args = decomposeArguments(SGF, tuple, 2);
+  auto argsOrError = decomposeArguments(SGF, loc, std::move(preparedArgs), 2);
+  if (!argsOrError)
+    return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+
+  auto args = *argsOrError;
 
   CanType formalType =
     substitutions.getReplacementTypes()[0]->getCanonicalType();
@@ -299,8 +276,7 @@ static ManagedValue emitCastToReferenceType(SILGenFunction &SGF,
   if (!argTy->mayHaveSuperclass() && !argTy->isClassExistentialType()) {
     SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
                      "castToNativeObject source must be a class");
-    SILValue undef = SILUndef::get(objPointerType, SGF.SGM.M);
-    return ManagedValue::forUnmanaged(undef);
+    return SGF.emitUndef(objPointerType);
   }
 
   // Grab the argument.
@@ -308,7 +284,7 @@ static ManagedValue emitCastToReferenceType(SILGenFunction &SGF,
 
   // If the argument is existential, open it.
   if (argTy->isClassExistentialType()) {
-    auto openedTy = ArchetypeType::getOpened(argTy);
+    auto openedTy = OpenedArchetypeType::get(argTy);
     SILType loweredOpenedTy = SGF.getLoweredLoadableType(openedTy);
     arg = SGF.B.createOpenExistentialRef(loc, arg, loweredOpenedTy);
   }
@@ -362,8 +338,7 @@ static ManagedValue emitCastFromReferenceType(SILGenFunction &SGF,
     SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
                      "castFromNativeObject dest must be an object type");
     // Recover by propagating an undef result.
-    SILValue result = SILUndef::get(destType, SGF.SGM.M);
-    return ManagedValue::forUnmanaged(result);
+    return SGF.emitUndef(destType);
   }
 
   return SGF.B.createUncheckedRefCast(loc, args[0], destType);
@@ -423,23 +398,29 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
 static ManagedValue emitBuiltinAddressOf(SILGenFunction &SGF,
                                          SILLocation loc,
                                          SubstitutionMap substitutions,
-                                         Expr *argument,
+                                         PreparedArguments &&preparedArgs,
                                          SGFContext C) {
-  auto rawPointerTy = SILType::getRawPointerType(SGF.getASTContext());
+  SILType rawPointerType = SILType::getRawPointerType(SGF.getASTContext());
+
+  auto argsOrError = decomposeArguments(SGF, loc, std::move(preparedArgs), 1);
+  if (!argsOrError)
+    return SGF.emitUndef(rawPointerType);
+
+  auto argument = (*argsOrError)[0];
+
   // If the argument is inout, try forming its lvalue. This builtin only works
   // if it's trivially physically projectable.
   auto inout = cast<InOutExpr>(argument->getSemanticsProvidingExpr());
   auto lv = SGF.emitLValue(inout->getSubExpr(), SGFAccessKind::ReadWrite);
   if (!lv.isPhysical() || !lv.isLoadingPure()) {
     SGF.SGM.diagnose(argument->getLoc(), diag::non_physical_addressof);
-    return ManagedValue::forUnmanaged(SILUndef::get(rawPointerTy, &SGF.SGM.M));
+    return SGF.emitUndef(rawPointerType);
   }
   
   auto addr = SGF.emitAddressOfLValue(argument, std::move(lv))
                  .getLValueAddress();
   
   // Take the address argument and cast it to RawPointer.
-  SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());
   SILValue result = SGF.B.createAddressToPointer(loc, addr,
                                                  rawPointerType);
   return ManagedValue::forUnmanaged(result);
@@ -449,9 +430,16 @@ static ManagedValue emitBuiltinAddressOf(SILGenFunction &SGF,
 static ManagedValue emitBuiltinAddressOfBorrow(SILGenFunction &SGF,
                                                SILLocation loc,
                                                SubstitutionMap substitutions,
-                                               Expr *argument,
+                                               PreparedArguments &&preparedArgs,
                                                SGFContext C) {
-  auto rawPointerTy = SILType::getRawPointerType(SGF.getASTContext());
+  SILType rawPointerType = SILType::getRawPointerType(SGF.getASTContext());
+
+  auto argsOrError = decomposeArguments(SGF, loc, std::move(preparedArgs), 1);
+  if (!argsOrError)
+    return SGF.emitUndef(rawPointerType);
+
+  auto argument = (*argsOrError)[0];
+
   SILValue addr;
   // Try to borrow the argument at +0. We only support if it's
   // naturally emitted borrowed in memory.
@@ -459,13 +447,12 @@ static ManagedValue emitBuiltinAddressOfBorrow(SILGenFunction &SGF,
      .getAsSingleValue(SGF, argument);
   if (!borrow.isPlusZero() || !borrow.getType().isAddress()) {
     SGF.SGM.diagnose(argument->getLoc(), diag::non_borrowed_indirect_addressof);
-    return ManagedValue::forUnmanaged(SILUndef::get(rawPointerTy, &SGF.SGM.M));
+    return SGF.emitUndef(rawPointerType);
   }
   
   addr = borrow.getValue();
   
   // Take the address argument and cast it to RawPointer.
-  SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());
   SILValue result = SGF.B.createAddressToPointer(loc, addr,
                                                  rawPointerType);
   return ManagedValue::forUnmanaged(result);
@@ -757,7 +744,7 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
   // Create the appropriate bitcast based on the source and dest types.
   ManagedValue in = args[0];
   SILType resultTy = toTL.getLoweredType();
-  if (resultTy.isTrivial(SGF.getModule()))
+  if (resultTy.isTrivial(SGF.F))
     return SGF.B.createUncheckedTrivialBitCast(loc, in, resultTy);
 
   // If we can perform a ref cast, just return.
@@ -788,8 +775,7 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &SGF,
       !sourceType->isClassExistentialType()) {
     SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
                      "castToBridgeObject source must be a class");
-    SILValue undef = SILUndef::get(objPointerType, SGF.SGM.M);
-    return ManagedValue::forUnmanaged(undef);
+    return SGF.emitUndef(objPointerType);
   }
 
   ManagedValue ref = args[0];
@@ -797,7 +783,7 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &SGF,
   
   // If the argument is existential, open it.
   if (sourceType->isClassExistentialType()) {
-    auto openedTy = ArchetypeType::getOpened(sourceType);
+    auto openedTy = OpenedArchetypeType::get(sourceType);
     SILType loweredOpenedTy = SGF.getLoweredLoadableType(openedTy);
     ref = SGF.B.createOpenExistentialRef(loc, ref, loweredOpenedTy);
   }
@@ -825,8 +811,7 @@ static ManagedValue emitBuiltinCastReferenceFromBridgeObject(
     SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
                  "castReferenceFromBridgeObject dest must be an object type");
     // Recover by propagating an undef result.
-    SILValue result = SILUndef::get(destType, SGF.SGM.M);
-    return ManagedValue::forUnmanaged(result);
+    return SGF.emitUndef(destType);
   }
 
   return SGF.B.createBridgeObjectToRef(loc, args[0], destType);
@@ -873,8 +858,7 @@ static ManagedValue emitBuiltinValueToBridgeObject(SILGenFunction &SGF,
     SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
                      "argument to builtin should be a builtin integer");
     SILType objPointerType = SILType::getBridgeObjectType(SGF.F.getASTContext());
-    SILValue undef = SILUndef::get(objPointerType, SGF.SGM.M);
-    return ManagedValue::forUnmanaged(undef);
+    return SGF.emitUndef(objPointerType);
   }
 
   SILValue result = SGF.B.createValueToBridgeObject(loc, args[0].getValue());
@@ -963,8 +947,11 @@ static ManagedValue emitBuiltinAllocWithTailElems(SILGenFunction &SGF,
   }
   ManagedValue Metatype = args[0];
   if (isa<MetatypeInst>(Metatype)) {
-    assert(Metatype.getType().getMetatypeInstanceType(SGF.SGM.M) == RefType &&
+    auto InstanceType =
+      Metatype.getType().castTo<MetatypeType>().getInstanceType();
+    assert(InstanceType == RefType.getASTType() &&
            "substituted type does not match operand metatype");
+    (void) InstanceType;
     return SGF.B.createAllocRef(loc, RefType, false, false,
                                 ElemTypes, Counts);
   } else {
@@ -1045,15 +1032,11 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
 static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
     AutoDiffAssociatedFunctionKind kind, unsigned arity, unsigned order,
     bool rethrows, SILGenFunction &SGF, SILLocation loc,
-    SubstitutionMap substitutions, Expr *argument, SGFContext C) {
-  // Get values of the original function and arguments.
-  auto *argTuple = cast<TupleExpr>(argument);
-  auto origFnVal =
-      SGF.emitRValueAsSingleValue(argTuple->getElement(0)).forward(SGF);
+    SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
+  auto origFnVal = args[0].getValue();
   SmallVector<SILValue, 2> origFnArgVals;
-  for (auto *origFnArgExpr : argTuple->getElements().drop_front(1))
-    origFnArgVals.push_back(
-        SGF.emitRValueAsSingleValue(origFnArgExpr).forward(SGF));
+  for (auto& arg : args.drop_front(1))
+    origFnArgVals.push_back(arg.getValue());
 
   // Get the associated function.
   SILValue assocFn = SGF.B.createAutoDiffFunctionExtract(
@@ -1062,8 +1045,8 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
 
   // We don't need to destroy the original function or retain the `assocFn`,
   // because they are trivial (because they are @noescape).
-  assert(origFnVal->getType().isTrivial(SGF.SGM.M));
-  assert(assocFn->getType().isTrivial(SGF.SGM.M));
+  assert(origFnVal->getType().isTrivial(SGF.F));
+  assert(assocFn->getType().isTrivial(SGF.F));
   bool assocFnNeedsDestroy = false;
 
   // Unwrap curry levels.
@@ -1088,21 +1071,6 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
       assert(!isConsumedParameter(parameter.getConvention()));
 #endif
 
-  // Destroys all the values.
-  auto destroyValues = [&](ArrayRef<SILValue> argumentValues) {
-    for (auto argumentValue : argumentValues) {
-      if (argumentValue->getType().isTrivial(SGF.SGM.M))
-        continue;
-
-      if (argumentValue->getType().isObject()) {
-        SGF.B.createDestroyValue(loc, argumentValue);
-        continue;
-      }
-
-      SGF.B.createDestroyAddr(loc, argumentValue);
-    }
-  };
-
   // Apply all the curry levels except the last one, whose results we handle
   // specially. We overwrite `assocFn` with the application results.
   unsigned currentParameter = 0;
@@ -1112,13 +1080,11 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
     auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
         currentParameter, curryLevel->getNumParameters());
     auto applyResult = SGF.B.createApply(
-        loc, assocFn, curryLevelArgVals, /*isNonThrowing*/ false);
+        loc, assocFn, SubstitutionMap(), curryLevelArgVals,
+        /*isNonThrowing*/ false);
     currentParameter += curryLevel->getNumParameters();
 
-    if (assocFnNeedsDestroy)
-      SGF.B.createDestroyValue(loc, assocFn);
     assocFn = applyResult;
-    destroyValues(curryLevelArgVals);
 
     // Our new `assocFn` needs to be released because it's an owned result from
     // a function call.
@@ -1141,13 +1107,10 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
         currentParameter);
     for (auto origFnArgVal : curryLevelArgVals)
       applyArgs.push_back(origFnArgVal);
-    auto differential = SGF.B.createApply(loc, assocFn, applyArgs,
-                                          /*isNonThrowing*/ false);
+    auto differential = SGF.B.createApply(
+        loc, assocFn, SubstitutionMap(), applyArgs, /*isNonThrowing*/ false);
 
-    if (assocFnNeedsDestroy)
-      SGF.B.createDestroyValue(loc, assocFn);
     assocFn = SILValue();
-    destroyValues(curryLevelArgVals);
 
     SGF.B.createStore(loc, differential,
                       SGF.B.createTupleElementAddr(loc, indResBuffer, 1),
@@ -1159,13 +1122,11 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
   // Apply the last curry level, in the case where it only has direct results.
   auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
       currentParameter);
-  auto resultTuple = SGF.B.createApply(loc, assocFn, curryLevelArgVals,
-                                       /*isNonThrowing*/ false);
+  auto resultTuple = SGF.B.createApply(
+      loc, assocFn, SubstitutionMap(), curryLevelArgVals,
+      /*isNonThrowing*/ false);
 
-  if (assocFnNeedsDestroy)
-    SGF.B.createDestroyValue(loc, assocFn);
   assocFn = SILValue();
-  destroyValues(curryLevelArgVals);
 
   return SGF.emitManagedRValueWithCleanup(resultTuple);
 }
@@ -1173,7 +1134,8 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
 static ManagedValue emitBuiltinAutoDiffApply(SILGenFunction &SGF,
                                              SILLocation loc,
                                              SubstitutionMap substitutions,
-                                             Expr *argument, SGFContext C) {
+                                             ArrayRef<ManagedValue> args,
+                                             SGFContext C) {
   auto *callExpr = loc.castToASTNode<CallExpr>();
   auto builtinDecl = cast<FuncDecl>(cast<DeclRefExpr>(
       cast<DotSyntaxBaseIgnoredExpr>(callExpr->getDirectCallee())->getRHS())
@@ -1187,7 +1149,7 @@ static ManagedValue emitBuiltinAutoDiffApply(SILGenFunction &SGF,
   assert(successfullyParsed);
   return emitBuiltinAutoDiffApplyAssociatedFunction(kind, arity, order,
                                                     rethrows, SGF, loc,
-                                                    substitutions, argument, C);
+                                                    substitutions, args, C);
 }
 
 Optional<SpecializedEmitter>

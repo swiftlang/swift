@@ -564,8 +564,9 @@ func vjpNonvariadic(_ x: Float, indices: [Int32]) -> (Float, (Float) -> Float) {
   return (x, { $0 })
 }
 
-// expected-error @+2 {{type 'Scalar' constrained to non-protocol, non-class type 'Float'}}
-// expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but 'Scalar' does not conform to 'Differentiable'}}
+// expected-error @+3 {{type 'Scalar' constrained to non-protocol, non-class type 'Float'}}
+// expected-error @+2 {{can only differentiate with respect to parameters that conform to 'Differentiable', but 'Scalar' does not conform to 'Differentiable'}}
+// expected-note @+1 {{use 'Scalar == Float' to require 'Scalar' to be 'Float'}}
 @differentiable(where Scalar : Float)
 func invalidRequirementConformance<Scalar>(x: Scalar) -> Scalar {
   return x

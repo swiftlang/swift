@@ -122,3 +122,49 @@ struct X<T> {
 
 let testXa: X<Int> = .foo(i: 0)
 let testXb: X<Int> = .bar
+
+// SR-10062
+
+var aLiteral = 1
+let bLiteral = 2
+
+func inoutFuncWithDefaultArg1(x: inout Int = 1) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
+func inoutFuncWithDefaultArg2(x: inout Int = bLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
+func inoutFuncWithDefaultArg3(x: inout Int = aLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
+func inoutFuncWithDefaultArg4(x: inout Int = &aLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
+func inoutFuncWithDefaultArg5(x: inout Int = &bLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
+func inoutFuncWithDefaultArg6(x: inout Int = #file) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
+func inoutFuncWithDefaultArg7(_: inout Int = 1) {} // expected-error {{cannot provide default value to inout parameter '_'}}
+
+// SE-0242 - Test that memberwise constructor generates default values
+
+struct Foo {
+  var a: Int
+  var b: Bool = false
+  let c: (Int, Bool) = (1, true)
+  let d: Int
+  var (e, f) = (0, false)
+  var g: Int?
+  let h: Bool?
+
+  // The generated memberwise should look like the following:
+  // init(a: Int, b: Bool = false, d: Int, e: Int, f: Bool, g: Int? = nil, h: Bool?)
+}
+
+// Here b = false and g = nil
+let fooThing1 = Foo(a: 0, d: 1, e: 2, f: false, h: nil) // ok
+// Here g = nil
+let fooThing2 = Foo(a: 0, b: true, d: 1, e: 2, f: false, h: nil) // ok
+// Here b = false
+let fooThing3 = Foo(a: 0, d: 1, e: 2, f: false, g: 10, h: nil) // ok
+// Use all the parameters
+let fooThing4 = Foo(a: 0, b: true, d: 1, e: 2, f: false, g: 10, h: nil) // ok
+
+// Ensure that tuple init is not allowed
+// Here b = false and g = nil, but we're checking that e and f don't get a default value
+let fooThing5 = Foo(a: 0, d: 1, h: nil) // expected-error {{missing argument for parameter 'e' in call}}
+                                        // expected-note@-25 {{'init(a:b:d:e:f:g:h:)' declared here}}
+
+// Here b = false and g = nil, but we're checking that f doesn't get a default value
+let fooThing6 = Foo(a: 0, d: 1, e: 2, h: nil) // expected-error {{missing argument for parameter 'f' in call}}
+                                              // expected-note@-29 {{'init(a:b:d:e:f:g:h:)' declared here}}

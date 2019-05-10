@@ -1,11 +1,3 @@
-if(SWIFT_ENABLE_TENSORFLOW)
-  find_package(TensorFlow REQUIRED)
-  if (TF_PATH_ADJUSTMENT)
-    include_directories(BEFORE "${TF_INCLUDE_DIR}/${TF_PATH_ADJUSTMENT}" )
-  endif()
-  include_directories(BEFORE "${TF_INCLUDE_DIR}" )
-endif()
-
 add_swift_host_library(swiftSIL STATIC
   AbstractionPattern.cpp
   BasicBlockUtils.cpp
@@ -28,6 +20,7 @@ add_swift_host_library(swiftSIL STATIC
   SILArgument.cpp
   SILBasicBlock.cpp
   SILBuilder.cpp
+  SILConstants.cpp
   SILCoverageMap.cpp
   SILDebugScope.cpp
   SILDeclRef.cpp
@@ -45,6 +38,7 @@ add_swift_host_library(swiftSIL STATIC
   SILProfiler.cpp
   SILSuccessor.cpp
   SILType.cpp
+  SILUndef.cpp
   SILValue.cpp
   SILVerifier.cpp
   SILOwnershipVerifier.cpp
@@ -52,12 +46,10 @@ add_swift_host_library(swiftSIL STATIC
   SILWitnessTable.cpp
   TypeLowering.cpp
   ValueOwnership.cpp
-  ValueUtils.cpp
-  LINK_LIBRARIES
-    swiftSerialization
-    swiftSema
-  INTERFACE_LINK_LIBRARIES "${TF_LIBRARIES}"
-)
+  ValueUtils.cpp)
+target_link_libraries(swiftSIL PRIVATE
+  swiftSema
+  swiftSerialization)
 
 # intrinsics_gen is the LLVM tablegen target that generates the include files
 # where intrinsics and attributes are declared. swiftSIL depends on these

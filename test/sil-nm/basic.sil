@@ -1,9 +1,9 @@
-// RUN: %target-sil-nm -assume-parsing-unqualified-ownership-sil %s | %FileCheck -check-prefix=SIL-NM -check-prefix=CHECK %s
-// RUN: %target-sil-nm -demangle -assume-parsing-unqualified-ownership-sil %s | %FileCheck -check-prefix=DEMANGLE %s
+// RUN: %target-sil-nm %s | %FileCheck -check-prefix=SIL-NM -check-prefix=CHECK %s
+// RUN: %target-sil-nm -demangle %s | %FileCheck -check-prefix=DEMANGLE %s
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt -module-name main -assume-parsing-unqualified-ownership-sil -emit-sib -o %t/out.sib %s
-// RUN: %target-sil-nm -module-name main -assume-parsing-unqualified-ownership-sil %t/out.sib | %FileCheck %s
-// RUN: %target-sil-nm -module-name main -demangle -assume-parsing-unqualified-ownership-sil %t/out.sib | %FileCheck -check-prefix=DEMANGLE %s
+// RUN: %target-sil-opt -module-name main -emit-sib -o %t/out.sib %s
+// RUN: %target-sil-nm -module-name main %t/out.sib | %FileCheck %s
+// RUN: %target-sil-nm -module-name main -demangle %t/out.sib | %FileCheck -check-prefix=DEMANGLE %s
 
 import Builtin
 

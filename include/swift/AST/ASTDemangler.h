@@ -25,16 +25,23 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/TypeRepr.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
 
 namespace swift {
  
+class TypeDecl;
+
 namespace Demangle {
 
 Type getTypeForMangling(ASTContext &ctx,
                         llvm::StringRef mangling);
+
+TypeDecl *getTypeDeclForMangling(ASTContext &ctx,
+                                 llvm::StringRef mangling);
+
+TypeDecl *getTypeDeclForUSR(ASTContext &ctx,
+                            llvm::StringRef usr);
 
 /// An implementation of MetadataReader's BuilderType concept that
 /// just finds and builds things in the AST.
@@ -48,30 +55,42 @@ class ASTBuilder {
 
 public:
   using BuiltType = swift::Type;
-  using BuiltNominalTypeDecl = swift::NominalTypeDecl *;
+  using BuiltTypeDecl = swift::GenericTypeDecl *; // nominal or type alias
   using BuiltProtocolDecl = swift::ProtocolDecl *;
   explicit ASTBuilder(ASTContext &ctx) : Ctx(ctx) {}
+  
+  /// The resolver to use for type checking, if necessary.
+  LazyResolver *Resolver = nullptr;
 
   ASTContext &getASTContext() { return Ctx; }
   DeclContext *getNotionalDC();
 
   Demangle::NodeFactory &getNodeFactory() { return Factory; }
 
-  Type createBuiltinType(const std::string &mangledName);
+  Type createBuiltinType(StringRef builtinName, StringRef mangledName);
 
-  NominalTypeDecl *createNominalTypeDecl(StringRef mangledName);
+  TypeDecl *createTypeDecl(NodePointer node);
+
+  GenericTypeDecl *createTypeDecl(StringRef mangledName, bool &typeAlias);
   
-  NominalTypeDecl *createNominalTypeDecl(const Demangle::NodePointer &node);
+  GenericTypeDecl *createTypeDecl(NodePointer node,
+                                  bool &typeAlias);
 
-  ProtocolDecl *createProtocolDecl(const Demangle::NodePointer &node);
+  ProtocolDecl *createProtocolDecl(NodePointer node);
 
-  Type createNominalType(NominalTypeDecl *decl);
+  Type createNominalType(GenericTypeDecl *decl);
 
-  Type createNominalType(NominalTypeDecl *decl, Type parent);
+  Type createNominalType(GenericTypeDecl *decl, Type parent);
 
-  Type createBoundGenericType(NominalTypeDecl *decl, ArrayRef<Type> args);
+  Type createTypeAliasType(GenericTypeDecl *decl, Type parent);
 
-  Type createBoundGenericType(NominalTypeDecl *decl, ArrayRef<Type> args,
+  Type createBoundGenericType(GenericTypeDecl *decl, ArrayRef<Type> args);
+  
+  Type resolveOpaqueType(NodePointer opaqueDescriptor,
+                         ArrayRef<Type> args,
+                         unsigned ordinal);
+
+  Type createBoundGenericType(GenericTypeDecl *decl, ArrayRef<Type> args,
                               Type parent);
 
   Type createTupleType(ArrayRef<Type> eltTypes, StringRef labels,
@@ -80,15 +99,26 @@ public:
   Type createFunctionType(ArrayRef<Demangle::FunctionParam<Type>> params,
                           Type output, FunctionTypeFlags flags);
 
+  Type createImplFunctionType(
+    Demangle::ImplParameterConvention calleeConvention,
+    ArrayRef<Demangle::ImplFunctionParam<Type>> params,
+    ArrayRef<Demangle::ImplFunctionResult<Type>> results,
+    Optional<Demangle::ImplFunctionResult<Type>> errorResult,
+    ImplFunctionTypeFlags flags);
+
   Type createProtocolCompositionType(ArrayRef<ProtocolDecl *> protocols,
                                      Type superclass,
                                      bool isClassBound);
 
-  Type createExistentialMetatypeType(Type instance);
+  Type createExistentialMetatypeType(Type instance,
+                     Optional<Demangle::ImplMetatypeRepresentation> repr=None);
 
-  Type createMetatypeType(Type instance, bool wasAbstract=false);
+  Type createMetatypeType(Type instance,
+                     Optional<Demangle::ImplMetatypeRepresentation> repr=None);
 
   Type createGenericTypeParameterType(unsigned depth, unsigned index);
+
+  Type createDependentMemberType(StringRef member, Type base);
 
   Type createDependentMemberType(StringRef member, Type base,
                                  ProtocolDecl *protocol);
@@ -101,7 +131,11 @@ public:
 
   Type createObjCClassType(StringRef name);
 
+  Type createBoundGenericObjCClassType(StringRef name, ArrayRef<Type> args);
+
   ProtocolDecl *createObjCProtocolDecl(StringRef name);
+
+  Type createDynamicSelfType(Type selfType);
 
   Type createForeignClassType(StringRef mangledName);
 
@@ -109,11 +143,22 @@ public:
 
   Type getOpaqueType();
 
+  Type createOptionalType(Type base);
+
+  Type createArrayType(Type base);
+
+  Type createDictionaryType(Type key, Type value);
+
+  Type createParenType(Type base);
+
 private:
-  bool validateNominalParent(NominalTypeDecl *decl, Type parent);
-  DeclContext *findDeclContext(const Demangle::NodePointer &node);
-  ModuleDecl *findModule(const Demangle::NodePointer &node);
-  Demangle::NodePointer findModuleNode(const Demangle::NodePointer &node);
+  bool validateParentType(TypeDecl *decl, Type parent);
+  CanGenericSignature demangleGenericSignature(
+      NominalTypeDecl *nominalDecl,
+      NodePointer node);
+  DeclContext *findDeclContext(NodePointer node);
+  ModuleDecl *findModule(NodePointer node);
+  Demangle::NodePointer findModuleNode(NodePointer node);
 
   enum class ForeignModuleKind {
     Imported,
@@ -121,41 +166,19 @@ private:
   };
 
   Optional<ForeignModuleKind>
-  getForeignModuleKind(const Demangle::NodePointer &node);
+  getForeignModuleKind(NodePointer node);
 
-  NominalTypeDecl *findNominalTypeDecl(DeclContext *dc,
-                                       Identifier name,
-                                       Identifier privateDiscriminator,
+  GenericTypeDecl *findTypeDecl(DeclContext *dc,
+                                Identifier name,
+                                Identifier privateDiscriminator,
+                                Demangle::Node::Kind kind);
+  GenericTypeDecl *findForeignTypeDecl(StringRef name,
+                                       StringRef relatedEntityKind,
+                                       ForeignModuleKind lookupKind,
                                        Demangle::Node::Kind kind);
-  NominalTypeDecl *findForeignNominalTypeDecl(StringRef name,
-                                              StringRef relatedEntityKind,
-                                              ForeignModuleKind lookupKind,
+
+  static GenericTypeDecl *getAcceptableTypeDeclCandidate(ValueDecl *decl,
                                               Demangle::Node::Kind kind);
-
-  Type checkTypeRepr(TypeRepr *repr);
-
-  static NominalTypeDecl *getAcceptableNominalTypeCandidate(ValueDecl *decl, 
-                                                     Demangle::Node::Kind kind);
-
-  class TypeReprList {
-    SmallVector<FixedTypeRepr, 4> Reprs;
-    SmallVector<TypeRepr*, 4> Refs;
-
-  public:
-    explicit TypeReprList(ArrayRef<Type> types) {
-      Reprs.reserve(types.size());
-      Refs.reserve(types.size());
-
-      for (auto type : types) {
-        Reprs.emplace_back(type, SourceLoc());
-        Refs.push_back(&Reprs.back());
-      }
-    }
-
-    ArrayRef<TypeRepr*> getList() const {
-      return Refs;
-    }
-  };
 };
 
 }  // namespace Demangle

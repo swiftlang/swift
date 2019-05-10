@@ -11,6 +11,8 @@ function(add_sourcekit_symbol_exports target_name export_file)
     add_custom_target(${target_name}_exports DEPENDS symbol.exports)
     set_property(DIRECTORY APPEND
       PROPERTY ADDITIONAL_MAKE_CLEAN_FILES symbol.exports)
+    set_target_properties(${target_name}_exports PROPERTIES
+      FOLDER "SourceKit libraries")
 
     get_property(srcs TARGET ${target_name} PROPERTY SOURCES)
     foreach(src ${srcs})
@@ -64,19 +66,9 @@ function(add_sourcekit_default_compiler_flags target)
     ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
     LTO_OBJECT_NAME "${target}-${sdk}-${arch}"
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
-    RESULT_VAR_NAME link_flags)
-
-  # TODO(compnerd) this should really use target_compile_options but the use
-  # of keyword and non-keyword flags prevents this
-  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    list(APPEND c_compile_flags -fblocks)
-  elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    if(SWIFT_COMPILER_IS_MSVC_LIKE)
-      list(APPEND c_compile_flags -Xclang;-fblocks)
-    else()
-      list(APPEND c_compile_flags -fblocks)
-    endif()
-  endif()
+    RESULT_VAR_NAME link_flags
+    LINK_LIBRARIES_VAR_NAME link_libraries
+    LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
 
   # SWIFT_ENABLE_TENSORFLOW
   if(SWIFT_ENABLE_TENSORFLOW)
@@ -98,9 +90,11 @@ function(add_sourcekit_default_compiler_flags target)
 
   # Set compilation and link flags.
   set_property(TARGET "${target}" APPEND_STRING PROPERTY
-      COMPILE_FLAGS " ${c_compile_flags}")
+      COMPILE_FLAGS " ${c_compile_flags} -fblocks")
   set_property(TARGET "${target}" APPEND_STRING PROPERTY
       LINK_FLAGS " ${link_flags}")
+  set_property(TARGET "${target}" APPEND PROPERTY LINK_LIBRARIES ${link_libraries})
+  swift_target_link_search_directories("${target}" "${library_search_directories}")
 endfunction()
 
 # Add a new SourceKit library.
@@ -208,14 +202,14 @@ macro(add_sourcekit_library name)
       set(SOURCEKITLIB_INSTALL_IN_COMPONENT dev)
     endif()
   endif()
-  swift_install_in_component("${SOURCEKITLIB_INSTALL_IN_COMPONENT}"
-      TARGETS ${name}
-      LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
-      ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
-      RUNTIME DESTINATION "bin")
-  swift_install_in_component("${SOURCEKITLIB_INSTALL_IN_COMPONENT}"
-    FILES ${SOURCEKITLIB_HEADERS}
-    DESTINATION "include/SourceKit")
+  swift_install_in_component(TARGETS ${name}
+                             LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
+                             ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
+                             RUNTIME DESTINATION "bin"
+                             COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}")
+  swift_install_in_component(FILES ${SOURCEKITLIB_HEADERS}
+                             DESTINATION "include/SourceKit"
+                             COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}")
   set_target_properties(${name} PROPERTIES FOLDER "SourceKit libraries")
   add_sourcekit_default_compiler_flags("${name}")
 endmacro()
@@ -347,11 +341,6 @@ macro(add_sourcekit_framework name)
 
 
   if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
-    swift_install_in_component(${SOURCEKITFW_INSTALL_IN_COMPONENT}
-        TARGETS ${name}
-        LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-        ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-        RUNTIME DESTINATION bin)
     set_output_directory(${name}
         BINARY_DIR ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR}
         LIBRARY_DIR ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
@@ -365,11 +354,13 @@ macro(add_sourcekit_framework name)
                           MACOSX_FRAMEWORK_SHORT_VERSION_STRING "1.0"
                           MACOSX_FRAMEWORK_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}"
                           PUBLIC_HEADER "${headers}")
+    swift_install_in_component(TARGETS ${name}
+                               FRAMEWORK DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+                               LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+                               ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+                               RUNTIME DESTINATION bin
+                               COMPONENT ${SOURCEKITFW_INSTALL_IN_COMPONENT})
   else()
-    swift_install_in_component(${SOURCEKITFW_INSTALL_IN_COMPONENT}
-        DIRECTORY ${framework_location}
-        DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-        USE_SOURCE_PERMISSIONS)
     set_output_directory(${name}
         BINARY_DIR ${framework_location}
         LIBRARY_DIR ${framework_location})
@@ -379,6 +370,10 @@ macro(add_sourcekit_framework name)
                           INSTALL_NAME_DIR "@rpath/${name}.framework"
                           PREFIX ""
                           SUFFIX "")
+    swift_install_in_component(DIRECTORY ${framework_location}
+                               DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+                               COMPONENT ${SOURCEKITFW_INSTALL_IN_COMPONENT}
+                               USE_SOURCE_PERMISSIONS)
 
     foreach(hdr ${headers})
       get_filename_component(hdrname ${hdr} NAME)

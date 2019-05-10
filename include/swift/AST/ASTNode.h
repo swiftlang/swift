@@ -20,6 +20,10 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "swift/AST/TypeAlignments.h"
 
+namespace llvm {
+  class raw_ostream;
+}
+
 namespace swift {
   class Expr;
   class Stmt;
@@ -38,16 +42,16 @@ namespace swift {
     
     SourceRange getSourceRange() const;
 
-    /// \brief Return the location of the start of the statement.
+    /// Return the location of the start of the statement.
     SourceLoc getStartLoc() const;
   
-    /// \brief Return the location of the end of the statement.
+    /// Return the location of the end of the statement.
     SourceLoc getEndLoc() const;
 
     void walk(ASTWalker &Walker);
     void walk(ASTWalker &&walker) { walk(walker); }
 
-    /// \brief get the underlying entity as a decl context if it is one,
+    /// get the underlying entity as a decl context if it is one,
     /// otherwise, return nullptr;
     DeclContext *getAsDeclContext() const;
 
@@ -57,6 +61,11 @@ namespace swift {
     FUNC(Expr)
     FUNC(Decl)
 #undef FUNC
+    
+    LLVM_ATTRIBUTE_DEPRECATED(
+        void dump() const LLVM_ATTRIBUTE_USED,
+        "only for use within the debugger");
+    void dump(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 
     /// Whether the AST node is implicit.
     bool isImplicit() const;

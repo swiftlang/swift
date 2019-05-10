@@ -120,16 +120,20 @@ public:
 
   void
   getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &Modules) const {
+    ModuleDecl::ImportFilter ImportFilter;
+    ImportFilter |= ModuleDecl::ImportFilterKind::Public;
+    ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+    ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+
     if (auto *SF = SFOrMod.dyn_cast<SourceFile *>()) {
-      SF->getImportedModules(Modules, ModuleDecl::ImportFilter::All);
+      SF->getImportedModules(Modules, ImportFilter);
     } else {
-      SFOrMod.get<ModuleDecl *>()->getImportedModules(Modules,
-                                                  ModuleDecl::ImportFilter::All);
+      SFOrMod.get<ModuleDecl *>()->getImportedModules(Modules, ImportFilter);
     }
   }
 };
 
-struct ValueWitness {
+struct IndexedWitness {
   ValueDecl *Member;
   ValueDecl *Requirement;
 };
@@ -146,7 +150,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
     Decl *D;
     SymbolInfo SymInfo;
     SymbolRoleSet Roles;
-    SmallVector<ValueWitness, 6> ExplicitValueWitnesses;
+    SmallVector<IndexedWitness, 6> ExplicitWitnesses;
     SmallVector<SourceLoc, 6> RefsToSuppress;
   };
   SmallVector<Entity, 6> EntitiesStack;
@@ -330,6 +334,7 @@ private:
     // get label locations
     auto *MemberwiseInit = DeclRef->getDecl();
     std::vector<SourceLoc> LabelLocs;
+    ArrayRef<Identifier> Labels;
     auto NameLoc = DeclRef->getNameLoc();
     if (NameLoc.isCompound()) {
       size_t LabelIndex = 0;
@@ -337,12 +342,16 @@ private:
       while ((ArgLoc = NameLoc.getArgumentLabelLoc(LabelIndex++)).isValid()) {
         LabelLocs.push_back(ArgLoc);
       }
+      Labels = MemberwiseInit->getFullName().getArgumentNames();
     } else if (auto *CallParent = dyn_cast_or_null<CallExpr>(getParentExpr())) {
       LabelLocs = CallParent->getArgumentLabelLocs();
+      Labels = CallParent->getArgumentLabels();
     }
 
     if (LabelLocs.empty())
       return;
+
+    assert(Labels.size() == LabelLocs.size());
 
     // match labels to properties
     auto *TypeContext =
@@ -350,14 +359,23 @@ private:
     if (!TypeContext || !shouldIndex(TypeContext, false))
       return;
 
-    auto LabelIt = LabelLocs.begin();
-    for (auto Prop : TypeContext->getStoredProperties()) {
-      if (Prop->getParentInitializer() && Prop->isLet())
+    unsigned CurLabel = 0;
+    for (auto Member : TypeContext->getMembers()) {
+      auto Prop = dyn_cast<VarDecl>(Member);
+      if (!Prop)
         continue;
 
-      assert(LabelIt != LabelLocs.end());
+      if (!Prop->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
+        continue;
+
+      if (CurLabel == LabelLocs.size())
+        break;
+
+      if (Labels[CurLabel] != Prop->getName())
+        continue;
+
       IndexSymbol Info;
-      if (initIndexSymbol(Prop, *LabelIt++, /*IsRef=*/true, Info))
+      if (initIndexSymbol(Prop, LabelLocs[CurLabel++], /*IsRef=*/true, Info))
         continue;
       if (startEntity(Prop, Info, /*IsRef=*/true))
         finishCurrentEntity();
@@ -390,6 +408,10 @@ private:
       return true;
 
     IndexSymbol Info;
+
+    if (Data.isImplicit)
+      Info.roles |= (unsigned)SymbolRole::Implicit;
+
     if (CtorTyRef)
       if (!reportRef(CtorTyRef, Loc, Info, Data.AccKind))
         return false;
@@ -462,8 +484,8 @@ private:
   bool reportExtension(ExtensionDecl *D);
   bool reportRef(ValueDecl *D, SourceLoc Loc, IndexSymbol &Info,
                  Optional<AccessKind> AccKind);
-  bool reportImplicitValueConformance(ValueDecl *witness, ValueDecl *requirement,
-                                      Decl *container);
+  bool reportImplicitConformance(ValueDecl *witness, ValueDecl *requirement,
+                                 Decl *container);
 
   bool startEntity(Decl *D, IndexSymbol &Info, bool IsRef);
   bool startEntityDecl(ValueDecl *D);
@@ -516,6 +538,12 @@ private:
   }
 
   bool shouldIndex(ValueDecl *D, bool IsRef) const {
+    if (D->isImplicit() && isa<VarDecl>(D) && IsRef) {
+      // Bypass the implicit VarDecls introduced in CaseStmt bodies by using the
+      // canonical VarDecl for these checks instead.
+      D = cast<VarDecl>(D)->getCanonicalVarDecl();
+    }
+
     if (D->isImplicit() && !isa<ConstructorDecl>(D))
       return false;
 
@@ -535,7 +563,7 @@ private:
   /// members.
   ///
   /// \returns false if AST visitation should stop.
-  bool handleValueWitnesses(Decl *D, SmallVectorImpl<ValueWitness> &explicitValueWitnesses);
+  bool handleWitnesses(Decl *D, SmallVectorImpl<IndexedWitness> &explicitWitnesses);
 
   void getModuleHash(SourceFileOrModule SFOrMod, llvm::raw_ostream &OS);
   llvm::hash_code hashModule(llvm::hash_code code, SourceFileOrModule SFOrMod);
@@ -664,6 +692,7 @@ bool IndexSwiftASTWalker::visitImports(
         IsClangModuleOpt = false;
         break;
       case FileUnitKind::ClangModule:
+      case FileUnitKind::DWARFModule:
         assert(!IsClangModuleOpt.hasValue() &&
                "cannot handle multi-file modules");
         IsClangModuleOpt = true;
@@ -695,7 +724,7 @@ bool IndexSwiftASTWalker::visitImports(
   return true;
 }
 
-bool IndexSwiftASTWalker::handleValueWitnesses(Decl *D, SmallVectorImpl<ValueWitness> &explicitValueWitnesses) {
+bool IndexSwiftASTWalker::handleWitnesses(Decl *D, SmallVectorImpl<IndexedWitness> &explicitWitnesses) {
   auto DC = dyn_cast<DeclContext>(D);
   if (!DC)
     return true;
@@ -719,11 +748,26 @@ bool IndexSwiftASTWalker::handleValueWitnesses(Decl *D, SmallVectorImpl<ValueWit
         return;
 
       if (decl->getDeclContext() == DC) {
-        explicitValueWitnesses.push_back(ValueWitness{decl, req});
+        explicitWitnesses.push_back({decl, req});
+      } else {
+        reportImplicitConformance(decl, req, D);
+      }
+    });
+
+    normal->forEachTypeWitness(nullptr,
+                 [&](AssociatedTypeDecl *assoc, Type type, TypeDecl *typeDecl) {
+      if (Cancelled)
+        return true;
+      if (typeDecl == nullptr)
+        return false;
+
+      if (typeDecl->getDeclContext() == DC) {
+        explicitWitnesses.push_back({typeDecl, assoc});
       } else {
         // Report the implicit conformance.
-        reportImplicitValueConformance(decl, req, D);
+        reportImplicitConformance(typeDecl, assoc, D);
       }
+      return false;
     });
   }
 
@@ -741,12 +785,12 @@ bool IndexSwiftASTWalker::startEntity(Decl *D, IndexSymbol &Info, bool IsRef) {
     case swift::index::IndexDataConsumer::Skip:
       return false;
     case swift::index::IndexDataConsumer::Continue: {
-      SmallVector<ValueWitness, 6> explicitValueWitnesses;
+      SmallVector<IndexedWitness, 6> explicitWitnesses;
       if (!IsRef) {
-        if (!handleValueWitnesses(D, explicitValueWitnesses))
+        if (!handleWitnesses(D, explicitWitnesses))
           return false;
       }
-      EntitiesStack.push_back({D, Info.symInfo, Info.roles, std::move(explicitValueWitnesses), {}});
+      EntitiesStack.push_back({D, Info.symInfo, Info.roles, std::move(explicitWitnesses), {}});
       return true;
     }
   }
@@ -781,7 +825,7 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
   }
 
   if (auto Parent = getParentDecl()) {
-    for (const ValueWitness &witness : EntitiesStack.back().ExplicitValueWitnesses) {
+    for (const IndexedWitness &witness : EntitiesStack.back().ExplicitWitnesses) {
       if (witness.Member == D)
         addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, witness.Requirement);
     }
@@ -901,8 +945,7 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
     Info.symInfo.Kind = SymbolKind::Function;
     if (D->getDeclContext()->isTypeContext()) {
       if (D->isStatic()) {
-        if (isa<VarDecl>(D) &&
-            cast<VarDecl>(D)->getCorrectStaticSpelling() == StaticSpellingKind::KeywordClass)
+        if (D->getCorrectStaticSpelling() == StaticSpellingKind::KeywordClass)
           Info.symInfo.Kind = SymbolKind::ClassMethod;
         else
           Info.symInfo.Kind = SymbolKind::StaticMethod;
@@ -1104,8 +1147,8 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
   return finishCurrentEntity();
 }
 
-bool IndexSwiftASTWalker::reportImplicitValueConformance(ValueDecl *witness, ValueDecl *requirement,
-                                                         Decl *container) {
+bool IndexSwiftASTWalker::reportImplicitConformance(ValueDecl *witness, ValueDecl *requirement,
+                                                    Decl *container) {
   if (!shouldIndex(witness, /*IsRef=*/true))
     return true; // keep walking
 
@@ -1135,6 +1178,11 @@ bool IndexSwiftASTWalker::reportImplicitValueConformance(ValueDecl *witness, Val
 bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
                                           bool IsRef, IndexSymbol &Info) {
   assert(D);
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    // Always base the symbol information on the canonical VarDecl
+    D = VD->getCanonicalVarDecl();
+  }
+
   Info.decl = D;
   Info.symInfo = getSymbolInfoForDecl(D);
   if (Info.symInfo.Kind == SymbolKind::Unknown)
@@ -1462,6 +1510,7 @@ void IndexSwiftASTWalker::getRecursiveModuleImports(
             Info += "\"";
             break;
           case FileUnitKind::ClangModule:
+          case FileUnitKind::DWARFModule:
             Info += "clang module, file=\"";
             Info += cast<LoadedFile>(FU)->getFilename();
             Info += "\"";
@@ -1498,7 +1547,8 @@ void IndexSwiftASTWalker::collectRecursiveModuleImports(
   // need to hash the clang module.
   // FIXME: This is a bit of a hack.
   if (TopMod.getFiles().size() == 1)
-    if (TopMod.getFiles().front()->getKind() == FileUnitKind::ClangModule)
+    if (TopMod.getFiles().front()->getKind() == FileUnitKind::ClangModule ||
+        TopMod.getFiles().front()->getKind() == FileUnitKind::DWARFModule)
       return;
 
   auto It = ImportsMap.find(&TopMod);
@@ -1507,8 +1557,11 @@ void IndexSwiftASTWalker::collectRecursiveModuleImports(
     return;
   }
 
+  ModuleDecl::ImportFilter ImportFilter;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
   SmallVector<ModuleDecl::ImportedModule, 8> Imports;
-  TopMod.getImportedModules(Imports, ModuleDecl::ImportFilter::All);
+  TopMod.getImportedModules(Imports);
 
   for (auto Import : Imports) {
     collectRecursiveModuleImports(*Import.second, Visited);

@@ -169,7 +169,9 @@ static bool findXcodeClangPath(llvm::SmallVectorImpl<char> &path) {
 
   auto xcrunPath = llvm::sys::findProgramByName("xcrun");
   if (!xcrunPath.getError()) {
-    const char *args[] = {"-f", "clang", nullptr};
+    // Explicitly ask for the default toolchain so that we don't find a Clang
+    // included with an open-source toolchain.
+    const char *args[] = {"-toolchain", "default", "-f", "clang", nullptr};
     sys::TaskQueue queue;
     queue.addTask(xcrunPath->c_str(), args, /*Env=*/llvm::None,
                   /*Context=*/nullptr,

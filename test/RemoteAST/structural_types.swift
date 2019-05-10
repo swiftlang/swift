@@ -5,6 +5,9 @@
 @_silgen_name("printMetadataType")
 func printType(_: Any.Type)
 
+@_silgen_name("stopRemoteAST")
+func stopRemoteAST()
+
 typealias Fn1 = () -> ()
 printType(Fn1.self)
 // CHECK: found type: () -> ()
@@ -37,6 +40,14 @@ typealias Fn8 = (String, Int, Double, Float) -> ()
 printType(Fn8.self)
 // CHECK: found type: (String, Int, Double, Float) -> ()
 
+typealias Fn9 = ((Int, Float)) -> ()
+printType(Fn9.self)
+// CHECK: found type: ((Int, Float)) -> ()
+
+typealias Fn10 = (Int...) -> ()
+printType(Fn10.self)
+// CHECK: found type: (Int...) -> ()
+
 typealias Tuple1 = (Int, Float, Int)
 printType(Tuple1.self)
 // CHECK: found type: (Int, Float, Int)
@@ -62,3 +73,5 @@ func foo<T>(_: T) {
 
 foo() { (x: Int) -> Int in return x }
 // CHECK: found type: (Int) -> Int
+
+stopRemoteAST()

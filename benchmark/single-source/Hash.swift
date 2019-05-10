@@ -18,10 +18,11 @@ import TestsUtils
 public let HashTest = BenchmarkInfo(
   name: "HashTest",
   runFunction: run_HashTest,
-  tags: [.validation, .algorithm])
+  tags: [.validation, .algorithm],
+  legacyFactor: 10)
 
 class Hash {
-  /// \brief C'tor.
+  /// C'tor.
   init(_ bs: Int) {
     blocksize = bs
     messageLength = 0
@@ -29,7 +30,7 @@ class Hash {
     assert(blocksize <= 64, "Invalid block size")
   }
 
-  /// \brief Add the bytes in \p Msg to the hash.
+  /// Add the bytes in \p Msg to the hash.
   func update(_ Msg: String) {
     for c in Msg.unicodeScalars {
       data[dataLength] = UInt8(ascii: c)
@@ -39,7 +40,7 @@ class Hash {
     }
   }
 
-  /// \brief Add the bytes in \p Msg to the hash.
+  /// Add the bytes in \p Msg to the hash.
   func update(_ Msg: [UInt8]) {
     for c in Msg {
       data[dataLength] = c
@@ -65,7 +66,7 @@ class Hash {
   final var data = [UInt8](repeating: 0, count: 64)
   final var blocksize: Int
 
-  /// \brief Hash the internal data.
+  /// Hash the internal data.
   func hash() {
     fatalError("Pure virtual")
   }
@@ -78,7 +79,7 @@ class Hash {
     fatalError("Pure virtual")
   }
 
-  /// \brief Blow the data to fill the block.
+  /// Blow the data to fill the block.
   func fillBlock() {
     fatalError("Pure virtual")
   }
@@ -87,7 +88,7 @@ class Hash {
   final
   var HexTblFast : [UInt8] = [48,49,50,51,52,53,54,55,56,57,97,98,99,100,101,102]
 
-  /// \brief Convert a 4-byte integer to a hex string.
+  /// Convert a 4-byte integer to a hex string.
   final
   func toHex(_ In: UInt32) -> String {
     var In = In
@@ -110,13 +111,13 @@ class Hash {
     }
   }
 
-  /// \brief Left-rotate \p x by \p c.
+  /// Left-rotate \p x by \p c.
   final
   func rol(_ x: UInt32, _ c: UInt32) -> UInt32 {
     return x &<< c | x &>> (32 &- c)
   }
 
-  /// \brief Right-rotate \p x by \p c.
+  /// Right-rotate \p x by \p c.
   final
   func ror(_ x: UInt32, _ c: UInt32) -> UInt32 {
     return x &>> c | x &<< (32 &- c)
@@ -581,7 +582,7 @@ public func run_HashTest(_ N: Int) {
     "The quick brown fox jumps over the lazy dog." : "ef537f25c895bfa782526529a9b63d97aa631564d5d789c2b765448c8635fb6c"]
   let size = 50
 
-  for _ in 1...10*N {
+  for _ in 1...N {
     // Check for precomputed values.
     let MD = MD5()
     for (K, V) in TestMD5 {

@@ -1277,3 +1277,37 @@ let sr8811b: Never = fatalError() // Ok
 let sr8811c = (16, fatalError()) // expected-warning {{constant 'sr8811c' inferred to have type '(Int, Never)', which contains an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}
 
 let sr8811d: (Int, Never) = (16, fatalError()) // Ok
+
+// SR-9267
+
+class SR_9267 {}
+extension SR_9267 {
+  var foo: String = { // expected-error {{extensions must not contain stored properties}} // expected-error {{function produces expected type 'String'; did you mean to call it with '()'?}} // expected-note {{Remove '=' to make 'foo' a computed property}}{{19-21=}}
+    return "Hello"
+  }
+}
+
+enum SR_9267_E {
+  var SR_9267_prop: String = { // expected-error {{enums must not contain stored properties}} // expected-error {{function produces expected type 'String'; did you mean to call it with '()'?}} // expected-note {{Remove '=' to make 'SR_9267_prop' a computed property}}{{28-30=}}
+    return "Hello"
+  }
+}
+
+var SR_9267_prop_1: Int = { // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} // expected-note {{Remove '=' to make 'SR_9267_prop_1' a computed property}}{{25-27=}}
+  return 0
+}
+
+class SR_9267_C {
+  var SR_9267_prop_2: String = { // expected-error {{function produces expected type 'String'; did you mean to call it with '()'?}} // expected-note {{Remove '=' to make 'SR_9267_prop_2' a computed property}}{{30-32=}}
+    return "Hello"
+  }
+}
+
+class SR_9267_C2 {
+  let SR_9267_prop_3: Int = { return 0 } // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} // expected-note {{Remove '=' to make 'SR_9267_prop_3' a computed property}}{{3-6=var}}{{27-29=}}
+}
+
+class LazyPropInClass {
+  lazy var foo: Int = { return 0 } // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}}
+  // expected-note@-1 {{Remove '=' to make 'foo' a computed property}}{{21-23=}}{{3-8=}}
+}

@@ -85,9 +85,9 @@ public class C<R> {
 // IR: ![[BOOL:[0-9]+]] = !DICompositeType({{.*}}name: "Bool"
 // IR: ![[INT:[0-9]+]] = !DICompositeType({{.*}}name: "Int"
 // IR: ![[TAU_0_0:[0-9]+]] = {{.*}}DW_TAG_structure_type, name: "$sxD",
+// IR: ![[TAU_1_0:[0-9]+]] = {{.*}}DW_TAG_structure_type, name: "$sqd__D",
 // IR: ![[MD_1_0]] = !DILocalVariable(name: "$\CF\84_1_0"
-// IR: ![[S]] = !DILocalVariable(name: "s", {{.*}} type: ![[TAU_1_0:[0-9]+]]
-// IR: ![[TAU_1_0]] = {{.*}}DW_TAG_structure_type, name: "$sqd__D",
+// IR: ![[S]] = !DILocalVariable(name: "s", {{.*}} type: ![[TAU_1_0]]
 // IR: ![[GS_T]] = !DILocalVariable(name: "t", {{.*}} scope: ![[SP_GS_T:[0-9]+]], {{.*}} type: ![[TAU_1_0]])
 // IR: ![[SP_GS_T]] = {{.*}}linkageName: "$s1A1gyyxlFqd___Ti5"
 // IR: ![[GS_U]] = !DILocalVariable(name: "u", {{.*}} scope: ![[SP_GS_U:[0-9]+]], {{.*}} type: ![[TAU_1_0]])

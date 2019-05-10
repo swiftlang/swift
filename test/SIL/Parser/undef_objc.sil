@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil | %FileCheck %s
+// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
 // REQUIRES: objc_interop
 
 sil_stage raw

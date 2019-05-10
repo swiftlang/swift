@@ -14,6 +14,7 @@
 #include "swift/IDE/Utils.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
@@ -182,8 +183,8 @@ printTypeInterface(ModuleDecl *M, Type Ty, ASTPrinter &Printer,
 bool swift::ide::
 printTypeInterface(ModuleDecl *M, StringRef TypeUSR, ASTPrinter &Printer,
                    std::string &TypeName, std::string &Error) {
-  return printTypeInterface(M, getTypeFromMangledSymbolname(M->getASTContext(),
-                                                            TypeUSR, Error),
+  return printTypeInterface(M, Demangle::getTypeForMangling(M->getASTContext(),
+                                                            TypeUSR),
                             Printer, TypeName, Error);
 }
 

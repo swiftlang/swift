@@ -59,9 +59,8 @@ void Evaluator::registerRequestFunctions(
   requestFunctionsByZone.push_back({zoneID, functions});
 }
 
-Evaluator::Evaluator(DiagnosticEngine &diags,
-                     CycleDiagnosticKind shouldDiagnoseCycles)
-  : diags(diags), shouldDiagnoseCycles(shouldDiagnoseCycles) { }
+Evaluator::Evaluator(DiagnosticEngine &diags, bool debugDumpCycles)
+  : diags(diags), debugDumpCycles(debugDumpCycles) { }
 
 void Evaluator::emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath) {
   std::error_code error;
@@ -80,11 +79,9 @@ bool Evaluator::checkDependency(const AnyRequest &request) {
   }
 
   // Diagnose cycle.
-  switch (shouldDiagnoseCycles) {
-  case CycleDiagnosticKind::NoDiagnose:
-    return true;
+  diagnoseCycle(request);
 
-  case CycleDiagnosticKind::DebugDiagnose: {
+  if (debugDumpCycles) {
     llvm::errs() << "===CYCLE DETECTED===\n";
     llvm::DenseSet<AnyRequest> visitedAnywhere;
     llvm::SmallVector<AnyRequest, 4> visitedAlongPath;
@@ -92,12 +89,6 @@ bool Evaluator::checkDependency(const AnyRequest &request) {
     printDependencies(activeRequests.front(), llvm::errs(), visitedAnywhere,
                       visitedAlongPath, activeRequests.getArrayRef(),
                       prefixStr, /*lastChild=*/true);
-    return true;
-  }
-
-  case CycleDiagnosticKind::FullDiagnose:
-    diagnoseCycle(request);
-    return true;
   }
 
   return true;

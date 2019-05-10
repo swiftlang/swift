@@ -258,6 +258,11 @@ TypeRepr *CloneVisitor::visitSILBoxTypeRepr(SILBoxTypeRepr *type) {
                                 type->getArgumentRAngleLoc());
 }
 
+TypeRepr *CloneVisitor::visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *type) {
+  return new (Ctx) OpaqueReturnTypeRepr(type->getOpaqueLoc(),
+                                        visit(type->getConstraint()));
+}
+
 TypeRepr *TypeRepr::clone(const ASTContext &ctx) const {
   CloneVisitor visitor(ctx);
   return visitor.visit(const_cast<TypeRepr *>(this));
@@ -358,7 +363,7 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
   printTypeRepr(ArgsTy, Printer, Opts);
   if (throws()) {
     Printer << " ";
-    Printer.printKeyword("throws");
+    Printer.printKeyword("throws", Opts);
   }
   Printer << " -> ";
   Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
@@ -548,24 +553,28 @@ void ProtocolTypeRepr::printImpl(ASTPrinter &Printer,
   Printer << ".Protocol";
 }
 
+void OpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
+                                     const PrintOptions &Opts) const {
+  Printer << "some ";
+  printTypeRepr(Constraint, Printer, Opts);
+}
 
 void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
                                   const PrintOptions &Opts) const {
   switch (getKind()) {
   case TypeReprKind::InOut:
-    Printer.printKeyword("inout");
+    Printer.printKeyword("inout", Opts, " ");
     break;
   case TypeReprKind::Shared:
-    Printer.printKeyword("__shared");
+    Printer.printKeyword("__shared", Opts, " ");
     break;
   case TypeReprKind::Owned:
-    Printer.printKeyword("__owned");
+    Printer.printKeyword("__owned", Opts, " ");
     break;
   default:
     llvm_unreachable("unknown specifier type repr");
     break;
   }
-  Printer << " ";
   printTypeRepr(Base, Printer, Opts);
 }
 
@@ -577,7 +586,7 @@ void FixedTypeRepr::printImpl(ASTPrinter &Printer,
 void SILBoxTypeRepr::printImpl(ASTPrinter &Printer,
                                const PrintOptions &Opts) const {
   // TODO
-  Printer.printKeyword("sil_box");
+  Printer.printKeyword("sil_box", Opts);
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing

@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief Implements the text stub file (TBD v3) reader/writer.
+/// Implements the text stub file (TBD v3) reader/writer.
 ///
 //===----------------------------------------------------------------------===//
 

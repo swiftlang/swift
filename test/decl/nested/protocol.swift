@@ -52,7 +52,6 @@ protocol Racoon {
 }
 
 enum SillyRawEnum : SillyProtocol.InnerClass {}
-// expected-error@-1 {{type 'SillyRawEnum' does not conform to protocol 'RawRepresentable'}}
 
 protocol SillyProtocol {
   class InnerClass<T> {} // expected-error {{type 'InnerClass' cannot be nested in protocol 'SillyProtocol'}}

@@ -25,13 +25,13 @@ set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
 list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
 list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
-list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-sil-ownership")
 list(APPEND swift_stdlib_compile_flags "-force-single-frontend-invocation")
 # FIXME(SR-7972): Some tests fail when TensorFlow is optimized.
 list(APPEND swift_stdlib_compile_flags "-Onone")
 list(APPEND swift_stdlib_compile_flags "-DCOMPILING_TENSORFLOW_MODULE")
 
 set(SOURCES
+  ArrayOps.swift
   CompilerRuntime.swift
   CompositeMath.swift
   Dataset.swift
@@ -39,6 +39,8 @@ set(SOURCES
   Execution.swift
   Gradients.swift
   Ops.swift
+  # NumPy bridging for `ShapedArray` and `Tensor`.
+  PythonConversion.swift
   ShapedArray.swift
   StringOps.swift
   StringTensor.swift
@@ -47,12 +49,11 @@ set(SOURCES
   TensorHandle.swift
   TensorProtocol.swift
   TensorShape.swift
-  Utilities.swift
-  ArrayOps.swift
   Threading.swift
-  ExecuteOp.swift.gyb
-  # NumPy bridging for `ShapedArray` and `Tensor`.
-  PythonConversion.swift)
+  Utilities.swift)
+
+set(GYB_SOURCES
+  ExecuteOp.swift.gyb)
 
 # Copy TensorFlow bindings file, if it exists.
 if (TENSORFLOW_SWIFT_BINDINGS)
@@ -78,6 +79,7 @@ endif()
 
 add_swift_target_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   "${SOURCES}"
+  GYB_SOURCES "${GYB_SOURCES}"
 
   INCORPORATE_OBJECT_LIBRARIES swiftCTensorFlow
   TARGET_SDKS OSX LINUX

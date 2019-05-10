@@ -309,3 +309,14 @@ func testSameTypeCommutativity5<U, T: P1>(_ t: T, _ u: U)
 func testSameTypeCommutativity6<U, T: P1>(_ t: T, _ u: U)
   where U & P3 == T.Assoc { } // Equivalent to T.Assoc == U & P3
 // expected-error@-1 2 {{non-protocol, non-class type 'U' cannot be used within a protocol-constrained type}}
+
+// rdar;//problem/46848889
+struct Foo<A: P1, B: P1, C: P1> where A.Assoc == B.Assoc, A.Assoc == C.Assoc {}
+
+struct Bar<A: P1, B: P1> where A.Assoc == B.Assoc {
+  func f<C: P1>(with other: C) -> Foo<A, B, C> where A.Assoc == C.Assoc {
+    // expected-note@-1 {{previous same-type constraint 'B.Assoc' == 'C.Assoc' inferred from type here}}
+    // expected-warning@-2 {{redundant same-type constraint 'A.Assoc' == 'C.Assoc'}}
+    fatalError()
+  }
+}

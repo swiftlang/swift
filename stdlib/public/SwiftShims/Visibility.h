@@ -26,6 +26,10 @@
 #define __has_attribute(x) 0
 #endif
 
+#if !defined(__has_builtin)
+#define __has_builtin(builtin) 0
+#endif
+
 #if __has_feature(nullability)
 // Provide macros to temporarily suppress warning about the use of
 // _Nullable and _Nonnull.
@@ -158,6 +162,14 @@
 #define SWIFT_RUNTIME_STDLIB_INTERNAL extern "C" SWIFT_LIBRARY_VISIBILITY
 #else
 #define SWIFT_RUNTIME_STDLIB_INTERNAL SWIFT_LIBRARY_VISIBILITY
+#endif
+
+#if __has_builtin(__builtin_expect)
+#define SWIFT_LIKELY(expression) (__builtin_expect(!!(expression), 1))
+#define SWIFT_UNLIKELY(expression) (__builtin_expect(!!(expression), 0))
+#else
+#define SWIFT_LIKELY(expression) ((expression))
+#define SWIFT_UNLIKELY(expression) ((expression))
 #endif
 
 // SWIFT_STDLIB_SHIMS_VISIBILITY_H

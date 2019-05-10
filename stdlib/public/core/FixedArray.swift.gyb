@@ -22,7 +22,7 @@
 % for N in sizes:
 
 internal struct _FixedArray${N}<T> {
-  // ABI TODO: The has assumptions about tuple layout in the ABI, namely that
+  // ABI TODO: This makes assumptions about tuple layout in the ABI, namely that
   // they are laid out contiguously and individually addressable (i.e. strided).
   //
   internal var storage: (
@@ -74,7 +74,7 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
         let bufPtr = UnsafeBufferPointer(
           start: rawPtr.baseAddress!.assumingMemoryBound(to: T.self),
           count: count)
-        return bufPtr[i]
+        return bufPtr[_unchecked: i]
       }
       return res
     }
@@ -82,7 +82,7 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
     set {
       _internalInvariant(i >= 0 && i < count)
       self.withUnsafeMutableBufferPointer { buffer in
-        buffer[i] = newValue
+        buffer[_unchecked: i] = newValue
       }
     }
   }

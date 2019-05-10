@@ -32,6 +32,7 @@
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/Requirement.h"
+#include "swift/AST/TrailingCallArguments.h"
 #include "swift/AST/TypeLoc.h"
 // SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/AutoDiff.h"
@@ -52,6 +53,7 @@ class ClassDecl;
 class FuncDecl;
 class GenericFunctionType;
 class LazyConformanceLoader;
+class PatternBindingInitializer;
 class TrailingWhereClause;
 
 /// TypeAttributes - These are attributes that may be applied to types.
@@ -68,6 +70,14 @@ public:
 
   // For an opened existential type, the known ID.
   Optional<UUID> OpenedID;
+  
+  // For a reference to an opaque return type, the mangled name and argument
+  // index into the generic signature.
+  struct OpaqueReturnTypeRef {
+    StringRef mangledName;
+    unsigned index;
+  };
+  Optional<OpaqueReturnTypeRef> OpaqueReturnTypeOf;
 
   TypeAttributes() {}
   
@@ -83,6 +93,10 @@ public:
   
   SourceLoc getLoc(TypeAttrKind A) const {
     return AttrLocs[A];
+  }
+  
+  void setOpaqueReturnTypeOf(StringRef mangling, unsigned index) {
+    OpaqueReturnTypeOf = OpaqueReturnTypeRef{mangling, index};
   }
   
   void setAttr(TypeAttrKind A, SourceLoc L) {
@@ -619,6 +633,10 @@ enum class PlatformAgnosticAvailabilityKind {
   /// The declaration is available in some but not all versions
   /// of Swift, as specified by the VersionTuple members.
   SwiftVersionSpecific,
+  /// The declaration is available in some but not all versions
+  /// of SwiftPM's PackageDescription library, as specified by
+  /// the VersionTuple members.
+  PackageDescriptionVersionSpecific,
   /// The declaration is unavailable for other reasons.
   Unavailable,
 };
@@ -689,6 +707,9 @@ public:
   /// Whether this is a language-version-specific entity.
   bool isLanguageVersionSpecific() const;
 
+  /// Whether this is a PackageDescription version specific entity.
+  bool isPackageDescriptionVersionSpecific() const;
+
   /// Whether this is an unconditionally unavailable entity.
   bool isUnconditionallyUnavailable() const;
 
@@ -724,6 +745,12 @@ public:
 
   /// Returns true if this attribute is active given the current platform.
   bool isActivePlatform(const ASTContext &ctx) const;
+
+  /// Returns the active version from the AST context corresponding to
+  /// the available kind. For example, this will return the effective language
+  /// version for swift version-specific availability kind, PackageDescription
+  /// version for PackageDescription version-specific availability.
+  llvm::VersionTuple getActiveVersion(const ASTContext &ctx) const;
 
   /// Compare this attribute's version information against the platform or
   /// language version (assuming the this attribute pertains to the active
@@ -1398,6 +1425,58 @@ public:
   }
 };
 
+/// Defines a custom attribute.
+class CustomAttr final : public DeclAttribute,
+                         public TrailingCallArguments<CustomAttr> {
+  TypeLoc type;
+  Expr *arg;
+  PatternBindingInitializer *initContext;
+  Expr *semanticInit = nullptr;
+
+  unsigned hasArgLabelLocs : 1;
+  unsigned numArgLabels : 16;
+
+  CustomAttr(SourceLoc atLoc, SourceRange range, TypeLoc type,
+             PatternBindingInitializer *initContext, Expr *arg,
+             ArrayRef<Identifier> argLabels, ArrayRef<SourceLoc> argLabelLocs,
+             bool implicit);
+
+public:
+  static CustomAttr *create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
+                            bool implicit = false) {
+    return create(ctx, atLoc, type, false, nullptr, SourceLoc(), { }, { }, { },
+                  SourceLoc(), implicit);
+  }
+
+  static CustomAttr *create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
+                            bool hasInitializer,
+                            PatternBindingInitializer *initContext,
+                            SourceLoc lParenLoc,
+                            ArrayRef<Expr *> args,
+                            ArrayRef<Identifier> argLabels,
+                            ArrayRef<SourceLoc> argLabelLocs,
+                            SourceLoc rParenLoc,
+                            bool implicit = false);
+
+  unsigned getNumArguments() const { return numArgLabels; }
+  bool hasArgumentLabelLocs() const { return hasArgLabelLocs; }
+
+  TypeLoc &getTypeLoc() { return type; }
+  const TypeLoc &getTypeLoc() const { return type; }
+
+  Expr *getArg() const { return arg; }
+  void setArg(Expr *newArg) { arg = newArg; }
+
+  Expr *getSemanticInit() const { return semanticInit; }
+  void setSemanticInit(Expr *expr) { semanticInit = expr; }
+
+  PatternBindingInitializer *getInitContext() const { return initContext; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Custom;
+  }
+};
+
 // SWIFT_ENABLE_TENSORFLOW
 struct DeclNameWithLoc {
   DeclName Name;
@@ -1584,7 +1663,7 @@ public:
   }
 };
 
-/// \brief Attributes that may be applied to declarations.
+/// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
   DeclAttribute *DeclAttrs;
@@ -1621,6 +1700,11 @@ public:
   /// unavailable relative to the provided language version.
   bool
   isUnavailableInSwiftVersion(const version::Version &effectiveVersion) const;
+
+  /// Returns the first @available attribute that indicates
+  /// a declaration is unavailable, or the first one that indicates it's
+  /// potentially unavailable, or null otherwise.
+  const AvailableAttr *getPotentiallyUnavailable(const ASTContext &ctx) const;
 
   /// Returns the first @available attribute that indicates
   /// a declaration is unavailable, or null otherwise.
@@ -1754,6 +1838,8 @@ public:
 
   SourceLoc getStartLoc(bool forModifiers = false) const;
 };
+
+void simple_display(llvm::raw_ostream &out, const DeclAttribute *attr);
 
 } // end namespace swift
 

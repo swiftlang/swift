@@ -42,7 +42,7 @@ class Derived : Base<Int>, P {
 
 protocol R {}
 
-// CHECK-LABEL: sil hidden @$s21subclass_existentials11conversions8baseAndP7derived0fE1R0dE5PType0F4Type0fE5RTypeyAA1P_AA4BaseCySiGXc_AA7DerivedCAA1R_ANXcAaI_ALXcXpANmAaO_ANXcXptF : $@convention(thin) (@guaranteed Base<Int> & P, @guaranteed Derived, @guaranteed Derived & R, @thick (Base<Int> & P).Type, @thick Derived.Type, @thick (Derived & R).Type) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s21subclass_existentials11conversions8baseAndP7derived0fE1R0dE5PType0F4Type0fE5RTypeyAA1P_AA4BaseCySiGXc_AA7DerivedCAA1R_ANXcAaI_ALXcXpANmAaO_ANXcXptF : $@convention(thin) (@guaranteed Base<Int> & P, @guaranteed Derived, @guaranteed Derived & R, @thick (Base<Int> & P).Type, @thick Derived.Type, @thick (Derived & R).Type) -> () {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Base<Int> & P,
 
 func conversions(
@@ -110,7 +110,7 @@ func conversions(
   // CHECK: return
 }
 
-// CHECK-LABEL: sil hidden @$s21subclass_existentials11methodCalls8baseAndP0eF5PTypeyAA1P_AA4BaseCySiGXc_AaE_AHXcXptF : $@convention(thin) (@guaranteed Base<Int> & P, @thick (Base<Int> & P).Type) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s21subclass_existentials11methodCalls8baseAndP0eF5PTypeyAA1P_AA4BaseCySiGXc_AaE_AHXcXptF : $@convention(thin) (@guaranteed Base<Int> & P, @thick (Base<Int> & P).Type) -> () {
 
 func methodCalls(
   baseAndP: Base<Int> & P,
@@ -196,7 +196,7 @@ class PropertyC {
   }
 }
 
-// CHECK-LABEL: sil hidden @$s21subclass_existentials16propertyAccessesyyAA9PropertyP_AA0E1CCXcF : $@convention(thin) (@guaranteed PropertyC & PropertyP) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s21subclass_existentials16propertyAccessesyyAA9PropertyP_AA0E1CCXcF : $@convention(thin) (@guaranteed PropertyC & PropertyP) -> () {
 func propertyAccesses(_ x: PropertyP & PropertyC) {
   var xx = x
   xx.p.p = x
@@ -214,7 +214,7 @@ func propertyAccesses(_ x: PropertyP & PropertyC) {
   xx[(1, 2)] += 1
 }
 
-// CHECK-LABEL: sil hidden @$s21subclass_existentials19functionConversions15returnsBaseAndP0efG5PType0E7Derived0eI4Type0eiG1R0eiG5RTypeyAA1P_AA0F0CySiGXcyc_AaI_ALXcXpycAA0I0CycANmycAA1R_ANXcycAaO_ANXcXpyctF : $@convention(thin) (@guaranteed @callee_guaranteed () -> @owned Base<Int> & P, @guaranteed @callee_guaranteed () -> @thick (Base<Int> & P).Type, @guaranteed @callee_guaranteed () -> @owned Derived, @guaranteed @callee_guaranteed () -> @thick Derived.Type, @guaranteed @callee_guaranteed () -> @owned Derived & R, @guaranteed @callee_guaranteed () -> @thick (Derived & R).Type) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s21subclass_existentials19functionConversions15returnsBaseAndP0efG5PType0E7Derived0eI4Type0eiG1R0eiG5RTypeyAA1P_AA0F0CySiGXcyc_AaI_ALXcXpycAA0I0CycANmycAA1R_ANXcycAaO_ANXcXpyctF : $@convention(thin) (@guaranteed @callee_guaranteed () -> @owned Base<Int> & P, @guaranteed @callee_guaranteed () -> @thick (Base<Int> & P).Type, @guaranteed @callee_guaranteed () -> @owned Derived, @guaranteed @callee_guaranteed () -> @thick Derived.Type, @guaranteed @callee_guaranteed () -> @owned Derived & R, @guaranteed @callee_guaranteed () -> @thick (Derived & R).Type) -> () {
 func functionConversions(
   returnsBaseAndP: @escaping () -> (Base<Int> & P),
   returnsBaseAndPType: @escaping () -> (Base<Int> & P).Type,
@@ -245,13 +245,13 @@ func functionConversions(
   // CHECK-NEXT: }
 }
 
-// CHECK-LABEL: sil hidden @$s21subclass_existentials9downcasts8baseAndP7derived0dE5PType0F4TypeyAA1P_AA4BaseCySiGXc_AA7DerivedCAaG_AJXcXpALmtF : $@convention(thin) (@guaranteed Base<Int> & P, @guaranteed Derived, @thick (Base<Int> & P).Type, @thick Derived.Type) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s21subclass_existentials9downcasts8baseAndP7derived0dE5PType0F4TypeyAA1P_AA4BaseCySiGXc_AA7DerivedCAaG_AJXcXpALmtF : $@convention(thin) (@guaranteed Base<Int> & P, @guaranteed Derived, @thick (Base<Int> & P).Type, @thick Derived.Type) -> () {
 func downcasts(
   baseAndP: Base<Int> & P,
   derived: Derived,
   baseAndPType: (Base<Int> & P).Type,
   derivedType: Derived.Type) {
-  // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Base<Int> & P, [[ARG1:%.*]] : @guaranteed $Derived, [[ARG2:%.*]] : @trivial $@thick (Base<Int> & P).Type, [[ARG3:%.*]] : @trivial $@thick Derived.Type):
+  // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Base<Int> & P, [[ARG1:%.*]] : @guaranteed $Derived, [[ARG2:%.*]] : $@thick (Base<Int> & P).Type, [[ARG3:%.*]] : $@thick Derived.Type):
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG0]] : $Base<Int> & P
   // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to $Derived
   let _ = baseAndP as? Derived
@@ -290,7 +290,7 @@ func downcasts(
   // CHECK-NEXT: }
 }
 
-// CHECK-LABEL: sil hidden @$s21subclass_existentials16archetypeUpcasts9baseTAndP0E7IntAndP7derivedyq__q0_q1_tAA4BaseCyxGRb_AA1PR_AGySiGRb0_AaIR0_AA7DerivedCRb1_r2_lF : $@convention(thin) <T, BaseTAndP, BaseIntAndP, DerivedT where BaseTAndP : Base<T>, BaseTAndP : P, BaseIntAndP : Base<Int>, BaseIntAndP : P, DerivedT : Derived> (@guaranteed BaseTAndP, @guaranteed BaseIntAndP, @guaranteed DerivedT) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s21subclass_existentials16archetypeUpcasts9baseTAndP0E7IntAndP7derivedyq__q0_q1_tAA4BaseCyxGRb_AA1PR_AGySiGRb0_AaIR0_AA7DerivedCRb1_r2_lF : $@convention(thin) <T, BaseTAndP, BaseIntAndP, DerivedT where BaseTAndP : Base<T>, BaseTAndP : P, BaseIntAndP : Base<Int>, BaseIntAndP : P, DerivedT : Derived> (@guaranteed BaseTAndP, @guaranteed BaseIntAndP, @guaranteed DerivedT) -> () {
 func archetypeUpcasts<T,
                       BaseTAndP : Base<T> & P,
                       BaseIntAndP : Base<Int> & P,
@@ -315,7 +315,7 @@ func archetypeUpcasts<T,
   // CHECK-NEXT: }
 }
 
-// CHECK-LABEL: sil hidden @$s21subclass_existentials18archetypeDowncasts1s1t2pt5baseT0F3Int0f6TAndP_C00fg5AndP_C008derived_C00ji2R_C00fH10P_concrete0fgi2P_K0yx_q_q0_q1_q2_q3_q4_q5_AA1R_AA7DerivedCXcAA1P_AA4BaseCyq_GXcAaQ_ASySiGXctAaQR0_ATRb1_AURb2_ATRb3_AaQR3_AURb4_AaQR4_APRb5_r6_lF : $@convention(thin) <S, T, PT, BaseT, BaseInt, BaseTAndP, BaseIntAndP, DerivedT where PT : P, BaseT : Base<T>, BaseInt : Base<Int>, BaseTAndP : Base<T>, BaseTAndP : P, BaseIntAndP : Base<Int>, BaseIntAndP : P, DerivedT : Derived> (@in_guaranteed S, @in_guaranteed T, @in_guaranteed PT, @guaranteed BaseT, @guaranteed BaseInt, @guaranteed BaseTAndP, @guaranteed BaseIntAndP, @guaranteed DerivedT, @guaranteed Derived & R, @guaranteed Base<T> & P, @guaranteed Base<Int> & P) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s21subclass_existentials18archetypeDowncasts1s1t2pt5baseT0F3Int0f6TAndP_C00fg5AndP_C008derived_C00ji2R_C00fH10P_concrete0fgi2P_K0yx_q_q0_q1_q2_q3_q4_q5_AA1R_AA7DerivedCXcAA1P_AA4BaseCyq_GXcAaQ_ASySiGXctAaQR0_ATRb1_AURb2_ATRb3_AaQR3_AURb4_AaQR4_APRb5_r6_lF : $@convention(thin) <S, T, PT, BaseT, BaseInt, BaseTAndP, BaseIntAndP, DerivedT where PT : P, BaseT : Base<T>, BaseInt : Base<Int>, BaseTAndP : Base<T>, BaseTAndP : P, BaseIntAndP : Base<Int>, BaseIntAndP : P, DerivedT : Derived> (@in_guaranteed S, @in_guaranteed T, @in_guaranteed PT, @guaranteed BaseT, @guaranteed BaseInt, @guaranteed BaseTAndP, @guaranteed BaseIntAndP, @guaranteed DerivedT, @guaranteed Derived & R, @guaranteed Base<T> & P, @guaranteed Base<Int> & P) -> () {
 func archetypeDowncasts<S,
                         T,
                         PT : P,
@@ -338,7 +338,7 @@ func archetypeDowncasts<S,
   baseTAndP_concrete: Base<T> & P,
   baseIntAndP_concrete: Base<Int> & P) {
 
-  // CHECK: ([[ARG0:%.*]] : @trivial $*S, [[ARG1:%.*]] : @trivial $*T, [[ARG2:%.*]] : @trivial $*PT, [[ARG3:%.*]] : @guaranteed $BaseT, [[ARG4:%.*]] : @guaranteed $BaseInt, [[ARG5:%.*]] : @guaranteed $BaseTAndP, [[ARG6:%.*]] : @guaranteed $BaseIntAndP, [[ARG7:%.*]] : @guaranteed $DerivedT, [[ARG8:%.*]] : @guaranteed $Derived & R, [[ARG9:%.*]] : @guaranteed $Base<T> & P, [[ARG10:%.*]] : @guaranteed $Base<Int> & P)
+  // CHECK: ([[ARG0:%.*]] : $*S, [[ARG1:%.*]] : $*T, [[ARG2:%.*]] : $*PT, [[ARG3:%.*]] : @guaranteed $BaseT, [[ARG4:%.*]] : @guaranteed $BaseInt, [[ARG5:%.*]] : @guaranteed $BaseTAndP, [[ARG6:%.*]] : @guaranteed $BaseIntAndP, [[ARG7:%.*]] : @guaranteed $DerivedT, [[ARG8:%.*]] : @guaranteed $Derived & R, [[ARG9:%.*]] : @guaranteed $Base<T> & P, [[ARG10:%.*]] : @guaranteed $Base<Int> & P)
 
   // CHECK:      [[COPY:%.*]] = alloc_stack $S
   // CHECK-NEXT: copy_addr %0 to [initialization] [[COPY]] : $*S

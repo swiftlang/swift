@@ -52,7 +52,9 @@ static void printSyntaxKind(SyntaxKind Kind, llvm::raw_ostream &OS,
   OS << ">";
 }
 
-static void dumpTokenKind(llvm::raw_ostream &OS, tok Kind) {
+} // end of anonymous namespace
+
+void swift::dumpTokenKind(llvm::raw_ostream &OS, tok Kind) {
   switch (Kind) {
 #define TOKEN(X)                                                               \
   case tok::X:                                                                 \
@@ -64,8 +66,6 @@ static void dumpTokenKind(llvm::raw_ostream &OS, tok Kind) {
     break;
   }
 }
-
-} // end of anonymous namespace
 
 unsigned RawSyntax::NextFreeNodeId = 1;
 

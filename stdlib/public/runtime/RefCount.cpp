@@ -17,7 +17,10 @@ namespace swift {
 template <typename RefCountBits>
 void RefCounts<RefCountBits>::incrementSlow(RefCountBits oldbits,
                                             uint32_t n) {
-  if (oldbits.hasSideTable()) {
+  if (oldbits.isImmortal()) {
+    return;
+  }
+  else if (oldbits.hasSideTable()) {
     // Out-of-line slow path.
     auto side = oldbits.getSideTable();
     side->incrementStrong(n);
@@ -33,7 +36,10 @@ template void RefCounts<SideTableRefCountBits>::incrementSlow(SideTableRefCountB
 template <typename RefCountBits>
 void RefCounts<RefCountBits>::incrementNonAtomicSlow(RefCountBits oldbits,
                                                      uint32_t n) {
-  if (oldbits.hasSideTable()) {
+  if (oldbits.isImmortal()) {
+    return;
+  }
+  else if (oldbits.hasSideTable()) {
     // Out-of-line slow path.
     auto side = oldbits.getSideTable();
     side->incrementStrong(n);  // FIXME: can there be a nonatomic impl?
@@ -46,7 +52,10 @@ template void RefCounts<SideTableRefCountBits>::incrementNonAtomicSlow(SideTable
 
 template <typename RefCountBits>
 bool RefCounts<RefCountBits>::tryIncrementSlow(RefCountBits oldbits) {
-  if (oldbits.hasSideTable())
+  if (oldbits.isImmortal()) {
+    return true;
+  }
+  else if (oldbits.hasSideTable())
     return oldbits.getSideTable()->tryIncrement();
   else
     swift::swift_abortRetainOverflow();
@@ -56,7 +65,10 @@ template bool RefCounts<SideTableRefCountBits>::tryIncrementSlow(SideTableRefCou
 
 template <typename RefCountBits>
 bool RefCounts<RefCountBits>::tryIncrementNonAtomicSlow(RefCountBits oldbits) {
-  if (oldbits.hasSideTable())
+  if (oldbits.isImmortal()) {
+    return true;
+  }
+  else if (oldbits.hasSideTable())
     return oldbits.getSideTable()->tryIncrementNonAtomic();
   else
     swift::swift_abortRetainOverflow();
@@ -136,6 +148,12 @@ template <>
 void RefCounts<SideTableRefCountBits>::incrementUnownedSlow(uint32_t n) {
   // Overflow from side table to a new side table?!
   swift_abortUnownedRetainOverflow();
+}
+  
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+void _swift_stdlib_immortalize(void *obj) {
+  auto heapObj = reinterpret_cast<HeapObject *>(obj);
+  heapObj->refCounts.setIsImmortal(true);
 }
 
 // namespace swift
