@@ -2057,13 +2057,6 @@ TypeDecl *EquivalenceClass::lookupNestedType(
               != proto->getParentModule())
           continue;
 
-        // Resolve the signature of this type.
-        if (!type->hasInterfaceType()) {
-          type->getASTContext().getLazyResolver()->resolveDeclSignature(type);
-          if (!type->hasInterfaceType())
-            continue;
-        }
-
         concreteDecls.push_back(type);
         continue;
       }

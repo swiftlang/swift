@@ -4326,7 +4326,7 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
     // protocol, also use the RawRepresentable and _ErrorCodeProtocol
     // conformances on the Code associated type witness.
     if (auto codeType = ProtocolConformanceRef::getTypeWitnessByName(
-                          type, *conformance, Context.Id_Code, this)) {
+                          type, *conformance, Context.Id_Code)) {
       (void)conformsToProtocol(codeType, errorCodeProto, dc,
                                ConformanceCheckFlags::Used);
       (void)conformsToProtocol(codeType, rawProto, dc,
@@ -4341,7 +4341,7 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
                       ConformanceCheckFlags::Used));
   if (conformance && conformance->isConcrete()) {
     if (Type errorType = ProtocolConformanceRef::getTypeWitnessByName(
-          type, *conformance, Context.Id_ErrorType, this)) {
+          type, *conformance, Context.Id_ErrorType)) {
       (void)conformsToProtocol(errorType, bridgedStoredNSError, dc,
                                ConformanceCheckFlags::Used);
     }
@@ -5663,8 +5663,7 @@ Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
                                  ProtocolConformanceRef conformance,
                                  Identifier name,
                                  Diag<> brokenProtocolDiag) {
-  Type ty = ProtocolConformanceRef::getTypeWitnessByName(type, conformance,
-                                                         name, this);
+  Type ty = ProtocolConformanceRef::getTypeWitnessByName(type, conformance, name);
   if (!ty &&
       !(conformance.isConcrete() && conformance.getConcrete()->isInvalid()))
     diagnose(protocol->getLoc(), brokenProtocolDiag);

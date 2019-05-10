@@ -228,8 +228,13 @@ Type TypeResolution::resolveDependentMemberType(
   auto lazyResolver = ctx.getLazyResolver();
   if (lazyResolver)
     lazyResolver->resolveDeclSignature(concrete);
-  if (!concrete->hasInterfaceType())
+  if (!concrete->hasInterfaceType()) {
+    ctx.Diags.diagnose(ref->getIdLoc(), diag::recursive_decl_reference,
+                       concrete->getDescriptiveKind(), concrete->getName());
+    concrete->diagnose(diag::kind_declared_here,
+                       DescriptiveDeclKind::Type);
     return ErrorType::get(ctx);
+  }
 
   // Make sure that base type didn't get replaced along the way.
   assert(baseTy->isTypeParameter());
