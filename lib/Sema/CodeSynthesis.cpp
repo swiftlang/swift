@@ -2603,32 +2603,60 @@ static void synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn,
   auto *ctor = cast<ConstructorDecl>(fn);
   auto &ctx = ctor->getASTContext();
 
-  auto *bodyParams = ctor->getParameters();
   auto *superclassCtor = (ConstructorDecl *) context;
+
+  if (!superclassCtor->hasValidSignature())
+    ctx.getLazyResolver()->resolveDeclSignature(superclassCtor);
 
   // Reference to super.init.
   auto *selfDecl = ctor->getImplicitSelfDecl();
-  Expr *superRef = new (ctx) SuperRefExpr(selfDecl, SourceLoc(),
-                                          /*Implicit=*/true);
-  Expr *ctorRef  = new (ctx) UnresolvedDotExpr(superRef, SourceLoc(),
-                                               superclassCtor->getFullName(),
-                                               DeclNameLoc(),
-                                               /*Implicit=*/true);
+  auto *superRef = buildSelfReference(selfDecl, SelfAccessorKind::Super,
+                                      /*isLValue=*/false, ctx, true);
 
-  auto ctorArgs = buildArgumentForwardingExpr(bodyParams->getArray(), ctx, false);
+  SubstitutionMap subs;
+  if (auto *genericEnv = fn->getGenericEnvironment())
+    subs = genericEnv->getForwardingSubstitutionMap();
+  subs = SubstitutionMap::getOverrideSubstitutions(superclassCtor, fn, subs);
+  ConcreteDeclRef ctorRef(superclassCtor, subs);
 
-  Expr *superCall =
-    CallExpr::create(ctx, ctorRef, ctorArgs,
+  auto type = superclassCtor->getInitializerInterfaceType()
+      .subst(subs, SubstFlags::UseErrorType);
+  auto *ctorRefExpr =
+      new (ctx) OtherConstructorDeclRefExpr(ctorRef, DeclNameLoc(),
+                                            IsImplicit, type);
+
+  if (auto *funcTy = type->getAs<FunctionType>())
+    type = funcTy->getResult();
+  auto *superclassCtorRefExpr =
+      new (ctx) DotSyntaxCallExpr(ctorRefExpr, SourceLoc(), superRef, type);
+  superclassCtorRefExpr->setIsSuper(true);
+
+  auto *bodyParams = ctor->getParameters();
+  auto ctorArgs = buildArgumentForwardingExpr(bodyParams->getArray(), ctx, true);
+  Expr *superclassCallExpr =
+    CallExpr::create(ctx, superclassCtorRefExpr, ctorArgs,
                      superclassCtor->getFullName().getArgumentNames(), { },
                      /*hasTrailingClosure=*/false, /*implicit=*/true);
+
+  if (auto *funcTy = type->getAs<FunctionType>())
+    type = funcTy->getResult();
+  superclassCallExpr->setType(type);
+
   if (superclassCtor->hasThrows()) {
-    superCall = new (ctx) TryExpr(SourceLoc(), superCall, Type(),
-                                  /*implicit=*/true);
+    superclassCallExpr = new (ctx) TryExpr(SourceLoc(), superclassCallExpr,
+                                           type, /*implicit=*/true);
   }
-  ctor->setBody(BraceStmt::create(ctx, SourceLoc(),
-                                  ASTNode(superCall),
-                                  SourceLoc(),
+
+  auto *rebindSelfExpr =
+    new (ctx) RebindSelfInConstructorExpr(superclassCallExpr,
+                                          selfDecl);
+
+  SmallVector<ASTNode, 2> stmts;
+  stmts.push_back(rebindSelfExpr);
+  stmts.push_back(new (ctx) ReturnStmt(SourceLoc(), /*Result=*/nullptr));
+  ctor->setBody(BraceStmt::create(ctx, SourceLoc(), stmts, SourceLoc(),
                                   /*implicit=*/true));
+  ctor->setBodyTypeCheckedIfPresent();
 }
 
 ConstructorDecl *
@@ -2678,7 +2706,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   // like 'class A : B<Int>'.
   for (auto *decl : *bodyParams) {
     auto paramTy = decl->getInterfaceType();
-    auto substTy = paramTy.subst(subMap);
+    auto substTy = paramTy.subst(subMap, SubstFlags::UseErrorType);
     decl->setInterfaceType(substTy);
   }
 
