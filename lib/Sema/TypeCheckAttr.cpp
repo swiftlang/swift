@@ -3085,14 +3085,13 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         required.getOptGenericSignature())
       return false;
 
-    // Check that parameter types match (disregards labels).
-    if (candidateFnTy.getParams().size() != required.getParams().size())
+    // Check that parameter types match, disregarding labels.
+    if (!std::equal(required.getParams().begin(), required.getParams().end(),
+                    candidateFnTy.getParams().begin(),
+                    [](AnyFunctionType::Param x, AnyFunctionType::Param y) {
+                      return x.getPlainType()->isEqual(y.getPlainType());
+                    }))
       return false;
-    for (auto paramPair : llvm::zip(candidateFnTy.getParams(),
-                                    required.getParams()))
-      if (!std::get<0>(paramPair).getPlainType()->isEqual(
-          std::get<1>(paramPair).getPlainType()))
-        return false;
 
     // If required result type is non-function, check that result types match.
     // If result types are tuple types, ignore labels.
@@ -3106,15 +3105,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         return required.getResult()->isEqual(candidateFnTy.getResult());
       // If result types are tuple types, check that element types match,
       // ignoring labels.
-      if (requiredResultTupleTy->getNumElements() !=
-          candidateResultTupleTy->getNumElements())
-        return false;
-      return llvm::all_of(llvm::zip(requiredResultTupleTy->getElementTypes(),
-                                    candidateResultTupleTy->getElementTypes()),
-                          [](std::tuple<Type, Type> pair) {
-                            return std::get<0>(pair)->isEqual(
-                                std::get<1>(pair));
-                          });
+      return std::equal(requiredResultTupleTy->getElementTypes().begin(),
+                        requiredResultTupleTy->getElementTypes().end(),
+                        candidateResultTupleTy->getElementTypes().begin(),
+                        [](Type x, Type y) { return x->isEqual(y); });
     }
 
     // Required result type is a function. Recurse.

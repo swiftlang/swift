@@ -287,9 +287,11 @@ extension InstanceMethodProto where Self : Differentiable {
 func consistentSpecifiedDerivatives(_ x: Float) -> Float {
   return x
 }
+@differentiating(consistentSpecifiedDerivatives)
 func jvpConsistent(_ x: Float) -> (value: Float, differential: (Float) -> Float) {
   return (x, { $0 })
 }
+@differentiating(consistentSpecifiedDerivatives(_:))
 func vjpConsistent(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   return (x, { $0 })
 }
