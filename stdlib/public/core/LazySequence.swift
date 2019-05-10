@@ -45,10 +45,10 @@
 ///         ///     (1..<6).scan(0, +) // [0, 1, 3, 6, 10, 15]
 ///         ///
 ///         /// - Complexity: O(n)
-///         func scan<ResultElement>(
-///             _ initial: ResultElement,
-///             _ nextPartialResult: (ResultElement, Element) -> ResultElement
-///         ) -> [ResultElement] {
+///         func scan<Result>(
+///             _ initial: Result,
+///             _ nextPartialResult: (Result, Element) -> Result
+///         ) -> [Result] {
 ///             var result = [initial]
 ///             for x in self {
 ///                 result.append(nextPartialResult(result.last!, x))
@@ -60,21 +60,21 @@
 /// You can build a sequence type that lazily computes the elements in the
 /// result of a scan:
 ///
-///     struct LazyScanSequence<Base: Sequence, ResultElement>
+///     struct LazyScanSequence<Base: Sequence, Result>
 ///         : LazySequenceProtocol
 ///     {
-///         let initial: ResultElement
+///         let initial: Result
 ///         let base: Base
 ///         let nextPartialResult:
-///             (ResultElement, Base.Element) -> ResultElement
+///             (Result, Base.Element) -> Result
 ///
 ///         struct Iterator: IteratorProtocol {
 ///             var base: Base.Iterator
-///             var nextElement: ResultElement?
+///             var nextElement: Result?
 ///             let nextPartialResult:
-///                 (ResultElement, Base.Element) -> ResultElement
+///                 (Result, Base.Element) -> Result
 ///             
-///             mutating func next() -> ResultElement? {
+///             mutating func next() -> Result? {
 ///                 return nextElement.map { result in
 ///                     nextElement = base.next().map {
 ///                         nextPartialResult(result, $0)
@@ -87,7 +87,7 @@
 ///         func makeIterator() -> Iterator {
 ///             return Iterator(
 ///                 base: base.makeIterator(),
-///                 nextElement: initial as ResultElement?,
+///                 nextElement: initial as Result?,
 ///                 nextPartialResult: nextPartialResult)
 ///         }
 ///     }
@@ -95,11 +95,11 @@
 /// Finally, you can give all lazy sequences a lazy `scan(_:_:)` method:
 ///     
 ///     extension LazySequenceProtocol {
-///         func scan<ResultElement>(
-///             _ initial: ResultElement,
-///             _ nextPartialResult: @escaping (ResultElement, Element) -> ResultElement
-///         ) -> LazyScanSequence<Self, ResultElement> {
-///             return LazyScanSequence<Self, ResultElement>(
+///         func scan<Result>(
+///             _ initial: Result,
+///             _ nextPartialResult: @escaping (Result, Element) -> Result
+///         ) -> LazyScanSequence<Self, Result> {
+///             return LazyScanSequence(
 ///                 initial: initial, base: self, nextPartialResult: nextPartialResult)
 ///         }
 ///     }
