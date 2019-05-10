@@ -28,6 +28,18 @@ var ResilientClassTestSuite = TestSuite("ResilientClass")
 
 class ResilientNSObjectSubclass : ResilientNSObjectOutsideParent {}
 
+@_optimize(none) func blackHole<T>(_: T) {}
+
+@_optimize(none) func forceMetadata() {
+  blackHole(ResilientNSObjectSubclass())
+}
+
+// This should not crash on older runtimes because we check before
+// attempting to register the class stub.
+ResilientClassTestSuite.test("RealizeResilientClass") {
+  forceMetadata()
+}
+
 @objc protocol MyProtocol {
   func myMethod() -> Int
 }
@@ -59,22 +71,6 @@ ResilientClassTestSuite.test("category on other class")
   .code {
   let o = ResilientNSObjectOutsideParent()
   expectEqual(69, (o as AnotherProtocol).anotherMethod())
-}
-
-@_optimize(none) func blackHole<T>(_: T) {}
-
-@_optimize(none) func forceMetadata() {
-  blackHole(ResilientNSObjectSubclass())
-}
-
-if loadClassrefMissing {
-  ResilientClassTestSuite.test("RealizeResilientClass")
-    .crashOutputMatches("class ResilientNSObjectSubclass requires missing Objective-C runtime feature")
-    .code {
-      expectCrashLater()
-      print("About to crash...")
-      forceMetadata()
-    }
 }
 
 runAllTests()
