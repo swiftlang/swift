@@ -25,7 +25,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Returns: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func minimum<U>(_ vectorA: U,
                                   _ vectorB: U) -> [Float]
@@ -52,7 +52,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Parameter result: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func minimum<U, V>(_ vectorA: U,
                                      _ vectorB: U,
@@ -83,7 +83,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Returns: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func minimum<U>(_ vectorA: U,
                                   _ vectorB: U) -> [Double]
@@ -110,7 +110,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Parameter result: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func minimum<U, V>(_ vectorA: U,
                                      _ vectorB: U,
@@ -143,7 +143,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
     /// - Parameter vectorB: the `b` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
     /// - Returns: the `c` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func maximum<U>(_ vectorA: U,
                                   _ vectorB: U) -> [Float]
@@ -170,7 +170,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
     /// - Parameter vectorB: the `b` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
     /// - Parameter result: the `c` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func maximum<U, V>(_ vectorA: U,
                                      _ vectorB: U,
@@ -201,7 +201,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
     /// - Parameter vectorB: the `b` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
     /// - Returns: the `c` in `c[i] = `c[i] = a[i] > b[i] ? a[i] : b[i]`
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func maximum<U>(_ vectorA: U,
                                   _ vectorB: U) -> [Double]
@@ -228,7 +228,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
     /// - Parameter vectorB: the `b` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
     /// - Parameter result: the `c` in `c[i] = a[i] > b[i] ? a[i] : b[i]`
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func maximum<U, V>(_ vectorA: U,
                                      _ vectorB: U,
@@ -268,7 +268,7 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     /// - Parameter result: The output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func absolute<U>(_ vector: U) -> [Float]
         where
@@ -292,7 +292,7 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     /// - Parameter result: The output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func absolute<U, V>(_ vector: U,
                                       result: inout V)
@@ -318,7 +318,7 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     /// - Parameter result: The output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func absolute<U>(_ vector: U) -> [Double]
         where
@@ -342,7 +342,7 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     /// - Parameter result: The output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func absolute<U, V>(_ vector: U,
                                       result: inout V)
@@ -367,7 +367,7 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     /// - Parameter result: The output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func negativeAbsolute<U>(_ vector: U) -> [Float]
         where
@@ -391,7 +391,7 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     /// - Parameter result: The output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func negativeAbsolute<U, V>(_ vector: U,
                                               result: inout V)
@@ -416,7 +416,7 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     /// - Parameter result: The output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func negativeAbsolute<U>(_ vector: U) -> [Double]
         where
@@ -440,7 +440,7 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     /// - Parameter result: The output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func negativeAbsolute<U, V>(_ vector: U,
                                               result: inout V)
@@ -465,7 +465,7 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     /// - Parameter result: The output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func negative<U>(_ vector: U) -> [Float]
         where
@@ -489,7 +489,7 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     /// - Parameter result: The output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func negative<U, V>(_ vector: U,
                                       result: inout V)
@@ -514,7 +514,7 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     /// - Parameter result: The output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func negative<U>(_ vector: U) -> [Double]
         where
@@ -538,7 +538,7 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     /// - Parameter result: The output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func negative<U, V>(_ vector: U,
                                       result: inout V)
@@ -572,7 +572,7 @@ extension vDSP {
     /// Reverses an array of single-precision values in-place.
     ///
     /// - Parameter vector: The array to reverse.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func reverse<V>(_ vector: inout V)
         where
@@ -590,7 +590,7 @@ extension vDSP {
     /// Reverses an array of double-precision values in-place.
     ///
     /// - Parameter vector: The array to reverse.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func reverse<V>(_ vector: inout V)
         where
@@ -616,7 +616,7 @@ extension vDSP {
     ///
     /// - Parameter vector: The array to sort.
     /// - Parameter sortOrder: The sort direction.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sort<V>(_ vector: inout V,
                                sortOrder: SortOrder)
@@ -637,7 +637,7 @@ extension vDSP {
     ///
     /// - Parameter vector: The array to sort.
     /// - Parameter sortOrder: The sort direction.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sort<V>(_ vector: inout V,
                                sortOrder: SortOrder)
@@ -670,7 +670,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Returns: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func square<U>(_ vector: U) -> [Float]
         where
@@ -693,7 +693,7 @@ extension vDSP {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func square<U, V>(_ vector: U,
                                     result: inout V)
@@ -720,7 +720,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Returns: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func square<U>(_ vector: U) -> [Double]
         where
@@ -743,7 +743,7 @@ extension vDSP {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func square<U, V>(_ vector: U,
                                     result: inout V)
@@ -772,7 +772,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Returns: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func signedSquare<U>(_ vector: U) -> [Float]
         where
@@ -795,7 +795,7 @@ extension vDSP {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func signedSquare<U, V>(_ vector: U,
                                           result: inout V)
@@ -822,7 +822,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Returns: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func signedSquare<U>(_ vector: U) -> [Double]
         where
@@ -845,7 +845,7 @@ extension vDSP {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func signedSquare<U, V>(_ vector: U,
                                           result: inout V)
@@ -874,7 +874,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Returns: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func trunc<U>(_ vector: U) -> [Float]
         where
@@ -897,7 +897,7 @@ extension vDSP {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func trunc<U, V>(_ vector: U,
                                    result: inout V)
@@ -924,7 +924,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Parameter vectorB: the `b` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
     /// - Returns: the `c` in `c[i] = a[i] < b[i] ? a[i] : b[i]`
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func trunc<U>(_ vector: U) -> [Double]
         where
@@ -947,7 +947,7 @@ extension vDSP {
     ///
     /// - Parameter _ vector: Input values.
     /// - Parameter result: Output values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func trunc<U, V>(_ vector: U,
                                    result: inout V)
@@ -975,7 +975,7 @@ extension vDSP {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: The total number of transitions from positive to negative values and from negative to positive values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func countZeroCrossings<U>(_ vector: U) -> UInt
         where
@@ -1001,7 +1001,7 @@ extension vDSP {
     ///
     /// - Parameter _ vector: Input values.
     /// - Returns: The total number of transitions from positive to negative values and from negative to positive values.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func countZeroCrossings<U>(_ vector: U) -> UInt
         where
