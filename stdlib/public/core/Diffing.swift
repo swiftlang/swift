@@ -54,7 +54,7 @@ extension CollectionDifference {
 }
 
 extension RangeReplaceableCollection {
-  /// Applies a difference to a collection.
+  /// Applies the given difference to this collection.
   ///
   /// - Parameter difference: The difference to be applied.
   ///
@@ -112,23 +112,24 @@ extension RangeReplaceableCollection {
 // MARK: Definition of API
 
 extension BidirectionalCollection {
-  /// Returns the difference needed to produce the receiver's state from the
-  /// parameter's state, using the provided closure to establish equivalence
-  /// between elements.
+  /// Returns the difference needed to produce this collection's ordered 
+  /// elements from the given collection, using the given predicate as an 
+  /// equivalence test.
   ///
-  /// This function does not infer moves.
+  /// This function does not infer element moves. If you need to infer moves,
+  /// call the `inferringMoves()` method on the resulting difference.
   ///
   /// - Parameters:
   ///   - other: The base state.
-  ///   - areEquivalent: A closure that returns whether the two
-  ///     parameters are equivalent.
+  ///   - areEquivalent: A closure that returns a Boolean value indicating 
+  ///     whether two elements are equivalent.
   ///
   /// - Returns: The difference needed to produce the reciever's state from
   ///   the parameter's state.
   ///
-  /// - Complexity: For pathological inputs, worst case performance is
-  ///   O(`self.count` * `other.count`). Faster execution can be expected
-  ///   when the collections share many common elements.
+  /// - Complexity: Worst case performance is O(*n* * *m*), where *n* is the 
+  ///   count of this collection and *m* is `other.count`. You can expect 
+  ///   faster execution when the collections share many common elements.
   @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
   public func difference<C: BidirectionalCollection>(
     from other: C,
@@ -167,23 +168,22 @@ extension BidirectionalCollection {
 }
 
 extension BidirectionalCollection where Element : Equatable {
-  /// Returns the difference needed to produce the receiver's state from the
-  /// parameter's state, using equality to establish equivalence between
-  /// elements.
+  /// Returns the difference needed to produce this collection's ordered 
+  /// elements from the given collection.
   ///
-  /// This function does not infer element moves, but they can be computed
-  /// using `CollectionDifference.inferringMoves()` if desired.
+  /// This function does not infer element moves. If you need to infer moves,
+  /// call the `inferringMoves()` method on the resulting difference.
   ///
   /// - Parameters:
   ///   - other: The base state.
   ///
-  /// - Returns: The difference needed to produce the reciever's state from
-  ///   the parameter's state.
+  /// - Returns: The difference needed to produce this collection's ordered 
+  ///   elements from the given collection.
   ///
-  /// - Complexity: For pathological inputs, worst case performance is
-  ///   O(`self.count` * `other.count`). Faster execution can be expected
-  ///   when the collections share many common elements, or if `Element`
-  ///   also conforms to `Hashable`.
+  /// - Complexity: Worst case performance is O(*n* * *m*), where *n* is the 
+  ///   count of this collection and *m* is `other.count`. You can expect 
+  ///   faster execution when the collections share many common elements, or 
+  ///   if `Element` conforms to `Hashable`.
   @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
   public func difference<C: BidirectionalCollection>(
     from other: C
