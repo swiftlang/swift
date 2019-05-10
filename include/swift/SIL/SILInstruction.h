@@ -7031,6 +7031,11 @@ public:
   SuccessorListTy getSuccessors() {
     return DestBBs;
   }
+
+  SILYieldInfo getYieldInfoForOperand(const Operand &op) const;
+
+  SILArgumentConvention
+  getArgumentConventionForOperand(const Operand &op) const;
 };
 
 /// BranchInst - An unconditional branch.
