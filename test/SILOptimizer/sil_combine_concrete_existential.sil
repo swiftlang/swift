@@ -499,3 +499,36 @@ bb0(%0 : $Array<Int>):
   %25 = tuple ()
   return %25 : $()
 }
+
+struct InGuaranteedArgTestNativeObjectWrapper {
+  var i: Builtin.NativeObject
+}
+
+protocol InGuaranteedArgTestProtocol {}
+extension InGuaranteedArgTestNativeObjectWrapper : InGuaranteedArgTestProtocol {}
+
+sil @in_guaranteed_arg_test_callee : $@convention(thin) <τ_0_0 where τ_0_0 : InGuaranteedArgTestProtocol> (@in τ_0_0) -> ()
+
+// The current transformation is not smart enough to remove the
+// destroy_addr. Simply substituting the copy source for the apply argument
+// would introduce a use-after-free. = (.
+//
+// CHECK-LABEL: sil @in_guaranteed_arg_test_caller : $@convention(thin) <τ_0_0 where τ_0_0 : InGuaranteedArgTestProtocol> (@in τ_0_0) -> () {
+// CHECK: apply {{%.*}}<@opened("C494A60E-71EA-11E9-B8C0-D0817AD3F8AD") InGuaranteedArgTestProtocol>
+// CHECK: } // end sil function 'in_guaranteed_arg_test_caller'
+sil @in_guaranteed_arg_test_caller : $@convention(thin) <τ_0_0 where τ_0_0 : InGuaranteedArgTestProtocol> (@in τ_0_0) -> () {
+bb0(%0 : $*τ_0_0):
+  %1 = alloc_stack $InGuaranteedArgTestProtocol
+  %2 = init_existential_addr %1 : $*InGuaranteedArgTestProtocol, $τ_0_0
+  copy_addr [take] %0 to [initialization] %2 : $*τ_0_0
+  %3 = function_ref @in_guaranteed_arg_test_callee : $@convention(thin) <τ_0_0 where τ_0_0 : InGuaranteedArgTestProtocol> (@in τ_0_0) -> ()
+  %4 = alloc_stack $InGuaranteedArgTestProtocol
+  copy_addr %1 to [initialization] %4 : $*InGuaranteedArgTestProtocol
+  %5 = open_existential_addr mutable_access %4 : $*InGuaranteedArgTestProtocol to $*@opened("C494A60E-71EA-11E9-B8C0-D0817AD3F8AD") InGuaranteedArgTestProtocol
+  apply %3<@opened("C494A60E-71EA-11E9-B8C0-D0817AD3F8AD") InGuaranteedArgTestProtocol>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : InGuaranteedArgTestProtocol> (@in τ_0_0) -> ()
+  dealloc_stack %4 : $*InGuaranteedArgTestProtocol
+  destroy_addr %1 : $*InGuaranteedArgTestProtocol
+  dealloc_stack %1 : $*InGuaranteedArgTestProtocol
+  %9999 = tuple()
+  return %9999 : $()
+}
