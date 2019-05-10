@@ -2082,6 +2082,13 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
     Status.setIsParseError();
     return makeParserResult(Status, new (Context) ErrorExpr(Loc));
   }
+    
+  // The simple case: just a single literal segment.
+  if (Segments.size() == 1 &&
+      Segments.front().Kind == Lexer::StringSegment::Literal) {
+    return makeParserResult(
+                            createStringLiteralExprFromSegment(Context, L, Segments.front(), Loc));
+  }
 
   return makeParserResult(Status, new (Context) InterpolatedStringLiteralExpr(
                                       Loc, LiteralCapacity, InterpolationCount,
