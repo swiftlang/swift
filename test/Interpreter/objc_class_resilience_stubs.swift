@@ -3,7 +3,7 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_struct)) -enable-library-evolution %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule
 // RUN: %target-codesign %t/%target-library-name(resilient_struct)
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_objc_class)) -I %t -L %t -lresilient_struct -enable-library-evolution %S/../Inputs/resilient_objc_class.swift -emit-module -emit-module-path %t/resilient_objc_class.swiftmodule -Xfrontend -enable-resilient-objc-class-stubs
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_objc_class)) -I %t -L %t -lresilient_struct -enable-library-evolution %S/../Inputs/resilient_objc_class.swift -emit-module -emit-module-path %t/resilient_objc_class.swiftmodule
 // RUN: %target-codesign %t/%target-library-name(resilient_objc_class)
 
 // RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -lresilient_objc_class -o %t/main %target-rpath(%t) -Xfrontend -enable-resilient-objc-class-stubs
