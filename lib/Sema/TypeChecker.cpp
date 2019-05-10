@@ -341,16 +341,6 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
       llvm_unreachable("Unhandled external definition kind");
     }
 
-    // Complete any protocol requirement signatures that were delayed
-    // because the protocol was validated via validateDeclForNameLookup().
-    while (!TC.DelayedRequirementSignatures.empty()) {
-      auto decl = TC.DelayedRequirementSignatures.pop_back_val();
-      if (decl->isInvalid() || TC.Context.hadError())
-        continue;
-
-      TC.validateDecl(decl);
-    }
-
     // Validate any referenced declarations for SIL's purposes.
     // Note: if we ever start putting extension members in vtables, we'll need
     // to validate those members too.
@@ -398,7 +388,6 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
            currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
            TC.NextDeclToFinalize < TC.DeclsToFinalize.size() ||
            !TC.ConformanceContexts.empty() ||
-           !TC.DelayedRequirementSignatures.empty() ||
            !TC.UsedConformances.empty() ||
            !TC.PartiallyCheckedConformances.empty());
 
