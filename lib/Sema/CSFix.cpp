@@ -161,15 +161,15 @@ RelabelArguments::create(ConstraintSystem &cs,
 
 bool MissingConformance::diagnose(Expr *root, bool asNote) const {
   MissingConformanceFailure failure(root, getConstraintSystem(), getLocator(),
-                                    {NonConformingType, Protocol});
+                                    {NonConformingType, ProtocolType});
   return failure.diagnose(asNote);
 }
 
 MissingConformance *MissingConformance::create(ConstraintSystem &cs, Type type,
-                                               ProtocolDecl *protocol,
+                                               Type protocolType,
                                                ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      MissingConformance(cs, type, protocol, locator);
+      MissingConformance(cs, type, protocolType, locator);
 }
 
 bool SkipSameTypeRequirement::diagnose(Expr *root, bool asNote) const {

@@ -3335,8 +3335,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           return SolutionKind::Error;
       }
 
-      auto *fix = MissingConformance::create(*this, type, protocol,
-                                             getConstraintLocator(locator));
+      auto *fix =
+          MissingConformance::create(*this, type, protocol->getDeclaredType(),
+                                     getConstraintLocator(locator));
       if (!recordFix(fix))
         return SolutionKind::Solved;
     }

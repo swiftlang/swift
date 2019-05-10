@@ -364,12 +364,13 @@ private:
 /// Add a new conformance to the type to satisfy a requirement.
 class MissingConformance final : public ConstraintFix {
   Type NonConformingType;
-  ProtocolDecl *Protocol;
+  // This could either be a protocol or protocol composition.
+  Type ProtocolType;
 
-  MissingConformance(ConstraintSystem &cs, Type type, ProtocolDecl *protocol,
+  MissingConformance(ConstraintSystem &cs, Type type, Type protocolType,
                      ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AddConformance, locator),
-        NonConformingType(type), Protocol(protocol) {}
+        NonConformingType(type), ProtocolType(protocolType) {}
 
 public:
   std::string getName() const override {
@@ -379,12 +380,12 @@ public:
   bool diagnose(Expr *root, bool asNote = false) const override;
 
   static MissingConformance *create(ConstraintSystem &cs, Type type,
-                                    ProtocolDecl *protocol,
+                                    Type protocolType,
                                     ConstraintLocator *locator);
 
   Type getNonConformingType() { return NonConformingType; }
 
-  ProtocolDecl *getProtocol() { return Protocol; }
+  Type getProtocolType() { return ProtocolType; }
 };
 
 /// Skip same-type generic requirement constraint,
