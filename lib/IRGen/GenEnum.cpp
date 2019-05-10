@@ -1334,11 +1334,6 @@ namespace {
         PayloadBitCount = ~0u;
       }
     }
-    
-    ~PayloadEnumImplStrategyBase() override {
-      if (auto schema = PayloadSchema.getSchema())
-        delete schema;
-    }
 
     void getSchema(ExplosionSchema &schema) const override {
       if (TIK < Loadable) {
