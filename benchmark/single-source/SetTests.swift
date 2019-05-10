@@ -617,52 +617,52 @@ public let SetTests = [
 
   BenchmarkInfo(
     name: "Set.subtracting.Seq.Empty.Int",
-    runFunction: { n in run_SetSubtractingSeqInt(setE, arrayAB, 0, 1000 * n) },
+    runFunction: { n in run_SetSubtractingSeqInt(setE, arrayAB, 0, 5000 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setE, arrayAB]) }),
   BenchmarkInfo(
     name: "Set.subtracting.Seq.Int.Empty",
-    runFunction: { n in run_SetSubtractingSeqInt(setAB, arrayE, countAB, 1000 * n) },
+    runFunction: { n in run_SetSubtractingSeqInt(setAB, arrayE, countAB, 5000 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, arrayE]) }),
   BenchmarkInfo(
     name: "Set.subtracting.Seq.Empty.Box",
-    runFunction: { n in run_SetSubtractingSeqBox(setOE, arrayOAB, 0, 1000 * n) },
+    runFunction: { n in run_SetSubtractingSeqBox(setOE, arrayOAB, 0, 5000 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOE, arrayOAB]) }),
   BenchmarkInfo(
     name: "Set.subtracting.Seq.Box.Empty",
-    runFunction: { n in run_SetSubtractingSeqBox(setOAB, arrayOE, countAB, 1000 * n) },
+    runFunction: { n in run_SetSubtractingSeqBox(setOAB, arrayOE, countAB, 5000 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOAB, arrayOE]) }),
   BenchmarkInfo(
     name: "Set.subtracting.Seq.Int0",
-    runFunction: { n in run_SetSubtractingSeqInt(setAB, arrayCD, countAB, 10 * n) },
+    runFunction: { n in run_SetSubtractingSeqInt(setAB, arrayCD, countAB, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, arrayCD]) }),
   BenchmarkInfo(
     name: "Set.subtracting.Seq.Box0",
-    runFunction: { n in run_SetSubtractingSeqBox(setOAB, arrayOCD, countAB, 10 * n) },
+    runFunction: { n in run_SetSubtractingSeqBox(setOAB, arrayOCD, countAB, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOAB, arrayOCD]) }),
   BenchmarkInfo(
     name: "Set.subtracting.Seq.Int25",
-    runFunction: { n in run_SetSubtractingSeqInt(setAB, arrayBC, countA, 10 * n) },
+    runFunction: { n in run_SetSubtractingSeqInt(setAB, arrayBC, countA, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, arrayBC]) }),
   BenchmarkInfo(
     name: "Set.subtracting.Seq.Box25",
-    runFunction: { n in run_SetSubtractingSeqBox(setOAB, arrayOBC, countA, 10 * n) },
+    runFunction: { n in run_SetSubtractingSeqBox(setOAB, arrayOBC, countA, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOAB, arrayOBC]) }),
   BenchmarkInfo(
     name: "Set.subtracting.Seq.Int50",
-    runFunction: { n in run_SetSubtractingSeqInt(setXY, arrayYZ, half, 10 * n) },
+    runFunction: { n in run_SetSubtractingSeqInt(setXY, arrayYZ, half, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setXY, arrayYZ]) }),
   BenchmarkInfo(
     name: "Set.subtracting.Seq.Int100",
-    runFunction: { n in run_SetSubtractingSeqInt(setP, arrayP, 0, 10 * n) },
+    runFunction: { n in run_SetSubtractingSeqInt(setP, arrayP, 0, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setP, arrayP]) }),
 
