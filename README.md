@@ -40,7 +40,7 @@ You will also need [CMake](https://cmake.org), [Ninja](https://ninja-build.org),
 
 ```shell
 brew install cmake ninja
-brew cask install caskroom/versions/java8 # required for Bazel
+brew cask install java # required for Bazel
 ```
 
 Additionally, [Bazel](https://www.bazel.build) v0.22.0 is required to build with TensorFlow support. Instructions to download Bazel directly can be found [below](###bazel). You can find instructions for installing CMake, and Ninja directly [below](#build-dependencies) as well.
