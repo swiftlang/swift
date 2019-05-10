@@ -114,7 +114,8 @@ void TBDGenVisitor::addBaseConformanceDescriptor(
 }
 
 void TBDGenVisitor::addConformances(DeclContext *DC) {
-  for (auto conformance : DC->getLocalConformances()) {
+  for (auto conformance : DC->getLocalConformances(
+                            ConformanceLookupKind::NonInherited)) {
     auto protocol = conformance->getProtocol();
     auto needsWTable =
         Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
