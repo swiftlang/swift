@@ -780,6 +780,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
     newMember->copyFormalAccessFrom(member, /*sourceIsParentContext*/ true);
     newMember->setValidationToChecked();
     newMember->setSetterAccess(member->getFormalAccess());
+    addExpectedOpaqueAccessorsToStorage(newMember, C);
     C.addSynthesizedDecl(newMember);
     C.addSynthesizedDecl(memberBinding);
 
