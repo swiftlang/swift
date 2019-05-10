@@ -160,14 +160,14 @@ public let SetTests = [
     setUpFunction: { blackHole([setB, arrayBC]) }),
   BenchmarkInfo(
     name: "Set.isSubset.Seq.Box25",
-    runFunction: { n in run_SetIsSubsetSeqBox(setOB, arrayOAB, true, 50 * n) },
+    runFunction: { n in run_SetIsSubsetSeqBox(setOB, arrayOBC, true, 50 * n) },
     tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setOB, arrayOAB]) }),
+    setUpFunction: { blackHole([setOB, arrayOBC]) }),
   BenchmarkInfo(
     name: "Set.isSubset.Seq.Int50",
-    runFunction: { n in run_SetIsSubsetSeqInt(setY, arrayXY, true, 50 * n) },
+    runFunction: { n in run_SetIsSubsetSeqInt(setY, arrayYZ, true, 50 * n) },
     tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setY, arrayXY]) }),
+    setUpFunction: { blackHole([setY, arrayYZ]) }),
   BenchmarkInfo(
     name: "Set.isSubset.Seq.Int100",
     runFunction: { n in run_SetIsSubsetSeqInt(setP, arrayP, true, 50 * n) },
@@ -242,14 +242,14 @@ public let SetTests = [
     setUpFunction: { blackHole([setB, arrayBC]) }),
   BenchmarkInfo(
     name: "Set.isStrictSubset.Seq.Box25",
-    runFunction: { n in run_SetIsStrictSubsetSeqBox(setOB, arrayOAB, true, 50 * n) },
+    runFunction: { n in run_SetIsStrictSubsetSeqBox(setOB, arrayOBC, true, 50 * n) },
     tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setOB, arrayOAB]) }),
+    setUpFunction: { blackHole([setOB, arrayOBC]) }),
   BenchmarkInfo(
     name: "Set.isStrictSubset.Seq.Int50",
-    runFunction: { n in run_SetIsStrictSubsetSeqInt(setY, arrayXY, true, 50 * n) },
+    runFunction: { n in run_SetIsStrictSubsetSeqInt(setY, arrayYZ, true, 50 * n) },
     tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setY, arrayXY]) }),
+    setUpFunction: { blackHole([setY, arrayYZ]) }),
   BenchmarkInfo(
     name: "Set.isStrictSubset.Seq.Int100",
     runFunction: { n in run_SetIsStrictSubsetSeqInt(setP, arrayP, false, 50 * n) },
@@ -283,14 +283,14 @@ public let SetTests = [
     setUpFunction: { blackHole([setB, arrayBC]) }),
   BenchmarkInfo(
     name: "Set.isSuperset.Seq.Box25",
-    runFunction: { n in run_SetIsSupersetSeqBox(setOAB, arrayOB, true, 50 * n) },
+    runFunction: { n in run_SetIsSupersetSeqBox(setOB, arrayOBC, false, 50 * n) },
     tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setOAB, arrayOB]) }),
+    setUpFunction: { blackHole([setOB, arrayOBC]) }),
   BenchmarkInfo(
     name: "Set.isSuperset.Seq.Int50",
-    runFunction: { n in run_SetIsSupersetSeqInt(setXY, arrayY, true, 50 * n) },
+    runFunction: { n in run_SetIsSupersetSeqInt(setY, arrayYZ, false, 50 * n) },
     tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setXY, arrayY]) }),
+    setUpFunction: { blackHole([setY, arrayYZ]) }),
   BenchmarkInfo(
     name: "Set.isSuperset.Seq.Int100",
     runFunction: { n in run_SetIsSupersetSeqInt(setP, arrayP, true, 50 * n) },
@@ -324,14 +324,14 @@ public let SetTests = [
     setUpFunction: { blackHole([setB, arrayBC]) }),
   BenchmarkInfo(
     name: "Set.isStrictSuperset.Seq.Box25",
-    runFunction: { n in run_SetIsStrictSupersetSeqBox(setOAB, arrayOB, true, 50 * n) },
+    runFunction: { n in run_SetIsStrictSupersetSeqBox(setOB, arrayOBC, false, 50 * n) },
     tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setOAB, arrayOB]) }),
+    setUpFunction: { blackHole([setOB, arrayOBC]) }),
   BenchmarkInfo(
     name: "Set.isStrictSuperset.Seq.Int50",
-    runFunction: { n in run_SetIsStrictSupersetSeqInt(setXY, arrayY, true, 50 * n) },
+    runFunction: { n in run_SetIsStrictSupersetSeqInt(setY, arrayYZ, false, 50 * n) },
     tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setXY, arrayY]) }),
+    setUpFunction: { blackHole([setY, arrayYZ]) }),
   BenchmarkInfo(
     name: "Set.isStrictSuperset.Seq.Int100",
     runFunction: { n in run_SetIsStrictSupersetSeqInt(setP, arrayP, false, 50 * n) },
