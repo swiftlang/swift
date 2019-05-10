@@ -4521,10 +4521,6 @@ namespace {
                           inheritedTypes);
       result->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
 
-      // Compute the requirement signature.
-      if (!result->isRequirementSignatureComputed())
-        result->computeRequirementSignature();
-
       result->setMemberLoader(&Impl, 0);
 
       // Add the protocol decl to ExternalDefinitions so that IRGen can emit
@@ -7877,9 +7873,6 @@ void ClangImporter::Implementation::finishNormalConformance(
   auto *proto = conformance->getProtocol();
   PrettyStackTraceConformance trace(SwiftContext, "completing import of",
                                     conformance);
-
-  if (!proto->isRequirementSignatureComputed())
-    proto->computeRequirementSignature();
 
   finishTypeWitnesses(conformance);
   finishInheritedConformances(conformance);

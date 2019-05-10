@@ -243,6 +243,32 @@ public:
   void cacheResult(bool value) const;
 };
 
+/// Compute the requirements that describe a protocol.
+class RequirementSignatureRequest :
+    public SimpleRequest<RequirementSignatureRequest,
+                         CacheKind::SeparatelyCached,
+                         ArrayRef<Requirement>,
+                         ProtocolDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ArrayRef<Requirement>> evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<ArrayRef<Requirement>> getCachedResult() const;
+  void cacheResult(ArrayRef<Requirement> value) const;
+};
+
 /// Describes the owner of a where clause, from which we can extract
 /// requirements.
 struct WhereClauseOwner {

@@ -3284,6 +3284,7 @@ void Serializer::writeDecl(const Decl *D) {
                                rawAccessLevel,
                                inherited);
 
+    const_cast<ProtocolDecl*>(proto)->createGenericParamsIfMissing();
     writeGenericParams(proto->getGenericParams());
     writeGenericRequirements(
       proto->getRequirementSignature(), DeclTypeAbbrCodes);
