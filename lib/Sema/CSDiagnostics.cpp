@@ -2137,7 +2137,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
           return true;
         }
 
-        SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
+        SourceRange fixItRng = ctorRef->getBase()->getSourceRange();
         emitDiagnostic(loc, diag::init_not_instance_member)
             .fixItInsert(fixItRng.Start, "type(of: ")
             .fixItInsertAfter(fixItRng.End, ")");
