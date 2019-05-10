@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
+// Temporary workaround; ImmutableAddressUseVerifier asserts in 32-bit. rdar://problem/50676315
+// UNSUPPORTED: CPU=i386
+
 // Text Formatting Prototype
 //
 // This file demonstrates the concepts proposed in TextFormatting.rst
