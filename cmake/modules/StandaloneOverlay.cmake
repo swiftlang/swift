@@ -9,6 +9,12 @@ if(DEFINED SWIFT_MASTER_LOADED
 endif()
 
 
+list(APPEND CMAKE_MODULE_PATH
+  "${SWIFT_SOURCE_ROOT}/llvm/cmake/modules"
+  "${PROJECT_SOURCE_DIR}/../../../../cmake/modules"
+  "${PROJECT_SOURCE_DIR}/../../../cmake/modules")
+
+
 # -----------------------------------------------------------------------------
 # Preconditions
 
@@ -68,11 +74,6 @@ set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
 
 set(CMAKE_INSTALL_PREFIX
   "${SWIFT_DEST_ROOT}${TOOLCHAIN_DIR}/usr")
-
-list(APPEND CMAKE_MODULE_PATH
-  "${SWIFT_SOURCE_ROOT}/llvm/cmake/modules"
-  "${PROJECT_SOURCE_DIR}/../../../../cmake/modules"
-  "${PROJECT_SOURCE_DIR}/../../../cmake/modules")
 
 
 set(SWIFT_APPLE_PLATFORMS
