@@ -196,8 +196,10 @@ static NSString *_getClassDescription(Class cls) {
 @implementation SwiftObject
 + (void)initialize {
 #if SWIFT_HAS_ISA_MASKING
-  assert(&objc_debug_isa_class_mask);
-  assert(objc_debug_isa_class_mask == SWIFT_ISA_MASK);
+  // Really old ObjC runtimes don't have this symbol, which is OK. If
+  // the symbol exists, then our value must match.
+  assert(&objc_debug_isa_class_mask == NULL ||
+         objc_debug_isa_class_mask == SWIFT_ISA_MASK);
 #endif
 }
 
