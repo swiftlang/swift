@@ -185,6 +185,7 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_library_evolution);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
   inputArgs.AddLastArg(arguments, options::OPT_enable_private_imports);
   inputArgs.AddLastArg(arguments, options::OPT_g_Group);
@@ -192,7 +193,6 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_import_underlying_module);
   inputArgs.AddLastArg(arguments, options::OPT_module_cache_path);
   inputArgs.AddLastArg(arguments, options::OPT_module_link_name);
-  inputArgs.AddLastArg(arguments, options::OPT_enable_parseable_module_interface);
   inputArgs.AddLastArg(arguments, options::OPT_nostdimport);
   inputArgs.AddLastArg(arguments, options::OPT_parse_stdlib);
   inputArgs.AddLastArg(arguments, options::OPT_resource_dir);
@@ -221,6 +221,10 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_AssumeSingleThreaded);
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_experimental_dependencies);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_experimental_dependency_include_intrafile);
+  inputArgs.AddLastArg(arguments, options::OPT_package_description_version);
+  inputArgs.AddLastArg(arguments, options::OPT_serialize_diagnostics_path);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
@@ -243,6 +247,12 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
     arguments.push_back(inputArgs.MakeArgString(workingDirectory));
   }
 
+  // -g implies -enable-anonymous-context-mangled-names, because the extra
+  // metadata aids debugging.
+  if (inputArgs.hasArg(options::OPT_g)) {
+    arguments.push_back("-enable-anonymous-context-mangled-names");
+  }
+
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
   inputArgs.AddAllArgs(arguments, options::OPT_Xcc);
@@ -258,6 +268,8 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   ArgStringList &Arguments = II.Arguments;
   II.allowsResponseFiles = true;
 
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
   Arguments.push_back("-frontend");
 
   {
@@ -585,6 +597,8 @@ ToolChain::constructInvocation(const InterpretJobAction &job,
   ArgStringList &Arguments = II.Arguments;
   II.allowsResponseFiles = true;
 
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
   Arguments.push_back("-frontend");
   Arguments.push_back("-interpret");
 
@@ -621,6 +635,8 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   assert(context.Args.hasArg(options::OPT_embed_bitcode));
   ArgStringList Arguments;
 
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
   Arguments.push_back("-frontend");
 
   // Determine the frontend mode option.
@@ -763,6 +779,8 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   ArgStringList &Arguments = II.Arguments;
   II.allowsResponseFiles = true;
 
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
   Arguments.push_back("-frontend");
 
   Arguments.push_back("-merge-modules");
@@ -843,6 +861,8 @@ ToolChain::constructInvocation(const ModuleWrapJobAction &job,
   ArgStringList &Arguments = II.Arguments;
   II.allowsResponseFiles = true;
 
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
   Arguments.push_back("-modulewrap");
 
   addInputsOfType(Arguments, context.Inputs, context.Args,
@@ -886,6 +906,8 @@ ToolChain::constructInvocation(const REPLJobAction &job,
   }
 
   ArgStringList FrontendArgs;
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    FrontendArgs.push_back(s.c_str());
   addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
                         FrontendArgs);
   context.Args.AddLastArg(FrontendArgs, options::OPT_import_objc_header);
@@ -966,6 +988,8 @@ ToolChain::constructInvocation(const GeneratePCHJobAction &job,
   ArgStringList &Arguments = II.Arguments;
   II.allowsResponseFiles = true;
 
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
   Arguments.push_back("-frontend");
 
   addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,

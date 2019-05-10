@@ -109,7 +109,9 @@ extension UFIProto {
 
 // CHECK: extension PublicStruct {{[{]$}}
 extension PublicStruct {
-  // CHECK: public private(set) static var secretlySettable: Int{{$}}
+  // CHECK: @_hasInitialValue public static var secretlySettable: Int {
+  // CHECK-NEXT: get
+  // CHECK-NEXT: }
   public private(set) static var secretlySettable: Int = 0
 } // CHECK: {{^[}]$}}
 
@@ -195,12 +197,12 @@ extension GenericStruct where InternalStruct_BAD == T {
   @usableFromInline internal func constrainedToInternalStruct2_BAD() {}
 }
 
-// CHECK: extension GenericStruct where T : PublicProto {{[{]$}}
+// CHECK: extension GenericStruct where T : main.PublicProto {{[{]$}}
 extension GenericStruct where T: PublicProto {
   // CHECK-NEXT: public func constrainedToPublicProto(){{$}}
   public func constrainedToPublicProto() {}
 } // CHECK-NEXT: {{^[}]$}}
-// CHECK: extension GenericStruct where T : UFIProto {{[{]$}}
+// CHECK: extension GenericStruct where T : main.UFIProto {{[{]$}}
 extension GenericStruct where T: UFIProto {
   // CHECK-NEXT: @usableFromInline{{$}}
   // CHECK-NEXT: internal func constrainedToUFIProto(){{$}}
@@ -243,12 +245,12 @@ internal typealias InternalAlias_BAD = PublicAliasBase
 
 internal typealias ReallyInternalAlias_BAD = ReallyInternalAliasBase_BAD
 
-// CHECK: extension GenericStruct where T == PublicAlias {{[{]$}}
+// CHECK: extension GenericStruct where T == main.PublicAlias {{[{]$}}
 extension GenericStruct where T == PublicAlias {
   // CHECK-NEXT: public func constrainedToPublicAlias(){{$}}
   public func constrainedToPublicAlias() {}
 } // CHECK-NEXT: {{^[}]$}}
-// CHECK: extension GenericStruct where T == UFIAlias {{[{]$}}
+// CHECK: extension GenericStruct where T == main.UFIAlias {{[{]$}}
 extension GenericStruct where T == UFIAlias {
   // CHECK-NEXT: @usableFromInline{{$}}
   // CHECK-NEXT: internal func constrainedToUFIAlias(){{$}}

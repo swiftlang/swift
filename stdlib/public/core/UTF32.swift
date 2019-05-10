@@ -24,7 +24,7 @@ extension Unicode.UTF32 : Unicode.Encoding {
   internal static var _replacementCodeUnit: CodeUnit {
     @inline(__always) get { return 0xFFFD }
   }
-  
+
   @inlinable
   public static var encodedReplacementCharacter : EncodedScalar {
     return EncodedScalar(_replacementCodeUnit)
@@ -32,8 +32,14 @@ extension Unicode.UTF32 : Unicode.Encoding {
 
   @inlinable
   @inline(__always)
-  public static func _isScalar(_ x: CodeUnit) -> Bool  {
+  public static func _isScalar(_ x: CodeUnit) -> Bool {
     return true
+  }
+
+  /// Returns whether the given code unit represents an ASCII scalar
+  @_alwaysEmitIntoClient
+  public static func isASCII(_ x: CodeUnit) -> Bool {
+    return x <= 0x7F
   }
 
   @inlinable

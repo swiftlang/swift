@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -module-name=witness_tables | %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name=witness_tables | %FileCheck %s
+// RUN: %target-sil-opt %s -module-name=witness_tables | %target-sil-opt -module-name=witness_tables | %FileCheck %s
 
 protocol AssocReqt {
   func requiredMethod()

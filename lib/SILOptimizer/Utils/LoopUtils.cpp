@@ -42,7 +42,7 @@ static SILBasicBlock *createInitialPreheader(SILBasicBlock *Header) {
   return Preheader;
 }
 
-/// \brief Create a unique loop preheader.
+/// Create a unique loop preheader.
 static SILBasicBlock *insertPreheader(SILLoop *L, DominanceInfo *DT,
                                       SILLoopInfo *LI) {
   assert(!L->getLoopPreheader() && "Expect multiple preheaders");
@@ -89,7 +89,7 @@ static SILBasicBlock *insertPreheader(SILLoop *L, DominanceInfo *DT,
   return Preheader;
 }
 
-/// \brief Convert a loop with multiple backedges to a single backedge loop.
+/// Convert a loop with multiple backedges to a single backedge loop.
 ///
 /// Create a new block as a common target for all the current loop backedges.
 static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,

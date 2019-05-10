@@ -305,8 +305,8 @@ public struct _CollectionState : Equatable, Hashable {
     }
   }
 
-  public var hashValue: Int {
-    return _id.hashValue
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(_id)
   }
 }
 

@@ -38,6 +38,16 @@ class NominalTypeDecl;
 
 enum class KnownProtocolKind : uint8_t;
 
+enum class Bridgeability : unsigned {
+  /// This context does not permit bridging at all.  For example, the
+  /// target of a C pointer.
+  None,
+
+  /// This context permits all kinds of bridging.  For example, the
+  /// imported result of a method declaration.
+  Full
+};
+
 /// Records dependencies on files outside of the current module;
 /// implemented in terms of a wrapped clang::DependencyCollector.
 class DependencyTracker {
@@ -61,7 +71,7 @@ public:
   std::shared_ptr<clang::DependencyCollector> getClangCollector();
 };
 
-/// \brief Abstract interface that loads named modules into the AST.
+/// Abstract interface that loads named modules into the AST.
 class ModuleLoader {
   virtual void anchor();
 
@@ -72,14 +82,14 @@ protected:
 public:
   virtual ~ModuleLoader() = default;
 
-  /// \brief Check whether the module with a given name can be imported without
+  /// Check whether the module with a given name can be imported without
   /// importing it.
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
   virtual bool canImportModule(std::pair<Identifier, SourceLoc> named) = 0;
 
-  /// \brief Import a module with the given module path.
+  /// Import a module with the given module path.
   ///
   /// \param importLoc The location of the 'import' keyword.
   ///
@@ -92,7 +102,7 @@ public:
   ModuleDecl *loadModule(SourceLoc importLoc,
                          ArrayRef<std::pair<Identifier, SourceLoc>> path) = 0;
 
-  /// \brief Load extensions to the given nominal type.
+  /// Load extensions to the given nominal type.
   ///
   /// \param nominal The nominal type whose extensions should be loaded.
   ///
@@ -102,7 +112,7 @@ public:
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) { }
 
-  /// \brief Load the methods within the given class that produce
+  /// Load the methods within the given class that produce
   /// Objective-C class or instance methods with the given selector.
   ///
   /// \param classDecl The class in which we are searching for @objc methods.
@@ -128,7 +138,7 @@ public:
                  unsigned previousGeneration,
                  llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) = 0;
 
-  /// \brief Verify all modules loaded by this loader.
+  /// Verify all modules loaded by this loader.
   virtual void verifyAllModules() { }
 };
 

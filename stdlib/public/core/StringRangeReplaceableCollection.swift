@@ -125,6 +125,7 @@ extension String: RangeReplaceableCollection {
   ///     // Prints "Hello, friend"
   ///
   /// - Parameter other: Another string.
+  @_semantics("string.append")
   public mutating func append(_ other: String) {
     if self.isEmpty && !_guts.hasNativeStorage {
       self = other
@@ -298,23 +299,23 @@ extension String: RangeReplaceableCollection {
 extension String {
   @inlinable @inline(__always)
   internal func _boundsCheck(_ index: Index) {
-    _precondition(index.encodedOffset >= 0 && index.encodedOffset < _guts.count,
+    _precondition(index._encodedOffset >= 0 && index._encodedOffset < _guts.count,
       "String index is out of bounds")
   }
 
   @inlinable @inline(__always)
   internal func _boundsCheck(_ range: Range<Index>) {
     _precondition(
-      range.lowerBound.encodedOffset >= 0 &&
-      range.upperBound.encodedOffset <= _guts.count,
+      range.lowerBound._encodedOffset >= 0 &&
+      range.upperBound._encodedOffset <= _guts.count,
       "String index range is out of bounds")
   }
 
   @inlinable @inline(__always)
   internal func _boundsCheck(_ range: ClosedRange<Index>) {
     _precondition(
-      range.lowerBound.encodedOffset >= 0 &&
-      range.upperBound.encodedOffset < _guts.count,
+      range.lowerBound._encodedOffset >= 0 &&
+      range.upperBound._encodedOffset < _guts.count,
       "String index range is out of bounds")
   }
 }

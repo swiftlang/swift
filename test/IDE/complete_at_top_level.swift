@@ -262,10 +262,12 @@ func resyncParser7() {}
 
 var topLevelVar2 = FooStruct#^TOP_LEVEL_VAR_INIT_2^#
 // TOP_LEVEL_VAR_INIT_2: Begin completions
-// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#self: FooStruct#})[#(Int) -> Void#]{{; name=.+$}}
+// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(self): FooStruct#})[#(Int) -> Void#]{{; name=.+$}}
+// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ()[#FooStruct#]{{; name=.+$}}
 // TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ({#instanceVar: Int#})[#FooStruct#]{{; name=.+$}}
 // TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ()[#FooStruct#]{{; name=.+$}}
 // TOP_LEVEL_VAR_INIT_2-NEXT: Keyword[self]/CurrNominal: .self[#FooStruct.Type#]; name=self
+// TOP_LEVEL_VAR_INIT_2-NEXT: Keyword/CurrNominal:       .Type[#FooStruct.Type#]; name=Type
 // TOP_LEVEL_VAR_INIT_2-NEXT: End completions
 
 func resyncParser8() {}

@@ -59,11 +59,17 @@ TypeNameTests.test("Prints") {
   typealias F = () -> ()
   typealias F2 = () -> () -> ()
   typealias F3 = (() -> ()) -> ()
+  typealias F4 = (Int, Float) -> ()
+  typealias F5 = ((Int, Float)) -> ()
+  typealias F6 = (Int...) -> ()
 
   expectEqual("() -> ()", _typeName(F.self))
   expectEqual("() -> () -> ()", _typeName(F2.self))
   expectEqual("(() -> ()) -> ()", _typeName(F3.self))
   expectEqual("() -> ()", _typeName((() -> ()).self))
+  expectEqual("(Swift.Int, Swift.Float) -> ()", _typeName(F4.self))
+  expectEqual("((Swift.Int, Swift.Float)) -> ()", _typeName(F5.self))
+  expectEqual("(Swift.Int...) -> ()", _typeName(F6.self))
 
   expectEqual("(main.P) -> main.P2 & main.P3",
     _typeName(((P) -> P2 & P3).self))

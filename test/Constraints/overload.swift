@@ -131,7 +131,7 @@ func overloaded_identity(_ b : Float) -> Float {}
 
 func test_contextual_result_1() {
   return overloaded_identity()  // expected-error {{cannot invoke 'overloaded_identity' with no arguments}}
-  // expected-note @-1 {{overloads for 'overloaded_identity' exist with these partially matching parameter lists: (Int), (Float)}}
+  // expected-note @-1 {{overloads for 'overloaded_identity' exist with these partially matching parameter lists: (Float), (Int)}}
 }
 
 func test_contextual_result_2() {

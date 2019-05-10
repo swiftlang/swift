@@ -162,7 +162,7 @@ Contrasts with Alias Analysis
 
 A common question is what is the difference in between RC Identity analysis and
 alias analysis. While alias analysis is attempting to determine if two memory
-location are the same, RC identity analysis is attempting to determine if
+locations are the same, RC identity analysis is attempting to determine if
 reference counting operations on different values would result in the same
 reference count being read or written to.
 
@@ -544,7 +544,7 @@ optimization? We must consider three areas of concern:
    retain/release counts in the loop? Consider a set of retains and a set of
    releases that we wish to hoist out of a loop. We can only hoist the retain,
    release sets out of the loop if all paths in the given loop region from the
-   entrance to the backedge.  have exactly one retain or release from this set.
+   entrance to the backedge have exactly one retain or release from this set.
 
 4. Any early exits that we must move a retain past or a release by must be
    compensated appropriately. This will be discussed in the next section.
@@ -555,7 +555,7 @@ hoist with safety.
 Compensating Early Exits for Lost Dynamic Reference Counts
 ----------------------------------------------------------
 
-Lets say that we have the following loop canonicalized SIL::
+Let's say that we have the following loop canonicalized SIL::
 
   bb0(%0 : $Builtin.NativeObject):
     br bb1
@@ -579,7 +579,7 @@ Lets say that we have the following loop canonicalized SIL::
   bb6:
     return ...
 
-Can we hoist the retain/release pair here? Lets assume the loop is 3 iterations
+Can we hoist the retain/release pair here? Let's assume the loop is 3 iterations
 and we completely unroll it. Then we have::
 
   bb0:
@@ -667,7 +667,7 @@ exit. Consider the following::
   bb6:
     return ...
 
-Lets unroll this loop::
+Let's unroll this loop::
 
   bb0(%0 : $Builtin.NativeObject):
     br bb1

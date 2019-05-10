@@ -60,6 +60,17 @@ static const clang::Type *getClangType(const clang::Decl *decl) {
   return cast<clang::ObjCPropertyDecl>(decl)->getType().getTypePtr();
 }
 
+static Bridgeability getClangDeclBridgeability(const clang::Decl *decl) {
+  // These declarations are always imported without bridging (for now).
+  if (isa<clang::VarDecl>(decl) ||
+      isa<clang::FieldDecl>(decl) ||
+      isa<clang::IndirectFieldDecl>(decl))
+    return Bridgeability::None;
+
+  // Functions and methods always use normal bridging.
+  return Bridgeability::Full;
+}
+
 AbstractionPattern
 TypeConverter::getAbstractionPattern(VarDecl *var, bool isNonObjC) {
   CanGenericSignature genericSig;
@@ -77,7 +88,7 @@ TypeConverter::getAbstractionPattern(VarDecl *var, bool isNonObjC) {
     auto contextType = var->getDeclContext()->mapTypeIntoContext(swiftType);
     swiftType = getLoweredBridgedType(
         AbstractionPattern(genericSig, swiftType, clangType),
-        contextType,
+        contextType, getClangDeclBridgeability(clangDecl),
         SILFunctionTypeRepresentation::CFunctionPointer,
         TypeConverter::ForMemory)->getCanonicalType();
     return AbstractionPattern(genericSig, swiftType, clangType);

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-resilience -enable-source-import -I %S/../Inputs | %FileCheck %s
-// RUN: %target-swift-frontend %s -emit-ir -num-threads 8 -enable-resilience -enable-source-import -I %S/../Inputs | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-library-evolution -enable-source-import -I %S/../Inputs | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -num-threads 8 -enable-library-evolution -enable-source-import -I %S/../Inputs | %FileCheck %s
 
 import resilient_struct
 import resilient_protocol
@@ -22,8 +22,7 @@ public protocol Runcible {
 // -- witness table
 // CHECK-SAME:           @"$s28protocol_conformance_records15NativeValueTypeVAA8RuncibleAAWP"
 // -- flags
-// CHECK-SAME:           i32 0
-// CHECK-SAME:         },
+// CHECK-SAME:           i32 0 },
 public struct NativeValueType: Runcible {
   public func runce() {}
 }
@@ -36,8 +35,7 @@ public struct NativeValueType: Runcible {
 // -- witness table
 // CHECK-SAME:           @"$s28protocol_conformance_records15NativeClassTypeCAA8RuncibleAAWP"
 // -- flags
-// CHECK-SAME:           i32 0
-// CHECK-SAME:         },
+// CHECK-SAME:           i32 0 },
 public class NativeClassType: Runcible {
   public func runce() {}
 }
@@ -50,8 +48,7 @@ public class NativeClassType: Runcible {
 // -- witness table
 // CHECK-SAME:           @"$s28protocol_conformance_records17NativeGenericTypeVyxGAA8RuncibleAAWP"
 // -- flags
-// CHECK-SAME:           i32 0
-// CHECK-SAME:         },
+// CHECK-SAME:           i32 0 },
 public struct NativeGenericType<T>: Runcible {
   public func runce() {}
 }
@@ -87,6 +84,30 @@ extension Size: Runcible {
   public func runce() {}
 }
 
+// A non-dependent type conforming to a protocol with associated conformances
+// does not require a generic witness table.
+public protocol Simple {}
+
+public protocol AssociateConformance {
+  associatedtype X : Simple
+}
+
+public struct Other : Simple {}
+
+public struct Concrete : AssociateConformance {
+  public typealias X = Other
+}
+
+// CHECK-LABEL: @"$s28protocol_conformance_records8ConcreteVAA20AssociateConformanceAAMc" ={{ dllexport | protected | }}constant
+// -- protocol descriptor
+// CHECK-SAME:           @"$s28protocol_conformance_records20AssociateConformanceMp"
+// -- nominal type descriptor
+// CHECK-SAME:           @"$s28protocol_conformance_records8ConcreteVMn"
+// -- witness table
+// CHECK-SAME:           @"$s28protocol_conformance_records8ConcreteVAA20AssociateConformanceAAWP"
+// -- no flags are set, and no generic witness table follows
+// CHECK-SAME:           i32 0 }
+
 // CHECK-LABEL: @"\01l_protocols"
 // CHECK-SAME: @"$s28protocol_conformance_records8RuncibleMp"
 // CHECK-SAME: @"$s28protocol_conformance_records5SpoonMp"
@@ -119,7 +140,7 @@ extension NativeGenericType : Spoon where T: Spoon {
 // -- nominal type descriptor
 // CHECK-SAME:           @"{{got.|__imp_}}$sSiMn"
 // -- witness table pattern
-// CHECK-SAME:           @"$sSi18resilient_protocol22OtherResilientProtocol0B20_conformance_recordsWp"
+// CHECK-SAME:           i32 0,
 // -- flags
 // CHECK-SAME:           i32 131144,
 // -- module context for retroactive conformance
@@ -136,7 +157,7 @@ extension Int : OtherResilientProtocol { }
 // -- witness table pattern
 // CHECK-SAME:           @"$s28protocol_conformance_records9DependentVyxGAA9AssociateAAWp"
 // -- flags
-// CHECK-SAME:           i32 0
+// CHECK-SAME:           i32 131072,
 // -- number of words in witness table
 // CHECK-SAME:           i16 2,
 // -- number of private words in witness table + bit for "needs instantiation"
@@ -151,5 +172,6 @@ extension Dependent : Associate {
 // CHECK-SAME: @"$s28protocol_conformance_records15NativeClassTypeCAA8RuncibleAAMc"
 // CHECK-SAME: @"$s28protocol_conformance_records17NativeGenericTypeVyxGAA8RuncibleAAMc"
 // CHECK-SAME: @"$s16resilient_struct4SizeV28protocol_conformance_records8RuncibleADMc"
+// CHECK-SAME: @"$s28protocol_conformance_records8ConcreteVAA20AssociateConformanceAAMc"
 // CHECK-SAME: @"$s28protocol_conformance_records17NativeGenericTypeVyxGAA5SpoonA2aERzlMc"
 // CHECK-SAME: @"$sSi18resilient_protocol22OtherResilientProtocol0B20_conformance_recordsMc"

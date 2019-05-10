@@ -1,50 +1,50 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift-dylib(%t/libModule1.%target-dylib-extension) -DMODULE -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
-// RUN: %target-build-swift-dylib(%t/libModule2.%target-dylib-extension) -I%t -L%t -lModule1 -Xlinker -rpath -Xlinker %t -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
-// RUN: %target-build-swift -I%t -L%t -lModule1 -DMAIN -o %t/main -Xlinker -rpath -Xlinker %t %s -swift-version 5
-// RUN: %target-codesign %t/main %t/libModule1.%target-dylib-extension %t/libModule2.%target-dylib-extension
-// RUN: %target-run %t/main %t/libModule1.%target-dylib-extension %t/libModule2.%target-dylib-extension
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module1)) -DMODULE -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module2)) -I%t -L%t -lModule1 %target-rpath(%t) -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
+// RUN: %target-build-swift -I%t -L%t -lModule1 -DMAIN -o %t/main %target-rpath(%t) %s -swift-version 5
+// RUN: %target-codesign %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
+// RUN: %target-run %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
 
 // Now the same in optimized mode.
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift-dylib(%t/libModule1.%target-dylib-extension) -O -DMODULE -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
-// RUN: %target-build-swift-dylib(%t/libModule2.%target-dylib-extension) -O -I%t -L%t -lModule1 -Xlinker -rpath -Xlinker %t -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
-// RUN: %target-build-swift -O -I%t -L%t -lModule1 -DMAIN -o %t/main -Xlinker -rpath -Xlinker %t %s -swift-version 5
-// RUN: %target-codesign %t/main %t/libModule1.%target-dylib-extension %t/libModule2.%target-dylib-extension
-// RUN: %target-run %t/main %t/libModule1.%target-dylib-extension %t/libModule2.%target-dylib-extension
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module1)) -O -DMODULE -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module2)) -O -I%t -L%t -lModule1 %target-rpath(%t) -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
+// RUN: %target-build-swift -O -I%t -L%t -lModule1 -DMAIN -o %t/main %target-rpath(%t) %s -swift-version 5
+// RUN: %target-codesign %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
+// RUN: %target-run %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
 
 // Now the same in size mode.
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift-dylib(%t/libModule1.%target-dylib-extension) -Osize -DMODULE -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
-// RUN: %target-build-swift-dylib(%t/libModule2.%target-dylib-extension) -Osize -I%t -L%t -lModule1 -Xlinker -rpath -Xlinker %t -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
-// RUN: %target-build-swift -Osize -I%t -L%t -lModule1 -DMAIN -o %t/main -Xlinker -rpath -Xlinker %t %s -swift-version 5
-// RUN: %target-codesign %t/main %t/libModule1.%target-dylib-extension %t/libModule2.%target-dylib-extension
-// RUN: %target-run %t/main %t/libModule1.%target-dylib-extension %t/libModule2.%target-dylib-extension
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module1)) -Osize -DMODULE -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module2)) -Osize -I%t -L%t -lModule1 %target-rpath(%t) -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
+// RUN: %target-build-swift -Osize -I%t -L%t -lModule1 -DMAIN -o %t/main %target-rpath(%t) %s -swift-version 5
+// RUN: %target-codesign %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
+// RUN: %target-run %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
 
 // Now the same in optimized wholemodule mode.
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift-dylib(%t/libModule1.%target-dylib-extension) -O -wmo -DMODULE -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
-// RUN: %target-build-swift-dylib(%t/libModule2.%target-dylib-extension) -O -wmo -I%t -L%t -lModule1 -Xlinker -rpath -Xlinker %t -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
-// RUN: %target-build-swift -O -wmo -I%t -L%t -lModule1 -DMAIN -o %t/main -Xlinker -rpath -Xlinker %t %s -swift-version 5
-// RUN: %target-codesign %t/main %t/libModule1.%target-dylib-extension %t/libModule2.%target-dylib-extension
-// RUN: %target-run %t/main %t/libModule1.%target-dylib-extension %t/libModule2.%target-dylib-extension
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module1)) -O -wmo -DMODULE -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module2)) -O -wmo -I%t -L%t -lModule1 %target-rpath(%t) -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
+// RUN: %target-build-swift -O -wmo -I%t -L%t -lModule1 -DMAIN -o %t/main %target-rpath(%t) %s -swift-version 5
+// RUN: %target-codesign %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
+// RUN: %target-run %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
 
 // Test the -enable-implicit-dynamic flag.
 
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift-dylib(%t/libModule1.%target-dylib-extension) -DMODULENODYNAMIC -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift -Xfrontend -enable-implicit-dynamic
-// RUN: %target-build-swift-dylib(%t/libModule2.%target-dylib-extension) -I%t -L%t -lModule1 -Xlinker -rpath -Xlinker %t -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
-// RUN: %target-build-swift -I%t -L%t -lModule1 -DMAIN -o %t/main -Xlinker -rpath -Xlinker %t %s -swift-version 5
-// RUN: %target-codesign %t/main %t/libModule1.%target-dylib-extension %t/libModule2.%target-dylib-extension
-// RUN: %target-run %t/main %t/libModule1.%target-dylib-extension %t/libModule2.%target-dylib-extension
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module1)) -DMODULENODYNAMIC -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift -Xfrontend -enable-implicit-dynamic
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module2)) -I%t -L%t -lModule1 %target-rpath(%t) -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
+// RUN: %target-build-swift -I%t -L%t -lModule1 -DMAIN -o %t/main %target-rpath(%t) %s -swift-version 5
+// RUN: %target-codesign %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
+// RUN: %target-run %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
 
 // Test the -enable-implicit-dynamic flag in optimized wholemodule mode.
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift-dylib(%t/libModule1.%target-dylib-extension) -O -wmo -DMODULENODYNAMIC -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift -Xfrontend -enable-implicit-dynamic
-// RUN: %target-build-swift-dylib(%t/libModule2.%target-dylib-extension) -O -wmo -I%t -L%t -lModule1 -Xlinker -rpath -Xlinker %t -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
-// RUN: %target-build-swift -O -wmo -I%t -L%t -lModule1 -DMAIN -o %t/main -Xlinker -rpath -Xlinker %t %s -swift-version 5
-// RUN: %target-codesign %t/main %t/libModule1.%target-dylib-extension %t/libModule2.%target-dylib-extension
-// RUN: %target-run %t/main %t/libModule1.%target-dylib-extension %t/libModule2.%target-dylib-extension
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module1)) -O -wmo -DMODULENODYNAMIC -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift -Xfrontend -enable-implicit-dynamic
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module2)) -O -wmo -I%t -L%t -lModule1 %target-rpath(%t) -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
+// RUN: %target-build-swift -O -wmo -I%t -L%t -lModule1 -DMAIN -o %t/main %target-rpath(%t) %s -swift-version 5
+// RUN: %target-codesign %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
+// RUN: %target-run %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
 
 
 // REQUIRES: executable_test
@@ -53,12 +53,15 @@ import Module1
 
 import StdlibUnittest
 
-#if os(Linux)
-  import Glibc
-  let dylibSuffix = "so"
-#else
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   import Darwin
-  let dylibSuffix = "dylib"
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
+#elseif os(Windows)
+  import MSVCRT
+  import WinSDK
+#else
+#error("Unsupported platform")
 #endif
 
 var DynamicallyReplaceable = TestSuite("DynamicallyReplaceable")
@@ -81,6 +84,8 @@ func checkExpectedResults(forOriginalLibrary useOrig: Bool) {
 
  expectTrue(PublicClass().function() ==
             expectedResult(useOrig, "public_class_func"))
+ expectTrue(PublicClass().finalFunction() ==
+            expectedResult(useOrig, "public_class_final_func"))
  expectTrue(PublicClass().genericFunction(Int.self) ==
             expectedResult(useOrig, "public_class_generic_func"))
 
@@ -108,6 +113,16 @@ func checkExpectedResults(forOriginalLibrary useOrig: Bool) {
             expectedResult(useOrig, "public_enum_generic_func"))
 }
 
+private func target_library_name(_ name: String) -> String {
+#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+  return "lib\(name).dylib"
+#elseif os(Windows)
+  return "\(name).dll"
+#else
+  return "lib\(name).so"
+#endif
+}
+
 DynamicallyReplaceable.test("DynamicallyReplaceable") {
   var executablePath = CommandLine.arguments[0]
   executablePath.removeLast(4)
@@ -118,9 +133,11 @@ DynamicallyReplaceable.test("DynamicallyReplaceable") {
   // Now, test with the module containing the replacements.
 
 #if os(Linux)
-	_ = dlopen("libModule2."+dylibSuffix, RTLD_NOW)
+	_ = dlopen(target_library_name("Module2"), RTLD_NOW)
+#elseif os(Windows)
+        _ = LoadLibraryA(target_library_name("Module2"))
 #else
-	_ = dlopen(executablePath+"libModule2."+dylibSuffix, RTLD_NOW)
+	_ = dlopen(executablePath+target_library_name("Module2"), RTLD_NOW)
 #endif
 	checkExpectedResults(forOriginalLibrary: false)
 }

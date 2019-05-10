@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts %s | %FileCheck %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts %s | %FileCheck -check-prefix=CHECK-NEGATIVE %s
+// RUN: %target-sil-opt -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts %s | %FileCheck -check-prefix=CHECK-NEGATIVE %s
 
 import Builtin
 import Swift

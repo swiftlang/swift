@@ -11,13 +11,15 @@ public var Radix2CooleyTukey = [
     runFunction: run_Radix2CooleyTukey,
     tags: [.validation, .algorithm],
     setUpFunction: setUpRadix2CooleyTukey,
-    tearDownFunction: tearDownRadix2CooleyTukey),
+    tearDownFunction: tearDownRadix2CooleyTukey,
+    legacyFactor: 48),
   BenchmarkInfo(
     name: "Radix2CooleyTukeyf",
     runFunction: run_Radix2CooleyTukeyf,
     tags: [.validation, .algorithm],
     setUpFunction: setUpRadix2CooleyTukeyf,
-    tearDownFunction: tearDownRadix2CooleyTukeyf),
+    tearDownFunction: tearDownRadix2CooleyTukeyf,
+  legacyFactor: 48),
 ]
 
 //===----------------------------------------------------------------------===//
@@ -31,7 +33,7 @@ var double_output_imag: UnsafeMutablePointer<Double>?
 var double_temp_real: UnsafeMutablePointer<Double>?
 var double_temp_imag: UnsafeMutablePointer<Double>?
 
-let doubleN = 65_536
+let doubleN = 2_048
 let doubleSize = { MemoryLayout<Double>.size * doubleN }()
 
 func setUpRadix2CooleyTukey() {
@@ -143,7 +145,7 @@ public func run_Radix2CooleyTukey(_ N: Int) {
 // Float Benchmark
 //===----------------------------------------------------------------------===//
 
-let floatN = 65_536
+let floatN = 2_048
 let floatSize = { MemoryLayout<Float>.size * floatN }()
 
 var float_input_real: UnsafeMutablePointer<Float>?

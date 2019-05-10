@@ -92,7 +92,7 @@ public func testTopLevel() {
 }
 
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sSo10PrivFooSubCMa{{.*}} {
-// CHECK: %objc_class** @"\01l_OBJC_CLASS_REF_$_PrivFooSub"
+// CHECK: %objc_class** @"OBJC_CLASS_REF_$_PrivFooSub"
 // CHECK: }
 
 // CHECK-LABEL: define linkonce_odr hidden {{.+}} @"$sSo3BarC8__noArgsABSgyt_tcfcTO"

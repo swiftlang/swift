@@ -1,5 +1,5 @@
 
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -array-element-propagation %s | %FileCheck %s
+// RUN: %target-sil-opt -array-element-propagation %s | %FileCheck %s
 sil_stage canonical
 
 import Builtin

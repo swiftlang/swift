@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -module-name=autodiff_sil_function_type_parse | %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name=autodiff_sil_function_type_parse | %FileCheck %s
+// RUN: %target-sil-opt %s -module-name=autodiff_sil_function_type_parse | %target-sil-opt -module-name=autodiff_sil_function_type_parse | %FileCheck %s
 
 sil_stage raw
 

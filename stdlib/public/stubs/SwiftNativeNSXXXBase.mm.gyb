@@ -62,6 +62,9 @@ SWIFT_RUNTIME_STDLIB_API
 
 @implementation __SwiftNativeNS${Class}Base
 
+- (id)initWithCoder: (NSCoder *)coder {
+  return [self init];
+}
 - (id)retain {
   auto SELF = reinterpret_cast<HeapObject *>(self);
   swift_retain(SELF);
@@ -91,6 +94,10 @@ SWIFT_RUNTIME_STDLIB_API
 }
 - (BOOL)retainWeakReference {
   return swift_tryRetain(reinterpret_cast<HeapObject*>(self)) != nullptr;
+}
+
++ (BOOL)automaticallyNotifiesObserversForKey:(NSString *)key {
+  return NO;
 }
 
 #pragma clang diagnostic push

@@ -265,8 +265,11 @@ void SILDeserializer::setLocalValue(ValueBase *Value, ValueID Id) {
 
 SILValue SILDeserializer::getLocalValue(ValueID Id,
                                         SILType Type) {
+  // The first two IDs are special undefined values.
   if (Id == 0)
-    return SILUndef::get(Type, &SILMod);
+    return SILUndef::get(Type, SILMod, ValueOwnershipKind::Any);
+  else if (Id == 1)
+    return SILUndef::get(Type, SILMod, ValueOwnershipKind::Owned);
 
   // Check to see if this is already defined.
   ValueBase *Entry = LocalValues.lookup(Id);
@@ -697,7 +700,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   }
 
   if (!hasQualifiedOwnership)
-    fn->setUnqualifiedOwnership();
+    fn->setOwnershipEliminated();
 
   NumDeserializedFunc++;
 
@@ -715,7 +718,9 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   BasicBlockID = 0;
   BlocksByID.clear();
   UndefinedBlocks.clear();
-  LastValueID = 0;
+
+  // The first two IDs are reserved for SILUndef.
+  LastValueID = 1;
   LocalValues.clear();
   ForwardLocalValues.clear();
 
@@ -971,6 +976,9 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
   case KeyPathComponentKindEncoding::OptionalWrap:
     return KeyPathPatternComponent::forOptional(
         KeyPathPatternComponent::Kind::OptionalWrap, type);
+  case KeyPathComponentKindEncoding::TupleElement:
+    return KeyPathPatternComponent::forTupleElement(
+        ListOfValues[nextValue++], type);
   case KeyPathComponentKindEncoding::Trivial:
     llvm_unreachable("handled above");
   }
@@ -1062,8 +1070,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   case SIL_INST_APPLY: {
     unsigned IsPartial;
-    SILInstApplyLayout::readRecord(scratch, IsPartial, NumSubs,
-                                   TyID, TyID2, ValID, ListOfValues);
+    SILInstApplyLayout::readRecord(scratch, IsPartial, NumSubs, TyID, TyID2,
+                                   ValID, ListOfValues);
     switch (IsPartial) {
     case SIL_APPLY:
       RawOpCode = (unsigned)SILInstructionKind::ApplyInst;
@@ -1232,12 +1240,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
     bool isLifetimeGuaranteed = Attr & 0x01;
-    bool isEscaped = Attr & 0x02;
     ResultVal = Builder.createConvertEscapeToNoEscape(
         Loc,
         getLocalValue(ValID, getSILType(MF->getType(TyID2),
                                         (SILValueCategory)TyCategory2)),
-        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory), isEscaped,
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory),
         isLifetimeGuaranteed);
     break;
   }
@@ -1469,11 +1476,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
       Args.push_back(getLocalValue(
           ListOfValues[I], fnConv.getSILArgumentType(I + unappliedArgs)));
-
+    auto onStack = closureTy.castTo<SILFunctionType>()->isNoEscape()
+                       ? PartialApplyInst::OnStackKind::OnStack
+                       : PartialApplyInst::OnStackKind::NotOnStack;
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = Builder.createPartialApply(
         Loc, FnVal, Substitutions, Args,
-        closureTy.castTo<SILFunctionType>()->getCalleeConvention());
+        closureTy.castTo<SILFunctionType>()->getCalleeConvention(), onStack);
     break;
   }
   case SILInstructionKind::BuiltinInst: {
@@ -1917,12 +1926,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case SILInstructionKind::AssignInst: {
     auto Ty = MF->getType(TyID);
     SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
-    SILType ValType = addrType.getObjectType();
+    SILType valType = addrType.getObjectType();
+    auto qualifier = AssignOwnershipQualifier(Attr);
     ResultVal = Builder.createAssign(Loc,
-                    getLocalValue(ValID, ValType),
-                    getLocalValue(ValID2, addrType));
+                    getLocalValue(ValID, valType),
+                    getLocalValue(ValID2, addrType),
+                    qualifier);
     break;
   }
+  case SILInstructionKind::AssignByDelegateInst:
+    llvm_unreachable("not supported");
   case SILInstructionKind::BindMemoryInst: {
     assert(RecordKind == SIL_ONE_TYPE_VALUES &&
            "Layout should be OneTypeValues.");
@@ -2519,8 +2532,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createKeyPath(Loc, pattern, subMap, operands, kpTy);
     break;
   }
-  case SILInstructionKind::MarkUninitializedBehaviorInst:
-    llvm_unreachable("todo");
   }
 
   for (auto result : ResultVal->getResults()) {

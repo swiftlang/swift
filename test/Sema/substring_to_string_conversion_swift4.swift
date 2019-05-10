@@ -81,12 +81,6 @@ do {
 // Substring-to-String via subscripting in a context expecting String
 func takesString(_ s: String) {}
 
-func apply(_ fn: (String) -> (), _ s: String) {
-  fn(s[s.startIndex..<s.endIndex]) // expected-error{{subscripts returning String were obsoleted in Swift 4; explicitly construct a String from subscripted result}} {{6-6=String(}} {{34-34=)}}
-  let _: String = s[s.startIndex..<s.endIndex] // expected-error{{subscripts returning String were obsoleted in Swift 4; explicitly construct a String from subscripted result}} {{19-19=String(}} {{47-47=)}}
-  _ = s[s.startIndex..<s.endIndex] as String // expected-error{{subscripts returning String were obsoleted in Swift 4; explicitly construct a String from subscripted result}} {{7-7=String(}} {{35-35=)}}
-}
-
 // rdar://33474838
 protocol Derivable {
   func derive() -> Substring

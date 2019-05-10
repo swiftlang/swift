@@ -40,7 +40,6 @@
     "StringUTF8View.swift",
     "StringUTF8Validation.swift",
     "StringUnicodeScalarView.swift",
-    "StringVariant.swift",
     "Substring.swift",
     "Unicode.swift",
     "UnicodeEncoding.swift",
@@ -82,6 +81,8 @@
     "UnfoldSequence.swift",
     "UIntBuffer.swift",
     "KeyValuePairs.swift",
+    "Diffing.swift",
+    "CollectionDifference.swift",
     {
       "Type-erased": [
         "ExistentialCollection.swift"
@@ -158,7 +159,7 @@
   ],
   "Math": [
     "SetAlgebra.swift",
-    "BuiltinMath.swift",
+    "MathFunctions.swift",
     {
     "Integers": [
       "Integers.swift",
@@ -167,7 +168,10 @@
     "Floating": [
       "FloatingPoint.swift",
       "FloatingPointParsing.swift",
-      "FloatingPointTypes.swift"]}
+      "FloatingPointTypes.swift"],
+    "Vector": [
+      "SIMDVector.swift",
+      "SIMDVectorTypes.swift"]}
   ],
   "AutoDiff": [
     "AutoDiff.swift",
@@ -198,7 +202,7 @@
     "Bitset.swift"
   ],
   "Misc": [
-    "Interval.swift",
+    "AtomicInt.swift",
     "ErrorType.swift",
     "InputStream.swift",
     "LifetimeManager.swift",
@@ -223,6 +227,10 @@
     "Equatable.swift",
     "Comparable.swift",
     "Codable.swift",
+    "LegacyABI.swift",
     "MigrationSupport.swift"
+  ],
+  "Result": [
+    "Result.swift"
   ]
 }

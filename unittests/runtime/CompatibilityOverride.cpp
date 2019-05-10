@@ -41,13 +41,13 @@ namespace  {
   }
 }
 
-#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
-  static ret name ## Override(COMPATIBILITY_UNPAREN typedArgs,      \
-                          Original_ ## name originalImpl) {         \
-    if (!EnableOverride)                                            \
-      return originalImpl namedArgs;                                \
-    Ran = true;                                                     \
-    return getEmptyValue<ret>();                                    \
+#define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
+  static ccAttrs ret name ## Override(COMPATIBILITY_UNPAREN typedArgs,       \
+                                       Original_ ## name originalImpl) {     \
+    if (!EnableOverride)                                                     \
+      return originalImpl namedArgs;                                         \
+    Ran = true;                                                              \
+    return getEmptyValue<ret>();                                             \
   }
 #include "../../stdlib/public/runtime/CompatibilityOverride.def"
 
@@ -55,14 +55,14 @@ namespace  {
 struct OverrideSection {
   uintptr_t version;
   
-#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
+#define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   Override_ ## name name;
 #include "../../stdlib/public/runtime/CompatibilityOverride.def"
 };
 
-OverrideSection Overrides __attribute__((section("__DATA,__swift_hooks"))) = {
+OverrideSection Overrides __attribute__((section("__DATA,__swift51_hooks"))) = {
   0,
-#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
+#define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   name ## Override,
 #include "../../stdlib/public/runtime/CompatibilityOverride.def"
 };
@@ -98,7 +98,7 @@ TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastClass) {
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastClassUnconditional) {
-  auto Result = swift_dynamicCastClassUnconditional(nullptr, nullptr);
+  auto Result = swift_dynamicCastClassUnconditional(nullptr, nullptr, nullptr, 0, 0);
   ASSERT_EQ(Result, nullptr);
 }
 
@@ -108,7 +108,7 @@ TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastObjCClass) {
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastObjCClassUnconditional) {
-  auto Result = swift_dynamicCastObjCClassUnconditional(nullptr, nullptr);
+  auto Result = swift_dynamicCastObjCClassUnconditional(nullptr, nullptr, nullptr, 0, 0);
   ASSERT_EQ(Result, nullptr);
 }
 
@@ -118,7 +118,7 @@ TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastForeignClass) {
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastForeignClassUnconditional) {
-  auto Result = swift_dynamicCastForeignClassUnconditional(nullptr, nullptr);
+  auto Result = swift_dynamicCastForeignClassUnconditional(nullptr, nullptr, nullptr, 0, 0);
   ASSERT_EQ(Result, nullptr);
 }
 
@@ -128,7 +128,7 @@ TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastUnknownClass) {
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastUnknownClassUnconditional) {
-  auto Result = swift_dynamicCastUnknownClassUnconditional(nullptr, nullptr);
+  auto Result = swift_dynamicCastUnknownClassUnconditional(nullptr, nullptr, nullptr, 0, 0);
   ASSERT_EQ(Result, nullptr);
 }
 
@@ -138,7 +138,7 @@ TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastMetatype) {
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastMetatypeUnconditional) {
-  auto Result = swift_dynamicCastMetatypeUnconditional(nullptr, nullptr);
+  auto Result = swift_dynamicCastMetatypeUnconditional(nullptr, nullptr, nullptr, 0, 0);
   ASSERT_EQ(Result, nullptr);
 }
 
@@ -148,7 +148,7 @@ TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastObjCClassMetatype) {
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastObjCClassMetatypeUnconditional) {
-  auto Result = swift_dynamicCastObjCClassMetatypeUnconditional(nullptr, nullptr);
+  auto Result = swift_dynamicCastObjCClassMetatypeUnconditional(nullptr, nullptr, nullptr, 0, 0);
   ASSERT_EQ(Result, nullptr);
 }
 
@@ -159,7 +159,7 @@ TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastForeignClassMetatype) {
 
 TEST_F(CompatibilityOverrideTest,
        test_swift_dynamicCastForeignClassMetatypeUnconditional) {
-  auto Result = swift_dynamicCastForeignClassMetatypeUnconditional(nullptr, nullptr);
+  auto Result = swift_dynamicCastForeignClassMetatypeUnconditional(nullptr, nullptr, nullptr, 0, 0);
   ASSERT_EQ(Result, nullptr);
 }
 
@@ -168,16 +168,22 @@ TEST_F(CompatibilityOverrideTest, test_swift_conformsToProtocol) {
   ASSERT_EQ(Result, nullptr);  
 }
 
+TEST_F(CompatibilityOverrideTest, test_swift_conformsToSwiftProtocol) {
+  auto Result = swift_conformsToSwiftProtocol(nullptr, nullptr, StringRef());
+  ASSERT_EQ(Result, nullptr);
+}
+
 TEST_F(CompatibilityOverrideTest, test_swift_getTypeByMangledNode) {
   Demangler demangler;
-  auto Result = swift_getTypeByMangledNode(demangler, nullptr, nullptr,
-                                           nullptr);
-  ASSERT_EQ((const Metadata *)Result, nullptr);
+  auto Result = swift_getTypeByMangledNode(MetadataState::Abstract,
+                                           demangler, nullptr, nullptr, nullptr,nullptr);
+  ASSERT_EQ(Result.getMetadata(), nullptr);
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_getTypeByMangledName) {
-  auto Result = swift_getTypeByMangledName("", nullptr, nullptr);
-  ASSERT_EQ((const Metadata *)Result, nullptr);
+  auto Result = swift_getTypeByMangledName(MetadataState::Abstract,
+                                           "", nullptr, nullptr, nullptr);
+  ASSERT_EQ(Result.getMetadata(), nullptr);
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_getAssociatedTypeWitnessSlow) {

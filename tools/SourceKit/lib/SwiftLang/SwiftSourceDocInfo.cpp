@@ -16,10 +16,12 @@
 #include "SourceKit/Support/ImmutableTextBuffer.h"
 #include "SourceKit/Support/Logging.h"
 
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -431,6 +433,14 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
   VD->print(Printer, PO);
 }
 
+void SwiftLangSupport::printFullyAnnotatedGenericReq(
+    const swift::GenericSignature *Sig, llvm::raw_ostream &OS) {
+  assert(Sig);
+  FullyAnnotatedDeclarationPrinter Printer(OS);
+  PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
+  Sig->print(Printer, PO);
+}
+
 void SwiftLangSupport::printFullyAnnotatedSynthesizedDeclaration(
     const swift::ValueDecl *VD, TypeOrExtensionDecl Target,
     llvm::raw_ostream &OS) {
@@ -738,7 +748,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   if (VD->hasInterfaceType()) {
     llvm::raw_svector_ostream OS(SS);
     PrintOptions Options;
-    Options.PrintNameAliasUnderlyingType = true;
+    Options.PrintTypeAliasUnderlyingType = true;
     VD->getInterfaceType().print(OS, Options);
   }
   unsigned TypenameEnd = SS.size();
@@ -1715,8 +1725,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
       }
 
       auto &context = CompIns.getASTContext();
-      std::string error;
-      Decl *D = ide::getDeclFromUSR(context, USR, error);
+      TypeDecl *D = Demangle::getTypeDeclForUSR(context, USR);
 
       if (!D) {
         Receiver(CursorInfoData());
@@ -1729,15 +1738,15 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
       if (auto *M = dyn_cast<ModuleDecl>(D)) {
         passCursorInfoForModule(M, Lang.getIFaceGenContexts(), CompInvok,
                                 Receiver);
-      } else if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        auto *DC = VD->getDeclContext();
+      } else {
+        auto *DC = D->getDeclContext();
         Type selfTy;
         if (DC->isTypeContext()) {
           selfTy = DC->getSelfInterfaceType();
-          selfTy = VD->getInnermostDeclContext()->mapTypeIntoContext(selfTy);
+          selfTy = D->getInnermostDeclContext()->mapTypeIntoContext(selfTy);
         }
         bool Failed =
-            passCursorInfoForDecl(/*SourceFile*/nullptr, VD, MainModule, selfTy,
+            passCursorInfoForDecl(/*SourceFile*/nullptr, D, MainModule, selfTy,
                                   /*IsRef=*/false, false, ResolvedCursorInfo(),
                                   BufferID, SourceLoc(), {}, Lang, CompInvok,
                                   PreviousASTSnaps, Receiver);
@@ -1829,15 +1838,27 @@ public:
   explicit RelatedIdScanner(SourceFile &SrcFile, unsigned BufferID,
                             ValueDecl *D,
       llvm::SmallVectorImpl<std::pair<unsigned, unsigned>> &Ranges)
-    : Dcl(D), Ranges(Ranges),
-      SourceMgr(SrcFile.getASTContext().SourceMgr),
+    : Ranges(Ranges), SourceMgr(SrcFile.getASTContext().SourceMgr),
       BufferID(BufferID) {
+    if (auto *V = dyn_cast<VarDecl>(D)) {
+      // Always use the canonical var decl for comparison. This is so we
+      // pick up all occurrences of x in case statements like the below:
+      //   case .first(let x), .second(let x)
+      //     fallthrough
+      //   case .third(let x)
+      //     print(x)
+      Dcl = V->getCanonicalVarDecl();
+    } else {
+      Dcl = D;
+    }
   }
 
 private:
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
     if (Cancelled)
       return false;
+    if (auto *V = dyn_cast<VarDecl>(D))
+        D = V->getCanonicalVarDecl();
     if (D == Dcl)
       return passId(Range);
     return true;
@@ -1847,8 +1868,12 @@ private:
                           ReferenceMetaData Data) override {
     if (Cancelled)
       return false;
-    if (CtorTyRef)
+
+    if (auto *V = dyn_cast<VarDecl>(D))
+      D = V->getCanonicalVarDecl();
+    else if (CtorTyRef)
       D = CtorTyRef;
+
     if (D == Dcl)
       return passId(Range);
     return true;
@@ -1924,7 +1949,13 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
           return;
 
         RelatedIdScanner Scanner(SrcFile, BufferID, VD, Ranges);
-        if (DeclContext *LocalDC = VD->getDeclContext()->getLocalContext()) {
+
+        if (auto *Case = getCaseStmtOfCanonicalVar(VD)) {
+          Scanner.walk(Case);
+          while ((Case = Case->getFallthroughDest().getPtrOrNull())) {
+            Scanner.walk(Case);
+          }
+        } else if (DeclContext *LocalDC = VD->getDeclContext()->getLocalContext()) {
           Scanner.walk(LocalDC);
         } else {
           Scanner.walk(SrcFile);
@@ -1946,6 +1977,16 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
     void failed(StringRef Error) override {
       LOG_WARN_FUNC("related idents failed: " << Error);
       Receiver({});
+    }
+
+    static CaseStmt *getCaseStmtOfCanonicalVar(Decl *D) {
+      assert(D);
+      if (auto *VD = dyn_cast<VarDecl>(D)) {
+        if (auto *Canonical = VD->getCanonicalVarDecl()) {
+          return dyn_cast_or_null<CaseStmt>(Canonical->getRecursiveParentPatternStmt());
+        }
+      }
+      return nullptr;
     }
   };
 
@@ -2022,4 +2063,57 @@ semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
   getASTManager()->processASTAsync(Invok, std::move(Consumer), &OncePerASTToken);
+}
+
+void SwiftLangSupport::collectExpressionTypes(StringRef FileName,
+                                              ArrayRef<const char *> Args,
+                                    ArrayRef<const char *> ExpectedProtocols,
+                  std::function<void(const ExpressionTypesInFile&)> Receiver) {
+  std::string Error;
+  SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, FileName, Error);
+  if (!Invok) {
+    // FIXME: Report it as failed request.
+    LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
+    Receiver({});
+    return;
+  }
+  assert(Invok);
+  class ExpressionTypeCollector: public SwiftASTConsumer {
+    std::function<void(const ExpressionTypesInFile&)> Receiver;
+    std::vector<const char *> ExpectedProtocols;
+  public:
+    ExpressionTypeCollector(
+        std::function<void(const ExpressionTypesInFile&)> Receiver,
+        ArrayRef<const char *> ExpectedProtocols): Receiver(std::move(Receiver)),
+          ExpectedProtocols(ExpectedProtocols.vec()) {}
+    void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      auto *SF = AstUnit->getCompilerInstance().getPrimarySourceFile();
+      std::vector<ExpressionTypeInfo> Scratch;
+      llvm::SmallString<256> TypeBuffer;
+      llvm::raw_svector_ostream OS(TypeBuffer);
+      ExpressionTypesInFile Result;
+      for (auto Item: collectExpressionType(*SF, ExpectedProtocols, Scratch, OS)) {
+        Result.Results.push_back({Item.offset, Item.length, Item.typeOffset, {}});
+        for (auto P: Item.protocols) {
+          Result.Results.back().ProtocolOffsets.push_back(P.first);
+        }
+      }
+      Result.TypeBuffer = OS.str();
+      Receiver(Result);
+    }
+
+    void cancelled() override {
+      Receiver({});
+    }
+
+    void failed(StringRef Error) override {
+      Receiver({});
+    }
+  };
+  auto Collector = std::make_shared<ExpressionTypeCollector>(Receiver,
+                                                             ExpectedProtocols);
+  /// FIXME: When request cancellation is implemented and Xcode adopts it,
+  /// don't use 'OncePerASTToken'.
+  static const char OncePerASTToken = 0;
+  getASTManager()->processASTAsync(Invok, std::move(Collector), &OncePerASTToken);
 }

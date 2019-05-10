@@ -60,6 +60,18 @@ public:
   const T *getPtrOrNull() const { return Ptr; }
 
   explicit operator bool() const { return Ptr; }
+
+  bool operator==(const NullablePtr<T> &other) const {
+    return other.Ptr == Ptr;
+  }
+
+  bool operator!=(const NullablePtr<T> &other) const {
+    return !(*this == other);
+  }
+
+  bool operator==(const T *other) const { return other == Ptr; }
+
+  bool operator!=(const T *other) const { return !(*this == other); }
 };
   
 } // end namespace swift

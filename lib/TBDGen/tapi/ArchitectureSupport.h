@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief Defines architecture specific enums and helper functions.
+/// Defines architecture specific enums and helper functions.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -45,13 +45,13 @@ struct PackedVersion {
 
   bool empty() const { return _version == 0; }
 
-  /// \brief Retrieve the major version number.
+  /// Retrieve the major version number.
   unsigned getMajor() const { return _version >> 16; }
 
-  /// \brief Retrieve the minor version number, if provided.
+  /// Retrieve the minor version number, if provided.
   unsigned getMinor() const { return (_version >> 8) & 0xff; }
 
-  /// \brief Retrieve the subminor version number, if provided.
+  /// Retrieve the subminor version number, if provided.
   unsigned getSubminor() const { return _version & 0xff; }
 
   bool parse32(StringRef str);

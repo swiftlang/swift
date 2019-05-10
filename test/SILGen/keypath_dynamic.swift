@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -module-name A %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name A %s | %FileCheck %s
 
 struct Foo {
   var x : Int {

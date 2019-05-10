@@ -138,6 +138,9 @@ public:
   /// it is non-empty and at least one of the type parameters can be
   /// substituted (i.e., is not mapped to a concrete type).
   bool hasAnySubstitutableParams() const;
+  
+  /// True if this substitution map is an identity mapping.
+  bool isIdentity() const;
 
   /// Whether the substitution map is non-empty.
   explicit operator bool() const { return !empty(); }
@@ -169,8 +172,9 @@ public:
   /// Apply a substitution to all replacement types in the map. Does not
   /// change keys.
   SubstitutionMap subst(TypeSubstitutionFn subs,
-                        LookupConformanceFn conformances) const;
-
+                        LookupConformanceFn conformances,
+                        SubstOptions options = None) const;
+  
   /// Create a substitution map for a protocol conformance.
   static SubstitutionMap
   getProtocolSubstitutions(ProtocolDecl *protocol,

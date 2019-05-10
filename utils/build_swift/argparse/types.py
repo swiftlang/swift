@@ -115,7 +115,7 @@ class PathType(object):
         path = os.path.abspath(path)
 
         if self._assert_exists and not os.path.exists(path):
-            raise ArgumentTypeError('{} does not exists'.format(path))
+            raise ArgumentTypeError('{} does not exist'.format(path))
 
         if self._assert_executable and not PathType._is_executable(path):
             raise ArgumentTypeError('{} is not an executable'.format(path))

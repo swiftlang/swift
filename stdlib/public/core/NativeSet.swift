@@ -10,48 +10,56 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A wrapper around _RawSetStorage that provides most of the
+/// A wrapper around __RawSetStorage that provides most of the
 /// implementation of Set.
 @usableFromInline
 @_fixed_layout
 internal struct _NativeSet<Element: Hashable> {
-  /// See the comments on _RawSetStorage and its subclasses to understand why we
+  /// See the comments on __RawSetStorage and its subclasses to understand why we
   /// store an untyped storage here.
   @usableFromInline
-  internal var _storage: _RawSetStorage
+  internal var _storage: __RawSetStorage
 
   /// Constructs an instance from the empty singleton.
   @inlinable
   @inline(__always)
   internal init() {
-    self._storage = _RawSetStorage.empty
+    self._storage = __RawSetStorage.empty
   }
 
   /// Constructs a native set adopting the given storage.
   @inlinable
   @inline(__always)
-  internal init(_ storage: __owned _RawSetStorage) {
+  internal init(_ storage: __owned __RawSetStorage) {
     self._storage = storage
   }
 
   @inlinable
   internal init(capacity: Int) {
-    self._storage = _SetStorage<Element>.allocate(capacity: capacity)
+    if capacity == 0 {
+      self._storage = __RawSetStorage.empty
+    } else {
+      self._storage = _SetStorage<Element>.allocate(capacity: capacity)
+    }
   }
 
 #if _runtime(_ObjC)
   @inlinable
-  internal init(_ cocoa: __owned _CocoaSet) {
+  internal init(_ cocoa: __owned __CocoaSet) {
     self.init(cocoa, capacity: cocoa.count)
   }
 
   @inlinable
-  internal init(_ cocoa: __owned _CocoaSet, capacity: Int) {
-    _internalInvariant(cocoa.count <= capacity)
-    self._storage = _SetStorage<Element>.convert(cocoa, capacity: capacity)
-    for element in cocoa {
-      let nativeElement = _forceBridgeFromObjectiveC(element, Element.self)
-      insertNew(nativeElement, isUnique: true)
+  internal init(_ cocoa: __owned __CocoaSet, capacity: Int) {
+    if capacity == 0 {
+      self._storage = __RawSetStorage.empty
+    } else {
+      _internalInvariant(cocoa.count <= capacity)
+      self._storage = _SetStorage<Element>.convert(cocoa, capacity: capacity)
+      for element in cocoa {
+        let nativeElement = _forceBridgeFromObjectiveC(element, Element.self)
+        insertNew(nativeElement, isUnique: true)
+      }
     }
   }
 #endif
@@ -109,9 +117,20 @@ extension _NativeSet { // Low-level unchecked operations
   @inline(__always)
   internal func uncheckedInitialize(
     at bucket: Bucket,
-    to element: __owned Element) {
+    to element: __owned Element
+  ) {
     _internalInvariant(hashTable.isValid(bucket))
     (_elements + bucket.offset).initialize(to: element)
+  }
+
+  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  @inline(__always)
+  internal func uncheckedAssign(
+    at bucket: Bucket,
+    to element: __owned Element
+  ) {
+    _internalInvariant(hashTable.isOccupied(bucket))
+    (_elements + bucket.offset).pointee = element
   }
 }
 
@@ -422,6 +441,21 @@ extension _NativeSet { // Insertions
     _unsafeInsertNew(element, at: bucket)
     return nil
   }
+
+  /// Insert an element into uniquely held storage, replacing an existing value
+  /// (if any).  Storage must be uniquely referenced with adequate capacity.
+  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  internal mutating func _unsafeUpdate(
+    with element: __owned Element
+  ) {
+    let (bucket, found) = find(element)
+    if found {
+      uncheckedAssign(at: bucket, to: element)
+    } else {
+      _precondition(count < capacity)
+      _unsafeInsertNew(element, at: bucket)
+    }
+  }
 }
 
 extension _NativeSet {
@@ -439,7 +473,7 @@ extension _NativeSet {
 
 #if _runtime(_ObjC)
   @inlinable
-  func isEqual(to other: _CocoaSet) -> Bool {
+  func isEqual(to other: __CocoaSet) -> Bool {
     if self.count != other.count { return false }
 
     defer { _fixLifetime(self) }

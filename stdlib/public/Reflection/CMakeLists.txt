@@ -3,14 +3,14 @@ set(swiftReflection_SOURCES
   TypeLowering.cpp
   TypeRef.cpp
   TypeRefBuilder.cpp
+  "${SWIFT_SOURCE_DIR}/stdlib/public/runtime/LLVMSupport.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Context.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/OldDemangler.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Demangler.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/NodePrinter.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/ManglingUtils.cpp"
   "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp"
-  "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
-  "${SWIFT_SOURCE_DIR}/lib/Demangling/TypeDecoder.cpp")
+  "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp")
 
 # When we're building with assertions, include the demangle node dumper to aid
 # in debugging.
@@ -22,7 +22,7 @@ endif(LLVM_ENABLE_ASSERTIONS)
 if(SWIFT_BUILD_STDLIB)
   add_swift_target_library(swiftReflection STATIC TARGET_LIBRARY
     ${swiftReflection_SOURCES}
-    C_COMPILE_FLAGS ${SWIFT_RUNTIME_CXX_FLAGS}
+    C_COMPILE_FLAGS ${SWIFT_RUNTIME_CXX_FLAGS} -DswiftCore_EXPORTS
     LINK_FLAGS ${SWIFT_RUNTIME_LINK_FLAGS}
     INSTALL_IN_COMPONENT dev)
 endif()
@@ -35,6 +35,8 @@ if(SWIFT_INCLUDE_TOOLS)
   endif()
 
   if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+    set(CURRENT_CMAKE_C_COMPILER ${CMAKE_C_COMPILER})
+    set(CURRENT_CMAKE_CXX_COMPILER ${CMAKE_CXX_COMPILER})
     set(CMAKE_C_COMPILER ${HOST_CMAKE_C_COMPILER})
     set(CMAKE_CXX_COMPILER ${HOST_CMAKE_CXX_COMPILER})
   endif()
@@ -45,5 +47,9 @@ if(SWIFT_INCLUDE_TOOLS)
     ${SWIFT_RUNTIME_CXX_FLAGS})
   set_property(TARGET swiftReflection
     APPEND_STRING PROPERTY LINK_FLAGS ${SWIFT_RUNTIME_LINK_FLAGS})
-endif()
 
+  if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+    set(CMAKE_C_COMPILER ${CURRENT_CMAKE_C_COMPILER})
+    set(CMAKE_CXX_COMPILER ${CURRENT_CMAKE_CXX_COMPILER})
+  endif()
+endif()

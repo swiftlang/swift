@@ -3,15 +3,21 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
 endif()
 
 if(SWIFT_BUILD_SDK_OVERLAY)
-  # SwiftPrivatePthreadExtras makes use of Darwin/Glibc, which is part of the
+  # SwiftPrivateThreadExtras makes use of Darwin/Glibc, which is part of the
   # SDK overlay. It can't be built separately from the SDK overlay.
   add_subdirectory(DifferentiationUnittest)
   add_subdirectory(RuntimeUnittest)
-  add_subdirectory(StdlibUnittest)
   add_subdirectory(StdlibUnicodeUnittest)
   add_subdirectory(StdlibCollectionUnittest)
   add_subdirectory(SwiftPrivateLibcExtras)
-  add_subdirectory(SwiftPrivatePthreadExtras)
+  add_subdirectory(SwiftPrivateThreadExtras)
+
+  # NOTE(compnerd) this must come after SwiftPrivateLibcExtras and
+  # SwiftPrivateThreadExtras to ensure that the dependency targets are setup in
+  # the correct order for Windows.
+  add_subdirectory(StdlibUnittest)
+
+  add_subdirectory(OSLog)
 
   # SWIFT_ENABLE_TENSORFLOW
   if(SWIFT_ENABLE_TENSORFLOW)

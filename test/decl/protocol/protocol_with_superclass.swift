@@ -208,10 +208,10 @@ protocol ProtocolWithClassInits : ClassWithInits<Int> {}
 
 func useProtocolWithClassInits1() {
   _ = ProtocolWithClassInits(notRequiredInit: ())
-  // expected-error@-1 {{member 'init' cannot be used on type 'ProtocolWithClassInits'}}
+  // expected-error@-1 {{protocol type 'ProtocolWithClassInits' cannot be instantiated}}
 
   _ = ProtocolWithClassInits(requiredInit: ())
-  // expected-error@-1 {{member 'init' cannot be used on type 'ProtocolWithClassInits'}}
+  // expected-error@-1 {{protocol type 'ProtocolWithClassInits' cannot be instantiated}}
 }
 
 func useProtocolWithClassInits2(_ t: ProtocolWithClassInits.Type) {
@@ -237,10 +237,10 @@ protocol ProtocolRefinesClassInits : ProtocolWithClassInits {}
 
 func useProtocolRefinesClassInits1() {
   _ = ProtocolRefinesClassInits(notRequiredInit: ())
-  // expected-error@-1 {{member 'init' cannot be used on type 'ProtocolRefinesClassInits'}}
+  // expected-error@-1 {{protocol type 'ProtocolRefinesClassInits' cannot be instantiated}}
 
   _ = ProtocolRefinesClassInits(requiredInit: ())
-  // expected-error@-1 {{member 'init' cannot be used on type 'ProtocolRefinesClassInits'}}
+  // expected-error@-1 {{protocol type 'ProtocolRefinesClassInits' cannot be instantiated}}
 }
 
 func useProtocolRefinesClassInits2(_ t: ProtocolRefinesClassInits.Type) {
@@ -339,4 +339,16 @@ extension Amb { // expected-error {{'Amb' is ambiguous for type lookup in this c
   func extensionMethodUsesClassTypes() {
     _ = ConcreteAlias.self
   }
+}
+
+protocol ProtoRefinesClassComposition : Generic<Int> & BaseProto {}
+
+func usesProtoRefinesClass1(_ t: ProtoRefinesClassComposition) {
+  t.genericMethod((1, 2))
+  let _: BaseProto = t
+}
+
+func usesProtoRefinesClass2<T : ProtoRefinesClassComposition>(_ t: T) {
+  t.genericMethod((1, 2))
+  let _: BaseProto = t
 }

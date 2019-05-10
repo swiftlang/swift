@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -generic-specializer -module-name inherit | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -generic-specializer -module-name inherit | %FileCheck %s
 
 import Builtin
 import Swift
@@ -12,7 +12,7 @@ struct MMStorage<Key : Hashable, Value> {
 func ==(lhs: MMObject, rhs: MMObject) -> Bool
 
 class MMObject : Hashable {
-  var hashValue: Int { get }
+  func hash(into hasher: inout Hasher)
 }
 
 class MMString : MMObject {

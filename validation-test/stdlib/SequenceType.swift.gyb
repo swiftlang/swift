@@ -629,21 +629,6 @@ SequenceTypeTests.test("allSatisfy/Predicate") {
 }
 
 //===----------------------------------------------------------------------===//
-// count(where:)
-//===----------------------------------------------------------------------===//
-
-SequenceTypeTests.test("count/Predicate") {
-  for test in predicateCountTests {
-    let s = MinimalSequence<OpaqueValue<Int>>(
-      elements: test.sequence.map { OpaqueValue($0) })
-    expectEqual(
-      test.expected,
-      s.count(where: { test.includeElement($0.value) }),
-      stackTrace: SourceLocStack().with(test.loc))
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // reduce()
 //===----------------------------------------------------------------------===//
 
@@ -1047,6 +1032,20 @@ SequenceTypeTests.test("underestimatedCount/Sequence/CustomImplementation") {
     let s = SequenceWithCustomUnderestimatedCount(underestimatedCount: 42)
     expectEqual(42, callGenericUnderestimatedCount(s))
   }
+}
+
+//===----------------------------------------------------------------------===//
+// withContiguousStorageIfAvailable()
+//===----------------------------------------------------------------------===//
+SequenceTypeTests.test("withContiguousMutableStorageIfAvailable")
+.code {
+  let s = [ 1, 2, 3 ].map(OpaqueValue.init)
+  let tester = SequenceLog.dispatchTester(s)
+  let result = tester.withContiguousStorageIfAvailable { buf in
+    buf.reduce(0) { $0 + $1.value }
+  }
+  expectEqual(6, result)
+  expectCustomizable(tester, tester.log.withContiguousStorageIfAvailable)
 }
 
 //===----------------------------------------------------------------------===//

@@ -20,10 +20,10 @@
 // RUN: %FileCheck %s -check-prefix=UN_OPT_DOT_FOOSTRUCT < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=UN_OPT_DOT_2 > %t.opt.txt
-// RUN: %FileCheck %s -check-prefix=UN_OPT_DOT_FOOSTRUCT_RETURN < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=UN_OPT_DOT_FOOSTRUCT < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=UN_OPT_NO_DOT_2 > %t.opt.txt
-// RUN: %FileCheck %s -check-prefix=UN_OPT_NO_DOT_FOOSTRUCT_RETURN < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=UN_OPT_NO_DOT_FOOSTRUCT < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_TUPLE_1 | %FileCheck %s -check-prefix=OPT_TUPLE_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_TUPLE_2 | %FileCheck %s -check-prefix=OPT_TUPLE_2
@@ -71,11 +71,6 @@ func returnsImplicitlyUnwrappedOptional() -> FooStruct! {
 // UN_OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
 // UN_OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc()[#Void#]{{; name=.+$}}
 // UN_OPT_DOT_FOOSTRUCT: End completions
-
-// UN_OPT_DOT_FOOSTRUCT_RETURN: Begin completions
-// UN_OPT_DOT_FOOSTRUCT_RETURN-DAG: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.instanceVar[#Int#]{{; name=.+$}}
-// UN_OPT_DOT_FOOSTRUCT_RETURN-DAG: Decl[InstanceMethod]/CurrNominal/Erase[1]: ?.instanceFunc()[#Void#]{{; name=.+$}}
-// UN_OPT_DOT_FOOSTRUCT_RETURN: End completions
 
 
 //===---
@@ -153,7 +148,3 @@ func testOptionalTuple5(a: (x: Int, y: String)?) {
 // UN_OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc()[#Void#]{{; name=.+$}}
 // UN_OPT_NO_DOT_FOOSTRUCT: End completions
 
-// UN_OPT_NO_DOT_FOOSTRUCT_RETURN: Begin completions
-// UN_OPT_NO_DOT_FOOSTRUCT_RETURN-DAG: Decl[InstanceVar]/CurrNominal:    ?.instanceVar[#Int#]{{; name=.+$}}
-// UN_OPT_NO_DOT_FOOSTRUCT_RETURN-DAG: Decl[InstanceMethod]/CurrNominal: ?.instanceFunc()[#Void#]{{; name=.+$}}
-// UN_OPT_NO_DOT_FOOSTRUCT_RETURN: End completions

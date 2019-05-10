@@ -15,7 +15,7 @@ add_sourcekit_executable(sourcekitd-test
     clangRewrite clangLex clangBasic
   LLVM_COMPONENT_DEPENDS core support option coverage lto
 )
-if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
+if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
   target_link_libraries(sourcekitd-test PRIVATE dispatch BlocksRuntime)
 endif()
 
@@ -32,6 +32,6 @@ if(SWIFT_ANALYZE_CODE_COVERAGE)
     LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
 endif()
 
-swift_install_in_component(tools
-    TARGETS sourcekitd-test
-    RUNTIME DESTINATION bin)
+swift_install_in_component(TARGETS sourcekitd-test
+                           RUNTIME DESTINATION bin
+                           COMPONENT tools)

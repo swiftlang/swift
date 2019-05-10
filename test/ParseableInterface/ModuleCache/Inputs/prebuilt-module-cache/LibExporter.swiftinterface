@@ -1,0 +1,4 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -parse-stdlib -module-name LibExporter
+
+@_exported import Lib

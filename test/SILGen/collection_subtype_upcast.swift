@@ -1,9 +1,9 @@
 
-// RUN: %target-swift-emit-silgen -module-name collection_subtype_upcast -enable-sil-ownership -sdk %S/Inputs %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name collection_subtype_upcast -sdk %S/Inputs %s | %FileCheck %s
 
 struct S { var x, y: Int }
 
-// CHECK-LABEL: sil hidden @$s25collection_subtype_upcast06array_C00D0SayypGSayAA1SVG_tF :
+// CHECK-LABEL: sil hidden [ossa] @$s25collection_subtype_upcast06array_C00D0SayypGSayAA1SVG_tF :
 // CHECK:    bb0([[ARG:%.*]] : @guaranteed $Array<S>):
 // CHECK: debug_value [[ARG]]
 // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
@@ -17,8 +17,9 @@ func array_upcast(array: [S]) -> [Any] {
 }
 
 extension S : Hashable {
-  var hashValue : Int {
-    return x + y
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(x)
+    hasher.combine(y)
   }
 }
 func ==(lhs: S, rhs: S) -> Bool {
@@ -26,7 +27,7 @@ func ==(lhs: S, rhs: S) -> Bool {
 }
 
 // FIXME: This entrypoint name should not be bridging-specific
-// CHECK-LABEL:      sil hidden @$s25collection_subtype_upcast05dict_C00D0SDyAA1SVypGSDyAESiG_tF :
+// CHECK-LABEL:      sil hidden [ossa] @$s25collection_subtype_upcast05dict_C00D0SDyAA1SVypGSDyAESiG_tF :
 // CHECK:    bb0([[ARG:%.*]] : @guaranteed $Dictionary<S, Int>):
 // CHECK: debug_value [[ARG]]
 // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]

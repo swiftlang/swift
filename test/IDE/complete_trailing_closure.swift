@@ -41,7 +41,7 @@ func test1() {
 // GLOBAL_1: Begin completions
 // GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global1 {|}[#Void#]
 // GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global2 {|}[#Void#]
-// GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global3 {|}[#Void#]
+// GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global3 {|}[' rethrows'][#Void#]
 // GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global4 {|}[#Void#]
 // GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global1({#() -> ()##() -> ()#})[#Void#]
 // GLOBAL_1-DAG: Decl[FreeFunction]/CurrModule:      global2({#label: () -> ()##() -> ()#})[#Void#]

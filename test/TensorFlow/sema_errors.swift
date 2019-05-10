@@ -1,20 +1,19 @@
 // RUN: %target-swift-frontend -O -emit-sil -verify %s
 
 // This file contains tests that produce errors in the semantic analysis pass
-// or earlier.  These have to be split from the other SIL tests because if there
-// is a type checking error, then the SIL passes aren't run.
+// or earlier. These must be split from other SIL tests because SIL passes are
+// not run when there are type-checking errors.
 
 import TensorFlow
-
 
 public func testExpressibleByLiteral() {
   let _: Tensor<Int32> = [1, 2, 3, 4] // ok
   let _: Tensor<Float> = [1, 2.0, 3, 4] // ok
   let _: Tensor<Bool> = [[[true, false, false, true]]] // ok
-  let _: Tensor<Float> = [[[true, false, false, true]]] // expected-error {{cannot convert value of type 'Bool' to expected element type '_TensorElementLiteral<Float>'}}
+  // expected-error @+1 4 {{generic struct '_TensorElementLiteral' requires that 'Float' conform to 'ExpressibleByBooleanLiteral'}}
+  let _: Tensor<Float> = [[[true, false, false, true]]]
   let _: Tensor<Float> = Tensor([[[true, false, false, true]]]) // ok
 }
-
 
 func testTensorFlowFunctionTypes() {
   // expected-error@+2 {{convention 'tensorflow' not supported}}
@@ -24,7 +23,6 @@ func testTensorFlowFunctionTypes() {
   tf_fn = tf_fn2
   tf_fn2 = tf_fn
 }
-
 
 // These are testcases that show the next steps in "@convention(tensorflow)" support.
 
@@ -43,8 +41,9 @@ func testTFFunc() {
   // check if the closures that are tensorflow functions do not have captures.
   takesTFFunc { $0 + one }
   // FIXME: Should eventually be supported.
-  //expect-error@+1 {{convention 'tensorflow' not supported}}
-  @convention(tensorflow) // expected-error {{attribute can only be applied to types, not declarations}}
+  // xpected-error @+2 {{convention 'tensorflow' not supported}}
+  // expected-error @+1 {{attribute can only be applied to types, not declarations}}
+  @convention(tensorflow)
   func inner1(a : Tensor<Float>) -> Tensor<Float> {
     return a+1
   }

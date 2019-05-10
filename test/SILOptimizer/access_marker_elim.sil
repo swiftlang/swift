@@ -15,7 +15,7 @@ public struct S {
 // [unknown] markers are treated like [dynamic] markers by AccessMarkerElimination.
 // We don't remove them for -enforce-exclusivity=checked
 
-// UNCHECKED-LABEL: sil hidden [noinline] @f010_initS : $@convention(thin) () -> @owned S {
+// UNCHECKED-LABEL: sil hidden [noinline] [ossa] @f010_initS : $@convention(thin) () -> @owned S {
 // UNCHECKED: bb0:
 // UNCHECKED:  [[BOX:%.*]] = alloc_box ${ var S }, var, name "s"
 // UNCHECKED:  [[ADDRS:%.*]] = project_box [[BOX]] : ${ var S }, 0
@@ -31,7 +31,7 @@ public struct S {
 // UNCHECKED:  return [[VALS]] : $S
 // UNCHECKED-LABEL: } // end sil function 'f010_initS'
 //
-// CHECKED-LABEL: sil hidden [noinline] @f010_initS : $@convention(thin) () -> @owned S {
+// CHECKED-LABEL: sil hidden [noinline] [ossa] @f010_initS : $@convention(thin) () -> @owned S {
 // CHECKED: bb0:
 // CHECKED:  [[BOX:%.*]] = alloc_box ${ var S }, var, name "s"
 // CHECKED:  [[ADDRS:%.*]] = project_box [[BOX]] : ${ var S }, 0
@@ -46,7 +46,7 @@ public struct S {
 // CHECKED:  destroy_value [[BOX]] : ${ var S }
 // CHECKED:  return [[VALS]] : $S
 // CHECKED-LABEL: } // end sil function 'f010_initS'
-sil hidden [noinline] @f010_initS : $@convention(thin) () -> @owned S {
+sil hidden [noinline] [ossa] @f010_initS : $@convention(thin) () -> @owned S {
 bb0:
   %0 = alloc_box ${ var S }, var, name "s"
   %1 = project_box %0 : ${ var S }, 0
@@ -66,7 +66,7 @@ bb0:
 // And since inactive elimination currently eliminates all dynamic markers,
 // they are gone from the output.
 //
-// UNCHECKED-LABEL: sil hidden @f020_boxArg : $@convention(thin) (@owned { var Builtin.Int64 }) -> () {
+// UNCHECKED-LABEL: sil hidden [ossa] @f020_boxArg : $@convention(thin) (@owned { var Builtin.Int64 }) -> () {
 // UNCHECKED: bb0(%0 : @owned ${ var Builtin.Int64 }):
 // UNCHECKED:  [[ADR:%.*]] = project_box %0 : ${ var Builtin.Int64 }, 0
 // UNCHECKED:  [[VAL:%.*]] = integer_literal $Builtin.Int64, 42
@@ -77,7 +77,7 @@ bb0:
 // UNCHECKED:  return %{{.*}} : $()
 // UNCHECKED-LABEL: } // end sil function 'f020_boxArg'
 //
-// CHECKED-LABEL: sil hidden @f020_boxArg : $@convention(thin) (@owned { var Builtin.Int64 }) -> () {
+// CHECKED-LABEL: sil hidden [ossa] @f020_boxArg : $@convention(thin) (@owned { var Builtin.Int64 }) -> () {
 // CHECKED: bb0(%0 : @owned ${ var Builtin.Int64 }):
 // CHECKED:  [[ADR:%.*]] = project_box %0 : ${ var Builtin.Int64 }, 0
 // CHECKED:  [[VAL:%.*]] = integer_literal $Builtin.Int64, 42
@@ -87,7 +87,7 @@ bb0:
 // CHECKED:  destroy_value %0 : ${ var Builtin.Int64 }
 // CHECKED:  return %{{.*}} : $()
 // CHECKED-LABEL: } // end sil function 'f020_boxArg'
-sil hidden @f020_boxArg : $@convention(thin) (@owned { var Builtin.Int64 }) -> () {
+sil hidden [ossa] @f020_boxArg : $@convention(thin) (@owned { var Builtin.Int64 }) -> () {
 bb0(%0 : @owned ${ var Builtin.Int64 }):
   %1 = project_box %0 : ${ var Builtin.Int64 }, 0
   %3 = integer_literal $Builtin.Int64, 42

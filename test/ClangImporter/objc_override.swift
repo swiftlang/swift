@@ -110,11 +110,21 @@ class CallbackSubC : CallbackBase {
 
 //
 class MyHashableNSObject: NSObject {
-  override var hashValue: Int { // expected-warning{{override of 'NSObject.hashValue' is deprecated}}
+  override var hashValue: Int {
+    // expected-error@-1 {{'NSObject.hashValue' is not overridable; did you mean to override 'NSObject.hash'?}}
     return 0
   }
 }
 
+// rdar://problem/47557376
+// Adding an override to someone else's class in an extension like this isn't
+// really sound, but it's allowed in Objective-C too.
+extension OverrideInExtensionSub {
+  open override func method() {}
+}
+public extension OverrideInExtensionSub {
+  open override func accessWarning() {} // expected-warning {{'open' modifier conflicts with extension's default access of 'public'}}
+}
 
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: overridden declaration is here

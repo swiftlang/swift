@@ -42,6 +42,7 @@ syn keyword swiftDefinitionModifier
       \ nonmutating
       \ open
       \ override
+      \ prefix
       \ private
       \ public
       \ required

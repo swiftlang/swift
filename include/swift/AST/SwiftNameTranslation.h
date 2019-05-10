@@ -18,6 +18,7 @@
 
 namespace swift {
   class ValueDecl;
+  class EnumDecl;
   class EnumElementDecl;
 
 namespace objc_translation {
@@ -28,6 +29,8 @@ namespace objc_translation {
 
   StringRef getNameForObjC(const ValueDecl *VD,
                            CustomNamesOnly_t customNamesOnly = Normal);
+
+  std::string getErrorDomainStringForObjC(const EnumDecl *ED);
 
   /// Print the ObjC name of an enum element decl to OS, also allowing the client
   /// to specify a preferred name other than the decl's original name.

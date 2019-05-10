@@ -37,14 +37,6 @@ class TypeInfo;
 /// for a type.
 class DebugTypeInfo {
 public:
-  /// The DeclContext of the function. This might not be the DeclContext of
-  /// the variable if inlining took place.
-  DeclContext *DeclCtx = nullptr;
-
-  /// The generic environment of the type. Ideally we should need only this and
-  /// retire the DeclCtxt.
-  GenericEnvironment *GenericEnv = nullptr;
-
   /// The type we need to emit may be different from the type
   /// mentioned in the Decl, for example, stripped of qualifiers.
   TypeBase *Type = nullptr;
@@ -54,21 +46,25 @@ public:
   Size size = Size(0);
   Alignment align = Alignment(0);
   bool DefaultAlignment = true;
+  bool IsMetadataType = false;
 
   DebugTypeInfo() {}
-  DebugTypeInfo(DeclContext *DC, GenericEnvironment *GE, swift::Type Ty,
-                llvm::Type *StorageTy, Size SizeInBytes, Alignment AlignInBytes,
-                bool HasDefaultAlignment);
+  DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy, Size SizeInBytes,
+                Alignment AlignInBytes, bool HasDefaultAlignment,
+                bool IsMetadataType);
+
   /// Create type for a local variable.
-  static DebugTypeInfo getLocalVariable(DeclContext *DeclCtx,
-                                        GenericEnvironment *GE, VarDecl *Decl,
+  static DebugTypeInfo getLocalVariable(VarDecl *Decl,
                                         swift::Type Ty, const TypeInfo &Info);
-  /// Create type for an artificial metadata variable.
+  /// Create type for global type metadata.
   static DebugTypeInfo getMetadata(swift::Type Ty, llvm::Type *StorageTy,
                                    Size size, Alignment align);
+  /// Create type for an artificial metadata variable.
+  static DebugTypeInfo getArchetype(swift::Type Ty, llvm::Type *StorageTy,
+                                    Size size, Alignment align);
+
   /// Create a standalone type from a TypeInfo object.
-  static DebugTypeInfo getFromTypeInfo(DeclContext *DC, GenericEnvironment *GE,
-                                       swift::Type Ty, const TypeInfo &Info);
+  static DebugTypeInfo getFromTypeInfo(swift::Type Ty, const TypeInfo &Info);
   /// Global variables.
   static DebugTypeInfo getGlobal(SILGlobalVariable *GV, llvm::Type *StorageType,
                                  Size size, Alignment align);
@@ -76,24 +72,20 @@ public:
   static DebugTypeInfo getObjCClass(ClassDecl *theClass,
                                     llvm::Type *StorageType, Size size,
                                     Alignment align);
+  /// Error type.
+  static DebugTypeInfo getErrorResult(swift::Type Ty, llvm::Type *StorageType,
+                                      Size size, Alignment align);
 
   TypeBase *getType() const { return Type; }
 
   TypeDecl *getDecl() const;
-  DeclContext *getDeclContext() const { return DeclCtx; }
-  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
 
-  // Determine whether this type is an Archetype itself.
-  bool isArchetype() const {
-    return Type->getWithoutSpecifierType()->is<ArchetypeType>();
-  }
-
-  /// LValues, inout args, and Archetypes are implicitly indirect by
-  /// virtue of their DWARF type.
-  //
-  // FIXME: There exists an inverse workaround in LLDB. Both should be removed.
-  bool isImplicitlyIndirect() const {
-    return isArchetype();
+  // Determine whether this type is an Archetype dependent on a generic context.
+  bool isContextArchetype() const {
+    if (auto archetype = Type->getWithoutSpecifierType()->getAs<ArchetypeType>()) {
+      return !isa<OpaqueTypeArchetypeType>(archetype->getRoot());
+    }
+    return false;
   }
 
   bool isNull() const { return Type == nullptr; }
@@ -114,9 +106,8 @@ template <> struct DenseMapInfo<swift::irgen::DebugTypeInfo> {
   }
   static swift::irgen::DebugTypeInfo getTombstoneKey() {
     return swift::irgen::DebugTypeInfo(
-        nullptr, nullptr,
         llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey(), nullptr,
-        swift::irgen::Size(0), swift::irgen::Alignment(0), false);
+        swift::irgen::Size(0), swift::irgen::Alignment(0), false, false);
   }
   static unsigned getHashValue(swift::irgen::DebugTypeInfo Val) {
     return DenseMapInfo<swift::CanType>::getHashValue(Val.getType());

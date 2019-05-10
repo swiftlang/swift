@@ -12,15 +12,16 @@
 // CHECK-LEAFINTERFACE: LeafFunc
 //
 // Break LeafModule's version number
-// RUN: sed -i.prev -e 's/swift-interface-format-version:.*/swift-interface-format-version: 9999.999/' %t/LeafModule.swiftinterface
+// RUN: sed -e 's/swift-interface-format-version:.*/swift-interface-format-version: 9999.999/' %t/LeafModule.swiftinterface | tr -d '\r' > %t/LeafModule.swiftinterface.tmp
+// RUN: mv %t/LeafModule.swiftinterface.tmp %t/LeafModule.swiftinterface
 //
 // Try to build TestModule into a .swiftmodule explicitly using LeafModule via LeafModule.swiftinterface, but fail because version mismatch in LeafModule.swiftinterface.
 //
-// RUN: not %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module  -o %t/TestModule.swiftmodule -module-name TestModule %s >%t/err.txt 2>&1
+// RUN: not %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-module  -o %t/TestModule.swiftmodule -module-name TestModule %s >%t/err.txt 2>&1
 // RUN: test ! -f %t/TestModule.swiftmodule
 // RUN: test ! -f %t/modulecache/LeafModule-*.swiftmodule
 // RUN: %FileCheck %s -check-prefix=CHECK-ERR <%t/err.txt
-// CHECK-ERR: {{error: unsupported version of parseable module interface '.*/LeafModule.swiftinterface': '9999.999'}}
+// CHECK-ERR: {{error: unsupported version of module interface '.*[/\\]LeafModule.swiftinterface': '9999.999'}}
 // CHECK-ERR: error: no such module 'LeafModule
 
 import LeafModule

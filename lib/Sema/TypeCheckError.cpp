@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PrettyStackTrace.h"
 
 using namespace swift;
 
@@ -146,11 +147,19 @@ public:
       // Look through closure capture lists.
       } else if (auto captureList = dyn_cast<CaptureListExpr>(fn)) {
         fn = captureList->getClosureBody();
+        // Look through optional evaluations.
+      } else if (auto optionalEval = dyn_cast<OptionalEvaluationExpr>(fn)) {
+        fn = optionalEval->getSubExpr()->getValueProvidingExpr();
       } else {
         break;
       }
     }
     
+    // Constructor delegation.
+    if (auto otherCtorDeclRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
+      return AbstractFunction(otherCtorDeclRef->getDecl());
+    }
+
     // Normal function references.
     if (auto declRef = dyn_cast<DeclRefExpr>(fn)) {
       ValueDecl *decl = declRef->getDecl();
@@ -670,13 +679,27 @@ private:
   Classification classifyRethrowsArgument(Expr *arg, Type paramType) {
     arg = arg->getValueProvidingExpr();
 
+    if (isa<DefaultArgumentExpr>(arg) ||
+        isa<CallerDefaultArgumentExpr>(arg)) {
+      return classifyArgumentByType(arg->getType(),
+                                    PotentialReason::forDefaultArgument());
+    }
+
+    // If this argument is `nil` literal or `.none`,
+    // it doesn't cause the call to throw.
+    if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(arg)) {
+      if (auto *DE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
+        auto &ctx = paramType->getASTContext();
+        if (DE->getDecl() == ctx.getOptionalNoneDecl())
+          return Classification();
+      }
+    }
+
     // If the parameter was structurally a tuple, try to look through the
     // various tuple operations.
     if (auto paramTupleType = dyn_cast<TupleType>(paramType.getPointer())) {
       if (auto tuple = dyn_cast<TupleExpr>(arg)) {
         return classifyTupleRethrowsArgument(tuple, paramTupleType);
-      } else if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg)) {
-        return classifyShuffleRethrowsArgument(shuffle, paramTupleType);
       }
 
       if (paramTupleType->getNumElements() != 1) {
@@ -690,7 +713,7 @@ private:
 
       // FIXME: There's a case where we can end up with an ApplyExpr that
       // has a single-element-tuple argument type, but the argument is just
-      // a ClosureExpr and not a TupleExpr/TupleShuffleExpr.
+      // a ClosureExpr and not a TupleExpr.
       paramType = paramTupleType->getElementType(0);
     }
 
@@ -710,7 +733,10 @@ private:
 
     // If it doesn't have function type, we must have invalid code.
     Type argType = fn.getType();
-    auto argFnType = (argType ? argType->getAs<AnyFunctionType>() : nullptr);
+    if (!argType) return Classification::forInvalidCode();
+
+    auto argFnType =
+        argType->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
     if (!argFnType) return Classification::forInvalidCode();
 
     // If it doesn't throw, this argument does not cause the call to throw.
@@ -732,79 +758,6 @@ private:
                                             paramTupleType->getElementType(i)));
     }
     return result;
-  }
-
-  /// Classify an argument to a 'rethrows' function that's a tuple shuffle.
-  Classification classifyShuffleRethrowsArgument(TupleShuffleExpr *shuffle,
-                                                 TupleType *paramTupleType) {
-    auto reversedParamType =
-      reverseShuffleParamType(shuffle, paramTupleType);
-
-    // Classify the operand.
-    auto result = classifyRethrowsArgument(shuffle->getSubExpr(),
-                                           reversedParamType);
-
-    // Check for default arguments in the shuffle.
-    for (auto i : indices(shuffle->getElementMapping())) {
-      // If this element comes from the sub-expression, we've already
-      // analyzed it.  (Variadic arguments also end up here, which is
-      // correct for our purposes.)
-      auto elt = shuffle->getElementMapping()[i];
-      if (elt >= 0) {
-        // Ignore.
-
-      // Otherwise, it might come from a default argument.  It still
-      // might contribute to 'rethrows', but treat it as an opaque source.
-      } else if (elt == TupleShuffleExpr::DefaultInitialize ||
-                 elt == TupleShuffleExpr::CallerDefaultInitialize) {
-        result.merge(classifyArgumentByType(paramTupleType->getElementType(i),
-                                       PotentialReason::forDefaultArgument()));
-      }
-    }
-
-    return result;
-  }
-
-  /// Given a tuple shuffle and an original parameter type, construct
-  /// the type of the source of the tuple shuffle preserving as much
-  /// information as possible from the original parameter type.
-  Type reverseShuffleParamType(TupleShuffleExpr *shuffle,
-                               TupleType *origParamTupleType) {
-    SmallVector<TupleTypeElt, 4> origSrcElts;
-    if (shuffle->isSourceScalar()) {
-      origSrcElts.append(1, TupleTypeElt());
-    } else {
-      auto srcTupleType = shuffle->getSubExpr()->getType()->castTo<TupleType>();
-      origSrcElts.append(srcTupleType->getNumElements(), TupleTypeElt());
-    }
-
-    auto mapping = shuffle->getElementMapping();
-    for (unsigned destIndex = 0; destIndex != mapping.size(); ++destIndex) {
-      auto srcIndex = mapping[destIndex];
-      if (srcIndex >= 0) {
-        origSrcElts[srcIndex] = origParamTupleType->getElement(destIndex);
-      } else if (srcIndex == TupleShuffleExpr::DefaultInitialize ||
-                 srcIndex == TupleShuffleExpr::CallerDefaultInitialize) {
-        // Nothing interesting from the source expression.
-      } else if (srcIndex == TupleShuffleExpr::Variadic) {
-        // Variadic arguments never contribute to 'rethrows'.
-        // Assign the rest of the source elements parameter types that will
-        // cause the recursive walker to ignore them.
-        for (unsigned srcIndex : shuffle->getVariadicArgs()) {
-          assert(srcIndex >= 0 && "default-initialized variadic argument?");
-          origSrcElts[srcIndex] =
-            origParamTupleType->getASTContext().TheRawPointerType;
-        }
-      } else {
-        llvm_unreachable("bad source-element mapping!");
-      }
-    }
-
-    if (shuffle->isSourceScalar()) {
-      return origSrcElts[0].getType();
-    } else {
-      return TupleType::get(origSrcElts, origParamTupleType->getASTContext());
-    }
   }
 
   /// Given the type of an argument, try to determine if it contains
@@ -870,6 +823,9 @@ public:
 
     /// The pattern of a catch.
     CatchGuard,
+
+    /// A defer body
+    DeferBody
   };
 
 private:
@@ -895,8 +851,9 @@ private:
 
   Kind TheKind;
   bool DiagnoseErrorOnTry = false;
+  bool isInDefer = false;
   DeclContext *RethrowsDC = nullptr;
-  InterpolatedStringLiteralExpr * InterpolatedString;
+  InterpolatedStringLiteralExpr *InterpolatedString = nullptr;
 
   explicit Context(Kind kind) : TheKind(kind) {}
 
@@ -937,6 +894,12 @@ public:
         D->getInterfaceType(), D->hasImplicitSelfDecl() ? 2 : 1));
   }
 
+  static Context forDeferBody() {
+    Context result(Kind::DeferBody);
+    result.isInDefer = true;
+    return result;
+  }
+
   static Context forInitializer(Initializer *init) {
     if (isa<DefaultArgumentInitializer>(init)) {
       return Context(Kind::DefaultArgument);
@@ -969,6 +932,10 @@ public:
 
   static Context forCatchGuard(CatchStmt *S) {
     return Context(Kind::CatchGuard);
+  }
+
+  static Context forPatternBinding(PatternBindingDecl *binding) {
+    return getContextForPatternBinding(binding);
   }
 
   Context withInterpolatedString(InterpolatedStringLiteralExpr *E) const {
@@ -1007,13 +974,20 @@ public:
   }
 
   static void diagnoseThrowInIllegalContext(TypeChecker &TC, ASTNode node,
-                                            StringRef description) {
+                                            StringRef description,
+                                            bool throwInDefer = false) {
     if (auto *e = node.dyn_cast<Expr*>())
       if (isa<ApplyExpr>(e)) {
         TC.diagnose(e->getLoc(), diag::throwing_call_in_illegal_context,
                     description);
         return;
       }
+
+    if (throwInDefer) {
+      // Return because this would've already been diagnosed in TypeCheckStmt.
+      return;
+    }
+
     TC.diagnose(node.getStartLoc(), diag::throw_in_illegal_context,
                 description);
   }
@@ -1054,7 +1028,9 @@ public:
       insertLoc = loc;
       highlight = e->getSourceRange();
       
-      if (InterpolatedString && e->getCalledValue()->getBaseName() ==
+      if (InterpolatedString &&
+          e->getCalledValue() &&
+          e->getCalledValue()->getBaseName() ==
           TC.Context.Id_appendInterpolation) {
         message = diag::throwing_interpolation_without_try;
         insertLoc = InterpolatedString->getLoc();
@@ -1172,6 +1148,9 @@ public:
     case Kind::CatchGuard:
       diagnoseThrowInIllegalContext(TC, E, "a catch guard expression");
       return;
+    case Kind::DeferBody:
+      diagnoseThrowInIllegalContext(TC, E, "a defer body", isInDefer);
+      return;
     }
     llvm_unreachable("bad context kind");
   }
@@ -1199,6 +1178,7 @@ public:
     case Kind::DefaultArgument:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
+    case Kind::DeferBody:
       assert(!DiagnoseErrorOnTry);
       // Diagnosed at the call sites.
       return;
@@ -1642,7 +1622,14 @@ void TypeChecker::checkFunctionErrorHandling(AbstractFunctionDecl *fn) {
   // by the time we got here.
   if (!fn->hasInterfaceType()) return;
 
-  CheckErrorCoverage checker(*this, Context::forFunction(fn));
+#ifndef NDEBUG
+  PrettyStackTraceDecl debugStack("checking error handling for", fn);
+#endif
+
+  auto isDeferBody = isa<FuncDecl>(fn) && cast<FuncDecl>(fn)->isDeferBody();
+  auto context =
+      isDeferBody ? Context::forDeferBody() : Context::forFunction(fn);
+  CheckErrorCoverage checker(*this, context);
 
   // If this is a debugger function, suppress 'try' marking at the top level.
   if (fn->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>())
@@ -1675,4 +1662,10 @@ void TypeChecker::checkEnumElementErrorHandling(EnumElementDecl *elt) {
     CheckErrorCoverage checker(*this, Context::forEnumElementInitializer(elt));
     init->walk(checker);
   }
+}
+
+void TypeChecker::checkPropertyDelegateErrorHandling(
+    PatternBindingDecl *binding, Expr *expr) {
+  CheckErrorCoverage checker(*this, Context::forPatternBinding(binding));
+  expr->walk(checker);
 }

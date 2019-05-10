@@ -397,6 +397,14 @@ static bool initDocEntityInfo(const Decl *D,
             VD, SynthesizedTarget, OS);
       else
         SwiftLangSupport::printFullyAnnotatedDeclaration(VD, Type(), OS);
+    } else if (auto *E = dyn_cast<ExtensionDecl>(D)) {
+      if (auto *Sig = E->getGenericSignature()) {
+        // The extension under printing is potentially part of a synthesized
+        // extension. Thus it's hard to print the fully annotated decl. We
+        // need to at least print the generic signature here.
+        llvm::raw_svector_ostream OS(Info.FullyAnnotatedGenericSig);
+        SwiftLangSupport::printFullyAnnotatedGenericReq(Sig, OS);
+      }
     }
   }
 
@@ -405,6 +413,7 @@ static bool initDocEntityInfo(const Decl *D,
     case DeclContextKind::TopLevelCodeDecl:
     case DeclContextKind::AbstractFunctionDecl:
     case DeclContextKind::SubscriptDecl:
+    case DeclContextKind::EnumElementDecl:
     case DeclContextKind::Initializer:
     case DeclContextKind::SerializedLocal:
     case DeclContextKind::ExtensionDecl:
@@ -442,7 +451,7 @@ static bool initDocEntityInfo(const TextEntity &Entity,
 }
 
 static const TypeDecl *getTypeDeclFromType(Type Ty) {
-  if (auto alias = dyn_cast<NameAliasType>(Ty.getPointer()))
+  if (auto alias = dyn_cast<TypeAliasType>(Ty.getPointer()))
     return alias->getDecl();
   return Ty->getAnyNominal();
 }
@@ -1023,17 +1032,18 @@ public:
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type Ty,
                           ReferenceMetaData Data) override {
+    if (Data.isImplicit)
+      return true;
     unsigned StartOffset = getOffset(Range.getStart());
     References.emplace_back(D, StartOffset, Range.getByteLength(), Ty);
     return true;
   }
 
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
-                               Optional<AccessKind> AccKind,
+                               ReferenceMetaData Data,
                                bool IsOpenBracket) override {
     // Treat both open and close brackets equally
-    return visitDeclReference(D, Range, nullptr, nullptr, Type(),
-                      ReferenceMetaData(SemaReferenceKind::SubscriptRef, AccKind));
+    return visitDeclReference(D, Range, nullptr, nullptr, Type(), Data);
   }
 
   bool isLocal(Decl *D) const {
@@ -1171,13 +1181,13 @@ accept(SourceManager &SM, RegionType RegionType,
   Impl.accept(SM, RegionType, Replacements);
 }
 
-void RequestRefactoringEditConsumer::
-handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                 StringRef FormatString,
-                 ArrayRef<DiagnosticArgument> FormatArgs,
-                 const DiagnosticInfo &Info) {
+void RequestRefactoringEditConsumer::handleDiagnostic(
+    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
+    const DiagnosticInfo &Info,
+    const SourceLoc bufferIndirectlyCausingDiagnostic) {
   Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
-                                     Info);
+                                     Info, bufferIndirectlyCausingDiagnostic);
 }
 
 class RequestRenameRangeConsumer::Implementation {
@@ -1231,15 +1241,13 @@ void RequestRenameRangeConsumer::accept(
   Impl.accept(SM, RegionType, Ranges);
 }
 
-void RequestRenameRangeConsumer::
-handleDiagnostic(SourceManager &SM,
-                 SourceLoc Loc,
-                 DiagnosticKind Kind,
-                 StringRef FormatString,
-                 ArrayRef<DiagnosticArgument> FormatArgs,
-                 const DiagnosticInfo &Info) {
+void RequestRenameRangeConsumer::handleDiagnostic(
+    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
+    const DiagnosticInfo &Info,
+    const SourceLoc bufferIndirectlyCausingDiagnostic) {
   Impl.DiagConsumer.handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
-                                     Info);
+                                     Info, bufferIndirectlyCausingDiagnostic);
 }
 
 static NameUsage getNameUsage(RenameType Type) {

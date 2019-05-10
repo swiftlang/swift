@@ -16,6 +16,7 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Basic/SourceManager.h"
@@ -29,6 +30,7 @@
 #include "swift/FrontendTool/FrontendTool.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/Errno.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Host.h"
@@ -44,6 +46,10 @@
 
 #include <memory>
 #include <stdlib.h>
+
+#if defined(_WIN32)
+#include <windows.h>
+#endif
 
 using namespace swift;
 using namespace swift::driver;
@@ -111,8 +117,6 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
   return true;
 }
 
-extern int apinotes_main(ArrayRef<const char *> Args);
-
 static int run_driver(StringRef ExecName,
                        const ArrayRef<const char *> argv) {
   // Handle integrated tools.
@@ -127,10 +131,6 @@ static int run_driver(StringRef ExecName,
       return modulewrap_main(llvm::makeArrayRef(argv.data()+2,
                                                 argv.data()+argv.size()),
                              argv[0], (void *)(intptr_t)getExecutablePath);
-    }
-    if (FirstArg == "-apinotes") {
-      return apinotes_main(llvm::makeArrayRef(argv.data()+1,
-                                              argv.data()+argv.size()));
     }
   }
 
@@ -180,6 +180,26 @@ static int run_driver(StringRef ExecName,
 }
 
 int main(int argc_, const char **argv_) {
+#if defined(_WIN32)
+  LPWSTR *wargv_ = CommandLineToArgvW(GetCommandLineW(), &argc_);
+  std::vector<std::string> utf8Args;
+  // We use UTF-8 as the internal character encoding. On Windows,
+  // arguments passed to wmain are encoded in UTF-16
+  for (int i = 0; i < argc_; i++) {
+    const wchar_t *wideArg = wargv_[i];
+    int wideArgLen = std::wcslen(wideArg);
+    utf8Args.push_back("");
+    llvm::ArrayRef<char> uRef((const char *)wideArg,
+                              (const char *)(wideArg + wideArgLen));
+    llvm::convertUTF16ToUTF8String(uRef, utf8Args[i]);
+  }
+
+  std::vector<const char *> utf8CStrs;
+  std::transform(utf8Args.begin(), utf8Args.end(),
+                 std::back_inserter(utf8CStrs),
+                 std::mem_fn(&std::string::c_str));
+  argv_ = utf8CStrs.data();
+#endif
   // Expand any response files in the command line argument vector - arguments
   // may be passed through response files in the event of command line length
   // restrictions.
@@ -188,17 +208,24 @@ int main(int argc_, const char **argv_) {
   llvm::StringSaver Saver(Allocator);
   llvm::cl::ExpandResponseFiles(
       Saver,
-      llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows() ?
-      llvm::cl::TokenizeWindowsCommandLine :
-      llvm::cl::TokenizeGNUCommandLine,
+      llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows()
+          ? llvm::cl::TokenizeWindowsCommandLine
+          : llvm::cl::TokenizeGNUCommandLine,
       ExpandedArgs);
 
   // Initialize the stack trace using the parsed argument vector with expanded
   // response files.
-  int ExpandedArgc = ExpandedArgs.size();
-  const char **ExpandedArgv = ExpandedArgs.data();
-  PROGRAM_START(ExpandedArgc, ExpandedArgv);
-  ArrayRef<const char *> argv(ExpandedArgv, ExpandedArgc);
+
+  // PROGRAM_START/InitLLVM overwrites the passed in arguments with UTF-8
+  // versions of them on Windows. This also has the effect of overwriting the
+  // response file expansion. Since we handle the UTF-8 conversion above, we
+  // pass in a copy and throw away the modifications.
+  int ThrowawayExpandedArgc = ExpandedArgs.size();
+  const char **ThrowawayExpandedArgv = ExpandedArgs.data();
+  PROGRAM_START(ThrowawayExpandedArgc, ThrowawayExpandedArgv);
+  ArrayRef<const char *> argv(ExpandedArgs);
+
+  PrettyStackTraceSwiftVersion versionStackTrace;
 
   // Check if this invocation should execute a subcommand.
   StringRef ExecName = llvm::sys::path::stem(argv[0]);

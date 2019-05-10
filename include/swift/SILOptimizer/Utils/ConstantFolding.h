@@ -92,6 +92,10 @@ public:
   /// Initialize the worklist with all instructions of the function \p F.
   void initializeWorklist(SILFunction &F);
 
+  /// When asserts are enabled, dumps the worklist for diagnostic
+  /// purposes. Without asserts this is a no-op.
+  void dumpWorklist() const;
+
   /// Initialize the worklist with a single instruction \p I.
   void addToWorklist(SILInstruction *I) {
     WorkList.insert(I);

@@ -52,6 +52,7 @@
 namespace swift {
 
 class SerializedModuleLoader;
+class MemoryBufferSerializedModuleLoader;
 class SILModule;
 
 /// The abstract configuration of the compiler, including:
@@ -80,7 +81,7 @@ class CompilerInvocation {
 
   llvm::MemoryBuffer *CodeCompletionBuffer = nullptr;
 
-  /// \brief Code completion offset in bytes from the beginning of the main
+  /// Code completion offset in bytes from the beginning of the main
   /// source file.  Valid only if \c isCodeCompletion() == true.
   unsigned CodeCompletionOffset = ~0U;
 
@@ -184,9 +185,7 @@ public:
 
   void setRuntimeResourcePath(StringRef Path);
 
-  void setSDKPath(const std::string &Path) {
-    SearchPathOpts.SDKPath = Path;
-  }
+  void setSDKPath(const std::string &Path);
 
   StringRef getSDKPath() const {
     return SearchPathOpts.SDKPath;
@@ -374,6 +373,7 @@ class CompilerInstance {
 
   ModuleDecl *MainModule = nullptr;
   SerializedModuleLoader *SML = nullptr;
+  MemoryBufferSerializedModuleLoader *MemoryBufferLoader = nullptr;
 
   /// Contains buffer IDs for input source code files.
   std::vector<unsigned> InputSourceCodeBufferIDs;
@@ -430,7 +430,7 @@ public:
 
   DiagnosticEngine &getDiags() { return Diagnostics; }
 
-  clang::vfs::FileSystem &getFileSystem() { return *SourceMgr.getFileSystem(); }
+  llvm::vfs::FileSystem &getFileSystem() { return *SourceMgr.getFileSystem(); }
 
   ASTContext &getASTContext() {
     return *Context;
@@ -467,7 +467,10 @@ public:
 
   ModuleDecl *getMainModule();
 
-  SerializedModuleLoader *getSerializedModuleLoader() const { return SML; }
+  MemoryBufferSerializedModuleLoader *
+  getMemoryBufferSerializedModuleLoader() const {
+    return MemoryBufferLoader;
+  }
 
   ArrayRef<unsigned> getInputBufferIDs() const {
     return InputSourceCodeBufferIDs;
@@ -512,7 +515,7 @@ public:
     }
   }
 
-  /// \brief Returns true if there was an error during setup.
+  /// Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
 
 private:
@@ -574,6 +577,13 @@ public:
   /// parse-only invocation, module imports will be processed.
   void performParseAndResolveImportsOnly();
 
+  /// Performs mandatory, diagnostic, and optimization passes over the SIL.
+  /// \param silModule The SIL module that was generated during SILGen.
+  /// \param stats A stats reporter that will report optimization statistics.
+  /// \returns true if any errors occurred.
+  bool performSILProcessing(SILModule *silModule,
+                            UnifiedStatsReporter *stats = nullptr);
+
 private:
   SourceFile *
   createSourceFileForMainModule(SourceFileKind FileKind,
@@ -607,8 +617,7 @@ public: // for static functions in Frontend.cpp
 
 private:
   void createREPLFile(const ImplicitImports &implicitImports);
-  std::unique_ptr<DelayedParsingCallbacks>
-  computeDelayedParsingCallback(bool isPrimary);
+  std::unique_ptr<DelayedParsingCallbacks> computeDelayedParsingCallback();
 
   void addMainFileToModule(const ImplicitImports &implicitImports);
 
@@ -619,15 +628,13 @@ private:
   void parseLibraryFile(unsigned BufferID,
                         const ImplicitImports &implicitImports,
                         PersistentParserState &PersistentState,
-                        DelayedParsingCallbacks *PrimaryDelayedCB,
-                        DelayedParsingCallbacks *SecondaryDelayedCB);
+                        DelayedParsingCallbacks *DelayedCB);
 
   /// Return true if had load error
   bool
   parsePartialModulesAndLibraryFiles(const ImplicitImports &implicitImports,
                                      PersistentParserState &PersistentState,
-                                     DelayedParsingCallbacks *PrimaryDelayedCB,
-                                     DelayedParsingCallbacks *SecondaryDelayedCB);
+                                     DelayedParsingCallbacks *DelayedCB);
 
   OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
 

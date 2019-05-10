@@ -59,7 +59,7 @@
       "declKind": "Protocol",
       "usr": "s:4cake2P3P",
       "moduleName": "cake",
-      "genericSig": "<τ_0_0 : P1, τ_0_0 : P2>",
+      "genericSig": "<τ_0_0 : cake.P1, τ_0_0 : cake.P2>",
       "conformances": [
         {
           "kind": "Conformance",
@@ -212,7 +212,6 @@
           "usr": "s:4cake2C1C4foo1yyFZ",
           "moduleName": "cake",
           "static": true,
-          "fixedbinaryorder": 0,
           "funcSelfKind": "NonMutating"
         },
         {
@@ -227,8 +226,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -246,7 +245,7 @@
                 }
               ],
               "declKind": "Accessor",
-              "usr": "s:4cake2C1C3InsACSgXwvg",
+              "usr": "s:4cake2C1C3InsACSgvg",
               "moduleName": "cake",
               "implicit": true,
               "declAttributes": [
@@ -255,8 +254,8 @@
             },
             {
               "kind": "Setter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Set",
+              "printedName": "Set()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -279,7 +278,7 @@
                 }
               ],
               "declKind": "Accessor",
-              "usr": "s:4cake2C1C3InsACSgXwvs",
+              "usr": "s:4cake2C1C3InsACSgvs",
               "moduleName": "cake",
               "implicit": true,
               "declAttributes": [
@@ -288,11 +287,12 @@
             }
           ],
           "declKind": "Var",
-          "usr": "s:4cake2C1C3InsACSgXwvp",
+          "usr": "s:4cake2C1C3InsACSgvp",
           "moduleName": "cake",
           "declAttributes": [
             "HasInitialValue",
-            "ReferenceOwnership"
+            "ReferenceOwnership",
+            "HasStorage"
           ],
           "fixedbinaryorder": 0,
           "ownership": 1,
@@ -310,8 +310,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -321,7 +321,7 @@
                 }
               ],
               "declKind": "Accessor",
-              "usr": "s:4cake2C1C4Ins2ACXovg",
+              "usr": "s:4cake2C1C4Ins2ACvg",
               "moduleName": "cake",
               "implicit": true,
               "declAttributes": [
@@ -330,8 +330,8 @@
             },
             {
               "kind": "Setter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Set",
+              "printedName": "Set()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -346,7 +346,7 @@
                 }
               ],
               "declKind": "Accessor",
-              "usr": "s:4cake2C1C4Ins2ACXovs",
+              "usr": "s:4cake2C1C4Ins2ACvs",
               "moduleName": "cake",
               "implicit": true,
               "declAttributes": [
@@ -355,11 +355,12 @@
             }
           ],
           "declKind": "Var",
-          "usr": "s:4cake2C1C4Ins2ACXovp",
+          "usr": "s:4cake2C1C4Ins2ACvp",
           "moduleName": "cake",
           "declAttributes": [
             "HasInitialValue",
-            "ReferenceOwnership"
+            "ReferenceOwnership",
+            "HasStorage"
           ],
           "fixedbinaryorder": 1,
           "ownership": 2,
@@ -475,64 +476,6 @@
           "fixedbinaryorder": 0
         },
         {
-          "kind": "Var",
-          "name": "hashValue",
-          "printedName": "hashValue",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Int",
-              "usr": "s:Si"
-            },
-            {
-              "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int",
-                  "usr": "s:Si"
-                }
-              ],
-              "declKind": "Accessor",
-              "usr": "s:4cake6NumberO9hashValueSivg",
-              "moduleName": "cake",
-              "implicit": true
-            }
-          ],
-          "declKind": "Var",
-          "usr": "s:4cake6NumberO9hashValueSivp",
-          "moduleName": "cake",
-          "implicit": true
-        },
-        {
-          "kind": "Function",
-          "name": "hash",
-          "printedName": "hash(into:)",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Void",
-              "printedName": "()"
-            },
-            {
-              "kind": "TypeNominal",
-              "name": "Hasher",
-              "printedName": "Hasher",
-              "paramValueOwnership": "InOut",
-              "usr": "s:s6HasherV"
-            }
-          ],
-          "declKind": "Func",
-          "usr": "s:4cake6NumberO4hash4intoys6HasherVz_tF",
-          "moduleName": "cake",
-          "implicit": true,
-          "funcSelfKind": "NonMutating"
-        },
-        {
           "kind": "Constructor",
           "name": "init",
           "printedName": "init(rawValue:)",
@@ -579,8 +522,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -695,8 +638,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -715,8 +658,8 @@
             },
             {
               "kind": "Setter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Set",
+              "printedName": "Set()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -743,7 +686,8 @@
           "usr": "s:4cake17fixedLayoutStructV1aSivp",
           "moduleName": "cake",
           "declAttributes": [
-            "HasInitialValue"
+            "HasInitialValue",
+            "HasStorage"
           ],
           "fixedbinaryorder": 0,
           "hasStorage": true
@@ -761,8 +705,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -786,7 +730,8 @@
           "moduleName": "cake",
           "isInternal": true,
           "declAttributes": [
-            "HasInitialValue"
+            "HasInitialValue",
+            "HasStorage"
           ],
           "fixedbinaryorder": 1,
           "hasStorage": true,
@@ -806,8 +751,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -831,7 +776,8 @@
           "moduleName": "cake",
           "isInternal": true,
           "declAttributes": [
-            "HasInitialValue"
+            "HasInitialValue",
+            "HasStorage"
           ],
           "fixedbinaryorder": 2,
           "hasStorage": true
@@ -849,8 +795,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -873,7 +819,8 @@
           "moduleName": "cake",
           "declAttributes": [
             "HasInitialValue",
-            "Available"
+            "Available",
+            "HasStorage"
           ],
           "fixedbinaryorder": 3,
           "isLet": true,
@@ -948,8 +895,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -1062,6 +1009,25 @@
           "moduleName": "cake",
           "genericSig": "<τ_0_0 where τ_0_0 : PSuper>",
           "protocolReq": true,
+          "reqNewWitnessTableEntry": true,
+          "funcSelfKind": "NonMutating"
+        },
+        {
+          "kind": "Function",
+          "name": "futureFoo",
+          "printedName": "futureFoo()",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            }
+          ],
+          "declKind": "Func",
+          "usr": "s:4cake6PSuperPAAE9futureFooyyF",
+          "moduleName": "cake",
+          "genericSig": "<τ_0_0 where τ_0_0 : PSuper>",
+          "isABIPlaceholder": true,
           "funcSelfKind": "NonMutating"
         }
       ],
@@ -1110,7 +1076,7 @@
       "declKind": "Protocol",
       "usr": "s:4cake4PSubP",
       "moduleName": "cake",
-      "genericSig": "<τ_0_0 : PSuper>",
+      "genericSig": "<τ_0_0 : cake.PSuper>",
       "conformances": [
         {
           "kind": "Conformance",
@@ -1135,7 +1101,8 @@
       "usr": "s:4cake9GlobalVarSivp",
       "moduleName": "cake",
       "declAttributes": [
-        "HasInitialValue"
+        "HasInitialValue",
+        "HasStorage"
       ],
       "isLet": true,
       "hasStorage": true
@@ -1168,8 +1135,8 @@
             },
             {
               "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
+              "name": "Get",
+              "printedName": "Get()",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -1193,7 +1160,8 @@
           "moduleName": "cake",
           "isInternal": true,
           "declAttributes": [
-            "HasInitialValue"
+            "HasInitialValue",
+            "HasStorage"
           ],
           "fixedbinaryorder": 0,
           "hasStorage": true
@@ -1205,6 +1173,71 @@
       "declAttributes": [
         "FixedLayout",
         "UsableFromInline"
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "FutureContainer",
+      "printedName": "FutureContainer",
+      "children": [
+        {
+          "kind": "Function",
+          "name": "futureFoo",
+          "printedName": "futureFoo()",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            }
+          ],
+          "declKind": "Func",
+          "usr": "s:4cake15FutureContainerC9futureFooyyF",
+          "moduleName": "cake",
+          "isABIPlaceholder": true,
+          "declAttributes": [
+            "Available",
+            "Available",
+            "Available",
+            "Available"
+          ],
+          "funcSelfKind": "NonMutating"
+        },
+        {
+          "kind": "Function",
+          "name": "NotfutureFoo",
+          "printedName": "NotfutureFoo()",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            }
+          ],
+          "declKind": "Func",
+          "usr": "s:4cake15FutureContainerC12NotfutureFooyyF",
+          "moduleName": "cake",
+          "declAttributes": [
+            "Available"
+          ],
+          "funcSelfKind": "NonMutating"
+        }
+      ],
+      "declKind": "Class",
+      "usr": "s:4cake15FutureContainerC",
+      "moduleName": "cake",
+      "conformances": [
+        {
+          "kind": "Conformance",
+          "name": "P1",
+          "printedName": "P1",
+          "isABIPlaceholder": true
+        },
+        {
+          "kind": "Conformance",
+          "name": "P2",
+          "printedName": "P2"
+        }
       ]
     },
     {
@@ -1254,8 +1287,8 @@
       "conformances": [
         {
           "kind": "Conformance",
-          "name": "Comparable",
-          "printedName": "Comparable"
+          "name": "FixedWidthInteger",
+          "printedName": "FixedWidthInteger"
         },
         {
           "kind": "Conformance",
@@ -1369,13 +1402,23 @@
         },
         {
           "kind": "Conformance",
-          "name": "FixedWidthInteger",
-          "printedName": "FixedWidthInteger"
+          "name": "Comparable",
+          "printedName": "Comparable"
         },
         {
           "kind": "Conformance",
           "name": "P1",
           "printedName": "P1"
+        },
+        {
+          "kind": "Conformance",
+          "name": "MirrorPath",
+          "printedName": "MirrorPath"
+        },
+        {
+          "kind": "Conformance",
+          "name": "CVarArg",
+          "printedName": "CVarArg"
         },
         {
           "kind": "Conformance",
@@ -1414,13 +1457,101 @@
         },
         {
           "kind": "Conformance",
-          "name": "MirrorPath",
-          "printedName": "MirrorPath"
-        },
-        {
-          "kind": "Conformance",
-          "name": "CVarArg",
-          "printedName": "CVarArg"
+          "name": "SIMDScalar",
+          "printedName": "SIMDScalar",
+          "children": [
+            {
+              "kind": "TypeWitness",
+              "name": "SIMDMaskScalar",
+              "printedName": "SIMDMaskScalar",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ]
+            },
+            {
+              "kind": "TypeWitness",
+              "name": "SIMD2Storage",
+              "printedName": "SIMD2Storage",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "SIMD2Storage",
+                  "printedName": "Int.SIMD2Storage",
+                  "usr": "s:Si12SIMD2StorageV"
+                }
+              ]
+            },
+            {
+              "kind": "TypeWitness",
+              "name": "SIMD4Storage",
+              "printedName": "SIMD4Storage",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "SIMD4Storage",
+                  "printedName": "Int.SIMD4Storage",
+                  "usr": "s:Si12SIMD4StorageV"
+                }
+              ]
+            },
+            {
+              "kind": "TypeWitness",
+              "name": "SIMD8Storage",
+              "printedName": "SIMD8Storage",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "SIMD8Storage",
+                  "printedName": "Int.SIMD8Storage",
+                  "usr": "s:Si12SIMD8StorageV"
+                }
+              ]
+            },
+            {
+              "kind": "TypeWitness",
+              "name": "SIMD16Storage",
+              "printedName": "SIMD16Storage",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "SIMD16Storage",
+                  "printedName": "Int.SIMD16Storage",
+                  "usr": "s:Si13SIMD16StorageV"
+                }
+              ]
+            },
+            {
+              "kind": "TypeWitness",
+              "name": "SIMD32Storage",
+              "printedName": "SIMD32Storage",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "SIMD32Storage",
+                  "printedName": "Int.SIMD32Storage",
+                  "usr": "s:Si13SIMD32StorageV"
+                }
+              ]
+            },
+            {
+              "kind": "TypeWitness",
+              "name": "SIMD64Storage",
+              "printedName": "SIMD64Storage",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "SIMD64Storage",
+                  "printedName": "Int.SIMD64Storage",
+                  "usr": "s:Si13SIMD64StorageV"
+                }
+              ]
+            }
+          ]
         }
       ]
     }

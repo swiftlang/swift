@@ -48,6 +48,7 @@ public:
 
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
+  AvailabilityContext AvailCtx;
   const TBDGenOptions &Opts;
 
 private:
@@ -67,15 +68,17 @@ private:
   void addProtocolRequirementsBaseDescriptor(ProtocolDecl *proto);
   void addAssociatedTypeDescriptor(AssociatedTypeDecl *assocType);
   void addAssociatedConformanceDescriptor(AssociatedConformance conformance);
+  void addBaseConformanceDescriptor(BaseConformance conformance);
 
 public:
   TBDGenVisitor(tapi::internal::InterfaceFile &symbols,
                 tapi::internal::ArchitectureSet archs, StringSet *stringSymbols,
                 const UniversalLinkageInfo &universalLinkInfo,
-                ModuleDecl *swiftModule, const TBDGenOptions &opts)
+                ModuleDecl *swiftModule, AvailabilityContext availCtx,
+                const TBDGenOptions &opts)
       : Symbols(symbols), Archs(archs), StringSymbols(stringSymbols),
         UniversalLinkInfo(universalLinkInfo), SwiftModule(swiftModule),
-        Opts(opts) {}
+        AvailCtx(availCtx), Opts(opts) {}
 
   void addMainIfNecessary(FileUnit *file) {
     // HACK: 'main' is a special symbol that's always emitted in SILGen if
@@ -85,7 +88,7 @@ public:
       addSymbol("main");
   }
 
-  /// \brief Adds the global symbols associated with the first file.
+  /// Adds the global symbols associated with the first file.
   void addFirstFileSymbols();
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD);
@@ -101,6 +104,8 @@ public:
   void visitDestructorDecl(DestructorDecl *DD);
 
   void visitExtensionDecl(ExtensionDecl *ED);
+  
+  void visitFuncDecl(FuncDecl *FD);
 
   void visitProtocolDecl(ProtocolDecl *PD);
 

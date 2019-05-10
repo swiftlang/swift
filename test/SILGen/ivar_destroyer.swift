@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-as-library -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-as-library %s | %FileCheck %s
 
 // Only derived classes with non-trivial ivars need an ivar destroyer.
 
@@ -25,7 +25,7 @@ class DerivedClassWithNonTrivialProperties : RootClassWithoutProperties {
   var z: Canary = Canary()
 }
 
-// CHECK-LABEL: sil hidden @$s14ivar_destroyer36DerivedClassWithNonTrivialPropertiesCfE
+// CHECK-LABEL: sil hidden [ossa] @$s14ivar_destroyer36DerivedClassWithNonTrivialPropertiesCfE
 // CHECK:       bb0(%0 : @guaranteed $DerivedClassWithNonTrivialProperties):
 // CHECK-NEXT:    debug_value %0
 // CHECK-NEXT:    [[Z_ADDR:%.*]] = ref_element_addr %0

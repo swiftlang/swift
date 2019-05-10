@@ -13,34 +13,10 @@
 //
 // Low-level helper functions and utilities for interpreting Unicode
 //
-
-internal let _leadingSurrogateBias: UInt16 = 0xd800
-internal let _trailingSurrogateBias: UInt16 = 0xdc00
-internal let _surrogateMask: UInt16 = 0xfc00
-
-@inline(__always)
-internal func _isTrailingSurrogate(_ cu: UInt16) -> Bool {
-  return cu & _surrogateMask == _trailingSurrogateBias
-}
-@inline(__always)
-internal func _isLeadingSurrogate(_ cu: UInt16) -> Bool {
-  return cu & _surrogateMask == _leadingSurrogateBias
-}
-@inline(__always)
-internal func _isSurrogate(_ cu: UInt16) -> Bool {
-  // TODO(String micro-performance): check codegen
-  return _isLeadingSurrogate(cu) || _isTrailingSurrogate(cu)
-}
-
-@inlinable @inline(__always)
-internal func _isASCII(_ x: UInt8) -> Bool {
-  return x & 0b1000_0000 == 0
-}
-
 @inlinable
 @inline(__always)
 internal func _decodeUTF8(_ x: UInt8) -> Unicode.Scalar {
-  _internalInvariant(_isASCII(x))
+  _internalInvariant(UTF8.isASCII(x))
   return Unicode.Scalar(_unchecked: UInt32(x))
 }
 
@@ -48,7 +24,7 @@ internal func _decodeUTF8(_ x: UInt8) -> Unicode.Scalar {
 @inline(__always)
 internal func _decodeUTF8(_ x: UInt8, _ y: UInt8) -> Unicode.Scalar {
   _internalInvariant(_utf8ScalarLength(x) == 2)
-  _internalInvariant(_isContinuation(y))
+  _internalInvariant(UTF8.isContinuation(y))
   let x = UInt32(x)
   let value = ((x & 0b0001_1111) &<< 6) | _continuationPayload(y)
   return Unicode.Scalar(_unchecked: value)
@@ -60,7 +36,7 @@ internal func _decodeUTF8(
   _ x: UInt8, _ y: UInt8, _ z: UInt8
 ) -> Unicode.Scalar {
   _internalInvariant(_utf8ScalarLength(x) == 3)
-  _internalInvariant(_isContinuation(y) && _isContinuation(z))
+  _internalInvariant(UTF8.isContinuation(y) && UTF8.isContinuation(z))
   let x = UInt32(x)
   let value = ((x & 0b0000_1111) &<< 12)
             | (_continuationPayload(y) &<< 6)
@@ -75,7 +51,8 @@ internal func _decodeUTF8(
 ) -> Unicode.Scalar {
   _internalInvariant(_utf8ScalarLength(x) == 4)
   _internalInvariant(
-    _isContinuation(y) && _isContinuation(z) && _isContinuation(w))
+    UTF8.isContinuation(y) && UTF8.isContinuation(z)
+    && UTF8.isContinuation(w))
   let x = UInt32(x)
   let value = ((x & 0b0000_1111) &<< 18)
             | (_continuationPayload(y) &<< 12)
@@ -84,18 +61,45 @@ internal func _decodeUTF8(
   return Unicode.Scalar(_unchecked: value)
 }
 
+internal func _decodeScalar(
+  _ utf16: UnsafeBufferPointer<UInt16>, startingAt i: Int
+) -> (Unicode.Scalar, scalarLength: Int) {
+  let high = utf16[i]
+  if i + 1 >= utf16.count {
+    _internalInvariant(!UTF16.isLeadSurrogate(high))
+    _internalInvariant(!UTF16.isTrailSurrogate(high))
+    return (Unicode.Scalar(_unchecked: UInt32(high)), 1)
+  }
+
+  if !UTF16.isLeadSurrogate(high) {
+    _internalInvariant(!UTF16.isTrailSurrogate(high))
+    return (Unicode.Scalar(_unchecked: UInt32(high)), 1)
+  }
+
+  let low = utf16[i+1]
+  _internalInvariant(UTF16.isLeadSurrogate(high))
+  _internalInvariant(UTF16.isTrailSurrogate(low))
+  return (UTF16._decodeSurrogates(high, low), 2)
+}
+
 @inlinable
 internal func _decodeScalar(
   _ utf8: UnsafeBufferPointer<UInt8>, startingAt i: Int
 ) -> (Unicode.Scalar, scalarLength: Int) {
-  let cu0 = utf8[i]
+  let cu0 = utf8[_unchecked: i]
   let len = _utf8ScalarLength(cu0)
   switch  len {
   case 1: return (_decodeUTF8(cu0), len)
-  case 2: return (_decodeUTF8(cu0, utf8[i &+ 1]), len)
-  case 3: return (_decodeUTF8(cu0, utf8[i &+ 1], utf8[i &+ 2]), len)
+  case 2: return (_decodeUTF8(cu0, utf8[_unchecked: i &+ 1]), len)
+  case 3: return (_decodeUTF8(
+    cu0, utf8[_unchecked: i &+ 1], utf8[_unchecked: i &+ 2]), len)
   case 4:
-    return (_decodeUTF8(cu0, utf8[i &+ 1], utf8[i &+ 2], utf8[i &+ 3]), len)
+    return (_decodeUTF8(
+      cu0,
+      utf8[_unchecked: i &+ 1],
+      utf8[_unchecked: i &+ 2],
+      utf8[_unchecked: i &+ 3]),
+    len)
   default: Builtin.unreachable()
   }
 }
@@ -112,8 +116,8 @@ internal func _decodeScalar(
 
 @inlinable @inline(__always)
 internal func _utf8ScalarLength(_ x: UInt8) -> Int {
-  _internalInvariant(!_isContinuation(x))
-  if _isASCII(x) { return 1 }
+  _internalInvariant(!UTF8.isContinuation(x))
+  if UTF8.isASCII(x) { return 1 }
   // TODO(String micro-performance): check codegen
   return (~x).leadingZeroBitCount
 }
@@ -123,16 +127,11 @@ internal func _utf8ScalarLength(
   _ utf8: UnsafeBufferPointer<UInt8>, endingAt i: Int
   ) -> Int {
   var len = 1
-  while _isContinuation(utf8[i &- len]) {
-    len += 1
+  while UTF8.isContinuation(utf8[_unchecked: i &- len]) {
+    len &+= 1
   }
   _internalInvariant(len == _utf8ScalarLength(utf8[i &- len]))
   return len
-}
-
-@inlinable @inline(__always)
-internal func _isContinuation(_ x: UInt8) -> Bool {
-  return x & 0b1100_0000 == 0b1000_0000
 }
 
 @inlinable
@@ -141,63 +140,45 @@ internal func _continuationPayload(_ x: UInt8) -> UInt32 {
   return UInt32(x & 0x3F)
 }
 
-@inline(__always)
-internal func _decodeSurrogatePair(
-  leading high: UInt16, trailing low: UInt16
-) -> UInt32 {
-  _internalInvariant(_isLeadingSurrogate(high) && _isTrailingSurrogate(low))
-  let hi10: UInt32 = UInt32(high) &- UInt32(_leadingSurrogateBias)
-  _internalInvariant(hi10 < 1<<10, "I said high 10. Not high, like, 20 or something")
-  let lo10: UInt32 = UInt32(low) &- UInt32(_trailingSurrogateBias)
-  _internalInvariant(lo10 < 1<<10, "I said low 10. Not low, like, 20 or something")
-
-  return ((hi10 &<< 10) | lo10) &+ 0x1_00_00
-}
-
-@inline(__always)
-internal func _numUTF8CodeUnits(_ scalar: Unicode.Scalar) -> Int {
-  switch scalar.value {
-    case 0..<0x80: return 1
-    case 0x80..<0x0800: return 2
-    case 0x0800..<0x1_0000: return 3
-    default: return 4
+@inlinable @inline(__always)
+internal func _scalarAlign(
+  _ utf8: UnsafeBufferPointer<UInt8>, _ idx: Int
+) -> Int {
+  var i = idx
+  while _slowPath(UTF8.isContinuation(utf8[_unchecked: i])) {
+    i &-= 1
+    _internalInvariant(i >= 0,
+      "Malformed contents: starts with continuation byte")
   }
-}
-@inline(__always)
-internal func _numUTF16CodeUnits(_ scalar: Unicode.Scalar) -> Int {
-  return scalar.value <= UInt16.max ? 1 : 2
+  return i
 }
 
 //
 // Scalar helpers
 //
 extension _StringGuts {
-  @inlinable // FIXME(inline-always) was usableFromInline
-   @inline(__always) // fast-path: fold common fastUTF8 check
+  @inlinable
+  @inline(__always) // fast-path: fold common fastUTF8 check
   internal func scalarAlign(_ idx: Index) -> Index {
     // TODO(String performance): isASCII check
 
-    if _slowPath(idx.transcodedOffset != 0 || idx.encodedOffset == 0) {
+    if _slowPath(idx.transcodedOffset != 0 || idx._encodedOffset == 0) {
       // Transcoded indices are already scalar aligned
-      return String.Index(encodedOffset: idx.encodedOffset)
+      return String.Index(_encodedOffset: idx._encodedOffset)
     }
     if _slowPath(self.isForeign) {
       return foreignScalarAlign(idx)
     }
 
     return self.withFastUTF8 { utf8 in
-      var i = idx.encodedOffset
-      while _slowPath(_isContinuation(utf8[i])) {
-        i -= 1
-        _internalInvariant(
-          i >= 0, "Malformed contents: starts with continuation byte")
-      }
+      let i = _scalarAlign(utf8, idx._encodedOffset)
+
       // If no alignment is performed, keep grapheme cache
-      if i == idx.encodedOffset {
+      if i == idx._encodedOffset {
         return idx
       }
 
-      return Index(encodedOffset: i)
+      return Index(_encodedOffset: i)
     }
   }
 
@@ -214,10 +195,10 @@ extension _StringGuts {
     _internalInvariant(isFastUTF8)
 
     return self.withFastUTF8 { utf8 in
-      _internalInvariant(i == utf8.count || !_isContinuation(utf8[i]))
+      _internalInvariant(i == utf8.count || !UTF8.isContinuation(utf8[i]))
       var len = 1
-      while _isContinuation(utf8[i - len]) {
-        _internalInvariant(i - len > 0)
+      while UTF8.isContinuation(utf8[i &- len]) {
+        _internalInvariant(i &- len > 0)
         len += 1
       }
       _internalInvariant(len <= 4)
@@ -241,7 +222,9 @@ extension _StringGuts {
     if i == self.startIndex || i == self.endIndex { return true }
 
     if _fastPath(isFastUTF8) {
-      return self.withFastUTF8 { return !_isContinuation($0[i.encodedOffset]) }
+      return self.withFastUTF8 {
+        return !UTF8.isContinuation($0[i._encodedOffset])
+      }
     }
 
     return i == foreignScalarAlign(i)
@@ -269,12 +252,12 @@ extension _StringGuts {
     startingAt idx: String.Index
   ) -> (Unicode.Scalar, scalarLength: Int) {
     _internalInvariant(idx.transcodedOffset == 0)
-    _internalInvariant(idx.encodedOffset < self.count)
+    _internalInvariant(idx._encodedOffset < self.count)
 
-    let start = idx.encodedOffset
+    let start = idx._encodedOffset
     let leading = _getForeignCodeUnit(at: start)
 
-    if _fastPath(!_isSurrogate(leading)) {
+    if _fastPath(!UTF16.isSurrogate(leading)) {
       return (Unicode.Scalar(_unchecked: UInt32(leading)), 1)
     }
 
@@ -284,17 +267,15 @@ extension _StringGuts {
     // TODO(String performance): Consider having a valid performance flag
     // available to check, and assert it's not set in the condition here.
     let nextOffset = start &+ 1
-    if _slowPath(_isTrailingSurrogate(leading) || nextOffset == self.count) {
+    if _slowPath(UTF16.isTrailSurrogate(leading) || nextOffset == self.count) {
       return (Unicode.Scalar._replacementCharacter, 1)
     }
     let trailing = _getForeignCodeUnit(at: nextOffset)
-    if _slowPath(!_isTrailingSurrogate(trailing)) {
+    if _slowPath(!UTF16.isTrailSurrogate(trailing)) {
       return (Unicode.Scalar._replacementCharacter, 1)
     }
 
-    return (Unicode.Scalar(
-      _unchecked: _decodeSurrogatePair(leading: leading, trailing: trailing)),
-      2)
+    return (UTF16._decodeSurrogates(leading, trailing), 2)
   }
 
   @_effects(releasenone)
@@ -302,12 +283,12 @@ extension _StringGuts {
     endingAt idx: String.Index
   ) -> (Unicode.Scalar, scalarLength: Int) {
     _internalInvariant(idx.transcodedOffset == 0)
-    _internalInvariant(idx.encodedOffset <= self.count)
-    _internalInvariant(idx.encodedOffset > 0)
+    _internalInvariant(idx._encodedOffset <= self.count)
+    _internalInvariant(idx._encodedOffset > 0)
 
-    let end = idx.encodedOffset
+    let end = idx._encodedOffset
     let trailing = _getForeignCodeUnit(at: end &- 1)
-    if _fastPath(!_isSurrogate(trailing)) {
+    if _fastPath(!UTF16.isSurrogate(trailing)) {
       return (Unicode.Scalar(_unchecked: UInt32(trailing)), 1)
     }
 
@@ -317,17 +298,15 @@ extension _StringGuts {
     // TODO(String performance): Consider having a valid performance flag
     // available to check, and assert it's not set in the condition here.
     let priorOffset = end &- 2
-    if _slowPath(_isLeadingSurrogate(trailing) || priorOffset < 0) {
+    if _slowPath(UTF16.isLeadSurrogate(trailing) || priorOffset < 0) {
       return (Unicode.Scalar._replacementCharacter, 1)
     }
     let leading = _getForeignCodeUnit(at: priorOffset)
-    if _slowPath(!_isLeadingSurrogate(leading)) {
+    if _slowPath(!UTF16.isLeadSurrogate(leading)) {
       return (Unicode.Scalar._replacementCharacter, 1)
     }
 
-    return (Unicode.Scalar(
-      _unchecked: _decodeSurrogatePair(leading: leading, trailing: trailing)),
-      2)
+    return (UTF16._decodeSurrogates(leading, trailing), 2)
   }
 
   @_effects(releasenone)
@@ -335,11 +314,11 @@ extension _StringGuts {
     at idx: String.Index
   ) -> UInt16 {
     _internalInvariant(idx.transcodedOffset == 0)
-    _internalInvariant(idx.encodedOffset < self.count)
+    _internalInvariant(idx._encodedOffset < self.count)
 
-    let start = idx.encodedOffset
+    let start = idx._encodedOffset
     let cu = _getForeignCodeUnit(at: start)
-    if _fastPath(!_isSurrogate(cu)) {
+    if _fastPath(!UTF16.isSurrogate(cu)) {
       return cu
     }
 
@@ -348,15 +327,15 @@ extension _StringGuts {
     //
     // TODO(String performance): Consider having a valid performance flag
     // available to check, and assert it's not set in the condition here.
-    if _isLeadingSurrogate(cu) {
+    if UTF16.isLeadSurrogate(cu) {
       let nextOffset = start &+ 1
       guard nextOffset < self.count,
-            _isTrailingSurrogate(_getForeignCodeUnit(at: nextOffset))
+            UTF16.isTrailSurrogate(_getForeignCodeUnit(at: nextOffset))
       else { return UTF16._replacementCodeUnit }
     } else {
       let priorOffset = start &- 1
       guard priorOffset >= 0,
-            _isLeadingSurrogate(_getForeignCodeUnit(at: priorOffset))
+            UTF16.isLeadSurrogate(_getForeignCodeUnit(at: priorOffset))
       else { return UTF16._replacementCodeUnit }
     }
 
@@ -366,15 +345,15 @@ extension _StringGuts {
   @usableFromInline @inline(never) // slow-path
   @_effects(releasenone)
   internal func foreignScalarAlign(_ idx: Index) -> Index {
-    _internalInvariant(idx.encodedOffset < self.count)
+    _internalInvariant(idx._encodedOffset < self.count)
 
     let ecCU = foreignErrorCorrectedUTF16CodeUnit(at: idx)
-    if _fastPath(!_isTrailingSurrogate(ecCU)) {
+    if _fastPath(!UTF16.isTrailSurrogate(ecCU)) {
       return idx
     }
-    _internalInvariant(idx.encodedOffset > 0,
+    _internalInvariant(idx._encodedOffset > 0,
       "Error-correction shouldn't give trailing surrogate at position zero")
-    return String.Index(encodedOffset: idx.encodedOffset &- 1)
+    return String.Index(_encodedOffset: idx._encodedOffset &- 1)
   }
 
   @usableFromInline @inline(never)
@@ -390,7 +369,7 @@ extension _StringGuts {
     let count = end &- start
     if start &- end == 1 {
       return Character(String(self.foreignErrorCorrectedScalar(
-        startingAt: String.Index(encodedOffset: start)
+        startingAt: String.Index(_encodedOffset: start)
       ).0))
     }
 
@@ -423,7 +402,7 @@ extension _StringGuts {
       return withFastUTF8 { _decodeScalar($0, startingAt: i) }
     }
     return foreignErrorCorrectedScalar(
-      startingAt: String.Index(encodedOffset: i))
+      startingAt: String.Index(_encodedOffset: i))
   }
   @inlinable @inline(__always)
   internal func errorCorrectedCharacter(

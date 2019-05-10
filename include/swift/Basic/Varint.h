@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file Varint.h
-/// \brief Defines transformations of integral types to/from variable length
+/// Defines transformations of integral types to/from variable length
 ///        7-bit encoding.
 //===----------------------------------------------------------------------===//
 

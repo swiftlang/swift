@@ -87,6 +87,10 @@ module Newtype {
   header "Newtype.h"
 }
 
+module NewtypeSystem [system] {
+  header "NewtypeSystem.h"
+}
+
 module ImportAsMember {
   export *
 
@@ -201,6 +205,10 @@ module IndirectFields {
 
 module ObjCBridgeNonconforming {
   header "ObjCBridgeNonconforming.h"
+}
+
+module BlocksReturningBool {
+  header "BlocksReturningBool.h"
 }
 
 module Warnings1 { header "Warnings1.h" }

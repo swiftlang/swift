@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir > %t.ll
+// RUN: %target-swift-frontend -primary-file %s -emit-ir > %t.ll
 // RUN: %FileCheck %s -check-prefix=GLOBAL < %t.ll
 // RUN: %FileCheck %s < %t.ll
 
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir -wmo -num-threads 1 > %t.ll.wmo
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -wmo -num-threads 1 > %t.ll.wmo
 // RUN: %FileCheck %s -check-prefix=GLOBAL < %t.ll.wmo
 // RUN: %FileCheck %s < %t.ll.wmo
 // REQUIRES: CPU=x86_64
@@ -17,7 +17,7 @@ protocol Assocked {
 struct Universal : P, Q {}
 
 
-// CHECK-LABEL: @"symbolic _____ 23associated_type_witness12OuterPrivate{{.*}}V" = linkonce_odr hidden constant
+// CHECK-LABEL: @"symbolic _____ 23associated_type_witness12OuterPrivate{{.*}}InnermostV" = linkonce_odr hidden constant
 // CHECK-SAME: @"$s23associated_type_witness12OuterPrivate{{.*}}5InnerE0V9InnermostVMn"
 private struct OuterPrivate {
   struct InnerPrivate: HasSimpleAssoc {
@@ -146,7 +146,7 @@ struct UsesVoid : HasSimpleAssoc {
 //   Protocol conformance descriptor for GenericComputed : DerivedFromSimpleAssoc.
 // GLOBAL-LABEL: @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAMc" = hidden constant
 // GLOBAL-SAME:    i16 2,
-// GLOBAL-SAME:    i16 0,
+// GLOBAL-SAME:    i16 1,
 
 //   Relative reference to instantiator function
 // GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint (void (i8**, %swift.type*, i8**)* @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI" to i64),

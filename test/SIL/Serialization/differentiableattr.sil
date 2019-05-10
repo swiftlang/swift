@@ -1,7 +1,7 @@
 // SWIFT_ENABLE_TENSORFLOW
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -parse-sil -assume-parsing-unqualified-ownership-sil -emit-sib -parse-as-library -parse-stdlib -module-name DifferentiableAttr -o %t/DifferentiableAttr.sib %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %t/DifferentiableAttr.sib -o - -emit-sorted-sil | %FileCheck %s
+// RUN: %target-swift-frontend -parse-sil -emit-sib -parse-as-library -parse-stdlib -module-name DifferentiableAttr -o %t/DifferentiableAttr.sib %s
+// RUN: %target-sil-opt %t/DifferentiableAttr.sib -o - -emit-sorted-sil | %FileCheck %s
 
 sil_stage canonical
 

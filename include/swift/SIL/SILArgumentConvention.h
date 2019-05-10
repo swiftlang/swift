@@ -87,6 +87,24 @@ struct SILArgumentConvention {
     return Value <= SILArgumentConvention::Indirect_Out;
   }
 
+  bool isInoutConvention() const {
+    switch (Value) {
+      case SILArgumentConvention::Indirect_Inout:
+      case SILArgumentConvention::Indirect_InoutAliasable:
+        return true;
+      case SILArgumentConvention::Indirect_In_Guaranteed:
+      case SILArgumentConvention::Indirect_In:
+      case SILArgumentConvention::Indirect_In_Constant:
+      case SILArgumentConvention::Indirect_Out:
+      case SILArgumentConvention::Direct_Unowned:
+      case SILArgumentConvention::Direct_Owned:
+      case SILArgumentConvention::Direct_Deallocating:
+      case SILArgumentConvention::Direct_Guaranteed:
+        return false;
+    }
+    llvm_unreachable("covered switch isn't covered?!");
+  }
+
   bool isOwnedConvention() const {
     switch (Value) {
     case SILArgumentConvention::Indirect_In:

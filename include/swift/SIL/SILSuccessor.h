@@ -23,7 +23,7 @@ namespace swift {
 class SILBasicBlock;
 class TermInst;
 
-/// \brief An edge in the control flow graph.
+/// An edge in the control flow graph.
 ///
 /// A SILSuccessor is stored in the terminator instruction of the tail block of
 /// the CFG edge. Internally it has a back reference to the terminator that
@@ -111,6 +111,12 @@ public:
       Cur = Cur->Next;
       cacheBasicBlock();
       return *this;
+    }
+
+    pred_iterator operator++(int) {
+      auto old = *this;
+      ++*this;
+      return old;
     }
 
     pred_iterator operator+(unsigned distance) const {

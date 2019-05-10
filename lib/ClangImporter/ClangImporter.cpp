@@ -407,6 +407,35 @@ void ClangImporter::clearTypeResolver() {
 
 #pragma mark Module loading
 
+/// Finds the glibc.modulemap file relative to the provided resource dir.
+///
+/// Note that the module map used for Glibc depends on the target we're
+/// compiling for, and is not included in the resource directory with the other
+/// implicit module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
+static Optional<StringRef>
+getGlibcModuleMapPath(StringRef resourceDir, llvm::Triple triple,
+                      SmallVectorImpl<char> &scratch) {
+  if (resourceDir.empty())
+    return None;
+
+  scratch.append(resourceDir.begin(), resourceDir.end());
+  llvm::sys::path::append(
+      scratch,
+      swift::getPlatformNameForTriple(triple),
+      swift::getMajorArchitectureName(triple),
+      "glibc.modulemap");
+
+  // Only specify the module map if that file actually exists.
+  // It may not--for example in the case that
+  // `swiftc -target x86_64-unknown-linux-gnu -emit-ir` is invoked using
+  // a Swift compiler not built for Linux targets.
+  if (llvm::sys::fs::exists(scratch)) {
+    return StringRef(scratch.data(), scratch.size());
+  } else {
+    return None;
+  }
+}
+
 static void
 getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
                              ASTContext &ctx,
@@ -421,6 +450,17 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
           .endswith(file_types::getExtension(file_types::TY_PCH))) {
     invocationArgStrs.insert(invocationArgStrs.end(), {
         "-include-pch", importerOpts.BridgingHeader
+    });
+  }
+
+  // If there are no shims in the resource dir, add a search path in the SDK.
+  SmallString<128> shimsPath(searchPathOpts.RuntimeResourcePath);
+  llvm::sys::path::append(shimsPath, "shims");
+  if (!llvm::sys::fs::exists(shimsPath)) {
+    shimsPath = searchPathOpts.SDKPath;
+    llvm::sys::path::append(shimsPath, "usr", "lib", "swift", "shims");
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+      "-isystem", shimsPath.str()
     });
   }
 
@@ -541,28 +581,29 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       });
     }
 
-    // The module map used for Glibc depends on the target we're compiling for,
-    // and is not included in the resource directory with the other implicit
-    // module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
+    if (triple.isOSWindows()) {
+      switch (triple.getArch()) {
+      default: llvm_unreachable("unsupported Windows architecture");
+      case llvm::Triple::arm:
+      case llvm::Triple::thumb:
+        invocationArgStrs.insert(invocationArgStrs.end(), {"-D_ARM_"});
+        break;
+      case llvm::Triple::aarch64:
+        invocationArgStrs.insert(invocationArgStrs.end(), {"-D_ARM64_"});
+        break;
+      case llvm::Triple::x86:
+        invocationArgStrs.insert(invocationArgStrs.end(), {"-D_X86_"});
+        break;
+      case llvm::Triple::x86_64:
+        invocationArgStrs.insert(invocationArgStrs.end(), {"-D_AMD64_"});
+        break;
+      }
+    }
+
     SmallString<128> GlibcModuleMapPath;
-    GlibcModuleMapPath = searchPathOpts.RuntimeResourcePath;
-
-    // Running without a resource directory is not a supported configuration.
-    assert(!GlibcModuleMapPath.empty());
-
-    llvm::sys::path::append(
-      GlibcModuleMapPath,
-      swift::getPlatformNameForTriple(triple),
-      swift::getMajorArchitectureName(triple),
-      "glibc.modulemap");
-
-    // Only specify the module map if that file actually exists.
-    // It may not--for example in the case that
-    // `swiftc -target x86_64-unknown-linux-gnu -emit-ir` is invoked using
-    // a Swift compiler not built for Linux targets.
-    if (llvm::sys::fs::exists(GlibcModuleMapPath)) {
-      invocationArgStrs.push_back(
-        (Twine("-fmodule-map-file=") + GlibcModuleMapPath).str());
+    if (auto path = getGlibcModuleMapPath(searchPathOpts.RuntimeResourcePath,
+                                          triple, GlibcModuleMapPath)) {
+      invocationArgStrs.push_back((Twine("-fmodule-map-file=") + *path).str());
     } else {
       // FIXME: Emit a warning of some kind.
     }
@@ -626,10 +667,12 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
   // Enable API notes alongside headers/in frameworks.
   invocationArgStrs.push_back("-fapinotes-modules");
-  invocationArgStrs.push_back("-iapinotes-modules");
-  invocationArgStrs.push_back(searchPathOpts.RuntimeLibraryImportPath);
   invocationArgStrs.push_back("-fapinotes-swift-version=" +
-      languageVersion.asAPINotesVersionString());
+                              languageVersion.asAPINotesVersionString());
+  invocationArgStrs.push_back("-iapinotes-modules");
+  invocationArgStrs.push_back((llvm::Twine(searchPathOpts.RuntimeResourcePath) +
+                               llvm::sys::path::get_separator() +
+                               "apinotes").str());
 }
 
 static void
@@ -709,6 +752,8 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.push_back(importerOpts.IndexStorePath);
   }
 
+  invocationArgStrs.push_back("-fansi-escape-codes");
+
   for (auto extraArg : importerOpts.ExtraArgs) {
     invocationArgStrs.push_back(extraArg);
   }
@@ -750,7 +795,6 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
                          *clangDiags,
                          CI.getLangOpts(),
                          clangSrcMgr,
-                         CI.getPCMCache(),
                          headerSearchInfo,
                          (clang::ModuleLoader &)CI,
                          /*IILookup=*/nullptr,
@@ -763,7 +807,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   // Note: Reusing the PCHContainerReader or ModuleFileExtensions could be
   // dangerous.
   std::unique_ptr<clang::ASTReader> Reader(new clang::ASTReader(
-      PP, &ctx, CI.getPCHContainerReader(),
+      PP, CI.getModuleCache(), &ctx, CI.getPCHContainerReader(),
       CI.getFrontendOpts().ModuleFileExtensions,
       CI.getHeaderSearchOpts().Sysroot,
       /*DisableValidation*/ false,
@@ -869,7 +913,6 @@ ClangImporter::create(ASTContext &ctx,
   // Clang expects this to be like an actual command line. So we need to pass in
   // "clang" for argv[0]
   invocationArgStrs.push_back("clang");
-
   switch (importerOpts.Mode) {
   case ClangImporterOptions::Modes::Normal:
     getNormalInvocationArguments(invocationArgStrs, ctx, importerOpts);
@@ -1158,6 +1201,14 @@ ClangImporter::Implementation::getNextIncludeLoc() {
   if (!DummyIncludeBuffer.isValid()) {
     clang::SourceLocation includeLoc =
         srcMgr.getLocForStartOfFile(srcMgr.getMainFileID());
+    // Picking the beginning of the main FileID as include location is also what
+    // the clang PCH mechanism is doing (see
+    // clang::ASTReader::getImportLocation()). Choose the next source location
+    // here to avoid having the exact same import location as the clang PCH.
+    // Otherwise, if we are using a PCH for bridging header, we'll have
+    // problems with source order comparisons of clang source locations not
+    // being deterministic.
+    includeLoc = includeLoc.getLocWithOffset(1);
     DummyIncludeBuffer = srcMgr.createFileID(
         llvm::make_unique<ZeroFilledMemoryBuffer>(
           256*1024, StringRef(moduleImportBufferName)),
@@ -1337,7 +1388,12 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
     return true;
   }
 
-  llvm::SmallString<128> importLine{"#import \""};
+  llvm::SmallString<128> importLine;
+  if (Impl.SwiftContext.LangOpts.EnableObjCInterop)
+    importLine = "#import \"";
+  else
+    importLine = "#include \"";
+
   importLine += header;
   importLine += "\"\n";
 
@@ -1363,7 +1419,8 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
   invocation->getPreprocessorOpts().resetNonModularOptions();
 
   clang::CompilerInstance rewriteInstance(
-    Impl.Instance->getPCHContainerOperations());
+    Impl.Instance->getPCHContainerOperations(),
+    &Impl.Instance->getModuleCache());
   rewriteInstance.setInvocation(invocation);
   rewriteInstance.createDiagnostics(new clang::IgnoringDiagConsumer);
 
@@ -1419,9 +1476,11 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   invocation->getFrontendOpts().ProgramAction = clang::frontend::GeneratePCH;
   invocation->getPreprocessorOpts().resetNonModularOptions();
   invocation->getLangOpts()->NeededByPCHOrCompilationUsesPCH = true;
+  invocation->getLangOpts()->CacheGeneratedPCH = true;
 
   clang::CompilerInstance emitInstance(
-    Impl.Instance->getPCHContainerOperations());
+    Impl.Instance->getPCHContainerOperations(),
+    &Impl.Instance->getModuleCache());
   emitInstance.setInvocation(std::move(invocation));
   emitInstance.createDiagnostics(&Impl.Instance->getDiagnosticClient(),
                                  /*ShouldOwnClient=*/false);
@@ -1664,65 +1723,88 @@ ModuleDecl *ClangImporter::getImportedHeaderModule() const {
   return Impl.ImportedHeaderUnit->getParentModule();
 }
 
-PlatformAvailability::PlatformAvailability(LangOptions &langOpts) {
-  // Add filters to determine if a Clang availability attribute
-  // applies in Swift, and if so, what is the cutoff for deprecated
-  // declarations that are now considered unavailable in Swift.
+PlatformAvailability::PlatformAvailability(LangOptions &langOpts)
+    : platformKind(targetPlatform(langOpts)) {
+  switch (platformKind) {
+  case PlatformKind::iOS:
+  case PlatformKind::iOSApplicationExtension:
+  case PlatformKind::tvOS:
+  case PlatformKind::tvOSApplicationExtension:
+    deprecatedAsUnavailableMessage =
+        "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
+    break;
 
-  if (langOpts.Target.isiOS() && !langOpts.Target.isTvOS()) {
-    if (!langOpts.EnableAppExtensionRestrictions) {
-      filter = [](StringRef Platform) { return Platform == "ios"; };
-    } else {
-      filter = [](StringRef Platform) {
-        return Platform == "ios" || Platform == "ios_app_extension";
-      };
-    }
-    // Anything deprecated in iOS 7.x and earlier is unavailable in Swift.
-    deprecatedAsUnavailableFilter = [](
-        unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
-    deprecatedAsUnavailableMessage =
-        "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
-  } else if (langOpts.Target.isTvOS()) {
-    if (!langOpts.EnableAppExtensionRestrictions) {
-      filter = [](StringRef Platform) { return Platform == "tvos"; };
-    } else {
-      filter = [](StringRef Platform) {
-        return Platform == "tvos" || Platform == "tvos_app_extension";
-      };
-    }
-    // Anything deprecated in iOS 7.x and earlier is unavailable in Swift.
-    deprecatedAsUnavailableFilter = [](
-        unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
-    deprecatedAsUnavailableMessage =
-        "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
-  } else if (langOpts.Target.isWatchOS()) {
-    if (!langOpts.EnableAppExtensionRestrictions) {
-      filter = [](StringRef Platform) { return Platform == "watchos"; };
-    } else {
-      filter = [](StringRef Platform) {
-        return Platform == "watchos" || Platform == "watchos_app_extension";
-      };
-    }
-    // No deprecation filter on watchOS
-    deprecatedAsUnavailableFilter = [](
-        unsigned major, llvm::Optional<unsigned> minor) { return false; };
+  case PlatformKind::watchOS:
+  case PlatformKind::watchOSApplicationExtension:
     deprecatedAsUnavailableMessage = "";
-  } else if (langOpts.Target.isMacOSX()) {
-    if (!langOpts.EnableAppExtensionRestrictions) {
-      filter = [](StringRef Platform) { return Platform == "macos"; };
-    } else {
-      filter = [](StringRef Platform) {
-        return Platform == "macos" || Platform == "macos_app_extension";
-      };
-    }
-    // Anything deprecated in OSX 10.9.x and earlier is unavailable in Swift.
-    deprecatedAsUnavailableFilter = [](unsigned major,
-                                       llvm::Optional<unsigned> minor) {
-      return major < 10 ||
-             (major == 10 && (!minor.hasValue() || minor.getValue() <= 9));
-    };
+    break;
+
+  case PlatformKind::OSX:
+  case PlatformKind::OSXApplicationExtension:
     deprecatedAsUnavailableMessage =
-        "APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift";
+        "APIs deprecated as of macOS 10.9 and earlier are unavailable in Swift";
+    break;
+
+  default:
+    break;
+  }
+}
+
+bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
+  switch (platformKind) {
+  case PlatformKind::OSX:
+    return name == "macos";
+  case PlatformKind::OSXApplicationExtension:
+    return name == "macos" || name == "macos_app_extension";
+
+  case PlatformKind::iOS:
+    return name == "ios";
+  case PlatformKind::iOSApplicationExtension:
+    return name == "ios" || name == "ios_app_extension";
+
+  case PlatformKind::tvOS:
+    return name == "tvos";
+  case PlatformKind::tvOSApplicationExtension:
+    return name == "tvos" || name == "tvos_app_extension";
+
+  case PlatformKind::watchOS:
+    return name == "watchos";
+  case PlatformKind::watchOSApplicationExtension:
+    return name == "watchos" || name == "watchos_app_extension";
+
+  case PlatformKind::none:
+    return false;
+  }
+
+  llvm_unreachable("Unexpected platform");
+}
+
+bool PlatformAvailability::treatDeprecatedAsUnavailable(
+    const clang::Decl *clangDecl, const llvm::VersionTuple &version) const {
+  assert(!version.empty() && "Must provide version when deprecated");
+  unsigned major = version.getMajor();
+  Optional<unsigned> minor = version.getMinor();
+
+  switch (platformKind) {
+  case PlatformKind::OSX:
+    // Anything deprecated in OSX 10.9.x and earlier is unavailable in Swift.
+    return major < 10 ||
+           (major == 10 && (!minor.hasValue() || minor.getValue() <= 9));
+
+  case PlatformKind::iOS:
+  case PlatformKind::iOSApplicationExtension:
+  case PlatformKind::tvOS:
+  case PlatformKind::tvOSApplicationExtension:
+    // Anything deprecated in iOS 7.x and earlier is unavailable in Swift.
+    return major <= 7;
+
+  case PlatformKind::watchOS:
+  case PlatformKind::watchOSApplicationExtension:
+    // No deprecation filter on watchOS
+    return false;
+
+  default:
+    return false;
   }
 }
 
@@ -2550,7 +2632,7 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
 
       // Note: We can't use getAnyGeneric() here because `aliasedTy`
       // might be typealias.
-      if (auto Ty = dyn_cast<NameAliasType>(aliasedTy.getPointer()))
+      if (auto Ty = dyn_cast<TypeAliasType>(aliasedTy.getPointer()))
         importedDecl = Ty->getDecl();
       else if (auto Ty = dyn_cast<AnyGenericType>(aliasedTy.getPointer()))
         importedDecl = Ty->getDecl();
@@ -3055,6 +3137,18 @@ ClangModuleUnit::ClangModuleUnit(ModuleDecl &M,
                                  const clang::Module *clangModule)
   : LoadedFile(FileUnitKind::ClangModule, M), owner(owner),
     clangModule(clangModule) {
+  // Capture the file metadata before it goes away.
+  if (clangModule)
+    ASTSourceDescriptor = {*clangModule};
+}
+
+Optional<clang::ExternalASTSource::ASTSourceDescriptor>
+ClangModuleUnit::getASTSourceDescriptor() const {
+  if (clangModule) {
+    assert(ASTSourceDescriptor.getModuleOrNull() == clangModule);
+    return ASTSourceDescriptor;
+  }
+  return None;
 }
 
 bool ClangModuleUnit::hasClangModule(ModuleDecl *M) {
@@ -3077,7 +3171,7 @@ clang::ASTContext &ClangModuleUnit::getClangASTContext() const {
   return owner.getClangASTContext();
 }
 
-std::string ClangModuleUnit::getExportedModuleName() const {
+StringRef ClangModuleUnit::getExportedModuleName() const {
   if (clangModule && !clangModule->ExportAsModule.empty())
     return clangModule->ExportAsModule;
 
@@ -3123,71 +3217,43 @@ ModuleDecl *ClangModuleUnit::getAdapterModule() const {
 void ClangModuleUnit::getImportedModules(
     SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
     ModuleDecl::ImportFilter filter) const {
-  switch (filter) {
-  case ModuleDecl::ImportFilter::All:
-  case ModuleDecl::ImportFilter::Private:
+  // Bail out if we /only/ want ImplementationOnly imports; Clang modules never
+  // have any of these.
+  if (filter.containsOnly(ModuleDecl::ImportFilterKind::ImplementationOnly))
+    return;
+
+  if (filter.contains(ModuleDecl::ImportFilterKind::Private))
     if (auto stdlib = owner.getStdlibModule())
       imports.push_back({ModuleDecl::AccessPathTy(), stdlib});
-    break;
-  case ModuleDecl::ImportFilter::Public:
-    break;
-  }
 
   SmallVector<clang::Module *, 8> imported;
   if (!clangModule) {
     // This is the special "imported headers" module.
-    switch (filter) {
-    case ModuleDecl::ImportFilter::All:
-    case ModuleDecl::ImportFilter::Public:
+    if (filter.contains(ModuleDecl::ImportFilterKind::Public)) {
       imported.append(owner.ImportedHeaderExports.begin(),
                       owner.ImportedHeaderExports.end());
-      break;
-
-    case ModuleDecl::ImportFilter::Private:
-      break;
     }
 
   } else {
     clangModule->getExportedModules(imported);
 
-    switch (filter) {
-    case ModuleDecl::ImportFilter::All: {
-      llvm::SmallPtrSet<clang::Module *, 8> knownModules;
-      imported.append(clangModule->Imports.begin(), clangModule->Imports.end());
-      imported.erase(std::remove_if(imported.begin(), imported.end(),
-                                    [&](clang::Module *mod) -> bool {
-                                      return !knownModules.insert(mod).second;
-                                    }),
-                     imported.end());
-
-      // FIXME: The parent module isn't exactly a private import, but it is
-      // needed for link dependencies.
-      if (clangModule->Parent)
-        imported.push_back(clangModule->Parent);
-
-      break;
-    }
-
-    case ModuleDecl::ImportFilter::Private: {
+    if (filter.contains(ModuleDecl::ImportFilterKind::Private)) {
+      // Copy in any modules that are imported but not exported.
       llvm::SmallPtrSet<clang::Module *, 8> knownModules(imported.begin(),
                                                          imported.end());
-      SmallVector<clang::Module *, 8> privateImports;
-      std::copy_if(clangModule->Imports.begin(), clangModule->Imports.end(),
-                   std::back_inserter(privateImports), [&](clang::Module *mod) {
-                     return knownModules.count(mod) == 0;
-                   });
-      imported.swap(privateImports);
+      if (!filter.contains(ModuleDecl::ImportFilterKind::Public)) {
+        // Remove the exported ones now that we're done with them.
+        imported.clear();
+      }
+      llvm::copy_if(clangModule->Imports, std::back_inserter(imported),
+                    [&](clang::Module *mod) {
+                     return !knownModules.insert(mod).second;
+                    });
 
       // FIXME: The parent module isn't exactly a private import, but it is
       // needed for link dependencies.
       if (clangModule->Parent)
         imported.push_back(clangModule->Parent);
-
-      break;
-    }
-
-    case ModuleDecl::ImportFilter::Public:
-      break;
     }
   }
 

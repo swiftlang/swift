@@ -51,22 +51,20 @@ struct LValueTypeData {
   CanType SubstFormalType;
 
   /// The lowered type of value that should be stored in the l-value.
-  /// Always an object type.
   ///
   /// On physical path components, projection yields an address of
   /// this type.  On logical path components, materialize yields an
   /// address of this type, set expects a value of this type, and
-  /// get yields a value of this type.
-  SILType TypeOfRValue;
+  /// get yields an object of this type.
+  CanType TypeOfRValue;
 
   SGFAccessKind AccessKind;
 
   LValueTypeData() = default;
   LValueTypeData(SGFAccessKind accessKind, AbstractionPattern origFormalType,
-                 CanType substFormalType, SILType typeOfRValue)
+                 CanType substFormalType, CanType typeOfRValue)
     : OrigFormalType(origFormalType), SubstFormalType(substFormalType),
       TypeOfRValue(typeOfRValue), AccessKind(accessKind) {
-    assert(typeOfRValue.isObject());
     assert(substFormalType->isMaterializable());
   }
 
@@ -185,7 +183,9 @@ public:
 
   /// Returns the logical type-as-rvalue of the value addressed by the
   /// component.  This is always an object type, never an address.
-  SILType getTypeOfRValue() const { return TypeData.TypeOfRValue; }
+  SILType getTypeOfRValue() const {
+    return SILType::getPrimitiveObjectType(TypeData.TypeOfRValue);
+  }
   AbstractionPattern getOrigFormalType() const {
     return TypeData.OrigFormalType;
   }
@@ -413,7 +413,7 @@ public:
   }
 
   void addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
-                                VarDecl *var, Optional<SubstitutionMap> subs,
+                                VarDecl *var, SubstitutionMap subs,
                                 LValueOptions options,
                                 SGFAccessKind accessKind,
                                 AccessStrategy strategy,
@@ -485,7 +485,9 @@ public:
   /// Returns the type-of-rvalue of the logical object referenced by
   /// this l-value.  Note that this may differ significantly from the
   /// type of l-value.
-  SILType getTypeOfRValue() const { return getTypeData().TypeOfRValue; }
+  SILType getTypeOfRValue() const {
+    return SILType::getPrimitiveObjectType(getTypeData().TypeOfRValue);
+  }
   CanType getSubstFormalType() const { return getTypeData().SubstFormalType; }
   AbstractionPattern getOrigFormalType() const {
     return getTypeData().OrigFormalType;

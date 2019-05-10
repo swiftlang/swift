@@ -233,98 +233,7 @@ ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
   }
 
   assert(StdlibModule && "no main module found");
-  Context.recordKnownProtocols(StdlibModule);
   return StdlibModule;
-}
-
-Type TypeChecker::lookupBoolType(const DeclContext *dc) {
-  if (!boolType) {
-    boolType = ([&] {
-      SmallVector<ValueDecl *, 2> results;
-      getStdlibModule(dc)->lookupValue({}, Context.getIdentifier("Bool"),
-                                       NLKind::QualifiedLookup, results);
-      if (results.size() != 1) {
-        diagnose(SourceLoc(), diag::broken_bool);
-        return Type();
-      }
-
-      auto tyDecl = dyn_cast<NominalTypeDecl>(results.front());
-      if (!tyDecl) {
-        diagnose(SourceLoc(), diag::broken_bool);
-        return Type();
-      }
-
-      return tyDecl->getDeclaredType();
-    })();
-  }
-  return *boolType;
-}
-
-/// Clone the given generic parameters in the given list. We don't need any
-/// of the requirements, because they will be inferred.
-static GenericParamList *cloneGenericParams(ASTContext &ctx,
-                                            DeclContext *dc,
-                                            GenericParamList *fromParams) {
-  // Clone generic parameters.
-  SmallVector<GenericTypeParamDecl *, 2> toGenericParams;
-  for (auto fromGP : *fromParams) {
-    // Create the new generic parameter.
-    auto toGP = new (ctx) GenericTypeParamDecl(dc, fromGP->getName(),
-                                               SourceLoc(),
-                                               fromGP->getDepth(),
-                                               fromGP->getIndex());
-    toGP->setImplicit(true);
-
-    // Record new generic parameter.
-    toGenericParams.push_back(toGP);
-  }
-
-  auto toParams = GenericParamList::create(ctx, SourceLoc(), toGenericParams,
-                                           SourceLoc());
-
-  auto outerParams = fromParams->getOuterParameters();
-  if (outerParams != nullptr)
-    outerParams = cloneGenericParams(ctx, dc, outerParams);
-  toParams->setOuterParameters(outerParams);
-
-  return toParams;
-}
-
-/// FIXME: Similar to TypeChecker::prepareGenericParamList(), which needs
-/// to be separated from the type checker.
-static void prepareGenericParamList(GenericParamList *genericParams) {
-  unsigned depth = genericParams->getDepth();
-  for (auto gp : *genericParams) {
-    if (gp->getDepth() == depth)
-      return;
-
-    gp->setDepth(depth);
-  }
-
-  if (auto outerGenericParams = genericParams->getOuterParameters())
-    prepareGenericParamList(outerGenericParams);
-}
-
-/// Ensure that the outer generic parameters of the given generic
-/// context have been configured.
-static void configureOuterGenericParams(const GenericContext *dc) {
-  auto genericParams = dc->getGenericParams();
-  if (!genericParams) return;
-
-  if (genericParams->getOuterParameters()) return;
-
-  DeclContext *outerDC = dc->getParent();
-  while (!outerDC->isModuleScopeContext()) {
-    if (auto outerDecl = outerDC->getAsDecl()) {
-      if (auto outerGenericDC = outerDecl->getAsGenericContext()) {
-        genericParams->setOuterParameters(outerGenericDC->getGenericParams());
-        configureOuterGenericParams(outerGenericDC);
-        return;
-      }
-    }
-
-    outerDC = outerDC->getParent();
-  }
 }
 
 /// Bind the given extension to the given nominal type.
@@ -333,43 +242,7 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
   if (ext->alreadyBoundToNominal())
     return;
 
-  if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-    // For a protocol extension, build the generic parameter list.
-    auto genericParams = proto->createGenericParams(ext);
-    prepareGenericParamList(genericParams);
-    ext->setGenericParams(genericParams);
-  } else if (auto genericParams = nominal->getGenericParamsOfContext()) {
-    // Make sure the generic parameters are set up.
-    configureOuterGenericParams(nominal);
-
-    // Clone the generic parameter list of a generic type.
-    prepareGenericParamList(genericParams);
-    ext->setGenericParams(
-        cloneGenericParams(ext->getASTContext(), ext, genericParams));
-  }
-
-  // If we have a trailing where clause, deal with it now.
-  // For now, trailing where clauses are only permitted on protocol extensions.
-  if (auto trailingWhereClause = ext->getTrailingWhereClause()) {
-    if (!(nominal->getGenericParamsOfContext() || isa<ProtocolDecl>(nominal))) {
-      // Only generic and protocol types are permitted to have
-      // trailing where clauses.
-      ext->diagnose(diag::extension_nongeneric_trailing_where,
-                    nominal->getFullName())
-        .highlight(trailingWhereClause->getSourceRange());
-      ext->setTrailingWhereClause(nullptr);
-    } else {
-      // Merge the trailing where clause into the generic parameter list.
-      // FIXME: Long-term, we'd like clients to deal with the trailing where
-      // clause explicitly, but for now it's far more direct to represent
-      // the trailing where clause as part of the requirements.
-      ext->getGenericParams()->addTrailingWhereClause(
-        ext->getASTContext(),
-        trailingWhereClause->getWhereLoc(),
-        trailingWhereClause->getRequirements());
-    }
-  }
-
+  ext->createGenericParamsIfMissing(nominal);
   nominal->addExtension(ext);
 }
 
@@ -466,10 +339,8 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
         TC.checkFunctionErrorHandling(AFD);
         continue;
       }
-      if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-        (void)nominal->getAllConformances();
+      if (isa<NominalTypeDecl>(decl))
         continue;
-      }
       if (isa<VarDecl>(decl))
         continue;
       llvm_unreachable("Unhandled external definition kind");
@@ -483,17 +354,6 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
         continue;
 
       TC.validateDecl(decl);
-    }
-
-    // Synthesize any necessary function bodies.
-    // FIXME: If we're not planning to run SILGen, this is wasted effort.
-    while (!TC.FunctionsToSynthesize.empty()) {
-      auto function = TC.FunctionsToSynthesize.back().second;
-      TC.FunctionsToSynthesize.pop_back();
-      if (function.getDecl()->isInvalid() || TC.Context.hadError())
-        continue;
-
-      TC.synthesizeFunctionBody(function);
     }
 
     // Validate any referenced declarations for SIL's purposes.
@@ -541,7 +401,6 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
            currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
-           !TC.FunctionsToSynthesize.empty() ||
            TC.NextDeclToFinalize < TC.DeclsToFinalize.size() ||
            !TC.ConformanceContexts.empty() ||
            !TC.DelayedRequirementSignatures.empty() ||
@@ -568,7 +427,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   TC.DelayedCircularityChecks.clear();
 
   // Compute captures for functions and closures we visited.
-  for (AnyFunctionRef closure : TC.ClosuresWithUncomputedCaptures) {
+  for (auto *closure : TC.ClosuresWithUncomputedCaptures) {
     TC.computeCaptures(closure);
   }
   TC.ClosuresWithUncomputedCaptures.clear();
@@ -612,6 +471,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     return;
 
   auto &Ctx = SF.getASTContext();
+  BufferIndirectlyCausingDiagnosticRAII cpr(SF);
 
   // Make sure we have a type checker.
   TypeChecker &TC = createTypeChecker(Ctx);
@@ -621,7 +481,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   performNameBinding(SF, StartElem);
 
   {
-    SharedTimer timer("Type checking / Semantic analysis");
+    SharedTimer timer("Type checking and Semantic analysis");
 
     TC.setWarnLongFunctionBodies(WarnLongFunctionBodies);
     TC.setWarnLongExpressionTypeChecking(WarnLongExpressionTypeChecking);
@@ -661,20 +521,14 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     checkBridgedFunctions(TC.Context);
 
     // Type check the top-level elements of the source file.
-    bool hasTopLevelCode = false;
     for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-        hasTopLevelCode = true;
         // Immediately perform global name-binding etc.
         TC.typeCheckTopLevelCodeDecl(TLCD);
+        TC.contextualizeTopLevelCode(TLC, TLCD);
       } else {
         TC.typeCheckDecl(D);
       }
-    }
-
-    if (hasTopLevelCode) {
-      TC.contextualizeTopLevelCode(TLC,
-                             llvm::makeArrayRef(SF.Decls).slice(StartElem));
     }
 
     // If we're in REPL mode, inject temporary result variables and other stuff
@@ -722,10 +576,10 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   auto &Ctx = SF.getASTContext();
   FrontendStatsTracer tracer(Ctx.Stats, "perform-whole-module-type-checking");
-  Ctx.diagnoseAttrsRequiringFoundation(SF);
-  Ctx.diagnoseObjCMethodConflicts(SF);
-  Ctx.diagnoseObjCUnsatisfiedOptReqConflicts(SF);
-  Ctx.diagnoseUnintendedObjCMethodOverrides(SF);
+  diagnoseAttrsRequiringFoundation(SF);
+  diagnoseObjCMethodConflicts(SF);
+  diagnoseObjCUnsatisfiedOptReqConflicts(SF);
+  diagnoseUnintendedObjCMethodOverrides(SF);
 
   // In whole-module mode, import verification is deferred until all files have
   // been type checked. This avoids caching imported declarations when a valid
@@ -797,6 +651,17 @@ void swift::typeCheckCompletionDecl(Decl *D) {
     TC.validateDecl(cast<ValueDecl>(D));
 }
 
+void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
+                                    unsigned bindingIndex) {
+  assert(!PBD->isInitializerChecked(bindingIndex) &&
+         PBD->getInit(bindingIndex));
+
+  auto &Ctx = PBD->getASTContext();
+  DiagnosticSuppression suppression(Ctx.Diags);
+  TypeChecker &TC = createTypeChecker(Ctx);
+  TC.typeCheckPatternBinding(PBD, bindingIndex);
+}
+
 static Optional<Type> getTypeOfCompletionContextExpr(
                         TypeChecker &TC,
                         DeclContext *DC,
@@ -837,7 +702,7 @@ static Optional<Type> getTypeOfCompletionContextExpr(
   return None;
 }
 
-/// \brief Return the type of an expression parsed during code completion, or
+/// Return the type of an expression parsed during code completion, or
 /// a null \c Type on error.
 Optional<Type> swift::getTypeOfCompletionContextExpr(
                         ASTContext &Ctx,
@@ -853,7 +718,7 @@ Optional<Type> swift::getTypeOfCompletionContextExpr(
                                           referencedDecl);
 }
 
-/// \brief Return the type of operator function for specified LHS, or a null
+/// Return the type of operator function for specified LHS, or a null
 /// \c Type on error.
 FunctionType *
 swift::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,

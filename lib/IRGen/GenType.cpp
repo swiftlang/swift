@@ -21,11 +21,13 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Platform.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/Path.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 
 #include "EnumPayload.h"
@@ -240,15 +242,16 @@ llvm::Value *FixedTypeInfo::isDynamicallyPackedInline(IRGenFunction &IGF,
 unsigned FixedTypeInfo::getSpareBitExtraInhabitantCount() const {
   if (SpareBits.none())
     return 0;
-  // The runtime supports a max of 0x7FFFFFFF extra inhabitants, which ought
-  // to be enough for anybody.
+  // Make sure the arithmetic below doesn't overflow.
   if (getFixedSize().getValue() >= 4)
-    return 0x7FFFFFFF;
+    return ValueWitnessFlags::MaxNumExtraInhabitants;
   unsigned spareBitCount = SpareBits.count();
   assert(spareBitCount <= getFixedSize().getValueInBits()
          && "more spare bits than storage bits?!");
   unsigned inhabitedBitCount = getFixedSize().getValueInBits() - spareBitCount;
-  return ((1U << spareBitCount) - 1U) << inhabitedBitCount;
+  unsigned rawCount = ((1U << spareBitCount) - 1U) << inhabitedBitCount;
+  return std::min(rawCount,
+                  unsigned(ValueWitnessFlags::MaxNumExtraInhabitants));
 }
 
 void FixedTypeInfo::applyFixedSpareBitsMask(SpareBitVector &mask,
@@ -392,7 +395,7 @@ static llvm::Value *computeExtraTagBytes(IRGenFunction &IGF, IRBuilder &Builder,
   auto *entryBB = Builder.GetInsertBlock();
   llvm::Value *size = asSizeConstant(IGM, fixedSize);
   auto *returnBB = llvm::BasicBlock::Create(Ctx);
-  size = Builder.CreateTrunc(size, int32Ty); // We know size < 4.
+  size = Builder.CreateZExtOrTrunc(size, int32Ty); // We know size < 4.
 
   auto *two = llvm::ConstantInt::get(int32Ty, 2U);
   auto *four = llvm::ConstantInt::get(int32Ty, 4U);
@@ -426,15 +429,26 @@ static llvm::Value *computeExtraTagBytes(IRGenFunction &IGF, IRBuilder &Builder,
 llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
                                                     llvm::Value *numEmptyCases,
                                                     Address enumAddr,
-                                                    SILType T) const {
+                                                    SILType T,
+                                                    bool isOutlined) const {
+  return getFixedTypeEnumTagSinglePayload(IGF, *this, numEmptyCases, enumAddr,
+                                          T, isOutlined);
+}
+
+llvm::Value *irgen::getFixedTypeEnumTagSinglePayload(IRGenFunction &IGF,
+                                                     const FixedTypeInfo &ti,
+                                                     llvm::Value *numEmptyCases,
+                                                     Address enumAddr,
+                                                     SILType T,
+                                                     bool isOutlined) {
   auto &IGM = IGF.IGM;
   auto &Ctx = IGF.IGM.getLLVMContext();
   auto &Builder = IGF.Builder;
 
-  auto *size = getSize(IGF, T);
-  Size fixedSize = getFixedSize();
+  auto *size = ti.getSize(IGF, T);
+  Size fixedSize = ti.getFixedSize();
   auto *numExtraInhabitants =
-      llvm::ConstantInt::get(IGM.Int32Ty, getFixedExtraInhabitantCount(IGM));
+      llvm::ConstantInt::get(IGM.Int32Ty, ti.getFixedExtraInhabitantCount(IGM));
 
   auto *zero = llvm::ConstantInt::get(IGM.Int32Ty, 0U);
   auto *one = llvm::ConstantInt::get(IGM.Int32Ty, 1U);
@@ -487,7 +501,7 @@ llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
 
   Builder.emitBlock(extraTagBitsBB);
 
-  auto *truncSize = Builder.CreateTrunc(size, IGM.Int32Ty);
+  auto *truncSize = Builder.CreateZExtOrTrunc(size, IGM.Int32Ty);
   Address caseIndexFromValueSlot = IGF.createAlloca(IGM.Int32Ty, Alignment(4));
   Builder.CreateStore(zero, caseIndexFromValueSlot);
 
@@ -513,8 +527,8 @@ llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
   Builder.emitBlock(noExtraTagBitsBB);
   // If there are extra inhabitants, see whether the payload is valid.
   llvm::Value *result0;
-  if (mayHaveExtraInhabitants(IGM)) {
-    result0 = getExtraInhabitantIndex(IGF, enumAddr, T, false);
+  if (ti.mayHaveExtraInhabitants(IGM)) {
+    result0 = ti.getExtraInhabitantIndex(IGF, enumAddr, T, false);
     noExtraTagBitsBB = Builder.GetInsertBlock();
   } else {
     result0 = llvm::ConstantInt::getSigned(IGM.Int32Ty, -1);
@@ -605,7 +619,19 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
                                               llvm::Value *whichCase,
                                               llvm::Value *numEmptyCases,
                                               Address enumAddr,
-                                              SILType T) const {
+                                              SILType T,
+                                              bool isOutlined) const {
+  storeFixedTypeEnumTagSinglePayload(IGF, *this, whichCase, numEmptyCases,
+                                     enumAddr, T, isOutlined);
+}
+
+void irgen::storeFixedTypeEnumTagSinglePayload(IRGenFunction &IGF,
+                                               const FixedTypeInfo &ti,
+                                               llvm::Value *whichCase,
+                                               llvm::Value *numEmptyCases,
+                                               Address enumAddr,
+                                               SILType T,
+                                               bool isOutlined) {
   auto &IGM = IGF.IGM;
   auto &Ctx = IGF.IGM.getLLVMContext();
   auto &Builder = IGF.Builder;
@@ -616,15 +642,15 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
   auto *four = llvm::ConstantInt::get(int32Ty, 4U);
   auto *eight = llvm::ConstantInt::get(int32Ty, 8U);
 
-  auto fixedSize = getFixedSize();
+  auto fixedSize = ti.getFixedSize();
 
   Address valueAddr = Builder.CreateElementBitCast(enumAddr, IGM.Int8Ty);
   Address extraTagBitsAddr =
     Builder.CreateConstByteArrayGEP(valueAddr, fixedSize);
 
   auto *numExtraInhabitants =
-      llvm::ConstantInt::get(IGM.Int32Ty, getFixedExtraInhabitantCount(IGM));
-  auto *size = getSize(IGF, T);
+      llvm::ConstantInt::get(IGM.Int32Ty, ti.getFixedExtraInhabitantCount(IGM));
+  auto *size = ti.getSize(IGF, T);
 
   // Do we need extra tag bytes.
   auto *entryBB = Builder.GetInsertBlock();
@@ -666,11 +692,11 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
   Builder.CreateCondBr(isPayload, returnBB, storeInhabitantBB);
 
   Builder.emitBlock(storeInhabitantBB);
-  if (mayHaveExtraInhabitants(IGM)) {
+  if (ti.mayHaveExtraInhabitants(IGM)) {
     // Store an index in the range [0..ElementsWithNoPayload-1].
     auto *nonPayloadElementIndex = Builder.CreateSub(whichCase, one);
-    storeExtraInhabitant(IGF, nonPayloadElementIndex, enumAddr, T,
-                         /*outlined*/ false);
+    ti.storeExtraInhabitant(IGF, nonPayloadElementIndex, enumAddr, T,
+                            /*outlined*/ false);
   }
   Builder.CreateBr(returnBB);
 
@@ -683,7 +709,7 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
   auto *nonPayloadElementIndex = Builder.CreateSub(whichCase, one);
   auto *caseIndex =
       Builder.CreateSub(nonPayloadElementIndex, numExtraInhabitants);
-  auto *truncSize = Builder.CreateTrunc(size, IGM.Int32Ty);
+  auto *truncSize = Builder.CreateZExtOrTrunc(size, IGM.Int32Ty);
   auto *isFourBytesPayload = Builder.CreateICmpUGE(truncSize, four);
   auto *payloadGE4BB = Builder.GetInsertBlock();
   auto *payloadLT4BB = llvm::BasicBlock::Create(Ctx);
@@ -726,30 +752,6 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
   Builder.CreateBr(returnBB);
 
   Builder.emitBlock(returnBB);
-}
-
-llvm::Value *irgen::emitGetEnumTagSinglePayload(IRGenFunction &IGF,
-                                                llvm::Value *numEmptyCases,
-                                                Address enumAddr, SILType T) {
-  auto metadata = IGF.emitTypeMetadataRefForLayout(T);
-  auto opaqueAddr =
-      IGF.Builder.CreateBitCast(enumAddr.getAddress(), IGF.IGM.OpaquePtrTy);
-
-  return IGF.Builder.CreateCall(IGF.IGM.getGetEnumCaseSinglePayloadFn(),
-                                {opaqueAddr, metadata, numEmptyCases});
-}
-
-void irgen::emitStoreEnumTagSinglePayload(IRGenFunction &IGF,
-                                          llvm::Value *whichCase,
-                                          llvm::Value *numEmptyCases,
-                                          Address enumAddr,
-                                          SILType T) {
-  auto metadata = IGF.emitTypeMetadataRefForLayout(T);
-  auto opaqueAddr =
-      IGF.Builder.CreateBitCast(enumAddr.getAddress(), IGF.IGM.OpaquePtrTy);
-
-  IGF.Builder.CreateCall(IGF.IGM.getStoreEnumTagSinglePayloadFn(),
-                         {opaqueAddr, metadata, whichCase, numEmptyCases});
 }
 
 void
@@ -1114,24 +1116,85 @@ TypeConverter::getLegacyTypeInfo(NominalTypeDecl *decl) const {
   return found->second;
 }
 
+// The following Apple platforms support backward deployment of Swift
+// code built with Swift 5.0 running on an old Objective-C runtime
+// that does not support the class metadata update hook.
+//
+// We ship a YAML legacy type info file for these platforms as part
+// of the toolchain.
+static llvm::StringLiteral platformsWithLegacyLayouts[][2] = {
+  {"appletvos", "arm64"},
+  {"appletvsimulator", "x86_64"},
+  {"iphoneos", "armv7"},
+  {"iphoneos", "armv7s"},
+  {"iphoneos", "arm64"},
+  {"iphonesimulator", "i386"},
+  {"iphonesimulator", "x86_64"},
+  {"macosx", "x86_64"},
+  {"watchos", "armv7k"},
+  {"watchsimulator", "i386"}
+};
+
+static bool doesPlatformUseLegacyLayouts(StringRef platformName,
+                                         StringRef archName) {
+  for (auto platformArchPair : platformsWithLegacyLayouts) {
+    if (platformName == platformArchPair[0] &&
+        archName == platformArchPair[1]) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 TypeConverter::TypeConverter(IRGenModule &IGM)
   : IGM(IGM),
     FirstType(invalidTypeInfo()) {
-  // FIXME: In LLDB, everything is completely fragile, so that IRGen can query
-  // the size of resilient types. Of course this is not the right long term
-  // solution, because it won't work once the swiftmodule file is not in
-  // sync with the binary module. Once LLDB can calculate type layouts at
-  // runtime (using remote mirrors or some other mechanism), we can remove this.
-  if (IGM.IRGen.Opts.EnableResilienceBypass)
-    LoweringMode = Mode::CompletelyFragile;
+  // Whether the Objective-C runtime is guaranteed to invoke the class
+  // metadata update callback when realizing a Swift class referenced from
+  // Objective-C.
+  bool supportsObjCMetadataUpdateCallback =
+    IGM.Context.LangOpts.doesTargetSupportObjCMetadataUpdateCallback();
 
-  StringRef path = IGM.IRGen.Opts.ReadTypeInfoPath;
-  if (!path.empty()) {
-    bool error = readLegacyTypeInfo(path);
-    if (error) {
-      llvm::report_fatal_error("Cannot read '" + path + "'");
-    }
+  // If our deployment target allows us to rely on the metadata update
+  // callback being called, we don't have to emit a legacy layout for a
+  // class with resiliently-sized fields.
+  if (supportsObjCMetadataUpdateCallback)
+    return;
+
+  // We have a bunch of -parse-stdlib tests that pass a -target in the test
+  // suite. To prevent these from failing when the user hasn't build the
+  // standard library for that target, we pass -disable-legacy-type-info to
+  // disable trying to load the legacy type info.
+  if (IGM.IRGen.Opts.DisableLegacyTypeInfo)
+    return;
+
+  llvm::SmallString<128> defaultPath;
+
+  StringRef path = IGM.IRGen.Opts.ReadLegacyTypeInfoPath;
+  if (path.empty()) {
+    const auto &Triple = IGM.Context.LangOpts.Target;
+
+    // If the flag was not explicitly specified, look for a file in a
+    // platform-specific location, if this platform is known to require
+    // one.
+    auto platformName = getPlatformNameForTriple(Triple);
+    auto archName = swift::getMajorArchitectureName(Triple);
+
+    if (!doesPlatformUseLegacyLayouts(platformName, archName))
+      return;
+
+    defaultPath.append(IGM.Context.SearchPathOpts.RuntimeLibraryPath);
+    llvm::sys::path::append(defaultPath, "layouts-");
+    defaultPath.append(archName);
+    defaultPath.append(".yaml");
+
+    path = defaultPath;
   }
+
+  bool error = readLegacyTypeInfo(path);
+  if (error)
+    llvm::report_fatal_error("Cannot read '" + path + "'");
 }
 
 TypeConverter::~TypeConverter() {
@@ -1346,13 +1409,26 @@ const TypeInfo &IRGenFunction::getTypeInfo(SILType T) {
 }
 
 /// Return the SIL-lowering of the given type.
-SILType IRGenModule::getLoweredType(AbstractionPattern orig, Type subst) {
-  return getSILTypes().getLoweredType(orig, subst);
+SILType IRGenModule::getLoweredType(AbstractionPattern orig, Type subst) const {
+  return getSILTypes().getLoweredType(orig, subst,
+                                      ResilienceExpansion::Maximal);
 }
 
 /// Return the SIL-lowering of the given type.
-SILType IRGenModule::getLoweredType(Type subst) {
-  return getSILTypes().getLoweredType(subst);
+SILType IRGenModule::getLoweredType(Type subst) const {
+  return getSILTypes().getLoweredType(subst,
+                                      ResilienceExpansion::Maximal);
+}
+
+/// Return the SIL-lowering of the given type.
+const Lowering::TypeLowering &IRGenModule::getTypeLowering(SILType type) const {
+  return getSILTypes().getTypeLowering(type,
+                                       ResilienceExpansion::Maximal);
+}
+
+bool IRGenModule::isTypeABIAccessible(SILType type) const {
+  return getSILModule().isTypeABIAccessible(type,
+                                            ResilienceExpansion::Maximal);
 }
 
 /// Get a pointer to the storage type for the given type.  Note that,
@@ -1369,7 +1445,7 @@ llvm::PointerType *IRGenModule::getStoragePointerTypeForLowered(CanType T) {
 }
 
 llvm::Type *IRGenModule::getStorageTypeForUnlowered(Type subst) {
-  return getStorageType(getSILTypes().getLoweredType(subst));
+  return getStorageType(getLoweredType(subst));
 }
 
 llvm::Type *IRGenModule::getStorageType(SILType T) {
@@ -1399,7 +1475,7 @@ IRGenModule::getTypeInfoForUnlowered(AbstractionPattern orig, Type subst) {
 /// have yet undergone SIL type lowering.
 const TypeInfo &
 IRGenModule::getTypeInfoForUnlowered(AbstractionPattern orig, CanType subst) {
-  return getTypeInfo(getSILTypes().getLoweredType(orig, subst));
+  return getTypeInfo(getLoweredType(orig, subst));
 }
 
 /// Get the fragile type information for the given type, which is known
@@ -1420,11 +1496,15 @@ const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
 }
 
 ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
+  // Get the primary archetype.
+  auto primary = dyn_cast<PrimaryArchetypeType>(t->getRoot());
+  
+  // If there is no primary (IOW, it's an opened archetype), the archetype is
+  // an exemplar.
+  if (!primary) return t;
+  
   // Retrieve the generic environment of the archetype.
-  auto genericEnv = t->getGenericEnvironment();
-
-  // If there is no generic environment, the archetype is an exemplar.
-  if (!genericEnv) return t;
+  auto genericEnv = primary->getGenericEnvironment();
 
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
@@ -1562,7 +1642,7 @@ TypeConverter::getOpaqueStorageTypeInfo(Size size, Alignment align) {
   return *type;
 }
 
-/// \brief Convert a primitive builtin type to its LLVM type, size, and
+/// Convert a primitive builtin type to its LLVM type, size, and
 /// alignment.
 static std::tuple<llvm::Type *, Size, Alignment>
 convertPrimitiveBuiltin(IRGenModule &IGM, CanType canTy) {
@@ -1678,7 +1758,10 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     return createPrimitive(llvmTy, size, align);
   }
 
-  case TypeKind::Archetype:
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype:
+  case TypeKind::OpaqueTypeArchetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));
   case TypeKind::Class:
   case TypeKind::Enum:
@@ -2076,32 +2159,27 @@ SpareBitVector IRGenModule::getSpareBitsForType(llvm::Type *scalarTy, Size size)
   if (it != SpareBitsForTypes.end())
     return it->second;
 
-  assert(DataLayout.getTypeAllocSizeInBits(scalarTy) <= size.getValueInBits() &&
+  assert(!isa<llvm::StructType>(scalarTy));
+
+  unsigned allocBits = size.getValueInBits();
+  assert(allocBits >= DataLayout.getTypeAllocSizeInBits(scalarTy) &&
          "using a size that's smaller than LLVM's alloc size?");
-  
-  {
-    // FIXME: Currently we only implement spare bits for primitive integer
-    // types.
-    assert(!isa<llvm::StructType>(scalarTy));
 
-    auto *intTy = dyn_cast<llvm::IntegerType>(scalarTy);
-    if (!intTy)
-      goto no_spare_bits;
+  // Allocate a new cache entry.
+  SpareBitVector &result = SpareBitsForTypes[scalarTy];
 
-    // Round Integer-Of-Unusual-Size types up to their allocation size.
-    unsigned allocBits = size.getValueInBits();
-    assert(allocBits >= intTy->getBitWidth());
-        
-    // FIXME: Endianness.
-    SpareBitVector &result = SpareBitsForTypes[scalarTy];
-    result.appendClearBits(intTy->getBitWidth());
-    result.extendWithSetBits(allocBits);
+  // FIXME: Currently we only implement spare bits for primitive integer
+  // types.
+  if (auto *intTy = dyn_cast<llvm::IntegerType>(scalarTy)) {
+    // Pad integers with spare bits up to their allocation size.
+    auto v = llvm::APInt::getBitsSetFrom(allocBits, intTy->getBitWidth());
+    // FIXME: byte swap v on big-endian platforms.
+    result = SpareBitVector::fromAPInt(v);
     return result;
   }
-  
-no_spare_bits:
-  SpareBitVector &result = SpareBitsForTypes[scalarTy];
-  result.appendClearBits(size.getValueInBits());
+
+  // No spare bits.
+  result = SpareBitVector::getConstant(allocBits, false);
   return result;
 }
 
@@ -2126,8 +2204,9 @@ void IRGenFunction::setLocalSelfMetadata(llvm::Value *value,
 
 #ifndef NDEBUG
 bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
-  auto genericEnv = arch->getGenericEnvironment();
-  if (!genericEnv) return true;
+  auto primary = dyn_cast<PrimaryArchetypeType>(arch->getRoot());
+  if (!primary) return true;
+  auto genericEnv = primary->getGenericEnvironment();
 
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();

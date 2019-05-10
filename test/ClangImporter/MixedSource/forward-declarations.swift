@@ -8,7 +8,7 @@ class Sub: Base {
     // CHECK: [[OPAQUE_SELF:%.+]] = bitcast %TSo4BaseC* %2 to {{%.+}}*
     // CHECK: [[RESULT:%.+]] = call {{%.+}}* bitcast (void ()* @objc_msgSend to {{%.+}}* ({{%.+}}*, i8*)*)({{%.+}}* [[OPAQUE_SELF]], i8* [[SELECTOR]])
     // CHECK: [[OPAQUE_RESULT:%.+]] = bitcast {{%.+}}* [[RESULT]] to i8*
-    // CHECK: call i8* @objc_retainAutoreleasedReturnValue(i8* [[OPAQUE_RESULT]])
+    // CHECK: call i8* @llvm.objc.retainAutoreleasedReturnValue(i8* [[OPAQUE_RESULT]])
     _ = self.getClassInstanceWithoutMentioningItsName()
     // CHECK: call void @swift_release(%swift.refcounted* {{%.+}})
     // CHECK: ret void

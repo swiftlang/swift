@@ -81,6 +81,7 @@ class ElementLayout {
 public:
   enum class Kind {
     /// The element is known to require no storage in the aggregate.
+    /// Its offset in the aggregate is always statically zero.
     Empty,
 
     /// The element can be positioned at a fixed offset within the
@@ -95,10 +96,12 @@ public:
     /// offset zero.  This is necessary because LLVM forbids even a
     /// 'gep 0' on an unsized type.
     InitialNonFixedSize
+
+    // IncompleteKind comes here
   };
 
 private:
-  enum : unsigned { IncompleteKind  = 4 };
+  enum : unsigned { IncompleteKind  = unsigned(Kind::InitialNonFixedSize) + 1 };
 
   /// The swift type information for this element's layout.
   const TypeInfo *Type;
@@ -137,19 +140,17 @@ public:
     Index = other.Index;
   }
 
-  void completeEmpty(IsPOD_t isPOD, Size byteOffset) {
+  void completeEmpty(IsPOD_t isPOD) {
     TheKind = unsigned(Kind::Empty);
     IsPOD = unsigned(isPOD);
-    // We still want to give empty fields an offset for use by things like
-    // ObjC ivar emission. We use the first field in a class layout as the
-    // instanceStart.
-    ByteOffset = byteOffset.getValue();
+    ByteOffset = 0;
     Index = 0; // make a complete write of the bitfield
   }
 
   void completeInitialNonFixedSize(IsPOD_t isPOD) {
     TheKind = unsigned(Kind::InitialNonFixedSize);
     IsPOD = unsigned(isPOD);
+    ByteOffset = 0;
     Index = 0; // make a complete write of the bitfield
   }
 
@@ -189,10 +190,25 @@ public:
     return IsPOD_t(IsPOD);
   }
 
+  /// Can we access this element at a static offset?
+  bool hasByteOffset() const {
+    switch (getKind()) {
+    case Kind::Empty:
+    case Kind::Fixed:
+      return true;
+
+    // FIXME: InitialNonFixedSize should go in the above, but I'm being
+    // paranoid about changing behavior.
+    case Kind::InitialNonFixedSize:
+    case Kind::NonFixed:
+      return false;
+    }
+    llvm_unreachable("bad kind");
+  }
+
   /// Given that this element has a fixed offset, return that offset in bytes.
   Size getByteOffset() const {
-    assert(isCompleted() &&
-           (getKind() == Kind::Fixed || getKind() == Kind::Empty));
+    assert(isCompleted() && hasByteOffset());
     return Size(ByteOffset);
   }
 

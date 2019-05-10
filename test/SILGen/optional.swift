@@ -1,10 +1,10 @@
 
-// RUN: %target-swift-emit-silgen -module-name optional -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name optional %s | %FileCheck %s
 
 func testCall(_ f: (() -> ())?) {
   f?()
 }
-// CHECK:    sil hidden @{{.*}}testCall{{.*}}
+// CHECK:    sil hidden [ossa] @{{.*}}testCall{{.*}}
 // CHECK:    bb0([[T0:%.*]] : @guaranteed $Optional<@callee_guaranteed () -> ()>):
 // CHECK:      [[T0_COPY:%.*]] = copy_value [[T0]]
 // CHECK-NEXT: switch_enum [[T0_COPY]] : $Optional<@callee_guaranteed () -> ()>, case #Optional.some!enumelt.1: [[SOME:bb[0-9]+]], case #Optional.none!enumelt: [[NONE:bb[0-9]+]]
@@ -29,7 +29,7 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
   var f = f
   var x = f?()
 }
-// CHECK-LABEL: sil hidden @{{.*}}testAddrOnlyCallResult{{.*}} : $@convention(thin) <T> (@guaranteed Optional<@callee_guaranteed () -> @out T>) -> ()
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}testAddrOnlyCallResult{{.*}} : $@convention(thin) <T> (@guaranteed Optional<@callee_guaranteed () -> @out T>) -> ()
 // CHECK:    bb0([[T0:%.*]] : @guaranteed $Optional<@callee_guaranteed () -> @out T>):
 // CHECK: [[F:%.*]] = alloc_box $<τ_0_0> { var Optional<@callee_guaranteed () -> @out τ_0_0> } <T>, var, name "f"
 // CHECK-NEXT: [[PBF:%.*]] = project_box [[F]]
@@ -73,7 +73,7 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
 
 func wrap<T>(_ x: T) -> T? { return x }
 
-// CHECK-LABEL: sil hidden @$s8optional16wrap_then_unwrap{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s8optional16wrap_then_unwrap{{[_0-9a-zA-Z]*}}F
 func wrap_then_unwrap<T>(_ x: T) -> T {
   // CHECK:   switch_enum_addr {{.*}}, case #Optional.some!enumelt.1: [[OK:bb[0-9]+]], case #Optional.none!enumelt: [[FAIL:bb[0-9]+]]
   // CHECK: [[FAIL]]:
@@ -83,7 +83,7 @@ func wrap_then_unwrap<T>(_ x: T) -> T {
   return wrap(x)!
 }
 
-// CHECK-LABEL: sil hidden @$s8optional10tuple_bind{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s8optional10tuple_bind{{[_0-9a-zA-Z]*}}F
 func tuple_bind(_ x: (Int, String)?) -> String? {
   return x?.1
   // CHECK:   switch_enum {{%.*}}, case #Optional.some!enumelt.1: [[NONNULL:bb[0-9]+]], case #Optional.none!enumelt: [[NULL:bb[0-9]+]]
@@ -96,7 +96,7 @@ func tuple_bind(_ x: (Int, String)?) -> String? {
 
 // rdar://21883752 - We were crashing on this function because the deallocation happened
 // out of scope.
-// CHECK-LABEL: sil hidden @$s8optional16crash_on_deallocyySDySiSaySiGGFfA_
+// CHECK-LABEL: sil hidden [ossa] @$s8optional16crash_on_deallocyySDySiSaySiGGFfA_
 func crash_on_dealloc(_ dict : [Int : [Int]] = [:]) {
   var dict = dict
   dict[1]?.append(2)
@@ -104,7 +104,7 @@ func crash_on_dealloc(_ dict : [Int : [Int]] = [:]) {
 
 func use_unwrapped(_: Int) {}
 
-// CHECK-LABEL: sil hidden @$s8optional15explicit_unwrap{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s8optional15explicit_unwrap{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[FILESTR:%.*]] = string_literal utf8 "{{.*}}optional.swift"
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
@@ -117,7 +117,7 @@ func explicit_unwrap(_ value: Int?) {
   use_unwrapped(value!)
 }
 
-// CHECK-LABEL: sil hidden @$s8optional19explicit_iuo_unwrap{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s8optional19explicit_iuo_unwrap{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[FILESTR:%.*]] = string_literal utf8 "{{.*}}optional.swift"
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
@@ -130,7 +130,7 @@ func explicit_iuo_unwrap(_ value: Int!) {
   use_unwrapped(value!)
 }
 
-// CHECK-LABEL: sil hidden @$s8optional19implicit_iuo_unwrap{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s8optional19implicit_iuo_unwrap{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[FILESTR:%.*]] = string_literal utf8 "{{.*}}optional.swift"
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
@@ -143,7 +143,7 @@ func implicit_iuo_unwrap(_ value: Int!) {
   use_unwrapped(value)
 }
 
-// CHECK-LABEL: sil hidden @$s8optional34implicit_iuo_unwrap_sourceLocation{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s8optional34implicit_iuo_unwrap_sourceLocation{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[FILESTR:%.*]] = string_literal utf8 "custom.swuft"
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 

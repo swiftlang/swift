@@ -85,7 +85,7 @@ public func run_StringWalk(_ N: Int) {
 }
 
 // Extended String benchmarks:
-let baseMultiplier = 10_000
+let baseMultiplier = 250
 let unicodeScalarsMultiplier = baseMultiplier
 let charactersMultiplier = baseMultiplier / 5
 
@@ -99,7 +99,8 @@ public var StringWalk = [
   BenchmarkInfo(
     name: "StringWalk",
     runFunction: run_StringWalk,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
 % for Name in Names:
 %   for Direction in Directions:
@@ -108,19 +109,22 @@ public var StringWalk = [
   BenchmarkInfo(
     name: "StringWalk_${Name}_${Kind}${Direction}",
     runFunction: run_StringWalk_${Name}_${Kind}${Direction},
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 %     end # Kinds
 
   BenchmarkInfo(
     name: "CharIteration_${Name}_unicodeScalars${Direction}",
     runFunction: run_CharIteration_${Name}_unicodeScalars${Direction},
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIndexing_${Name}_unicodeScalars${Direction}",
     runFunction: run_CharIndexing_${Name}_unicodeScalars${Direction},
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 %   end # Directions
 % end # Names
 ]

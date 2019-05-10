@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-verify-without-invalidation -enable-sil-verify-all -simplify-cfg -closure-specialize %s
+// RUN: %target-sil-opt -sil-verify-without-invalidation -enable-sil-verify-all -simplify-cfg -closure-specialize %s
 
 // Test if the ClosureSpecializer correctly invalidates the dominator tree
 // even if there are no functions specialized.

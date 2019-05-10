@@ -60,13 +60,13 @@ extension _StringGuts {
 
     // TODO: shared native
     _internalInvariant(_object.providesFastUTF8)
-    _internalInvariant(_object.largeFastIsNative)
     if _object.isImmortal {
       result._form = ._immortal(
         address: UInt(bitPattern: _object.nativeUTF8Start))
       return result
     }
     if _object.hasNativeStorage {
+      _internalInvariant(_object.largeFastIsTailAllocated)
       result._form = ._native(object: _object.nativeStorage)
       return result
     }

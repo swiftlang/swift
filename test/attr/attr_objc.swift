@@ -158,6 +158,8 @@ class subject_class1 { // no-error
 
   @objc
   func subject_instanceFunc() {} // no-error
+  
+  
 }
 
 @objc
@@ -193,9 +195,9 @@ extension subject_genericClass where T : Hashable {
 }
 
 extension subject_genericClass {
-  @objc var extProp: Int { return 0 } // expected-error{{members of extensions of generic classes cannot be declared @objc}}
+  @objc var extProp: Int { return 0 } // expected-error{{extensions of generic classes cannot contain '@objc' members}}
   
-  @objc func extFoo() {} // expected-error{{members of extensions of generic classes cannot be declared @objc}}
+  @objc func extFoo() {} // expected-error{{extensions of generic classes cannot contain '@objc' members}}
 }
 
 @objc
@@ -323,7 +325,6 @@ class ConcreteContext3 {
   func dynamicSelf1() -> Self { return self }
 
   @objc func dynamicSelf1_() -> Self { return self }
-  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
 
   @objc func genericParams<T: NSObject>() -> [T] { return [] }
   // expected-error@-1{{method cannot be marked @objc because it has generic parameters}}
@@ -507,7 +508,12 @@ class subject_subscriptGeneric<T> {
   }
 }
 
-
+class subject_subscriptInvalid1 {
+  @objc class subscript(_ i: Int) -> AnyObject? {
+  // expected-error@-1 {{class subscript cannot be marked @objc}}
+    return nil
+  }
+}
 
 class subject_subscriptInvalid2 {
   @objc
@@ -839,19 +845,19 @@ class infer_instanceVar1 {
   }
 
   var observingAccessorsVar1: Int {
-  // CHECK: @objc var observingAccessorsVar1: Int {
+  // CHECK: @objc @_hasStorage var observingAccessorsVar1: Int {
     willSet {}
-    // CHECK-NEXT: {{^}} willSet {}
+    // CHECK-NEXT: {{^}} @objc get
     didSet {}
-    // CHECK-NEXT: {{^}} didSet {}
+    // CHECK-NEXT: {{^}} @objc set
   }
 
   @objc var observingAccessorsVar1_: Int {
-  // CHECK: {{^}} @objc var observingAccessorsVar1_: Int {
+  // CHECK: {{^}} @objc @_hasStorage var observingAccessorsVar1_: Int {
     willSet {}
-    // CHECK-NEXT: {{^}} willSet {}
+    // CHECK-NEXT: {{^}} @objc get
     didSet {}
-    // CHECK-NEXT: {{^}} didSet {}
+    // CHECK-NEXT: {{^}} @objc set
   }
 
 
@@ -1709,14 +1715,20 @@ class HasNSManaged {
 
   @NSManaged
   var goodManaged: Class_ObjC1
-  // CHECK-LABEL: {{^}}  @objc @NSManaged dynamic var goodManaged: Class_ObjC1
+  // CHECK-LABEL: {{^}}  @objc @NSManaged dynamic var goodManaged: Class_ObjC1 {
+  // CHECK-NEXT: {{^}} @objc get
+  // CHECK-NEXT: {{^}} @objc set
+  // CHECK-NEXT: {{^}} }
 
   @NSManaged
   var badManaged: PlainStruct
   // expected-error@-1 {{property cannot be marked @NSManaged because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // expected-error@-3{{'dynamic' property 'badManaged' must also be '@objc'}}
-  // CHECK-LABEL: {{^}}  @NSManaged var badManaged: PlainStruct
+  // CHECK-LABEL: {{^}}  @NSManaged var badManaged: PlainStruct {
+  // CHECK-NEXT: {{^}} get
+  // CHECK-NEXT: {{^}} set
+  // CHECK-NEXT: {{^}} }
 }
 
 //===---
@@ -2180,8 +2192,8 @@ class ConformsToProtocolThrowsObjCName2 : ProtocolThrowsObjCName {
   @nonobjc final func objc_ext_objc_explicit_nonobjc(_: PlainStruct) { }
 }
 
-@objc class ObjC_Class1 : Hashable { 
-  var hashValue: Int { return 0 }
+@objc class ObjC_Class1 : Hashable {
+  func hash(into hasher: inout Hasher) {}
 }
 
 func ==(lhs: ObjC_Class1, rhs: ObjC_Class1) -> Bool {
@@ -2305,4 +2317,42 @@ protocol ObjCProtocolWithWeakProperty {
 @objc
 protocol ObjCProtocolWithUnownedProperty {
    unowned var unownedProp: AnyObject { get set } // okay
+}
+
+// rdar://problem/46699152: errors about read/modify accessors being implicitly
+// marked @objc.
+@objc class MyObjCClass: NSObject {}
+
+@objc
+extension MyObjCClass {
+    @objc
+    static var objCVarInObjCExtension: Bool {
+        get {
+            return true
+        }
+        set {}
+    }
+
+    // CHECK: {{^}} @objc private dynamic func stillExposedToObjCDespiteBeingPrivate()
+    private func stillExposedToObjCDespiteBeingPrivate() {}
+}
+
+@objc private extension MyObjCClass {
+  // CHECK: {{^}} @objc dynamic func alsoExposedToObjCDespiteBeingPrivate()
+  func alsoExposedToObjCDespiteBeingPrivate() {}
+}
+
+@objcMembers class VeryObjCClass: NSObject {
+  // CHECK: {{^}} private func notExposedToObjC()
+  private func notExposedToObjC() {}
+}
+
+// SR-9035
+
+class SR_9035_C {}
+
+@objc protocol SR_9035_P {
+  func throwingMethod1() throws -> Unmanaged<CFArray> // Ok
+  func throwingMethod2() throws -> Unmanaged<SR_9035_C> // expected-error {{method cannot be a member of an @objc protocol because its result type cannot be represented in Objective-C}}
+  // expected-note@-1 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 }

@@ -81,6 +81,7 @@ enum CastConsumptionKindEncoding : uint8_t {
 
 enum class KeyPathComponentKindEncoding : uint8_t {
   StoredProperty,
+  TupleElement,
   GettableProperty,
   SettableProperty,
   OptionalChain,
@@ -396,7 +397,7 @@ namespace sil_block {
     SIL_BEGIN_APPLY,
     SIL_NON_THROWING_BEGIN_APPLY
   };
-  
+
   using SILInstApplyLayout = BCRecordLayout<
     SIL_INST_APPLY,
     BCFixed<3>,           // ApplyKind

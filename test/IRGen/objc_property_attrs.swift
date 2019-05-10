@@ -50,11 +50,11 @@ class Foo: NSManagedObject {
 
   // -- Bridged value types
 
-  // nonatomic, copy, ivar k
-  // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSString\22,N,C,Vk\00"
+  // nonatomic, copy
+  // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSString\22,N,C\00"
   @objc var k: String = ""
-  // nonatomic, readonly, ivar l
-  // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSString\22,N,R,Vl\00"
+  // nonatomic, readonly
+  // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSString\22,N,R\00"
   @objc let l: String? = nil
 
   // -- Protocol types:

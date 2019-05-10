@@ -33,9 +33,9 @@ using Param = remote::FunctionParam<const TypeRef *>;
 TEST(TypeRefTest, UniqueBuiltinTypeRef) {
   TypeRefBuilder Builder;
 
-  auto BI1 = Builder.createBuiltinType(ABC);
-  auto BI2 = Builder.createBuiltinType(ABC);
-  auto BI3 = Builder.createBuiltinType(ABCD);
+  auto BI1 = Builder.createBuiltinType(ABC, ABC);
+  auto BI2 = Builder.createBuiltinType(ABC, ABC);
+  auto BI3 = Builder.createBuiltinType(ABCD, ABCD);
 
   EXPECT_EQ(BI1, BI2);
   EXPECT_NE(BI2, BI3);
@@ -240,10 +240,10 @@ TEST(TypeRefTest, UniqueMetatypeTypeRef) {
   TypeRefBuilder Builder;
 
   auto N1 = Builder.createNominalType(ABC, nullptr);
-  auto M1 = Builder.createMetatypeType(N1, false);
-  auto M2 = Builder.createMetatypeType(N1, false);
-  auto MM3 = Builder.createMetatypeType(M1, false);
-  auto M4 = Builder.createMetatypeType(N1, true);
+  auto M1 = Builder.createMetatypeType(N1, None);
+  auto M2 = Builder.createMetatypeType(N1, None);
+  auto MM3 = Builder.createMetatypeType(M1, None);
+  auto M4 = Builder.createMetatypeType(N1, Demangle::ImplMetatypeRepresentation::Thick);
 
   EXPECT_EQ(M1, M2);
   EXPECT_NE(M2, MM3);

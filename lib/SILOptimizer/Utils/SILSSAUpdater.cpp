@@ -213,7 +213,7 @@ SILValue SILSSAUpdater::GetValueInMiddleOfBlock(SILBasicBlock *BB) {
 
   // Return undef for blocks without predecessor.
   if (PredVals.empty())
-    return SILUndef::get(ValType, BB->getModule());
+    return SILUndef::get(ValType, *BB->getParent());
 
   if (SingularValue)
     return SingularValue;
@@ -305,7 +305,7 @@ public:
 
   static SILValue GetUndefVal(SILBasicBlock *BB,
                               SILSSAUpdater *Updater) {
-    return SILUndef::get(Updater->ValType, &BB->getModule());
+    return SILUndef::get(Updater->ValType, *BB->getParent());
   }
 
   /// Add an Argument to the basic block.
@@ -390,7 +390,7 @@ SILValue SILSSAUpdater::GetValueAtEndOfBlockInternal(SILBasicBlock *BB){
   return Impl.GetValue(BB);
 }
 
-/// \brief Construct a use wrapper. For branches we store information so that we
+/// Construct a use wrapper. For branches we store information so that we
 /// can reconstruct the use after the branch has been modified.
 ///
 /// When a branch is modified existing pointers to the operand

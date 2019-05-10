@@ -68,12 +68,12 @@ tests.test("_isUnique/NativeObjectWithUnownedRef") {
 
 tests.test("_isUniquelyReferenced/OptionalNativeObject") {
   var a: Builtin.NativeObject? = Builtin.castToNativeObject(X())
-  StdlibUnittest.expectTrue(_getBool(Builtin.isUnique(&a)))
+  StdlibUnittest.expectTrue(Bool(_builtinBooleanLiteral: Builtin.isUnique(&a)))
   var b = a
-  expectFalse(_getBool(Builtin.isUnique(&a)))
-  expectFalse(_getBool(Builtin.isUnique(&b)))
+  expectFalse(Bool(_builtinBooleanLiteral: Builtin.isUnique(&a)))
+  expectFalse(Bool(_builtinBooleanLiteral: Builtin.isUnique(&b)))
   var x: Builtin.NativeObject? = nil
-  expectFalse(_getBool(Builtin.isUnique(&x)))
+  expectFalse(Bool(_builtinBooleanLiteral: Builtin.isUnique(&x)))
 }
 
 #if _runtime(_ObjC)

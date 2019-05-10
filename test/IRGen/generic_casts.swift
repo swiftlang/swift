@@ -4,20 +4,17 @@
 
 // REQUIRES: CPU=x86_64
 
-// FIXME: rdar://problem/19648117 Needs splitting objc parts out
-// XFAIL: linux
-
 import Foundation
 import gizmo
 
 // -- Protocol records for cast-to ObjC protocols
 // CHECK: @_PROTOCOL__TtP13generic_casts10ObjCProto1_ = private constant
-// CHECK: @"\01l_OBJC_LABEL_PROTOCOL_$__TtP13generic_casts10ObjCProto1_" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL__TtP13generic_casts10ObjCProto1_ to i8*), section "__DATA,__objc_protolist,coalesced,no_dead_strip"
-// CHECK: @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP13generic_casts10ObjCProto1_" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL__TtP13generic_casts10ObjCProto1_ to i8*), section "__DATA,__objc_protorefs,coalesced,no_dead_strip"
+// CHECK: @"\01l_OBJC_LABEL_PROTOCOL_$__TtP13generic_casts10ObjCProto1_" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL__TtP13generic_casts10ObjCProto1_ to i8*), section {{"__DATA,__objc_protolist,coalesced,no_dead_strip"|"objc_protolist"|".objc_protolist\$B"}}
+// CHECK: @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP13generic_casts10ObjCProto1_" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL__TtP13generic_casts10ObjCProto1_ to i8*), section {{"__DATA,__objc_protorefs,coalesced,no_dead_strip"|"objc_protorefs"|".objc_protorefs\$B"}}
 
 // CHECK: @_PROTOCOL_NSRuncing = private constant
-// CHECK: @"\01l_OBJC_LABEL_PROTOCOL_$_NSRuncing" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL_NSRuncing to i8*), section "__DATA,__objc_protolist,coalesced,no_dead_strip"
-// CHECK: @"\01l_OBJC_PROTOCOL_REFERENCE_$_NSRuncing" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL_NSRuncing to i8*), section "__DATA,__objc_protorefs,coalesced,no_dead_strip"
+// CHECK: @"\01l_OBJC_LABEL_PROTOCOL_$_NSRuncing" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL_NSRuncing to i8*), section {{"__DATA,__objc_protolist,coalesced,no_dead_strip"|"objc_protolist"|".objc_protolist\$B"}}
+// CHECK: @"\01l_OBJC_PROTOCOL_REFERENCE_$_NSRuncing" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL_NSRuncing to i8*), section {{"__DATA,__objc_protorefs,coalesced,no_dead_strip"|"objc_protorefs"|".objc_protorefs\$B"}}
 
 // CHECK: @_PROTOCOLS__TtC13generic_casts10ObjCClass2 = private constant { i64, [1 x i8*] } {
 // CHECK:   i64 1, 
@@ -38,9 +35,9 @@ func allToInt<T>(_ x: T) -> Int {
 	// CHECK: [[TYPE_ADDR:%.*]] = bitcast %swift.type* %T to i8***
   // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_ADDR]], i64 -1
   // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-  // CHECK: [[SIZE_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
-  // CHECK: [[SIZE_WITNESS:%.*]] = load i8*, i8** [[SIZE_WITNESS_ADDR]]
-  // CHECK: [[SIZE:%.*]] = ptrtoint i8* [[SIZE_WITNESS]]
+  // CHECK: [[VWT_CAST:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
+  // CHECK: [[SIZE_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT_CAST]], i32 0, i32 8
+  // CHECK: [[SIZE:%.*]] = load i64, i64* [[SIZE_ADDR]]
   // CHECK: [[T_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
   // CHECK: [[T_TMP:%.*]] = bitcast i8* [[T_ALLOCA]] to %swift.opaque*
   // CHECK: [[TEMP:%.*]] = call %swift.opaque* {{.*}}(%swift.opaque* noalias [[T_TMP]], %swift.opaque* noalias %0, %swift.type* %T)

@@ -80,9 +80,9 @@ StringRef getBuiltinBaseName(ASTContext &C, StringRef Name,
                              SmallVectorImpl<Type> &Types);
 
 /// Given an LLVM IR intrinsic name with argument types remove (e.g. like
-/// "bswap") return the LLVM IR IntrinsicID for the intrinsic or 0 if the
-/// intrinsic name doesn't match anything.
-unsigned getLLVMIntrinsicID(StringRef Name);
+/// "bswap") return the LLVM IR IntrinsicID for the intrinsic or not_intrinsic
+/// (0) if the intrinsic name doesn't match anything.
+llvm::Intrinsic::ID getLLVMIntrinsicID(StringRef Name);
 
 /// Get the LLVM intrinsic ID that corresponds to the given builtin with
 /// overflow.
@@ -90,15 +90,15 @@ llvm::Intrinsic::ID
 getLLVMIntrinsicIDForBuiltinWithOverflow(BuiltinValueKind ID);
 
 
-/// \brief Create a ValueDecl for the builtin with the given name.
+/// Create a ValueDecl for the builtin with the given name.
 ///
 /// Returns null if the name does not identifier a known builtin value.
 ValueDecl *getBuiltinValueDecl(ASTContext &Context, Identifier Name);
   
-/// \brief Returns the name of a builtin declaration given a builtin ID.
+/// Returns the name of a builtin declaration given a builtin ID.
 StringRef getBuiltinName(BuiltinValueKind ID);
   
-/// \brief The information identifying the builtin - its kind and types.
+/// The information identifying the builtin - its kind and types.
 class BuiltinInfo {
 public:
   BuiltinValueKind ID;
@@ -106,14 +106,17 @@ public:
   bool isReadNone() const;
 };
 
-/// \brief The information identifying the llvm intrinsic - its id and types.
-struct IntrinsicInfo {
+/// The information identifying the llvm intrinsic - its id and types.
+class IntrinsicInfo {
+  mutable llvm::AttributeList Attrs =
+      llvm::DenseMapInfo<llvm::AttributeList>::getEmptyKey();
+public:
   llvm::Intrinsic::ID ID;
   SmallVector<Type, 4> Types;
   bool hasAttribute(llvm::Attribute::AttrKind Kind) const;
 };
 
-/// decodeLLVMAtomicOrdering - turn a string like "release" into the LLVM enum.
+/// Turn a string like "release" into the LLVM enum.
 llvm::AtomicOrdering decodeLLVMAtomicOrdering(StringRef O);
   
 }

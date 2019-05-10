@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name builtins -assume-parsing-unqualified-ownership-sil -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -module-name builtins -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64
 
@@ -183,14 +183,13 @@ func sizeof_alignof_test() {
 
 // CHECK: define hidden {{.*}}void @"$s8builtins27generic_sizeof_alignof_testyyxlF"
 func generic_sizeof_alignof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 8
-  // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
-  // CHECK-NEXT: [[SIZE:%.*]] = ptrtoint i8* [[T1]] to i64
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[T:%.*]], i32 0, i32 8
+  // CHECK-NEXT: [[SIZE:%.*]] = load i64, i64* [[T0]]
   // CHECK-NEXT: store i64 [[SIZE]], i64* [[S:%.*]]
   var s = Builtin.sizeof(T.self)
-  // CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
-  // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
-  // CHECK-NEXT: [[T2:%.*]] = ptrtoint i8* [[T1]] to i64
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[T:%.*]], i32 0, i32 10
+  // CHECK-NEXT: [[FLAGS:%.*]] = load i32, i32* [[T0]]
+  // CHECK-NEXT: [[T2:%.*]] = zext i32 [[FLAGS]] to i64
   // CHECK-NEXT: [[T3:%.*]] = and i64 [[T2]], 255
   // CHECK-NEXT: [[ALIGN:%.*]] = add i64 [[T3]], 1
   // CHECK-NEXT: store i64 [[ALIGN]], i64* [[A:%.*]]
@@ -199,9 +198,8 @@ func generic_sizeof_alignof_test<T>(_: T) {
 
 // CHECK: define hidden {{.*}}void @"$s8builtins21generic_strideof_testyyxlF"
 func generic_strideof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 10
-  // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
-  // CHECK-NEXT: [[STRIDE:%.*]] = ptrtoint i8* [[T1]] to i64
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[T:%.*]], i32 9
+  // CHECK-NEXT: [[STRIDE:%.*]] = load i64, i64* [[T0]]
   // CHECK-NEXT: store i64 [[STRIDE]], i64* [[S:%.*]]
   var s = Builtin.strideof(T.self)
 }
@@ -681,11 +679,10 @@ func isUniqueIUO(_ ref: inout Builtin.NativeObject?) -> Bool {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_ispod_test
 func generic_ispod_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
-  // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
-  // CHECK-NEXT: [[FLAGS:%.*]] = ptrtoint i8* [[T1]] to i64
-  // CHECK-NEXT: [[ISNOTPOD:%.*]] = and i64 [[FLAGS]], 65536
-  // CHECK-NEXT: [[ISPOD:%.*]] = icmp eq i64 [[ISNOTPOD]], 0
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[T:%.*]], i32 10
+  // CHECK-NEXT: [[FLAGS:%.*]] = load i32, i32* [[T0]]
+  // CHECK-NEXT: [[ISNOTPOD:%.*]] = and i32 [[FLAGS]], 65536
+  // CHECK-NEXT: [[ISPOD:%.*]] = icmp eq i32 [[ISNOTPOD]], 0
   // CHECK-NEXT: store i1 [[ISPOD]], i1* [[S:%.*]]
   var s = Builtin.ispod(T.self)
 }
@@ -700,11 +697,10 @@ func ispod_test() {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_isbitwisetakable_test
 func generic_isbitwisetakable_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
-  // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
-  // CHECK-NEXT: [[FLAGS:%.*]] = ptrtoint i8* [[T1]] to i64
-  // CHECK-NEXT: [[ISNOTBITWISETAKABLE:%.*]] = and i64 [[FLAGS]], 1048576
-  // CHECK-NEXT: [[ISBITWISETAKABLE:%.*]] = icmp eq i64 [[ISNOTBITWISETAKABLE]], 0
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[T:%.*]], i32 10
+  // CHECK-NEXT: [[FLAGS:%.*]] = load i32, i32* [[T0]]
+  // CHECK-NEXT: [[ISNOTBITWISETAKABLE:%.*]] = and i32 [[FLAGS]], 1048576
+  // CHECK-NEXT: [[ISBITWISETAKABLE:%.*]] = icmp eq i32 [[ISNOTBITWISETAKABLE]], 0
   // CHECK-NEXT: store i1 [[ISBITWISETAKABLE]], i1* [[S:%.*]]
   var s = Builtin.isbitwisetakable(T.self)
 }

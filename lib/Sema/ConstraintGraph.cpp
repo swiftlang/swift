@@ -698,7 +698,7 @@ bool ConstraintGraph::contractEdges() {
           auto type = binding.BindingType;
           isNotContractable = type.findIf([&](Type nestedType) -> bool {
             if (auto tv = nestedType->getAs<TypeVariableType>()) {
-              if (!tv->getImpl().mustBeMaterializable())
+              if (tv->getImpl().canBindToInOut())
                 return true;
             }
 

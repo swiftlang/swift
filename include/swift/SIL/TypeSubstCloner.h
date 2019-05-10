@@ -30,7 +30,7 @@
 
 namespace swift {
 
-/// \brief A utility class for cloning code while remapping types.
+/// A utility class for cloning code while remapping types.
 ///
 /// \tparam FunctionBuilderTy Function builder type injected by
 /// subclasses. Used to break a circular dependency from SIL <=>
@@ -215,8 +215,8 @@ protected:
     PartialApplyInst *N = getBuilder().createPartialApply(
         getOpLocation(Inst->getLoc()), Helper.getCallee(),
         Helper.getSubstitutions(), Helper.getArguments(), ParamConvention,
-        GenericSpecializationInformation::create(
-          Inst, getBuilder()));
+        Inst->isOnStack(),
+        GenericSpecializationInformation::create(Inst, getBuilder()));
     recordClonedInstruction(Inst, N);
   }
 
@@ -267,7 +267,7 @@ protected:
   void visitCopyValueInst(CopyValueInst *Copy) {
     // If the substituted type is trivial, ignore the copy.
     SILType copyTy = getOpType(Copy->getType());
-    if (copyTy.isTrivial(Copy->getModule())) {
+    if (copyTy.isTrivial(*Copy->getFunction())) {
       recordFoldedValue(SILValue(Copy), getOpValue(Copy->getOperand()));
       return;
     }
@@ -277,7 +277,7 @@ protected:
   void visitDestroyValueInst(DestroyValueInst *Destroy) {
     // If the substituted type is trivial, ignore the destroy.
     SILType destroyTy = getOpType(Destroy->getOperand()->getType());
-    if (destroyTy.isTrivial(Destroy->getModule())) {
+    if (destroyTy.isTrivial(*Destroy->getFunction())) {
       return;
     }
     super::visitDestroyValueInst(Destroy);

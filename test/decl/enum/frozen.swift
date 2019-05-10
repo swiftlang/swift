@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-resilience
+// RUN: %target-typecheck-verify-swift -enable-library-evolution
 
 @_frozen public enum Exhaustive {} // no-warning
 

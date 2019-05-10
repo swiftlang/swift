@@ -115,54 +115,6 @@ func _stdlib_atomicLoadARCRef(
 }
 
 //===----------------------------------------------------------------------===//
-// These pieces are used in ThreadLocalStorage.swift in debug builds.
-// For tests, see similar functions from SwiftPrivate/AtomicInt.swift.gyb
-//===----------------------------------------------------------------------===//
-internal func _swift_stdlib_atomicLoadInt(
-  object target: UnsafeMutablePointer<Int>) -> Int {
-#if arch(i386) || arch(arm)
-  let value = Builtin.atomicload_seqcst_Int32(target._rawValue)
-  return Int(value)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  let value = Builtin.atomicload_seqcst_Int64(target._rawValue)
-  return Int(value)
-#endif
-}
-
-% for bits in [ 32, 64 ]:
-
-// Warning: no overflow checking.
-internal func _swift_stdlib_atomicFetchAddInt${bits}(
-  object target: UnsafeMutablePointer<Int${bits}>,
-  operand: Int${bits}) -> Int${bits} {
-
-  let value = Builtin.atomicrmw_add_seqcst_Int${bits}(
-    target._rawValue, operand._value)
-
-  return Int${bits}(value)
-}
-
-% end
-
-// Warning: no overflow checking.
-internal func _swift_stdlib_atomicFetchAddInt(
-  object target: UnsafeMutablePointer<Int>,
-  operand: Int) -> Int {
-  let rawTarget = UnsafeMutableRawPointer(target)
-#if arch(i386) || arch(arm)
-  let value = _swift_stdlib_atomicFetchAddInt32(
-    object: rawTarget.assumingMemoryBound(to: Int32.self),
-    operand: Int32(operand))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  let value = _swift_stdlib_atomicFetchAddInt64(
-    object: rawTarget.assumingMemoryBound(to: Int64.self),
-    operand: Int64(operand))
-#endif
-  return Int(value)
-}
-//===----------------------------------------------------------------------===//
-
-//===----------------------------------------------------------------------===//
 // Conversion of primitive types to `String`
 //===----------------------------------------------------------------------===//
 

@@ -265,7 +265,7 @@ static OptionalTypeKind getResultOptionality(
   return OTK_ImplicitlyUnwrappedOptional;
 }
 
-/// \brief Determine whether the given name is reserved for Swift.
+/// Determine whether the given name is reserved for Swift.
 static bool isSwiftReservedName(StringRef name) {
   tok kind = Lexer::kindOfIdentifier(name, /*InSILMode=*/false);
   return (kind != tok::identifier);

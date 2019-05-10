@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -global-opt | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -global-opt | %FileCheck %s
 //
 // ginit.cold has a hammock with an initializer call on the slow path.
 // ginit.loop has a loop containing an initializer call.

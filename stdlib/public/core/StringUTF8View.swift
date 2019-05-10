@@ -121,19 +121,15 @@ extension String.UTF8View: BidirectionalCollection {
   /// nonempty.
   ///
   /// If the UTF-8 view is empty, `startIndex` is equal to `endIndex`.
-  @inlinable
-  public var startIndex: Index {
-    @inline(__always) get { return _guts.startIndex }
-  }
+  @inlinable @inline(__always)
+  public var startIndex: Index { return _guts.startIndex }
 
   /// The "past the end" position---that is, the position one
   /// greater than the last valid subscript argument.
   ///
   /// In an empty UTF-8 view, `endIndex` is equal to `startIndex`.
-  @inlinable
-  public var endIndex: Index {
-    @inline(__always) get { return _guts.endIndex }
-  }
+  @inlinable @inline(__always)
+  public var endIndex: Index { return _guts.endIndex }
 
   /// Returns the next consecutive position after `i`.
   ///
@@ -160,7 +156,7 @@ extension String.UTF8View: BidirectionalCollection {
   @inlinable @inline(__always)
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     if _fastPath(_guts.isFastUTF8) {
-      _precondition(n + i.encodedOffset <= _guts.count)
+      _precondition(n + i._encodedOffset <= _guts.count)
       return i.encoded(offsetBy: n)
     }
 
@@ -175,15 +171,15 @@ extension String.UTF8View: BidirectionalCollection {
       // Check the limit: ignore limit if it precedes `i` (in the correct
       // direction), otherwise must not be beyond limit (in the correct
       // direction).
-      let iOffset = i.encodedOffset
+      let iOffset = i._encodedOffset
       let result = iOffset + n
-      let limitOffset = limit.encodedOffset
+      let limitOffset = limit._encodedOffset
       if n >= 0 {
         guard limitOffset < iOffset || result <= limitOffset else { return nil }
       } else {
         guard limitOffset > iOffset || result >= limitOffset else { return nil }
       }
-      return Index(encodedOffset: result)
+      return Index(_encodedOffset: result)
     }
 
     return _foreignIndex(i, offsetBy: n, limitedBy: limit)
@@ -192,7 +188,7 @@ extension String.UTF8View: BidirectionalCollection {
   @inlinable @inline(__always)
   public func distance(from i: Index, to j: Index) -> Int {
     if _fastPath(_guts.isFastUTF8) {
-      return j.encodedOffset &- i.encodedOffset
+      return j._encodedOffset &- i._encodedOffset
     }
     return _foreignDistance(from: i, to: j)
   }
@@ -209,30 +205,26 @@ extension String.UTF8View: BidirectionalCollection {
   ///
   /// - Parameter position: A valid index of the view. `position`
   ///   must be less than the view's end index.
-  @inlinable
+  @inlinable @inline(__always)
   public subscript(i: Index) -> UTF8.CodeUnit {
-    @inline(__always) get {
-      String(_guts)._boundsCheck(i)
-      if _fastPath(_guts.isFastUTF8) {
-        return _guts.withFastUTF8 { utf8 in utf8[i.encodedOffset] }
-      }
-
-      return _foreignSubscript(position: i)
+    String(_guts)._boundsCheck(i)
+    if _fastPath(_guts.isFastUTF8) {
+      return _guts.withFastUTF8 { utf8 in utf8[_unchecked: i._encodedOffset] }
     }
+
+    return _foreignSubscript(position: i)
   }
 }
 
 extension String.UTF8View: CustomStringConvertible {
- @inlinable
- public var description: String {
-   @inline(__always) get { return String(String(_guts)) }
- }
+  @inlinable @inline(__always)
+  public var description: String { return String(_guts) }
 }
 
 extension String.UTF8View: CustomDebugStringConvertible {
- public var debugDescription: String {
-   return "UTF8View(\(self.description.debugDescription))"
- }
+  public var debugDescription: String {
+    return "UTF8View(\(self.description.debugDescription))"
+  }
 }
 
 
@@ -241,11 +233,7 @@ extension String {
   @inlinable
   public var utf8: UTF8View {
     @inline(__always) get { return UTF8View(self._guts) }
-    set {
-      // TODO(String testing): test suite doesn't currenlty exercise this code at
-      // all, test it.
-      self = String(utf8._guts)
-    }
+    set { self = String(newValue._guts) }
   }
 
   /// A contiguously stored null-terminated UTF-8 representation of the string.
@@ -293,14 +281,12 @@ extension String {
 }
 
 extension String.UTF8View {
-  @inlinable
+  @inlinable @inline(__always)
   public var count: Int {
-    @inline(__always) get {
-      if _fastPath(_guts.isFastUTF8) {
-        return _guts.count
-      }
-      return _foreignCount()
+    if _fastPath(_guts.isFastUTF8) {
+      return _guts.count
     }
+    return _foreignCount()
   }
 }
 
@@ -419,7 +405,7 @@ extension String.UTF8View {
 
     let (scalar, scalarLen) = _guts.foreignErrorCorrectedScalar(
       startingAt: i.strippingTranscoding)
-    let utf8Len = _numUTF8CodeUnits(scalar)
+    let utf8Len = UTF8.width(scalar)
 
     if utf8Len == 1 {
       _internalInvariant(i.transcodedOffset == 0)
@@ -446,7 +432,7 @@ extension String.UTF8View {
 
     let (scalar, scalarLen) = _guts.foreignErrorCorrectedScalar(
       endingAt: i)
-    let utf8Len = _numUTF8CodeUnits(scalar)
+    let utf8Len = UTF8.width(scalar)
     return i.encoded(offsetBy: -scalarLen).transcoded(withOffset: utf8Len &- 1)
   }
 
@@ -508,5 +494,15 @@ extension String.Index {
     // Otherwise, we must be scalar-aligned, i.e. not pointing at a trailing
     // surrogate.
     return target._guts.isOnUnicodeScalarBoundary(self)
+  }
+}
+
+extension String.UTF8View {
+  @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    guard _guts.isFastUTF8 else { return nil }
+    return try _guts.withFastUTF8(body)
   }
 }

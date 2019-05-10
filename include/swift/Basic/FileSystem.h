@@ -23,7 +23,7 @@ namespace llvm {
   class Twine;
 }
 
-namespace clang {
+namespace llvm {
   namespace vfs {
     class FileSystem;
   }
@@ -58,7 +58,7 @@ namespace swift {
 
   namespace vfs {
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-    getFileOrSTDIN(clang::vfs::FileSystem &FS,
+    getFileOrSTDIN(llvm::vfs::FileSystem &FS,
                    const llvm::Twine &Name, int64_t FileSize = -1,
                    bool RequiresNullTerminator = true, bool IsVolatile = false);
   } // end namespace vfs

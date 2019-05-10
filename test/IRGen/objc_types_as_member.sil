@@ -15,7 +15,7 @@ sil @use_metatype : $@convention(thin) <T> (@thin T.Type) -> ()
 // CHECK:   ret void
 
 sil @test : $@convention(witness_method: NSRuncing) (@guaranteed OuterType.InnerType) -> () {
-bb0(%0 : @guaranteed $OuterType.InnerType):
+bb0(%0 : $OuterType.InnerType):
   %1 = function_ref @use_metatype : $@convention(thin) <τ_0_0> (@thin τ_0_0.Type) -> ()
   %2 = metatype $@thin OuterType.Type
   %3 = apply %1<OuterType>(%2) : $@convention(thin) <τ_0_0> (@thin τ_0_0.Type) -> ()

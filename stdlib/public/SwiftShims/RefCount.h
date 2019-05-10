@@ -238,14 +238,11 @@ struct RefCountBitOffsets;
 // 32-bit out of line
 template <>
 struct RefCountBitOffsets<8> {
-  // We reserve 1 bit (which we likely be using in future) to make the
-  // unowned field 31 bit. The reason is that unowned overflow checking does
-  // not work with 32 bit in the current implementation.
-  static const size_t ReservedShift = 0;
-  static const size_t ReservedBitCount = 1;
-  static const uint32_t ReservedMask = maskForField(Reserved);
+  static const size_t IsImmortalShift = 0;
+  static const size_t IsImmortalBitCount = 1;
+  static const uint64_t IsImmortalMask = maskForField(IsImmortal);
 
-  static const size_t UnownedRefCountShift = shiftAfterField(Reserved);
+  static const size_t UnownedRefCountShift = shiftAfterField(IsImmortal);
   static const size_t UnownedRefCountBitCount = 31;
   static const uint64_t UnownedRefCountMask = maskForField(UnownedRefCount);
 
@@ -256,7 +253,7 @@ struct RefCountBitOffsets<8> {
   static const size_t StrongExtraRefCountShift = shiftAfterField(IsDeiniting);
   static const size_t StrongExtraRefCountBitCount = 30;
   static const uint64_t StrongExtraRefCountMask = maskForField(StrongExtraRefCount);
-
+  
   static const size_t UseSlowRCShift = shiftAfterField(StrongExtraRefCount);
   static const size_t UseSlowRCBitCount = 1;
   static const uint64_t UseSlowRCMask = maskForField(UseSlowRC);
@@ -274,22 +271,22 @@ struct RefCountBitOffsets<8> {
 // 32-bit inline
 template <>
 struct RefCountBitOffsets<4> {
-  static const size_t ReservedShift = 0;
-  static const size_t ReservedBitCount = 0;
-  static const uint32_t ReservedMask = maskForField(Reserved);
-
-  static const size_t UnownedRefCountShift = shiftAfterField(Reserved);
-  static const size_t UnownedRefCountBitCount = 8;
+  static const size_t IsImmortalShift = 0;
+  static const size_t IsImmortalBitCount = 1;
+  static const uint64_t IsImmortalMask = maskForField(IsImmortal);
+  
+  static const size_t UnownedRefCountShift = shiftAfterField(IsImmortal);
+  static const size_t UnownedRefCountBitCount = 7;
   static const uint32_t UnownedRefCountMask = maskForField(UnownedRefCount);
 
   static const size_t IsDeinitingShift = shiftAfterField(UnownedRefCount);
   static const size_t IsDeinitingBitCount = 1;
   static const uint32_t IsDeinitingMask = maskForField(IsDeiniting);
-
+  
   static const size_t StrongExtraRefCountShift = shiftAfterField(IsDeiniting);
   static const size_t StrongExtraRefCountBitCount = 22;
   static const uint32_t StrongExtraRefCountMask = maskForField(StrongExtraRefCount);
-
+  
   static const size_t UseSlowRCShift = shiftAfterField(StrongExtraRefCount);
   static const size_t UseSlowRCBitCount = 1;
   static const uint32_t UseSlowRCMask = maskForField(UseSlowRC);
@@ -307,7 +304,7 @@ struct RefCountBitOffsets<4> {
 
 // FIXME: reinstate these assertions
 #if 0
-  static_assert(StrongExtraRefCountShift == IsDeinitingShift + 1, 
+  static_assert(StrongExtraRefCountShift == IsDeinitingShift + 1,
                 "IsDeiniting must be LSB-wards of StrongExtraRefCount");
   static_assert(UseSlowRCShift + UseSlowRCBitCount == sizeof(bits)*8,
                 "UseSlowRC must be MSB");
@@ -368,7 +365,20 @@ class RefCountBitsT {
   }
 
   public:
+  
+  enum Immortal_t { Immortal };
 
+  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  bool isImmortal() const {
+    return bool(getField(IsImmortal));
+  }
+  
+  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  void setIsImmortal(bool value) {
+    setField(IsImmortal, value);
+    setField(UseSlowRC, value);
+  }
+  
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   RefCountBitsT() = default;
 
@@ -377,6 +387,15 @@ class RefCountBitsT {
   RefCountBitsT(uint32_t strongExtraCount, uint32_t unownedCount)
     : bits((BitsType(strongExtraCount) << Offsets::StrongExtraRefCountShift) |
            (BitsType(unownedCount)     << Offsets::UnownedRefCountShift))
+  { }
+  
+  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  constexpr
+  RefCountBitsT(Immortal_t immortal)
+    : bits((BitsType(2) << Offsets::StrongExtraRefCountShift) |
+           (BitsType(2) << Offsets::UnownedRefCountShift) |
+           (BitsType(1) << Offsets::IsImmortalShift) |
+           (BitsType(1) << Offsets::UseSlowRCShift))
   { }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
@@ -414,8 +433,7 @@ class RefCountBitsT {
   
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   bool hasSideTable() const {
-    // FIXME: change this when introducing immutable RC objects
-    bool hasSide = getUseSlowRC();
+    bool hasSide = getUseSlowRC() && !isImmortal();
 
     // Side table refcount must not point to another side table.
     assert((refcountIsInline || !hasSide)  &&
@@ -505,7 +523,7 @@ class RefCountBitsT {
   LLVM_NODISCARD LLVM_ATTRIBUTE_ALWAYS_INLINE
   bool decrementStrongExtraRefCount(uint32_t dec) {
 #ifndef NDEBUG
-    if (!hasSideTable()) {
+    if (!hasSideTable() && !isImmortal()) {
       // Can't check these assertions with side table present.
 
       if (getIsDeiniting())
@@ -537,10 +555,10 @@ class RefCountBitsT {
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   bool isUniquelyReferenced() {
-    static_assert(Offsets::ReservedBitCount +
-                  Offsets::UnownedRefCountBitCount +
+    static_assert(Offsets::UnownedRefCountBitCount +
                   Offsets::IsDeinitingBitCount +
                   Offsets::StrongExtraRefCountBitCount +
+                  Offsets::IsImmortalBitCount +
                   Offsets::UseSlowRCBitCount == sizeof(bits)*8,
                   "inspect isUniquelyReferenced after adding fields");
 
@@ -663,6 +681,7 @@ class RefCounts {
 
   public:
   enum Initialized_t { Initialized };
+  enum Immortal_t { Immortal };
 
   // RefCounts must be trivially constructible to avoid ObjC++
   // destruction overhead at runtime. Use RefCounts(Initialized)
@@ -673,6 +692,10 @@ class RefCounts {
   constexpr RefCounts(Initialized_t)
     : refCounts(RefCountBits(0, 1)) {}
 
+  // Refcount of an immortal object has top and bottom bits set
+  constexpr RefCounts(Immortal_t)
+  : refCounts(RefCountBits(RefCountBits::Immortal)) {}
+  
   void init() {
     refCounts.store(RefCountBits(0, 1), std::memory_order_relaxed);
   }
@@ -683,6 +706,24 @@ class RefCounts {
   // because the extra unowned ref will keep the side table alive forever
   void initForNotFreeing() {
     refCounts.store(RefCountBits(0, 2), std::memory_order_relaxed);
+  }
+  
+  // Initialize for an object which will never deallocate.
+  void initImmortal() {
+    refCounts.store(RefCountBits(RefCountBits::Immortal), std::memory_order_relaxed);
+  }
+  
+  void setIsImmortal(bool immortal) {
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    if (oldbits.isImmortal()) {
+      return;
+    }
+    RefCountBits newbits;
+    do {
+      newbits = oldbits;
+      newbits.setIsImmortal(immortal);
+    } while (!refCounts.compare_exchange_weak(oldbits, newbits,
+                                              std::memory_order_relaxed));
   }
 
   // Initialize from another refcount bits.
@@ -698,8 +739,11 @@ class RefCounts {
     do {
       newbits = oldbits;
       bool fast = newbits.incrementStrongExtraRefCount(inc);
-      if (!fast)
+      if (SWIFT_UNLIKELY(!fast)) {
+        if (oldbits.isImmortal())
+          return;
         return incrementSlow(oldbits, inc);
+      }
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
   }
@@ -708,8 +752,11 @@ class RefCounts {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     auto newbits = oldbits;
     bool fast = newbits.incrementStrongExtraRefCount(inc);
-    if (!fast)
+    if (SWIFT_UNLIKELY(!fast)) {
+      if (oldbits.isImmortal())
+        return;
       return incrementNonAtomicSlow(oldbits, inc);
+    }
     refCounts.store(newbits, std::memory_order_relaxed);
  }
 
@@ -723,8 +770,11 @@ class RefCounts {
 
       newbits = oldbits;
       bool fast = newbits.incrementStrongExtraRefCount(1);
-      if (!fast)
+      if (SWIFT_UNLIKELY(!fast)) {
+        if (oldbits.isImmortal())
+          return true;
         return tryIncrementSlow(oldbits);
+      }
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
     return true;
@@ -737,8 +787,11 @@ class RefCounts {
 
     auto newbits = oldbits;
     bool fast = newbits.incrementStrongExtraRefCount(1);
-    if (!fast)
+    if (SWIFT_UNLIKELY(!fast)) {
+      if (oldbits.isImmortal())
+        return true;
       return tryIncrementNonAtomicSlow(oldbits);
+    }
     refCounts.store(newbits, std::memory_order_relaxed);
     return true;
   }
@@ -771,6 +824,9 @@ class RefCounts {
   // Precondition: the reference count must be 1
   void decrementFromOneNonAtomic() {
     auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    if (bits.isImmortal()) {
+      return;
+    }
     if (bits.hasSideTable())
       return bits.getSideTable()->decrementFromOneNonAtomic();
     
@@ -866,7 +922,9 @@ class RefCounts {
         // Decrement completed normally. New refcount is not zero.
         deinitNow = false;
       }
-      else if (oldbits.hasSideTable()) {
+      else if (oldbits.isImmortal()) {
+        return false;
+      } else if (oldbits.hasSideTable()) {
         // Decrement failed because we're on some other slow path.
         return doDecrementSideTable<performDeinit>(oldbits, dec);
       }
@@ -902,6 +960,9 @@ class RefCounts {
     if (fast) {
       // Decrement completed normally. New refcount is not zero.
       deinitNow = false;
+    }
+    else if (oldbits.isImmortal()) {
+      return false;
     }
     else if (oldbits.hasSideTable()) {
       // Decrement failed because we're on some other slow path.
@@ -939,9 +1000,13 @@ class RefCounts {
       newbits = oldbits;
       bool fast =
         newbits.decrementStrongExtraRefCount(dec);
-      if (!fast)
+      if (SWIFT_UNLIKELY(!fast)) {
+        if (oldbits.isImmortal()) {
+            return false;
+        }
         // Slow paths include side table; deinit; underflow
         return doDecrementSlow<performDeinit>(oldbits, dec);
+      }
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_release,
                                               std::memory_order_relaxed));
@@ -960,6 +1025,8 @@ class RefCounts {
   // Increment the unowned reference count.
   void incrementUnowned(uint32_t inc) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    if (oldbits.isImmortal())
+      return;
     RefCountBits newbits;
     do {
       if (oldbits.hasSideTable())
@@ -979,6 +1046,8 @@ class RefCounts {
 
   void incrementUnownedNonAtomic(uint32_t inc) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    if (oldbits.isImmortal())
+      return;
     if (oldbits.hasSideTable())
       return oldbits.getSideTable()->incrementUnownedNonAtomic(inc);
 
@@ -997,6 +1066,8 @@ class RefCounts {
   // Return true if the caller should free the object.
   bool decrementUnownedShouldFree(uint32_t dec) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    if (oldbits.isImmortal())
+      return false;
     RefCountBits newbits;
     
     bool performFree;
@@ -1023,7 +1094,8 @@ class RefCounts {
 
   bool decrementUnownedShouldFreeNonAtomic(uint32_t dec) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
-
+    if (oldbits.isImmortal())
+      return false;
     if (oldbits.hasSideTable())
       return oldbits.getSideTable()->decrementUnownedShouldFreeNonAtomic(dec);
 
@@ -1116,8 +1188,6 @@ class RefCounts {
 typedef RefCounts<InlineRefCountBits> InlineRefCounts;
 typedef RefCounts<SideTableRefCountBits> SideTableRefCounts;
 
-static_assert(swift::IsTriviallyConstructible<InlineRefCounts>::value,
-              "InlineRefCounts must be trivially initializable");
 static_assert(std::is_trivially_destructible<InlineRefCounts>::value,
               "InlineRefCounts must be trivially destructible");
 
@@ -1312,8 +1382,12 @@ inline bool RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
 
   auto newbits = oldbits;
   bool fast = newbits.decrementStrongExtraRefCount(dec);
-  if (!fast)
+  if (!fast) {
+    if (oldbits.isImmortal()) {
+      return false;
+    }
     return doDecrementNonAtomicSlow<performDeinit>(oldbits, dec);
+  }
 
   refCounts.store(newbits, std::memory_order_relaxed);
   return false;  // don't deinit

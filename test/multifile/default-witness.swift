@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %S/Inputs/default-witness.swift -primary-file %s -enable-resilience
+// RUN: %target-swift-frontend -typecheck %S/Inputs/default-witness.swift -primary-file %s -enable-library-evolution
 
 public protocol GraphType {
     func insert<U>(_: GraphNode<U>, _: GraphNode<U>)

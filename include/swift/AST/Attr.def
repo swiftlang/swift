@@ -49,7 +49,6 @@
 // Type attributes
 TYPE_ATTR(autoclosure)
 TYPE_ATTR(convention)
-TYPE_ATTR(noreturn)
 TYPE_ATTR(noescape)
 TYPE_ATTR(escaping)
 // SWIFT_ENABLE_TENSORFLOW
@@ -86,6 +85,9 @@ TYPE_ATTR(yield_many)
 // SIL metatype attributes.
 TYPE_ATTR(thin)
 TYPE_ATTR(thick)
+
+// Generated interface attributes
+TYPE_ATTR(_opaqueReturnTypeOf)
 
 // Schema for DECL_ATTR:
 //
@@ -140,9 +142,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(optional, Optional,
 SIMPLE_DECL_ATTR(dynamicCallable, DynamicCallable,
   OnNominalType,
   6)
-SIMPLE_DECL_ATTR(noreturn, NoReturn,
-  OnFunc | OnAccessor,
-  7)
+// NOTE: 7 is unused
 SIMPLE_DECL_ATTR(_exported, Exported,
   OnImport |
   UserInaccessible,
@@ -342,7 +342,7 @@ DECL_ATTR(_implements, Implements,
   NotSerialized, 67)
 DECL_ATTR(_objcRuntimeName, ObjCRuntimeName,
   OnClass |
-  UserInaccessible | RejectByParser |
+  UserInaccessible |
   NotSerialized, 68)
 SIMPLE_DECL_ATTR(_staticInitializeObjCMetadata, StaticInitializeObjCMetadata,
   OnClass | LongAttribute | RejectByParser |
@@ -366,7 +366,7 @@ DECL_ATTR(_clangImporterSynthesizedType, ClangImporterSynthesizedType,
   NotSerialized, 74)
 SIMPLE_DECL_ATTR(_weakLinked, WeakLinked,
   OnNominalType | OnAssociatedType | OnFunc | OnAccessor | OnVar |
-  OnSubscript | OnConstructor | OnEnumElement | UserInaccessible,
+  OnSubscript | OnConstructor | OnEnumElement | OnExtension | UserInaccessible,
   75)
 SIMPLE_DECL_ATTR(_frozen, Frozen,
   OnEnum |
@@ -394,24 +394,36 @@ DECL_ATTR(_private, PrivateImport,
   OnImport |
   UserInaccessible |
   NotSerialized, 82)
+SIMPLE_DECL_ATTR(_alwaysEmitIntoClient, AlwaysEmitIntoClient,
+  OnVar | OnSubscript | OnAbstractFunction | UserInaccessible,
+  83)
+SIMPLE_DECL_ATTR(_implementationOnly, ImplementationOnly,
+  OnImport | UserInaccessible,
+  84)
+DECL_ATTR(_custom, Custom,
+  OnAnyDecl | UserInaccessible,
+  85)
+SIMPLE_DECL_ATTR(_propertyDelegate, PropertyDelegate,
+  OnStruct | OnClass | OnEnum,
+  86)
 
 // SWIFT_ENABLE_TENSORFLOW
 DECL_ATTR(differentiable, Differentiable,
   OnAccessor | OnConstructor | OnFunc | OnVar | OnSubscript | LongAttribute |
   AllowMultipleAttributes,
-  83)
+  87)
 DECL_ATTR(differentiating, Differentiating,
   OnFunc | LongAttribute | AllowMultipleAttributes |
-  NotSerialized, 84)
+  NotSerialized, 88)
 SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
                  OnAccessor | OnFunc | OnConstructor | OnSubscript,
-                 /* Not serialized */ 85)
+                 /* Not serialized */ 89)
 SIMPLE_DECL_ATTR(TensorFlowGraph, TensorFlowGraph,
-                 OnFunc, 86)
+                 OnFunc, 90)
 SIMPLE_DECL_ATTR(_fieldwiseDifferentiable, FieldwiseDifferentiable,
-                 OnNominalType | UserInaccessible, 87)
+                 OnNominalType | UserInaccessible, 91)
 SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
-                 OnVar, 88)
+                 OnVar, 92)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

@@ -393,6 +393,10 @@ llvm::Value *emitClassFieldOffset(IRGenFunction &IGF,
 Address emitAddressOfSuperclassRefInClassMetadata(IRGenFunction &IGF,
                                                   llvm::Value *metadata);
 
+Size getStaticTupleElementOffset(IRGenModule &IGM,
+                                 SILType tupleType,
+                                 unsigned eltIdx);
+
 } // end namespace irgen
 } // end namespace swift
 

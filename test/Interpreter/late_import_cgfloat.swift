@@ -11,4 +11,4 @@ let pt = CGPoint(x: 1.0, y: 2.0)
 
 import simd
 let f = float2(x: 1.0, y: 2.0)
-// CHECK: f : float2 = float2(1.0, 2.0)
+// CHECK: f : float2 = SIMD2<Float>(1.0, 2.0)

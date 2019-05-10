@@ -26,6 +26,8 @@
 #if __has_builtin(__is_target_environment)
 # if __is_target_environment(simulator)
 #  define SWIFT_TARGET_OS_SIMULATOR 1
+# else
+#  define SWIFT_TARGET_OS_SIMULATOR 0
 # endif
 #endif
 

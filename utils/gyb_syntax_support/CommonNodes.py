@@ -46,7 +46,8 @@ COMMON_NODES = [
          traits=['Braced', 'WithStatements'],
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
-             Child('Statements', kind='CodeBlockItemList'),
+             Child('Statements', kind='CodeBlockItemList',
+                   collection_element_name='Statement'),
              Child('RightBrace', kind='RightBraceToken'),
          ]),
 ]

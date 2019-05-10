@@ -28,6 +28,35 @@ func f6(_: (i: Int, j: Int), k: Int = 15) {}
 // Conversions and shuffles
 //===----------------------------------------------------------------------===//
 
+func foo(a : [(some: Int, (key: Int, value: String))]) -> String {
+  for (i , (j, k)) in a {
+    if i == j { return k }
+  }
+}
+
+func rdar28207648() -> [(Int, CustomStringConvertible)] {
+  let v : [(Int, Int)] = []
+  return v as [(Int, CustomStringConvertible)]
+}
+
+class rdar28207648Base {}
+class rdar28207648Derived : rdar28207648Base {}
+
+func rdar28207648(x: (Int, rdar28207648Derived)) -> (Int, rdar28207648Base) {
+  return x as (Int, rdar28207648Base)
+}
+
+public typealias Success<T, V> = (response: T, data: V?)
+
+public enum Result {
+    case success(Success<Any, Any>)
+    case error(Error)
+}
+
+
+let a = Success<Int, Int>(response: 3, data: 3)
+let success: Result = .success(a)
+
 // Variadic functions.
 f4()
 f4(1)
@@ -56,7 +85,7 @@ f5((1,1))
 // Tuples with existentials
 var any : Any = ()
 any = (1, 2)
-any = (label: 4)
+any = (label: 4) // expected-error {{cannot create a single-element tuple with an element label}}
 
 // Scalars don't have .0/.1/etc
 i = j.0 // expected-error{{value of type 'Int' has no member '0'}}
@@ -153,7 +182,7 @@ func gcd_23700031<T>(_ a: T, b: T) {
   var a = a
   var b = b
   (a, b) = (b, a % b)  // expected-error {{binary operator '%' cannot be applied to two 'T' operands}}
-  // expected-note @-1 {{overloads for '%' exist with these partially matching parameter lists: (UInt8, UInt8), (Int8, Int8), (UInt16, UInt16), (Int16, Int16), (UInt32, UInt32), (Int32, Int32), (UInt64, UInt64), (Int64, Int64), (UInt, UInt), (Int, Int)}}
+  // expected-note @-1 {{overloads for '%' exist with these partially matching parameter lists: (Int, Int), (Int16, Int16), (Int32, Int32), (Int64, Int64), (Int8, Int8), (Self, Self.Scalar), (Self.Scalar, Self), (UInt, UInt), (UInt16, UInt16), (UInt32, UInt32), (UInt64, UInt64), (UInt8, UInt8)}}
 }
 
 // <rdar://problem/24210190>
@@ -251,4 +280,12 @@ func f(b: Bool) -> (a: Int, b: String)? {
   let x = 3
   let y = ""
   return b ? (x, y) : nil
+}
+
+// Single element tuple expressions
+func singleElementTuple() {
+  let _ = (label: 123) // expected-error {{cannot create a single-element tuple with an element label}} {{12-19=}}
+  let _ = (label: 123).label // expected-error {{cannot create a single-element tuple with an element label}} {{12-19=}}
+  let _ = ((label: 123)) // expected-error {{cannot create a single-element tuple with an element label}} {{13-20=}}
+  let _ = ((label: 123)).label // expected-error {{cannot create a single-element tuple with an element label}} {{13-20=}}
 }

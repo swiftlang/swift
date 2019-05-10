@@ -1,4 +1,4 @@
-// Ensure that driver does not issue a remark iff in batch mode. (The remark has been removed.)
+// Ensure that driver does not issue a remark iff in batch mode. (The remark has been removed.)
 //
 // RUN: %swiftc_driver -whole-module-optimization -enable-batch-mode   %S/../Inputs/empty.swift -### 2>&1 >/dev/null | %FileCheck %s
 // RUN: %swiftc_driver                                                 %S/../Inputs/empty.swift -### 2>&1 >/dev/null | %FileCheck -allow-empty %s

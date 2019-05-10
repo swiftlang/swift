@@ -10,8 +10,8 @@ target triple = "x86_64-apple-macosx10.9"
 
 declare %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* returned)
 declare void @swift_unknownObjectRelease(%swift.refcounted*)
-declare %objc_object* @objc_retain(%objc_object*)
-declare void @objc_release(%objc_object*)
+declare i8* @llvm.objc.retain(i8*)
+declare void @llvm.objc.release(i8*)
 declare %swift.refcounted* @swift_allocObject(%swift.heapmetadata* , i64, i64) nounwind
 declare void @swift_release(%swift.refcounted* nocapture)
 declare %swift.refcounted* @swift_retain(%swift.refcounted* returned) nounwind
@@ -20,7 +20,7 @@ declare void @swift_bridgeObjectRelease(%swift.bridge*)
 declare %swift.refcounted* @swift_retainUnowned(%swift.refcounted* returned)
 
 declare void @user(%swift.refcounted *) nounwind
-declare void @user_objc(%objc_object*) nounwind
+declare void @user_objc(i8*) nounwind
 declare void @unknown_func()
 
 define private void @__swift_fixLifetime(%swift.refcounted*) noinline nounwind {
@@ -30,16 +30,16 @@ entry:
 
 ; CHECK-LABEL: @trivial_objc_canonicalization(
 ; CHECK-NEXT: entry:
-; CHECK-NEXT: [[RET0:%.+]] = bitcast i8* %O to %objc_object*
-; CHECK-NEXT: [[RET1:%.+]] = tail call %objc_object* @objc_retain(%objc_object* [[RET0:%.+]])
-; CHECK-NEXT: call void @user_objc(%objc_object* [[RET0:%.+]])
+; CHECK-NEXT: [[RET0:%.+]] = bitcast i8* %O to i8*
+; CHECK-NEXT: [[RET1:%.+]] = tail call i8* @llvm.objc.retain(i8* [[RET0:%.+]])
+; CHECK-NEXT: call void @user_objc(i8* [[RET0:%.+]])
 ; CHECK-NEXT: ret void
 
 define void @trivial_objc_canonicalization(i8* %O) {
 entry:
-  %0 = bitcast i8* %O to %objc_object*
-  %1 = tail call %objc_object* @objc_retain(%objc_object* %0)
-  call void @user_objc(%objc_object* %1) nounwind
+  %0 = bitcast i8* %O to i8*
+  %1 = tail call i8* @llvm.objc.retain(i8* %0)
+  call void @user_objc(i8* %1) nounwind
   ret void
 }
 
@@ -48,14 +48,14 @@ entry:
 ; CHECK-NEXT: call void @user
 ; CHECK-NEXT: ret void
 
-define void @trivial_retain_release(%swift.refcounted* %P, %objc_object* %O, %swift.bridge * %B) {
+define void @trivial_retain_release(%swift.refcounted* %P, i8* %O, %swift.bridge * %B) {
 entry:
   tail call %swift.refcounted* @swift_retain(%swift.refcounted* %P)
   tail call void @swift_release(%swift.refcounted* %P) nounwind
   tail call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %P)
   tail call void @swift_unknownObjectRelease(%swift.refcounted* %P)
-  tail call %objc_object* @objc_retain(%objc_object* %O)
-  tail call void @objc_release(%objc_object* %O)
+  tail call i8* @llvm.objc.retain(i8* %O)
+  tail call void @llvm.objc.release(i8* %O)
   %v = tail call %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge* %B)
   tail call void @swift_bridgeObjectRelease(%swift.bridge* %v)
   call void @user(%swift.refcounted* %P) nounwind
@@ -66,11 +66,11 @@ entry:
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT: [[RET0:%.+]] = bitcast %swift.refcounted* %P to %swift.refcounted*
 ; CHECK-NEXT: [[RET1:%.+]] = bitcast %swift.refcounted* %P to %swift.refcounted*
-; CHECK-NEXT: [[RET2:%.+]] = bitcast %objc_object* %O to %objc_object*
+; CHECK-NEXT: [[RET2:%.+]] = bitcast i8* %O to i8*
 ; CHECK-NEXT: call void @user
 ; CHECK-NEXT: ret void
 
-define void @trivial_retain_release_with_rcidentity(%swift.refcounted* %P, %objc_object* %O, %swift.bridge * %B) {
+define void @trivial_retain_release_with_rcidentity(%swift.refcounted* %P, i8* %O, %swift.bridge * %B) {
 entry:
   tail call %swift.refcounted* @swift_retain(%swift.refcounted* %P)
   %1 = bitcast %swift.refcounted* %P to %swift.refcounted*
@@ -78,9 +78,9 @@ entry:
   tail call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %P)
   %3 = bitcast %swift.refcounted* %P to %swift.refcounted*
   tail call void @swift_unknownObjectRelease(%swift.refcounted* %3)
-  tail call %objc_object* @objc_retain(%objc_object* %O)
-  %5 = bitcast %objc_object* %O to %objc_object*
-  tail call void @objc_release(%objc_object* %5)
+  tail call i8* @llvm.objc.retain(i8* %O)
+  %5 = bitcast i8* %O to i8*
+  tail call void @llvm.objc.release(i8* %5)
   call void @user(%swift.refcounted* %P) nounwind
   ret void
 }
@@ -110,8 +110,8 @@ define void @retain_motion1(%swift.refcounted* %A) {
 
 define void @objc_retain_release_null() {
 entry:
-  tail call void @objc_release(%objc_object* null) nounwind
-  tail call %objc_object* @objc_retain(%objc_object* null)
+  tail call void @llvm.objc.release(i8* null) nounwind
+  tail call i8* @llvm.objc.retain(i8* null)
   ret void
 }
 
@@ -132,10 +132,10 @@ entry:
 ; CHECK-NEXT: store i32 42
 ; CHECK-NEXT: ret void
 
-define void @objc_retain_release_opt(%objc_object* %P, i32* %IP) {
-  tail call %objc_object* @objc_retain(%objc_object* %P) nounwind
+define void @objc_retain_release_opt(i8* %P, i32* %IP) {
+  tail call i8* @llvm.objc.retain(i8* %P) nounwind
   store i32 42, i32* %IP
-  tail call void @objc_release(%objc_object* %P) nounwind
+  tail call void @llvm.objc.release(i8* %P) nounwind
   ret void
 }
 
@@ -165,12 +165,12 @@ define void @move_retain_across_unknown_retain(%swift.refcounted* %A, %swift.ref
 
 ; CHECK-LABEL: @move_retain_across_objc_retain
 ; CHECK-NOT: swift_retain
-; CHECK: objc_retain
+; CHECK: llvm.objc.retain
 ; CHECK-NOT: swift_release
 ; CHECK: ret
-define void @move_retain_across_objc_retain(%swift.refcounted* %A, %objc_object* %B) {
+define void @move_retain_across_objc_retain(%swift.refcounted* %A, i8* %B) {
   tail call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  tail call %objc_object* @objc_retain(%objc_object* %B)
+  tail call i8* @llvm.objc.retain(i8* %B)
   tail call void @swift_release(%swift.refcounted* %A) nounwind
   ret void
 }

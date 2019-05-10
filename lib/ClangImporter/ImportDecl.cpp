@@ -203,7 +203,7 @@ static bool verifyNameMapping(MappedTypeNameKind NameMapping,
 }
 #endif
 
-/// \brief Map a well-known C type to a swift type from the standard library.
+/// Map a well-known C type to a swift type from the standard library.
 ///
 /// \param IsError set to true when we know the corresponding swift type name,
 /// but we could not find it.  (For example, the type was not defined in the
@@ -226,6 +226,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
   StringRef SwiftTypeName;
   bool CanBeMissing;
 
+
   do {
 #define MAP_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,        \
                  SWIFT_MODULE_NAME, SWIFT_TYPE_NAME,               \
@@ -233,12 +234,8 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     if (Name.str() == C_TYPE_NAME) {                               \
       CTypeKind = MappedCTypeKind::C_TYPE_KIND;                    \
       Bitwidth = C_TYPE_BITWIDTH;                                  \
-      if (StringRef(SWIFT_MODULE_NAME) == StringRef(STDLIB_NAME))  \
-        IsSwiftModule = true;                                      \
-      else {                                                       \
-        IsSwiftModule = false;                                     \
-        SwiftModuleName = SWIFT_MODULE_NAME;                       \
-      }                                                            \
+      SwiftModuleName = SWIFT_MODULE_NAME;                         \
+      IsSwiftModule = SwiftModuleName == STDLIB_NAME;              \
       SwiftTypeName = SWIFT_TYPE_NAME;                             \
       CanBeMissing = CAN_BE_MISSING;                               \
       NameMapping = MappedTypeNameKind::C_NAME_MAPPING;            \
@@ -248,6 +245,58 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
       break;                                                       \
     }
 #include "MappedTypes.def"
+
+    // We handle `BOOL` as a special case because the selection here is more
+    // complicated as the type alias exists on multiple platforms as different
+    // types.  It appears in an Objective-C context where it is a `signed char`
+    // and appears in Windows as an `int`.  Furthermore, you can actually have
+    // the two interoperate, which requires a further bit of logic to
+    // disambiguate the type aliasing behaviour.  To complicate things, the two
+    // aliases bridge to different types - `ObjCBool` for Objective-C and
+    // `WindowsBool` for Windows's `BOOL` type.
+    if (Name.str() == "BOOL") {
+      auto &CASTContext = Impl.getClangASTContext();
+      auto &SwiftASTContext = Impl.SwiftContext;
+
+      // Default to Objective-C `BOOL`
+      CTypeKind = MappedCTypeKind::ObjCBool;
+      if (CASTContext.getTargetInfo().getTriple().isOSWindows()) {
+        // On Windows fall back to Windows `BOOL`
+        CTypeKind = MappedCTypeKind::SignedInt;
+        // If Objective-C interop is enabled, and we match the Objective-C
+        // `BOOL` type, then switch back to `ObjCBool`.
+        if (SwiftASTContext.LangOpts.EnableObjCInterop &&
+            CASTContext.hasSameType(D->getUnderlyingType(),
+                                    CASTContext.ObjCBuiltinBoolTy))
+          CTypeKind = MappedCTypeKind::ObjCBool;
+      }
+
+      if (CTypeKind == MappedCTypeKind::ObjCBool) {
+        Bitwidth = 8;
+        SwiftModuleName = StringRef("ObjectiveC");
+        IsSwiftModule = false;
+        SwiftTypeName = "ObjCBool";
+        NameMapping = MappedTypeNameKind::DoNothing;
+        CanBeMissing = false;
+        assert(verifyNameMapping(MappedTypeNameKind::DoNothing,
+                                 "BOOL", "ObjCBool") &&
+               "MappedTypes.def: Identical names must use DoNothing");
+      } else {
+        assert(CTypeKind == MappedCTypeKind::SignedInt &&
+               "expected Windows `BOOL` desugared to `int`");
+        Bitwidth = 32;
+        SwiftModuleName = StringRef("WinSDK");
+        IsSwiftModule = false;
+        SwiftTypeName = "WindowsBool";
+        NameMapping = MappedTypeNameKind::DoNothing;
+        CanBeMissing = true;
+        assert(verifyNameMapping(MappedTypeNameKind::DoNothing,
+                                 "BOOL", "WindowsBool") &&
+               "MappedTypes.def: Identical names must use DoNothing");
+      }
+
+      break;
+    }
 
     // We did not find this type, thus it is not mapped.
     return std::make_pair(Type(), "");
@@ -322,8 +371,21 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     break;
 
   case MappedCTypeKind::VaList:
-    if (ClangTypeSize != ClangCtx.getTypeSize(ClangCtx.VoidPtrTy))
-      return std::make_pair(Type(), "");
+    switch (ClangCtx.getTargetInfo().getBuiltinVaListKind()) {
+      case clang::TargetInfo::CharPtrBuiltinVaList:
+      case clang::TargetInfo::VoidPtrBuiltinVaList:
+      case clang::TargetInfo::PowerABIBuiltinVaList:
+      case clang::TargetInfo::AAPCSABIBuiltinVaList:
+        assert(ClangCtx.getTypeSize(ClangCtx.VoidPtrTy) == ClangTypeSize &&
+               "expected va_list type to be sizeof(void *)");
+        break;
+      case clang::TargetInfo::AArch64ABIBuiltinVaList:
+        break;
+      case clang::TargetInfo::PNaClABIBuiltinVaList:
+      case clang::TargetInfo::SystemZBuiltinVaList:
+      case clang::TargetInfo::X86_64ABIBuiltinVaList:
+        return std::make_pair(Type(), "");
+    }
     break;
 
   case MappedCTypeKind::ObjCBool:
@@ -1024,7 +1086,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                   nullptr);
     cGetterDecl->setParams(cGetterSelf);
     
-    auto cGetterSelfExpr = new (Ctx) clang::DeclRefExpr(cGetterSelf, false,
+    auto cGetterSelfExpr = new (Ctx) clang::DeclRefExpr(Ctx, cGetterSelf, false,
                                                         recordType,
                                                         clang::VK_RValue,
                                                         clang::SourceLocation());
@@ -1037,7 +1099,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                    clang::VK_RValue,
                                                    clang::OK_BitField);
     
-    auto cGetterBody = new (Ctx) clang::ReturnStmt(clang::SourceLocation(),
+    auto cGetterBody = clang::ReturnStmt::Create(Ctx, clang::SourceLocation(),
                                                    cGetterExpr,
                                                    nullptr);
     cGetterDecl->setBody(cGetterBody);
@@ -1070,7 +1132,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
     cSetterParams.push_back(cSetterSelf);
     cSetterDecl->setParams(cSetterParams);
     
-    auto cSetterSelfExpr = new (Ctx) clang::DeclRefExpr(cSetterSelf, false,
+    auto cSetterSelfExpr = new (Ctx) clang::DeclRefExpr(Ctx, cSetterSelf, false,
                                                         recordPointerType,
                                                         clang::VK_RValue,
                                                         clang::SourceLocation());
@@ -1084,7 +1146,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                          clang::VK_LValue,
                                                          clang::OK_BitField);
     
-    auto cSetterValueExpr = new (Ctx) clang::DeclRefExpr(cSetterValue, false,
+    auto cSetterValueExpr = new (Ctx) clang::DeclRefExpr(Ctx, cSetterValue, false,
                                                          fieldType,
                                                          clang::VK_RValue,
                                                          clang::SourceLocation());
@@ -1184,7 +1246,7 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   return constructor;
 }
 
-/// \brief Create a constructor that initializes a struct from its members.
+/// Create a constructor that initializes a struct from its members.
 static ConstructorDecl *
 createValueConstructor(ClangImporter::Implementation &Impl,
                        StructDecl *structDecl, ArrayRef<VarDecl *> members,
@@ -1552,7 +1614,7 @@ buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
                      AccessorKind::Get,
                      subscript,
                      /*StaticLoc=*/SourceLoc(),
-                     StaticSpellingKind::None,
+                     subscript->getStaticSpelling(),
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
@@ -1608,7 +1670,7 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
                      AccessorKind::Set,
                      subscript,
                      /*StaticLoc=*/SourceLoc(),
-                     StaticSpellingKind::None,
+                     subscript->getStaticSpelling(),
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
@@ -1641,7 +1703,7 @@ static std::pair<Type, ParamDecl *> decomposeSubscriptSetter(FuncDecl *setter) {
                          ->castTo<AnyFunctionType>()
                          ->getResult()
                          ->castTo<AnyFunctionType>()
-                         ->getParams().front().getOldType();
+                         ->getParams().front().getParameterType();
   ParamDecl *keyDecl = PL->get(1);
 
   return {elementType, keyDecl};
@@ -2002,7 +2064,7 @@ namespace {
     }
   };
 
-  /// \brief Convert Clang declarations into the corresponding Swift
+  /// Convert Clang declarations into the corresponding Swift
   /// declarations.
   class SwiftDeclConverter
     : public clang::ConstDeclVisitor<SwiftDeclConverter, Decl *>
@@ -2090,7 +2152,7 @@ namespace {
       return alternateName;
     }
 
-    /// \brief Create a declaration name for anonymous enums, unions and
+    /// Create a declaration name for anonymous enums, unions and
     /// structs.
     ///
     /// Since Swift does not natively support these features, we fake them by
@@ -2353,7 +2415,7 @@ namespace {
               TypeAliasDecl *typealias = nullptr;
               typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
                             Decl, AccessLevel::Public,
-                            Impl.importSourceLoc(Decl->getLocStart()),
+                            Impl.importSourceLoc(Decl->getBeginLoc()),
                             SourceLoc(), Name,
                             Impl.importSourceLoc(Decl->getLocation()),
                             /*genericparams*/nullptr, DC);
@@ -2372,7 +2434,7 @@ namespace {
               TypeAliasDecl *typealias = nullptr;
               typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
                             Decl, AccessLevel::Public,
-                            Impl.importSourceLoc(Decl->getLocStart()),
+                            Impl.importSourceLoc(Decl->getBeginLoc()),
                             SourceLoc(), Name,
                             Impl.importSourceLoc(Decl->getLocation()),
                             /*genericparams*/nullptr, DC);
@@ -2403,7 +2465,7 @@ namespace {
             // the name in the imported module and the same name in the
             // standard library.
             if (auto *NAT =
-                  dyn_cast<NameAliasType>(SwiftType.getPointer()))
+                  dyn_cast<TypeAliasType>(SwiftType.getPointer()))
               return NAT->getDecl();
 
             auto *NTD = SwiftType->getAnyNominal();
@@ -2440,7 +2502,7 @@ namespace {
       auto Loc = Impl.importSourceLoc(Decl->getLocation());
       auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(Decl,
                                       AccessLevel::Public,
-                                      Impl.importSourceLoc(Decl->getLocStart()),
+                                      Impl.importSourceLoc(Decl->getBeginLoc()),
                                       SourceLoc(), Name,
                                       Loc,
                                       /*genericparams*/nullptr, DC);
@@ -2581,7 +2643,7 @@ namespace {
         /// Basic information about the enum type we're building.
         Identifier enumName = name;
         DeclContext *enumDC = dc;
-        SourceLoc loc = Impl.importSourceLoc(decl->getLocStart());
+        SourceLoc loc = Impl.importSourceLoc(decl->getBeginLoc());
 
         // If this is an error enum, form the error wrapper type,
         // which is a struct containing an NSError instance.
@@ -3033,7 +3095,7 @@ namespace {
       auto name = importedName.getDeclName().getBaseIdentifier();
       auto result = Impl.createDeclWithClangNode<StructDecl>(decl,
                                  AccessLevel::Public,
-                                 Impl.importSourceLoc(decl->getLocStart()),
+                                 Impl.importSourceLoc(decl->getBeginLoc()),
                                  name,
                                  Impl.importSourceLoc(decl->getLocation()),
                                  None, nullptr, dc);
@@ -3357,7 +3419,7 @@ namespace {
                        /*IsStatic*/false,
                        VarDecl::Specifier::Var,
                        /*IsCaptureList*/false,
-                       Impl.importSourceLoc(decl->getLocStart()),
+                       Impl.importSourceLoc(decl->getBeginLoc()),
                        name, dc);
       result->setInterfaceType(type);
       result->setIsObjC(false);
@@ -4107,7 +4169,7 @@ namespace {
     /// Record the function or initializer overridden by the given Swift method.
     void recordObjCOverride(AbstractFunctionDecl *decl);
 
-    /// \brief Given an imported method, try to import it as a constructor.
+    /// Given an imported method, try to import it as a constructor.
     ///
     /// Objective-C methods in the 'init' family are imported as
     /// constructors in Swift, enabling object construction syntax, e.g.,
@@ -4133,7 +4195,7 @@ namespace {
                                const clang::ObjCMethodDecl *objcMethod,
                                CtorInitializerKind kind);
 
-    /// \brief Given an imported method, try to import it as a constructor.
+    /// Given an imported method, try to import it as a constructor.
     ///
     /// Objective-C methods in the 'init' family are imported as
     /// constructors in Swift, enabling object construction syntax, e.g.,
@@ -4158,7 +4220,7 @@ namespace {
 
     void recordObjCOverride(SubscriptDecl *subscript);
 
-    /// \brief Given either the getter or setter for a subscript operation,
+    /// Given either the getter or setter for a subscript operation,
     /// create the Swift subscript declaration.
     SubscriptDecl *importSubscript(Decl *decl,
                                    const clang::ObjCMethodDecl *objcMethod);
@@ -4196,7 +4258,7 @@ namespace {
     importObjCGenericParams(const clang::ObjCInterfaceDecl *decl,
                             DeclContext *dc);
 
-    /// \brief Import the members of all of the protocols to which the given
+    /// Import the members of all of the protocols to which the given
     /// Objective-C class, category, or extension explicitly conforms into
     /// the given list of members, so long as the method was not already
     /// declared in the class.
@@ -4217,7 +4279,7 @@ namespace {
                                   MutableArrayRef<MirroredMethodEntry> entries,
                                   SmallVectorImpl<Decl *> &newMembers);
 
-    /// \brief Import constructors from our superclasses (and their
+    /// Import constructors from our superclasses (and their
     /// categories/extensions), effectively "inheriting" constructors.
     void importInheritedConstructors(ClassDecl *classDecl,
                                      SmallVectorImpl<Decl *> &newMembers);
@@ -4240,7 +4302,7 @@ namespace {
       if (!dc)
         return nullptr;
 
-      auto loc = Impl.importSourceLoc(decl->getLocStart());
+      auto loc = Impl.importSourceLoc(decl->getBeginLoc());
       auto result = ExtensionDecl::create(
                       Impl.SwiftContext, loc,
                       TypeLoc::withoutLoc(objcClass->getDeclaredType()),
@@ -4248,36 +4310,10 @@ namespace {
 
       // Determine the type and generic args of the extension.
       if (objcClass->getGenericParams()) {
-        // Clone generic parameters.
-        SmallVector<GenericTypeParamDecl *, 2> toGenericParams;
-        for (auto fromGP : *objcClass->getGenericParams()) {
-          // Create the new generic parameter.
-          auto toGP = new (Impl.SwiftContext) GenericTypeParamDecl(
-              result, fromGP->getName(), SourceLoc(), fromGP->getDepth(),
-              fromGP->getIndex());
-          toGP->setImplicit(true);
-          toGP->setInherited(
-              Impl.SwiftContext.AllocateCopy(fromGP->getInherited()));
-          // Record new generic parameter.
-          toGenericParams.push_back(toGP);
-        }
+        result->createGenericParamsIfMissing(objcClass);
 
-        auto genericParams = GenericParamList::create(Impl.SwiftContext,
-            SourceLoc(), toGenericParams, SourceLoc());
-        result->setGenericParams(genericParams);
-
-        auto *env = Impl.buildGenericEnvironment(genericParams, result);
+        auto *env = objcClass->getGenericEnvironment();
         result->setGenericEnvironment(env);
-
-        // Calculate the correct bound-generic extended type.
-        SmallVector<Type, 2> genericArgs;
-        for (auto paramTy :
-             env->getGenericSignature()->getInnermostGenericParams()) {
-          genericArgs.push_back(paramTy);
-        }
-        Type extendedType =
-          BoundGenericClassType::get(objcClass, nullptr, genericArgs);
-        result->getExtendedTypeLoc().setType(extendedType);
       }
 
       // Create the extension declaration and record it.
@@ -4403,7 +4439,7 @@ namespace {
       // Create the protocol declaration and record it.
       auto result = Impl.createDeclWithClangNode<ProtocolDecl>(
           decl, AccessLevel::Public, dc,
-          Impl.importSourceLoc(decl->getLocStart()),
+          Impl.importSourceLoc(decl->getBeginLoc()),
           Impl.importSourceLoc(decl->getLocation()), name, None,
           /*TrailingWhere=*/nullptr);
       result->computeType();
@@ -4429,9 +4465,6 @@ namespace {
       // Compute the requirement signature.
       if (!result->isRequirementSignatureComputed())
         result->computeRequirementSignature();
-
-      auto *env = Impl.buildGenericEnvironment(result->getGenericParams(), dc);
-      result->setGenericEnvironment(env);
 
       result->setMemberLoader(&Impl, 0);
 
@@ -4555,7 +4588,7 @@ namespace {
 
       // Create the class declaration and record it.
       auto result = Impl.createDeclWithClangNode<ClassDecl>(
-          decl, access, Impl.importSourceLoc(decl->getLocStart()), name,
+          decl, access, Impl.importSourceLoc(decl->getBeginLoc()), name,
           Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
 
       // Import generic arguments, if any.
@@ -4880,7 +4913,7 @@ namespace {
       TypeAliasDecl *typealias = nullptr;
       typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
                     decl, AccessLevel::Public,
-                    Impl.importSourceLoc(decl->getLocStart()),
+                    Impl.importSourceLoc(decl->getBeginLoc()),
                     SourceLoc(), name,
                     Impl.importSourceLoc(decl->getLocation()),
                     /*genericparams=*/nullptr, dc);
@@ -5113,7 +5146,7 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
 
   // Create the type alias.
   auto alias = Impl.createDeclWithClangNode<TypeAliasDecl>(
-      decl, AccessLevel::Public, Impl.importSourceLoc(decl->getLocStart()),
+      decl, AccessLevel::Public, Impl.importSourceLoc(decl->getBeginLoc()),
       SourceLoc(), compatibilityName.getDeclName().getBaseIdentifier(),
       Impl.importSourceLoc(decl->getLocation()), /*generic params*/nullptr, dc);
 
@@ -5929,10 +5962,10 @@ SwiftDeclConverter::findLatestIntroduction(const clang::Decl *D) {
 
     // Does this availability attribute map to the platform we are
     // currently targeting?
-    if (!Impl.platformAvailability.filter ||
-        !Impl.platformAvailability.filter(attr->getPlatform()->getName()))
+    if (!Impl.platformAvailability.isPlatformRelevant(
+            attr->getPlatform()->getName())) {
       continue;
-
+    }
     // Take advantage of the empty version being 0.0.0.0.
     result = std::max(result, attr->getIntroduced());
   }
@@ -6002,7 +6035,7 @@ bool SwiftDeclConverter::existingConstructorIsWorse(
   return false;
 }
 
-/// \brief Given an imported method, try to import it as a constructor.
+/// Given an imported method, try to import it as a constructor.
 ///
 /// Objective-C methods in the 'init' family are imported as
 /// constructors in Swift, enabling object construction syntax, e.g.,
@@ -6360,7 +6393,7 @@ void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
   }
 }
 
-/// \brief Given either the getter or setter for a subscript operation,
+/// Given either the getter or setter for a subscript operation,
 /// create the Swift subscript declaration.
 SubscriptDecl *
 SwiftDeclConverter::importSubscript(Decl *decl,
@@ -6586,6 +6619,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   DeclName name(C, DeclBaseName::createSubscript(), {Identifier()});
   auto subscript = Impl.createDeclWithClangNode<SubscriptDecl>(
       getter->getClangNode(), getOverridableAccessLevel(dc), name,
+      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       decl->getLoc(), bodyParams, decl->getLoc(),
       TypeLoc::withoutLoc(elementTy), dc,
       /*GenericParams=*/nullptr);
@@ -7337,8 +7371,7 @@ void ClangImporter::Implementation::importAttributes(
 
       // Does this availability attribute map to the platform we are
       // currently targeting?
-      if (!platformAvailability.filter ||
-          !platformAvailability.filter(Platform))
+      if (!platformAvailability.isPlatformRelevant(Platform))
         continue;
 
       auto platformK =
@@ -7370,9 +7403,8 @@ void ClangImporter::Implementation::importAttributes(
       llvm::VersionTuple deprecated = avail->getDeprecated();
 
       if (!deprecated.empty()) {
-        if (platformAvailability.deprecatedAsUnavailableFilter &&
-            platformAvailability.deprecatedAsUnavailableFilter(
-                deprecated.getMajor(), deprecated.getMinor())) {
+        if (platformAvailability.treatDeprecatedAsUnavailable(ClangDecl,
+                                                              deprecated)) {
           AnyUnavailable = true;
           PlatformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
           if (message.empty())
@@ -7416,13 +7448,9 @@ void ClangImporter::Implementation::importAttributes(
       return;
     }
 
-    // Map Clang's swift_objc_members attribute to @objcMembers. Also handle
-    // inheritance of @objcMembers by looking at the superclass.
-    if (ID->hasAttr<clang::SwiftObjCMembersAttr>() ||
-        (isa<ClassDecl>(MappedDecl) &&
-         cast<ClassDecl>(MappedDecl)->hasSuperclass() &&
-         cast<ClassDecl>(MappedDecl)->getSuperclassDecl()
-           ->getAttrs().hasAttribute<ObjCMembersAttr>())) {
+    // Map Clang's swift_objc_members attribute to @objcMembers.
+    if (ID->hasAttr<clang::SwiftObjCMembersAttr>() &&
+        isa<ClassDecl>(MappedDecl)) {
       if (!MappedDecl->getAttrs().hasAttribute<ObjCMembersAttr>()) {
         auto attr = new (C) ObjCMembersAttr(/*IsImplicit=*/true);
         MappedDecl->getAttrs().add(attr);
@@ -7945,11 +7973,8 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
 GenericSignature *ClangImporter::Implementation::buildGenericSignature(
     GenericParamList *genericParams, DeclContext *dc) {
   GenericSignatureBuilder builder(SwiftContext);
-  SmallVector<GenericTypeParamType *, 4> allGenericParams;
   for (auto param : *genericParams) {
     builder.addGenericParameter(param);
-    allGenericParams.push_back(
-      param->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
   }
   for (auto param : *genericParams) {
     bool result = builder.addGenericParameterRequirements(param);
@@ -8050,10 +8075,8 @@ ClangImporter::Implementation::importDeclContextOf(
   ext->setMemberLoader(this, reinterpret_cast<uintptr_t>(declSubmodule));
 
   if (auto protoDecl = ext->getExtendedProtocolDecl()) {
-    ext->setGenericParams(protoDecl->createGenericParams(ext));
-
-    auto *env = buildGenericEnvironment(ext->getGenericParams(), ext);
-    ext->setGenericEnvironment(env);
+    ext->createGenericParamsIfMissing(protoDecl);
+    ext->setGenericEnvironment(protoDecl->getGenericEnvironment());
   }
 
   // Add the extension to the nominal type.
@@ -8243,7 +8266,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   return var;
 }
 
-/// \brief Create a decl with error type and an "unavailable" attribute on it
+/// Create a decl with error type and an "unavailable" attribute on it
 /// with the specified message.
 void ClangImporter::Implementation::
 markUnavailable(ValueDecl *decl, StringRef unavailabilityMsgRef) {
@@ -8254,7 +8277,7 @@ markUnavailable(ValueDecl *decl, StringRef unavailabilityMsgRef) {
   decl->getAttrs().add(ua);
 }
 
-/// \brief Create a decl with error type and an "unavailable" attribute on it
+/// Create a decl with error type and an "unavailable" attribute on it
 /// with the specified message.
 ValueDecl *ClangImporter::Implementation::
 createUnavailableDecl(Identifier name, DeclContext *dc, Type type,

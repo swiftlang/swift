@@ -77,10 +77,13 @@ swift::_swift_stdlib_CFStringGetLength(_swift_shims_CFStringRef theString) {
 
 _swift_shims_CFStringRef
 swift::_swift_stdlib_CFStringCreateWithSubstring(
-                                         _swift_shims_CFAllocatorRef alloc,
+                                         const void *unused,
                                          _swift_shims_CFStringRef str,
                                          _swift_shims_CFRange range) {
-  return cast(CFStringCreateWithSubstring(cast(alloc), cast(str), cast(range)));
+  assert(unused == NULL);
+  return cast(CFStringCreateWithSubstring(kCFAllocatorSystemDefault,
+                                          cast(str),
+                                          cast(range)));
 }
 
 _swift_shims_CFComparisonResult
@@ -108,17 +111,19 @@ swift::_swift_stdlib_CFStringGetCharacterAtIndex(_swift_shims_CFStringRef theStr
 }
 
 _swift_shims_CFStringRef
-swift::_swift_stdlib_CFStringCreateCopy(_swift_shims_CFAllocatorRef alloc,
+swift::_swift_stdlib_CFStringCreateCopy(const void *unused,
                                         _swift_shims_CFStringRef theString) {
-  return cast(CFStringCreateCopy(cast(alloc), cast(theString)));
+  assert(unused == NULL);
+  return cast(CFStringCreateCopy(kCFAllocatorSystemDefault, cast(theString)));
 }
 
 _swift_shims_CFStringRef
 swift::_swift_stdlib_CFStringCreateWithBytes(
-    _swift_shims_CFAllocatorRef _Nullable alloc, const uint8_t *bytes,
+    const void *unused, const uint8_t *bytes,
     _swift_shims_CFIndex numBytes, _swift_shims_CFStringEncoding encoding,
     _swift_shims_Boolean isExternalRepresentation) {
-  return cast(CFStringCreateWithBytes(cast(alloc), bytes, numBytes,
+  assert(unused == NULL);
+  return cast(CFStringCreateWithBytes(kCFAllocatorSystemDefault, bytes, numBytes,
                                       cast(encoding),
                                       isExternalRepresentation));
 }
@@ -173,6 +178,11 @@ swift::_swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
   
   return imp(obj, sel, buffer, maxLength, encoding);
 
+}
+
+__swift_uintptr_t
+swift::_swift_stdlib_unsafeAddressOfClass(id _Nonnull obj) {
+  return (__swift_uintptr_t)object_getClass(obj); //TODO: do direct isa access when in the OS
 }
 
 

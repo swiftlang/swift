@@ -26,16 +26,16 @@ namespace swift {
 
 #define COMPATIBILITY_UNPAREN(...) __VA_ARGS__
 
-#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
-  typedef ret (*Original_ ## name) typedArgs;
+#define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
+  ccAttrs typedef ret (*Original_ ## name) typedArgs;
 #include "CompatibilityOverride.def"
 
-#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
-  typedef ret (*Override_ ## name)(COMPATIBILITY_UNPAREN typedArgs, \
-                                   Original_ ## name originalImpl);
+#define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
+  ccAttrs typedef ret (*Override_ ## name)(COMPATIBILITY_UNPAREN typedArgs, \
+                                           Original_ ## name originalImpl);
 #include "CompatibilityOverride.def"
 
-#define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
+#define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   Override_ ## name getOverride_ ## name();
 #include "CompatibilityOverride.def"
 
@@ -44,8 +44,8 @@ namespace swift {
 /// OVERRIDE macro from CompatibilityOverride.def to this macro, then includes
 /// the file to generate the override points. The original implementation of the
 /// functionality must be available as swift_funcNameHereImpl.
-#define COMPATIBILITY_OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
-  attrs ret namespace swift_ ## name typedArgs {                                  \
+#define COMPATIBILITY_OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
+  attrs ccAttrs ret namespace swift_ ## name typedArgs {                          \
     static Override_ ## name Override;                                            \
     static swift_once_t Predicate;                                                \
     swift_once(&Predicate, [](void *) {                                           \

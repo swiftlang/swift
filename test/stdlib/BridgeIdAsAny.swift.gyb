@@ -33,8 +33,9 @@ struct KnownUnbridged: Equatable, Hashable {
     return a.x === b.x && a.y === b.y
   }
 
-  public var hashValue: Int {
-    return x.hashValue ^ y.hashValue
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(x)
+    hasher.combine(y)
   }
 }
 

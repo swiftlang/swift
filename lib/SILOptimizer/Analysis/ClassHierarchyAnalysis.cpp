@@ -64,7 +64,7 @@ void ClassHierarchyAnalysis::init() {
   }
 }
 
-/// \brief Get all subclasses of a given class.
+/// Get all subclasses of a given class.
 ///
 /// \p Current class, whose direct and indirect subclasses are
 ///    to be collected.

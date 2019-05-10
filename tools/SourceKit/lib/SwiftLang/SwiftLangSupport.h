@@ -41,6 +41,7 @@ namespace swift {
   class SourceFile;
   class SILOptions;
   class ValueDecl;
+  class GenericSignature;
   enum class AccessorKind;
 
 namespace syntax {
@@ -72,6 +73,8 @@ namespace SourceKit {
   class SwiftLangSupport;
   class Context;
   class NotificationCenter;
+
+  using TypeContextKind = swift::ide::CodeCompletionContext::TypeContextKind;
 
 class SwiftEditorDocument :
     public ThreadSafeRefCountedBase<SwiftEditorDocument> {
@@ -161,7 +164,7 @@ class SessionCache : public ThreadSafeRefCountedBase<SessionCache> {
   CompletionSink sink;
   std::vector<Completion *> sortedCompletions;
   CompletionKind completionKind;
-  bool completionHasExpectedTypes;
+  TypeContextKind typeContextKind;
   bool completionMayUseImplicitMemberExpr;
   FilterRules filterRules;
   llvm::sys::Mutex mtx;
@@ -170,11 +173,10 @@ public:
   SessionCache(CompletionSink &&sink,
                std::unique_ptr<llvm::MemoryBuffer> &&buffer,
                std::vector<std::string> &&args, CompletionKind completionKind,
-               bool hasExpectedTypes, bool mayUseImplicitMemberExpr,
+               TypeContextKind typeContextKind, bool mayUseImplicitMemberExpr,
                FilterRules filterRules)
       : buffer(std::move(buffer)), args(std::move(args)), sink(std::move(sink)),
-        completionKind(completionKind),
-        completionHasExpectedTypes(hasExpectedTypes),
+        completionKind(completionKind), typeContextKind(typeContextKind),
         completionMayUseImplicitMemberExpr(mayUseImplicitMemberExpr),
         filterRules(std::move(filterRules)) {}
   void setSortedCompletions(std::vector<Completion *> &&completions);
@@ -183,7 +185,7 @@ public:
   ArrayRef<std::string> getCompilerArgs();
   const FilterRules &getFilterRules();
   CompletionKind getCompletionKind();
-  bool getCompletionHasExpectedTypes();
+  TypeContextKind getCompletionTypeContextKind();
   bool getCompletionMayUseImplicitMemberExpr();
 };
 typedef RefPtr<SessionCache> SessionCacheRef;
@@ -245,11 +247,12 @@ public:
   ~RequestRefactoringEditConsumer();
   void accept(swift::SourceManager &SM, swift::ide::RegionType RegionType,
               ArrayRef<swift::ide::Replacement> Replacements) override;
-  void handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
-                        swift::DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<swift::DiagnosticArgument> FormatArgs,
-                        const swift::DiagnosticInfo &Info) override;
+  void
+  handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
+                   swift::DiagnosticKind Kind, StringRef FormatString,
+                   ArrayRef<swift::DiagnosticArgument> FormatArgs,
+                   const swift::DiagnosticInfo &Info,
+                   swift::SourceLoc bufferIndirectlyCausingDiagnostic) override;
 };
 
 class RequestRenameRangeConsumer : public swift::ide::FindRenameRangesConsumer,
@@ -262,11 +265,12 @@ public:
   ~RequestRenameRangeConsumer();
   void accept(swift::SourceManager &SM, swift::ide::RegionType RegionType,
               ArrayRef<swift::ide::RenameRangeDetail> Ranges) override;
-  void handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
-                        swift::DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<swift::DiagnosticArgument> FormatArgs,
-                        const swift::DiagnosticInfo &Info) override;
+  void
+  handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
+                   swift::DiagnosticKind Kind, StringRef FormatString,
+                   ArrayRef<swift::DiagnosticArgument> FormatArgs,
+                   const swift::DiagnosticInfo &Info,
+                   swift::SourceLoc bufferIndirectlyCausingDiagnostic) override;
 };
 
 struct SwiftStatistics {
@@ -305,6 +309,13 @@ public:
     return CCCache;
   }
 
+  /// Copy a memory buffer inserting '0' at the position of \c origBuf.
+  // TODO: Share with code completion.
+  static std::unique_ptr<llvm::MemoryBuffer>
+  makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
+                                 unsigned &Offset,
+                                 const std::string bufferIdentifier);
+
   static SourceKit::UIdent getUIDForDecl(const swift::Decl *D,
                                          bool IsRef = false);
   static SourceKit::UIdent getUIDForExtensionOfDecl(const swift::Decl *D);
@@ -317,6 +328,7 @@ public:
                                              swift::AccessorKind AccKind,
                                              bool IsRef = false);
   static SourceKit::UIdent getUIDForModuleRef();
+  static SourceKit::UIdent getUIDForObjCAttr();
   static SourceKit::UIdent getUIDForSyntaxNodeKind(
       swift::ide::SyntaxNodeKind Kind);
   static SourceKit::UIdent getUIDForSyntaxStructureKind(
@@ -376,6 +388,17 @@ public:
   printFullyAnnotatedSynthesizedDeclaration(const swift::ValueDecl *VD,
                                             swift::TypeOrExtensionDecl Target,
                                             llvm::raw_ostream &OS);
+
+  static void
+  printFullyAnnotatedGenericReq(const swift::GenericSignature *Sig,
+                                llvm::raw_ostream &OS);
+
+  /// Print 'description' or 'sourcetext' the given \p VD to \p OS. If
+  /// \p usePlaceholder is \c true, call argument positions are substituted with
+  /// a typed editor placeholders which is suitable for 'sourcetext'.
+  static void
+  printMemberDeclDescription(const swift::ValueDecl *VD, swift::Type baseTy,
+                             bool usePlaceholder, llvm::raw_ostream &OS);
 
   /// Tries to resolve the path to the real file-system path. If it fails it
   /// returns the original path;
@@ -502,6 +525,10 @@ public:
                              unsigned Length, ArrayRef<const char *> Args,
                              CategorizedRenameRangesReceiver Receiver) override;
 
+  void collectExpressionTypes(StringRef FileName, ArrayRef<const char *> Args,
+                              ArrayRef<const char *> ExpectedProtocols,
+                              std::function<void(const ExpressionTypesInFile&)> Receiver) override;
+
   void semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
                            ArrayRef<const char*> Args,
                            CategorizedEditsReceiver Receiver) override;
@@ -519,6 +546,15 @@ public:
 
   void findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
                std::function<void(ArrayRef<StringRef>, StringRef Error)> Receiver) override;
+
+  void getExpressionContextInfo(llvm::MemoryBuffer *inputBuf, unsigned Offset,
+                                ArrayRef<const char *> Args,
+                                TypeContextInfoConsumer &Consumer) override;
+
+  void getConformingMethodList(llvm::MemoryBuffer *inputBuf, unsigned Offset,
+                               ArrayRef<const char *> Args,
+                               ArrayRef<const char *> ExpectedTypes,
+                               ConformingMethodListConsumer &Consumer) override;
 
   void getStatistics(StatisticsReceiver) override;
 

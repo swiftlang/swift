@@ -13,7 +13,7 @@ func foo(a: TwoInts) {
 
 // CHECK:      key.kind: source.lang.swift.import.module.swift
 // CHECK-NEXT: key.name: "Swift"
-// CHECK-NEXT: key.filepath: "{{.*[/\\]}}Swift.swiftmodule"
+// CHECK-NEXT: key.filepath: "{{.*[/\\]Swift[.]swiftmodule([/\\].+[.]swiftmodule)?}}"
 // CHECK-NEXT: key.hash:
 
 // CHECK:      key.kind: source.lang.swift.import.module.swift

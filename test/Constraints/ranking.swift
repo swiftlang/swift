@@ -30,7 +30,7 @@ func genericOverload<T>(_: T?) {}
 func genericOptional<T>(_: T?) {}
 func genericNoOptional<T>(_: T) {}
 
-// CHECK-LABEL: sil hidden @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlF
+// CHECK-LABEL: sil hidden [ossa] @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlF
 func propertyVersusFunction<T : P>(_ p: P, _ t: T) {
   // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter.1
   let _ = p.p
@@ -149,7 +149,7 @@ func f1(_ a: A) -> A { return a }
 func f1(_ b: B) -> B { return b }
 
 func testDerived(b: B) {
-  // CHECK-LABEL: sil hidden @$s7ranking11testDerived1byAA1BC_tF
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking11testDerived1byAA1BC_tF
   // CHECK: function_ref @$s7ranking2f1yAA1BCADF
   // CHECK: function_ref @$s7ranking2f0yyxlF
   f0(f1(b))
@@ -191,7 +191,7 @@ extension GenericClass {
 
 // Make sure we favour the class implementation over the protocol requirement.
 
-// CHECK-LABEL: sil hidden @$s7ranking32testGenericPropertyProtocolClassyyxAA1YCRbzAA1XRzlF
+// CHECK-LABEL: sil hidden [ossa] @$s7ranking32testGenericPropertyProtocolClassyyxAA1YCRbzAA1XRzlF
 func testGenericPropertyProtocolClass<T : X & Y>(_ t: T) {
   _ = t.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter.1
   _ = t.bar   // CHECK: function_ref @$s7ranking1YC3barSivg
@@ -199,7 +199,7 @@ func testGenericPropertyProtocolClass<T : X & Y>(_ t: T) {
   _ = t[""]   // CHECK: class_method {{%.*}} : $Y, #Y.subscript!getter.1
 }
 
-// CHECK-LABEL: sil hidden @$s7ranking36testExistentialPropertyProtocolClassyyAA1X_AA1YCXcF
+// CHECK-LABEL: sil hidden [ossa] @$s7ranking36testExistentialPropertyProtocolClassyyAA1X_AA1YCXcF
 func testExistentialPropertyProtocolClass(_ t: X & Y) {
   _ = t.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter.1
   _ = t.bar   // CHECK: function_ref @$s7ranking1YC3barSivg
@@ -207,7 +207,7 @@ func testExistentialPropertyProtocolClass(_ t: X & Y) {
   _ = t[""]   // CHECK: class_method {{%.*}} : $Y, #Y.subscript!getter.1
 }
 
-// CHECK-LABEL: sil hidden @$s7ranking46testGenericPropertySubclassConstrainedProtocolyyxAA1ZRzlF
+// CHECK-LABEL: sil hidden [ossa] @$s7ranking46testGenericPropertySubclassConstrainedProtocolyyxAA1ZRzlF
 func testGenericPropertySubclassConstrainedProtocol<T : Z>(_ t: T) {
   _ = t.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter.1
   _ = t.bar   // CHECK: function_ref @$s7ranking1YC3barSivg
@@ -215,7 +215,7 @@ func testGenericPropertySubclassConstrainedProtocol<T : Z>(_ t: T) {
   _ = t[""]   // CHECK: class_method {{%.*}} : $Y, #Y.subscript!getter.1
 }
 
-// CHECK-LABEL: sil hidden @$s7ranking50testExistentialPropertySubclassConstrainedProtocolyyAA1Z_pF
+// CHECK-LABEL: sil hidden [ossa] @$s7ranking50testExistentialPropertySubclassConstrainedProtocolyyAA1Z_pF
 func testExistentialPropertySubclassConstrainedProtocol(_ t: Z) {
   _ = t.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter.1
   _ = t.bar   // CHECK: function_ref @$s7ranking1YC3barSivg
@@ -223,7 +223,7 @@ func testExistentialPropertySubclassConstrainedProtocol(_ t: Z) {
   _ = t[""]   // CHECK: class_method {{%.*}} : $Y, #Y.subscript!getter.1
 }
 
-// CHECK-LABEL: sil hidden @$s7ranking43testExistentialPropertyProtocolGenericClassyyAA1X_AA0fG0CySiGXcF
+// CHECK-LABEL: sil hidden [ossa] @$s7ranking43testExistentialPropertyProtocolGenericClassyyAA1X_AA0fG0CySiGXcF
 func testExistentialPropertyProtocolGenericClass(_ t: GenericClass<Int> & X) {
   _ = t.foo   // CHECK: class_method {{%.*}} : $GenericClass<Int>, #GenericClass.foo!getter.1
   _ = t.bar   // CHECK: function_ref @$s7ranking12GenericClassC3barxvg
@@ -231,7 +231,7 @@ func testExistentialPropertyProtocolGenericClass(_ t: GenericClass<Int> & X) {
   _ = t[""]   // CHECK: function_ref @$s7ranking12GenericClassCySiSScig
 }
 
-// CHECK-LABEL: sil hidden @$s7ranking43testExistentialPropertyProtocolGenericClassyyAA1X_AA0fG0CySSGXcF
+// CHECK-LABEL: sil hidden [ossa] @$s7ranking43testExistentialPropertyProtocolGenericClassyyAA1X_AA0fG0CySSGXcF
 func testExistentialPropertyProtocolGenericClass(_ t: GenericClass<String> & X) {
   _ = t.foo   // CHECK: class_method {{%.*}} : $GenericClass<String>, #GenericClass.foo!getter.1
   _ = t.bar   // CHECK: function_ref @$s7ranking12GenericClassC3barxvg
@@ -240,7 +240,7 @@ func testExistentialPropertyProtocolGenericClass(_ t: GenericClass<String> & X) 
 }
 
 extension X where Self : Y {
-  // CHECK-LABEL: sil hidden @$s7ranking1XPA2A1YCRbzrlE32testGenericPropertyProtocolClassyyxF
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking1XPA2A1YCRbzrlE32testGenericPropertyProtocolClassyyxF
   func testGenericPropertyProtocolClass(_ x: Self) {
     _ = self.foo   // CHECK: class_method {{%.*}} : $Y, #Y.foo!getter.1
     _ = self.bar   // CHECK: function_ref @$s7ranking1YC3barSivg
@@ -250,7 +250,7 @@ extension X where Self : Y {
 }
 
 extension X where Self : GenericClass<Int> {
-  // CHECK-LABEL: sil hidden @$s7ranking1XPA2A12GenericClassCySiGRbzrlE04testb16PropertyProtocolbC0yyxF
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking1XPA2A12GenericClassCySiGRbzrlE04testb16PropertyProtocolbC0yyxF
   func testGenericPropertyProtocolGenericClass(_ x: Self) {
     _ = self.foo   // CHECK: class_method {{%.*}} : $GenericClass<Int>, #GenericClass.foo!getter.1
     _ = self.bar   // CHECK: function_ref @$s7ranking12GenericClassC3barxvg
@@ -260,7 +260,7 @@ extension X where Self : GenericClass<Int> {
 }
 
 extension X where Self : GenericClass<String> {
-  // CHECK-LABEL: sil hidden @$s7ranking1XPA2A12GenericClassCySSGRbzrlE04testb16PropertyProtocolbC0yyxF
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking1XPA2A12GenericClassCySSGRbzrlE04testb16PropertyProtocolbC0yyxF
   func testGenericPropertyProtocolGenericClass(_ x: Self) {
     _ = self.foo   // CHECK: class_method {{%.*}} : $GenericClass<String>, #GenericClass.foo!getter.1
     _ = self.bar   // CHECK: function_ref @$s7ranking12GenericClassC3barxvg
@@ -274,7 +274,7 @@ extension X where Self : GenericClass<String> {
 //--------------------------------------------------------------------
 
 struct UnsafePointerStruct {
-  // CHECK-LABEL: sil hidden @$s7ranking19UnsafePointerStructVyACSPyxGSgclufC : $@convention(method) <U> (Optional<UnsafePointer<U>>, @thin UnsafePointerStruct.Type) -> UnsafePointerStruct
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking19UnsafePointerStructVyACSPyxGSgclufC : $@convention(method) <U> (Optional<UnsafePointer<U>>, @thin UnsafePointerStruct.Type) -> UnsafePointerStruct
   init<U>(_ from: UnsafePointer<U>) {}
   init<U>(_ from: UnsafePointer<U>?) {
     // CHECK: function_ref @$s7ranking19UnsafePointerStructVyACSPyxGclufC : $@convention(method) <τ_0_0> (UnsafePointer<τ_0_0>, @thin UnsafePointerStruct.Type) -> UnsafePointerStruct
@@ -282,7 +282,7 @@ struct UnsafePointerStruct {
   }
 }
 
-// CHECK-LABEL: sil hidden @$s7ranking22useUnsafePointerStructyySPyxGlF : $@convention(thin) <U> (UnsafePointer<U>) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s7ranking22useUnsafePointerStructyySPyxGlF : $@convention(thin) <U> (UnsafePointer<U>) -> ()
 func useUnsafePointerStruct<U>(_ ptr: UnsafePointer<U>) {
   // CHECK: function_ref @$s7ranking19UnsafePointerStructVyACSPyxGclufC : $@convention(method) <τ_0_0> (UnsafePointer<τ_0_0>, @thin UnsafePointerStruct.Type) -> UnsafePointerStruct
   let _: UnsafePointerStruct = UnsafePointerStruct(ptr)

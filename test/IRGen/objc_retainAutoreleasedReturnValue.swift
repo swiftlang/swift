@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-frontend -module-name objc_retainAutoreleasedReturnValue -assume-parsing-unqualified-ownership-sil -import-objc-header %S/Inputs/StaticInline.h %s -emit-ir | %FileCheck %s
-// RUN: %target-swift-frontend -module-name objc_retainAutoreleasedReturnValue -O -assume-parsing-unqualified-ownership-sil -import-objc-header %S/Inputs/StaticInline.h %s -emit-ir | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend -module-name objc_retainAutoreleasedReturnValue -import-objc-header %S/Inputs/StaticInline.h %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -module-name objc_retainAutoreleasedReturnValue -O -import-objc-header %S/Inputs/StaticInline.h %s -emit-ir | %FileCheck %s --check-prefix=OPT
 
 // REQUIRES: objc_interop
 // REQUIRES: CPU=x86_64
@@ -28,11 +28,11 @@ public func test(_ dict: NSDictionary) {
 // CHECK-LABEL: define {{.*}}swiftcc void @"$s34objc_retainAutoreleasedReturnValue4testyySo12NSDictionaryCFyADXEfU_"(%TSo12NSDictionaryC*)
 // CHECK: entry:
 // CHECK:   call {{.*}}@objc_msgSend
-// CHECK:   notail call i8* @objc_retainAutoreleasedReturnValue
+// CHECK:   notail call i8* @llvm.objc.retainAutoreleasedReturnValue
 // CHECK:   ret void
 
 // OPT-LABEL: define {{.*}}swiftcc void @"$s34objc_retainAutoreleasedReturnValue4testyySo12NSDictionaryCFyADXEfU_"(%TSo12NSDictionaryC*)
 // OPT: entry:
 // OPT:   call {{.*}}@objc_msgSend
-// OPT:   notail call i8* @objc_retainAutoreleasedReturnValue
+// OPT:   notail call i8* @llvm.objc.retainAutoreleasedReturnValue
 // OPT:   ret void

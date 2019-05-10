@@ -80,7 +80,7 @@ _swift_shims_CFIndex _swift_stdlib_CFStringGetLength(
 SWIFT_RUNTIME_STDLIB_API
 __attribute__((ns_returns_retained))
 _swift_shims_CFStringRef _Nonnull _swift_stdlib_CFStringCreateWithSubstring(
-    _swift_shims_CFAllocatorRef _Nullable alloc,
+    const void * _Nullable unused,
     _swift_shims_CFStringRef _Nonnull str, _swift_shims_CFRange range);
 
 SWIFT_RUNTIME_STDLIB_API
@@ -90,13 +90,13 @@ _swift_shims_UniChar _swift_stdlib_CFStringGetCharacterAtIndex(
 SWIFT_RUNTIME_STDLIB_API
 __attribute__((ns_returns_retained))
 _swift_shims_CFStringRef _Nonnull _swift_stdlib_CFStringCreateCopy(
-    _swift_shims_CFAllocatorRef _Nullable alloc,
+    const void * _Nullable unused,
     _swift_shims_CFStringRef _Nonnull theString);
 
 SWIFT_RUNTIME_STDLIB_API
 __attribute__((ns_returns_retained))
 _swift_shims_CFStringRef _Nonnull _swift_stdlib_CFStringCreateWithBytes(
-    _swift_shims_CFAllocatorRef _Nullable alloc,
+    const void * _Nullable unused,
     const __swift_uint8_t *_Nonnull bytes, _swift_shims_CFIndex numBytes,
     _swift_shims_CFStringEncoding encoding,
     _swift_shims_Boolean isExternalRepresentation);
@@ -134,9 +134,13 @@ _swift_stdlib_NSStringCStringUsingEncodingTrampoline(id _Nonnull obj,
 SWIFT_RUNTIME_STDLIB_API
 __swift_uint8_t
 _swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
-                                         _swift_shims_UInt8 *buffer,
-                                         _swift_shims_CFIndex maxLength,
-                                         unsigned long encoding);
+                                           _swift_shims_UInt8 *_Nonnull buffer,
+                                           _swift_shims_CFIndex maxLength,
+                                           unsigned long encoding);
+
+SWIFT_RUNTIME_STDLIB_API
+__swift_uintptr_t
+_swift_stdlib_unsafeAddressOfClass(id _Nonnull obj);
   
 #endif // __OBJC2__
 

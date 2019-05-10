@@ -1,0 +1,50 @@
+#!/usr/bin/python
+# TODO(TF-491): Re-enable.
+# RUN: echo "disabled"
+# UN: ${python} %s %target-swiftmodule-name %platform-sdk-overlay-dir \
+# UN:     %target-sil-opt -sdk %sdk -enable-sil-verify-all \
+# UN:       -F %sdk/System/Library/PrivateFrameworks \
+# UN:       -F "%xcode-extra-frameworks-dir"
+
+# REQUIRES: long_test
+# REQUIRES: nonexecutable_test
+
+# TODO(TF-491): Re-enable XFAIL.
+# XFAI: OS=macosx
+# https://bugs.swift.org/browse/SR-9847
+
+from __future__ import print_function
+
+import os
+import subprocess
+import sys
+
+target_swiftmodule_name = sys.argv[1]
+sdk_overlay_dir = sys.argv[2]
+sil_opt_invocation = sys.argv[3:]
+
+for module_file in os.listdir(sdk_overlay_dir):
+    module_name, ext = os.path.splitext(module_file)
+    if ext != ".swiftmodule":
+        continue
+    # Skip the standard library because it's tested elsewhere.
+    if module_name == "Swift":
+        continue
+    print("# " + module_name)
+
+    module_path = os.path.join(sdk_overlay_dir, module_file)
+    if os.path.isdir(module_path):
+        module_path = os.path.join(module_path, target_swiftmodule_name)
+
+    # llvm-bcanalyzer | not grep Unknown
+    bcanalyzer_output = subprocess.check_output(["llvm-bcanalyzer",
+                                                 module_path])
+    if "Unknown" in bcanalyzer_output:
+        print(bcanalyzer_output)
+        sys.exit(1)
+
+    # sil-opt
+    # We are deliberately discarding the output here; we're just making sure
+    # it can be generated.
+    subprocess.check_output(sil_opt_invocation +
+                            [module_path, "-module-name", module_name])

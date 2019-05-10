@@ -44,7 +44,7 @@ enum class RequirementKind : unsigned {
   // when adding enumerators.
 };
 
-/// \brief A single requirement placed on the type parameters (or associated
+/// A single requirement placed on the type parameters (or associated
 /// types thereof) of a
 class Requirement {
   llvm::PointerIntPair<Type, 3, RequirementKind> FirstTypeAndKind;
@@ -73,21 +73,21 @@ public:
     assert(second);
   }
 
-  /// \brief Determine the kind of requirement.
+  /// Determine the kind of requirement.
   RequirementKind getKind() const { return FirstTypeAndKind.getInt(); }
 
-  /// \brief Retrieve the first type.
+  /// Retrieve the first type.
   Type getFirstType() const {
     return FirstTypeAndKind.getPointer();
   }
 
-  /// \brief Retrieve the second type.
+  /// Retrieve the second type.
   Type getSecondType() const {
     assert(getKind() != RequirementKind::Layout);
     return SecondType;
   }
 
-  /// \brief Subst the types involved in this requirement.
+  /// Subst the types involved in this requirement.
   ///
   /// The \c args arguments are passed through to Type::subst. This doesn't
   /// touch the superclasses, protocols or layout constraints.
@@ -113,7 +113,7 @@ public:
     llvm_unreachable("Unhandled RequirementKind in switch.");
   }
 
-  /// \brief Retrieve the layout constraint.
+  /// Retrieve the layout constraint.
   LayoutConstraint getLayoutConstraint() const {
     assert(getKind() == RequirementKind::Layout);
     return SecondLayout;

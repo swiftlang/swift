@@ -1,10 +1,10 @@
-// RUN: %target-swift-emit-silgen %s -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 struct X { }
 
 class A {
-// CHECK-LABEL: sil hidden @$s20complete_object_init1AC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick A.Type) -> @owned A
-// CHECK: bb0([[SELF_META:%[0-9]+]] : @trivial $@thick A.Type):
+// CHECK-LABEL: sil hidden [ossa] @$s20complete_object_init1AC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick A.Type) -> @owned A
+// CHECK: bb0([[SELF_META:%[0-9]+]] : $@thick A.Type):
 // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var A }
 // CHECK:   [[UNINIT_SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]] : ${ var A }
 // CHECK:   [[PB:%.*]] = project_box [[UNINIT_SELF]]

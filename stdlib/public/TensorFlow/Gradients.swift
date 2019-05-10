@@ -344,8 +344,9 @@ func _vjpPow<T : TensorFlowFloatingPoint>(
 ) -> (Tensor<T>, (Tensor<T>) -> (Tensor<T>, Tensor<T>)) {
   let value = pow(x, y)
   return (value, { v in
-    ((v * y * pow(x, y-1)).unbroadcast(like: x),
-     (v * log(x) * value).unbroadcast(like: y))
+    let dfdx = v * y * pow(x, y-1)
+    let dfdy = v * log(x) * value
+    return (dfdx.unbroadcast(like: x), dfdy.unbroadcast(like: y))
   })
 }
 

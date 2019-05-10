@@ -123,6 +123,7 @@ void OutputFileMap::write(llvm::raw_ostream &os,
     }
 
     os << "\n";
+    // DenseMap is unordered. If you write a test, please sort the output.
     for (auto &typeAndOutputPath : *outputMap) {
       file_types::ID type = typeAndOutputPath.getFirst();
       StringRef output = typeAndOutputPath.getSecond();

@@ -45,6 +45,10 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
       id.AddPointer(elt.getWitness());
       break;
 
+    case KeyPathDynamicMember:
+      id.AddPointer(elt.getKeyPath());
+      break;
+
     case ApplyArgument:
     case ApplyFunction:
     case FunctionArgument:
@@ -74,6 +78,12 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
     case ContextualType:
+    case SynthesizedArgument:
+    case KeyPathType:
+    case KeyPathRoot:
+    case KeyPathValue:
+    case KeyPathComponentResult:
+    case SingleExprFuncResultType:
       if (unsigned numValues = numNumericValuesInPathElement(elt.getKind())) {
         id.AddInteger(elt.getValue());
         if (numValues > 1)
@@ -82,6 +92,77 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
       break;
     }
   }
+}
+
+/// Determine whether given locator points to the subscript reference
+/// e.g. `foo[0]` or `\Foo.[0]`
+bool ConstraintLocator::isSubscriptMemberRef() const {
+  auto *anchor = getAnchor();
+  auto path = getPath();
+
+  if (!anchor || path.empty())
+    return false;
+
+  return path.back().getKind() == ConstraintLocator::SubscriptMember;
+}
+
+bool ConstraintLocator::isKeyPathType() const {
+  auto *anchor = getAnchor();
+  auto path = getPath();
+  // The format of locator should be `<keypath expr> -> key path type`
+  if (!anchor || !isa<KeyPathExpr>(anchor) || path.size() != 1)
+    return false;
+  return path.back().getKind() == ConstraintLocator::KeyPathType;
+}
+
+bool ConstraintLocator::isKeyPathRoot() const {
+  auto *anchor = getAnchor();
+  auto path = getPath();
+
+  if (!anchor || path.empty())
+    return false;
+
+  return path.back().getKind() == ConstraintLocator::KeyPathRoot;
+}
+
+bool ConstraintLocator::isKeyPathValue() const {
+  auto *anchor = getAnchor();
+  auto path = getPath();
+
+  if (!anchor || path.empty())
+    return false;
+
+  return path.back().getKind() == ConstraintLocator::KeyPathValue;
+}
+
+bool ConstraintLocator::isResultOfKeyPathDynamicMemberLookup() const {
+  return llvm::any_of(getPath(), [](const LocatorPathElt &elt) {
+    return elt.isKeyPathDynamicMember();
+  });
+}
+
+bool ConstraintLocator::isKeyPathSubscriptComponent() const {
+  auto *anchor = getAnchor();
+  auto *KPE = dyn_cast_or_null<KeyPathExpr>(anchor);
+  if (!KPE)
+    return false;
+
+  using ComponentKind = KeyPathExpr::Component::Kind;
+  return llvm::any_of(getPath(), [&](const LocatorPathElt &elt) {
+    if (!elt.isKeyPathComponent())
+      return false;
+
+    auto index = elt.getValue();
+    auto &component = KPE->getComponents()[index];
+    return component.getKind() == ComponentKind::Subscript ||
+           component.getKind() == ComponentKind::UnresolvedSubscript;
+  });
+}
+
+bool ConstraintLocator::isForKeyPathComponent() const {
+  return llvm::any_of(getPath(), [&](const LocatorPathElt &elt) {
+    return elt.isKeyPathComponent();
+  });
 }
 
 void ConstraintLocator::dump(SourceManager *sm) {
@@ -105,6 +186,25 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       anchor->getLoc().print(out, *sm);
     }
   }
+
+  auto dumpReqKind = [&out](RequirementKind kind) {
+    out << " (";
+    switch (kind) {
+    case RequirementKind::Conformance:
+      out << "conformance";
+      break;
+    case RequirementKind::Superclass:
+      out << "superclass";
+      break;
+    case RequirementKind::SameType:
+      out << "same-type";
+      break;
+    case RequirementKind::Layout:
+      out << "layout";
+      break;
+    }
+    out << ")";
+  };
 
   for (auto elt : getPath()) {
     out << " -> ";
@@ -222,26 +322,12 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case ConditionalRequirement:
       out << "conditional requirement #" << llvm::utostr(elt.getValue());
+      dumpReqKind(static_cast<RequirementKind>(elt.getValue2()));
       break;
 
     case TypeParameterRequirement: {
-      out << "type parameter requirement #" << llvm::utostr(elt.getValue())
-          << " (";
-      switch (static_cast<RequirementKind>(elt.getValue2())) {
-      case RequirementKind::Conformance:
-        out << "conformance";
-        break;
-      case RequirementKind::Superclass:
-        out << "superclass";
-        break;
-      case RequirementKind::SameType:
-        out << "same-type";
-        break;
-      case RequirementKind::Layout:
-        out << "layout";
-        break;
-      }
-      out << ")";
+      out << "type parameter requirement #" << llvm::utostr(elt.getValue());
+      dumpReqKind(static_cast<RequirementKind>(elt.getValue2()));
       break;
     }
 
@@ -256,8 +342,34 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
     case ContextualType:
       out << "contextual type";
       break;
+
+    case SynthesizedArgument:
+      out << "synthesized argument #" << llvm::utostr(elt.getValue());
+      break;
+
+    case KeyPathDynamicMember:
+      out << "key path dynamic member lookup";
+      break;
+
+    case KeyPathType:
+      out << "key path type";
+      break;
+
+    case KeyPathRoot:
+      out << "key path root";
+      break;
+
+    case KeyPathValue:
+      out << "key path value";
+      break;
+
+    case KeyPathComponentResult:
+      out << "key path component result";
+      break;
+    case SingleExprFuncResultType:
+      out << " expected result type of the function with a single expression";
+      break;
     }
   }
-
   out << ']';
 }

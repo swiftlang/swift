@@ -1,11 +1,10 @@
-
-// RUN: %target-swift-emit-silgen -module-name without_actually_escaping -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name without_actually_escaping %s | %FileCheck %s
 
 var escapeHatch: Any = 0
 
-// CHECK-LABEL: sil hidden @$s25without_actually_escaping9letEscape1fyycyyXE_tF
+// CHECK-LABEL: sil hidden [ossa] @$s25without_actually_escaping9letEscape1fyycyyXE_tF
 func letEscape(f: () -> ()) -> () -> () {
-  // CHECK: bb0([[ARG:%.*]] : @trivial $@noescape @callee_guaranteed () -> ()):
+  // CHECK: bb0([[ARG:%.*]] : $@noescape @callee_guaranteed () -> ()):
   // CHECK: [[THUNK:%.*]] = function_ref @$sIg_Ieg_TR : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   // TODO: Use a canary wrapper instead of just copying the nonescaping value
   // CHECK: [[ESCAPABLE_COPY:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[ARG]])
@@ -20,10 +19,10 @@ func letEscape(f: () -> ()) -> () -> () {
 
 // thunk for @callee_guaranteed () -> ()
 // The thunk must be [without_actually_escaping].
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] @$sIg_Ieg_TR : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] [ossa] @$sIg_Ieg_TR : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> () {
 
-// CHECK-LABEL: sil hidden @$s25without_actually_escaping14letEscapeThrow1fyycyycyKXE_tKF
-// CHECK: bb0([[ARG:%.*]] : @trivial $@noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error Error)):
+// CHECK-LABEL: sil hidden [ossa] @$s25without_actually_escaping14letEscapeThrow1fyycyycyKXE_tKF
+// CHECK: bb0([[ARG:%.*]] : $@noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error Error)):
 // CHECK: [[CVT:%.*]] = function_ref @$sIeg_s5Error_pIgozo_Ieg_sAA_pIegozo_TR
 // CHECK: [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CVT]]([[ARG]])
 // CHECK:  [[MD:%.*]] = mark_dependence [[CLOSURE]] : {{.*}} on [[ARG]]
@@ -50,7 +49,7 @@ func letEscapeThrow(f: () throws -> () -> ()) throws -> () -> () {
 
 // thunk for @callee_guaranteed () -> (@owned @escaping @callee_guaranteed () -> (), @error @owned Error)
 // The thunk must be [without_actually_escaping].
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] @$sIeg_s5Error_pIgozo_Ieg_sAA_pIegozo_TR : $@convention(thin) (@noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error Error)) -> (@owned @callee_guaranteed () -> (), @error Error) {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] [ossa] @$sIeg_s5Error_pIgozo_Ieg_sAA_pIegozo_TR : $@convention(thin) (@noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error Error)) -> (@owned @callee_guaranteed () -> (), @error Error) {
 
 // We used to crash on this example because we would use the wrong substitution
 // map.
@@ -73,5 +72,31 @@ struct DontCrash {
   ) {
     withoutActuallyEscaping(closure2) { closure2 in
     }
+  }
+}
+
+func modifyAndPerform<T>(_ _: UnsafeMutablePointer<T>, closure: () ->()) {
+  closure()
+}
+
+// Make sure that we properly handle cases where the input closure is not
+// trivial. This means we need to copy first.
+// CHECK-LABEL: sil hidden [ossa] @$s25without_actually_escaping0A24ActuallyEscapingConflictyyF : $@convention(thin) () -> () {
+// CHECK: [[CLOSURE_1_FUN:%.*]] = function_ref @$s25without_actually_escaping0A24ActuallyEscapingConflictyyFyycfU_ :
+// CHECK: [[CLOSURE_1:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_1_FUN]](
+// CHECK: [[BORROWED_CLOSURE_1:%.*]] = begin_borrow [[CLOSURE_1]]
+// CHECK: [[COPY_BORROWED_CLOSURE_1:%.*]] = copy_value [[BORROWED_CLOSURE_1]]
+// CHECK: [[COPY_2_BORROWED_CLOSURE_1:%.*]] = copy_value [[COPY_BORROWED_CLOSURE_1]]
+// CHECK: [[THUNK_FUNC:%.*]] = function_ref @$sIeg_Ieg_TR :
+// CHECK: [[THUNK_PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FUNC]]([[COPY_2_BORROWED_CLOSURE_1]])
+// CHECK: [[THUNK_PA_MDI:%.*]] = mark_dependence [[THUNK_PA]] : $@callee_guaranteed () -> () on [[COPY_BORROWED_CLOSURE_1]] : $@callee_guaranteed () -> ()
+// CHECK: destroy_value [[THUNK_PA_MDI]]
+// CHECK: destroy_value [[COPY_BORROWED_CLOSURE_1]]
+// CHECK: } // end sil function '$s25without_actually_escaping0A24ActuallyEscapingConflictyyF'
+func withoutActuallyEscapingConflict() {
+  var localVar = 0
+  let nestedModify = { localVar = 3 }
+  withoutActuallyEscaping(nestedModify) {
+    modifyAndPerform(&localVar, closure: $0)
   }
 }

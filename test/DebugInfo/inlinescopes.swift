@@ -5,9 +5,9 @@
 // RUN: %FileCheck %s < %t.ll
 // RUN: %FileCheck %s -check-prefix=TRANSPARENT-CHECK < %t.ll
 
-// CHECK: define{{( protected)?( signext)?}} i32 @main
+// CHECK: define{{( dllexport)?}}{{( protected)?( signext)?}} i32 @main
 // CHECK: call {{.*}}noinline{{.*}}, !dbg ![[CALL:.*]]
-// CHECK-DAG: ![[TOPLEVEL:.*]] = !DIFile(filename: "inlinescopes.swift"
+// CHECK-DAG: ![[TOPLEVEL:.*]] = !DIFile(filename: "{{.*}}inlinescopes.swift"
 
 import FooBar
 

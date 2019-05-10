@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_class_thunks.swiftmodule -module-name=resilient_class_thunks %S/../Inputs/resilient_class_thunks.swift
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_class_thunks.swiftmodule -module-name=resilient_class_thunks %S/../Inputs/resilient_class_thunks.swift
 // RUN: %target-swift-frontend -I %t -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // RUN: %target-swift-frontend -I %t -emit-ir -O %s
 
@@ -54,4 +54,8 @@ public func testDispatchThunkMyOverride(d: MyDerived, o: Object) {
   d.takesReference(o)
 
   // CHECK: ret void
+}
+
+public func testDispatchThunkCast(d: Derived) {
+  _ = d.returnsSuperclass()
 }

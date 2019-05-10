@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle %s -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 protocol P {
   associatedtype Assoc1
@@ -194,14 +194,14 @@ struct GenericTypeContext<T>: GenericWitnessTest {
   typealias Tee = T
 
   var a: T
-  // CHECK-LABEL: sil private @$s23interface_type_mangling18GenericTypeContextV09closureIndF0yyqd__lF3fooL_yyx_qd__tr__lF
+  // CHECK-LABEL: sil private [ossa] @$s23interface_type_mangling18GenericTypeContextV09closureIndF0yyqd__lF3fooL_yyx_qd__tr__lF
   func closureInGenericContext<U>(_ b: U) {
     func foo(_ x: T, _ y: U) { }
 
     foo(a, b)
   }
 
-  // CHECK-LABEL: sil private @$s23interface_type_mangling18GenericTypeContextV09closureInd8PropertyF0xvg3fooL_xylF
+  // CHECK-LABEL: sil private [ossa] @$s23interface_type_mangling18GenericTypeContextV09closureInd8PropertyF0xvg3fooL_xylF
   var closureInGenericPropertyContext: T {
     func foo() -> T { }
 
@@ -210,7 +210,7 @@ struct GenericTypeContext<T>: GenericWitnessTest {
 
   // FIXME: Demangling for generic params at depth is wrong.
   // CHECK-LABEL: twoParamsAtDepth<A, B>(_: A1, y: B1) -> ()
-  // CHECK-LABEL: sil hidden @$s23interface_type_mangling18GenericTypeContextV16twoParamsAtDepth_1yyqd___qd_0_tr0_lF
+  // CHECK-LABEL: sil hidden [ossa] @$s23interface_type_mangling18GenericTypeContextV16twoParamsAtDepth_1yyqd___qd_0_tr0_lF
   func twoParamsAtDepth<A, B>(_ x: A, y: B) {}
 }
 

@@ -31,7 +31,7 @@ extension Set {
   @_fixed_layout
   internal struct _Variant {
     @usableFromInline
-    internal var object: _BridgeStorage<_RawSetStorage>
+    internal var object: _BridgeStorage<__RawSetStorage>
 
     @inlinable
     @inline(__always)
@@ -52,7 +52,7 @@ extension Set {
 #if _runtime(_ObjC)
     @inlinable
     @inline(__always)
-    init(cocoa: __owned _CocoaSet) {
+    init(cocoa: __owned __CocoaSet) {
       self.object = _BridgeStorage(objC: cocoa.object)
     }
 #endif
@@ -92,15 +92,19 @@ extension Set._Variant {
     _modify {
       var native = _NativeSet<Element>(object.unflaggedNativeInstance)
       self = .init(dummy: ())
+      defer {
+        // This is in a defer block because yield might throw, and we need to
+        // preserve Set's storage invariants when that happens.
+        object = .init(native: native._storage)
+      }
       yield &native
-      object = .init(native: native._storage)
     }
   }
 
 #if _runtime(_ObjC)
   @inlinable
-  internal var asCocoa: _CocoaSet {
-    return _CocoaSet(object.objCInstance)
+  internal var asCocoa: __CocoaSet {
+    return __CocoaSet(object.objCInstance)
   }
 #endif
 
@@ -314,7 +318,7 @@ extension Set._Variant {
 #if _runtime(_ObjC)
   @inlinable
   internal mutating func _migrateToNative(
-    _ cocoa: _CocoaSet,
+    _ cocoa: __CocoaSet,
     removing member: Element
   ) -> Element {
     // FIXME(performance): fuse data migration and element deletion into one

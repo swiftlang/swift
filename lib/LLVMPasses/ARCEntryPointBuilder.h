@@ -119,7 +119,6 @@ public:
 
     // Create the call.
     CallInst *CI = CreateCall(getRetain(OrigI), V);
-    CI->setTailCall(true);
     return CI;
   }
 
@@ -129,7 +128,6 @@ public:
 
     // Create the call.
     CallInst *CI = CreateCall(getRelease(OrigI), V);
-    CI->setTailCall(true);
     return CI;
   }
 
@@ -139,7 +137,6 @@ public:
     V = B.CreatePointerCast(V, getObjectPtrTy());
     
     CallInst *CI = CreateCall(getCheckUnowned(OrigI), V);
-    CI->setTailCall(true);
     return CI;
   }
 
@@ -147,7 +144,6 @@ public:
     // Cast just to make sure that we have the right object type.
     V = B.CreatePointerCast(V, getObjectPtrTy());
     CallInst *CI = CreateCall(getRetainN(OrigI), {V, getIntConstant(n)});
-    CI->setTailCall(true);
     return CI;
   }
 
@@ -155,7 +151,6 @@ public:
     // Cast just to make sure we have the right object type.
     V = B.CreatePointerCast(V, getObjectPtrTy());
     CallInst *CI = CreateCall(getReleaseN(OrigI), {V, getIntConstant(n)});
-    CI->setTailCall(true);
     return CI;
   }
 
@@ -164,7 +159,6 @@ public:
     V = B.CreatePointerCast(V, getObjectPtrTy());
     CallInst *CI =
         CreateCall(getUnknownObjectRetainN(OrigI), {V, getIntConstant(n)});
-    CI->setTailCall(true);
     return CI;
   }
 
@@ -173,7 +167,6 @@ public:
     V = B.CreatePointerCast(V, getObjectPtrTy());
     CallInst *CI =
         CreateCall(getUnknownObjectReleaseN(OrigI), {V, getIntConstant(n)});
-    CI->setTailCall(true);
     return CI;
   }
 
@@ -181,7 +174,6 @@ public:
     // Cast just to make sure we have the right object type.
     V = B.CreatePointerCast(V, getBridgeObjectPtrTy());
     CallInst *CI = CreateCall(getBridgeRetainN(OrigI), {V, getIntConstant(n)});
-    CI->setTailCall(true);
     return CI;
   }
 
@@ -189,11 +181,14 @@ public:
     // Cast just to make sure we have the right object type.
     V = B.CreatePointerCast(V, getBridgeObjectPtrTy());
     CallInst *CI = CreateCall(getBridgeReleaseN(OrigI), {V, getIntConstant(n)});
-    CI->setTailCall(true);
     return CI;
   }
 
   bool isNonAtomic(CallInst *I) {
+    // If we have an intrinsic, we know it must be an objc intrinsic. All objc
+    // intrinsics are atomic today.
+    if (I->getIntrinsicID() != llvm::Intrinsic::not_intrinsic)
+      return false;
     return (I->getCalledFunction()->getName().find("nonatomic") !=
             llvm::StringRef::npos);
   }

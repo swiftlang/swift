@@ -80,7 +80,12 @@ if "@CMAKE_GENERATOR@" == "Xcode":
 
 config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
 
+if "@SWIFT_ENABLE_LLD_LINKER@" == "TRUE":
+    config.android_linker_name = "lld"
+else:
+    # even if SWIFT_ENABLE_GOLD_LINKER isn't set, we cannot use BFD for Android
+    config.android_linker_name = "gold"
+
 # Let the main config do the real work.
 config.test_exec_root = os.path.dirname(os.path.realpath(__file__))
 lit_config.load_config(config, "@SWIFT_SOURCE_DIR@/validation-test/lit.cfg")
-

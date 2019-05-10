@@ -242,8 +242,6 @@ public func _unsafeUncheckedDowncast<T : AnyObject>(_ x: AnyObject, to type: T.T
   return Builtin.castReference(x)
 }
 
-import SwiftShims
-
 @inlinable
 @inline(__always)
 public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
@@ -255,6 +253,18 @@ public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
     storedPropertyOffset
 }
 
+/// Get the minimum alignment for manually allocated memory.
+///
+/// Memory allocated via UnsafeMutable[Raw][Buffer]Pointer must never pass
+/// an alignment less than this value to Builtin.allocRaw. This
+/// ensures that the memory can be deallocated without specifying the
+/// alignment.
+@inlinable
+@inline(__always)
+internal func _minAllocationAlignment() -> Int {
+  return _swift_MinAllocationAlignment
+}
+
 //===----------------------------------------------------------------------===//
 // Branch hints
 //===----------------------------------------------------------------------===//
@@ -263,24 +273,18 @@ public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
 // semantics of these function calls. This won't be necessary with
 // mandatory generic inlining.
 
-@usableFromInline @_transparent
-@_semantics("branchhint")
-internal func _branchHint(_ actual: Bool, expected: Bool) -> Bool {
-  return Bool(Builtin.int_expect_Int1(actual._value, expected._value))
-}
-
 /// Optimizer hint that `x` is expected to be `true`.
 @_transparent
 @_semantics("fastpath")
 public func _fastPath(_ x: Bool) -> Bool {
-  return _branchHint(x, expected: true)
+  return Bool(Builtin.int_expect_Int1(x._value, true._value))
 }
 
 /// Optimizer hint that `x` is expected to be `false`.
 @_transparent
 @_semantics("slowpath")
 public func _slowPath(_ x: Bool) -> Bool {
-  return _branchHint(x, expected: false)
+  return Bool(Builtin.int_expect_Int1(x._value, false._value))
 }
 
 /// Optimizer hint that the code where this function is called is on the fast
@@ -308,6 +312,11 @@ func _uncheckedUnsafeAssume(_ condition: Bool) {
 @usableFromInline
 @_silgen_name("_swift_objcClassUsesNativeSwiftReferenceCounting")
 internal func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool
+
+/// Returns the class of a non-tagged-pointer Objective-C object
+@_effects(readonly)
+@_silgen_name("_swift_classOfObjCHeapObject")
+internal func _swift_classOfObjCHeapObject(_ object: AnyObject) -> AnyClass
 #else
 @inlinable
 @inline(__always)
@@ -658,9 +667,6 @@ internal func _isUnique<T>(_ object: inout T) -> Bool {
   return Bool(Builtin.isUnique(&object))
 }
 
-@_silgen_name("_swift_reallocObject")
-internal func _reallocObject(_ object: UnsafeMutableRawPointer, _ newSizeInBytes: Int) -> UnsafeMutableRawPointer?
-
 /// Returns `true` if `object` is uniquely referenced.
 /// This provides sanity checks on top of the Builtin.
 @_transparent
@@ -746,8 +752,8 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
 /// declared for the parameter) and a dynamic type of `Int`.
 ///
 ///     func printInfo(_ value: Any) {
-///         let type = type(of: value)
-///         print("'\(value)' of type '\(type)'")
+///         let t = type(of: value)
+///         print("'\(value)' of type '\(t)'")
 ///     }
 ///
 ///     let count: Int = 5
@@ -809,8 +815,8 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
 /// of `String.self` (the dynamic type inside the parameter).
 ///
 ///     func printGenericInfo<T>(_ value: T) {
-///         let type = type(of: value)
-///         print("'\(value)' of type '\(type)'")
+///         let t = type(of: value)
+///         print("'\(value)' of type '\(t)'")
 ///     }
 ///
 ///     protocol P {}
@@ -828,8 +834,8 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
 /// calling `type(of:)`.
 ///
 ///     func betterPrintGenericInfo<T>(_ value: T) {
-///         let type = type(of: value as Any)
-///         print("'\(value)' of type '\(type)'")
+///         let t = type(of: value as Any)
+///         print("'\(value)' of type '\(t)'")
 ///     }
 ///
 ///     betterPrintGenericInfo(stringAsP)

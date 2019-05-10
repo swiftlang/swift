@@ -30,12 +30,6 @@ class Swift(product.Product):
         # Add benchmark specific flags.
         self.cmake_options.extend(self._benchmark_flags)
 
-        # Add any sil ownership flags.
-        self.cmake_options.extend(self._sil_ownership_flags)
-
-        # Add any guaranteed normal arguments flags
-        self.cmake_options.extend(self._guaranteed_normal_arguments_flags)
-
         # Generate the compile db.
         self.cmake_options.extend(self._compile_db_flags)
 
@@ -108,18 +102,6 @@ updated without updating swift.py?")
             "-DSWIFT_BENCHMARK_NUM_ONONE_ITERATIONS={}".format(onone_iters),
             "-DSWIFT_BENCHMARK_NUM_O_ITERATIONS={}".format(o_iters)
         ]
-
-    @property
-    def _sil_ownership_flags(self):
-        if not self.args.enable_sil_ownership:
-            return ["-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE"]
-        return ["-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=TRUE"]
-
-    @property
-    def _guaranteed_normal_arguments_flags(self):
-        if self.args.disable_guaranteed_normal_arguments:
-            return ["-DSWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS=FALSE"]
-        return ["-DSWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS=TRUE"]
 
     @property
     def _compile_db_flags(self):

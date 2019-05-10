@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 // When we synthesize an inherited designated initializer, the default
 // arguments are still conceptually rooted on the base declaration.
@@ -18,7 +18,7 @@ class Goldfish<T> {
   class Shark<U> : Puppy<T, U> {}
 }
 
-// CHECK-LABEL: sil hidden @$s27default_arguments_inherited4doItyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s27default_arguments_inherited4doItyyF : $@convention(thin) () -> () {
 func doIt() {
   // CHECK: [[ARG1:%.*]] = function_ref @$s27default_arguments_inherited5PuppyC1t1uACyxq_GxSg_q_SgtcfcfA_
   // CHECK: apply [[ARG1]]<Int, String>({{.*}})

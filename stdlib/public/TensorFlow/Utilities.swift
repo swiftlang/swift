@@ -176,3 +176,17 @@ public func _addScalarTensorsWithShape<Scalar: TensorFlowNumeric>(
 ) -> Tensor<Scalar> {
   return Raw.add(x, y)
 }
+
+// TODO: Consider revising the call sites where this is necessary to only need
+// UnsafeMutablePointer to optional when it is the actual c-api call site.
+extension UnsafeMutablePointer where Pointee == CTensorHandle? {
+  @usableFromInline
+  init(_ other: UnsafeMutablePointer<CTensorHandle>) {
+    self.init(other._rawValue)
+  }
+  @usableFromInline
+  init?(_ other: UnsafeMutablePointer<CTensorHandle>?) {
+    guard let unwrapped = other else { return nil }
+    self.init(unwrapped)
+  }
+}

@@ -102,7 +102,7 @@ bool ArrayAllocation::isInitializationWithKnownCount() {
       (ArrayValue = Uninitialized.getArrayValue()))
     return true;
 
-  ArraySemanticsCall Init(Alloc, "array.init");
+  ArraySemanticsCall Init(Alloc, "array.init", /*matchPartialName*/true);
   if (Init &&
       (ArrayCount = Init.getInitializationCount()) &&
       (ArrayValue = Init.getArrayValue()))
@@ -184,6 +184,11 @@ public:
 
   void run() override {
     auto &Fn = *getFunction();
+
+    // FIXME: Add ownership support.
+    if (Fn.hasOwnership())
+      return;
+
     bool Changed = false;
     SmallVector<ApplyInst *, 16> DeadArrayCountCalls;
     // Propagate the count of array allocations to array.count users.

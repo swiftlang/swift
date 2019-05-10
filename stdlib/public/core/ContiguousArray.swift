@@ -520,10 +520,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   /// - Parameter s: The sequence of elements to turn into an array.
   @inlinable
   public init<S: Sequence>(_ s: S) where S.Element == Element {
-    self = ContiguousArray(
-      _buffer: _Buffer(
-        _buffer: s._copyToContiguousArray()._buffer,
-        shiftedToStartIndex: 0))
+    self.init(_buffer: s._copyToContiguousArray()._buffer)
   }
 
   /// Creates a new array containing the specified number of a single, repeated
@@ -924,11 +921,31 @@ extension ContiguousArray: RangeReplaceableCollection {
   }
 
   @inlinable
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withUnsafeMutableBufferPointer {
+      (bufferPointer) -> R in
+      return try body(&bufferPointer)
+    }
+  }
+  
+  @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withUnsafeBufferPointer {
+      (bufferPointer) -> R in
+      return try body(bufferPointer)
+    }
+  }
+
+  @inlinable
   public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     if let n = _buffer.requestNativeBuffer() {
       return ContiguousArray(_buffer: n)
     }
-    return _copyCollectionToContiguousArray(_buffer)
+    return _copyCollectionToContiguousArray(self)
   }
 }
 
@@ -968,6 +985,43 @@ extension ContiguousArray {
 }
 
 extension ContiguousArray {
+  /// Creates an array with the specified capacity, then calls the given
+  /// closure with a buffer covering the array's uninitialized memory.
+  ///
+  /// Inside the closure, set the `initializedCount` parameter to the number of
+  /// elements that are initialized by the closure. The memory in the range
+  /// `buffer[0..<initializedCount]` must be initialized at the end of the
+  /// closure's execution, and the memory in the range
+  /// `buffer[initializedCount...]` must be uninitialized. This postcondition
+  /// must hold even if the `initializer` closure throws an error.
+  ///
+  /// - Note: While the resulting array may have a capacity larger than the
+  ///   requested amount, the buffer passed to the closure will cover exactly
+  ///   the requested number of elements.
+  ///
+  /// - Parameters:
+  ///   - unsafeUninitializedCapacity: The number of elements to allocate
+  ///     space for in the new array.
+  ///   - initializer: A closure that initializes elements and sets the count
+  ///     of the new array.
+  ///     - Parameters:
+  ///       - buffer: A buffer covering uninitialized memory with room for the
+  ///         specified number of of elements.
+  ///       - initializedCount: The count of initialized elements in the array,
+  ///         which begins as zero. Set `initializedCount` to the number of
+  ///         elements you initialize.
+  @_alwaysEmitIntoClient @inlinable
+  public init(
+    unsafeUninitializedCapacity: Int,
+    initializingWith initializer: (
+      _ buffer: inout UnsafeMutableBufferPointer<Element>,
+      _ initializedCount: inout Int) throws -> Void
+  ) rethrows {
+    self = try ContiguousArray(Array(
+      _unsafeUninitializedCapacity: unsafeUninitializedCapacity,
+      initializingWith: initializer))
+  }
+
   /// Calls a closure with a pointer to the array's contiguous storage.
   ///
   /// Often, the optimizer can eliminate bounds checks within an array

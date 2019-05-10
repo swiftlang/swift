@@ -30,3 +30,8 @@ typedef NSString * AnimalAttributeName NS_STRING_ENUM;
 extern AnimalAttributeName globalAttributeName;
 
 typedef NSString * CatAttributeName NS_STRING_ENUM;
+
+
+@interface Cat
+- (nullable instancetype) initWithName:(nullable NSString*) name;
+@end

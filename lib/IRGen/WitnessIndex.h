@@ -32,7 +32,6 @@ class WitnessIndex {
   unsigned IsPrefix : 1;
 public:
   WitnessIndex() = default;
-  WitnessIndex(ValueWitness index) : Value(int(index)) {}
   explicit WitnessIndex(int index, bool isPrefix)
       : Value(index), IsPrefix(isPrefix) {}
 

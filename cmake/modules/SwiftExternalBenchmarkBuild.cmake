@@ -74,6 +74,14 @@ function (add_external_benchmark_suite)
     list(APPEND all_stdlib_dependencies ${stdlib_dependencies})
   endforeach()
 
+  if(CMAKE_SYSTEM_NAME STREQUAL Windows)
+    set(CC $<TARGET_PROPERTY:clang-cl,LOCATION>)
+    set(CXX $<TARGET_PROPERTY:clang-cl,LOCATION>)
+  else()
+    set(CC $<TARGET_PROPERTY:clang,LOCATION>)
+    set(CXX $<TARGET_PROPERTY:clang,LOCATION>++)
+  endif()
+
   llvm_ExternalProject_add(swift-bench ${src_dir}
     SOURCE_DIR ${src_dir}
     EXCLUDE_FROM_ALL
@@ -82,9 +90,9 @@ function (add_external_benchmark_suite)
     CMAKE_ARGS
       -DSWIFT_EXEC=${SWIFT_BINARY_DIR}/bin/swiftc
       -DSWIFT_LIBRARY_PATH=${SWIFT_BINARY_DIR}/lib/swift
-      -DCMAKE_C_COMPILER=${PATH_TO_CLANG_BUILD}/bin/clang
-      -DCMAKE_CXX_COMPILER=${PATH_TO_CLANG_BUILD}/bin/clang++
-      -DCLANG_EXEC=${PATH_TO_CLANG_BUILD}/bin/clang
+      -DCMAKE_C_COMPILER=${CC}
+      -DCMAKE_CXX_COMPILER=${CXX}
+      -DCLANG_EXEC=${CC}
       -DSWIFT_BENCHMARK_SUBCMAKE_BUILD=TRUE
     PASSTHROUGH_PREFIXES SWIFT_BENCHMARK
     )

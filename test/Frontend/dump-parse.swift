@@ -6,12 +6,11 @@
 func foo(_ n: Int) -> Int {
   // CHECK:   (brace_stmt
   // CHECK:     (return_stmt
-  // CHECK:       (integer_literal_expr type='<null>' value=42)))
+  // CHECK:       (integer_literal_expr type='<null>' value=42 {{.*}})))
   // CHECK-AST: (brace_stmt
   // CHECK-AST:   (return_stmt
-  // CHECK-AST:     (call_expr implicit type='Int'
-  // CHECK-AST:       (integer_literal_expr type='{{[^']+}}' {{.*}} value=42)
-  return 42
+  // CHECK-AST:     (integer_literal_expr type='{{[^']+}}' {{.*}} value=42 {{.*}})
+    return 42
 }
 
 // -dump-parse should print an AST even though this code is invalid.

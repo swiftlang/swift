@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/generic_structs.sil
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %t/generic_structs.sil -emit-ir | %FileCheck %t/generic_structs.sil
+// RUN: %target-swift-frontend %t/generic_structs.sil -emit-ir | %FileCheck %t/generic_structs.sil
 
 // REQUIRES: CPU=x86_64
 
@@ -28,12 +28,11 @@ import Builtin
 // CHECK: @"$s15generic_structs13SingleDynamicVWV" = internal constant
 // CHECK-SAME:   i8* bitcast (%swift.opaque* ([24 x i8]*, [24 x i8]*, %swift.type*)* @"$s15generic_structs13SingleDynamicVwCP" to i8*),
 // -- ...
-// -- placeholder for size, flags, stride
-// CHECK-SAME:   i8* null, i8* inttoptr (i64 4194304 to i8*), i8* null
-// -- extra inhabitants
-// CHECK-SAME:   i8* null,
-// CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @"$s15generic_structs13SingleDynamicVwxs" to i8*),
-// CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @"$s15generic_structs13SingleDynamicVwxg" to i8*)]
+// -- placeholder for size, stride, flags
+// CHECK-SAME:   i64 0,
+// CHECK-SAME:   i64 0,
+// CHECK-SAME:   i32 4194304,
+// CHECK-SAME:   i32 0 }
 
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
 // CHECK: [[SINGLEDYNAMIC_NAME:@.*]] = private constant [14 x i8] c"SingleDynamic\00"

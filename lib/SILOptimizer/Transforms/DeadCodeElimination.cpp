@@ -111,6 +111,10 @@ class DCE : public SILFunctionTransform {
 
     SILFunction *F = getFunction();
 
+    // FIXME: Support ownership.
+    if (F->hasOwnership())
+      return;
+
     auto *DA = PM->getAnalysis<PostDominanceAnalysis>();
     PDT = DA->get(F);
 
@@ -448,7 +452,7 @@ void DCE::replaceBranchWithJump(SILInstruction *Inst, SILBasicBlock *Block) {
     auto E = Block->args_end();
     for (auto A = Block->args_begin(); A != E; ++A) {
       assert(!LiveValues.count(*A) && "Unexpected live block argument!");
-      Args.push_back(SILUndef::get((*A)->getType(), (*A)->getModule()));
+      Args.push_back(SILUndef::get((*A)->getType(), *(*A)->getFunction()));
     }
     Branch =
         SILBuilderWithScope(Inst).createBranch(Inst->getLoc(), Block, Args);

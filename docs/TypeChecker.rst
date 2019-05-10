@@ -1,5 +1,3 @@
-.. @raise litre.TestsAreMissing
-
 Type Checker Design and Implementation
 ========================================
 

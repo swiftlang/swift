@@ -21,7 +21,9 @@
 // RUN: fi
 // RUN: %target-codesign %t/Mirror
 // RUN: %target-run %t/Mirror
+
 // REQUIRES: executable_test
+// REQUIRES: shell
 
 import StdlibUnittest
 
@@ -1827,6 +1829,24 @@ mirrors.test("GenericNestedWithSameTypeConstraints") {
     "  - x: Mirror.ConformsToP1AndP2\n" +
     "  - y: Mirror.ConformsToP1AndP2\n" +
     "  - z: Mirror.ConformsToP3\n"
+
+  expectEqual(expected, output)
+}
+
+@_alignment(16) struct CustomAlignment {
+  var x: Int
+  var y: Int
+}
+
+mirrors.test("CustomAlignment") {
+  let value = CustomAlignment(x: 123, y: 321)
+  var output = ""
+  dump(value, to: &output)
+
+  let expected =
+    "▿ Mirror.CustomAlignment\n" +
+    "  - x: 123\n" +
+    "  - y: 321\n"
 
   expectEqual(expected, output)
 }

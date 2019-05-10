@@ -8,17 +8,17 @@ var x: Int
 
 // Just check a small part, mainly to make sure we can print the interface of the stdlib.
 // CHECK-STDLIB-NOT: extension _SwiftNSOperatingSystemVersion
-// CHECK-STDLIB: struct Int : FixedWidthInteger, SignedInteger {
-// CHECK-STDLIB:   static var bitWidth: Int { get }
-// CHECK-STDLIB:   var nonzeroBitCount: Int { get }
+// CHECK-STDLIB-LABEL: struct Int : FixedWidthInteger, SignedInteger {
+// CHECK-STDLIB-DAG:   static var bitWidth: Int { get }
+// CHECK-STDLIB-DAG:   var nonzeroBitCount: Int { get }
 // CHECK-STDLIB: }
 
 // Check that extensions of nested decls are showing up.
 // CHECK-STDLIB-LABEL: extension String.Index {
-// CHECK-STDLIB: func samePosition(in utf8: String.UTF8View) -> String.UTF8View.Index?
-// CHECK-STDLIB: func samePosition(in characters: String) -> String.Index?
-// CHECK-STDLIB: func samePosition(in unicodeScalars: String.UnicodeScalarView) -> String.UnicodeScalarIndex?
-// CHECK-STDLIB-NEXT: }
+// CHECK-STDLIB-DAG: func samePosition(in utf8: String.UTF8View) -> String.UTF8View.Index?
+// CHECK-STDLIB-DAG: func samePosition(in characters: String) -> String.Index?
+// CHECK-STDLIB-DAG: func samePosition(in unicodeScalars: String.UnicodeScalarView) -> String.UnicodeScalarIndex?
+// CHECK-STDLIB: }
 
 // CHECK-MUTATING-ATTR: mutating func
 

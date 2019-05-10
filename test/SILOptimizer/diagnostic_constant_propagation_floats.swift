@@ -171,6 +171,14 @@ func testHexFloatImprecision() {
   // Smallest non-zero number representable in Double.
   let d2: Double = 0x0.0000000000001p-1022
   _blackHole(d2)
+  let d3: Double = 0x1p-1074
+  _blackHole(d3)
+
+  // Test the case where conversion results in subnormality in the destination.
+  let d4: Float = 0x1p-149
+  _blackHole(d4)
+  let d5: Float = 0x1.8p-149 // expected-warning {{'0x1.8p-149' loses precision during conversion to 'Float}}
+  _blackHole(d5)
 
   // All warnings are disabled during explict conversions.
   _blackHole(Float(0x1.000002p-126))
@@ -206,10 +214,7 @@ func testIntToFloatConversion() {
   let d1: Double = 9_007_199_254_740_992 // This value is 2^53
   _blackHole(d1)
 
-  // FIXME: False Negative: no warning is produced here since we do not
-  // distinguish between implicit Double conversion that are within the
-  // context of an explicit conversion from others.
-  let d2: Double = 9_007_199_254_740_993
+  let d2: Double = 9_007_199_254_740_993 // expected-warning {{'9007199254740993' is not exactly representable as 'Double'; it becomes '9007199254740992'}}
   _blackHole(d2)
 
    // No warnings are emitted for conversion through explicit constructor calls.
