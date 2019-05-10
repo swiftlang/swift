@@ -4307,9 +4307,6 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
       return;
     proto->computeType();
 
-    // Compute the requirement signature later to avoid circularity.
-    DelayedRequirementSignatures.insert(proto);
-
     // FIXME: IRGen likes to emit @objc protocol descriptors even if the
     // protocol comes from a different module or translation unit.
     //
