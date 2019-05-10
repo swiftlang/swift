@@ -324,14 +324,15 @@ private:
 /// ```
 class MissingConformanceFailure final : public RequirementFailure {
   Type NonConformingType;
-  ProtocolDecl *Protocol;
+  Type ProtocolType;
 
 public:
   MissingConformanceFailure(Expr *expr, ConstraintSystem &cs,
                             ConstraintLocator *locator,
-                            std::pair<Type, ProtocolDecl *> conformance)
+                            std::pair<Type, Type> conformance)
       : RequirementFailure(cs, expr, RequirementKind::Conformance, locator),
-        NonConformingType(conformance.first), Protocol(conformance.second) {}
+        NonConformingType(conformance.first), ProtocolType(conformance.second) {
+  }
 
   bool diagnoseAsError() override;
 
@@ -341,7 +342,7 @@ private:
   Type getLHS() const override { return NonConformingType; }
 
   /// The protocol generic requirement expected associated type to conform to.
-  Type getRHS() const override { return Protocol->getDeclaredType(); }
+  Type getRHS() const override { return ProtocolType; }
 
 protected:
   DiagOnDecl getDiagnosticOnDecl() const override {
