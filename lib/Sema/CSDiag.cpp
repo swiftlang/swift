@@ -1741,7 +1741,7 @@ static Type isRawRepresentable(Type fromType, const ConstraintSystem &CS) {
     return Type();
 
   Type rawTy = ProtocolConformanceRef::getTypeWitnessByName(
-      fromType, *conformance, CS.getASTContext().Id_RawValue, &CS.TC);
+      fromType, *conformance, CS.getASTContext().Id_RawValue);
   return rawTy;
 }
 
@@ -2120,8 +2120,8 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
         Type errorCodeType = CS.getType(expr);
         Type errorType =
           ProtocolConformanceRef::getTypeWitnessByName(errorCodeType, *conformance,
-                                                       TC.Context.Id_ErrorType,
-                                                       &TC)->getCanonicalType();
+                                                       TC.Context.Id_ErrorType)
+                                                         ->getCanonicalType();
         if (errorType) {
           auto diag = diagnose(expr->getLoc(), diag::cannot_throw_error_code,
                                errorCodeType, errorType);
@@ -6255,7 +6255,7 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
     Type contextualElementType =
         ProtocolConformanceRef::getTypeWitnessByName(
             contextualType, *Conformance,
-            CS.getASTContext().Id_ArrayLiteralElement, &CS.TC)
+            CS.getASTContext().Id_ArrayLiteralElement)
             ->getDesugaredType();
 
     // Type check each of the subexpressions in place, passing down the contextual
@@ -6344,12 +6344,12 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
 
     contextualKeyType =
         ProtocolConformanceRef::getTypeWitnessByName(
-            contextualType, *Conformance, CS.getASTContext().Id_Key, &CS.TC)
+            contextualType, *Conformance, CS.getASTContext().Id_Key)
             ->getDesugaredType();
 
     contextualValueType =
         ProtocolConformanceRef::getTypeWitnessByName(
-            contextualType, *Conformance, CS.getASTContext().Id_Value, &CS.TC)
+            contextualType, *Conformance, CS.getASTContext().Id_Value)
             ->getDesugaredType();
 
     assert(contextualKeyType && contextualValueType &&

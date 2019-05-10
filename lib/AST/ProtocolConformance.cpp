@@ -144,13 +144,13 @@ ProtocolConformanceRef::subst(Type origType,
 Type
 ProtocolConformanceRef::getTypeWitnessByName(Type type,
                                              ProtocolConformanceRef conformance,
-                                             Identifier name,
-                                             LazyResolver *resolver) {
+                                             Identifier name) {
   assert(!conformance.isInvalid());
 
   // Find the named requirement.
+  ProtocolDecl *proto = conformance.getRequirement();
   AssociatedTypeDecl *assocType = nullptr;
-  auto members = conformance.getRequirement()->lookupDirect(name);
+  auto members = proto->lookupDirect(name);
   for (auto member : members) {
     assocType = dyn_cast<AssociatedTypeDecl>(member);
     if (assocType)
@@ -161,21 +161,8 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type,
   if (!assocType)
     return nullptr;
 
-  if (conformance.isAbstract()) {
-    // For an archetype, retrieve the nested type with the appropriate
-    // name. There are no conformance tables.
-    if (auto archetype = type->getAs<ArchetypeType>()) {
-      return archetype->getNestedType(name);
-    }
-
-    return DependentMemberType::get(type, assocType);
-  }
-
-  auto concrete = conformance.getConcrete();
-  if (!concrete->hasTypeWitness(assocType, resolver)) {
-    return nullptr;
-  }
-  return concrete->getTypeWitness(assocType, resolver);
+  return assocType->getDeclaredInterfaceType().subst(
+    SubstitutionMap::getProtocolSubstitutions(proto, type, conformance));
 }
 
 void *ProtocolConformance::operator new(size_t bytes, ASTContext &context,
@@ -498,37 +485,6 @@ ProtocolConformanceRef::getConditionalRequirements() const {
   else
     // An abstract conformance is never conditional, as above.
     return {};
-}
-
-ProtocolConformanceRef
-ProtocolConformanceRef::getInheritedConformanceRef(ProtocolDecl *base) const {
-  if (isAbstract()) {
-    assert(getRequirement()->inheritsFrom(base));
-    return ProtocolConformanceRef(base);
-  }
-
-  auto concrete = getConcrete();
-  auto proto = concrete->getProtocol();
-  auto path =
-    proto->getGenericSignature()->getConformanceAccessPath(
-                                            proto->getSelfInterfaceType(), base);
-  ProtocolConformanceRef result = *this;
-  Type resultType = concrete->getType();
-  bool first = true;
-  for (const auto &step : path) {
-    if (first) {
-      assert(step.first->isEqual(proto->getSelfInterfaceType()));
-      assert(step.second == proto);
-      first = false;
-      continue;
-    }
-
-    result =
-        result.getAssociatedConformance(resultType, step.first, step.second);
-    resultType = result.getAssociatedType(resultType, step.first);
-  }
-
-  return result;
 }
 
 void NormalProtocolConformance::differenceAndStoreConditionalRequirements()

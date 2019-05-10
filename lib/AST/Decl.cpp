@@ -5673,6 +5673,21 @@ Type ParamDecl::getVarargBaseTy(Type VarArgT) {
   return T;
 }
 
+AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
+  if (!type)
+    type = getInterfaceType();
+
+  if (isVariadic())
+    type = ParamDecl::getVarargBaseTy(type);
+
+  auto label = getArgumentName();
+  auto flags = ParameterTypeFlags::fromParameterType(type,
+                                                     isVariadic(),
+                                                     isAutoClosure(),
+                                                     getValueOwnership());
+  return AnyFunctionType::Param(type, label, flags);
+}
+
 void ParamDecl::setDefaultValue(Expr *E) {
   if (!DefaultValueAndFlags.getPointer()) {
     if (!E) return;
