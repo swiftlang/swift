@@ -16,8 +16,8 @@ import Foundation
 public let ReduceInto = [
   BenchmarkInfo(name: "FilterEvenUsingReduce", runFunction: run_FilterEvenUsingReduce, tags: [.validation, .api], legacyFactor: 10),
   BenchmarkInfo(name: "FilterEvenUsingReduceInto", runFunction: run_FilterEvenUsingReduceInto, tags: [.validation, .api]),
-  BenchmarkInfo(name: "FrequenciesUsingReduce", runFunction: run_FrequenciesUsingReduce, tags: [.validation, .api]),
-  BenchmarkInfo(name: "FrequenciesUsingReduceInto", runFunction: run_FrequenciesUsingReduceInto, tags: [.validation, .api]),
+  BenchmarkInfo(name: "FrequenciesUsingReduce", runFunction: run_FrequenciesUsingReduce, tags: [.validation, .api], legacyFactor: 10),
+  BenchmarkInfo(name: "FrequenciesUsingReduceInto", runFunction: run_FrequenciesUsingReduceInto, tags: [.validation, .api], legacyFactor: 10),
   BenchmarkInfo(name: "SumUsingReduce", runFunction: run_SumUsingReduce, tags: [.validation, .api]),
   BenchmarkInfo(name: "SumUsingReduceInto", runFunction: run_SumUsingReduceInto, tags: [.validation, .api]),
 ]
@@ -93,7 +93,7 @@ public func run_FrequenciesUsingReduce(_ N: Int) {
   let s = "thequickbrownfoxjumpsoverthelazydogusingasmanycharacteraspossible123456789"
 
   var c = 0
-  for _ in 1...N*100 {
+  for _ in 1...N*10 {
     let a = s.reduce([:]) {
       (acc: [Character: Int], c: Character) -> [Character: Int] in
       var d = acc
@@ -110,7 +110,7 @@ public func run_FrequenciesUsingReduceInto(_ N: Int) {
   let s = "thequickbrownfoxjumpsoverthelazydogusingasmanycharacteraspossible123456789"
 
   var c = 0
-  for _ in 1...N*100 {
+  for _ in 1...N*10 {
     let a = s.reduce(into: [:]) {
       (acc: inout [Character: Int], c: Character) in
       acc[c, default: 0] += 1
