@@ -63,13 +63,16 @@ enum class SearchPathKind {
 /// non-None value. Returns the return value from \p body, or \c None.
 Optional<bool> forEachModuleSearchPath(
     const ASTContext &Ctx,
-    llvm::function_ref<Optional<bool>(StringRef, SearchPathKind)> callback) {
+    llvm::function_ref<Optional<bool>(StringRef, SearchPathKind, bool isSystem)>
+        callback) {
   for (const auto &path : Ctx.SearchPathOpts.ImportSearchPaths)
-    if (auto result = callback(path, SearchPathKind::Import))
+    if (auto result =
+            callback(path, SearchPathKind::Import, /*isSystem=*/false))
       return result;
 
   for (const auto &path : Ctx.SearchPathOpts.FrameworkSearchPaths)
-    if (auto result = callback(path.Path, SearchPathKind::Framework))
+    if (auto result =
+            callback(path.Path, SearchPathKind::Framework, path.IsSystem))
       return result;
 
   // Apple platforms have extra implicit framework search paths:
@@ -78,17 +81,20 @@ Optional<bool> forEachModuleSearchPath(
     SmallString<128> scratch;
     scratch = Ctx.SearchPathOpts.SDKPath;
     llvm::sys::path::append(scratch, "System", "Library", "Frameworks");
-    if (auto result = callback(scratch, SearchPathKind::Framework))
+    if (auto result =
+            callback(scratch, SearchPathKind::Framework, /*isSystem=*/true))
       return result;
 
     scratch = Ctx.SearchPathOpts.SDKPath;
     llvm::sys::path::append(scratch, "Library", "Frameworks");
-    if (auto result = callback(scratch, SearchPathKind::Framework))
+    if (auto result =
+            callback(scratch, SearchPathKind::Framework, /*isSystem=*/true))
       return result;
   }
 
   for (auto importPath : Ctx.SearchPathOpts.RuntimeLibraryImportPaths) {
-    if (auto result = callback(importPath, SearchPathKind::RuntimeLibrary))
+    if (auto result = callback(importPath, SearchPathKind::RuntimeLibrary,
+                               /*isSystem=*/true))
       return result;
   }
 
@@ -150,7 +156,8 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
     return false;
   };
 
-  forEachModuleSearchPath(Ctx, [&](StringRef searchPath, SearchPathKind Kind) {
+  forEachModuleSearchPath(Ctx, [&](StringRef searchPath, SearchPathKind Kind,
+                                   bool isSystem) {
     switch (Kind) {
     case SearchPathKind::Import: {
       // Look for:
@@ -369,7 +376,7 @@ bool
 SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
            std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
            std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
-           bool &isFramework) {
+           bool &isFramework, bool &isSystemModule) {
   llvm::SmallString<64> moduleName(moduleID.first.str());
   ModuleFilenamePair fileNames(moduleName);
 
@@ -413,8 +420,11 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
   };
 
   auto result = forEachModuleSearchPath(
-      Ctx, [&](StringRef path, SearchPathKind Kind) -> Optional<bool> {
+      Ctx,
+      [&](StringRef path, SearchPathKind Kind,
+          bool isSystem) -> Optional<bool> {
         currPath = path;
+        isSystemModule = isSystem;
 
         switch (Kind) {
         case SearchPathKind::Import:
@@ -547,6 +557,15 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     loadInfo.status =
         loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid,
                                                    treatAsPartialModule);
+
+    // FIXME: This seems wrong. Overlay for system Clang module doesn't
+    // necessarily mean it's "system" module. User can make their own overlay
+    // in non-system directory.
+    // Remove this block after we fix the test suite.
+    if (auto shadowed = loadedModuleFile->getShadowedModule())
+      if (shadowed->isSystemModule())
+        M.setIsSystemModule(true);
+
     if (loadInfo.status == serialization::Status::Valid) {
       Ctx.bumpGeneration();
       LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
@@ -748,7 +767,8 @@ bool SerializedModuleLoaderBase::canImportModule(
     std::pair<Identifier, SourceLoc> mID) {
   // Look on disk.
   bool isFramework = false;
-  return findModule(mID, nullptr, nullptr, isFramework);
+  bool isSystemModule = false;
+  return findModule(mID, nullptr, nullptr, isFramework, isSystemModule);
 }
 
 bool MemoryBufferSerializedModuleLoader::canImportModule(
@@ -766,13 +786,14 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
 
   auto moduleID = path[0];
   bool isFramework = false;
+  bool isSystemModule = false;
 
   std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer;
   std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer;
 
   // Look on disk.
   if (!findModule(moduleID, &moduleInputBuffer, &moduleDocInputBuffer,
-                  isFramework)) {
+                  isFramework, isSystemModule)) {
     return nullptr;
   }
   if (dependencyTracker) {
@@ -786,6 +807,7 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
   assert(moduleInputBuffer);
 
   auto M = ModuleDecl::create(moduleID.first, Ctx);
+  M->setIsSystemModule(isSystemModule);
   Ctx.LoadedModules[moduleID.first] = M;
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
