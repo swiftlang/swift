@@ -1106,7 +1106,7 @@ Possible Restrictions on Classes
 --------------------------------
 
 In addition to ``final``, it may be useful to restrict the stored properties of
-a class instance, like `Fixed-Contents Structs`_. However, there are open
+a class instance, like `Frozen Structs`_. However, there are open
 questions about how this would actually work, and the compiler still wouldn't
 be able to make much use of the information, because classes from other
 libraries must almost always be allocated on the heap.
