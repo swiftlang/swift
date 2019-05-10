@@ -138,8 +138,7 @@ public:
   static Type
   getTypeWitnessByName(Type type,
                        ProtocolConformanceRef conformance,
-                       Identifier name,
-                       LazyResolver *resolver);
+                       Identifier name);
 
   /// Determine whether this conformance is canonical.
   bool isCanonical() const;
