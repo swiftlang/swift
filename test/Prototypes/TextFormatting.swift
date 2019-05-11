@@ -1,9 +1,6 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
-// Temporary workaround; ImmutableAddressUseVerifier asserts nondeterministically. rdar://problem/50676315
-// REQUIRES: rdar50676315
-
 // Text Formatting Prototype
 //
 // This file demonstrates the concepts proposed in TextFormatting.rst
