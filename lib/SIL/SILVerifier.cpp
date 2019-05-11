@@ -512,6 +512,14 @@ struct ImmutableAddressUseVerifier {
         //
         // TODO: Can we do better?
         break;
+      case SILInstructionKind::BranchInst:
+      case SILInstructionKind::CondBranchInst:
+        // We do not analyze through branches and cond_br instructions and just
+        // assume correctness. This is so that we can avoid having to analyze
+        // through phi loops and since we want to remove address phis (meaning
+        // that this eventually would never be able to happen). Once that
+        // changes happens, we should remove this code and just error below.
+        break;
       case SILInstructionKind::ApplyInst:
       case SILInstructionKind::TryApplyInst:
       case SILInstructionKind::PartialApplyInst:
