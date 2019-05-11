@@ -4671,7 +4671,7 @@ public:
     };
 
     // Parameter indices must be specified.
-    require(!Attr.getIndices().parameters.empty(),
+    require(!Attr.getIndices().parameters->isEmpty(),
             "Parameter indices cannot be empty");
     // JVP and VJP must be specified in canonical SIL.
     if (F->getModule().getStage() == SILStage::Canonical)
@@ -4680,16 +4680,16 @@ public:
     // Verify if specified parameter indices are valid.
     auto numParams = countParams(F->getLoweredFunctionType());
     int lastIndex = -1;
-    for (auto paramIdx : Attr.getIndices().parameters.set_bits()) {
+    for (auto paramIdx : Attr.getIndices().parameters->getIndices()) {
       require(paramIdx < numParams, "Parameter index out of bounds.");
       auto currentIdx = (int)paramIdx;
       require(currentIdx > lastIndex, "Parameter indices not ascending.");
       lastIndex = currentIdx;
     }
-    // TODO: Verify if the specified primal/adjoint function has the right
-    // signature. SIL function verification runs right after a function is
+    // TODO: Verify if the specified JVP/VJP function has the right signature.
+    // SIL function verification runs right after a function is
     // parsed.
-    // However, the adjoint function may come after the this function. Without
+    // However, the JVP/VJP function may come after the this function. Without
     // changing the compiler too much, is there a way to verify this at a module
     // level, after everything is parsed?
   }

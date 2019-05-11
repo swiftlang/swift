@@ -277,8 +277,6 @@ public:
                                   IntRange<> range);
   static AutoDiffIndexSubset *get(ASTContext &ctx, unsigned capacity,
                                   ArrayRef<unsigned> indices);
-  template<typename TBool>
-  static AutoDiffIndexSubset *get(ASTContext &ctx, ArrayRef<TBool> bits);
 
   unsigned getCapacity() const {
     return capacity;
@@ -297,11 +295,14 @@ public:
     return getBitWord(bitWordIndex) & (1 << offset);
   }
 
+  bool isEmpty() const;
   bool equals(const AutoDiffIndexSubset *other) const;
   bool isSubsetOf(const AutoDiffIndexSubset *other) const;
   bool isSupersetOf(const AutoDiffIndexSubset *other) const;
 
   AutoDiffIndexSubset *adding(unsigned index, ASTContext &ctx) const;
+  AutoDiffIndexSubset *extendingCapacity(ASTContext &ctx,
+                                         unsigned newCapacity) const;
 
   void Profile(llvm::FoldingSetNodeID &id) const;
 
@@ -349,13 +350,13 @@ public:
 
     bool operator==(const iterator &other) const {
       assert(&parent == &other.parent &&
-             "Comparing iterators from different BitVectors");
+             "Comparing iterators from different AutoDiffIndexSubsets");
       return current == other.current;
     }
 
     bool operator!=(const iterator &other) const {
       assert(&parent == &other.parent &&
-             "Comparing iterators from different BitVectors");
+             "Comparing iterators from different AutoDiffIndexSubsets");
       return current != other.current;
     }
   };

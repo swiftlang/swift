@@ -364,17 +364,6 @@ AutoDiffIndexSubset::get(ASTContext &ctx, unsigned capacity, bool includeAll) {
              SmallVector<unsigned, 8>(capacity, (unsigned)includeAll));
 }
 
-template<typename TBool>
-AutoDiffIndexSubset *
-AutoDiffIndexSubset::get(ASTContext &ctx, ArrayRef<TBool> bits) {
-  SmallVector<unsigned, 8> indices;
-  indices.reserve(bits.size());
-  for (auto i : indices(bits))
-    if (bits[i])
-      indices.push_back(i);
-  return get(ctx, bits.size(), indices);
-}
-
 AutoDiffIndexSubset *AutoDiffIndexSubset::get(ASTContext &ctx,
                                               unsigned capacity,
                                               IntRange<> range) {
@@ -406,6 +395,10 @@ unsigned AutoDiffIndexSubset::getNumIndices() const {
                     [](unsigned total, BitWord bitWord) {
                       return total + llvm::countPopulation(bitWord);
                     });
+}
+
+bool AutoDiffIndexSubset::isEmpty() const {
+  return llvm::all_of(getBitWords(), [](BitWord bw) { return !(bool)bw; });
 }
 
 bool AutoDiffIndexSubset::equals(const AutoDiffIndexSubset *other) const {
@@ -446,6 +439,15 @@ AutoDiffIndexSubset::adding(unsigned index, ASTContext &ctx) const {
     newIndices.push_back(curIndex);
   }
   return get(ctx, capacity, newIndices);
+}
+
+AutoDiffIndexSubset *AutoDiffIndexSubset::extendingCapacity(
+    ASTContext &ctx, unsigned newCapacity) const {
+  assert(newCapacity >= getCapacity());
+  SmallVector<unsigned, 8> indices;
+  for (auto index : getIndices())
+    indices.push_back(index);
+  return AutoDiffIndexSubset::get(ctx, newCapacity, indices);
 }
 
 int AutoDiffIndexSubset::findNext(int startIndex) const {

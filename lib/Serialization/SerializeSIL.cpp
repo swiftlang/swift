@@ -971,8 +971,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::AutoDiffFunctionInst: {
     auto *adfi = cast<AutoDiffFunctionInst>(&SI);
     SmallVector<ValueID, 4> trailingInfo;
-    auto &paramIndices = adfi->getParameterIndices();
-    for (unsigned idx : paramIndices.set_bits())
+    auto *paramIndices = adfi->getParameterIndices();
+    for (unsigned idx : paramIndices->getIndices())
       trailingInfo.push_back(idx);
     for (auto &op : adfi->getAllOperands()) {
       auto val = op.get();
@@ -982,7 +982,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILInstAutoDiffFunctionLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstAutoDiffFunctionLayout::Code],
-        adfi->getDifferentiationOrder(), (unsigned)paramIndices.size(),
+        adfi->getDifferentiationOrder(), paramIndices->getCapacity(),
         adfi->getNumOperands(), trailingInfo);
     break;
   }

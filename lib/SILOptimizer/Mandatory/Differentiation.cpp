@@ -1812,7 +1812,7 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
     if (diffableFnType->isDifferentiable()) {
       auto paramIndices = diffableFnType->getDifferentiationParameterIndices();
       for (auto i : desiredIndices.parameters->getIndices()) {
-        if (i >= paramIndices.size() || !paramIndices[i]) {
+        if (i >= paramIndices->getCapacity() || !paramIndices->contains(i)) {
           context.emitNondifferentiabilityError(original, parentTask,
               diag::autodiff_function_nondiff_parameter_not_differentiable);
           return None;
@@ -2764,7 +2764,8 @@ public:
       errorOccurred = true;
       return;
     }
-    SILAutoDiffIndices indices(/*source*/ 0, /*parameters*/ {0});
+    SILAutoDiffIndices indices(/*source*/ 0,
+        /*parameters*/ AutoDiffIndexSubset::get(getASTContext(), 1));
     auto *task = getContext().lookUpDifferentiationTask(getterFn, indices);
     if (!task) {
       getContext().emitNondifferentiabilityError(

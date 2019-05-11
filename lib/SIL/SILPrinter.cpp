@@ -1159,9 +1159,9 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
-    if (adfi->getParameterIndices().any()) {
+    if (adfi->getParameterIndices()->isEmpty()) {
       *this << "[wrt";
-      for (auto i : adfi->getParameterIndices().set_bits())
+      for (auto i : adfi->getParameterIndices()->getIndices())
         *this << ' ' << i;
       *this << "] ";
     }
@@ -3118,7 +3118,7 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
 void SILDifferentiableAttr::print(llvm::raw_ostream &OS) const {
   auto &indices = getIndices();
   OS << "source " << indices.source << " wrt ";
-  interleave(indices.parameters.set_bits(),
+  interleave(indices.parameters->getIndices(),
              [&](unsigned index) { OS << index; },
              [&] { OS << ", "; });
   if (!JVPName.empty()) {

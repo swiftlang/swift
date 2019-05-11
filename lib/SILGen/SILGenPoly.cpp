@@ -3820,6 +3820,7 @@ getWitnessFunctionRef(SILGenFunction &SGF,
       auto originalFn = SGF.emitGlobalFunctionRef(
           loc, witness.asAutoDiffOriginalFunction());
       auto loweredIndices = autoDiffFuncId->getParameterIndices()->getLowered(
+          SGF.getASTContext(),
           witness.getDecl()->getInterfaceType()->castTo<AnyFunctionType>());
       auto autoDiffFn = SGF.B.createAutoDiffFunction(
           loc, loweredIndices, /*differentiationOrder*/ 1, originalFn);

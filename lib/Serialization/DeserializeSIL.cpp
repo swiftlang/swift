@@ -654,17 +654,19 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     uint64_t jvpNameId;
     uint64_t vjpNameId;
     uint64_t source;
-    ArrayRef<uint64_t> parameters;
+    ArrayRef<uint64_t> rawParameterIndices;
     SmallVector<Requirement, 8> requirements;
 
     SILDifferentiableAttrLayout::readRecord(scratch, jvpNameId, vjpNameId,
-                                            source, parameters);
+                                            source, rawParameterIndices);
 
-    llvm::SmallBitVector parametersBitVector(parameters.size());
     StringRef jvpName = MF->getIdentifier(jvpNameId).str();
     StringRef vjpName = MF->getIdentifier(vjpNameId).str();
-    auto *parameterIndexSubset =
-        AutoDiffIndexSubset::get(MF->getContext(), parameters);
+    SmallVector<unsigned, 8> parameterIndices(rawParameterIndices.begin(),
+                                              rawParameterIndices.end());
+    auto *parameterIndexSubset = AutoDiffIndexSubset::get(
+        MF->getContext(), fn->getLoweredFunctionType()->getNumParameters(),
+        parameterIndices);
     SILAutoDiffIndices indices(source, parameterIndexSubset);
     MF->readGenericRequirements(requirements, SILCursor);
 
@@ -1505,18 +1507,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::AutoDiffFunctionInst: {
     auto numParamIndices = ListOfValues.size() - NumArguments * 3;
-    auto paramIndices = ListOfValues.take_front(numParamIndices);
+    auto rawParamIndices =
+       map<SmallVector<unsigned, 8>>(ListOfValues.take_front(numParamIndices),
+                                     [&](uint64_t i) { return i; });
     auto numParams = Attr2;
-    llvm::SmallBitVector paramIndicesBitVec(numParams);
-    for (unsigned idx : paramIndices)
-      paramIndicesBitVec.set(idx);
+    auto *paramIndices =
+        AutoDiffIndexSubset::get(MF->getContext(), numParams, rawParamIndices);
     SmallVector<SILValue, 4> operands;
     for (auto i = numParamIndices; i < NumArguments * 3; i += 3) {
       auto astTy = MF->getType(ListOfValues[i]);
       auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i+1]);
       operands.push_back(getLocalValue(ListOfValues[i+2], silTy));
     }
-    ResultVal = Builder.createAutoDiffFunction(Loc, paramIndicesBitVec,
+    ResultVal = Builder.createAutoDiffFunction(Loc, paramIndices,
         /*differentiationOrder*/ Attr, operands[0],
         ArrayRef<SILValue>(operands).drop_front());
     break;
