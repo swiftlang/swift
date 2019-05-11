@@ -17,6 +17,7 @@ var tests = TestSuite("metadata identity for synthesized types")
 tests.test("synthesized type identity across modules") {
   expectEqual(A.getCLError(), B.getCLError())
   expectEqual(A.getCLErrorCode(), B.getCLErrorCode())
+  expectEqual(A.getNotificationNameSet(), B.getNotificationNameSet())
 }
 
 runAllTests()

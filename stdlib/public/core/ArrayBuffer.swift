@@ -223,6 +223,14 @@ extension _ArrayBuffer {
     return UnsafeMutableRawPointer(result).assumingMemoryBound(to: Element.self)
   }
 
+  public __consuming func _copyContents(
+    initializing buffer: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
+    // This customization point is not implemented for internal types.
+    // Accidentally calling it would be a catastrophic performance bug.
+    fatalError("unsupported")
+  }
+
   /// Returns a `_SliceBuffer` containing the given sub-range of elements in
   /// `bounds` from this buffer.
   @inlinable

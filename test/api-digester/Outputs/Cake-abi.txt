@@ -1,11 +1,13 @@
 
 /* Generic Signature Changes */
 cake1: Func P1.P1Constraint() has generic signature change from <τ_0_0 where τ_0_0 : P1, τ_0_0 : P2> to <τ_0_0 where τ_0_0 : P1>
-cake1: Protocol P3 has generic signature change from <τ_0_0 : P1, τ_0_0 : P2> to <τ_0_0 : P1, τ_0_0 : P4>
+cake1: Protocol P3 has generic signature change from <τ_0_0 : cake.P1, τ_0_0 : cake.P2> to <τ_0_0 : cake.P1, τ_0_0 : cake.P4>
 
 /* RawRepresentable Changes */
 
 /* Removed Decls */
+cake1: Accessor GlobalVarChangedToLet.Set() has been removed
+cake1: Accessor RemoveSetters.Value.Set() has been removed
 cake1: AssociatedType RequiementChanges.removedType has been removed
 cake1: Class C3 has been removed
 cake1: Constructor Somestruct2.init(_:) has been removed
@@ -45,6 +47,7 @@ cake1: Func C1.foo1() is now not static
 cake1: Func C5.dy_foo() is now with dynamic
 cake1: Func FinalFuncContainer.NewFinalFunc() is now with final
 cake1: Func FinalFuncContainer.NoLongerFinalFunc() is now without final
+cake1: Func HasMutatingMethodClone.foo() has self access kind changing from Mutating to NonMutating
 cake1: Func S1.foo1() has self access kind changing from NonMutating to Mutating
 cake1: Func S1.foo3() is now static
 cake1: Func _NoResilientClass.NoLongerFinalFunc() is now without final
@@ -57,16 +60,13 @@ cake1: Var GlobalVarChangedToLet changes from var to let
 /* Fixed-layout Type changes */
 cake1: EnumElement FrozenKind.Fixed in a non-resilient type changes position from 1 to 2
 cake1: EnumElement FrozenKind.Rigid in a non-resilient type changes position from 2 to 1
-cake1: Func _NoResilientClass.FuncPositionChange0() in a non-resilient type changes position from 0 to 2
-cake1: Func _NoResilientClass.NoLongerFinalFunc() is now a non-final instance function
 cake1: Var fixedLayoutStruct.a in a non-resilient type changes position from 1 to 0
 cake1: Var fixedLayoutStruct.b in a non-resilient type changes position from 0 to 1
 cake1: Var fixedLayoutStruct2.BecomeFixedBinaryOrder is now a stored property
 cake1: Var fixedLayoutStruct2.NoLongerWithFixedBinaryOrder is no longer a stored property
 cake2: EnumElement FrozenKind.AddedCase is added to a non-resilient type
-cake2: Func _NoResilientClass.FuncPositionChange2() is added to a non-resilient type
+cake2: Var fixedLayoutStruct.$__lazy_storage_$_lazy_d is added to a non-resilient type
 cake2: Var fixedLayoutStruct.c is added to a non-resilient type
-cake2: Var fixedLayoutStruct.lazy_d.storage is added to a non-resilient type
 
 /* Conformance changes */
 cake1: Func ObjCProtocol.addOptional() is now an optional requirement
@@ -76,7 +76,9 @@ cake1: Struct fixedLayoutStruct has removed conformance to P1
 cake2: Protocol P3 has added inherited protocol P4
 
 /* Protocol Requirement Change */
+cake1: Accessor HasMutatingMethodClone.bar.Get() now requires new witness table entry
 cake1: AssociatedType AssociatedTypePro.T1 has removed default type Int
+cake1: Func HasMutatingMethodClone.foo() now requires new witness table entry
 cake2: AssociatedType RequiementChanges.addedTypeWithoutDefault has been added as a protocol requirement
 cake2: Func RequiementChanges.addedFunc() has been added as a protocol requirement
 cake2: Var RequiementChanges.addedVar has been added as a protocol requirement

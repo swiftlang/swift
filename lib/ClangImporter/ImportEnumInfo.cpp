@@ -108,7 +108,7 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
   // FIXME: Stop using these once flag_enum and enum_extensibility
   // have been adopted everywhere, or at least relegate them to Swift 4 mode
   // only.
-  auto loc = decl->getLocStart();
+  auto loc = decl->getBeginLoc();
   if (loc.isMacroID()) {
     StringRef MacroName = pp.getImmediateMacroName(loc);
     if (MacroName == "CF_ENUM" || MacroName == "__CF_NAMED_ENUM" ||

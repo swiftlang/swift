@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -O -emit-ir  %s | %FileCheck %s
 // RUN: %target-swift-frontend -Osize -emit-ir  %s | %FileCheck %s
+// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 // We have a separate test for 32-bit architectures.
 // REQUIRES: PTRSIZE=64
@@ -33,9 +34,9 @@ public func test_strng_strng2() -> String {
   return "aé" + "def"
 }
 
-// NOTE: 43 = code-unit length
+// NOTE: 1152921504606847019 = 43 (code-unit length) | `isTailAllocated` perf flag
 // CHECK-LABEL: test_scalar_strng
-// CHECK:  ret { i64, %swift.bridge* } { i64 43, %swift.bridge* inttoptr {{.*}}i64 -{{[0-9]+}}{{.*}} to %swift.bridge*) }
+// CHECK:  ret { i64, %swift.bridge* } { i64 1152921504606847019, %swift.bridge* inttoptr {{.*}}i64 -{{[0-9]+}}{{.*}} to %swift.bridge*) }
 public func test_scalar_strng() -> String {
   return "a" + "👨🏿‍💼+🧙🏿‍♂️=🕴🏿"
 }
@@ -47,9 +48,9 @@ public func test_strng_concat_smol() -> String {
   return "a" + "bc" + "dèf" + "ghī"
 }
 
-// NOTE: 23 = code-unit length
+// NOTE: 1152921504606846999 = 23 (code-unit length) | `isTailAllocated` perf flag
 // CHECK-LABEL test_strng_concat_large
-// CHECK:  ret { i64, %swift.bridge* } { i64 23, %swift.bridge* inttoptr {{.*}}i64 -{{[0-9]+}}{{.*}} to %swift.bridge*) }
+// CHECK:  ret { i64, %swift.bridge* } { i64 1152921504606846999, %swift.bridge* inttoptr {{.*}}i64 -{{[0-9]+}}{{.*}} to %swift.bridge*) }
 public func test_strng_concat_large() -> String {
   return "a" + "bc" + "dèf" + "ghī" + "jklmn" + "o" + "𝛒qr"
 }

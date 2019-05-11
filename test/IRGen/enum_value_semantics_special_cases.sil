@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime  --check-prefix=CHECK-%target-runtime-simulator-%target-is-simulator
+// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime  --check-prefix=CHECK-%target-runtime-simulator-%target-is-simulator
 
 // REQUIRES: CPU=x86_64
 

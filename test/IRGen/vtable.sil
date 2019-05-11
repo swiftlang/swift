@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 // REQUIRES: executable_test
 
 // REQUIRES: CPU=x86_64
@@ -20,7 +20,7 @@ sil @$s6vtable1CCfD : $@convention(method) (@owned C) -> ()
 
 // CHECK-objc: @"$s6vtable1CCMf" = internal global [[C_METADATA_T:<{.*\* }>]] <{
 // CHECK-objc: void ([[C]]*)* @"$s6vtable1CCfD",
-// CHECK-objc: i8** @"$sBoWV",
+// CHECK-objc: i8** {{@"\$sBoWV"|null}},
 // CHECK-objc: i64 ptrtoint (%objc_class* @"$s6vtable1CCMm" to i64),
 // CHECK-objc: %objc_class* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
 // CHECK-objc: %swift.opaque* @_objc_empty_cache,
@@ -34,7 +34,7 @@ sil @$s6vtable1CCfD : $@convention(method) (@owned C) -> ()
 
 // CHECK-native: @"$s6vtable1CCMf" = internal global [[C_METADATA_T:<{.*\* }>]] <{
 // CHECK-native: void ([[C]]*)* @"$s6vtable1CCfD",
-// CHECK-native: i8** @"$sBoWV",
+// CHECK-native: i8** {{@"\$sBoWV"|null}},
 // CHECK-native: i64 0,
 // CHECK-native: %swift.type* null,
 // CHECK-native: %swift.opaque* null,

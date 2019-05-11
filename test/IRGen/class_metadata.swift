@@ -1,13 +1,14 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/class_metadata.swift
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %t/class_metadata.swift -check-prefix=CHECK -check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %t/class_metadata.swift -check-prefix=CHECK -check-prefix=CHECK-%target-ptrsize -check-prefix CHECK-%target-import-type
 
 class A {}
 
 // CHECK:      [[A_NAME:@.*]] = private constant [2 x i8] c"A\00"
 // CHECK-LABEL: @"$s14class_metadata1ACMn" =
 //   Flags. 0x8000_0050 == HasVTable | Unique | Class
-// CHECK-SAME: <i32 0x8000_0050>,
+// CHECK-DIRECT-SAME: <i32 0x8000_0050>,
+// CHECK-INDIRECT-SAME: <i32 0x8001_0050>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$s14class_metadataMXM"
 //   Name.
@@ -24,8 +25,8 @@ class A {}
 //   Field count.
 // CHECK-SAME: i32 0,
 //   Field offset vector offset.
-// CHECK-32-SAME: i32 14,
-// CHECK-64-SAME: i32 11,
+// CHECK-32-SAME: i32 13,
+// CHECK-64-SAME: i32 10,
 //   V-table offset.
 // CHECK-32-SAME: i32 13,
 // CHECK-64-SAME: i32 10,
@@ -43,7 +44,8 @@ class B : A {}
 // CHECK:      [[B_NAME:@.*]] = private constant [2 x i8] c"B\00"
 // CHECK-LABEL: @"$s14class_metadata1BCMn" =
 //   Flags. 0x4000_0050 == HasOverrideTable | Unique | Class
-// CHECK-SAME: <i32 0x4000_0050>,
+// CHECK-DIRECT-SAME: <i32 0x4000_0050>,
+// CHECK-INDIRECT-SAME: <i32 0x4001_0050>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$s14class_metadataMXM"
 //   Name.
@@ -70,7 +72,8 @@ class B : A {}
 //   Override table entry #1: base class.
 // CHECK-SAME: @"$s14class_metadata1ACMn"
 //   Override table entry #1: base method.
-// CHECK-SAME: @"$s14class_metadata1ACMn", i32 0, i32 13
+// CHECK-DIRECT-SAME: @"$s14class_metadata1ACMn", i32 0, i32 13
+// CHECK-INDIRECT-SAME: @"$s14class_metadata1ACMn", i32 0, i32 16
 //   Override table entry #1: invocation function.
 // CHECK-SAME: @"$s14class_metadata1BCACycfC"
 
@@ -126,7 +129,8 @@ class C<T> : B {}
 //   Override table entry #1: base class.
 // CHECK-SAME: @"$s14class_metadata1ACMn"
 //   Override table entry #1: base method.
-// CHECK-SAME: @"$s14class_metadata1ACMn", i32 0, i32 13
+// CHECK-DIRECT-SAME: @"$s14class_metadata1ACMn", i32 0, i32 13
+// CHECK-INDIRECT-SAME: @"$s14class_metadata1ACMn", i32 0, i32 16
 //   Override table entry #1: invocation function.
 // CHECK-SAME: @"$s14class_metadata1CCACyxGycfC"
 // CHECK-SAME: }>, section
@@ -142,7 +146,8 @@ class D : E {}
 // CHECK:      [[D_NAME:@.*]] = private constant [2 x i8] c"D\00"
 // CHECK-LABEL: @"$s14class_metadata1DCMn" =
 //   Flags. 0x4200_0050 == HasOverrideTable | Unique | Class
-// CHECK-SAME: <i32 0x4000_0050>,
+// CHECK-DIRECT-SAME: <i32 0x4000_0050>,
+// CHECK-INDIRECT-SAME: <i32 0x4001_0050>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$s14class_metadataMXM"
 //   Name.

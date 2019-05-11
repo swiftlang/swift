@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-indexed-symbols -enable-source-import -source-filename %s -I %S/Store/Inputs | %FileCheck %s
+// RUN: %target-swift-ide-test -print-indexed-symbols -enable-objc-interop -enable-source-import -source-filename %s -I %S/Store/Inputs | %FileCheck %s
 
 import NonExistingModuleName // Make sure invalid imports aren't affecting results
 // CHECK-NOT: {{.*}} | NonExistingModuleName

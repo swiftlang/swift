@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -o - -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -o - -primary-file %s | %FileCheck %s
 // REQUIRES: CPU=x86_64
 
 sil_stage canonical
@@ -109,10 +109,10 @@ bb3:
   return %9 : $()
 }
 
-sil_witness_table Int: Kindable module existential_metatypes {
+sil_witness_table public_external Int: Kindable module existential_metatypes {
   method #Kindable.kind!getter.1: @int_kind_getter_witness
 }
 
-sil_witness_table Float: Kindable module existential_metatypes {
+sil_witness_table public_external Float: Kindable module existential_metatypes {
   method #Kindable.kind!getter.1: @float_kind_getter_witness
 }

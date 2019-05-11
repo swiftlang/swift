@@ -55,3 +55,9 @@ func sr5176(description: String = "unambiguous Int32.init(bitPattern:)") {
 func sr6634(x: UnsafeBufferPointer<UInt8>) -> Int {
   return x.lazy.filter { $0 > 127 || $0 == 0 }.count // should be unambiguous
 }
+
+// abs of an integer literal
+func returnIntAbs() -> Int {
+  let x = abs(-8)
+  return x
+}

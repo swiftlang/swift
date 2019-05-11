@@ -16,10 +16,18 @@
 #ifndef SWIFT_SEMA_TYPE_CHECK_TYPE_H
 #define SWIFT_SEMA_TYPE_CHECK_TYPE_H
 
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "llvm/ADT/None.h"
 
 namespace swift {
+
+class ASTContext;
+class TypeRepr;
+class ComponentIdentTypeRepr;
+class GenericEnvironment;
+class GenericSignature;
+class GenericSignatureBuilder;
 
 /// Flags that describe the context of type checking a pattern or
 /// type.
@@ -118,8 +126,11 @@ enum class TypeResolverContext : uint8_t {
   /// Whether this is the payload subpattern of an enum pattern.
   EnumPatternPayload,
 
-  /// Whether we are checking the underlying type of a typealias.
+  /// Whether we are checking the underlying type of a non-generic typealias.
   TypeAliasDecl,
+
+  /// Whether we are checking the underlying type of a generic typealias.
+  GenericTypeAliasDecl,
 
   /// Whether we are in a requirement of a generic declaration
   GenericRequirement,
@@ -207,6 +218,7 @@ public:
     case Context::EnumElementDecl:
     case Context::EnumPatternPayload:
     case Context::TypeAliasDecl:
+    case Context::GenericTypeAliasDecl:
     case Context::GenericRequirement:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
@@ -288,6 +300,8 @@ class TypeResolution {
   GenericSignatureBuilder *getGenericSignatureBuilder() const;
 
 public:
+  LazyResolver *Resolver = nullptr;
+  
   /// Form a type resolution for the structure of a type, which does not
   /// attempt to resolve member types of type parameters to a particular
   /// associated type.
@@ -295,12 +309,14 @@ public:
 
   /// Form a type resolution for an interface type, which is a complete
   /// description of the type using generic parameters.
-  static TypeResolution forInterface(DeclContext *dc);
+  static TypeResolution forInterface(DeclContext *dc,
+                                     LazyResolver *resolver = nullptr);
 
   /// Form a type resolution for an interface type, which is a complete
   /// description of the type using generic parameters.
   static TypeResolution forInterface(DeclContext *dc,
-                                     GenericSignature *genericSig);
+                                     GenericSignature *genericSig,
+                                     LazyResolver *resolver = nullptr);
 
   /// Form a type resolution for a contextual type, which is a complete
   /// description of the type using the archetypes of the given declaration
@@ -314,7 +330,7 @@ public:
                                       GenericEnvironment *genericEnv);
 
   /// Retrieve the ASTContext in which this resolution occurs.
-  ASTContext &getASTContext() const { return dc->getASTContext(); }
+  ASTContext &getASTContext() const;
 
   /// Retrieve the declaration context in which type resolution will be
   /// performed.
@@ -327,7 +343,7 @@ public:
   /// no generic signature to resolve types.
   GenericSignature *getGenericSignature() const;
 
-  /// \brief Resolves a TypeRepr to a type.
+  /// Resolves a TypeRepr to a type.
   ///
   /// Performs name binding, checking of generic arguments, and so on in order
   /// to create a well-formed type.

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -emit-library -o %t/libcomplex.%target-dylib-extension -emit-module %S/complex.swift -module-link-name complex
+// RUN: %target-build-swift -emit-library -o %t/%target-library-name(complex) -emit-module %S/complex.swift -module-link-name complex
 // RUN: %target-jit-run %s -I %t -L %t | %FileCheck %s
 
 // RUN: grep -v import %s > %t/main.swift
@@ -7,6 +7,9 @@
 
 // REQUIRES: executable_test
 // REQUIRES: swift_interpreter
+
+// JIT runs in swift-version 4
+// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
 
 import complex
 

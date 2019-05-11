@@ -85,7 +85,7 @@ public:
 
   void visitType(CanType formalType, ManagedValue v) {
     // If we have a loadable type that has not been loaded, actually load it.
-    if (!v.getType().isObject() && v.getType().isLoadable(SGF.getModule())) {
+    if (!v.getType().isObject() && v.getType().isLoadable(SGF.F)) {
       if (v.isPlusOne(SGF)) {
         v = SGF.B.createLoadTake(loc, v);
       } else {
@@ -318,13 +318,8 @@ static void copyOrInitValuesInto(Initialization *init,
                 KIND == ImplodeKind::Copy, "Not handled by init");
   bool isInit = (KIND == ImplodeKind::Forward);
 
-  // First, unwrap one-element tuples, since we cannot lower them.
-  auto tupleType = dyn_cast<TupleType>(type);
-  if (tupleType && tupleType->getNumElements() == 1)
-    type = tupleType.getElementType(0);
-
   // If the element has non-tuple type, just serve it up to the initialization.
-  tupleType = dyn_cast<TupleType>(type);
+  auto tupleType = dyn_cast<TupleType>(type);
   if (!tupleType) {
     // We take the first value.
     ManagedValue result = values[0];
@@ -338,7 +333,7 @@ static void copyOrInitValuesInto(Initialization *init,
 
   if (init->canPerformInPlaceInitialization() &&
       init->isInPlaceInitializationOfGlobal() &&
-      SGF.getTypeLowering(type).getLoweredType().isTrivial(SGF.SGM.M)) {
+      SGF.getTypeLowering(type).isTrivial()) {
     // Implode tuples in initialization of globals if they are
     // of trivial types.
     implodeTuple = true;
@@ -395,12 +390,12 @@ static void verifyHelper(ArrayRef<ManagedValue> values,
   auto result = Optional<ValueOwnershipKind>(ValueOwnershipKind::Any);
   Optional<bool> sameHaveCleanups;
   for (ManagedValue v : values) {
-    assert((!SGF || !v.getType().isLoadable(SGF.get()->getModule()) ||
+    assert((!SGF || !v.getType().isLoadable(SGF.get()->F) ||
             v.getType().isObject()) &&
            "All loadable values in an RValue must be an object");
 
     ValueOwnershipKind kind = v.getOwnershipKind();
-    if (kind == ValueOwnershipKind::Trivial)
+    if (kind == ValueOwnershipKind::Any)
       continue;
 
     // Merge together whether or not the RValue has cleanups.
@@ -808,7 +803,7 @@ SILType RValue::getLoweredType(SILGenFunction &SGF) const & {
 
 SILType RValue::getLoweredImplodedTupleType(SILGenFunction &SGF) const & {
   SILType loweredType = getLoweredType(SGF);
-  if (loweredType.isAddressOnly(SGF.getModule()) &&
+  if (loweredType.isAddressOnly(SGF.F) &&
       SGF.silConv.useLoweredAddresses())
     return loweredType.getAddressType();
   return loweredType.getObjectType();

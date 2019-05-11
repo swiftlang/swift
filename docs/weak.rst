@@ -412,7 +412,7 @@ Looking at these use-cases, there are two main thrusts:
   Here it is reasonable to expect more user expertise, such that
   power and flexibility should take priority over ease of use.
 
-The second set of use cases should addressed by library types working
+The second set of use cases should be addressed by library types working
 on top of basic runtime support.
 
 The first set of use cases will require more direct language support.
@@ -436,7 +436,7 @@ also adds :code:`capture`, and we may later add more variants, such as
 
 :code:`weak` is an attribute which may be applied to any
 variable-like declaration of reference type :code:`T`.  For
-type-system purposes, the variables behaves like a normal
+type-system purposes, the variable behaves like a normal
 variable of type :code:`Optional<T>`, except:
 
 - it does not maintain a +1 reference count invariant and

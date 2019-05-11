@@ -23,8 +23,8 @@ struct A : Preening, Hashable, Equatable {
     return lhs.value == rhs.value
   }
 
-  var hashValue: Int {
-    return value.hashValue
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
   }
 }
 

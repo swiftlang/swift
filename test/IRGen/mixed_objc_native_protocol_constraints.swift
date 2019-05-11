@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -verify %s
+// RUN: %target-swift-frontend -emit-ir -verify %s
 
 // compiler_crashers/029-class-with-anyobject-type-constraint.swift
 // Test case submitted to project by https://github.com/jansabbe (Jan Sabbe)

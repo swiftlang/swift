@@ -169,7 +169,7 @@ def compare_sizes(old_sizes, new_sizes, name_key, title, total_size_key="",
 
         if total_size_key:
             if csv:
-                csv.writerow([title, name_key, 
+                csv.writerow([title, name_key,
                               old_size, old_size * 100.0 / old_total_size,
                               new_size, new_size * 100.0 / new_total_size,
                               perc])
@@ -190,7 +190,7 @@ def compare_sizes(old_sizes, new_sizes, name_key, title, total_size_key="",
                       (title, name_key, old_size, new_size, perc))
 
 
-def compare_sizes_of_file(old_files, new_files, all_sections, list_categories, 
+def compare_sizes_of_file(old_files, new_files, all_sections, list_categories,
                           csv=None):
     old_sizes = collections.defaultdict(int)
     new_sizes = collections.defaultdict(int)
@@ -214,13 +214,13 @@ def compare_sizes_of_file(old_files, new_files, all_sections, list_categories,
     if list_categories:
         for cat in categories:
             cat_name = cat[0]
-            compare_sizes(old_sizes, new_sizes, cat_name, "", "__text", 
+            compare_sizes(old_sizes, new_sizes, cat_name, "", "__text",
                           csv=csv)
 
     if all_sections:
         section_title = "    section"
 
-        compare_sizes(old_sizes, new_sizes, "__textcoal_nt", section_title, 
+        compare_sizes(old_sizes, new_sizes, "__textcoal_nt", section_title,
                       csv=csv)
         compare_sizes(old_sizes, new_sizes, "__stubs", section_title, csv=csv)
         compare_sizes(old_sizes, new_sizes, "__const", section_title, csv=csv)

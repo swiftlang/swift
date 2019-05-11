@@ -139,7 +139,7 @@ reflect(object: alignedClass)
 // CHECK-64-NEXT:       (field name=_value offset=0
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK-64-NEXT:   (field name=x offset=16
-// CHECK-64-NEXT:     (builtin size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1)))
+// CHECK-64-NEXT:     (struct size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1
 
 // CHECK-32: Reflecting an object.
 // CHECK-32: Type reference:
@@ -152,7 +152,7 @@ reflect(object: alignedClass)
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK-32-NEXT:   (field name=x offset=16
-// CHECK-32-NEXT:     (builtin size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1)))
+// CHECK-32-NEXT:     (struct size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1
 
 class GenericAlignedNSClass<T> : NSObject {
   var w: T = 0 as! T
@@ -174,7 +174,7 @@ reflect(object: genericAlignedClass)
 // CHECK-64-NEXT:       (field name=_value offset=0
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK-64-NEXT:   (field name=x offset=32
-// CHECK-64-NEXT:     (builtin size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1)))
+// CHECK-64-NEXT:     (struct size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1
 
 // CHECK-32: Reflecting an object.
 // CHECK-32: Type reference:
@@ -188,6 +188,6 @@ reflect(object: genericAlignedClass)
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
 // CHECK-32-NEXT:   (field name=x offset=32
-// CHECK-32-NEXT:     (builtin size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1)))
+// CHECK-32-NEXT:     (struct size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1
 
 doneReflecting()

@@ -43,6 +43,10 @@ private protocol P2 {
   associatedtype A
 }
 
+private func getP2_A<T: P2>(_: T.Type) -> Any.Type {
+  return T.A.self
+}
+
 struct Bar: P2 {
   typealias A = Int
 }
@@ -54,5 +58,20 @@ private class C2<T: P2>: C1<T.A> { }
 AssociatedTypeDemangleTests.test("private protocols") {
   expectEqual("C2<Bar>", String(describing: C2<Bar>.self))
 }
+
+// rdar://problem/46853806
+class C3<T: P>: P2 {
+  fileprivate struct Inner<U: P> { }
+  fileprivate typealias A = Inner<T>
+}
+
+extension Int: P {
+  typealias A = Int
+}
+
+AssociatedTypeDemangleTests.test("generic anonymous contexts") {
+  expectEqual("Inner<Int>", String(describing: getP2_A(C3<Int>.self)))
+}
+
 
 runAllTests()

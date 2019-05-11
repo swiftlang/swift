@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -inline -generic-specializer -inline %s > %t.sil
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-full-demangle -enable-sil-verify-all -specdevirt %t.sil | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -inline -generic-specializer -inline %s > %t.sil
+// RUN: %target-sil-opt -sil-full-demangle -enable-sil-verify-all -specdevirt %t.sil | %FileCheck %s
 
 // Check that the  @_optimize(none) annotation prevents
 // any optimizations of the annotated function:

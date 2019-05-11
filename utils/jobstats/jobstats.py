@@ -19,6 +19,7 @@ import datetime
 import itertools
 import json
 import os
+import platform
 import random
 import re
 
@@ -315,7 +316,13 @@ def load_stats_dir(path, select_module=[], select_stat=[],
                 continue
             jobargs = [mg["input"], mg["triple"], mg["out"], mg["opt"]]
 
-            with open(os.path.join(root, f)) as fp:
+            if platform.system() == 'Windows':
+                p = unicode(u"\\\\?\\%s" % os.path.abspath(os.path.join(root,
+                                                                        f)))
+            else:
+                p = os.path.join(root, f)
+
+            with open(p) as fp:
                 j = json.load(fp)
             dur_usec = 1
             stats = dict()

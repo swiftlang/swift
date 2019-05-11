@@ -44,6 +44,8 @@ enum class PrintNameContext {
   Normal,
   /// Keyword context, where no keywords are escaped.
   Keyword,
+  /// Type member context, e.g. properties or enum cases.
+  TypeMember,
   /// Generic parameter context, where 'Self' is not escaped.
   GenericParameter,
   /// Class method return type, where 'Self' is not escaped.
@@ -118,6 +120,10 @@ public:
   /// Callers should use callPrintDeclPost().
   virtual void printDeclPost(const Decl *D, Optional<BracketOptions> Bracket) {}
 
+  /// Called before printing the result type of the declaration. Printer can
+  /// replace \p TL to customize the input.
+  virtual void printDeclResultTypePre(ValueDecl *VD, TypeLoc &TL) {}
+
   /// Called before printing a type.
   virtual void printTypePre(const TypeLoc &TL) {}
   /// Called after printing a type.
@@ -186,10 +192,13 @@ public:
     return *this << StringRef(&c, 1);
   }
 
-  void printKeyword(StringRef name) {
+  void printKeyword(StringRef name, PrintOptions Opts, StringRef Suffix = "") {
+    if (Opts.SkipUnderscoredKeywords && name.startswith("_"))
+      return;
     callPrintNamePre(PrintNameContext::Keyword);
     *this << name;
     printNamePost(PrintNameContext::Keyword);
+    *this << Suffix;
   }
 
   void printAttrName(StringRef name, bool needAt = false) {
@@ -206,6 +215,8 @@ public:
     printStructurePost(PrintStructureKind::BuiltinAttribute);
     return *this;
   }
+
+  void printEscapedStringLiteral(StringRef str);
 
   void printName(Identifier Name,
                  PrintNameContext Context = PrintNameContext::Normal);

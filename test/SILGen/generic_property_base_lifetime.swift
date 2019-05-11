@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name generic_property_base_lifetime %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name generic_property_base_lifetime %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
 
 protocol ProtocolA: class {
     var intProp: Int { get set }
@@ -14,7 +14,7 @@ protocol ProtocolB {
 }
 
 
-// CHECK-LABEL: sil hidden @$s30generic_property_base_lifetime21getIntPropExistentialySiAA9ProtocolA_pF : $@convention(thin) (@guaranteed ProtocolA) -> Int {
+// CHECK-LABEL: sil hidden [ossa] @$s30generic_property_base_lifetime21getIntPropExistentialySiAA9ProtocolA_pF : $@convention(thin) (@guaranteed ProtocolA) -> Int {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $ProtocolA):
 // CHECK:   [[PROJECTION:%.*]] = open_existential_ref [[ARG]]
 // CHECK:   [[PROJECTION_COPY:%.*]] = copy_value [[PROJECTION]]
@@ -29,7 +29,7 @@ func getIntPropExistential(_ a: ProtocolA) -> Int {
   return a.intProp
 }
 
-// CHECK-LABEL: sil hidden @$s30generic_property_base_lifetime21setIntPropExistentialyyAA9ProtocolA_pF : $@convention(thin) (@guaranteed ProtocolA) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s30generic_property_base_lifetime21setIntPropExistentialyyAA9ProtocolA_pF : $@convention(thin) (@guaranteed ProtocolA) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $ProtocolA):
 // CHECK:   [[PROJECTION:%.*]] = open_existential_ref [[ARG]]
 // CHECK:   [[PROJECTION_COPY:%.*]] = copy_value [[PROJECTION]]
@@ -41,7 +41,7 @@ func setIntPropExistential(_ a: ProtocolA) {
   a.intProp = 0
 }
 
-// CHECK-LABEL: sil hidden @$s30generic_property_base_lifetime17getIntPropGeneric{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s30generic_property_base_lifetime17getIntPropGeneric{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $T):
 // CHECK:    apply {{%.*}}<T>([[ARG]])
 // CHECK: } // end sil function '$s30generic_property_base_lifetime17getIntPropGeneric{{[_0-9a-zA-Z]*}}F'
@@ -49,14 +49,14 @@ func getIntPropGeneric<T: ProtocolA>(_ a: T) -> Int {
   return a.intProp
 }
 
-// CHECK-LABEL: sil hidden @$s30generic_property_base_lifetime17setIntPropGeneric{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s30generic_property_base_lifetime17setIntPropGeneric{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $T):
 // CHECK:   apply {{%.*}}<T>({{%.*}}, [[ARG]])
 func setIntPropGeneric<T: ProtocolA>(_ a: T) {
   a.intProp = 0
 }
 
-// CHECK-LABEL: sil hidden @$s30generic_property_base_lifetime21getIntPropExistentialySiAA9ProtocolB_pF
+// CHECK-LABEL: sil hidden [ossa] @$s30generic_property_base_lifetime21getIntPropExistentialySiAA9ProtocolB_pF
 // CHECK:         [[PROJECTION:%.*]] = open_existential_addr immutable_access %0
 // CHECK:         [[STACK:%[0-9]+]] = alloc_stack $@opened({{".*"}}) ProtocolB
 // CHECK:         copy_addr [[PROJECTION]] to [initialization] [[STACK]]
@@ -67,7 +67,7 @@ func getIntPropExistential(_ a: ProtocolB) -> Int {
   return a.intProp
 }
 
-// CHECK-LABEL: sil hidden @$s30generic_property_base_lifetime17getIntPropGeneric{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s30generic_property_base_lifetime17getIntPropGeneric{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[STACK:%[0-9]+]] = alloc_stack $T
 // CHECK:         copy_addr %0 to [initialization] [[STACK]]
 // CHECK:         apply {{%.*}}<T>([[STACK]])
@@ -77,7 +77,7 @@ func getIntPropGeneric<T: ProtocolB>(_ a: T) -> Int {
   return a.intProp
 }
 
-// CHECK-LABEL: sil hidden @$s30generic_property_base_lifetime21getIntPropExistentialySiAA9ProtocolO_pF : $@convention(thin) (@guaranteed ProtocolO) -> Int {
+// CHECK-LABEL: sil hidden [ossa] @$s30generic_property_base_lifetime21getIntPropExistentialySiAA9ProtocolO_pF : $@convention(thin) (@guaranteed ProtocolO) -> Int {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $ProtocolO):
 // CHECK:  [[PROJECTION:%.*]] = open_existential_ref [[ARG]]
 // CHECK:  [[PROJECTION_COPY:%.*]] = copy_value [[PROJECTION]]
@@ -90,7 +90,7 @@ func getIntPropExistential(_ a: ProtocolO) -> Int {
   return a.intProp
 }
 
-// CHECK-LABEL: sil hidden @$s30generic_property_base_lifetime21setIntPropExistentialyyAA9ProtocolO_pF : $@convention(thin) (@guaranteed ProtocolO) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s30generic_property_base_lifetime21setIntPropExistentialyyAA9ProtocolO_pF : $@convention(thin) (@guaranteed ProtocolO) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $ProtocolO):
 // CHECK:   [[PROJECTION:%.*]] = open_existential_ref [[ARG]]
 // CHECK:   [[PROJECTION_COPY:%.*]] = copy_value [[PROJECTION]]
@@ -102,14 +102,14 @@ func setIntPropExistential(_ a: ProtocolO) {
   a.intProp = 0
 }
 
-// CHECK-LABEL: sil hidden @$s30generic_property_base_lifetime17getIntPropGeneric{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s30generic_property_base_lifetime17getIntPropGeneric{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $T):
 // CHECK:   apply {{%.*}}<T>([[ARG]])
 func getIntPropGeneric<T: ProtocolO>(_ a: T) -> Int {
   return a.intProp
 }
 
-// CHECK-LABEL: sil hidden @$s30generic_property_base_lifetime17setIntPropGeneric{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s30generic_property_base_lifetime17setIntPropGeneric{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $T):
 // CHECK:   apply {{%.*}}<T>({{%.*}}, [[ARG]])
 func setIntPropGeneric<T: ProtocolO>(_ a: T) {

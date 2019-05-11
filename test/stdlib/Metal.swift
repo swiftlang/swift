@@ -5,6 +5,9 @@
 
 // REQUIRES: executable_test
 
+// Requires swift-version 4
+// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
+
 import StdlibUnittest
 
 import Metal
@@ -259,10 +262,12 @@ if #available(OSX 10.14, iOS 12.0, tvOS 12.0, *){
       let encoder = cmdBuf.makeRenderCommandEncoder(descriptor: rpDesc)!
       encoder.useResources([buf], usage: MTLResourceUsage.read)
       encoder.useHeaps([heap])
-      #if os(macOS)
+#if os(macOS) || os(iOS)
+      if #available(iOS 12.0, macOS 10.13, *) {
         encoder.setViewports([MTLViewport()])
         encoder.setScissorRects([MTLScissorRect(x:0, y:0, width:1, height:1)])
-      #endif
+      }
+#endif
       encoder.setVertexBuffers([buf], offsets: [0], range: 0..<1)
       encoder.setVertexTextures([tex], range: 0..<1)
       encoder.setVertexSamplerStates([smplr], range: 0..<1)

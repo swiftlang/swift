@@ -17,6 +17,8 @@
 #ifndef SWIFT_RUNTIME_CONFIG_H
 #define SWIFT_RUNTIME_CONFIG_H
 
+#include "swift/Runtime/CMakeConfig.h"
+
 /// \macro SWIFT_RUNTIME_GNUC_PREREQ
 /// Extend the default __GNUC_PREREQ even if glibc's features.h isn't
 /// available.
@@ -139,10 +141,27 @@
 /// Which bits in the class metadata are used to distinguish Swift classes
 /// from ObjC classes?
 #ifndef SWIFT_CLASS_IS_SWIFT_MASK
-# if defined(__APPLE__) && SWIFT_OBJC_INTEROP && SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
-#  define SWIFT_CLASS_IS_SWIFT_MASK 2ULL
-# else
+
+// Non-Apple platforms always use 1.
+# if !defined(__APPLE__)
 #  define SWIFT_CLASS_IS_SWIFT_MASK 1ULL
+
+// Builds for Swift-in-the-OS always use 2.
+# elif SWIFT_BNI_OS_BUILD
+#  define SWIFT_CLASS_IS_SWIFT_MASK 2ULL
+
+// Builds for Xcode always use 1.
+# elif SWIFT_BNI_XCODE_BUILD
+#  define SWIFT_CLASS_IS_SWIFT_MASK 1ULL
+
+// Other builds (such as local builds on developers' computers)
+// dynamically choose the bit at runtime based on the current OS
+// version.
+# else
+#  define SWIFT_CLASS_IS_SWIFT_MASK _swift_classIsSwiftMask
+#  define SWIFT_CLASS_IS_SWIFT_MASK_GLOBAL_VARIABLE 1
+#  include "BackDeployment.h"
+
 # endif
 #endif
 

@@ -540,13 +540,16 @@ public:
   /// Records the use of the given SILLayout.
   SILLayoutID addSILLayoutRef(SILLayout *layout);
 
-  /// Records the use of the given module.
+  /// Records the module containing \p DC.
   ///
-  /// The module's name will be scheduled for serialization if necessary.
+  /// The module's name will be scheduled for serialization if necessary. This
+  /// may not be exactly the same as the name of the module containing DC;
+  /// instead, it will match the containing file's "exported module name".
   ///
   /// \returns The ID for the identifier for the module's name, or one of the
   /// special module codes defined above.
-  IdentifierID addModuleRef(const ModuleDecl *M);
+  /// \see FileUnit::getExportedModuleName
+  IdentifierID addContainingModuleRef(const DeclContext *DC);
 
   /// Write a normal protocol conformance.
   void writeNormalConformance(const NormalProtocolConformance *conformance);

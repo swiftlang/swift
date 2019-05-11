@@ -521,7 +521,8 @@ internal struct _Stdout : TextOutputStream {
   internal mutating func write(_ string: String) {
     if string.isEmpty { return }
 
-    _ = string._withUTF8 { utf8 in
+    var string = string
+    _ = string.withUTF8 { utf8 in
       _swift_stdlib_fwrite_stdout(utf8.baseAddress!, 1, utf8.count)
     }
   }

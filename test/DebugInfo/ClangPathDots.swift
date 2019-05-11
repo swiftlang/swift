@@ -5,8 +5,10 @@
 // RUN: %target-swift-frontend -emit-ir %s -g -I %S/Inputs -o - \
 // RUN:   -module-cache-path %t.cache | %FileCheck %s --check-prefix=CACHED
 
-// FIRST: !DIFile(filename: "NSObject.h", directory: {{.*}}/include/objc")
-// CACHED: !DIFile(filename: "NSObject.h", directory: {{.*}}/include/objc")
+// Test that the paths have no extra "./" components on rebuild.
+
+// FIRST: !DIFile(filename: "{{.*}}/include/objc/NSObject.h",
+// CACHED: !DIFile(filename: "{{.*}}/include/objc/NSObject.h",
 
 import ObjectiveC
 

@@ -312,16 +312,6 @@ VarDecl *DebugValueAddrInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }
 
-static void declareWitnessTable(SILModule &Mod,
-                                ProtocolConformanceRef conformanceRef) {
-  if (conformanceRef.isAbstract()) return;
-  auto C = conformanceRef.getConcrete();
-  if (!Mod.lookUpWitnessTable(C, false))
-    Mod.createWitnessTableDeclaration(C,
-        getLinkageForProtocolConformance(C->getRootNormalConformance(),
-                                         NotForDefinition));
-}
-
 AllocExistentialBoxInst *AllocExistentialBoxInst::create(
     SILDebugLocation Loc, SILType ExistentialType, CanType ConcreteType,
     ArrayRef<ProtocolConformanceRef> Conformances,
@@ -333,8 +323,6 @@ AllocExistentialBoxInst *AllocExistentialBoxInst::create(
   SILModule &Mod = F->getModule();
   auto Size = totalSizeToAlloc<swift::Operand>(TypeDependentOperands.size());
   auto Buffer = Mod.allocateInst(Size, alignof(AllocExistentialBoxInst));
-  for (ProtocolConformanceRef C : Conformances)
-    declareWitnessTable(Mod, C);
   return ::new (Buffer) AllocExistentialBoxInst(Loc,
                                                 ExistentialType,
                                                 ConcreteType,
@@ -479,11 +467,11 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
     auto convention = SILArgumentConvention(yield.getConvention());
     resultTypes.push_back(yieldType);
     resultOwnerships.push_back(
-      ValueOwnershipKind(F.getModule(), yieldType, convention));
+      ValueOwnershipKind(F, yieldType, convention));
   }
 
   resultTypes.push_back(SILType::getSILTokenType(F.getASTContext()));
-  resultOwnerships.push_back(ValueOwnershipKind::Trivial);
+  resultOwnerships.push_back(ValueOwnershipKind::Any);
 
   SmallVector<SILValue, 32> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, openedArchetypes, F,
@@ -515,19 +503,19 @@ PartialApplyInst::PartialApplyInst(
     // PartialApplyInst
     // should derive the type of its result by partially applying the callee's
     // type.
-    : InstructionBase(Loc, Callee, SubstCalleeTy, Subs,
-                      Args, TypeDependentOperands, SpecializationInfo,
-                      ClosureType) {}
+    : InstructionBase(Loc, Callee, SubstCalleeTy, Subs, Args,
+                      TypeDependentOperands, SpecializationInfo, ClosureType) {}
 
 PartialApplyInst *PartialApplyInst::create(
     SILDebugLocation Loc, SILValue Callee, ArrayRef<SILValue> Args,
     SubstitutionMap Subs, ParameterConvention CalleeConvention, SILFunction &F,
     SILOpenedArchetypesState &OpenedArchetypes,
-    const GenericSpecializationInformation *SpecializationInfo) {
+    const GenericSpecializationInformation *SpecializationInfo,
+    OnStackKind onStack) {
   SILType SubstCalleeTy =
       Callee->getType().substGenericArgs(F.getModule(), Subs);
   SILType ClosureType = SILBuilder::getPartialApplyResultType(
-      SubstCalleeTy, Args.size(), F.getModule(), {}, CalleeConvention);
+      SubstCalleeTy, Args.size(), F.getModule(), {}, CalleeConvention, onStack);
 
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
@@ -947,8 +935,22 @@ StringRef swift::getSILAccessEnforcementName(SILAccessEnforcement enforcement) {
   llvm_unreachable("bad access enforcement");
 }
 
-AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest)
-    : InstructionBase(Loc), Operands(this, Src, Dest) {}
+AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest,
+                       AssignOwnershipQualifier Qualifier) :
+    AssignInstBase(Loc, Src, Dest) {
+  SILInstruction::Bits.AssignInst.OwnershipQualifier = unsigned(Qualifier);
+}
+
+AssignByDelegateInst::AssignByDelegateInst(SILDebugLocation Loc,
+                                           SILValue Src, SILValue Dest,
+                                           SILValue Initializer,
+                                           SILValue Setter,
+                                          AssignOwnershipQualifier Qualifier) :
+    AssignInstBase(Loc, Src, Dest, Initializer, Setter) {
+  assert(Initializer->getType().is<SILFunctionType>());
+  SILInstruction::Bits.AssignByDelegateInst.OwnershipQualifier =
+      unsigned(Qualifier);
+}
 
 MarkFunctionEscapeInst *
 MarkFunctionEscapeInst::create(SILDebugLocation Loc,
@@ -1031,15 +1033,15 @@ TupleInst *TupleInst::create(SILDebugLocation Loc, SILType Ty,
 }
 
 bool TupleExtractInst::isTrivialEltOfOneRCIDTuple() const {
-  SILModule &Mod = getModule();
+  auto *F = getFunction();
 
   // If we are not trivial, bail.
-  if (!getType().isTrivial(Mod))
+  if (!getType().isTrivial(*F))
     return false;
 
   // If the elt we are extracting is trivial, we cannot have any non trivial
   // fields.
-  if (getOperand()->getType().isTrivial(Mod))
+  if (getOperand()->getType().isTrivial(*F))
     return false;
 
   // Ok, now we know that our tuple has non-trivial fields. Make sure that our
@@ -1056,7 +1058,7 @@ bool TupleExtractInst::isTrivialEltOfOneRCIDTuple() const {
 
     // Otherwise check if we have a non-trivial type. If we don't have one,
     // continue.
-    if (OpTy.getTupleElementType(i).isTrivial(Mod))
+    if (OpTy.getTupleElementType(i).isTrivial(*F))
       continue;
 
     // Ok, this type is non-trivial. If we have not seen a non-trivial field
@@ -1078,11 +1080,11 @@ bool TupleExtractInst::isTrivialEltOfOneRCIDTuple() const {
 }
 
 bool TupleExtractInst::isEltOnlyNonTrivialElt() const {
-  SILModule &Mod = getModule();
+  auto *F = getFunction();
 
   // If the elt we are extracting is trivial, we cannot be a non-trivial
   // field... return false.
-  if (getType().isTrivial(Mod))
+  if (getType().isTrivial(*F))
     return false;
 
   // Ok, we know that the elt we are extracting is non-trivial. Make sure that
@@ -1098,7 +1100,7 @@ bool TupleExtractInst::isEltOnlyNonTrivialElt() const {
 
     // Otherwise check if we have a non-trivial type. If we don't have one,
     // continue.
-    if (OpTy.getTupleElementType(i).isTrivial(Mod))
+    if (OpTy.getTupleElementType(i).isTrivial(*F))
       continue;
 
     // If we do have a non-trivial type, return false. We have multiple
@@ -1112,17 +1114,17 @@ bool TupleExtractInst::isEltOnlyNonTrivialElt() const {
 }
 
 bool StructExtractInst::isTrivialFieldOfOneRCIDStruct() const {
-  SILModule &Mod = getModule();
+  auto *F = getFunction();
 
   // If we are not trivial, bail.
-  if (!getType().isTrivial(Mod))
+  if (!getType().isTrivial(*F))
     return false;
 
   SILType StructTy = getOperand()->getType();
 
   // If the elt we are extracting is trivial, we cannot have any non trivial
   // fields.
-  if (StructTy.isTrivial(Mod))
+  if (StructTy.isTrivial(*F))
     return false;
 
   // Ok, now we know that our tuple has non-trivial fields. Make sure that our
@@ -1137,7 +1139,7 @@ bool StructExtractInst::isTrivialFieldOfOneRCIDStruct() const {
 
     // Otherwise check if we have a non-trivial type. If we don't have one,
     // continue.
-    if (StructTy.getFieldType(D, Mod).isTrivial(Mod))
+    if (StructTy.getFieldType(D, F->getModule()).isTrivial(*F))
       continue;
 
     // Ok, this type is non-trivial. If we have not seen a non-trivial field
@@ -1162,11 +1164,11 @@ bool StructExtractInst::isTrivialFieldOfOneRCIDStruct() const {
 /// struct. This implies that a ref count operation on the aggregate is
 /// equivalent to a ref count operation on this field.
 bool StructExtractInst::isFieldOnlyNonTrivialField() const {
-  SILModule &Mod = getModule();
+  auto *F = getFunction();
 
   // If the field we are extracting is trivial, we cannot be a non-trivial
   // field... return false.
-  if (getType().isTrivial(Mod))
+  if (getType().isTrivial(*F))
     return false;
 
   SILType StructTy = getOperand()->getType();
@@ -1180,7 +1182,7 @@ bool StructExtractInst::isFieldOnlyNonTrivialField() const {
     // Ok, we have a field that is not equal to the field we are
     // extracting. If that field is trivial, we do not care about
     // it... continue.
-    if (StructTy.getFieldType(D, Mod).isTrivial(Mod))
+    if (StructTy.getFieldType(D, F->getModule()).isTrivial(*F))
       continue;
 
     // We have found a non trivial member that is not the member we are
@@ -1701,6 +1703,12 @@ SwitchEnumInstBase::getUniqueCaseForDestination(SILBasicBlock *BB) {
   return D;
 }
 
+NullablePtr<SILBasicBlock> SwitchEnumInstBase::getDefaultBBOrNull() const {
+  if (!hasDefault())
+    return nullptr;
+  return getDefaultBB();
+}
+
 SwitchEnumInst *SwitchEnumInst::create(
     SILDebugLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
     ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
@@ -1756,7 +1764,6 @@ WitnessMethodInst::create(SILDebugLocation Loc, CanType LookupType,
   auto Size = totalSizeToAlloc<swift::Operand>(TypeDependentOperands.size());
   auto Buffer = Mod.allocateInst(Size, alignof(WitnessMethodInst));
 
-  declareWitnessTable(Mod, Conformance);
   return ::new (Buffer) WitnessMethodInst(Loc, LookupType, Conformance, Member,
                                           Ty, TypeDependentOperands);
 }
@@ -1790,8 +1797,6 @@ InitExistentialAddrInst *InitExistentialAddrInst::create(
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size,
                                   alignof(InitExistentialAddrInst));
-  for (ProtocolConformanceRef C : Conformances)
-    declareWitnessTable(Mod, C);
   return ::new (Buffer) InitExistentialAddrInst(Loc, Existential,
                                                 TypeDependentOperands,
                                                 ConcreteType,
@@ -1811,9 +1816,6 @@ InitExistentialValueInst *InitExistentialValueInst::create(
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
 
   void *Buffer = Mod.allocateInst(size, alignof(InitExistentialRefInst));
-  for (ProtocolConformanceRef C : Conformances)
-    declareWitnessTable(Mod, C);
-
   return ::new (Buffer)
       InitExistentialValueInst(Loc, ExistentialType, ConcreteType, Instance,
                                 TypeDependentOperands, Conformances);
@@ -1834,9 +1836,6 @@ InitExistentialRefInst::create(SILDebugLocation Loc, SILType ExistentialType,
 
   void *Buffer = Mod.allocateInst(size,
                                   alignof(InitExistentialRefInst));
-  for (ProtocolConformanceRef C : Conformances)
-    declareWitnessTable(Mod, C);
-
   return ::new (Buffer) InitExistentialRefInst(Loc, ExistentialType,
                                                ConcreteType,
                                                Instance,
@@ -1869,9 +1868,6 @@ InitExistentialMetatypeInst *InitExistentialMetatypeInst::create(
       1 + TypeDependentOperands.size(), conformances.size());
 
   void *buffer = M.allocateInst(size, alignof(InitExistentialMetatypeInst));
-  for (ProtocolConformanceRef conformance : conformances)
-    declareWitnessTable(M, conformance);
-
   return ::new (buffer) InitExistentialMetatypeInst(
       Loc, existentialMetatypeType, metatype,
       TypeDependentOperands, conformances);
@@ -1880,42 +1876,6 @@ InitExistentialMetatypeInst *InitExistentialMetatypeInst::create(
 ArrayRef<ProtocolConformanceRef>
 InitExistentialMetatypeInst::getConformances() const {
   return {getTrailingObjects<ProtocolConformanceRef>(), NumConformances};
-}
-
-MarkUninitializedBehaviorInst *
-MarkUninitializedBehaviorInst::create(SILModule &M,
-                                      SILDebugLocation DebugLoc,
-                                      SILValue InitStorage,
-                                      SubstitutionMap InitStorageSubs,
-                                      SILValue Storage,
-                                      SILValue Setter,
-                                      SubstitutionMap SetterSubs,
-                                      SILValue Self,
-                                      SILType Ty) {
-  auto mem = M.allocateInst(sizeof(MarkUninitializedBehaviorInst),
-                            alignof(MarkUninitializedBehaviorInst));
-  return ::new (mem) MarkUninitializedBehaviorInst(DebugLoc,
-                                                   InitStorage, InitStorageSubs,
-                                                   Storage,
-                                                   Setter, SetterSubs,
-                                                   Self,
-                                                   Ty);
-}
-
-MarkUninitializedBehaviorInst::MarkUninitializedBehaviorInst(
-                                        SILDebugLocation DebugLoc,
-                                        SILValue InitStorage,
-                                        SubstitutionMap InitStorageSubs,
-                                        SILValue Storage,
-                                        SILValue Setter,
-                                        SubstitutionMap SetterSubs,
-                                        SILValue Self,
-                                        SILType Ty)
-  : InstructionBase(DebugLoc, Ty),
-    Operands(this, InitStorage, Storage, Setter, Self),
-    InitStorageSubstitutions(InitStorageSubs),
-    SetterSubstitutions(SetterSubs)
-{
 }
 
 OpenedExistentialAccess swift::getOpenedExistentialAccessFor(AccessKind access) {
@@ -2168,7 +2128,7 @@ ConvertFunctionInst *ConvertFunctionInst::create(
     (void)opTI;
     CanSILFunctionType resTI = CFI->getType().castTo<SILFunctionType>();
     (void)resTI;
-    assert(opTI->isABICompatibleWith(resTI).isCompatible() &&
+    assert(opTI->isABICompatibleWith(resTI, &F).isCompatible() &&
            "Can not convert in between ABI incompatible function types");
   }
   return CFI;
@@ -2176,8 +2136,7 @@ ConvertFunctionInst *ConvertFunctionInst::create(
 
 ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(
     SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILFunction &F,
-    SILOpenedArchetypesState &OpenedArchetypes, bool isEscapedByUser,
-    bool isLifetimeGuaranteed) {
+    SILOpenedArchetypesState &OpenedArchetypes, bool isLifetimeGuaranteed) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
@@ -2185,9 +2144,8 @@ ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(
   unsigned size =
     totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(ConvertEscapeToNoEscapeInst));
-  auto *CFI = ::new (Buffer)
-      ConvertEscapeToNoEscapeInst(DebugLoc, Operand, TypeDependentOperands, Ty,
-                                  isEscapedByUser, isLifetimeGuaranteed);
+  auto *CFI = ::new (Buffer) ConvertEscapeToNoEscapeInst(
+      DebugLoc, Operand, TypeDependentOperands, Ty, isLifetimeGuaranteed);
   // If we do not have lowered SIL, make sure that are not performing
   // ABI-incompatible conversions.
   //
@@ -2200,9 +2158,9 @@ ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(
     (void)opTI;
     CanSILFunctionType resTI = CFI->getType().castTo<SILFunctionType>();
     (void)resTI;
-    assert(
-        opTI->isABICompatibleWith(resTI).isCompatibleUpToNoEscapeConversion() &&
-        "Can not convert in between ABI incompatible function types");
+    assert(opTI->isABICompatibleWith(resTI, &F)
+               .isCompatibleUpToNoEscapeConversion() &&
+           "Can not convert in between ABI incompatible function types");
   }
   return CFI;
 }
@@ -2214,6 +2172,7 @@ bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {
   case Kind::OptionalChain:
   case Kind::OptionalWrap:
   case Kind::OptionalForce:
+  case Kind::TupleElement:
     llvm_unreachable("not a settable computed property");
   case Kind::SettableProperty: {
     auto setter = getComputedPropertySetter();
@@ -2232,6 +2191,7 @@ forEachRefcountableReference(const KeyPathPatternComponent &component,
   case KeyPathPatternComponent::Kind::OptionalChain:
   case KeyPathPatternComponent::Kind::OptionalWrap:
   case KeyPathPatternComponent::Kind::OptionalForce:
+  case KeyPathPatternComponent::Kind::TupleElement:
     return;
   case KeyPathPatternComponent::Kind::SettableProperty:
     forFunction(component.getComputedPropertySetter());
@@ -2288,6 +2248,7 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
     case KeyPathPatternComponent::Kind::OptionalChain:
     case KeyPathPatternComponent::Kind::OptionalWrap:
     case KeyPathPatternComponent::Kind::OptionalForce:
+    case KeyPathPatternComponent::Kind::TupleElement:
       break;
     
     case KeyPathPatternComponent::Kind::GettableProperty:
@@ -2367,7 +2328,11 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
     case KeyPathPatternComponent::Kind::StoredProperty:
       ID.AddPointer(component.getStoredPropertyDecl());
       break;
-            
+    
+    case KeyPathPatternComponent::Kind::TupleElement:
+      ID.AddInteger(component.getTupleIndex());
+      break;
+    
     case KeyPathPatternComponent::Kind::SettableProperty:
       ID.AddPointer(component.getComputedPropertySetter());
       LLVM_FALLTHROUGH;
@@ -2513,8 +2478,10 @@ GenericSpecializationInformation::create(SILInstruction *Inst, SILBuilder &B) {
 }
 
 static void computeAggregateFirstLevelSubtypeInfo(
-    SILModule &M, SILValue Operand, llvm::SmallVectorImpl<SILType> &Types,
+    const SILFunction &F, SILValue Operand,
+    llvm::SmallVectorImpl<SILType> &Types,
     llvm::SmallVectorImpl<ValueOwnershipKind> &OwnershipKinds) {
+  auto &M = F.getModule();
   SILType OpType = Operand->getType();
 
   // TODO: Create an iterator for accessing first level projections to eliminate
@@ -2527,19 +2494,21 @@ static void computeAggregateFirstLevelSubtypeInfo(
     SILType ProjType = P.getType(OpType, M);
     Types.emplace_back(ProjType);
     OwnershipKinds.emplace_back(
-        OpOwnershipKind.getProjectedOwnershipKind(M, ProjType));
+        OpOwnershipKind.getProjectedOwnershipKind(F, ProjType));
   }
 }
 
-DestructureStructInst *DestructureStructInst::create(SILModule &M,
+DestructureStructInst *DestructureStructInst::create(const SILFunction &F,
                                                      SILDebugLocation Loc,
                                                      SILValue Operand) {
+  auto &M = F.getModule();
+
   assert(Operand->getType().getStructOrBoundGenericStruct() &&
          "Expected a struct typed operand?!");
 
   llvm::SmallVector<SILType, 8> Types;
   llvm::SmallVector<ValueOwnershipKind, 8> OwnershipKinds;
-  computeAggregateFirstLevelSubtypeInfo(M, Operand, Types, OwnershipKinds);
+  computeAggregateFirstLevelSubtypeInfo(F, Operand, Types, OwnershipKinds);
   assert(Types.size() == OwnershipKinds.size() &&
          "Expected same number of Types and OwnerKinds");
 
@@ -2554,15 +2523,17 @@ DestructureStructInst *DestructureStructInst::create(SILModule &M,
       DestructureStructInst(M, Loc, Operand, Types, OwnershipKinds);
 }
 
-DestructureTupleInst *DestructureTupleInst::create(SILModule &M,
+DestructureTupleInst *DestructureTupleInst::create(const SILFunction &F,
                                                    SILDebugLocation Loc,
                                                    SILValue Operand) {
+  auto &M = F.getModule();
+
   assert(Operand->getType().is<TupleType>() &&
          "Expected a tuple typed operand?!");
 
   llvm::SmallVector<SILType, 8> Types;
   llvm::SmallVector<ValueOwnershipKind, 8> OwnershipKinds;
-  computeAggregateFirstLevelSubtypeInfo(M, Operand, Types, OwnershipKinds);
+  computeAggregateFirstLevelSubtypeInfo(F, Operand, Types, OwnershipKinds);
   assert(Types.size() == OwnershipKinds.size() &&
          "Expected same number of Types and OwnerKinds");
 

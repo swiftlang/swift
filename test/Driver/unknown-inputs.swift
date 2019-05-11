@@ -23,6 +23,9 @@
 // LINK-elf: 1: swift-autolink-extract, {0}, autolink
 // LINK-elf: 2: link, {0, 1}, image
 
+// LINK-coff: 0: input
+// LINK-coff: 1: link, {0}, image
+
 // LINK-SWIFTMODULES: 0: input, "{{.*}}.swiftmodule", swiftmodule
 // LINK-SWIFTMODULES: 1: link, {0}, image
 

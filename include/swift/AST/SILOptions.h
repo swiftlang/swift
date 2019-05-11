@@ -70,6 +70,9 @@ public:
   /// Whether to dump verbose SIL with scope and location information.
   bool EmitVerboseSIL = false;
 
+  /// Whether to stop the optimization pipeline after serializing SIL.
+  bool StopOptimizationAfterSerialization = false;
+
   /// Optimization mode being used.
   OptimizationMode OptMode = OptimizationMode::NotSet;
 
@@ -109,10 +112,7 @@ public:
   std::string SILOutputFileNameForDebugging;
 
   /// If set to true, compile with the SIL Ownership Model enabled.
-  bool EnableSILOwnership = false;
-
-  /// When parsing SIL, assume unqualified ownership.
-  bool AssumeUnqualifiedOwnershipWhenParsing = false;
+  bool VerifySILOwnership = true;
 
   /// Assume that code will be executed in a single-threaded environment.
   bool AssumeSingleThreaded = false;
@@ -129,10 +129,7 @@ public:
   /// Emit extra exclusvity markers for memory access and verify coverage.
   bool VerifyExclusivity = false;
 
-  /// Enable the mandatory semantic arc optimizer.
-  bool EnableMandatorySemanticARCOpts = false;
-
-  /// \brief Enable large loadable types IRGen pass.
+  /// Enable large loadable types IRGen pass.
   // bool EnableLargeLoadableTypes = true;
   // FIXME(TF-11, SR-9849): Disabled because LoadableByAddress cannot handle
   // some functions that return closures that take/return large loadable types.
@@ -143,6 +140,10 @@ public:
   /// from this module.  The LLDB REPL uses this so that the differentiation
   /// pass can differentiate functions defined on different lines.
   bool SerializeForDifferentiation = false;
+
+  /// Should the default pass pipelines strip ownership during the diagnostic
+  /// pipeline or after serialization.
+  bool StripOwnershipAfterSerialization = false;
 
   /// The name of the file to which the backend should save YAML optimization
   /// records.

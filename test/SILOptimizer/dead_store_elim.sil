@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -dead-store-elim -max-partial-store-count=2 -enable-sil-verify-all | %FileCheck %s
+// RUN: %target-sil-opt %s -dead-store-elim -max-partial-store-count=2 -enable-sil-verify-all | %FileCheck %s
 
 sil_stage canonical
 

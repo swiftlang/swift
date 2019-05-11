@@ -232,15 +232,16 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'NamedAttributeStringArgument': 227,
     'DeclName': 228,
     'PoundAssertStmt': 229,
+    'SomeType': 230,
     # SWIFT_ENABLE_TENSORFLOW
-    'DifferentiableAttributeArguments': 230,
-    'DifferentiationParamsClause': 231,
-    'DifferentiationParams': 232,
-    'DifferentiationParamList': 233,
-    'DifferentiationParam': 234,
-    'DifferentiableAttributeFuncSpecifier': 235,
-    'FunctionDeclName': 236,
-    'DifferentiatingAttributeArguments': 237,
+    'DifferentiableAttributeArguments': 231,
+    'DifferentiationParamsClause': 232,
+    'DifferentiationParams': 233,
+    'DifferentiationParamList': 234,
+    'DifferentiationParam': 235,
+    'DifferentiableAttributeFuncSpecifier': 236,
+    'FunctionDeclName': 237,
+    'DifferentiatingAttributeArguments': 238,
 }
 
 
@@ -256,3 +257,7 @@ def verify_syntax_node_serialization_codes(nodes, serialization_codes):
         if serialization_code in used_codes:
             error("Serialization code %d used twice" % serialization_code)
         used_codes.add(serialization_code)
+
+
+def get_serialization_code(syntax_kind):
+    return SYNTAX_NODE_SERIALIZATION_CODES[syntax_kind]

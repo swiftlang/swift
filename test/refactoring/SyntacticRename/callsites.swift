@@ -28,6 +28,10 @@ func /*trailing:def*/withTrailingClosure(x: Int, y: () -> Int) {}
 /*trailing:call*/withTrailingClosure(x: 2)
 { return 1}
 
+func /*trailing-only:def*/trailingOnly(a: () -> ()) {}
+/*trailing-only:call*/trailingOnly(a: {})
+/*trailing-only:call*/trailingOnly {}
+
 
 func /*varargs:def*/withVarargs(x: Int..., y: Int, _: Int) {}
 
@@ -69,6 +73,8 @@ func /*mixed:def*/withAllOfTheAbove(x: Int = 2, _: Int..., z: Int = 2, c: () -> 
 // RUN: diff -u %S/Outputs/callsites/defaults.swift.expected %t.result/callsites_defaults.swift
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="trailing" -is-function-like -old-name "withTrailingClosure(x:y:)" -new-name "betterName(a:b:)" >> %t.result/callsites_trailing.swift
 // RUN: diff -u %S/Outputs/callsites/trailing.swift.expected %t.result/callsites_trailing.swift
+// RUN: %refactor -syntactic-rename -source-filename %s -pos="trailing-only" -is-function-like -old-name "trailingOnly(a:)" -new-name "betterName(b:)" >> %t.result/callsites_trailing_only.swift
+// RUN: diff -u %S/Outputs/callsites/trailing_only.swift.expected %t.result/callsites_trailing_only.swift
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="varargs" -is-function-like -old-name "withVarargs(x:y:_:)" -new-name "betterName(a:b:c:)" >> %t.result/callsites_varargs.swift
 // RUN: diff -u %S/Outputs/callsites/varargs.swift.expected %t.result/callsites_varargs.swift
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="varargs2" -is-function-like -old-name "withVarargs(x:y:_:)" -new-name "betterName(a:b:c:)" >> %t.result/callsites_varargs2.swift
@@ -80,3 +86,5 @@ func /*mixed:def*/withAllOfTheAbove(x: Int = 2, _: Int..., z: Int = 2, c: () -> 
 // RUN: diff -u %S/FindRangeOutputs/callsites/defaults.swift.expected %t.ranges/callsites_defaults.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="trailing" -is-function-like -old-name "withTrailingClosure(x:y:)" >> %t.ranges/callsites_trailing.swift
 // RUN: diff -u %S/FindRangeOutputs/callsites/trailing.swift.expected %t.ranges/callsites_trailing.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="trailing-only" -is-function-like -old-name "trailingOnly(a:)" >> %t.ranges/callsites_trailing_only.swift
+// RUN: diff -u %S/FindRangeOutputs/callsites/trailing_only.swift.expected %t.ranges/callsites_trailing_only.swift

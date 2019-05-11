@@ -16,9 +16,8 @@
 
 using namespace swift;
 
-bool swift::isValueAddressOrTrivial(SILValue v, SILModule &m) {
+bool swift::isValueAddressOrTrivial(SILValue v) {
   return v->getType().isAddress() ||
-         v.getOwnershipKind() == ValueOwnershipKind::Trivial ||
          v.getOwnershipKind() == ValueOwnershipKind::Any;
 }
 
@@ -123,8 +122,7 @@ bool swift::getUnderlyingBorrowIntroducers(SILValue inputValue,
 
     // If v produces any ownership, then we can ignore it. Otherwise, we need to
     // return false since this is an introducer we do not understand.
-    if (v.getOwnershipKind() != ValueOwnershipKind::Any &&
-        v.getOwnershipKind() != ValueOwnershipKind::Trivial)
+    if (v.getOwnershipKind() != ValueOwnershipKind::Any)
       return false;
   }
 

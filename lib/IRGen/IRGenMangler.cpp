@@ -49,16 +49,14 @@ std::string IRGenMangler::mangleValueWitness(Type type, ValueWitness witness) {
     GET_MANGLING(AssignWithTake) \
     GET_MANGLING(GetEnumTagSinglePayload) \
     GET_MANGLING(StoreEnumTagSinglePayload) \
-    GET_MANGLING(StoreExtraInhabitant) \
-    GET_MANGLING(GetExtraInhabitantIndex) \
     GET_MANGLING(GetEnumTag) \
     GET_MANGLING(DestructiveProjectEnumData) \
     GET_MANGLING(DestructiveInjectEnumTag)
 #undef GET_MANGLING
     case ValueWitness::Size:
     case ValueWitness::Flags:
+    case ValueWitness::ExtraInhabitantCount:
     case ValueWitness::Stride:
-    case ValueWitness::ExtraInhabitantFlags:
       llvm_unreachable("not a function witness");
   }
   appendOperator("w", Code);
@@ -85,6 +83,7 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
                                   llvm::function_ref<void ()> body) {
   Mod = IGM.getSwiftModule();
   OptimizeProtocolNames = false;
+  UseObjCProtocolNames = true;
 
   llvm::SaveAndRestore<bool>
     AllowSymbolicReferencesLocally(AllowSymbolicReferences);
@@ -104,7 +103,8 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
       // when the referent may be in another file, once the on-disk
       // ObjectMemoryReader can handle them.
       // Private entities are known to be accessible.
-      if (type->getEffectiveAccess() >= AccessLevel::Internal &&
+      auto formalAccessScope = type->getFormalAccessScope(nullptr, true);
+      if ((formalAccessScope.isPublic() || formalAccessScope.isInternal()) &&
           (!IGM.CurSourceFile ||
            IGM.CurSourceFile != type->getParentSourceFile()))
         return false;
@@ -114,6 +114,9 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
         if (proto->isObjC())
           return false;
       
+      return true;
+    } else if (auto opaque = s.dyn_cast<const OpaqueTypeDecl *>()) {
+      // Always symbolically reference opaque types.
       return true;
     } else {
       llvm_unreachable("symbolic referent not handled");
@@ -247,6 +250,8 @@ mangleSymbolNameForSymbolicMangling(const SymbolicMangling &mangling,
     Buffer << ' ';
     if (auto ty = referent.dyn_cast<const NominalTypeDecl*>())
       appendContext(ty);
+    else if (auto opaque = referent.dyn_cast<const OpaqueTypeDecl*>())
+      appendOpaqueDeclName(opaque);
     else
       llvm_unreachable("unhandled referent");
   }

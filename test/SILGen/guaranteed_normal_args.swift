@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -parse-as-library -module-name Swift -parse-stdlib -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-as-library -module-name Swift -parse-stdlib %s | %FileCheck %s
 
 // This test checks specific codegen related to normal arguments being passed at
 // +0. Eventually, it should be merged into normal SILGen tests.
@@ -112,7 +112,7 @@ class KlassWithBuffer {
   var buffer: Buffer
 
   // Make sure that the allocating init forwards into the initializing init at +1.
-  // CHECK-LABEL: sil hidden @$ss15KlassWithBufferC3inKABs0A0C_tcfC : $@convention(method) (@owned Klass, @thick KlassWithBuffer.Type) -> @owned KlassWithBuffer {
+  // CHECK-LABEL: sil hidden [ossa] @$ss15KlassWithBufferC3inKABs0A0C_tcfC : $@convention(method) (@owned Klass, @thick KlassWithBuffer.Type) -> @owned KlassWithBuffer {
   // CHECK: bb0([[ARG:%.*]] : @owned $Klass,
   // CHECK:   [[INITIALIZING_INIT:%.*]] = function_ref @$ss15KlassWithBufferC3inKABs0A0C_tcfc : $@convention(method) (@owned Klass, @owned KlassWithBuffer) -> @owned KlassWithBuffer
   // CHECK:   apply [[INITIALIZING_INIT]]([[ARG]],
@@ -126,7 +126,7 @@ class KlassWithBuffer {
   // 1. Are able to propagate a +0 value value buffer.k into a +0 value and that
   // we then copy that +0 value into a +1 value, before we begin the epilog and
   // then return that value.
-  // CHECK-LABEL: sil hidden @$ss15KlassWithBufferC03getC14AsNativeObjectBoyF : $@convention(method) (@guaranteed KlassWithBuffer) -> @owned Builtin.NativeObject {
+  // CHECK-LABEL: sil hidden [ossa] @$ss15KlassWithBufferC03getC14AsNativeObjectBoyF : $@convention(method) (@guaranteed KlassWithBuffer) -> @owned Builtin.NativeObject {
   // CHECK: bb0([[SELF:%.*]] : @guaranteed $KlassWithBuffer):
   // CHECK:   [[METHOD:%.*]] = class_method [[SELF]] : $KlassWithBuffer, #KlassWithBuffer.buffer!getter.1
   // CHECK:   [[BUF:%.*]] = apply [[METHOD]]([[SELF]])
@@ -146,7 +146,7 @@ class KlassWithBuffer {
 struct StructContainingBridgeObject {
   var rawValue: Builtin.BridgeObject
 
-  // CHECK-LABEL: sil hidden @$ss28StructContainingBridgeObjectV8swiftObjAByXl_tcfC : $@convention(method) (@owned AnyObject, @thin StructContainingBridgeObject.Type) -> @owned StructContainingBridgeObject {
+  // CHECK-LABEL: sil hidden [ossa] @$ss28StructContainingBridgeObjectV8swiftObjAByXl_tcfC : $@convention(method) (@owned AnyObject, @thin StructContainingBridgeObject.Type) -> @owned StructContainingBridgeObject {
   // CHECK: bb0([[ARG:%.*]] : @owned $AnyObject,
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[COPIED_ARG:%.*]] = copy_value [[BORROWED_ARG]]
@@ -169,7 +169,7 @@ struct ReabstractionThunkTest : Protocol {
 // Make sure that we provide a cleanup to x properly before we pass it to
 // result.
 extension FakeDictionary {
-  // CHECK-LABEL: sil hidden @$ss14FakeDictionaryV20makeSureToCopyTuplesyyF : $@convention(method) <Key, Value> (FakeDictionary<Key, Value>) -> () {
+  // CHECK-LABEL: sil hidden [ossa] @$ss14FakeDictionaryV20makeSureToCopyTuplesyyF : $@convention(method) <Key, Value> (FakeDictionary<Key, Value>) -> () {
   // CHECK:   [[X:%.*]] = alloc_stack $(Key, Value), let, name "x"
   // CHECK:   [[INDUCTION_VAR:%.*]] = unchecked_take_enum_data_addr {{%.*}} : $*Optional<(Key, Value)>, #Optional.some!enumelt.1
   // CHECK:   [[INDUCTION_VAR_0:%.*]] = tuple_element_addr [[INDUCTION_VAR]] : $*(Key, Value), 0

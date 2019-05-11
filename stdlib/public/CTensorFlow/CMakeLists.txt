@@ -88,9 +88,11 @@ foreach(sdk ${TARGET_SDKS})
     list(APPEND ctensorflow_modulemap_target_list ${outputs})
 
     # Install include directory.
-    swift_install_in_component(stdlib
+    swift_install_in_component(
       DIRECTORY "${output_dir}/"
-      DESTINATION "lib/swift/${arch_modulemaps_subdir}/CTensorFlow")
+      DESTINATION "lib/swift/${arch_modulemaps_subdir}/CTensorFlow"
+      COMPONENT stdlib
+      )
   endforeach()
 
   # Install TensorFlow libraries in each SDK subdirectory.
@@ -98,9 +100,11 @@ foreach(sdk ${TARGET_SDKS})
   # everywhere.
   # To properly support multiple targets, TF library/include variables should be
   # SDK/architecture-specific, just like the ones for ICU.
-  swift_install_in_component(stdlib
+  swift_install_in_component(
     FILES "${TF_LIBRARIES}"
-    DESTINATION "lib/swift/${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+    DESTINATION "lib/swift/${SWIFT_SDK_${sdk}_LIB_SUBDIR}"
+    COMPONENT stdlib
+    )
 endforeach()
 add_custom_target(ctensorflow_modulemap DEPENDS ${ctensorflow_modulemap_target_list})
 

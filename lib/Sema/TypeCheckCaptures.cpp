@@ -62,6 +62,7 @@ class FindCapturedVars : public ASTWalker {
   SourceLoc &GenericParamCaptureLoc;
   SourceLoc &DynamicSelfCaptureLoc;
   DynamicSelfType *&DynamicSelf;
+  OpaqueValueExpr *&OpaqueValue;
   llvm::SmallPtrSet<ValueDecl *, 2> Diagnosed;
   /// The AbstractClosureExpr or AbstractFunctionDecl being analyzed.
   AnyFunctionRef AFR;
@@ -71,16 +72,18 @@ public:
                    SourceLoc &GenericParamCaptureLoc,
                    SourceLoc &DynamicSelfCaptureLoc,
                    DynamicSelfType *&DynamicSelf,
+                   OpaqueValueExpr *&OpaqueValue,
                    AnyFunctionRef AFR)
       : TC(tc), Captures(Captures),
         GenericParamCaptureLoc(GenericParamCaptureLoc),
         DynamicSelfCaptureLoc(DynamicSelfCaptureLoc),
         DynamicSelf(DynamicSelf),
+        OpaqueValue(OpaqueValue),
         AFR(AFR) {
     CaptureLoc = getCaptureLoc(AFR);
   }
 
-  /// \brief Check if the type of an expression references any generic
+  /// Check if the type of an expression references any generic
   /// type parameters, or the dynamic Self type.
   ///
   /// Note that we do not need to distinguish inner from outer generic
@@ -166,7 +169,7 @@ public:
       });
 
       for (const auto &param : gft->getParams())
-        param.getOldType().walk(walker);
+        param.getPlainType().walk(walker);
 
       gft->getResult().walk(walker);
     }
@@ -199,34 +202,6 @@ public:
             || !isa<VarDecl>(VD)
             || !cast<VarDecl>(VD)->getType()->hasRetainablePointerRepresentation()))
       checkType(VD->getInterfaceType(), VD->getLoc());
-
-    // If VD is a noescape decl, then the closure we're computing this for
-    // must also be noescape.
-    if (AFR.hasType() &&
-        !AFR.getType()->hasError() &&
-        VD->hasInterfaceType() &&
-        VD->getInterfaceType()->is<AnyFunctionType>() &&
-        VD->getInterfaceType()->castTo<AnyFunctionType>()->isNoEscape() &&
-        !capture.isNoEscape() &&
-        // Don't repeatedly diagnose the same thing.
-        Diagnosed.insert(VD).second) {
-
-      // Otherwise, diagnose this as an invalid capture.
-      bool isDecl = AFR.getAbstractFunctionDecl() != nullptr;
-
-      TC.diagnose(Loc, isDecl ? diag::decl_closure_noescape_use
-                              : diag::closure_noescape_use,
-                  VD->getBaseName().getIdentifier());
-
-      // If we're a parameter, emit a helpful fixit to add @escaping
-      auto paramDecl = dyn_cast<ParamDecl>(VD);
-      if (paramDecl) {
-        TC.diagnose(paramDecl->getStartLoc(), diag::noescape_parameter,
-                    paramDecl->getName())
-            .fixItInsert(paramDecl->getTypeLoc().getSourceRange().Start,
-                         "@escaping ");
-      }
-    }
   }
 
   bool shouldWalkIntoLazyInitializers() override {
@@ -283,15 +258,14 @@ public:
         // recontextualized into it, so treat it as if it's already there.
         if (auto init = dyn_cast<PatternBindingInitializer>(TmpDC)) {
           if (auto lazyVar = init->getInitializedLazyVar()) {
-            // Referring to the 'self' parameter is fine.
-            if (D == init->getImplicitSelfDecl())
-              return { false, DRE };
-
-            // Otherwise, act as if we're in the getter.
-            auto getter = lazyVar->getGetter();
-            assert(getter && "lazy variable without getter");
-            TmpDC = getter;
-            continue;
+            // If we have a getter with a body, we're already re-parented
+            // everything so pretend we're inside the getter.
+            if (auto getter = lazyVar->getGetter()) {
+              if (getter->getBody(/*canSynthesize=*/false)) {
+                TmpDC = getter;
+                continue;
+              }
+            }
           }
         }
 
@@ -394,22 +368,6 @@ public:
     if (!validateForwardCapture(DRE->getDecl()))
       return { false, DRE };
 
-    bool isInOut = (isa<ParamDecl>(D) && cast<ParamDecl>(D)->isInOut());
-    bool isNested = false;
-    if (auto f = AFR.getAbstractFunctionDecl())
-      isNested = f->getDeclContext()->isLocalContext();
-
-    if (isInOut && !AFR.isKnownNoEscape() && !isNested) {
-      if (D->getBaseName() == D->getASTContext().Id_self) {
-        TC.diagnose(DRE->getLoc(),
-          diag::closure_implicit_capture_mutating_self);
-      } else {
-        TC.diagnose(DRE->getLoc(),
-          diag::closure_implicit_capture_without_noescape);
-      }
-      return { false, DRE };
-    }
-
     // We're going to capture this, compute flags for the capture.
     unsigned Flags = 0;
 
@@ -472,6 +430,11 @@ public:
         DynamicSelfCaptureLoc = getCaptureLoc(innerClosure);
         DynamicSelf = captureInfo.getDynamicSelfType();
       }
+
+    if (!OpaqueValue) {
+      if (captureInfo.hasOpaqueValueCapture())
+        OpaqueValue = captureInfo.getOpaqueValue();
+    }
   }
 
   bool walkToDeclPre(Decl *D) override {
@@ -682,6 +645,15 @@ public:
       return { false, E };
     }
 
+    // Capture a placeholder opaque value.
+    if (auto opaqueValue = dyn_cast<OpaqueValueExpr>(E)) {
+      if (opaqueValue->isPlaceholder()) {
+        assert(!OpaqueValue || OpaqueValue == opaqueValue);
+        OpaqueValue = opaqueValue;
+        return { true, E };
+      }
+    }
+
     return { true, E };
   }
 };
@@ -699,14 +671,17 @@ void TypeChecker::maybeDiagnoseCaptures(Expr *E, AnyFunctionRef AFR) {
 
   if (AFR.getCaptureInfo().hasGenericParamCaptures() ||
       AFR.getCaptureInfo().hasDynamicSelfCapture() ||
-      AFR.getCaptureInfo().hasLocalCaptures()) {
+      AFR.getCaptureInfo().hasLocalCaptures() ||
+      AFR.getCaptureInfo().hasOpaqueValueCapture()) {
     unsigned kind;
     if (AFR.getCaptureInfo().hasLocalCaptures())
       kind = 0;
     else if (AFR.getCaptureInfo().hasGenericParamCaptures())
       kind = 1;
-    else
+    else if (AFR.getCaptureInfo().hasLocalCaptures())
       kind = 2;
+    else
+      kind = 3;
     diagnose(E->getLoc(),
              diag::c_function_pointer_from_function_with_context,
              /*closure*/ AFR.getAbstractClosureExpr() != nullptr,
@@ -725,35 +700,15 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   SourceLoc GenericParamCaptureLoc;
   SourceLoc DynamicSelfCaptureLoc;
   DynamicSelfType *DynamicSelf = nullptr;
+  OpaqueValueExpr *OpaqueValuePlaceholder = nullptr;
   FindCapturedVars finder(*this, Captures,
                           GenericParamCaptureLoc,
                           DynamicSelfCaptureLoc,
                           DynamicSelf,
+                          OpaqueValuePlaceholder,
                           AFR);
   if (AFR.getBody())
     AFR.getBody()->walk(finder);
-
-  unsigned inoutCount = 0;
-  for (auto C : Captures) {
-    if (auto PD = dyn_cast<ParamDecl>(C.getDecl()))
-      if (PD->isInOut())
-        inoutCount++;
-  }
-
-  if (inoutCount > 0) {
-    if (auto e = AFR.getAbstractFunctionDecl()) {
-      for (auto returnOccurrence : getEscapingFunctionAsReturnValue(e)) {
-        diagnose(returnOccurrence->getReturnLoc(),
-          diag::nested_function_escaping_inout_capture);
-      }
-      auto occurrences = getEscapingFunctionAsArgument(e);
-      for (auto occurrence : occurrences) {
-        diagnose(occurrence->getLoc(),
-          diag::nested_function_with_implicit_capture_argument,
-          inoutCount > 1);
-      }
-    }
-  }
 
   if (AFR.hasType() && !AFR.isObjC()) {
     finder.checkType(AFR.getType(), getCaptureLoc(AFR));
@@ -773,7 +728,7 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
         // Walk the initializers for all properties declared in the type with
         // an initializer.
         for (auto &elt : PBD->getPatternList()) {
-          if (elt.isInitializerLazy())
+          if (elt.isInitializerSubsumed())
             continue;
 
           if (auto *init = elt.getInit())
@@ -789,6 +744,10 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
     if (AFD->getGenericParams())
       AFR.getCaptureInfo().setGenericParamCaptures(true);
   }
+
+  // Anything can capture an opaque value placeholder.
+  if (OpaqueValuePlaceholder)
+    AFR.getCaptureInfo().setOpaqueValue(OpaqueValuePlaceholder);
 
   // Only local functions capture dynamic 'Self'.
   if (AFR.getAsDeclContext()->getParent()->isLocalContext()) {

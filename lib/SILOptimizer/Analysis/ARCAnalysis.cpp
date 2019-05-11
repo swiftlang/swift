@@ -99,13 +99,13 @@ bool swift::mayDecrementRefCount(SILInstruction *User,
 /// non-trivial types as arguments is that we want to be careful in the face of
 /// intrinsics that may be equivalent to bitcast and inttoptr operations.
 static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
-  SILModule &Mod = BInst->getModule();
+  auto *F = BInst->getFunction();
 
   auto &II = BInst->getIntrinsicInfo();
   if (II.ID != llvm::Intrinsic::not_intrinsic) {
     if (II.hasAttribute(llvm::Attribute::ReadNone)) {
       for (auto &Op : BInst->getAllOperands()) {
-        if (!Op.get()->getType().isTrivial(Mod)) {
+        if (!Op.get()->getType().isTrivial(*F)) {
           return false;
         }
       }
@@ -117,7 +117,7 @@ static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
   auto &BI = BInst->getBuiltinInfo();
   if (BI.isReadNone()) {
     for (auto &Op : BInst->getAllOperands()) {
-      if (!Op.get()->getType().isTrivial(Mod)) {
+      if (!Op.get()->getType().isTrivial(*F)) {
         return false;
       }
     }
@@ -183,7 +183,7 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
   // safe.
   case SILInstructionKind::UncheckedTrivialBitCastInst: {
     SILValue Op = cast<UncheckedTrivialBitCastInst>(Inst)->getOperand();
-    return Op->getType().isTrivial(Inst->getModule());
+    return Op->getType().isTrivial(*Inst->getFunction());
   }
 
   // Typed GEPs do not use pointers. The user of the typed GEP may but we will
@@ -746,7 +746,7 @@ bool ConsumedArgToEpilogueReleaseMatcher::isRedundantRelease(
 bool ConsumedArgToEpilogueReleaseMatcher::releaseArgument(
     ArrayRef<SILInstruction *> Insts, SILValue Arg) {
   // Reason about whether all parts are released.
-  SILModule *Mod = &(*Insts.begin())->getModule();
+  auto *F = (*Insts.begin())->getFunction();
 
   // These are the list of SILValues that are actually released.
   ProjectionPathSet Paths;
@@ -758,7 +758,7 @@ bool ConsumedArgToEpilogueReleaseMatcher::releaseArgument(
   } 
 
   // Is there an uncovered non-trivial type.
-  return !ProjectionPath::hasUncoveredNonTrivials(Arg->getType(), Mod, Paths);
+  return !ProjectionPath::hasUncoveredNonTrivials(Arg->getType(), *F, Paths);
 }
 
 void
@@ -1055,7 +1055,7 @@ bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
 
     // Try to speed up the trivial case of single release/dealloc.
     if (isa<StrongReleaseInst>(User) || isa<DeallocBoxInst>(User) ||
-        isa<DestroyValueInst>(User)) {
+        isa<DestroyValueInst>(User) || isa<ReleaseValueInst>(User)) {
       if (!seenRelease)
         OneRelease = User;
       else

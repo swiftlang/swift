@@ -367,6 +367,7 @@ public struct String {
   ///     let empty = ""
   ///     let alsoEmpty = String()
   @inlinable @inline(__always)
+  @_semantics("string.init_empty")
   public init() { self.init(_StringGuts()) }
 }
 
@@ -400,22 +401,31 @@ extension String {
   public init<C: Collection, Encoding: Unicode.Encoding>(
     decoding codeUnits: C, as sourceEncoding: Encoding.Type
   ) where C.Iterator.Element == Encoding.CodeUnit {
+    guard _fastPath(sourceEncoding == UTF8.self) else {
+      self = String._fromCodeUnits(
+        codeUnits, encoding: sourceEncoding, repair: true)!.0
+      return
+    }
+
     if let contigBytes = codeUnits as? _HasContiguousBytes,
-       sourceEncoding == UTF8.self,
        contigBytes._providesContiguousBytesNoCopy
     {
       self = contigBytes.withUnsafeBytes { rawBufPtr in
-        let ptr = rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked
         return String._fromUTF8Repairing(
           UnsafeBufferPointer(
-            start: ptr.assumingMemoryBound(to: UInt8.self),
+            start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
             count: rawBufPtr.count)).0
       }
       return
     }
 
-    self = String._fromCodeUnits(
-      codeUnits, encoding: sourceEncoding, repair: true)!.0
+    // Just copying to an Array is significantly faster than performing
+    // generic operations
+    self = Array(codeUnits).withUnsafeBufferPointer {
+      let raw = UnsafeRawBufferPointer($0)
+      return String._fromUTF8Repairing(raw.bindMemory(to: UInt8.self)).0
+    }
+    return
   }
 
   /// Calls the given closure with a pointer to the contents of the string,
@@ -458,7 +468,8 @@ extension String {
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {
-    return try self._withUTF8 { utf8 in
+    var copy = self
+    return try copy.withUTF8 { utf8 in
       var arg = Array<TargetEncoding.CodeUnit>()
       arg.reserveCapacity(1 &+ self._guts.count / 4)
       let repaired = transcode(
@@ -560,6 +571,7 @@ extension String {
 
   // String append
   @inlinable // Forward inlinability to append
+  @_semantics("string.plusequals")
   public static func += (lhs: inout String, rhs: String) {
     lhs.append(rhs)
   }
@@ -590,10 +602,10 @@ extension Sequence where Element: StringProtocol {
   internal func _joined(separator: String) -> String {
     // A likely-under-estimate, but lets us skip some of the growth curve
     // for large Sequences.
-    let understimatedCap =
+    let underestimatedCap =
       (1 &+ separator._guts.count) &* self.underestimatedCount
     var result = ""
-    result.reserveCapacity(understimatedCap)
+    result.reserveCapacity(underestimatedCap)
     if separator.isEmpty {
       for x in self {
         result.append(x._ephemeralString)
@@ -830,15 +842,129 @@ extension String: CustomStringConvertible {
 extension String {
   public // @testable
   var _nfcCodeUnits: [UInt8] {
-    return _gutsSlice.withNFCCodeUnitsIterator_2 { Array($0) }
+    var codeUnits = [UInt8]()
+    _withNFCCodeUnits {
+      codeUnits.append($0)
+    }
+    return codeUnits
   }
 
   public // @testable
   func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
-    try _gutsSlice.withNFCCodeUnitsIterator_2 {
-      for cu in $0 {
-        try f(cu)
+    try _gutsSlice._withNFCCodeUnits(f)
+  }
+}
+
+extension _StringGutsSlice {
+  internal func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
+    var output = _FixedArray16<UInt8>(allZeros: ())
+    var icuInput = _FixedArray16<UInt16>(allZeros: ())
+    var icuOutput = _FixedArray16<UInt16>(allZeros: ())
+    if _fastPath(isFastUTF8) {
+      try withFastUTF8 {
+        return try _fastWithNormalizedCodeUnitsImpl(
+          sourceBuffer: $0,
+          outputBuffer: _castOutputBuffer(&output),
+          icuInputBuffer: _castOutputBuffer(&icuInput),
+          icuOutputBuffer: _castOutputBuffer(&icuOutput),
+          f
+        )
       }
+    } else {
+      return try _foreignWithNormalizedCodeUnitsImpl(
+        outputBuffer: _castOutputBuffer(&output),
+        icuInputBuffer: _castOutputBuffer(&icuInput),
+        icuOutputBuffer: _castOutputBuffer(&icuOutput),
+        f
+      )
+    }
+  }
+
+  internal func _foreignWithNormalizedCodeUnitsImpl(
+    outputBuffer: UnsafeMutableBufferPointer<UInt8>,
+    icuInputBuffer: UnsafeMutableBufferPointer<UInt16>,
+    icuOutputBuffer: UnsafeMutableBufferPointer<UInt16>,
+    _ f: (UInt8) throws -> Void
+  ) rethrows {
+    var outputBuffer = outputBuffer
+    var icuInputBuffer = icuInputBuffer
+    var icuOutputBuffer = icuOutputBuffer
+  
+    var index = range.lowerBound
+    let cachedEndIndex = range.upperBound
+  
+    var hasBufferOwnership = false
+    
+    defer {
+      if hasBufferOwnership {
+        outputBuffer.deallocate()
+        icuInputBuffer.deallocate()
+        icuOutputBuffer.deallocate()
+      }
+    }
+    
+    while index < cachedEndIndex {
+      let result = _foreignNormalize(
+        readIndex: index,
+        endIndex: cachedEndIndex,
+        guts: _guts,
+        outputBuffer: &outputBuffer,
+        icuInputBuffer: &icuInputBuffer,
+        icuOutputBuffer: &icuOutputBuffer
+      )
+      for i in 0..<result.amountFilled {
+        try f(outputBuffer[i])
+      }
+      _internalInvariant(result.nextReadPosition != index)
+      index = result.nextReadPosition
+      if result.allocatedBuffers {
+        _internalInvariant(!hasBufferOwnership)
+        hasBufferOwnership = true
+      }
+    }
+  }
+}
+
+internal func _fastWithNormalizedCodeUnitsImpl(
+  sourceBuffer: UnsafeBufferPointer<UInt8>,
+  outputBuffer: UnsafeMutableBufferPointer<UInt8>,
+  icuInputBuffer: UnsafeMutableBufferPointer<UInt16>,
+  icuOutputBuffer: UnsafeMutableBufferPointer<UInt16>,
+  _ f: (UInt8) throws -> Void
+) rethrows {
+  var outputBuffer = outputBuffer
+  var icuInputBuffer = icuInputBuffer
+  var icuOutputBuffer = icuOutputBuffer
+
+  var index = String.Index(_encodedOffset: 0)
+  let cachedEndIndex = String.Index(_encodedOffset: sourceBuffer.count)
+  
+  var hasBufferOwnership = false
+  
+  defer {
+    if hasBufferOwnership {
+      outputBuffer.deallocate()
+      icuInputBuffer.deallocate()
+      icuOutputBuffer.deallocate()
+    }
+  }
+  
+  while index < cachedEndIndex {
+    let result = _fastNormalize(
+      readIndex: index,
+      sourceBuffer: sourceBuffer,
+      outputBuffer: &outputBuffer,
+      icuInputBuffer: &icuInputBuffer,
+      icuOutputBuffer: &icuOutputBuffer
+    )
+    for i in 0..<result.amountFilled {
+      try f(outputBuffer[i])
+    }
+    _internalInvariant(result.nextReadPosition != index)
+    index = result.nextReadPosition
+    if result.allocatedBuffers {
+      _internalInvariant(!hasBufferOwnership)
+      hasBufferOwnership = true
     }
   }
 }

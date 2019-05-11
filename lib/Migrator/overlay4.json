@@ -1320,5 +1320,27 @@
     "DiffItemKind": "SpecialCaseDiffItem",
     "Usr": "s:5UIKit17UIApplicationMainys5Int32VAD_SpySpys4Int8VGGSgSSSgAJtF",
     "SpecialCaseId": "UIApplicationMain"
-  }
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "s:SlsSQ7ElementRpzrlE5index2of5IndexQzSgAB_tF",
+    "LeftComment": "index",
+    "RightUsr": "",
+    "RightComment": "firstIndex",
+    "ModuleName": "Swift"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "s:SlsE5index5where5IndexQzSgSb7ElementQzKXE_tKF",
+    "LeftComment": "index",
+    "RightUsr": "",
+    "RightComment": "firstIndex",
+    "ModuleName": "Swift"
+  },
 ]

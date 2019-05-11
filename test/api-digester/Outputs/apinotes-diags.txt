@@ -19,6 +19,7 @@ APINotesTest(APINotesTest.h): Var OldType.oldMember has been renamed to Var NewT
 APINotesTest(APINotesTest.h): Var globalAttributeName has been renamed to Var AnimalAttributeName.globalAttributeName
 
 /* Type Changes */
+APINotesTest(APINotesTest.h): Constructor Cat.init(name:) has return type change from Cat to Cat?
 APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingAttributes(_:) has parameter 0 type change from [String : Any] to [AnimalAttributeName : Any]
 APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingAttributesArray(_:) has parameter 0 type change from [String] to [AnimalAttributeName]
 APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingOptionalAttributes(_:) has parameter 0 type change from [String : Any]? to [AnimalAttributeName : Any]?

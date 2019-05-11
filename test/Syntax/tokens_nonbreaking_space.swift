@@ -1,4 +1,4 @@
-// RUN: cat %s | sed -e 's/'$(echo -ne "\x5a")'/'$(echo -ne "\xc2\xa0")'/g' > %t.tmp
+// RUN: cat %s | sed -f %S/Inputs/nbsp.sed > %t.tmp
 // RUN: cp -f %t.tmp %t
 // RUN: %swift-syntax-test -input-source-filename %t -dump-full-tokens 2>&1 | %FileCheck %t
 let a =Z3Z // nbsp(Z)

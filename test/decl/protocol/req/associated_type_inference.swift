@@ -150,7 +150,7 @@ struct XSubP0b : SubscriptP0 {
 struct XSubP0c : SubscriptP0 {
 // expected-error@-1 {{type 'XSubP0c' does not conform to protocol 'SubscriptP0'}}
   subscript (i: Index) -> Element { get { } }
-  // expected-error@-1 {{reference to invalid associated type 'Element' of type 'XSubP0c'}}
+  // expected-error@-1 {{reference to invalid associated type 'Index' of type 'XSubP0c'}}
 }
 
 struct XSubP0d : SubscriptP0 {
@@ -200,6 +200,7 @@ public class CorePromise<U> : Thenable { // expected-error{{type 'CorePromise<U>
     public func then(_ success: @escaping (_ t: U, _: CorePromise<U>) -> U) -> Self {
         return self.then() { (t: U) -> U in // expected-error{{contextual closure type '(U, CorePromise<U>) -> U' expects 2 arguments, but 1 was used in closure body}}
             return success(t: t, self)
+            // expected-error@-1 {{extraneous argument label 't:' in call}}
         }
     }
 }

@@ -2,7 +2,7 @@
 // swift-module-flags: 
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/Conformances.swiftmodule -enable-resilience -emit-sil -o %t/Conformances.sil -enable-objc-interop -disable-objc-attr-requires-foundation-module %s
+// RUN: %target-swift-frontend -emit-module-path %t/Conformances.swiftmodule -enable-library-evolution -emit-sil -o %t/Conformances.sil -enable-objc-interop -disable-objc-attr-requires-foundation-module %s
 // RUN: %FileCheck -check-prefix CHECK-MODULE %s < %t/Conformances.sil
 // RUN: %FileCheck -check-prefix NEGATIVE-MODULE %s < %t/Conformances.sil
 // RUN: %target-swift-frontend -enable-objc-interop -emit-sil -I %t %S/Inputs/ConformancesUser.swift -O | %FileCheck %s

@@ -354,25 +354,85 @@ public:
 /// A key value as provided to the concurrent map.
 class MetadataCacheKey {
   const void * const *Data;
-  uint32_t Length;
+  uint16_t NumKeyParameters;
+  uint16_t NumWitnessTables;
   uint32_t Hash;
 
+  /// Compare two witness tables, which may involving checking the
+  /// contents of their conformance descriptors.
+  static int compareWitnessTables(const WitnessTable *awt,
+                                  const WitnessTable *bwt) {
+    if (awt == bwt)
+      return 0;
+
+    auto *aDescription = awt->Description;
+    auto *bDescription = bwt->Description;
+    if (aDescription == bDescription)
+      return 0;
+
+    if (!aDescription->isSynthesizedNonUnique() ||
+        !bDescription->isSynthesizedNonUnique())
+      return comparePointers(aDescription, bDescription);
+
+    auto aType = aDescription->getCanonicalTypeMetadata();
+    auto bType = bDescription->getCanonicalTypeMetadata();
+    if (!aType || !bType)
+      return comparePointers(aDescription, bDescription);
+
+    if (int result = comparePointers(aType, bType))
+      return result;
+
+    return comparePointers(aDescription->getProtocol(),
+                           bDescription->getProtocol());
+  }
+
+  /// Compare the content from two keys.
+  static int compareContent(const void * const *adata,
+                            const void * const *bdata,
+                            unsigned numKeyParameters,
+                            unsigned numWitnessTables) {
+    // Compare generic arguments for key parameters.
+    for (unsigned i = 0; i != numKeyParameters; ++i) {
+      if (auto result = comparePointers(*adata++, *bdata++))
+        return result;
+    }
+
+    // Compare witness tables.
+    for (unsigned i = 0; i != numWitnessTables; ++i) {
+      if (auto result =
+              compareWitnessTables((const WitnessTable *)*adata++,
+                                   (const WitnessTable *)*bdata++))
+        return result;
+    }
+
+    return 0;
+  }
+
 public:
-  MetadataCacheKey(const void * const *data, size_t size)
-    : Data(data), Length(size), Hash(computeHash()) {}
-  MetadataCacheKey(const void * const *data, size_t size, uint32_t hash)
-    : Data(data), Length(size), Hash(hash) {}
+  MetadataCacheKey(uint16_t numKeyParams,
+                   uint16_t numWitnessTables,
+                   const void * const *data)
+      : Data(data), NumKeyParameters(numKeyParams),
+        NumWitnessTables(numWitnessTables), Hash(computeHash()) { }
+
+  MetadataCacheKey(uint16_t numKeyParams,
+                   uint16_t numWitnessTables,
+                   const void * const *data,
+                   uint32_t hash)
+    : Data(data), NumKeyParameters(numKeyParams),
+      NumWitnessTables(numWitnessTables), Hash(hash) {}
 
   bool operator==(MetadataCacheKey rhs) const {
+    // Compare the hashes.
+    if (hash() != rhs.hash()) return false;
+
     // Compare the sizes.
-    unsigned asize = size(), bsize = rhs.size();
-    if (asize != bsize) return false;
+    if (NumKeyParameters != rhs.NumKeyParameters) return false;
+    if (NumWitnessTables != rhs.NumWitnessTables) return false;
 
     // Compare the content.
-    auto abegin = begin(), bbegin = rhs.begin();
-    for (unsigned i = 0; i < asize; ++i)
-      if (abegin[i] != bbegin[i]) return false;
-    return true;
+    return compareContent(begin(), rhs.begin(), NumKeyParameters,
+                          NumWitnessTables) == 0;
   }
 
   int compare(const MetadataCacheKey &rhs) const {
@@ -381,38 +441,43 @@ public:
       return hashComparison;
     }
 
-    // Compare the sizes.
-    if (auto sizeComparison = compareIntegers(size(), rhs.size())) {
-      return sizeComparison;
+    // Compare the # of key parameters.
+    if (auto keyParamsComparison =
+            compareIntegers(NumKeyParameters, rhs.NumKeyParameters)) {
+      return keyParamsComparison;
+    }
+
+    // Compare the # of witness tables.
+    if (auto witnessTablesComparison =
+            compareIntegers(NumWitnessTables, rhs.NumWitnessTables)) {
+      return witnessTablesComparison;
     }
 
     // Compare the content.
-    auto lbegin = begin(), rbegin = rhs.begin();
-    for (unsigned i = 0, e = size(); i != e; ++i) {
-      if (auto ptrComparison = comparePointers(lbegin[i], rbegin[i]))
-        return ptrComparison;
-    }
-
-    // Equal.
-    return 0;
+    return compareContent(begin(), rhs.begin(), NumKeyParameters,
+                          NumWitnessTables);
   }
+
+  uint16_t numKeyParameters() const { return NumKeyParameters; }
+  uint16_t numWitnessTables() const { return NumWitnessTables; }
 
   uint32_t hash() const {
     return Hash;
   }
 
   const void * const *begin() const { return Data; }
-  const void * const *end() const { return Data + Length; }
-  unsigned size() const { return Length; }
+  const void * const *end() const { return Data + size(); }
+  unsigned size() const { return NumKeyParameters + NumWitnessTables; }
 
 private:
   uint32_t computeHash() const {
-    size_t H = 0x56ba80d1 * Length;
-    for (unsigned i = 0; i < Length; i++) {
+    size_t H = 0x56ba80d1 * NumKeyParameters;
+    for (unsigned index = 0; index != NumKeyParameters; ++index) {
       H = (H >> 10) | (H << ((sizeof(size_t) * 8) - 10));
-      H ^= (reinterpret_cast<size_t>(Data[i])
-            ^ (reinterpret_cast<size_t>(Data[i]) >> 19));
+      H ^= (reinterpret_cast<size_t>(Data[index])
+            ^ (reinterpret_cast<size_t>(Data[index]) >> 19));
     }
+
     H *= 0x27d4eb2d;
 
     // Rotate right by 10 and then truncate to 32 bits.
@@ -1270,7 +1335,7 @@ protected:
   using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
 
   size_t numTrailingObjects(OverloadToken<const void *>) const {
-    return KeyLength;
+    return NumKeyParameters + NumWitnessTables;
   }
 
   template <class... Args>
@@ -1284,7 +1349,8 @@ private:
   // These are arranged to fit into the tail-padding of the superclass.
 
   /// These are set during construction and never changed.
-  const uint16_t KeyLength;
+  const uint16_t NumKeyParameters;
+  const uint16_t NumWitnessTables;
   const uint32_t Hash;
 
   /// Valid if TrackingInfo.getState() >= PrivateMetadataState::Abstract.
@@ -1300,14 +1366,17 @@ private:
 
 public:
   VariadicMetadataCacheEntryBase(const MetadataCacheKey &key)
-      : KeyLength(key.size()), Hash(key.hash()) {
+      : NumKeyParameters(key.numKeyParameters()),
+        NumWitnessTables(key.numWitnessTables()),
+        Hash(key.hash()) {
     memcpy(this->template getTrailingObjects<const void *>(),
            key.begin(), key.size() * sizeof(const void *));
   }
 
   MetadataCacheKey getKey() const {
-    return MetadataCacheKey(this->template getTrailingObjects<const void*>(),
-                            KeyLength, Hash);
+    return MetadataCacheKey(NumKeyParameters, NumWitnessTables,
+                            this->template getTrailingObjects<const void*>(),
+                            Hash);
   }
 
   intptr_t getKeyIntValueForDump() const {

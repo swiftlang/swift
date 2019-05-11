@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-remarks=sil-inliner -o %t.sil 2>&1 | %FileCheck -check-prefix=REMARKS_PASSED %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-remarks=sil-inliner -o %t.sil 2>&1 | %FileCheck -check-prefix=REMARKS_PASSED %s
 // RUN: %FileCheck %s < %t.sil
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-remarks-missed=sil-inliner -o /dev/null 2>&1 | %FileCheck -check-prefix=REMARKS_MISSED %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -save-optimization-record-path %t.yaml -o /dev/null 2>&1 | %FileCheck -allow-empty -check-prefix=NO_REMARKS %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-remarks-missed=sil-inliner -o /dev/null 2>&1 | %FileCheck -check-prefix=REMARKS_MISSED %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -save-optimization-record-path %t.yaml -o /dev/null 2>&1 | %FileCheck -allow-empty -check-prefix=NO_REMARKS %s
 // RUN: %FileCheck -check-prefix=YAML %s < %t.yaml
 
 // REMARKS_PASSED-NOT: remark:

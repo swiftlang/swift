@@ -7,6 +7,9 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// Requires swift-version 4
+// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
+
 import Swift
 import StdlibUnittest
 
@@ -334,6 +337,33 @@ enum PlainEnum {}
 protocol ProtocolA {}
 protocol ProtocolB {}
 
+class OuterClass {
+    
+    private class PrivateGeneric<T, U> {
+      class InnerGeneric<X> {
+        class Inner { }
+      }
+    }
+    
+    static func getPrivateGenericName() -> String {
+      return NSStringFromClass(OuterClass.PrivateGeneric<Int, Bool>.self)
+    }
+    static func getInnerGenericName() -> String {
+      return NSStringFromClass(OuterClass.PrivateGeneric<Int, Bool>.InnerGeneric<Float>.self)
+    }
+    static func getInnerName() -> String {
+      return NSStringFromClass(OuterClass.PrivateGeneric<Int, Bool>.InnerGeneric<Float>.Inner.self)
+    }
+}
+
+// The private discriminator is not deterministic.
+// Replace it with a constant string.
+func removePrivateDiscriminator(_ symbol: String) -> String {
+  let regexp = try! NSRegularExpression(pattern: "P[0-9]+\\$[0-9a-f]+")
+  let range = NSRange(0..<symbol.count)
+  return regexp.stringByReplacingMatches(in: symbol, range: range, withTemplate: "XXX")
+}
+
 Runtime.test("Generic class ObjC runtime names") {
   expectEqual("_TtGC1a12GenericClassSi_",
               NSStringFromClass(GenericClass<Int>.self))
@@ -385,6 +415,13 @@ Runtime.test("Generic class ObjC runtime names") {
   expectEqual("_TtGC1a17MultiGenericClassGVS_13GenericStructSi_GOS_11GenericEnumGS2_Si___",
               NSStringFromClass(MultiGenericClass<GenericStruct<Int>,
                                                   GenericEnum<GenericEnum<Int>>>.self))
+  
+  expectEqual("_TtGCC1a10OuterClassXXXPrivateGeneric_SiSb_",
+              removePrivateDiscriminator(OuterClass.getPrivateGenericName()))
+  expectEqual("_TtGCCC1a10OuterClassXXXPrivateGeneric12InnerGeneric_SiSb_Sf_",
+              removePrivateDiscriminator(OuterClass.getInnerGenericName()))
+  expectEqual("_TtGCCCC1a10OuterClassXXXPrivateGeneric12InnerGeneric5Inner_SiSb_Sf__",
+              removePrivateDiscriminator(OuterClass.getInnerName()))
 }
 
 @objc protocol P {}

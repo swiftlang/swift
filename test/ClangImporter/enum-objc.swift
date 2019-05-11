@@ -3,7 +3,7 @@
 // REQUIRES: objc_interop
 
 func test(_ value: SwiftEnum, _ exhaustiveValue: ExhaustiveEnum) {
-  switch value { // expected-warning {{switch must be exhaustive}} expected-note {{handle unknown values using "@unknown default"}}
+  switch value { // expected-warning {{switch covers known cases, but 'SwiftEnum' may have additional unknown values}} expected-note {{handle unknown values using "@unknown default"}}
   case .one: break
   case .two: break
   case .three: break

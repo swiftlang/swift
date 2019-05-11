@@ -48,7 +48,7 @@ public:
   PostOrderFunctionInfo *PO;
   SILLoopInfo *LoopInfo;
 
-  /// \brief returns True if were able to sink the instruction \p II
+  /// returns True if were able to sink the instruction \p II
   /// closer to it's users.
   bool sinkInstruction(SILInstruction *II) {
 

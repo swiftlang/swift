@@ -1,17 +1,16 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -emit-module -module-name Foo -o %t -F %S/Inputs/mock-sdk %s
+// RUN: %target-build-swift -emit-module -module-name Foo -o %t -F %S/Inputs/mock-sdk %s -Xfrontend -enable-objc-interop -Xfrontend -disable-objc-attr-requires-foundation-module
 //
-// RUN: %target-swift-ide-test -print-module -source-filename %s -I %t -F %S/Inputs/mock-sdk -module-to-print=Foo -access-filter-public > %t.printed.txt
+// RUN: %target-swift-ide-test -print-module -source-filename %s -I %t -F %S/Inputs/mock-sdk -module-to-print=Foo -access-filter-public -enable-objc-interop -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_WITH_OVERLAY -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_NO_INTERNAL -strict-whitespace < %t.printed.txt
 //
-// RUN: %target-swift-ide-test -print-module -source-filename %s -I %t -F %S/Inputs/mock-sdk -module-to-print=Foo.FooSub > %t.printed.txt
+// RUN: %target-swift-ide-test -print-module -source-filename %s -I %t -F %S/Inputs/mock-sdk -module-to-print=Foo.FooSub -enable-objc-interop -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_WITHOUT_OVERLAY -strict-whitespace < %t.printed.txt
 
-// XFAIL: linux, freebsd
-
-// RUN: %target-swift-ide-test -print-module -source-filename %s -I %t -F %S/Inputs/mock-sdk -module-to-print=Foo -access-filter-public -annotate-print > %t.annotated.txt
+// RUN: %target-swift-ide-test -print-module -source-filename %s -I %t -F %S/Inputs/mock-sdk -module-to-print=Foo -access-filter-public -annotate-print -enable-objc-interop -disable-objc-attr-requires-foundation-module > %t.annotated.txt
 // RUN: %FileCheck %s -check-prefix=PASS_ANNOTATED -strict-whitespace < %t.annotated.txt
+
 // REQUIRES: executable_test
 
 @_exported import Foo

@@ -19,6 +19,7 @@
 #include "IRGenModule.h"
 #include "IRGenFunction.h"
 #include "SwiftTargetInfo.h"
+#include "swift/ABI/MetadataValues.h"
 
 using namespace swift;
 using namespace irgen;
@@ -44,8 +45,9 @@ static unsigned getPointerExtraInhabitantCount(const IRGenModule &IGM,
   uint64_t rawCount =
     IGM.TargetInfo.LeastValidPointerValue >> numReservedLowBits;
   
-  // The runtime limits the count to INT_MAX.
-  return std::min((uint64_t)INT_MAX, rawCount);
+  // The runtime limits the count.
+  return std::min(uint64_t(ValueWitnessFlags::MaxNumExtraInhabitants),
+                  rawCount);
 }
 
 unsigned irgen::getHeapObjectExtraInhabitantCount(const IRGenModule &IGM) {

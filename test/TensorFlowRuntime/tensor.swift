@@ -1,8 +1,5 @@
-// FIXME: TFPartition fails in `GraphFunctionDeviceInfo::finalizeUsedDevices()`
-
-// RUN: %target-run-eager-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize
 //
 // Tensor API tests.
 
@@ -467,36 +464,6 @@ TensorTests.testAllBackends("Concatenation") {
   expectEqual(ShapedArray(shape: [2, 6],
                           scalars: [0, 1, 2, 6, 7, 8, 3, 4, 5, 9, 10, 11]),
               concatenated1.array)
-}
-
-TensorTests.testAllBackends("VJPConcatenation") {
-  let a1 = Tensor<Float>([1,2,3,4])
-  let b1 = Tensor<Float>([5,6,7,8,9,10])
-
-  let a2 = Tensor<Float>([1,1,1,1])
-  let b2 = Tensor<Float>([1,1,1,1,1,1])
-
-  let grads = gradient(at: a2, b2) { a, b in
-    return ((a1 * a) ++ (b1 * b)).sum()
-  }
-
-  expectEqual(a1, grads.0)
-  expectEqual(b1, grads.1)
-}
-
-TensorTests.testAllBackends("VJPConcatenationNegativeAxis") {
-  let a1 = Tensor<Float>([1,2,3,4])
-  let b1 = Tensor<Float>([5,6,7,8,9,10])
-
-  let a2 = Tensor<Float>([1,1,1,1])
-  let b2 = Tensor<Float>([1,1,1,1,1,1])
-
-  let grads = gradient(at: a2, b2) { a, b in
-    return (a1 * a).concatenated(with: b1 * b, alongAxis: -1).sum()
-  }
-
-  expectEqual(a1, grads.0)
-  expectEqual(b1, grads.1)
 }
 
 TensorTests.test("EwiseComparison") {

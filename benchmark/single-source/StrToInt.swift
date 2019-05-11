@@ -17,7 +17,8 @@ import TestsUtils
 public let StrToInt = BenchmarkInfo(
   name: "StrToInt",
   runFunction: run_StrToInt,
-  tags: [.validation, .api, .String])
+  tags: [.validation, .api, .String],
+  legacyFactor: 10)
 
 @inline(never)
 public func run_StrToInt(_ N: Int) {
@@ -45,7 +46,7 @@ public func run_StrToInt(_ N: Int) {
     return r
   }
   var res = Int.max
-  for _ in 1...1000*N {
+  for _ in 1...100*N {
     res = res & DoOneIter(input)
   }
   CheckResults(res == ref_result)

@@ -213,7 +213,7 @@ extension SuperBaseA {
 // COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseProp[#Int#]{{; name=.+$}}
 // COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseFunc0()[#Void#]{{; name=.+$}}
 // COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
-// COMMON_BASE_A_NO_DOT-DAG: Decl[Subscript]/CurrNominal:      [{#Int#}][#Double#]{{; name=.+$}}
+// COMMON_BASE_A_NO_DOT-DAG: Decl[Subscript]/CurrNominal:      [{#(i): Int#}][#Double#]{{; name=.+$}}
 // COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseExtProp[#Int#]{{; name=.+$}}
 // COMMON_BASE_A_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseExtFunc0()[#Void#]{{; name=.+$}}
 // COMMON_BASE_A_NO_DOT: End completions
@@ -262,7 +262,9 @@ class SuperDerivedA : SuperBaseA {
   }
   init (b: Float) {
     super.init(#^CONSTRUCTOR_SUPER_INIT_PAREN_1^#
-// CONSTRUCTOR_SUPER_INIT_PAREN_1-NOT: Pattern/
+// CONSTRUCTOR_SUPER_INIT_PAREN_1: Begin completions, 1 items
+// CONSTRUCTOR_SUPER_INIT_PAREN_1: Pattern/CurrModule: ['('][')'][#SuperBaseA#]; name=
+// CONSTRUCTOR_SUPER_INIT_PAREN_1: End completions
   }
 
   deinit {
@@ -297,7 +299,7 @@ class SuperDerivedA : SuperBaseA {
 // COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseProp[#Int#]{{; name=.+$}}
 // COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseFunc0()[#Void#]{{; name=.+$}}
 // COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
-// COMMON_BASE_B_NO_DOT-DAG: Decl[Subscript]/CurrNominal:      [{#Int#}][#Double#]{{; name=.+$}}
+// COMMON_BASE_B_NO_DOT-DAG: Decl[Subscript]/CurrNominal:      [{#(i): Int#}][#Double#]{{; name=.+$}}
 // COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .baseExtProp[#Int#]{{; name=.+$}}
 // COMMON_BASE_B_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .baseExtFunc0()[#Void#]{{; name=.+$}}
 // COMMON_BASE_B_NO_DOT: End completions

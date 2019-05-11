@@ -1,7 +1,7 @@
 
-// RUN: %target-swift-emit-sil -enable-sil-ownership -parse-stdlib %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -parse-stdlib %s | %FileCheck %s -check-prefix=SILGEN
-// RUN: %target-swift-emit-ir -enable-sil-ownership -parse-stdlib %s
+// RUN: %target-swift-emit-sil -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-stdlib %s | %FileCheck %s -check-prefix=SILGEN
+// RUN: %target-swift-emit-ir -parse-stdlib %s
 
 // This test includes some calls to transparent stdlib functions.
 // We pattern match for the absence of access markers in the inlined code.
@@ -104,7 +104,7 @@ var global: Int32 {
   unsafeAddress {
     return UnsafePointer(uninitAddr)
   }
-// CHECK: sil hidden @$s10addressors6globals5Int32Vvlu : $@convention(thin) () -> UnsafePointer<Int32> {
+// CHECK-LABEL: sil hidden @$s10addressors6globals5Int32Vvlu : $@convention(thin) () -> UnsafePointer<Int32> {
 // CHECK:   [[T0:%.*]] = global_addr @$s10addressors10uninitAddrSpys5Int32VGvp : $*UnsafeMutablePointer<Int32>
 // CHECK:   [[T1:%.*]] = load [[T0]] : $*UnsafeMutablePointer<Int32>
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>, #UnsafeMutablePointer._rawValue
@@ -199,8 +199,8 @@ struct D : Subscriptable {
   }
 }
 // Setter.
-// SILGEN-LABEL: sil hidden [transparent] @$s10addressors1DVys5Int32VAEcis
-// SILGEN: bb0([[VALUE:%.*]] : @trivial $Int32, [[I:%.*]] : @trivial $Int32, [[SELF:%.*]] : @trivial $*D):
+// SILGEN-LABEL: sil hidden [transparent] [ossa] @$s10addressors1DVys5Int32VAEcis
+// SILGEN: bb0([[VALUE:%.*]] : $Int32, [[I:%.*]] : $Int32, [[SELF:%.*]] : $*D):
 // SILGEN:   debug_value [[VALUE]] : $Int32
 // SILGEN:   debug_value [[I]] : $Int32
 // SILGEN:   debug_value_addr [[SELF]]
@@ -212,8 +212,8 @@ struct D : Subscriptable {
 // SILGEN:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADDR]] : $*Int32
 // SILGEN:   assign [[VALUE]] to [[ACCESS]] : $*Int32
 
-// SILGEN-LABEL: sil hidden [transparent] @$s10addressors1DVys5Int32VAEciM
-// SILGEN: bb0([[I:%.*]] : @trivial $Int32, [[SELF:%.*]] : @trivial $*D):
+// SILGEN-LABEL: sil hidden [transparent] [ossa] @$s10addressors1DVys5Int32VAEciM
+// SILGEN: bb0([[I:%.*]] : $Int32, [[SELF:%.*]] : $*D):
 // SILGEN:   [[SELF_ACCESS:%.*]] = begin_access [modify] [unknown] [[SELF]]
 // SILGEN:   [[T0:%.*]] = function_ref @$s10addressors1DVys5Int32VAEciau
 // SILGEN:   [[PTR:%.*]] = apply [[T0]]([[I]], [[SELF_ACCESS]])

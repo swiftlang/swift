@@ -12,11 +12,30 @@
 import TestsUtils
 
 public let StringTests = [
-  BenchmarkInfo(name: "StringEqualPointerComparison", runFunction: run_StringEqualPointerComparison, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "StringHasPrefixAscii", runFunction: run_StringHasPrefixAscii, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "StringHasPrefixUnicode", runFunction: run_StringHasPrefixUnicode, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "StringHasSuffixAscii", runFunction: run_StringHasSuffixAscii, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "StringHasSuffixUnicode", runFunction: run_StringHasSuffixUnicode, tags: [.validation, .api, .String]),
+  BenchmarkInfo(
+    name: "StringEqualPointerComparison",
+    runFunction: run_StringEqualPointerComparison,
+    tags: [.validation, .api, .String]),
+  BenchmarkInfo(
+    name: "StringHasPrefixAscii",
+    runFunction: run_StringHasPrefixAscii,
+    tags: [.validation, .api, .String],
+    legacyFactor: 10),
+  BenchmarkInfo(
+    name: "StringHasPrefixUnicode",
+    runFunction: run_StringHasPrefixUnicode,
+    tags: [.validation, .api, .String],
+    legacyFactor: 1000),
+  BenchmarkInfo(
+    name: "StringHasSuffixAscii",
+    runFunction: run_StringHasSuffixAscii,
+    tags: [.validation, .api, .String],
+    legacyFactor: 10),
+  BenchmarkInfo(
+    name: "StringHasSuffixUnicode",
+    runFunction: run_StringHasSuffixUnicode,
+    tags: [.validation, .api, .String],
+    legacyFactor: 1000),
 ]
 
 // FIXME(string)
@@ -25,7 +44,7 @@ public func run_StringHasPrefixAscii(_ N: Int) {
   let prefix = "prefix"
   let testString = "prefixedString"
   for _ in 0 ..< N {
-    for _ in 0 ..< 100_000 {
+    for _ in 0 ..< 10_000 {
       CheckResults(testString.hasPrefix(getString(prefix)))
     }
   }
@@ -38,7 +57,7 @@ public func run_StringHasSuffixAscii(_ N: Int) {
   let suffix = "Suffixed"
   let testString = "StringSuffixed"
   for _ in 0 ..< N {
-    for _ in 0 ..< 100_000 {
+    for _ in 0 ..< 10_000 {
       CheckResults(testString.hasSuffix(getString(suffix)))
     }
   }
@@ -51,7 +70,7 @@ public func run_StringHasPrefixUnicode(_ N: Int) {
   let prefix = "❄️prefix"
   let testString = "❄️prefixedString"
   for _ in 0 ..< N {
-    for _ in 0 ..< 100_000 {
+    for _ in 0 ..< 100 {
       CheckResults(testString.hasPrefix(getString(prefix)))
     }
   }
@@ -64,7 +83,7 @@ public func run_StringHasSuffixUnicode(_ N: Int) {
   let suffix = "❄️Suffixed"
   let testString = "String❄️Suffixed"
   for _ in 0 ..< N {
-    for _ in 0 ..< 100_000 {
+    for _ in 0 ..< 100 {
       CheckResults(testString.hasSuffix(getString(suffix)))
     }
   }

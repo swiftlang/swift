@@ -16,11 +16,13 @@ import TestsUtils
 public let Dictionary = [
   BenchmarkInfo(name: "Dictionary", runFunction: run_Dictionary,
     tags: [.validation, .api, .Dictionary],
-    setUpFunction: { blackHole(half) }),
+    setUpFunction: { blackHole(half) },
+    legacyFactor: 5),
   BenchmarkInfo(name: "DictionaryOfObjects",
     runFunction: run_DictionaryOfObjects,
     tags: [.validation, .api, .Dictionary],
-    setUpFunction: { blackHole(halfObjects) }),
+    setUpFunction: { blackHole(halfObjects) },
+    legacyFactor: 5),
 ]
 
 let text = [
@@ -132,9 +134,8 @@ let half: Dictionary<String, Bool> = {
 }()
 
 @inline(never)
-public func run_Dictionary(scale: Int) {
+public func run_Dictionary(N: Int) {
   var dict: Dictionary<String, Bool> = [:]
-  let N = 5*scale
 
   // Check performance of filling the dictionary:
   for _ in 1...N {
@@ -186,9 +187,8 @@ let halfObjects: Dictionary<Box<String>, Box<Bool>> = {
 }()
 
 @inline(never)
-public func run_DictionaryOfObjects(scale: Int) {
+public func run_DictionaryOfObjects(N: Int) {
   var dict: Dictionary<Box<String>, Box<Bool>> = [:]
-  let N = 5*scale
 
   // Check performance of filling the dictionary:
   for _ in 1...N {

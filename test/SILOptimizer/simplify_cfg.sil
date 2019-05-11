@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil -enforce-exclusivity=none -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
 // FIXME: Update for select_enum change.
 
 // Declare this SIL to be canonical because some tests break raw SIL
@@ -2483,10 +2483,12 @@ sil @rethrow_function : $@convention(thin) (@owned @callee_owned (Int) -> (Int, 
 sil @non_throwing_closure : $@convention(thin) (Int) -> Int
 
 // CHECK-LABEL: sil @replace_try_apply_with_apply
-// CHECK: [[R:%[0-9]+]] = apply [nothrow] %0(%{{[0-9]+}}) : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error Error)) -> (Int, @error Error)
+// CHECK: [[R:%[0-9]+]] = apply [nothrow] %1(%{{[0-9]+}}) : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error Error)) -> (Int, @error Error)
+// CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: return [[R]] : $Int
 sil @replace_try_apply_with_apply : $@convention(thin) () -> Int {
 bb0:
+  %as = alloc_stack $Builtin.Int32
   %0 = function_ref @rethrow_function : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error Error)) -> (Int, @error Error)
   %1 = function_ref @non_throwing_closure : $@convention(thin) (Int) -> Int
   %2 = thin_to_thick_function %1 : $@convention(thin) (Int) -> Int to $@callee_owned (Int) -> Int
@@ -2494,9 +2496,11 @@ bb0:
   try_apply %0(%3) : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error Error)) -> (Int, @error Error), normal bb1, error bb2
 
 bb1(%5 : $Int):
+  dealloc_stack %as: $*Builtin.Int32
   return %5 : $Int
 
 bb2(%8 : $Error):
+  dealloc_stack %as: $*Builtin.Int32
   unreachable
 }
 
@@ -3146,4 +3150,47 @@ bb6:
   end_apply %token
   %rv = tuple ()
   return %rv : $()
+}
+
+class X {
+  @objc func f() { }
+}
+
+sil @external_g : $@convention(thin) () -> ()
+
+// Don't tail duplicate dynamic_method_br. IRGen cannot handle phi nodes of
+// objc_methods.
+// CHECK-LABEL: sil @dont_tail_duplicate_dynamic_method_br
+// CHECK: dynamic_method_br
+// CHECK-NOT: dynamic_method_br
+// CHECK: return
+sil @dont_tail_duplicate_dynamic_method_br : $@convention(thin) (@owned Builtin.UnknownObject, Builtin.Int1) -> () {
+bb0(%x : $Builtin.UnknownObject, %b : $Builtin.Int1):
+  cond_br %b, bb1, bb2
+
+bb1:
+  %f = function_ref @external_f : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
+  strong_retain %x : $Builtin.UnknownObject
+  br bb3(%x : $Builtin.UnknownObject)
+
+bb2:
+  %g = function_ref @external_g : $@convention(thin) () -> ()
+  apply %g() : $@convention(thin) () -> ()
+  strong_retain %x : $Builtin.UnknownObject
+  br bb3(%x : $Builtin.UnknownObject)
+
+bb3(%y: $Builtin.UnknownObject):
+  strong_release %y : $Builtin.UnknownObject
+  dynamic_method_br %x : $Builtin.UnknownObject, #X.f!1.foreign, bb4, bb5
+
+bb4(%m : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %r = tuple()
+  return %r : $()
 }

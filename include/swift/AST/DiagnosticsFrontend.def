@@ -103,8 +103,6 @@ ERROR(error_no_source_location_scope_map,none,
       "-dump-scope-maps argument must be 'expanded' or a list of "
       "source locations", ())
 
-NOTE(note_swift_version_major, none,
-     "use major version, as in '-swift-version %0'", (unsigned))
 NOTE(note_valid_swift_versions, none,
      "valid arguments to '-swift-version' are %0", (StringRef))
 
@@ -121,7 +119,7 @@ ERROR(error_mode_cannot_emit_module,none,
 ERROR(error_mode_cannot_emit_module_doc,none,
       "this mode does not support emitting module documentation files", ())
 ERROR(error_mode_cannot_emit_interface,none,
-      "this mode does not support emitting parseable interface files", ())
+      "this mode does not support emitting module interface files", ())
 
 WARNING(emit_reference_dependencies_without_primary_file,none,
   "ignoring -emit-reference-dependencies (requires -primary-file)", ())
@@ -260,21 +258,31 @@ ERROR(error_invalid_debug_prefix_map, none,
 ERROR(invalid_vfs_overlay_file,none,
       "invalid virtual overlay file '%0'", (StringRef))
 
-WARNING(parseable_interface_scoped_import_unsupported,none,
-        "scoped imports are not yet supported in parseable module interfaces",
+WARNING(module_interface_scoped_import_unsupported,none,
+        "scoped imports are not yet supported in module interfaces",
         ())
-ERROR(error_extracting_version_from_parseable_interface,none,
-      "error extracting version from parseable module interface", ())
-ERROR(unsupported_version_of_parseable_interface,none,
-      "unsupported version of parseable module interface '%0': '%1'",
+WARNING(warn_unsupported_module_interface_swift_version,none,
+        "module interfaces are only supported with Swift language version 5 "
+        "or later (currently using -swift-version %0)",
+        (StringRef))
+WARNING(warn_unsupported_module_interface_library_evolution,none,
+        "module interfaces are only supported with -enable-library-evolution",
+        ())
+ERROR(error_extracting_version_from_module_interface,none,
+      "error extracting version from module interface", ())
+ERROR(unsupported_version_of_module_interface,none,
+      "unsupported version of module interface '%0': '%1'",
       (StringRef, llvm::VersionTuple))
-ERROR(error_extracting_flags_from_parseable_interface,none,
-      "error extracting flags from parseable module interface", ())
-ERROR(missing_dependency_of_parseable_module_interface,none,
-      "missing dependency '%0' of parseable module interface '%1': %2",
+ERROR(error_extracting_flags_from_module_interface,none,
+      "error extracting flags from module interface", ())
+ERROR(missing_dependency_of_module_interface,none,
+      "missing dependency '%0' of module interface '%1': %2",
       (StringRef, StringRef, StringRef))
 ERROR(error_extracting_dependencies_from_cached_module,none,
       "error extracting dependencies from cached module '%0'",
+      (StringRef))
+ERROR(unknown_forced_module_loading_mode,none,
+      "unknown value for SWIFT_FORCE_MODULE_LOADING variable: '%0'",
       (StringRef))
 
 #ifndef DIAG_NO_UNDEF

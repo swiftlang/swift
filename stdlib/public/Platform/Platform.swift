@@ -13,6 +13,10 @@
 import SwiftShims
 import SwiftOverlayShims
 
+#if os(Windows)
+import ucrt
+#endif
+
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 //===----------------------------------------------------------------------===//
 // MacTypes.h
@@ -26,13 +30,15 @@ public var noErr: OSStatus { return 0 }
 /// The C type is a typedef for `unsigned char`.
 @_fixed_layout
 public struct DarwinBoolean : ExpressibleByBooleanLiteral {
-  var _value: UInt8
+  @usableFromInline var _value: UInt8
 
+  @_transparent
   public init(_ value: Bool) {
     self._value = value ? 1 : 0
   }
 
   /// The value of `self`, expressed as a `Bool`.
+  @_transparent
   public var boolValue: Bool {
     return _value != 0
   }
@@ -59,15 +65,19 @@ extension DarwinBoolean : CustomStringConvertible {
 }
 
 extension DarwinBoolean : Equatable {
+  @_transparent
   public static func ==(lhs: DarwinBoolean, rhs: DarwinBoolean) -> Bool {
     return lhs.boolValue == rhs.boolValue
   }
 }
 
+@_transparent
 public // COMPILER_INTRINSIC
 func _convertBoolToDarwinBoolean(_ x: Bool) -> DarwinBoolean {
   return DarwinBoolean(x)
 }
+
+@_transparent
 public // COMPILER_INTRINSIC
 func _convertDarwinBooleanToBool(_ x: DarwinBoolean) -> Bool {
   return x.boolValue
@@ -132,6 +142,14 @@ public func snprintf(ptr: UnsafeMutablePointer<Int8>, _ len: Int, _ format: Unsa
     return vsnprintf(ptr, len, format, va_args)
   }
 }
+#elseif os(Windows)
+public var stdin: UnsafeMutablePointer<FILE> { return __acrt_iob_func(0) }
+public var stdout: UnsafeMutablePointer<FILE> { return __acrt_iob_func(1) }
+public var stderr: UnsafeMutablePointer<FILE> { return __acrt_iob_func(2) }
+
+public var STDIN_FILENO: Int32 { return _fileno(stdin) }
+public var STDOUT_FILENO: Int32 { return _fileno(stdout) }
+public var STDERR_FILENO: Int32 { return _fileno(stderr) }
 #endif
 
 

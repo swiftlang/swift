@@ -668,10 +668,7 @@ extension ArraySlice: RangeReplaceableCollection {
   public init<S: Sequence>(_ s: S)
     where S.Element == Element {
 
-    self = ArraySlice(
-      _buffer: _Buffer(
-        _buffer: s._copyToContiguousArray()._buffer,
-        shiftedToStartIndex: 0))
+    self.init(_buffer: s._copyToContiguousArray()._buffer)
   }
 
   /// Creates a new array containing the specified number of a single, repeated
@@ -1076,11 +1073,31 @@ extension ArraySlice: RangeReplaceableCollection {
   }
 
   @inlinable
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withUnsafeMutableBufferPointer {
+      (bufferPointer) -> R in
+      return try body(&bufferPointer)
+    }
+  }
+
+  @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withUnsafeBufferPointer {
+      (bufferPointer) -> R in
+      return try body(bufferPointer)
+    }
+  }
+
+  @inlinable
   public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     if let n = _buffer.requestNativeBuffer() {
       return ContiguousArray(_buffer: n)
     }
-    return _copyCollectionToContiguousArray(_buffer)
+    return _copyCollectionToContiguousArray(self)
   }
 }
 

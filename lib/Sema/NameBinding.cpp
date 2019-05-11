@@ -252,6 +252,18 @@ void NameBinder::addImport(
   if (privateImportAttr)
     options |= SourceFile::ImportFlags::PrivateImport;
 
+  auto *implementationOnlyAttr =
+      ID->getAttrs().getAttribute<ImplementationOnlyAttr>();
+  if (implementationOnlyAttr) {
+    if (options.contains(SourceFile::ImportFlags::Exported)) {
+      diagnose(ID, diag::import_implementation_cannot_be_exported,
+               topLevelModule->getName())
+        .fixItRemove(implementationOnlyAttr->getRangeWithAt());
+    } else {
+      options |= SourceFile::ImportFlags::ImplementationOnly;
+    }
+  }
+
   imports.push_back(SourceFile::ImportedModuleDesc(
       {ID->getDeclPath(), M}, options, privateImportFileName));
 
@@ -304,7 +316,7 @@ void NameBinder::addImport(
         emittedDiag.emplace(diagnose(ID,
             diag::imported_decl_is_wrong_kind_typealias,
             typealias->getDescriptiveKind(),
-            NameAliasType::get(typealias, Type(), SubstitutionMap(),
+            TypeAliasType::get(typealias, Type(), SubstitutionMap(),
                                 typealias->getUnderlyingTypeLoc().getType()),
             getImportKindString(ID->getImportKind())));
       } else {

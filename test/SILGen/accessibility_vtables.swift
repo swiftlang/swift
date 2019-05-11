@@ -12,7 +12,7 @@ class Sub : Base {
   }
 }
 
-// CHECK-LABEL: sil hidden @$s21accessibility_vtables3SubCACycfc : $@convention(method) (@owned Sub) -> @owned Sub
+// CHECK-LABEL: sil hidden [ossa] @$s21accessibility_vtables3SubCACycfc : $@convention(method) (@owned Sub) -> @owned Sub
 // CHECK:       bb0(%0 : @owned $Sub):
 // CHECK:         function_ref @$ss25_unimplementedInitializer9className04initD04file4line6columns5NeverOs12StaticStringV_A2JS2utF
 

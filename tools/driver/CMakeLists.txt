@@ -1,5 +1,4 @@
 add_swift_host_tool(swift
-  api_notes.cpp
   driver.cpp
   autolink_extract_main.cpp
   modulewrap_main.cpp
@@ -38,12 +37,12 @@ if(NOT SWIFT_BUILT_STANDALONE)
   add_dependencies(swift clang-headers)
 endif()
 
-swift_install_in_component(compiler
-    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc${CMAKE_EXECUTABLE_SUFFIX}"
-    DESTINATION "bin")
-swift_install_in_component(autolink-driver
-    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-autolink-extract${CMAKE_EXECUTABLE_SUFFIX}"
-    DESTINATION "bin")
-swift_install_in_component(editor-integration
-    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-format${CMAKE_EXECUTABLE_SUFFIX}"
-    DESTINATION "bin")
+swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc${CMAKE_EXECUTABLE_SUFFIX}"
+                           DESTINATION "bin"
+                           COMPONENT compiler)
+swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-autolink-extract${CMAKE_EXECUTABLE_SUFFIX}"
+                           DESTINATION "bin"
+                           COMPONENT autolink-driver)
+swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-format${CMAKE_EXECUTABLE_SUFFIX}"
+                           DESTINATION "bin"
+                           COMPONENT editor-integration)

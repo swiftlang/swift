@@ -1,12 +1,13 @@
-// RUN: %target-swift-emit-sil -verify %s
+// RUN: %target-swift-emit-sil -swift-version 4 -verify %s
+// RUN: %target-swift-emit-sil -swift-version 5 -verify %s
 
 // Integration test to ensure that `type(of: self)` keeps working in
 // class convenience initializers, even though they are now implemented as
 // allocating entry points.
 
 class C {
-  init() { }
-  init(throwingDesignated: ()) throws {}
+  required init() { }
+  required init(throwingDesignated: ()) throws {}
 
   convenience init(normal: ()) {
     _ = (type(of: self), type(of: self))
@@ -36,5 +37,12 @@ class C {
       return nil
     }
     _ = (type(of: self), type(of: self))
+  }
+
+  convenience init(closureCapture: ()) {
+    let t = type(of: self)
+    let fn = { t.init() }
+    _ = fn()
+    self.init()
   }
 }

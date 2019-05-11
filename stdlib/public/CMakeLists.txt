@@ -1,3 +1,4 @@
+
 set(SWIFT_RUNTIME_CXX_FLAGS)
 set(SWIFT_RUNTIME_LINK_FLAGS)
 set(SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS)
@@ -17,7 +18,11 @@ list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-verify-syntax-tree"
 
 # Build the runtime with -Wall to catch, e.g., uninitialized variables
 # warnings.
-list(APPEND SWIFT_RUNTIME_CXX_FLAGS "-Wall")
+if(SWIFT_COMPILER_IS_MSVC_LIKE)
+  list(APPEND SWIFT_RUNTIME_CXX_FLAGS "/W3")
+else()
+  list(APPEND SWIFT_RUNTIME_CXX_FLAGS "-Wall")
+endif()
 
 set(SWIFT_RUNTIME_CORE_CXX_FLAGS "${SWIFT_RUNTIME_CXX_FLAGS}")
 set(SWIFT_RUNTIME_CORE_LINK_FLAGS "${SWIFT_RUNTIME_LINK_FLAGS}")
@@ -81,8 +86,14 @@ if(SWIFT_BUILD_SDK_OVERLAY)
   add_subdirectory(Platform)
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  if(SWIFT_BUILD_SDK_OVERLAY)
-    add_subdirectory(SDK)
+if(SWIFT_BUILD_SDK_OVERLAY)
+  list_intersect("${SWIFT_APPLE_PLATFORMS}" "${SWIFT_SDKS}" building_darwin_sdks)
+  if(building_darwin_sdks)
+    add_subdirectory(Darwin)
+  endif()
+
+  if(WINDOWS IN_LIST SWIFT_SDKS)
+    add_subdirectory(Windows)
   endif()
 endif()
+

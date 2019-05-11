@@ -1,7 +1,7 @@
 
-// RUN: %target-swift-emit-silgen -module-name optional_lvalue -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name optional_lvalue %s | %FileCheck %s
 
-// CHECK-LABEL: sil hidden @$s15optional_lvalue07assign_a1_B0yySiSgz_SitF
+// CHECK-LABEL: sil hidden [ossa] @$s15optional_lvalue07assign_a1_B0yySiSgz_SitF
 // CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Optional<Int>
 // CHECK:         [[FILESTR:%.*]] = string_literal utf8 "
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
@@ -17,7 +17,7 @@ func assign_optional_lvalue(_ x: inout Int?, _ y: Int) {
   x! = y
 }
 
-// CHECK-LABEL: sil hidden @$s15optional_lvalue011assign_iuo_B0yySiSgz_SitF
+// CHECK-LABEL: sil hidden [ossa] @$s15optional_lvalue011assign_iuo_B0yySiSgz_SitF
 // CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Optional<Int>
 // CHECK:         [[FILESTR:%.*]] = string_literal utf8 "
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
@@ -42,7 +42,7 @@ struct S {
   }
 }
 
-// CHECK-LABEL: sil hidden @$s15optional_lvalue011assign_iuo_B9_implicityyAA1SVSgz_SitF
+// CHECK-LABEL: sil hidden [ossa] @$s15optional_lvalue011assign_iuo_B9_implicityyAA1SVSgz_SitF
 // CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Optional<S>
 // CHECK:         [[FILESTR:%.*]] = string_literal utf8 "
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
@@ -62,7 +62,7 @@ struct Struct<T> {
   var value: T?
 }
 
-// CHECK-LABEL: sil hidden @$s15optional_lvalue07assign_a1_B13_reabstractedyyAA6StructVyS2icGz_S2ictF
+// CHECK-LABEL: sil hidden [ossa] @$s15optional_lvalue07assign_a1_B13_reabstractedyyAA6StructVyS2icGz_S2ictF
 // CHECK:         [[REABSTRACT:%.*]] = function_ref @$sS2iIegyd_S2iIegnr_TR
 // CHECK:         [[REABSTRACTED:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT]]
 // CHECK:         assign [[REABSTRACTED]] to {{%.*}} : $*@callee_guaranteed (@in_guaranteed Int) -> @out Int
@@ -71,7 +71,7 @@ func assign_optional_lvalue_reabstracted(_ x: inout Struct<(Int) -> Int>,
   x.value! = y
 }
 
-// CHECK-LABEL: sil hidden @$s15optional_lvalue07assign_a1_B9_computedySiAA1SVSgz_SitF
+// CHECK-LABEL: sil hidden [ossa] @$s15optional_lvalue07assign_a1_B9_computedySiAA1SVSgz_SitF
 // CHECK:         function_ref @$s15optional_lvalue1SV8computedSivs
 // CHECK:         function_ref @$s15optional_lvalue1SV8computedSivg
 func assign_optional_lvalue_computed(_ x: inout S?, _ y: Int) -> Int {
@@ -81,7 +81,7 @@ func assign_optional_lvalue_computed(_ x: inout S?, _ y: Int) -> Int {
 
 func generate_int() -> Int { return 0 }
 
-// CHECK-LABEL: sil hidden @$s15optional_lvalue013assign_bound_a1_B0yySiSgzF
+// CHECK-LABEL: sil hidden [ossa] @$s15optional_lvalue013assign_bound_a1_B0yySiSgzF
 // CHECK:         [[HASVALUE:%.*]] = select_enum_addr {{%.*}}
 // CHECK:         cond_br [[HASVALUE]], [[SOME:bb[0-9]+]], [[NONE:bb[0-9]+]]
 //
@@ -101,7 +101,7 @@ struct ComputedOptional {
   }
 }
 
-// CHECK-LABEL: sil hidden @$s15optional_lvalue013assign_bound_a10_computed_B0yyAA16ComputedOptionalVzF
+// CHECK-LABEL: sil hidden [ossa] @$s15optional_lvalue013assign_bound_a10_computed_B0yyAA16ComputedOptionalVzF
 // CHECK:  [[SELF:%.*]] = begin_access [modify] [unknown] %0 : $*ComputedOptional
 // CHECK:  [[TEMP:%.*]] = alloc_stack $Optional<Int>
 // CHECK:  [[T0:%.*]] = load [trivial] [[SELF]] : $*ComputedOptional
@@ -123,7 +123,7 @@ func assign_bound_optional_computed_lvalue(_ co: inout ComputedOptional) {
   co.computedOptional? = generate_int()
 }
 
-// CHECK-LABEL: sil hidden @$s15optional_lvalue014assign_forced_a10_computed_B0yyAA16ComputedOptionalVzF
+// CHECK-LABEL: sil hidden [ossa] @$s15optional_lvalue014assign_forced_a10_computed_B0yyAA16ComputedOptionalVzF
 // CHECK:  [[GENERATOR:%.*]] = function_ref @$s15optional_lvalue12generate_intSiyF
 // CHECK:  [[VALUE:%.*]] = apply [[GENERATOR]]()
 // CHECK:  [[SELF:%.*]] = begin_access [modify] [unknown] %0 : $*ComputedOptional

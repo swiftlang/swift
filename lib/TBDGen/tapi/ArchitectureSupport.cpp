@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief Implements architecture specific helper functions.
+/// Implements architecture specific helper functions.
 ///
 //===----------------------------------------------------------------------===//
 

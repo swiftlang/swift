@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief Provides an interface for serializing to JSON.
+/// Provides an interface for serializing to JSON.
 /// \note This does not include support for deserializing JSON; since JSON is
 /// a subset of YAML, use LLVM's YAML parsing support instead.
 ///

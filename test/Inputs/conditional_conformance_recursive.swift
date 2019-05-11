@@ -18,11 +18,6 @@ protocol P3: P2 where A: P3 { }
 
 extension Wrapper: P3 where T: P3 { }
 
-// instantiation function for Wrapper<T>: P3
-// CHECK-LABEL: define internal void @"$s33conditional_conformance_recursive7WrapperVyxGAA2P3A2aERzrlWI"
-// CHECK-NOT: ret
-// CHECK: call i8** @swift_getWitnessTable
-
 // associated type witness table accessor for A : P2 in Wrapper<T>: P2
 // CHECK-LABEL: define internal swiftcc i8** @"$s33conditional_conformance_recursive7WrapperVyxGAA2P2A2aERzrl1A_AaEPWT"
 // CHECK: [[CONDITIONAL_REQ_BUFFER:%.*]] = alloca [1 x i8**]

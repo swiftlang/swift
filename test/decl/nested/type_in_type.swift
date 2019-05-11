@@ -298,9 +298,9 @@ extension OuterGeneric.MidGeneric : HasAssocType {
   func takesAssocType(first: D, second: F) {}
 }
 
-typealias OuterGenericMidGeneric<T> = OuterGeneric<T>.MidGeneric
+typealias OuterGenericMidNonGeneric<T> = OuterGeneric<T>.MidNonGeneric
 
-extension OuterGenericMidGeneric {
+extension OuterGenericMidNonGeneric {
 
 }
 
@@ -417,7 +417,6 @@ extension OuterGeneric.MidNonGeneric {
   }
 
   func doMoreStuffWrong() -> Self {
-    // expected-error@-1 {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'OuterGeneric.MidNonGeneric'?}}
 
   }
 }

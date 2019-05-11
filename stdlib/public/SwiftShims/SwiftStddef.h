@@ -29,11 +29,18 @@ typedef __SIZE_TYPE__ __swift_size_t;
 #endif
 
 // This selects the signed equivalent of the unsigned type chosen for size_t.
+#if __STDC_VERSION__-0 >= 201112l
 typedef __typeof__(_Generic((__swift_size_t)0,                                 \
                             unsigned long long int : (long long int)0,         \
                             unsigned long int : (long int)0,                   \
                             unsigned int : (int)0,                             \
                             unsigned short : (short)0,                         \
                             unsigned char : (signed char)0)) __swift_ssize_t;
+#elif defined(__cplusplus)
+#include <type_traits>
+using __swift_ssize_t = std::make_signed<__swift_size_t>::type;
+#else
+#error "do not have __swift_ssize_t defined"
+#endif
 
 #endif // SWIFT_STDLIB_SHIMS_SWIFT_STDDEF_H

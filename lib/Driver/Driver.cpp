@@ -127,9 +127,9 @@ static void validateBridgingHeaderArgs(DiagnosticEngine &diags,
   if (args.hasArgNoClaim(options::OPT_import_underlying_module))
     diags.diagnose({}, diag::error_framework_bridging_header);
 
-  if (args.hasArgNoClaim(options::OPT_emit_parseable_module_interface,
-                         options::OPT_emit_parseable_module_interface_path)) {
-    diags.diagnose({}, diag::error_bridging_header_parseable_interface);
+  if (args.hasArgNoClaim(options::OPT_emit_module_interface,
+                         options::OPT_emit_module_interface_path)) {
+    diags.diagnose({}, diag::error_bridging_header_module_interface);
   }
 }
 
@@ -409,6 +409,7 @@ static bool failedToReadOutOfDateMap(bool ShowIncrementalBuildDecisions,
   return true;
 }
 
+/// Returns true on error.
 static bool populateOutOfDateMap(InputInfoMap &map,
                                  llvm::sys::TimePoint<> &LastBuildTime,
                                  StringRef argsHashStr,
@@ -417,8 +418,11 @@ static bool populateOutOfDateMap(InputInfoMap &map,
                                  bool ShowIncrementalBuildDecisions) {
   // Treat a missing file as "no previous build".
   auto buffer = llvm::MemoryBuffer::getFile(buildRecordPath);
-  if (!buffer)
+  if (!buffer) {
+    if (ShowIncrementalBuildDecisions)
+      llvm::outs() << "Incremental compilation could not read build record.\n";
     return false;
+  }
 
   namespace yaml = llvm::yaml;
   using InputInfo = CompileJobAction::InputInfo;
@@ -912,7 +916,8 @@ Driver::buildCompilation(const ToolChain &TC,
   std::unique_ptr<Compilation> C;
   {
     const unsigned DriverBatchSeed = getDriverBatchSeed(*ArgList, Diags);
-    const Optional<unsigned> DriverBatchCount = getDriverBatchCount(*ArgList, Diags);
+    const Optional<unsigned> DriverBatchCount =
+        getDriverBatchCount(*ArgList, Diags);
     const Optional<unsigned> DriverBatchSizeLimit =
       getDriverBatchSizeLimit(*ArgList, Diags);
     const bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
@@ -922,7 +927,16 @@ Driver::buildCompilation(const ToolChain &TC,
         createStatsReporter(ArgList.get(), Inputs, OI, DefaultTargetTriple);
     const bool EnableExperimentalDependencies =
         ArgList->hasArg(options::OPT_enable_experimental_dependencies);
+    const bool VerifyExperimentalDependencyGraphAfterEveryImport = ArgList->hasArg(
+        options::
+            OPT_driver_verify_experimental_dependency_graph_after_every_import);
+    const bool EmitExperimentalDependencyDotFileAfterEveryImport = ArgList->hasArg(
+        options::
+            OPT_driver_emit_experimental_dependency_dot_file_after_every_import);
+    const bool ExperimentalDependenciesIncludeIntrafileOnes = ArgList->hasArg(
+        options::OPT_experimental_dependency_include_intrafile);
 
+    // clang-format off
     C = llvm::make_unique<Compilation>(
         Diags, TC, OI, Level,
         std::move(ArgList),
@@ -942,7 +956,11 @@ Driver::buildCompilation(const ToolChain &TC,
         SaveTemps,
         ShowDriverTimeCompilation,
         std::move(StatsReporter),
-        EnableExperimentalDependencies);
+        EnableExperimentalDependencies,
+        VerifyExperimentalDependencyGraphAfterEveryImport,
+        EmitExperimentalDependencyDotFileAfterEveryImport,
+        ExperimentalDependenciesIncludeIntrafileOnes);
+    // clang-format on
   }
 
   // Construct the graph of Actions.
@@ -972,7 +990,7 @@ Driver::buildCompilation(const ToolChain &TC,
     C->setContinueBuildingAfterErrors();
 
   if (ShowIncrementalBuildDecisions || ShowJobLifecycle)
-    C->setShowsIncrementalBuildDecisions();
+    C->setShowIncrementalBuildDecisions();
 
   if (ShowJobLifecycle)
     C->setShowJobLifecycle();
@@ -1171,7 +1189,7 @@ Driver::translateInputAndPathArgs(const InputArgList &ArgList,
   return DAL;
 }
 
-/// \brief Check that the file referenced by \p Input exists. If it doesn't,
+/// Check that the file referenced by \p Input exists. If it doesn't,
 /// issue a diagnostic and return false.
 static bool checkInputExistence(const Driver &D, const DerivedArgList &Args,
                                 DiagnosticEngine &Diags, StringRef Input) {
@@ -1504,8 +1522,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     OI.ShouldTreatModuleAsTopLevelOutput = false;
   } else if (Args.hasArg(options::OPT_emit_objc_header,
                          options::OPT_emit_objc_header_path,
-                         options::OPT_emit_parseable_module_interface,
-                         options::OPT_emit_parseable_module_interface_path) &&
+                         options::OPT_emit_module_interface,
+                         options::OPT_emit_module_interface_path) &&
              OI.CompilerMode != OutputInfo::Mode::SingleCompile) {
     // An option has been passed which requires whole-module knowledge, but we
     // don't have that. Generate a module, but treat it as an intermediate
@@ -1928,7 +1946,8 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
 
     if (MergeModuleAction) {
       if (OI.DebugInfoLevel == IRGenDebugInfoLevel::Normal) {
-        if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF) {
+        if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF ||
+            TC.getTriple().getObjectFormat() == llvm::Triple::COFF) {
           auto *ModuleWrapAction =
               C.createAction<ModuleWrapJobAction>(MergeModuleAction);
           LinkAction->addInput(ModuleWrapAction);
@@ -1985,8 +2004,16 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
     SuppressNoInputFilesError = true;
   }
 
-  if (const Arg *A = Args.getLastArg(options::OPT_driver_use_frontend_path))
+  if (const Arg *A = Args.getLastArg(options::OPT_driver_use_frontend_path)) {
     DriverExecutable = A->getValue();
+    std::string commandString =
+        Args.getLastArgValue(options::OPT_driver_use_frontend_path);
+    SmallVector<StringRef, 10> commandArgs;
+    StringRef(commandString).split(commandArgs, ';', -1, false);
+    DriverExecutable = commandArgs[0];
+    DriverExecutableArgs.assign(std::begin(commandArgs) + 1,
+                                std::end(commandArgs));
+  }
 
   return true;
 }
@@ -2483,8 +2510,8 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     chooseSwiftModuleDocOutputPath(C, OutputMap, workingDirectory,
                                    Output.get());
 
-  if (C.getArgs().hasArg(options::OPT_emit_parseable_module_interface,
-                         options::OPT_emit_parseable_module_interface_path))
+  if (C.getArgs().hasArg(options::OPT_emit_module_interface,
+                         options::OPT_emit_module_interface_path))
     chooseParseableInterfacePath(C, JA, workingDirectory, Buf, Output.get());
 
   if (C.getArgs().hasArg(options::OPT_update_code) && isa<CompileJobAction>(JA))
@@ -2803,7 +2830,7 @@ void Driver::chooseParseableInterfacePath(Compilation &C, const JobAction *JA,
 
   StringRef outputPath = *getOutputFilenameFromPathArgOrAsTopLevel(
       C.getOutputInfo(), C.getArgs(),
-      options::OPT_emit_parseable_module_interface_path,
+      options::OPT_emit_module_interface_path,
       file_types::TY_SwiftParseableInterfaceFile,
       /*TreatAsTopLevelOutput*/true, workingDirectory, buffer);
   output->setAdditionalOutputForType(file_types::TY_SwiftParseableInterfaceFile,

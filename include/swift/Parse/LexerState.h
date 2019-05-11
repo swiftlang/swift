@@ -19,12 +19,12 @@
 
 #include "llvm/ADT/Optional.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Syntax/Trivia.h"
+#include "swift/Parse/ParsedTrivia.h"
 
 namespace swift {
 class Lexer;
 
-/// \brief Lexer state can be saved/restored to/from objects of this class.
+/// Lexer state can be saved/restored to/from objects of this class.
 class LexerState {
 public:
   LexerState() {}
@@ -39,7 +39,7 @@ public:
 private:
   explicit LexerState(SourceLoc Loc) : Loc(Loc) {}
   SourceLoc Loc;
-  llvm::Optional<syntax::Trivia> LeadingTrivia;
+  llvm::Optional<ParsedTrivia> LeadingTrivia;
   friend class Lexer;
 };
 

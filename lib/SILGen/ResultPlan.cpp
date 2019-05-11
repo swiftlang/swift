@@ -80,7 +80,7 @@ public:
 /// corresponding to each opened type,
 static std::tuple<CanType, CanGenericSignature, SubstitutionMap>
 mapTypeOutOfOpenedExistentialContext(CanType t) {
-  SmallVector<ArchetypeType *, 4> openedTypes;
+  SmallVector<OpenedArchetypeType *, 4> openedTypes;
   t->getOpenedExistentials(openedTypes);
 
   ArrayRef<Type> openedTypesAsTypes(

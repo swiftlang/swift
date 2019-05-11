@@ -16,14 +16,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTDemangler.h"
+#include "swift/AST/PrintOptions.h"
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "swift/Frontend/Frontend.h"
-#include "swift/IDE/Utils.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Basic/Dwarf.h"
 #include "llvm/Object/ELFObjectFile.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "llvm/Object/COFF.h"
 #include "llvm/Object/MachO.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Support/CommandLine.h"
@@ -77,30 +79,30 @@ validateModule(llvm::StringRef data, bool Verbose,
 
 static void resolveDeclFromMangledNameList(
     swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
-  std::string Error;
   for (auto &Mangled : MangledNames) {
-    swift::Decl *ResolvedDecl =
-        swift::ide::getDeclFromMangledSymbolName(Ctx, Mangled, Error);
+    swift::TypeDecl *ResolvedDecl =
+        swift::Demangle::getTypeDeclForMangling(Ctx, Mangled);
     if (!ResolvedDecl) {
       llvm::errs() << "Can't resolve decl of " << Mangled << "\n";
     } else {
-      ResolvedDecl->print(llvm::errs());
-      llvm::errs() << "\n";
+      ResolvedDecl->dumpRef(llvm::outs());
+      llvm::outs() << "\n";
     }
   }
 }
 
 static void resolveTypeFromMangledNameList(
     swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
-  std::string Error;
   for (auto &Mangled : MangledNames) {
     swift::Type ResolvedType =
-        swift::ide::getTypeFromMangledSymbolname(Ctx, Mangled, Error);
+        swift::Demangle::getTypeForMangling(Ctx, Mangled);
     if (!ResolvedType) {
-      llvm::errs() << "Can't resolve type of " << Mangled << "\n";
+      llvm::outs() << "Can't resolve type of " << Mangled << "\n";
     } else {
-      ResolvedType->print(llvm::errs());
-      llvm::errs() << "\n";
+      swift::PrintOptions PO;
+      PO.PrintStorageRepresentationAttrs = true;
+      ResolvedType->print(llvm::outs(), PO);
+      llvm::outs() << "\n";
     }
   }
 }
@@ -132,6 +134,7 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
     auto *Obj = OF->getBinary();
     auto *MachO = llvm::dyn_cast<llvm::object::MachOObjectFile>(Obj);
     auto *ELF = llvm::dyn_cast<llvm::object::ELFObjectFileBase>(Obj);
+    auto *COFF = llvm::dyn_cast<llvm::object::COFFObjectFile>(Obj);
 
     if (MachO) {
       for (auto &Symbol : Obj->symbols()) {
@@ -163,7 +166,8 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
       llvm::StringRef Name;
       Section.getName(Name);
       if ((MachO && Name == swift::MachOASTSectionName) ||
-          (ELF && Name == swift::ELFASTSectionName)) {
+          (ELF && Name == swift::ELFASTSectionName) ||
+          (COFF && Name == swift::COFFASTSectionName)) {
         uint64_t Size = Section.getSize();
         StringRef ContentsReference;
         Section.getContents(ContentsReference);
@@ -212,7 +216,12 @@ int main(int argc, char **argv) {
       desc("The directory that holds the compiler resource files"),
       cat(Visible));
 
+  opt<bool> EnableDWARFImporter(
+      "enable-dwarf-importer",
+      desc("Import with LangOptions.EnableDWARFImporter = true"), cat(Visible));
+
   ParseCommandLineOptions(argc, argv);
+
   // Unregister our options so they don't interfere with the command line
   // parsing in CodeGen/BackendUtil.cpp.
   ModuleCachePath.removeArgument();
@@ -224,7 +233,7 @@ int main(int argc, char **argv) {
     if (Filename.empty())
       return true;
     if (!llvm::sys::fs::exists(llvm::Twine(Filename))) {
-      llvm::errs() << Filename << " does not exists, exiting.\n";
+      llvm::errs() << Filename << " does not exist, exiting.\n";
       return false;
     }
     if (!llvm::sys::fs::is_regular_file(llvm::Twine(Filename))) {
@@ -273,6 +282,8 @@ int main(int argc, char **argv) {
 
   Invocation.setModuleName("lldbtest");
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
+  Invocation.getLangOptions().EnableMemoryBufferImporter = true;
+  Invocation.getLangOptions().EnableDWARFImporter = EnableDWARFImporter;
 
   if (!ResourceDir.empty()) {
     Invocation.setRuntimeResourcePath(ResourceDir);
@@ -282,7 +293,7 @@ int main(int argc, char **argv) {
     return 1;
 
   for (auto &Module : Modules)
-    if (!parseASTSection(CI.getSerializedModuleLoader(),
+    if (!parseASTSection(*CI.getMemoryBufferSerializedModuleLoader(),
                          StringRef(Module.first, Module.second), modules))
       return 1;
 

@@ -108,7 +108,7 @@ static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
   unsigned Offset = SourceMgr.getLocOffsetInBuffer(Range.getStart(), BufferID);
   unsigned EndOffset = SourceMgr.getLocOffsetInBuffer(Range.getEnd(), BufferID);
   LangOptions FakeLangOpts;
-  Lexer L(FakeLangOpts, SourceMgr, BufferID, nullptr, /*InSILMode=*/false,
+  Lexer L(FakeLangOpts, SourceMgr, BufferID, nullptr, LexerMode::Swift,
           HashbangMode::Disallowed,
           CommentRetentionMode::ReturnAsTokens,
           TriviaRetentionMode::WithoutTrivia,

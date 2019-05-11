@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-silgen %s -swift-version 4 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s -swift-version 4 | %FileCheck %s
 
 final class Final<T> {
     var x: T
@@ -10,13 +10,13 @@ final class Final<T> {
 // CHECK:   deinit
 // CHECK:   enum CodingKeys : CodingKey {
 // CHECK:     case x
+// CHECK:     @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Final<T>.CodingKeys, _ b: Final<T>.CodingKeys) -> Bool
+// CHECK:     var hashValue: Int { get }
+// CHECK:     func hash(into hasher: inout Hasher)
 // CHECK:     var stringValue: String { get }
 // CHECK:     init?(stringValue: String)
 // CHECK:     var intValue: Int? { get }
 // CHECK:     init?(intValue: Int)
-// CHECK:     @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Final<T>.CodingKeys, _ b: Final<T>.CodingKeys) -> Bool
-// CHECK:     var hashValue: Int { get }
-// CHECK:     func hash(into hasher: inout Hasher)
 // CHECK:   }
 // CHECK: }
 
@@ -30,13 +30,13 @@ class Nonfinal<T> {
 // CHECK:   deinit
 // CHECK:   enum CodingKeys : CodingKey {
 // CHECK:     case x
+// CHECK:     @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Nonfinal<T>.CodingKeys, _ b: Nonfinal<T>.CodingKeys) -> Bool
+// CHECK:     var hashValue: Int { get }
+// CHECK:     func hash(into hasher: inout Hasher)
 // CHECK:     var stringValue: String { get }
 // CHECK:     init?(stringValue: String)
 // CHECK:     var intValue: Int? { get }
 // CHECK:     init?(intValue: Int)
-// CHECK:     @_implements(Equatable, ==(_:_:)) static func __derived_enum_equals(_ a: Nonfinal<T>.CodingKeys, _ b: Nonfinal<T>.CodingKeys) -> Bool
-// CHECK:     var hashValue: Int { get }
-// CHECK:     func hash(into hasher: inout Hasher)
 // CHECK:   }
 // CHECK: }
 
@@ -53,15 +53,15 @@ class Nonfinal<T> {
 
 extension Final: Encodable where T: Encodable {}
 // CHECK-LABEL: // Final<A>.encode(to:)
-// CHECK-NEXT: sil hidden @$s29synthesized_conformance_class5FinalCAASERzlE6encode2toys7Encoder_p_tKF : $@convention(method) <T where T : Encodable> (@in_guaranteed Encoder, @guaranteed Final<T>) -> @error Error {
+// CHECK-NEXT: sil hidden [ossa] @$s29synthesized_conformance_class5FinalCAASERzlE6encode2toys7Encoder_p_tKF : $@convention(method) <T where T : Encodable> (@in_guaranteed Encoder, @guaranteed Final<T>) -> @error Error {
 
 extension Final: Decodable where T: Decodable {}
 // CHECK-LABEL: // Final<A>.init(from:)
-// CHECK-NEXT: sil hidden @$s29synthesized_conformance_class5FinalCAASeRzlE4fromACyxGs7Decoder_p_tKcfC : $@convention(method) <T where T : Decodable> (@in Decoder, @thick Final<T>.Type) -> (@owned Final<T>, @error Error) {
+// CHECK-NEXT: sil hidden [ossa] @$s29synthesized_conformance_class5FinalCAASeRzlE4fromACyxGs7Decoder_p_tKcfC : $@convention(method) <T where T : Decodable> (@in Decoder, @thick Final<T>.Type) -> (@owned Final<T>, @error Error) {
 
 extension Nonfinal: Encodable where T: Encodable {}
 // CHECK-LABEL: // Nonfinal<A>.encode(to:)
-// CHECK-NEXT: sil hidden @$s29synthesized_conformance_class8NonfinalCAASERzlE6encode2toys7Encoder_p_tKF : $@convention(method) <T where T : Encodable> (@in_guaranteed Encoder, @guaranteed Nonfinal<T>) -> @error Error {
+// CHECK-NEXT: sil hidden [ossa] @$s29synthesized_conformance_class8NonfinalCAASERzlE6encode2toys7Encoder_p_tKF : $@convention(method) <T where T : Encodable> (@in_guaranteed Encoder, @guaranteed Nonfinal<T>) -> @error Error {
 
 // Witness tables for Final
 

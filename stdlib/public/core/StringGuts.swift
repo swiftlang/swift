@@ -37,9 +37,9 @@ struct _StringGuts {
 
 // Raw
 extension _StringGuts {
-  @inlinable
+  @inlinable @inline(__always)
   internal var rawBits: _StringObject.RawBitPattern {
-    @inline(__always) get { return _object.rawBits }
+    return _object.rawBits
   }
 }
 
@@ -56,13 +56,12 @@ extension _StringGuts {
   }
 
   @inline(__always)
-  internal init(_ storage: _StringStorage) {
+  internal init(_ storage: __StringStorage) {
     self.init(_StringObject(storage))
   }
 
-  internal init(_ storage: _SharedStringStorage) {
-    // TODO(cleanup): We should probably pass whole perf flags struct around
-    self.init(_StringObject(storage, isASCII: false))
+  internal init(_ storage: __SharedStringStorage) {
+    self.init(_StringObject(storage))
   }
 
   internal init(
@@ -79,44 +78,44 @@ extension _StringGuts {
 // Queries
 extension _StringGuts {
   // The number of code units
-  @inlinable
-  internal var count: Int { @inline(__always) get { return _object.count } }
+  @inlinable @inline(__always)
+  internal var count: Int { return _object.count }
 
-  @inlinable
-  internal var isEmpty: Bool { @inline(__always) get { return count == 0 } }
+  @inlinable @inline(__always)
+  internal var isEmpty: Bool { return count == 0 }
 
-  @inlinable
-  internal var isSmall: Bool {
-    @inline(__always) get { return _object.isSmall }
+  @inlinable @inline(__always)
+  internal var isSmall: Bool { return _object.isSmall }
+
+  @inline(__always)
+  internal var isSmallASCII: Bool {
+    return _object.isSmall && _object.smallIsASCII
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var asSmall: _SmallString {
-    @inline(__always) get { return _SmallString(_object) }
+    return _SmallString(_object)
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var isASCII: Bool  {
-    @inline(__always) get { return _object.isASCII }
+    return _object.isASCII
   }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var isFastASCII: Bool  {
-    @inline(__always) get { return isFastUTF8 && _object.isASCII }
+    return isFastUTF8 && _object.isASCII
   }
 
-  @inlinable
-  internal var isNFC: Bool  {
-    @inline(__always) get { return _object.isNFC }
-  }
+  @inline(__always)
+  internal var isNFC: Bool { return _object.isNFC }
 
-  @inlinable
-  internal var isNFCFastUTF8: Bool  {
+  @inline(__always)
+  internal var isNFCFastUTF8: Bool {
     // TODO(String micro-performance): Consider a dedicated bit for this
-    @inline(__always) get { return _object.isNFC && isFastUTF8 }
+    return _object.isNFC && isFastUTF8
   }
 
-  @inlinable
   internal var hasNativeStorage: Bool { return _object.hasNativeStorage }
 
   internal var hasSharedStorage: Bool { return _object.hasSharedStorage }
@@ -134,9 +133,9 @@ extension _StringGuts {
   internal var isFastUTF8: Bool { return _fastPath(_object.providesFastUTF8) }
 
   // A String which does not provide fast access to contiguous UTF-8 code units
-  @inlinable
+  @inlinable @inline(__always)
   internal var isForeign: Bool {
-    @inline(__always) get { return _slowPath(_object.isForeign) }
+     return _slowPath(_object.isForeign)
   }
 
   @inlinable @inline(__always)
@@ -153,18 +152,11 @@ extension _StringGuts {
 
   @inlinable @inline(__always)
   internal func withFastUTF8<R>(
-    range: Range<Int>?,
+    range: Range<Int>,
     _ f: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R {
     return try self.withFastUTF8 { wholeUTF8 in
-      let slicedUTF8: UnsafeBufferPointer<UInt8>
-      if let r = range {
-        slicedUTF8 = UnsafeBufferPointer(rebasing: wholeUTF8[r])
-      } else {
-        slicedUTF8 = wholeUTF8
-      }
-
-      return try f(slicedUTF8)
+      return try f(UnsafeBufferPointer(rebasing: wholeUTF8[range]))
     }
   }
 
@@ -254,23 +246,18 @@ extension _StringGuts {
   internal func _foreignCopyUTF8(
     into mbp: UnsafeMutableBufferPointer<UInt8>
   ) -> Int? {
-    var ptr = mbp.baseAddress._unsafelyUnwrappedUnchecked
-    var numWritten = 0
-    for cu in String(self).utf8 {
-      guard numWritten < mbp.count else { return nil }
-      ptr.initialize(to: cu)
-      ptr += 1
-      numWritten += 1
-    }
-
-    return numWritten
+    #if _runtime(_ObjC)
+    // Currently, foreign  means NSString
+    return _cocoaStringCopyUTF8(_object.cocoaObject, into: mbp)
+    #else
+    fatalError("No foreign strings on Linux in this version of Swift")
+    #endif
   }
 
+  @inline(__always)
   internal var utf8Count: Int {
-    @inline(__always) get {
-      if _fastPath(self.isFastUTF8) { return count }
-      return String(self).utf8.count
-    }
+    if _fastPath(self.isFastUTF8) { return count }
+    return String(self).utf8.count
   }
 }
 
@@ -279,13 +266,13 @@ extension _StringGuts {
   @usableFromInline
   internal typealias Index = String.Index
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var startIndex: String.Index {
-    @inline(__always) get { return Index(encodedOffset: 0) }
+   return Index(_encodedOffset: 0)
   }
-  @inlinable
+  @inlinable @inline(__always)
   internal var endIndex: String.Index {
-    @inline(__always) get { return Index(encodedOffset: self.count) }
+    return Index(_encodedOffset: self.count)
   }
 }
 

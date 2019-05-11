@@ -588,7 +588,7 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
       });
 
   auto contBB = scope.exit();
-  auto isa = contBB->createPhiArgument(i1Ty, ValueOwnershipKind::Trivial);
+  auto isa = contBB->createPhiArgument(i1Ty, ValueOwnershipKind::Any);
   return isa;
 }
 

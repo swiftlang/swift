@@ -258,3 +258,14 @@ let _: Int? = try? producer.produceDoubleOptionalInt() // expected-error {{value
 let _: Int?? = try? producer.produceDoubleOptionalInt() // expected-error {{value of optional type 'Int???' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
 let _: Int??? = try? producer.produceDoubleOptionalInt() // good
 let _: String = try? producer.produceDoubleOptionalInt() // expected-error {{cannot convert value of type 'Int???' to specified type 'String'}}
+
+// rdar://problem/46742002
+protocol Dummy : class {}
+
+class F<T> {
+  func wait() throws -> T { fatalError() }
+}
+
+func bar(_ a: F<Dummy>, _ b: F<Dummy>) {
+  _ = (try? a.wait()) === (try? b.wait())
+}

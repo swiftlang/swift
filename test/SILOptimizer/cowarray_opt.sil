@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enforce-exclusivity=none -enable-sil-verify-all -cowarray-opt %s | %FileCheck %s
+// RUN: %target-sil-opt -enforce-exclusivity=none -enable-sil-verify-all -cowarray-opt %s | %FileCheck %s
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -193,6 +193,39 @@ bb1:
 bb2:
   %7 = tuple()
   return %7 : $()
+}
+
+// CHECK-LABEL: sil @dont_hoist_if_executed_conditionally
+// CHECK: bb0({{.*}}):
+// CHECK-NOT: apply
+// CHECK: bb1({{.*}}):
+// CHECK: bb2:
+// CHECK:   apply
+// CHECK: bb3:
+sil @dont_hoist_if_executed_conditionally : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> MyArray<MyStruct> {
+bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
+  debug_value_addr %0 : $*MyArray<MyStruct>
+  %2 = load %0 : $*MyArray<MyStruct>
+  br bb1(%2 : $MyArray<MyStruct>)
+
+bb1(%p1 : $MyArray<MyStruct>):
+  cond_br undef, bb2, bb3
+
+bb2:
+  // If this block is never taken, then hoisting to bb0 would change the value of %p3.
+  %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %7 = load %0 : $*MyArray<MyStruct>
+  br bb4(%7 : $MyArray<MyStruct>)
+
+bb3:
+  br bb4(%p1 : $MyArray<MyStruct>)
+
+bb4(%p2 : $MyArray<MyStruct>):
+  cond_br undef, bb1(%p2 : $MyArray<MyStruct>), bb5(%p2 : $MyArray<MyStruct>)
+
+bb5(%p3 : $MyArray<MyStruct>):
+  return %p3 : $MyArray<MyStruct>
 }
 
 // CHECK-LABEL: sil @cow_should_ignore_mark_dependence_addrproj_use : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {

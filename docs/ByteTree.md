@@ -13,20 +13,20 @@ For example, the string "Hello World" would be encoded as `(uint32_t)11` `"Hello
 
 ## Serialization of objects
 
-An object consists of its size, measured in the number of fields and represented as a `uint_32t` in little endian order, followed by the direct concatenation of its fields. Because each field is again prefixed with its size, no delimites are necessary in between the fields.
+An object consists of its size, measured in the number of fields and represented as a `uint_32t` in little endian order, followed by the direct concatenation of its fields. Because each field is again prefixed with its size, no delimits are necessary in between the fields.
 
-To distinguish scalars and objects, the size of objects has its most-siginificant bit set to 1. It must be ignored to retrieve the number of fields in the object.
+To distinguish scalars and objects, the size of objects has its most-significant bit set to 1. It must be ignored to retrieve the number of fields in the object.
 
 Arrays are modelled as objects whose fields are all of the same type and whose length is variadic (and is indicated by the object's size).
 
 ## Versioning
 
-The ByteTree format is prepended by a 4-byte protocol version number that describes the version of the object tree that was serialized. Its exact semantics are up to each specific application, but it is encouraged to interpret it as a two-comentent number where the first component, consisting of the three most significant bytes, is incremented for breaking changes and the last byte is incremented for backwards-compatible changes.
+The ByteTree format is prepended by a 4-byte protocol version number that describes the version of the object tree that was serialized. Its exact semantics are up to each specific application, but it is encouraged to interpret it as a two-component number where the first component, consisting of the three most significant bytes, is incremented for breaking changes and the last byte is incremented for backwards-compatible changes.
 
-## Forward compatilibity
+## Forward compatibility
 
 Fields may be added to the end of objects in a backwards compatible manner (older deserialisers will still be able to deserialise the format). It does so by skipping over all fields that are not read during deserialisation. Newer versions of the deserialiser can detect if recently added fields are not present in the serialised data by inspecting the `numFields` property passed during deserialisation.
 
 ## Serialization safety
 
-Since all fields in objects are accessed by their index, issues quickly arise if a new field is accidentally added at the beginning of an object. To prevent issues like this, the ByteTree serialiser and deserialiser requires the explicit specification of each field's index within the object. These indicies are never serialised. Their sole purpose is to check that all fields are read in the correct order in assertion builds.
+Since all fields in objects are accessed by their index, issues quickly arise if a new field is accidentally added at the beginning of an object. To prevent issues like this, the ByteTree serialiser and deserialiser requires the explicit specification of each field's index within the object. These indices are never serialised. Their sole purpose is to check that all fields are read in the correct order in assertion builds.

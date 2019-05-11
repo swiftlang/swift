@@ -57,3 +57,12 @@ void CCRefrigeratorGetItemUnaudited(CCRefrigeratorRef fridge, unsigned index, CC
 
 typedef void *CFNonConstVoidRef __attribute__((objc_bridge(id)));
 CFNonConstVoidRef CFNonConstBottom();
+
+typedef struct IceCube {
+    float width;
+    float height;
+    float depth;
+} IceCube;
+
+typedef IceCube IceCube;
+typedef IceCube BlockOfIce;

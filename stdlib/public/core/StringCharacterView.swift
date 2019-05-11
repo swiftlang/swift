@@ -35,25 +35,20 @@ extension String: BidirectionalCollection {
   /// The position of the first character in a nonempty string.
   ///
   /// In an empty string, `startIndex` is equal to `endIndex`.
-  @inlinable
-  public var startIndex: Index {
-    @inline(__always) get { return _guts.startIndex }
-  }
+  @inlinable @inline(__always)
+  public var startIndex: Index { return _guts.startIndex }
 
   /// A string's "past the end" position---that is, the position one greater
   /// than the last valid subscript argument.
   ///
   /// In an empty string, `endIndex` is equal to `startIndex`.
-  @inlinable
-  public var endIndex: Index {
-    @inline(__always) get { return _guts.endIndex }
-  }
+  @inlinable @inline(__always)
+  public var endIndex: Index { return _guts.endIndex }
 
   /// The number of characters in a string.
+  @inline(__always)
   public var count: Int {
-    @inline(__always) get {
-      return distance(from: startIndex, to: endIndex)
-    }
+    return distance(from: startIndex, to: endIndex)
   }
 
   /// Returns the position immediately after the given index.
@@ -66,9 +61,9 @@ extension String: BidirectionalCollection {
 
     // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
     let stride = _characterStride(startingAt: i)
-    let nextOffset = i.encodedOffset &+ stride
+    let nextOffset = i._encodedOffset &+ stride
     let nextStride = _characterStride(
-      startingAt: Index(encodedOffset: nextOffset))
+      startingAt: Index(_encodedOffset: nextOffset))
 
     return Index(
       encodedOffset: nextOffset, characterStride: nextStride)
@@ -84,7 +79,7 @@ extension String: BidirectionalCollection {
 
     // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
     let stride = _characterStride(endingAt: i)
-    let priorOffset = i.encodedOffset &- stride
+    let priorOffset = i._encodedOffset &- stride
     return Index(encodedOffset: priorOffset, characterStride: stride)
   }
   /// Returns an index that is the specified distance from the given index.
@@ -190,16 +185,14 @@ extension String: BidirectionalCollection {
   ///
   /// - Parameter i: A valid index of the string. `i` must be less than the
   ///   string's end index.
-  @inlinable
+  @inlinable @inline(__always)
   public subscript(i: Index) -> Character {
-    @inline(__always) get {
-      _boundsCheck(i)
+    _boundsCheck(i)
 
-      let i = _guts.scalarAlign(i)
-      let distance = _characterStride(startingAt: i)
-      return _guts.errorCorrectedCharacter(
-        startingAt: i.encodedOffset, endingAt: i.encodedOffset &+ distance)
-    }
+    let i = _guts.scalarAlign(i)
+    let distance = _characterStride(startingAt: i)
+    return _guts.errorCorrectedCharacter(
+      startingAt: i._encodedOffset, endingAt: i._encodedOffset &+ distance)
   }
 
   @inlinable @inline(__always)
@@ -209,14 +202,14 @@ extension String: BidirectionalCollection {
 
     if i == endIndex { return 0 }
 
-    return _guts._opaqueCharacterStride(startingAt: i.encodedOffset)
+    return _guts._opaqueCharacterStride(startingAt: i._encodedOffset)
   }
 
   @inlinable @inline(__always)
   internal func _characterStride(endingAt i: Index) -> Int {
     if i == startIndex { return 0 }
 
-    return _guts._opaqueCharacterStride(endingAt: i.encodedOffset)
+    return _guts._opaqueCharacterStride(endingAt: i._encodedOffset)
   }
 }
 
@@ -234,8 +227,8 @@ extension String {
 
     @inlinable
     internal init(_ guts: _StringGuts) {
-      self._guts = guts
       self._end = guts.count
+      self._guts = guts
     }
 
     @inlinable

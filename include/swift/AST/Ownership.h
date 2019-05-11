@@ -33,7 +33,7 @@ namespace swift {
 // This enum is used in diagnostics. If you add a case here, the diagnostics
 // must be updated as well.
 enum class ReferenceOwnership : uint8_t {
-  /// \brief a strong reference (the default semantics)
+  /// a strong reference (the default semantics)
   Strong,
 
 #define REF_STORAGE(Name, ...) Name,
@@ -122,14 +122,14 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, ReferenceOwnership RO);
 
 /// Different kinds of value ownership supported by Swift.
 enum class ValueOwnership : uint8_t {
-  /// \brief the context-dependent default ownership (sometimes shared,
+  /// the context-dependent default ownership (sometimes shared,
   /// sometimes owned)
   Default,
-  /// \brief an 'inout' mutating pointer-like value
+  /// an 'inout' mutating pointer-like value
   InOut,
-  /// \brief a '__shared' non-mutating pointer-like value
+  /// a '__shared' non-mutating pointer-like value
   Shared,
-  /// \brief an '__owned' value
+  /// an '__owned' value
   Owned,
 
   Last_Kind = Owned

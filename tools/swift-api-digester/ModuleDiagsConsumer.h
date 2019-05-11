@@ -30,7 +30,7 @@ namespace swift {
 namespace ide {
 namespace api {
 
-/// \brief Diagnostic consumer that displays diagnostics to standard output.
+/// Diagnostic consumer that displays diagnostics to standard output.
 class ModuleDifferDiagsConsumer: public PrintingDiagnosticConsumer {
   llvm::raw_ostream &OS;
   bool DiagnoseModuleDiff;
@@ -39,11 +39,11 @@ public:
   ModuleDifferDiagsConsumer(bool DiagnoseModuleDiff,
                             llvm::raw_ostream &OS = llvm::errs());
   ~ModuleDifferDiagsConsumer();
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind,
+  void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info) override;
+                        const DiagnosticInfo &Info,
+                        SourceLoc bufferIndirectlyCausingDiagnostic) override;
 };
 }
 }

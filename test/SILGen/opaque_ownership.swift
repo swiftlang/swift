@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-emit-silgen -enable-sil-opaque-values -enable-sil-ownership -emit-sorted-sil -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -target x86_64-apple-macosx10.9 -enable-sil-opaque-values -enable-sil-ownership -emit-sorted-sil -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck --check-prefix=CHECK-OSX %s
+// RUN: %target-swift-emit-silgen -enable-sil-opaque-values -emit-sorted-sil -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -target x86_64-apple-macosx10.9 -enable-sil-opaque-values -emit-sorted-sil -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck --check-prefix=CHECK-OSX %s
 
 public typealias AnyObject = Builtin.AnyObject
 
@@ -20,7 +20,7 @@ public protocol Decoder {
 
 // Test open_existential_value ownership
 // ---
-// CHECK-LABEL: sil @$ss11takeDecoder4fromBi1_s0B0_p_tKF : $@convention(thin) (@in_guaranteed Decoder) -> (Builtin.Int1, @error Error) {
+// CHECK-LABEL: sil [ossa] @$ss11takeDecoder4fromBi1_s0B0_p_tKF : $@convention(thin) (@in_guaranteed Decoder) -> (Builtin.Int1, @error Error) {
 // CHECK: bb0(%0 : @guaranteed $Decoder):
 // CHECK:  [[OPENED:%.*]] = open_existential_value %0 : $Decoder to $@opened("{{.*}}") Decoder
 // CHECK:  [[WT:%.*]] = witness_method $@opened("{{.*}}") Decoder, #Decoder.unkeyedContainer!1 : <Self where Self : Decoder> (Self) -> () throws -> UnkeyedDecodingContainer, %3 : $@opened("{{.*}}") Decoder : $@convention(witness_method: Decoder) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out UnkeyedDecodingContainer, @error Error)
@@ -43,8 +43,8 @@ public func takeDecoder(from decoder: Decoder) throws -> Builtin.Int1 {
 
 // Test unsafe_bitwise_cast nontrivial ownership.
 // ---
-// CHECK-LABEL: sil @$ss13unsafeBitCast_2toq_x_q_mtr0_lF : $@convention(thin) <T, U> (@in_guaranteed T, @thick U.Type) -> @out U {
-// CHECK: bb0([[ARG0:%.*]] : @guaranteed $T, [[ARG1:%.*]] : @trivial $@thick U.Type):
+// CHECK-LABEL: sil [ossa] @$ss13unsafeBitCast_2toq_x_q_mtr0_lF : $@convention(thin) <T, U> (@in_guaranteed T, @thick U.Type) -> @out U {
+// CHECK: bb0([[ARG0:%.*]] : @guaranteed $T, [[ARG1:%.*]] : $@thick U.Type):
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG0]] : $T
 // CHECK:   [[RESULT:%.*]] = unchecked_bitwise_cast [[ARG_COPY]] : $T to $U
 // CHECK:   [[RESULT_COPY:%.*]] = copy_value [[RESULT]] : $U
@@ -150,10 +150,10 @@ public struct Int64 : ExpressibleByIntegerLiteral, _ExpressibleByBuiltinIntegerL
   }
 }
 
-// Test ownership of multi-case Enum values in the context of @trivial to @in thunks.
+// Test ownership of multi-case Enum values in the context of to @in thunks.
 // ---
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @$ss17FloatingPointSignOSQsSQ2eeoiySbx_xtFZTW : $@convention(witness_method: Equatable) (@in_guaranteed FloatingPointSign, @in_guaranteed FloatingPointSign, @thick FloatingPointSign.Type) -> Bool {
-// CHECK: bb0(%0 : @trivial $FloatingPointSign, %1 : @trivial $FloatingPointSign, %2 : @trivial $@thick FloatingPointSign.Type):
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$ss17FloatingPointSignOSQsSQ2eeoiySbx_xtFZTW : $@convention(witness_method: Equatable) (@in_guaranteed FloatingPointSign, @in_guaranteed FloatingPointSign, @thick FloatingPointSign.Type) -> Bool {
+// CHECK: bb0(%0 : $FloatingPointSign, %1 : $FloatingPointSign, %2 : $@thick FloatingPointSign.Type):
 // CHECK:   %3 = function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
 // CHECK:   %4 = apply %3<FloatingPointSign>(%0, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
 // CHECK:   return %4 : $Bool
@@ -170,7 +170,7 @@ public enum FloatingPointSign: Int64 {
 // Test open_existential_value used in a conversion context.
 // (the actual bridging call is dropped because we don't import Swift).
 // ---
-// CHECK-OSX-LABEL: sil @$ss26_unsafeDowncastToAnyObject04fromD0yXlyp_tF : $@convention(thin) (@in_guaranteed Any) -> @owned AnyObject {
+// CHECK-OSX-LABEL: sil [ossa] @$ss26_unsafeDowncastToAnyObject04fromD0yXlyp_tF : $@convention(thin) (@in_guaranteed Any) -> @owned AnyObject {
 // CHECK-OSX: bb0(%0 : @guaranteed $Any):
 // CHECK-OSX:   [[COPY:%.*]] = copy_value %0 : $Any
 // CHECK-OSX:   [[BORROW2:%.*]] = begin_borrow [[COPY]] : $Any
@@ -192,7 +192,7 @@ public protocol Error {}
 #if os(macOS)
 // Test open_existential_box_value in a conversion context.
 // ---
-// CHECK-OSX-LABEL: sil @$ss3foo1eys5Error_pSg_tF : $@convention(thin) (@guaranteed Optional<Error>) -> () {
+// CHECK-OSX-LABEL: sil [ossa] @$ss3foo1eys5Error_pSg_tF : $@convention(thin) (@guaranteed Optional<Error>) -> () {
 // CHECK-OSX: [[BORROW:%.*]] = begin_borrow %{{.*}} : $Error
 // CHECK-OSX: [[VAL:%.*]] = open_existential_box_value [[BORROW]] : $Error to $@opened
 // CHECK-OSX: [[COPY:%.*]] = copy_value [[VAL]] : $@opened
@@ -234,7 +234,7 @@ public struct EnumIter<Base : IP> : IP, Seq {
 
 // Test passing a +1 RValue to @in_guaranteed.
 // ---
-// CHECK-LABEL: sil @$ss7EnumSeqV12makeIterators0A4IterVy0D0QzGyF : $@convention(method) <Base where Base : Seq> (@in_guaranteed EnumSeq<Base>) -> @out EnumIter<Base.Iterator> {
+// CHECK-LABEL: sil [ossa] @$ss7EnumSeqV12makeIterators0A4IterVy0D0QzGyF : $@convention(method) <Base where Base : Seq> (@in_guaranteed EnumSeq<Base>) -> @out EnumIter<Base.Iterator> {
 // CHECK: bb0(%0 : @guaranteed $EnumSeq<Base>):
 // CHECK:  [[MT:%.*]] = metatype $@thin EnumIter<Base.Iterator>.Type
 // CHECK:  [[FIELD:%.*]] = struct_extract %0 : $EnumSeq<Base>, #EnumSeq._base

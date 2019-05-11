@@ -55,9 +55,26 @@ static ArraySliceType *computeAllKeyPathsType(NominalTypeDecl *nominal) {
   return ArraySliceType::get(partialKeyPathType);
 }
 
+// Mark the given `ValueDecl` as `@inlinable`, if the conformance context's
+// module is not resilient and the `ValueDecl` is effectively public.
+// TODO: Dedupe with DerivedConformanceRawRepresentable.cpp.
+static void maybeMarkAsInlinable(DerivedConformance &derived, ValueDecl *decl) {
+  ASTContext &C = derived.TC.Context;
+  auto parentDC = derived.getConformanceContext();
+  if (!parentDC->getParentModule()->isResilient()) {
+    auto access = decl->getFormalAccessScope(
+        nullptr, /*treatUsableFromInlineAsPublic*/ true);
+    if (access.isPublic()) {
+      decl->getAttrs().add(new (C) InlinableAttr(/*implicit*/ false));
+      if (auto *attr = decl->getAttrs().getAttribute<UsableFromInlineAttr>())
+        attr->setInvalid();
+    }
+  }
+}
+
 // Synthesize body for the `allKeyPaths` computed property getter.
 static void
-deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl) {
+deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
   auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
 
@@ -108,14 +125,19 @@ deriveKeyPathIterable_allKeyPaths(DerivedConformance &derived) {
       C.Id_allKeyPaths, returnInterfaceTy, returnTy, /*isStatic*/ false,
       /*isFinal*/ true);
 
-  // Add `@inlinable` to the `allKeyPaths` declaration.
-  if (nominal->getEffectiveAccess() > AccessLevel::Internal)
-    allKeyPathsDecl->getAttrs().add(new (C) InlinableAttr(/*implicit*/ true));
+  // Maybe add `@inlinable` to the `allKeyPaths` declaration.
+  if (llvm::all_of(nominal->getStoredProperties(), [](VarDecl *vd) {
+    return vd->getFormalAccessScope(
+        nullptr, /*treatUsableFromInlineAsPublic*/ true).isPublic();
+  })) {
+    maybeMarkAsInlinable(derived, allKeyPathsDecl);
+  }
 
   // Create `allKeyPaths` getter.
   auto *getterDecl = derived.declareDerivedPropertyGetter(
       derived.TC, allKeyPathsDecl, returnTy);
-  getterDecl->setBodySynthesizer(deriveBodyKeyPathIterable_allKeyPaths);
+  getterDecl->setBodySynthesizer(
+      deriveBodyKeyPathIterable_allKeyPaths, nullptr);
   allKeyPathsDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
                                 SourceLoc(), {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext({getterDecl, allKeyPathsDecl, pbDecl});
@@ -129,9 +151,11 @@ static Type deriveKeyPathIterable_AllKeyPaths(DerivedConformance &derived) {
 }
 
 ValueDecl *DerivedConformance::deriveKeyPathIterable(ValueDecl *requirement) {
-  if (requirement->getBaseName() == TC.Context.Id_allKeyPaths) {
+  // Diagnose conformances in disallowed contexts.
+  if (checkAndDiagnoseDisallowedContext(requirement))
+    return nullptr;
+  if (requirement->getBaseName() == TC.Context.Id_allKeyPaths)
     return deriveKeyPathIterable_allKeyPaths(*this);
-  }
   TC.diagnose(requirement->getLoc(),
               diag::broken_key_path_iterable_requirement);
   return nullptr;
@@ -139,9 +163,11 @@ ValueDecl *DerivedConformance::deriveKeyPathIterable(ValueDecl *requirement) {
 
 Type DerivedConformance::deriveKeyPathIterable(
     AssociatedTypeDecl *requirement) {
-  if (requirement->getBaseName() == TC.Context.Id_AllKeyPaths) {
+  // Diagnose conformances in disallowed contexts.
+  if (checkAndDiagnoseDisallowedContext(requirement))
+    return nullptr;
+  if (requirement->getBaseName() == TC.Context.Id_AllKeyPaths)
     return deriveKeyPathIterable_AllKeyPaths(*this);
-  }
   TC.diagnose(requirement->getLoc(),
               diag::broken_key_path_iterable_requirement);
   return nullptr;

@@ -18,7 +18,7 @@ public struct Foo : Differentiable {
 // CHECK-AST:   public typealias CotangentVector = Foo.AllDifferentiableVariables
 
 // CHECK-SILGEN-LABEL: // Foo.a.getter
-// CHECK-SILGEN-NEXT: sil [transparent] [serialized] [differentiable source 0 wrt 0] @$s33derived_differentiable_properties3FooV1aSfvg : $@convention(method) (Foo) -> Float
+// CHECK-SILGEN-NEXT: sil [transparent] [serialized] [differentiable source 0 wrt 0] [ossa] @$s33derived_differentiable_properties3FooV1aSfvg : $@convention(method) (Foo) -> Float
 
 struct AdditiveTangentIsSelf : AdditiveArithmetic, Differentiable {
   var a: Float
@@ -92,7 +92,7 @@ public struct ConditionallyDifferentiable<T> {
 extension ConditionallyDifferentiable : Differentiable where T : Differentiable {}
 
 // CHECK-AST-LABEL: @_fieldwiseDifferentiable public struct ConditionallyDifferentiable<T> {
-// CHECK-AST:         @differentiable(where T : Differentiable)
+// CHECK-AST:         @differentiable(wrt: self where T : Differentiable)
 // CHECK-AST:         public let x: T
 // CHECK-AST:         internal init(x: T)
 // CHECK-AST:       }

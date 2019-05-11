@@ -359,19 +359,19 @@ extension Sequence {
 }
 
 class C_25341015 {
-  static func baz(_ x: Int, _ y: Int) {} // expected-note {{'baz' declared here}}
+  static func baz(_ x: Int, _ y: Int) {}
   func baz() {}
   func qux() {
-    baz(1, 2) // expected-error {{use of 'baz' refers to instance method 'baz()' rather than static method 'baz' in class 'C_25341015'}} expected-note {{use 'C_25341015.' to reference the static method}}
+    baz(1, 2) // expected-error {{static member 'baz' cannot be used on instance of type 'C_25341015'}} {{5-5=C_25341015.}}
   }
 }
 
 struct S_25341015 {
-  static func foo(_ x: Int, y: Int) {} // expected-note {{'foo(_:y:)' declared here}}
+  static func foo(_ x: Int, y: Int) {}
 
   func foo(z: Int) {}
   func bar() {
-    foo(1, y: 2) // expected-error {{use of 'foo' refers to instance method 'foo(z:)' rather than static method 'foo(_:y:)' in struct 'S_25341015'}} expected-note {{use 'S_25341015.' to reference the static method}}
+    foo(1, y: 2) // expected-error {{static member 'foo' cannot be used on instance of type 'S_25341015'}} {{5-5=S_25341015.}}
   }
 }
 
@@ -466,3 +466,114 @@ struct Outer {
 
 // rdar://problem/39514009 - don't crash when trying to diagnose members with special names
 print("hello")[0] // expected-error {{value of tuple type '()' has no member 'subscript'}}
+
+
+func rdar40537782() {
+  class A {}
+  class B : A {
+    override init() {}
+    func foo() -> A { return A() }
+  }
+
+  struct S<T> {
+    init(_ a: T...) {}
+  }
+
+  func bar<T>(_ t: T) {
+    _ = S(B(), .foo(), A()) // expected-error {{type 'A' has no member 'foo'}}
+  }
+}
+
+func rdar36989788() {
+  struct A<T> {
+    func foo() -> A<T> {
+      return self
+    }
+  }
+
+  func bar<T>(_ x: A<T>) -> (A<T>, A<T>) {
+    return (x.foo(), x.undefined()) // expected-error {{value of type 'A<T>' has no member 'undefined'}}
+  }
+}
+
+func rdar46211109() {
+  struct MyIntSequenceStruct: Sequence {
+    struct Iterator: IteratorProtocol {
+      var current = 0
+      mutating func next() -> Int? {
+        return current + 1
+      }
+    }
+
+    func makeIterator() -> Iterator {
+      return Iterator()
+    }
+  }
+
+  func foo<E, S: Sequence>(_ type: E.Type) -> S? where S.Element == E {
+    return nil
+  }
+
+  let _: MyIntSequenceStruct? = foo(Int.Self)
+  // expected-error@-1 {{type 'Int' has no member 'Self'}}
+}
+
+class A {}
+
+enum B {
+  static func foo() {
+    bar(A()) // expected-error {{'A' is not convertible to 'B'}}
+  }
+
+  func bar(_: A) {}
+}
+
+class C {
+  static func foo() {
+    bar(0) // expected-error {{instance member 'bar' cannot be used on type 'C'}}
+  }
+
+  func bar(_: Int) {}
+}
+
+class D {
+  static func foo() {}
+
+  func bar() {
+    foo() // expected-error {{static member 'foo' cannot be used on instance of type 'D'}}
+  }
+}
+
+func rdar_48114578() {
+  struct S<T> {
+    var value: T
+
+    static func valueOf<T>(_ v: T) -> S<T> {
+      return S<T>(value: v)
+    }
+  }
+
+  typealias A = (a: [String]?, b: Int)
+
+  func foo(_ a: [String], _ b: Int) -> S<A> {
+    let v = (a, b)
+    return .valueOf(v)
+  }
+
+  func bar(_ a: [String], _ b: Int) -> S<A> {
+    return .valueOf((a, b)) // Ok
+  }
+}
+
+struct S_Min {
+  var min: Int = 42
+}
+
+func min(_: Int, _: Float) -> Int { return 0 }
+func min(_: Float, _: Int) -> Int { return 0 }
+
+extension S_Min : CustomStringConvertible {
+  public var description: String {
+    return "\(min)" // Ok
+  }
+}

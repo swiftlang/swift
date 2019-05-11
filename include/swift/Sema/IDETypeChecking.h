@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief Provides extra type-checking entry points for use during code
+/// Provides extra type-checking entry points for use during code
 /// completion, which happens *without* type-checking an entire file at once.
 //
 //===----------------------------------------------------------------------===//
@@ -19,6 +19,7 @@
 #ifndef SWIFT_SEMA_IDETYPECHECKING_H
 #define SWIFT_SEMA_IDETYPECHECKING_H
 
+#include "llvm/ADT/MapVector.h"
 #include "swift/Basic/SourceLoc.h"
 #include <memory>
 
@@ -36,10 +37,13 @@ namespace swift {
   class ValueDecl;
   class DeclName;
 
-  /// \brief Typecheck a declaration parsed during code completion.
+  /// Typecheck a declaration parsed during code completion.
   void typeCheckCompletionDecl(Decl *D);
 
-  /// \brief Check if T1 is convertible to T2.
+  /// Typecheck binding initializer at \p bindingIndex.
+  void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex);
+
+  /// Check if T1 is convertible to T2.
   ///
   /// \returns true on convertible, false on not.
   bool isConvertibleTo(Type T1, Type T2, DeclContext &DC);
@@ -61,10 +65,16 @@ namespace swift {
 
   struct ResolvedMemberResult {
     struct Implementation;
-    Implementation &Impl;
+    Implementation *Impl;
 
     ResolvedMemberResult();
     ~ResolvedMemberResult();
+    ResolvedMemberResult(const ResolvedMemberResult &) = delete;
+    ResolvedMemberResult & operator=(ResolvedMemberResult &) = delete;
+    ResolvedMemberResult(ResolvedMemberResult &&other) {
+      Impl = other.Impl;
+      other.Impl = nullptr;
+    }
     operator bool() const;
     bool hasBestOverload() const;
     ValueDecl* getBestOverload() const;
@@ -74,13 +84,19 @@ namespace swift {
   ResolvedMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
                                          DeclName Name);
 
-  /// \brief Given a type and an extension to the original type decl of that type,
+  /// Given a type and an extension to the original type decl of that type,
   /// decide if the extension has been applied, i.e. if the requirements of the
   /// extension have been fulfilled.
   /// \returns True on applied, false on not applied.
-  bool isExtensionApplied(DeclContext &DC, Type Ty, const ExtensionDecl *ED);
+  bool isExtensionApplied(const DeclContext *DC, Type Ty,
+                          const ExtensionDecl *ED);
 
-/// The kind of type checking to perform for code completion.
+  /// Given a type and an member value decl , decide if the decl is applied,
+  /// i.e. if the \c where requirements of the decl have been fulfilled.
+  /// \returns True on applied, false on not applied.
+  bool isMemberDeclApplied(const DeclContext *DC, Type Ty, const ValueDecl *VD);
+
+  /// The kind of type checking to perform for code completion.
   enum class CompletionTypeCheckKind {
     /// Type check the expression as normal.
     Normal,
@@ -89,7 +105,7 @@ namespace swift {
     KeyPath,
   };
 
-  /// \brief Return the type of an expression parsed during code completion, or
+  /// Return the type of an expression parsed during code completion, or
   /// None on error.
   Optional<Type> getTypeOfCompletionContextExpr(
                    ASTContext &Ctx,
@@ -116,7 +132,7 @@ namespace swift {
   bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                           SourceLoc EndTypeCheckLoc);
 
-  /// \brief Typecheck top-level code parsed during code completion.
+  /// Typecheck top-level code parsed during code completion.
   ///
   /// \returns true on success, false on error.
   bool typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
@@ -161,6 +177,68 @@ namespace swift {
     bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
     bool hasMergeGroup(MergeGroupKind Kind);
   };
+
+  /// Reported type for an expression. This expression is represented by offset
+  /// length in the source buffer;
+  struct ExpressionTypeInfo {
+
+    /// The start of the expression;
+    uint32_t offset;
+
+    /// The length of the expression;
+    uint32_t length;
+
+    /// The start of the printed type in a separately given string buffer.
+    uint32_t typeOffset;
+
+    /// The length of the printed type
+    uint32_t typeLength;
+
+    /// The offsets and lengths of all protocols the type conforms to
+    std::vector<std::pair<uint32_t, uint32_t>> protocols;
+  };
+
+  /// Collect type information for every expression in \c SF; all types will
+  /// be printed to \c OS.
+  ArrayRef<ExpressionTypeInfo> collectExpressionType(SourceFile &SF,
+    ArrayRef<const char *> ExpectedProtocols,
+    std::vector<ExpressionTypeInfo> &scratch, llvm::raw_ostream &OS);
+
+  /// Resolve a list of mangled names to accessible protocol decls from
+  /// the decl context.
+  bool resolveProtocolNames(DeclContext *DC, ArrayRef<const char *> names,
+                            llvm::MapVector<ProtocolDecl*, StringRef> &result);
+
+  /// FIXME: All of the below goes away once CallExpr directly stores its
+  /// arguments.
+
+  /// Return value for getOriginalArgumentList().
+  struct OriginalArgumentList {
+    SmallVector<Expr *, 4> args;
+    SmallVector<Identifier, 4> labels;
+    SmallVector<SourceLoc, 4> labelLocs;
+    SourceLoc lParenLoc;
+    SourceLoc rParenLoc;
+    bool hasTrailingClosure = false;
+  };
+
+  /// When applying a solution to a constraint system, the type checker rewrites
+  /// argument lists of calls to insert default arguments and collect varargs.
+  /// Sometimes for diagnostics we want to work on the original argument list as
+  /// written by the user; this performs the reverse transformation.
+  OriginalArgumentList getOriginalArgumentList(Expr *expr);
+
+  /// Return true if the specified type or a super-class/super-protocol has the
+  /// @dynamicMemberLookup attribute on it.
+  bool hasDynamicMemberLookupAttribute(Type type);
+
+  /// Returns the root type of the keypath type in a keypath dynamic member
+  /// lookup subscript, or \c None if it cannot be determined.
+  ///
+  /// \param subscript The potential keypath dynamic member lookup subscript.
+  /// \param DC The DeclContext from which the subscript is being referenced.
+  Optional<Type> getRootTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
+                                                   const DeclContext *DC);
 }
 
 #endif

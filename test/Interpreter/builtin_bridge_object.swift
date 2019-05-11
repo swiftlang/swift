@@ -2,10 +2,11 @@
 // RUN: %target-build-swift -parse-stdlib %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
+
 // REQUIRES: executable_test
+// REQUIRES: objc_interop
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
-// XFAIL: linux
 
 import Swift
 import SwiftShims
@@ -29,7 +30,7 @@ let OBJC_TAGGED_POINTER_BITS: UInt = 0x8000_0000_0000_0001
 #elseif arch(arm64)
 
 // We have ObjC tagged pointers in the highest bit
-let NATIVE_SPARE_BITS: UInt = 0x7F00_0000_0000_0007
+let NATIVE_SPARE_BITS: UInt = 0x7000_0000_0000_0007
 let OBJC_TAGGED_POINTER_BITS: UInt = 0x8000_0000_0000_0000
 
 #elseif arch(powerpc64) || arch(powerpc64le)
@@ -70,10 +71,10 @@ if true {
   // CHECK-NEXT: true
   
   var bo3 = Builtin.castToBridgeObject(C(), 0._builtinWordValue)
-  print(_getBool(Builtin.isUnique(&bo3)))
+  print(Bool(_builtinBooleanLiteral: Builtin.isUnique(&bo3)))
   // CHECK-NEXT: true
   let bo4 = bo3
-  print(_getBool(Builtin.isUnique(&bo3)))
+  print(Bool(_builtinBooleanLiteral: Builtin.isUnique(&bo3)))
   // CHECK-NEXT: false
   _fixLifetime(bo3)
   _fixLifetime(bo4)
@@ -98,10 +99,10 @@ if true {
   // CHECK-NEXT: true
   
   var bo3 = Builtin.castToBridgeObject(C(), NATIVE_SPARE_BITS._builtinWordValue)
-  print(_getBool(Builtin.isUnique(&bo3)))
+  print(Bool(_builtinBooleanLiteral: Builtin.isUnique(&bo3)))
   // CHECK-NEXT: true
   let bo4 = bo3
-  print(_getBool(Builtin.isUnique(&bo3)))
+  print(Bool(_builtinBooleanLiteral: Builtin.isUnique(&bo3)))
   // CHECK-NEXT: false
   _fixLifetime(bo3)
   _fixLifetime(bo4)
@@ -132,7 +133,7 @@ if true {
   print(x === x2)
 
   var bo3 = nonNativeBridgeObject(NSNumber(value: 22))
-  print(_getBool(Builtin.isUnique(&bo3)))
+  print(Bool(_builtinBooleanLiteral: Builtin.isUnique(&bo3)))
   // CHECK-NEXT: false
   _fixLifetime(bo3)
 }
@@ -154,7 +155,7 @@ if true {
   print(x === x2)
   
   var bo3 = nonNativeBridgeObject(unTaggedString)
-  print(_getBool(Builtin.isUnique(&bo3)))
+  print(Bool(_builtinBooleanLiteral: Builtin.isUnique(&bo3)))
   // CHECK-NEXT: false
   _fixLifetime(bo3)
 }

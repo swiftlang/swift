@@ -10,6 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+// The code units in _SmallString are always stored in memory in the same order
+// that they would be stored in an array. This means that on big-endian
+// platforms the order of the bytes in storage is reversed compared to
+// _StringObject whereas on little-endian platforms the order is the same.
+//
+// Memory layout:
+//
+// |0 1 2 3 4 5 6 7 8 9 A B C D E F| ← hexadecimal offset in bytes
+// |  _storage.0   |  _storage.1   | ← raw bits
+// |          code units         | | ← encoded layout
+//  ↑                             ↑
+//  first (leftmost) code unit    discriminator (incl. count)
+//
 @_fixed_layout @usableFromInline
 internal struct _SmallString {
   @usableFromInline
@@ -19,10 +32,8 @@ internal struct _SmallString {
   @usableFromInline
   internal var _storage: RawBitPattern
 
-  @inlinable
-  internal var rawBits: RawBitPattern {
-    @inline(__always) get { return _storage }
-  }
+  @inlinable @inline(__always)
+  internal var rawBits: RawBitPattern { return _storage }
 
   @inlinable
   internal var leadingRawBits: UInt64 {
@@ -50,85 +61,64 @@ internal struct _SmallString {
   @inlinable @inline(__always)
   internal init(_ object: _StringObject) {
     _internalInvariant(object.isSmall)
-    self.init(raw: object.rawBits)
+    // On big-endian platforms the byte order is the reverse of _StringObject.
+    let leading = object.rawBits.0.littleEndian
+    let trailing = object.rawBits.1.littleEndian
+    self.init(raw: (leading, trailing))
   }
 
   @inlinable @inline(__always)
   internal init() {
-    self.init(raw: _StringObject(empty:()).rawBits)
+    self.init(_StringObject(empty:()))
   }
 }
 
-// TODO
 extension _SmallString {
-  @inlinable
+  @inlinable @inline(__always)
   internal static var capacity: Int {
-    @inline(__always) get {
 #if arch(i386) || arch(arm)
-      return 10
+    return 10
 #else
-      return 15
+    return 15
 #endif
-    }
   }
 
-  @inlinable
-  internal var discriminator: _StringObject.Discriminator {
-    @inline(__always) get {
-      let value = _storage.1 &>> _StringObject.Nibbles.discriminatorShift
-      return _StringObject.Discriminator(UInt8(truncatingIfNeeded: value))
-    }
-    @inline(__always) set {
-      _storage.1 &= _StringObject.Nibbles.largeAddressMask
-      _storage.1 |= (
-        UInt64(truncatingIfNeeded: newValue._value)
-          &<< _StringObject.Nibbles.discriminatorShift)
-    }
+  // Get an integer equivalent to the _StringObject.discriminatedObjectRawBits
+  // computed property.
+  @inlinable @inline(__always)
+  internal var rawDiscriminatedObject: UInt64 {
+    // Reverse the bytes on big-endian systems.
+    return _storage.1.littleEndian
   }
 
-  @inlinable
-  internal var capacity: Int {
-    @inline(__always) get {
-      return _SmallString.capacity
-    }
-  }
+  @inlinable @inline(__always)
+  internal var capacity: Int { return _SmallString.capacity }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var count: Int {
-    @inline(__always) get {
-      return discriminator.smallCount
-    }
+    return _StringObject.getSmallCount(fromRaw: rawDiscriminatedObject)
   }
 
-  @inlinable
-  internal var unusedCapacity: Int {
-    @inline(__always) get { return capacity &- count }
-  }
+  @inlinable @inline(__always)
+  internal var unusedCapacity: Int { return capacity &- count }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var isASCII: Bool {
-    @inline(__always) get {
-      return discriminator.smallIsASCII
-    }
+    return _StringObject.getSmallIsASCII(fromRaw: rawDiscriminatedObject)
   }
 
   // Give raw, nul-terminated code units. This is only for limited internal
   // usage: it always clears the discriminator and count (in case it's full)
-  @inlinable
+  @inlinable @inline(__always)
   internal var zeroTerminatedRawCodeUnits: RawBitPattern {
-    @inline(__always) get {
-      return (
-        self._storage.0,
-        self._storage.1 & _StringObject.Nibbles.largeAddressMask)
-    }
+    let smallStringCodeUnitMask = ~UInt64(0xFF).bigEndian // zero last byte
+    return (self._storage.0, self._storage.1 & smallStringCodeUnitMask)
   }
 
-  @inlinable
   internal func computeIsASCII() -> Bool {
-    // TODO(String micro-performance): Evaluate other expressions, e.g. | first
     let asciiMask: UInt64 = 0x8080_8080_8080_8080
     let raw = zeroTerminatedRawCodeUnits
-    return (raw.0 & asciiMask == 0) && (raw.1 & asciiMask == 0)
+    return (raw.0 | raw.1) & asciiMask == 0
   }
 }
 
@@ -166,11 +156,11 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
   @usableFromInline
   internal typealias SubSequence = _SmallString
 
-  @inlinable
-  internal var startIndex: Int { @inline(__always) get { return 0 } }
+  @inlinable @inline(__always)
+  internal var startIndex: Int { return 0 }
 
-  @inlinable
-  internal var endIndex: Int { @inline(__always) get { return count } }
+  @inlinable @inline(__always)
+  internal var endIndex: Int { return count }
 
   @inlinable
   internal subscript(_ idx: Int) -> UInt8 {
@@ -192,15 +182,12 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
     }
   }
 
-  @inlinable // FIXME(inline-always) was usableFromInline
-  // testable
+  @inlinable  @inline(__always)
   internal subscript(_ bounds: Range<Index>) -> SubSequence {
-    @inline(__always) get {
-      // TODO(String performance): In-vector-register operation
-      return self.withUTF8 { utf8 in
-        let rebased = UnsafeBufferPointer(rebasing: utf8[bounds])
-        return _SmallString(rebased)._unsafelyUnwrappedUnchecked
-      }
+    // TODO(String performance): In-vector-register operation
+    return self.withUTF8 { utf8 in
+      let rebased = UnsafeBufferPointer(rebasing: utf8[bounds])
+      return _SmallString(rebased)._unsafelyUnwrappedUnchecked
     }
   }
 }
@@ -220,7 +207,7 @@ extension _SmallString {
 
   // Overwrite stored code units, including uninitialized. `f` should return the
   // new count.
-  @inlinable @inline(__always)
+  @inline(__always)
   internal mutating func withMutableCapacity(
     _ f: (UnsafeMutableBufferPointer<UInt8>) throws -> Int
   ) rethrows {
@@ -231,17 +218,37 @@ extension _SmallString {
       return try f(UnsafeMutableBufferPointer(
         start: ptr, count: _SmallString.capacity))
     }
-
     _internalInvariant(len <= _SmallString.capacity)
-    discriminator = .small(withCount: len, isASCII: self.computeIsASCII())
+
+    let (leading, trailing) = self.zeroTerminatedRawCodeUnits
+    self = _SmallString(leading: leading, trailing: trailing, count: len)
   }
 }
 
 // Creation
 extension _SmallString {
+  @inlinable @inline(__always)
+  internal init(leading: UInt64, trailing: UInt64, count: Int) {
+    _internalInvariant(count <= _SmallString.capacity)
+
+    let isASCII = (leading | trailing) & 0x8080_8080_8080_8080 == 0
+    let discriminator = _StringObject.Nibbles
+      .small(withCount: count, isASCII: isASCII)
+      .littleEndian // reversed byte order on big-endian platforms
+    _internalInvariant(trailing & discriminator == 0)
+
+    self.init(raw: (leading, trailing | discriminator))
+    _internalInvariant(self.count == count)
+  }
+
   // Direct from UTF-8
   @inlinable @inline(__always)
   internal init?(_ input: UnsafeBufferPointer<UInt8>) {
+    if input.isEmpty {
+      self.init()
+      return
+    }
+
     let count = input.count
     guard count <= _SmallString.capacity else { return nil }
 
@@ -251,11 +258,7 @@ extension _SmallString {
     let leading = _bytesToUInt64(ptr, Swift.min(input.count, 8))
     let trailing = count > 8 ? _bytesToUInt64(ptr + 8, count &- 8) : 0
 
-    let isASCII = (leading | trailing) & 0x8080_8080_8080_8080 == 0
-    let discriminator = _StringObject.Discriminator.small(
-      withCount: count,
-      isASCII: isASCII)
-    self.init(raw: (leading, trailing | discriminator.rawBits))
+    self.init(leading: leading, trailing: trailing, count: count)
   }
 
   @usableFromInline // @testable
@@ -273,13 +276,8 @@ extension _SmallString {
     }
     _internalInvariant(writeIdx == totalCount)
 
-    let isASCII = base.isASCII && other.isASCII
-    let discriminator = _StringObject.Discriminator.small(
-      withCount: totalCount,
-      isASCII: isASCII)
-
     let (leading, trailing) = result.zeroTerminatedRawCodeUnits
-    self.init(raw: (leading, trailing | discriminator.rawBits))
+    self.init(leading: leading, trailing: trailing, count: totalCount)
   }
 }
 
@@ -304,23 +302,31 @@ extension _SmallString {
 #endif
 
 extension UInt64 {
-  // Fetches the `i`th byte, from least-significant to most-significant
-  //
-  // TODO: endianess awareness day
+  // Fetches the `i`th byte in memory order. On little-endian systems the byte
+  // at i=0 is the least significant byte (LSB) while on big-endian systems the
+  // byte at i=7 is the LSB.
   @inlinable @inline(__always)
   internal func _uncheckedGetByte(at i: Int) -> UInt8 {
     _internalInvariant(i >= 0 && i < MemoryLayout<UInt64>.stride)
+#if _endian(big)
+    let shift = (7 - UInt64(truncatingIfNeeded: i)) &* 8
+#else
     let shift = UInt64(truncatingIfNeeded: i) &* 8
+#endif
     return UInt8(truncatingIfNeeded: (self &>> shift))
   }
 
-  // Sets the `i`th byte, from least-significant to most-significant
-  //
-  // TODO: endianess awareness day
+  // Sets the `i`th byte in memory order. On little-endian systems the byte
+  // at i=0 is the least significant byte (LSB) while on big-endian systems the
+  // byte at i=7 is the LSB.
   @inlinable @inline(__always)
   internal mutating func _uncheckedSetByte(at i: Int, to value: UInt8) {
     _internalInvariant(i >= 0 && i < MemoryLayout<UInt64>.stride)
+#if _endian(big)
+    let shift = (7 - UInt64(truncatingIfNeeded: i)) &* 8
+#else
     let shift = UInt64(truncatingIfNeeded: i) &* 8
+#endif
     let valueMask: UInt64 = 0xFF &<< shift
     self = (self & ~valueMask) | (UInt64(truncatingIfNeeded: value) &<< shift)
   }
@@ -340,5 +346,6 @@ internal func _bytesToUInt64(
     r = r | (UInt64(input[idx]) &<< shift)
     shift = shift &+ 8
   }
-  return r
+  // Convert from little-endian to host byte order.
+  return r.littleEndian
 }

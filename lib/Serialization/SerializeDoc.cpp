@@ -38,6 +38,7 @@ using pFileNameToGroupNameMap = std::unique_ptr<FileNameToGroupNameMap>;
 
 namespace {
 class YamlGroupInputParser {
+  ASTContext &Ctx;
   StringRef RecordPath;
   static constexpr const char * const Separator = "/";
 
@@ -86,10 +87,18 @@ class YamlGroupInputParser {
   }
 
 public:
-  YamlGroupInputParser(StringRef RecordPath): RecordPath(RecordPath) {}
+  YamlGroupInputParser(ASTContext &Ctx, StringRef RecordPath):
+    Ctx(Ctx), RecordPath(RecordPath) {}
 
   FileNameToGroupNameMap* getParsedMap() {
     return AllMaps[RecordPath].get();
+  }
+
+  bool diagnoseGroupInfoFile(bool FileMissing = false) {
+    Ctx.Diags.diagnose(SourceLoc(),
+      FileMissing ? diag::cannot_find_group_info_file:
+      diag::cannot_parse_group_info_file, RecordPath);
+    return true;
   }
 
   // Parse the Yaml file that contains the group information.
@@ -102,32 +111,31 @@ public:
 
     auto Buffer = llvm::MemoryBuffer::getFile(RecordPath);
     if (!Buffer) {
-      // The group info file does not exist.
-      return true;
+      return diagnoseGroupInfoFile(/*Missing File*/true);
     }
     llvm::SourceMgr SM;
     llvm::yaml::Stream YAMLStream(Buffer.get()->getMemBufferRef(), SM);
     llvm::yaml::document_iterator I = YAMLStream.begin();
     if (I == YAMLStream.end()) {
       // Cannot parse correctly.
-      return true;
+      return diagnoseGroupInfoFile();
     }
     llvm::yaml::Node *Root = I->getRoot();
     if (!Root) {
       // Cannot parse correctly.
-      return true;
+      return diagnoseGroupInfoFile();
     }
 
     // The format is a map of ("group0" : ["file1", "file2"]), meaning all
     // symbols from file1 and file2 belong to "group0".
     auto *Map = dyn_cast<llvm::yaml::MappingNode>(Root);
     if (!Map) {
-      return true;
+      return diagnoseGroupInfoFile();
     }
     pFileNameToGroupNameMap pMap(new FileNameToGroupNameMap());
     std::string Empty;
     if (parseRoot(*pMap, Root, Empty))
-      return true;
+      return diagnoseGroupInfoFile();
 
     // Save the parsed map to the owner.
     AllMaps[RecordPath] = std::move(pMap);
@@ -168,7 +176,7 @@ class DeclGroupNameContext {
       StringRef FullPath =
           Ctx.SourceMgr.getIdentifierForBuffer(PathOp.getValue());
       if (!pMap) {
-        YamlGroupInputParser Parser(RecordPath);
+        YamlGroupInputParser Parser(Ctx, RecordPath);
         if (!Parser.parse()) {
 
           // Get the file-name to group map if parsing correctly.
@@ -359,10 +367,34 @@ static void writeDeclCommentTable(
       return StringRef(Mem, String.size());
     }
 
+    bool shouldSerializeDoc(Decl *D) {
+      if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        // Skip the decl if it's not visible to clients. The use of
+        // getEffectiveAccess is unusual here; we want to take the testability
+        // state into account and emit documentation if and only if they are
+        // visible to clients (which means public ordinarily, but
+        // public+internal when testing enabled).
+        if (VD->getEffectiveAccess() < swift::AccessLevel::Public)
+          return false;
+      }
+
+      // When building the stdlib we intend to serialize unusual comments.
+      // This situation is represented by GroupContext.isEnable().  In that
+      // case, we perform more serialization to keep track of source order.
+      if (GroupContext.isEnable())
+        return true;
+
+      // Skip the decl if it cannot have a comment.
+      if (!D->canHaveComment())
+        return false;
+
+      // Skip the decl if it does not have a comment.
+      if (D->getRawComment().Comments.empty())
+        return false;
+      return true;
+    }
+
     void writeDocForExtensionDecl(ExtensionDecl *ED) {
-      RawComment Raw = ED->getRawComment();
-      if (Raw.Comments.empty() && !GroupContext.isEnable())
-        return;
       // Compute USR.
       {
         USRBuffer.clear();
@@ -371,12 +403,14 @@ static void writeDeclCommentTable(
           return;
       }
       generator.insert(copyString(USRBuffer.str()),
-                       { ED->getBriefComment(), Raw,
+                       { ED->getBriefComment(), ED->getRawComment(),
                          GroupContext.getGroupSequence(ED),
                          SourceOrder++ });
     }
 
     bool walkToDeclPre(Decl *D) override {
+      if (!shouldSerializeDoc(D))
+        return true;
       if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
         writeDocForExtensionDecl(ED);
         return true;
@@ -385,29 +419,6 @@ static void writeDeclCommentTable(
       auto *VD = dyn_cast<ValueDecl>(D);
       if (!VD)
         return true;
-
-      RawComment Raw = VD->getRawComment();
-      // When building the stdlib we intend to serialize unusual comments.
-      // This situation is represented by GroupContext.isEnable().  In that
-      // case, we perform fewer serialization checks.
-      if (!GroupContext.isEnable()) {
-        // Skip the decl if it cannot have a comment.
-        if (!VD->canHaveComment()) {
-          return true;
-        }
-
-        // Skip the decl if it does not have a comment.
-        if (Raw.Comments.empty())
-          return true;
-
-        // Skip the decl if it's not visible to clients. The use of
-        // getEffectiveAccess is unusual here; we want to take the testability
-        // state into account and emit documentation if and only if they are
-        // visible to clients (which means public ordinarily, but
-        // public+internal when testing enabled).
-        if (VD->getEffectiveAccess() < swift::AccessLevel::Public)
-          return true;
-      }
 
       // Compute USR.
       {
@@ -418,7 +429,7 @@ static void writeDeclCommentTable(
       }
 
       generator.insert(copyString(USRBuffer.str()),
-                       { VD->getBriefComment(), Raw,
+                       { VD->getBriefComment(), D->getRawComment(),
                          GroupContext.getGroupSequence(VD),
                          SourceOrder++ });
       return true;

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t/ObjC.swiftmodule -O -enable-objc-interop %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t/ObjC.swiftmodule -O -enable-objc-interop -enable-resilience %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t/ObjC.swiftmodule -O -enable-objc-interop -enable-library-evolution %s
 
 // FIXME: This test is self-contained, so it shouldn't require objc_interop
 // (just -enable-objc-interop), but it's failing in Linux SILGen.
@@ -29,10 +29,9 @@ public class SomeClassInlinable {
     @inlinable get { return 0 }
     @inlinable set {}
   }
-  @objc @inlinable deinit {
-    print("bye")
-  }
+  @objc deinit
 }
+
 public class SomeNSObject : NSObject {
   @objc init?(_: Any)
   @objc func foo()
@@ -53,7 +52,5 @@ public class SomeNSObjectInlinable : NSObject {
     @inlinable get { return 0 }
     @inlinable set {}
   }
-  @objc @inlinable deinit {
-    print("bye")
-  }
+  @objc deinit
 }

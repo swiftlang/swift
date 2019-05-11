@@ -67,8 +67,10 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
     Optional<unsigned> Length;
     if (AttrLoc.isValid()) {
       // This token is following @, see if it's a known attribute name.
+      // Type attribute, decl attribute, or '@unknown' for swift case statement.
       if (TypeAttributes::getAttrKindFromString(Tok.getText()) != TAK_Count ||
-          DeclAttribute::getAttrKindFromString(Tok.getText()) != DAK_Count) {
+          DeclAttribute::getAttrKindFromString(Tok.getText()) != DAK_Count ||
+          Tok.getText() == "unknown")  {
         // It's a known attribute, so treat it as a syntactic attribute node for
         // syntax coloring. If swift gets user attributes then all identifiers
         // will be treated as syntactic attribute nodes.
@@ -176,8 +178,9 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       }
 
       case tok::unknown: {
-        if (Tok.getRawText().startswith("\"")) {
-          // This is an invalid string literal
+        if (Tok.getRawText().ltrim('#').startswith("\"")) {
+          // This is likely an invalid single-line ("), multi-line ("""),
+          // or raw (#", ##", #""", etc.) string literal.
           Kind = SyntaxNodeKind::String;
           break;
         }
@@ -425,18 +428,6 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
   if (isVisitedBeforeInIfConfig(E))
     return {false, E};
 
-  // In SequenceExpr, explicit cast expressions (e.g. 'as', 'is') appear twice.
-  // Skip pointers we've already seen.
-  if (auto SE = dyn_cast<SequenceExpr>(E)) {
-    SmallPtrSet<Expr *, 5> seenExpr;
-    for (auto subExpr : SE->getElements()) {
-      if (!seenExpr.insert(subExpr).second)
-        continue;
-      subExpr->walk(*this);
-    }
-    return { false, SE };
-  }
-
   auto addCallArgExpr = [&](Expr *Elem, TupleExpr *ParentTupleExpr) {
     if (isCurrentCallArgExpr(ParentTupleExpr)) {
       CharSourceRange NR = parameterNameRangeOfCallArg(ParentTupleExpr, Elem);
@@ -558,6 +549,18 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
                           Closure->getExplicitResultTypeLoc().getSourceRange());
 
     pushStructureNode(SN, Closure);
+  } else if (auto SE = dyn_cast<SequenceExpr>(E)) {
+    // In SequenceExpr, explicit cast expressions (e.g. 'as', 'is') appear
+    // twice. Skip pointers we've already seen.
+    SmallPtrSet<Expr *, 5> seenExpr;
+    for (auto subExpr : SE->getElements()) {
+      if (!seenExpr.insert(subExpr).second) {
+        continue;
+      }
+      llvm::SaveAndRestore<ASTWalker::ParentTy> SetParent(Parent, E);
+      subExpr->walk(*this);
+    }
+    return { false, walkToExprPost(SE) };
   }
 
   return { true, E };
@@ -749,7 +752,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
                         AFD->getSignatureSourceRange());
     if (FD) {
       SN.TypeRange = charSourceRangeFromSourceRange(SM,
-                                    FD->getReturnTypeLoc().getSourceRange());
+                                    FD->getBodyResultTypeLoc().getSourceRange());
     }
     pushStructureNode(SN, AFD);
   } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -892,6 +895,13 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
           SourceRange NameRange = SourceRange(EnumElemD->getNameLoc(),
                                               ParamList->getSourceRange().End);
           SN.NameRange = charSourceRangeFromSourceRange(SM, NameRange);
+
+          for (auto Param : ParamList->getArray()) {
+            auto TL = Param->getTypeLoc();
+            CharSourceRange TR = charSourceRangeFromSourceRange(SM,
+                                                                TL.getSourceRange());
+            passNonTokenNode({SyntaxNodeKind::TypeId, TR});
+          }
         } else {
           SN.NameRange = CharSourceRange(EnumElemD->getNameLoc(),
                                          EnumElemD->getName().getLength());
@@ -1041,6 +1051,8 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
     TokenNodes = TokenNodes.slice(I);
     return true;
   }
+  if (isa<RethrowsAttr>(D))
+    return true;
   return false;
 }
 

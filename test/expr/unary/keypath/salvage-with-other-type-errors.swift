@@ -51,9 +51,8 @@ protocol Bindable: class { }
 
 extension Bindable {
   func test<Value>(to targetKeyPath: ReferenceWritableKeyPath<Self, Value>, change: Value?) {
-    if self[keyPath:targetKeyPath] != change {  // expected-error{{}} 
-      // expected-note@-1{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
-      // expected-note@-2{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+    if self[keyPath:targetKeyPath] != change {
+      // expected-error@-1 {{operator function '!=' requires that 'Value' conform to 'Equatable'}}
       self[keyPath: targetKeyPath] = change!
     }
   }

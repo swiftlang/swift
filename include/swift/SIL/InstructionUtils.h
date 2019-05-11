@@ -44,6 +44,10 @@ SILValue stripCasts(SILValue V);
 /// mark_dependence) from the current SILValue.
 SILValue stripCastsWithoutMarkDependence(SILValue V);
 
+/// Return the underlying SILValue after stripping off all copy_value and
+/// begin_borrow instructions.
+SILValue stripOwnershipInsts(SILValue v);
+
 /// Return the underlying SILValue after stripping off all upcasts from the
 /// current SILValue.
 SILValue stripUpCasts(SILValue V);
@@ -126,13 +130,13 @@ bool mayCheckRefCount(SILInstruction *User);
 /// run-time sanitizers.
 bool isSanitizerInstrumentation(SILInstruction *Instruction);
 
-/// If V is a convert_function or convert_escape_to_noescape return its operand
-/// recursively.
-SILValue stripConvertFunctions(SILValue V);
-
 /// Check that this is a partial apply of a reabstraction thunk and return the
 /// argument of the partial apply if it is.
 SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
+
+/// Returns true if \p PAI is only used by an assign_by_delegate instruction as
+/// init or set function.
+bool onlyUsedByAssignByDelegate(PartialApplyInst *PAI);
 
 /// If V is a function closure, return the reaching set of partial_apply's.
 void findClosuresForFunctionValue(SILValue V,

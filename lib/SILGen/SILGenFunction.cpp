@@ -20,6 +20,7 @@
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/PropertyDelegates.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/SILUndef.h"
@@ -97,6 +98,12 @@ DeclName SILGenModule::getMagicFunctionName(DeclContext *dc) {
     assert(e->getExtendedNominal() && "extension for nonnominal");
     return e->getExtendedNominal()->getName();
   }
+  if (auto EED = dyn_cast<EnumElementDecl>(dc)) {
+    return EED->getFullName();
+  }
+  if (auto SD = dyn_cast<SubscriptDecl>(dc)) {
+    return SD->getFullName();
+  }
   llvm_unreachable("unexpected #function context");
 }
 
@@ -115,7 +122,7 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   case SILDeclRef::Kind::GlobalAccessor:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::DefaultArgGenerator:
-    return getMagicFunctionName(cast<AbstractFunctionDecl>(ref.getDecl()));
+    return getMagicFunctionName(cast<DeclContext>(ref.getDecl()));
   case SILDeclRef::Kind::StoredPropertyInitializer:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::IVarInitializer:
@@ -192,9 +199,17 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       continue;
     }
 
+    if (capture.isOpaqueValue()) {
+      OpaqueValueExpr *opaqueValue = capture.getOpaqueValue();
+      capturedArgs.push_back(
+          emitRValueAsSingleValue(opaqueValue).ensurePlusOne(*this, loc));
+      continue;
+    }
+
     auto *vd = capture.getDecl();
 
-    switch (SGM.Types.getDeclCaptureKind(capture)) {
+    auto expansion = F.getResilienceExpansion();
+    switch (SGM.Types.getDeclCaptureKind(capture, expansion)) {
     case CaptureKind::None:
       break;
 
@@ -366,13 +381,9 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 
   auto calleeConvention = ParameterConvention::Direct_Guaranteed;
 
-  SILType closureTy = SILGenBuilder::getPartialApplyResultType(
-      functionRef->getType(), capturedArgs.size(), SGM.M, subs,
-      calleeConvention);
-
   auto toClosure =
-    B.createPartialApply(loc, functionRef, functionTy,
-                         subs, forwardedArgs, closureTy);
+    B.createPartialApply(loc, functionRef, subs, forwardedArgs,
+                         calleeConvention);
   auto result = emitManagedRValueWithCleanup(toClosure);
 
   // Get the lowered AST types:
@@ -501,10 +512,10 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     SILValue metaTy = B.createMetatype(mainClass,
                              SILType::getPrimitiveObjectType(mainClassMetaty));
     metaTy = B.createInitExistentialMetatype(mainClass, metaTy,
-                          SILType::getPrimitiveObjectType(anyObjectMetaTy), {});
+                          SILType::getPrimitiveObjectType(anyObjectMetaTy),
+                          {});
     SILValue optNameValue = B.createApply(
-        mainClass, NSStringFromClass, NSStringFromClass->getType(),
-        SILType::getPrimitiveObjectType(OptNSStringTy), {}, metaTy);
+        mainClass, NSStringFromClass, {}, metaTy);
     ManagedValue optName = emitManagedRValueWithCleanup(optNameValue);
 
     // Fix up the string parameters to have the right type.
@@ -544,9 +555,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     SILValue args[] = {argc, managedArgv.getValue(), nilValue,
                        optName.getValue()};
 
-    B.createApply(mainClass, UIApplicationMain,
-                  UIApplicationMain->getType(),
-                  argc->getType(), {}, args);
+    B.createApply(mainClass, UIApplicationMain, SubstitutionMap(), args);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, ctx), 0);
     auto rType = F.getConventions().getSingleSILResultType();
@@ -591,9 +600,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     auto NSApplicationMain = B.createFunctionRef(mainClass, NSApplicationMainFn);
     SILValue args[] = { argc, argv };
 
-    B.createApply(mainClass, NSApplicationMain,
-                  NSApplicationMain->getType(),
-                  argc->getType(), {}, args);
+    B.createApply(mainClass, NSApplicationMain, SubstitutionMap(), args);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, getASTContext()), 0);
     auto rType = F.getConventions().getSingleSILResultType();
@@ -631,6 +638,69 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {
   prepareEpilog(value->getType(), false, CleanupLocation::get(Loc));
   emitReturnExpr(Loc, value);
   emitEpilog(Loc);
+}
+
+void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
+  MagicFunctionName = SILGenModule::getMagicFunctionName(function);
+
+  RegularLocation loc(var);
+  loc.markAutoGenerated();
+
+  auto decl = function.getAbstractFunctionDecl();
+  auto *dc = decl->getInnermostDeclContext();
+  auto interfaceType = var->getValueInterfaceType();
+  auto varType = var->getType();
+
+  // If this is the backing storage for a property with an attached
+  // delegate that was initialized with '=', the stored property initializer
+  // will be in terms of the original property's type.
+  if (auto originalProperty = var->getOriginalDelegatedProperty()) {
+    if (originalProperty->isPropertyDelegateInitializedWithInitialValue()) {
+      interfaceType = originalProperty->getValueInterfaceType();
+      varType = originalProperty->getType();
+    }
+  }
+
+  emitProlog(/*paramList*/ nullptr, /*selfParam*/ nullptr, interfaceType, dc,
+             false);
+  prepareEpilog(varType, false, CleanupLocation::get(loc));
+
+  auto pbd = var->getParentPatternBinding();
+  auto entry = pbd->getPatternEntryForVarDecl(var);
+  auto subs = getForwardingSubstitutionMap();
+  auto contextualType = dc->mapTypeIntoContext(interfaceType);
+  auto resultType = contextualType->getCanonicalType();
+  auto origResultType = AbstractionPattern(resultType);
+
+  SmallVector<SILValue, 4> directResults;
+
+  if (F.getConventions().hasIndirectSILResults()) {
+    Scope scope(Cleanups, CleanupLocation(var));
+
+    SmallVector<CleanupHandle, 4> cleanups;
+    auto init = prepareIndirectResultInit(resultType, directResults, cleanups);
+
+    emitApplyOfStoredPropertyInitializer(loc, entry, subs, resultType,
+                                         origResultType,
+                                         SGFContext(init.get()));
+
+    for (auto cleanup : cleanups) {
+      Cleanups.forwardCleanup(cleanup);
+    }
+  } else {
+    Scope scope(Cleanups, CleanupLocation(var));
+
+    // If we have no indirect results, just return the result.
+    auto result = emitApplyOfStoredPropertyInitializer(loc, entry, subs,
+                                                       resultType,
+                                                       origResultType,
+                                                       SGFContext())
+                    .ensurePlusOne(*this, loc);
+    std::move(result).forwardAll(*this, directResults);
+  }
+
+  Cleanups.emitBranchAndCleanups(ReturnDest, loc, directResults);
+  emitEpilog(loc);
 }
 
 static SILLocation getLocation(ASTNode Node) {
@@ -686,4 +756,20 @@ Optional<ASTNode> SILGenFunction::getPGOParent(ASTNode Node) const {
   if (SILProfiler *SP = F.getProfiler())
     return SP->getPGOParent(Node);
   return None;
+}
+
+SILValue SILGenFunction::emitUnwrapIntegerResult(SILLocation loc,
+                                                 SILValue value) {
+  // This is a loop because we want to handle types that wrap integer types,
+  // like ObjCBool (which may be Bool or Int8).
+  while (!value->getType().is<BuiltinIntegerType>()) {
+    auto structDecl = value->getType().getStructOrBoundGenericStruct();
+    assert(structDecl && "value for error result wasn't of struct type!");
+    assert(std::next(structDecl->getStoredProperties().begin())
+           == structDecl->getStoredProperties().end());
+    auto property = *structDecl->getStoredProperties().begin();
+    value = B.createStructExtract(loc, value, property);
+  }
+
+  return value;
 }

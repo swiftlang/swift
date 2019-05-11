@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name switch -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name switch %s | %FileCheck %s
 //
 // A temporary file for testing switch code around ownership. Once SILGenPattern
 // refactoring is complete, this will be merged into the normal pattern file.
@@ -30,7 +30,7 @@ func g() {}
 // Tests //
 ///////////
 
-// CHECK-LABEL: sil hidden @$s6switch05test_A19_two_trivial_unions1x1yyAA3FooO_AFtF : $@convention(thin) (Foo, Foo) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s6switch05test_A19_two_trivial_unions1x1yyAA3FooO_AFtF : $@convention(thin) (Foo, Foo) -> () {
 func test_switch_two_trivial_unions(x: Foo, y: Foo) {
   // CHECK:   [[T0:%.*]] = tuple (%0 : $Foo, %1 : $Foo)
   // CHECK:   ([[X:%.*]], [[Y:%.*]]) = destructure_tuple [[T0]]
@@ -62,7 +62,7 @@ func test_switch_two_trivial_unions(x: Foo, y: Foo) {
 }
 // CHECK: } // end sil function '$s6switch05test_A19_two_trivial_unions1x1yyAA3FooO_AFtF'
 
-// CHECK-LABEL: sil hidden @$s6switch05test_A22_two_nontrivial_unions1x1yyAA13NonTrivialFooO_AFtF : $@convention(thin) (@guaranteed NonTrivialFoo, @guaranteed NonTrivialFoo) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s6switch05test_A22_two_nontrivial_unions1x1yyAA13NonTrivialFooO_AFtF : $@convention(thin) (@guaranteed NonTrivialFoo, @guaranteed NonTrivialFoo) -> () {
 func test_switch_two_nontrivial_unions(x: NonTrivialFoo, y: NonTrivialFoo) {
   // CHECK:   [[ARG0_COPY:%.*]] = copy_value %0
   // CHECK:   [[ARG1_COPY:%.*]] = copy_value %1

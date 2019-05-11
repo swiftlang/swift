@@ -64,11 +64,11 @@ struct TargetOpaqueExistentialContainer {
   ///
   /// The intention is that this is used in combination with ASAN or Guard
   /// Malloc to catch use-after-frees.
-  void verify() const LLVM_ATTRIBUTE_USED;
+  void verify() const;
 
   /// Dump information about this specific box and its contents. Only intended
   /// for use in the debugger.
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
                             "Only meant for use in the debugger");
 #endif
 };

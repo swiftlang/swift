@@ -238,4 +238,13 @@ SubstringTests.test("Persistent Content") {
   expectEqual("bcdefg", (str.dropFirst(1) + "g") as String)
 }
 
+SubstringTests.test("Substring.base") {
+  let str = "abéÏ01😓🎃👨‍👨‍👧‍👦"
+  expectEqual(str, str.dropLast().base)
+  for idx in str.indices {
+    expectEqual(str, str[idx...].base)
+    expectEqual(str, str[...idx].base)
+  }
+}
+
 runAllTests()

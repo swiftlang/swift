@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
 
 protocol AddrOnly {}
 
@@ -132,7 +132,7 @@ class F: D {
 // This test is incorrect in semantic SIL today. But it will be fixed in
 // forthcoming commits.
 //
-// CHECK-LABEL: sil private @$s13vtable_thunks1DC3iuo{{[_0-9a-zA-Z]*}}FTV
+// CHECK-LABEL: sil private [ossa] @$s13vtable_thunks1DC3iuo{{[_0-9a-zA-Z]*}}FTV
 // CHECK: bb0([[X:%.*]] : @guaranteed $B, [[Y:%.*]] : @guaranteed $Optional<B>, [[Z:%.*]] : @guaranteed $B, [[W:%.*]] : @guaranteed $D):
 // CHECK:   [[WRAP_X:%.*]] = enum $Optional<B>, #Optional.some!enumelt.1, [[X]] : $B
 // CHECK:   [[Y_COPY:%.*]] = copy_value [[Y]]
@@ -150,7 +150,7 @@ class F: D {
 // CHECK:   [[WRAP_RES:%.*]] = enum $Optional<B>, {{.*}} [[RES]]
 // CHECK:   return [[WRAP_RES]]
 
-// CHECK-LABEL: sil private @$s13vtable_thunks1DC1g{{[_0-9a-zA-Z]*}}FTV
+// CHECK-LABEL: sil private [ossa] @$s13vtable_thunks1DC1g{{[_0-9a-zA-Z]*}}FTV
 // TODO: extra copies here
 // CHECK:         [[WRAPPED_X_ADDR:%.*]] = init_enum_data_addr [[WRAP_X_ADDR:%.*]] :
 // CHECK:         copy_addr [take] {{%.*}} to [initialization] [[WRAPPED_X_ADDR]]
@@ -218,30 +218,30 @@ class Noot : Aap {
   override func map() -> (S?) -> () -> Noot {}
 }
 
-// CHECK-LABEL: sil private @$s13vtable_thunks3BarC3foo{{[_0-9a-zA-Z]*}}FTV : $@convention(method) (@guaranteed @callee_guaranteed (Int) -> Int, @guaranteed Bar) -> @owned Optional<@callee_guaranteed (Int) -> Int>
+// CHECK-LABEL: sil private [ossa] @$s13vtable_thunks3BarC3foo{{[_0-9a-zA-Z]*}}FTV : $@convention(method) (@guaranteed @callee_guaranteed (Int) -> Int, @guaranteed Bar) -> @owned Optional<@callee_guaranteed (Int) -> Int>
 // CHECK:         [[IMPL:%.*]] = function_ref @$s13vtable_thunks3BarC3foo{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[IMPL]]
 
-// CHECK-LABEL: sil private @$s13vtable_thunks4NootC4flip{{[_0-9a-zA-Z]*}}FTV
+// CHECK-LABEL: sil private [ossa] @$s13vtable_thunks4NootC4flip{{[_0-9a-zA-Z]*}}FTV
 // CHECK:         [[IMPL:%.*]] = function_ref @$s13vtable_thunks4NootC4flip{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[INNER:%.*]] = apply %1(%0)
 // CHECK:         [[THUNK:%.*]] = function_ref @$s13vtable_thunks1SVIegd_ACSgIegd_TR
 // CHECK:         [[OUTER:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[INNER]])
 // CHECK:         return [[OUTER]]
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$s13vtable_thunks1SVIegd_ACSgIegd_TR
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s13vtable_thunks1SVIegd_ACSgIegd_TR
 // CHECK:         [[INNER:%.*]] = apply %0()
 // CHECK:         [[OUTER:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, [[INNER]] : $S
 // CHECK:         return [[OUTER]] : $Optional<S>
 
-// CHECK-LABEL: sil private @$s13vtable_thunks4NootC3map{{[_0-9a-zA-Z]*}}FTV
+// CHECK-LABEL: sil private [ossa] @$s13vtable_thunks4NootC3map{{[_0-9a-zA-Z]*}}FTV
 // CHECK:         [[IMPL:%.*]] = function_ref @$s13vtable_thunks4NootC3map{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[INNER:%.*]] = apply %1(%0)
 // CHECK:         [[THUNK:%.*]] = function_ref @$s13vtable_thunks1SVSgAA4NootCIego_Iegyo_AcA3AapCSgIego_Iegyo_TR
 // CHECK:         [[OUTER:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[INNER]])
 // CHECK:         return [[OUTER]]
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$s13vtable_thunks1SVSgAA4NootCIego_Iegyo_AcA3AapCSgIego_Iegyo_TR
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$s13vtable_thunks1SVSgAA4NootCIego_Iegyo_AcA3AapCSgIego_Iegyo_TR
 // CHECK:         [[ARG:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, %0
 // CHECK:         [[INNER:%.*]] = apply %1([[ARG]])
 // CHECK:         [[OUTER:%.*]] = convert_function [[INNER]] : $@callee_guaranteed () -> @owned Noot to $@callee_guaranteed () -> @owned Optional<Aap>

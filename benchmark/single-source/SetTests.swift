@@ -16,6 +16,10 @@ let size = 400
 let half = size / 2
 let quarter = size / 4
 
+// Construction of empty sets.
+let setE: Set<Int> = []
+let setOE: Set<Box<Int>> = []
+
 // Construction kit for sets with 25% overlap
 let setAB = Set(0 ..< size)                              //   0 ..< 400
 let setCD = Set(size ..< 2 * size)                       // 400 ..< 800
@@ -54,6 +58,16 @@ let setQ: Set<Int> = {
 public let SetTests = [
   // Mnemonic: number after name is percentage of common elements in input sets.
   BenchmarkInfo(
+    name: "Set.isSubset.Empty.Int",
+    runFunction: { n in run_SetIsSubsetInt(setE, setAB, true, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setE, setAB]) }),
+  BenchmarkInfo(
+    name: "Set.isSubset.Int.Empty",
+    runFunction: { n in run_SetIsSubsetInt(setAB, setE, false, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setE]) }),
+  BenchmarkInfo(
     name: "SetIsSubsetInt0",
     runFunction: { n in run_SetIsSubsetInt(setAB, setCD, false, 5000 * n) },
     tags: [.validation, .api, .Set],
@@ -81,6 +95,98 @@ public let SetTests = [
   BenchmarkInfo(
     name: "SetIsSubsetInt100",
     runFunction: { n in run_SetIsSubsetInt(setP, setQ, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setP, setQ]) }),
+
+  BenchmarkInfo(
+    name: "Set.isStrictSubset.Empty.Int",
+    runFunction: { n in run_SetIsStrictSubsetInt(setE, setAB, true, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setE, setAB]) }),
+  BenchmarkInfo(
+    name: "Set.isStrictSubset.Int.Empty",
+    runFunction: { n in run_SetIsStrictSubsetInt(setAB, setE, false, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setE]) }),
+  BenchmarkInfo(
+    name: "Set.isStrictSubset.Int0",
+    runFunction: { n in run_SetIsStrictSubsetInt(setAB, setCD, false, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setCD]) }),
+  BenchmarkInfo(
+    name: "Set.isStrictSubset.Box0",
+    runFunction: { n in run_SetIsStrictSubsetBox(setOAB, setOCD, false, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOCD]) }),
+  BenchmarkInfo(
+    name: "Set.isStrictSubset.Int25",
+    runFunction: { n in run_SetIsStrictSubsetInt(setB, setAB, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setB, setAB]) }),
+  BenchmarkInfo(
+    name: "Set.isStrictSubset.Box25",
+    runFunction: { n in run_SetIsStrictSubsetBox(setOB, setOAB, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOB, setOAB]) }),
+  BenchmarkInfo(
+    name: "Set.isStrictSubset.Int50",
+    runFunction: { n in run_SetIsStrictSubsetInt(setY, setXY, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setY, setXY]) }),
+  BenchmarkInfo(
+    name: "Set.isStrictSubset.Int100",
+    runFunction: { n in run_SetIsStrictSubsetInt(setP, setQ, false, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setP, setQ]) }),
+
+  BenchmarkInfo(
+    name: "Set.isDisjoint.Empty.Int",
+    runFunction: { n in run_SetIsDisjointInt(setE, setAB, true, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setE, setAB]) }),
+  BenchmarkInfo(
+    name: "Set.isDisjoint.Int.Empty",
+    runFunction: { n in run_SetIsDisjointInt(setAB, setE, true, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setE]) }),
+  BenchmarkInfo(
+    name: "Set.isDisjoint.Empty.Box",
+    runFunction: { n in run_SetIsDisjointBox(setOE, setOAB, true, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOE, setOAB]) }),
+  BenchmarkInfo(
+    name: "Set.isDisjoint.Box.Empty",
+    runFunction: { n in run_SetIsDisjointBox(setOAB, setOE, true, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOE]) }),
+  BenchmarkInfo(
+    name: "Set.isDisjoint.Int0",
+    runFunction: { n in run_SetIsDisjointInt(setAB, setCD, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setCD]) }),
+  BenchmarkInfo(
+    name: "Set.isDisjoint.Box0",
+    runFunction: { n in run_SetIsDisjointBox(setOAB, setOCD, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOCD]) }),
+  BenchmarkInfo(
+    name: "Set.isDisjoint.Int25",
+    runFunction: { n in run_SetIsDisjointInt(setB, setAB, false, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setB, setAB]) }),
+  BenchmarkInfo(
+    name: "Set.isDisjoint.Box25",
+    runFunction: { n in run_SetIsDisjointBox(setOB, setOAB, false, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOB, setOAB]) }),
+  BenchmarkInfo(
+    name: "Set.isDisjoint.Int50",
+    runFunction: { n in run_SetIsDisjointInt(setY, setXY, false, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setY, setXY]) }),
+  BenchmarkInfo(
+    name: "Set.isDisjoint.Int100",
+    runFunction: { n in run_SetIsDisjointInt(setP, setQ, false, 5000 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setP, setQ]) }),
 
@@ -178,6 +284,26 @@ public let SetTests = [
     setUpFunction: { blackHole([setP, setQ]) }),
 
   BenchmarkInfo(
+    name: "Set.subtracting.Empty.Int",
+    runFunction: { n in run_SetSubtractingInt(setE, setAB, 0, 1000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setE, setAB]) }),
+  BenchmarkInfo(
+    name: "Set.subtracting.Int.Empty",
+    runFunction: { n in run_SetSubtractingInt(setAB, setE, countAB, 1000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setE]) }),
+  BenchmarkInfo(
+    name: "Set.subtracting.Empty.Box",
+    runFunction: { n in run_SetSubtractingBox(setOE, setOAB, 0, 1000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOE, setOAB]) }),
+  BenchmarkInfo(
+    name: "Set.subtracting.Box.Empty",
+    runFunction: { n in run_SetSubtractingBox(setOAB, setOE, countAB, 1000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOE]) }),
+  BenchmarkInfo(
     name: "SetSubtractingInt0",
     runFunction: { n in run_SetSubtractingInt(setAB, setCD, countAB, 10 * n) },
     tags: [.validation, .api, .Set],
@@ -211,29 +337,29 @@ public let SetTests = [
   // Legacy benchmarks, kept for continuity with previous releases.
   BenchmarkInfo(
     name: "SetExclusiveOr", // ~"SetSymmetricDifferenceInt0"
-    runFunction: { n in run_SetSymmetricDifferenceInt(setAB, setCD, countABCD, 100 * n) },
+    runFunction: { n in run_SetSymmetricDifferenceInt(setAB, setCD, countABCD, 10 * n) },
     tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setAB, setCD]) }),
+    setUpFunction: { blackHole([setAB, setCD]) }, legacyFactor: 10),
   BenchmarkInfo(
     name: "SetExclusiveOr_OfObjects", // ~"SetSymmetricDifferenceBox0"
-    runFunction: { n in run_SetSymmetricDifferenceBox(setOAB, setOCD, countABCD, 100 * n) },
+    runFunction: { n in run_SetSymmetricDifferenceBox(setOAB, setOCD, countABCD, 10 * n) },
     tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setOAB, setOCD]) }),
+    setUpFunction: { blackHole([setOAB, setOCD]) }, legacyFactor: 10),
   BenchmarkInfo(
     name: "SetIntersect", // ~"SetIntersectionInt0"
-    runFunction: { n in run_SetIntersectionInt(setAB, setCD, 0, 100 * n) },
+    runFunction: { n in run_SetIntersectionInt(setAB, setCD, 0, 10 * n) },
     tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setAB, setCD]) }),
+    setUpFunction: { blackHole([setAB, setCD]) }, legacyFactor: 10),
   BenchmarkInfo(
     name: "SetUnion", // ~"SetUnionInt0"
-    runFunction: { n in run_SetUnionInt(setAB, setCD, countABCD, 100 * n) },
+    runFunction: { n in run_SetUnionInt(setAB, setCD, countABCD, 10 * n) },
     tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setAB, setCD]) }),
+    setUpFunction: { blackHole([setAB, setCD]) }, legacyFactor: 10),
   BenchmarkInfo(
     name: "SetUnion_OfObjects", // ~"SetUnionBox0"
-    runFunction: { n in run_SetUnionBox(setOAB, setOCD, countABCD, 100 * n) },
+    runFunction: { n in run_SetUnionBox(setOAB, setOCD, countABCD, 10 * n) },
     tags: [.validation, .api, .Set],
-    setUpFunction: { blackHole([setOAB, setOCD]) }),
+    setUpFunction: { blackHole([setOAB, setOCD]) }, legacyFactor: 10),
 ]
 
 @inline(never)
@@ -245,6 +371,18 @@ public func run_SetIsSubsetInt(
   for _ in 0 ..< n {
     let isSubset = a.isSubset(of: identity(b))
     CheckResults(isSubset == r)
+  }
+}
+
+@inline(never)
+public func run_SetIsStrictSubsetInt(
+  _ a: Set<Int>,
+  _ b: Set<Int>,
+  _ r: Bool,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    let isStrictSubset = a.isStrictSubset(of: identity(b))
+    CheckResults(isStrictSubset == r)
   }
 }
 
@@ -296,6 +434,18 @@ public func run_SetSubtractingInt(
   }
 }
 
+@inline(never)
+public func run_SetIsDisjointInt(
+    _ a: Set<Int>,
+    _ b: Set<Int>,
+    _ r: Bool,
+    _ n: Int) {
+    for _ in 0 ..< n {
+        let isDisjoint = a.isDisjoint(with: identity(b))
+        CheckResults(isDisjoint == r)
+    }
+}
+
 class Box<T : Hashable> : Hashable {
   var value: T
 
@@ -321,6 +471,18 @@ func run_SetIsSubsetBox(
   for _ in 0 ..< n {
     let isSubset = a.isSubset(of: identity(b))
     CheckResults(isSubset == r)
+  }
+}
+
+@inline(never)
+func run_SetIsStrictSubsetBox(
+  _ a: Set<Box<Int>>,
+  _ b: Set<Box<Int>>,
+  _ r: Bool,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    let isStrictSubset = a.isStrictSubset(of: identity(b))
+    CheckResults(isStrictSubset == r)
   }
 }
 
@@ -370,4 +532,16 @@ func run_SetSubtractingBox(
     let and = a.subtracting(b)
     CheckResults(and.count == r)
   }
+}
+
+@inline(never)
+func run_SetIsDisjointBox(
+    _ a: Set<Box<Int>>,
+    _ b: Set<Box<Int>>,
+    _ r: Bool,
+    _ n: Int) {
+    for _ in 0 ..< n {
+        let isDisjoint = a.isDisjoint(with: identity(b))
+        CheckResults(isDisjoint == r)
+    }
 }

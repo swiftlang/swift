@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
@@ -133,6 +134,48 @@ DeclAttributes::isUnavailableInSwiftVersion(
   return false;
 }
 
+const AvailableAttr *
+DeclAttributes::getPotentiallyUnavailable(const ASTContext &ctx) const {
+  const AvailableAttr *potential = nullptr;
+  const AvailableAttr *conditional = nullptr;
+
+  for (auto Attr : *this)
+    if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
+      if (AvAttr->isInvalid())
+        continue;
+
+      if (!AvAttr->isActivePlatform(ctx) &&
+          !AvAttr->isLanguageVersionSpecific() &&
+          !AvAttr->isPackageDescriptionVersionSpecific())
+        continue;
+
+      // Definitely not available.
+      if (AvAttr->isUnconditionallyUnavailable())
+        return AvAttr;
+
+      switch (AvAttr->getVersionAvailability(ctx)) {
+      case AvailableVersionComparison::Available:
+        // Doesn't limit the introduced version.
+        break;
+
+      case AvailableVersionComparison::PotentiallyUnavailable:
+        // We'll return this if we don't see something that proves it's
+        // not available in this version.
+        potential = AvAttr;
+        break;
+
+      case AvailableVersionComparison::Unavailable:
+      case AvailableVersionComparison::Obsoleted:
+        conditional = AvAttr;
+        break;
+      }
+    }
+
+  if (conditional)
+    return conditional;
+  return potential;
+}
+
 const AvailableAttr *DeclAttributes::getUnavailable(
                           const ASTContext &ctx) const {
   const AvailableAttr *conditional = nullptr;
@@ -144,7 +187,8 @@ const AvailableAttr *DeclAttributes::getUnavailable(
 
       // If this attribute doesn't apply to the active platform, we're done.
       if (!AvAttr->isActivePlatform(ctx) &&
-          !AvAttr->isLanguageVersionSpecific())
+          !AvAttr->isLanguageVersionSpecific() &&
+          !AvAttr->isPackageDescriptionVersionSpecific())
         continue;
 
       // Unconditional unavailable.
@@ -174,7 +218,8 @@ DeclAttributes::getDeprecated(const ASTContext &ctx) const {
         continue;
 
       if (!AvAttr->isActivePlatform(ctx) &&
-          !AvAttr->isLanguageVersionSpecific())
+          !AvAttr->isLanguageVersionSpecific() &&
+          !AvAttr->isPackageDescriptionVersionSpecific())
         continue;
 
       // Unconditional deprecated.
@@ -185,10 +230,7 @@ DeclAttributes::getDeprecated(const ASTContext &ctx) const {
       if (!DeprecatedVersion.hasValue())
         continue;
 
-      llvm::VersionTuple MinVersion =
-        AvAttr->isLanguageVersionSpecific() ?
-        ctx.LangOpts.EffectiveLanguageVersion :
-        ctx.LangOpts.getMinPlatformVersion();
+      llvm::VersionTuple MinVersion = AvAttr->getActiveVersion(ctx);
 
       // We treat the declaration as deprecated if it is deprecated on
       // all deployment targets.
@@ -242,6 +284,7 @@ static bool isShortAvailable(const DeclAttribute *DA) {
     return false;
   case PlatformAgnosticAvailabilityKind::None:
   case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+  case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
     return true;
   }
 
@@ -263,10 +306,16 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
   Printer << "@available(";
   auto FirstAvail = cast<AvailableAttr>(Attrs.front());
   if (Attrs.size() == 1 &&
-      FirstAvail->isLanguageVersionSpecific()) {
+      FirstAvail->getPlatformAgnosticAvailability() !=
+      PlatformAgnosticAvailabilityKind::None) {
     assert(FirstAvail->Introduced.hasValue());
-    Printer << "swift "
-            << FirstAvail->Introduced.getValue().getAsString()
+    if (FirstAvail->isLanguageVersionSpecific()) {
+      Printer << "swift ";
+    } else {
+      assert(FirstAvail->isPackageDescriptionVersionSpecific());
+      Printer << "_PackageDescription ";
+    }
+    Printer << FirstAvail->Introduced.getValue().getAsString()
             << ")";
   } else {
     for (auto *DA : Attrs) {
@@ -291,17 +340,19 @@ static std::string getDifferentiationParametersClauseString(
       ->castTo<AnyFunctionType>();
   bool isInstanceMethod = function && function->isInstanceMember();
 
-  // If the number of specified parameters is equal to the number of inferred
-  // differentiation parameters, then return an empty string.
-  auto parameterCount =
-      indices ? indices->parameters.count() : parsedParams.size();
-  if (!prettyPrintInModule)
-    prettyPrintInModule = function->getModuleContext();
-  auto inferredParametersCount =
-      AutoDiffParameterIndicesBuilder::inferParameters(
-          functionType, prettyPrintInModule).count();
-  if (parameterCount == inferredParametersCount)
-    return "";
+  // If pretty-printing, and the number of specified parameters is equal to the
+  // number of inferred differentiation parameters, then return an empty
+  // string. Otherwise, return the explicit differentiation parameters clause
+  // string.
+  if (prettyPrintInModule) {
+    auto parameterCount =
+        indices ? indices->parameters.count() : parsedParams.size();
+    auto inferredParametersCount =
+        AutoDiffParameterIndicesBuilder::inferParameters(
+            functionType, prettyPrintInModule).count();
+    if (parameterCount == inferredParametersCount)
+      return "";
+  }
 
   std::string result;
   llvm::raw_string_ostream printer(result);
@@ -458,6 +509,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   // Process attributes in passes.
   AttributeVector shortAvailableAttributes;
   const DeclAttribute *swiftVersionAvailableAttribute = nullptr;
+  const DeclAttribute *packageDescriptionVersionAvailableAttribute = nullptr;
   AttributeVector longAttributes;
   AttributeVector attributes;
   AttributeVector modifiers;
@@ -479,6 +531,11 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
         swiftVersionAvailableAttribute = availableAttr;
         continue;
       }
+      if (availableAttr->isPackageDescriptionVersionSpecific() &&
+          isShortAvailable(availableAttr)) {
+        packageDescriptionVersionAvailableAttribute = availableAttr;
+        continue;
+      }
     }
 
     AttributeVector &which = DA->isDeclModifier() ? modifiers :
@@ -490,6 +547,8 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
 
   if (swiftVersionAvailableAttribute)
     printShortFormAvailable(swiftVersionAvailableAttribute, Printer, Options);
+  if (packageDescriptionVersionAvailableAttribute)
+    printShortFormAvailable(packageDescriptionVersionAvailableAttribute, Printer, Options);
   if (!shortAvailableAttributes.empty())
     printShortFormAvailable(shortAvailableAttributes, Printer, Options);
 
@@ -528,7 +587,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_RawDocComment:
   case DAK_ObjCBridged:
   case DAK_SynthesizedProtocol:
-  case DAK_ShowInInterface:
   case DAK_Rethrows:
   case DAK_Infix:
     return false;
@@ -550,15 +608,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Effects:
   case DAK_Optimize:
     if (DeclAttribute::isDeclModifier(getKind())) {
-      Printer.printKeyword(getAttrName());
+      Printer.printKeyword(getAttrName(), Options);
     } else {
       Printer.printSimpleAttr(getAttrName(), /*needAt=*/true);
     }
     return true;
 
   case DAK_SetterAccess:
-    Printer.printKeyword(getAttrName());
-    Printer << "(set)";
+    Printer.printKeyword(getAttrName(), Options, "(set)");
     return true;
 
   default:
@@ -592,6 +649,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto Attr = cast<AvailableAttr>(this);
     if (Attr->isLanguageVersionSpecific())
       Printer << "swift";
+    else if (Attr->isPackageDescriptionVersionSpecific())
+      Printer << "_PackageDescription";
     else
       Printer << Attr->platformString();
 
@@ -613,8 +672,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     // If there's no message, but this is specifically an imported
     // "unavailable in Swift" attribute, synthesize a message to look good in
     // the generated interface.
-    if (!Attr->Message.empty())
-      Printer << ", message: \"" << Attr->Message << "\"";
+    if (!Attr->Message.empty()) {
+      Printer << ", message: ";
+      Printer.printEscapedStringLiteral(Attr->Message);
+    }
     else if (Attr->getPlatformAgnosticAvailability()
                == PlatformAgnosticAvailabilityKind::UnavailableInSwift)
       Printer << ", message: \"Not available in Swift\"";
@@ -704,10 +765,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   case DAK_ObjCRuntimeName: {
-    Printer.printAttrName("@objc");
+    Printer.printAttrName("@_objcRuntimeName");
     Printer << "(";
     auto *attr = cast<ObjCRuntimeNameAttr>(this);
-    Printer << "\"" << attr->Name << "\"";
+    Printer << attr->Name;
     Printer << ")";
     break;
   }
@@ -748,6 +809,16 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << "(for: \"";
     auto *attr = cast<DynamicReplacementAttr>(this);
     Printer << attr->getReplacedFunctionName() << "\")";
+    break;
+  }
+
+  case DAK_Custom: {
+    Printer.printAttrName("@");
+    const TypeLoc &typeLoc = cast<CustomAttr>(this)->getTypeLoc();
+    if (auto type = typeLoc.getType())
+      type->print(Printer, Options);
+    else
+      typeLoc.getTypeRepr()->print(Printer, Options);
     break;
   }
 
@@ -877,6 +948,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_implements";
   case DAK_ClangImporterSynthesizedType:
     return "_clangImporterSynthesizedType";
+  case DAK_Custom:
+    return "<<custom>>";
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiable:
     return "differentiable";
@@ -1086,11 +1159,25 @@ bool AvailableAttr::isLanguageVersionSpecific() const {
   return false;
 }
 
+bool AvailableAttr::isPackageDescriptionVersionSpecific() const {
+  if (PlatformAgnostic ==
+      PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific)
+    {
+      assert(Platform == PlatformKind::none &&
+             (Introduced.hasValue() ||
+              Deprecated.hasValue() ||
+              Obsoleted.hasValue()));
+      return true;
+    }
+  return false;
+}
+
 bool AvailableAttr::isUnconditionallyUnavailable() const {
   switch (PlatformAgnostic) {
   case PlatformAgnosticAvailabilityKind::None:
   case PlatformAgnosticAvailabilityKind::Deprecated:
   case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+  case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
     return false;
 
   case PlatformAgnosticAvailabilityKind::Unavailable:
@@ -1107,6 +1194,7 @@ bool AvailableAttr::isUnconditionallyDeprecated() const {
   case PlatformAgnosticAvailabilityKind::Unavailable:
   case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
   case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+  case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
     return false;
 
   case PlatformAgnosticAvailabilityKind::Deprecated:
@@ -1116,6 +1204,16 @@ bool AvailableAttr::isUnconditionallyDeprecated() const {
   llvm_unreachable("Unhandled PlatformAgnosticAvailabilityKind in switch.");
 }
 
+llvm::VersionTuple AvailableAttr::getActiveVersion(const ASTContext &ctx) const {
+  if (isLanguageVersionSpecific()) {
+    return ctx.LangOpts.EffectiveLanguageVersion;
+  } else if (isPackageDescriptionVersionSpecific()) {
+    return ctx.LangOpts.PackageDescriptionVersion;
+  } else {
+    return ctx.LangOpts.getMinPlatformVersion();
+  }
+}
+
 AvailableVersionComparison AvailableAttr::getVersionAvailability(
   const ASTContext &ctx) const {
 
@@ -1123,10 +1221,7 @@ AvailableVersionComparison AvailableAttr::getVersionAvailability(
   if (isUnconditionallyUnavailable())
     return AvailableVersionComparison::Unavailable;
 
-  llvm::VersionTuple queryVersion =
-    isLanguageVersionSpecific() ?
-    ctx.LangOpts.EffectiveLanguageVersion :
-    ctx.LangOpts.getMinPlatformVersion();
+  llvm::VersionTuple queryVersion = getActiveVersion(ctx);
 
   // If this entity was obsoleted before or at the query platform version,
   // consider it obsolete.
@@ -1139,7 +1234,7 @@ AvailableVersionComparison AvailableAttr::getVersionAvailability(
   // static requirement, so we treat "introduced later" as just plain
   // unavailable.
   if (Introduced && *Introduced > queryVersion) {
-    if (isLanguageVersionSpecific())
+    if (isLanguageVersionSpecific() || isPackageDescriptionVersionSpecific())
       return AvailableVersionComparison::Unavailable;
     else
       return AvailableVersionComparison::PotentiallyUnavailable;
@@ -1364,4 +1459,52 @@ TypeLoc ImplementsAttr::getProtocolType() const {
 
 TypeLoc &ImplementsAttr::getProtocolType() {
   return ProtocolType;
+}
+
+CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeLoc type,
+                       PatternBindingInitializer *initContext, Expr *arg,
+                       ArrayRef<Identifier> argLabels,
+                       ArrayRef<SourceLoc> argLabelLocs, bool implicit)
+    : DeclAttribute(DAK_Custom, atLoc, range, implicit),
+      type(type),
+      arg(arg),
+      initContext(initContext) {
+  hasArgLabelLocs = !argLabelLocs.empty();
+  numArgLabels = argLabels.size();
+  initializeCallArguments(argLabels, argLabelLocs,
+                          /*hasTrailingClosure=*/false);
+}
+
+CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
+                               bool hasInitializer,
+                               PatternBindingInitializer *initContext,
+                               SourceLoc lParenLoc,
+                               ArrayRef<Expr *> args,
+                               ArrayRef<Identifier> argLabels,
+                               ArrayRef<SourceLoc> argLabelLocs,
+                               SourceLoc rParenLoc,
+                               bool implicit) {
+  SmallVector<Identifier, 2> argLabelsScratch;
+  SmallVector<SourceLoc, 2> argLabelLocsScratch;
+  Expr *arg = nullptr;
+  if (hasInitializer) {
+    arg = packSingleArgument(ctx, lParenLoc, args, argLabels, argLabelLocs,
+                             rParenLoc, nullptr, implicit, argLabelsScratch,
+                             argLabelLocsScratch);
+  }
+
+  SourceRange range(atLoc, type.getSourceRange().End);
+  if (arg)
+    range.End = arg->getEndLoc();
+
+  size_t size = totalSizeToAlloc(argLabels, argLabelLocs,
+                                 /*hasTrailingClosure=*/false);
+  void *mem = ctx.Allocate(size, alignof(CustomAttr));
+  return new (mem) CustomAttr(atLoc, range, type, initContext, arg, argLabels,
+                              argLabelLocs, implicit);
+}
+
+void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
+  if (attr)
+    attr->print(out);
 }
