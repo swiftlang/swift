@@ -10,7 +10,6 @@
 // RUN:     %t/SomeModule.swift
 
 // RUN: %target-swift-ide-test -code-completion -sdk %t/SDK -iframework %t/SDK/Frameworks -source-filename %t/main.swift -code-completion-token=GLOBAL | %FileCheck --check-prefix GLOBAL %s
-// RUN: %target-swift-ide-test -code-completion -sdk %t/SDK -iframework %t/SDK/Frameworks -source-filename %t/main.swift -code-completion-token=GLOBAL_TYPE | %FileCheck --check-prefix GLOBAL_TYPE %s
 // RUN: %target-swift-ide-test -code-completion -sdk %t/SDK -iframework %t/SDK/Frameworks -source-filename %t/main.swift -code-completion-token=INSTANCE | %FileCheck --check-prefix INSTANCE %s
 // RUN: %target-swift-ide-test -code-completion -sdk %t/SDK -iframework %t/SDK/Frameworks -source-filename %t/main.swift -code-completion-token=INITIALIZER | %FileCheck --check-prefix INITIALIZER %s
 
@@ -37,10 +36,6 @@ internal func internalFunc() {}
 public func _secretFunc() {}
 public func publicFunc() {}
 
-internal class InternalClass {}
-public class _SecretClass {}
-public class PublicClass {}
-
 // BEGIN main.swift
 import SomeModule
 
@@ -49,20 +44,9 @@ func test(value: SomeValue) {
 // GLOBAL: Begin completions
 // GLOBAL-NOT: _secretFunc
 // GLOBAL-NOT: internalFunc
-// GLOBAL-NOT: _SecretClass
-// GLOBAL-NOT: InternalClass
 // GLOBAL-DAG: Decl[Struct]/OtherModule[SomeModule]: SomeValue[#SomeValue#];
 // GLOBAL-DAG: Decl[FreeFunction]/OtherModule[SomeModule]: publicFunc()[#Void#];
-// GLOBAL-DAG: Decl[Class]/OtherModule[SomeModule]: PublicClass[#PublicClass#]; name=PublicClass
 // GLOBAL: End completions
-
-  let _: #^GLOBAL_TYPE^#
-// GLOBAL_TYPE: Begin completions
-// GLOBAL_TYPE-NOT: InternalClass
-// GLOBAL_TYPE-NOT: _SecretClass
-// GLOBAL-TYPE-DAG: Decl[Struct]/OtherModule[SomeModule]: SomeValue[#SomeValue#];
-// GLOBAL-TYPE-DAG: Decl[Class]/OtherModule[SomeModule]: PublicClass[#PublicClass#];
-// GLOBAL_TYPE: End completions
 
   let _ = value.#^INSTANCE^#
 // INSTANCE: Begin completions, 3 items
