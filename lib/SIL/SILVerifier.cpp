@@ -494,8 +494,10 @@ struct ImmutableAddressUseVerifier {
     while (!worklist.empty()) {
       auto *use = worklist.pop_back_val();
       auto *inst = use->getUser();
+
       if (inst->isTypeDependentOperand(*use))
         continue;
+
       switch (inst->getKind()) {
       case SILInstructionKind::MarkDependenceInst:
       case SILInstructionKind::LoadBorrowInst:
@@ -585,7 +587,8 @@ struct ImmutableAddressUseVerifier {
         }
         break;
       default:
-        llvm_unreachable("Unhandled unexpected instruction");
+        llvm::errs() << "Unhandled, unexpected instruction: " << *inst;
+        llvm_unreachable("invoking standard assertion failure");
         break;
       }
     }
