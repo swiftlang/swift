@@ -625,7 +625,7 @@ ERROR(serialization_missing_dependencies,Fatal,
 ERROR(serialization_circular_dependency,Fatal,
       "circular dependency between modules '%0' and %1",
       (StringRef, Identifier))
-ERROR(serialization_missing_shadowed_module,Fatal,
+ERROR(serialization_missing_underlying_module,Fatal,
       "cannot load underlying module for %0", (Identifier))
 ERROR(serialization_name_mismatch,Fatal,
       "cannot load module '%0' as '%1'", (StringRef, StringRef))
