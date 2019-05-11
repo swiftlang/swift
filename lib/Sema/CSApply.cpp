@@ -1834,8 +1834,6 @@ namespace {
     Expr *forceBridgeFromObjectiveC(Expr *object, Type valueType) {
       return bridgeFromObjectiveC(object, valueType, false);
     }
-
-    TypeAliasDecl *MaxFloatTypeDecl = nullptr;
     
   public:
     ExprRewriter(ConstraintSystem &cs, const Solution &solution,
@@ -2002,25 +2000,18 @@ namespace {
           type = defaultType;
       }
 
-      // Find the maximum-sized builtin float type.
-      // FIXME: Cache name lookup.
-      if (!MaxFloatTypeDecl) {
-        SmallVector<ValueDecl *, 1> lookupResults;
-        tc.getStdlibModule(dc)->lookupValue(/*AccessPath=*/{},
-                                            tc.Context.Id_MaxBuiltinFloatType,
-                                            NLKind::QualifiedLookup,
-                                            lookupResults);
-        if (lookupResults.size() == 1)
-          MaxFloatTypeDecl = dyn_cast<TypeAliasDecl>(lookupResults.front());
-      }
-      if (!MaxFloatTypeDecl ||
-          !MaxFloatTypeDecl->hasInterfaceType() ||
-          !MaxFloatTypeDecl->getDeclaredInterfaceType()->is<BuiltinFloatType>()) {
+      // Get the _MaxBuiltinFloatType decl, or look for it if it's not cached.
+      auto maxFloatTypeDecl = tc.Context.get_MaxBuiltinFloatTypeDecl();
+
+      if (!maxFloatTypeDecl ||
+          !maxFloatTypeDecl->hasInterfaceType() ||
+          !maxFloatTypeDecl->getDeclaredInterfaceType()->is<BuiltinFloatType>()) {
         tc.diagnose(expr->getLoc(), diag::no_MaxBuiltinFloatType_found);
         return nullptr;
       }
-      tc.validateDecl(MaxFloatTypeDecl);
-      auto maxType = MaxFloatTypeDecl->getUnderlyingTypeLoc().getType();
+
+      tc.validateDecl(maxFloatTypeDecl);
+      auto maxType = maxFloatTypeDecl->getUnderlyingTypeLoc().getType();
 
       DeclName initName(tc.Context, DeclBaseName::createConstructor(),
                         { tc.Context.Id_floatLiteral });
