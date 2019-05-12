@@ -439,7 +439,7 @@ In the following we assume that all loops are canonicalized such that:
 2. The loop has one backedge.
 3. All exiting edges have a unique exit block.
 
-Motiviation
+Motivation
 -----------
 
 Consider the following simple loop::
