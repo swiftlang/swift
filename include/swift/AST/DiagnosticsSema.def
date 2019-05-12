@@ -736,10 +736,6 @@ NOTE(object_literal_resolve_import,none,
      "import %0 to use '%1' as the default %2 literal type",
      (StringRef, StringRef, StringRef))
 
-// SWIFT_ENABLE_TENSORFLOW
-// TensorFlow op literal
-ERROR(invalid_tfop,none, "%0", (StringRef))
-
 ERROR(use_local_before_declaration,none,
       "use of local variable %0 before its declaration", (DeclName))
 ERROR(unsupported_existential_type,none,

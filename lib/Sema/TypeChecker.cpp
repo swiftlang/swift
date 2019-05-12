@@ -178,8 +178,6 @@ DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
     return DeclName(Context, DeclBaseName::createConstructor(),
             { Context.getIdentifier("fileReferenceLiteralResourceName") });
   }
-  // SWIFT_ENABLE_TENSORFLOW
-  case ObjectLiteralExpr::tfop: return DeclName();
   }
   llvm_unreachable("unknown literal constructor");
 }
@@ -215,9 +213,6 @@ Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
   case ObjectLiteralExpr::fileLiteral:
   case ObjectLiteralExpr::imageLiteral:
     return replace("resourceName");
-  // SWIFT_ENABLE_TENSORFLOW
-  case ObjectLiteralExpr::tfop:
-    llvm_unreachable("#tfop gets special type checking");
   }
   llvm_unreachable("unknown literal constructor");
 }
