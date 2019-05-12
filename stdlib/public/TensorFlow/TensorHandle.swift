@@ -130,54 +130,6 @@ internal extension TensorHandle {
   }
 }
 
-extension TensorHandle : TensorSendableReceivable {
-  @inlinable
-  static func receiveFromAccelerator(_ computation: _TensorComputation,
-                                     _ tensorID: Int
-  ) -> TensorHandle<Scalar> {
-    debugLog("Receiving tensor of id \(tensorID) and type \(Scalar.self).")
-    let status = TF_NewStatus()
-    internalConsistencyCheck(status != nil)
-    let tensorHandle: TensorHandle<Scalar>
-    let context = _ExecutionContext.global
-    let cTensorHandle = TFE_DequeueNamedTensorFromCtx(
-      context.eagerContext, Int32(tensorID),
-      Scalar.tensorFlowDataType._cDataType, status)
-    checkOk(status)
-    tensorHandle = TensorHandle<Scalar>(_owning: cTensorHandle!)
-    if _RuntimeConfig.printsDebugLog {
-      debugLog("The received tensor of id \(tensorID) has content:")
-      dumpTensorContent(tensorHandle._cTensorHandle, Scalar.self)
-    }
-    return tensorHandle
-  }
-
-  @inlinable
-  func sendToAccelerator(_ computation: _TensorComputation,
-                         _ tensorID: Int) {
-    if _RuntimeConfig.printsDebugLog {
-      debugLog("Sending tensor of id \(tensorID) and type \(Scalar.self) with:")
-      dumpTensorContent(_cTensorHandle, Scalar.self)
-    }
-    let status = TF_NewStatus()
-    internalConsistencyCheck(status != nil)
-    let context = _ExecutionContext.global
-    TFE_EnqueueNamedTensorFromCtx(
-      context.eagerContext, Int32(tensorID), _cTensorHandle, status)
-    debugLog("Tensor is sent.")
-    checkOk(status)
-    TF_DeleteStatus(status)
-  }
-
-  @inlinable
-  static func scalar(_ scalar: Scalar) -> TensorHandle<Scalar> {
-    debugLog("Creating a tensor from scalar \(scalar).")
-    let cTensorHandle = _TFCCreateCTensorHandle(
-        scalar, Scalar.tensorFlowDataType._cDataType)
-    return TensorHandle<Scalar>(_owning: cTensorHandle)
-  }
-}
-
 internal extension ShapedArray where Scalar : _TensorFlowDataTypeCompatible {
   @usableFromInline
   @inline(never)
@@ -209,45 +161,7 @@ public final class ResourceHandle : _AnyTensorHandle {
   }
 }
 
-extension ResourceHandle : TensorSendableReceivable {
-  @inlinable
-  static func receiveFromAccelerator(
-    _ computation: _TensorComputation,
-    _ tensorID: Int
-  ) -> ResourceHandle {
-    debugLog("Receiving resource tensor of id \(tensorID).")
-    let status = TF_NewStatus()
-    let context = _ExecutionContext.global
-    let cTensorHandle: CTensorHandle! = TFE_DequeueNamedTensorFromCtx(
-      context.eagerContext, Int32(tensorID), TF_RESOURCE, status)
-    checkOk(status)
-    TF_DeleteStatus(status)
-    debugLog("Done receiving resource tensor of id \(tensorID).")
-    return ResourceHandle(owning: cTensorHandle)
-  }
-
-  @inlinable
-  func sendToAccelerator(_ computation: _TensorComputation,
-                         _ tensorID: Int) {
-    debugLog("Sending resource tensor of id \(tensorID).")
-    let status = TF_NewStatus()
-    let context = _ExecutionContext.global
-    TFE_EnqueueNamedTensorFromCtx(
-      context.eagerContext, Int32(tensorID), self._cTensorHandle, status)
-    TF_DeleteStatus(status)
-    debugLog("Done sending resource tensor of id \(tensorID).")
-  }
-
-  // TODO: Remove this dummy `Scalar` typealias, currently required in order to
-  // conform to `TensorSendableReceivable`.
-  @usableFromInline typealias Scalar = Float
-  @inlinable
-  static func scalar(_ scalar: Scalar) -> ResourceHandle {
-    fatalError("Unsupported")
-  }
-}
-
-/// `VariantHandle` is the type used by ops to represent TensorFlow "variant" 
+/// `VariantHandle` is the type used by ops to represent TensorFlow "variant"
 /// values.
 public final class VariantHandle : _AnyTensorHandle {
   @usableFromInline
@@ -259,43 +173,5 @@ public final class VariantHandle : _AnyTensorHandle {
     debugLog("De-initializing TensorHandle.")
     TFE_DeleteTensorHandle(_cTensorHandle)
     debugLog("Returning from deinit of VariantHandle.")
-  }
-}
-
-extension VariantHandle : TensorSendableReceivable {
-  @inlinable
-  static func receiveFromAccelerator(
-    _ computation: _TensorComputation,
-    _ tensorID: Int
-  ) -> VariantHandle {
-    debugLog("Receiving variant tensor of id \(tensorID).")
-    let status = TF_NewStatus()
-    let context = _ExecutionContext.global
-    let cTensorHandle: CTensorHandle! = TFE_DequeueNamedTensorFromCtx(
-      context.eagerContext, Int32(tensorID), TF_VARIANT, status)
-    checkOk(status)
-    TF_DeleteStatus(status)
-    debugLog("Done receiving variant tensor of id \(tensorID).")
-    return VariantHandle(owning: cTensorHandle)
-  }
-
-  @inlinable
-  func sendToAccelerator(_ computation: _TensorComputation,
-                         _ tensorID: Int) {
-    debugLog("Sending variant tensor of id \(tensorID).")
-    let status = TF_NewStatus()
-    let context = _ExecutionContext.global
-    TFE_EnqueueNamedTensorFromCtx(
-      context.eagerContext, Int32(tensorID), self._cTensorHandle, status)
-    TF_DeleteStatus(status)
-    debugLog("Done sending variant tensor of id \(tensorID).")
-  }
-
-  // TODO: Remove this dummy `Scalar` typealias, currently required in order to
-  // conform to `TensorSendableReceivable`.
-  @usableFromInline typealias Scalar = Float
-  @inlinable
-  static func scalar(_ scalar: Scalar) -> VariantHandle {
-    fatalError("Unsupported")
   }
 }

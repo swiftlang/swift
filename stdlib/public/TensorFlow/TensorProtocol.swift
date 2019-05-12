@@ -26,33 +26,3 @@ public protocol TensorProtocol {
   /// - Note: Do NOT remove this. This is a compiler requirement.
   init(handle: TensorHandle<Scalar>)
 }
-
-// FIXME: Consider moving to CompilerProtocols.swift when the interaction
-// between compiler and runtime becomes general enough.
-//
-/// The protocol on tensor sends and receives.
-///
-/// - Note: The compiler knows about this protocol and generates code to use
-/// it. So changing the protocol design requires changing the compiler
-/// accordingly too.
-protocol TensorSendableReceivable {
-  associatedtype Scalar
-
-  /// Receive a tensor based on a tensor computation handle (equivalent to a TF
-  /// session handle), and a tensor ID.
-  static func receiveFromAccelerator(_ computation: _TensorComputation,
-                                     _ tensorID: Int) -> Self
-
-  /// Send a tensor of `this` instance based on a tensor computation handle
-  /// (equivalent to a TF session handle), and a tensor ID.
-  func sendToAccelerator(_ computation: _TensorComputation,
-                         _ tensorID: Int)
-
-  /// Create a scalar tensor. It can be used by the host program to send a
-  /// scalar value to accelerator.
-  ///
-  /// - Note: This is different from protocol method
-  /// `TensorFlowScalar._makeScalarTensor()`, a marker function to assist
-  /// compiler in generating Accelerator code, and has no runtime effects.
-  static func scalar(_ scalar: Scalar) -> Self
-}

@@ -48,14 +48,14 @@ func _tensorSeeds(_ seed: Tensor<Int64>) -> (Tensor<Int64>, Tensor<Int64>) {
 public struct Dataset<Element : TensorGroup> {
   public let _handle: VariantHandle
 
-  @inlinable @inline(__always)
+  @inlinable
   public init(_handle: VariantHandle) {
     self._handle = _handle
   }
 }
 
 public extension Dataset {
-  @inlinable @inline(__always)
+  @inlinable
   init(randomSeed: Int64) {
     let (seed1, seed2) = _tensorSeeds(Tensor(randomSeed))
     self.init(_handle: Raw.experimentalRandomDataset(
@@ -68,7 +68,7 @@ public extension Dataset {
 
 public extension Dataset {
   /// Creates a dataset from a batch of elements as a tensor.
-  @inlinable @inline(__always)
+  @inlinable
   init(elements: Element) {
     self.init(_handle: Raw.tensorSliceDataset(
       components: [elements],
@@ -80,7 +80,7 @@ extension Dataset : Sequence {
   public typealias Iterator = DatasetIterator<Element>
 
   /// Returns an iterator over the elements of this dataset.
-  @inlinable @inline(__always)
+  @inlinable
   public func makeIterator() -> DatasetIterator<Element> {
     let resource = Raw.anonymousIterator(
       outputTypes: Element._typeList,
@@ -93,7 +93,7 @@ extension Dataset : Sequence {
 public extension Dataset {
   // Note that this Dataset API implementation uses an experimental tracing
   // feature, which is not robust and does not have great diagnostics yet.
-  @inlinable @inline(__always)
+  @inlinable
   func map<ResultElement : TensorGroup>(
     _ transform: (Element) -> ResultElement
   ) -> Dataset<ResultElement> {
@@ -107,7 +107,7 @@ public extension Dataset {
       preserveCardinality: false))
   }
 
-  @inlinable @inline(__always)
+  @inlinable
   func map<ResultElement : TensorGroup>(
     parallelCallCount: Int,
     _ transform: (Element) -> ResultElement
@@ -124,7 +124,7 @@ public extension Dataset {
       preserveCardinality: false))
   }
 
-  @inlinable @inline(__always)
+  @inlinable
   func filter(
     _ isIncluded: (Element) -> Tensor<Bool>
   ) -> Dataset {
@@ -138,7 +138,7 @@ public extension Dataset {
 }
 
 public extension Dataset {
-  @inlinable @inline(__always)
+  @inlinable
   func shuffled(
     sampleCount: Int, randomSeed: Int64
   ) -> Dataset {
@@ -152,7 +152,7 @@ public extension Dataset {
       outputShapes: Element._unknownShapeList))
   }
 
-  @inlinable @inline(__always)
+  @inlinable
   func batched(_ batchSize: Int) -> Dataset {
     return Dataset(_handle: Raw.batchDataset(
       inputDataset: _handle,
@@ -167,7 +167,7 @@ public extension Dataset {
 public struct DatasetIterator<Element : TensorGroup> {
   @usableFromInline let _handle: ResourceHandle
 
-  @usableFromInline @inline(__always)
+  @usableFromInline
   internal init(_handle: ResourceHandle) {
     self._handle = _handle
   }
@@ -176,7 +176,7 @@ public struct DatasetIterator<Element : TensorGroup> {
 extension DatasetIterator : IteratorProtocol {
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
-  @inlinable @inline(__always)
+  @inlinable
   public mutating func next() -> Element? {
     let optional = Raw.iteratorGetNextAsOptional(
       iterator: _handle,
@@ -204,8 +204,7 @@ public struct Zip2TensorGroup<T : TensorGroup, U : TensorGroup> : TensorGroup {
   }
 }
 
-// TODO(SR-9156): This does not work in graph mode.
-@inlinable @inline(__always)
+@inlinable
 public func zip<T : TensorGroup, U : TensorGroup>(
   _ dataset1: Dataset<T>, _ dataset2: Dataset<U>
 ) -> Dataset<Zip2TensorGroup<T, U>> {
