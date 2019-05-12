@@ -212,13 +212,13 @@ public let SetTests = [
   BenchmarkInfo(
     name: "Set.isStrictSubset.Int100",
     runFunction: { n in run_SetIsStrictSubsetInt(setP, setQ, false, 5000 * n) },
-    tags: [.validation, .api, .Set],
+    tags: [.validation, .api, .Set, .skip],
     setUpFunction: { blackHole([setP, setQ]) }),
 
   BenchmarkInfo(
     name: "Set.isStrictSubset.Seq.Empty.Int",
     runFunction: { n in run_SetIsStrictSubsetSeqInt(setE, arrayAB, true, 5000 * n) },
-    tags: [.validation, .api, .Set],
+    tags: [.validation, .api, .Set, .skip],
     setUpFunction: { blackHole([setE, arrayAB]) }),
   BenchmarkInfo(
     name: "Set.isStrictSubset.Seq.Int.Empty",
@@ -305,7 +305,7 @@ public let SetTests = [
   BenchmarkInfo(
     name: "Set.isStrictSuperset.Seq.Int.Empty",
     runFunction: { n in run_SetIsStrictSupersetSeqInt(setE, arrayAB, false, 5000 * n) },
-    tags: [.validation, .api, .Set],
+    tags: [.validation, .api, .Set, .skip],
     setUpFunction: { blackHole([setE, arrayAB]) }),
   BenchmarkInfo(
     name: "Set.isStrictSuperset.Seq.Int0",
