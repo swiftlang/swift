@@ -975,21 +975,6 @@ static ValueDecl *getGetObjCTypeEncodingOperation(ASTContext &Context,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-static ValueDecl *getTensorFlowSend(ASTContext &Context, Identifier Id) {
-  // <T> (T) -> ()
-  BuiltinGenericSignatureBuilder builder(Context);
-  builder.addParameter(makeGenericParam());
-  builder.setResult(makeConcrete(Context.TheEmptyTupleType));
-  return builder.build(Id);
-}
-
-static ValueDecl *getTensorFlowReceive(ASTContext &Context, Identifier Id) {
-  // <T> () -> (T)
-  BuiltinGenericSignatureBuilder builder(Context);
-  builder.setResult(makeGenericParam());
-  return builder.build(Id);
-}
-
 static ValueDecl *getAutoDiffApplyAssociatedFunction(
     ASTContext &Context, Identifier Id, AutoDiffAssociatedFunctionKind kind,
     unsigned arity, unsigned order, bool rethrows) {
@@ -2069,10 +2054,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getUnsafeGuaranteedEnd(Context, Id);
 
   // SWIFT_ENABLE_TENSORFLOW
-  case BuiltinValueKind::TensorFlowSend:
-    return getTensorFlowSend(Context, Id);
-  case BuiltinValueKind::TensorFlowReceive:
-    return getTensorFlowReceive(Context, Id);
   case BuiltinValueKind::AutoDiffApply:
     llvm_unreachable("Handled above");
 

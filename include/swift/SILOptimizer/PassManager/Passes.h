@@ -42,10 +42,6 @@ namespace swift {
   /// Run all SIL passes for -Onone on module \p M.
   void runSILPassesForOnone(SILModule &M);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Run the partioning pass for TensorFlow operations.
-  void runSILTFPartitionPass(SILModule &M);
-
   /// Run the SIL ownership eliminator pass on \p M.
   bool runSILOwnershipEliminatorPass(SILModule &M);
 

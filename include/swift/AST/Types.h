@@ -2661,10 +2661,6 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   
   /// A closure invocation function that has not been bound to a context.
   Closure,
-
-  // SWIFT_ENABLE_TENSORFLOW
-  /// A TensorFlow function pointer.
-  TensorFlow,
 };
 
 /// Can this calling convention result in a function being called indirectly
@@ -2676,8 +2672,6 @@ inline bool canBeCalledIndirectly(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Block:
   case SILFunctionTypeRepresentation::Closure:
-  // SWIFT_ENABLE_TENSORFLOW
-  case SILFunctionTypeRepresentation::TensorFlow:
     return false;
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Method:
@@ -2702,8 +2696,6 @@ getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
   case SILFunctionTypeRepresentation::Closure:
-  // SWIFT_ENABLE_TENSORFLOW
-  case SILFunctionTypeRepresentation::TensorFlow:
     return SILFunctionLanguage::Swift;
   }
 
@@ -2935,8 +2927,6 @@ public:
       case SILFunctionTypeRepresentation::Thin:
       case SILFunctionTypeRepresentation::CFunctionPointer:
       case SILFunctionTypeRepresentation::Closure:
-      // SWIFT_ENABLE_TENSORFLOW
-      case SILFunctionTypeRepresentation::TensorFlow:
         return false;
       case SILFunctionTypeRepresentation::ObjCMethod:
       case SILFunctionTypeRepresentation::Method:
@@ -2959,8 +2949,6 @@ public:
       case SILFunctionTypeRepresentation::WitnessMethod:
       case SILFunctionTypeRepresentation::CFunctionPointer:
       case SILFunctionTypeRepresentation::Closure:
-      // SWIFT_ENABLE_TENSORFLOW
-      case SILFunctionTypeRepresentation::TensorFlow:
         return false;
       }
 
@@ -3808,8 +3796,6 @@ public:
       case Representation::Thin:
       case Representation::CFunctionPointer:
       case Representation::Closure:
-      // SWIFT_ENABLE_TENSORFLOW
-      case Representation::TensorFlow:
         return false;
       case Representation::ObjCMethod:
       case Representation::Method:
@@ -3832,8 +3818,6 @@ public:
       case Representation::Method:
       case Representation::WitnessMethod:
       case Representation::Closure:
-      // SWIFT_ENABLE_TENSORFLOW
-      case Representation::TensorFlow:
         return false;
       }
 

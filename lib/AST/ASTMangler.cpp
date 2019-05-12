@@ -1405,8 +1405,6 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   switch (fn->getRepresentation()) {
     case SILFunctionTypeRepresentation::Thick:
     case SILFunctionTypeRepresentation::Thin:
-    // SWIFT_ENABLE_TENSORFLOW
-    case SILFunctionTypeRepresentation::TensorFlow:
       break;
     case SILFunctionTypeRepresentation::Block:
       OpArgs.push_back('B');
