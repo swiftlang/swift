@@ -2777,21 +2777,6 @@ ERROR(compiler_evaluable_forbidden_type,none,
 ERROR(compiler_evaluable_ref_non_compiler_evaluable,none,
       "@compilerEvaluable functions may not reference non-@compilerEvaluable functions", ())
 
-// @TensorFlowGraph attribute
-ERROR(tf_graph_attr_top_level_only,none,
-      "@TensorFlowGraph can only be applied to top-level functions", ())
-ERROR(tf_graph_deprecated_please_remove,none,
-      "@TensorFlowGraph has no effect and is deprecated. Please remove.", ())
-ERROR(tf_graph_attr_function_tensorflow_value_only,none,
-      "@TensorFlowGraph can only be applied to functions whose parameters and "
-      "return values are TensorFlow values or aggregates of TensorFlow "
-      "values", ())
-ERROR(tf_graph_attr_no_generic_functions,none,
-      "@TensorFlowGraph cannot be applied to generic functions", ())
-ERROR(tf_graph_attr_no_functions_with_captures,none,
-      "@TensorFlowGraph cannot be applied to functions that capture values",
-      ())
-
 // @noDerivative attribute
 ERROR(noderivative_only_on_stored_properties_in_differentiable_structs,none,
       "'@noDerivative' is only allowed on stored properties in structure types "
