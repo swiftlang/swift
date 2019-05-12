@@ -946,7 +946,6 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::TensorArrayProtocol:
   case KnownProtocolKind::TensorGroup:
   case KnownProtocolKind::TensorFlowDataTypeCompatible:
-  case KnownProtocolKind::TensorSendableReceivable:
   case KnownProtocolKind::TensorProtocol:
     M = getLoadedModule(Id_TensorFlow);
     break;

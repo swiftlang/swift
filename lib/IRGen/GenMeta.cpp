@@ -4192,7 +4192,6 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::TensorGroup:
   case KnownProtocolKind::TensorFlowDataTypeCompatible:
   case KnownProtocolKind::TensorProtocol:
-  case KnownProtocolKind::TensorSendableReceivable:
   case KnownProtocolKind::VectorNumeric:
   // TODO(TF-213): Remove underscore `Differentiable` protocols.
   case KnownProtocolKind::__Differentiable:
