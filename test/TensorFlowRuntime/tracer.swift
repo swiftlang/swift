@@ -42,20 +42,20 @@ TracerTests.testAllBackends("Basic") {
   let tracedFn = _graph(with: state, in: tracee)
   let (newState, result) = tracedFn(state, data)
   
-  _hostOp(newState)
+  print(newState)
   expectNearlyEqualWithScalarTensor(5.0, newState)
 
-  _hostOp(result)
+  print(result)
   expectNearlyEqualWithScalarTensor(3.0, result)
 
   // A second call to `tracedFn` with different input data.
   let data2 = Tensor<Float>(1.0)
   let (newState2, result2) = tracedFn(newState, data2)
 
-  _hostOp(newState2)
+  print(newState2)
   expectNearlyEqualWithScalarTensor(6.0, newState2)
 
-  _hostOp(result2)
+  print(result2)
   expectNearlyEqualWithScalarTensor(1.0, result2)
 }
 
@@ -151,10 +151,10 @@ TracerTests.testAllBackends("Basic_IntermediateTensors") {
   let tracedFn = _graph(with: state, in: tracee)
   let (newState, result) = tracedFn(state, data)
 
-  _hostOp(newState)
+  print(newState)
   expectNearlyEqualWithScalarTensor(1.0, newState)
 
-  _hostOp(result)
+  print(result)
   expectNearlyEqualWithScalarTensor(4.0, result)
 }
 
@@ -229,13 +229,13 @@ TracerTests.testAllBackends("Advanced") {
   let tracedFn = _graph(with: state, in: tracee)
   let (newState, result) = tracedFn(state, data)
 
-  _hostOp(newState) // should be State(model: [3.0, 2.0], optimizer: [1.0, 2.0])
+  print(newState) // should be State(model: [3.0, 2.0], optimizer: [1.0, 2.0])
   expectNearlyEqualWithScalarTensor(3.0, newState.model[0])
   expectNearlyEqualWithScalarTensor(2.0, newState.model[1])
   expectNearlyEqualWithScalarTensor(1.0, newState.optimizer[0])
   expectNearlyEqualWithScalarTensor(2.0, newState.optimizer[1])
 
-  _hostOp(result) // should be 8.0
+  print(result) // should be 8.0
   expectNearlyEqualWithScalarTensor(8.0, result)
 }
 

@@ -26,7 +26,7 @@ DatasetGlobalTests.testCPUOrGPU("DatasetAsGlobalVar") {
 
   var expectedVal: Float = 0.0
   for item in dataset {
-    _hostOp(item)
+    print(item)
     expectNearlyEqualWithScalarTensor(expectedVal, item)
     expectedVal += 1.0
   }
@@ -39,7 +39,7 @@ DatasetGlobalTests.testCPUOrGPU("IteratorAsGlobalVar") {
 
   var expectedVal: Float = 0.0
   while let item = iterator.next() {
-    _hostOp(item)
+    print(item)
     expectNearlyEqualWithScalarTensor(expectedVal, item)
     expectedVal += 1.0
   }

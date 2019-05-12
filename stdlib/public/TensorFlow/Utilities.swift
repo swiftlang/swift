@@ -137,45 +137,6 @@ func writeContents(of buffer: UnsafePointer<TF_Buffer>,
 //===----------------------------------------------------------------------===//
 // Unit test utilities
 //===----------------------------------------------------------------------===//
-// TODO: Move this section to a unit-test only Swift module, once the google
-// internal lit based test infra can handle importing additional Swift modules.
-
-/// This is a generic host-only op that hides the details of its impl in the SIL
-/// code. This makes reading/writing SIL based compiler unit tests simple.
-@inline(never)
-public func _hostOp<T>(_ x: T) {
-  print(x)
-}
-
-@inline(never)
-public func _hostOp<Scalar>(_ x: Tensor<Scalar>) {
-  print(x)
-}
-
-@inline(never)
-public func _hostOp<Scalar : TensorFlowScalar>(_ x: TensorHandle<Scalar>) {
-  print(Tensor(handle: x))
-}
-
-/// Some TPU ops (e.g. infeed/outfeed) require tensor shape info, which the APIs
-/// below can provide.
-///
-/// TODO: Remove these helper APIs, when we have a better shape
-/// inference/propagation design.
-@inlinable @inline(__always)
-public func _scalarTensorWithShape<Scalar: TensorFlowScalar>(
-  _ x: Tensor<Scalar>
-) -> Tensor<Scalar> {
-  return Raw.identity(x)
-}
-
-@inlinable @inline(__always)
-public func _addScalarTensorsWithShape<Scalar: TensorFlowNumeric>(
-  _ x: Tensor<Scalar>,
-  _ y: Tensor<Scalar>
-) -> Tensor<Scalar> {
-  return Raw.add(x, y)
-}
 
 // TODO: Consider revising the call sites where this is necessary to only need
 // UnsafeMutablePointer to optional when it is the actual c-api call site.
