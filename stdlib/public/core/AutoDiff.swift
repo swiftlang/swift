@@ -765,10 +765,3 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
     return AnyDerivative(_box: _box._tangentVector(from: cotangent._box))
   }
 }
-
-//===----------------------------------------------------------------------===//
-// Builtins
-//===----------------------------------------------------------------------===//
-
-@usableFromInline @_fixed_layout
-class _AutoDiffTape<Element> {}

@@ -31,8 +31,6 @@ set(swift_runtime_objc_sources
 set(swift_runtime_sources
     AnyHashableSupport.cpp
     Array.cpp
-    # SWIFT_ENABLE_TENSORFLOW
-    AutoDiff.cpp
     BackDeployment.cpp
     Casting.cpp
     CompatibilityOverride.cpp

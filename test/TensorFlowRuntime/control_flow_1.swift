@@ -25,24 +25,17 @@ public func weighPet(_ pet: Pet,
   switch pet {
   case .bird:
     weight += 1.0
-    // Currently we make this call and the ones below to declare a shape,
-    // because when targeitng TPU, the bb arg for `weight` gets replicated onto
-    // both CPU and TPU devices.
-    // TODO: Remove these calls once we do bb arg pruning via dataflow analysis.
-    weight = _scalarTensorWithShape(weight)
   case .cat:
     weight += 5.0
-    weight = _scalarTensorWithShape(weight)
   case .dog:
     weight += 10.0
-    weight = _scalarTensorWithShape(weight)
   case .fish: break // no tensor code here
   }
   expectNearlyEqualWithScalarTensor(expectedVal, weight)
   // TODO: remove the extra code below once TPU execution supports 0 output
   // tensors (b/111123797)
   let extra = Tensor<Float>(1.0)
-  _hostOp(extra)
+  print(extra)
 }
 // TODO: fix the disabled GPU tests below.
 #if !CUDA
@@ -61,16 +54,14 @@ public func weighPetWithDefault(_ pet: Pet,
   switch pet {
   case .cat:
     weight += 5.0
-    weight = _scalarTensorWithShape(weight)
   default:
     weight += 3.0
-    weight = _scalarTensorWithShape(weight)
   }
   expectNearlyEqualWithScalarTensor(expectedVal, weight)
   // TODO: remove the extra code below once TPU execution supports 0 output
   // tensors (b/111123797)
   let extra = Tensor<Float>(1.0)
-  _hostOp(extra)
+  print(extra)
 }
 ControlFlowTests.testAllBackends("weighPetWithDefault") {
   weighPetWithDefault(.cat, 6.0)
@@ -93,22 +84,18 @@ public func testEnumWithPayload(_ x: EnumWithPayload, _ expectedVal: Float) {
   switch x {
   case .a(let x):
     val += 1.0
-    val = _scalarTensorWithShape(val)
-    _hostOp(x)
+    print(x)
   case .b(let x):
-    _hostOp(x)
+    print(x)
     let tx = Tensor<Float>(x)
     val += tx
-    val = _scalarTensorWithShape(val)
   case .c(let x, let y):
     val *= x + y
-    val = _scalarTensorWithShape(val)
-    _hostOp(x)
-    _hostOp(y)
+    print(x)
+    print(y)
   case .d(let f):
     val += 10.0
-    val = _scalarTensorWithShape(val)
-    _hostOp(f)
+    print(f)
   }
   val += 0.0
   expectNearlyEqualWithScalarTensor(expectedVal, val)
@@ -144,7 +131,6 @@ public func testSwitchEnum(_ a: Tensor<Float>?,
   var b = Tensor<Float>(2.0)
   if let a = a {
     b += a
-    b = _scalarTensorWithShape(b)
   }
   b -= 1.0
   expectNearlyEqualWithScalarTensor(expectedVal, b)
@@ -168,7 +154,6 @@ public func testSwitchEnumAddr(_ a: EnumAddr,
   switch a {
   case .A:
       b += 1.0
-      b = _scalarTensorWithShape(b)
   default:
       break
   }
@@ -198,7 +183,6 @@ public func testTryApply(_ a: Int,
   do {
     try foo(a)
     b += 1.0
-    b = _scalarTensorWithShape(b)
   } catch { }
   b -= 1.0
   expectNearlyEqualWithScalarTensor(expectedVal, b)
@@ -216,7 +200,6 @@ public func testCheckedCastBranch(_ a: AnyObject,
   var b = Tensor<Float>(2.0)
   if a is X {
     b += 1.0
-    b = _scalarTensorWithShape(b)
   }
   b -= 1.0
   expectNearlyEqualWithScalarTensor(expectedVal, b)
@@ -234,7 +217,6 @@ public func testCheckedCastAddrBranch(_ p: P,
   var b = Tensor<Float>(2.0)
   if let _ = p as? S {
     b += 1.0
-    b = _scalarTensorWithShape(b)
   }
   b -= 1.0
   expectNearlyEqualWithScalarTensor(expectedVal, b)

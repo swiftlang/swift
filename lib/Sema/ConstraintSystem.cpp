@@ -325,8 +325,6 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   case KnownProtocolKind::ExpressibleByColorLiteral: index = 10; break;
   case KnownProtocolKind::ExpressibleByImageLiteral: index = 11; break;
   case KnownProtocolKind::ExpressibleByFileReferenceLiteral: index = 12; break;
-  // SWIFT_ENABLE_TENSORFLOW
-  case KnownProtocolKind::ExpressibleByTensorFlowOp: return ArrayRef<Type>();
   }
   static_assert(NumAlternativeLiteralTypes == 13, "Wrong # of literal types");
 
@@ -372,8 +370,6 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   case KnownProtocolKind::ExpressibleByColorLiteral:
   case KnownProtocolKind::ExpressibleByImageLiteral:
   case KnownProtocolKind::ExpressibleByFileReferenceLiteral:
-  // SWIFT_ENABLE_TENSORFLOW
-  case KnownProtocolKind::ExpressibleByTensorFlowOp:
     break;
   }
 
