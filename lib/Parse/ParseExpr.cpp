@@ -2032,15 +2032,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   llvm::SaveAndRestore<ParsedTrivia> SavedLeadingTrivia(LeadingTrivia);
   llvm::SaveAndRestore<ParsedTrivia> SavedTrailingTrivia(TrailingTrivia);
 
-  // We're not in a place where an interpolation would be valid.
-  if (!CurLocalContext) {
-    // Return an error, but include an empty InterpolatedStringLiteralExpr 
-    // so that parseDeclPoundDiagnostic() can figure out why this string 
-    // literal was bad.
-    return makeParserErrorResult(
-        new (Context) InterpolatedStringLiteralExpr(Loc, 0, 0, nullptr));
-  }
-
   unsigned LiteralCapacity = 0;
   unsigned InterpolationCount = 0;
   TapExpr * AppendingExpr;
