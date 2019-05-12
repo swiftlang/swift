@@ -2319,12 +2319,6 @@ namespace {
       llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
     }
 
-    // SWIFT_ENABLE_TENSORFLOW
-    Expr *visitTFOp(ObjectLiteralExpr *expr) {
-      cs.TC.diagnose(expr->getLoc(), diag::invalid_tfop, "all tfops are now invalid");
-      return nullptr;
-    }
-
     Expr *visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
       if (cs.getType(expr) && !cs.getType(expr)->hasTypeVariable())
         return expr;
@@ -2336,12 +2330,6 @@ namespace {
       auto openedType = cs.getType(expr);
       auto type = simplifyType(openedType);
       cs.setType(expr, type);
-
-      // SWIFT_ENABLE_TENSORFLOW
-      // #tfop() declarations are not like normal object literals, so we use
-      // special checking logic.
-      if (expr->isTFOp())
-        return visitTFOp(expr);
 
       if (type->is<UnresolvedType>()) return expr;
 

@@ -252,13 +252,6 @@ NOTE(constexpr_not_evaluable, none,
 // TensorFlow Support Diagnostics.
 ERROR(tf_internal_error, none,
       "internal error: %0", (StringRef))
-ERROR(tfop_invalid_tfop, none,
-      "#tfop invalid: %0", (StringRef))
-ERROR(tfop_incorrect_definition, none,
-      "tfop function doesn't align with TensorFlow op definition:\n%0",
-      (StringRef))
-ERROR(tfop_value_no_send_receive, none,
-      "value cannot be used by non-TensorFlow API", ())
 ERROR(tf_multiple_device, none,
       "device configuration specified multiple times", ())
 NOTE(tf_multiple_device_prev, none,

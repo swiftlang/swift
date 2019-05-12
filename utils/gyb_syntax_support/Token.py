@@ -330,12 +330,6 @@ SYNTAX_TOKENS = [
          text=')', classification='StringInterpolationAnchor',
          serialization_code=101),
     Misc('Yield', 'kw_yield', serialization_code=116, text='yield'),
-
-    # SWIFT_ENABLE_TENSORFLOW
-    PoundObjectLiteral('PoundTensorFlowOp', 'tfop', text='#tfop',
-                       serialization_code=119,
-                       description='TensorFlow operation',
-                       protocol='ExpressibleByTensorFlowOp'),
 ]
 
 SYNTAX_TOKEN_MAP = {token.name + 'Token': token for token in SYNTAX_TOKENS}
