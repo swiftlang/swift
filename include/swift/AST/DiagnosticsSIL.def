@@ -248,52 +248,6 @@ NOTE(constexpr_called_from, none, "when called from here", ())
 NOTE(constexpr_not_evaluable, none,
      "expression not evaluable as constant here", ())
 
-// SWIFT_ENABLE_TENSORFLOW
-// TensorFlow Support Diagnostics.
-ERROR(tf_internal_error, none,
-      "internal error: %0", (StringRef))
-ERROR(tf_multiple_device, none,
-      "device configuration specified multiple times", ())
-NOTE(tf_multiple_device_prev, none,
-      "previous configuration is specified here", ())
-ERROR(tf_lowering_error, none,
-      "internal error generating TensorFlow graph:\n%0", (StringRef))
-ERROR(tf_lowering_unknown_op, none,
-      "op named '%0' is not registered in TensorFlow", (StringRef))
-ERROR(tf_convention_tf_host_code_not_allowed, none,
-      "host code is not allowed in a TensorFlow function", ())
-ERROR(tf_no_captures_in_tf_functions, none,
-      "TensorFlow functions cannot capture values", ())
-
-WARNING(tf_value_implicitly_copied_to_accel, none,
-        "%0 implicitly copied to the accelerator, use .toAccelerator() to make "
-        "transfer explicit",
-        (StringRef))
-WARNING(tf_value_implicitly_copied_to_accel_always, none,
-        "%0 always cause a copy to the accelerator, use .toAccelerator() to make "
-        "transfer explicit",
-        (StringRef))
-
-WARNING(tf_value_implicitly_copied_to_host, none,
-        "value implicitly copied to the host, use .toHost() to make "
-        "transfer explicit",
-        ())
-
-NOTE(tf_value_used_here, none,
-     "value used here", ())
-ERROR(tf_op_misuse, none,
-      "%0", (StringRef))
-NOTE(tf_op_misuse_note, none,
-     "%0", (StringRef))
-
-ERROR(tf_op_result_generic,none,
-      "cannot extract TensorFlow result into type %0, because %0 contains "
-      "unbound generic parameters", (Type))
-ERROR(tf_op_result_not_value_or_aggregate,none,
-      "cannot extract TensorFlow result into type %0, because %0 is not a "
-      "TensorFlow value type or an aggregate of TensorFlow value types",
-      (Type))
-
 // Control flow diagnostics.
 ERROR(missing_return,none,
       "missing return in a %select{function|closure}1 expected to return %0",

@@ -15,21 +15,8 @@
 // This file should only contain internal details: runtime-related public APIs
 // should be defined in `Execution.swift`.
 //
-// Design notes on TF eager based runtime:
-//
-// 1. A global context (`_ExecutionContext.global`) is used to manage all tensor
+// A global context (`_ExecutionContext.global`) is used to manage all tensor
 // computation and transfers.
-//
-// 2. When the tensor computation involves N device functions, run them in N
-// threads (but with the same execution/eager context). In addition, run the
-// host-side of sends/recvs in the main thread. These N + 1 threads form
-// "coroutines", and use sends/recvs mechanisms to communicate and unblock each
-// other's progress.
-// 2a) The sends/recvs mechanism between host and TF is the enqueue / dequeue
-// operations on TF (CPU-based) Fifo queues. Only tensor handles are transferred
-// in these enqueue / dequeue operations. For host to consume the content of the
-// tensor sent from TF, it uses TFE_TensorHandleResolve().
-// 2b) The sends/recvs mechanism between TF devices is the _Send / _Recv TF ops.
 //
 // Potential TODOs:
 // - Support async on platforms other than Linux and FreeBSD.
