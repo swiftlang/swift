@@ -167,7 +167,8 @@ public:
   static bool buildSwiftModuleFromSwiftInterface(
     ASTContext &Ctx, StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
-    bool SerializeDependencyHashes, bool TrackSystemDependencies);
+    bool SerializeDependencyHashes, bool TrackSystemDependencies,
+    bool RemarkOnRebuildFromInterface);
 };
 
 /// Extract the specified-or-defaulted -module-cache-path that winds up in

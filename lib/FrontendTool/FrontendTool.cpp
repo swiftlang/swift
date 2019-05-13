@@ -603,7 +603,7 @@ static bool buildModuleFromParseableInterface(CompilerInvocation &Invocation,
       PrebuiltCachePath, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(),
       FEOpts.SerializeModuleInterfaceDependencyHashes,
-      FEOpts.TrackSystemDeps);
+      FEOpts.TrackSystemDeps, FEOpts.RemarkOnRebuildFromModuleInterface);
 }
 
 static bool compileLLVMIR(CompilerInvocation &Invocation,
