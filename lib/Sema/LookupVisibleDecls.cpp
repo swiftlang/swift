@@ -923,6 +923,11 @@ static void lookupVisibleDynamicMemberLookupDecls(
     LazyResolver *typeResolver, GenericSignatureBuilder *GSB,
     VisitedSet &visited, llvm::DenseSet<TypeBase *> &seenDynamicLookup);
 
+/// Enumerates all members of \c baseType, including both directly visible and
+/// members visible by keypath dynamic member lookup.
+///
+/// \note This is an implementation detail of \c lookupVisibleMemberDecls and
+/// exists to create the correct recursion for dynamic member lookup.
 static void lookupVisibleMemberAndDynamicMemberDecls(
     Type baseType, VisibleDeclConsumer &consumer,
     KeyPathDynamicMemberConsumer &dynamicMemberConsumer, const DeclContext *DC,
@@ -936,6 +941,12 @@ static void lookupVisibleMemberAndDynamicMemberDecls(
                                         seenDynamicLookup);
 }
 
+/// Enumerates all keypath dynamic members of \c baseType, as seen from the
+/// context \c dc.
+///
+/// If \c baseType is \c @dynamicMemberLookup, this looks up any keypath
+/// dynamic member subscripts and looks up the members of the keypath's root
+/// type.
 static void lookupVisibleDynamicMemberLookupDecls(
     Type baseType, KeyPathDynamicMemberConsumer &consumer,
     const DeclContext *dc, LookupState LS, DeclVisibilityKind reason,
