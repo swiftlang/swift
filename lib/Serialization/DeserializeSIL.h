@@ -141,7 +141,7 @@ public:
     SILFunction *lookupSILFunction(StringRef Name,
                                    bool declarationOnly = false);
     bool hasSILFunction(StringRef Name, Optional<SILLinkage> Linkage = None);
-    SILVTable *lookupVTable(Identifier Name);
+    SILVTable *lookupVTable(StringRef MangledClassName);
     SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt);
     SILDefaultWitnessTable *
     lookupDefaultWitnessTable(SILDefaultWitnessTable *wt);
