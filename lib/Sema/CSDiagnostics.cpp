@@ -1732,6 +1732,14 @@ bool MissingCallFailure::diagnoseAsError() {
       return true;
     }
 
+    case ConstraintLocator::FunctionResult: {
+      path = path.drop_back();
+      if (path.back().getKind() != ConstraintLocator::AutoclosureResult)
+        break;
+
+      LLVM_FALLTHROUGH;
+    }
+
     case ConstraintLocator::AutoclosureResult: {
       auto &cs = getConstraintSystem();
       auto loc = cs.getConstraintLocator(getRawAnchor(), path.drop_back(),
