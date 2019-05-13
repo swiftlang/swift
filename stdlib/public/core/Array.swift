@@ -2008,6 +2008,12 @@ extension Array.DifferentiableView : Equatable where Element : Equatable {
   }
 }
 
+extension Array.DifferentiableView : CustomStringConvertible {
+  public var description: String {
+    return base.description
+  }
+}
+
 /// Makes `Array.DifferentiableView` additive as the product space.
 ///
 /// Note that `Array.DifferentiableView([])` is the zero in the product spaces
