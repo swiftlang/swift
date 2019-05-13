@@ -3195,7 +3195,7 @@ ERROR(iterator_protocol_broken,none,
 ERROR(label_shadowed, none,
       "label %0 cannot be reused on an inner statement", (Identifier))
 ERROR(break_outside_loop,none,
-      "'break' is only allowed inside a loop, if, do, or switch", ())
+      "'break' is only allowed inside a loop, if, do, repeat or switch", ())
 ERROR(unlabeled_break_outside_loop,none,
       "unlabeled 'break' is only allowed inside a loop or switch, a"
       " labeled break is required to exit an if or do", ())
