@@ -112,7 +112,7 @@ SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info):
 
 SDKNodeConformance::SDKNodeConformance(SDKNodeInitInfo Info):
   SDKNode(Info, SDKNodeKind::Conformance),
-  IsABIPlaceholder(Info.IsABIPlaceholder) {}
+  Usr(Info.Usr), IsABIPlaceholder(Info.IsABIPlaceholder) {}
 
 SDKNodeTypeWitness::SDKNodeTypeWitness(SDKNodeInitInfo Info):
   SDKNode(Info, SDKNodeKind::TypeWitness) {}
@@ -1708,6 +1708,7 @@ void SDKNode::jsonize(json::Output &out) {
 
 void SDKNodeConformance::jsonize(json::Output &out) {
   SDKNode::jsonize(out);
+  output(out, KeyKind::KK_usr, Usr);
   output(out, KeyKind::KK_isABIPlaceholder, IsABIPlaceholder);
 }
 
