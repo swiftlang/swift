@@ -269,6 +269,30 @@ public:
   void cacheResult(ArrayRef<Requirement> value) const;
 };
 
+/// Compute the default definition type of an associated type.
+class DefaultDefinitionTypeRequest :
+    public SimpleRequest<DefaultDefinitionTypeRequest,
+                         CacheKind::Cached,
+                         Type,
+                         AssociatedTypeDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type> evaluate(Evaluator &evaluator, AssociatedTypeDecl *decl) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Describes the owner of a where clause, from which we can extract
 /// requirements.
 struct WhereClauseOwner {
