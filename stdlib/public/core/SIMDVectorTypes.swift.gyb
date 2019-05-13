@@ -185,6 +185,15 @@ extension SIMD${n} where Scalar: BinaryFloatingPoint {
   }
 }
 
+extension SIMD${n} : AdditiveArithmetic
+  /*where SIMD${n} : RangeReplaceableCollection, Scalar : FloatingPoint*/ {
+  public static var zero: SIMD${n} {
+    return SIMD${n}()
+  }
+}
+
+extension SIMD${n} : VectorNumeric where Scalar : AdditiveArithmetic {}
+
 %end
 
 extension SIMD3 {
