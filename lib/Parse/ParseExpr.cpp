@@ -2022,31 +2022,17 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   // Add the open quote to the context; the quote should have the leading trivia
   // of the entire string token and a void trailing trivia.
   SyntaxContext->addToken(OpenQuote, LeadingTrivia, EmptyTrivia);
-
-  // We don't expose the entire interpolated string as one token. Instead, we
-  // should expose the tokens in each segment.
-  consumeTokenWithoutFeedingReceiver();
-  // We are going to mess with Tok to do reparsing for interpolated literals,
-  // don't lose our 'next' token.
-  llvm::SaveAndRestore<Token> SavedTok(Tok);
-  llvm::SaveAndRestore<ParsedTrivia> SavedLeadingTrivia(LeadingTrivia);
-  llvm::SaveAndRestore<ParsedTrivia> SavedTrailingTrivia(TrailingTrivia);
     
   // The simple case: just a single literal segment.
   if (Segments.size() == 1 &&
-    Segments.front().Kind == Lexer::StringSegment::Literal) {
+      Segments.front().Kind == Lexer::StringSegment::Literal) {
     {
+      consumeExtraToken(Tok);
+      consumeTokenWithoutFeedingReceiver();
+  
       SyntaxParsingContext SegmentsCtx(SyntaxContext,
                                        SyntaxKind::StringLiteralSegments);
-
-      // First segment shall inherit the attached comments.
-      unsigned CommentLength = 0;
-      CommentLength = SourceMgr.getByteDistance(EntireTok.getCommentRange().
-                                                getStart(), Loc);
-      consumeExtraToken(Token(tok::string_literal,
-                              CharSourceRange(SourceMgr, Loc, EndLoc).str(),
-                              CommentLength));
-
+        
       SyntaxParsingContext StrSegContext(SyntaxContext,
                                          SyntaxKind::StringSegment);
         
@@ -2061,17 +2047,27 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
     // Add the close quote the context; the quote should have a void leading trivia
     // and the trailing trivia of the entire string token.
     SyntaxContext->addToken(CloseQuote, EmptyTrivia, EntireTrailingTrivia);
-
-    return makeParserResult(createStringLiteralExprFromSegment(Context, L, Segments.front(), Loc));
-  }
     
+    return makeParserResult(
+        createStringLiteralExprFromSegment(Context, L, Segments.front(), Loc));
+  }
+
+  // We don't expose the entire interpolated string as one token. Instead, we
+  // should expose the tokens in each segment.
+  consumeTokenWithoutFeedingReceiver();
+  // We are going to mess with Tok to do reparsing for interpolated literals,
+  // don't lose our 'next' token.
+  llvm::SaveAndRestore<Token> SavedTok(Tok);
+  llvm::SaveAndRestore<ParsedTrivia> SavedLeadingTrivia(LeadingTrivia);
+  llvm::SaveAndRestore<ParsedTrivia> SavedTrailingTrivia(TrailingTrivia);
+
   // We're not in a place where an interpolation would be valid.
   if (!CurLocalContext) {
     // Return an error, but include an empty InterpolatedStringLiteralExpr
     // so that parseDeclPoundDiagnostic() can figure out why this string
     // literal was bad.
     return makeParserErrorResult(
-                                 new (Context) InterpolatedStringLiteralExpr(Loc, 0, 0, nullptr));
+        new (Context) InterpolatedStringLiteralExpr(Loc, 0, 0, nullptr));
   }
 
   unsigned LiteralCapacity = 0;
