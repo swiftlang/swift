@@ -1159,7 +1159,7 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
-    if (adfi->getParameterIndices()->isEmpty()) {
+    if (!adfi->getParameterIndices()->isEmpty()) {
       *this << "[wrt";
       for (auto i : adfi->getParameterIndices()->getIndices())
         *this << ' ' << i;

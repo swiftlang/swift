@@ -653,7 +653,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     uint64_t jvpNameId;
     uint64_t vjpNameId;
-    uint64_t source;
+    unsigned source;
     ArrayRef<uint64_t> rawParameterIndices;
     SmallVector<Requirement, 8> requirements;
 
@@ -662,6 +662,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     StringRef jvpName = MF->getIdentifier(jvpNameId).str();
     StringRef vjpName = MF->getIdentifier(vjpNameId).str();
+
     SmallVector<unsigned, 8> parameterIndices(rawParameterIndices.begin(),
                                               rawParameterIndices.end());
     auto *parameterIndexSubset = AutoDiffIndexSubset::get(

@@ -223,21 +223,30 @@ public:
 };
 
 class AutoDiffIndexSubset : public llvm::FoldingSetNode {
-private:
-  using BitWord = uint64_t;
+public:
+  typedef uint64_t BitWord;
 
+  static constexpr unsigned bitWordSize = sizeof(BitWord);
+  static constexpr unsigned numBitsPerBitWord = bitWordSize * 8;
+
+  static std::pair<unsigned, unsigned>
+  getBitWordIndexAndOffset(unsigned index) {
+    auto bitWordIndex = index / numBitsPerBitWord;
+    auto bitWordOffset = index % numBitsPerBitWord;
+    return {bitWordIndex, bitWordOffset};
+  }
+
+  static unsigned getNumBitWordsNeededForCapacity(unsigned capacity) {
+    if (capacity == 0) return 0;
+    return capacity / numBitsPerBitWord + 1;
+  }
+  
+private:
   /// The total capacity of the index subset, which is `1` less than the largest
   /// index.
   unsigned capacity;
   /// The number of bit words in the index subset. in the index subset.
   unsigned numBitWords;
-
-  static std::pair<unsigned, unsigned> getBitWordIndexAndOffset(unsigned index);
-  static unsigned getNumBitWordsNeededForCapacity(unsigned capacity);
-
-  unsigned getNumBitWords() const {
-    return numBitWords;
-  }
 
   BitWord *getBitWordsData() {
     return reinterpret_cast<BitWord *>(this + 1);
@@ -263,20 +272,45 @@ private:
     return {const_cast<BitWord *>(getBitWordsData()), getNumBitWords()};
   }
 
-  explicit AutoDiffIndexSubset(unsigned capacity, unsigned numBitWords,
-                               ArrayRef<unsigned> indices);
+  explicit AutoDiffIndexSubset(unsigned capacity, ArrayRef<unsigned> indices)
+      : capacity(capacity),
+        numBitWords(getNumBitWordsNeededForCapacity(capacity)) {
+    std::uninitialized_fill_n(getBitWordsData(), numBitWords, 0);
+    for (auto i : indices) {
+      unsigned bitWordIndex, offset;
+      std::tie(bitWordIndex, offset) = getBitWordIndexAndOffset(i);
+      getBitWord(bitWordIndex) |= (1 << offset);
+    }
+  }
 
 public:
   AutoDiffIndexSubset() = delete;
   AutoDiffIndexSubset(const AutoDiffIndexSubset &) = delete;
   AutoDiffIndexSubset &operator=(const AutoDiffIndexSubset &) = delete;
 
-  static AutoDiffIndexSubset *get(ASTContext &ctx, unsigned capacity,
-                                  bool includeAll = false);
-  static AutoDiffIndexSubset *get(ASTContext &ctx, unsigned capacity,
-                                  IntRange<> range);
-  static AutoDiffIndexSubset *get(ASTContext &ctx, unsigned capacity,
+  // Defined in ASTContext.h.
+  static AutoDiffIndexSubset *get(ASTContext &ctx,
+                                  unsigned capacity,
                                   ArrayRef<unsigned> indices);
+
+  static AutoDiffIndexSubset *getDefault(ASTContext &ctx,
+                                         unsigned capacity,
+                                         bool includeAll = false) {
+    if (includeAll)
+      return getFromRange(ctx, capacity, IntRange<>(capacity));
+    return get(ctx, capacity, {});
+  }
+
+  static AutoDiffIndexSubset *getFromRange(ASTContext &ctx,
+                                           unsigned capacity,
+                                           IntRange<> range) {
+    return get(ctx, capacity,
+               SmallVector<unsigned, 8>(range.begin(), range.end()));
+  }
+
+  unsigned getNumBitWords() const {
+    return numBitWords;
+  }
 
   unsigned getCapacity() const {
     return capacity;
@@ -284,10 +318,21 @@ public:
 
   class iterator;
 
-  iterator begin() const;
-  iterator end() const;
-  iterator_range<iterator> getIndices() const;
-  unsigned getNumIndices() const;
+  iterator begin() const {
+    return iterator(this);
+  }
+  
+  iterator end() const {
+    return iterator(this, (int)capacity);
+  }
+  
+  iterator_range<iterator> getIndices() const {
+    return make_range(begin(), end());
+  }
+
+  unsigned getNumIndices() const {
+    return (unsigned)std::distance(begin(), end());
+  }
 
   bool contains(unsigned index) const {
     unsigned bitWordIndex, offset;
@@ -295,30 +340,91 @@ public:
     return getBitWord(bitWordIndex) & (1 << offset);
   }
 
-  bool isEmpty() const;
-  bool equals(const AutoDiffIndexSubset *other) const;
-  bool isSubsetOf(const AutoDiffIndexSubset *other) const;
-  bool isSupersetOf(const AutoDiffIndexSubset *other) const;
+  bool isEmpty() const {
+    return llvm::all_of(getBitWords(), [](BitWord bw) { return !(bool)bw; });
+  }
+  
+  bool equals(const AutoDiffIndexSubset *other) const {
+    return capacity == other->getCapacity() &&
+        getBitWords().equals(other->getBitWords());
+  }
 
-  AutoDiffIndexSubset *adding(unsigned index, ASTContext &ctx) const;
-  AutoDiffIndexSubset *extendingCapacity(ASTContext &ctx,
-                                         unsigned newCapacity) const;
+  bool isSubsetOf(const AutoDiffIndexSubset *other) const {
+    assert(capacity == other->capacity);
+    for (auto index : range(numBitWords))
+      if (getBitWord(index) & ~other->getBitWord(index))
+        return false;
+    return true;
+  }
 
-  void Profile(llvm::FoldingSetNodeID &id) const;
+  bool isSupersetOf(const AutoDiffIndexSubset *other) const {
+    assert(capacity == other->capacity);
+    for (auto index : range(numBitWords))
+      if (~getBitWord(index) & other->getBitWord(index))
+        return false;
+    return true;
+  }
 
-private:
+  AutoDiffIndexSubset *adding(
+      unsigned index, ASTContext &ctx) const {
+    assert(index < getCapacity());
+    SmallVector<unsigned, 8> newIndices;
+    newIndices.reserve(capacity + 1);
+    bool inserted = false;
+    for (auto curIndex : getIndices()) {
+      if (inserted && curIndex > index) {
+        newIndices.push_back(index);
+        inserted = false;
+      }
+      newIndices.push_back(curIndex);
+    }
+    return get(ctx, capacity, newIndices);
+  }
+
+  AutoDiffIndexSubset *extendingCapacity(
+      ASTContext &ctx, unsigned newCapacity) const {
+    assert(newCapacity >= capacity);
+    if (newCapacity == capacity)
+      return const_cast<AutoDiffIndexSubset *>(this);
+    SmallVector<unsigned, 8> indices;
+    for (auto index : getIndices())
+      indices.push_back(index);
+    return AutoDiffIndexSubset::get(ctx, newCapacity, indices);
+  }
+
+  void Profile(llvm::FoldingSetNodeID &id) const {
+    id.AddInteger(capacity);
+    for (auto index : getIndices())
+      id.AddInteger(index);
+  }
+
+  void print(llvm::raw_ostream &s = llvm::outs()) const {
+    s << '{';
+    interleave(range(capacity), [this, &s](unsigned i) { s << contains(i); },
+               [&s] { s << ", "; });
+    s << '}';
+  }
+
+  void dump(llvm::raw_ostream &s = llvm::errs()) const {
+    s << "(autodiff_index_subset capacity=" << capacity << " indices=(";
+    interleave(getIndices(), [&s](unsigned i) { s << i; },
+               [&s] { s << ", "; });
+    s << "))";
+  }
+
   int findNext(int startIndex) const;
   int findFirst() const { return findNext(-1); }
   int findPrevious(int endIndex) const;
   int findLast() const { return findPrevious(capacity); }
 
-public:
   class iterator {
-  typedef unsigned value_type;
-  typedef int difference_type;
-  typedef unsigned * pointer;
-  typedef unsigned & reference;
-  typedef std::forward_iterator_tag iterator_category;
+  public:
+    typedef unsigned value_type;
+    typedef unsigned difference_type;
+    typedef unsigned * pointer;
+    typedef unsigned & reference;
+    typedef std::forward_iterator_tag iterator_category;
+
   private:
     const AutoDiffIndexSubset *parent;
     int current = 0;
@@ -349,40 +455,17 @@ public:
     unsigned operator*() const { return current; }
 
     bool operator==(const iterator &other) const {
-      assert(&parent == &other.parent &&
+      assert(parent == other.parent &&
              "Comparing iterators from different AutoDiffIndexSubsets");
       return current == other.current;
     }
 
     bool operator!=(const iterator &other) const {
-      assert(&parent == &other.parent &&
+      assert(parent == other.parent &&
              "Comparing iterators from different AutoDiffIndexSubsets");
       return current != other.current;
     }
   };
-};
-
-class AutoDiffFunctionParameterSubset {
-private:
-  AutoDiffIndexSubset *indexSubset;
-  bool curried;
-
-public:
-  explicit AutoDiffFunctionParameterSubset(
-      AutoDiffIndexSubset *indexSubset, bool isCurried)
-      : indexSubset(indexSubset), curried(isCurried) {}
-
-  explicit AutoDiffFunctionParameterSubset(
-      ASTContext &ctx, AutoDiffIndexSubset *parameterSubset,
-      Optional<bool> isSelfIncluded);
-
-  AutoDiffIndexSubset *getIndexSubset() const {
-    return indexSubset;
-  }
-
-  bool isCurried() const {
-    return curried;
-  }
 };
 
 /// SIL-level automatic differentiation indices. Consists of a source index,

@@ -4536,9 +4536,9 @@ AutoDiffParameterIndices::get(llvm::SmallBitVector indices, ASTContext &C) {
   return newNode;
 }
 
-AutoDiffIndexSubset *AutoDiffIndexSubset::get(ASTContext &ctx,
-                                              unsigned capacity,
-                                              ArrayRef<unsigned> indices) {
+AutoDiffIndexSubset *
+AutoDiffIndexSubset::get(ASTContext &ctx, unsigned capacity,
+                         ArrayRef<unsigned> indices) {
   auto &foldingSet = ctx.getImpl().AutoDiffIndexSubsets;
   llvm::FoldingSetNodeID id;
   id.AddInteger(capacity);
@@ -4548,7 +4548,7 @@ AutoDiffIndexSubset *AutoDiffIndexSubset::get(ASTContext &ctx,
   for (unsigned index : indices) {
 #ifndef NDEBUG
     assert((int)index > last && "Indices must be ascending");
-    last = index;
+    last = (int)index;
 #endif
     id.AddInteger(index);
   }
@@ -4556,11 +4556,11 @@ AutoDiffIndexSubset *AutoDiffIndexSubset::get(ASTContext &ctx,
   auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
   if (existing)
     return existing;
-  auto numBitWords = sizeof(AutoDiffIndexSubset) +
-  getNumBitWordsNeededForCapacity(capacity);
+  auto sizeToAlloc = sizeof(AutoDiffIndexSubset) +
+      getNumBitWordsNeededForCapacity(capacity);
   auto *buf = reinterpret_cast<AutoDiffIndexSubset *>(
-      ctx.Allocate(numBitWords, alignof(AutoDiffIndexSubset)));
-  auto *newNode = new (buf) AutoDiffIndexSubset(capacity, numBitWords, indices);
+      ctx.Allocate(sizeToAlloc, alignof(AutoDiffIndexSubset)));
+  auto *newNode = new (buf) AutoDiffIndexSubset(capacity, indices);
   foldingSet.InsertNode(newNode, insertPos);
   return newNode;
 }

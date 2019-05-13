@@ -437,11 +437,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       assert(DA->hasJVP() && DA->hasVJP() &&
              "JVP and VJP must exist in canonical SIL");
 
-    auto &paramIndices = DA->getIndices();
-    SmallVector<bool, 4> parameters;
-    for (unsigned i : range(paramIndices.parameters->getCapacity()))
-      parameters.push_back(paramIndices.parameters->contains(i));
-
+    auto &indices = DA->getIndices();
+    SmallVector<unsigned, 8> parameters(indices.parameters->begin(),
+                                        indices.parameters->end());
     SILDifferentiableAttrLayout::emitRecord(
         Out, ScratchRecord, differentiableAttrAbbrCode,
         DA->hasJVP()
@@ -450,7 +448,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
         DA->hasVJP()
             ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getVJPName()))
             : IdentifierID(),
-        paramIndices.source, parameters);
+        indices.source, parameters);
     S.writeGenericRequirements(DA->getRequirements(), SILAbbrCodes);
   }
 
