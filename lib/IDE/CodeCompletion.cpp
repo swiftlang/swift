@@ -2561,7 +2561,7 @@ public:
     }
 
     // If we won't be able to provide a result, bail out.
-    if (MemberType->hasError() && addName.empty() && !needInit)
+    if (!ConstructorType && addName.empty() && !needInit)
       return;
 
     // Add the constructor, possibly including any default arguments.
@@ -2579,8 +2579,6 @@ public:
         Builder.addTextChunk("init");
       } else if (!addName.empty()) {
         Builder.addTextChunk(addName.str());
-      } else {
-        assert(!MemberType->hasError() && "will insert empty result");
       }
 
       if (!ConstructorType) {
