@@ -353,7 +353,7 @@ bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
 // If there is 2+ writes, we can not optimize = (.
 
 bool mayFunctionMutateArgument(const AccessedStorage &storage, SILFunction &f) {
-  auto *arg = cast<SILFunctionArgument>(storage.getArgument(&f));
+  auto *arg = cast<SILFunctionArgument>(storage.getArgument());
 
   // Then check if we have an in_guaranteed argument. In this case, we can
   // always optimize load [copy] from this.
