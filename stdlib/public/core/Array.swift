@@ -1917,7 +1917,7 @@ extension Array where Element : Differentiable {
   /// The view of an array as the differentiable product manifold of `Element`
   /// multiplied with itself `count` times.
   @_fixed_layout
-  public struct DifferentiableView : Differentiable, CustomStringConvertible {
+  public struct DifferentiableView : Differentiable {
     private var _base: [Element]
 
     /// The viewed array.
@@ -1996,10 +1996,6 @@ extension Array where Element : Differentiable {
         selfElement.tangentVector(from: cotangentVectorElement)
       })
     }
-    
-    public var description: String {
-      return base.description
-    }
   }
 }
 
@@ -2009,6 +2005,13 @@ extension Array.DifferentiableView : Equatable where Element : Equatable {
     rhs: Array.DifferentiableView
   ) -> Bool {
     return lhs.base == rhs.base
+  }
+}
+
+extension Array.DifferentiableView : CustomStringConvertible
+where Element : Differentiable {
+  public var description: String {
+    return base.description
   }
 }
 
