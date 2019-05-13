@@ -1570,10 +1570,10 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
     }
     auto module = getModule(modulePath, /*allowLoading*/true);
     if (!module || module->failedToLoad()) {
-      // If we're missing the module we're shadowing, treat that specially.
+      // If we're missing the module we're an overlay for, treat that specially.
       if (modulePath.size() == 1 &&
           modulePath.front() == file->getParentModule()->getName()) {
-        return error(Status::MissingShadowedModule);
+        return error(Status::MissingUnderlyingModule);
       }
 
       // Otherwise, continue trying to load dependencies, so that we can list
@@ -1720,10 +1720,10 @@ TypeDecl *ModuleFile::lookupNestedType(Identifier name,
     }
   }
 
-  if (!ShadowedModule)
+  if (!UnderlyingModule)
     return nullptr;
 
-  for (FileUnit *file : ShadowedModule->getFiles())
+  for (FileUnit *file : UnderlyingModule->getFiles())
     if (auto *nestedType = file->lookupNestedType(name, parent))
       return nestedType;
 
@@ -2195,8 +2195,8 @@ ModuleFile::getOpaqueReturnTypeDecls(SmallVectorImpl<OpaqueTypeDecl *> &results)
 }
 
 void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results) {
-  if (ShadowedModule)
-    ShadowedModule->getDisplayDecls(results);
+  if (UnderlyingModule)
+    UnderlyingModule->getDisplayDecls(results);
 
   PrettyStackTraceModuleFile stackEntry(*this);
   getImportDecls(results);
