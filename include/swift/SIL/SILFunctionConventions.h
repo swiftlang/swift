@@ -322,6 +322,10 @@ public:
                          SILParameterTypeFunc(silConv)));
   }
 
+  SILYieldInfo getYieldInfoForOperandIndex(unsigned opIndex) const {
+    return getYields()[opIndex];
+  }
+
   //===--------------------------------------------------------------------===//
   // SILArgument API, including indirect results and parameters.
   //
