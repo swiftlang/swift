@@ -2008,8 +2008,7 @@ extension Array.DifferentiableView : Equatable where Element : Equatable {
   }
 }
 
-extension Array.DifferentiableView : CustomStringConvertible
-where Element : Differentiable {
+extension Array.DifferentiableView : CustomStringConvertible {
   public var description: String {
     return base.description
   }
