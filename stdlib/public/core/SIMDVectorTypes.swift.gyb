@@ -185,14 +185,133 @@ extension SIMD${n} where Scalar: BinaryFloatingPoint {
   }
 }
 
-extension SIMD${n} : AdditiveArithmetic
-  /*where SIMD${n} : RangeReplaceableCollection, Scalar : FloatingPoint*/ {
-  public static var zero: SIMD${n} {
-    return SIMD${n}()
+extension SIMD${n}
+  where Scalar : Differentiable,
+  Scalar.CotangentVector : SIMDScalar,
+  Scalar.TangentVector : SIMDScalar {
+  // Same implementation as DifferentiableView in Array.swift
+  @_fixed_layout // BART_TODO: what's this for?
+  public struct VectorView : Differentiable {
+    private var _base: SIMD${n}
+    
+    // The viewed SIMD vector
+    // I'm implementing this as a computed property instead of directly
+    // exposing `_base` because the `@differentiable` annotation does not make
+    // the stored property actually differentiable. I think this is a bug.
+    // Maybe it's related to `@_fixed_layout`?
+    // TODO: Determine if that is a bug, and fix.
+    public var base: SIMD${n} {
+      @differentiable(wrt: self, vjp: _vjpBase)
+      get { return _base }
+      _modify { yield &_base }
+    }
+    
+    @usableFromInline
+    func _vjpBase() ->
+    (SIMD${n}, (SIMD${n}<Scalar>.CotangentVector) -> CotangentVector) {
+      return (base, { $0 })
+    }
+    
+    /// Creates a differentiable view of the given SIMD vector.
+    @differentiable(wrt: base, vjp: _vjpInit)
+    public init(_ base: SIMD${n}) { self._base = base }
+    
+    @usableFromInline
+    static func _vjpInit(_ base: SIMD${n}) ->
+    (SIMD${n}.VectorView, (CotangentVector) -> CotangentVector) {
+      return (SIMD${n}.VectorView(base), { $0 })
+    }
+    
+    // MARK: - Differentiable conformance.
+    
+    public typealias TangentVector =
+    SIMD${n}<Scalar.TangentVector>.VectorView
+    public typealias CotangentVector =
+    SIMD${n}<Scalar.CotangentVector>.VectorView // ???????
+    public typealias AllDifferentiableVariables =
+    SIMD${n}<Scalar.AllDifferentiableVariables>.VectorView
+
+    public var allDifferentiableVariables: AllDifferentiableVariables {
+      get {
+        return AllDifferentiableVariables(
+        base.map { $0.allDifferentiableVariables })
+      }
+      set {
+        precondition(
+        base.count == newValue.base.count,
+        "cannot set \(SIMD${n}).VectorView.AllDifferentiableVariables " +
+        "with count \(base.count) to " +
+        "\(SIMD${n}).VectorView.AllDifferentiableVariables with " +
+        "different count \(newValue.base.count)")
+        for i in base.indices {
+          base[i].allDifferentiableVariables = newValue.base[i]
+        }
+      }
+    }
+    
+    public func moved(along direction: TangentVector) -> VectorView {
+      precondition(
+      base.count == direction.base.count,
+      "cannot move \(SIMD${n}).VectorView with count \(base.count) along " +
+      "direction with different count \(direction.base.count)")
+      return VectorView(
+      zip(base, direction.base).map { $0.moved(along: $1) })
+    }
+    
+    public func tangentVector(from cotangentVector: CotangentVector) ->
+    TangentVector {
+      precondition(
+      base.count == cotangentVector.base.count,
+      "cannot use \(SIMD${n}).VectorView with count \(base.count) to " +
+      "get tangentVector from cotangentVector with different count " +
+      "\(cotangentVector.base.count)")
+      return TangentVector(zip(base, cotangentVector.base).map {
+        (selfElement, cotangentVectorElement) in
+        selfElement.tangentVector(from: cotangentVectorElement)
+      })
+    }
   }
 }
 
-extension SIMD${n} : VectorNumeric where Scalar : AdditiveArithmetic {}
+/// Makes `SIMD${n}` differentiable as the product manifold of `Scalar`
+/// multiplied with itself `count` times.
+extension SIMD${n} : Differentiable
+  where Scalar : Differentiable,
+  Scalar.CotangentVector : SIMDScalar,
+  Scalar.TangentVector : SIMDScalar {
+  // In an ideal world, `TangentVector`, `CotangentVector`, and
+  // `AllDifferentiableVariables` would all be `SIMD${n}`s. Unfortunately, we
+  // can't conform `SIMD${n}` to `AdditiveArithmetic` for `TangentVector` and
+  // `CotangentVector`, because `SIMD${n}` already has a static `+` method with
+  // different semantics from `AdditiveArithmetic` `+`. So we use
+  // `SIMD${n}.VectorView` for all these associated types.
+  public typealias TangentVector =
+  SIMD${n}<Scalar.TangentVector>.VectorView
+  public typealias CotangentVector =
+  SIMD${n}<Scalar.CotangentVector>.VectorView
+  public typealias AllDifferentiableVariables =
+  SIMD${n}<Scalar.AllDifferentiableVariables>.VectorView
+
+  public var allDifferentiableVariables: AllDifferentiableVariables {
+    get {
+      return VectorView(self).allDifferentiableVariables
+    }
+    set {
+      var view = VectorView(self)
+      view.allDifferentiableVariables = newValue
+      self = view.base
+    }
+  }
+
+  public func moved(along direction: TangentVector) -> Array {
+    return VectorView(self).moved(along: direction).base
+  }
+
+  public func tangentVector(from cotangentVector: CotangentVector) ->
+  TangentVector {
+    return VectorView(self).tangentVector(from: cotangentVector)
+  }
+}
 
 %end
 
