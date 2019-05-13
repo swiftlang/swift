@@ -562,7 +562,7 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     // necessarily mean it's "system" module. User can make their own overlay
     // in non-system directory.
     // Remove this block after we fix the test suite.
-    if (auto shadowed = loadedModuleFile->getShadowedModule())
+    if (auto shadowed = loadedModuleFile->getUnderlyingModule())
       if (shadowed->isSystemModule())
         M.setIsSystemModule(true);
 
@@ -704,8 +704,8 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     break;
   }
 
-  case serialization::Status::MissingShadowedModule: {
-    Ctx.Diags.diagnose(diagLoc, diag::serialization_missing_shadowed_module,
+  case serialization::Status::MissingUnderlyingModule: {
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_missing_underlying_module,
                        ModuleName);
     if (Ctx.SearchPathOpts.SDKPath.empty() &&
         llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
@@ -938,7 +938,7 @@ void SerializedASTFile::collectLinkLibraries(
 }
 
 bool SerializedASTFile::isSystemModule() const {
-  if (auto Mod = File.getShadowedModule()) {
+  if (auto Mod = File.getUnderlyingModule()) {
     return Mod->isSystemModule();
   }
   return false;
@@ -1065,8 +1065,8 @@ StringRef SerializedASTFile::getFilename() const {
 }
 
 const clang::Module *SerializedASTFile::getUnderlyingClangModule() const {
-  if (auto *ShadowedModule = File.getShadowedModule())
-    return ShadowedModule->findUnderlyingClangModule();
+  if (auto *UnderlyingModule = File.getUnderlyingModule())
+    return UnderlyingModule->findUnderlyingClangModule();
   return nullptr;
 }
 

@@ -2010,14 +2010,14 @@ ModuleDecl *ModuleFile::getModule(ArrayRef<Identifier> name,
   // FIXME: duplicated from NameBinder::getModule
   if (name.size() == 1 &&
       name.front() == FileContext->getParentModule()->getName()) {
-    if (!ShadowedModule && allowLoading) {
+    if (!UnderlyingModule && allowLoading) {
       auto importer = getContext().getClangModuleLoader();
       assert(importer && "no way to import shadowed module");
-      ShadowedModule = importer->loadModule(SourceLoc(),
-                                            { { name.front(), SourceLoc() } });
+      UnderlyingModule = importer->loadModule(SourceLoc(),
+                                              {{name.front(), SourceLoc()}});
     }
 
-    return ShadowedModule;
+    return UnderlyingModule;
   }
 
   SmallVector<ImportDecl::AccessPathElement, 4> importPath;
