@@ -1553,8 +1553,6 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
     case SILFunctionType::Representation::Block:
       return SGF.emitBlockToFunc(loc, source, sourceFormalTy, resultFormalTy,
                                  resultTy);
-    // SWIFT_ENABLE_TENSORFLOW
-    case SILFunctionType::Representation::TensorFlow:
     case SILFunctionType::Representation::Method:
     case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
@@ -1584,8 +1582,6 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
                                  resultTy);
     case SILFunctionType::Representation::Block:
       llvm_unreachable("should not try block-to-block repr change");
-    // SWIFT_ENABLE_TENSORFLOW
-    case SILFunctionType::Representation::TensorFlow:
     case SILFunctionType::Representation::Method:
     case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:

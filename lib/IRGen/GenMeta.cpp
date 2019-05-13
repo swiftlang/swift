@@ -4167,7 +4167,6 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::ExpressibleByImageLiteral:
   case KnownProtocolKind::ExpressibleByFileReferenceLiteral:
   // SWIFT_ENABLE_TENSORFLOW
-  case KnownProtocolKind::ExpressibleByTensorFlowOp:
   case KnownProtocolKind::ExpressibleByBuiltinBooleanLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinExtendedGraphemeClusterLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinFloatLiteral:
@@ -4192,7 +4191,6 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::TensorGroup:
   case KnownProtocolKind::TensorFlowDataTypeCompatible:
   case KnownProtocolKind::TensorProtocol:
-  case KnownProtocolKind::TensorSendableReceivable:
   case KnownProtocolKind::VectorNumeric:
   // TODO(TF-213): Remove underscore `Differentiable` protocols.
   case KnownProtocolKind::__Differentiable:

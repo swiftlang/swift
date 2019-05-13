@@ -524,18 +524,6 @@ TensorTests.testAllBackends("StandardDeviation") {
     byError: 0.001)
 }
 
-TensorTests.testAllBackends("ReductionToScalar") {
-  let _: Tensor<Float> = [1, 2, 3, 4, 5]
-  // expectEqual(x.mean(), 3)
-  // TODO: Test other reduction ops here. Currently code motion isn't
-  // smart enough to avoid send/receive.
-
-  // TODO: remove the extra code below once TPU execution supports 0 output
-  // tensors (b/111123797)
-  let extra = Tensor<Float>(1.0)
-  _hostOp(extra)
-}
-
 TensorTests.testAllBackends("3Adds") {
   let a = Tensor<Float>([1])
   let b = Tensor<Float>([2])

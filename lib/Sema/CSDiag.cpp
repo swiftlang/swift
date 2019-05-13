@@ -6417,11 +6417,6 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
 bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
   auto &TC = CS.getTypeChecker();
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // TensorFlow ops don't act like other literals.
-  if (E->isTFOp())
-    return false;
-
   // Type check the argument first.
   auto protocol = TC.getLiteralProtocol(E);
   if (!protocol)

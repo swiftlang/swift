@@ -134,7 +134,6 @@ public:
   IGNORED_ATTR(Differentiable)
   IGNORED_ATTR(Differentiating)
   IGNORED_ATTR(CompilerEvaluable)
-  IGNORED_ATTR(TensorFlowGraph)
   IGNORED_ATTR(FieldwiseDifferentiable)
   IGNORED_ATTR(NoDerivative)
 #undef IGNORED_ATTR
@@ -876,7 +875,6 @@ public:
   void visitDifferentiableAttr(DifferentiableAttr *attr);
   void visitDifferentiatingAttr(DifferentiatingAttr *attr);
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
-  void visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr);
   void visitFieldwiseDifferentiableAttr(FieldwiseDifferentiableAttr *attr);
   void visitNoDerivativeAttr(NoDerivativeAttr *attr);
 };
@@ -3627,12 +3625,6 @@ void AttributeChecker::visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr) {
   // follow certain rules. We can only check these rules after the body is type
   // checked, and it's not type checked yet, so we check these rules later in
   // TypeChecker::checkFunctionBodyCompilerEvaluable().
-}
-
-// SWIFT_ENABLE_TENSORFLOW
-void AttributeChecker::visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr) {
-  diagnoseAndRemoveAttr(attr, diag::tf_graph_deprecated_please_remove);
-  return;
 }
 
 // SWIFT_ENABLE_TENSORFLOW

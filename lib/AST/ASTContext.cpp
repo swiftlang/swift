@@ -150,9 +150,6 @@ struct ASTContext::Implementation {
   /// The declaration of TensorFlow.TensorDataType.
   StructDecl *TensorDataTypeDecl = nullptr;
 
-  /// The declaration of Swift._AutoDiffTape<T>.
-  ClassDecl *AutoDiffTapeDecl = nullptr;
-
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** The declaration of Swift.NAME. */ \
   DECL_CLASS *NAME##Decl = nullptr;
@@ -875,12 +872,6 @@ StructDecl *ASTContext::getTensorDataTypeDecl() const {
   return nullptr;
 }
 
-CanType ASTContext::getAutoDiffTapeType() const {
-  if (auto adtDecl = get_AutoDiffTapeDecl())
-    return adtDecl->getDeclaredType()->getCanonicalType();
-  return CanType();
-}
-
 CanType ASTContext::getNeverType() const {
   auto neverDecl = getNeverDecl();
   if (!neverDecl)
@@ -958,7 +949,6 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::TensorArrayProtocol:
   case KnownProtocolKind::TensorGroup:
   case KnownProtocolKind::TensorFlowDataTypeCompatible:
-  case KnownProtocolKind::TensorSendableReceivable:
   case KnownProtocolKind::TensorProtocol:
     M = getLoadedModule(Id_TensorFlow);
     break;

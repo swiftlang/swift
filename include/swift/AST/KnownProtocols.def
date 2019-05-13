@@ -85,7 +85,6 @@ PROTOCOL(TensorArrayProtocol)
 PROTOCOL(TensorGroup)
 PROTOCOL_(TensorFlowDataTypeCompatible)
 PROTOCOL(TensorProtocol)
-PROTOCOL(TensorSendableReceivable)
 PROTOCOL(VectorNumeric)
 // TODO(TF-213): Remove underscore `Differentiable` protocols.
 PROTOCOL(__Differentiable)
@@ -111,8 +110,6 @@ EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByUnicodeScalarLiteral, "UnicodeScala
 EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByColorLiteral, "_ColorLiteralType", true)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByImageLiteral, "_ImageLiteralType", true)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByFileReferenceLiteral, "_FileReferenceLiteralType", true)
-// SWIFT_ENABLE_TENSORFLOW
-EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByTensorFlowOp, "_ExpressibleByTensorFlowOp", true)
 
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinBooleanLiteral)
 BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinExtendedGraphemeClusterLiteral)

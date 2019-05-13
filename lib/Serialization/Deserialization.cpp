@@ -4316,8 +4316,6 @@ getActualSILFunctionTypeRepresentation(uint8_t rep) {
   CASE(Method)
   CASE(ObjCMethod)
   CASE(WitnessMethod)
-  // SWIFT_ENABLE_TENSORFLOW
-  CASE(TensorFlow)
 #undef CASE
   default:
     return None;

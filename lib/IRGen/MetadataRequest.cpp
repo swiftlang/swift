@@ -2054,8 +2054,6 @@ namespace {
       case SILFunctionType::Representation::ObjCMethod:
       case SILFunctionType::Representation::CFunctionPointer:
       case SILFunctionType::Representation::Closure:
-      // SWIFT_ENABLE_TENSORFLOW
-      case SILFunctionType::Representation::TensorFlow:
 
         // A thin function looks like a plain pointer.
         // FIXME: Except for extra inhabitants?
@@ -2268,8 +2266,6 @@ namespace {
       case SILFunctionType::Representation::ObjCMethod:
       case SILFunctionType::Representation::CFunctionPointer:
       case SILFunctionType::Representation::Closure:
-      // SWIFT_ENABLE_TENSORFLOW
-        case SILFunctionType::Representation::TensorFlow:
 
         // A thin function looks like a plain pointer.
         // FIXME: Except for extra inhabitants?
