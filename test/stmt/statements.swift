@@ -124,7 +124,7 @@ SomeGeneric<Int>
   .builder2()
 
 
-break // expected-error {{'break' is only allowed inside a loop, if, do, or switch}}
+break // expected-error {{'break' is only allowed inside a loop, if, do, repeat or switch}}
 continue // expected-error {{'continue' is only allowed inside a loop}}
 while true {
   func f() {
@@ -548,7 +548,7 @@ do {
 
 func fn(a: Int) {
   guard a < 1 else {
-    break // expected-error {{'break' is only allowed inside a loop, if, do, or switch}}
+    break // expected-error {{'break' is only allowed inside a loop, if, do, repeat or switch}}
   }
 }
 
