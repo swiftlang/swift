@@ -5,5 +5,6 @@ add_swift_target_library(swiftStdlibUnittestFoundationExtras ${SWIFT_STDLIB_LIBR
   UnavailableFoundationMethodThunks.mm
 
   SWIFT_MODULE_DEPENDS Foundation StdlibUnittest
-  INSTALL_IN_COMPONENT stdlib-experimental)
+  INSTALL_IN_COMPONENT stdlib-experimental
+  DARWIN_INSTALL_NAME_DIR "${SWIFT_DARWIN_STDLIB_PRIVATE_INSTALL_NAME_DIR}")
 
