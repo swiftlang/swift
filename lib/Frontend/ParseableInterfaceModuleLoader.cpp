@@ -289,6 +289,7 @@ class swift::ParseableInterfaceBuilder {
   const StringRef prebuiltCachePath;
   const bool serializeDependencyHashes;
   const bool trackSystemDependencies;
+  const bool remarkOnRebuildFromInterface;
   const SourceLoc diagnosticLoc;
   DependencyTracker *const dependencyTracker;
   CompilerInvocation subInvocation;
@@ -350,7 +351,12 @@ class swift::ParseableInterfaceBuilder {
     // Tell the subinvocation to serialize dependency hashes if asked to do so.
     auto &frontendOpts = subInvocation.getFrontendOptions();
     frontendOpts.SerializeModuleInterfaceDependencyHashes =
-      serializeDependencyHashes;
+        serializeDependencyHashes;
+
+    // Tell the subinvocation to remark on rebuilds from an interface if asked
+    // to do so.
+    frontendOpts.RemarkOnRebuildFromModuleInterface =
+        remarkOnRebuildFromInterface;
   }
 
   bool extractSwiftInterfaceVersionAndArgs(
@@ -473,6 +479,7 @@ public:
                             StringRef prebuiltCachePath,
                             bool serializeDependencyHashes = false,
                             bool trackSystemDependencies = false,
+                            bool remarkOnRebuildFromInterface = false,
                             SourceLoc diagnosticLoc = SourceLoc(),
                             DependencyTracker *tracker = nullptr)
   : ctx(ctx), fs(*ctx.SourceMgr.getFileSystem()), diags(ctx.Diags),
@@ -480,6 +487,7 @@ public:
   moduleCachePath(moduleCachePath), prebuiltCachePath(prebuiltCachePath),
   serializeDependencyHashes(serializeDependencyHashes),
   trackSystemDependencies(trackSystemDependencies),
+  remarkOnRebuildFromInterface(remarkOnRebuildFromInterface),
   diagnosticLoc(diagnosticLoc), dependencyTracker(tracker) {
     configureSubInvocation();
   }
@@ -1230,7 +1238,7 @@ class ParseableInterfaceModuleLoaderImpl {
     ParseableInterfaceBuilder builder(
       ctx, interfacePath, moduleName, cacheDir, prebuiltCacheDir,
       /*serializeDependencyHashes*/false, trackSystemDependencies,
-      diagnosticLoc, dependencyTracker);
+      remarkOnRebuildFromInterface, diagnosticLoc, dependencyTracker);
     auto &subInvocation = builder.getSubInvocation();
 
     // Compute the output path if we're loading or emitting a cached module.
@@ -1367,11 +1375,13 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
 bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
   ASTContext &Ctx, StringRef CacheDir, StringRef PrebuiltCacheDir,
   StringRef ModuleName, StringRef InPath, StringRef OutPath,
-  bool SerializeDependencyHashes, bool TrackSystemDependencies) {
+  bool SerializeDependencyHashes, bool TrackSystemDependencies,
+  bool RemarkOnRebuildFromInterface) {
   ParseableInterfaceBuilder builder(Ctx, InPath, ModuleName,
                                     CacheDir, PrebuiltCacheDir,
                                     SerializeDependencyHashes,
-                                    TrackSystemDependencies);
+                                    TrackSystemDependencies,
+                                    RemarkOnRebuildFromInterface);
   // FIXME: We really only want to serialize 'important' dependencies here, if
   //        we want to ship the built swiftmodules to another machine.
   return builder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
