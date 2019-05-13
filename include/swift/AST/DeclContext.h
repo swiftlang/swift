@@ -149,6 +149,8 @@ enum class ConformanceLookupKind : unsigned {
   All,
   /// Only the explicit conformance.
   OnlyExplicit,
+  /// All conformances except for inherited ones.
+  NonInherited,
 };
 
 /// Describes a diagnostic for a conflict between two protocol
