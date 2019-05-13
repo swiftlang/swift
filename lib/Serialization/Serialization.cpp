@@ -3212,7 +3212,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(theClass->getDeclContext());
 
     auto conformances = theClass->getLocalConformances(
-                          ConformanceLookupKind::All, nullptr);
+                          ConformanceLookupKind::NonInherited, nullptr);
 
     SmallVector<TypeID, 4> inheritedTypes;
     for (auto inherited : theClass->getInherited()) {
