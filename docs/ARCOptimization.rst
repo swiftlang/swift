@@ -440,7 +440,7 @@ In the following we assume that all loops are canonicalized such that:
 3. All exiting edges have a unique exit block.
 
 Motivation
------------
+----------
 
 Consider the following simple loop::
 
