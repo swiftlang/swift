@@ -535,7 +535,7 @@ extension UnsafeMutableRawBufferPointer {
 // Note that the second overload is declared on a more specific protocol.
 // See: test/stdlib/StringFlatMap.swift for tests.
 extension Sequence {
-  @available(swift, deprecated: 4.1, obsoleted: 5.1, renamed: "compactMap(_:)",
+  @available(swift, deprecated: 4.1/*, obsoleted: 5.1 */, renamed: "compactMap(_:)",
     message: "Please use compactMap(_:) for the case where closure returns an optional value")
   public func flatMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?
