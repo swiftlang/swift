@@ -2031,6 +2031,39 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   llvm::SaveAndRestore<Token> SavedTok(Tok);
   llvm::SaveAndRestore<ParsedTrivia> SavedLeadingTrivia(LeadingTrivia);
   llvm::SaveAndRestore<ParsedTrivia> SavedTrailingTrivia(TrailingTrivia);
+    
+  // The simple case: just a single literal segment.
+  if (Segments.size() == 1 &&
+    Segments.front().Kind == Lexer::StringSegment::Literal) {
+    {
+      SyntaxParsingContext SegmentsCtx(SyntaxContext,
+                                       SyntaxKind::StringLiteralSegments);
+
+      // First segment shall inherit the attached comments.
+      unsigned CommentLength = 0;
+      CommentLength = SourceMgr.getByteDistance(EntireTok.getCommentRange().
+                                                getStart(), Loc);
+      consumeExtraToken(Token(tok::string_literal,
+                              CharSourceRange(SourceMgr, Loc, EndLoc).str(),
+                              CommentLength));
+
+      SyntaxParsingContext StrSegContext(SyntaxContext,
+                                         SyntaxKind::StringSegment);
+        
+      // Make an unknown token to encapsulate the entire string segment and add
+      // such token to the context.
+      auto Segment = Segments.front();
+      Token content(tok::string_segment,
+                    CharSourceRange(Segment.Loc, Segment.Length).str());
+      SyntaxContext->addToken(content, EmptyTrivia, EmptyTrivia);
+    }
+    
+    // Add the close quote the context; the quote should have a void leading trivia
+    // and the trailing trivia of the entire string token.
+    SyntaxContext->addToken(CloseQuote, EmptyTrivia, EntireTrailingTrivia);
+
+    return makeParserResult(createStringLiteralExprFromSegment(Context, L, Segments.front(), Loc));
+  }
 
   unsigned LiteralCapacity = 0;
   unsigned InterpolationCount = 0;
@@ -2072,13 +2105,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   if (AppendingExpr->getBody()->getNumElements() == 1) {
     Status.setIsParseError();
     return makeParserResult(Status, new (Context) ErrorExpr(Loc));
-  }
-    
-  // The simple case: just a single literal segment.
-  if (Segments.size() == 1 &&
-      Segments.front().Kind == Lexer::StringSegment::Literal) {
-    return makeParserResult(
-                            createStringLiteralExprFromSegment(Context, L, Segments.front(), Loc));
   }
 
   return makeParserResult(Status, new (Context) InterpolatedStringLiteralExpr(
