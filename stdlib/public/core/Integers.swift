@@ -716,6 +716,8 @@ public protocol BinaryInteger :
   ///     let x = Int8(bitPattern: 0b1111_1000)
   ///     // x == -8
   ///     // x.trailingZeroBitCount == 3
+  ///
+  /// If the value is zero, then `trailingZeroBitCount` is equal to `bitWidth`.
   var trailingZeroBitCount: Int { get }
 
   /// Returns the quotient of dividing the first value by the second.
@@ -2081,6 +2083,8 @@ where Magnitude : FixedWidthInteger & UnsignedInteger,
   ///     let x: Int8 = 0b0001_1111
   ///     // x == 31
   ///     // x.leadingZeroBitCount == 3
+  ///
+  /// If the value is zero, then `leadingZeroBitCount` is equal to `bitWidth`.
   var leadingZeroBitCount: Int { get }
 
   /// Creates an integer from its big-endian representation, changing the byte
