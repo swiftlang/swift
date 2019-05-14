@@ -1590,9 +1590,8 @@ void ConstExprEvaluator::computeConstantValues(
 
 ConstExprStepEvaluator::ConstExprStepEvaluator(SymbolicValueAllocator &alloc,
                                                SILFunction *fun)
-    : evaluator(ConstExprEvaluator(alloc)),
-      internalState(
-          new ConstExprFunctionState(evaluator, fun, {}, stepsEvaluated)) {
+    : evaluator(alloc), internalState(new ConstExprFunctionState(
+                            evaluator, fun, {}, stepsEvaluated)) {
   assert(fun);
 }
 
