@@ -1436,7 +1436,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::Class: {
     // Emit witness tables.
     auto nom = cast<NominalTypeDecl>(d);
-    for (auto c : nom->getLocalConformances(ConformanceLookupKind::All,
+    for (auto c : nom->getLocalConformances(ConformanceLookupKind::NonInherited,
                                             nullptr)) {
       auto *proto = c->getProtocol();
       if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto) &&
