@@ -142,9 +142,9 @@ func testShadow1(r: Shadow1<Point>) {
   r.#^testShadow1^#
 }
 // testShadow1-NOT: x[#Int#];
-// testShadow1: Decl[InstanceVar]/CurrNominal:      x[#String#];
-// testShadow1-NOT: x[#Int#];
 // testShadow1: Decl[InstanceVar]/CurrNominal:      y[#Int#];
+// testShadow1-NOT: x[#Int#];
+// testShadow1: Decl[InstanceVar]/CurrNominal:      x[#String#];
 
 @dynamicMemberLookup
 protocol P {
@@ -312,16 +312,16 @@ func testAnyObjectRoot1(r: AnyObjectRoot) {
 func testNested1(r: Lens<Lens<Point>>) {
   r.#^testNested1^#
 // testNested1: Begin completions
-// FIXME-DAG: Decl[InstanceVar]/CurrNominal:      x[#Int#];
-// FIXME-DAG: Decl[InstanceVar]/CurrNominal:      y[#Int#];
+// testNested1-DAG: Decl[InstanceVar]/CurrNominal:      x[#Int#];
+// testNested1-DAG: Decl[InstanceVar]/CurrNominal:      y[#Int#];
 // testNested1: End completions
 }
 
 func testNested2(r: Lens<Lens<Lens<Point>>>) {
   r.#^testNested2^#
 // testNested2: Begin completions
-// FIXME-DAG: Decl[InstanceVar]/CurrNominal:      x[#Int#];
-// FIXME-DAG: Decl[InstanceVar]/CurrNominal:      y[#Int#];
+// testNested2-DAG: Decl[InstanceVar]/CurrNominal:      x[#Int#];
+// testNested2-DAG: Decl[InstanceVar]/CurrNominal:      y[#Int#];
 // testNested2: End completions
 }
 
