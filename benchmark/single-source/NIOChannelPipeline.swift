@@ -97,7 +97,7 @@ func runBench(iterations: Int) {
     pipeline.addHandler(ConsumingHandler())
 
     for _ in 0 ..< iterations {
-        for _ in 0 ..< 100 {
+        for _ in 0 ..< 1000 {
             pipeline.fireEvent()
         }
     }
