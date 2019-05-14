@@ -2815,3 +2815,65 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
                                      eltType, contextualType, anchor);
   return true;
 }
+
+bool MissingContextualConformanceFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+  auto path = getLocator()->getPath();
+
+  Optional<Diag<Type, Type>> diagnostic;
+  if (path.empty()) {
+    assert(isa<AssignExpr>(anchor));
+    diagnostic = getDiagnosticFor(CTP_AssignSource);
+  } else {
+    const auto &last = path.back();
+    switch (last.getKind()) {
+    case ConstraintLocator::ContextualType:
+      assert(Context != CTP_Unused);
+      diagnostic = getDiagnosticFor(Context);
+      break;
+    }
+  }
+
+  emitDiagnostic(anchor->getLoc(), *diagnostic, getFromType(), getToType());
+  return true;
+}
+
+Optional<Diag<Type, Type>>
+MissingContextualConformanceFailure::getDiagnosticFor(
+    ContextualTypePurpose context) {
+  switch (context) {
+  case CTP_Initialization:
+    return diag::cannot_convert_initializer_value_protocol;
+  case CTP_ReturnStmt:
+  case CTP_ReturnSingleExpr:
+    return diag::cannot_convert_to_return_type_protocol;
+  case CTP_EnumCaseRawValue:
+    return diag::cannot_convert_raw_initializer_value;
+  case CTP_DefaultParameter:
+    return diag::cannot_convert_default_arg_value_protocol;
+  case CTP_YieldByValue:
+    return diag::cannot_convert_yield_value_protocol;
+  case CTP_CallArgument:
+    return diag::cannot_convert_argument_value_protocol;
+  case CTP_ClosureResult:
+    return diag::cannot_convert_closure_result_protocol;
+  case CTP_ArrayElement:
+    return diag::cannot_convert_array_element_protocol;
+  case CTP_DictionaryKey:
+    return diag::cannot_convert_dict_key_protocol;
+  case CTP_DictionaryValue:
+    return diag::cannot_convert_dict_value_protocol;
+  case CTP_CoerceOperand:
+    return diag::cannot_convert_coerce_protocol;
+  case CTP_AssignSource:
+    return diag::cannot_convert_assign_protocol;
+
+  case CTP_ThrowStmt:
+  case CTP_Unused:
+  case CTP_CannotFail:
+  case CTP_YieldByReference:
+  case CTP_CalleeResult:
+    break;
+  }
+  return None;
+}

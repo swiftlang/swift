@@ -363,14 +363,19 @@ private:
 
 /// Add a new conformance to the type to satisfy a requirement.
 class MissingConformance final : public ConstraintFix {
+  // Determines whether given protocol type comes from the context e.g.
+  // assignment destination or argument comparison.
+  bool IsContextual;
+
   Type NonConformingType;
   // This could either be a protocol or protocol composition.
   Type ProtocolType;
 
-  MissingConformance(ConstraintSystem &cs, Type type, Type protocolType,
-                     ConstraintLocator *locator)
+  MissingConformance(ConstraintSystem &cs, bool isContextual, Type type,
+                     Type protocolType, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AddConformance, locator),
-        NonConformingType(type), ProtocolType(protocolType) {}
+        IsContextual(isContextual), NonConformingType(type),
+        ProtocolType(protocolType) {}
 
 public:
   std::string getName() const override {
@@ -379,9 +384,13 @@ public:
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static MissingConformance *create(ConstraintSystem &cs, Type type,
-                                    Type protocolType,
-                                    ConstraintLocator *locator);
+  static MissingConformance *forRequirement(ConstraintSystem &cs, Type type,
+                                            Type protocolType,
+                                            ConstraintLocator *locator);
+
+  static MissingConformance *forContextual(ConstraintSystem &cs, Type type,
+                                           Type protocolType,
+                                           ConstraintLocator *locator);
 
   Type getNonConformingType() { return NonConformingType; }
 

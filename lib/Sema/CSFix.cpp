@@ -160,16 +160,35 @@ RelabelArguments::create(ConstraintSystem &cs,
 }
 
 bool MissingConformance::diagnose(Expr *root, bool asNote) const {
-  MissingConformanceFailure failure(root, getConstraintSystem(), getLocator(),
-                                    {NonConformingType, ProtocolType});
+  auto &cs = getConstraintSystem();
+  auto *locator = getLocator();
+
+  if (IsContextual) {
+    auto context = cs.getContextualTypePurpose();
+    MissingContextualConformanceFailure failure(
+        root, cs, context, NonConformingType, ProtocolType, locator);
+    return failure.diagnose(asNote);
+  }
+
+  MissingConformanceFailure failure(
+      root, cs, locator, std::make_pair(NonConformingType, ProtocolType));
   return failure.diagnose(asNote);
 }
 
-MissingConformance *MissingConformance::create(ConstraintSystem &cs, Type type,
-                                               Type protocolType,
-                                               ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      MissingConformance(cs, type, protocolType, locator);
+MissingConformance *
+MissingConformance::forContextual(ConstraintSystem &cs, Type type,
+                                  Type protocolType,
+                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator()) MissingConformance(
+      cs, /*isContextual=*/true, type, protocolType, locator);
+}
+
+MissingConformance *
+MissingConformance::forRequirement(ConstraintSystem &cs, Type type,
+                                   Type protocolType,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) MissingConformance(
+      cs, /*isContextual=*/false, type, protocolType, locator);
 }
 
 bool SkipSameTypeRequirement::diagnose(Expr *root, bool asNote) const {
