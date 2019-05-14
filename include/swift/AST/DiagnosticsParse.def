@@ -1535,7 +1535,7 @@ ERROR(sil_inst_autodiff_operand_list_expected_rbrace,PointsToFirstBadToken,
 ERROR(sil_inst_autodiff_num_operand_list_order_mismatch,PointsToFirstBadToken,
       "the number of operand lists does not match the order", ())
 ERROR(sil_inst_autodiff_expected_associated_function_kind_attr,PointsToFirstBadToken,
-      "expected an assoiacted function kind attribute, e.g. '[jvp]'", ())
+      "expected an associated function kind attribute, e.g. '[jvp]'", ())
 ERROR(sil_inst_autodiff_expected_function_type_operand,PointsToFirstBadToken,
       "expected an operand of a function type", ())
 

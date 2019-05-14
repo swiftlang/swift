@@ -245,7 +245,7 @@ private:
   /// The total capacity of the index subset, which is `1` less than the largest
   /// index.
   unsigned capacity;
-  /// The number of bit words in the index subset. in the index subset.
+  /// The number of bit words in the index subset.
   unsigned numBitWords;
 
   BitWord *getBitWordsData() {

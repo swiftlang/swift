@@ -943,8 +943,8 @@ public:
     for (auto *rda : original->getDifferentiableAttrs()) {
       auto *rdaIndexSet = rda->getIndices().parameters;
       // If all indices in `indexSet` are in `rdaIndexSet`, and it has fewer
-      // indices than our current candidate and a primitive VJP, `rda` is our
-      // new candidate.
+      // indices than our current candidate and a primitive VJP, then `rda` is
+      // our new candidate.
       //
       // NOTE: `rda` may come from a un-partial-applied function, it may have
       // more parameters than the desired indices. We expect this logic to go
