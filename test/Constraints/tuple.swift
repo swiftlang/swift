@@ -289,3 +289,13 @@ func singleElementTuple() {
   let _ = ((label: 123)) // expected-error {{cannot create a single-element tuple with an element label}} {{13-20=}}
   let _ = ((label: 123)).label // expected-error {{cannot create a single-element tuple with an element label}} {{13-20=}}
 }
+
+// Tuples with duplicate labels
+
+let dupLabel1: (foo: Int, foo: Int) = (foo: 1, foo: 2) // expected-error 2{{cannot create a tuple with a duplicate element label}}
+
+func dupLabel2(x a: Int, x b: Int) -> (y: Int, y: Int) { // expected-error {{cannot create a tuple with a duplicate element label}}
+  return (a, b)
+}
+
+let _ = (bar: 0, bar: "") // expected-error {{cannot create a tuple with a duplicate element label}}

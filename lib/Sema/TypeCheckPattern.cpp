@@ -313,7 +313,7 @@ public:
   Pattern *visitExprPattern(ExprPattern *P) {
     if (P->isResolved())
       return P;
-    
+
     // Try to convert to a pattern.
     Pattern *exprAsPattern = visit(P->getSubExpr());
     // If we failed, keep the ExprPattern as is.

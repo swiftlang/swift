@@ -269,6 +269,27 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         }
       }
 
+      // Diagnose tuple expressions with duplicate element label
+      if (auto *tupleExpr = dyn_cast<TupleExpr>(E)) {
+        auto diagnose = false;
+
+        llvm::SmallDenseSet<Identifier> names;
+        names.reserve(tupleExpr->getNumElements());
+
+        for (auto name : tupleExpr->getElementNames()) {
+          if (names.count(name) == 1) {
+            diagnose = true;
+            break;
+          }
+
+          names.insert(name);
+        }
+
+        if (diagnose) {
+          TC.diagnose(tupleExpr->getLoc(), diag::tuple_duplicate_label);
+        }
+      }
+
       return { true, E };
     }
 
