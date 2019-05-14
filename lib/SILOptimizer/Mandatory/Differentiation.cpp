@@ -213,9 +213,10 @@ static FuncDecl *findOperatorDeclInProtocol(DeclName operatorName,
 /// qualifier for creating a `store` instruction into the buffer.
 static StoreOwnershipQualifier getBufferSOQ(Type type, SILFunction &fn) {
   if (fn.hasOwnership())
-    return fn.getModule().Types.getTypeLowering(type, ResilienceExpansion::Minimal).isTrivial()
-               ? StoreOwnershipQualifier::Trivial
-               : StoreOwnershipQualifier::Init;
+    return fn.getModule().Types.getTypeLowering(
+        type, ResilienceExpansion::Minimal).isTrivial()
+            ? StoreOwnershipQualifier::Trivial
+            : StoreOwnershipQualifier::Init;
   return StoreOwnershipQualifier::Unqualified;
 }
 
@@ -223,9 +224,10 @@ static StoreOwnershipQualifier getBufferSOQ(Type type, SILFunction &fn) {
 /// qualified for creating a `load` instruction from the buffer.
 static LoadOwnershipQualifier getBufferLOQ(Type type, SILFunction &fn) {
   if (fn.hasOwnership())
-    return fn.getModule().Types.getTypeLowering(type, ResilienceExpansion::Minimal).isTrivial()
-               ? LoadOwnershipQualifier::Trivial
-               : LoadOwnershipQualifier::Take;
+    return fn.getModule().Types.getTypeLowering(
+        type, ResilienceExpansion::Minimal).isTrivial()
+            ? LoadOwnershipQualifier::Trivial
+            : LoadOwnershipQualifier::Take;
   return LoadOwnershipQualifier::Unqualified;
 }
 
@@ -932,22 +934,31 @@ public:
   DifferentiationTask *
   lookUpMinimalDifferentiationTask(SILFunction *original,
                                    const SILAutoDiffIndices &indices) {
-    auto supersetParamIndices = llvm::SmallBitVector();
-    const auto &indexSet = indices.parameters;
+    auto *superset = AutoDiffIndexSubset::getDefault(
+        getASTContext(),
+        original->getLoweredFunctionType()->getNumParameters(), false);
+    auto *indexSet = indices.parameters;
     if (auto *existingTask = lookUpDifferentiationTask(original, indices))
       return existingTask;
     for (auto *rda : original->getDifferentiableAttrs()) {
-      const auto &rdaIndexSet = rda->getIndices().parameters;
-      // If all indices in indexSet are in rdaIndexSet, and it has fewer
-      // indices than our current candidate and a primitive adjoint, rda is our
-      // new candidate.
-      if (!indexSet.test(rdaIndexSet) && // all indexSet indices in rdaIndexSet
-          (supersetParamIndices.empty() || // fewer parameters than before
-           rdaIndexSet.count() < supersetParamIndices.count()))
-        supersetParamIndices = rda->getIndices().parameters;
+      auto *rdaIndexSet = rda->getIndices().parameters;
+      // If all indices in `indexSet` are in `rdaIndexSet`, and it has fewer
+      // indices than our current candidate and a primitive VJP, then `rda` is
+      // our new candidate.
+      //
+      // NOTE: `rda` may come from a un-partial-applied function, it may have
+      // more parameters than the desired indices. We expect this logic to go
+      // away when we support `@differentiable` partial apply.
+      if (rdaIndexSet->isSupersetOf(
+              indexSet->extendingCapacity(getASTContext(),
+                                          rdaIndexSet->getCapacity())) &&
+          // fewer parameters than before
+          (superset->isEmpty() ||
+           rdaIndexSet->getNumIndices() < superset->getNumIndices()))
+        superset = rda->getIndices().parameters;
     }
-    auto existing = enqueuedTaskIndices.find(
-        {original, {indices.source, supersetParamIndices}});
+    auto existing =
+        enqueuedTaskIndices.find({original, {indices.source, superset}});
     if (existing == enqueuedTaskIndices.end())
       return nullptr;
     return differentiationTasks[existing->getSecond()].get();
@@ -957,7 +968,7 @@ public:
   /// function.
   SILValue promoteToDifferentiableFunction(
       SILBuilder &builder, SILLocation loc, SILValue origFnOperand,
-      const llvm::SmallBitVector &parameterIndices,
+      AutoDiffIndexSubset *parameterIndices,
       unsigned differentiationOrder, DifferentiationInvoker invoker);
 
   /// For an autodiff_function instruction that is missing associated functions,
@@ -1260,8 +1271,7 @@ public:
 
   bool isVaried(SILValue value, unsigned independentVariableIndex) const;
   bool isUseful(SILValue value, unsigned dependentVariableIndex) const;
-  bool isVaried(SILValue value,
-                const llvm::SmallBitVector &parameterIndices) const;
+  bool isVaried(SILValue value, AutoDiffIndexSubset *parameterIndices) const;
   bool isActive(SILValue value, const SILAutoDiffIndices &indices) const;
 
   Activity getActivity(SILValue value,
@@ -1531,8 +1541,8 @@ bool DifferentiableActivityInfo::isVaried(
 }
 
 bool DifferentiableActivityInfo::isVaried(
-    SILValue value, const llvm::SmallBitVector &parameterIndices) const {
-  for (auto paramIdx : parameterIndices.set_bits())
+    SILValue value, AutoDiffIndexSubset *parameterIndices) const {
+  for (auto paramIdx : parameterIndices->getIndices())
     if (isVaried(value, paramIdx))
       return true;
   return false;
@@ -1814,8 +1824,8 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
   if (auto diffableFnType = original->getType().castTo<SILFunctionType>()) {
     if (diffableFnType->isDifferentiable()) {
       auto paramIndices = diffableFnType->getDifferentiationParameterIndices();
-      for (auto i : desiredIndices.parameters.set_bits()) {
-        if (i >= paramIndices.size() || !paramIndices[i]) {
+      for (auto i : desiredIndices.parameters->getIndices()) {
+        if (!paramIndices->contains(i)) {
           context.emitNondifferentiabilityError(original, parentTask,
               diag::autodiff_function_nondiff_parameter_not_differentiable);
           return None;
@@ -1966,12 +1976,20 @@ emitAssociatedFunctionReference(ADContext &context, SILBuilder &builder,
     // Check that the requirement indices are the same as the desired indices.
     auto *requirementParameterIndices = diffAttr->getParameterIndices();
     auto loweredRequirementIndices = requirementParameterIndices->getLowered(
+        context.getASTContext(),
         requirementDecl->getInterfaceType()->castTo<AnyFunctionType>());
     SILAutoDiffIndices requirementIndices(/*source*/ 0,
                                           loweredRequirementIndices);
 
+    // NOTE: We need to extend the capacity of desired parameter indices to
+    // requirement parameter indices, because there's a argument count mismatch.
+    // When `@differentiable` partial apply is supported, this problem will go
+    // away.
     if (desiredIndices.source != requirementIndices.source ||
-        desiredIndices.parameters.test(requirementIndices.parameters)) {
+        !desiredIndices.parameters->extendingCapacity(
+            context.getASTContext(),
+            requirementIndices.parameters->getCapacity())
+                ->isSubsetOf(requirementIndices.parameters)) {
       context.emitNondifferentiabilityError(original, parentTask,
           diag::autodiff_protocol_member_subset_indices_not_differentiable);
       return None;
@@ -2447,11 +2465,11 @@ ADContext::createPrimalValueStruct(const DifferentiationTask *task,
 /// indices, figure out whether the parent function is being differentiated with
 /// respect to this parameter, according to the indices.
 static bool isDifferentiationParameter(SILArgument *argument,
-                                       llvm::SmallBitVector indices) {
+                                       AutoDiffIndexSubset *indices) {
   if (!argument) return false;
   auto *function = argument->getFunction();
   auto paramArgs = function->getArgumentsWithoutIndirectResults();
-  for (unsigned i : indices.set_bits())
+  for (unsigned i : indices->getIndices())
     if (paramArgs[i] == argument)
       return true;
   return false;
@@ -2604,7 +2622,8 @@ public:
     auto &builder = getBuilder();
     builder.setInsertionPoint(exit);
     auto structLoweredTy =
-        getContext().getTypeConverter().getLoweredType(structTy, ResilienceExpansion::Minimal);
+        getContext().getTypeConverter().getLoweredType(
+            structTy, ResilienceExpansion::Minimal);
     auto primValsVal = builder.createStruct(loc, structLoweredTy, primalValues);
     // If the original result was a tuple, return a tuple of all elements in the
     // original result tuple and the primal value struct value.
@@ -2695,7 +2714,8 @@ public:
       errorOccurred = true;
       return;
     }
-    SILAutoDiffIndices indices(/*source*/ 0, /*parameters*/ {0});
+    SILAutoDiffIndices indices(/*source*/ 0,
+        AutoDiffIndexSubset::getDefault(getASTContext(), 1, true));
     auto *task = getContext().lookUpDifferentiationTask(getterFn, indices);
     if (!task) {
       getContext().emitNondifferentiabilityError(
@@ -2764,7 +2784,8 @@ public:
       errorOccurred = true;
       return;
     }
-    SILAutoDiffIndices indices(/*source*/ 0, /*parameters*/ {0});
+    SILAutoDiffIndices indices(/*source*/ 0,
+        AutoDiffIndexSubset::getDefault(getASTContext(), 1, true));
     auto *task = getContext().lookUpDifferentiationTask(getterFn, indices);
     if (!task) {
       getContext().emitNondifferentiabilityError(
@@ -2977,7 +2998,11 @@ public:
       return;
     }
     // Form expected indices by assuming there's only one result.
-    SILAutoDiffIndices indices(activeResultIndices.front(), activeParamIndices);
+    SILAutoDiffIndices indices(activeResultIndices.front(),
+        AutoDiffIndexSubset::get(
+            getASTContext(),
+            ai->getArgumentsWithoutIndirectResults().size(),
+            activeParamIndices));
 
     // Emit the VJP.
     auto vjpAndVJPIndices = emitAssociatedFunctionReference(
@@ -3988,7 +4013,7 @@ public:
         task->getIndices().isWrtParameter(selfParamIndex))
       addRetElt(selfParamIndex);
     // Add the non-self parameters that are differentiated with respect to.
-    for (auto i : task->getIndices().parameters.set_bits()) {
+    for (auto i : task->getIndices().parameters->getIndices()) {
       // Do not add the self parameter because we have already added it at the
       // beginning.
       if (origTy->hasSelfParam() && i == selfParamIndex)
@@ -4197,7 +4222,7 @@ public:
       }
     }
     // Accumulate adjoints for the remaining non-self original parameters.
-    for (unsigned i : applyInfo.actualIndices.parameters.set_bits()) {
+    for (unsigned i : applyInfo.actualIndices.parameters->getIndices()) {
       // Do not set the adjoint of the original self parameter because we
       // already added it at the beginning.
       if (ai->hasSelfArgument() && i == selfParamIndex)
@@ -4206,8 +4231,7 @@ public:
       auto cotan = *allResultsIt++;
       // If a cotangent value corresponds to a non-desired parameter, it won't
       // be used, so release it.
-      if (i >= applyInfo.desiredIndices.parameters.size() ||
-          !applyInfo.desiredIndices.parameters[i]) {
+      if (!applyInfo.desiredIndices.parameters->contains(i)) {
         emitCleanup(builder, loc, cotan);
         continue;
       }
@@ -4267,8 +4291,9 @@ public:
             AutoDiffAssociatedVectorSpaceKind::Cotangent,
             LookUpConformanceInModule(getModule().getSwiftModule()))
                 ->getType()->getCanonicalType();
-        assert(!getModule().Types.getTypeLowering(cotangentVectorTy, ResilienceExpansion::Minimal)
-                   .isAddressOnly());
+        assert(!getModule().Types.getTypeLowering(
+                   cotangentVectorTy, ResilienceExpansion::Minimal)
+                       .isAddressOnly());
         auto *cotangentVectorDecl =
             cotangentVectorTy->getStructOrBoundGenericStruct();
         assert(cotangentVectorDecl);
@@ -4339,8 +4364,9 @@ public:
           AutoDiffAssociatedVectorSpaceKind::Cotangent,
           LookUpConformanceInModule(getModule().getSwiftModule()))
               ->getType()->getCanonicalType();
-      assert(!getModule().Types.getTypeLowering(cotangentVectorTy, ResilienceExpansion::Minimal)
-                 .isAddressOnly());
+      assert(!getModule().Types.getTypeLowering(
+                 cotangentVectorTy, ResilienceExpansion::Minimal)
+                     .isAddressOnly());
       auto cotangentVectorSILTy =
           SILType::getPrimitiveObjectType(cotangentVectorTy);
       auto *cotangentVectorDecl =
@@ -4376,7 +4402,8 @@ public:
                 field->getModuleContext(), field);
             auto fieldTy = field->getType().subst(substMap);
             auto fieldSILTy =
-                getContext().getTypeConverter().getLoweredType(fieldTy, ResilienceExpansion::Minimal);
+                getContext().getTypeConverter().getLoweredType(
+                    fieldTy, ResilienceExpansion::Minimal);
             assert(fieldSILTy.isObject());
             eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
           }
@@ -4932,7 +4959,8 @@ void AdjointEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
 }
 
 SILValue AdjointEmitter::emitZeroDirect(CanType type, SILLocation loc) {
-  auto silType = getModule().Types.getLoweredLoadableType(type, ResilienceExpansion::Minimal);
+  auto silType = getModule().Types.getLoweredLoadableType(
+      type, ResilienceExpansion::Minimal);
   auto *buffer = builder.createAllocStack(loc, silType);
   auto *initAccess = builder.createBeginAccess(loc, buffer, SILAccessKind::Init,
                                                SILAccessEnforcement::Static,
@@ -5410,7 +5438,8 @@ void DifferentiationTask::createEmptyAdjoint() {
   // Given a type, returns its formal SIL parameter info.
   auto getCotangentParameterInfoForOriginalResult = [&](
       CanType cotanType, ResultConvention origResConv) -> SILParameterInfo {
-    auto &tl = context.getTypeConverter().getTypeLowering(cotanType, ResilienceExpansion::Minimal);
+    auto &tl = context.getTypeConverter().getTypeLowering(
+        cotanType, ResilienceExpansion::Minimal);
     ParameterConvention conv;
     switch (origResConv) {
     case ResultConvention::Owned:
@@ -5433,7 +5462,8 @@ void DifferentiationTask::createEmptyAdjoint() {
   // Given a type, returns its formal SIL result info.
   auto getCotangentResultInfoForOriginalParameter = [&](
       CanType cotanType, ParameterConvention origParamConv) -> SILResultInfo {
-    auto &tl = context.getTypeConverter().getTypeLowering(cotanType, ResilienceExpansion::Minimal);
+    auto &tl = context.getTypeConverter().getTypeLowering(
+        cotanType, ResilienceExpansion::Minimal);
     ResultConvention conv;
     switch (origParamConv) {
     case ParameterConvention::Direct_Owned:
@@ -5492,7 +5522,7 @@ void DifferentiationTask::createEmptyAdjoint() {
   }
 
   // Add adjoint results for the requested non-self wrt parameters.
-  for (auto i : getIndices().parameters.set_bits()) {
+  for (auto i : getIndices().parameters->getIndices()) {
     if (origTy->hasSelfParam() && i == selfParamIndex)
       continue;
     auto origParam = origParams[i];
@@ -5655,7 +5685,8 @@ void DifferentiationTask::createVJP(bool isExported) {
          "unexpected number of vjp parameters");
   assert(vjpConv.getResults().size() == numOriginalResults + 1 &&
          "unexpected number of vjp results");
-  assert(adjointConv.getResults().size() == getIndices().parameters.count() &&
+  assert(adjointConv.getResults().size() ==
+             getIndices().parameters->getNumIndices() &&
          "unexpected number of adjoint results");
 
   // We assume that primal result conventions (for all results but the optional
@@ -5732,7 +5763,7 @@ public:
 
 SILValue ADContext::promoteToDifferentiableFunction(
     SILBuilder &builder, SILLocation loc, SILValue origFnOperand,
-    const llvm::SmallBitVector &parameterIndices, unsigned differentiationOrder,
+    AutoDiffIndexSubset *parameterIndices, unsigned differentiationOrder,
     DifferentiationInvoker invoker) {
   if (auto *ai = dyn_cast<ApplyInst>(origFnOperand)) {
     if (auto *sourceFn = dyn_cast<FunctionRefInst>(ai->getCallee())) {
@@ -5809,9 +5840,6 @@ SILValue ADContext::promoteToDifferentiableFunction(
     // Return nullptr.
     if (!assocFnAndIndices)
       return nullptr;
-    assert(assocFnAndIndices->second == desiredIndices &&
-           "FIXME: We could emit a thunk that converts the VJP to have the "
-           "desired indices.");
     auto assocFn = assocFnAndIndices->first;
     builder.createRetainValue(loc, assocFn, builder.getDefaultAtomicity());
     assocFns.push_back(assocFn);

@@ -437,11 +437,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       assert(DA->hasJVP() && DA->hasVJP() &&
              "JVP and VJP must exist in canonical SIL");
 
-    auto &paramIndices = DA->getIndices();
-    SmallVector<bool, 4> parameters;
-    for (unsigned i : indices(paramIndices.parameters))
-      parameters.push_back(paramIndices.parameters[i]);
-
+    auto &indices = DA->getIndices();
+    SmallVector<unsigned, 8> parameters(indices.parameters->begin(),
+                                        indices.parameters->end());
     SILDifferentiableAttrLayout::emitRecord(
         Out, ScratchRecord, differentiableAttrAbbrCode,
         DA->hasJVP()
@@ -450,7 +448,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
         DA->hasVJP()
             ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getVJPName()))
             : IdentifierID(),
-        paramIndices.source, parameters);
+        indices.source, parameters);
     S.writeGenericRequirements(DA->getRequirements(), SILAbbrCodes);
   }
 
@@ -971,8 +969,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::AutoDiffFunctionInst: {
     auto *adfi = cast<AutoDiffFunctionInst>(&SI);
     SmallVector<ValueID, 4> trailingInfo;
-    auto &paramIndices = adfi->getParameterIndices();
-    for (unsigned idx : paramIndices.set_bits())
+    auto *paramIndices = adfi->getParameterIndices();
+    for (unsigned idx : paramIndices->getIndices())
       trailingInfo.push_back(idx);
     for (auto &op : adfi->getAllOperands()) {
       auto val = op.get();
@@ -982,7 +980,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILInstAutoDiffFunctionLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstAutoDiffFunctionLayout::Code],
-        adfi->getDifferentiationOrder(), (unsigned)paramIndices.size(),
+        adfi->getDifferentiationOrder(), paramIndices->getCapacity(),
         adfi->getNumOperands(), trailingInfo);
     break;
   }

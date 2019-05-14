@@ -396,6 +396,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// For uniquifying `AutoDiffParameterIndices` allocations.
   llvm::FoldingSet<AutoDiffParameterIndices> AutoDiffParameterIndicesSet;
 
+  /// For uniquifying `AutoDiffIndexSubset` allocations.
+  llvm::FoldingSet<AutoDiffIndexSubset> AutoDiffIndexSubsets;
+
   /// For uniquifying `AutoDiffAssociatedFunctionIdentifier` allocations.
   llvm::FoldingSet<AutoDiffAssociatedFunctionIdentifier>
       AutoDiffAssociatedFunctionIdentifiers;
@@ -4530,6 +4533,35 @@ AutoDiffParameterIndices::get(llvm::SmallBitVector indices, ASTContext &C) {
   auto *newNode = ::new (mem) AutoDiffParameterIndices(indices);
   foldingSet.InsertNode(newNode, insertPos);
 
+  return newNode;
+}
+
+AutoDiffIndexSubset *
+AutoDiffIndexSubset::get(ASTContext &ctx, unsigned capacity,
+                         ArrayRef<unsigned> indices) {
+  auto &foldingSet = ctx.getImpl().AutoDiffIndexSubsets;
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(capacity);
+#ifndef NDEBUG
+  int last = -1;
+#endif
+  for (unsigned index : indices) {
+#ifndef NDEBUG
+    assert((int)index > last && "Indices must be ascending");
+    last = (int)index;
+#endif
+    id.AddInteger(index);
+  }
+  void *insertPos = nullptr;
+  auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+  auto sizeToAlloc = sizeof(AutoDiffIndexSubset) +
+      getNumBitWordsNeededForCapacity(capacity);
+  auto *buf = reinterpret_cast<AutoDiffIndexSubset *>(
+      ctx.Allocate(sizeToAlloc, alignof(AutoDiffIndexSubset)));
+  auto *newNode = new (buf) AutoDiffIndexSubset(capacity, indices);
+  foldingSet.InsertNode(newNode, insertPos);
   return newNode;
 }
 

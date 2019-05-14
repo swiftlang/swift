@@ -974,7 +974,7 @@ void SILParser::convertRequirements(SILFunction *F,
 
 /// SWIFT_ENABLE_TENSORFLOW
 /// Parse a `differentiable` attribute, e.g.
-/// `[differentiable wrt 0, 1 adjoint @other]`.
+/// `[differentiable wrt 0, 1 vjp @other]`.
 /// Returns true on error.
 static bool parseDifferentiableAttr(
   SmallVectorImpl<SILDifferentiableAttr *> &DAs, SILParser &SP) {
@@ -1045,9 +1045,12 @@ static bool parseDifferentiableAttr(
                    diag::sil_attr_differentiable_expected_rsquare))
     return true;
   // Create a SILDifferentiableAttr and we are done.
+  auto maxIndexRef = std::max_element(ParamIndices.begin(), ParamIndices.end());
+  auto *paramIndicesSubset = AutoDiffIndexSubset::get(
+      P.Context, maxIndexRef ? *maxIndexRef + 1 : 0, ParamIndices);
   auto *Attr = SILDifferentiableAttr::create(
-      SP.SILMod, {SourceIndex, ParamIndices}, JVPName.str(), VJPName.str(),
-      WhereClause);
+      SP.SILMod, {SourceIndex, paramIndicesSubset}, JVPName.str(),
+      VJPName.str(), WhereClause);
   DAs.push_back(Attr);
   return false;
 }
@@ -2873,7 +2876,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     //      {%1 : $T, %2 : $T}, {%3 : $T, %4 : $T}
     //        ^ jvp    ^ vjp
     SourceLoc lastLoc;
-    SmallBitVector parameterIndices(32);
+    SmallVector<unsigned, 8> parameterIndices;
     unsigned order = 1;
     // Parse optional `[wrt <integer_literal>...]`
     if (P.Tok.is(tok::l_square) &&
@@ -2882,15 +2885,12 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       P.consumeToken(tok::l_square);
       P.consumeToken(tok::identifier);
       // Parse indices.
-      unsigned size = parameterIndices.size();
       while (P.Tok.is(tok::integer_literal)) {
         unsigned index;
         if (P.parseUnsignedInteger(index, lastLoc,
               diag::sil_inst_autodiff_expected_parameter_index))
           return true;
-        if (index >= size)
-          parameterIndices.resize((size *= 2));
-        parameterIndices.set(index);
+        parameterIndices.push_back(index);
       }
       if (P.parseToken(tok::r_square,
                        diag::sil_inst_autodiff_attr_expected_rsquare,
@@ -2917,8 +2917,15 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     }
     // Parse the original function value.
     SILValue original;
-    if (parseTypedValueRef(original, B))
+    SourceLoc originalOperandLoc;
+    if (parseTypedValueRef(original, originalOperandLoc, B))
       return true;
+    auto fnType = original->getType().getAs<SILFunctionType>();
+    if (!fnType) {
+      P.diagnose(originalOperandLoc,
+                 diag::sil_inst_autodiff_expected_function_type_operand);
+      return true;
+    }
     SmallVector<SILValue, 16> associatedFunctions;
     // Parse optional operand lists `with { <operand> , <operand> }, ...`.
     if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with") {
@@ -2950,7 +2957,10 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     }
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createAutoDiffFunction(InstLoc, parameterIndices, order,
+    auto *parameterIndicesSubset =
+        AutoDiffIndexSubset::get(P.Context, fnType->getNumParameters(),
+                                 parameterIndices);
+    ResultVal = B.createAutoDiffFunction(InstLoc, parameterIndicesSubset, order,
                                          original, associatedFunctions);
     break;
   }
@@ -5714,6 +5724,18 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
 
       // SWIFT_ENABLE_TENSORFLOW
       for (auto &attr : DiffAttrs) {
+        // Resolve parameter indices to have the right capacity, if it's
+        // different from the number of parameters. We have to do this because
+        // the parser does not know the function type before creating a
+        // `SILDifferentiableAttr`, so it had to find the max of all provided
+        // indices.
+        if (attr->getIndices().parameters->getCapacity() !=
+                SILFnType->getNumParameters()) {
+          auto *newParamIndices = attr->getIndices().parameters
+              ->extendingCapacity(P.Context, SILFnType->getNumParameters());
+          attr->setIndices({attr->getIndices().source, newParamIndices});
+        }
+
         // Resolve where clause requirements.
         // If no where clause, continue.
         if (!attr->getWhereClause())

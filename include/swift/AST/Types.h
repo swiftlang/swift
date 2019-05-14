@@ -4132,14 +4132,14 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   CanSILFunctionType getWithDifferentiability(
-      unsigned differentiationOrder, const SmallBitVector &parameterIndices);
+      unsigned differentiationOrder, AutoDiffIndexSubset *parameterIndices);
 
   CanSILFunctionType getWithoutDifferentiability();
 
   /// Returns the type of a differentiation function that is associated with
   /// a function of this type.
   CanSILFunctionType getAutoDiffAssociatedFunctionType(
-      const SmallBitVector &parameterIndices, unsigned resultIndex,
+      AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
       SILModule &module, LookupConformanceFn lookupConformance,
       GenericSignature *whereClauseGenericSignature = nullptr);
@@ -4148,7 +4148,7 @@ public:
   /// differentiate with respect to for this differentiable function type. (e.g.
   /// which parameters are not @nondiff). The function type must be
   /// differentiable.
-  SmallBitVector getDifferentiationParameterIndices() const;
+  AutoDiffIndexSubset *getDifferentiationParameterIndices();
 
   /// If this is a @convention(witness_method) function with a class
   /// constrained self parameter, return the class constraint for the

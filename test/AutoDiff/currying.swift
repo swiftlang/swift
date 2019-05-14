@@ -7,7 +7,7 @@ var CurryingAutodiffTests = TestSuite("CurryingAutodiff")
 CurryingAutodiffTests.test("StructMember") {
   struct A {
     @differentiable(wrt: (value))
-      func v(_ value: Float) -> Float { return value * value }
+    func v(_ value: Float) -> Float { return value * value }
   }
 
   let a = A()

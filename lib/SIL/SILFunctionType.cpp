@@ -98,20 +98,19 @@ CanType SILFunctionType::getSelfInstanceType() const {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-SmallBitVector
-SILFunctionType::getDifferentiationParameterIndices() const {
+AutoDiffIndexSubset *
+SILFunctionType::getDifferentiationParameterIndices() {
   assert(isDifferentiable());
-  SmallBitVector result(NumParameters, true);
+  SmallVector<unsigned, 8> result;
   for (auto valueAndIndex : enumerate(getParameters()))
-    if (valueAndIndex.value().getDifferentiability() ==
+    if (valueAndIndex.value().getDifferentiability() !=
             SILParameterDifferentiability::NotDifferentiable)
-      result.reset(valueAndIndex.index());
-  return result;
+      result.push_back(valueAndIndex.index());
+  return AutoDiffIndexSubset::get(getASTContext(), getNumParameters(), result);
 }
 
 CanSILFunctionType SILFunctionType::getWithDifferentiability(
-    unsigned differentiationOrder,
-    const SmallBitVector &parameterIndices) {
+    unsigned differentiationOrder, AutoDiffIndexSubset *parameterIndices) {
   // FIXME(rxwei): Handle differentiation order.
 
   SmallVector<SILParameterInfo, 8> newParameters;
@@ -119,9 +118,10 @@ CanSILFunctionType SILFunctionType::getWithDifferentiability(
     auto &param = paramAndIndex.value();
     unsigned index = paramAndIndex.index();
     newParameters.push_back(param.getWithDifferentiability(
-        index < parameterIndices.size() && parameterIndices[index]
-            ? SILParameterDifferentiability::DifferentiableOrNotApplicable
-            : SILParameterDifferentiability::NotDifferentiable));
+        index < parameterIndices->getCapacity() &&
+            parameterIndices->contains(index)
+                ? SILParameterDifferentiability::DifferentiableOrNotApplicable
+                : SILParameterDifferentiability::NotDifferentiable));
   }
 
   auto newExtInfo = getExtInfo().withDifferentiable();
@@ -147,10 +147,9 @@ CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
 }
 
 CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
-    const SmallBitVector &parameterIndices, unsigned resultIndex,
-    unsigned differentiationOrder,
-    AutoDiffAssociatedFunctionKind kind, SILModule &module,
-    LookupConformanceFn lookupConformance,
+    AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
+    unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
+    SILModule &module, LookupConformanceFn lookupConformance,
     GenericSignature *whereClauseGenSig) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
@@ -213,7 +212,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
 
   // Helper function testing if we are differentiating wrt this index.
   auto isWrtIndex = [&](unsigned index) -> bool {
-    return index < parameterIndices.size() && parameterIndices[index];
+    return index < parameterIndices->getCapacity() &&
+        parameterIndices->contains(index);
   };
 
   // Calculate WRT parameter infos, in the order that they should appear in the
@@ -2301,8 +2301,8 @@ const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
   if (auto *autoDiffFuncId = constant.autoDiffAssociatedFunctionIdentifier) {
     auto origFnConstantInfo =
         getConstantInfo(constant.asAutoDiffOriginalFunction());
-    auto loweredIndices =
-        autoDiffFuncId->getParameterIndices()->getLowered(formalInterfaceType);
+    auto loweredIndices = autoDiffFuncId->getParameterIndices()
+        ->getLowered(Context, formalInterfaceType);
     silFnType = origFnConstantInfo.SILFnType->getAutoDiffAssociatedFunctionType(
         loweredIndices, /*resultIndex*/ 0,
         autoDiffFuncId->getDifferentiationOrder(), autoDiffFuncId->getKind(), M,

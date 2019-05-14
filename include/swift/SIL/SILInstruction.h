@@ -7721,7 +7721,7 @@ class AutoDiffFunctionInst final :
 private:
   friend SILBuilder;
   /// Differentiation parameter indices.
-  SmallBitVector parameterIndices;
+  AutoDiffIndexSubset *parameterIndices;
   /// The order of differentiation.
   unsigned differentiationOrder;
   /// The number of operands. The first operand is always the original function.
@@ -7730,7 +7730,7 @@ private:
   unsigned numOperands;
 
   AutoDiffFunctionInst(SILModule &module, SILDebugLocation debugLoc,
-                       const SmallBitVector &parameterIndices,
+                       AutoDiffIndexSubset *parameterIndices,
                        unsigned differentiationOrder,
                        SILValue originalFunction,
                        ArrayRef<SILValue> associatedFunctions);
@@ -7738,20 +7738,20 @@ private:
 public:
   static AutoDiffFunctionInst *create(SILModule &module,
                                       SILDebugLocation debugLoc,
-                                      const SmallBitVector &parameterIndices,
+                                      AutoDiffIndexSubset *parameterIndices,
                                       unsigned differentiationOrder,
                                       SILValue originalFunction,
                                       ArrayRef<SILValue> associatedFunctions);
 
   static SILType getAutoDiffType(SILValue original,
                                  unsigned differentiationOrder,
-                                 const SmallBitVector &parameterIndices);
+                                 AutoDiffIndexSubset *parameterIndices);
 
   /// Returns the original function.
   SILValue getOriginalFunction() const { return getAllOperands()[0].get(); }
 
   /// Returns differentiation indices.
-  const SmallBitVector &getParameterIndices() const {
+  AutoDiffIndexSubset *getParameterIndices() const {
     return parameterIndices;
   }
 
