@@ -2234,8 +2234,7 @@ endmacro()
 
 function(add_swift_host_tool executable)
   set(options)
-  set(single_parameter_options SWIFT_COMPONENT)
-  set(multiple_parameter_options LINK_LIBRARIES)
+  set(multiple_parameter_options LINK_LIBRARIES SWIFT_COMPONENTS)
 
   cmake_parse_arguments(ASHT
     "${options}"
@@ -2247,8 +2246,8 @@ function(add_swift_host_tool executable)
     message(SEND_ERROR "${executable} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
   endif()
 
-  precondition(ASHT_SWIFT_COMPONENT
-               MESSAGE "Swift Component is required to add a host tool")
+  precondition(ASHT_SWIFT_COMPONENTS
+               MESSAGE "Swift Components is required to add a host tool")
 
   # Create the executable rule.
   _add_swift_executable_single(${executable}
@@ -2256,11 +2255,17 @@ function(add_swift_host_tool executable)
     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
     ${ASHT_UNPARSED_ARGUMENTS})
 
-  swift_install_in_component(TARGETS ${executable}
-                             RUNTIME DESTINATION bin
-                             COMPONENT ${ASHT_SWIFT_COMPONENT})
+  foreach(comp ${ASHT_SWIFT_COMPONENTS})
+    swift_install_in_component(TARGETS ${executable}
+                               RUNTIME DESTINATION bin
+                               COMPONENT ${comp})
 
-  swift_is_installing_component(${ASHT_SWIFT_COMPONENT} is_installing)
+    swift_is_installing_component(${comp} is_installing)
+
+    if(is_installing)
+      break()
+    endif()
+  endforeach()
 
   if(NOT is_installing)
     set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${executable})

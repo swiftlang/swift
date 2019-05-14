@@ -5,7 +5,7 @@ add_swift_host_tool(swift-syntax-parser-test
   swift-syntax-parser-test.cpp
   LLVM_LINK_COMPONENTS
     Support
-  SWIFT_COMPONENT tools
+  SWIFT_COMPONENTS tools
 )
 target_link_libraries(swift-syntax-parser-test
   PRIVATE

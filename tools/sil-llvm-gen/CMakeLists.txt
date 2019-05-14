@@ -1,6 +1,6 @@
 add_swift_host_tool(sil-llvm-gen
   SILLLVMGen.cpp
-  SWIFT_COMPONENT tools
+  SWIFT_COMPONENTS tools
 )
 target_link_libraries(sil-llvm-gen
                       PRIVATE

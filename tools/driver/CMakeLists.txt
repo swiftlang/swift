@@ -3,7 +3,7 @@ add_swift_host_tool(swift
   autolink_extract_main.cpp
   modulewrap_main.cpp
   swift_format_main.cpp
-  SWIFT_COMPONENT compiler
+  SWIFT_COMPONENTS compiler
 )
 target_link_libraries(swift
                       PRIVATE
