@@ -2181,19 +2181,19 @@ static llvm::MemoryBuffer *
 getBufferForFilename(StringRef Filename,
                      const llvm::StringMap<std::string> &VFSFiles) {
   auto VFSFileIt = VFSFiles.find(Filename);
-  if (VFSFileIt != VFSFiles.end())
-    Filename = VFSFileIt->second;
+  auto MappedFilename =
+      VFSFileIt == VFSFiles.end() ? Filename : VFSFileIt->second;
 
-  auto It = Buffers.find(Filename);
+  auto It = Buffers.find(MappedFilename);
   if (It != Buffers.end())
     return It->second;
 
-  auto FileBufOrErr = llvm::MemoryBuffer::getFile(Filename);
+  auto FileBufOrErr = llvm::MemoryBuffer::getFile(MappedFilename);
   if (!FileBufOrErr) {
-    llvm::errs() << "error opening input file '" << Filename << "' ("
+    llvm::errs() << "error opening input file '" << MappedFilename << "' ("
                  << FileBufOrErr.getError().message() << ")\n";
     exit(1);
   }
 
-  return Buffers[Filename] = FileBufOrErr.get().release();
+  return Buffers[MappedFilename] = FileBufOrErr.get().release();
 }
