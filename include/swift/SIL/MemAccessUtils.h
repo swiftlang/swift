@@ -15,8 +15,9 @@
 #ifndef SWIFT_SIL_MEMACCESSUTILS_H
 #define SWIFT_SIL_MEMACCESSUTILS_H
 
-#include "swift/SIL/Projection.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -27,31 +28,6 @@ namespace swift {
 inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
   return !(a == SILAccessKind::Read && b == SILAccessKind::Read);
 }
-
-/// Represents the identity of a stored class property as a combination
-/// of a base and projection.
-class ObjectProjection {
-  SILValue object;
-  Projection proj;
-
-public:
-  ObjectProjection(SILValue object, const Projection &projection)
-      : object(object), proj(projection) {
-    assert(object->getType().isObject());
-  }
-
-  SILValue getObject() const { return object; }
-
-  const Projection &getProjection() const { return proj; }
-
-  bool operator==(const ObjectProjection &other) const {
-    return object == other.object && proj == other.proj;
-  }
-
-  bool operator!=(const ObjectProjection &other) const {
-    return object != other.object || proj != other.proj;
-  }
-};
 
 /// Represents the identity of a storage object being accessed.
 ///
@@ -107,7 +83,23 @@ public:
   /// of access base. Otherwise, return Unidentified.
   static AccessedStorage::Kind classify(SILValue base);
 
+  /// Directly create an AccessedStorage for class property access.
+  static AccessedStorage forClass(SILValue object, unsigned propertyIndex) {
+    AccessedStorage storage;
+    storage.initKind(Class, propertyIndex);
+    storage.value = object;
+    return storage;
+  }
+
 protected:
+  // Checking the storage kind is far more common than other fields. Make sure
+  // it can be byte load with no shift.
+  static const int ReservedKindBits = 8;
+  static_assert(ReservedKindBits >= NumKindBits, "Too many storage kinds.");
+
+  static const unsigned InvalidElementIndex =
+      (1 << (32 - ReservedKindBits)) - 1;
+
   // Form a bitfield that is effectively a union over any pass-specific data
   // with the fields used within this class as a common prefix.
   //
@@ -122,9 +114,13 @@ protected:
   // each begin_access to its storage object, unique access index, and summary
   // info for that access.
   union {
-    uint64_t OpaqueBits;
-    SWIFT_INLINE_BITFIELD_BASE(AccessedStorage, bitmax(NumKindBits, 8),
-                               Kind : bitmax(NumKindBits, 8));
+    uint64_t opaqueBits;
+    // elementIndex can overflow while gracefully degrading analysis. For now,
+    // reserve an absurd number of bits at a nice alignment boundary, but this
+    // can be reduced.
+    SWIFT_INLINE_BITFIELD_BASE(AccessedStorage, 32, kind
+                               : ReservedKindBits,
+                                 elementIndex : 32 - ReservedKindBits);
 
     // Define bits for use in AccessedStorageAnalysis. Each identified storage
     // object is mapped to one instance of this subclass.
@@ -157,15 +153,22 @@ protected:
 
 private:
   union {
+    // For non-class storage, 'value' is the access base. For class storage
+    // 'value' is the object base, where the access base is the class' stored
+    // property.
     SILValue value;
-    unsigned paramIndex;
     SILGlobalVariable *global;
-    ObjectProjection objProj;
   };
 
-  void initKind(Kind k) {
-    Bits.OpaqueBits = 0;
-    Bits.AccessedStorage.Kind = k;
+  void initKind(Kind k, unsigned elementIndex = InvalidElementIndex) {
+    Bits.opaqueBits = 0;
+    Bits.AccessedStorage.kind = k;
+    Bits.AccessedStorage.elementIndex = elementIndex;
+  }
+
+  unsigned getElementIndex() const { return Bits.AccessedStorage.elementIndex; }
+  void setElementIndex(unsigned elementIndex) {
+    Bits.AccessedStorage.elementIndex = elementIndex;
   }
 
 public:
@@ -173,33 +176,30 @@ public:
 
   AccessedStorage(SILValue base, Kind kind);
 
-  AccessedStorage(SILValue object, Projection projection)
-      : objProj(object, projection) {
-    initKind(Class);
-  }
-
   // Return true if this is a valid storage object.
   operator bool() const { return getKind() != Unidentified || value; }
 
-  Kind getKind() const { return static_cast<Kind>(Bits.AccessedStorage.Kind); }
+  Kind getKind() const { return static_cast<Kind>(Bits.AccessedStorage.kind); }
 
   // Clear any bits reserved for subclass data. Useful for up-casting back to
   // the base class.
-  void resetSubclassData() { initKind(getKind()); }
+  void resetSubclassData() {
+    initKind(getKind(), Bits.AccessedStorage.elementIndex);
+  }
 
   SILValue getValue() const {
-    assert(getKind() != Argument && getKind() != Global && getKind() != Class);
+    assert(getKind() != Global && getKind() != Class);
     return value;
   }
 
   unsigned getParamIndex() const {
     assert(getKind() == Argument);
-    return paramIndex;
+    return getElementIndex();
   }
 
-  SILArgument *getArgument(SILFunction *F) const {
+  SILArgument *getArgument() const {
     assert(getKind() == Argument);
-    return F->getArgument(paramIndex);
+    return cast<SILArgument>(value);
   }
 
   SILGlobalVariable *getGlobal() const {
@@ -207,9 +207,13 @@ public:
     return global;
   }
 
-  const ObjectProjection &getObjectProjection() const {
+  SILValue getObject() const {
     assert(getKind() == Class);
-    return objProj;
+    return value;
+  }
+  unsigned getPropertyIndex() const {
+    assert(getKind() == Class);
+    return getElementIndex();
   }
 
   /// Return true if the given storage objects have identical storage locations.
@@ -223,16 +227,16 @@ public:
     switch (getKind()) {
     case Box:
     case Stack:
+    case Argument:
     case Yield:
     case Nested:
     case Unidentified:
       return value == other.value;
-    case Argument:
-      return paramIndex == other.paramIndex;
     case Global:
       return global == other.global;
     case Class:
-      return objProj == other.objProj;
+      return value == other.value
+             && getElementIndex() == other.getElementIndex();
     }
   }
 
@@ -286,19 +290,19 @@ public:
     // Classes are not uniquely identified by their base. However, if the
     // underling objects have identical types and distinct property indices then
     // they are distinct storage locations.
-    auto &proj = getObjectProjection();
-    auto &otherProj = other.getObjectProjection();
-    if (proj.getObject()->getType() == otherProj.getObject()->getType()
-        && proj.getProjection() != otherProj.getProjection()) {
+    if (getObject()->getType() == other.getObject()->getType()
+        && getPropertyIndex() != other.getPropertyIndex()) {
       return true;
     }
     return false;
   }
 
   /// Returns the ValueDecl for the underlying storage, if it can be
-  /// determined. Otherwise returns null. For diagnostics and checking via the
-  /// ValueDecl if we are processing a `let` variable.
-  const ValueDecl *getDecl(SILFunction *F) const;
+  /// determined. Otherwise returns null.
+  ///
+  /// WARNING: This is not a constant-time operation. It is for diagnostics and
+  /// checking via the ValueDecl if we are processing a `let` variable.
+  const ValueDecl *getDecl() const;
 
   void print(raw_ostream &os) const;
   void dump() const;
@@ -343,8 +347,8 @@ template <> struct DenseMapInfo<swift::AccessedStorage> {
     case swift::AccessedStorage::Global:
       return DenseMapInfo<void *>::getHashValue(storage.getGlobal());
     case swift::AccessedStorage::Class: {
-      const swift::ObjectProjection &P = storage.getObjectProjection();
-      return llvm::hash_combine(P.getObject(), P.getProjection());
+      return llvm::hash_combine(storage.getObject(),
+                                storage.getPropertyIndex());
     }
     }
     llvm_unreachable("Unhandled AccessedStorageKind");
