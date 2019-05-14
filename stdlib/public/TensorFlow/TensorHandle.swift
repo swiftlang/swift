@@ -81,9 +81,16 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
   }
 
   deinit {
-    debugLog("De-initializing TensorHandle.")
-    TFE_DeleteTensorHandle(_cTensorHandle)
-    debugLog("Returning from deinit of TensorHandle.")
+    switch lazyHandle {
+      case LazyTensorHandle.conc(let h): do {
+        debugLog("De-initializing TensorHandle.")
+        TFE_DeleteTensorHandle(_cTensorHandle)
+        debugLog("Returning from deinit of TensorHandle.")
+      }
+      case LazyTensorHandle.sym(_): do {
+        debugLog("Symbolic tensor need not be cleaned up.")
+      }
+    }
   }
 
   /// Create a `TensorHandle` with a closure that initializes the underlying
@@ -186,9 +193,16 @@ public final class ResourceHandle : _AnyTensorHandle {
   }
 
   deinit {
-    debugLog("De-initializing TensorHandle.")
-    TFE_DeleteTensorHandle(_cTensorHandle)
-    debugLog("Returning from deinit of ResourceHandle.")
+    switch lazyHandle {
+      case LazyTensorHandle.conc(let h): do {
+        debugLog("De-initializing TensorHandle.")
+        TFE_DeleteTensorHandle(_cTensorHandle)
+        debugLog("Returning from deinit of ResourceHandle.")
+      }
+      case LazyTensorHandle.sym(_): do {
+        debugLog("Symbolic tensor need not be cleaned up.")
+      }
+    }
   }
 }
 
@@ -206,8 +220,15 @@ public final class VariantHandle : _AnyTensorHandle {
   }
 
   deinit {
-    debugLog("De-initializing TensorHandle.")
-    TFE_DeleteTensorHandle(_cTensorHandle)
-    debugLog("Returning from deinit of VariantHandle.")
+    switch lazyHandle {
+      case LazyTensorHandle.conc(let h): do {
+        debugLog("De-initializing TensorHandle.")
+        TFE_DeleteTensorHandle(_cTensorHandle)
+        debugLog("Returning from deinit of VariantHandle.")
+      }
+      case LazyTensorHandle.sym(_): do {
+        debugLog("Symbolic tensor need not be cleaned up.")
+      }
+    }
   }
 }
