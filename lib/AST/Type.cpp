@@ -4444,7 +4444,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
     AutoDiffParameterIndices *indices, unsigned resultIndex,
     unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
     LookupConformanceFn lookupConformance,
-    GenericSignature *whereClauseGenSig) {
+    GenericSignature *whereClauseGenSig, bool makeSelfParamFirst) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
@@ -4460,7 +4460,8 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   auto &ctx = getASTContext();
 
   SmallVector<Type, 8> wrtParamTypes;
-  indices->getSubsetParameterTypes(this, wrtParamTypes);
+  indices->getSubsetParameterTypes(
+      this, wrtParamTypes, /*reverseCurryLevels*/ !makeSelfParamFirst);
 
   // Unwrap curry levels. At most, two parameter lists are necessary, for
   // curried method types with a `(Self)` parameter list.

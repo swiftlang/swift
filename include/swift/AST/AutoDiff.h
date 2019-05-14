@@ -149,14 +149,17 @@ public:
   ///
   ///   functionType = (A, B) -> (C, D) -> R
   ///   if "A", "C", and "D" are in the set,
-  ///   ==> pushes {A, C, D} to `paramTypes`.
+  ///   ==> pushes {A, C, D} to `paramTypes` if `reverseCurryLevels` is false,
+  ///    or pushes {C, D, A} otherwise.
   ///
   ///   functionType = (Self) -> (A, B, C) -> R
   ///   if "Self" and "C" are in the set,
-  ///   ==> pushes {Self, C} to `paramTypes`.
+  ///   ==> pushes {Self, C} to `paramTypes` if `reverseCurryLevels` is false,
+  ///    or pushes {C, Self} otherwise.
   ///
   void getSubsetParameterTypes(AnyFunctionType *functionType,
-                               SmallVectorImpl<Type> &paramTypes) const;
+                               SmallVectorImpl<Type> &paramTypes,
+                               bool reverseCurryLevels = false) const;
 
   /// Returns a bitvector for the SILFunction parameters corresponding to the
   /// parameters in this set. In particular, this explodes tuples. For example,

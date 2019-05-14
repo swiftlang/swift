@@ -3120,7 +3120,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         originalFnTy->getAutoDiffAssociatedFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
             /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP,
-            lookupConformance, whereClauseGenSig);
+            lookupConformance, whereClauseGenSig, /*makeSelfParamFirst*/ true);
 
     auto isValidJVP = [&](FuncDecl *jvpCandidate) {
       TC.validateDeclForNameLookup(jvpCandidate);
@@ -3146,7 +3146,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         originalFnTy->getAutoDiffAssociatedFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
             /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP,
-            lookupConformance, whereClauseGenSig);
+            lookupConformance, whereClauseGenSig, /*makeSelfParamFirst*/ true);
 
     auto isValidVJP = [&](FuncDecl *vjpCandidate) {
       TC.validateDeclForNameLookup(vjpCandidate);

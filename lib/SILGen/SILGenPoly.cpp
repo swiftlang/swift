@@ -4210,57 +4210,6 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
                                                 origWitnessFTy,
                                                 witnessKind, witnessSubs,
                                                 witnessParams, loc);
-  // SWIFT_ENABLE_TENSORFLOW
-  // Perform witness method thunking.
-  if (auto *autoDiffFuncId = witness.autoDiffAssociatedFunctionIdentifier) {
-    auto *AFD = witness.getAbstractFunctionDecl();
-    auto loweredParamIndices =
-        autoDiffFuncId->getParameterIndices()->getLowered(
-            this->getASTContext(),
-            AFD->getInterfaceType()->castTo<AnyFunctionType>());
-    SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
-    auto assocFnKind = autoDiffFuncId->getKind();
-
-    unsigned selfParamIndex = F.getLoweredFunctionType()->getNumParameters() - 1;
-    bool isWrtSelf = indices.isWrtParameter(selfParamIndex);
-    if (isWrtSelf && indices.parameters->getNumIndices() > 1) {
-      // Given the type of an autodiff associated method that is differentiable
-      // wrt self, return a version where self's tangent/cotangent is reordered
-      // in the returned linear map.
-      // This is done by computing the original function type and recomputing
-      // the corresponding associated function type.
-      auto getReorderedFunctionType =
-          [&](CanAnyFunctionType fnType) -> CanAnyFunctionType {
-        auto *fnOrigType = fnType->getAutoDiffOriginalFunctionType();
-        auto *newFnType = fnOrigType->getAutoDiffAssociatedFunctionType(
-            autoDiffFuncId->getParameterIndices(), /*resultIndex*/ 0,
-            /*differentiationOrder*/ 1, assocFnKind,
-            LookUpConformanceInModule(F.getModule().getSwiftModule()),
-            fnType->getOptGenericSignature());
-        CanGenericSignature canGenSig;
-        if (auto *genSig = newFnType->getOptGenericSignature())
-          canGenSig = genSig->getCanonicalSignature();
-        return CanAnyFunctionType::get(
-            canGenSig, newFnType->getParams(),
-            newFnType->getResult()->getCanonicalType(canGenSig));
-      };
-
-      // Given the abstraction pattern of an autodiff associated method that is
-      // differentiable wrt self, return a version where self's
-      // tangent/cotangent is reordered in the returned linear map.
-      auto getReorderedUpdatePattern =
-          [&](AbstractionPattern pattern) -> AbstractionPattern {
-        auto canFnTy = pattern.getAs<AnyFunctionType>();
-        canFnTy = getReorderedFunctionType(canFnTy);
-        return AbstractionPattern(pattern.getGenericSignature(), canFnTy);
-      };
-
-      witnessOrigTy = getReorderedUpdatePattern(witnessOrigTy);
-      reqtOrigTy = getReorderedUpdatePattern(reqtOrigTy);
-      witnessSubstTy = getReorderedFunctionType(witnessSubstTy);
-      reqtSubstTy = getReorderedFunctionType(reqtSubstTy);
-    }
-  }
 
   auto coroutineKind =
     witnessFnRef->getType().castTo<SILFunctionType>()->getCoroutineKind();

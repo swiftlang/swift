@@ -165,15 +165,16 @@ static void unwrapCurryLevels(AnyFunctionType *fnTy,
 ///   ==> pushes {A, C} to `paramTypes`.
 ///
 ///   functionType = (A, B) -> (C, D) -> R
-///   if "A", "C", and "D" are in the set,
-///   ==> pushes {A, C, D} to `paramTypes`.
+///   ==> pushes {A, C, D} to `paramTypes` if `reverseCurryLevels` is true,
+///    or pushes {C, D, A} otherwise.
 ///
 ///   functionType = (Self) -> (A, B, C) -> R
-///   if "Self" and "C" are in the set,
-///   ==> pushes {Self, C} to `paramTypes`.
+///   ==> pushes {Self, C} to `paramTypes` if `reverseCurryLevels` is true,
+///    or pushes {C, Self} otherwise.
 ///
 void AutoDiffParameterIndices::getSubsetParameterTypes(
-    AnyFunctionType *functionType, SmallVectorImpl<Type> &paramTypes) const {
+    AnyFunctionType *functionType, SmallVectorImpl<Type> &paramTypes,
+    bool reverseCurryLevels) const {
   SmallVector<AnyFunctionType *, 2> curryLevels;
   unwrapCurryLevels(functionType, curryLevels);
 
@@ -182,6 +183,13 @@ void AutoDiffParameterIndices::getSubsetParameterTypes(
   for (unsigned curryLevelIndex : reversed(indices(curryLevels))) {
     curryLevelParameterIndexOffsets[curryLevelIndex] = currentOffset;
     currentOffset += curryLevels[curryLevelIndex]->getNumParams();
+  }
+
+  // If `reverseCurryLevels` is true, reverse the curry levels and offsets.
+  if (reverseCurryLevels) {
+    std::reverse(curryLevels.begin(), curryLevels.end());
+    std::reverse(curryLevelParameterIndexOffsets.begin(),
+                 curryLevelParameterIndexOffsets.end());
   }
 
   for (unsigned curryLevelIndex : indices(curryLevels)) {
