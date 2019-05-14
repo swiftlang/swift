@@ -1029,10 +1029,6 @@ static bool parseDifferentiableAttr(
     P.consumeToken();
     if (parseFnName(VJPName)) return true;
   }
-  // Parse ']'.
-  if (P.parseToken(tok::r_square,
-                   diag::sil_attr_differentiable_expected_rsquare))
-    return true;
   // Parse a trailing 'where' clause if any.
   TrailingWhereClause *WhereClause = nullptr;
   if (P.Tok.is(tok::kw_where)) {
@@ -1044,6 +1040,10 @@ static bool parseDifferentiableAttr(
     WhereClause = TrailingWhereClause::create(SP.SILMod.getASTContext(),
                                               whereLoc, requirementReprs);
   }
+  // Parse ']'.
+  if (P.parseToken(tok::r_square,
+                   diag::sil_attr_differentiable_expected_rsquare))
+    return true;
   // Create a SILDifferentiableAttr and we are done.
   auto *Attr = SILDifferentiableAttr::create(
       SP.SILMod, {SourceIndex, ParamIndices}, JVPName.str(), VJPName.str(),
