@@ -20,5 +20,4 @@ silopt_register_sources(
   SemanticARCOpts.cpp
   SILGenCleanup.cpp
   YieldOnceCheck.cpp
-  OSLogOptimization.cpp
 )

@@ -128,12 +128,6 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   P.addDiagnoseInfiniteRecursion();
   P.addYieldOnceCheck();
   P.addEmitDFDiagnostics();
-
-  // This phase performs optimizations necessary for correct inter-operation of
-  // Swift os log APIs with C os_log ABIs. It also diagnoses log calls whose
-  // size exceed a predefined limit.
-  P.addOSLogOptimization();
-
   // Canonical swift requires all non cond_br critical edges to be split.
   P.addSplitNonCondBrCriticalEdges();
 }

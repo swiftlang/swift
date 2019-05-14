@@ -46,9 +46,7 @@ enum class WellKnownFunction {
   // static String.append (_: String, _: inout String)
   StringAppend,
   // static String.== infix(_: String)
-  StringEquals,
-  // String.percentEscapedString.getter
-  StringEscapePercent
+  StringEquals
 };
 
 static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
@@ -63,8 +61,6 @@ static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
     return WellKnownFunction::StringAppend;
   if (fn->hasSemanticsAttr("string.equals"))
     return WellKnownFunction::StringEquals;
-  if (fn->hasSemanticsAttr("string.escapePercent.get"))
-    return WellKnownFunction::StringEscapePercent;
   return None;
 }
 
@@ -762,38 +758,6 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     auto result = SymbolicValue::getAggregate(ArrayRef<SymbolicValue>(intVal),
                                               evaluator.getAllocator());
     setValue(apply, result);
-    return None;
-  }
-  case WellKnownFunction::StringEscapePercent: {
-    // String.percentEscapedString.getter
-    assert(conventions.getNumDirectSILResults() == 1 &&
-           conventions.getNumIndirectSILResults() == 0 &&
-           conventions.getNumParameters() == 1 &&
-           "unexpected String.percentEscapedString signature");
-
-    auto stringArgument = getConstantValue(apply->getOperand(1));
-    if (!stringArgument.isConstant()) {
-      return stringArgument;
-    }
-
-    if (stringArgument.getKind() != SymbolicValue::String) {
-      return evaluator.getUnknown((SILInstruction *)apply,
-                                  UnknownReason::InvalidOperandValue);
-    }
-
-    // Replace all precent symbol (%) in the string with double percents (%%)
-    StringRef stringVal = stringArgument.getStringValue();
-    SmallString<4> percentEscapedString;
-    for (auto charElem : stringVal) {
-      percentEscapedString.push_back(charElem);
-      if (charElem == '%') {
-        percentEscapedString.push_back('%');
-      }
-    }
-
-    auto resultVal = SymbolicValue::getString(percentEscapedString.str(),
-                                              evaluator.getAllocator());
-    setValue(apply, resultVal);
     return None;
   }
   }
