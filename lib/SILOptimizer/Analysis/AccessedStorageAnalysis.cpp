@@ -129,7 +129,6 @@ bool AccessedStorageResult::mergeAccesses(
   // can occur ~1000 elements. 200 is large enough to cover "normal" code,
   // while ensuring compile time isn't affected.
   if (storageAccessSet.size() > 200) {
-    llvm::dbgs() << "BIG SET " << storageAccessSet.size() << "\n";
     setWorstEffects();
     return true;
   }
