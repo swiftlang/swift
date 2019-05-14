@@ -2844,3 +2844,46 @@ bool ExtraneousReturnFailure::diagnoseAsError() {
   emitDiagnostic(anchor->getLoc(), diag::cannot_return_value_from_void_func);
   return true;
 }
+
+bool CollectionElementContextualFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+
+  auto eltType = getFromType();
+  auto contextualType = getToType();
+
+  Optional<InFlightDiagnostic> diagnostic;
+  if (isa<ArrayExpr>(getRawAnchor())) {
+    diagnostic.emplace(emitDiagnostic(anchor->getLoc(),
+                                      diag::cannot_convert_array_element,
+                                      eltType, contextualType));
+  }
+
+  if (isa<DictionaryExpr>(getRawAnchor())) {
+    auto *locator = getLocator();
+    const auto eltLoc = locator->getPath().back();
+
+    switch (eltLoc.getValue()) {
+    case 0: // key
+      diagnostic.emplace(emitDiagnostic(anchor->getLoc(),
+                                        diag::cannot_convert_dict_key, eltType,
+                                        contextualType));
+      break;
+
+    case 1: // value
+      diagnostic.emplace(emitDiagnostic(anchor->getLoc(),
+                                        diag::cannot_convert_dict_value,
+                                        eltType, contextualType));
+      break;
+
+    default:
+      break;
+    }
+  }
+
+  if (!diagnostic)
+    return false;
+
+  (void)trySequenceSubsequenceFixIts(*diagnostic, getConstraintSystem(),
+                                     eltType, contextualType, anchor);
+  return true;
+}

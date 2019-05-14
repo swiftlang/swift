@@ -603,7 +603,7 @@ func r22470302(_ c: r22470302Class) {
 // <rdar://problem/21928143> QoI: Pointfree reference to generic initializer in generic context does not compile
 extension String {
   @available(*, unavailable, message: "calling this is unwise")
-  func unavail<T : Sequence> // expected-note 2 {{'unavail' has been explicitly marked unavailable here}}
+  func unavail<T : Sequence> // expected-note {{'unavail' has been explicitly marked unavailable here}}
     (_ a : T) -> String where T.Iterator.Element == String {}
 }
 extension Array {
@@ -612,7 +612,7 @@ extension Array {
   }
   
   func h() -> String {
-    return "foo".unavail([0])  // expected-error {{'unavail' is unavailable: calling this is unwise}}
+    return "foo".unavail([0])  // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
   }
 }
 
