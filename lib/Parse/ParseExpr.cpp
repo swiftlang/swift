@@ -1862,10 +1862,22 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
       SyntaxParsingContext ExprContext(SyntaxContext,
                                        SyntaxKind::ExpressionSegment);
 
+      unsigned DelimiterLen = EntireTok.getCustomDelimiterLen();
+      bool HasCustomDelimiter = DelimiterLen > 0;
+
       // Backslash is part of an expression segment.
-      SourceLoc BackSlashLoc = Segment.Loc.getAdvancedLoc(-1);
+      SourceLoc BackSlashLoc = Segment.Loc.getAdvancedLoc(-1 - DelimiterLen);
       Token BackSlash(tok::backslash, CharSourceRange(BackSlashLoc, 1).str());
       ExprContext.addToken(BackSlash, EmptyTrivia, EmptyTrivia);
+
+      // Custom delimiter may be a part of an expression segment.
+      if (HasCustomDelimiter) {
+        SourceLoc DelimiterLoc = Segment.Loc.getAdvancedLoc(-DelimiterLen);
+        Token Delimiter(tok::raw_string_delimiter,
+                        CharSourceRange(DelimiterLoc, DelimiterLen).str());
+        ExprContext.addToken(Delimiter, EmptyTrivia, EmptyTrivia);
+      }
+
       // Create a temporary lexer that lexes from the body of the string.
       LexerState BeginState =
           L->getStateForBeginningOfTokenLoc(Segment.Loc);
@@ -1948,15 +1960,20 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   SourceLoc Loc = Tok.getLoc();
   SourceLoc EndLoc = Loc.getAdvancedLoc(Tok.getLength());
 
-  StringRef OpenQuoteStr, CloseQuoteStr;
+  StringRef OpenDelimiterStr, OpenQuoteStr, CloseQuoteStr, CloseDelimiterStr;
+  unsigned DelimiterLength = Tok.getCustomDelimiterLen();
+  bool HasCustomDelimiter = DelimiterLength > 0;
+  unsigned QuoteLength;
   tok QuoteKind;
-  std::tie(OpenQuoteStr, CloseQuoteStr, QuoteKind) = Tok.isMultilineString() ?
-    std::make_tuple(Tok.getRawText().take_front(3),
-                    Tok.getRawText().take_back(3),
-                    tok::multiline_string_quote) :
-    std::make_tuple(Tok.getRawText().take_front(1),
-                    Tok.getRawText().take_back(1),
-                    tok::string_quote);
+  std::tie(QuoteLength, QuoteKind) =
+      Tok.isMultilineString() ? std::make_tuple(3, tok::multiline_string_quote)
+                              : std::make_tuple(1, tok::string_quote);
+  unsigned CloseQuoteBegin = Tok.getLength() - DelimiterLength - QuoteLength;
+
+  OpenDelimiterStr = Tok.getRawText().take_front(DelimiterLength);
+  OpenQuoteStr = Tok.getRawText().substr(DelimiterLength, QuoteLength);
+  CloseQuoteStr = Tok.getRawText().substr(CloseQuoteBegin, QuoteLength);
+  CloseDelimiterStr = Tok.getRawText().take_back(DelimiterLength);
 
   // Make unknown tokens to represent the open and close quote.
   Token OpenQuote(QuoteKind, OpenQuoteStr);
@@ -1964,23 +1981,30 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   ParsedTrivia EmptyTrivia;
   ParsedTrivia EntireTrailingTrivia = TrailingTrivia;
 
-  // Add the open quote to the context; the quote should have the leading trivia
-  // of the entire string token and a void trailing trivia.
-  SyntaxContext->addToken(OpenQuote, LeadingTrivia, EmptyTrivia);
-    
+  if (HasCustomDelimiter) {
+    Token OpenDelimiter(tok::raw_string_delimiter, OpenDelimiterStr);
+    // When a custom delimiter is present, it owns the leading trivia.
+    SyntaxContext->addToken(OpenDelimiter, LeadingTrivia, EmptyTrivia);
+
+    SyntaxContext->addToken(OpenQuote, EmptyTrivia, EmptyTrivia);
+  } else {
+    // Without custom delimiter the quote owns trailing trivia.
+    SyntaxContext->addToken(OpenQuote, LeadingTrivia, EmptyTrivia);
+  }
+
   // The simple case: just a single literal segment.
   if (Segments.size() == 1 &&
       Segments.front().Kind == Lexer::StringSegment::Literal) {
     {
       consumeExtraToken(Tok);
       consumeTokenWithoutFeedingReceiver();
-  
+
       SyntaxParsingContext SegmentsCtx(SyntaxContext,
                                        SyntaxKind::StringLiteralSegments);
-        
+
       SyntaxParsingContext StrSegContext(SyntaxContext,
                                          SyntaxKind::StringSegment);
-        
+
       // Make an unknown token to encapsulate the entire string segment and add
       // such token to the context.
       auto Segment = Segments.front();
@@ -1988,11 +2012,18 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
                     CharSourceRange(Segment.Loc, Segment.Length).str());
       SyntaxContext->addToken(content, EmptyTrivia, EmptyTrivia);
     }
-    
-    // Add the close quote the context; the quote should have a void leading trivia
-    // and the trailing trivia of the entire string token.
-    SyntaxContext->addToken(CloseQuote, EmptyTrivia, EntireTrailingTrivia);
-    
+
+    if (HasCustomDelimiter) {
+      SyntaxContext->addToken(CloseQuote, EmptyTrivia, EmptyTrivia);
+
+      Token CloseDelimiter(tok::raw_string_delimiter, CloseDelimiterStr);
+      // When a custom delimiter is present it owns the trailing trivia.
+      SyntaxContext->addToken(CloseDelimiter, EmptyTrivia, EntireTrailingTrivia);
+    } else {
+      // Without custom delimiter the quote owns trailing trivia.
+      SyntaxContext->addToken(CloseQuote, EmptyTrivia, EntireTrailingTrivia);
+    }
+
     return makeParserResult(
         createStringLiteralExprFromSegment(Context, L, Segments.front(), Loc));
   }
@@ -2048,9 +2079,16 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
     AppendingExpr = new (Context) TapExpr(nullptr, Body);
   }
 
-  // Add the close quote the context; the quote should have a void leading trivia
-  // and the trailing trivia of the entire string token.
-  SyntaxContext->addToken(CloseQuote, EmptyTrivia, EntireTrailingTrivia);
+  if (HasCustomDelimiter) {
+    SyntaxContext->addToken(CloseQuote, EmptyTrivia, EmptyTrivia);
+
+    Token CloseDelimiter(tok::raw_string_delimiter, CloseDelimiterStr);
+    // When a custom delimiter is present it owns the trailing trivia.
+    SyntaxContext->addToken(CloseDelimiter, EmptyTrivia, EntireTrailingTrivia);
+  } else {
+    // Without custom delimiter the quote owns trailing trivia.
+    SyntaxContext->addToken(CloseQuote, EmptyTrivia, EntireTrailingTrivia);
+  }
 
   if (AppendingExpr->getBody()->getNumElements() == 1) {
     Status.setIsParseError();
