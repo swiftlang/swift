@@ -2052,7 +2052,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   // system had a contextual type specified, we use it - it will have a purpose
   // indicator which allows us to give a very "to the point" diagnostic.
   Diag<Type, Type> diagID;
-  Diag<Type, Type> diagIDProtocol;
   Diag<Type> nilDiag;
   std::function<void(void)> nilFollowup;
 
@@ -2069,7 +2068,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
                      "contextual type");
   case CTP_Initialization:
     diagID = diag::cannot_convert_initializer_value;
-    diagIDProtocol = diag::cannot_convert_initializer_value_protocol;
     nilDiag = diag::cannot_convert_initializer_value_nil;
     nilFollowup = [this] {
       TypeRepr *patternTR = CS.getContextualTypeLoc().getTypeRepr();
@@ -2095,7 +2093,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     }
 
     diagID = diag::cannot_convert_to_return_type;
-    diagIDProtocol = diag::cannot_convert_to_return_type_protocol;
     nilDiag = diag::cannot_convert_to_return_type_nil;
     break;
   case CTP_ThrowStmt: {
@@ -2143,12 +2140,10 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
 
   case CTP_EnumCaseRawValue:
     diagID = diag::cannot_convert_raw_initializer_value;
-    diagIDProtocol = diag::cannot_convert_raw_initializer_value;
     nilDiag = diag::cannot_convert_raw_initializer_value_nil;
     break;
   case CTP_DefaultParameter:
     diagID = diag::cannot_convert_default_arg_value;
-    diagIDProtocol = diag::cannot_convert_default_arg_value_protocol;
     nilDiag = diag::cannot_convert_default_arg_value_nil;
     break;
 
@@ -2168,42 +2163,34 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     return true;
   case CTP_YieldByValue:
     diagID = diag::cannot_convert_yield_value;
-    diagIDProtocol = diag::cannot_convert_yield_value_protocol;
     nilDiag = diag::cannot_convert_yield_value_nil;
     break;
   case CTP_CallArgument:
     diagID = diag::cannot_convert_argument_value;
-    diagIDProtocol = diag::cannot_convert_argument_value_protocol;
     nilDiag = diag::cannot_convert_argument_value_nil;
     break;
   case CTP_ClosureResult:
     diagID = diag::cannot_convert_closure_result;
-    diagIDProtocol = diag::cannot_convert_closure_result_protocol;
     nilDiag = diag::cannot_convert_closure_result_nil;
     break;
   case CTP_ArrayElement:
     diagID = diag::cannot_convert_array_element;
-    diagIDProtocol = diag::cannot_convert_array_element_protocol;
     nilDiag = diag::cannot_convert_array_element_nil;
     break;
   case CTP_DictionaryKey:
     diagID = diag::cannot_convert_dict_key;
-    diagIDProtocol = diag::cannot_convert_dict_key_protocol;
     nilDiag = diag::cannot_convert_dict_key_nil;
     break;
   case CTP_DictionaryValue:
     diagID = diag::cannot_convert_dict_value;
-    diagIDProtocol = diag::cannot_convert_dict_value_protocol;
     nilDiag = diag::cannot_convert_dict_value_nil;
     break;
   case CTP_CoerceOperand:
     diagID = diag::cannot_convert_coerce;
-    diagIDProtocol = diag::cannot_convert_coerce_protocol;
     nilDiag = diag::cannot_convert_coerce_nil;
     break;
   case CTP_AssignSource:
     diagID = diag::cannot_convert_assign;
-    diagIDProtocol = diag::cannot_convert_assign_protocol;
     nilDiag = diag::cannot_convert_assign_nil;
     break;
   }
@@ -2316,9 +2303,13 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   // When complaining about conversion to a protocol type, complain about
   // conformance instead of "conversion".
   if (contextualType->is<ProtocolType>() ||
-      contextualType->is<ProtocolCompositionType>())
-    diagID = diagIDProtocol;
-  
+      contextualType->is<ProtocolCompositionType>()) {
+    MissingContextualConformanceFailure failure(
+        expr, CS, CTP, exprType, contextualType,
+        CS.getConstraintLocator(expr, ConstraintLocator::ContextualType));
+    return failure.diagnoseAsError();
+  }
+
   // Try to simplify irrelevant details of function types.  For example, if
   // someone passes a "() -> Float" function to a "() throws -> Int"
   // parameter, then uttering the "throws" may confuse them into thinking that
