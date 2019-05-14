@@ -112,47 +112,47 @@ extension MDLAnimatedScalarArray {
 @available(iOS, introduced: 11.0)
 @available(tvOS, introduced: 11.0)
 extension MDLAnimatedVector3Array {
-    @nonobjc public func set(float3Array array:[float3], atTime time: TimeInterval){
+    @nonobjc public func set(float3Array array:[SIMD3<Float>], atTime time: TimeInterval){
         __setFloat3(array, count: array.count, atTime: time)
     }
     
-    @nonobjc public func set(double3Array array:[double3], atTime time: TimeInterval){
+    @nonobjc public func set(double3Array array:[SIMD3<Double>], atTime time: TimeInterval){
         __setDouble3(array, count: array.count, atTime: time)
     }
     
-    @nonobjc public func float3Array(atTime time: TimeInterval) -> [float3] {
-        var values = [float3](repeating: float3(), count: Int(elementCount))
+    @nonobjc public func float3Array(atTime time: TimeInterval) -> [SIMD3<Float>] {
+        var values = [SIMD3<Float>](repeating: SIMD3<Float>(), count: Int(elementCount))
         __getFloat3Array(&values[0], maxCount: elementCount, atTime: time)
         return values
     }
     
-    @nonobjc public func double3Array(atTime time: TimeInterval) -> [double3] {
-        var values = [double3](repeating: double3(), count: Int(elementCount))
+    @nonobjc public func double3Array(atTime time: TimeInterval) -> [SIMD3<Double>] {
+        var values = [SIMD3<Double>](repeating: SIMD3<Double>(), count: Int(elementCount))
         __getDouble3Array(&values[0], maxCount: elementCount, atTime: time)
         return values
     }
     
-    @nonobjc public func reset(float3Array array:[float3], atTimes times: [TimeInterval]){
+    @nonobjc public func reset(float3Array array:[SIMD3<Float>], atTimes times: [TimeInterval]){
         __reset(withFloat3Array: array, count: array.count, atTimes: times, count: times.count)
     }
     
-    @nonobjc public func reset(double3Array array:[double3], atTimes times: [TimeInterval]){
+    @nonobjc public func reset(double3Array array:[SIMD3<Double>], atTimes times: [TimeInterval]){
         __reset(withDouble3Array: array, count: array.count, atTimes: times, count: times.count)
     }
     
-    @nonobjc public var float3Array: [float3] {
+    @nonobjc public var float3Array: [SIMD3<Float>] {
         get {
             let count = elementCount * timeSampleCount
-            var values = [float3](repeating: float3(), count: Int(count))
+            var values = [SIMD3<Float>](repeating: SIMD3<Float>(), count: Int(count))
             __getFloat3Array(&values[0], maxCount: count)
             return values
         }
     }
     
-    @nonobjc public var double3Array: [double3] {
+    @nonobjc public var double3Array: [SIMD3<Double>] {
         get {
             let count = elementCount * timeSampleCount
-            var values = [double3](repeating: double3(), count: Int(count))
+            var values = [SIMD3<Double>](repeating: SIMD3<Double>(), count: Int(count))
             __getDouble3Array(&values[0], maxCount: count)
             return values
         }
@@ -243,25 +243,25 @@ extension MDLAnimatedScalar {
 @available(iOS, introduced: 11.0)
 @available(tvOS, introduced: 11.0)
 extension MDLAnimatedVector2 {
-    @nonobjc public func reset(float2Array array:[float2], atTimes times: [TimeInterval]){
+    @nonobjc public func reset(float2Array array:[SIMD2<Float>], atTimes times: [TimeInterval]){
         __reset(withFloat2Array: array, atTimes: times, count: times.count)
     }
     
-    @nonobjc public func reset(double2Array array:[double2], atTimes times: [TimeInterval]){
+    @nonobjc public func reset(double2Array array:[SIMD2<Double>], atTimes times: [TimeInterval]){
         __reset(withDouble2Array: array, atTimes: times, count: times.count)
     }
     
-    @nonobjc public var float2Array: [float2] {
+    @nonobjc public var float2Array: [SIMD2<Float>] {
         get {
-            var values = [float2](repeating: float2(), count: Int(timeSampleCount))
+            var values = [SIMD2<Float>](repeating: SIMD2<Float>(), count: Int(timeSampleCount))
             __getFloat2Array(&values[0], maxCount: timeSampleCount)
             return values
         }
     }
 
-    @nonobjc public var double2Array: [double2] {
+    @nonobjc public var double2Array: [SIMD2<Double>] {
         get {
-            var values = [double2](repeating: double2(), count: Int(timeSampleCount))
+            var values = [SIMD2<Double>](repeating: SIMD2<Double>(), count: Int(timeSampleCount))
             __getDouble2Array(&values[0], maxCount: timeSampleCount)
             return values
         }
@@ -272,25 +272,25 @@ extension MDLAnimatedVector2 {
 @available(iOS, introduced: 11.0)
 @available(tvOS, introduced: 11.0)
 extension MDLAnimatedVector3 {
-    @nonobjc public func reset(float3Array array:[float3], atTimes times: [TimeInterval]){
+    @nonobjc public func reset(float3Array array:[SIMD3<Float>], atTimes times: [TimeInterval]){
         __reset(withFloat3Array: array, atTimes: times, count: times.count)
     }
     
-    @nonobjc public func reset(double3Array array:[double3], atTimes times: [TimeInterval]){
+    @nonobjc public func reset(double3Array array:[SIMD3<Double>], atTimes times: [TimeInterval]){
         __reset(withDouble3Array: array, atTimes: times, count: times.count)
     }
     
-    @nonobjc public var float3Array: [float3] {
+    @nonobjc public var float3Array: [SIMD3<Float>] {
         get {
-            var values = [float3](repeating: float3(), count: Int(timeSampleCount))
+            var values = [SIMD3<Float>](repeating: SIMD3<Float>(), count: Int(timeSampleCount))
             __getFloat3Array(&values[0], maxCount: timeSampleCount)
             return values
         }
     }
 
-    @nonobjc public var double3Array: [double3] {
+    @nonobjc public var double3Array: [SIMD3<Double>] {
         get {
-            var values = [double3](repeating: double3(), count: Int(timeSampleCount))
+            var values = [SIMD3<Double>](repeating: SIMD3<Double>(), count: Int(timeSampleCount))
             __getDouble3Array(&values[0], maxCount: timeSampleCount)
             return values
         }
@@ -301,25 +301,25 @@ extension MDLAnimatedVector3 {
 @available(iOS, introduced: 11.0)
 @available(tvOS, introduced: 11.0)
 extension MDLAnimatedVector4 {
-    @nonobjc public func reset(float4Array array:[float4], atTimes times: [TimeInterval]){
+    @nonobjc public func reset(float4Array array:[SIMD4<Float>], atTimes times: [TimeInterval]){
         __reset(withFloat4Array: array, atTimes: times, count: times.count)
     }
     
-    @nonobjc public func reset(double4Array array:[double4], atTimes times: [TimeInterval]){
+    @nonobjc public func reset(double4Array array:[SIMD4<Double>], atTimes times: [TimeInterval]){
         __reset(withDouble4Array: array, atTimes: times, count: times.count)
     }
     
-    @nonobjc public var float4Array: [float4] {
+    @nonobjc public var float4Array: [SIMD4<Float>] {
         get {
-            var values = [float4](repeating: float4(), count: Int(timeSampleCount))
+            var values = [SIMD4<Float>](repeating: SIMD4<Float>(), count: Int(timeSampleCount))
             __getFloat4Array(&values[0], maxCount: timeSampleCount)
             return values
         }
     }
 
-    @nonobjc public var double4Array: [double4] {
+    @nonobjc public var double4Array: [SIMD4<Double>] {
         get {
-            var values = [double4](repeating: double4(), count: Int(timeSampleCount))
+            var values = [SIMD4<Double>](repeating: SIMD4<Double>(), count: Int(timeSampleCount))
             __getDouble4Array(&values[0], maxCount: timeSampleCount)
             return values
         }
