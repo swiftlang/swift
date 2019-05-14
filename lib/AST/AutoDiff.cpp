@@ -90,7 +90,7 @@ bool autodiff::getBuiltinAutoDiffApplyConfig(
 }
 
 SILLinkage autodiff::getAutoDiffFunctionLinkage(SILLinkage originalLinkage,
-                                                bool isExported) {
+                                                bool isAssocFnExported) {
   // If the original is defined externally, then the AD pass is just generating
   // associated functions for use in the current module and therefore these
   // associated functions should not be visible outside the module.
@@ -98,12 +98,14 @@ SILLinkage autodiff::getAutoDiffFunctionLinkage(SILLinkage originalLinkage,
     return SILLinkage::Hidden;
 
   // If the original is public, then external modules may need to link the
-  // associated function. Make the associated function public unless
-  // differentiation is not explicitly requested.
+  // associated function. Return the linkage of the original function, unless
+  // the associated function is not exported (i.e. differentiation is not
+  // explicitly requested via a `[differentiable]` attribute on the original
+  // function).
   if (originalLinkage == SILLinkage::Public ||
       originalLinkage == SILLinkage::PublicNonABI ||
       originalLinkage == SILLinkage::Shared)
-    return isExported ? originalLinkage : SILLinkage::Hidden;
+    return isAssocFnExported ? originalLinkage : SILLinkage::Hidden;
 
   // Otherwise, the original function is defined and used only in the current
   // module, so external modules will never try to access the associated

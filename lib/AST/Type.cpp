@@ -4463,7 +4463,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   indices->getSubsetParameterTypes(this, wrtParamTypes);
 
   // Unwrap curry levels. At most, two parameter lists are necessary, for
-  // curried method types.
+  // curried method types with a `(Self)` parameter list.
   SmallVector<AnyFunctionType *, 2> curryLevels;
   auto *currentLevel = eraseDynamicSelfType()->castTo<AnyFunctionType>();
   for (unsigned i : range(2)) {
@@ -4576,7 +4576,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
 AnyFunctionType *
 AnyFunctionType::getAutoDiffOriginalFunctionType() {
   // Unwrap curry levels. At most, two parameter lists are necessary, for
-  // curried method types.
+  // curried method types with a `(Self)` parameter list.
   SmallVector<AnyFunctionType *, 2> curryLevels;
   auto *currentLevel = this;
   for (unsigned i : range(2)) {

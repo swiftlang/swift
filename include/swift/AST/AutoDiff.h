@@ -572,16 +572,20 @@ getOffsetForAutoDiffAssociatedFunction(unsigned order,
 unsigned
 getNumAutoDiffAssociatedFunctions(unsigned differentiationOrder);
 
-// Retrieve config from the function name of a variant of
-// `Builtin.autodiffApply`, e.g. `Builtin.autodiffApply_jvp_arity2_order1`.
-// Returns true if the function name is parsed successfully.
+/// Retrieve config from the function name of a variant of
+/// `Builtin.autodiffApply`, e.g. `Builtin.autodiffApply_jvp_arity2_order1`.
+/// Returns true if the function name is parsed successfully.
 bool getBuiltinAutoDiffApplyConfig(StringRef operationName,
                                    AutoDiffAssociatedFunctionKind &kind,
                                    unsigned &arity, unsigned &order,
                                    bool &rethrows);
 
+/// Computes the correct linkage for associated functions given the linkage of
+/// the original function. If the original linkage is not external and
+/// `isAssocFnExported` is true, use the original function's linkage. Otherwise,
+/// return hidden linkage.
 SILLinkage getAutoDiffFunctionLinkage(SILLinkage originalLinkage,
-                                      bool isExported);
+                                      bool isAssocFnExported);
 
 } // end namespace autodiff
 
