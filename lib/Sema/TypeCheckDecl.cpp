@@ -1413,6 +1413,25 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator, ProtocolDecl *proto)
   return reqSignature->getRequirements();
 }
 
+llvm::Expected<Type>
+DefaultDefinitionTypeRequest::evaluate(Evaluator &evaluator,
+                                       AssociatedTypeDecl *assocType) const {
+  if (assocType->Resolver) {
+    auto defaultType = assocType->Resolver->loadAssociatedTypeDefault(
+                                    assocType, assocType->ResolverContextData);
+    assocType->Resolver = nullptr;
+    return defaultType;
+  }
+
+  TypeRepr *defaultDefinition = assocType->getDefaultDefinitionTypeRepr();
+  if (defaultDefinition) {
+    auto resolution = TypeResolution::forInterface(assocType->getDeclContext());
+    return resolution.resolveType(defaultDefinition, None);
+  }
+
+  return Type();
+}
+
 namespace {
   /// How to generate the raw value for each element of an enum that doesn't
   /// have one explicitly specified.
@@ -2652,6 +2671,25 @@ public:
 
     // Trigger the checking for overridden declarations.
     (void)AT->getOverriddenDecls();
+
+    auto defaultType = AT->getDefaultDefinitionType();
+    if (defaultType && !defaultType->hasError()) {
+      // associatedtype X = X is invalid
+      auto mentionsItself =
+        defaultType.findIf([&](Type defaultType) {
+          if (auto DMT = defaultType->getAs<DependentMemberType>()) {
+            return DMT->getAssocType() == AT;
+          }
+          return false;
+        });
+
+      if (mentionsItself) {
+        TC.diagnose(AT->getDefaultDefinitionTypeRepr()->getLoc(),
+                    diag::recursive_decl_reference,
+                    AT->getDescriptiveKind(), AT->getName());
+        AT->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
+      }
+    }
   }
 
   void checkUnsupportedNestedType(NominalTypeDecl *NTD) {
@@ -3754,32 +3792,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(assocType);
 
-    // Check the default definition, if there is one.
-    TypeLoc &defaultDefinition = assocType->getDefaultDefinitionLoc();
-    if (!defaultDefinition.isNull()) {
-      if (validateType(
-            defaultDefinition,
-            TypeResolution::forInterface(
-              assocType->getDeclContext()),
-            None)) {
-        defaultDefinition.setInvalidType(Context);
-      } else {
-        // associatedtype X = X is invalid
-        auto mentionsItself =
-            defaultDefinition.getType().findIf([&](Type type) {
-              if (auto DMT = type->getAs<DependentMemberType>()) {
-                return DMT->getAssocType() == assocType;
-              }
-              return false;
-            });
-
-        if (mentionsItself) {
-          diagnose(defaultDefinition.getLoc(), diag::recursive_decl_reference,
-                   assocType->getDescriptiveKind(), assocType->getName());
-          diagnose(assocType, diag::kind_declared_here, DescriptiveDeclKind::Type);
-        }
-      }
-    }
     // Finally, set the interface type.
     if (!assocType->hasInterfaceType())
       assocType->computeType();

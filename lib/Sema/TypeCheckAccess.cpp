@@ -626,7 +626,8 @@ public:
         }
       });
     });
-    checkTypeAccess(assocType->getDefaultDefinitionLoc(), assocType,
+    checkTypeAccess(assocType->getDefaultDefinitionType(),
+                    assocType->getDefaultDefinitionTypeRepr(), assocType,
                     /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr,
@@ -1215,7 +1216,8 @@ public:
         highlightOffendingType(TC, diag, complainRepr);
       });
     });
-    checkTypeAccess(assocType->getDefaultDefinitionLoc(), assocType,
+    checkTypeAccess(assocType->getDefaultDefinitionType(),
+                    assocType->getDefaultDefinitionTypeRepr(), assocType,
                      /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
@@ -1775,7 +1777,8 @@ public:
       checkType(requirement, assocType, getDiagnoseCallback(assocType),
                 getDiagnoseCallback(assocType));
     });
-    checkType(assocType->getDefaultDefinitionLoc(), assocType,
+    checkType(assocType->getDefaultDefinitionType(),
+              assocType->getDefaultDefinitionTypeRepr(), assocType,
               getDiagnoseCallback(assocType), getDiagnoseCallback(assocType));
 
     if (assocType->getTrailingWhereClause()) {
