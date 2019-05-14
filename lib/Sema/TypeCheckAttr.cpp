@@ -1410,7 +1410,7 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   }
 
   if (VD->hasInterfaceType()) {
-    if (TC.checkConformanceToNSCopying(VD)) {
+    if (!TC.checkConformanceToNSCopying(VD)) {
       attr->setInvalid();
       return;
     }

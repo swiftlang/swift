@@ -106,7 +106,7 @@ class TestNSCopying {
   // CHECK-LABEL: sil hidden [transparent] [ossa] @$s15objc_properties13TestNSCopyingC8propertySo8NSStringCvs : $@convention(method) (@owned NSString, @guaranteed TestNSCopying) -> ()
   // CHECK: bb0([[ARG0:%.*]] : @owned $NSString, [[ARG1:%.*]] : @guaranteed $TestNSCopying):
   // CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-  // CHECK:   objc_method [[BORROWED_ARG0]] : $NSString, #NSString.copy!1.foreign
+  // CHECK:   objc_method [[BORROWED_ARG0]] : $NSString, #NSCopying.copy!1.foreign
   @NSCopying var property : NSString
 
   @NSCopying var optionalProperty : NSString?
