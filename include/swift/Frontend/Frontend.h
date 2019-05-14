@@ -516,10 +516,13 @@ public:
   }
 
   /// Returns true if there was an error during setup.
-  /// \param BaseFS If set, uses this, instead of the real filesystem, as the
-  ///        base filesystem.
+  bool setup(const CompilerInvocation &Invocation);
+
+  /// Returns true if there was an error during setup.
+  /// \param BaseFS Use this, instead of the real filesystem, as the vase
+  ///        filesystem.
   bool setup(const CompilerInvocation &Invocation,
-             llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS = nullptr);
+             llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS);
 
 private:
   /// Set up the file system by loading and validating all VFS overlay YAML

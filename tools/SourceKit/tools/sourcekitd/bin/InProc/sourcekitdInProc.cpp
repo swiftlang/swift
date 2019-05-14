@@ -133,7 +133,7 @@ void sourcekitd_send_request(sourcekitd_object_t req,
 
   sourcekitd_request_retain(req);
   receiver = Block_copy(receiver);
-  WorkQueue::dispatchConcurrent([=] {
+  WorkQueue::dispatchConcurrent([=]{
     sourcekitd::handleRequest(req, [=](sourcekitd_response_t resp) {
       // The receiver accepts ownership of the response.
       receiver(resp);

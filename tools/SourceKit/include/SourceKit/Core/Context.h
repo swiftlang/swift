@@ -14,9 +14,9 @@
 #define LLVM_SOURCEKIT_CORE_CONTEXT_H
 
 #include "SourceKit/Core/LLVM.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/StringRef.h"
 #include <memory>
 #include <string>
 
@@ -25,9 +25,9 @@ namespace llvm {
 }
 
 namespace SourceKit {
-class FileSystemProvider;
-class LangSupport;
-class NotificationCenter;
+  class FileSystemProvider;
+  class LangSupport;
+  class NotificationCenter;
 
 class Context {
   std::string RuntimeLibPath;
@@ -49,11 +49,14 @@ public:
 
   std::shared_ptr<NotificationCenter> getNotificationCenter() { return NotificationCtr; }
 
-  /// Returns the FileSystemProvider registered under Name.
+  /// Returns the FileSystemProvider registered under Name, or nullptr if not
+  /// found.
   FileSystemProvider *getFileSystemProvider(StringRef Name);
 
   /// Registers the given FileSystemProvider under Name. The caller is
-  /// responsible for keeping FileSystemProvider alive as long as this Context.
+  /// responsible for keeping FileSystemProvider alive at least as long as
+  /// this Context.
+  /// \param FileSystemProvider must be non-null
   void setFileSystemProvider(StringRef Name,
                              FileSystemProvider *FileSystemProvider);
 };

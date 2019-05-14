@@ -77,8 +77,8 @@ struct InvocationOptions {
   const std::string PrimaryFile;
   const CompilerInvocation Invok;
 
-  /// If defined, all filesystem operations resulting from this invocation
-  /// should use this filesystem instead of the real filesystem.
+  /// All filesystem operations resulting from this invocation should use this
+  /// filesystem.
   const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem;
 
   InvocationOptions(ArrayRef<const char *> CArgs, StringRef PrimaryFile,
@@ -86,6 +86,7 @@ struct InvocationOptions {
                     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem)
       : Args(_convertArgs(CArgs)), PrimaryFile(PrimaryFile),
         Invok(std::move(Invok)), FileSystem(FileSystem) {
+    assert(FileSystem);
     // Assert invocation with a primary file. We want to avoid full typechecking
     // for all files.
     assert(!this->PrimaryFile.empty());
@@ -370,14 +371,16 @@ struct SwiftASTManager::Implementation {
 
   ASTProducerRef getASTProducer(SwiftInvocationRef InvokRef);
   FileContent
-  getFileContent(StringRef FilePath, bool IsPrimary, std::string &Error,
-                 llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem);
+  getFileContent(StringRef FilePath, bool IsPrimary,
+                 llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+                 std::string &Error);
   BufferStamp
   getBufferStamp(StringRef FilePath,
                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem);
   std::unique_ptr<llvm::MemoryBuffer> getMemoryBuffer(
-      StringRef Filename, std::string &Error,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem = nullptr);
+      StringRef Filename,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      std::string &Error);
 };
 
 SwiftASTManager::SwiftASTManager(
@@ -391,7 +394,7 @@ SwiftASTManager::~SwiftASTManager() {
 
 std::unique_ptr<llvm::MemoryBuffer>
 SwiftASTManager::getMemoryBuffer(StringRef Filename, std::string &Error) {
-  return Impl.getMemoryBuffer(Filename, Error);
+  return Impl.getMemoryBuffer(Filename, llvm::vfs::getRealFileSystem(), Error);
 }
 
 static FrontendInputsAndOutputs
@@ -404,10 +407,10 @@ convertFileContentsToInputs(const SmallVectorImpl<FileContent> &contents) {
 
 static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
     FrontendInputsAndOutputs &inputsAndOutputs, StringRef UnresolvedPrimaryFile,
-    std::string &Error,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
-  if (!FileSystem)
-    FileSystem = llvm::vfs::getRealFileSystem();
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    std::string &Error) {
+  assert(FileSystem);
+
   llvm::SmallString<128> PrimaryFile;
   if (auto err = FileSystem->getRealPath(UnresolvedPrimaryFile, PrimaryFile))
     PrimaryFile = UnresolvedPrimaryFile;
@@ -444,8 +447,18 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
 bool SwiftASTManager::initCompilerInvocation(
     CompilerInvocation &Invocation, ArrayRef<const char *> OrigArgs,
     DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
-    std::string &Error,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
+    std::string &Error) {
+  return initCompilerInvocation(Invocation, OrigArgs, Diags,
+                                UnresolvedPrimaryFile,
+                                llvm::vfs::getRealFileSystem(),
+                                Error);
+}
+
+bool SwiftASTManager::initCompilerInvocation(
+    CompilerInvocation &Invocation, ArrayRef<const char *> OrigArgs,
+    DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    std::string &Error) {
   SmallVector<const char *, 16> Args;
   // Make sure to put '-resource-dir' at the top to allow overriding it by
   // the passed in arguments.
@@ -474,7 +487,7 @@ bool SwiftASTManager::initCompilerInvocation(
   Invocation.getFrontendOptions().InputsAndOutputs =
       resolveSymbolicLinksInInputs(
           Invocation.getFrontendOptions().InputsAndOutputs,
-          UnresolvedPrimaryFile, Error, FileSystem);
+          UnresolvedPrimaryFile, FileSystem, Error);
   if (!Error.empty())
     return true;
 
@@ -542,16 +555,24 @@ bool SwiftASTManager::initCompilerInvocationNoInputs(
 }
 
 SwiftInvocationRef SwiftASTManager::getInvocation(
-    ArrayRef<const char *> OrigArgs, StringRef PrimaryFile, std::string &Error,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
+    ArrayRef<const char *> OrigArgs, StringRef PrimaryFile, std::string &Error) {
+  return getInvocation(OrigArgs, PrimaryFile, llvm::vfs::getRealFileSystem(),
+                       Error);
+}
+
+SwiftInvocationRef SwiftASTManager::getInvocation(
+    ArrayRef<const char *> OrigArgs, StringRef PrimaryFile,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    std::string &Error) {
+  assert(FileSystem);
 
   DiagnosticEngine Diags(Impl.SourceMgr);
   EditorDiagConsumer CollectDiagConsumer;
   Diags.addConsumer(CollectDiagConsumer);
 
   CompilerInvocation CompInvok;
-  if (initCompilerInvocation(CompInvok, OrigArgs, Diags, PrimaryFile, Error,
-                             FileSystem)) {
+  if (initCompilerInvocation(CompInvok, OrigArgs, Diags, PrimaryFile,
+                             FileSystem, Error)) {
     // We create a traced operation here to represent the failure to parse
     // arguments since we cannot reach `createAST` where that would normally
     // happen.
@@ -634,8 +655,9 @@ static FileContent getFileContentFromSnap(ImmutableTextSnapshotRef Snap,
 }
 
 FileContent SwiftASTManager::Implementation::getFileContent(
-    StringRef UnresolvedPath, bool IsPrimary, std::string &Error,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
+    StringRef UnresolvedPath, bool IsPrimary,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    std::string &Error) {
   std::string FilePath = SwiftLangSupport::resolvePathSymlinks(UnresolvedPath);
   if (auto EditorDoc = EditorDocs->findByPath(FilePath))
     return getFileContentFromSnap(EditorDoc->getLatestSnapshot(), IsPrimary,
@@ -643,7 +665,7 @@ FileContent SwiftASTManager::Implementation::getFileContent(
 
   // FIXME: Is there a way to get timestamp and buffer for a file atomically ?
   auto Stamp = getBufferStamp(FilePath, FileSystem);
-  auto Buffer = getMemoryBuffer(FilePath, Error, FileSystem);
+  auto Buffer = getMemoryBuffer(FilePath, FileSystem, Error);
   return FileContent(nullptr, UnresolvedPath, std::move(Buffer), IsPrimary,
                      Stamp);
 }
@@ -651,12 +673,12 @@ FileContent SwiftASTManager::Implementation::getFileContent(
 BufferStamp SwiftASTManager::Implementation::getBufferStamp(
     StringRef FilePath,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
+  assert(FileSystem);
+
   if (auto EditorDoc = EditorDocs->findByPath(FilePath))
     return EditorDoc->getLatestSnapshot()->getStamp();
 
-  auto StatusOrErr = FileSystem
-                         ? FileSystem->status(FilePath)
-                         : llvm::vfs::getRealFileSystem()->status(FilePath);
+  auto StatusOrErr = FileSystem->status(FilePath);
   if (std::error_code Err = StatusOrErr.getError()) {
     // Failure to read the file.
     LOG_WARN_FUNC("failed to stat file: " << FilePath << " (" << Err.message()
@@ -668,11 +690,12 @@ BufferStamp SwiftASTManager::Implementation::getBufferStamp(
 
 std::unique_ptr<llvm::MemoryBuffer>
 SwiftASTManager::Implementation::getMemoryBuffer(
-    StringRef Filename, std::string &Error,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
+    StringRef Filename,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    std::string &Error) {
+  assert(FileSystem);
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      FileSystem ? FileSystem->getBufferForFile(Filename)
-                 : llvm::vfs::getRealFileSystem()->getBufferForFile(Filename);
+      FileSystem->getBufferForFile(Filename);
   if (FileBufOrErr)
     return std::move(FileBufOrErr.get());
 
@@ -981,7 +1004,7 @@ void ASTProducer::findSnapshotAndOpenFiles(
       continue;
 
     auto Content =
-        MgrImpl.getFileContent(File, IsPrimary, Error, Opts.FileSystem);
+        MgrImpl.getFileContent(File, IsPrimary, Opts.FileSystem, Error);
     if (!Content.Buffer) {
       LOG_WARN_FUNC("failed getting file contents for " << File << ": "
                                                         << Error);

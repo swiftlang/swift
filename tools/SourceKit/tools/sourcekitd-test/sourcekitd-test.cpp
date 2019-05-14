@@ -272,7 +272,7 @@ static int skt_main(int argc, const char **argv) {
   sourcekitd_initialize();
 
   TestFileSystemProvider testFileSystemProvider;
-  SourceKit::setFileSystemProvider("testvfs", &testFileSystemProvider);
+  SourceKit::setGlobalFileSystemProvider("testvfs", &testFileSystemProvider);
 
   sourcekitd_set_notification_handler(^(sourcekitd_response_t resp) {
     notification_receiver(resp);

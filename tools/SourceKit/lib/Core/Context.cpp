@@ -38,7 +38,7 @@ FileSystemProvider *SourceKit::Context::getFileSystemProvider(StringRef Name) {
 
 void SourceKit::Context::setFileSystemProvider(
     StringRef Name, FileSystemProvider *FileSystemProvider) {
-  auto Result =
-      FileSystemProviders.try_emplace(Name, std::move(FileSystemProvider));
+  assert(FileSystemProvider);
+  auto Result = FileSystemProviders.try_emplace(Name, FileSystemProvider);
   assert(Result.second && "tried to set existing FileSystemProvider");
 }

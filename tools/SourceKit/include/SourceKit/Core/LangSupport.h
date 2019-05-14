@@ -15,12 +15,12 @@
 
 #include "SourceKit/Core/LLVM.h"
 #include "SourceKit/Support/UIdent.h"
-#include "swift/AST/Type.h"
+#include "llvm/Support/VersionTuple.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/Support/VersionTuple.h"
+#include "swift/AST/Type.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include <functional>
 #include <memory>
