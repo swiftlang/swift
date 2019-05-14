@@ -3370,6 +3370,14 @@ void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
 
 auto NominalTypeDecl::getStoredProperties(bool skipInaccessible) const
     -> StoredPropertyRange {
+  // This should be called at most once per SIL instruction that accesses a
+  // VarDecl.
+  //
+  // FIXME: Once VarDecl itself caches its field index, it should be called at
+  // most once per finalized VarDecl.
+  if (getASTContext().Stats)
+    getASTContext().Stats->getFrontendCounters().NumStoredPropertiesQueries++;
+
   // Clang-imported classes never have stored properties.
   if (hasClangNode() && isa<ClassDecl>(this))
     return StoredPropertyRange(DeclRange(nullptr, nullptr),
