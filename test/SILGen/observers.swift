@@ -311,8 +311,7 @@ func propertyWithDidSetTakingOldValue() {
   p = zero
 }
 
-// CHECK: // setter of p #1 : Swift.Int in observers.propertyWithDidSetTakingOldValue()
-// CHECK-NEXT: sil {{.*}} [ossa] @$s9observers32propertyWithDidSetTakingOldValueyyF1pL_Sivs
+// CHECK-LABEL: sil private [ossa] @$s9observers32propertyWithDidSetTakingOldValueyyF1pL_Sivs
 // CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : @guaranteed ${ var Int }):
 // CHECK-NEXT:  debug_value [[ARG1]] : $Int, let, name "newValue", argno 1
 // CHECK-NEXT:  [[ARG2_PB:%.*]] = project_box [[ARG2]]

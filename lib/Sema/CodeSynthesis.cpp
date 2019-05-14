@@ -1094,9 +1094,17 @@ static void synthesizePropertyDelegateSetterBody(AccessorDecl *setter,
                                          true);
 }
 
+static Expr *maybeWrapInOutExpr(Expr *expr, ASTContext &ctx) {
+  if (auto lvalueType = expr->getType()->getAs<LValueType>()) {
+    auto type = lvalueType->getObjectType();
+    return new (ctx) InOutExpr(SourceLoc(), expr, type, true);
+  }
+
+  return expr;
+}
+
 static void synthesizeCoroutineAccessorBody(AccessorDecl *accessor,
-                                            ASTContext &ctx,
-                                            bool typeChecked) {
+                                            ASTContext &ctx) {
   assert(accessor->isCoroutine());
 
   auto storage = accessor->getStorage();
@@ -1111,25 +1119,17 @@ static void synthesizeCoroutineAccessorBody(AccessorDecl *accessor,
 
   // Build a reference to the storage.
   Expr *ref = buildStorageReference(accessor, storage, target, isLValue,
-                                    ctx, typeChecked);
+                                    ctx, true);
 
   // Wrap it with an `&` marker if this is a modify.
-  if (isLValue) {
-    auto *inoutRef = new (ctx) InOutExpr(SourceLoc(), ref, Type(), true);
-    if (typeChecked) {
-      auto type = ref->getType()->getWithoutSpecifierType();
-      inoutRef->setType(InOutType::get(type));
-    }
-    ref = inoutRef;
-  }
+  ref = maybeWrapInOutExpr(ref, ctx);
 
   // Yield it.
   YieldStmt *yield = YieldStmt::create(ctx, loc, loc, ref, loc, true);
   body.push_back(yield);
 
   accessor->setBody(BraceStmt::create(ctx, loc, body, loc, true));
-  if (typeChecked)
-    accessor->setBodyTypeCheckedIfPresent();
+  accessor->setBodyTypeCheckedIfPresent();
 
   maybeMarkTransparent(accessor, ctx);
 }
@@ -1138,7 +1138,7 @@ static void synthesizeCoroutineAccessorBody(AccessorDecl *accessor,
 static void synthesizeReadCoroutineBody(AccessorDecl *read,
                                         ASTContext &ctx) {
   assert(read->getStorage()->getReadImpl() != ReadImplKind::Read);
-  synthesizeCoroutineAccessorBody(read, ctx, true);
+  synthesizeCoroutineAccessorBody(read, ctx);
 }
 
 /// Synthesize the body of a modify coroutine.
@@ -1149,7 +1149,7 @@ static void synthesizeModifyCoroutineBody(AccessorDecl *modify,
   assert(impl != ReadWriteImplKind::Modify &&
          impl != ReadWriteImplKind::Immutable);
 #endif
-  synthesizeCoroutineAccessorBody(modify, ctx, true);
+  synthesizeCoroutineAccessorBody(modify, ctx);
 }
 
 static void addGetterToStorage(AbstractStorageDecl *storage,
@@ -1348,17 +1348,48 @@ static void synthesizeObservedSetterBody(AccessorDecl *Set,
 
   SourceLoc Loc = VD->getLoc();
 
-  // We have to be paranoid about the accessors already having bodies
-  // because there might be an (invalid) existing definition.
-  
-  // Okay, the getter is done, create the setter now.  Start by finding the
-  // decls for 'self' and 'value'.
+  // Start by finding the decls for 'self' and 'value'.
   auto *SelfDecl = Set->getImplicitSelfDecl();
   VarDecl *ValueDecl = Set->getParameters()->get(0);
+
+  bool IsSelfLValue = VD->isSetterMutating();
+
+  SubstitutionMap subs;
+  if (auto *genericEnv = Set->getGenericEnvironment())
+    subs = genericEnv->getForwardingSubstitutionMap();
 
   // The setter loads the oldValue, invokes willSet with the incoming value,
   // does a direct store, then invokes didSet with the oldValue.
   SmallVector<ASTNode, 6> SetterBody;
+
+  auto callObserver = [&](AccessorDecl *observer, VarDecl *arg) {
+    ConcreteDeclRef ref(observer, subs);
+    auto type = observer->getInterfaceType()
+                  .subst(subs, SubstFlags::UseErrorType);
+    Expr *Callee = new (Ctx) DeclRefExpr(ref, DeclNameLoc(), /*imp*/true);
+    Callee->setType(type);
+    auto *ValueDRE = new (Ctx) DeclRefExpr(arg, DeclNameLoc(), /*imp*/true);
+    ValueDRE->setType(arg->getType());
+
+    if (SelfDecl) {
+      auto *SelfDRE = buildSelfReference(SelfDecl, SelfAccessorKind::Peer,
+                                         IsSelfLValue, Ctx, true);
+      SelfDRE = maybeWrapInOutExpr(SelfDRE, Ctx);
+      Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
+
+      if (auto funcType = type->getAs<FunctionType>())
+        type = funcType->getResult();
+      Callee->setType(type);
+    }
+
+    auto *Call = CallExpr::createImplicit(Ctx, Callee, { ValueDRE },
+                                          { Identifier() });
+    if (auto funcType = type->getAs<FunctionType>())
+      type = funcType->getResult();
+    Call->setType(type);
+
+    SetterBody.push_back(Call);
+  };
 
   // If there is a didSet, it will take the old value.  Load it into a temporary
   // 'let' so we have it for later.
@@ -1367,12 +1398,15 @@ static void synthesizeObservedSetterBody(AccessorDecl *Set,
   VarDecl *OldValue = nullptr;
   if (VD->getDidSetFunc()) {
     Expr *OldValueExpr
-      = createPropertyLoadOrCallSuperclassGetter(Set, VD, target, Ctx, false);
+      = buildStorageReference(Set, VD, target, /*isLValue=*/true,
+                              Ctx, true);
+    OldValueExpr = new (Ctx) LoadExpr(OldValueExpr, VD->getType());
 
     OldValue = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
                                  /*IsCaptureList*/false, SourceLoc(),
                                  Ctx.getIdentifier("tmp"), Set);
     OldValue->setImplicit();
+    OldValue->setInterfaceType(VD->getValueInterfaceType());
     auto *tmpPattern = new (Ctx) NamedPattern(OldValue, /*implicit*/ true);
     auto *tmpPBD = PatternBindingDecl::createImplicit(
         Ctx, StaticSpellingKind::None, tmpPattern, OldValueExpr, Set);
@@ -1380,50 +1414,20 @@ static void synthesizeObservedSetterBody(AccessorDecl *Set,
     SetterBody.push_back(OldValue);
   }
 
-  // Create:
-  //   (call_expr (dot_syntax_call_expr (decl_ref_expr(willSet)),
-  //                                    (decl_ref_expr(self))),
-  //              (declrefexpr(value)))
-  // or:
-  //   (call_expr (decl_ref_expr(willSet)), (declrefexpr(value)))
-  if (auto willSet = VD->getWillSetFunc()) {
-    Expr *Callee = new (Ctx) DeclRefExpr(willSet, DeclNameLoc(), /*imp*/true);
-    auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, DeclNameLoc(),
-                                           /*imp*/true);
-    if (SelfDecl) {
-      auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, DeclNameLoc(),
-                                            /*imp*/true);
-      Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
-    }
-    SetterBody.push_back(CallExpr::createImplicit(Ctx, Callee, { ValueDRE },
-                                                  { Identifier() }));
-  }
+  if (auto willSet = VD->getWillSetFunc())
+    callObserver(willSet, ValueDecl);
   
   // Create an assignment into the storage or call to superclass setter.
   auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, DeclNameLoc(), true);
+  ValueDRE->setType(ValueDecl->getType());
   createPropertyStoreOrCallSuperclassSetter(Set, ValueDRE, VD, target,
-                                            SetterBody, Ctx, false);
+                                            SetterBody, Ctx, true);
 
-  // Create:
-  //   (call_expr (dot_syntax_call_expr (decl_ref_expr(didSet)),
-  //                                    (decl_ref_expr(self))),
-  //              (decl_ref_expr(tmp)))
-  // or:
-  //   (call_expr (decl_ref_expr(didSet)), (decl_ref_expr(tmp)))
-  if (auto didSet = VD->getDidSetFunc()) {
-    auto *OldValueExpr = new (Ctx) DeclRefExpr(OldValue, DeclNameLoc(),
-                                               /*impl*/true);
-    Expr *Callee = new (Ctx) DeclRefExpr(didSet, DeclNameLoc(), /*imp*/true);
-    if (SelfDecl) {
-      auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, DeclNameLoc(),
-                                            /*imp*/true);
-      Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
-    }
-    SetterBody.push_back(CallExpr::createImplicit(Ctx, Callee, { OldValueExpr },
-                                                  { Identifier() }));
-  }
+  if (auto didSet = VD->getDidSetFunc())
+    callObserver(didSet, OldValue);
 
   Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc, true));
+  Set->setBodyTypeCheckedIfPresent();
 }
 
 static void synthesizeStoredWithObserversSetterBody(AccessorDecl *setter,
