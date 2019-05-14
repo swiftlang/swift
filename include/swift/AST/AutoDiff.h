@@ -21,7 +21,6 @@
 #include "ASTContext.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "swift/Basic/Range.h"
-#include "swift/SIL/SILLinkage.h"
 
 namespace swift {
 
@@ -78,6 +77,7 @@ class AnyFunctionType;
 class AutoDiffIndexSubset;
 class AutoDiffParameterIndicesBuilder;
 class Type;
+enum class SILLinkage : uint8_t;
 
 /// Identifies a subset of a function's parameters.
 ///

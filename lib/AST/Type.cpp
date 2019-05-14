@@ -4462,10 +4462,14 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   SmallVector<Type, 8> wrtParamTypes;
   indices->getSubsetParameterTypes(this, wrtParamTypes);
 
-  // Unwrap curry levels.
+  // Unwrap curry levels. At most, two parameter lists are necessary, for
+  // curried method types.
   SmallVector<AnyFunctionType *, 2> curryLevels;
   auto *currentLevel = eraseDynamicSelfType()->castTo<AnyFunctionType>();
-  while (currentLevel != nullptr) {
+  for (unsigned i : range(2)) {
+    (void)i;
+    if (currentLevel == nullptr)
+      break;
     curryLevels.push_back(currentLevel);
     currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
   }
@@ -4571,10 +4575,14 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
 // function type.
 AnyFunctionType *
 AnyFunctionType::getAutoDiffOriginalFunctionType() {
-  // Unwrap curry levels.
+  // Unwrap curry levels. At most, two parameter lists are necessary, for
+  // curried method types.
   SmallVector<AnyFunctionType *, 2> curryLevels;
   auto *currentLevel = this;
-  while (currentLevel != nullptr) {
+  for (unsigned i : range(2)) {
+    (void)i;
+    if (currentLevel == nullptr)
+      break;
     curryLevels.push_back(currentLevel);
     currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
   }
@@ -4589,7 +4597,7 @@ AnyFunctionType::getAutoDiffOriginalFunctionType() {
 
   // Wrap the associated function type in additional curry levels.
   auto curryLevelsWithoutLast =
-  ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
+      ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
   for (auto pair : enumerate(reversed(curryLevelsWithoutLast))) {
     unsigned i = pair.index();
     AnyFunctionType *curryLevel = pair.value();
