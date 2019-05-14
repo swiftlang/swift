@@ -13,8 +13,8 @@
 #ifndef LLVM_SOURCEKIT_LIB_SWIFTLANG_SWIFTASTMANAGER_H
 #define LLVM_SOURCEKIT_LIB_SWIFTLANG_SWIFTASTMANAGER_H
 
-#include "SourceKit/Core/LLVM.h"
 #include "SwiftInvocation.h"
+#include "SourceKit/Core/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringRef.h"
@@ -94,8 +94,14 @@ public:
   ~SwiftASTManager();
 
   SwiftInvocationRef getInvocation(
-      ArrayRef<const char *> Args, StringRef PrimaryFile, std::string &Error,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem = nullptr);
+      ArrayRef<const char *> Args, StringRef PrimaryFile, std::string &Error);
+
+  /// Same as the previous `getInvocation`, but allows the caller to specify a
+  /// custom `FileSystem` to be used throughout the invocation.
+  SwiftInvocationRef getInvocation(
+      ArrayRef<const char *> Args, StringRef PrimaryFile,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      std::string &Error);
 
   /// Provides the AST associated with an invocation to the AST consumer,
   /// asynchronously.
@@ -113,8 +119,15 @@ public:
 
   bool initCompilerInvocation(
       swift::CompilerInvocation &Invocation, ArrayRef<const char *> Args,
-      swift::DiagnosticEngine &Diags, StringRef PrimaryFile, std::string &Error,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem = nullptr);
+      swift::DiagnosticEngine &Diags, StringRef PrimaryFile, std::string &Error);
+
+  /// Same as the previous `initCompilerInvocation`, but allows the caller to
+  /// specify a custom `FileSystem` to be used throughout the invocation.
+  bool initCompilerInvocation(
+      swift::CompilerInvocation &Invocation, ArrayRef<const char *> Args,
+      swift::DiagnosticEngine &Diags, StringRef PrimaryFile,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      std::string &Error);
 
   bool initCompilerInvocation(swift::CompilerInvocation &CompInvok,
                               ArrayRef<const char *> OrigArgs,

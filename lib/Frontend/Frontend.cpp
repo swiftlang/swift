@@ -195,13 +195,17 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   return false;
 }
 
+bool CompilerInstance::setup(const CompilerInvocation &Invok) {
+  return setup(Invok, llvm::vfs::getRealFileSystem());
+}
+
 bool CompilerInstance::setup(
     const CompilerInvocation &Invok,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS) {
+  assert(BaseFS);
   Invocation = Invok;
 
-  if (BaseFS)
-    SourceMgr.setFileSystem(BaseFS);
+  SourceMgr.setFileSystem(BaseFS);
 
   // If initializing the overlay file system fails there's no sense in
   // continuing because the compiler will read the wrong files.

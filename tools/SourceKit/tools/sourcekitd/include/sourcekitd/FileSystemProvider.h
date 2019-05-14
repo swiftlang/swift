@@ -24,8 +24,12 @@ namespace SourceKit {
 ///
 /// The caller is responsible for keeping FileSystemProvider alive as long as
 /// sourcekitd.
-void setFileSystemProvider(llvm::StringRef Name,
-                           SourceKit::FileSystemProvider *FileSystemProvider);
+///
+/// Is not threadsafe.
+///
+/// \param FileSystemProvider must be non-null
+void setGlobalFileSystemProvider(
+    llvm::StringRef Name, SourceKit::FileSystemProvider *FileSystemProvider);
 
 } // namespace SourceKit
 

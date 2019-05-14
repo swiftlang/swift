@@ -626,9 +626,10 @@ public:
   void
   setCompilerArgs(ArrayRef<const char *> Args,
                   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
+    assert(FileSystem);
     if (auto ASTMgr = this->ASTMgr.lock()) {
       InvokRef =
-          ASTMgr->getInvocation(Args, Filename, CompilerArgsError, FileSystem);
+          ASTMgr->getInvocation(Args, Filename, FileSystem, CompilerArgsError);
     }
   }
 
@@ -1706,6 +1707,7 @@ ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
     llvm::MemoryBuffer *Buf, ArrayRef<const char *> Args,
     bool ProvideSemanticInfo,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
+  assert(FileSystem);
 
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
@@ -2123,6 +2125,7 @@ void SwiftLangSupport::editorOpen(
     StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
+  assert(FileSystem);
 
   ImmutableTextSnapshotRef Snapshot = nullptr;
   auto EditorDoc = EditorDocuments->getByUnresolvedName(Name);
