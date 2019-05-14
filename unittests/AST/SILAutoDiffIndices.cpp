@@ -47,6 +47,30 @@ TEST(AutoDiffIndexSubset, BitWordIndexAndOffset) {
             std::make_pair(1u, 0u));
 }
 
+TEST(AutoDiffIndexSubset, Equality) {
+  TestContext ctx;
+  EXPECT_EQ(AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                     /*indices*/ {0}),
+            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                     /*indices*/ {0}));
+  EXPECT_EQ(AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                     /*indices*/ {0, 2, 4}),
+            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                     /*indices*/ {0, 2, 4}));
+  EXPECT_EQ(AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                     /*indices*/ {}),
+            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                     /*indices*/ {}));
+  EXPECT_NE(AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 1,
+                                     /*indices*/ {}),
+            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 0,
+                                     /*indices*/ {}));
+  EXPECT_NE(AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                     /*indices*/ {0}),
+            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                     /*indices*/ {}));
+}
+
 TEST(AutoDiffIndexSubset, Bits) {
   TestContext ctx;
   auto *indices1 = AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
