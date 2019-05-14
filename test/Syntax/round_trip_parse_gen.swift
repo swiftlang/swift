@@ -576,3 +576,9 @@ func foo() {}
 @custom(A: a, B: b, C:c)
 func foo() {}
 
+"abc"
+"abc \(foo)"
+#"abc"#
+#"abc \#(foo)"#
+##"abc"##
+##"abc \##(foo)"##

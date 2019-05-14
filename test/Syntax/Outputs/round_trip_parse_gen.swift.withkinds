@@ -574,5 +574,11 @@ func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSigna
 
 @<SimpleTypeIdentifier>custom_attr</SimpleTypeIdentifier></CustomAttribute><CustomAttribute>
 @<SimpleTypeIdentifier>custom</SimpleTypeIdentifier>(<FunctionCallArgument>A: <IdentifierExpr>a</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument>B: <IdentifierExpr>b</IdentifierExpr>, </FunctionCallArgument><FunctionCallArgument>C:<IdentifierExpr>c</IdentifierExpr></FunctionCallArgument>)</CustomAttribute>
-func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl>
+func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><StringLiteralExpr>
 
+"<StringSegment>abc</StringSegment>"</StringLiteralExpr><StringLiteralExpr>
+"<StringSegment>abc </StringSegment><ExpressionSegment>\(<FunctionCallArgument><IdentifierExpr>foo</IdentifierExpr></FunctionCallArgument>)</ExpressionSegment><StringSegment></StringSegment>"</StringLiteralExpr><StringLiteralExpr>
+#"<StringSegment>abc</StringSegment>"#</StringLiteralExpr><StringLiteralExpr>
+#"<StringSegment>abc </StringSegment><ExpressionSegment>\#(<FunctionCallArgument><IdentifierExpr>foo</IdentifierExpr></FunctionCallArgument>)</ExpressionSegment><StringSegment></StringSegment>"#</StringLiteralExpr><StringLiteralExpr>
+##"<StringSegment>abc</StringSegment>"##</StringLiteralExpr><StringLiteralExpr>
+##"<StringSegment>abc </StringSegment><ExpressionSegment>\##(<FunctionCallArgument><IdentifierExpr>foo</IdentifierExpr></FunctionCallArgument>)</ExpressionSegment><StringSegment></StringSegment>"##</StringLiteralExpr>
