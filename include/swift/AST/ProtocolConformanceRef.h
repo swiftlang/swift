@@ -135,10 +135,7 @@ public:
     return llvm::hash_value(conformance.Union.getOpaqueValue());
   }
 
-  static Type
-  getTypeWitnessByName(Type type,
-                       ProtocolConformanceRef conformance,
-                       Identifier name);
+  Type getTypeWitnessByName(Type type, Identifier name) const;
 
   /// Determine whether this conformance is canonical.
   bool isCanonical() const;

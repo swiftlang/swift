@@ -142,15 +142,14 @@ ProtocolConformanceRef::subst(Type origType,
 }
 
 Type
-ProtocolConformanceRef::getTypeWitnessByName(Type type,
-                                             ProtocolConformanceRef conformance,
-                                             Identifier name) {
-  assert(!conformance.isInvalid());
+ProtocolConformanceRef::getTypeWitnessByName(Type type, Identifier name) const {
+  assert(!isInvalid());
 
   // Find the named requirement.
-  ProtocolDecl *proto = conformance.getRequirement();
+  ProtocolDecl *proto = getRequirement();
   AssociatedTypeDecl *assocType = nullptr;
-  auto members = proto->lookupDirect(name);
+  auto members = proto->lookupDirect(name,
+                      NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions);
   for (auto member : members) {
     assocType = dyn_cast<AssociatedTypeDecl>(member);
     if (assocType)
@@ -162,7 +161,7 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type,
     return nullptr;
 
   return assocType->getDeclaredInterfaceType().subst(
-    SubstitutionMap::getProtocolSubstitutions(proto, type, conformance));
+    SubstitutionMap::getProtocolSubstitutions(proto, type, *this));
 }
 
 void *ProtocolConformance::operator new(size_t bytes, ASTContext &context,

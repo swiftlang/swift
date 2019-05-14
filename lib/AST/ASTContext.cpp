@@ -4225,8 +4225,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
       *bridgedValueType = type;
 
     // Find the Objective-C class type we bridge to.
-    return ProtocolConformanceRef::getTypeWitnessByName(
-        type, *conformance, Id_ObjectiveCType);
+    return conformance->getTypeWitnessByName(type, Id_ObjectiveCType);
   }
 
   // Do we conform to Error?
