@@ -216,23 +216,11 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
         parameterIndices->contains(index);
   };
 
-  // Calculate WRT parameter infos, in the order that they should appear in the
-  // results/parameters of the differential/pullback.
+  // Calculate differentiation parameter infos.
   SmallVector<SILParameterInfo, 4> wrtParams;
-  // Make the self parameter appear first in the results/parameters of the
-  // differntial/pullback, even though it's the last parameter of the original
-  // method.
-  if (getExtInfo().hasSelfParam() &&
-      isWrtIndex(getNumParameters() - 1))
-    wrtParams.push_back(getParameters()[getNumParameters() - 1]);
-  for (auto valueAndIndex : enumerate(getParameters())) {
-    // Skip the self parameter because we have already added it.
-    if (getExtInfo().hasSelfParam() &&
-        valueAndIndex.index() == getNumParameters() - 1)
-      continue;
+  for (auto valueAndIndex : enumerate(getParameters()))
     if (isWrtIndex(valueAndIndex.index()))
       wrtParams.push_back(valueAndIndex.value());
-  }
 
   CanSILFunctionType closureType;
   switch (kind) {
@@ -1233,6 +1221,74 @@ static CanSILFunctionType getSILFunctionType(
   bool pseudogeneric = genericSig && constant
     ? isPseudogeneric(*constant)
     : false;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // If constant is an autodiff associated function and is differentiable wrt
+  // self, reorder self so that it appears as:
+  // - The last parameter in the differential.
+  // - The last result in the pullback.
+  if (constant && constant->hasFuncDecl() &&
+      constant->autoDiffAssociatedFunctionIdentifier) {
+    auto *AFD = constant->getAbstractFunctionDecl();
+    auto *autoDiffFuncId = constant->autoDiffAssociatedFunctionIdentifier;
+    assert(results.size() == 2);
+    auto linearMapResultInfo = results.back();
+    auto linearMapType =
+        linearMapResultInfo.getSILStorageType().castTo<SILFunctionType>();
+    // Compute autodiff indices.
+    auto loweredParamIndices =
+        autoDiffFuncId->getParameterIndices()->getLowered(
+            M.getASTContext(),
+            AFD->getInterfaceType()->castTo<AnyFunctionType>());
+    SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
+    auto selfParamIndex = inputs.size() - 1;
+    // Reorder *only* if differentiable wrt to self.
+    if (indices.isWrtParameter(selfParamIndex)) {
+      switch (autoDiffFuncId->getKind()) {
+      // Reorder self as the first differential parameter.
+      case AutoDiffAssociatedFunctionKind::JVP: {
+        SmallVector<SILParameterInfo, 8> differentialParams;
+        differentialParams.append(linearMapType->getParameters().begin(),
+                                  linearMapType->getParameters().end());
+        std::rotate(differentialParams.begin(), differentialParams.begin() + 1,
+                    differentialParams.end());
+        auto differentialType = SILFunctionType::get(
+            linearMapType->getGenericSignature(), linearMapType->getExtInfo(),
+            linearMapType->getCoroutineKind(),
+            linearMapType->getCalleeConvention(), differentialParams,
+            linearMapType->getYields(), linearMapType->getResults(),
+            linearMapType->getOptionalErrorResult(), M.getASTContext());
+        results.pop_back();
+        auto newDifferentialResult = SILResultInfo(
+            differentialType->getCanonicalType(),
+            linearMapResultInfo.getConvention());
+        results.push_back(newDifferentialResult);
+        break;
+      }
+      // Reorder self as the last pullback result.
+      case AutoDiffAssociatedFunctionKind::VJP: {
+        SmallVector<SILResultInfo, 8> pullbackResults;
+        pullbackResults.append(linearMapType->getResults().begin(),
+                               linearMapType->getResults().end());
+        std::rotate(pullbackResults.begin(), pullbackResults.begin() + 1,
+                    pullbackResults.end());
+        auto pullbackType = SILFunctionType::get(
+            linearMapType->getGenericSignature(), linearMapType->getExtInfo(),
+            linearMapType->getCoroutineKind(),
+            linearMapType->getCalleeConvention(),
+            linearMapType->getParameters(), linearMapType->getYields(),
+            pullbackResults, linearMapType->getOptionalErrorResult(),
+            M.getASTContext());
+        auto newPullbackResult = SILResultInfo(
+            pullbackType->getCanonicalType(),
+            linearMapResultInfo.getConvention());
+        results.pop_back();
+        results.push_back(newPullbackResult);
+        break;
+      }
+      }
+    }
+  }
 
   // NOTE: SILFunctionType::ExtInfo doesn't track everything that
   // AnyFunctionType::ExtInfo tracks. For example: 'throws' or 'auto-closure'

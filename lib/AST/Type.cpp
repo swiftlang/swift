@@ -4464,7 +4464,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
 
   // Unwrap curry levels.
   SmallVector<AnyFunctionType *, 2> curryLevels;
-  auto *currentLevel = this->eraseDynamicSelfType()->castTo<AnyFunctionType>();
+  auto *currentLevel = eraseDynamicSelfType()->castTo<AnyFunctionType>();
   while (currentLevel != nullptr) {
     curryLevels.push_back(currentLevel);
     currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
@@ -4564,6 +4564,41 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   }
 
   return associatedFunction;
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+// Compute the original function type corresponding to the given derivative
+// function type.
+AnyFunctionType *
+AnyFunctionType::getAutoDiffOriginalFunctionType() {
+  // Unwrap curry levels.
+  SmallVector<AnyFunctionType *, 2> curryLevels;
+  auto *currentLevel = this;
+  while (currentLevel != nullptr) {
+    curryLevels.push_back(currentLevel);
+    currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
+  }
+
+  auto derivativeResult = curryLevels.back()->getResult()->getAs<TupleType>();
+  assert(derivativeResult && derivativeResult->getNumElements() == 2 &&
+         "Expected derivative result to be a two-element tuple");
+  auto originalResult = derivativeResult->getElement(0).getType();
+  auto *originalType = makeFunctionType(
+      curryLevels.back(), curryLevels.back()->getParams(), originalResult,
+      curryLevels.size() == 1 ? getOptGenericSignature() : nullptr);
+
+  // Wrap the associated function type in additional curry levels.
+  auto curryLevelsWithoutLast =
+  ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
+  for (auto pair : enumerate(reversed(curryLevelsWithoutLast))) {
+    unsigned i = pair.index();
+    AnyFunctionType *curryLevel = pair.value();
+    originalType = makeFunctionType(
+        curryLevel, curryLevel->getParams(), originalType,
+        i == curryLevelsWithoutLast.size() - 1 ? getOptGenericSignature()
+                                               : nullptr);
+  }
+  return originalType;
 }
 
 AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {

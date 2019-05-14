@@ -66,41 +66,45 @@ func vjpTestWhereClause<T>(x: T) -> (T, (T.CotangentVector) -> T.CotangentVector
 
 protocol P {}
 extension P {
-  // CHECK-DAG: @differentiable(wrt: self, vjp: vjpTestWhereClause where Self : Differentiable)
-  // CHECK-DAG: func testWhereClause() -> Self
-  @differentiable(wrt: self, vjp: vjpTestWhereClause where Self : Differentiable)
-  func testWhereClause() -> Self {
+  // Note: Method JVP/VJPs that are differentiable wrt self are erased from
+  // `@differentiable` attributes for self-reordering thunking.
+  // CHECK-DAG: @differentiable(wrt: self where Self : Differentiable)
+  // CHECK-DAG: func testWhereClauseMethod() -> Self
+  @differentiable(wrt: self, vjp: vjpTestWhereClauseMethod where Self : Differentiable)
+  func testWhereClauseMethod() -> Self {
     return self
   }
 }
 extension P where Self : Differentiable {
-  func vjpTestWhereClause() -> (Self, (Self.CotangentVector) -> Self.CotangentVector) {
+  func vjpTestWhereClauseMethod() -> (Self, (Self.CotangentVector) -> Self.CotangentVector) {
     return (self, { v in v })
   }
 }
 
-// CHECK-DAG: @differentiable(wrt: x, vjp: vjpTestWhereClauseMemberTypeConstraint where T : Differentiable, T == T.CotangentVector)
-// CHECK-DAG: func testWhereClauseMemberTypeConstraint<T>(x: T) -> T where T : Numeric
-@differentiable(vjp: vjpTestWhereClauseMemberTypeConstraint where T : Differentiable, T == T.CotangentVector)
-func testWhereClauseMemberTypeConstraint<T : Numeric>(x: T) -> T {
+// CHECK-DAG: @differentiable(wrt: x, vjp: vjpTestWhereClauseMethodTypeConstraint where T : Differentiable, T == T.CotangentVector)
+// CHECK-DAG: func testWhereClauseMethodTypeConstraint<T>(x: T) -> T where T : Numeric
+@differentiable(vjp: vjpTestWhereClauseMethodTypeConstraint where T : Differentiable, T == T.CotangentVector)
+func testWhereClauseMethodTypeConstraint<T : Numeric>(x: T) -> T {
   return x
 }
-func vjpTestWhereClauseMemberTypeConstraint<T>(x: T) -> (T, (T) -> T)
+func vjpTestWhereClauseMethodTypeConstraint<T>(x: T) -> (T, (T) -> T)
   where T : Numeric, T : Differentiable, T == T.CotangentVector
 {
   return (x, { v in v })
 }
 
 extension P {
-  // CHECK-DAG: @differentiable(wrt: self, vjp: vjpTestWhereClauseMemberTypeConstraint where Self : Differentiable, Self == Self.CotangentVector)
-  // CHECK-DAG: func testWhereClauseMemberTypeConstraint() -> Self
-  @differentiable(wrt: self, vjp: vjpTestWhereClauseMemberTypeConstraint where Self.CotangentVector == Self, Self : Differentiable)
-  func testWhereClauseMemberTypeConstraint() -> Self {
+  // Note: Method JVP/VJPs that are differentiable wrt self are erased from
+  // `@differentiable` attributes for self-reordering thunking.
+  // CHECK-DAG: @differentiable(wrt: self where Self : Differentiable, Self == Self.CotangentVector)
+  // CHECK-DAG: func testWhereClauseMethodTypeConstraint() -> Self
+  @differentiable(wrt: self, vjp: vjpTestWhereClauseMethodTypeConstraint where Self.CotangentVector == Self, Self : Differentiable)
+  func testWhereClauseMethodTypeConstraint() -> Self {
     return self
   }
 }
 extension P where Self : Differentiable, Self == Self.CotangentVector {
-  func vjpTestWhereClauseMemberTypeConstraint() -> (Self, (Self.CotangentVector) -> Self.CotangentVector) {
+  func vjpTestWhereClauseMethodTypeConstraint() -> (Self, (Self.CotangentVector) -> Self.CotangentVector) {
     return (self, { v in v })
   }
 }

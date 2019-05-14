@@ -21,6 +21,7 @@
 #include "ASTContext.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "swift/Basic/Range.h"
+#include "swift/SIL/SILLinkage.h"
 
 namespace swift {
 
@@ -465,6 +466,10 @@ struct SILAutoDiffIndices {
 
   bool operator==(const SILAutoDiffIndices &other) const;
 
+  bool operator!=(const SILAutoDiffIndices &other) const {
+    return !(*this == other);
+  };
+
   /// Queries whether the function's parameter with index `parameterIndex` is
   /// one of the parameters to differentiate with respect to.
   bool isWrtParameter(unsigned parameterIndex) const {
@@ -574,6 +579,10 @@ bool getBuiltinAutoDiffApplyConfig(StringRef operationName,
                                    AutoDiffAssociatedFunctionKind &kind,
                                    unsigned &arity, unsigned &order,
                                    bool &rethrows);
+
+SILLinkage getAutoDiffFunctionLinkage(SILLinkage originalLinkage,
+                                      bool isExported);
+
 } // end namespace autodiff
 
 class BuiltinFloatType;

@@ -13,6 +13,7 @@
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/SILLinkage.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/STLExtras.h"
@@ -86,6 +87,28 @@ bool autodiff::getBuiltinAutoDiffApplyConfig(
     rethrows = false;
   }
   return operationName.empty();
+}
+
+SILLinkage autodiff::getAutoDiffFunctionLinkage(SILLinkage originalLinkage,
+                                                bool isExported) {
+  // If the original is defined externally, then the AD pass is just generating
+  // associated functions for use in the current module and therefore these
+  // associated functions should not be visible outside the module.
+  if (isAvailableExternally(originalLinkage))
+    return SILLinkage::Hidden;
+
+  // If the original is public, then external modules may need to link the
+  // associated function. Make the associated function public unless
+  // differentiation is not explicitly requested.
+  if (originalLinkage == SILLinkage::Public ||
+      originalLinkage == SILLinkage::PublicNonABI ||
+      originalLinkage == SILLinkage::Shared)
+    return isExported ? originalLinkage : SILLinkage::Hidden;
+
+  // Otherwise, the original function is defined and used only in the current
+  // module, so external modules will never try to access the associated
+  // function. Make the associated function hidden.
+  return SILLinkage::Hidden;
 }
 
 /// Allocates and initializes an `AutoDiffParameterIndices` corresponding to

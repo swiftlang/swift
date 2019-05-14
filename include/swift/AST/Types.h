@@ -3081,6 +3081,10 @@ public:
       LookupConformanceFn lookupConformance,
       GenericSignature *whereClauseGenericSignature = nullptr);
 
+  /// Given the type of an autodiff associated function, returns the
+  /// corresponding original function type.
+  AnyFunctionType *getAutoDiffOriginalFunctionType();
+
   AnyFunctionType *getWithoutDifferentiability() const;
 
   /// True if the parameter declaration it is attached to is guaranteed
