@@ -19,6 +19,6 @@
 
 import OuterModule
 
-// CHECK: rebuilding module 'InnerModule' from interface '{{.*}}/Build/InnerModule.swiftinterface'
-// CHECK: compiled module is out of date: '{{.*}}/Build/InnerModule.swiftmodule'
-// CHECK: dependency is out of date: '{{.*}}/Build/InnerModule.swiftinterface'
+// CHECK: rebuilding module 'InnerModule' from interface '{{.*}}{{[/\\]}}Build{{[/\\]}}InnerModule.swiftinterface'
+// CHECK: compiled module is out of date: '{{.*}}{{[/\\]}}Build{{[/\\]}}InnerModule.swiftmodule'
+// CHECK: dependency is out of date: '{{.*}}{{[/\\]}}Build{{[/\\]}}InnerModule.swiftinterface'
