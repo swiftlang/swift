@@ -718,7 +718,17 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
   /// Internal struct representing an opaque zero value.
   @_fixed_layout
   @usableFromInline
-  internal struct OpaqueZero : Differentiable & AdditiveArithmetic {}
+  internal struct OpaqueZero : Differentiable & AdditiveArithmetic {
+    @usableFromInline
+    static func +=(lhs: inout Self, rhs: Self) {
+      lhs = lhs + rhs
+    }
+  
+    @usableFromInline
+    static func -=(lhs: inout Self, rhs: Self) {
+      lhs = lhs - rhs
+    }
+  }
 
   public static var zero: AnyDerivative {
     return AnyDerivative(
@@ -751,6 +761,14 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
   ) -> (value: AnyDerivative,
         pullback: (AnyDerivative) -> (AnyDerivative, AnyDerivative)) {
     return (lhs - rhs, { v in (v, .zero - v) })
+  }
+  
+  public static func +=(lhs: inout Self, rhs: Self) {
+    lhs = lhs + rhs
+  }
+  
+  public static func -=(lhs: inout Self, rhs: Self) {
+    lhs = lhs - rhs
   }
 
   // `Differentiable` requirements.
