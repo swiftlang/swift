@@ -1516,24 +1516,30 @@ static void synthesizeLazyGetterBody(AbstractFunctionDecl *fn, void *context) {
   auto *Tmp1VD = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
                                    /*IsCaptureList*/false, SourceLoc(),
                                    Ctx.getIdentifier("tmp1"), Get);
+  Tmp1VD->setInterfaceType(VD->getValueInterfaceType());
   Tmp1VD->setHasNonPatternBindingInit();
   Tmp1VD->setImplicit();
 
   auto *Named = new (Ctx) NamedPattern(Tmp1VD, /*implicit*/true);
+  Named->setType(Tmp1VD->getType());
   auto *Let = new (Ctx) VarPattern(SourceLoc(), /*let*/true, Named,
                                    /*implict*/true);
+  Let->setType(Named->getType());
   auto *Some = new (Ctx) OptionalSomePattern(Let, SourceLoc(),
                                              /*implicit*/true);
+  Some->setElementDecl(Ctx.getOptionalSomeDecl());
+  Some->setType(OptionalType::get(Let->getType()));
 
   auto *StoredValueExpr =
     createPropertyLoadOrCallSuperclassGetter(Get, Storage,
-                                             TargetImpl::Storage, Ctx, false);
+                                             TargetImpl::Storage, Ctx, true);
   SmallVector<StmtConditionElement, 1> Cond;
   Cond.emplace_back(SourceLoc(), Some, StoredValueExpr);
 
   // Build the early return inside the if.
   auto *Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, DeclNameLoc(), /*Implicit*/true,
                                         AccessSemantics::Ordinary);
+  Tmp1DRE->setType(Tmp1VD->getType());
   auto *Return = new (Ctx) ReturnStmt(SourceLoc(), Tmp1DRE,
                                       /*implicit*/true);
 
@@ -1549,8 +1555,7 @@ static void synthesizeLazyGetterBody(AbstractFunctionDecl *fn, void *context) {
                                    /*IsCaptureList*/false, SourceLoc(),
                                    Ctx.getIdentifier("tmp2"),
                                    Get);
-  Tmp2VD->setType(VD->getType());
-  Tmp2VD->setInterfaceType(VD->getInterfaceType());
+  Tmp2VD->setInterfaceType(VD->getValueInterfaceType());
   Tmp2VD->setImplicit();
 
 
@@ -1577,7 +1582,7 @@ static void synthesizeLazyGetterBody(AbstractFunctionDecl *fn, void *context) {
 
   Pattern *Tmp2PBDPattern = new (Ctx) NamedPattern(Tmp2VD, /*implicit*/true);
   Tmp2PBDPattern =
-    TypedPattern::createImplicit(Ctx, Tmp2PBDPattern, VD->getType());
+    TypedPattern::createImplicit(Ctx, Tmp2PBDPattern, Tmp2VD->getType());
 
   auto *Tmp2PBD = PatternBindingDecl::createImplicit(
       Ctx, StaticSpellingKind::None, Tmp2PBDPattern, InitValue, Get,
@@ -1588,17 +1593,20 @@ static void synthesizeLazyGetterBody(AbstractFunctionDecl *fn, void *context) {
   // Assign tmp2 into storage.
   auto Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, DeclNameLoc(), /*Implicit*/true,
                                        AccessSemantics::DirectToStorage);
+  Tmp2DRE->setType(Tmp2VD->getType());
   createPropertyStoreOrCallSuperclassSetter(Get, Tmp2DRE, Storage,
-                                            TargetImpl::Storage, Body, Ctx, false);
+                                            TargetImpl::Storage, Body, Ctx, true);
 
   // Return tmp2.
   Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, DeclNameLoc(), /*Implicit*/true,
                                   AccessSemantics::DirectToStorage);
+  Tmp2DRE->setType(Tmp2VD->getType());
 
   Body.push_back(new (Ctx) ReturnStmt(SourceLoc(), Tmp2DRE, /*implicit*/true));
 
   Get->setBody(BraceStmt::create(Ctx, VD->getLoc(), Body, VD->getLoc(),
                                  /*implicit*/true));
+  Get->setBodyTypeCheckedIfPresent();
 }
 
 static void synthesizeLazySetterBody(AbstractFunctionDecl *fn, void *context) {

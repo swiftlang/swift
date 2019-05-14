@@ -3985,10 +3985,7 @@ namespace {
     }
 
     Expr *visitLazyInitializerExpr(LazyInitializerExpr *expr) {
-      // Since `LazyInitializerExpr` should always have a type set,
-      // there is no need to do anything here.
-      assert(cs.getType(expr)->isEqual(expr->getSubExpr()->getType()));
-      return expr;
+      llvm_unreachable("Already type-checked");
     }
     
     Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
