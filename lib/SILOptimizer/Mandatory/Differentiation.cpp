@@ -4143,7 +4143,7 @@ public:
       llvm::for_each(allResults, [&](SILValue v) { s << v; });
     });
 
-    // Accumulate adjoints for original parameters.
+    // Accumulate adjoints for original differentiation parameters.
     auto allResultsIt = allResults.begin();
     for (unsigned i : applyInfo.actualIndices.parameters->getIndices()) {
       auto origArg = ai->getArgument(origNumIndRes + i);
@@ -5428,7 +5428,7 @@ void DifferentiationTask::createEmptyAdjoint() {
       ->getDeclaredInterfaceType()->getCanonicalType();
   adjParams.push_back({pvType, ParameterConvention::Direct_Guaranteed});
 
-  // Add adjoint results for the requested wrt parameters.
+  // Add adjoint results for the original differentiation parameters.
   for (auto i : getIndices().parameters->getIndices()) {
     auto origParam = origParams[i];
     adjResults.push_back(getCotangentResultInfoForOriginalParameter(
