@@ -13,7 +13,9 @@
 #define DEBUG_TYPE "sil-access-utils"
 
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 
 using namespace swift;
@@ -81,7 +83,8 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
     value = base;
     break;
   case Argument:
-    paramIndex = cast<SILFunctionArgument>(base)->getIndex();
+    value = base;
+    setElementIndex(cast<SILFunctionArgument>(base)->getIndex());
     break;
   case Global:
     if (auto *GAI = dyn_cast<GlobalAddrInst>(base))
@@ -105,13 +108,13 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
     // dynamically checked, and static analysis will be sufficiently
     // conservative given that classes are not "uniquely identified".
     auto *REA = cast<RefElementAddrInst>(base);
-    SILValue Object = stripBorrow(REA->getOperand());
-    objProj = ObjectProjection(Object, Projection(REA));
+    value = stripBorrow(REA->getOperand());
+    setElementIndex(REA->getFieldNo());
   }
   }
 }
 
-const ValueDecl *AccessedStorage::getDecl(SILFunction *F) const {
+const ValueDecl *AccessedStorage::getDecl() const {
   switch (getKind()) {
   case Box:
     return cast<AllocBoxInst>(value)->getLoc().getAsASTNode<VarDecl>();
@@ -122,11 +125,12 @@ const ValueDecl *AccessedStorage::getDecl(SILFunction *F) const {
   case Global:
     return global->getDecl();
 
-  case Class:
-    return objProj.getProjection().getVarDecl(objProj.getObject()->getType());
-
+  case Class: {
+    auto *decl = getObject()->getType().getNominalOrBoundGenericNominal();
+    return *std::next(decl->getStoredProperties().begin(), getPropertyIndex());
+  }
   case Argument:
-    return getArgument(F)->getDecl();
+    return getArgument()->getDecl();
 
   case Yield:
     return nullptr;
@@ -173,15 +177,17 @@ void AccessedStorage::print(raw_ostream &os) const {
     os << value;
     break;
   case Argument:
-    os << "index: " << paramIndex << "\n";
+    os << value;
     break;
   case Global:
     os << *global;
     break;
   case Class:
-    os << objProj.getObject() << "  ";
-    objProj.getProjection().print(os, objProj.getObject()->getType());
-    os << "\n";
+    os << getObject();
+    os << "  Field: ";
+    getDecl()->print(os);
+    os << " Index: " << getPropertyIndex() << "\n";
+    break;
   }
 }
 
@@ -457,7 +463,7 @@ AccessedStorage swift::findAccessedStorageNonNested(SILValue sourceAddr) {
 
 // Return true if the given access is on a 'let' lvalue.
 static bool isLetAccess(const AccessedStorage &storage, SILFunction *F) {
-  if (auto *decl = dyn_cast_or_null<VarDecl>(storage.getDecl(F)))
+  if (auto *decl = dyn_cast_or_null<VarDecl>(storage.getDecl()))
     return decl->isLet();
 
   // It's unclear whether a global will ever be missing it's varDecl, but

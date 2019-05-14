@@ -234,13 +234,15 @@ transformCalleeStorage(const StorageAccessInfo &storage,
   case AccessedStorage::Class: {
     // If the object's value is an argument, translate it into a value on the
     // caller side.
-    SILValue obj = storage.getObjectProjection().getObject();
+    SILValue obj = storage.getObject();
     if (auto *arg = dyn_cast<SILFunctionArgument>(obj)) {
       SILValue argVal = getCallerArg(fullApply, arg->getIndex());
       if (argVal) {
-        auto &proj = storage.getObjectProjection().getProjection();
-        // Remap the argument source value and inherit the old storage info.
-        return StorageAccessInfo(AccessedStorage(argVal, proj), storage);
+        unsigned idx = storage.getPropertyIndex();
+        // Remap this storage info. The argument source value is now the new
+        // object. The old storage info is inherited.
+        return StorageAccessInfo(AccessedStorage::forClass(argVal, idx),
+                                 storage);
       }
     }
     // Otherwise, continue to reference the value in the callee because we don't

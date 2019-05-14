@@ -5648,7 +5648,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
       diagnose(defaultedAssocType, diag::assoc_type_default_here,
                assocType->getFullName(), defaultAssocType)
         .highlight(
-          defaultedAssocType->getDefaultDefinitionLoc().getSourceRange());
+          defaultedAssocType->getDefaultDefinitionTypeRepr()->getSourceRange());
 
       continue;
     }
