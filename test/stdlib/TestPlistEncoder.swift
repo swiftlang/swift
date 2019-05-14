@@ -873,7 +873,11 @@ PropertyListEncoderTests.test("testEncodingTopLevelStructuredSingleClass") { Tes
 PropertyListEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestPropertyListEncoder().testEncodingTopLevelDeepStructuredType() }
 PropertyListEncoderTests.test("testEncodingClassWhichSharesEncoderWithSuper") { TestPropertyListEncoder().testEncodingClassWhichSharesEncoderWithSuper() }
 PropertyListEncoderTests.test("testEncodingTopLevelNullableType") { TestPropertyListEncoder().testEncodingTopLevelNullableType() }
-PropertyListEncoderTests.test("testEncodingMultipleNestedContainersWithTheSameTopLevelKey") { TestPropertyListEncoder().testEncodingMultipleNestedContainersWithTheSameTopLevelKey() }
+PropertyListEncoderTests.test("testEncodingMultipleNestedContainersWithTheSameTopLevelKey") {
+  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    TestPropertyListEncoder().testEncodingMultipleNestedContainersWithTheSameTopLevelKey()
+  }
+}
 PropertyListEncoderTests.test("testEncodingConflictedTypeNestedContainersWithTheSameTopLevelKey") {
   expectCrash() {
     TestPropertyListEncoder().testEncodingConflictedTypeNestedContainersWithTheSameTopLevelKey()
