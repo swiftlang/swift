@@ -506,3 +506,18 @@ RemoveReturn *RemoveReturn::create(ConstraintSystem &cs,
                                    ConstraintLocator *locator) {
   return new (cs.getAllocator()) RemoveReturn(cs, locator);
 }
+
+bool CollectionElementContextualMismatch::diagnose(Expr *root,
+                                                   bool asNote) const {
+  CollectionElementContextualFailure failure(
+      root, getConstraintSystem(), getFromType(), getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+CollectionElementContextualMismatch *
+CollectionElementContextualMismatch::create(ConstraintSystem &cs, Type srcType,
+                                            Type dstType,
+                                            ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      CollectionElementContextualMismatch(cs, srcType, dstType, locator);
+}

@@ -890,6 +890,23 @@ public:
   static RemoveReturn *create(ConstraintSystem &cs, ConstraintLocator *locator);
 };
 
+class CollectionElementContextualMismatch final : public ContextualMismatch {
+  CollectionElementContextualMismatch(ConstraintSystem &cs, Type srcType,
+                                      Type dstType, ConstraintLocator *locator)
+      : ContextualMismatch(cs, srcType, dstType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "fix collection element contextual mismatch";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static CollectionElementContextualMismatch *
+  create(ConstraintSystem &cs, Type srcType, Type dstType,
+         ConstraintLocator *locator);
+};
+
 } // end namespace constraints
 } // end namespace swift
 

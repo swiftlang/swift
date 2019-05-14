@@ -2148,6 +2148,14 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::TupleElement: {
+    if (anchor && (isa<ArrayExpr>(anchor) || isa<DictionaryExpr>(anchor))) {
+      conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
+          *this, lhs, rhs, getConstraintLocator(locator)));
+    }
+    break;
+  }
+
   default:
     break;
   }
