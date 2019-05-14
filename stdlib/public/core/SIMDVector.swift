@@ -1222,11 +1222,6 @@ extension SIMD where Scalar: FloatingPoint {
   }
   
   @_transparent
-  public static func *=(lhs: inout Self, rhs: Scalar) {
-    lhs = lhs * rhs
-  }
-  
-  @_transparent
   public static func /=(lhs: inout Self, rhs: Scalar) {
     lhs = lhs / rhs
   }
