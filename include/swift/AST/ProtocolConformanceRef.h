@@ -28,6 +28,7 @@ namespace llvm {
 
 namespace swift {
 
+class ConcreteDeclRef;
 class ProtocolConformance;
 
 /// A ProtocolConformanceRef is a handle to a protocol conformance which
@@ -136,6 +137,14 @@ public:
   }
 
   Type getTypeWitnessByName(Type type, Identifier name) const;
+
+  /// Find a particular named function witness for a type that conforms to
+  /// the given protocol.
+  ///
+  /// \param type The conforming type.
+  ///
+  /// \param name The name of the requirement.
+  ConcreteDeclRef getWitnessByName(Type type, DeclName name) const;
 
   /// Determine whether this conformance is canonical.
   bool isCanonical() const;

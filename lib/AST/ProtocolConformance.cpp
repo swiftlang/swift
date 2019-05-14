@@ -164,6 +164,34 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type, Identifier name) const {
     SubstitutionMap::getProtocolSubstitutions(proto, type, *this));
 }
 
+ConcreteDeclRef
+ProtocolConformanceRef::getWitnessByName(Type type, DeclName name) const {
+  // Find the named requirement.
+  auto *proto = getRequirement();
+  auto results =
+    proto->lookupDirect(name,
+                      NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions);
+
+  ValueDecl *requirement = nullptr;
+  for (auto *result : results) {
+    if (isa<ProtocolDecl>(result->getDeclContext()))
+      requirement = result;
+  }
+
+  if (requirement == nullptr)
+    return ConcreteDeclRef();
+
+  // For a type with dependent conformance, just return the requirement from
+  // the protocol. There are no protocol conformance tables.
+  if (!isConcrete()) {
+    auto subs = SubstitutionMap::getProtocolSubstitutions(proto, type, *this);
+    return ConcreteDeclRef(requirement, subs);
+  }
+
+  auto *resolver = proto->getASTContext().getLazyResolver();
+  return getConcrete()->getWitnessDeclRef(requirement, resolver);
+}
+
 void *ProtocolConformance::operator new(size_t bytes, ASTContext &context,
                                         AllocationArena arena,
                                         unsigned alignment) {
