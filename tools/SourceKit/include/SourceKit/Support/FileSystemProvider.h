@@ -33,7 +33,12 @@ namespace SourceKit {
 /// requests respond with an invalid request error if you try):
 /// - source.request.editor.open: Associates the given custom filesystem with
 ///                               this editor file, so that all subsequent
-///                               operations on this editor file use it.
+///                               operations on this editor file use it. Sending
+///                               another 'source.request.editor.open' with
+///                               'key.vfs.name' replaces the filesystem.
+///                               Sending another 'source.request.editor.open'
+///                               without 'key.vfs.name' resets it to the default
+///                               filesystem.
 /// - source.request.codecomplete: Uses the given custom filesystem to process.
 /// - source.request.cursorinfo: Uses the given custom filesystem to process.
 class FileSystemProvider {
