@@ -238,9 +238,9 @@ transformCalleeStorage(const StorageAccessInfo &storage,
     if (auto *arg = dyn_cast<SILFunctionArgument>(obj)) {
       SILValue argVal = getCallerArg(fullApply, arg->getIndex());
       if (argVal) {
-        auto *instr = storage.getObjectProjection().getInstr();
+        auto &proj = storage.getObjectProjection().getProjection();
         // Remap the argument source value and inherit the old storage info.
-        return StorageAccessInfo(AccessedStorage(argVal, instr), storage);
+        return StorageAccessInfo(AccessedStorage(argVal, proj), storage);
       }
     }
     // Otherwise, continue to reference the value in the callee because we don't

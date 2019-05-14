@@ -101,10 +101,12 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
   case Class: {
     // Do a best-effort to find the identity of the object being projected
     // from. It is OK to be unsound here (i.e. miss when two ref_element_addrs
-    // actually refer the same address) because these will be dynamically
-    // checked.
+    // actually refer the same address) because these addresses will be
+    // dynamically checked, and static analysis will be sufficiently
+    // conservative given that classes are not "uniquely identified".
     auto *REA = cast<RefElementAddrInst>(base);
-    objProj = ObjectProjection(REA);
+    SILValue Object = stripBorrow(REA->getOperand());
+    objProj = ObjectProjection(Object, Projection(REA));
   }
   }
 }
