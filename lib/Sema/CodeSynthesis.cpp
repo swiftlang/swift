@@ -1503,9 +1503,8 @@ static void synthesizeLazyGetterBody(AbstractFunctionDecl *fn, void *context) {
   // The getter checks the optional, storing the initial value in if nil.  The
   // specific pattern we generate is:
   //   get {
-  //     let tmp1 = storage
-  //     if tmp1 {
-  //       return tmp1!
+  //     if let tmp1 = storage {
+  //       return tmp1
   //     }
   //     let tmp2 : Ty = <<initializer expression>>
   //     storage = tmp2
@@ -1517,39 +1516,33 @@ static void synthesizeLazyGetterBody(AbstractFunctionDecl *fn, void *context) {
   auto *Tmp1VD = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
                                    /*IsCaptureList*/false, SourceLoc(),
                                    Ctx.getIdentifier("tmp1"), Get);
+  Tmp1VD->setHasNonPatternBindingInit();
   Tmp1VD->setImplicit();
 
-  auto *Tmp1PBDPattern = new (Ctx) NamedPattern(Tmp1VD, /*implicit*/true);
-  auto *Tmp1Init =
+  auto *Named = new (Ctx) NamedPattern(Tmp1VD, /*implicit*/true);
+  auto *Let = new (Ctx) VarPattern(SourceLoc(), /*let*/true, Named,
+                                   /*implict*/true);
+  auto *Some = new (Ctx) OptionalSomePattern(Let, SourceLoc(),
+                                             /*implicit*/true);
+
+  auto *StoredValueExpr =
     createPropertyLoadOrCallSuperclassGetter(Get, Storage,
                                              TargetImpl::Storage, Ctx, false);
-  auto *Tmp1PBD = PatternBindingDecl::createImplicit(
-      Ctx, StaticSpellingKind::None, Tmp1PBDPattern, Tmp1Init, Get);
-  Body.push_back(Tmp1PBD);
-  Body.push_back(Tmp1VD);
+  SmallVector<StmtConditionElement, 1> Cond;
+  Cond.emplace_back(SourceLoc(), Some, StoredValueExpr);
 
   // Build the early return inside the if.
   auto *Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, DeclNameLoc(), /*Implicit*/true,
-                                        AccessSemantics::DirectToStorage);
-  auto *EarlyReturnVal = new (Ctx) ForceValueExpr(Tmp1DRE, SourceLoc());
-  auto *Return = new (Ctx) ReturnStmt(SourceLoc(), EarlyReturnVal,
+                                        AccessSemantics::Ordinary);
+  auto *Return = new (Ctx) ReturnStmt(SourceLoc(), Tmp1DRE,
                                       /*implicit*/true);
 
-  // Build the "if" around the early return.
-  Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, DeclNameLoc(), /*Implicit*/true,
-                                  AccessSemantics::DirectToStorage);
-  
-  // Call through "hasValue" on the decl ref.
-  Tmp1DRE->setType(OptionalType::get(VD->getType()));
-  constraints::ConstraintSystem cs(TC,
-                                   VD->getDeclContext(),
-                                   constraints::ConstraintSystemOptions());
-  constraints::Solution solution(cs, constraints::Score());
-  auto HasValueExpr = solution.convertOptionalToBool(Tmp1DRE, nullptr);
 
-  Body.push_back(new (Ctx) IfStmt(SourceLoc(), HasValueExpr, Return,
+  // Build the "if" around the early return.
+  Body.push_back(new (Ctx) IfStmt(LabeledStmtInfo(),
+                                  SourceLoc(), Ctx.AllocateCopy(Cond), Return,
                                   /*elseloc*/SourceLoc(), /*else*/nullptr,
-                                  /*implicit*/ true, Ctx));
+                                  /*implicit*/ true));
 
 
   auto *Tmp2VD = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
@@ -1568,23 +1561,19 @@ static void synthesizeLazyGetterBody(AbstractFunctionDecl *fn, void *context) {
   auto PBD = VD->getParentPatternBinding();
   unsigned entryIndex = PBD->getPatternEntryIndexForVarDecl(VD);
   assert(PBD->isInitializerSubsumed(entryIndex));
-  bool wasInitializerChecked = PBD->isInitializerChecked(entryIndex);
-  PBD->setInitializerChecked(entryIndex);
+
+  if (!PBD->isInitializerChecked(entryIndex))
+    TC.typeCheckPatternBinding(PBD, entryIndex);
 
   // Recontextualize any closure declcontexts nested in the initializer to
   // realize that they are in the getter function.
   Get->getImplicitSelfDecl()->setDeclContext(Get);
   InitValue->walk(RecontextualizeClosures(Get));
 
-  // Wrap the initializer in a LazyInitializerExpr to avoid problems with
-  // re-typechecking it if it was already type-checked.
-  // FIXME: we should really have stronger invariants than this.  Leaving it
-  // unwrapped may expose both expressions to naive walkers
-  if (wasInitializerChecked) {
-    auto initType = InitValue->getType();
-    InitValue = new (Ctx) LazyInitializerExpr(InitValue);
-    InitValue->setType(initType);
-  }
+  // Wrap the initializer in a LazyInitializerExpr to avoid walking it twice.
+  auto initType = InitValue->getType();
+  InitValue = new (Ctx) LazyInitializerExpr(InitValue);
+  InitValue->setType(initType);
 
   Pattern *Tmp2PBDPattern = new (Ctx) NamedPattern(Tmp2VD, /*implicit*/true);
   Tmp2PBDPattern =
