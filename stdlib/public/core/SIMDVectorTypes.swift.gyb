@@ -187,11 +187,11 @@ extension SIMD${n} where Scalar: BinaryFloatingPoint {
 
 // Don't think I need to conform Scalar to SIMDScalar since it already is being done
 // it seems in SIMDVectorTypes.swift
-//extension SIMD${n} : AdditiveArithmetic where Scalar: BinaryFloatingPoint {
-//  public static var zero: SIMD${n} {
-//    return SIMD${n}()
-//  }
-//}
+extension SIMD${n} : AdditiveArithmetic where Scalar: BinaryFloatingPoint {
+  public static var zero: SIMD${n} {
+    return SIMD${n}()
+  }
+}
 
 //extension SIMD${n} : VectorNumeric where Scalar : AdditiveArithmetic & FloatingPoint {}
 

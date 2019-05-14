@@ -1202,16 +1202,6 @@ extension SIMD where Scalar: FloatingPoint {
   }
   
   @_transparent
-  public static func +=(lhs: inout Self, rhs: Self) {
-    lhs = lhs + rhs
-  }
-  
-  @_transparent
-  public static func -=(lhs: inout Self, rhs: Self) {
-    lhs = lhs - rhs
-  }
-  
-  @_transparent
   public static func *=(lhs: inout Self, rhs: Self) {
     lhs = lhs * rhs
   }

@@ -2054,14 +2054,6 @@ extension Array.DifferentiableView : AdditiveArithmetic
     }
     return Array.DifferentiableView(zip(lhs.base, rhs.base).map(-))
   }
-  
-  public static func +=(lhs: inout Self, rhs: Self) {
-    lhs = lhs + rhs
-  }
-
-  public static func -=(lhs: inout Self, rhs: Self) {
-    lhs = lhs - rhs
-  }
 }
 
 /// Makes `Array` differentiable as the product manifold of `Element`
