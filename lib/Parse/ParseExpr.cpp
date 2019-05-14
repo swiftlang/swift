@@ -2003,16 +2003,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   SourceLoc Loc = Tok.getLoc();
   SourceLoc EndLoc = Loc.getAdvancedLoc(Tok.getLength());
 
-  // The simple case: just a single literal segment.
-  if (Segments.size() == 1 &&
-      Segments.front().Kind == Lexer::StringSegment::Literal) {
-    consumeToken();
-    return makeParserResult(
-        createStringLiteralExprFromSegment(Context, L, Segments.front(), Loc));
-  }
-
-  // We are now sure this is a string interpolation expression.
-  LocalContext.setCreateSyntax(SyntaxKind::StringInterpolationExpr);
   StringRef OpenQuoteStr, CloseQuoteStr;
   tok QuoteKind;
   std::tie(OpenQuoteStr, CloseQuoteStr, QuoteKind) = Tok.isMultilineString() ?
@@ -2032,6 +2022,35 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   // Add the open quote to the context; the quote should have the leading trivia
   // of the entire string token and a void trailing trivia.
   SyntaxContext->addToken(OpenQuote, LeadingTrivia, EmptyTrivia);
+    
+  // The simple case: just a single literal segment.
+  if (Segments.size() == 1 &&
+      Segments.front().Kind == Lexer::StringSegment::Literal) {
+    {
+      consumeExtraToken(Tok);
+      consumeTokenWithoutFeedingReceiver();
+  
+      SyntaxParsingContext SegmentsCtx(SyntaxContext,
+                                       SyntaxKind::StringLiteralSegments);
+        
+      SyntaxParsingContext StrSegContext(SyntaxContext,
+                                         SyntaxKind::StringSegment);
+        
+      // Make an unknown token to encapsulate the entire string segment and add
+      // such token to the context.
+      auto Segment = Segments.front();
+      Token content(tok::string_segment,
+                    CharSourceRange(Segment.Loc, Segment.Length).str());
+      SyntaxContext->addToken(content, EmptyTrivia, EmptyTrivia);
+    }
+    
+    // Add the close quote the context; the quote should have a void leading trivia
+    // and the trailing trivia of the entire string token.
+    SyntaxContext->addToken(CloseQuote, EmptyTrivia, EntireTrailingTrivia);
+    
+    return makeParserResult(
+        createStringLiteralExprFromSegment(Context, L, Segments.front(), Loc));
+  }
 
   // We don't expose the entire interpolated string as one token. Instead, we
   // should expose the tokens in each segment.
@@ -2044,8 +2063,8 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   // We're not in a place where an interpolation would be valid.
   if (!CurLocalContext) {
-    // Return an error, but include an empty InterpolatedStringLiteralExpr 
-    // so that parseDeclPoundDiagnostic() can figure out why this string 
+    // Return an error, but include an empty InterpolatedStringLiteralExpr
+    // so that parseDeclPoundDiagnostic() can figure out why this string
     // literal was bad.
     return makeParserErrorResult(
         new (Context) InterpolatedStringLiteralExpr(Loc, 0, 0, nullptr));
@@ -2075,7 +2094,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
     // Collect all string segments.
     SyntaxParsingContext SegmentsCtx(SyntaxContext,
-                                     SyntaxKind::StringInterpolationSegments);
+                                     SyntaxKind::StringLiteralSegments);
     Status = parseStringSegments(Segments, EntireTok, InterpolationVar, 
                                  Stmts, LiteralCapacity, InterpolationCount);
 
