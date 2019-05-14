@@ -202,6 +202,13 @@ public struct Zip2TensorGroup<T : TensorGroup, U : TensorGroup> : TensorGroup {
     self.first = first
     self.second = second
   }
+
+  public var _handles: [_AnyTensorHandle] {
+    var res: [_AnyTensorHandle] = first._handles
+    res += second._handles
+    return res
+
+  }
 }
 
 @inlinable

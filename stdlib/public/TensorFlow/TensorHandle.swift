@@ -19,7 +19,7 @@ import CTensorFlow
 @usableFromInline
 enum LazyTensorHandle {
   case conc(CTensorHandle)
-  case sym(TFE_Op)
+  case sym(TFE_Op, Int32)
 }
 
 /// `_AnyTensorHandle` is the scalar-agnostic base type for `TensorHandle`, used
@@ -40,7 +40,7 @@ public class _AnyTensorHandle {
     get {
       switch lazyHandle {
         case .conc(let h): return h
-        case .sym(let op): return op.evaluate()
+        case .sym(let op, let idx): return op.evaluate(idx: idx)
       }
     }
   }
@@ -51,8 +51,8 @@ public class _AnyTensorHandle {
     self.lazyHandle = .conc(base)
   }
 
-  fileprivate init(op: TFE_Op) {
-    self.lazyHandle = .sym(op)
+  fileprivate init(op: TFE_Op, idx: Int32) {
+    self.lazyHandle = .sym(op, idx)
   }
 }
 
@@ -67,8 +67,8 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
   }
 
   @usableFromInline
-  init(_lazy op: TFE_Op) {
-    super.init(op: op)
+  init(_lazy op: TFE_Op, idx: Int32) {
+    super.init(op: op, idx: idx)
   }
 
   @usableFromInline

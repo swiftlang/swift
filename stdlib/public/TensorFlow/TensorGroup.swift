@@ -39,6 +39,8 @@ public protocol TensorArrayProtocol {
   var _typeList: [TensorDataType] { get }
 
   init(_owning tensorHandles: UnsafePointer<CTensorHandle>?, count: Int)
+
+  var _handles: [_AnyTensorHandle] { get }
 }
 
 /// A protocol representing types that can be mapped to and from
@@ -107,6 +109,11 @@ extension TensorHandle : TensorGroup {
     address!.initialize(to: _cTensorHandle)
   }
 
+  public var _handles:  [_AnyTensorHandle] {
+    return [self]
+  }
+
+
   public convenience init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
     self.init(_owning: tensorHandles!.pointee)
   }
@@ -126,6 +133,10 @@ extension ResourceHandle : TensorGroup {
   public func _unpackTensorHandles(
       into address: UnsafeMutablePointer<CTensorHandle>?) {
     address!.initialize(to: _cTensorHandle)
+  }
+
+  public var _handles:  [_AnyTensorHandle] {
+    return [self]
   }
 
   public convenience init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
@@ -149,6 +160,10 @@ extension VariantHandle : TensorGroup {
     address!.initialize(to: _cTensorHandle)
   }
 
+  public var _handles:  [_AnyTensorHandle] {
+    return [self]
+  }
+
   public convenience init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
     self.init(owning: tensorHandles!.pointee)
   }
@@ -168,6 +183,10 @@ extension Tensor : TensorGroup {
   public func _unpackTensorHandles(
       into address: UnsafeMutablePointer<CTensorHandle>?) {
     address!.initialize(to: handle._cTensorHandle)
+  }
+
+  public var _handles:  [_AnyTensorHandle] {
+    return [self.handle]
   }
 
   public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
@@ -191,6 +210,10 @@ extension _TensorElementLiteral : TensorGroup {
     address!.initialize(to: handle._cTensorHandle)
   }
 
+  public var _handles:  [_AnyTensorHandle] {
+    return [self.handle]
+  }
+
   public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
     self.init(handle: TensorHandle(_owning: tensorHandles!.pointee))
   }
@@ -212,6 +235,10 @@ extension StringTensor : TensorGroup {
     address!.initialize(to: handle._cTensorHandle)
   }
 
+  public var _handles:  [_AnyTensorHandle] {
+    return [self.handle]
+  }
+
   public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
     self.init(handle: TensorHandle(_owning: tensorHandles!.pointee))
   }
@@ -226,6 +253,14 @@ extension Array : TensorArrayProtocol where Element : TensorGroup {
     }
   }
 
+  public var _handles:  [_AnyTensorHandle] {
+    var res: [_AnyTensorHandle] = []
+    for elem in self {
+      res += elem._handles
+    }
+    return res
+  }
+  
   public var _tensorHandleCount: Int32 {
     return Element._tensorHandleCount * Int32(count)
   }
