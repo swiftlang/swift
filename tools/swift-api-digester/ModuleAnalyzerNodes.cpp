@@ -845,10 +845,7 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
 }
 
 bool SDKContext::isEqual(const SDKNode &Left, const SDKNode &Right) {
-  if (!EqualCache[&Left].count(&Right)) {
-    EqualCache[&Left][&Right] = isSDKNodeEqual(*this, Left, Right);
-  }
-  return EqualCache[&Left][&Right];
+  return isSDKNodeEqual(*this, Left, Right);
 }
 
 AccessLevel SDKContext::getAccessLevel(const ValueDecl *VD) const {
