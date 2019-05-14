@@ -274,20 +274,6 @@ func associatedTypeIdentity() {
   sameType(gary(doug()).r_out(), gary(candace()).r_out()) // expected-error{{}}
 }
 
-/* TODO: diagnostics
-struct DoesNotConform {}
-
-func doesNotConform() -> some P {
-  return DoesNotConform()
-}
-
-var doesNotConformProp: some P = DoesNotConform()
-
-var DoesNotConformComputedProp: some P {
-  return DoesNotConform()
-}
-*/
-
 func redeclaration() -> some P { return 0 } // expected-note{{previously declared}}
 func redeclaration() -> some P { return 0 } // expected-error{{redeclaration}}
 func redeclaration() -> some Q { return 0 }
@@ -355,4 +341,11 @@ func recursive_func_is_invalid_opaque() {
     }
     return rec(x: x - 1)
   }
+}
+
+func closure() -> some P {
+  _ = {
+    return "test"
+  }
+  return 42
 }
