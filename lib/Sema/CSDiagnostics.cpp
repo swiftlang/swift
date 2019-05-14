@@ -2828,10 +2828,28 @@ bool MissingContextualConformanceFailure::diagnoseAsError() {
       assert(Context != CTP_Unused);
       diagnostic = getDiagnosticFor(Context);
       break;
+
+    default:
+      break;
     }
   }
 
-  emitDiagnostic(anchor->getLoc(), *diagnostic, getFromType(), getToType());
+  if (!diagnostic)
+    return false;
+
+  auto srcType = getFromType();
+  auto dstType = getToType();
+
+  emitDiagnostic(anchor->getLoc(), *diagnostic, srcType, dstType);
+
+  if (isa<InOutExpr>(anchor))
+    return true;
+
+  if (srcType->isAny() && dstType->isAnyObject()) {
+    emitDiagnostic(anchor->getLoc(), diag::any_as_anyobject_fixit)
+        .fixItInsertAfter(anchor->getEndLoc(), " as AnyObject");
+  }
+
   return true;
 }
 

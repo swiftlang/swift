@@ -1761,8 +1761,28 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
       case SolutionKind::Unsolved:
         break;
 
-      case SolutionKind::Error:
-        return getTypeMatchFailure(locator);
+      case SolutionKind::Error: {
+        if (!shouldAttemptFixes())
+          return getTypeMatchFailure(locator);
+
+        if (auto last = locator.last()) {
+          // TODO(diagnostics): Diagnosing missing conformances
+          // associated with arguments requires having general
+          // conversion failures implemented first, otherwise
+          // we would be misdiagnosing ambiguous cases associated
+          // with overloaded declarations.
+          if (last->getKind() == ConstraintLocator::ApplyArgToParam)
+            return getTypeMatchFailure(locator);
+        }
+
+        auto *fix = MissingConformance::forContextual(
+            *this, type1, proto, getConstraintLocator(locator));
+
+        if (recordFix(fix))
+          return getTypeMatchFailure(locator);
+
+        break;
+      }
     }
   }
 
@@ -2039,12 +2059,8 @@ bool ConstraintSystem::repairFailures(
     return false;
   };
 
-  auto repairByAddingConformance = [&](Type lhs, Type rhs) -> bool {
-    if (lhs->isTypeVariableOrMember())
-      return false;
-
-    if (rhs->isAny() ||
-        !(rhs->is<ProtocolType>() || rhs->is<ProtocolCompositionType>()))
+  auto repairByAnyToAnyObjectCast = [&](Type lhs, Type rhs) -> bool {
+    if (!(lhs->isAny() && rhs->isAnyObject()))
       return false;
 
     conversionsOrFixes.push_back(MissingConformance::forContextual(
@@ -2071,14 +2087,14 @@ bool ConstraintSystem::repairFailures(
       if (repairByInsertingExplicitCall(lhs, rhs))
         return true;
 
-      if (repairByAddingConformance(lhs, rhs))
-        return true;
-
       if (isa<InOutExpr>(AE->getSrc())) {
         conversionsOrFixes.push_back(
             RemoveAddressOf::create(*this, getConstraintLocator(locator)));
         return true;
       }
+
+      if (repairByAnyToAnyObjectCast(lhs, rhs))
+        return true;
     }
 
     return false;
@@ -2165,7 +2181,7 @@ bool ConstraintSystem::repairFailures(
     if (repairByInsertingExplicitCall(lhs, rhs))
       return true;
 
-    if (repairByAddingConformance(lhs, rhs))
+    if (repairByAnyToAnyObjectCast(lhs, rhs))
       return true;
 
     // If both types are key path, the only differences
