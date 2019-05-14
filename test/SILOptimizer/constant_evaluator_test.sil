@@ -1044,3 +1044,35 @@ bb0:
   %11 = apply %10(%3, %5, %7, %9) : $@convention(thin) (IntFormat, Bool, Int64, Bool) -> @owned String
   return %11 : $String
 } // CHECK: Returns string: "%{public}llu"
+
+// String.percentEscapedString.getter
+// The semantics attribute is used by the interpreter.
+sil [serialized] [readonly] [_semantics "string.escapePercent.get"] @$sSS14OSLogPrototypeE20percentEscapedStringSSvg : $@convention(method) (@guaranteed String) -> @owned String
+
+// CHECK-LABEL: @interpretStringPercentEscape
+sil @interpretStringPercentEscape : $@convention(thin) () -> @owned String {
+bb0:
+  %1 = string_literal utf8 "a%"
+  %2 = integer_literal $Builtin.Word, 2
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = metatype $@thin String.Type
+  %5 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %6 = apply %5(%1, %2, %3, %4) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %8 = function_ref @$sSS14OSLogPrototypeE20percentEscapedStringSSvg : $@convention(method) (@guaranteed String) -> @owned String
+  %9 = apply %8(%6) : $@convention(method) (@guaranteed String) -> @owned String
+  return %9 : $String
+} // CHECK: Returns string: "a%%"
+
+// CHECK-LABEL: @interpretEscapeMutiplePercent
+sil @interpretEscapeMutiplePercent : $@convention(thin) () -> @owned String {
+bb0:
+  %1 = string_literal utf8 "%%%a% %%b%"
+  %2 = integer_literal $Builtin.Word, 10
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = metatype $@thin String.Type
+  %5 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %6 = apply %5(%1, %2, %3, %4) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %8 = function_ref @$sSS14OSLogPrototypeE20percentEscapedStringSSvg : $@convention(method) (@guaranteed String) -> @owned String
+  %9 = apply %8(%6) : $@convention(method) (@guaranteed String) -> @owned String
+  return %9 : $String
+} // CHECK: Returns string: "%%%%%%a%% %%%%b%%"
