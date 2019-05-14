@@ -2182,7 +2182,7 @@ getBufferForFilename(StringRef Filename,
                      const llvm::StringMap<std::string> &VFSFiles) {
   auto VFSFileIt = VFSFiles.find(Filename);
   auto MappedFilename =
-      VFSFileIt == VFSFiles.end() ? Filename : VFSFileIt->second;
+      VFSFileIt == VFSFiles.end() ? Filename : StringRef(VFSFileIt->second);
 
   auto It = Buffers.find(MappedFilename);
   if (It != Buffers.end())
