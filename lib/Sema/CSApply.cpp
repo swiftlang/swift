@@ -1912,55 +1912,25 @@ namespace {
     }
     
     Expr *visitNilLiteralExpr(NilLiteralExpr *expr) {
+      auto type = simplifyType(cs.getType(expr));
+
+      // By far the most common 'nil' literal is for Optional<T>.none.
+      // We don't have to look up the witness in this case since SILGen
+      // knows how to lower it directly.
+      if (auto objectType = type->getOptionalObjectType()) {
+        cs.setType(expr, type);
+        return expr;
+      }
+
       auto &tc = cs.getTypeChecker();
       auto *protocol = tc.getProtocol(expr->getLoc(),
                                       KnownProtocolKind::ExpressibleByNilLiteral);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
-      auto type = simplifyType(cs.getType(expr));
       if (auto defaultType = tc.getDefaultType(protocol, dc)) {
         if (defaultType->isEqual(type))
           type = defaultType;
-      }
-
-      // By far the most common 'nil' literal is for Optional<T>.none.
-      //
-      // Emit this case directly instead of calling Optional.init(nilLiteral:),
-      // since this generates more efficient SIL.
-      if (auto objectType = type->getOptionalObjectType()) {
-        auto *nilDecl = tc.Context.getOptionalNoneDecl();
-        tc.validateDecl(nilDecl);
-        if (!nilDecl->hasInterfaceType())
-          return nullptr;
-
-        auto genericSig =
-          nilDecl->getDeclContext()->getGenericSignatureOfContext();
-        SubstitutionMap subs =
-          SubstitutionMap::get(genericSig, llvm::makeArrayRef(objectType),
-                               { });
-        ConcreteDeclRef concreteDeclRef(nilDecl, subs);
-
-        auto nilType = FunctionType::get(
-            {FunctionType::Param(MetatypeType::get(type))}, type);
-        auto *nilRefExpr = new (tc.Context) DeclRefExpr(
-            concreteDeclRef, DeclNameLoc(expr->getLoc()),
-              /*implicit=*/true, AccessSemantics::Ordinary,
-            nilType);
-        cs.cacheType(nilRefExpr);
-
-        auto *typeExpr = TypeExpr::createImplicitHack(
-            expr->getLoc(),
-            type,
-            tc.Context);
-        cs.cacheType(typeExpr);
-
-        auto *callExpr = new (tc.Context) DotSyntaxCallExpr(
-            nilRefExpr, expr->getLoc(), typeExpr, type);
-        callExpr->setImplicit(true);
-        cs.cacheType(callExpr);
-
-        return callExpr;
       }
 
       DeclName initName(tc.Context, DeclBaseName::createConstructor(),

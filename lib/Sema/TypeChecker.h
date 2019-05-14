@@ -1688,9 +1688,7 @@ public:
                                   IterableDeclContext *idc);
 
   /// Check that the type of the given property conforms to NSCopying.
-  ///
-  /// Return true if there was an error.
-  bool checkConformanceToNSCopying(VarDecl *var);
+  Optional<ProtocolConformanceRef> checkConformanceToNSCopying(VarDecl *var);
 
   /// Mark any _BridgedNSError/_BridgedStoredNSError/related
   /// conformances in the given type as "used".
