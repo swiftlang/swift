@@ -2378,8 +2378,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
 
   // When complaining about conversion to a protocol type, complain about
   // conformance instead of "conversion".
-  if (contextualType->is<ProtocolType>() ||
-      contextualType->is<ProtocolCompositionType>()) {
+  if (contextualType->isExistentialType()) {
     MissingContextualConformanceFailure failure(
         expr, CS, CTP, exprType, contextualType,
         CS.getConstraintLocator(expr, ConstraintLocator::ContextualType));
