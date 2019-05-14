@@ -344,53 +344,17 @@ public:
     return llvm::all_of(getBitWords(), [](BitWord bw) { return !(bool)bw; });
   }
   
-  bool equals(const AutoDiffIndexSubset *other) const {
+  bool equals(AutoDiffIndexSubset *other) const {
     return capacity == other->getCapacity() &&
         getBitWords().equals(other->getBitWords());
   }
 
-  bool isSubsetOf(const AutoDiffIndexSubset *other) const {
-    assert(capacity == other->capacity);
-    for (auto index : range(numBitWords))
-      if (getBitWord(index) & ~other->getBitWord(index))
-        return false;
-    return true;
-  }
+  bool isSubsetOf(AutoDiffIndexSubset *other) const;
+  bool isSupersetOf(AutoDiffIndexSubset *other) const;
 
-  bool isSupersetOf(const AutoDiffIndexSubset *other) const {
-    assert(capacity == other->capacity);
-    for (auto index : range(numBitWords))
-      if (~getBitWord(index) & other->getBitWord(index))
-        return false;
-    return true;
-  }
-
-  AutoDiffIndexSubset *adding(
-      unsigned index, ASTContext &ctx) const {
-    assert(index < getCapacity());
-    SmallVector<unsigned, 8> newIndices;
-    newIndices.reserve(capacity + 1);
-    bool inserted = false;
-    for (auto curIndex : getIndices()) {
-      if (inserted && curIndex > index) {
-        newIndices.push_back(index);
-        inserted = false;
-      }
-      newIndices.push_back(curIndex);
-    }
-    return get(ctx, capacity, newIndices);
-  }
-
-  AutoDiffIndexSubset *extendingCapacity(
-      ASTContext &ctx, unsigned newCapacity) const {
-    assert(newCapacity >= capacity);
-    if (newCapacity == capacity)
-      return const_cast<AutoDiffIndexSubset *>(this);
-    SmallVector<unsigned, 8> indices;
-    for (auto index : getIndices())
-      indices.push_back(index);
-    return AutoDiffIndexSubset::get(ctx, newCapacity, indices);
-  }
+  AutoDiffIndexSubset *adding(unsigned index, ASTContext &ctx) const;
+  AutoDiffIndexSubset *extendingCapacity(ASTContext &ctx,
+                                         unsigned newCapacity) const;
 
   void Profile(llvm::FoldingSetNodeID &id) const {
     id.AddInteger(capacity);

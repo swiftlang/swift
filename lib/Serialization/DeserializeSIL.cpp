@@ -1510,7 +1510,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto numParamIndices = ListOfValues.size() - NumArguments * 3;
     auto rawParamIndices =
        map<SmallVector<unsigned, 8>>(ListOfValues.take_front(numParamIndices),
-                                     [&](uint64_t i) { return i; });
+                                     [](uint64_t i) { return (unsigned)i; });
     auto numParams = Attr2;
     auto *paramIndices =
         AutoDiffIndexSubset::get(MF->getContext(), numParams, rawParamIndices);

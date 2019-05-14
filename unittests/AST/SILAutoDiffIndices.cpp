@@ -148,3 +148,13 @@ TEST(AutoDiffIndexSubset, SupersetAndSubset) {
   EXPECT_TRUE(indices1->isSupersetOf(indices2));
   EXPECT_TRUE(indices2->isSubsetOf(indices1));
 }
+
+TEST(AutoDiffIndexSubset, Insertion) {
+  TestContext ctx;
+  auto *indices1 = AutoDiffIndexSubset::get(ctx.Ctx, 5, {0, 2, 4});
+  EXPECT_EQ(indices1->adding(0, ctx.Ctx), indices1);
+  EXPECT_EQ(indices1->adding(1, ctx.Ctx),
+            AutoDiffIndexSubset::get(ctx.Ctx, 5, {0, 1, 2, 4}));
+  EXPECT_EQ(indices1->adding(3, ctx.Ctx),
+            AutoDiffIndexSubset::get(ctx.Ctx, 5, {0, 2, 3, 4}));
+}

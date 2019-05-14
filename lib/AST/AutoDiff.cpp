@@ -331,6 +331,51 @@ NominalTypeDecl *VectorSpace::getNominal() const {
   return getVector()->getNominalOrBoundGenericNominal();
 }
 
+bool AutoDiffIndexSubset::isSubsetOf(AutoDiffIndexSubset *other) const {
+  assert(capacity == other->capacity);
+  for (auto index : range(numBitWords))
+    if (getBitWord(index) & ~other->getBitWord(index))
+      return false;
+  return true;
+}
+
+bool AutoDiffIndexSubset::isSupersetOf(AutoDiffIndexSubset *other) const {
+  assert(capacity == other->capacity);
+  for (auto index : range(numBitWords))
+    if (~getBitWord(index) & other->getBitWord(index))
+      return false;
+  return true;
+}
+
+AutoDiffIndexSubset *AutoDiffIndexSubset::adding(unsigned index,
+                                                 ASTContext &ctx) const {
+  assert(index < getCapacity());
+  if (contains(index))
+    return const_cast<AutoDiffIndexSubset *>(this);
+  SmallVector<unsigned, 8> newIndices;
+  newIndices.reserve(capacity + 1);
+  bool inserted = false;
+  for (auto curIndex : getIndices()) {
+    if (!inserted && curIndex > index) {
+      newIndices.push_back(index);
+      inserted = true;
+    }
+    newIndices.push_back(curIndex);
+  }
+  return get(ctx, capacity, newIndices);
+}
+
+AutoDiffIndexSubset *AutoDiffIndexSubset::extendingCapacity(
+    ASTContext &ctx, unsigned newCapacity) const {
+  assert(newCapacity >= capacity);
+  if (newCapacity == capacity)
+    return const_cast<AutoDiffIndexSubset *>(this);
+  SmallVector<unsigned, 8> indices;
+  for (auto index : getIndices())
+    indices.push_back(index);
+  return AutoDiffIndexSubset::get(ctx, newCapacity, indices);
+}
+
 int AutoDiffIndexSubset::findNext(int startIndex) const {
   assert(startIndex < (int)capacity && "Start index cannot be past the end");
   unsigned bitWordIndex = 0, offset = 0;
