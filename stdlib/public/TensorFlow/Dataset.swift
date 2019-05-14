@@ -207,7 +207,13 @@ public struct Zip2TensorGroup<T : TensorGroup, U : TensorGroup> : TensorGroup {
     var res: [_AnyTensorHandle] = first._handles
     res += second._handles
     return res
+  }
 
+  public init(_lazySingle op: TFE_Op, idx: Int32) {
+    // TODO:
+    self.first = T.init(_lazySingle: op, idx: idx)
+    self.second = U.init(_lazySingle: op, idx: idx)
+    assert(false)
   }
 }
 

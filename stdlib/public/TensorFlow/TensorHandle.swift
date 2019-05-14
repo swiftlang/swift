@@ -180,6 +180,11 @@ public final class ResourceHandle : _AnyTensorHandle {
     super.init(base: cTensorHandle)
   }
 
+  @usableFromInline
+  init(_lazy op: TFE_Op, idx: Int32) {
+    super.init(op: op, idx: idx)
+  }
+
   deinit {
     debugLog("De-initializing TensorHandle.")
     TFE_DeleteTensorHandle(_cTensorHandle)
@@ -193,6 +198,11 @@ public final class VariantHandle : _AnyTensorHandle {
   @usableFromInline
   init(owning cTensorHandle: CTensorHandle) {
     super.init(base: cTensorHandle)
+  }
+
+  @usableFromInline
+  init(_lazy op: TFE_Op, idx: Int32) {
+    super.init(op: op, idx: idx)
   }
 
   deinit {

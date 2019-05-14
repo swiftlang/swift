@@ -41,6 +41,9 @@ public protocol TensorArrayProtocol {
   init(_owning tensorHandles: UnsafePointer<CTensorHandle>?, count: Int)
 
   var _handles: [_AnyTensorHandle] { get }
+
+  init(_lazySingle op: TFE_Op, idx: Int32)
+
 }
 
 /// A protocol representing types that can be mapped to and from
@@ -113,6 +116,10 @@ extension TensorHandle : TensorGroup {
     return [self]
   }
 
+  public convenience init(_lazySingle op: TFE_Op, idx: Int32) {
+    self.init(_lazy: op, idx: idx)
+  }
+
 
   public convenience init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
     self.init(_owning: tensorHandles!.pointee)
@@ -139,6 +146,12 @@ extension ResourceHandle : TensorGroup {
     return [self]
   }
 
+ 
+  public convenience init(_lazySingle op: TFE_Op, idx: Int32) {
+    self.init(_lazy: op, idx: idx)
+  }
+
+
   public convenience init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
     self.init(owning: tensorHandles!.pointee)
   }
@@ -163,6 +176,11 @@ extension VariantHandle : TensorGroup {
   public var _handles:  [_AnyTensorHandle] {
     return [self]
   }
+
+  public convenience init(_lazySingle op: TFE_Op, idx: Int32) {
+    self.init(_lazy: op, idx: idx)
+  }
+
 
   public convenience init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
     self.init(owning: tensorHandles!.pointee)
@@ -189,6 +207,11 @@ extension Tensor : TensorGroup {
     return [self.handle]
   }
 
+  public init(_lazySingle op: TFE_Op, idx: Int32) {
+    self.init(handle: TensorHandle(_lazy: op, idx: idx))
+  }
+
+
   public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
     self.init(handle: TensorHandle(_owning: tensorHandles!.pointee))
   }
@@ -212,6 +235,10 @@ extension _TensorElementLiteral : TensorGroup {
 
   public var _handles:  [_AnyTensorHandle] {
     return [self.handle]
+  }
+
+  public init(_lazySingle op: TFE_Op, idx: Int32) {
+    self.init(handle: TensorHandle(_lazy: op, idx: idx))
   }
 
   public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
@@ -239,6 +266,10 @@ extension StringTensor : TensorGroup {
     return [self.handle]
   }
 
+  public init(_lazySingle op: TFE_Op, idx: Int32) {
+    self.init(handle: TensorHandle(_lazy: op, idx: idx))
+  }
+
   public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
     self.init(handle: TensorHandle(_owning: tensorHandles!.pointee))
   }
@@ -259,6 +290,11 @@ extension Array : TensorArrayProtocol where Element : TensorGroup {
       res += elem._handles
     }
     return res
+  }
+
+  public init(_lazySingle op: TFE_Op, idx: Int32) {
+    // TODO:
+    self = Array([Element.init(_lazySingle: op, idx: idx)])
   }
   
   public var _tensorHandleCount: Int32 {
