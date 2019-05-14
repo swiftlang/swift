@@ -615,7 +615,8 @@ swift_conformsToProtocolImpl(const Metadata * const type,
   if (!description)
     return nullptr;
 
-  return description->getWitnessTable(type);
+  return description->getWitnessTable(
+      findConformingSuperclass(type, description));
 }
 
 const ContextDescriptor *
