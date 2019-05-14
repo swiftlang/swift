@@ -1203,6 +1203,27 @@ public:
   bool diagnoseAsError() override;
 };
 
+class MissingContextualConformanceFailure final : public ContextualFailure {
+  ContextualTypePurpose Context;
+
+public:
+  MissingContextualConformanceFailure(Expr *root, ConstraintSystem &cs,
+                                      ContextualTypePurpose context, Type type,
+                                      Type protocolType,
+                                      ConstraintLocator *locator)
+      : ContextualFailure(root, cs, type, protocolType, locator),
+        Context(context) {
+    assert(protocolType->is<ProtocolType>() ||
+           protocolType->is<ProtocolCompositionType>());
+  }
+
+  bool diagnoseAsError() override;
+
+private:
+  static Optional<Diag<Type, Type>>
+  getDiagnosticFor(ContextualTypePurpose purpose);
+};
+
 } // end namespace constraints
 } // end namespace swift
 

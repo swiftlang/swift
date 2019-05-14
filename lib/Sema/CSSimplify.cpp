@@ -2040,6 +2040,19 @@ bool ConstraintSystem::repairFailures(
     return false;
   };
 
+  auto repairByAddingConformance = [&](Type lhs, Type rhs) -> bool {
+    if (lhs->isTypeVariableOrMember())
+      return false;
+
+    if (rhs->isAny() ||
+        !(rhs->is<ProtocolType>() || rhs->is<ProtocolCompositionType>()))
+      return false;
+
+    conversionsOrFixes.push_back(MissingConformance::forContextual(
+        *this, lhs, rhs, getConstraintLocator(locator)));
+    return true;
+  };
+
   if (path.empty()) {
     if (!anchor)
       return false;
@@ -2057,6 +2070,9 @@ bool ConstraintSystem::repairFailures(
 
     if (auto *AE = dyn_cast<AssignExpr>(anchor)) {
       if (repairByInsertingExplicitCall(lhs, rhs))
+        return true;
+
+      if (repairByAddingConformance(lhs, rhs))
         return true;
 
       if (isa<InOutExpr>(AE->getSrc())) {
@@ -2148,6 +2164,9 @@ bool ConstraintSystem::repairFailures(
     }
 
     if (repairByInsertingExplicitCall(lhs, rhs))
+      return true;
+
+    if (repairByAddingConformance(lhs, rhs))
       return true;
 
     // If both types are key path, the only differences
@@ -3347,9 +3366,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           return SolutionKind::Error;
       }
 
-      auto *fix =
-          MissingConformance::create(*this, type, protocol->getDeclaredType(),
-                                     getConstraintLocator(locator));
+      auto *fix = MissingConformance::forRequirement(
+          *this, type, protocol->getDeclaredType(),
+          getConstraintLocator(locator));
       if (!recordFix(fix))
         return SolutionKind::Solved;
     }
@@ -6585,6 +6604,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
 
   case FixKind::InsertCall:
   case FixKind::RemoveReturn:
+  case FixKind::AddConformance:
   case FixKind::RemoveAddressOf:
   case FixKind::SkipSameTypeRequirement:
   case FixKind::SkipSuperclassRequirement:
@@ -6597,7 +6617,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::ExplicitlyEscaping:
   case FixKind::CoerceToCheckedCast:
   case FixKind::RelabelArguments:
-  case FixKind::AddConformance:
   case FixKind::RemoveUnwrap:
   case FixKind::DefineMemberBasedOnUse:
   case FixKind::AllowTypeOrInstanceMember:
