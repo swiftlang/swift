@@ -3330,8 +3330,20 @@ namespace {
           return nullptr;
 
         // Extract a Bool from the resulting expression.
-        return solution.convertOptionalToBool(result,
-                                              cs.getConstraintLocator(expr));
+        tc.requireOptionalIntrinsics(expr->getLoc());
+
+        // Match the optional value against its `Some` case.
+        auto &ctx = tc.Context;
+        auto *someDecl = tc.Context.getOptionalSomeDecl();
+        auto isSomeExpr = new (tc.Context) EnumIsCaseExpr(result, someDecl);
+        auto boolDecl = ctx.getBoolDecl();
+
+        if (!boolDecl) {
+          tc.diagnose(SourceLoc(), diag::broken_bool);
+        }
+
+        cs.setType(isSomeExpr, boolDecl ? boolDecl->getDeclaredType() : Type());
+        return isSomeExpr;
       }
 
       return expr;
@@ -7852,23 +7864,4 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
   rewriter.finalize(result);
   return result;
-}
-
-Expr *Solution::convertOptionalToBool(Expr *expr,
-                                      ConstraintLocator *locator) const {
-  auto &cs = getConstraintSystem();
-  auto &tc = cs.getTypeChecker();
-  tc.requireOptionalIntrinsics(expr->getLoc());
-
-  // Match the optional value against its `Some` case.
-  auto &ctx = tc.Context;
-  auto isSomeExpr = new (ctx) EnumIsCaseExpr(expr, ctx.getOptionalSomeDecl());
-  auto boolDecl = ctx.getBoolDecl();
-
-  if (!boolDecl) {
-    tc.diagnose(SourceLoc(), diag::broken_bool);
-  }
-
-  cs.setType(isSomeExpr, boolDecl ? boolDecl->getDeclaredType() : Type());
-  return isSomeExpr;
 }

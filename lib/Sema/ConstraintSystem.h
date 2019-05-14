@@ -668,20 +668,6 @@ public:
                      bool ignoreTopLevelInjection = false,
                      Optional<Pattern*> typeFromPattern = None) const;
 
-  /// Convert the given optional-producing expression to a Bool
-  /// indicating whether the optional has a value.
-  ///
-  /// This operation cannot fail.
-  ///
-  /// \param expr The expression to coerce. The type of this expression
-  /// must be T?.
-  ///
-  /// \param locator Locator used to describe the location of this expression.
-  ///
-  /// \returns a Bool expression indicating whether the optional
-  /// contains a value.
-  Expr *convertOptionalToBool(Expr *expr, ConstraintLocator *locator) const;
-
   /// Compute the set of substitutions for a generic signature opened at the
   /// given locator.
   ///
