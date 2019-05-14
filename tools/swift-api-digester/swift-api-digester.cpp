@@ -2246,12 +2246,6 @@ static int prepareForDump(const char *Main,
   InitInvok.setMainExecutablePath(fs::getMainExecutable(Main,
     reinterpret_cast<void *>(&anchorForGetMainExecutable)));
   InitInvok.setModuleName("swift_ide_test");
-#if __APPLE__
-  InitInvok.getLangOptions().EnableObjCInterop = true;
-#else
-  // Ensure the tool works on linux properly
-  InitInvok.getLangOptions().EnableObjCInterop = false;
-#endif
   if (!options::SDK.empty()) {
     InitInvok.setSDKPath(options::SDK);
   } else if (const char *SDKROOT = getenv("SDKROOT")) {
@@ -2264,6 +2258,10 @@ static int prepareForDump(const char *Main,
 
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
+
+  // Ensure the tool works on linux properly
+  InitInvok.getLangOptions().EnableObjCInterop =
+    InitInvok.getLangOptions().Target.isOSDarwin();
   InitInvok.getClangImporterOptions().ModuleCachePath =
   options::ModuleCachePath;
 
