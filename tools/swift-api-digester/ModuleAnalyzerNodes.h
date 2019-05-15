@@ -160,8 +160,6 @@ class SDKContext {
 
   CheckerOptions Opts;
   std::vector<BreakingAttributeInfo> BreakingAttrs;
-  /// This is to cache the equal comparison results between nodes.
-  llvm::DenseMap<const SDKNode*, llvm::DenseMap<const SDKNode*, bool>> EqualCache;
 
 public:
   SDKContext(CheckerOptions Options);
@@ -499,11 +497,13 @@ public:
 /// The SDKNode part of the conformance node is constructed using the protocol
 /// in the conformance, thus getName() will give us the name of the protocol.
 class SDKNodeConformance: public SDKNode {
+  StringRef Usr;
   SDKNodeDeclType *TypeDecl;
   friend class SDKNodeDeclType;
   bool IsABIPlaceholder;
 public:
   SDKNodeConformance(SDKNodeInitInfo Info);
+  StringRef getUsr() const { return Usr; }
   ArrayRef<SDKNode*> getTypeWitnesses() const { return Children; }
   SDKNodeDeclType *getNominalTypeDecl() const { return TypeDecl; }
   bool isABIPlaceholder() const { return IsABIPlaceholder; }

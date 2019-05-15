@@ -112,7 +112,7 @@ SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info):
 
 SDKNodeConformance::SDKNodeConformance(SDKNodeInitInfo Info):
   SDKNode(Info, SDKNodeKind::Conformance),
-  IsABIPlaceholder(Info.IsABIPlaceholder) {}
+  Usr(Info.Usr), IsABIPlaceholder(Info.IsABIPlaceholder) {}
 
 SDKNodeTypeWitness::SDKNodeTypeWitness(SDKNodeInitInfo Info):
   SDKNode(Info, SDKNodeKind::TypeWitness) {}
@@ -845,10 +845,7 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
 }
 
 bool SDKContext::isEqual(const SDKNode &Left, const SDKNode &Right) {
-  if (!EqualCache[&Left].count(&Right)) {
-    EqualCache[&Left][&Right] = isSDKNodeEqual(*this, Left, Right);
-  }
-  return EqualCache[&Left][&Right];
+  return isSDKNodeEqual(*this, Left, Right);
 }
 
 AccessLevel SDKContext::getAccessLevel(const ValueDecl *VD) const {
@@ -1158,6 +1155,16 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       IsImplicit(D->isImplicit()),
       IsDeprecated(D->getAttrs().getDeprecated(D->getASTContext())),
       IsABIPlaceholder(isABIPlaceholderRecursive(D)) {
+
+  // Force some attributes that are lazily computed.
+  // FIXME: we should use these AST predicates directly instead of looking at
+  // the attributes rdar://50217247.
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    (void) VD->isObjC();
+    (void) VD->isFinal();
+    (void) VD->isDynamic();
+  }
+
   // Capture all attributes.
   auto AllAttrs = D->getAttrs();
   std::transform(AllAttrs.begin(), AllAttrs.end(), std::back_inserter(DeclAttrs),
@@ -1698,6 +1705,7 @@ void SDKNode::jsonize(json::Output &out) {
 
 void SDKNodeConformance::jsonize(json::Output &out) {
   SDKNode::jsonize(out);
+  output(out, KeyKind::KK_usr, Usr);
   output(out, KeyKind::KK_isABIPlaceholder, IsABIPlaceholder);
 }
 
