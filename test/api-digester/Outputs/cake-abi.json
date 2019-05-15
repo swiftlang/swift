@@ -1478,7 +1478,8 @@
         {
           "kind": "Conformance",
           "name": "MirrorPath",
-          "printedName": "MirrorPath"
+          "printedName": "MirrorPath",
+          "usr": "s:s10MirrorPathP"
         },
         {
           "kind": "Conformance",
@@ -1583,7 +1584,7 @@
           "kind": "Conformance",
           "name": "CVarArg",
           "printedName": "CVarArg",
-          "usr": "s:s10SIMDScalarP"
+          "usr": "s:s7CVarArgP"
         }
       ]
     }

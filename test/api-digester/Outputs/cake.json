@@ -1363,7 +1363,8 @@
         {
           "kind": "Conformance",
           "name": "MirrorPath",
-          "printedName": "MirrorPath"
+          "printedName": "MirrorPath",
+          "usr": "s:s10MirrorPathP"
         },
         {
           "kind": "Conformance",
