@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -o /dev/null %s
+// RUN: %target-swift-frontend -disable-availability-checking -emit-ir -o /dev/null %s
 
 protocol P {
   associatedtype AT

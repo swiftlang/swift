@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t) 
-// RUN: %target-build-swift -module-name=test %s -o %t/a.out
+// RUN: %target-build-swift -Xfrontend -disable-availability-checking -module-name=test %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: CPU=arm64 || CPU=x86_64
 
-// Check that the IRGenMangler does not crashq when mangling a conformance
+// Check that the IRGenMangler does not crash when mangling a conformance
 // access path with an opaque result type as root.
 // As a bonus, also do a runtime test to check that there is no miscompile.
 
