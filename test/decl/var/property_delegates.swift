@@ -690,3 +690,22 @@ struct UsesExplicitClosures {
   @WrapperAcceptingAutoclosure(body: { return 42 })
   var y: Int
 }
+
+// ---------------------------------------------------------------------------
+// Miscellaneous bugs
+// ---------------------------------------------------------------------------
+
+// rdar://problem/50822051 - compiler assertion / hang
+@_propertyDelegate
+struct PD<Value> {
+  var value: Value
+
+  init<A>(initialValue: Value, a: A) { // expected-note{{'init(initialValue:a:)' declared here}}
+    self.value = initialValue
+  }
+}
+
+struct TestPD {
+  @PD(a: "foo") var foo: Int = 42 // expected-error{{property 'foo' with attached delegate cannot initialize both the delegate type and the property}}
+  // expected-error@-1{{missing argument for parameter 'initialValue' in call}}
+}
