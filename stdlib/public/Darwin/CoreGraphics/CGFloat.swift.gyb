@@ -589,10 +589,18 @@ BinaryFunctions = [
 }%
 
 %for ufunc in UnaryFunctions:
+% if ufunc in ['rint','nearbyint']:
+@available(swift, deprecated: 5.1, message: "Swift does not model dynamic rounding modes, use x.rounded(.toNearestOrEven) instead.")
+@_transparent
+public func ${ufunc}(_ x: CGFloat) -> CGFloat {
+  return x.rounded(.toNearestOrEven)
+}
+% else:
 @_transparent
 public func ${ufunc}(_ x: CGFloat) -> CGFloat {
   return CGFloat(${ufunc}(x.native))
 }
+% end
 
 %end
 
