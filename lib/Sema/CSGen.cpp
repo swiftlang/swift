@@ -641,6 +641,7 @@ namespace {
         continue;
 
       if (!decl->getAttrs().isUnavailable(CS.getASTContext()) &&
+          !decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>() &&
           isFavored(decl, overloadType)) {
         // If we might need to roll back the favored constraints, keep
         // track of those we are favoring.
