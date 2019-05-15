@@ -3166,13 +3166,16 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
     auto eltName = repr->getElementName(i);
 
+    elements.emplace_back(ty, eltName, ParameterTypeFlags());
+
+    if (eltName.empty())
+      continue;
+
     if (seenEltNames.count(eltName) == 1) {
       foundDupLabel = true;
     }
 
     seenEltNames.insert(eltName);
-
-    elements.emplace_back(ty, eltName, ParameterTypeFlags());
   }
 
   if (hadError)

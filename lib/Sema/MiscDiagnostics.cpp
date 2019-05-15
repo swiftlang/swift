@@ -277,6 +277,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         names.reserve(tupleExpr->getNumElements());
 
         for (auto name : tupleExpr->getElementNames()) {
+          if (name.empty())
+            continue;
+
           if (names.count(name) == 1) {
             diagnose = true;
             break;
