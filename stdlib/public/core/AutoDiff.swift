@@ -69,10 +69,7 @@ public protocol __Differentiable {
   /// The cotangent bundle of this differentiable manifold.
   associatedtype CotangentVector : AdditiveArithmetic
   /// The type of all differentiable variables in this type.
-  associatedtype AllDifferentiableVariables : Differentiable
-
-  /// All differentiable variables of this value.
-  var allDifferentiableVariables: AllDifferentiableVariables { get set }
+  typealias AllDifferentiableVariables = Self
 
   /// Returns `self` moved along the value space towards the given tangent
   /// vector. In Riemannian geometry (mathematics), this represents an
@@ -103,18 +100,15 @@ public protocol Differentiable : _Differentiable
   where TangentVector.TangentVector == TangentVector,
         TangentVector.CotangentVector == CotangentVector,
         CotangentVector.TangentVector == CotangentVector,
-        CotangentVector.CotangentVector == TangentVector,
-        AllDifferentiableVariables.AllDifferentiableVariables ==
-          AllDifferentiableVariables,
-        AllDifferentiableVariables.TangentVector == TangentVector,
-        AllDifferentiableVariables.CotangentVector == CotangentVector {
+        CotangentVector.CotangentVector == TangentVector {
 }
 // END DIFFERENTIABLE
 
-public extension Differentiable where AllDifferentiableVariables == Self {
+public extension Differentiable {
+  @available(*, deprecated, message: "'allDifferentiableVariables' will be replaced by 'self'")
   var allDifferentiableVariables: AllDifferentiableVariables {
-    get { return self }
-    set { self = newValue }
+    _read { yield self }
+    _modify { yield &self }
   }
 }
 
@@ -496,6 +490,30 @@ public func gradient<T, U, V, R>(
 }
 
 //===----------------------------------------------------------------------===//
+// `NoDerivative` attribute for properties
+//===----------------------------------------------------------------------===//
+
+@_propertyDelegate
+public struct NoDerivative<Value> {
+  public var value: Value
+
+  public init(_ value: Value) {
+    self.value = value
+  }
+}
+
+extension NoDerivative : Differentiable {
+  public struct TangentVector: AdditiveArithmetic, Differentiable {}
+  public typealias CotangentVector = TangentVector
+  public func moved(along direction: TangentVector) -> NoDerivative {
+    self
+  }
+  public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
+    cotangent
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Type-erased `AnyDerivative`
 //===----------------------------------------------------------------------===//
 
@@ -511,7 +529,6 @@ internal protocol _AnyDerivativeBox {
   func _subtracting(_ x: _AnyDerivativeBox) -> _AnyDerivativeBox
 
   // `Differentiable` requirements.
-  var _allDifferentiableVariables: _AnyDerivativeBox { get }
   func _moved(along direction: _AnyDerivativeBox) -> _AnyDerivativeBox
   func _tangentVector(from cotangent: _AnyDerivativeBox) -> _AnyDerivativeBox
 
@@ -520,11 +537,7 @@ internal protocol _AnyDerivativeBox {
 
   /// Returns the underlying value unboxed to the given type, if possible.
   func _unboxed<U>(to type: U.Type) -> U?
-    where U : Differentiable, U.TangentVector == U,
-          U.AllDifferentiableVariables == U,
-          // NOTE: The requirement below should be defined on `Differentiable`.
-          // But it causes a crash due to generic signature minimization bug.
-          U.CotangentVector == U.CotangentVector.AllDifferentiableVariables
+    where U : Differentiable, U.TangentVector == U
 }
 
 extension _AnyDerivativeBox {
@@ -546,11 +559,7 @@ internal func _derivativeTypeMismatch(
 }
 
 internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
-  where T : Differentiable, T.TangentVector == T,
-        T.AllDifferentiableVariables == T,
-        // NOTE: The requirement below should be defined on `Differentiable`.
-        // But it causes a crash due to generic signature minimization bug.
-        T.CotangentVector == T.CotangentVector.AllDifferentiableVariables
+  where T : Differentiable, T.TangentVector == T
 {
   /// The underlying base value.
   var _base: T
@@ -565,12 +574,7 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
   }
 
   func _unboxed<U>(to type: U.Type) -> U?
-    where U : Differentiable, U.TangentVector == U,
-          U.AllDifferentiableVariables == U,
-          // NOTE: The requirement below should be defined on `Differentiable`.
-          // But it causes a crash due to generic signature minimization bug.
-          U.CotangentVector == U.CotangentVector.AllDifferentiableVariables
-  {
+    where U : Differentiable, U.TangentVector == U {
     return (self as? _ConcreteDerivativeBox<U>)?._base
   }
 
@@ -626,10 +630,6 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
 
   // `Differentiable` requirements.
 
-  var _allDifferentiableVariables: _AnyDerivativeBox {
-    return _ConcreteDerivativeBox(_base.allDifferentiableVariables)
-  }
-
   func _moved(along direction: _AnyDerivativeBox) -> _AnyDerivativeBox {
     if _isOpaqueZero() {
       return direction
@@ -680,11 +680,7 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
   /// Creates a type-erased derivative from the given derivative.
   @differentiable(vjp: _vjpInit(_:))
   public init<T>(_ base: T)
-    where T : Differentiable, T.TangentVector == T,
-          T.AllDifferentiableVariables == T,
-          // NOTE: The requirement below should be defined on `Differentiable`.
-          // But it causes a crash due to generic signature minimization bug.
-          T.CotangentVector == T.CotangentVector.AllDifferentiableVariables
+    where T : Differentiable, T.TangentVector == T
   {
     self._box = _ConcreteDerivativeBox<T>(base)
   }
@@ -692,18 +688,13 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
   @usableFromInline internal static func _vjpInit<T>(
     _ base: T
   ) -> (AnyDerivative, (AnyDerivative) -> T.CotangentVector)
-    where T : Differentiable, T.TangentVector == T,
-          T.AllDifferentiableVariables == T,
-          // NOTE: The requirement below should be defined on `Differentiable`.
-          // But it causes a crash due to generic signature minimization bug.
-          T.CotangentVector == T.CotangentVector.AllDifferentiableVariables
+    where T : Differentiable, T.TangentVector == T
   {
     return (AnyDerivative(base), { v in v.base as! T.CotangentVector })
   }
 
   public typealias TangentVector = AnyDerivative
   public typealias CotangentVector = AnyDerivative
-  public typealias AllDifferentiableVariables = AnyDerivative
 
   // `Equatable` requirements (implied by `AdditiveArithmetic`).
   public static func == (lhs: AnyDerivative, rhs: AnyDerivative) -> Bool {
@@ -753,11 +744,6 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
     return (lhs - rhs, { v in (v, .zero - v) })
   }
 
-  // `Differentiable` requirements.
-  public var allDifferentiableVariables: AllDifferentiableVariables {
-    get { return AnyDerivative(_box: _box._allDifferentiableVariables) }
-    // set { _box._allDifferentiableVariables = newValue._box }
-  }
   public func moved(along direction: TangentVector) -> AnyDerivative {
     return AnyDerivative(_box: _box._moved(along: direction._box))
   }
