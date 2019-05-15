@@ -107,6 +107,13 @@ func foo(block: () -> (), other: () -> Int) {
   takesAny(other) // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
 }
 
+struct S {
+  init<T>(_ x: T, _ y: T) {} // expected-note {{generic parameters are always considered '@escaping'}}
+  init(fn: () -> Int) {
+    self.init({ 0 }, fn) // expected-error {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
+  }
+}
+
 protocol P {
   associatedtype U
 }
