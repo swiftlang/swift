@@ -781,6 +781,7 @@ extension SIMD where Scalar: FixedWidthInteger {
 //  be replaced with @_semantics to lower directly to vector IR nodes.
 extension SIMD where Scalar: FloatingPoint {
   @_transparent
+  @differentiable(vjp: _vjpAdd(lhs:rhs:) where Self: Differentiable, Self.CotangentVector == Self)
   public static func +(lhs: Self, rhs: Self) -> Self {
     var result = Self()
     for i in result.indices { result[i] = lhs[i] + rhs[i] }
@@ -1162,6 +1163,11 @@ extension SIMD where Scalar: FloatingPoint {
   }
   
   @_transparent
+  @differentiable(vjp: _vjpAdd(lhs:rhs:)
+    where Scalar: Differentiable & FixedWidthInteger,
+    Self: Differentiable,
+    Self.CotangentVector == Self,
+    Scalar.CotangentVector == Scalar)
   public static func +(lhs: Scalar, rhs: Self) -> Self {
     return Self(repeating: lhs) + rhs
   }
@@ -1391,4 +1397,33 @@ where T: SIMD, T.Scalar: FloatingPoint {
     result[i] = T.Scalar.maximum(a[i], b[i])
   }
   return result
+}
+
+extension SIMD
+  where Self: Differentiable,
+  Scalar : FloatingPoint,
+  CotangentVector == Self {
+  @inlinable
+  static func _vjpAdd(
+    lhs: Self, rhs: Self
+    ) -> (Self, (Self) -> (Self, Self)) {
+    return (lhs + rhs, { v in
+      return (v, v)
+    })
+  }
+}
+
+extension SIMD
+  where Self: Differentiable,
+  Scalar : FloatingPoint & Differentiable & FixedWidthInteger,
+  Self.CotangentVector == Self,
+  Scalar.CotangentVector == Scalar {
+  @inlinable
+  static func _vjpAdd(
+    lhs: Scalar, rhs: Self
+    ) -> (Self, (Self) -> (Scalar, Self)) {
+    return (lhs + rhs, { v in
+      return (v.wrappedSum(), v)
+    })
+  }
 }
