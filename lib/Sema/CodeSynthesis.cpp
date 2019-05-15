@@ -441,42 +441,24 @@ createModifyCoroutinePrototype(AbstractStorageDecl *storage,
 /// Build an expression that evaluates the specified parameter list as a tuple
 /// or paren expr, suitable for use in an apply expr.
 static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
-                                         ASTContext &ctx,
-                                         bool typeChecked) {
+                                         ASTContext &ctx) {
   SmallVector<Identifier, 4> labels;
   SmallVector<SourceLoc, 4> labelLocs;
   SmallVector<Expr *, 4> args;
   SmallVector<AnyFunctionType::Param, 4> elts;
 
   for (auto param : params) {
-    auto type = (typeChecked ? param->getType() : Type());
-
-    if (typeChecked)
-      elts.push_back(param->toFunctionParam(type));
+    auto type = param->getType();
+    elts.push_back(param->toFunctionParam(type));
 
     Expr *ref = new (ctx) DeclRefExpr(param, DeclNameLoc(), /*implicit*/ true);
-
-    if (typeChecked)
-      ref->setType(param->isInOut() ? LValueType::get(type) : type);
+    ref->setType(param->isInOut() ? LValueType::get(type) : type);
 
     if (param->isInOut()) {
-      ref = new (ctx) InOutExpr(SourceLoc(), ref, Type(), /*isImplicit=*/true);
-      if (typeChecked)
-        ref->setType(InOutType::get(type));
+      ref = new (ctx) InOutExpr(SourceLoc(), ref, type, /*isImplicit=*/true);
     } else if (param->isVariadic()) {
       ref = new (ctx) VarargExpansionExpr(ref, /*implicit*/ true);
-      if (typeChecked)
-        ref->setType(type);
-    } else if (param->isAutoClosure()) {
-      if (!typeChecked) {
-        // If parameter is marked as `@autoclosure` it means
-        // that it has to be called.
-        auto arg = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
-                                          /*implicit=*/true);
-        ref = CallExpr::create(ctx, ref, arg, {}, {},
-                              /*hasTrailingClosure=*/false,
-                              /*implicit=*/true);
-      }
+      ref->setType(type);
     }
 
     args.push_back(ref);
@@ -497,10 +479,8 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
                                 SourceLoc(), false, IsImplicit);
   }
 
-  if (typeChecked) {
-    auto argTy = AnyFunctionType::composeInput(ctx, elts, /*canonical*/false);
-    argExpr->setType(argTy);
-  }
+  auto argTy = AnyFunctionType::composeInput(ctx, elts, /*canonical*/false);
+  argExpr->setType(argTy);
 
   return argExpr;
 }
@@ -509,8 +489,7 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
 /// Build a reference to the subscript index variables for this subscript
 /// accessor.
 static Expr *buildSubscriptIndexReference(ASTContext &ctx,
-                                          AccessorDecl *accessor,
-                                          bool typeChecked) {
+                                          AccessorDecl *accessor) {
   // Pull out the body parameters, which we should have cloned
   // previously to be forwardable.  Drop the initial buffer/value
   // parameter in accessors that have one.
@@ -523,7 +502,7 @@ static Expr *buildSubscriptIndexReference(ASTContext &ctx,
   }
 
   // Okay, everything else should be forwarded, build the expression.
-  return buildArgumentForwardingExpr(params, ctx, typeChecked);
+  return buildArgumentForwardingExpr(params, ctx);
 }
 
 enum class SelfAccessorKind {
@@ -540,23 +519,19 @@ enum class SelfAccessorKind {
 static Expr *buildSelfReference(VarDecl *selfDecl,
                                 SelfAccessorKind selfAccessorKind,
                                 bool isLValue,
-                                ASTContext &ctx,
-                                bool typeChecked) {
+                                ASTContext &ctx) {
   switch (selfAccessorKind) {
   case SelfAccessorKind::Peer:
     return new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(), IsImplicit,
                                  AccessSemantics::Ordinary,
-                                 typeChecked ?
-                                 (isLValue
+                                 isLValue
                                   ? LValueType::get(selfDecl->getType())
-                                  : selfDecl->getType()) : Type());
+                                  : selfDecl->getType());
 
   case SelfAccessorKind::Super:
     assert(!isLValue);
     return new (ctx) SuperRefExpr(selfDecl, SourceLoc(), IsImplicit,
-                                  typeChecked
-                                  ? selfDecl->getType()->getSuperclass()
-                                  : Type());
+                                  selfDecl->getType()->getSuperclass());
   }
   llvm_unreachable("bad self access kind");
 }
@@ -586,8 +561,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
                                    AbstractStorageDecl *storage,
                                    TargetImpl target,
                                    bool isLValue,
-                                   ASTContext &ctx,
-                                   bool typeChecked) {
+                                   ASTContext &ctx) {
   // Local function to "finish" the expression, creating a member reference
   // to the underlying variable if there is one.
   VarDecl *underlyingVar = nullptr;
@@ -595,25 +569,20 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     if (!underlyingVar)
       return result;
 
-    SubstitutionMap subs;
-    if (typeChecked) {
-      subs = result->getType()
+    auto subs = result->getType()
         ->getWithoutSpecifierType()
         ->getContextSubstitutionMap(
           accessor->getParentModule(),
           underlyingVar->getDeclContext());
-    }
 
     ConcreteDeclRef memberRef(underlyingVar, subs);
     auto *memberRefExpr = new (ctx) MemberRefExpr(
         result, SourceLoc(), memberRef, DeclNameLoc(), /*Implicit=*/true);
-    if (typeChecked) {
-      auto type = underlyingVar->getValueInterfaceType()
-          .subst(subs, SubstFlags::UseErrorType);
-      if (isLValue)
-        type = LValueType::get(type);
-      memberRefExpr->setType(type);
-    }
+    auto type = underlyingVar->getValueInterfaceType()
+        .subst(subs, SubstFlags::UseErrorType);
+    if (isLValue)
+      type = LValueType::get(type);
+    memberRefExpr->setType(type);
 
     return memberRefExpr;
   };
@@ -626,7 +595,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
 
   auto *genericEnv = accessor->getGenericEnvironment();
   SubstitutionMap subs;
-  if (genericEnv && typeChecked)
+  if (genericEnv)
     subs = genericEnv->getForwardingSubstitutionMap();
 
   switch (target) {
@@ -651,14 +620,12 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
       semantics = AccessSemantics::Ordinary;
       selfAccessKind = SelfAccessorKind::Super;
 
-      if (typeChecked) {
-        auto *baseClass = override->getDeclContext()->getSelfClassDecl();
-        selfTypeForAccess = selfTypeForAccess->getSuperclassForDecl(baseClass);
-        subs =
-          selfTypeForAccess->getContextSubstitutionMap(
-            accessor->getParentModule(),
-            baseClass);
-      }
+      auto *baseClass = override->getDeclContext()->getSelfClassDecl();
+      selfTypeForAccess = selfTypeForAccess->getSuperclassForDecl(baseClass);
+      subs =
+        selfTypeForAccess->getContextSubstitutionMap(
+          accessor->getParentModule(),
+          baseClass);
 
       storage = override;
 
@@ -696,54 +663,45 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     assert(target != TargetImpl::Super);
     auto *storageDRE = new (ctx) DeclRefExpr(storage, DeclNameLoc(),
                                              IsImplicit, semantics);
-    if (typeChecked) {
-      auto type = storage->getValueInterfaceType()
-          .subst(subs, SubstFlags::UseErrorType);
-      if (isLValue)
-        type = LValueType::get(type);
-      storageDRE->setType(type);
-    }
+    auto type = storage->getValueInterfaceType()
+        .subst(subs, SubstFlags::UseErrorType);
+    if (isLValue)
+      type = LValueType::get(type);
+    storageDRE->setType(type);
+
     return finish(storageDRE);
   }
 
-  bool isMemberLValue = false;
-  if (typeChecked) {
-    // If we're acessing a property delegate, determine if the
-    // intermediate access requires an lvalue.
-    if (underlyingVar) {
-      isMemberLValue = underlyingVar->isGetterMutating();
-      if (isLValue)
-        isMemberLValue |= underlyingVar->isSetterMutating();
-    } else {
-      isMemberLValue = isLValue;
-    }
+  bool isMemberLValue = isLValue;
+
+  // If we're acessing a property delegate, determine if the
+  // intermediate access requires an lvalue.
+  if (underlyingVar) {
+    isMemberLValue = underlyingVar->isGetterMutating();
+    if (isLValue)
+      isMemberLValue |= underlyingVar->isSetterMutating();
   }
 
-  bool isSelfLValue = false;
-  if (typeChecked) {
-    isSelfLValue = storage->isGetterMutating();
-    if (isMemberLValue)
-      isSelfLValue |= storage->isSetterMutating();
-  }
+  bool isSelfLValue = storage->isGetterMutating();
+  if (isMemberLValue)
+    isSelfLValue |= storage->isSetterMutating();
 
   Expr *selfDRE =
     buildSelfReference(selfDecl, selfAccessKind, isSelfLValue,
-                       ctx, typeChecked);
-  if (typeChecked) {
-    if (isSelfLValue)
-      selfTypeForAccess = LValueType::get(selfTypeForAccess);
+                       ctx);
+  if (isSelfLValue)
+    selfTypeForAccess = LValueType::get(selfTypeForAccess);
 
-    if (!selfDRE->getType()->isEqual(selfTypeForAccess)) {
-      assert(selfAccessKind == SelfAccessorKind::Super);
-      selfDRE = new (ctx) DerivedToBaseExpr(selfDRE, selfTypeForAccess);
-    }
+  if (!selfDRE->getType()->isEqual(selfTypeForAccess)) {
+    assert(selfAccessKind == SelfAccessorKind::Super);
+    selfDRE = new (ctx) DerivedToBaseExpr(selfDRE, selfTypeForAccess);
   }
 
   LookupExpr *lookupExpr;
   ConcreteDeclRef memberRef(storage, subs);
 
   if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
-    Expr *indices = buildSubscriptIndexReference(ctx, accessor, typeChecked);
+    Expr *indices = buildSubscriptIndexReference(ctx, accessor);
     lookupExpr = SubscriptExpr::create(ctx, selfDRE, indices, memberRef,
                                        IsImplicit, semantics);
   } else {
@@ -751,16 +709,14 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
                                          DeclNameLoc(), IsImplicit, semantics);
   }
 
-  if (typeChecked) {
-    if (selfAccessKind == SelfAccessorKind::Super)
-      lookupExpr->setIsSuper(true);
+  if (selfAccessKind == SelfAccessorKind::Super)
+    lookupExpr->setIsSuper(true);
 
-    auto type = storage->getValueInterfaceType()
-        .subst(subs, SubstFlags::UseErrorType);
-    if (isMemberLValue)
-      type = LValueType::get(type);
-    lookupExpr->setType(type);
-  }
+  auto type = storage->getValueInterfaceType()
+      .subst(subs, SubstFlags::UseErrorType);
+  if (isMemberLValue)
+    type = LValueType::get(type);
+  lookupExpr->setType(type);
 
   return finish(lookupExpr);
 }
@@ -771,10 +727,9 @@ static Expr *
 createPropertyLoadOrCallSuperclassGetter(AccessorDecl *accessor,
                                          AbstractStorageDecl *storage,
                                          TargetImpl target,
-                                         ASTContext &ctx,
-                                         bool typeChecked) {
+                                         ASTContext &ctx) {
   return buildStorageReference(accessor, storage, target, /*isLValue=*/false,
-                               ctx, typeChecked);
+                               ctx);
 }
 
 /// Look up the NSCopying protocol from the Foundation module, if present.
@@ -833,8 +788,7 @@ TypeChecker::checkConformanceToNSCopying(VarDecl *var) {
 /// just need to generate something like "self.property = val.copy(zone: nil)"
 /// here.  This does some type checking to validate that the call will succeed.
 static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
-                                        ASTContext &Ctx,
-                                        bool typeChecked) {
+                                        ASTContext &Ctx) {
   // We support @NSCopying on class types (which conform to NSCopying),
   // protocols which conform, and option types thereof.
   auto underlyingTypeAndIsOptional = getUnderlyingTypeOfVariable(VD);
@@ -864,8 +818,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   // evaluate the subexpression if the incoming value is non-null.
   if (isOptional) {
     Val = new (Ctx) BindOptionalExpr(Val, SourceLoc(), 0);
-    if (typeChecked)
-      Val->setType(underlyingType);
+    Val->setType(underlyingType);
   }
 
   SubstitutionMap subs =
@@ -877,24 +830,20 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
                            ->castTo<GenericFunctionType>()
                            ->substGenericArgs(subs);
   auto DRE = new (Ctx) DeclRefExpr(copyMethodRef, DeclNameLoc(), IsImplicit);
-  if (typeChecked)
-    DRE->setType(copyMethodType);
+  DRE->setType(copyMethodType);
 
   // Drop the self type
   copyMethodType = copyMethodType->getResult()->castTo<FunctionType>();
 
   auto DSCE = new (Ctx) DotSyntaxCallExpr(DRE, SourceLoc(), Val);
   DSCE->setImplicit();
-  if (typeChecked)
-    DSCE->setType(copyMethodType);
+  DSCE->setType(copyMethodType);
 
   Expr *Nil = new (Ctx) NilLiteralExpr(SourceLoc(), /*implicit*/true);
-  if (typeChecked)
-    Nil->setType(copyMethodType->getParams()[0].getParameterType());
+  Nil->setType(copyMethodType->getParams()[0].getParameterType());
 
   Expr *Call = CallExpr::createImplicit(Ctx, DSCE, { Nil }, { Ctx.Id_with });
-  if (typeChecked)
-    Call->setType(copyMethodType->getResult());
+  Call->setType(copyMethodType->getResult());
 
   TypeLoc ResultTy;
   ResultTy.setType(VD->getType());
@@ -904,11 +853,9 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
     auto *Cast =
       new (Ctx) ForcedCheckedCastExpr(Call, SourceLoc(), SourceLoc(),
                                       TypeLoc::withoutLoc(underlyingType));
+    Cast->setCastKind(CheckedCastKind::ValueCast);
+    Cast->setType(underlyingType);
     Cast->setImplicit();
-    if (typeChecked) {
-      Cast->setCastKind(CheckedCastKind::ValueCast);
-      Cast->setType(underlyingType);
-    }
 
     return Cast;
   }
@@ -918,17 +865,13 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   auto *Cast =
     new (Ctx) ConditionalCheckedCastExpr(Call, SourceLoc(), SourceLoc(),
                                          TypeLoc::withoutLoc(underlyingType));
-  if (typeChecked) {
-    Cast->setCastKind(CheckedCastKind::ValueCast);
-    Cast->setType(OptionalType::get(underlyingType));
-  }
-
+  Cast->setCastKind(CheckedCastKind::ValueCast);
+  Cast->setType(OptionalType::get(underlyingType));
   Cast->setImplicit();
 
   // Use OptionalEvaluationExpr to evaluate the "?".
   auto *Result = new (Ctx) OptionalEvaluationExpr(Cast);
-  if (typeChecked)
-    Result->setType(OptionalType::get(underlyingType));
+  Result->setType(OptionalType::get(underlyingType));
 
   return Result;
 }
@@ -943,33 +886,28 @@ void createPropertyStoreOrCallSuperclassSetter(AccessorDecl *accessor,
                                                AbstractStorageDecl *storage,
                                                TargetImpl target,
                                                SmallVectorImpl<ASTNode> &body,
-                                               ASTContext &ctx,
-                                               bool typeChecked) {
+                                               ASTContext &ctx) {
   // If the storage is an @NSCopying property, then we store the
   // result of a copyWithZone call on the value, not the value itself.
   if (auto property = dyn_cast<VarDecl>(storage)) {
     if (property->getAttrs().hasAttribute<NSCopyingAttr>())
-      value = synthesizeCopyWithZoneCall(value, property, ctx, typeChecked);
+      value = synthesizeCopyWithZoneCall(value, property, ctx);
   }
 
   Expr *dest = buildStorageReference(accessor, storage, target,
-                                     /*isLValue=*/true,
-                                     ctx, typeChecked);
+                                     /*isLValue=*/true, ctx);
 
   // A lazy property setter will store a value of type T into underlying storage
   // of type T?.
-  if (typeChecked) {
-    auto destType = dest->getType()->getWithoutSpecifierType();
-    if (!destType->isEqual(value->getType())) {
-      assert(destType->getOptionalObjectType()->isEqual(value->getType()));
-      value = new (ctx) InjectIntoOptionalExpr(value, destType);
-    }
+  auto destType = dest->getType()->getWithoutSpecifierType();
+  if (!destType->isEqual(value->getType())) {
+    assert(destType->getOptionalObjectType()->isEqual(value->getType()));
+    value = new (ctx) InjectIntoOptionalExpr(value, destType);
   }
 
   auto *assign = new (ctx) AssignExpr(dest, SourceLoc(), value,
                                       IsImplicit);
-  if (typeChecked)
-    assign->setType(ctx.TheEmptyTupleType);
+  assign->setType(ctx.TheEmptyTupleType);
 
   body.push_back(assign);
 }
@@ -997,7 +935,7 @@ static void synthesizeTrivialGetterBody(AccessorDecl *getter,
   SourceLoc loc = storage->getLoc();
 
   Expr *result =
-    createPropertyLoadOrCallSuperclassGetter(getter, storage, target, ctx, true);
+    createPropertyLoadOrCallSuperclassGetter(getter, storage, target, ctx);
   ASTNode returnStmt = new (ctx) ReturnStmt(SourceLoc(), result, IsImplicit);
 
   getter->setBody(BraceStmt::create(ctx, loc, returnStmt, loc, true));
@@ -1054,24 +992,21 @@ static void
 synthesizeTrivialSetterBodyWithStorage(AccessorDecl *setter,
                                        TargetImpl target,
                                        AbstractStorageDecl *storageToUse,
-                                       ASTContext &ctx,
-                                       bool typeChecked) {
+                                       ASTContext &ctx) {
   SourceLoc loc = setter->getStorage()->getLoc();
 
   VarDecl *valueParamDecl = getFirstParamDecl(setter);
 
   auto *valueDRE =
     new (ctx) DeclRefExpr(valueParamDecl, DeclNameLoc(), IsImplicit);
-  if (typeChecked)
-    valueDRE->setType(valueParamDecl->getType());
+  valueDRE->setType(valueParamDecl->getType());
 
   SmallVector<ASTNode, 1> setterBody;
 
   createPropertyStoreOrCallSuperclassSetter(setter, valueDRE, storageToUse,
-                                            target, setterBody, ctx, typeChecked);
+                                            target, setterBody, ctx);
   setter->setBody(BraceStmt::create(ctx, loc, setterBody, loc, true));
-  if (typeChecked)
-    setter->setBodyTypeCheckedIfPresent();
+  setter->setBodyTypeCheckedIfPresent();
 
   maybeMarkTransparent(setter, ctx);
 }
@@ -1082,7 +1017,7 @@ static void synthesizeTrivialSetterBody(AccessorDecl *setter,
   assert(!isSynthesizedComputedProperty(storage));
 
   synthesizeTrivialSetterBodyWithStorage(setter, TargetImpl::Storage,
-                                         storage, ctx, true);
+                                         storage, ctx);
 }
 
 /// Synthesize the body of a setter for a property delegate, which
@@ -1090,13 +1025,20 @@ static void synthesizeTrivialSetterBody(AccessorDecl *setter,
 static void synthesizePropertyDelegateSetterBody(AccessorDecl *setter,
                                                  ASTContext &ctx) {
   synthesizeTrivialSetterBodyWithStorage(setter, TargetImpl::Delegate,
-                                         setter->getStorage(), ctx,
-                                         true);
+                                         setter->getStorage(), ctx);
+}
+
+static Expr *maybeWrapInOutExpr(Expr *expr, ASTContext &ctx) {
+  if (auto lvalueType = expr->getType()->getAs<LValueType>()) {
+    auto type = lvalueType->getObjectType();
+    return new (ctx) InOutExpr(SourceLoc(), expr, type, true);
+  }
+
+  return expr;
 }
 
 static void synthesizeCoroutineAccessorBody(AccessorDecl *accessor,
-                                            ASTContext &ctx,
-                                            bool typeChecked) {
+                                            ASTContext &ctx) {
   assert(accessor->isCoroutine());
 
   auto storage = accessor->getStorage();
@@ -1110,26 +1052,17 @@ static void synthesizeCoroutineAccessorBody(AccessorDecl *accessor,
   bool isLValue = accessor->getAccessorKind() == AccessorKind::Modify;
 
   // Build a reference to the storage.
-  Expr *ref = buildStorageReference(accessor, storage, target, isLValue,
-                                    ctx, typeChecked);
+  Expr *ref = buildStorageReference(accessor, storage, target, isLValue, ctx);
 
   // Wrap it with an `&` marker if this is a modify.
-  if (isLValue) {
-    auto *inoutRef = new (ctx) InOutExpr(SourceLoc(), ref, Type(), true);
-    if (typeChecked) {
-      auto type = ref->getType()->getWithoutSpecifierType();
-      inoutRef->setType(InOutType::get(type));
-    }
-    ref = inoutRef;
-  }
+  ref = maybeWrapInOutExpr(ref, ctx);
 
   // Yield it.
   YieldStmt *yield = YieldStmt::create(ctx, loc, loc, ref, loc, true);
   body.push_back(yield);
 
   accessor->setBody(BraceStmt::create(ctx, loc, body, loc, true));
-  if (typeChecked)
-    accessor->setBodyTypeCheckedIfPresent();
+  accessor->setBodyTypeCheckedIfPresent();
 
   maybeMarkTransparent(accessor, ctx);
 }
@@ -1138,7 +1071,7 @@ static void synthesizeCoroutineAccessorBody(AccessorDecl *accessor,
 static void synthesizeReadCoroutineBody(AccessorDecl *read,
                                         ASTContext &ctx) {
   assert(read->getStorage()->getReadImpl() != ReadImplKind::Read);
-  synthesizeCoroutineAccessorBody(read, ctx, true);
+  synthesizeCoroutineAccessorBody(read, ctx);
 }
 
 /// Synthesize the body of a modify coroutine.
@@ -1149,7 +1082,7 @@ static void synthesizeModifyCoroutineBody(AccessorDecl *modify,
   assert(impl != ReadWriteImplKind::Modify &&
          impl != ReadWriteImplKind::Immutable);
 #endif
-  synthesizeCoroutineAccessorBody(modify, ctx, true);
+  synthesizeCoroutineAccessorBody(modify, ctx);
 }
 
 static void addGetterToStorage(AbstractStorageDecl *storage,
@@ -1257,7 +1190,7 @@ static void synthesizeMutableAddressSetterBody(AccessorDecl *setter,
                                                ASTContext &ctx) {
   // This should call the mutable addressor.
   synthesizeTrivialSetterBodyWithStorage(setter, TargetImpl::Implementation,
-                                         setter->getStorage(), ctx, true);
+                                         setter->getStorage(), ctx);
 }
 
 /// Synthesize the body of a setter which just delegates to a modify
@@ -1266,7 +1199,7 @@ static void synthesizeModifyCoroutineSetterBody(AccessorDecl *setter,
                                                 ASTContext &ctx) {
   // This should call the modify coroutine.
   synthesizeTrivialSetterBodyWithStorage(setter, TargetImpl::Implementation,
-                                         setter->getStorage(), ctx, true);
+                                         setter->getStorage(), ctx);
 }
 
 static void convertNSManagedStoredVarToComputed(VarDecl *VD, ASTContext &ctx) {
@@ -1348,17 +1281,48 @@ static void synthesizeObservedSetterBody(AccessorDecl *Set,
 
   SourceLoc Loc = VD->getLoc();
 
-  // We have to be paranoid about the accessors already having bodies
-  // because there might be an (invalid) existing definition.
-  
-  // Okay, the getter is done, create the setter now.  Start by finding the
-  // decls for 'self' and 'value'.
+  // Start by finding the decls for 'self' and 'value'.
   auto *SelfDecl = Set->getImplicitSelfDecl();
   VarDecl *ValueDecl = Set->getParameters()->get(0);
+
+  bool IsSelfLValue = VD->isSetterMutating();
+
+  SubstitutionMap subs;
+  if (auto *genericEnv = Set->getGenericEnvironment())
+    subs = genericEnv->getForwardingSubstitutionMap();
 
   // The setter loads the oldValue, invokes willSet with the incoming value,
   // does a direct store, then invokes didSet with the oldValue.
   SmallVector<ASTNode, 6> SetterBody;
+
+  auto callObserver = [&](AccessorDecl *observer, VarDecl *arg) {
+    ConcreteDeclRef ref(observer, subs);
+    auto type = observer->getInterfaceType()
+                  .subst(subs, SubstFlags::UseErrorType);
+    Expr *Callee = new (Ctx) DeclRefExpr(ref, DeclNameLoc(), /*imp*/true);
+    Callee->setType(type);
+    auto *ValueDRE = new (Ctx) DeclRefExpr(arg, DeclNameLoc(), /*imp*/true);
+    ValueDRE->setType(arg->getType());
+
+    if (SelfDecl) {
+      auto *SelfDRE = buildSelfReference(SelfDecl, SelfAccessorKind::Peer,
+                                         IsSelfLValue, Ctx);
+      SelfDRE = maybeWrapInOutExpr(SelfDRE, Ctx);
+      Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
+
+      if (auto funcType = type->getAs<FunctionType>())
+        type = funcType->getResult();
+      Callee->setType(type);
+    }
+
+    auto *Call = CallExpr::createImplicit(Ctx, Callee, { ValueDRE },
+                                          { Identifier() });
+    if (auto funcType = type->getAs<FunctionType>())
+      type = funcType->getResult();
+    Call->setType(type);
+
+    SetterBody.push_back(Call);
+  };
 
   // If there is a didSet, it will take the old value.  Load it into a temporary
   // 'let' so we have it for later.
@@ -1367,12 +1331,14 @@ static void synthesizeObservedSetterBody(AccessorDecl *Set,
   VarDecl *OldValue = nullptr;
   if (VD->getDidSetFunc()) {
     Expr *OldValueExpr
-      = createPropertyLoadOrCallSuperclassGetter(Set, VD, target, Ctx, false);
+      = buildStorageReference(Set, VD, target, /*isLValue=*/true, Ctx);
+    OldValueExpr = new (Ctx) LoadExpr(OldValueExpr, VD->getType());
 
     OldValue = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
                                  /*IsCaptureList*/false, SourceLoc(),
                                  Ctx.getIdentifier("tmp"), Set);
     OldValue->setImplicit();
+    OldValue->setInterfaceType(VD->getValueInterfaceType());
     auto *tmpPattern = new (Ctx) NamedPattern(OldValue, /*implicit*/ true);
     auto *tmpPBD = PatternBindingDecl::createImplicit(
         Ctx, StaticSpellingKind::None, tmpPattern, OldValueExpr, Set);
@@ -1380,50 +1346,20 @@ static void synthesizeObservedSetterBody(AccessorDecl *Set,
     SetterBody.push_back(OldValue);
   }
 
-  // Create:
-  //   (call_expr (dot_syntax_call_expr (decl_ref_expr(willSet)),
-  //                                    (decl_ref_expr(self))),
-  //              (declrefexpr(value)))
-  // or:
-  //   (call_expr (decl_ref_expr(willSet)), (declrefexpr(value)))
-  if (auto willSet = VD->getWillSetFunc()) {
-    Expr *Callee = new (Ctx) DeclRefExpr(willSet, DeclNameLoc(), /*imp*/true);
-    auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, DeclNameLoc(),
-                                           /*imp*/true);
-    if (SelfDecl) {
-      auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, DeclNameLoc(),
-                                            /*imp*/true);
-      Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
-    }
-    SetterBody.push_back(CallExpr::createImplicit(Ctx, Callee, { ValueDRE },
-                                                  { Identifier() }));
-  }
+  if (auto willSet = VD->getWillSetFunc())
+    callObserver(willSet, ValueDecl);
   
   // Create an assignment into the storage or call to superclass setter.
   auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, DeclNameLoc(), true);
+  ValueDRE->setType(ValueDecl->getType());
   createPropertyStoreOrCallSuperclassSetter(Set, ValueDRE, VD, target,
-                                            SetterBody, Ctx, false);
+                                            SetterBody, Ctx);
 
-  // Create:
-  //   (call_expr (dot_syntax_call_expr (decl_ref_expr(didSet)),
-  //                                    (decl_ref_expr(self))),
-  //              (decl_ref_expr(tmp)))
-  // or:
-  //   (call_expr (decl_ref_expr(didSet)), (decl_ref_expr(tmp)))
-  if (auto didSet = VD->getDidSetFunc()) {
-    auto *OldValueExpr = new (Ctx) DeclRefExpr(OldValue, DeclNameLoc(),
-                                               /*impl*/true);
-    Expr *Callee = new (Ctx) DeclRefExpr(didSet, DeclNameLoc(), /*imp*/true);
-    if (SelfDecl) {
-      auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, DeclNameLoc(),
-                                            /*imp*/true);
-      Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
-    }
-    SetterBody.push_back(CallExpr::createImplicit(Ctx, Callee, { OldValueExpr },
-                                                  { Identifier() }));
-  }
+  if (auto didSet = VD->getDidSetFunc())
+    callObserver(didSet, OldValue);
 
   Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc, true));
+  Set->setBodyTypeCheckedIfPresent();
 }
 
 static void synthesizeStoredWithObserversSetterBody(AccessorDecl *setter,
@@ -1499,9 +1435,8 @@ static void synthesizeLazyGetterBody(AbstractFunctionDecl *fn, void *context) {
   // The getter checks the optional, storing the initial value in if nil.  The
   // specific pattern we generate is:
   //   get {
-  //     let tmp1 = storage
-  //     if tmp1 {
-  //       return tmp1!
+  //     if let tmp1 = storage {
+  //       return tmp1
   //     }
   //     let tmp2 : Ty = <<initializer expression>>
   //     storage = tmp2
@@ -1513,47 +1448,46 @@ static void synthesizeLazyGetterBody(AbstractFunctionDecl *fn, void *context) {
   auto *Tmp1VD = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
                                    /*IsCaptureList*/false, SourceLoc(),
                                    Ctx.getIdentifier("tmp1"), Get);
+  Tmp1VD->setInterfaceType(VD->getValueInterfaceType());
+  Tmp1VD->setHasNonPatternBindingInit();
   Tmp1VD->setImplicit();
 
-  auto *Tmp1PBDPattern = new (Ctx) NamedPattern(Tmp1VD, /*implicit*/true);
-  auto *Tmp1Init =
+  auto *Named = new (Ctx) NamedPattern(Tmp1VD, /*implicit*/true);
+  Named->setType(Tmp1VD->getType());
+  auto *Let = new (Ctx) VarPattern(SourceLoc(), /*let*/true, Named,
+                                   /*implict*/true);
+  Let->setType(Named->getType());
+  auto *Some = new (Ctx) OptionalSomePattern(Let, SourceLoc(),
+                                             /*implicit*/true);
+  Some->setElementDecl(Ctx.getOptionalSomeDecl());
+  Some->setType(OptionalType::get(Let->getType()));
+
+  auto *StoredValueExpr =
     createPropertyLoadOrCallSuperclassGetter(Get, Storage,
-                                             TargetImpl::Storage, Ctx, false);
-  auto *Tmp1PBD = PatternBindingDecl::createImplicit(
-      Ctx, StaticSpellingKind::None, Tmp1PBDPattern, Tmp1Init, Get);
-  Body.push_back(Tmp1PBD);
-  Body.push_back(Tmp1VD);
+                                             TargetImpl::Storage, Ctx);
+  SmallVector<StmtConditionElement, 1> Cond;
+  Cond.emplace_back(SourceLoc(), Some, StoredValueExpr);
 
   // Build the early return inside the if.
   auto *Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, DeclNameLoc(), /*Implicit*/true,
-                                        AccessSemantics::DirectToStorage);
-  auto *EarlyReturnVal = new (Ctx) ForceValueExpr(Tmp1DRE, SourceLoc());
-  auto *Return = new (Ctx) ReturnStmt(SourceLoc(), EarlyReturnVal,
+                                        AccessSemantics::Ordinary);
+  Tmp1DRE->setType(Tmp1VD->getType());
+  auto *Return = new (Ctx) ReturnStmt(SourceLoc(), Tmp1DRE,
                                       /*implicit*/true);
 
-  // Build the "if" around the early return.
-  Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, DeclNameLoc(), /*Implicit*/true,
-                                  AccessSemantics::DirectToStorage);
-  
-  // Call through "hasValue" on the decl ref.
-  Tmp1DRE->setType(OptionalType::get(VD->getType()));
-  constraints::ConstraintSystem cs(TC,
-                                   VD->getDeclContext(),
-                                   constraints::ConstraintSystemOptions());
-  constraints::Solution solution(cs, constraints::Score());
-  auto HasValueExpr = solution.convertOptionalToBool(Tmp1DRE, nullptr);
 
-  Body.push_back(new (Ctx) IfStmt(SourceLoc(), HasValueExpr, Return,
+  // Build the "if" around the early return.
+  Body.push_back(new (Ctx) IfStmt(LabeledStmtInfo(),
+                                  SourceLoc(), Ctx.AllocateCopy(Cond), Return,
                                   /*elseloc*/SourceLoc(), /*else*/nullptr,
-                                  /*implicit*/ true, Ctx));
+                                  /*implicit*/ true));
 
 
   auto *Tmp2VD = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
                                    /*IsCaptureList*/false, SourceLoc(),
                                    Ctx.getIdentifier("tmp2"),
                                    Get);
-  Tmp2VD->setType(VD->getType());
-  Tmp2VD->setInterfaceType(VD->getInterfaceType());
+  Tmp2VD->setInterfaceType(VD->getValueInterfaceType());
   Tmp2VD->setImplicit();
 
 
@@ -1564,27 +1498,23 @@ static void synthesizeLazyGetterBody(AbstractFunctionDecl *fn, void *context) {
   auto PBD = VD->getParentPatternBinding();
   unsigned entryIndex = PBD->getPatternEntryIndexForVarDecl(VD);
   assert(PBD->isInitializerSubsumed(entryIndex));
-  bool wasInitializerChecked = PBD->isInitializerChecked(entryIndex);
-  PBD->setInitializerChecked(entryIndex);
+
+  if (!PBD->isInitializerChecked(entryIndex))
+    TC.typeCheckPatternBinding(PBD, entryIndex);
 
   // Recontextualize any closure declcontexts nested in the initializer to
   // realize that they are in the getter function.
   Get->getImplicitSelfDecl()->setDeclContext(Get);
   InitValue->walk(RecontextualizeClosures(Get));
 
-  // Wrap the initializer in a LazyInitializerExpr to avoid problems with
-  // re-typechecking it if it was already type-checked.
-  // FIXME: we should really have stronger invariants than this.  Leaving it
-  // unwrapped may expose both expressions to naive walkers
-  if (wasInitializerChecked) {
-    auto initType = InitValue->getType();
-    InitValue = new (Ctx) LazyInitializerExpr(InitValue);
-    InitValue->setType(initType);
-  }
+  // Wrap the initializer in a LazyInitializerExpr to avoid walking it twice.
+  auto initType = InitValue->getType();
+  InitValue = new (Ctx) LazyInitializerExpr(InitValue);
+  InitValue->setType(initType);
 
   Pattern *Tmp2PBDPattern = new (Ctx) NamedPattern(Tmp2VD, /*implicit*/true);
   Tmp2PBDPattern =
-    TypedPattern::createImplicit(Ctx, Tmp2PBDPattern, VD->getType());
+    TypedPattern::createImplicit(Ctx, Tmp2PBDPattern, Tmp2VD->getType());
 
   auto *Tmp2PBD = PatternBindingDecl::createImplicit(
       Ctx, StaticSpellingKind::None, Tmp2PBDPattern, InitValue, Get,
@@ -1595,17 +1525,20 @@ static void synthesizeLazyGetterBody(AbstractFunctionDecl *fn, void *context) {
   // Assign tmp2 into storage.
   auto Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, DeclNameLoc(), /*Implicit*/true,
                                        AccessSemantics::DirectToStorage);
+  Tmp2DRE->setType(Tmp2VD->getType());
   createPropertyStoreOrCallSuperclassSetter(Get, Tmp2DRE, Storage,
-                                            TargetImpl::Storage, Body, Ctx, false);
+                                            TargetImpl::Storage, Body, Ctx);
 
   // Return tmp2.
   Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, DeclNameLoc(), /*Implicit*/true,
                                   AccessSemantics::DirectToStorage);
+  Tmp2DRE->setType(Tmp2VD->getType());
 
   Body.push_back(new (Ctx) ReturnStmt(SourceLoc(), Tmp2DRE, /*implicit*/true));
 
   Get->setBody(BraceStmt::create(Ctx, VD->getLoc(), Body, VD->getLoc(),
                                  /*implicit*/true));
+  Get->setBodyTypeCheckedIfPresent();
 }
 
 static void synthesizeLazySetterBody(AbstractFunctionDecl *fn, void *context) {
@@ -1617,7 +1550,7 @@ static void synthesizeLazySetterBody(AbstractFunctionDecl *fn, void *context) {
     return;
 
   synthesizeTrivialSetterBodyWithStorage(setter, TargetImpl::Storage,
-                                         underlyingStorage, ctx, true);
+                                         underlyingStorage, ctx);
 }
 
 void swift::completeLazyVarImplementation(VarDecl *VD) {
@@ -2178,7 +2111,7 @@ static void synthesizeSetterBody(AccessorDecl *setter,
       auto backingVar = original->getPropertyDelegateBackingProperty();
       synthesizeTrivialSetterBodyWithStorage(setter,
                                              TargetImpl::DelegateStorage,
-                                             backingVar, ctx, true);
+                                             backingVar, ctx);
       return;
     }
   }
@@ -2611,7 +2544,7 @@ static void synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn,
   // Reference to super.init.
   auto *selfDecl = ctor->getImplicitSelfDecl();
   auto *superRef = buildSelfReference(selfDecl, SelfAccessorKind::Super,
-                                      /*isLValue=*/false, ctx, true);
+                                      /*isLValue=*/false, ctx);
 
   SubstitutionMap subs;
   if (auto *genericEnv = fn->getGenericEnvironment())
@@ -2632,7 +2565,7 @@ static void synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn,
   superclassCtorRefExpr->setIsSuper(true);
 
   auto *bodyParams = ctor->getParameters();
-  auto ctorArgs = buildArgumentForwardingExpr(bodyParams->getArray(), ctx, true);
+  auto ctorArgs = buildArgumentForwardingExpr(bodyParams->getArray(), ctx);
   Expr *superclassCallExpr =
     CallExpr::create(ctx, superclassCtorRefExpr, ctorArgs,
                      superclassCtor->getFullName().getArgumentNames(), { },

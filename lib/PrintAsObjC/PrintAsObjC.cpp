@@ -1377,10 +1377,9 @@ private:
 
     // Dig out the Objective-C type.
     auto conformance = conformances.front();
-    Type objcType = ProtocolConformanceRef::getTypeWitnessByName(
-                      nominal->getDeclaredType(),
-                      ProtocolConformanceRef(conformance),
-                      ctx.Id_ObjectiveCType);
+    Type objcType = ProtocolConformanceRef(conformance).getTypeWitnessByName(
+                                           nominal->getDeclaredType(),
+                                           ctx.Id_ObjectiveCType);
     if (!objcType) return nullptr;
 
     // Dig out the Objective-C class.
