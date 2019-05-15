@@ -3710,81 +3710,14 @@ public:
       return;
 
     ModuleDecl *CurrModule = CurrDeclContext->getParentModule();
+    DeclContext *DC = const_cast<DeclContext *>(CurrDeclContext);
 
     // We can only say .foo where foo is a static member of the contextual
     // type and has the same type (or if the member is a function, then the
     // same result type) as the contextual type.
     FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD,
                                              DeclVisibilityKind Reason) {
-
-      if (VD->isOperator())
-        return false;
-
-      if (!VD->hasInterfaceType()) {
-        TypeResolver->resolveDeclSignature(VD);
-        if (!VD->hasInterfaceType())
-          return false;
-      }
-
-      if (T->getOptionalObjectType() &&
-          VD->getModuleContext()->isStdlibModule()) {
-        // In optional context, ignore '.init(<some>)', 'init(nilLiteral:)',
-        if (isa<ConstructorDecl>(VD))
-          return false;
-        // TODO: Ignore '.some(<Wrapped>)' and '.none' too *in expression
-        // context*. They are useful in pattern context though.
-      }
-
-      // Enum element decls can always be referenced by implicit member
-      // expression.
-      if (isa<EnumElementDecl>(VD))
-        return true;
-
-      // Only non-failable constructors are implicitly referenceable.
-      if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
-        switch (CD->getFailability()) {
-        case OTK_None:
-        case OTK_ImplicitlyUnwrappedOptional:
-          return true;
-        case OTK_Optional:
-          return false;
-        }
-      }
-
-      // Otherwise, check the result type matches the contextual type.
-      auto declTy = T->getTypeOfMember(CurrModule, VD);
-      if (declTy->is<ErrorType>())
-        return false;
-
-      DeclContext *DC = const_cast<DeclContext *>(CurrDeclContext);
-
-      // Member types can also be implicitly referenceable as long as it's
-      // convertible to the contextual type.
-      if (auto CD = dyn_cast<TypeDecl>(VD)) {
-        declTy = declTy->getMetatypeInstanceType();
-
-        // Emit construction for the same type via typealias doesn't make sense
-        // because we are emitting all `.init()`s.
-        if (declTy->isEqual(T))
-          return false;
-        return swift::isConvertibleTo(declTy, T, *DC);
-      }
-
-      // Only static member can be referenced.
-      if (!VD->isStatic())
-        return false;
-
-      if (isa<FuncDecl>(VD)) {
-        // Strip '(Self.Type) ->' and parameters.
-        declTy = declTy->castTo<AnyFunctionType>()->getResult();
-        declTy = declTy->castTo<AnyFunctionType>()->getResult();
-      } else if (auto FT = declTy->getAs<AnyFunctionType>()) {
-        // The compiler accepts 'static var factory: () -> T' for implicit
-        // member expression.
-        // FIXME: This emits just 'factory'. We should emit 'factory()' instead.
-        declTy = FT->getResult();
-      }
-      return declTy->isEqual(T) || swift::isConvertibleTo(declTy, T, *DC);
+      return isReferenceableByImplicitMemberExpr(CurrModule, DC, T, VD);
     });
 
     auto baseType = MetatypeType::get(T);
