@@ -716,16 +716,6 @@ public:
     return None;
   }
 
-  /// Retrieve overload choices associated with given expression.
-  void getOverloadChoices(Expr *anchor,
-                          SmallVectorImpl<SelectedOverload> &overloads) const {
-    for (auto &e : overloadChoices) {
-      auto *locator = e.first;
-      if (locator->getAnchor() == anchor)
-        overloads.push_back(e.second);
-    }
-  }
-
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");

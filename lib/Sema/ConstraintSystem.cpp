@@ -2464,9 +2464,9 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
 
   // Problems related to fixes forming ambiguous solution set
   // could only be diagnosed (at the moment), if all of the fixes
-  // are attached to the same anchor, which means they fix
-  // different overloads of the same declaration.
-  Expr *commonAnchor = nullptr;
+  // have the same callee locator, which means they fix different
+  // overloads of the same declaration.
+  ConstraintLocator *commonCalleeLocator = nullptr;
   SmallPtrSet<ValueDecl *, 4> distinctChoices;
   SmallVector<std::pair<const Solution *, const ConstraintFix *>, 4>
       viableSolutions;
@@ -2480,21 +2480,17 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       return false;
 
     const auto *fix = fixes.front();
-    if (commonAnchor && commonAnchor != fix->getAnchor())
+    auto *calleeLocator = getCalleeLocator(fix->getAnchor());
+    if (commonCalleeLocator && commonCalleeLocator != calleeLocator)
       return false;
 
-    commonAnchor = fix->getAnchor();
+    commonCalleeLocator = calleeLocator;
 
-    SmallVector<SelectedOverload, 2> overloads;
-    solution.getOverloadChoices(commonAnchor, overloads);
-    // There is unfortunately no way, at the moment, to figure out
-    // what declaration the fix is attached to, so we have to make
-    // sure that there is only one declaration associated with common
-    // anchor to be sure that the right problem is being diagnosed.
-    if (overloads.size() != 1)
+    auto overload = solution.getOverloadChoiceIfAvailable(calleeLocator);
+    if (!overload)
       return false;
 
-    auto *decl = getOverloadDecl(overloads.front());
+    auto *decl = getOverloadDecl(*overload);
     if (!decl)
       return false;
 
@@ -2517,6 +2513,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     DiagnosticTransaction transaction(TC.Diags);
 
     const auto *fix = viableSolutions.front().second;
+    auto *commonAnchor = commonCalleeLocator->getAnchor();
     if (fix->getKind() == FixKind::UseSubscriptOperator) {
       auto *UDE = cast<UnresolvedDotExpr>(commonAnchor);
       TC.diagnose(commonAnchor->getLoc(),
