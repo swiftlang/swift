@@ -2254,7 +2254,7 @@ size_t Solution::getTotalMemory() const {
          llvm::capacity_in_bytes(Fixes) + DisjunctionChoices.getMemorySize() +
          OpenedTypes.getMemorySize() + OpenedExistentialTypes.getMemorySize() +
          (DefaultedConstraints.size() * sizeof(void *)) +
-         llvm::capacity_in_bytes(Conformances);
+         Conformances.size() * sizeof(std::pair<ConstraintLocator *, ProtocolConformanceRef>);
 }
 
 DeclName OverloadChoice::getName() const {
@@ -2664,6 +2664,18 @@ Expr *constraints::getArgumentExpr(Expr *expr, unsigned index) {
 
   assert(isa<TupleExpr>(argExpr));
   return cast<TupleExpr>(argExpr)->getElement(index);
+}
+
+bool constraints::isAutoClosureArgument(Expr *argExpr) {
+  if (!argExpr)
+    return false;
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(argExpr)) {
+    if (auto *param = dyn_cast<ParamDecl>(DRE->getDecl()))
+      return param->isAutoClosure();
+  }
+
+  return false;
 }
 
 void ConstraintSystem::generateConstraints(

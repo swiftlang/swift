@@ -1292,7 +1292,7 @@ namespace {
       AnyFunctionType::decomposeInput(constrParamType, params);
 
       ::matchCallArguments(
-          CS, args, params,
+          CS, args, params, ConstraintKind::ArgumentConversion,
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
 
       Type result = tv;
@@ -2036,7 +2036,8 @@ namespace {
                           SmallVectorImpl<AnyFunctionType::Param> &params) {
       auto *paramList = closureExpr->getParameters();
       unsigned i = 0;
-      paramList->getParams(params, [&](ParamDecl *param) {
+
+      for (auto *param : *paramList) {
         auto *locator = CS.getConstraintLocator(
             closureExpr, LocatorPathElt::getTupleElement(i++));
         Type paramType, internalType;
@@ -2058,8 +2059,8 @@ namespace {
                            locator);
         }
         CS.setType(param, internalType);
-        return paramType;
-      });
+        params.push_back(param->toFunctionParam(paramType));
+      }
     }
 
     /// Produces a type for the given pattern, filling in any missing
@@ -2886,9 +2887,7 @@ namespace {
     }
 
     Type visitLazyInitializerExpr(LazyInitializerExpr *expr) {
-      auto type = expr->getType();
-      assert(type && "LazyInitializerExpr should always have type set");
-      return type;
+      llvm_unreachable("Already type-checked");
     }
 
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {

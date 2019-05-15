@@ -2377,14 +2377,30 @@ public:
                                                  : FunctionRefKind::Unapplied);
   }
   
-  SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
+  SourceLoc getLoc() const {
+    if (NameLoc.isValid())
+      return NameLoc.getBaseNameLoc();
+    else if (DotLoc.isValid())
+      return DotLoc;
+    else
+      return SubExpr->getEndLoc();
+  }
 
   SourceLoc getStartLoc() const {
-    return (DotLoc.isInvalid() ? NameLoc.getSourceRange().End 
-                               : SubExpr->getStartLoc());
+    if (SubExpr->getStartLoc().isValid())
+      return SubExpr->getStartLoc();
+    else if (DotLoc.isValid())
+      return DotLoc;
+    else
+      return NameLoc.getSourceRange().Start;
   }
   SourceLoc getEndLoc() const {
-    return NameLoc.getSourceRange().End;
+    if (NameLoc.isValid())
+      return NameLoc.getSourceRange().End;
+    else if (DotLoc.isValid())
+      return DotLoc;
+    else
+      return SubExpr->getEndLoc();
   }
 
   SourceLoc getDotLoc() const { return DotLoc; }

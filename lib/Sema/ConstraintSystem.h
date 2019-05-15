@@ -609,14 +609,14 @@ public:
   ConstraintSystem &getConstraintSystem() const { return *constraintSystem; }
 
   /// The set of type bindings.
-  llvm::SmallDenseMap<TypeVariableType *, Type> typeBindings;
+  llvm::DenseMap<TypeVariableType *, Type> typeBindings;
   
   /// The set of overload choices along with their types.
-  llvm::SmallDenseMap<ConstraintLocator *, SelectedOverload> overloadChoices;
+  llvm::DenseMap<ConstraintLocator *, SelectedOverload> overloadChoices;
 
   /// The set of constraint restrictions used to arrive at this restriction,
   /// which informs constraint application.
-  llvm::SmallDenseMap<std::pair<CanType, CanType>, ConversionRestrictionKind>
+  llvm::DenseMap<std::pair<CanType, CanType>, ConversionRestrictionKind>
     ConstraintRestrictions;
 
   /// The list of fixes that need to be applied to the initial expression
@@ -628,19 +628,19 @@ public:
 
   /// The set of disjunction choices used to arrive at this solution,
   /// which informs constraint application.
-  llvm::SmallDenseMap<ConstraintLocator *, unsigned> DisjunctionChoices;
+  llvm::DenseMap<ConstraintLocator *, unsigned> DisjunctionChoices;
 
   /// The set of opened types for a given locator.
-  llvm::SmallDenseMap<ConstraintLocator *, ArrayRef<OpenedType>> OpenedTypes;
+  llvm::DenseMap<ConstraintLocator *, ArrayRef<OpenedType>> OpenedTypes;
 
   /// The opened existential type for a given locator.
-  llvm::SmallDenseMap<ConstraintLocator *, OpenedArchetypeType *>
+  llvm::DenseMap<ConstraintLocator *, OpenedArchetypeType *>
     OpenedExistentialTypes;
 
   /// The locators of \c Defaultable constraints whose defaults were used.
-  llvm::SmallPtrSet<ConstraintLocator *, 8> DefaultedConstraints;
+  llvm::SmallPtrSet<ConstraintLocator *, 2> DefaultedConstraints;
 
-  llvm::SmallVector<std::pair<ConstraintLocator *, ProtocolConformanceRef>, 8>
+  std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       Conformances;
 
   /// Simplify the given type by substituting all occurrences of
@@ -667,20 +667,6 @@ public:
                      ConstraintLocator *locator,
                      bool ignoreTopLevelInjection = false,
                      Optional<Pattern*> typeFromPattern = None) const;
-
-  /// Convert the given optional-producing expression to a Bool
-  /// indicating whether the optional has a value.
-  ///
-  /// This operation cannot fail.
-  ///
-  /// \param expr The expression to coerce. The type of this expression
-  /// must be T?.
-  ///
-  /// \param locator Locator used to describe the location of this expression.
-  ///
-  /// \returns a Bool expression indicating whether the optional
-  /// contains a value.
-  Expr *convertOptionalToBool(Expr *expr, ConstraintLocator *locator) const;
 
   /// Compute the set of substitutions for a generic signature opened at the
   /// given locator.
@@ -1055,7 +1041,7 @@ private:
   /// solution it represents.
   Score CurrentScore;
 
-  SmallVector<TypeVariableType *, 16> TypeVariables;
+  std::vector<TypeVariableType *> TypeVariables;
 
   /// Maps expressions to types for choosing a favored overload
   /// type in a disjunction constraint.
@@ -1090,7 +1076,7 @@ private:
   /// there are multiple ways in which one type could convert to another, e.g.,
   /// given class types A and B, the solver might choose either a superclass
   /// conversion or a user-defined conversion.
-  SmallVector<std::tuple<Type, Type, ConversionRestrictionKind>, 32>
+  std::vector<std::tuple<Type, Type, ConversionRestrictionKind>>
       ConstraintRestrictions;
 
   /// The set of fixes applied to make the solution work.
@@ -1100,7 +1086,7 @@ private:
 
   /// The set of remembered disjunction choices used to reach
   /// the current constraint system.
-  SmallVector<std::pair<ConstraintLocator*, unsigned>, 32>
+  std::vector<std::pair<ConstraintLocator*, unsigned>>
       DisjunctionChoices;
 
   /// The worklist of "active" constraints that should be revisited
@@ -1124,12 +1110,12 @@ private:
   SmallVector<std::pair<ConstraintLocator *, OpenedArchetypeType *>, 4>
     OpenedExistentialTypes;
 
-  SmallVector<std::pair<ConstraintLocator *, ProtocolConformanceRef>, 8>
+  std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       CheckedConformances;
 
 public:
   /// The locators of \c Defaultable constraints whose defaults were used.
-  SmallVector<ConstraintLocator *, 8> DefaultedConstraints;
+  std::vector<ConstraintLocator *> DefaultedConstraints;
 
   /// A cache that stores the @dynamicCallable required methods implemented by
   /// types.
@@ -2624,6 +2610,13 @@ public:
     TypeMatchResult(SolutionKind result) : Kind(result) {}
   };
 
+  /// Attempt to repair typing failures and record fixes if needed.
+  /// \return true if at least some of the failures has been repaired
+  /// successfully, which allows type matcher to continue.
+  bool repairFailures(Type lhs, Type rhs,
+                      SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
+                      ConstraintLocatorBuilder locator);
+
   /// Subroutine of \c matchTypes(), which matches up two tuple types.
   ///
   /// \returns the result of performing the tuple-to-tuple conversion.
@@ -3700,6 +3693,13 @@ public:
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.
   virtual bool relabelArguments(ArrayRef<Identifier> newNames);
+
+  /// Indicates that the trailing closure argument at the given \c argIdx
+  /// cannot be passed to the last parameter at \c paramIdx.
+  ///
+  /// \returns true to indicate that this should cause a failure, false
+  /// otherwise.
+  virtual bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx);
 };
 
 /// Match the call arguments (as described by the given argument type) to
@@ -3729,6 +3729,7 @@ ConstraintSystem::TypeMatchResult
 matchCallArguments(ConstraintSystem &cs,
                    ArrayRef<AnyFunctionType::Param> args,
                    ArrayRef<AnyFunctionType::Param> params,
+                   ConstraintKind subKind,
                    ConstraintLocatorBuilder locator);
 
 /// Given an expression that is the target of argument labels (for a call,
@@ -3778,6 +3779,17 @@ Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
 /// \returns argument expression or `nullptr` if given "base" expression
 /// wasn't of one of the kinds listed above.
 Expr *getArgumentExpr(Expr *expr, unsigned index);
+
+// Check whether argument of the call at given position refers to
+// parameter marked as `@autoclosure`. This function is used to
+// maintain source compatibility with Swift versions < 5,
+// previously examples like following used to type-check:
+//
+// func foo(_ x: @autoclosure () -> Int) {}
+// func bar(_ y: @autoclosure () -> Int) {
+//   foo(y)
+// }
+bool isAutoClosureArgument(Expr *argExpr);
 
 class DisjunctionChoice {
   unsigned Index;

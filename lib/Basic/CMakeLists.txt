@@ -105,7 +105,7 @@ add_swift_host_library(swiftBasic STATIC
   GYB_SOURCES
     UnicodeExtendedGraphemeClusters.cpp.gyb
 
-  LLVM_COMPONENT_DEPENDS support)
+  LLVM_LINK_COMPONENTS support)
 target_include_directories(swiftBasic PRIVATE
   ${UUID_INCLUDE})
 

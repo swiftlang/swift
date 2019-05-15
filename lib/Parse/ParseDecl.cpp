@@ -1834,6 +1834,8 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   else if (Tok.isContextualKeyword("unknown")) {
     diagnose(Tok, diag::unknown_attribute, "unknown");
   } else {
+    // Change the context to create a custom attribute syntax.
+    SyntaxContext->setCreateSyntax(SyntaxKind::CustomAttribute);
     // Parse a custom attribute.
     auto type = parseType(diag::expected_type);
     if (type.hasCodeCompletion() || type.isNull()) {
@@ -1857,8 +1859,6 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
     PatternBindingInitializer *initContext = nullptr;
 
     if (Tok.isFollowingLParen()) {
-      SyntaxParsingContext InitCtx(SyntaxContext,
-                                   SyntaxKind::InitializerClause);
 
       // If we have no local context to parse the initial value into, create one
       // for the PBD we'll eventually create.  This allows us to have reasonable
@@ -5694,9 +5694,7 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
     if (!Body.hasCodeCompletion() && BS->getNumElements() == 1) {
       auto Element = BS->getElement(0);
       if (auto *stmt = Element.dyn_cast<Stmt *>()) {
-        auto kind = AFD->getKind();
-        if (kind == DeclKind::Var || kind == DeclKind::Subscript ||
-            kind == DeclKind::Func ) {
+        if (isa<FuncDecl>(AFD)) {
           if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
             if (!returnStmt->hasResult()) {
               auto returnExpr = TupleExpr::createEmpty(Context,

@@ -316,10 +316,6 @@ public:
   /// Replace references to substitutable types with error types.
   Type substDependentTypesWithErrorTypes() const;
   
-  /// Replace opaque types with their underlying types when visible at the given
-  /// resilience expansion.
-  Type substOpaqueTypesWithUnderlyingTypes() const;
-
   bool isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
   void dump() const;

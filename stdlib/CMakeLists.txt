@@ -143,9 +143,9 @@ foreach(sdk ${SWIFT_SDKS})
         "swift-stdlib-${platform}-${arch}"
         "copy-legacy-layouts-${platform}-${arch}")
 
-      swift_install_in_component(compiler
-          FILES ${input}
-          DESTINATION "lib/swift/${platform}/")
+      swift_install_in_component(FILES ${input}
+                                 DESTINATION "lib/swift/${platform}/"
+                                 COMPONENT compiler)
     else()
       # Add a dummy target that does nothing so we can still depend on it
       # later without checking if the input files exist.

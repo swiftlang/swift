@@ -255,11 +255,14 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
                                    unsigned ordinal) {
   if (opaqueDescriptor->getKind() == Node::Kind::OpaqueReturnTypeOf) {
     auto definingDecl = opaqueDescriptor->getChild(0);
-    auto mangledName = mangleNode(definingDecl);
+    auto definingGlobal = Factory.createNode(Node::Kind::Global);
+    definingGlobal->addChild(definingDecl, Factory);
+    auto mangledName = mangleNode(definingGlobal);
+    
     auto moduleNode = findModuleNode(definingDecl);
     if (!moduleNode)
       return Type();
-    auto parentModule = findModule(findModuleNode(definingDecl));
+    auto parentModule = findModule(moduleNode);
     if (!parentModule)
       return Type();
 
@@ -1038,7 +1041,8 @@ ASTBuilder::findForeignTypeDecl(StringRef name,
 
     explicit Consumer(Demangle::Node::Kind kind) : ExpectedKind(kind) {}
 
-    void foundDecl(ValueDecl *decl, DeclVisibilityKind reason) override {
+    void foundDecl(ValueDecl *decl, DeclVisibilityKind reason,
+                   DynamicLookupInfo dynamicLookupInfo = {}) override {
       if (HadError) return;
       if (decl == Result) return;
       if (!Result) {

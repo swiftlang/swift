@@ -322,6 +322,13 @@ private:
   void visitClassDecl(ClassDecl *CD) {
     printDocumentationComment(CD);
 
+    // This is just for testing, so we check explicitly for the attribute instead
+    // of asking if the class is weak imported. If the class has availablility,
+    // we'll print a SWIFT_AVAIALBLE() which implies __attribute__((weak_imported))
+    // already.
+    if (CD->getAttrs().hasAttribute<WeakLinkedAttr>())
+      os << "SWIFT_WEAK_IMPORT\n";
+
     bool hasResilientAncestry =
       CD->checkAncestry().contains(AncestryFlags::ResilientOther);
     if (hasResilientAncestry) {
@@ -1370,11 +1377,9 @@ private:
 
     // Dig out the Objective-C type.
     auto conformance = conformances.front();
-    Type objcType = ProtocolConformanceRef::getTypeWitnessByName(
-                      nominal->getDeclaredType(),
-                      ProtocolConformanceRef(conformance),
-                      ctx.Id_ObjectiveCType,
-                      nullptr);
+    Type objcType = ProtocolConformanceRef(conformance).getTypeWitnessByName(
+                                           nominal->getDeclaredType(),
+                                           ctx.Id_ObjectiveCType);
     if (!objcType) return nullptr;
 
     // Dig out the Objective-C class.
@@ -2716,6 +2721,9 @@ public:
            "#endif\n"
            "#if !defined(SWIFT_AVAILABILITY)\n"
            "# define SWIFT_AVAILABILITY(plat, ...) __attribute__((availability(plat, __VA_ARGS__)))\n"
+           "#endif\n"
+           "#if !defined(SWIFT_WEAK_IMPORT)\n"
+           "# define SWIFT_WEAK_IMPORT __attribute__((weak_import))\n"
            "#endif\n"
            "#if !defined(SWIFT_DEPRECATED)\n"
            "# define SWIFT_DEPRECATED __attribute__((deprecated))\n"

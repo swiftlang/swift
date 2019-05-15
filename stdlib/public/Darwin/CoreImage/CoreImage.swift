@@ -38,7 +38,7 @@ extension CIFilter {
     for (key, value) in elements {
       dict[key] = value
     }
-    self.init(name: name, withInputParameters: dict)
+    self.init(name: name, parameters: dict)
   }
 }
 

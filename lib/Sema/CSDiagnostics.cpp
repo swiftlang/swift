@@ -101,6 +101,35 @@ Expr *FailureDiagnostic::getArgumentExprFor(Expr *anchor) const {
   return nullptr;
 }
 
+// TODO: Replace duplications of this logic with calls to this.
+Optional<SelectedOverload> FailureDiagnostic::getChoiceFor(Expr *expr) {
+  auto &cs = getConstraintSystem();
+  ConstraintLocator *locator = nullptr;
+
+  if (auto *AE = dyn_cast<ApplyExpr>(expr)) {
+    if (auto *TE = dyn_cast<TypeExpr>(AE->getFn())) {
+      locator = cs.getConstraintLocator(AE,
+                                        {ConstraintLocator::ApplyFunction,
+                                         ConstraintLocator::ConstructorMember},
+                                        /*summaryFlags=*/0);
+    }
+    return getChoiceFor(AE->getFn());
+  } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+    locator = cs.getConstraintLocator(UDE, ConstraintLocator::Member);
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(expr)) {
+    locator = cs.getConstraintLocator(UME, ConstraintLocator::UnresolvedMember);
+  } else if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
+    locator = cs.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
+  } else {
+    locator = cs.getConstraintLocator(expr);
+  }
+
+  if (!locator)
+    return None;
+
+  return getOverloadChoiceIfAvailable(locator);
+}
+
 Type RequirementFailure::getOwnerType() const {
   return getType(getRawAnchor())
       ->getInOutObjectType()
@@ -155,12 +184,25 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   auto *anchor = getRawAnchor();
   auto *locator = cs.getConstraintLocator(anchor);
 
-  if (isFromContextualType()) {
-    auto type = cs.getContextualType();
+  // Get a declaration associated with given type (if any).
+  // This is used to retrieve affected declaration when
+  // failure is in any way contextual, and declaration can't
+  // be fetched directly from constraint system.
+  auto getAffectedDeclFromType = [](Type type) -> ValueDecl * {
     assert(type);
-    auto *alias = dyn_cast<TypeAliasType>(type.getPointer());
-    return alias ? alias->getDecl() : type->getAnyGeneric();
-  }
+    // If problem is related to a typealias, let's point this
+    // diagnostic directly to its declaration without desugaring.
+    if (auto *alias = dyn_cast<TypeAliasType>(type.getPointer()))
+      return alias->getDecl();
+
+    if (auto *opaque = type->getAs<OpaqueTypeArchetypeType>())
+      return opaque->getDecl();
+
+    return type->getAnyGeneric();
+  };
+
+  if (isFromContextualType())
+    return getAffectedDeclFromType(cs.getContextualType());
 
   if (auto *AE = dyn_cast<CallExpr>(anchor)) {
     // NOTE: In valid code, the function can only be a TypeExpr
@@ -196,11 +238,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   if (overload)
     return overload->choice.getDecl();
 
-  auto ownerType = getOwnerType();
-  if (auto *NA = dyn_cast<TypeAliasType>(ownerType.getPointer()))
-    return NA->getDecl();
-
-  return ownerType->getAnyGeneric();
+  return getAffectedDeclFromType(getOwnerType());
 }
 
 GenericSignature *RequirementFailure::getSignature(ConstraintLocator *locator) {
@@ -262,6 +300,19 @@ bool RequirementFailure::diagnoseAsError() {
 
   auto lhs = resolveType(getLHS());
   auto rhs = resolveType(getRHS());
+
+  if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
+    auto *namingDecl = OTD->getNamingDecl();
+    emitDiagnostic(
+        anchor->getLoc(), diag::type_does_not_conform_in_opaque_return,
+        namingDecl->getDescriptiveKind(), namingDecl->getFullName(), lhs, rhs);
+
+    if (auto *repr = namingDecl->getOpaqueResultTypeRepr()) {
+      emitDiagnostic(repr->getLoc(), diag::opaque_return_type_declared_here)
+          .highlight(repr->getSourceRange());
+    }
+    return true;
+  }
 
   if (genericCtx != reqDC && (genericCtx->isChildContextOf(reqDC) ||
                               isStaticOrInstanceMember(AffectedDecl))) {
@@ -395,6 +446,9 @@ bool LabelingFailure::diagnoseAsError() {
 bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
 
+  if (diagnoseParameterUse())
+    return true;
+
   if (ConvertTo) {
     emitDiagnostic(anchor->getLoc(), diag::converting_noescape_to_type,
                    ConvertTo);
@@ -417,6 +471,138 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
     emitDiagnostic(anchor->getLoc(), diag::unknown_escaping_use_of_noescape);
   }
   return true;
+}
+
+bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
+  // If the other side is not a function, we have common case diagnostics
+  // which handle function-to-type conversion diagnostics.
+  if (!ConvertTo || !ConvertTo->is<FunctionType>())
+    return false;
+
+  auto *anchor = getAnchor();
+  auto *locator = getLocator();
+  auto diagnostic = diag::general_noescape_to_escaping;
+
+  auto getGenericParamType =
+      [](TypeVariableType *typeVar) -> GenericTypeParamType * {
+    auto *locator = typeVar->getImpl().getLocator();
+    if (locator->isForGenericParameter()) {
+      const auto &GP = locator->getPath().back();
+      return GP.getGenericParameter();
+    }
+    return nullptr;
+  };
+
+  ParamDecl *PD = nullptr;
+  if (auto *DRE = dyn_cast<DeclRefExpr>(anchor)) {
+    PD = dyn_cast<ParamDecl>(DRE->getDecl());
+
+    // If anchor is not a parameter declaration there
+    // is no need to dig up more information.
+    if (!PD)
+      return false;
+
+    // Let's check whether this is a function parameter passed
+    // as an argument to another function which accepts @escaping
+    // function at that position.
+    auto path = locator->getPath();
+    if (!path.empty() &&
+        (path.back().getKind() == ConstraintLocator::ApplyArgToParam)) {
+      if (auto paramType =
+              getParameterTypeFor(getRawAnchor(), path.back().getValue2())) {
+        if (paramType->isTypeVariableOrMember()) {
+          auto diagnoseGenericParamFailure = [&](Type genericParam,
+                                                 GenericTypeParamDecl *decl) {
+            emitDiagnostic(anchor->getLoc(),
+                           diag::converting_noespace_param_to_generic_type,
+                           PD->getName(), genericParam);
+
+            emitDiagnostic(decl, diag::generic_parameters_always_escaping);
+          };
+
+          // If this is a situation when non-escaping parameter is passed
+          // to the argument which represents generic parameter, there is
+          // a tailored diagnostic for that.
+
+          if (auto *DMT = paramType->getAs<DependentMemberType>()) {
+            auto baseTy = DMT->getBase()->castTo<TypeVariableType>();
+            diagnoseGenericParamFailure(resolveType(DMT),
+                                        getGenericParamType(baseTy)->getDecl());
+            return true;
+          }
+
+          auto *typeVar = paramType->getAs<TypeVariableType>();
+          if (auto *GP = getGenericParamType(typeVar)) {
+            diagnoseGenericParamFailure(GP, GP->getDecl());
+            return true;
+          }
+        }
+      }
+
+      // If there are no generic parameters involved, this could
+      // only mean that parameter is expecting @escaping function type.
+      diagnostic = diag::passing_noescape_to_escaping;
+    }
+  } else if (auto *AE = dyn_cast<AssignExpr>(getRawAnchor())) {
+    if (auto *DRE = dyn_cast<DeclRefExpr>(AE->getSrc())) {
+      PD = dyn_cast<ParamDecl>(DRE->getDecl());
+      diagnostic = diag::assigning_noescape_to_escaping;
+    }
+  }
+
+  if (!PD)
+    return false;
+
+  emitDiagnostic(anchor->getLoc(), diagnostic, PD->getName());
+
+  // Give a note and fix-it
+  auto note =
+      emitDiagnostic(PD->getLoc(), diag::noescape_parameter, PD->getName());
+
+  if (!PD->isAutoClosure()) {
+    note.fixItInsert(PD->getTypeLoc().getSourceRange().Start, "@escaping ");
+  } // TODO: add in a fixit for autoclosure
+
+  return true;
+}
+
+Type NoEscapeFuncToTypeConversionFailure::getParameterTypeFor(
+    Expr *expr, unsigned paramIdx) const {
+  auto &cs = getConstraintSystem();
+  ConstraintLocator *locator = nullptr;
+
+  if (auto *call = dyn_cast<CallExpr>(expr)) {
+    auto *fnExpr = call->getFn();
+    if (isa<UnresolvedDotExpr>(fnExpr)) {
+      locator = cs.getConstraintLocator(fnExpr, ConstraintLocator::Member);
+    } else if (isa<UnresolvedMemberExpr>(fnExpr)) {
+      locator =
+          cs.getConstraintLocator(fnExpr, ConstraintLocator::UnresolvedMember);
+    } else if (auto *TE = dyn_cast<TypeExpr>(fnExpr)) {
+      locator = cs.getConstraintLocator(call,
+                                        {ConstraintLocator::ApplyFunction,
+                                         ConstraintLocator::ConstructorMember},
+                                        /*summaryFlags=*/0);
+    } else {
+      locator = cs.getConstraintLocator(fnExpr);
+    }
+  } else if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
+    locator = cs.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
+  }
+
+  if (!locator)
+    return Type();
+
+  auto choice = getOverloadChoiceIfAvailable(locator);
+  if (!choice)
+    return Type();
+
+  if (auto *fnType = choice->openedType->getAs<FunctionType>()) {
+    const auto &param = fnType->getParams()[paramIdx];
+    return param.getPlainType();
+  }
+
+  return Type();
 }
 
 bool MissingForcedDowncastFailure::diagnoseAsError() {
@@ -950,100 +1136,133 @@ bool AssignmentFailure::diagnoseAsError() {
   // we find a node in the lvalue path that is problematic, this returns it.
   auto immInfo = resolveImmutableBase(destExpr);
 
-  // Otherwise, we cannot resolve this because the available setter candidates
-  // are all mutating and the base must be mutating.  If we dug out a
-  // problematic decl, we can produce a nice tailored diagnostic.
-  if (auto *VD = dyn_cast_or_null<VarDecl>(immInfo.second)) {
-    std::string message = "'";
-    message += VD->getName().str().str();
-    message += "'";
+  Optional<OverloadChoice> choice = immInfo.second;
 
-    auto type = getType(immInfo.first);
-    auto bgt = type ? type->getAs<BoundGenericType>() : nullptr;
+  // Attempt diagnostics based on the overload choice.
+  if (choice.hasValue()) {
 
-    if (bgt && bgt->getDecl() == getASTContext().getKeyPathDecl())
-      message += " is a read-only key path";
-    else if (VD->isCaptureList())
-      message += " is an immutable capture";
-    else if (VD->isImplicit())
-      message += " is immutable";
-    else if (VD->isLet())
-      message += " is a 'let' constant";
-    else if (!VD->isSettable(DC))
-      message += " is a get-only property";
-    else if (!VD->isSetterAccessibleFrom(DC))
-      message += " setter is inaccessible";
-    else {
-      message += " is immutable";
+    auto getKeyPathArgument = [](SubscriptExpr *expr) {
+      auto *TE = dyn_cast<TupleExpr>(expr->getIndex());
+      assert(TE->getNumElements() == 1);
+      assert(TE->getElementName(0).str() == "keyPath");
+      return TE->getElement(0);
+    };
+
+    if (!choice->isDecl()) {
+      if (choice->getKind() == OverloadChoiceKind::KeyPathApplication &&
+          !isa<ApplyExpr>(immInfo.first)) {
+        std::string message = "key path is read-only";
+        if (auto *SE = dyn_cast<SubscriptExpr>(immInfo.first)) {
+          if (auto *DRE = dyn_cast<DeclRefExpr>(getKeyPathArgument(SE))) {
+            auto identifier = DRE->getDecl()->getBaseName().getIdentifier();
+            message =
+                "'" + identifier.str().str() + "' is a read-only key path";
+          }
+        }
+        emitDiagnostic(Loc, DeclDiagnostic, message)
+            .highlight(immInfo.first->getSourceRange());
+        return true;
+      }
+      return false;
     }
 
-    emitDiagnostic(Loc, DeclDiagnostic, message)
-        .highlight(immInfo.first->getSourceRange());
+    // Otherwise, we cannot resolve this because the available setter candidates
+    // are all mutating and the base must be mutating.  If we dug out a
+    // problematic decl, we can produce a nice tailored diagnostic.
+    if (auto *VD = dyn_cast<VarDecl>(choice->getDecl())) {
+      std::string message = "'";
+      message += VD->getName().str().str();
+      message += "'";
 
-    // If there is a masked instance variable of the same type, emit a
-    // note to fixit prepend a 'self.'.
-    if (auto typeContext = DC->getInnermostTypeContext()) {
-      UnqualifiedLookup lookup(VD->getFullName(), typeContext,
-                               getASTContext().getLazyResolver());
-      for (auto &result : lookup.Results) {
-        const VarDecl *typeVar = dyn_cast<VarDecl>(result.getValueDecl());
-        if (typeVar && typeVar != VD && typeVar->isSettable(DC) &&
-            typeVar->isSetterAccessibleFrom(DC) &&
-            typeVar->getType()->isEqual(VD->getType())) {
-          // But not in its own accessor.
-          auto AD =
-              dyn_cast_or_null<AccessorDecl>(DC->getInnermostMethodContext());
-          if (!AD || AD->getStorage() != typeVar) {
-            emitDiagnostic(Loc, diag::masked_instance_variable,
-                           typeContext->getSelfTypeInContext())
-                .fixItInsert(Loc, "self.");
+      auto type = getType(immInfo.first);
+
+      if (isKnownKeyPathType(type))
+        message += " is read-only";
+      else if (VD->isCaptureList())
+        message += " is an immutable capture";
+      else if (VD->isImplicit())
+        message += " is immutable";
+      else if (VD->isLet())
+        message += " is a 'let' constant";
+      else if (!VD->isSettable(DC))
+        message += " is a get-only property";
+      else if (!VD->isSetterAccessibleFrom(DC))
+        message += " setter is inaccessible";
+      else {
+        message += " is immutable";
+      }
+
+      emitDiagnostic(Loc, DeclDiagnostic, message)
+          .highlight(immInfo.first->getSourceRange());
+
+      // If there is a masked instance variable of the same type, emit a
+      // note to fixit prepend a 'self.'.
+      if (auto typeContext = DC->getInnermostTypeContext()) {
+        UnqualifiedLookup lookup(VD->getFullName(), typeContext,
+                                 getASTContext().getLazyResolver());
+        for (auto &result : lookup.Results) {
+          const VarDecl *typeVar = dyn_cast<VarDecl>(result.getValueDecl());
+          if (typeVar && typeVar != VD && typeVar->isSettable(DC) &&
+              typeVar->isSetterAccessibleFrom(DC) &&
+              typeVar->getType()->isEqual(VD->getType())) {
+            // But not in its own accessor.
+            auto AD =
+                dyn_cast_or_null<AccessorDecl>(DC->getInnermostMethodContext());
+            if (!AD || AD->getStorage() != typeVar) {
+              emitDiagnostic(Loc, diag::masked_instance_variable,
+                             typeContext->getSelfTypeInContext())
+                  .fixItInsert(Loc, "self.");
+            }
           }
         }
       }
+
+      // If this is a simple variable marked with a 'let', emit a note to fixit
+      // hint it to 'var'.
+      VD->emitLetToVarNoteIfSimple(DC);
+      return true;
     }
 
-    // If this is a simple variable marked with a 'let', emit a note to fixit
-    // hint it to 'var'.
-    VD->emitLetToVarNoteIfSimple(DC);
-    return true;
+    // If the underlying expression was a read-only subscript, diagnose that.
+    if (auto *SD = dyn_cast_or_null<SubscriptDecl>(choice->getDecl())) {
+      StringRef message;
+      if (!SD->isSettable())
+        message = "subscript is get-only";
+      else if (!SD->isSetterAccessibleFrom(DC))
+        message = "subscript setter is inaccessible";
+      else
+        message = "subscript is immutable";
+
+      emitDiagnostic(Loc, DeclDiagnostic, message)
+          .highlight(immInfo.first->getSourceRange());
+      return true;
+    }
+
+    // If we're trying to set an unapplied method, say that.
+    if (auto *VD = choice->getDecl()) {
+      std::string message = "'";
+      message += VD->getBaseName().getIdentifier().str();
+      message += "'";
+
+      auto diagID = DeclDiagnostic;
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
+        if (AFD->hasImplicitSelfDecl()) {
+          message += " is a method";
+          diagID = diag::assignment_lhs_is_immutable_variable;
+        } else {
+          message += " is a function";
+        }
+      } else
+        message += " is not settable";
+
+      emitDiagnostic(Loc, diagID, message)
+          .highlight(immInfo.first->getSourceRange());
+      return true;
+    }
   }
 
-  // If the underlying expression was a read-only subscript, diagnose that.
-  if (auto *SD = dyn_cast_or_null<SubscriptDecl>(immInfo.second)) {
-    StringRef message;
-    if (!SD->isSettable())
-      message = "subscript is get-only";
-    else if (!SD->isSetterAccessibleFrom(DC))
-      message = "subscript setter is inaccessible";
-    else
-      message = "subscript is immutable";
-
-    emitDiagnostic(Loc, DeclDiagnostic, message)
-        .highlight(immInfo.first->getSourceRange());
-    return true;
-  }
-
-  // If we're trying to set an unapplied method, say that.
-  if (auto *VD = immInfo.second) {
-    std::string message = "'";
-    message += VD->getBaseName().getIdentifier().str();
-    message += "'";
-
-    auto diagID = DeclDiagnostic;
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
-      if (AFD->hasImplicitSelfDecl()) {
-        message += " is a method";
-        diagID = diag::assignment_lhs_is_immutable_variable;
-      } else {
-        message += " is a function";
-      }
-    } else
-      message += " is not settable";
-
-    emitDiagnostic(Loc, diagID, message)
-        .highlight(immInfo.first->getSourceRange());
-    return true;
-  }
+  // Fall back to producing diagnostics based on the expression since we
+  // couldn't determine anything from the OverloadChoice.
 
   // If a keypath was the problem but wasn't resolved into a vardecl
   // it is ambiguous or unable to be used for setting.
@@ -1196,40 +1415,60 @@ void AssignmentFailure::fixItChangeInoutArgType(const Expr *arg,
       .fixItReplaceChars(startLoc, endLoc, scratch);
 }
 
-std::pair<Expr *, ValueDecl *>
+std::pair<Expr *, Optional<OverloadChoice>>
 AssignmentFailure::resolveImmutableBase(Expr *expr) const {
   auto &cs = getConstraintSystem();
   auto *DC = getDC();
   expr = expr->getValueProvidingExpr();
+
+  auto isImmutable = [&DC](ValueDecl *decl) {
+    if (auto *storage = dyn_cast<AbstractStorageDecl>(decl))
+      return !storage->isSettable(nullptr) ||
+             !storage->isSetterAccessibleFrom(DC);
+
+    return false;
+  };
 
   // Provide specific diagnostics for assignment to subscripts whose base expr
   // is known to be an rvalue.
   if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
     // If we found a decl for the subscript, check to see if it is a set-only
     // subscript decl.
-    SubscriptDecl *member = nullptr;
-    if (SE->hasDecl())
-      member = dyn_cast_or_null<SubscriptDecl>(SE->getDecl().getDecl());
-
-    if (!member) {
-      auto loc =
-          cs.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
-      member = dyn_cast_or_null<SubscriptDecl>(getMemberRef(loc));
+    if (SE->hasDecl()) {
+      const auto &declRef = SE->getDecl();
+      if (auto *subscript =
+              dyn_cast_or_null<SubscriptDecl>(declRef.getDecl())) {
+        if (isImmutable(subscript))
+          return {expr, OverloadChoice(getType(SE->getBase()), subscript,
+                                       FunctionRefKind::DoubleApply)};
+      }
     }
+
+    Optional<OverloadChoice> member = getMemberRef(
+        cs.getConstraintLocator(SE, ConstraintLocator::SubscriptMember));
 
     // If it isn't settable, return it.
     if (member) {
-      if (!member->isSettable() || !member->isSetterAccessibleFrom(DC))
+      if (member->isDecl() && isImmutable(member->getDecl()))
         return {expr, member};
-    }
 
-    if (auto tupleExpr = dyn_cast<TupleExpr>(SE->getIndex())) {
-      if (tupleExpr->getNumElements() == 1 &&
-          tupleExpr->getElementName(0).str() == "keyPath") {
-        auto indexType = getType(tupleExpr->getElement(0));
+      // We still have a choice, the choice is not a decl
+      if (!member->isDecl()) {
+        // This must be a keypath application
+        assert(member->getKind() == OverloadChoiceKind::KeyPathApplication);
+
+        auto *argType = getType(SE->getIndex())->castTo<TupleType>();
+        assert(argType->getNumElements() == 1);
+
+        auto indexType = resolveType(argType->getElementType(0));
+
         if (auto bgt = indexType->getAs<BoundGenericType>()) {
-          if (bgt->getDecl() == getASTContext().getKeyPathDecl())
-            return resolveImmutableBase(tupleExpr->getElement(0));
+          // In Swift versions lower than 5, this check will fail as read only
+          // key paths can masquerade as writable for compatibilty reasons.
+          // This is fine as in this case we just fall back on old diagnostics.
+          if (bgt->getDecl() == getASTContext().getKeyPathDecl()) {
+            return {expr, member};
+          }
         }
       }
     }
@@ -1243,18 +1482,12 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
     // If we found a decl for the UDE, check it.
     auto loc = cs.getConstraintLocator(UDE, ConstraintLocator::Member);
 
-    auto *member = getMemberRef(loc);
+    auto member = getMemberRef(loc);
+
     // If we can resolve a member, we can determine whether it is settable in
     // this context.
-    if (member) {
-      auto *memberVD = dyn_cast<VarDecl>(member);
-
-      // If the member isn't a vardecl (e.g. its a funcdecl), or it isn't
-      // settable, then it is the problem: return it.
-      if (!memberVD || !member->isSettable(nullptr) ||
-          !memberVD->isSetterAccessibleFrom(DC))
-        return {expr, member};
-    }
+    if (member && member->isDecl() && isImmutable(member->getDecl()))
+      return {expr, member};
 
     // If we weren't able to resolve a member or if it is mutable, then the
     // problem must be with the base, recurse.
@@ -1264,8 +1497,9 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
   if (auto *MRE = dyn_cast<MemberRefExpr>(expr)) {
     // If the member isn't settable, then it is the problem: return it.
     if (auto member = dyn_cast<AbstractStorageDecl>(MRE->getMember().getDecl()))
-      if (!member->isSettable(nullptr) || !member->isSetterAccessibleFrom(DC))
-        return {expr, member};
+      if (isImmutable(member))
+        return {expr, OverloadChoice(getType(MRE->getBase()), member,
+                                     FunctionRefKind::SingleApply)};
 
     // If we weren't able to resolve a member or if it is mutable, then the
     // problem must be with the base, recurse.
@@ -1273,7 +1507,8 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
   }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(expr))
-    return {expr, DRE->getDecl()};
+    return {expr,
+            OverloadChoice(Type(), DRE->getDecl(), FunctionRefKind::Unapplied)};
 
   // Look through x!
   if (auto *FVE = dyn_cast<ForceValueExpr>(expr))
@@ -1291,13 +1526,17 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
   if (auto *SAE = dyn_cast<SelfApplyExpr>(expr))
     return resolveImmutableBase(SAE->getFn());
 
-  return {expr, nullptr};
+  return {expr, None};
 }
 
-ValueDecl *AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
+Optional<OverloadChoice>
+AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
   auto member = getOverloadChoiceIfAvailable(locator);
-  if (!member || !member->choice.isDecl())
-    return nullptr;
+  if (!member)
+    return None;
+
+  if (!member->choice.isDecl())
+    return member->choice;
 
   auto *DC = getDC();
   auto &TC = getTypeChecker();
@@ -1321,14 +1560,14 @@ ValueDecl *AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
           locator, LocatorPathElt::getKeyPathDynamicMember(keyPath));
 
       auto memberRef = getOverloadChoiceIfAvailable(memberLoc);
-      return memberRef ? memberRef->choice.getDecl() : nullptr;
+      return memberRef ? Optional<OverloadChoice>(memberRef->choice) : None;
     }
 
     // If this is a string based dynamic lookup, there is no member declaration.
-    return nullptr;
+    return None;
   }
 
-  return decl;
+  return member->choice;
 }
 
 Diag<StringRef> AssignmentFailure::findDeclDiagonstic(ASTContext &ctx,
@@ -1535,6 +1774,41 @@ bool MissingCallFailure::diagnoseAsError() {
   if (isa<KeyPathExpr>(baseExpr))
     return false;
 
+  auto path = getLocator()->getPath();
+  if (!path.empty()) {
+    const auto &last = path.back();
+
+    switch (last.getKind()) {
+    case ConstraintLocator::ContextualType:
+    case ConstraintLocator::ApplyArgToParam: {
+      auto fnType = getType(baseExpr)->castTo<FunctionType>();
+      assert(fnType->getNumParams() == 0);
+      emitDiagnostic(baseExpr->getLoc(), diag::missing_nullary_call,
+                     fnType->getResult())
+          .fixItInsertAfter(baseExpr->getEndLoc(), "()");
+      return true;
+    }
+
+    case ConstraintLocator::FunctionResult: {
+      path = path.drop_back();
+      if (path.back().getKind() != ConstraintLocator::AutoclosureResult)
+        break;
+
+      LLVM_FALLTHROUGH;
+    }
+
+    case ConstraintLocator::AutoclosureResult: {
+      auto &cs = getConstraintSystem();
+      auto loc = cs.getConstraintLocator(getRawAnchor(), path.drop_back(),
+                                         /*summaryFlags=*/0);
+      AutoClosureForwardingFailure failure(cs, loc);
+      return failure.diagnoseAsError();
+    }
+    default:
+      break;
+    }
+  }
+
   if (auto *DRE = dyn_cast<DeclRefExpr>(baseExpr)) {
     emitDiagnostic(baseExpr->getLoc(), diag::did_not_call_function,
                    DRE->getDecl()->getBaseName().getIdentifier())
@@ -1554,6 +1828,17 @@ bool MissingCallFailure::diagnoseAsError() {
       emitDiagnostic(baseExpr->getLoc(), diag::did_not_call_method,
                      DRE->getDecl()->getBaseName().getIdentifier())
           .fixItInsertAfter(insertLoc, "()");
+      return true;
+    }
+  }
+
+  if (auto *AE = dyn_cast<AssignExpr>(baseExpr)) {
+    auto *srcExpr = AE->getSrc();
+    if (auto *fnType = getType(srcExpr)->getAs<FunctionType>()) {
+      emitDiagnostic(srcExpr->getLoc(), diag::missing_nullary_call,
+                     fnType->getResult())
+          .highlight(srcExpr->getSourceRange())
+          .fixItInsertAfter(srcExpr->getEndLoc(), "()");
       return true;
     }
   }
@@ -1763,6 +2048,7 @@ bool MissingMemberFailure::diagnoseAsError() {
 bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   auto loc = getAnchor()->getLoc();
   auto &cs = getConstraintSystem();
+  auto *DC = getDC();
   auto locator = getLocator();
 
   if (loc.isInvalid()) {
@@ -1820,11 +2106,43 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         emitDiagnostic(loc, diag::super_initializer_not_in_initializer);
         return true;
       }
-      SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
-      emitDiagnostic(loc, diag::init_not_instance_member)
-          .fixItInsert(fixItRng.Start, "type(of: ")
-          .fixItInsertAfter(fixItRng.End, ")");
-      return true;
+
+      auto isCallArgument = [this](Expr *expr) {
+        auto &cs = getConstraintSystem();
+        auto argExpr = cs.getParentExpr(expr);
+        if (!argExpr)
+          return false;
+        auto possibleApplyExpr = cs.getParentExpr(expr);
+        return possibleApplyExpr && isa<ApplyExpr>(possibleApplyExpr);
+      };
+
+      auto *initCall = cs.getParentExpr(cs.getParentExpr(ctorRef));
+
+      auto isMutable = [&DC](ValueDecl *decl) {
+        if (auto *storage = dyn_cast<AbstractStorageDecl>(decl))
+          return storage->isSettable(DC) && storage->isSetterAccessibleFrom(DC);
+
+        return true;
+      };
+
+      auto selection = getChoiceFor(ctorRef->getBase());
+      if (selection) {
+        OverloadChoice choice = selection->choice;
+        if (choice.isDecl() && isMutable(choice.getDecl()) &&
+            !isCallArgument(initCall) &&
+            cs.getContextualTypePurpose() == CTP_Unused) {
+          auto fixItLoc = ctorRef->getBase()->getSourceRange().End;
+          emitDiagnostic(loc, diag::init_not_instance_member_use_assignment)
+              .fixItInsertAfter(fixItLoc, " = ");
+          return true;
+        }
+
+        SourceRange fixItRng = ctorRef->getBase()->getSourceRange();
+        emitDiagnostic(loc, diag::init_not_instance_member)
+            .fixItInsert(fixItRng.Start, "type(of: ")
+            .fixItInsertAfter(fixItRng.End, ")");
+        return true;
+      }
     }
   }
 
@@ -2490,17 +2808,39 @@ SourceLoc InvalidMemberRefInKeyPath::getLoc() const {
 }
 
 bool InvalidStaticMemberRefInKeyPath::diagnoseAsError() {
-  emitDiagnostic(getLoc(), diag::expr_keypath_static_member, getName());
+  emitDiagnostic(getLoc(), diag::expr_keypath_static_member, getName(),
+                 isForKeyPathDynamicMemberLookup());
   return true;
 }
 
 bool InvalidMemberWithMutatingGetterInKeyPath::diagnoseAsError() {
-  emitDiagnostic(getLoc(), diag::expr_keypath_mutating_getter, getName());
+  emitDiagnostic(getLoc(), diag::expr_keypath_mutating_getter, getName(),
+                 isForKeyPathDynamicMemberLookup());
   return true;
 }
 
 bool InvalidMethodRefInKeyPath::diagnoseAsError() {
   emitDiagnostic(getLoc(), diag::expr_keypath_not_property, getKind(),
-                 getName());
+                 getName(), isForKeyPathDynamicMemberLookup());
+  return true;
+}
+
+SourceLoc InvalidUseOfAddressOf::getLoc() const {
+  auto *anchor = getAnchor();
+
+  if (auto *assign = dyn_cast<AssignExpr>(anchor))
+    anchor = assign->getSrc();
+
+  return anchor->getLoc();
+}
+
+bool InvalidUseOfAddressOf::diagnoseAsError() {
+  emitDiagnostic(getLoc(), diag::extraneous_address_of);
+  return true;
+}
+
+bool ExtraneousReturnFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+  emitDiagnostic(anchor->getLoc(), diag::cannot_return_value_from_void_func);
   return true;
 }

@@ -499,11 +499,13 @@ public:
 /// The SDKNode part of the conformance node is constructed using the protocol
 /// in the conformance, thus getName() will give us the name of the protocol.
 class SDKNodeConformance: public SDKNode {
+  StringRef Usr;
   SDKNodeDeclType *TypeDecl;
   friend class SDKNodeDeclType;
   bool IsABIPlaceholder;
 public:
   SDKNodeConformance(SDKNodeInitInfo Info);
+  StringRef getUsr() const { return Usr; }
   ArrayRef<SDKNode*> getTypeWitnesses() const { return Children; }
   SDKNodeDeclType *getNominalTypeDecl() const { return TypeDecl; }
   bool isABIPlaceholder() const { return IsABIPlaceholder; }
@@ -690,7 +692,8 @@ public:
   std::vector<SDKNode*> createParameterNodes(ParameterList *PL);
   SDKNode *constructTypeNode(Type T, TypeInitInfo Info = TypeInitInfo());
   void processValueDecl(ValueDecl *VD);
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override;
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                 DynamicLookupInfo dynamicLookupInfo = {}) override;
   void processDecl(Decl *D);
 public:
   void lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules);

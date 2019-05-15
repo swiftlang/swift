@@ -1128,7 +1128,7 @@ bool WitnessChecker::findBestWitness(
       if (!clangModule)
         continue;
 
-      DeclContext *overlay = clangModule->getAdapterModule();
+      DeclContext *overlay = clangModule->getOverlayModule();
       if (!overlay)
         continue;
 
@@ -3475,11 +3475,6 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     abort();
   }
 
-  if (!Proto->isRequirementSignatureComputed()) {
-    Conformance->setInvalid();
-    return ResolveWitnessResult::Missing;
-  }
-
   // Look for a member type with the same name as the associated type.
   auto candidates = TC.lookupMemberType(DC, Adoptee, assocType->getName(),
                                         NameLookupFlags::ProtocolMembers);
@@ -3629,11 +3624,6 @@ void ConformanceChecker::addUsedConformances(ProtocolConformance *conformance) {
 void ConformanceChecker::ensureRequirementsAreSatisfied(
                                                      bool failUnsubstituted) {
   auto proto = Conformance->getProtocol();
-  // Some other problem stopped the signature being computed.
-  if (!proto->isRequirementSignatureComputed()) {
-    Conformance->setInvalid();
-    return;
-  }
 
   if (CheckedRequirementSignature)
     return;
@@ -4335,8 +4325,8 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
     // Hack: If we've used a conformance to the _BridgedStoredNSError
     // protocol, also use the RawRepresentable and _ErrorCodeProtocol
     // conformances on the Code associated type witness.
-    if (auto codeType = ProtocolConformanceRef::getTypeWitnessByName(
-                          type, *conformance, Context.Id_Code, this)) {
+    if (auto codeType = conformance->getTypeWitnessByName(
+                          type, Context.Id_Code)) {
       (void)conformsToProtocol(codeType, errorCodeProto, dc,
                                ConformanceCheckFlags::Used);
       (void)conformsToProtocol(codeType, rawProto, dc,
@@ -4350,8 +4340,8 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
                      (ConformanceCheckFlags::SuppressDependencyTracking|
                       ConformanceCheckFlags::Used));
   if (conformance && conformance->isConcrete()) {
-    if (Type errorType = ProtocolConformanceRef::getTypeWitnessByName(
-          type, *conformance, Context.Id_ErrorType, this)) {
+    if (Type errorType = conformance->getTypeWitnessByName(
+          type, Context.Id_ErrorType)) {
       (void)conformsToProtocol(errorType, bridgedStoredNSError, dc,
                                ConformanceCheckFlags::Used);
     }
@@ -4756,11 +4746,16 @@ static bool isNSCoding(ProtocolDecl *protocol) {
 
 /// Whether the given class has an explicit '@objc' name.
 static bool hasExplicitObjCName(ClassDecl *classDecl) {
+  // FIXME: Turn this function into a request instead of computing this
+  // as part of the @objc request.
+  (void) classDecl->isObjC();
+
   if (classDecl->getAttrs().hasAttribute<ObjCRuntimeNameAttr>())
     return true;
 
   auto objcAttr = classDecl->getAttrs().getAttribute<ObjCAttr>();
-  if (!objcAttr) return false;
+  if (!objcAttr)
+    return false;
 
   return objcAttr->hasName() && !objcAttr->isNameImplicit();
 }
@@ -4834,6 +4829,12 @@ static void inferStaticInitializeObjCMetadata(TypeChecker &tc,
   if (classDecl->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
     return;
 
+  // If the class does not have a custom @objc name and the deployment target
+  // supports the objc_getClass() hook, the workaround is unnecessary.
+  if (tc.Context.LangOpts.doesTargetSupportObjCGetClassHook() &&
+      !hasExplicitObjCName(classDecl))
+    return;
+
   // If we know that the Objective-C metadata will be statically registered,
   // there's nothing to do.
   if (!classDecl->checkAncestry(AncestryFlags::Generic)) {
@@ -4843,7 +4844,7 @@ static void inferStaticInitializeObjCMetadata(TypeChecker &tc,
   // If this class isn't always available on the deployment target, don't
   // mark it as statically initialized.
   // FIXME: This is a workaround. The proper solution is for IRGen to
-  // only statically initializae the Objective-C metadata when running on
+  // only statically initialize the Objective-C metadata when running on
   // a new-enough OS.
   if (auto sourceFile = classDecl->getParentSourceFile()) {
     AvailabilityContext availableInfo = AvailabilityContext::alwaysAvailable();
@@ -4993,7 +4994,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     if (auto classDecl = dc->getSelfClassDecl()) {
       if (Context.LangOpts.EnableObjCInterop &&
           isNSCoding(conformance->getProtocol()) &&
-          !classDecl->isGenericContext()) {
+          !classDecl->isGenericContext() &&
+          !classDecl->hasClangNode()) {
         diagnoseUnstableName(*this, conformance, classDecl);
         // Infer @_staticInitializeObjCMetadata if needed.
         inferStaticInitializeObjCMetadata(*this, classDecl);
@@ -5646,7 +5648,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
       diagnose(defaultedAssocType, diag::assoc_type_default_here,
                assocType->getFullName(), defaultAssocType)
         .highlight(
-          defaultedAssocType->getDefaultDefinitionLoc().getSourceRange());
+          defaultedAssocType->getDefaultDefinitionTypeRepr()->getSourceRange());
 
       continue;
     }
@@ -5661,8 +5663,7 @@ Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
                                  ProtocolConformanceRef conformance,
                                  Identifier name,
                                  Diag<> brokenProtocolDiag) {
-  Type ty = ProtocolConformanceRef::getTypeWitnessByName(type, conformance,
-                                                         name, this);
+  Type ty = conformance.getTypeWitnessByName(type, name);
   if (!ty &&
       !(conformance.isConcrete() && conformance.getConcrete()->isInvalid()))
     diagnose(protocol->getLoc(), brokenProtocolDiag);

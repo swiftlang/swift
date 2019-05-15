@@ -626,7 +626,8 @@ public:
         }
       });
     });
-    checkTypeAccess(assocType->getDefaultDefinitionLoc(), assocType,
+    checkTypeAccess(assocType->getDefaultDefinitionType(),
+                    assocType->getDefaultDefinitionTypeRepr(), assocType,
                     /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr,
@@ -1049,6 +1050,7 @@ public:
   UNINTERESTING(Var) // Handled at the PatternBinding level.
   UNINTERESTING(Destructor) // Always correct.
   UNINTERESTING(Accessor) // Handled by the Var or Subscript.
+  UNINTERESTING(OpaqueType) // Handled by the Var or Subscript.
 
   /// If \p PBD declared stored instance properties in a fixed-contents struct,
   /// return said struct.
@@ -1193,11 +1195,6 @@ public:
     });
   }
 
-  void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
-    // TODO(opaque): The constraint class/protocols on the opaque interface, as
-    // well as the naming decl for the opaque type, need to be accessible.
-  }
-
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
     // This must stay in sync with diag::associated_type_not_usable_from_inline.
     enum {
@@ -1219,7 +1216,8 @@ public:
         highlightOffendingType(TC, diag, complainRepr);
       });
     });
-    checkTypeAccess(assocType->getDefaultDefinitionLoc(), assocType,
+    checkTypeAccess(assocType->getDefaultDefinitionType(),
+                    assocType->getDefaultDefinitionTypeRepr(), assocType,
                      /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
@@ -1779,7 +1777,8 @@ public:
       checkType(requirement, assocType, getDiagnoseCallback(assocType),
                 getDiagnoseCallback(assocType));
     });
-    checkType(assocType->getDefaultDefinitionLoc(), assocType,
+    checkType(assocType->getDefaultDefinitionType(),
+              assocType->getDefaultDefinitionTypeRepr(), assocType,
               getDiagnoseCallback(assocType), getDiagnoseCallback(assocType));
 
     if (assocType->getTrailingWhereClause()) {

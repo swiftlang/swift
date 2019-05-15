@@ -334,7 +334,7 @@ public:
   const bool InferImportAsMember;
   const bool DisableSwiftBridgeAttr;
   const bool BridgingHeaderExplicitlyRequested;
-  const bool DisableAdapterModules;
+  const bool DisableOverlayModules;
 
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
@@ -520,7 +520,7 @@ private:
   Type NSObjectTy;
 
   /// A pair containing a ClangModuleUnit,
-  /// and whether the adapters of its re-exported modules have all been forced
+  /// and whether the overlays of its re-exported modules have all been forced
   /// to load already.
   using ModuleInitPair = llvm::PointerIntPair<ClangModuleUnit *, 1, bool>;
 
@@ -894,7 +894,7 @@ public:
 
   /// Constructs a Swift module for the given Clang module.
   ModuleDecl *finishLoadingClangModule(const clang::Module *clangModule,
-                                       bool preferAdapter);
+                                       bool preferOverlay);
 
   /// Call finishLoadingClangModule on each deferred import collected
   /// while scanning a bridging header or PCH.

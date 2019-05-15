@@ -24,7 +24,23 @@
 extern "C" {
 #endif
 
-typedef uint64_t swift_typeref_t;
+// Pointers used here need to be pointer-sized on watchOS for binary
+// compatibility. Everywhere else, they are 64-bit so 32-bit processes can
+// potentially read from 64-bit processes.
+#if defined(__APPLE__) && defined(__MACH__)
+#include <TargetConditionals.h>
+#if TARGET_OS_WATCH
+#define SWIFT_REFLECTION_NATIVE_POINTERS 1
+#endif
+#endif
+
+#if SWIFT_REFLECTION_NATIVE_POINTERS
+typedef uintptr_t swift_reflection_ptr_t;
+#else
+typedef uint64_t swift_reflection_ptr_t;
+#endif
+
+typedef swift_reflection_ptr_t swift_typeref_t;
 
 /// Represents one of the Swift reflection sections of an image.
 typedef struct swift_reflection_section {
@@ -37,37 +53,37 @@ typedef struct swift_reflection_section {
 typedef struct swift_reflection_info {
   struct {
     swift_reflection_section_t section;
-    uint64_t offset;
+    swift_reflection_ptr_t offset;
   } field;
 
   struct {
     swift_reflection_section_t section;
-    uint64_t offset;
+    swift_reflection_ptr_t offset;
   } associated_types;
 
   struct {
     swift_reflection_section_t section;
-    uint64_t offset;
+    swift_reflection_ptr_t offset;
   } builtin_types;
 
   struct {
     swift_reflection_section_t section;
-    uint64_t offset;
+    swift_reflection_ptr_t offset;
   } capture;
 
   struct {
     swift_reflection_section_t section;
-    uint64_t offset;
+    swift_reflection_ptr_t offset;
   } type_references;
 
   struct {
     swift_reflection_section_t section;
-    uint64_t offset;
+    swift_reflection_ptr_t offset;
   } reflection_strings;
 
   // Start address in local and remote address spaces.
-  uint64_t LocalStartAddress;
-  uint64_t RemoteStartAddress;
+  swift_reflection_ptr_t LocalStartAddress;
+  swift_reflection_ptr_t RemoteStartAddress;
 } swift_reflection_info_t;
 
 /// The layout kind of a Swift type.

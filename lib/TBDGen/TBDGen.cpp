@@ -114,7 +114,8 @@ void TBDGenVisitor::addBaseConformanceDescriptor(
 }
 
 void TBDGenVisitor::addConformances(DeclContext *DC) {
-  for (auto conformance : DC->getLocalConformances()) {
+  for (auto conformance : DC->getLocalConformances(
+                            ConformanceLookupKind::NonInherited)) {
     auto protocol = conformance->getProtocol();
     auto needsWTable =
         Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
@@ -379,13 +380,16 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
 
   visitNominalTypeDecl(CD);
 
-  // Types with resilient superclasses have some extra symbols.
-  if (CD->checkAncestry(AncestryFlags::ResilientOther) ||
-      CD->hasResilientMetadata()) {
-    addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
+  bool resilientAncestry = CD->checkAncestry(AncestryFlags::ResilientOther);
 
-    auto &Ctx = CD->getASTContext();
-    if (Ctx.LangOpts.EnableObjCResilientClassStubs) {
+  // Types with resilient superclasses have some extra symbols.
+  if (resilientAncestry || CD->hasResilientMetadata()) {
+    addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
+  }
+
+  auto &Ctx = CD->getASTContext();
+  if (Ctx.LangOpts.EnableObjCInterop) {
+    if (resilientAncestry) {
       addSymbol(LinkEntity::forObjCResilientClassStub(
           CD, TypeMetadataAddress::AddressPoint));
     }

@@ -274,20 +274,6 @@ func associatedTypeIdentity() {
   sameType(gary(doug()).r_out(), gary(candace()).r_out()) // expected-error{{}}
 }
 
-/* TODO: diagnostics
-struct DoesNotConform {}
-
-func doesNotConform() -> some P {
-  return DoesNotConform()
-}
-
-var doesNotConformProp: some P = DoesNotConform()
-
-var DoesNotConformComputedProp: some P {
-  return DoesNotConform()
-}
-*/
-
 func redeclaration() -> some P { return 0 } // expected-note{{previously declared}}
 func redeclaration() -> some P { return 0 } // expected-error{{redeclaration}}
 func redeclaration() -> some Q { return 0 }
@@ -313,4 +299,53 @@ struct RedeclarationTest {
   subscript(redeclared _: Int) -> some P { return 0 } // expected-error{{redeclaration}}
   subscript(redeclared _: Int) -> some Q { return 0 }
   subscript(redeclared _: Int) -> P { return 0 }
+}
+
+func diagnose_requirement_failures() {
+  struct S {
+    var foo: some P { return S() } // expected-note {{declared here}}
+    // expected-error@-1 {{return type of property 'foo' requires that 'S' conform to 'P'}}
+
+    subscript(_: Int) -> some P { // expected-note {{declared here}}
+      return S()
+      // expected-error@-1 {{return type of subscript 'subscript(_:)' requires that 'S' conform to 'P'}}
+    }
+
+    func bar() -> some P { // expected-note {{declared here}}
+      return S()
+      // expected-error@-1 {{return type of instance method 'bar()' requires that 'S' conform to 'P'}}
+    }
+
+    static func baz(x: String) -> some P { // expected-note {{declared here}}
+      return S()
+      // expected-error@-1 {{return type of static method 'baz(x:)' requires that 'S' conform to 'P'}}
+    }
+  }
+
+  func fn() -> some P { // expected-note {{declared here}}
+    return S()
+    // expected-error@-1 {{return type of local function 'fn()' requires that 'S' conform to 'P'}}
+  }
+}
+
+func global_function_with_requirement_failure() -> some P { // expected-note {{declared here}}
+  return 42 as Double
+  // expected-error@-1 {{return type of global function 'global_function_with_requirement_failure()' requires that 'Double' conform to 'P'}}
+}
+
+func recursive_func_is_invalid_opaque() {
+  func rec(x: Int) -> some P {
+    // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
+    if x == 0 {
+      return rec(x: 0)
+    }
+    return rec(x: x - 1)
+  }
+}
+
+func closure() -> some P {
+  _ = {
+    return "test"
+  }
+  return 42
 }

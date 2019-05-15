@@ -155,6 +155,8 @@ protected:
   /// reference or subscript, nullptr otherwise.
   Expr *getArgumentExprFor(Expr *anchor) const;
 
+  Optional<SelectedOverload> getChoiceFor(Expr *);
+
 private:
   /// Compute anchor expression associated with current diagnostic.
   std::pair<Expr *, bool> computeAnchor() const;
@@ -466,6 +468,16 @@ public:
       : FailureDiagnostic(expr, cs, locator), ConvertTo(toType) {}
 
   bool diagnoseAsError() override;
+
+private:
+  /// Emit tailored diagnostics for no-escape parameter conversions e.g.
+  /// passing such parameter as an @escaping argument, or trying to
+  /// assign it to a variable which expects @escaping function.
+  bool diagnoseParameterUse() const;
+
+  /// Retrieve a type of the parameter at give index for call or
+  /// subscript invocation represented by given expression node.
+  Type getParameterTypeFor(Expr *expr, unsigned paramIdx) const;
 };
 
 class MissingForcedDowncastFailure final : public FailureDiagnostic {
@@ -633,8 +645,10 @@ private:
   /// to complain about "x" being a let property if "v.v" are both mutable.
   ///
   /// \returns The base subexpression that looks immutable (or that can't be
-  /// analyzed any further) along with a decl extracted from it if we could.
-  std::pair<Expr *, ValueDecl *> resolveImmutableBase(Expr *expr) const;
+  /// analyzed any further) along with an OverloadChoice extracted from it if we
+  /// could.
+  std::pair<Expr *, Optional<OverloadChoice>>
+  resolveImmutableBase(Expr *expr) const;
 
   static Diag<StringRef> findDeclDiagonstic(ASTContext &ctx, Expr *destExpr);
 
@@ -650,7 +664,7 @@ private:
 
   /// Retrive an member reference associated with given member
   /// looking through dynamic member lookup on the way.
-  ValueDecl *getMemberRef(ConstraintLocator *locator) const;
+  Optional<OverloadChoice> getMemberRef(ConstraintLocator *locator) const;
 };
 
 /// Intended to diagnose any possible contextual failure
@@ -1039,7 +1053,8 @@ public:
                             ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), Member(member) {
     assert(member->hasName());
-    assert(locator->isForKeyPathComponent());
+    assert(locator->isForKeyPathComponent() ||
+           locator->isForKeyPathDynamicMemberLookup());
   }
 
   DescriptiveDeclKind getKind() const { return Member->getDescriptiveKind(); }
@@ -1051,6 +1066,10 @@ public:
 protected:
   /// Compute location of the failure for diagnostic.
   SourceLoc getLoc() const;
+
+  bool isForKeyPathDynamicMemberLookup() const {
+    return getLocator()->isForKeyPathDynamicMemberLookup();
+  }
 };
 
 /// Diagnose an attempt to reference a static member as a key path component
@@ -1119,6 +1138,45 @@ public:
       : InvalidMemberRefInKeyPath(root, cs, method, locator) {
     assert(isa<FuncDecl>(method));
   }
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose extraneous use of address of (`&`) which could only be
+/// associated with arguments to inout parameters e.g.
+///
+/// ```swift
+/// struct S {}
+///
+/// var a: S = ...
+/// var b: S = ...
+///
+/// a = &b
+/// ```
+class InvalidUseOfAddressOf final : public FailureDiagnostic {
+public:
+  InvalidUseOfAddressOf(Expr *root, ConstraintSystem &cs,
+                        ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator) {}
+
+  bool diagnoseAsError() override;
+
+protected:
+  /// Compute location of the failure for diagnostic.
+  SourceLoc getLoc() const;
+};
+
+/// Diagnose an attempt return something from a function which
+/// doesn't have a return type specified e.g.
+///
+/// ```swift
+/// func foo() { return 42 }
+/// ```
+class ExtraneousReturnFailure final : public FailureDiagnostic {
+public:
+  ExtraneousReturnFailure(Expr *root, ConstraintSystem &cs,
+                          ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator) {}
 
   bool diagnoseAsError() override;
 };

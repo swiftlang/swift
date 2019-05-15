@@ -107,6 +107,7 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
   result.FunctionDefinitions = true;
   result.CollapseSingleGetterProperty = false;
   result.VarInitializers = true;
+  result.EnumRawValues = EnumRawValueMode::PrintObjCOnly;
   result.OpaqueReturnTypePrinting =
       OpaqueReturnTypePrintingMode::StableReference;
 
@@ -1268,7 +1269,6 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
 
 void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
                                                       Decl *attachingTo) {
-  assert(proto->isRequirementSignatureComputed());
   printGenericSignature(
       GenericSignature::get({proto->getProtocolSelfType()} ,
                             proto->getRequirementSignature()),
@@ -1281,7 +1281,6 @@ void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
 
 void PrintAST::printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
                                                         Decl *attachingTo) {
-  assert(proto->isRequirementSignatureComputed());
   unsigned flags = PrintRequirements;
   if (isa<AssociatedTypeDecl>(attachingTo))
     flags |= SwapSelfAndDependentMemberType;
@@ -2315,11 +2314,7 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
     });
 
   auto proto = decl->getProtocol();
-  if (proto->isRequirementSignatureComputed()) {
-    printInheritedFromRequirementSignature(proto, decl);
-  } else {
-    printInherited(decl);
-  }
+  printInheritedFromRequirementSignature(proto, decl);
 
   if (decl->hasDefaultDefinitionType()) {
     Printer << " = ";
@@ -2328,13 +2323,7 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
 
   // As with protocol's trailing where clauses, use the requirement signature
   // when available.
-  if (proto->isRequirementSignatureComputed()) {
-    printWhereClauseFromRequirementSignature(proto, decl);
-  } else {
-    if (auto trailingWhere = decl->getTrailingWhereClause()) {
-      printTrailingWhereClause(trailingWhere);
-    }
-  }
+  printWhereClauseFromRequirementSignature(proto, decl);
 }
 
 void PrintAST::visitEnumDecl(EnumDecl *decl) {
@@ -2441,23 +2430,13 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
         Printer.printName(decl->getName());
       });
 
-    if (decl->isRequirementSignatureComputed()) {
-      printInheritedFromRequirementSignature(decl, decl);
-    } else {
-      printInherited(decl);
-    }
+    printInheritedFromRequirementSignature(decl, decl);
 
     // The trailing where clause is a syntactic thing, which isn't serialized
     // (etc.) and thus isn't available for printing things out of
     // already-compiled SIL modules. The requirement signature is available in
     // such cases, so let's go with that when we can.
-    if (decl->isRequirementSignatureComputed()) {
-      printWhereClauseFromRequirementSignature(decl, decl);
-    } else {
-      if (auto trailingWhere = decl->getTrailingWhereClause()) {
-        printTrailingWhereClause(trailingWhere);
-      }
-    }
+    printWhereClauseFromRequirementSignature(decl, decl);
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false, true,
@@ -2872,8 +2851,19 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
     Options.ExcludeAttrList.pop_back();
   }
 
+  switch (Options.EnumRawValues) {
+  case PrintOptions::EnumRawValueMode::Skip:
+    return;
+  case PrintOptions::EnumRawValueMode::PrintObjCOnly:
+    if (!elt->isObjC())
+      return;
+    break;
+  case PrintOptions::EnumRawValueMode::Print:
+    break;
+  }
+
   auto *raw = elt->getRawValueExpr();
-  if (!Options.EnumRawValues || !raw || raw->isImplicit())
+  if (!raw || raw->isImplicit())
     return;
 
   // Print the explicit raw value expression.

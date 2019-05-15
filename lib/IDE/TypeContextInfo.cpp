@@ -163,7 +163,8 @@ void ContextInfoCallbacks::getImplicitMembers(
         : DC(DC), TypeResolver(DC->getASTContext().getLazyResolver()),
           CurModule(DC->getParentModule()), T(T), Result(Result) {}
 
-    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) {
+    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                   DynamicLookupInfo) {
       if (canBeImplictMember(VD) && !VD->shouldHideFromEditor())
         Result.push_back(VD);
     }

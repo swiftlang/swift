@@ -90,6 +90,7 @@ namespace swift {
   class UnboundGenericType;
   class ValueDecl;
   class VarDecl;
+  class OpaqueReturnTypeRepr;
 
 enum class DeclKind : uint8_t {
 #define DECL(Id, Parent) Id,
@@ -601,7 +602,7 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1,
     /// If the module was or is being compiled with `-enable-testing`.
     TestingEnabled : 1,
 
@@ -620,7 +621,10 @@ protected:
     PrivateImportsEnabled : 1,
 
     // If the module is compiled with `-enable-implicit-dynamic`.
-    ImplicitDynamicEnabled : 1
+    ImplicitDynamicEnabled : 1,
+
+    // Whether the module is a system module.
+    IsSystemModule : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -2692,7 +2696,10 @@ public:
   
   /// Get the decl for this value's opaque result type, if it has one.
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const;
-  
+
+  /// Get the representative for this value's opaque result type, if it has one.
+  OpaqueReturnTypeRepr *getOpaqueResultTypeRepr() const;
+
   /// Set the opaque return type decl for this decl.
   ///
   /// `this` must be of a decl type that supports opaque return types, and
@@ -2896,6 +2903,8 @@ public:
   /// For generic typealiases, return the unbound generic type.
   UnboundGenericType *getUnboundGenericType() const;
 
+  Type getStructuralType() const;
+
   bool isCompatibilityAlias() const {
     return Bits.TypeAliasDecl.IsCompatibilityAlias;
   }
@@ -3036,7 +3045,7 @@ class AssociatedTypeDecl : public AbstractTypeParamDecl {
   SourceLoc KeywordLoc;
 
   /// The default definition.
-  TypeLoc DefaultDefinition;
+  TypeRepr *DefaultDefinition;
 
   /// The where clause attached to the associated type.
   TrailingWhereClause *TrailingWhere;
@@ -3044,9 +3053,11 @@ class AssociatedTypeDecl : public AbstractTypeParamDecl {
   LazyMemberLoader *Resolver = nullptr;
   uint64_t ResolverContextData;
 
+  friend class DefaultDefinitionTypeRequest;
+
 public:
   AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc, Identifier name,
-                     SourceLoc nameLoc, TypeLoc defaultDefinition,
+                     SourceLoc nameLoc, TypeRepr *defaultDefinition,
                      TrailingWhereClause *trailingWhere);
   AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc, Identifier name,
                      SourceLoc nameLoc, TrailingWhereClause *trailingWhere,
@@ -3062,17 +3073,14 @@ public:
   bool hasDefaultDefinitionType() const {
     // If we have a TypeRepr, return true immediately without kicking off
     // a request.
-    return !DefaultDefinition.isNull() || getDefaultDefinitionType();
+    return DefaultDefinition || getDefaultDefinitionType();
   }
 
   /// Retrieve the default definition type.
   Type getDefaultDefinitionType() const;
 
-  TypeLoc &getDefaultDefinitionLoc() {
-    return DefaultDefinition;
-  }
-
-  const TypeLoc &getDefaultDefinitionLoc() const {
+  /// Retrieve the default definition as written in the source.
+  TypeRepr *getDefaultDefinitionTypeRepr() const {
     return DefaultDefinition;
   }
 
@@ -4075,6 +4083,7 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
+  friend class RequirementSignatureRequest;
   friend class TypeChecker;
 
 public:
@@ -4296,22 +4305,22 @@ public:
   /// protocol. Requirements implied via any other protocol (e.g., inherited
   /// protocols of the inherited protocols) are not mentioned. The conformance
   /// requirements listed here become entries in the witness table.
-  ArrayRef<Requirement> getRequirementSignature() const {
-    assert(isRequirementSignatureComputed() &&
-           "getting requirement signature before computing it");
-    return llvm::makeArrayRef(RequirementSignature,
-                              Bits.ProtocolDecl.NumRequirementsInSignature);
-  }
+  ArrayRef<Requirement> getRequirementSignature() const;
+
+  /// Is the requirement signature currently being computed?
+  bool isComputingRequirementSignature() const;
 
   /// Has the requirement signature been computed yet?
   bool isRequirementSignatureComputed() const {
     return RequirementSignature != nullptr;
   }
 
-  void computeRequirementSignature();
-
   void setRequirementSignature(ArrayRef<Requirement> requirements);
 
+private:
+  ArrayRef<Requirement> getCachedRequirementSignature() const;
+
+public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Protocol;
@@ -5150,7 +5159,17 @@ public:
 
   /// Returns true if the name is the self identifier and is implicit.
   bool isSelfParameter() const;
-  
+
+  /// Determine whether this property will be part of the implicit memberwise
+  /// initializer.
+  ///
+  /// \param preferDeclaredProperties When encountering a `lazy` property
+  /// or a property that has an attached property delegate, prefer the
+  /// actual declared property (which may or may not be considered "stored"
+  /// as the moment) to the backing storage property. Otherwise, the stored
+  /// backing property will be treated as the member-initialized property.
+  bool isMemberwiseInitialized(bool preferDeclaredProperties) const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
     return D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param; 
@@ -5302,6 +5321,8 @@ public:
   }
   
   SourceRange getSourceRange() const;
+
+  AnyFunctionType::Param toFunctionParam(Type type = Type()) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 

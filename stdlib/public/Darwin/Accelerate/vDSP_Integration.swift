@@ -25,7 +25,7 @@ extension vDSP {
     /// - Parameter rule: The integration rule.
     /// - Parameter stepSize: The integration step size (weighting factor for running sum).
     /// - Returns: The integration result.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func integrate<U>(_ vector: U,
                                     using rule: IntegrationRule,
@@ -53,7 +53,6 @@ extension vDSP {
     /// - Parameter rule: The integration rule.
     /// - Parameter stepSize: The integration step size (weighting factor for running sum).
     /// - Parameter result: The destination vector to receive the result.
-    @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func integrate<U, V>(_ vector: U,
                                        using rule: IntegrationRule,
@@ -96,7 +95,7 @@ extension vDSP {
     /// - Parameter rule: The integration rule.
     /// - Parameter stepSize: The integration step size (weighting factor for running sum).
     /// - Returns: The integration result.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func integrate<U>(_ vector: U,
                                     using rule: IntegrationRule,
@@ -124,7 +123,6 @@ extension vDSP {
     /// - Parameter rule: The integration rule.
     /// - Parameter stepSize: The integration step size (weighting factor for running sum).
     /// - Parameter result: The destination vector to receive the result.
-    @inline(__always)
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func integrate<U, V>(_ vector: U,
                                        using rule: IntegrationRule,

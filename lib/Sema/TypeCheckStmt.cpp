@@ -80,13 +80,6 @@ namespace {
                           unsigned nextDiscriminator = 0)
       : ParentDC(parent), NextDiscriminator(nextDiscriminator) {}
 
-    /// Change the context we're contextualizing to.  This is
-    /// basically only reasonable when processing all the different
-    /// top-level code declarations.
-    void setContext(TopLevelCodeDecl *parent) {
-      ParentDC = parent;
-    }
-
     bool hasAutoClosures() const {
       return NextDiscriminator != 0;
     }
@@ -238,15 +231,10 @@ bool TypeChecker::contextualizeInitializer(Initializer *DC, Expr *E) {
 }
 
 void TypeChecker::contextualizeTopLevelCode(TopLevelContext &TLC,
-                                            ArrayRef<Decl*> topLevel) {
+                                            TopLevelCodeDecl *TLCD) {
   unsigned nextDiscriminator = TLC.NextAutoClosureDiscriminator;
-  ContextualizeClosures CC(nullptr, nextDiscriminator);
-  for (auto decl : topLevel) {
-    auto topLevelCode = dyn_cast<TopLevelCodeDecl>(decl);
-    if (!topLevelCode) continue;
-    CC.setContext(topLevelCode);
-    topLevelCode->getBody()->walk(CC);
-  }
+  ContextualizeClosures CC(TLCD, nextDiscriminator);
+  TLCD->getBody()->walk(CC);
   assert(nextDiscriminator == TLC.NextAutoClosureDiscriminator &&
          "reentrant/concurrent invocation of contextualizeTopLevelCode?");
   TLC.NextAutoClosureDiscriminator = CC.NextDiscriminator;
@@ -1895,6 +1883,9 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   // HACK: don't type-check the same function body twice.  This is
   // supposed to be handled by just not enqueuing things twice,
   // but that gets tricky with synthesized function bodies.
+  validateDecl(AFD);
+  (void) AFD->getBody();
+
   if (AFD->isBodyTypeChecked())
     return false;
 

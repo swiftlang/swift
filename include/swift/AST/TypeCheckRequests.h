@@ -33,6 +33,7 @@ class GenericParamList;
 struct PropertyDelegateBackingPropertyInfo;
 class RequirementRepr;
 class SpecializeAttr;
+class TypeAliasDecl;
 struct TypeLoc;
 
 /// Display a nominal type or extension thereof.
@@ -240,6 +241,56 @@ public:
   bool isCached() const { return true; }
   Optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
+};
+
+/// Compute the requirements that describe a protocol.
+class RequirementSignatureRequest :
+    public SimpleRequest<RequirementSignatureRequest,
+                         CacheKind::SeparatelyCached,
+                         ArrayRef<Requirement>,
+                         ProtocolDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ArrayRef<Requirement>> evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<ArrayRef<Requirement>> getCachedResult() const;
+  void cacheResult(ArrayRef<Requirement> value) const;
+};
+
+/// Compute the default definition type of an associated type.
+class DefaultDefinitionTypeRequest :
+    public SimpleRequest<DefaultDefinitionTypeRequest,
+                         CacheKind::Cached,
+                         Type,
+                         AssociatedTypeDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type> evaluate(Evaluator &evaluator, AssociatedTypeDecl *decl) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Caching.
+  bool isCached() const { return true; }
 };
 
 /// Describes the owner of a where clause, from which we can extract
@@ -545,6 +596,30 @@ public:
   // Cycle handling
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+/// Retrieve the structural type of an alias type.
+class StructuralTypeRequest :
+    public SimpleRequest<StructuralTypeRequest,
+                         CacheKind::Cached,
+                         Type,
+                         TypeAliasDecl*> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type> evaluate(Evaluator &eval, TypeAliasDecl *d) const;
+
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Caching.
+  bool isCached() const { return true; }
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

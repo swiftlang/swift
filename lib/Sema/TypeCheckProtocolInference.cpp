@@ -1095,10 +1095,6 @@ AssociatedTypeInference::getSubstOptionsWithCurrentTypeWitnesses() {
 bool AssociatedTypeInference::checkCurrentTypeWitnesses(
        const SmallVectorImpl<std::pair<ValueDecl *, ValueDecl *>>
          &valueWitnesses) {
-  // If we don't have a requirement signature for this protocol, bail out.
-  // FIXME: We should never get to this point. Or we should always fail.
-  if (!proto->isRequirementSignatureComputed()) return false;
-
   // Check any same-type requirements in the protocol's requirement signature.
   SubstOptions options = getSubstOptionsWithCurrentTypeWitnesses();
 
@@ -1870,7 +1866,7 @@ bool AssociatedTypeInference::diagnoseAmbiguousSolutions(
           // Otherwise, we have a default.
           diags.diagnose(assocType, diag::associated_type_deduction_default,
                          type)
-            .highlight(assocType->getDefaultDefinitionLoc().getSourceRange());
+            .highlight(assocType->getDefaultDefinitionTypeRepr()->getSourceRange());
         };
 
         diagnoseWitness(firstMatch, firstType);

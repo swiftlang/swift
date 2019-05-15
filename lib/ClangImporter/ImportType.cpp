@@ -2354,7 +2354,7 @@ Type ClangImporter::Implementation::getNamedSwiftType(ModuleDecl *module,
     if (auto clangUnit = dyn_cast<ClangModuleUnit>(file)) {
       // If we have an overlay, look in the overlay. Otherwise, skip
       // the lookup to avoid infinite recursion.
-      if (auto module = clangUnit->getAdapterModule())
+      if (auto module = clangUnit->getOverlayModule())
         module->lookupValue({ }, identifier,
                           NLKind::UnqualifiedLookup, results);
     } else {

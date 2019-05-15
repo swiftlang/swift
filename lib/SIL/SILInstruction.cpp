@@ -279,6 +279,20 @@ void SILInstruction::replaceAllUsesPairwiseWith(
   }
 }
 
+Operand *BeginBorrowInst::getSingleNonEndingUse() const {
+  Operand *singleUse = nullptr;
+  for (auto *use : getUses()) {
+    if (isa<EndBorrowInst>(use->getUser()))
+      continue;
+
+    if (singleUse)
+      return nullptr;
+
+    singleUse = use;
+  }
+  return singleUse;
+}
+
 namespace {
 class InstructionDestroyer
     : public SILInstructionVisitor<InstructionDestroyer> {

@@ -173,17 +173,26 @@ void constraints::simplifyLocator(Expr *&anchor,
       continue;
 
     case ConstraintLocator::NamedTupleElement:
-    case ConstraintLocator::TupleElement:
+    case ConstraintLocator::TupleElement: {
       // Extract tuple element.
+      unsigned index = path[0].getValue();
       if (auto tupleExpr = dyn_cast<TupleExpr>(anchor)) {
-        unsigned index = path[0].getValue();
         if (index < tupleExpr->getNumElements()) {
           anchor = tupleExpr->getElement(index);
           path = path.slice(1);
           continue;
         }
       }
+
+      if (auto *CE = dyn_cast<CollectionExpr>(anchor)) {
+        if (index < CE->getNumElements()) {
+          anchor = CE->getElement(index);
+          path = path.slice(1);
+          continue;
+        }
+      }
       break;
+    }
 
     case ConstraintLocator::ApplyArgToParam:
       // Extract tuple element.
@@ -1731,8 +1740,8 @@ static Type isRawRepresentable(Type fromType, const ConstraintSystem &CS) {
   if (!conformance)
     return Type();
 
-  Type rawTy = ProtocolConformanceRef::getTypeWitnessByName(
-      fromType, *conformance, CS.getASTContext().Id_RawValue, &CS.TC);
+  Type rawTy = conformance->getTypeWitnessByName(
+      fromType, CS.getASTContext().Id_RawValue);
   return rawTy;
 }
 
@@ -1994,34 +2003,9 @@ bool FailureDiagnosis::diagnoseNonEscapingParameterToEscaping(
   if (!srcFT || !dstFT || !srcFT->isNoEscape() || dstFT->isNoEscape())
     return false;
 
-  // Pick a specific diagnostic for the specific use
-  auto paramDecl = cast<ParamDecl>(declRef->getDecl());
-  switch (dstPurpose) {
-  case CTP_CallArgument:
-    CS.TC.diagnose(declRef->getLoc(), diag::passing_noescape_to_escaping,
-                   paramDecl->getName());
-    break;
-  case CTP_AssignSource:
-    CS.TC.diagnose(declRef->getLoc(), diag::assigning_noescape_to_escaping,
-                   paramDecl->getName());
-    break;
-
-  default:
-    CS.TC.diagnose(declRef->getLoc(), diag::general_noescape_to_escaping,
-                   paramDecl->getName());
-    break;
-  }
-
-  // Give a note and fixit
-  InFlightDiagnostic note = CS.TC.diagnose(
-      paramDecl->getLoc(), diag::noescape_parameter, paramDecl->getName());
-
-  if (!paramDecl->isAutoClosure()) {
-    note.fixItInsert(paramDecl->getTypeLoc().getSourceRange().Start,
-                     "@escaping ");
-  } // TODO: add in a fixit for autoclosure
-
-  return true;
+  NoEscapeFuncToTypeConversionFailure failure(
+      expr, CS, CS.getConstraintLocator(expr), dstType);
+  return failure.diagnoseAsError();
 }
 
 bool FailureDiagnosis::diagnoseContextualConversionError(
@@ -2135,9 +2119,9 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
                                     ConformanceCheckFlags::InExpression)) {
         Type errorCodeType = CS.getType(expr);
         Type errorType =
-          ProtocolConformanceRef::getTypeWitnessByName(errorCodeType, *conformance,
-                                                       TC.Context.Id_ErrorType,
-                                                       &TC)->getCanonicalType();
+          conformance->getTypeWitnessByName(errorCodeType,
+                                            TC.Context.Id_ErrorType)
+            ->getCanonicalType();
         if (errorType) {
           auto diag = diagnose(expr->getLoc(), diag::cannot_throw_error_code,
                                errorCodeType, errorType);
@@ -3513,6 +3497,28 @@ public:
     // Let's diagnose labeling problem but only related to corrected ones.
     if (diagnoseArgumentLabelError(TC.Context, ArgExpr, newNames, IsSubscript))
       Diagnosed = true;
+
+    return true;
+  }
+
+  bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx) override {
+    Expr *arg = ArgExpr;
+
+    auto tuple = dyn_cast<TupleExpr>(ArgExpr);
+    if (tuple)
+      arg = tuple->getElement(argIdx);
+
+    auto &param = Parameters[paramIdx];
+    TC.diagnose(arg->getLoc(), diag::trailing_closure_bad_param,
+                param.getPlainType())
+      .highlight(arg->getSourceRange());
+
+    auto candidate = CandidateInfo[0];
+    if (candidate.getDecl())
+      TC.diagnose(candidate.getDecl(), diag::decl_declared_here,
+                  candidate.getDecl()->getFullName());
+
+    Diagnosed = true;
 
     return true;
   }
@@ -6247,9 +6253,8 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
         = CS.TC.conformsToProtocol(contextualType, ALC, CS.DC,
                                    ConformanceCheckFlags::InExpression)) {
     Type contextualElementType =
-        ProtocolConformanceRef::getTypeWitnessByName(
-            contextualType, *Conformance,
-            CS.getASTContext().Id_ArrayLiteralElement, &CS.TC)
+        Conformance->getTypeWitnessByName(
+          contextualType, CS.getASTContext().Id_ArrayLiteralElement)
             ->getDesugaredType();
 
     // Type check each of the subexpressions in place, passing down the contextual
@@ -6337,13 +6342,13 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
     }
 
     contextualKeyType =
-        ProtocolConformanceRef::getTypeWitnessByName(
-            contextualType, *Conformance, CS.getASTContext().Id_Key, &CS.TC)
+        Conformance->getTypeWitnessByName(
+          contextualType, CS.getASTContext().Id_Key)
             ->getDesugaredType();
 
     contextualValueType =
-        ProtocolConformanceRef::getTypeWitnessByName(
-            contextualType, *Conformance, CS.getASTContext().Id_Value, &CS.TC)
+        Conformance->getTypeWitnessByName(
+          contextualType, CS.getASTContext().Id_Value)
             ->getDesugaredType();
 
     assert(contextualKeyType && contextualValueType &&

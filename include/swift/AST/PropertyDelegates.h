@@ -36,11 +36,15 @@ struct PropertyDelegateTypeInfo {
   VarDecl *valueVar = nullptr;
 
   /// The initializer init(initialValue:) that will be called when the
-  /// initiqlizing the property delegate type from a value of the property type.
+  /// initializing the property delegate type from a value of the property type.
   ///
   /// This initializer is optional, but if present will be used for the `=`
   /// initialization syntax.
   ConstructorDecl *initialValueInit = nullptr;
+
+  /// The initializer `init()` that will be called to default-initialize a
+  /// value with an attached property delegate.
+  ConstructorDecl *defaultInit = nullptr;
 
   /// The property through which the delegate value ($foo) will be accessed,
   /// hiding the underlying storage completely.

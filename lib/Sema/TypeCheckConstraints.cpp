@@ -952,6 +952,107 @@ namespace {
     /// the type conforms to the expected literal protocol.
     Expr *simplifyTypeConstructionWithLiteralArg(Expr *E);
 
+    /// In Swift < 5, diagnose and correct invalid multi-argument or
+    /// argument-labeled interpolations.
+    void correctInterpolationIfStrange(InterpolatedStringLiteralExpr *ISLE) {
+      // These expressions are valid in Swift 5+.
+      if (TC.Context.isSwiftVersionAtLeast(5))
+        return;
+
+      /// Diagnoses appendInterpolation(...) calls with multiple
+      /// arguments or argument labels and corrects them.
+      class StrangeInterpolationRewriter : public ASTWalker {
+        TypeChecker &TC;
+
+      public:
+        StrangeInterpolationRewriter(TypeChecker &TC) : TC(TC) { }
+
+        virtual bool walkToDeclPre(Decl *D) {
+          // We don't want to look inside decls.
+          return false;
+        }
+
+        virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+          // One InterpolatedStringLiteralExpr should never be nested inside
+          // another except as a child of a CallExpr, and we don't recurse into
+          // the children of CallExprs.
+          assert(!isa<InterpolatedStringLiteralExpr>(E) &&
+                 "StrangeInterpolationRewriter found nested interpolation?");
+
+          // We only care about CallExprs.
+          if (!isa<CallExpr>(E))
+            return { true, E };
+
+          auto call = cast<CallExpr>(E);
+          if (auto callee = dyn_cast<UnresolvedDotExpr>(call->getFn())) {
+            if (callee->getName().getBaseName() ==
+                    TC.Context.Id_appendInterpolation) {
+              Expr *newArg = nullptr;
+              SourceLoc lParen, rParen;
+
+              if (call->getNumArguments() > 1) {
+                auto *args = cast<TupleExpr>(call->getArg());
+
+                lParen = args->getLParenLoc();
+                rParen = args->getRParenLoc();
+                Expr *secondArg = args->getElement(1);
+
+                TC.diagnose(secondArg->getLoc(),
+                            diag::string_interpolation_list_changing)
+                  .highlightChars(secondArg->getLoc(), rParen);
+                TC.diagnose(secondArg->getLoc(),
+                            diag::string_interpolation_list_insert_parens)
+                  .fixItInsertAfter(lParen, "(")
+                  .fixItInsert(rParen, ")");
+
+                newArg = args;
+              }
+              else if(call->getNumArguments() == 1 &&
+                      call->getArgumentLabels().front() != Identifier()) {
+                auto *args = cast<TupleExpr>(call->getArg());
+                newArg = args->getElement(0);
+
+                lParen = args->getLParenLoc();
+                rParen = args->getRParenLoc();
+
+                SourceLoc argLabelLoc = call->getArgumentLabelLoc(0),
+                          argLoc = newArg->getStartLoc();
+
+                TC.diagnose(argLabelLoc,
+                            diag::string_interpolation_label_changing)
+                  .highlightChars(argLabelLoc, argLoc);
+                TC.diagnose(argLabelLoc,
+                            diag::string_interpolation_remove_label,
+                            call->getArgumentLabels().front())
+                  .fixItRemoveChars(argLabelLoc, argLoc);
+              }
+
+              // If newArg is no longer null, we need to build a new
+              // appendInterpolation(_:) call that takes it to replace the bad
+              // appendInterpolation(...) call.
+              if (newArg) {
+                auto newCallee = new (TC.Context) UnresolvedDotExpr(
+                    callee->getBase(), /*dotloc=*/SourceLoc(),
+                    DeclName(TC.Context.Id_appendInterpolation),
+                    /*nameloc=*/DeclNameLoc(), /*Implicit=*/true);
+
+                E = CallExpr::create(TC.Context, newCallee, lParen,
+                    { newArg }, { Identifier() }, { SourceLoc() },
+                    rParen, /*trailingClosure=*/nullptr, /*implicit=*/false);
+              }
+            }
+          }
+
+          // There is never a CallExpr between an InterpolatedStringLiteralExpr
+          // and an un-typechecked appendInterpolation(...) call, so whether we
+          // changed E or not, we don't need to recurse any deeper.
+          return { false, E };
+        }
+      };
+      
+      ISLE->getAppendingExpr()->walk(StrangeInterpolationRewriter(TC));
+    }
+
   public:
     PreCheckExpression(TypeChecker &tc, DeclContext *dc, Expr *parent)
         : TC(tc), DC(dc), ParentExpr(parent) {}
@@ -1085,6 +1186,9 @@ namespace {
         TC.diagnose(expr->getStartLoc(), diag::extraneous_address_of);
         return finish(false, nullptr);
       }
+
+      if (auto *ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr))
+        correctInterpolationIfStrange(ISLE);
 
       return finish(true, expr);
     }
@@ -2646,9 +2750,12 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   auto contextualPurpose = CTP_Unused;
   TypeCheckExprOptions flags = TypeCheckExprFlags::ConvertTypeIsOnlyAHint;
 
+  // Set the contextual purpose even if the pattern doesn't have a type so
+  // if there's an error we can use that information to inform diagnostics.
+  contextualPurpose = CTP_Initialization;
+
   if (pattern->hasType()) {
     contextualType = TypeLoc::withoutLoc(pattern->getType());
-    contextualPurpose = CTP_Initialization;
 
     // If we already had an error, don't repeat the problem.
     if (contextualType.getType()->hasError())

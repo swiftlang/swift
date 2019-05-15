@@ -943,14 +943,26 @@ extension Range {
   ///   common; otherwise, `false`.
   @inlinable
   public func overlaps(_ other: Range<Bound>) -> Bool {
-    return (!other.isEmpty && self.contains(other.lowerBound))
-        || (!self.isEmpty && other.contains(self.lowerBound))
+    // Disjoint iff the other range is completely before or after our range.
+    // Additionally either `Range` (unlike a `ClosedRange`) could be empty, in
+    // which case it is disjoint with everything as overlap is defined as having
+    // an element in common.
+    let isDisjoint = other.upperBound <= self.lowerBound
+      || self.upperBound <= other.lowerBound
+      || self.isEmpty || other.isEmpty
+    return !isDisjoint
   }
 
   @inlinable
   public func overlaps(_ other: ClosedRange<Bound>) -> Bool {
-    return self.contains(other.lowerBound)
-        || (!self.isEmpty && other.contains(self.lowerBound))
+    // Disjoint iff the other range is completely before or after our range.
+    // Additionally the `Range` (unlike the `ClosedRange`) could be empty, in
+    // which case it is disjoint with everything as overlap is defined as having
+    // an element in common.
+    let isDisjoint = other.upperBound < self.lowerBound
+      || self.upperBound <= other.lowerBound
+      || self.isEmpty
+    return !isDisjoint
   }
 }
 

@@ -990,6 +990,21 @@ bool TupleExtractInst::isEltOnlyNonTrivialElt() const {
   return true;
 }
 
+unsigned FieldIndexCacheBase::cacheFieldIndex() {
+  unsigned i = 0;
+  for (VarDecl *property : getParentDecl()->getStoredProperties()) {
+    if (field == property) {
+      SILInstruction::Bits.FieldIndexCacheBase.FieldIndex = i;
+      return i;
+    }
+    ++i;
+  }
+  llvm_unreachable("The field decl for a struct_extract, struct_element_addr, "
+                   "or ref_element_addr must be an accessible stored property "
+                   "of the operand's type");
+}
+
+// FIXME: this should be cached during cacheFieldIndex().
 bool StructExtractInst::isTrivialFieldOfOneRCIDStruct() const {
   auto *F = getFunction();
 
@@ -1011,7 +1026,7 @@ bool StructExtractInst::isTrivialFieldOfOneRCIDStruct() const {
   // For each element index of the tuple...
   for (VarDecl *D : getStructDecl()->getStoredProperties()) {
     // If the field is the one we are extracting, skip it...
-    if (Field == D)
+    if (getField() == D)
       continue;
 
     // Otherwise check if we have a non-trivial type. If we don't have one,
@@ -1040,6 +1055,8 @@ bool StructExtractInst::isTrivialFieldOfOneRCIDStruct() const {
 /// Return true if we are extracting the only non-trivial field of out parent
 /// struct. This implies that a ref count operation on the aggregate is
 /// equivalent to a ref count operation on this field.
+///
+/// FIXME: this should be cached during cacheFieldIndex().
 bool StructExtractInst::isFieldOnlyNonTrivialField() const {
   auto *F = getFunction();
 
@@ -1053,7 +1070,7 @@ bool StructExtractInst::isFieldOnlyNonTrivialField() const {
   // Ok, we are visiting a non-trivial field. Then for every stored field...
   for (VarDecl *D : getStructDecl()->getStoredProperties()) {
     // If we are visiting our own field continue.
-    if (Field == D)
+    if (getField() == D)
       continue;
 
     // Ok, we have a field that is not equal to the field we are
@@ -1151,6 +1168,19 @@ YieldInst *YieldInst::create(SILDebugLocation loc,
   auto Size = totalSizeToAlloc<swift::Operand>(yieldedValues.size());
   void *Buffer = F.getModule().allocateInst(Size, alignof(YieldInst));
   return ::new (Buffer) YieldInst(loc, yieldedValues, normalBB, unwindBB);
+}
+
+SILYieldInfo YieldInst::getYieldInfoForOperand(const Operand &op) const {
+  // We expect op to be our operand.
+  assert(op.getUser() == this);
+  auto conv = getFunction()->getConventions();
+  return conv.getYieldInfoForOperandIndex(op.getOperandNumber());
+}
+
+SILArgumentConvention
+YieldInst::getArgumentConventionForOperand(const Operand &op) const {
+  auto conv = getYieldInfoForOperand(op).getConvention();
+  return SILArgumentConvention(conv);
 }
 
 BranchInst *BranchInst::create(SILDebugLocation Loc, SILBasicBlock *DestBB,
@@ -2005,7 +2035,7 @@ ConvertFunctionInst *ConvertFunctionInst::create(
     (void)opTI;
     CanSILFunctionType resTI = CFI->getType().castTo<SILFunctionType>();
     (void)resTI;
-    assert(opTI->isABICompatibleWith(resTI).isCompatible() &&
+    assert(opTI->isABICompatibleWith(resTI, &F).isCompatible() &&
            "Can not convert in between ABI incompatible function types");
   }
   return CFI;
@@ -2035,9 +2065,9 @@ ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(
     (void)opTI;
     CanSILFunctionType resTI = CFI->getType().castTo<SILFunctionType>();
     (void)resTI;
-    assert(
-        opTI->isABICompatibleWith(resTI).isCompatibleUpToNoEscapeConversion() &&
-        "Can not convert in between ABI incompatible function types");
+    assert(opTI->isABICompatibleWith(resTI, &F)
+               .isCompatibleUpToNoEscapeConversion() &&
+           "Can not convert in between ABI incompatible function types");
   }
   return CFI;
 }
