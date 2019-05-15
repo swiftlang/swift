@@ -2766,6 +2766,7 @@ bool ExtraneousReturnFailure::diagnoseAsError() {
 
 bool CollectionElementContextualFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
+  auto *locator = getLocator();
 
   auto eltType = getFromType();
   auto contextualType = getToType();
@@ -2778,8 +2779,7 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   }
 
   if (isa<DictionaryExpr>(getRawAnchor())) {
-    auto *locator = getLocator();
-    const auto eltLoc = locator->getPath().back();
+    const auto &eltLoc = locator->getPath().back();
 
     switch (eltLoc.getValue()) {
     case 0: // key
@@ -2797,6 +2797,15 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
     default:
       break;
     }
+  }
+
+  if (locator->isForSequenceElementType()) {
+    diagnostic.emplace(
+        emitDiagnostic(anchor->getLoc(),
+                       contextualType->isExistentialType()
+                           ? diag::cannot_convert_sequence_element_protocol
+                           : diag::cannot_convert_sequence_element_value,
+                       eltType, contextualType));
   }
 
   if (!diagnostic)

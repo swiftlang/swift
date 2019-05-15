@@ -2156,6 +2156,12 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::SequenceElementType: {
+    conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
+        *this, lhs, rhs, getConstraintLocator(locator)));
+    break;
+  }
+
   default:
     break;
   }

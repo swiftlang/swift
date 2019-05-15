@@ -451,6 +451,13 @@ ERROR(cannot_convert_assign_protocol,none,
 ERROR(cannot_convert_assign_nil,none,
       "'nil' cannot be assigned to type %0", (Type))
 
+// for ... in expression
+ERROR(cannot_convert_sequence_element_value,none,
+      "cannot convert sequence element type %0 to expected type %1",
+      (Type, Type))
+ERROR(cannot_convert_sequence_element_protocol,none,
+      "sequence element type %0 does not conform to expected type %1",
+      (Type, Type))
 
 ERROR(throws_functiontype_mismatch,none,
       "invalid conversion from throwing function of type %0 to "

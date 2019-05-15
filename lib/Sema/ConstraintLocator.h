@@ -563,6 +563,10 @@ public:
   /// Determine whether this locator points to the generic parameter.
   bool isForGenericParameter() const;
 
+  /// Determine whether this locator points to the element type of a
+  /// sequence in a for ... in ... loop.
+  bool isForSequenceElementType() const;
+
   /// Produce a profile of this locator, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
                       ArrayRef<PathElement> path);
