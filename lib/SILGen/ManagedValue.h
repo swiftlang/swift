@@ -334,6 +334,10 @@ public:
   /// uninitialized address.
   void copyInto(SILGenFunction &SGF, SILLocation loc, SILValue dest);
 
+  /// Store a copy of this value with independent ownership into the given
+  /// initialization \p dest.
+  void copyInto(SILGenFunction &SGF, SILLocation loc, Initialization *dest);
+
   explicit operator bool() const {
     // "InContext" is not considered false.
     return bool(getValue()) || valueAndFlag.getInt();

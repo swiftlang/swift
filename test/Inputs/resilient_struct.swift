@@ -78,7 +78,9 @@ public struct ResilientDouble {
   }
 }
 
-public class Referent {}
+public class Referent {
+  public init() {}
+}
 
 public struct ResilientWeakRef {
   public weak var ref: Referent?
@@ -90,8 +92,21 @@ public struct ResilientWeakRef {
 
 public struct ResilientRef {
   public var r: Referent
+
+  public init(r: Referent) { self.r = r }
 }
 
 public struct ResilientWithInternalField {
   var x: Int
+}
+
+// Tuple parameters with resilient structs
+public class Subject {}
+
+public struct Container {
+  public var s: Subject
+}
+
+public struct PairContainer {
+  public var pair : (Container, Container)
 }
