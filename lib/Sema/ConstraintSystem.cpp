@@ -2189,6 +2189,12 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       << boundType->getString() << " := "
       << refType->getString() << ")\n";
   }
+
+  // If this overload is disfavored, note that.
+  if (choice.isDecl() &&
+      choice.getDecl()->getAttrs().hasAttribute<DisfavoredOverloadAttr>()) {
+    increaseScore(SK_DisfavoredOverload);
+  }
 }
 
 template <typename Fn>

@@ -130,6 +130,7 @@ public:
   IGNORED_ATTR(PrivateImport)
   IGNORED_ATTR(Custom)
   IGNORED_ATTR(PropertyDelegate)
+  IGNORED_ATTR(DisfavoredOverload)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -810,6 +811,7 @@ public:
     IGNORED_ATTR(Transparent)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(WeakLinked)
+    IGNORED_ATTR(DisfavoredOverload)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
