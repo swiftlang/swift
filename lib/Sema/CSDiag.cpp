@@ -1740,8 +1740,8 @@ static Type isRawRepresentable(Type fromType, const ConstraintSystem &CS) {
   if (!conformance)
     return Type();
 
-  Type rawTy = ProtocolConformanceRef::getTypeWitnessByName(
-      fromType, *conformance, CS.getASTContext().Id_RawValue);
+  Type rawTy = conformance->getTypeWitnessByName(
+      fromType, CS.getASTContext().Id_RawValue);
   return rawTy;
 }
 
@@ -2119,9 +2119,9 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
                                     ConformanceCheckFlags::InExpression)) {
         Type errorCodeType = CS.getType(expr);
         Type errorType =
-          ProtocolConformanceRef::getTypeWitnessByName(errorCodeType, *conformance,
-                                                       TC.Context.Id_ErrorType)
-                                                         ->getCanonicalType();
+          conformance->getTypeWitnessByName(errorCodeType,
+                                            TC.Context.Id_ErrorType)
+            ->getCanonicalType();
         if (errorType) {
           auto diag = diagnose(expr->getLoc(), diag::cannot_throw_error_code,
                                errorCodeType, errorType);
@@ -6253,9 +6253,8 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
         = CS.TC.conformsToProtocol(contextualType, ALC, CS.DC,
                                    ConformanceCheckFlags::InExpression)) {
     Type contextualElementType =
-        ProtocolConformanceRef::getTypeWitnessByName(
-            contextualType, *Conformance,
-            CS.getASTContext().Id_ArrayLiteralElement)
+        Conformance->getTypeWitnessByName(
+          contextualType, CS.getASTContext().Id_ArrayLiteralElement)
             ->getDesugaredType();
 
     // Type check each of the subexpressions in place, passing down the contextual
@@ -6343,13 +6342,13 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
     }
 
     contextualKeyType =
-        ProtocolConformanceRef::getTypeWitnessByName(
-            contextualType, *Conformance, CS.getASTContext().Id_Key)
+        Conformance->getTypeWitnessByName(
+          contextualType, CS.getASTContext().Id_Key)
             ->getDesugaredType();
 
     contextualValueType =
-        ProtocolConformanceRef::getTypeWitnessByName(
-            contextualType, *Conformance, CS.getASTContext().Id_Value)
+        Conformance->getTypeWitnessByName(
+          contextualType, CS.getASTContext().Id_Value)
             ->getDesugaredType();
 
     assert(contextualKeyType && contextualValueType &&
