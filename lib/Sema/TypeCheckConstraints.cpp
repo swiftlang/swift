@@ -2593,7 +2593,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
     /// Retrieve the type to which the pattern should be coerced.
     Type getPatternInitType() const {
-      if (!appliedPropertyDelegate || initType->hasError())
+      if (!appliedPropertyDelegate || initType->hasError() ||
+          initType->is<TypeVariableType>())
         return initType;
 
       // We applied a property delegate, so dig the pattern initialization
