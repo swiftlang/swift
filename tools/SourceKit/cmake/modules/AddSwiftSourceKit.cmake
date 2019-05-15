@@ -228,7 +228,7 @@ macro(add_sourcekit_executable name)
   cmake_parse_arguments(SOURCEKITEXE
     "EXCLUDE_FROM_ALL"
     ""
-    "LINK_LIBS;LLVM_COMPONENT_DEPENDS"
+    "C_COMPILE_FLAGS;LINK_LIBS;LLVM_COMPONENT_DEPENDS"
     ${ARGN})
 
   if (${SOURCEKITEXE_EXCLUDE_FROM_ALL})
@@ -263,6 +263,8 @@ macro(add_sourcekit_executable name)
     endif()
   endif()
   add_sourcekit_default_compiler_flags("${name}")
+  set_property(TARGET "${name}" APPEND_STRING PROPERTY
+	       COMPILE_FLAGS " ${SOURCEKITEXE_C_COMPILE_FLAGS}")
 endmacro()
 
 # Add a new SourceKit framework.

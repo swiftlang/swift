@@ -354,12 +354,18 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       break;
 
     case OPT_vfs_files:
+#ifdef SWIFT_SOURCEKIT_USE_INPROC_LIBRARY
       for (const char *VFSFile : InputArg->getValues()) {
         auto NameAndTarget = StringRef(VFSFile).split('=');
         VFSFiles.try_emplace(std::get<0>(NameAndTarget),
                              std::get<1>(NameAndTarget).str());
       }
       break;
+#else
+      llvm::errs() << "vfs-files only supported when "
+                      "SWIFT_SOURCEKIT_USE_INPROC_LIBRARY is set";
+      return true;
+#endif
 
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "

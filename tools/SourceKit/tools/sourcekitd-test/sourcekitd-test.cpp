@@ -271,8 +271,10 @@ static int skt_main(int argc, const char **argv) {
 
   sourcekitd_initialize();
 
+#ifdef SWIFT_SOURCEKIT_USE_INPROC_LIBRARY
   TestFileSystemProvider testFileSystemProvider;
   SourceKit::setGlobalFileSystemProvider("testvfs", &testFileSystemProvider);
+#endif
 
   sourcekitd_set_notification_handler(^(sourcekitd_response_t resp) {
     notification_receiver(resp);
