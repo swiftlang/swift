@@ -3050,7 +3050,8 @@ public:
         context.getTypeConverter(), canGenSig);
     auto loweredPullbackType =
         getOpType(context.getTypeConverter().getLoweredType(
-                      pullbackDecl->getInterfaceType()->getCanonicalType(), ResilienceExpansion::Minimal))
+                      pullbackDecl->getInterfaceType()->getCanonicalType(),
+                      ResilienceExpansion::Minimal))
             .castTo<SILFunctionType>();
     if (!loweredPullbackType->isEqual(actualPullbackType)) {
       // Set non-reabstracted original pullback type in nested apply info.
@@ -3790,7 +3791,12 @@ private:
         newBuf->getLoc(), newBuf, SILAccessKind::Init,
         SILAccessEnforcement::Static, /*noNestedConflict*/ true,
         /*fromBuiltin*/ false);
+    // Temporarily change global builder insertion point and emit zero into the
+    // local buffer.
+    auto insertionPoint = builder.getInsertionBB();
+    builder.setInsertionPoint(localAllocBuilder.getInsertionPoint());
     emitZeroIndirect(access->getType().getASTType(), access, access->getLoc());
+    builder.setInsertionPoint(insertionPoint);
     localAllocBuilder.createEndAccess(
         access->getLoc(), access, /*aborted*/ false);
     // Create cleanup for local buffer.
