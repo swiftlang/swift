@@ -352,8 +352,13 @@ static bool collectPossibleCalleesForApply(
   auto *fnExpr = callExpr->getFn();
 
   if (auto type = fnExpr->getType()) {
-    if (auto *funcType = type->getAs<AnyFunctionType>())
-      candidates.emplace_back(funcType, fnExpr->getReferencedDecl().getDecl());
+    if (auto *funcType = type->getAs<AnyFunctionType>()) {
+      auto refDecl = fnExpr->getReferencedDecl();
+      if (!refDecl)
+        if (auto apply = dyn_cast<ApplyExpr>(fnExpr))
+          refDecl = apply->getFn()->getReferencedDecl();
+      candidates.emplace_back(funcType, refDecl.getDecl());
+    }
   } else if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
     if (auto *decl = DRE->getDecl()) {
       auto declType = decl->getInterfaceType();
