@@ -1863,8 +1863,8 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                                        SyntaxKind::ExpressionSegment);
 
       // Backslash is part of an expression segment.
-      Token BackSlash(tok::backslash,
-                      CharSourceRange(Segment.Loc.getAdvancedLoc(-1), 1).str());
+      SourceLoc BackSlashLoc = Segment.Loc.getAdvancedLoc(-1);
+      Token BackSlash(tok::backslash, CharSourceRange(BackSlashLoc, 1).str());
       ExprContext.addToken(BackSlash, EmptyTrivia, EmptyTrivia);
       // Create a temporary lexer that lexes from the body of the string.
       LexerState BeginState =
@@ -1888,30 +1888,12 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
       TokReceiver->registerTokenKindChange(Tok.getLoc(),
                                            tok::string_interpolation_anchor);
 
-      SourceLoc lParen, rParen;
-      SmallVector<Expr *, 4> args;
-      SmallVector<Identifier, 4> argLabels;
-      SmallVector<SourceLoc, 4> argLabelLocs;
-      Expr *trailingClosureNeverPresent;
-      ParserStatus S =
-          parseExprList(tok::l_paren, tok::r_paren,
-                        /*isPostfix=*/false, /*isExprBasic=*/true,
-                        lParen, args, argLabels, argLabelLocs, rParen,
-                        trailingClosureNeverPresent,
-                        SyntaxKind::FunctionCallArgumentList);
-      assert(!trailingClosureNeverPresent);
-
-      Status |= S;
-      // If there was an error parsing a parameter, add an ErrorExpr to
-      // represent it. Prevents spurious errors about a nonexistent
-      // appendInterpolation() overload.
-      if (S.isError() && args.size() == 0)
-        args.push_back(new (Context) ErrorExpr(SourceRange(lParen, rParen)));
-      
-      while (argLabels.size() < args.size())
-        argLabels.push_back(Identifier());
-      while (argLabelLocs.size() < args.size())
-        argLabelLocs.push_back(SourceLoc());
+      auto callee = new (Context) UnresolvedDotExpr(InterpolationVarRef,
+                                                    /*dotloc=*/BackSlashLoc,
+                                                    appendInterpolation,
+                                                    /*nameloc=*/DeclNameLoc(),
+                                                    /*Implicit=*/true);
+      auto S = parseExprCallSuffix(makeParserResult(callee), true);
 
       // If we stopped parsing the expression before the expression segment is
       // over, eat the remaining tokens into a token list
@@ -1925,51 +1907,14 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                  L->getLocForEndOfToken(SourceMgr, Tok.getLoc()));
       }
 
+      Expr *call = S.getPtrOrNull();
+      if (!call)
+        call = new (Context) ErrorExpr(SourceRange(Segment.Loc,
+                                                   Segment.getEndLoc()));
+
       InterpolationCount += 1;
-      
-      // In Swift 4.2 and earlier, a single argument with a label would ignore
-      // the label (at best), and multiple arguments would form a tuple.
-      if (!Context.isSwiftVersionAtLeast(5)) {
-        if (args.size() > 1) {
-          diagnose(args[1]->getLoc(), diag::string_interpolation_list_changing)
-            .highlightChars(args[1]->getLoc(), rParen);
-          diagnose(args[1]->getLoc(),
-                   diag::string_interpolation_list_insert_parens)
-            .fixItInsertAfter(lParen, "(")
-            .fixItInsert(rParen, ")");
-          
-          args = {
-            TupleExpr::create(Context,
-                              lParen, args, argLabels, argLabelLocs, rParen,
-                              /*hasTrailingClosure=*/false,
-                              /*Implicit=*/false)
-          };
-          argLabels = { Identifier() };
-          argLabelLocs = { SourceLoc() };
-        }
-        else if (args.size() == 1 && argLabels[0] != Identifier()) {
-          diagnose(argLabelLocs[0], diag::string_interpolation_label_changing)
-            .highlightChars(argLabelLocs[0], args[0]->getStartLoc());
-          diagnose(argLabelLocs[0], diag::string_interpolation_remove_label,
-                   argLabels[0])
-            .fixItRemoveChars(argLabelLocs[0], args[0]->getStartLoc());
-          
-          argLabels[0] = Identifier();
-        }
-      }
-      
-      auto AppendInterpolationRef =
-        new (Context) UnresolvedDotExpr(InterpolationVarRef,
-                                        /*dotloc=*/SourceLoc(),
-                                        appendInterpolation,
-                                        /*nameloc=*/DeclNameLoc(), 
-                                        /*Implicit=*/true);
-      auto AppendInterpolationCall =
-        CallExpr::create(Context, AppendInterpolationRef,
-                         lParen, args, argLabels, argLabelLocs, rParen,
-                         /*trailingClosure=*/nullptr, /*implicit=*/false);
-      
-      Stmts.push_back(AppendInterpolationCall);
+      Stmts.push_back(call);
+      Status |= S;
 
       if (!Tok.is(tok::eof)) {
         diagnose(Tok, diag::string_interpolation_extra);
