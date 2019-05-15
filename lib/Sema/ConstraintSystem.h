@@ -1927,6 +1927,11 @@ public:
     return e != ExprWeights.end() ? e->second.second : nullptr;
   }
 
+  /// Returns a locator describing the callee for a given expression. For
+  /// a function application, this is a locator describing the function expr.
+  /// For an unresolved dot/member, this is a locator to the member.
+  ConstraintLocator *getCalleeLocator(Expr *expr);
+
 public:
 
   /// Whether we should attempt to fix problems.

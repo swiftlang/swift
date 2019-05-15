@@ -408,6 +408,44 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   return getConstraintLocator(anchor, path, builder.getSummaryFlags());
 }
 
+ConstraintLocator *ConstraintSystem::getCalleeLocator(Expr *expr) {
+  if (auto *applyExpr = dyn_cast<ApplyExpr>(expr)) {
+    auto *fnExpr = applyExpr->getFn();
+    // For an apply of a metatype, we have a short-form constructor. Unlike
+    // other locators to callees, these are anchored on the apply expression
+    // rather than the function expr.
+    if (simplifyType(getType(fnExpr))->is<AnyMetatypeType>()) {
+      auto *fnLocator =
+          getConstraintLocator(applyExpr, ConstraintLocator::ApplyFunction);
+      return getConstraintLocator(fnLocator,
+                                  ConstraintLocator::ConstructorMember);
+    }
+    // Otherwise fall through and look for locators anchored on the fn expr.
+    expr = fnExpr;
+  }
+
+  auto *locator = getConstraintLocator(expr);
+  if (auto *ude = dyn_cast<UnresolvedDotExpr>(expr)) {
+    if (TC.getSelfForInitDelegationInConstructor(DC, ude)) {
+      return getConstraintLocator(locator,
+                                  ConstraintLocator::ConstructorMember);
+    } else {
+      return getConstraintLocator(locator, ConstraintLocator::Member);
+    }
+  }
+
+  if (isa<UnresolvedMemberExpr>(expr))
+    return getConstraintLocator(locator, ConstraintLocator::UnresolvedMember);
+
+  if (isa<SubscriptExpr>(expr))
+    return getConstraintLocator(locator, ConstraintLocator::SubscriptMember);
+
+  if (isa<MemberRefExpr>(expr))
+    return getConstraintLocator(locator, ConstraintLocator::Member);
+
+  return locator;
+}
+
 Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
                                               ConstraintLocatorBuilder locator,
                                               OpenedTypeMap &replacements) {

@@ -704,6 +704,26 @@ func member_ref_with_explicit_init() {
   // expected-error@-1 {{generic struct 'S' requires that 'Int' conform to 'P'}}
 }
 
+protocol Q {
+  init<T : P>(_ x: T) // expected-note 2{{where 'T' = 'T'}}
+}
+
+struct SR10694 {
+  init<T : P>(_ x: T) {} // expected-note 2{{where 'T' = 'T'}}
+  func bar<T>(_ x: T, _ s: SR10694, _ q: Q) {
+    SR10694.self(x) // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
+
+    type(of: s)(x)  // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
+    // expected-error@-1 {{initializing from a metatype value must reference 'init' explicitly}}
+
+    Q.self(x) // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
+    // expected-error@-1 {{protocol type 'Q' cannot be instantiated}}
+
+    type(of: q)(x)  // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
+    // expected-error@-1 {{initializing from a metatype value must reference 'init' explicitly}}
+  }
+}
+
 func rdar_50007727() {
   struct A<T> { // expected-note {{'T' declared as parameter to type 'A'}}
     struct B<U> : ExpressibleByStringLiteral {
