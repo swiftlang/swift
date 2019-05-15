@@ -304,3 +304,6 @@ let zeroTuple = (0,0)
 
 if case (foo: let x, foo: let y) = zeroTuple { print(x+y) } // expected-error {{cannot create a tuple with a duplicate element label}} 
 // expected-warning@-1 {{'if' condition is always true}}
+
+enum BishBash { case bar(foo: Int, foo: String) }
+let f: BishBash = .bar(foo: 0, foo: "") // expected-error {{cannot create a tuple with a duplicate element label}}
