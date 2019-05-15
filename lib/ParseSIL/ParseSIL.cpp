@@ -953,8 +953,8 @@ void SILParser::convertRequirements(SILFunction *F,
     }
 
     if (Req.getKind() == RequirementReprKind::TypeConstraint) {
-      auto FirstType = ResolveToInterfaceType(Req.getFirstTypeLoc());
-      auto SecondType = ResolveToInterfaceType(Req.getSecondTypeLoc());
+      auto FirstType = ResolveToInterfaceType(Req.getSubjectLoc());
+      auto SecondType = ResolveToInterfaceType(Req.getConstraintLoc());
       Requirement ConvertedRequirement(RequirementKind::Conformance, FirstType,
                                        SecondType);
       To.push_back(ConvertedRequirement);

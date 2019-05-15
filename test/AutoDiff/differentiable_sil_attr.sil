@@ -16,16 +16,13 @@ entry(%0: $Float, %1: $Float):
   return undef: $(Float, (Float) -> (Float, Float))
 }
 
-// CHECK-LABEL: sil [differentiable source 0 wrt 0, 1 vjp @foo_vjp] @foo
-sil [differentiable source 0 wrt 0, 1 vjp @foo_vjp] @foo : $@convention(thin) <T, U, V> (@in_guaranteed T, @in_guaranteed U, @in_guaranteed V) -> @out V {
+// CHECK-LABEL: sil [differentiable source 0 wrt 0, 1 vjp @foo_vjp where T : Differentiable, U : Differentiable, V : Differentiable] @foo
+sil [differentiable source 0 wrt 0, 1 vjp @foo_vjp where T : Differentiable, U : Differentiable, V : Differentiable] @foo : $@convention(thin) <T, U, V> (@in_guaranteed T, @in_guaranteed U, @in_guaranteed V) -> @out V {
 entry(%0 : $*V, %1 : $*T, %2 : $*U, %3 : $*V):
   return undef: $()
 }
 
-sil @$foo_vjp : $@convention(thin) <T, U, V> (@in_guaranteed T, @in_guaranteed U, @in_guaranteed V) -> (@out V, @owned @callee_guaranteed (@in_guaranteed V) -> (@out T, @out U)) {
-// %1                                             // user: %4
-// %2                                             // user: %5
-// %3                                             // user: %6
+sil @foo_vjp : $@convention(thin) <T, U, V where T : Differentiable, U : Differentiable, V : Differentiable> (@in_guaranteed T, @in_guaranteed U, @in_guaranteed V) -> (@out V, @owned @callee_guaranteed (@in_guaranteed V) -> (@out T, @out U)) {
 bb0(%0 : $*V, %1 : $*T, %2 : $*U, %3 : $*V):
   return undef: $@callee_guaranteed (@in_guaranteed V) -> (@out T, @out U)
 }
