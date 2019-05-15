@@ -39,6 +39,7 @@ syn keyword swiftDefinitionModifier
       \ fileprivate
       \ final
       \ internal
+      \ lazy
       \ nonmutating
       \ open
       \ override
