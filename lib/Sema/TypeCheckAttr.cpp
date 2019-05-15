@@ -3120,7 +3120,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         originalFnTy->getAutoDiffAssociatedFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
             /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP,
-            lookupConformance, whereClauseGenSig);
+            lookupConformance, whereClauseGenSig, /*makeSelfParamFirst*/ true);
 
     auto isValidJVP = [&](FuncDecl *jvpCandidate) {
       TC.validateDeclForNameLookup(jvpCandidate);
@@ -3146,7 +3146,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         originalFnTy->getAutoDiffAssociatedFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
             /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP,
-            lookupConformance, whereClauseGenSig);
+            lookupConformance, whereClauseGenSig, /*makeSelfParamFirst*/ true);
 
     auto isValidVJP = [&](FuncDecl *vjpCandidate) {
       TC.validateDeclForNameLookup(vjpCandidate);
@@ -3174,56 +3174,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
     return;
   }
-}
-
-// SWIFT_ENABLE_TENSORFLOW
-// Makes a function with the same generic signature and extinfo as `copy`, but
-// with `params` parameters and `retTy` return type.
-static AnyFunctionType *
-makeFunctionType(AnyFunctionType *copy, ArrayRef<AnyFunctionType::Param> params,
-                 Type retTy, GenericSignature *genericSignature) {
-  if (!genericSignature)
-    if (auto *genericFunctionType = copy->getAs<GenericFunctionType>())
-      genericSignature = genericFunctionType->getGenericSignature();
-  if (genericSignature)
-    return GenericFunctionType::get(genericSignature, params, retTy,
-                                    copy->getExtInfo());
-  return FunctionType::get(params, retTy, copy->getExtInfo());
-}
-
-// SWIFT_ENABLE_TENSORFLOW
-// Compute the original function type corresponding to the given derivative
-// function type.
-static AnyFunctionType *
-computeAutoDiffOriginalFunctionType(AnyFunctionType *derivativeType) {
-  // Unwrap curry levels.
-  SmallVector<AnyFunctionType *, 2> curryLevels;
-  auto *currentLevel = derivativeType;
-  while (currentLevel != nullptr) {
-    curryLevels.push_back(currentLevel);
-    currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
-  }
-
-  auto derivativeResult = curryLevels.back()->getResult()->getAs<TupleType>();
-  assert(derivativeResult && derivativeResult->getNumElements() == 2 &&
-         "Expected derivative result to be a two-element tuple");
-  auto originalResult = derivativeResult->getElement(0).getType();
-  auto genericSignature = derivativeType->getOptGenericSignature();
-  auto *originalType = makeFunctionType(
-      curryLevels.back(), curryLevels.back()->getParams(), originalResult,
-      curryLevels.size() == 1 ? genericSignature : nullptr);
-
-  // Wrap the associated function type in additional curry levels.
-  auto curryLevelsWithoutLast =
-      ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
-  for (auto pair : enumerate(reversed(curryLevelsWithoutLast))) {
-    unsigned i = pair.index();
-    AnyFunctionType *curryLevel = pair.value();
-    originalType = makeFunctionType(
-        curryLevel, curryLevel->getParams(), originalType,
-        i == curryLevelsWithoutLast.size() - 1 ? genericSignature : nullptr);
-  }
-  return originalType;
 }
 
 // SWIFT_ENABLE_TENSORFLOW
@@ -3294,7 +3244,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
 
   // Compute expected original function type and look up original function.
   auto *originalFnType =
-      computeAutoDiffOriginalFunctionType(derivativeInterfaceType);
+      derivativeInterfaceType->getAutoDiffOriginalFunctionType();
 
   std::function<bool(GenericSignature *, GenericSignature *)>
     checkGenericSignatureSatisfied =

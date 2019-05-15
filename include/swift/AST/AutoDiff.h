@@ -77,6 +77,7 @@ class AnyFunctionType;
 class AutoDiffIndexSubset;
 class AutoDiffParameterIndicesBuilder;
 class Type;
+enum class SILLinkage : uint8_t;
 
 /// Identifies a subset of a function's parameters.
 ///
@@ -148,14 +149,17 @@ public:
   ///
   ///   functionType = (A, B) -> (C, D) -> R
   ///   if "A", "C", and "D" are in the set,
-  ///   ==> pushes {A, C, D} to `paramTypes`.
+  ///   ==> pushes {A, C, D} to `paramTypes` if `reverseCurryLevels` is false,
+  ///    or pushes {C, D, A} otherwise.
   ///
   ///   functionType = (Self) -> (A, B, C) -> R
   ///   if "Self" and "C" are in the set,
-  ///   ==> pushes {Self, C} to `paramTypes`.
+  ///   ==> pushes {Self, C} to `paramTypes` if `reverseCurryLevels` is false,
+  ///    or pushes {C, Self} otherwise.
   ///
   void getSubsetParameterTypes(AnyFunctionType *functionType,
-                               SmallVectorImpl<Type> &paramTypes) const;
+                               SmallVectorImpl<Type> &paramTypes,
+                               bool reverseCurryLevels = false) const;
 
   /// Returns a bitvector for the SILFunction parameters corresponding to the
   /// parameters in this set. In particular, this explodes tuples. For example,
@@ -465,6 +469,10 @@ struct SILAutoDiffIndices {
 
   bool operator==(const SILAutoDiffIndices &other) const;
 
+  bool operator!=(const SILAutoDiffIndices &other) const {
+    return !(*this == other);
+  };
+
   /// Queries whether the function's parameter with index `parameterIndex` is
   /// one of the parameters to differentiate with respect to.
   bool isWrtParameter(unsigned parameterIndex) const {
@@ -567,13 +575,21 @@ getOffsetForAutoDiffAssociatedFunction(unsigned order,
 unsigned
 getNumAutoDiffAssociatedFunctions(unsigned differentiationOrder);
 
-// Retrieve config from the function name of a variant of
-// `Builtin.autodiffApply`, e.g. `Builtin.autodiffApply_jvp_arity2_order1`.
-// Returns true if the function name is parsed successfully.
+/// Retrieve config from the function name of a variant of
+/// `Builtin.autodiffApply`, e.g. `Builtin.autodiffApply_jvp_arity2_order1`.
+/// Returns true if the function name is parsed successfully.
 bool getBuiltinAutoDiffApplyConfig(StringRef operationName,
                                    AutoDiffAssociatedFunctionKind &kind,
                                    unsigned &arity, unsigned &order,
                                    bool &rethrows);
+
+/// Computes the correct linkage for associated functions given the linkage of
+/// the original function. If the original linkage is not external and
+/// `isAssocFnExported` is true, use the original function's linkage. Otherwise,
+/// return hidden linkage.
+SILLinkage getAutoDiffFunctionLinkage(SILLinkage originalLinkage,
+                                      bool isAssocFnExported);
+
 } // end namespace autodiff
 
 class BuiltinFloatType;

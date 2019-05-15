@@ -63,6 +63,18 @@ extension Quadratic : VectorNumeric {
   }
 }
 
+// Test witness method SIL type computation.
+protocol P : Differentiable {
+  @differentiable(wrt: (x, y))
+  func foo(_ x: Float, _ y: Double) -> Float
+}
+struct S : P {
+  @differentiable(wrt: (x, y))
+  func foo(_ x: Float, _ y: Double) -> Float {
+    return x
+  }
+}
+
 ProtocolRequirementAutodiffTests.test("Trivial") {
   expectEqual((Quadratic(0, 0, 1), 12), Quadratic(11, 12, 13).gradF(at: 0))
   expectEqual((Quadratic(1, 1, 1), 2 * 11 + 12),
