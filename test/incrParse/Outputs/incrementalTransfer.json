@@ -199,6 +199,7 @@
                                               "id": 73,
                                               "kind": "StringLiteralExpr",
                                               "layout": [
+                                                null,
                                                 {
                                                   "id": 69,
                                                   "tokenKind": {
@@ -240,7 +241,8 @@
                                                   "leadingTrivia": [],
                                                   "trailingTrivia": [],
                                                   "presence": "Present"
-                                                }
+                                                },
+                                                null
                                               ],
                                               "presence": "Present"
                                             }
