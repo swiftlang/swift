@@ -1493,6 +1493,12 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
     }
   }
 
+  // Importer-synthesized types should always be mangled in the
+  // ClangImporterContext, even if an __attribute__((swift_name())) nests them
+  // inside a Swift type syntactically.
+  if (decl->getAttrs().hasAttribute<ClangImporterSynthesizedTypeAttr>())
+    return ASTMangler::ClangImporterContext;
+
   return None;
 }
 
