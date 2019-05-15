@@ -68,6 +68,8 @@ ERROR(conformance_removed,none,"%0 has removed %select{conformance to|inherited 
 
 ERROR(conformance_added,none,"%0 has added inherited protocol %1", (StringRef, StringRef))
 
+ERROR(existing_conformance_added,none,"%0 has added a conformance to an existing protocol %1", (StringRef, StringRef))
+
 ERROR(default_associated_type_removed,none,"%0 has removed default type %1", (StringRef, StringRef))
 
 ERROR(protocol_req_added,none,"%0 has been added as a protocol requirement", (StringRef))
