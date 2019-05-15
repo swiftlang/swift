@@ -71,8 +71,10 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
   if (!Linker.empty())
     Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
 
-  if (context.OI.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
-      Arguments.push_back("-Wl,/DEBUG");
+  if (context.OI.DebugInfoFormat == IRGenDebugInfoFormat::CodeView) {
+      Arguments.push_back("-Xlinker");
+      Arguments.push_back("/DEBUG");
+  }
 
   // Configure the toolchain.
   // By default, use the system clang++ to link.
