@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/OpaqueReturnTypeExporter.swiftmodule -module-name OpaqueReturnTypeExporter %S/Inputs/OpaqueReturnTypeExporter.swift
+// RUN: %target-swift-frontend -disable-availability-checking -emit-module -emit-module-path %t/OpaqueReturnTypeExporter.swiftmodule -module-name OpaqueReturnTypeExporter %S/Inputs/OpaqueReturnTypeExporter.swift
 // RUN: %target-sil-opt -I %t %s -emit-sib -module-name test -o %t/test.sib
-// RUN: %target-swift-frontend -I %t -emit-ir %t/test.sib
+// RUN: %target-swift-frontend -disable-availability-checking -I %t -emit-ir %t/test.sib
 
 import OpaqueReturnTypeExporter
 

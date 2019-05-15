@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
-// RUN: %target-swift-frontend -Onone -emit-sil %s | %FileCheck %s --check-prefix=MANDATORY
+// RUN: %target-swift-frontend -disable-availability-checking -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-availability-checking -Onone -emit-sil %s | %FileCheck %s --check-prefix=MANDATORY
 // We want to check two things here:
 // - Correctness
 // - That certain "is" checks are eliminated based on static analysis at compile-time
