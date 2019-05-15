@@ -940,9 +940,8 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
   if (constraint->getKind() == ConstraintKind::Disjunction) {
     for (auto elt : constraint->getNestedConstraints()) {
       if (elt->getKind() != ConstraintKind::BindOverload) continue;
-      if (!elt->getOverloadChoice().isDecl()) continue;
-      auto candidate = elt->getOverloadChoice().getDecl();
-      diagnose(candidate, diag::found_candidate);
+      if (auto *candidate = elt->getOverloadChoice().getDeclOrNull())
+        diagnose(candidate, diag::found_candidate);
     }
   }
 

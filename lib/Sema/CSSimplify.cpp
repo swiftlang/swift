@@ -828,8 +828,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
                            hasTrailingClosure, nullptr);
 
   // If there's a declaration, return it.
-  if (choice->isDecl()) {
-    auto decl = choice->getDecl();
+  if (auto *decl = choice->getDeclOrNull()) {
     bool hasCurriedSelf = false;
     if (decl->getDeclContext()->isTypeContext()) {
       if (auto function = dyn_cast<AbstractFunctionDecl>(decl)) {
@@ -4570,9 +4569,7 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
              Optional<MemberLookupResult::UnviableReason> reason = None) {
   // Not all of the choices handled here are going
   // to refer to a declaration.
-  if (choice.isDecl()) {
-    auto *decl = choice.getDecl();
-
+  if (auto *decl = choice.getDeclOrNull()) {
     if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
       if (auto *fix = validateInitializerRef(cs, CD, locator))
         return fix;

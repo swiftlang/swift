@@ -602,9 +602,9 @@ namespace {
     unsigned numFavoredConstraints = 0;
     Constraint *firstFavored = nullptr;
     for (auto constraint : disjunction->getNestedConstraints()) {
-      if (!constraint->getOverloadChoice().isDecl())
+      auto *decl = constraint->getOverloadChoice().getDeclOrNull();
+      if (!decl)
         continue;
-      auto decl = constraint->getOverloadChoice().getDecl();
 
       if (mustConsider && mustConsider(decl)) {
         // Roll back any constraints we favored.

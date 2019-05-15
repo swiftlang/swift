@@ -2104,11 +2104,9 @@ void ConstraintSystem::partitionDisjunction(
     forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
       if (constraint->getKind() != ConstraintKind::BindOverload)
         return false;
-      if (!constraint->getOverloadChoice().isDecl())
-        return false;
 
-      auto *decl = constraint->getOverloadChoice().getDecl();
-      auto *funcDecl = dyn_cast<FuncDecl>(decl);
+      auto *decl = constraint->getOverloadChoice().getDeclOrNull();
+      auto *funcDecl = dyn_cast_or_null<FuncDecl>(decl);
       if (!funcDecl)
         return false;
 

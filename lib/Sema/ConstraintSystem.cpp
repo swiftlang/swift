@@ -2134,8 +2134,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   }
   assert(!refType->hasTypeParameter() && "Cannot have a dependent type here");
   
-  if (choice.isDecl()) {
-    auto decl = choice.getDecl();
+  if (auto *decl = choice.getDeclOrNull()) {
     // If we're binding to an init member, the 'throws' need to line up between
     // the bound and reference types.
     if (auto CD = dyn_cast<ConstructorDecl>(decl)) {
@@ -2457,11 +2456,6 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   if (solutions.empty())
     return false;
 
-  auto getOverloadDecl = [&](SelectedOverload &overload) -> ValueDecl * {
-    auto &choice = overload.choice;
-    return choice.isDecl() ? choice.getDecl() : nullptr;
-  };
-
   // Problems related to fixes forming ambiguous solution set
   // could only be diagnosed (at the moment), if all of the fixes
   // have the same callee locator, which means they fix different
@@ -2490,7 +2484,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     if (!overload)
       return false;
 
-    auto *decl = getOverloadDecl(*overload);
+    auto *decl = overload->choice.getDeclOrNull();
     if (!decl)
       return false;
 
