@@ -4,13 +4,16 @@ swift_add_public_tablegen_target(sourcekitdTestOptionsTableGen)
 
 if(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY)
   set(SOURCEKITD_TEST_LINK_LIBS sourcekitdInProc)
+  set(SOURCEKITD_TEST_CFLAGS "-DSWIFT_SOURCEKIT_USE_INPROC_LIBRARY")
 else()
   set(SOURCEKITD_TEST_LINK_LIBS sourcekitd)
+  set(SOURCEKITD_TEST_CFLAGS)
 endif()
 
 add_sourcekit_executable(sourcekitd-test
   sourcekitd-test.cpp
   TestOptions.cpp
+  C_COMPILE_FLAGS ${SOURCEKITD_TEST_CFLAGS}
   LINK_LIBS ${SOURCEKITD_TEST_LINK_LIBS} SourceKitSupport
     clangRewrite clangLex clangBasic
   LLVM_COMPONENT_DEPENDS core support option coverage lto

@@ -1563,7 +1563,9 @@ static void resolveRange(SwiftLangSupport &Lang,
 void SwiftLangSupport::getCursorInfo(
     StringRef InputFile, unsigned Offset, unsigned Length, bool Actionables,
     bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     std::function<void(const CursorInfoData &)> Receiver) {
+  assert(FileSystem);
 
   if (auto IFaceGenRef = IFaceGenContexts.get(InputFile)) {
     IFaceGenRef->accessASTAsync([this, IFaceGenRef, Offset, Actionables, Receiver] {
@@ -1592,7 +1594,8 @@ void SwiftLangSupport::getCursorInfo(
   }
 
   std::string Error;
-  SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, InputFile, Error);
+  SwiftInvocationRef Invok =
+      ASTMgr->getInvocation(Args, InputFile, FileSystem, Error);
   if (!Invok) {
     // FIXME: Report it as failed request.
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
@@ -1788,7 +1791,10 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
 void SwiftLangSupport::getCursorInfoFromUSR(
     StringRef filename, StringRef USR, bool CancelOnSubsequentRequest,
     ArrayRef<const char *> args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     std::function<void(const CursorInfoData &)> receiver) {
+  assert(FileSystem);
+
   if (auto IFaceGenRef = IFaceGenContexts.get(filename)) {
     LOG_WARN_FUNC("info from usr for generated interface not implemented yet");
     receiver(CursorInfoData());
@@ -1796,7 +1802,8 @@ void SwiftLangSupport::getCursorInfoFromUSR(
   }
 
   std::string error;
-  SwiftInvocationRef invok = ASTMgr->getInvocation(args, filename, error);
+  SwiftInvocationRef invok =
+      ASTMgr->getInvocation(args, filename, FileSystem, error);
   if (!invok) {
     // FIXME: Report it as failed request.
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << error);

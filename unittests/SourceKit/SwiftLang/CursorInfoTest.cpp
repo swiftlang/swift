@@ -130,7 +130,8 @@ public:
     auto Args = CArgs.hasValue() ? makeArgs(DocName, *CArgs)
                                  : std::vector<const char *>{};
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
-    getLang().editorOpen(DocName, Buf.get(), Consumer, Args);
+    getLang().editorOpen(DocName, Buf.get(), Consumer, Args,
+                         llvm::vfs::getRealFileSystem());
   }
 
   void replaceText(StringRef DocName, unsigned Offset, unsigned Length,
@@ -146,6 +147,7 @@ public:
 
     TestCursorInfo TestInfo;
     getLang().getCursorInfo(DocName, Offset, 0, false, false, Args,
+                            llvm::vfs::getRealFileSystem(),
       [&](const CursorInfoData &Info) {
         TestInfo.Name = Info.Name;
         TestInfo.Typename = Info.TypeName;
