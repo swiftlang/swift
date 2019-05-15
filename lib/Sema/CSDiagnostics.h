@@ -669,7 +669,7 @@ private:
 
 /// Intended to diagnose any possible contextual failure
 /// e.g. argument/parameter, closure result, conversions etc.
-class ContextualFailure final : public FailureDiagnostic {
+class ContextualFailure : public FailureDiagnostic {
   Type FromType, ToType;
 
 public:
@@ -677,6 +677,10 @@ public:
                     ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), FromType(resolve(lhs)),
         ToType(resolve(rhs)) {}
+
+  Type getFromType() const { return resolveType(FromType); }
+
+  Type getToType() const { return resolveType(ToType); }
 
   bool diagnoseAsError() override;
 
@@ -1177,6 +1181,23 @@ public:
   ExtraneousReturnFailure(Expr *root, ConstraintSystem &cs,
                           ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose a contextual mismatch between expected collection element type
+/// and the one provided (e.g. source of the assignment or argument to a call)
+/// e.g.:
+///
+/// ```swift
+/// let _: [Int] = ["hello"]
+/// ```
+class CollectionElementContextualFailure final : public ContextualFailure {
+public:
+  CollectionElementContextualFailure(Expr *root, ConstraintSystem &cs,
+                                     Type eltType, Type contextualType,
+                                     ConstraintLocator *locator)
+      : ContextualFailure(root, cs, eltType, contextualType, locator) {}
 
   bool diagnoseAsError() override;
 };
