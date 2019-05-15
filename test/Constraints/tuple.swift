@@ -299,3 +299,8 @@ func dupLabel2(x a: Int, x b: Int) -> (y: Int, y: Int) { // expected-error {{can
 }
 
 let _ = (bar: 0, bar: "") // expected-error {{cannot create a tuple with a duplicate element label}}
+
+let zeroTuple = (0,0)
+
+if case (foo: let x, foo: let y) = zeroTuple { print(x+y) } // expected-error {{cannot create a tuple with a duplicate element label}} 
+// expected-warning@-1 {{'if' condition is always true}}
