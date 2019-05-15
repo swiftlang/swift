@@ -781,7 +781,8 @@ extension SIMD where Scalar: FixedWidthInteger {
 //  be replaced with @_semantics to lower directly to vector IR nodes.
 extension SIMD where Scalar: FloatingPoint {
   @_transparent
-  @differentiable(vjp: _vjpAdd(lhs:rhs:) where Self: Differentiable, Self.CotangentVector == Self)
+  @differentiable(vjp: _vjpAdd(lhs:rhs:)
+    where Self: Differentiable, Self.CotangentVector == Self)
   public static func +(lhs: Self, rhs: Self) -> Self {
     var result = Self()
     for i in result.indices { result[i] = lhs[i] + rhs[i] }
@@ -789,6 +790,8 @@ extension SIMD where Scalar: FloatingPoint {
   }
   
   @_transparent
+  @differentiable(vjp: _vjpSubtract(lhs:rhs:)
+    where Self: Differentiable, Self.CotangentVector == Self)
   public static func -(lhs: Self, rhs: Self) -> Self {
     var result = Self()
     for i in result.indices { result[i] = lhs[i] - rhs[i] }
@@ -844,6 +847,11 @@ extension SIMD where Scalar: FloatingPoint {
   
   /// Returns the sum of the scalars in the vector.
   @_alwaysEmitIntoClient
+  @differentiable(vjp: _vjpSum
+    where Self: Differentiable,
+    Scalar: Differentiable,
+    Scalar.CotangentVector == Scalar,
+    Self.CotangentVector == Self)
   public func sum() -> Scalar {
     // Implementation note: this eventually be defined to lower to either
     // llvm.experimental.vector.reduce.fadd or an explicit tree-sum. Open-
@@ -1157,14 +1165,14 @@ extension SIMD where Scalar: FixedWidthInteger {
 
 extension SIMD where Scalar: FloatingPoint {
   
-  @_transparent
+  @_transparent // ????
   public static prefix func -(rhs: Self) -> Self {
     return 0 - rhs
   }
   
   @_transparent
   @differentiable(vjp: _vjpAdd(lhs:rhs:)
-    where Scalar: Differentiable & FixedWidthInteger,
+    where Scalar: Differentiable,
     Self: Differentiable,
     Self.CotangentVector == Self,
     Scalar.CotangentVector == Scalar)
@@ -1173,6 +1181,11 @@ extension SIMD where Scalar: FloatingPoint {
   }
   
   @_transparent
+  @differentiable(vjp: _vjpAdd(lhs:rhs:)
+    where Scalar: Differentiable,
+    Self: Differentiable,
+    Self.CotangentVector == Self,
+    Scalar.CotangentVector == Scalar)
   public static func -(lhs: Scalar, rhs: Self) -> Self {
     return Self(repeating: lhs) - rhs
   }
@@ -1188,11 +1201,21 @@ extension SIMD where Scalar: FloatingPoint {
   }
   
   @_transparent
+  @differentiable(vjp: _vjpAdd(lhs:rhs:)
+    where Scalar: Differentiable,
+    Self: Differentiable,
+    Self.CotangentVector == Self,
+    Scalar.CotangentVector == Scalar)
   public static func +(lhs: Self, rhs: Scalar) -> Self {
     return lhs + Self(repeating: rhs)
   }
   
   @_transparent
+  @differentiable(vjp: _vjpSubtract(lhs:rhs:)
+    where Scalar: Differentiable,
+    Self: Differentiable,
+    Self.CotangentVector == Self,
+    Scalar.CotangentVector == Scalar)
   public static func -(lhs: Self, rhs: Scalar) -> Self {
     return lhs - Self(repeating: rhs)
   }
@@ -1399,6 +1422,13 @@ where T: SIMD, T.Scalar: FloatingPoint {
   return result
 }
 
+//public protocol SIMDDifferentiable : Differentiable
+//  where Scalar : FloatingPoint,
+//        Self == Self.TangentVector,
+//        Self == Self.CotangentVector,
+//        Self == Self.AllDifferentiableVariables {}
+
+
 extension SIMD
   where Self: Differentiable,
   Scalar : FloatingPoint,
@@ -1411,11 +1441,20 @@ extension SIMD
       return (v, v)
     })
   }
+  
+  @inlinable
+  static func _vjpSubtract(
+    lhs: Self, rhs: Self
+    ) -> (Self, (Self) -> (Self, Self)) {
+    return (lhs - rhs, { v in
+      return (v, -v)
+    })
+  }
 }
 
 extension SIMD
   where Self: Differentiable,
-  Scalar : FloatingPoint & Differentiable & FixedWidthInteger,
+  Scalar : FloatingPoint & Differentiable,
   Self.CotangentVector == Self,
   Scalar.CotangentVector == Scalar {
   @inlinable
@@ -1423,7 +1462,44 @@ extension SIMD
     lhs: Scalar, rhs: Self
     ) -> (Self, (Self) -> (Scalar, Self)) {
     return (lhs + rhs, { v in
-      return (v.wrappedSum(), v)
+      return (v.sum(), v)
     })
+  }
+  
+  @inlinable
+  static func _vjpSubtract(
+    lhs: Scalar, rhs: Self
+    ) -> (Self, (Self) -> (Scalar, Self)) {
+    return (lhs + rhs, { v in
+      return (v.sum(), -v)
+    })
+  }
+  
+  @inlinable
+  static func _vjpAdd(
+    lhs: Self, rhs: Scalar
+    ) -> (Self, (Self) -> (Self, Scalar)) {
+    return (lhs + rhs, { v in
+      return (v, v.sum())
+    })
+  }
+  
+  @inlinable
+  static func _vjpSubtract(
+    lhs: Self, rhs: Scalar
+    ) -> (Self, (Self) -> (Self, Scalar)) {
+    return (lhs + rhs, { v in
+      return (v, -v.sum())
+    })
+  }
+}
+
+extension SIMD
+  where Self: Differentiable,
+  Scalar: Differentiable & FloatingPoint,
+  Scalar.CotangentVector == Scalar,
+  Self.CotangentVector == Self {
+  public static func _vjpSum() -> (Scalar, (Scalar) -> Self) {
+    return (self.sum(), { v in SIMD(repeating: v) })
   }
 }
