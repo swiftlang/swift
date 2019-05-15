@@ -108,6 +108,7 @@ set(SWIFT_BENCH_MODULES
     single-source/NSError
     single-source/NSStringConversion
     single-source/NibbleSort
+    single-source/NIOChannelPipeline
     single-source/NopDeinit
     single-source/ObjectAllocation
     single-source/ObjectiveCBridging
