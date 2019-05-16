@@ -3444,8 +3444,8 @@ SILGenFunction::getOrCreateAutoDiffLinearMapReorderingThunk(
     break;
   }
   case AutoDiffAssociatedFunctionKind::VJP: {
-    auto selfCotanInfo = thunkConv.getResults().back();
-    if (selfCotanInfo.isFormalDirect()) {
+    auto selfTanInfo = thunkConv.getResults().back();
+    if (selfTanInfo.isFormalDirect()) {
       for (auto *indRes : indirectResults)
         argValues.push_back(indRes);
     } else {
@@ -3468,8 +3468,8 @@ SILGenFunction::getOrCreateAutoDiffLinearMapReorderingThunk(
     break;
   }
   case AutoDiffAssociatedFunctionKind::VJP: {
-    auto selfCotanInfo = thunkConv.getResults().back();
-    if (selfCotanInfo.isFormalIndirect()) {
+    auto selfTanInfo = thunkConv.getResults().back();
+    if (selfTanInfo.isFormalIndirect()) {
       thunkSGF.B.createReturn(loc, apply);
       break;
     }
@@ -3572,7 +3572,7 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionReorderingThunk(
 
   // Otherwise, generate a thunk for reordering:
   // - The differential self tangent parameter: move from first to last.
-  // - The pullback self cotangent result: move from first to last.
+  // - The pullback self tangent result: move from first to last.
   SmallVector<SILValue, 8> directResults;
   extractAllElements(apply, thunkSGF.B, directResults);
   auto linearMap = directResults.back();

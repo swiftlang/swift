@@ -10,11 +10,11 @@ _ = gradient(at: Float(1), in: { x in identity(x) })
 // Verify that local buffers are immediately set to zero.
 
 // CHECK-SIL-LABEL: sil hidden @AD__identity__adjoint_src_0_wrt_0
-// CHECK-SIL:      [[ORIG_COTAN:%.*]] = alloc_stack $τ_0_0.CotangentVector
+// CHECK-SIL:      [[ORIG_COTAN:%.*]] = alloc_stack $τ_0_0.TangentVector
 // CHECK-SIL-NEXT: [[ORIG_COTAN_BEGIN:%.*]] = begin_access [init] [static] [no_nested_conflict] [[ORIG_COTAN]]
-// CHECK-SIL-NEXT: [[ZERO_WITNESS:%.*]] = witness_method $τ_0_0.CotangentVector, #AdditiveArithmetic.zero!getter.1
-// CHECK-SIL-NEXT: [[ORIG_COTAN_METATYPE:%.*]] = metatype $@thick τ_0_0.CotangentVector.Type
-// CHECK-SIL-NEXT: [[EMIT_ZERO_INDIRECT:%.*]] = apply [[ZERO_WITNESS]]<τ_0_0.CotangentVector>([[ORIG_COTAN_BEGIN]], [[ORIG_COTAN_METATYPE]])
+// CHECK-SIL-NEXT: [[ZERO_WITNESS:%.*]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic.zero!getter.1
+// CHECK-SIL-NEXT: [[ORIG_COTAN_METATYPE:%.*]] = metatype $@thick τ_0_0.TangentVector.Type
+// CHECK-SIL-NEXT: [[EMIT_ZERO_INDIRECT:%.*]] = apply [[ZERO_WITNESS]]<τ_0_0.TangentVector>([[ORIG_COTAN_BEGIN]], [[ORIG_COTAN_METATYPE]])
 // CHECK-SIL-NEXT: end_access [[ORIG_COTAN_BEGIN]]
 // CHECK-SIL: }
 

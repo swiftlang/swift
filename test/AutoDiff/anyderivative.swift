@@ -20,19 +20,19 @@ AnyDerivativeTests.test("Vector") {
   expectEqual(AnyDerivative(Vector.TangentVector(x: 4, y: 4)), tan + tan)
   expectEqual(AnyDerivative(Vector.TangentVector(x: 0, y: 0)), tan - tan)
   expectEqual(AnyDerivative(Vector.TangentVector(x: 4, y: 4)), tan.moved(along: tan))
-  expectEqual(AnyDerivative(Vector.TangentVector(x: 2, y: 2)), tan.tangentVector(from: tan))
+  expectEqual(AnyDerivative(Vector.TangentVector(x: 2, y: 2)), tan)
 }
 
 AnyDerivativeTests.test("Generic") {
   var tan = AnyDerivative(Generic<Float>.TangentVector(x: 1))
-  let cotan = AnyDerivative(Generic<Float>.CotangentVector(x: 1))
+  let cotan = AnyDerivative(Generic<Float>.TangentVector(x: 1))
   tan += tan
   expectEqual(AnyDerivative(Generic<Float>.TangentVector(x: 2)), tan)
   expectEqual(tan, tan.allDifferentiableVariables)
   expectEqual(AnyDerivative(Generic<Float>.TangentVector(x: 4)), tan + tan)
   expectEqual(AnyDerivative(Generic<Float>.TangentVector(x: 0)), tan - tan)
   expectEqual(AnyDerivative(Generic<Float>.TangentVector(x: 4)), tan.moved(along: tan))
-  expectEqual(AnyDerivative(Generic<Float>.TangentVector(x: 1)), tan.tangentVector(from: cotan))
+  expectEqual(AnyDerivative(Generic<Float>.TangentVector(x: 1)), cotan)
 }
 
 AnyDerivativeTests.test("Zero") {
@@ -45,7 +45,7 @@ AnyDerivativeTests.test("Zero") {
   expectEqual(zero, zero.allDifferentiableVariables)
 
   var tan = AnyDerivative(Vector.TangentVector(x: 1, y: 1))
-  expectEqual(zero, tan.tangentVector(from: zero))
+  expectEqual(zero, zero)
   expectEqual(AnyDerivative(Vector.TangentVector.zero), tan - tan)
   expectNotEqual(AnyDerivative(Vector.TangentVector.zero), zero)
   expectNotEqual(AnyDerivative.zero, tan - tan)
@@ -55,8 +55,8 @@ AnyDerivativeTests.test("Zero") {
   expectEqual(tan, tan - zero)
   expectEqual(tan, tan.moved(along: zero))
   expectEqual(tan, zero.moved(along: tan))
-  expectEqual(zero, tan.tangentVector(from: zero))
-  expectEqual(tan, zero.tangentVector(from: tan))
+  expectEqual(zero, zero)
+  expectEqual(tan, tan)
 }
 
 AnyDerivativeTests.test("Casting") {
@@ -95,23 +95,23 @@ AnyDerivativeTests.test("Derivatives") {
   do {
     let x = AnyDerivative(Vector.TangentVector(x: 4, y: 5))
     let y = AnyDerivative(Vector.TangentVector(x: -2, y: -1))
-    let v = AnyDerivative(Vector.CotangentVector(x: 1, y: 1))
-    let expectedVJP = Vector.CotangentVector(x: 3, y: 3)
+    let v = AnyDerivative(Vector.TangentVector(x: 1, y: 1))
+    let expectedVJP = Vector.TangentVector(x: 3, y: 3)
 
     let (𝛁x, 𝛁y) = pullback(at: x, y, in: tripleSum)(v)
-    expectEqual(expectedVJP, 𝛁x.base as? Vector.CotangentVector)
-    expectEqual(expectedVJP, 𝛁y.base as? Vector.CotangentVector)
+    expectEqual(expectedVJP, 𝛁x.base as? Vector.TangentVector)
+    expectEqual(expectedVJP, 𝛁y.base as? Vector.TangentVector)
   }
 
   do {
     let x = AnyDerivative(Generic<Double>.TangentVector(x: 4))
     let y = AnyDerivative(Generic<Double>.TangentVector(x: -2))
-    let v = AnyDerivative(Generic<Double>.CotangentVector(x: 1))
-    let expectedVJP = Generic<Double>.CotangentVector(x: 3)
+    let v = AnyDerivative(Generic<Double>.TangentVector(x: 1))
+    let expectedVJP = Generic<Double>.TangentVector(x: 3)
 
     let (𝛁x, 𝛁y) = pullback(at: x, y, in: tripleSum)(v)
-    expectEqual(expectedVJP, 𝛁x.base as? Generic<Double>.CotangentVector)
-    expectEqual(expectedVJP, 𝛁y.base as? Generic<Double>.CotangentVector)
+    expectEqual(expectedVJP, 𝛁x.base as? Generic<Double>.TangentVector)
+    expectEqual(expectedVJP, 𝛁y.base as? Generic<Double>.TangentVector)
   }
 
   // Test `AnyDerivative` initializer.
@@ -120,7 +120,7 @@ AnyDerivativeTests.test("Derivatives") {
           T.AllDifferentiableVariables == T,
           // NOTE: The requirement below should be defined on `Differentiable`.
           // But it causes a crash due to generic signature minimization bug.
-          T.CotangentVector == T.CotangentVector.AllDifferentiableVariables
+          T.TangentVector == T.TangentVector.AllDifferentiableVariables
   {
     let any = AnyDerivative(x)
     return any + any
@@ -136,17 +136,17 @@ AnyDerivativeTests.test("Derivatives") {
 
   do {
     let x = Vector.TangentVector(x: 4, y: 5)
-    let v = AnyDerivative(Vector.CotangentVector(x: 1, y: 1))
+    let v = AnyDerivative(Vector.TangentVector(x: 1, y: 1))
     let 𝛁x = pullback(at: x, in: { x in typeErased(x) })(v)
-    let expectedVJP = Vector.CotangentVector(x: 2, y: 2)
+    let expectedVJP = Vector.TangentVector(x: 2, y: 2)
     expectEqual(expectedVJP, 𝛁x)
   }
 
   do {
     let x = Generic<Double>.TangentVector(x: 4)
-    let v = AnyDerivative(Generic<Double>.CotangentVector(x: 1))
+    let v = AnyDerivative(Generic<Double>.TangentVector(x: 1))
     let 𝛁x = pullback(at: x, in: { x in typeErased(x) })(v)
-    let expectedVJP = Generic<Double>.CotangentVector(x: 2)
+    let expectedVJP = Generic<Double>.TangentVector(x: 2)
     expectEqual(expectedVJP, 𝛁x)
   }
 }
