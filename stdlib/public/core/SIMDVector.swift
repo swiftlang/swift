@@ -784,9 +784,9 @@ extension SIMD where Scalar: FloatingPoint {
   // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpAdd(lhs:rhs:)
     where Self : Differentiable,
-          Self.CotangentVector : SIMD,
+          Self.TangentVector : SIMD,
           Scalar : BinaryFloatingPoint,
-          Self.CotangentVector.Scalar: BinaryFloatingPoint)
+          Self.TangentVector.Scalar: BinaryFloatingPoint)
   public static func +(lhs: Self, rhs: Self) -> Self {
     var result = Self()
     for i in result.indices { result[i] = lhs[i] + rhs[i] }
@@ -797,9 +797,9 @@ extension SIMD where Scalar: FloatingPoint {
   // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpAdd(lhs:rhs:)
     where Self: Differentiable,
-          Self.CotangentVector: SIMD,
+          Self.TangentVector: SIMD,
           Scalar : BinaryFloatingPoint,
-          Self.CotangentVector.Scalar: BinaryFloatingPoint)
+          Self.TangentVector.Scalar: BinaryFloatingPoint)
   public static func -(lhs: Self, rhs: Self) -> Self {
     var result = Self()
     for i in result.indices { result[i] = lhs[i] - rhs[i] }
@@ -810,9 +810,9 @@ extension SIMD where Scalar: FloatingPoint {
   // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpMultiply(lhs:rhs:)
     where Self: Differentiable,
-          Self.CotangentVector: SIMD,
+          Self.TangentVector: SIMD,
           Scalar : BinaryFloatingPoint,
-          Self.CotangentVector == Self)
+          Self.TangentVector == Self)
   public static func *(lhs: Self, rhs: Self) -> Self {
     var result = Self()
     for i in result.indices { result[i] = lhs[i] * rhs[i] }
@@ -864,10 +864,10 @@ extension SIMD where Scalar: FloatingPoint {
   // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpSum
     where Self : Differentiable,
-          Self.CotangentVector : SIMD,
+          Self.TangentVector : SIMD,
           Scalar : BinaryFloatingPoint & Differentiable,
-          Scalar.CotangentVector : BinaryFloatingPoint,
-          Self.CotangentVector == Self)
+          Scalar.TangentVector : BinaryFloatingPoint,
+          Self.TangentVector == Self)
   public func sum() -> Scalar {
     // Implementation note: this eventually be defined to lower to either
     // llvm.experimental.vector.reduce.fadd or an explicit tree-sum. Open-
@@ -1190,10 +1190,10 @@ extension SIMD where Scalar: FloatingPoint {
   // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpAdd(lhs:rhs:)
   where Self: Differentiable,
-        Self.CotangentVector: SIMD,
+        Self.TangentVector: SIMD,
         Scalar : Differentiable & BinaryFloatingPoint,
-        Scalar.CotangentVector: BinaryFloatingPoint,
-        Self.CotangentVector.Scalar == Scalar.CotangentVector)
+        Scalar.TangentVector: BinaryFloatingPoint,
+        Self.TangentVector.Scalar == Scalar.TangentVector)
   public static func +(lhs: Scalar, rhs: Self) -> Self {
     return Self(repeating: lhs) + rhs
   }
@@ -1202,10 +1202,10 @@ extension SIMD where Scalar: FloatingPoint {
   // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpAdd(lhs:rhs:)
     where Self: Differentiable,
-          Self.CotangentVector: SIMD,
+          Self.TangentVector: SIMD,
           Scalar : Differentiable & BinaryFloatingPoint,
-          Scalar.CotangentVector: BinaryFloatingPoint,
-          Self.CotangentVector.Scalar == Scalar.CotangentVector)
+          Scalar.TangentVector: BinaryFloatingPoint,
+          Self.TangentVector.Scalar == Scalar.TangentVector)
   public static func -(lhs: Scalar, rhs: Self) -> Self {
     return Self(repeating: lhs) - rhs
   }
@@ -1214,10 +1214,10 @@ extension SIMD where Scalar: FloatingPoint {
   // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpMultiply(lhs:rhs:)
     where Self : Differentiable,
-          Self.CotangentVector : SIMD,
+          Self.TangentVector : SIMD,
           Scalar : BinaryFloatingPoint & Differentiable,
-          Self.CotangentVector == Self,
-          Scalar.CotangentVector == Scalar)
+          Self.TangentVector == Self,
+          Scalar.TangentVector == Scalar)
   public static func *(lhs: Scalar, rhs: Self) -> Self {
     return Self(repeating: lhs) * rhs
   }
@@ -1226,10 +1226,10 @@ extension SIMD where Scalar: FloatingPoint {
   // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpDivide(lhs:rhs:)
   where Self : Differentiable,
-  Self.CotangentVector : SIMD,
+  Self.TangentVector : SIMD,
   Scalar : BinaryFloatingPoint & Differentiable,
-  Self.CotangentVector == Self,
-  Scalar.CotangentVector == Scalar)
+  Self.TangentVector == Self,
+  Scalar.TangentVector == Scalar)
   public static func /(lhs: Scalar, rhs: Self) -> Self {
     return Self(repeating: lhs) / rhs
   }
@@ -1238,10 +1238,10 @@ extension SIMD where Scalar: FloatingPoint {
   // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpAdd(lhs:rhs:)
     where Self: Differentiable,
-          Self.CotangentVector: SIMD,
+          Self.TangentVector: SIMD,
           Scalar : Differentiable & BinaryFloatingPoint,
-          Scalar.CotangentVector: BinaryFloatingPoint,
-          Self.CotangentVector.Scalar == Scalar.CotangentVector)
+          Scalar.TangentVector: BinaryFloatingPoint,
+          Self.TangentVector.Scalar == Scalar.TangentVector)
   public static func +(lhs: Self, rhs: Scalar) -> Self {
     return lhs + Self(repeating: rhs)
   }
@@ -1250,10 +1250,10 @@ extension SIMD where Scalar: FloatingPoint {
   // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpAdd(lhs:rhs:)
     where Self: Differentiable,
-          Self.CotangentVector: SIMD,
+          Self.TangentVector: SIMD,
           Scalar : Differentiable & BinaryFloatingPoint,
-          Scalar.CotangentVector: BinaryFloatingPoint,
-          Self.CotangentVector.Scalar == Scalar.CotangentVector)
+          Scalar.TangentVector: BinaryFloatingPoint,
+          Self.TangentVector.Scalar == Scalar.TangentVector)
   public static func -(lhs: Self, rhs: Scalar) -> Self {
     return lhs - Self(repeating: rhs)
   }
@@ -1262,10 +1262,10 @@ extension SIMD where Scalar: FloatingPoint {
   // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpMultiply(lhs:rhs:)
     where Self : Differentiable,
-          Self.CotangentVector : SIMD,
+          Self.TangentVector : SIMD,
           Scalar : BinaryFloatingPoint & Differentiable,
-          Self.CotangentVector == Self,
-          Scalar.CotangentVector == Scalar)
+          Self.TangentVector == Self,
+          Scalar.TangentVector == Scalar)
   public static func *(lhs: Self, rhs: Scalar) -> Self {
     return lhs * Self(repeating: rhs)
   }
@@ -1274,10 +1274,10 @@ extension SIMD where Scalar: FloatingPoint {
   // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpDivide(lhs:rhs:)
     where Self : Differentiable,
-          Self.CotangentVector : SIMD,
+          Self.TangentVector : SIMD,
           Scalar : BinaryFloatingPoint & Differentiable,
-          Self.CotangentVector == Self,
-          Scalar.CotangentVector == Scalar)
+          Self.TangentVector == Self,
+          Scalar.TangentVector == Scalar)
   public static func /(lhs: Self, rhs: Scalar) -> Self {
     return lhs / Self(repeating: rhs)
   }
@@ -1476,16 +1476,13 @@ where T: SIMD, T.Scalar: FloatingPoint {
 
 extension SIMD
   where Self: Differentiable,
-        CotangentVector: SIMD,
+        TangentVector: SIMD,
         Scalar : BinaryFloatingPoint,
-        /* Required in order to use unary negation operator due to following error:
-           >Self.CotangentVector.Scalar' does not conform to protocol 'FloatingPoint'
-        */
-        CotangentVector.Scalar: BinaryFloatingPoint {
+        TangentVector.Scalar: BinaryFloatingPoint {
   @inlinable
   static func _vjpAdd(
     lhs: Self, rhs: Self
-  ) -> (Self, (CotangentVector) -> (CotangentVector, CotangentVector)) {
+  ) -> (Self, (TangentVector) -> (TangentVector, TangentVector)) {
     return (lhs + rhs, { v in
       return (v, v)
     })
@@ -1494,8 +1491,8 @@ extension SIMD
   @inlinable
   static func _vjpSubtract(
     lhs: Self, rhs: Self
-  ) -> (Self, (CotangentVector) -> (CotangentVector, CotangentVector)) {
-    return (lhs - rhs, { (v: CotangentVector) in
+  ) -> (Self, (TangentVector) -> (TangentVector, TangentVector)) {
+    return (lhs - rhs, { (v: TangentVector) in
       return (v, -v)
     })
   }
@@ -1503,13 +1500,13 @@ extension SIMD
 
 extension SIMD
   where Self: Differentiable,
-        CotangentVector: SIMD,
+        TangentVector: SIMD,
         Scalar : BinaryFloatingPoint,
-        Self.CotangentVector == Self {
+        Self.TangentVector == Self {
   @inlinable
   static func _vjpMultiply(
     lhs: Self, rhs: Self
-  ) -> (Self, (CotangentVector) -> (CotangentVector, CotangentVector)) {
+  ) -> (Self, (TangentVector) -> (TangentVector, TangentVector)) {
     return (lhs * rhs, { v in
       return (v * rhs, v * lhs)
     })
@@ -1518,7 +1515,7 @@ extension SIMD
   @inlinable
   static func _vjpDivide(
     lhs: Self, rhs: Self
-  ) -> (Self, (CotangentVector) -> (CotangentVector, CotangentVector)) {
+  ) -> (Self, (TangentVector) -> (TangentVector, TangentVector)) {
     return (lhs / rhs, { v in
       (v / rhs, -lhs / (rhs * rhs) * v)
     })
@@ -1527,14 +1524,14 @@ extension SIMD
 
 extension SIMD
   where Self : Differentiable,
-        CotangentVector : SIMD,
+        TangentVector : SIMD,
         Scalar : BinaryFloatingPoint & Differentiable,
-        Scalar.CotangentVector: BinaryFloatingPoint,
-        CotangentVector.Scalar == Scalar.CotangentVector {
+        Scalar.TangentVector: BinaryFloatingPoint,
+        TangentVector.Scalar == Scalar.TangentVector {
   @inlinable
   static func _vjpAdd(
     lhs: Scalar, rhs: Self
-  ) -> (Self, (CotangentVector) -> (Scalar.CotangentVector, CotangentVector)) {
+  ) -> (Self, (TangentVector) -> (Scalar.TangentVector, TangentVector)) {
     return (lhs + rhs, { v in
       return (v.sum(), v)
     })
@@ -1543,7 +1540,7 @@ extension SIMD
   @inlinable
   static func _vjpSubtract(
     lhs: Scalar, rhs: Self
-  ) -> (Self, (CotangentVector) -> (Scalar.CotangentVector, CotangentVector)) {
+  ) -> (Self, (TangentVector) -> (Scalar.TangentVector, TangentVector)) {
     return (lhs + rhs, { v in
       return (v.sum(), -v)
     })
@@ -1552,7 +1549,7 @@ extension SIMD
   @inlinable
   static func _vjpAdd(
     lhs: Self, rhs: Scalar
-  ) -> (Self, (CotangentVector) -> (CotangentVector, Scalar.CotangentVector)) {
+  ) -> (Self, (TangentVector) -> (TangentVector, Scalar.TangentVector)) {
     return (lhs + rhs, { v in
       return (v, v.sum())
     })
@@ -1561,7 +1558,7 @@ extension SIMD
   @inlinable
   static func _vjpSubtract(
     lhs: Self, rhs: Scalar
-  ) -> (Self, (CotangentVector) -> (CotangentVector, Scalar.CotangentVector)) {
+  ) -> (Self, (TangentVector) -> (TangentVector, Scalar.TangentVector)) {
     return (lhs + rhs, { v in
       return (v, -v.sum())
     })
@@ -1570,14 +1567,14 @@ extension SIMD
 
 extension SIMD
   where Self : Differentiable,
-        CotangentVector : SIMD,
+        TangentVector : SIMD,
         Scalar : BinaryFloatingPoint & Differentiable,
-        Self.CotangentVector == Self,
-        Scalar.CotangentVector == Scalar {
+        Self.TangentVector == Self,
+        Scalar.TangentVector == Scalar {
   @inlinable
   static func _vjpMultiply(
     lhs: Self, rhs: Scalar
-  ) -> (Self, (CotangentVector) -> (CotangentVector, Scalar.CotangentVector)) {
+  ) -> (Self, (TangentVector) -> (TangentVector, Scalar.TangentVector)) {
     return (lhs * rhs, { v in
       return (v * rhs, (v * lhs).sum())
     })
@@ -1586,7 +1583,7 @@ extension SIMD
   @inlinable
   static func _vjpDivide(
     lhs: Self, rhs: Scalar
-  ) -> (Self, (CotangentVector) -> (CotangentVector, Scalar.CotangentVector)) {
+  ) -> (Self, (TangentVector) -> (TangentVector, Scalar.TangentVector)) {
     return (lhs / rhs, { v in
       (-lhs / (rhs * rhs) * v, (v / rhs).sum())
     })
@@ -1595,7 +1592,7 @@ extension SIMD
   @inlinable
   static func _vjpMultiply(
     lhs: Scalar, rhs: Self
-  ) -> (Self, (CotangentVector) -> (Scalar.CotangentVector, CotangentVector)) {
+  ) -> (Self, (TangentVector) -> (Scalar.TangentVector, TangentVector)) {
     return (lhs * rhs, { v in
       return ((v * lhs).sum(), v * rhs)
     })
@@ -1604,7 +1601,7 @@ extension SIMD
   @inlinable
   static func _vjpDivide(
     lhs: Scalar, rhs: Self
-  ) -> (Self, (CotangentVector) -> (Scalar.CotangentVector, CotangentVector)) {
+  ) -> (Self, (TangentVector) -> (Scalar.TangentVector, TangentVector)) {
     return (lhs / rhs, { v in
       ((v / rhs).sum(), -lhs / (rhs * rhs) * v)
     })
@@ -1613,12 +1610,12 @@ extension SIMD
 
 extension SIMD
   where Self : Differentiable,
-        CotangentVector : SIMD,
+        TangentVector : SIMD,
         Scalar : BinaryFloatingPoint & Differentiable,
-        Scalar.CotangentVector : BinaryFloatingPoint,
-        CotangentVector == Self {
+        Scalar.TangentVector : BinaryFloatingPoint,
+        TangentVector == Self {
   @usableFromInline
-  func _vjpSum() -> (Scalar, (Scalar.CotangentVector) -> CotangentVector) {
+  func _vjpSum() -> (Scalar, (Scalar.TangentVector) -> TangentVector) {
     return (sum(), { v in Self(repeating: Scalar(v)) })
   }
 }
