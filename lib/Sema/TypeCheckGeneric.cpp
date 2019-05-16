@@ -171,23 +171,6 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
 // Generic functions
 //
 
-static AvailabilityContext getOpaqueTypeAvailability(ASTContext &Context) {
-  if (Context.LangOpts.DisableAvailabilityChecking)
-    return AvailabilityContext::alwaysAvailable();
-  
-  auto target = Context.LangOpts.Target;
-  
-  if (target.isMacOSX()
-      || target.isiOS()
-      || target.isWatchOS())
-    // TODO: Update with OS versions that ship with runtime support
-    return AvailabilityContext(
-                           VersionRange::allGTE(llvm::VersionTuple(9999,0,0)));
-  
-  
-  return AvailabilityContext::alwaysAvailable();
-}
-
 /// Get the opaque type representing the return type of a declaration, or
 /// create it if it does not yet exist.
 Type TypeChecker::getOrCreateOpaqueResultType(TypeResolution resolution,
@@ -199,13 +182,15 @@ Type TypeChecker::getOrCreateOpaqueResultType(TypeResolution resolution,
   }
   
   // Check the availability of the opaque type runtime support.
-  auto runningOS = overApproximateAvailabilityAtLocation(repr->getLoc(),
+  if (!Context.LangOpts.DisableAvailabilityChecking) {
+    auto runningOS = overApproximateAvailabilityAtLocation(repr->getLoc(),
                                     originatingDecl->getInnermostDeclContext());
-  auto availability = getOpaqueTypeAvailability(Context);
-  if (!runningOS.isContainedIn(availability)) {
-    diagnosePotentialOpaqueTypeUnavailability(repr->getSourceRange(),
+    auto availability = Context.getOpaqueTypeAvailability();
+    if (!runningOS.isContainedIn(availability)) {
+      diagnosePotentialOpaqueTypeUnavailability(repr->getSourceRange(),
        originatingDecl->getInnermostDeclContext(),
        UnavailabilityReason::requiresVersionRange(availability.getOSVersion()));
+    }
   }
   
   // Try to resolve the constraint repr. It should be some kind of existential
