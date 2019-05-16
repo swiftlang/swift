@@ -143,7 +143,8 @@ protected:
     SWIFT_INLINE_BITFIELD_FULL(AccessEnforcementOptsInfo, AccessedStorage,
                                64 - NumAccessedStorageBits,
                                seenNestedConflict : 1,
-                               beginAccessIndex : 63 - NumAccessedStorageBits);
+                               seenIdenticalStorage : 1,
+                               beginAccessIndex : 62 - NumAccessedStorageBits);
 
     // Define data flow bits for use in the AccessEnforcementDom pass. Each
     // begin_access in the function is mapped to one instance of this subclass.
