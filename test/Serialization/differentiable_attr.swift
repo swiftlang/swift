@@ -51,7 +51,7 @@ func testOnlyWhereClause<T : Numeric>(x: T) -> T {
 func testWhereClause<T : Numeric>(x: T) -> T {
   return x
 }
-func vjpTestWhereClause<T>(x: T) -> (T, (T.CotangentVector) -> T.CotangentVector)
+func vjpTestWhereClause<T>(x: T) -> (T, (T.TangentVector) -> T.TangentVector)
   where T : Numeric, T : Differentiable
 {
   return (x, { v in v })
@@ -67,33 +67,33 @@ extension P {
   }
 }
 extension P where Self : Differentiable {
-  func vjpTestWhereClauseMethod() -> (Self, (Self.CotangentVector) -> Self.CotangentVector) {
+  func vjpTestWhereClauseMethod() -> (Self, (Self.TangentVector) -> Self.TangentVector) {
     return (self, { v in v })
   }
 }
 
-// CHECK: @differentiable(wrt: x, vjp: vjpTestWhereClauseMethodTypeConstraint where T : Differentiable, T == T.CotangentVector)
+// CHECK: @differentiable(wrt: x, vjp: vjpTestWhereClauseMethodTypeConstraint where T : Differentiable, T == T.TangentVector)
 // CHECK-NEXT: func testWhereClauseMethodTypeConstraint<T>(x: T) -> T where T : Numeric
-@differentiable(vjp: vjpTestWhereClauseMethodTypeConstraint where T : Differentiable, T == T.CotangentVector)
+@differentiable(vjp: vjpTestWhereClauseMethodTypeConstraint where T : Differentiable, T == T.TangentVector)
 func testWhereClauseMethodTypeConstraint<T : Numeric>(x: T) -> T {
   return x
 }
 func vjpTestWhereClauseMethodTypeConstraint<T>(x: T) -> (T, (T) -> T)
-  where T : Numeric, T : Differentiable, T == T.CotangentVector
+  where T : Numeric, T : Differentiable, T == T.TangentVector
 {
   return (x, { v in v })
 }
 
 extension P {
-  // CHECK: @differentiable(wrt: self, vjp: vjpTestWhereClauseMethodTypeConstraint where Self : Differentiable, Self == Self.CotangentVector)
+  // CHECK: @differentiable(wrt: self, vjp: vjpTestWhereClauseMethodTypeConstraint where Self : Differentiable, Self == Self.TangentVector)
   // CHECK-NEXT: func testWhereClauseMethodTypeConstraint() -> Self
-  @differentiable(wrt: self, vjp: vjpTestWhereClauseMethodTypeConstraint where Self.CotangentVector == Self, Self : Differentiable)
+  @differentiable(wrt: self, vjp: vjpTestWhereClauseMethodTypeConstraint where Self.TangentVector == Self, Self : Differentiable)
   func testWhereClauseMethodTypeConstraint() -> Self {
     return self
   }
 }
-extension P where Self : Differentiable, Self == Self.CotangentVector {
-  func vjpTestWhereClauseMethodTypeConstraint() -> (Self, (Self.CotangentVector) -> Self.CotangentVector) {
+extension P where Self : Differentiable, Self == Self.TangentVector {
+  func vjpTestWhereClauseMethodTypeConstraint() -> (Self, (Self.TangentVector) -> Self.TangentVector) {
     return (self, { v in v })
   }
 }
