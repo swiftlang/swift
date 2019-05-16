@@ -10,12 +10,8 @@
 #
 # ----------------------------------------------------------------------------
 
-import os
-import platform
-
 from . import product
-from .. import shell
-from .. import targets
+from .build_script_helper_builder import BuildScriptHelperBuilder
 
 
 class IndexStoreDB(product.Product):
@@ -27,30 +23,16 @@ class IndexStoreDB(product.Product):
     def is_build_script_impl_product(cls):
         return False
 
-    def build(self, host_target):
-        run_build_script_helper('build', host_target, self, self.args)
-
-    def test(self, host_target):
-        if self.args.test and self.args.test_indexstoredb:
-            run_build_script_helper('test', host_target, self, self.args)
+    @classmethod
+    def new_builder(cls, args, toolchain, workspace, host):
+        return IndexStoreDBBuilder(cls, args, toolchain, workspace, host)
 
 
-def run_build_script_helper(action, host_target, product, args):
-    script_path = os.path.join(
-        product.source_dir, 'Utilities', 'build-script-helper.py')
-    toolchain_path = args.install_destdir
-    if platform.system() == 'Darwin':
-        # The prefix is an absolute path, so concatenate without os.path.
-        toolchain_path += \
-            targets.darwin_toolchain_prefix(args.install_prefix)
-    configuration = 'debug' if args.build_variant == 'Debug' else 'release'
-    helper_cmd = [
-        script_path,
-        action,
-        '--verbose',
-        '--package-path', product.source_dir,
-        '--build-path', product.build_dir,
-        '--configuration', configuration,
-        '--toolchain', toolchain_path,
-    ]
-    shell.call(helper_cmd)
+class IndexStoreDBBuilder(BuildScriptHelperBuilder):
+    def __init__(self, product_class, args, toolchain, workspace, host):
+        BuildScriptHelperBuilder.__init__(self, product_class, args, toolchain,
+                                          workspace, host)
+        self.__args = args
+
+    def _should_test(self):
+        return self.__args.test and self.__args.test_indexstoredb

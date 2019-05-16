@@ -29,10 +29,24 @@ class TSanLibDispatch(product.Product):
     def is_build_script_impl_product(cls):
         return False
 
-    def build(self, host_target):
+    @classmethod
+    def new_builder(cls, args, toolchain, workspace, host):
+        return TSanLibDispatchBuilder(cls, args, toolchain, workspace, host)
+
+
+class TSanLibDispatchBuilder(product.ProductBuilder):
+    def __init__(self, product_class, args, toolchain, workspace, host):
+        self.__args = args
+        self.__workspace = workspace
+
+        self.__source_dir = workspace.source_dir('compiler-rt')
+        self.__build_dir = workspace.build_dir(host.name,
+                                               product_class.product_name())
+
+    def build(self):
         """Build TSan runtime (compiler-rt)."""
-        rt_source_dir = join_path(self.source_dir, os.pardir, 'compiler-rt')
-        toolchain_path = join_path(self.args.install_destdir, 'usr')
+
+        toolchain_path = join_path(self.__args.install_destdir, 'usr')
         clang = join_path(toolchain_path, 'bin', 'clang')
         clangxx = join_path(toolchain_path, 'bin', 'clang++')
 
@@ -48,21 +62,21 @@ class TSanLibDispatch(product.Product):
             '-DCOMPILER_RT_BUILD_XRAY=OFF',
             '-DCOMPILER_RT_INTERCEPT_LIBDISPATCH=ON',
             '-DCOMPILER_RT_LIBDISPATCH_INSTALL_PATH=%s' % toolchain_path,
-            rt_source_dir]
+            self.__source_dir]
         build_cmd = ['ninja', 'tsan']
 
         # Always rebuild TSan runtime
-        shell.rmtree(self.build_dir)
-        shell.makedirs(self.build_dir)
+        shell.rmtree(self.__build_dir)
+        shell.makedirs(self.__build_dir)
 
-        with shell.pushd(self.build_dir):
+        with shell.pushd(self.__build_dir):
             shell.call(config_cmd)
             shell.call(build_cmd)
 
-    def test(self, host_target):
+    def test(self):
         """Run check-tsan target with a LIT filter for libdispatch."""
         cmd = ['ninja', 'check-tsan']
         env = {'LIT_FILTER': 'libdispatch'}
 
-        with shell.pushd(self.build_dir):
+        with shell.pushd(self.__build_dir):
             shell.call(cmd, env=env)

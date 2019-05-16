@@ -30,13 +30,14 @@ class Ninja(product.Product):
 
     @classmethod
     def new_builder(cls, args, toolchain, workspace, host):
-        return NinjaBuilder(cls, args, toolchain, workspace)
+        return NinjaBuilder(cls, args, toolchain, workspace, host)
 
 
 class NinjaBuilder(product.ProductBuilder):
-    def __init__(self, product_class, args, toolchain, workspace):
+    def __init__(self, product_class, args, toolchain, workspace, host):
         self.source_dir = workspace.source_dir(
             product_class.product_source_name())
+        # host is ignored. Ninja only builds for the build host.
         self.build_dir = workspace.build_dir('build',
                                              product_class.product_name())
         self.args = args

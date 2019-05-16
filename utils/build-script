@@ -964,20 +964,16 @@ class BuildScriptInvocation(object):
 
         # Non-build-script-impl products...
         # Note: currently only supports building for the host.
-        for host_target in [self.args.host_target]:
+        for host_target in [
+                StdlibDeploymentTarget.get_target_for_name(
+                    self.args.host_target)]:
             for product_class in product_classes:
                 if product_class.is_build_script_impl_product():
                     continue
-                product_source = product_class.product_source_name()
-                product_name = product_class.product_name()
-                product = product_class(
-                    args=self.args,
-                    toolchain=self.toolchain,
-                    source_dir=self.workspace.source_dir(product_source),
-                    build_dir=self.workspace.build_dir(
-                        host_target, product_name))
-                product.build(host_target)
-                product.test(host_target)
+                builder = product_class.new_builder(
+                    self.args, self.toolchain, self.workspace, host_target)
+                builder.build()
+                builder.test()
 
         # Extract symbols...
         for host_target in all_hosts:

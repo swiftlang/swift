@@ -10,8 +10,8 @@
 #
 # ----------------------------------------------------------------------------
 
-from . import indexstoredb
 from . import product
+from .build_script_helper_builder import BuildScriptHelperBuilder
 
 
 class SourceKitLSP(product.Product):
@@ -23,11 +23,16 @@ class SourceKitLSP(product.Product):
     def is_build_script_impl_product(cls):
         return False
 
-    def build(self, host_target):
-        indexstoredb.run_build_script_helper(
-            'build', host_target, self, self.args)
+    @classmethod
+    def new_builder(cls, args, toolchain, workspace, host):
+        return SourceKitLSPBuilder(cls, args, toolchain, workspace, host)
 
-    def test(self, host_target):
-        if self.args.test and self.args.test_sourcekitlsp:
-            indexstoredb.run_build_script_helper(
-                'test', host_target, self, self.args)
+
+class SourceKitLSPBuilder(BuildScriptHelperBuilder):
+    def __init__(self, product_class, args, toolchain, workspace, host):
+        BuildScriptHelperBuilder.__init__(self, product_class, args, toolchain,
+                                          workspace, host)
+        self.__args = args
+
+    def _should_test(self):
+        return self.__args.test and self.__args.test_sourcekitlsp

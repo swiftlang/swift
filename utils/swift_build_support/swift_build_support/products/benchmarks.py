@@ -28,48 +28,53 @@ class Benchmarks(product.Product):
     def is_build_script_impl_product(cls):
         return False
 
-    def build(self, host_target):
-        run_build_script_helper(host_target, self, self.args)
+    @classmethod
+    def new_builder(cls, args, toolchain, workspace, host):
+        return BenchmarksBuilder(cls, args, toolchain, workspace, host)
 
-    def test(self, host_target):
+
+# NOTE: this is very similar to BuildScriptHelperBuilder, but also
+# different enough to justify a different builder altogether.
+class BenchmarksBuilder(product.ProductBuilder):
+    def __init__(self, product_class, args, toolchain, workspace, host):
+        # Our source directory is a subdirectory inside the swift source
+        # directory
+        self.__source_dir = os.path.join(workspace.source_dir('swift'),
+                                         'benchmark')
+        self.__build_dir = workspace.build_dir(host.name,
+                                               product_class.product_name())
+        self.__args = args
+
+    def build(self):
+        # We use a separate python helper to enable quicker iteration when
+        # working on this by avoiding going through build-script to test small
+        # changes.
+        script_path = os.path.join(
+            self.__source_dir, 'scripts', 'build_script_helper.py')
+        toolchain_path = self.__args.install_destdir
+        if platform.system() == 'Darwin':
+            # The prefix is an absolute path, so concatenate without os.path.
+            toolchain_path += \
+                targets.darwin_toolchain_prefix(self.__args.install_prefix)
+        helper_cmd = [
+            script_path,
+            '--verbose',
+            '--package-path', self.__source_dir,
+            '--build-path', self.__build_dir,
+            '--toolchain', toolchain_path,
+        ]
+        shell.call(helper_cmd)
+
+    def test(self):
         """Just run a single instance of the command for both .debug and
            .release.
         """
         cmdline = ['--num-iters=1', 'XorLoop']
-        bench_Onone = os.path.join(self.build_dir, 'bin', 'Benchmark_Onone')
+        bench_Onone = os.path.join(self.__build_dir, 'bin', 'Benchmark_Onone')
         shell.call([bench_Onone] + cmdline)
 
-        bench_O = os.path.join(self.build_dir, 'bin', 'Benchmark_O')
+        bench_O = os.path.join(self.__build_dir, 'bin', 'Benchmark_O')
         shell.call([bench_O] + cmdline)
 
-        bench_Osize = os.path.join(self.build_dir, 'bin', 'Benchmark_Osize')
+        bench_Osize = os.path.join(self.__build_dir, 'bin', 'Benchmark_Osize')
         shell.call([bench_Osize] + cmdline)
-
-
-def run_build_script_helper(host_target, product, args):
-    toolchain_path = args.install_destdir
-    if platform.system() == 'Darwin':
-        # The prefix is an absolute path, so concatenate without os.path.
-        toolchain_path += \
-            targets.darwin_toolchain_prefix(args.install_prefix)
-
-    # Our source_dir is expected to be './$SOURCE_ROOT/benchmarks'. That is due
-    # the assumption that each product is in its own build directory. This
-    # product is not like that and has its package/tools instead in
-    # ./$SOURCE_ROOT/swift/benchmark.
-    package_path = os.path.join(product.source_dir, '..', 'swift', 'benchmark')
-    package_path = os.path.abspath(package_path)
-
-    # We use a separate python helper to enable quicker iteration when working
-    # on this by avoiding going through build-script to test small changes.
-    helper_path = os.path.join(package_path, 'scripts',
-                               'build_script_helper.py')
-
-    build_cmd = [
-        helper_path,
-        '--verbose',
-        '--package-path', package_path,
-        '--build-path', product.build_dir,
-        '--toolchain', toolchain_path,
-    ]
-    shell.call(build_cmd)

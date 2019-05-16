@@ -40,20 +40,6 @@ class Product(object):
         """
         return True
 
-    def build(self, host_target):
-        """build() -> void
-
-        Perform the build, for a non-build-script-impl product.
-        """
-        raise NotImplementedError
-
-    def test(self, host_target):
-        """test() -> void
-
-        Run the tests, for a non-build-script-impl product.
-        """
-        raise NotImplementedError
-
     def __init__(self, args, toolchain, source_dir, build_dir):
         self.args = args
         self.toolchain = toolchain
@@ -81,7 +67,7 @@ class ProductBuilder(object):
     """
 
     @abc.abstractmethod
-    def __init__(self, product_class, args, toolchain, workspace):
+    def __init__(self, product_class, args, toolchain, workspace, host):
         """
         Create a product builder for the given product class.
 
@@ -102,6 +88,10 @@ class ProductBuilder(object):
             to be located. A builder should use the workspace to access its own
             source/build directory, as well as other products source/build
             directories.
+        host : `swift_build_support.targets.Target`
+            The target host for the product. The product is intended to be used
+            in the given target, even if the build machine is of a different OS
+            and/or architecture.
         """
         pass
 
