@@ -24,6 +24,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -2175,7 +2176,8 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   // Construct a constraint system from this expression.
   ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
 
-  if (options.contains(TypeCheckExprFlags::SuppressDiagnostics))
+  if (options.contains(TypeCheckExprFlags::SuppressDiagnostics) ||
+      DiagnosticSuppression::isEnabled(Diags))
     csOptions |= ConstraintSystemFlags::SuppressDiagnostics;
 
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))

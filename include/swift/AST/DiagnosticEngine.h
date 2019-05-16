@@ -634,7 +634,7 @@ namespace swift {
     }
 
     /// Return all \c DiagnosticConsumers.
-    ArrayRef<DiagnosticConsumer *> getConsumers() {
+    ArrayRef<DiagnosticConsumer *> getConsumers() const {
       return Consumers;
     }
 
