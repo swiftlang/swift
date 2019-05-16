@@ -194,7 +194,9 @@ extension SIMD${n} : AdditiveArithmetic where Scalar : FloatingPoint {}
 
 extension SIMD${n} : VectorNumeric where Scalar : FloatingPoint {}
 
-extension SIMD${n} : Differentiable where Scalar : Differentiable & BinaryFloatingPoint {
+extension SIMD${n} : Differentiable
+  where Scalar : Differentiable & BinaryFloatingPoint,
+        Scalar.TangentVector: BinaryFloatingPoint {
   public typealias TangentVector = SIMD${n}
   public typealias AllDifferentiableVariables = SIMD${n}
   public func tangentVector(from cotangent: TangentVector) -> TangentVector {
