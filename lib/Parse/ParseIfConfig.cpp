@@ -638,6 +638,11 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     SmallVector<ASTNode, 16> Elements;
     if (isActive || !isVersionCondition) {
       parseElements(Elements, isActive);
+    } else if (SyntaxContext->isEnabled()) {
+      // We shouldn't skip code if we are building syntax tree.
+      // The parser will keep running and we just discard the AST part.
+      SmallVector<ASTNode, 16> dropedElements;
+      parseElements(dropedElements, false);
     } else {
       DiagnosticTransaction DT(Diags);
       skipUntilConditionalBlockClose();
