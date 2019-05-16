@@ -4412,7 +4412,7 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedTangentSpace(
   // Find the TangentVector associated type on the Differentiable protocol.
   auto *differentiableProtocol =
       ctx.getProtocol(KnownProtocolKind::Differentiable);
-  assert(differentiableProtocol && "Could not find __Differentiable protocol");
+  assert(differentiableProtocol && "Could not find Differentiable protocol");
   auto associatedTypeLookup =
       differentiableProtocol->lookupDirect(ctx.Id_TangentVector);
   assert(associatedTypeLookup.size() == 1);

@@ -1516,6 +1516,133 @@ void MultiConformanceChecker::checkAllConformances() {
   }
 }
 
+static void diagnoseConformanceImpliedByConditionalConformance(
+    DiagnosticEngine &Diags, NormalProtocolConformance *conformance,
+    NormalProtocolConformance *implyingConf, bool issueFixit) {
+  Type T = conformance->getType();
+  auto proto = conformance->getProtocol();
+  Type protoType = proto->getDeclaredType();
+  auto implyingProto = implyingConf->getProtocol()->getDeclaredType();
+  auto loc = implyingConf->getLoc();
+  Diags.diagnose(loc, diag::conditional_conformances_cannot_imply_conformances,
+                 T, implyingProto, protoType);
+
+  if (!issueFixit)
+    return;
+
+  // Now we get down to business: constructing a few options for new
+  // extensions. They all look like:
+  //
+  // extension T: ProtoType where ... {
+  //     <# witnesses #>
+  // }
+  //
+  // The options are:
+  //
+  // - if possible, the original bounds relaxed, when the requirements match the
+  //   conforming protocol, e.g. 'X: Hashable where T: Hashable' often
+  //   corresponds to 'X: Equatable where T: Equatable'. This fixit is included
+  //   if all the requirements are conformance constraints to the protocol
+  //   that implies the conformance.
+  // - the same bounds: ... is copied from the implying extension
+  // - new bounds: ... becomes a placeholder
+  //
+  // We could also suggest adding ", ProtoType" to the existing extension,
+  // but we don't think having multiple conformances in a single extension
+  // (especially conditional ones) is good Swift style, and so we don't
+  // want to encourage it.
+
+  auto ext = cast<ExtensionDecl>(implyingConf->getDeclContext());
+  auto &ctxt = ext->getASTContext();
+
+  auto &SM = ctxt.SourceMgr;
+  StringRef extraIndent;
+  StringRef indent = Lexer::getIndentationForLine(SM, loc, &extraIndent);
+
+  // First, the bits that aren't the requirements are the same for all the
+  // types.
+  llvm::SmallString<128> prefix;
+  llvm::SmallString<128> suffix;
+  {
+    llvm::raw_svector_ostream prefixStream(prefix);
+    llvm::raw_svector_ostream suffixStream(suffix);
+
+    ValueDecl *decl = T->getAnyNominal();
+    if (!decl)
+      decl = T->getAnyGeneric();
+
+    prefixStream << "extension " << decl->getFullName() << ": " << protoType << " ";
+    suffixStream << " {\n"
+                 << indent << extraIndent << "<#witnesses#>\n"
+                 << indent << "}\n\n"
+                 << indent;
+  }
+
+  if (!ctxt.LangOpts.DiagnosticsEditorMode) {
+    // The fixits below are too complicated for the command line: the suggested
+    // code ends up not being displayed, and the text by itself doesn't help. So
+    // instead we skip all that and just have some text.
+    Diags.diagnose(loc,
+                   diag::note_explicitly_state_conditional_conformance_noneditor,
+                   prefix.str());
+    return;
+  }
+
+  // First, we do the fixit for "matching" requirements (i.e. X: P where T: P).
+  bool matchingIsValid = true;
+  llvm::SmallString<128> matchingFixit = prefix;
+  {
+    llvm::raw_svector_ostream matchingStream(matchingFixit);
+    matchingStream << "where ";
+    bool first = true;
+    for (const auto &req : implyingConf->getConditionalRequirements()) {
+      auto firstType = req.getFirstType();
+      // T: ImplyingProto => T: Proto
+      if (req.getKind() == RequirementKind::Conformance &&
+          req.getSecondType()->isEqual(implyingProto)) {
+        auto comma = first ? "" : ", ";
+        matchingStream << comma << firstType << ": " << protoType;
+        first = false;
+        continue;
+      }
+      // something didn't work out, so give up on this fixit.
+      matchingIsValid = false;
+      break;
+    }
+  }
+
+  if (matchingIsValid) {
+    matchingFixit += suffix;
+    Diags
+        .diagnose(loc,
+                  diag::note_explicitly_state_conditional_conformance_relaxed)
+        .fixItInsert(loc, matchingFixit);
+  }
+
+  // Next, do the fixit for using the same requirements, but be resilient to a
+  // missing `where` clause: this is one of a few fixits that get emitted here,
+  // and so is a very low priority diagnostic, and so shouldn't crash.
+  if (auto TWC = ext->getTrailingWhereClause()) {
+    llvm::SmallString<128> sameFixit = prefix;
+    auto CSR =
+        Lexer::getCharSourceRangeFromSourceRange(SM, TWC->getSourceRange());
+    sameFixit += SM.extractText(CSR);
+    sameFixit += suffix;
+    Diags
+        .diagnose(loc, diag::note_explicitly_state_conditional_conformance_same)
+        .fixItInsert(loc, sameFixit);
+  }
+
+  // And finally, just the generic new-requirements one:
+  llvm::SmallString<128> differentFixit = prefix;
+  differentFixit += "where <#requirements#>";
+  differentFixit += suffix;
+  Diags
+      .diagnose(loc,
+                diag::note_explicitly_state_conditional_conformance_different)
+      .fixItInsert(loc, differentFixit);
+}
+
 /// Determine whether the type \c T conforms to the protocol \c Proto,
 /// recording the complete witness table if it does.
 ProtocolConformance *MultiConformanceChecker::
@@ -1699,6 +1826,11 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
       // those suggestions will go in the current DeclContext, but really they
       // should go into the new extension we (might) suggest here.
       impliedDisablesMissingWitnessFixits = true;
+
+      diagnoseConformanceImpliedByConditionalConformance(
+          TC.Diags, conformance, implyingConf, issueFixit);
+
+      conformance->setInvalid();
     }
   }
 
