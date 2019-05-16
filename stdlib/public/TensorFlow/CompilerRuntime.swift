@@ -1614,41 +1614,6 @@ func _TFCOpAddInputFromAnyTensors(
   }
 }
 
-/// Initializes a TensorGroup value, taking ownership of all the tensor
-/// handles in `tensorHandles`.
-@usableFromInline
-@_silgen_name("_swift_tfc_InitTensorGroup")
-func _TFCInitTensorGroup<T : TensorGroup>(
-    _ tensorHandles: UnsafeMutablePointer<CTensorHandle>
-) -> T {
-  return T(_owning: tensorHandles)
-}
-
-/// Allocates a buffer of CTensorHandles on the heap.
-@usableFromInline
-@_silgen_name("_swift_tfc_AllocateCHandleBuffer")
-func _TFCAllocateCHandleBuffer(_ capacity: Int32)
-    -> UnsafeMutablePointer<CTensorHandle> {
-  return UnsafeMutablePointer.allocate(capacity: Int(capacity))
-}
-
-/// Deallocates a buffer of CTensorHandles.
-@usableFromInline
-@_silgen_name("_swift_tfc_DeallocateCHandleBuffer")
-func _TFCDeallocateCHandleBuffer(
-    _ buffer: UnsafeMutablePointer<CTensorHandle>
-) {
-  buffer.deallocate()
-}
-
-/// Returns the number of CTensorHandles in a TensorGroup of type T.
-@_silgen_name("_swift_tfc_GetTensorGroupCHandleCount")
-public func _TFCGetTensorGroupCHandleCount<T : TensorGroup>(
-    _ type: T.Type
-) -> Int32 {
-  return T._tensorHandleCount
-}
-
 @inlinable
 @_silgen_name("_swift_tfc_CreateTensorHandleFromC")
 public func _TFCCreateTensorHandleFromC(
@@ -1680,56 +1645,6 @@ public func _TFCCreateTensorHandleFromC(
 // into buffers that TFE_OpSetAttr*List functions can read.
 
 @usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrBoolArray")
-func _TFCOpSetAttrBoolArray(_ op: CTFEOp,
-                            _ attrName: UnsafePointer<Int8>,
-                            _ value: Array<Bool>) {
-  value.map({ $0 ? UInt8(1) : UInt8(0) }).withUnsafeBufferPointer { buffer in
-    TFE_OpSetAttrBoolList(op, attrName, buffer.baseAddress, Int32(buffer.count))
-  }
-}
-
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrInt32Array")
-func _TFCOpSetAttrInt32Array(_ op: CTFEOp,
-                             _ attrName: UnsafePointer<Int8>,
-                             _ value: Array<Int32>) {
-  value.map(Int64.init).withUnsafeBufferPointer { buffer in
-    TFE_OpSetAttrIntList(op, attrName, buffer.baseAddress, Int32(buffer.count))
-  }
-}
-
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrInt64Array")
-func _TFCOpSetAttrInt64Array(_ op: CTFEOp,
-                             _ attrName: UnsafePointer<Int8>,
-                             _ value: Array<Int64>) {
-  value.withUnsafeBufferPointer { buffer in
-    TFE_OpSetAttrIntList(op, attrName, buffer.baseAddress, Int32(buffer.count))
-  }
-}
-
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrDoubleArray")
-func _TFCOpSetAttrDoubleArray(_ op: CTFEOp,
-                              _ attrName: UnsafePointer<Int8>,
-                              _ value: Array<Double>) {
-  value.map(Float.init).withUnsafeBufferPointer { buffer in
-    TFE_OpSetAttrFloatList(op, attrName, buffer.baseAddress, Int32(buffer.count))
-  }
-}
-
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrFloatArray")
-func _TFCOpSetAttrFloatArray(_ op: CTFEOp,
-                             _ attrName: UnsafePointer<Int8>,
-                             _ value: Array<Float>) {
-  value.withUnsafeBufferPointer { buffer in
-    TFE_OpSetAttrFloatList(op, attrName, buffer.baseAddress, Int32(buffer.count))
-  }
-}
-
-@usableFromInline
 @_silgen_name("_swift_tfc_OpSetAttrTypeArray")
 func _TFCOpSetAttrTypeArray(_ op: CTFEOp,
                             _ attrName: UnsafePointer<Int8>,
@@ -1740,61 +1655,6 @@ func _TFCOpSetAttrTypeArray(_ op: CTFEOp,
                             Int32(reboundBuffer.count))
     }
   }
-}
-
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrTensorShape")
-func _TFCOpSetAttrTensorShape(_ op: CTFEOp,
-                              _ attrName: UnsafePointer<Int8>,
-                              _ shape: TensorShape,
-                              _ status: CTFStatus) {
-  let dimensions: [Int64] = shape.dimensions.map(Int64.init)
-  dimensions.withUnsafeBufferPointer { buffer in
-    TFE_OpSetAttrShape(op, attrName, buffer.baseAddress, Int32(buffer.count),
-                       status)
-  }
-}
-
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrOptionalTensorShape")
-func _TFCOpSetAttrOptionalTensorShape(_ op: CTFEOp,
-                                      _ attrName: UnsafePointer<Int8>,
-                                      _ optionalShape: TensorShape?,
-                                      _ status: CTFStatus) {
-  guard let shape = optionalShape else {
-    TFE_OpSetAttrShape(op, attrName, nil, -1, status)
-    return
-  }
-  _TFCOpSetAttrTensorShape(op, attrName, shape, status)
-}
-
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrTensorShapeArray")
-func _TFCOpSetAttrTensorShapeArray(_ op: CTFEOp,
-                                   _ attrName: UnsafePointer<Int8>,
-                                   _ value: Array<TensorShape>,
-                                   _ status: CTFStatus) {
-  let flattenedDims = value.flatMap { $0.dimensions.map(Int64.init) }
-  let ranks = value.map { Int32($0.rank) }
-  setAttrShapeList(op: op, attrName: attrName, flattenedDims: flattenedDims,
-                   ranks: ranks, status: status)
-}
-
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrOptionalTensorShapeArray")
-func _TFCOpSetAttrOptionalTensorShapeArray(_ op: CTFEOp,
-                                           _ attrName: UnsafePointer<Int8>,
-                                           _ value: Array<TensorShape?>,
-                                           _ status: CTFStatus) {
-  let flattenedDims = value.flatMap { (tensorShapeOpt) -> [Int64] in
-    if let tensorShape = tensorShapeOpt {
-      return tensorShape.dimensions.map(Int64.init)
-    }
-    return []
-  }
-  let ranks = value.map { shape in (shape?.rank).map(Int32.init) ?? -1 }
-  setAttrShapeList(op: op, attrName: attrName, flattenedDims: flattenedDims,
-                   ranks: ranks, status: status)
 }
 
 /// Given dimensions and ranks in the form described below, makes the
@@ -1822,74 +1682,6 @@ fileprivate func setAttrShapeList(
         TFE_OpSetAttrShapeList(op, attrName, dimsBuffer.baseAddress,
                                ranksBuffer.baseAddress,
                                Int32(ranksBuffer.count), status)
-      }
-    }
-  }
-}
-
-/// Wrapper around TFE_OpSetAttrString that handles converting the Swift Stdlib
-/// String into a buffer that TFE_OpSetAttrString can read.
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrString")
-func _TFCOpSetAttrString(_ op: CTFEOp,
-                         _ attrName: UnsafePointer<Int8>,
-                         _ value: String) {
-  value.utf8CString.withUnsafeBufferPointer { buffer in
-    // utf8CString is null-terminated; TFE_OpSetAttrString wants
-    // non-null-terminated.
-    TFE_OpSetAttrString(op, attrName, buffer.baseAddress, buffer.count - 1)
-  }
-}
-
-/// Wrapper around TFE_OpSetAttrFunctionName that handles converting the Swift
-/// Stdlib String into a buffer that TFE_OpSetAttrFunctionName can read.
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrFunctionName")
-func _TFCOpSetAttrFunctionName(_ op: CTFEOp,
-                               _ attrName: UnsafePointer<Int8>,
-                               _ value: String) {
-  value.utf8CString.withUnsafeBufferPointer { buffer in
-    // utf8CString is null-terminated; TFE_OpSetAttrFunctionName wants
-    // non-null-terminated.
-    TFE_OpSetAttrFunctionName(op, attrName, buffer.baseAddress, buffer.count - 1)
-  }
-}
-
-/// Wrapper around TFE_OpSetAttrStringList that handles converting the Swift
-/// Strings into buffers that TFE_OpSetAttrStringList can read.
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrStringArray")
-func _TFCOpSetAttrStringArray(_ op: CTFEOp,
-                             _ attrName: UnsafePointer<Int8>,
-                             _ strings: [String]) {
-  // Collect all the strings' utf8 bytes into a single array so that we can
-  // address all the strings with a single
-  // `flattenedStringBytes.withUnsafeBufferPointer`.
-  var flattenedStringBytes: [CChar] = []
-  var lengths: [Int] = []
-  for string in strings {
-    // Don't include the null-terminator because TFE_OpSetAttrStringList uses
-    // lengths instead of null-terminators.
-    let stringBytes = string.utf8CString.dropLast()
-    flattenedStringBytes.append(contentsOf: stringBytes)
-    lengths.append(stringBytes.count)
-  }
-
-  // Calculate the addresses of all the strings within our single buffer, and
-  // then call TFE_OpSetAttrStringList.
-  flattenedStringBytes.withUnsafeBufferPointer { flattenedStringBytesBuffer in
-    var stringAddrs: [UnsafeRawPointer?] = []
-    var currentStringAddr =
-        flattenedStringBytesBuffer.baseAddress.map(UnsafeRawPointer.init)
-    for length in lengths {
-      stringAddrs.append(currentStringAddr)
-      currentStringAddr = currentStringAddr?.advanced(by: length)
-    }
-
-    stringAddrs.withUnsafeBufferPointer { stringAddrsBuffer in
-      lengths.withUnsafeBufferPointer { lengthsBuffer in
-        TFE_OpSetAttrStringList(op, attrName, stringAddrsBuffer.baseAddress,
-                                lengthsBuffer.baseAddress, Int32(strings.count))
       }
     }
   }
@@ -1942,10 +1734,4 @@ func _TFCOpSetDeviceFromScope(_ op: CTFEOp, _ status: CTFStatus) {
   if let deviceName = _ExecutionContext.global.currentDeviceName {
     TFE_OpSetDevice(op, deviceName, status)
   }
-}
-
-@usableFromInline
-@_cdecl("_swift_tfc_CheckOk")
-func _TFCCheckOk(_ s: CTFStatus) {
-  checkOk(s)
 }
