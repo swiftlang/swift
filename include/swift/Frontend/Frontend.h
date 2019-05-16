@@ -183,7 +183,7 @@ public:
 
   void setMainExecutablePath(StringRef Path);
 
-  void setRuntimeResourcePath(StringRef Path, bool IsDefault = false);
+  void setRuntimeResourcePath(StringRef Path);
 
   void setSDKPath(const std::string &Path);
 
