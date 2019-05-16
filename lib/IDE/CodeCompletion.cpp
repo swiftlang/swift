@@ -1381,7 +1381,7 @@ public:
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
   void completeAssignmentRHS(AssignExpr *E) override;
-  void completeCallArg(CodeCompletionExpr *E) override;
+  void completeCallArg(CodeCompletionExpr *E, bool isFirst) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
                          Optional<unsigned> yieldIndex) override;
@@ -3713,81 +3713,14 @@ public:
       return;
 
     ModuleDecl *CurrModule = CurrDeclContext->getParentModule();
+    DeclContext *DC = const_cast<DeclContext *>(CurrDeclContext);
 
     // We can only say .foo where foo is a static member of the contextual
     // type and has the same type (or if the member is a function, then the
     // same result type) as the contextual type.
     FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD,
                                              DeclVisibilityKind Reason) {
-
-      if (VD->isOperator())
-        return false;
-
-      if (!VD->hasInterfaceType()) {
-        TypeResolver->resolveDeclSignature(VD);
-        if (!VD->hasInterfaceType())
-          return false;
-      }
-
-      if (T->getOptionalObjectType() &&
-          VD->getModuleContext()->isStdlibModule()) {
-        // In optional context, ignore '.init(<some>)', 'init(nilLiteral:)',
-        if (isa<ConstructorDecl>(VD))
-          return false;
-        // TODO: Ignore '.some(<Wrapped>)' and '.none' too *in expression
-        // context*. They are useful in pattern context though.
-      }
-
-      // Enum element decls can always be referenced by implicit member
-      // expression.
-      if (isa<EnumElementDecl>(VD))
-        return true;
-
-      // Only non-failable constructors are implicitly referenceable.
-      if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
-        switch (CD->getFailability()) {
-        case OTK_None:
-        case OTK_ImplicitlyUnwrappedOptional:
-          return true;
-        case OTK_Optional:
-          return false;
-        }
-      }
-
-      // Otherwise, check the result type matches the contextual type.
-      auto declTy = T->getTypeOfMember(CurrModule, VD);
-      if (declTy->is<ErrorType>())
-        return false;
-
-      DeclContext *DC = const_cast<DeclContext *>(CurrDeclContext);
-
-      // Member types can also be implicitly referenceable as long as it's
-      // convertible to the contextual type.
-      if (auto CD = dyn_cast<TypeDecl>(VD)) {
-        declTy = declTy->getMetatypeInstanceType();
-
-        // Emit construction for the same type via typealias doesn't make sense
-        // because we are emitting all `.init()`s.
-        if (declTy->isEqual(T))
-          return false;
-        return swift::isConvertibleTo(declTy, T, *DC);
-      }
-
-      // Only static member can be referenced.
-      if (!VD->isStatic())
-        return false;
-
-      if (isa<FuncDecl>(VD)) {
-        // Strip '(Self.Type) ->' and parameters.
-        declTy = declTy->castTo<AnyFunctionType>()->getResult();
-        declTy = declTy->castTo<AnyFunctionType>()->getResult();
-      } else if (auto FT = declTy->getAs<AnyFunctionType>()) {
-        // The compiler accepts 'static var factory: () -> T' for implicit
-        // member expression.
-        // FIXME: This emits just 'factory'. We should emit 'factory()' instead.
-        declTy = FT->getResult();
-      }
-      return declTy->isEqual(T) || swift::isConvertibleTo(declTy, T, *DC);
+      return isReferenceableByImplicitMemberExpr(CurrModule, DC, T, VD);
     });
 
     auto baseType = MetatypeType::get(T);
@@ -4703,10 +4636,26 @@ void CodeCompletionCallbacksImpl::completeAssignmentRHS(AssignExpr *E) {
   Kind = CompletionKind::AssignmentRHS;
 }
 
-void CodeCompletionCallbacksImpl::completeCallArg(CodeCompletionExpr *E) {
+void CodeCompletionCallbacksImpl::completeCallArg(CodeCompletionExpr *E,
+                                                  bool isFirst) {
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = E;
   Kind = CompletionKind::CallArg;
+
+  ShouldCompleteCallPatternAfterParen = false;
+  if (isFirst) {
+    ShouldCompleteCallPatternAfterParen = true;
+    if (Context.LangOpts.CodeCompleteCallPatternHeuristics) {
+      // Lookahead one token to decide what kind of call completions to provide.
+      // When it appears that there is already code for the call present, just
+      // complete values and/or argument labels.  Otherwise give the entire call
+      // pattern.
+      Token next = P.peekToken();
+      if (!next.isAtStartOfLine() && !next.is(tok::eof) && !next.is(tok::r_paren)) {
+        ShouldCompleteCallPatternAfterParen = false;
+      }
+    }
+  }
 }
 
 void CodeCompletionCallbacksImpl::completeReturnStmt(CodeCompletionExpr *E) {
@@ -5411,13 +5360,32 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
   case CompletionKind::CallArg : {
     ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
-    if (!ContextInfo.getPossibleNames().empty()) {
+
+    bool shouldPerformGlobalCompletion = true;
+
+    if (ShouldCompleteCallPatternAfterParen &&
+        !ContextInfo.getPossibleCallees().empty()) {
+      Lookup.setHaveLParen(true);
+      for (auto &typeAndDecl : ContextInfo.getPossibleCallees())
+        Lookup.tryFunctionCallCompletions(typeAndDecl.first,
+                                          typeAndDecl.second);
+      Lookup.setHaveLParen(false);
+
+      shouldPerformGlobalCompletion =
+          !Lookup.FoundFunctionCalls ||
+          (Lookup.FoundFunctionCalls &&
+           Lookup.FoundFunctionsWithoutFirstKeyword);
+    } else if (!ContextInfo.getPossibleNames().empty()) {
       Lookup.addArgNameCompletionResults(ContextInfo.getPossibleNames());
-      break;
+
+      shouldPerformGlobalCompletion = !ContextInfo.getPossibleTypes().empty();
     }
-    Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
-                            ContextInfo.isSingleExpressionBody());
-    DoPostfixExprBeginning();
+
+    if (shouldPerformGlobalCompletion) {
+      Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
+                              ContextInfo.isSingleExpressionBody());
+      DoPostfixExprBeginning();
+    }
     break;
   }
 
