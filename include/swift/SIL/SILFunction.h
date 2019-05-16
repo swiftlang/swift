@@ -174,6 +174,9 @@ public:
   SILFunction *getOriginal() const { return Original; }
 
   const SILAutoDiffIndices &getIndices() const { return indices; }
+  void setIndices(const SILAutoDiffIndices &indices) {
+    this->indices = indices;
+  }
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
 

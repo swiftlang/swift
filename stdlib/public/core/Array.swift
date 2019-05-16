@@ -1934,7 +1934,7 @@ extension Array where Element : Differentiable {
 
     @usableFromInline
     func _vjpBase() ->
-      ([Element], (Array<Element>.CotangentVector) -> CotangentVector) {
+      ([Element], (Array<Element>.TangentVector) -> TangentVector) {
       return (base, { $0 })
     }
 
@@ -1944,7 +1944,7 @@ extension Array where Element : Differentiable {
 
     @usableFromInline
     static func _vjpInit(_ base: [Element]) ->
-      (Array.DifferentiableView, (CotangentVector) -> CotangentVector) {
+      (Array.DifferentiableView, (TangentVector) -> TangentVector) {
       return (Array.DifferentiableView(base), { $0 })
     }
 
@@ -1952,8 +1952,6 @@ extension Array where Element : Differentiable {
 
     public typealias TangentVector =
       Array<Element.TangentVector>.DifferentiableView
-    public typealias CotangentVector =
-      Array<Element.CotangentVector>.DifferentiableView
     public typealias AllDifferentiableVariables =
       Array<Element.AllDifferentiableVariables>.DifferentiableView
 
@@ -1983,19 +1981,6 @@ extension Array where Element : Differentiable {
       return DifferentiableView(
         zip(base, direction.base).map { $0.moved(along: $1) })
     }
-
-    public func tangentVector(from cotangentVector: CotangentVector) ->
-      TangentVector {
-      precondition(
-        base.count == cotangentVector.base.count,
-        "cannot use Array.DifferentiableView with count \(base.count) to " +
-          "get tangentVector from cotangentVector with different count " +
-          "\(cotangentVector.base.count)")
-      return TangentVector(zip(base, cotangentVector.base).map {
-        (selfElement, cotangentVectorElement) in
-        selfElement.tangentVector(from: cotangentVectorElement)
-      })
-    }
   }
 }
 
@@ -2005,6 +1990,12 @@ extension Array.DifferentiableView : Equatable where Element : Equatable {
     rhs: Array.DifferentiableView
   ) -> Bool {
     return lhs.base == rhs.base
+  }
+}
+
+extension Array.DifferentiableView : CustomStringConvertible {
+  public var description: String {
+    return base.description
   }
 }
 
@@ -2059,16 +2050,14 @@ extension Array.DifferentiableView : AdditiveArithmetic
 /// Makes `Array` differentiable as the product manifold of `Element`
 /// multiplied with itself `count` times.
 extension Array : Differentiable where Element : Differentiable {
-  // In an ideal world, `TangentVector`, `CotangentVector`, and
+  // In an ideal world, `TangentVector`, `TangentVector`, and
   // `AllDifferentiableVariables` would all be `Array`s. Unfortunately, we
   // can't conform `Array` to `AdditiveArithmetic` for `TangentVector` and
-  // `CotangentVector`, because `Array` already has a static `+` method with
+  // `TangentVector`, because `Array` already has a static `+` method with
   // different semantics from `AdditiveArithmetic` `+`. So we use
   // `Array.DifferentiableView` for all these associated types.
   public typealias TangentVector =
     Array<Element.TangentVector>.DifferentiableView
-  public typealias CotangentVector =
-    Array<Element.CotangentVector>.DifferentiableView
   public typealias AllDifferentiableVariables =
     Array<Element.AllDifferentiableVariables>.DifferentiableView
 
@@ -2086,40 +2075,35 @@ extension Array : Differentiable where Element : Differentiable {
   public func moved(along direction: TangentVector) -> Array {
     return DifferentiableView(self).moved(along: direction).base
   }
-
-  public func tangentVector(from cotangentVector: CotangentVector) ->
-    TangentVector {
-    return DifferentiableView(self).tangentVector(from: cotangentVector)
-  }
 }
 
 extension Array where Element : Differentiable {
   public func _vjpSubscript(index: Int) ->
-    (Element, (Element.CotangentVector) -> CotangentVector)
+    (Element, (Element.TangentVector) -> TangentVector)
   {
-    func pullback(_ gradientIn: Element.CotangentVector) -> CotangentVector {
-      var gradientOut = Array<Element.CotangentVector>(
+    func pullback(_ gradientIn: Element.TangentVector) -> TangentVector {
+      var gradientOut = Array<Element.TangentVector>(
         repeating: .zero,
         count: count)
       gradientOut[index] = gradientIn
-      return CotangentVector(gradientOut)
+      return TangentVector(gradientOut)
     }
     return (self[index], pullback)
   }
 
   public static func _vjpPlus(_ lhs: [Element], _ rhs: [Element]) ->
-    ([Element], (CotangentVector) -> (CotangentVector, CotangentVector)) {
-      func pullback(_ gradientIn: CotangentVector) ->
-        (CotangentVector, CotangentVector) {
+    ([Element], (TangentVector) -> (TangentVector, TangentVector)) {
+      func pullback(_ gradientIn: TangentVector) ->
+        (TangentVector, TangentVector) {
         precondition(
           gradientIn.base.count == lhs.count + rhs.count,
           "+ should receive gradient with count equal to sum of operand " +
             "counts, but counts are: gradient \(gradientIn.base.count), " +
             "lhs \(lhs.count), rhs \(rhs.count)")
         return (
-          CotangentVector(Array<Element.CotangentVector>(
+          TangentVector(Array<Element.TangentVector>(
             gradientIn.base[0..<lhs.count])),
-          CotangentVector(Array<Element.CotangentVector>(
+          TangentVector(Array<Element.TangentVector>(
             gradientIn.base[lhs.count...])))
       }
       return (lhs + rhs, pullback)

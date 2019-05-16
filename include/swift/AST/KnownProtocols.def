@@ -86,9 +86,6 @@ PROTOCOL(TensorGroup)
 PROTOCOL_(TensorFlowDataTypeCompatible)
 PROTOCOL(TensorProtocol)
 PROTOCOL(VectorNumeric)
-// TODO(TF-213): Remove underscore `Differentiable` protocols.
-PROTOCOL(__Differentiable)
-PROTOCOL(_Differentiable)
 PROTOCOL(Differentiable)
 
 PROTOCOL_(ObjectiveCBridgeable)

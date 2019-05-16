@@ -569,7 +569,7 @@ TryApplyInst *TryApplyInst::create(
 SILType
 AutoDiffFunctionInst::getAutoDiffType(SILValue originalFunction,
                                       unsigned differentiationOrder,
-                                      const SmallBitVector &parameterIndices) {
+                                      AutoDiffIndexSubset *parameterIndices) {
   auto fnTy = originalFunction->getType().castTo<SILFunctionType>();
   auto diffTy =
       fnTy->getWithDifferentiability(differentiationOrder, parameterIndices);
@@ -578,7 +578,7 @@ AutoDiffFunctionInst::getAutoDiffType(SILValue originalFunction,
 
 AutoDiffFunctionInst::AutoDiffFunctionInst(
     SILModule &module, SILDebugLocation debugLoc,
-    const SmallBitVector &parameterIndices, unsigned differentiationOrder,
+    AutoDiffIndexSubset *parameterIndices, unsigned differentiationOrder,
     SILValue originalFunction, ArrayRef<SILValue> associatedFunctions)
     : InstructionBaseWithTrailingOperands(
           originalFunction, associatedFunctions, debugLoc,
@@ -591,7 +591,7 @@ AutoDiffFunctionInst::AutoDiffFunctionInst(
 
 AutoDiffFunctionInst *AutoDiffFunctionInst::create(
     SILModule &module, SILDebugLocation debugLoc,
-    const SmallBitVector &parameterIndices,
+    AutoDiffIndexSubset *parameterIndices,
     unsigned differentiationOrder, SILValue originalFunction,
     ArrayRef<SILValue> associatedFunctions) {
   size_t size = totalSizeToAlloc<Operand>(associatedFunctions.size() + 1);

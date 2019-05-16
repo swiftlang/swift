@@ -1762,6 +1762,19 @@ public:
                                     CanType &dynamicSelfType,
                                     bool withoutActuallyEscaping=false);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  //===--------------------------------------------------------------------===//
+  // Differentiation thunks
+  //===--------------------------------------------------------------------===//
+
+  /// Get or create a thunk for reordering linear maps that are differentiable
+  /// wrt self, so that self appears as:
+  /// - The last parameter in the differential.
+  /// - The last result in the pullback.
+  SILFunction *getOrCreateAutoDiffLinearMapReorderingThunk(
+      AutoDiffAssociatedFunctionKind assocFnKind,
+      CanSILFunctionType fromType, CanSILFunctionType toType);
+
   //===--------------------------------------------------------------------===//
   // NoEscaping to Escaping closure thunk
   //===--------------------------------------------------------------------===//

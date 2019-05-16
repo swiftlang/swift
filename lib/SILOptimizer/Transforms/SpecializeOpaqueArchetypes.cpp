@@ -28,13 +28,15 @@ using namespace swift;
 
 static Type substOpaqueTypesWithUnderlyingTypes(
     Type ty, SILFunction *context) {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(context);
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+      context->getModule().getSwiftModule(), context->getResilienceExpansion());
   return ty.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
 }
 
 static SubstitutionMap
 substOpaqueTypesWithUnderlyingTypes(SubstitutionMap map, SILFunction *context) {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(context);
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+      context->getModule().getSwiftModule(), context->getResilienceExpansion());
   return map.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
 }
 
@@ -292,7 +294,9 @@ protected:
       return Sty;
 
    // Apply the opaque types substitution.
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer(&Original);
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+        Original.getModule().getSwiftModule(),
+        Original.getResilienceExpansion());
     Sty = Ty.subst(Original.getModule(), replacer, replacer,
                    CanGenericSignature(), true);
     return Sty;
@@ -307,7 +311,9 @@ protected:
   ProtocolConformanceRef remapConformance(Type type,
                                           ProtocolConformanceRef conf) {
     // Apply the opaque types substitution.
-    ReplaceOpaqueTypesWithUnderlyingTypes replacer(&Original);
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+        Original.getModule().getSwiftModule(),
+        Original.getResilienceExpansion());
     return conf.subst(type, replacer, replacer,
                       SubstFlags::SubstituteOpaqueArchetypes);
   }
@@ -434,7 +440,9 @@ class OpaqueArchetypeSpecializer : public SILFunctionTransform {
         if (auto opaqueTy = type->getAs<OpaqueTypeArchetypeType>()) {
           auto opaque = opaqueTy->getDecl();
           return ReplaceOpaqueTypesWithUnderlyingTypes::
-              shouldPerformSubstitution(opaque, context);
+              shouldPerformSubstitution(opaque,
+                                        context->getModule().getSwiftModule(),
+                                        context->getResilienceExpansion());
         }
         return false;
       });

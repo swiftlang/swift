@@ -13,9 +13,7 @@ public struct Foo : Differentiable {
 // CHECK-AST:   @_fieldwiseDifferentiable public struct AllDifferentiableVariables
 // CHECK-AST:     public typealias AllDifferentiableVariables = Foo.AllDifferentiableVariables
 // CHECK-AST:     public typealias TangentVector = Foo.AllDifferentiableVariables
-// CHECK-AST:     public typealias CotangentVector = Foo.AllDifferentiableVariables
 // CHECK-AST:   public typealias TangentVector = Foo.AllDifferentiableVariables
-// CHECK-AST:   public typealias CotangentVector = Foo.AllDifferentiableVariables
 
 // CHECK-SILGEN-LABEL: // Foo.a.getter
 // CHECK-SILGEN-NEXT: sil [transparent] [serialized] [differentiable source 0 wrt 0] [ossa] @$s33derived_differentiable_properties3FooV1aSfvg : $@convention(method) (Foo) -> Float
@@ -31,7 +29,6 @@ let _: @differentiable (AdditiveTangentIsSelf) -> Float = { x in
 // CHECK-AST:         internal var a: Float
 // CHECK-AST:         internal init(a: Float)
 // CHECK-AST:         internal typealias TangentVector = AdditiveTangentIsSelf
-// CHECK-AST:         internal typealias CotangentVector = AdditiveTangentIsSelf
 // CHECK-AST:         internal typealias AllDifferentiableVariables = AdditiveTangentIsSelf
 
 struct TestNoDerivative : Differentiable {
@@ -46,9 +43,7 @@ struct TestNoDerivative : Differentiable {
 // CHECK-AST:         @_fieldwiseDifferentiable internal struct AllDifferentiableVariables : Differentiable, AdditiveArithmetic, VectorNumeric
 // CHECK-AST:           internal typealias AllDifferentiableVariables = TestNoDerivative.AllDifferentiableVariables
 // CHECK-AST:           internal typealias TangentVector = TestNoDerivative.AllDifferentiableVariables
-// CHECK-AST:           internal typealias CotangentVector = TestNoDerivative.AllDifferentiableVariables
 // CHECK-AST:         internal typealias TangentVector = TestNoDerivative.AllDifferentiableVariables
-// CHECK-AST:         internal typealias CotangentVector = TestNoDerivative.AllDifferentiableVariables
 
 struct TestKeyPathIterable : Differentiable, KeyPathIterable {
   var w: Float
@@ -62,29 +57,24 @@ struct TestKeyPathIterable : Differentiable, KeyPathIterable {
 // CHECK-AST:         @_fieldwiseDifferentiable internal struct AllDifferentiableVariables : Differentiable, AdditiveArithmetic, KeyPathIterable, VectorNumeric
 // CHECK-AST:           internal typealias AllDifferentiableVariables = TestKeyPathIterable.AllDifferentiableVariables
 // CHECK-AST:           internal typealias TangentVector = TestKeyPathIterable.AllDifferentiableVariables
-// CHECK-AST:           internal typealias CotangentVector = TestKeyPathIterable.AllDifferentiableVariables
 // CHECK-AST:         internal typealias TangentVector = TestKeyPathIterable.AllDifferentiableVariables
-// CHECK-AST:         internal typealias CotangentVector = TestKeyPathIterable.AllDifferentiableVariables
 
-struct GenericCotanMember<T : Differentiable> : Differentiable, AdditiveArithmetic {
-  var x: T.CotangentVector
+struct GenericTanMember<T : Differentiable> : Differentiable, AdditiveArithmetic {
+  var x: T.TangentVector
 }
 
 // TODO(TF-316): Revisit after `Differentiable` derived conformances behavior is standardized.
-// `AllDifferentiableVariables` and `CotangentVector` structs need not both be synthesized.
+// `AllDifferentiableVariables` and `TangentVector` structs need not both be synthesized.
 
-// CHECK-AST-LABEL: @_fieldwiseDifferentiable internal struct GenericCotanMember<T> : Differentiable, AdditiveArithmetic where T : Differentiable {
-// CHECK-AST:         var x: T.CotangentVector
-// CHECK-AST:         internal init(x: T.CotangentVector)
-// CHECK-AST:         internal typealias TangentVector = GenericCotanMember<T>
-// CHECK-AST-LABEL:   @_fieldwiseDifferentiable internal struct AllDifferentiableVariables : Differentiable
-// CHECK-AST:           internal typealias TangentVector = GenericCotanMember<T>
-// CHECK-AST:           internal typealias CotangentVector = GenericCotanMember<T>.CotangentVector
-// CHECK-AST:           internal typealias AllDifferentiableVariables = GenericCotanMember<T>.AllDifferentiableVariables
-// CHECK-AST-LABEL:   @_fieldwiseDifferentiable internal struct CotangentVector : Differentiable, AdditiveArithmetic
-// CHECK-AST:           internal typealias TangentVector = GenericCotanMember<T>.CotangentVector
-// CHECK-AST:           internal typealias CotangentVector = GenericCotanMember<T>
-// CHECK-AST:           internal typealias AllDifferentiableVariables = GenericCotanMember<T>.CotangentVector
+// CHECK-AST-LABEL: @_fieldwiseDifferentiable internal struct GenericTanMember<T> : Differentiable, AdditiveArithmetic where T : Differentiable
+// CHECK-AST:   internal var x: T.TangentVector
+// CHECK-AST:   internal init(x: T.TangentVector)
+// CHECK-AST:   internal typealias TangentVector = GenericTanMember<T>
+// CHECK-AST:   internal typealias AllDifferentiableVariables = GenericTanMember<T>
+// CHECK-AST:   internal static var zero: GenericTanMember<T> { get }
+// CHECK-AST:   internal static func + (lhs: GenericTanMember<T>, rhs: GenericTanMember<T>) -> GenericTanMember<T>
+// CHECK-AST:   internal static func - (lhs: GenericTanMember<T>, rhs: GenericTanMember<T>) -> GenericTanMember<T>
+// CHECK-AST:   @_implements(Equatable, ==(_:_:)) internal static func __derived_struct_equals(_ a: GenericTanMember<T>, _ b: GenericTanMember<T>) -> Bool
 
 public struct ConditionallyDifferentiable<T> {
   public let x: T

@@ -1096,20 +1096,17 @@ public:
   TypeTraitResult canBeClass();
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Return the associated tangent or cotangent type. Return the null type if
-  /// there is no associated tangent/cotangent type.
-  ///
-  /// `kind` specifies whether to return the tangent or cotangent type.
+  /// Return the associated tangent type. Return the null type if there is no
+  /// associated tangent type.
   ///
   /// If the type conforms to `Differentiable`, then the associated
-  /// tangent/cotangent type is the associated `TangentVector`/`CotangentVector`
-  /// from the `Differentiable` requirement. If the type is a tuple, then the
-  /// associated tangent/cotangent type is the elementwise tangent/cotangent
-  /// type of its elements. If the type is a builtin float, then the associated
-  /// tangent/cotangent type is itself. Otherwise, there is no associated type.
+  /// tangent type is the associated `TangentVector` from the `Differentiable`
+  /// requirement. If the type is a tuple, then the associated tangent type is
+  /// the elementwise tangent type of its elements. If the type is a builtin
+  /// float, then the associated tangent type is itself. Otherwise, there is no
+  /// associated type.
   Optional<VectorSpace>
-  getAutoDiffAssociatedVectorSpace(AutoDiffAssociatedVectorSpaceKind kind,
-                                   LookupConformanceFn lookupConformance);
+  getAutoDiffAssociatedTangentSpace(LookupConformanceFn lookupConformance);
 
 private:
   // Make vanilla new/delete illegal for Types.
@@ -2661,10 +2658,6 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   
   /// A closure invocation function that has not been bound to a context.
   Closure,
-
-  // SWIFT_ENABLE_TENSORFLOW
-  /// A TensorFlow function pointer.
-  TensorFlow,
 };
 
 /// Can this calling convention result in a function being called indirectly
@@ -2676,8 +2669,6 @@ inline bool canBeCalledIndirectly(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Block:
   case SILFunctionTypeRepresentation::Closure:
-  // SWIFT_ENABLE_TENSORFLOW
-  case SILFunctionTypeRepresentation::TensorFlow:
     return false;
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Method:
@@ -2702,8 +2693,6 @@ getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
   case SILFunctionTypeRepresentation::Closure:
-  // SWIFT_ENABLE_TENSORFLOW
-  case SILFunctionTypeRepresentation::TensorFlow:
     return SILFunctionLanguage::Swift;
   }
 
@@ -2935,8 +2924,6 @@ public:
       case SILFunctionTypeRepresentation::Thin:
       case SILFunctionTypeRepresentation::CFunctionPointer:
       case SILFunctionTypeRepresentation::Closure:
-      // SWIFT_ENABLE_TENSORFLOW
-      case SILFunctionTypeRepresentation::TensorFlow:
         return false;
       case SILFunctionTypeRepresentation::ObjCMethod:
       case SILFunctionTypeRepresentation::Method:
@@ -2959,8 +2946,6 @@ public:
       case SILFunctionTypeRepresentation::WitnessMethod:
       case SILFunctionTypeRepresentation::CFunctionPointer:
       case SILFunctionTypeRepresentation::Closure:
-      // SWIFT_ENABLE_TENSORFLOW
-      case SILFunctionTypeRepresentation::TensorFlow:
         return false;
       }
 
@@ -3084,14 +3069,28 @@ public:
   /// Given `indices`, `differentiationOrder`, and `kind`, calculates the type
   /// of the corresponding autodiff associated function.
   ///
-  /// \note The original function type (`self`) need not be `@differentiable`,
-  /// and the resulting function will preserve all `ExtInfo` of the original
+  /// By default, if the original type has a self parameter list and parameter
+  /// indices include self, the computed associated function type will return a
+  /// linear map taking/returning self's tangent *last* instead of first, for
+  /// consistency with SIL.
+  ///
+  /// If `makeSelfParamFirst` is true, self's tangent is reordered to appear
+  /// first. This should be used during type-checking, e.g. type-checking
+  /// `@differentiable` and `@differentiating` attributes.
+  ///
+  /// \note The original function type (`self`) need not be `@differentiable`.
+  /// The resulting function will preserve all `ExtInfo` of the original
   /// function, including `@differentiable`.
   AnyFunctionType *getAutoDiffAssociatedFunctionType(
       AutoDiffParameterIndices *indices, unsigned resultIndex,
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
       LookupConformanceFn lookupConformance,
-      GenericSignature *whereClauseGenericSignature = nullptr);
+      GenericSignature *whereClauseGenericSignature = nullptr,
+      bool makeSelfParamFirst = false);
+
+  /// Given the type of an autodiff associated function, returns the
+  /// corresponding original function type.
+  AnyFunctionType *getAutoDiffOriginalFunctionType();
 
   AnyFunctionType *getWithoutDifferentiability() const;
 
@@ -3808,8 +3807,6 @@ public:
       case Representation::Thin:
       case Representation::CFunctionPointer:
       case Representation::Closure:
-      // SWIFT_ENABLE_TENSORFLOW
-      case Representation::TensorFlow:
         return false;
       case Representation::ObjCMethod:
       case Representation::Method:
@@ -3832,8 +3829,6 @@ public:
       case Representation::Method:
       case Representation::WitnessMethod:
       case Representation::Closure:
-      // SWIFT_ENABLE_TENSORFLOW
-      case Representation::TensorFlow:
         return false;
       }
 
@@ -4148,14 +4143,14 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   CanSILFunctionType getWithDifferentiability(
-      unsigned differentiationOrder, const SmallBitVector &parameterIndices);
+      unsigned differentiationOrder, AutoDiffIndexSubset *parameterIndices);
 
   CanSILFunctionType getWithoutDifferentiability();
 
   /// Returns the type of a differentiation function that is associated with
   /// a function of this type.
   CanSILFunctionType getAutoDiffAssociatedFunctionType(
-      const SmallBitVector &parameterIndices, unsigned resultIndex,
+      AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
       SILModule &module, LookupConformanceFn lookupConformance,
       GenericSignature *whereClauseGenericSignature = nullptr);
@@ -4164,7 +4159,7 @@ public:
   /// differentiate with respect to for this differentiable function type. (e.g.
   /// which parameters are not @nondiff). The function type must be
   /// differentiable.
-  SmallBitVector getDifferentiationParameterIndices() const;
+  AutoDiffIndexSubset *getDifferentiationParameterIndices();
 
   /// If this is a @convention(witness_method) function with a class
   /// constrained self parameter, return the class constraint for the
@@ -4999,10 +4994,11 @@ END_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
 /// to their underlying types.
 class ReplaceOpaqueTypesWithUnderlyingTypes {
 public:
-  SILFunction *context;
-  ReplaceOpaqueTypesWithUnderlyingTypes(
-      SILFunction *context)
-      : context(context) {}
+  ModuleDecl *contextModule;
+  ResilienceExpansion contextExpansion;
+  ReplaceOpaqueTypesWithUnderlyingTypes(ModuleDecl *contextModule,
+                                        ResilienceExpansion contextExpansion)
+      : contextModule(contextModule), contextExpansion(contextExpansion) {}
 
   /// TypeSubstitutionFn
   Type operator()(SubstitutableType *maybeOpaqueType) const;
@@ -5015,7 +5011,8 @@ public:
   bool shouldPerformSubstitution(OpaqueTypeDecl *opaque) const;
 
   static bool shouldPerformSubstitution(OpaqueTypeDecl *opaque,
-                                        SILFunction *context);
+                                        ModuleDecl *contextModule,
+                                        ResilienceExpansion contextExpansion);
 };
 
 /// An archetype that represents the dynamic type of an opened existential.

@@ -8,11 +8,15 @@ var MethodTests = TestSuite("Method")
 // ==== Tests with generated adjoint ====
 
 struct Parameter : Equatable {
-  @differentiable(wrt: (self), vjp: vjpX)
+  @differentiable(wrt: (self), jvp: jvpX, vjp: vjpX)
   let x: Float
 
   func vjpX() -> (Float, (Float) -> Parameter) {
     return (x, { dx in Parameter(x: dx) } )
+  }
+
+  func jvpX() -> (Float, (Parameter) -> Float) {
+    return (x, { $0.x })
   }
 }
 
@@ -134,6 +138,22 @@ MethodTests.test("static method with generated adjoint, wrt all params") {
 }
 
 // ==== Tests with custom adjoint ====
+
+// Test self-reordering thunk for jvp/vjp methods.
+struct DiffWrtSelf : Differentiable {
+  @differentiable(wrt: (self, x, y), jvp: _jvpCall, vjp: _vjpCall)
+  func call<T : Differentiable, U : Differentiable>(_ x: T, _ y: U) -> T {
+    return x
+  }
+  func _jvpCall<T : Differentiable, U : Differentiable>(_ x: T, _ y: U)
+    -> (T, (DiffWrtSelf.TangentVector, T.TangentVector, U.TangentVector) -> T.TangentVector) {
+    return (x, { (dself, dx, dy) in dx })
+  }
+  func _vjpCall<T : Differentiable, U : Differentiable>(_ x: T, _ y: U)
+    -> (T, (T.CotangentVector) -> (DiffWrtSelf.CotangentVector, T.CotangentVector, U.CotangentVector)) {
+    return (x, { (.zero, $0, .zero) })
+  }
+}
 
 struct CustomParameter : Equatable {
   @differentiable(wrt: (self), vjp: vjpX)

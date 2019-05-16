@@ -1,9 +1,9 @@
 // SWIFT_ENABLE_TENSORFLOW
 // RUN: %target-swift-frontend -typecheck -verify -primary-file %s %S/Inputs/struct_differentiable_other_module.swift
 
-// Verify that a `Differentiable` type upholds `AllDifferentiableVariables == CotangentVector`.
-func assertAllDifferentiableVariablesEqualsCotangentVector<T>(_: T.Type)
-  where T : Differentiable, T.AllDifferentiableVariables == T.CotangentVector {}
+// Verify that a `Differentiable` type upholds `AllDifferentiableVariables == TangentVector`.
+func assertAllDifferentiableVariablesEqualsTangentVector<T>(_: T.Type)
+  where T : Differentiable, T.AllDifferentiableVariables == T.TangentVector {}
 
 // Verify that a type `T` conforms to `AdditiveArithmetic`.
 func assertConformsToAdditiveArithmetic<T>(_: T.Type) where T : AdditiveArithmetic {}
@@ -55,7 +55,6 @@ func testSimple() {
   var simple = Simple(w: 1, b: 1)
   simple.allDifferentiableVariables = simple + simple
   assert(simple.moved(along: simple) == simple + simple)
-  assert(simple.tangentVector(from: simple) == simple)
 }
 
 // Test type with mixed members.
@@ -67,7 +66,6 @@ func testMixed(_ simple: Simple) {
   var mixed = Mixed(simple: simple, float: 1)
   mixed.allDifferentiableVariables = Mixed(simple: simple, float: 2)
   assert(mixed.moved(along: mixed) == mixed + mixed)
-  assert(mixed.tangentVector(from: mixed) == mixed)
 }
 
 // Test type with manual definition of vector space types to `Self`.
@@ -75,13 +73,12 @@ struct VectorSpacesEqualSelf : AdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
   typealias TangentVector = VectorSpacesEqualSelf
-  typealias CotangentVector = VectorSpacesEqualSelf
   typealias AllDifferentiableVariables = VectorSpacesEqualSelf
 }
 
 // Test generic type with vector space types to `Self`.
 struct GenericVectorSpacesEqualSelf<T> : AdditiveArithmetic, Differentiable
-  where T : Differentiable, T == T.TangentVector, T == T.CotangentVector,
+  where T : Differentiable, T == T.TangentVector,
         T == T.AllDifferentiableVariables
 {
   var w: T
@@ -91,7 +88,6 @@ func testGenericVectorSpacesEqualSelf() {
   var genericSame = GenericVectorSpacesEqualSelf<Double>(w: 1, b: 1)
   genericSame.allDifferentiableVariables = genericSame + genericSame
   assert(genericSame.moved(along: genericSame) == genericSame + genericSame)
-  assert(genericSame.tangentVector(from: genericSame) == genericSame)
 }
 
 // Test nested type.
@@ -106,7 +102,6 @@ func testNested(
 ) {
   let nested = Nested(simple: simple, mixed: mixed, generic: genericSame)
   assert(nested.moved(along: nested) == nested + nested)
-  assert(nested.tangentVector(from: nested) == nested)
 
   _ = pullback(at: nested) { model in
     model.simple + model.simple
@@ -114,7 +109,7 @@ func testNested(
 }
 
 // Test type that does not conform to `AdditiveArithmetic` but whose members do.
-// Thus, `Self` cannot be used as `TangentVector` or `CotangentVector`.
+// Thus, `Self` cannot be used as `TangentVector` or `TangentVector`.
 // Vector space structs types must be synthesized.
 // Note: it would be nice to emit a warning if conforming `Self` to
 // `AdditiveArithmetic` is possible.
@@ -123,11 +118,11 @@ struct AllMembersAdditiveArithmetic : Differentiable {
   var b: Float
 }
 func testAllMembersAdditiveArithmetic() {
-  assertAllDifferentiableVariablesEqualsCotangentVector(AllMembersAdditiveArithmetic.self)
+  assertAllDifferentiableVariablesEqualsTangentVector(AllMembersAdditiveArithmetic.self)
 }
 
 // Test type `AllMembersVectorNumeric` whose members conforms to `VectorNumeric`,
-// in which case we should make `TangentVector` and `CotangentVector` conform to
+// in which case we should make `TangentVector` and `TangentVector` conform to
 // `VectorNumeric`.
 struct MyVector : VectorNumeric, Differentiable {
   var w: Float
@@ -139,7 +134,7 @@ struct AllMembersVectorNumeric : Differentiable {
 }
 func testAllMembersVectorNumeric() {
   assertConformsToVectorNumeric(AllMembersVectorNumeric.TangentVector.self)
-  assertConformsToVectorNumeric(AllMembersVectorNumeric.CotangentVector.self)
+  assertConformsToVectorNumeric(AllMembersVectorNumeric.TangentVector.self)
 }
 
 // Test type with immutable, differentiable stored property.
@@ -161,9 +156,9 @@ struct DifferentiableSubset : Differentiable {
 func testDifferentiableSubset() {
   assertConformsToAdditiveArithmetic(DifferentiableSubset.AllDifferentiableVariables.self)
   assertConformsToVectorNumeric(DifferentiableSubset.AllDifferentiableVariables.self)
-  assertAllDifferentiableVariablesEqualsCotangentVector(DifferentiableSubset.self)
+  assertAllDifferentiableVariablesEqualsTangentVector(DifferentiableSubset.self)
   _ = DifferentiableSubset.TangentVector(w: 1, b: 1)
-  _ = DifferentiableSubset.CotangentVector(w: 1, b: 1)
+  _ = DifferentiableSubset.TangentVector(w: 1, b: 1)
   _ = DifferentiableSubset.AllDifferentiableVariables(w: 1, b: 1)
 
   _ = pullback(at: DifferentiableSubset(w: 1, b: 2, flag: false)) { model in
@@ -178,7 +173,7 @@ struct NestedDifferentiableSubset : Differentiable {
   @noDerivative var technicallyDifferentiable: Float
 }
 func testNestedDifferentiableSubset() {
-  assertAllDifferentiableVariablesEqualsCotangentVector(NestedDifferentiableSubset.self)
+  assertAllDifferentiableVariablesEqualsTangentVector(NestedDifferentiableSubset.self)
 }
 
 // Test type that uses synthesized vector space types but provides custom
@@ -267,7 +262,7 @@ extension GenericConstrained : Differentiable
   where T : Differentiable {}
 
 struct TF_260<T : Differentiable> : Differentiable & AdditiveArithmetic {
-  var x: T.CotangentVector
+  var x: T.TangentVector
 }
 
 // TF-269: Test crash when differentiation properties have no getter.
@@ -295,25 +290,20 @@ public struct TF_269 : TF_269_Layer {
 // Test manually customizing vector space types.
 // Thees should fail. Synthesis is semantically unsupported if vector space
 // types are customized.
-// expected-error @+3 {{type 'VectorSpaceTypeAlias' does not conform to protocol '__Differentiable'}}
-// expected-error @+2 {{type 'VectorSpaceTypeAlias' does not conform to protocol '_Differentiable'}}
 // expected-error @+1 {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
 struct VectorSpaceTypeAlias : AdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
   typealias TangentVector = Simple
 }
-// expected-error @+3 {{type 'VectorSpaceCustomStruct' does not conform to protocol '__Differentiable'}}
-// expected-error @+2 {{type 'VectorSpaceCustomStruct' does not conform to protocol '_Differentiable'}}
 // expected-error @+1 {{type 'VectorSpaceCustomStruct' does not conform to protocol 'Differentiable'}}
 struct VectorSpaceCustomStruct : AdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
-  struct CotangentVector : AdditiveArithmetic, Differentiable {
-    var w: Float.CotangentVector
-    var b: Float.CotangentVector
-    typealias TangentVector = VectorSpaceCustomStruct.CotangentVector
-    typealias CotangentVector = VectorSpaceCustomStruct.CotangentVector
+  struct TangentVector : AdditiveArithmetic, Differentiable {
+    var w: Float.TangentVector
+    var b: Float.TangentVector
+    typealias TangentVector = VectorSpaceCustomStruct.TangentVector
   }
 }
 
@@ -343,14 +333,10 @@ struct InvalidInitializer : Differentiable {
 
 // Test derived conformances in disallowed contexts.
 
-// expected-error @+4 {{type 'OtherFileNonconforming' does not conform to protocol '__Differentiable'}}
-// expected-error @+3 {{type 'OtherFileNonconforming' does not conform to protocol '_Differentiable'}}
 // expected-error @+2 {{type 'OtherFileNonconforming' does not conform to protocol 'Differentiable'}}
-// expected-error @+1 {{implementation of '__Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
+// expected-error @+1 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
 extension OtherFileNonconforming : Differentiable {}
 
-// expected-error @+4 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol '__Differentiable'}}
-// expected-error @+3 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol '_Differentiable'}}
 // expected-error @+2 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'Differentiable'}}
-// expected-error @+1 {{implementation of '__Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
+// expected-error @+1 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
 extension GenericOtherFileNonconforming : Differentiable {}

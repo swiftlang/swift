@@ -20,7 +20,7 @@ func vjpSinExplicitWrt(x: Float) -> (value: Float, pullback: (Float) -> Float) {
 func vjpDuplicate(x: Float) -> (value: Float, pullback: (Float) -> Float) {
   return (x, { $0 })
 }
-// expected-error @+1 {{'@differentiating' attribute requires function to return a two-element tuple of type '(value: T..., pullback: (U.CotangentVector) -> T.CotangentVector...)' or '(value: T..., differential: (T.TangentVector...) -> U.TangentVector)'}}
+// expected-error @+1 {{'@differentiating' attribute requires function to return a two-element tuple of type '(value: T..., pullback: (U.TangentVector) -> T.TangentVector...)' or '(value: T..., differential: (T.TangentVector...) -> U.TangentVector)'}}
 @differentiating(sin)
 func jvpSinResultInvalid(x: @nondiff Float) -> Float {
   return x
@@ -36,7 +36,7 @@ func vjpSinResultNotDifferentiable(x: Int) -> (value: Int, pullback: (Int) -> In
   return (x, { $0 })
 }
 // expected-error @+2 {{function result's 'pullback' type does not match 'sin'}}
-// expected-note @+2 {{'pullback' does not have expected type '(Float.CotangentVector) -> (Float.CotangentVector)' (aka '(Float) -> Float')}}
+// expected-note @+2 {{'pullback' does not have expected type '(Float.TangentVector) -> (Float.TangentVector)' (aka '(Float) -> Float')}}
 @differentiating(sin)
 func vjpSinResultInvalidSeedType(x: Float) -> (value: Float, pullback: (Double) -> Double) {
   return (x, { $0 })
@@ -54,13 +54,13 @@ func jvpGeneric<T : Differentiable>(x: T, y: T) -> (value: T, differential: (T.T
 func vjpGenericWrongLabel<T : Differentiable>(x: T, y: T) -> (value: T, (T) -> (T, T)) {
   return (x, { ($0, $0) })
 }
-// expected-error @+1 {{could not find function 'generic' with expected type '<T where T : Differentiable, T == T.CotangentVector> (x: T) -> T'}}
+// expected-error @+1 {{could not find function 'generic' with expected type '<T where T : Differentiable, T == T.TangentVector> (x: T) -> T'}}
 @differentiating(generic)
-func vjpGenericDiffParamMismatch<T : Differentiable>(x: T) -> (value: T, pullback: (T) -> (T, T)) where T == T.CotangentVector {
+func vjpGenericDiffParamMismatch<T : Differentiable>(x: T) -> (value: T, pullback: (T) -> (T, T)) where T == T.TangentVector {
   return (x, { ($0, $0) })
 }
 @differentiating(generic) // ok
-func vjpGenericExtraGenericRequirements<T : Differentiable & FloatingPoint>(x: T, y: T) -> (value: T, pullback: (T) -> (T, T)) where T == T.CotangentVector {
+func vjpGenericExtraGenericRequirements<T : Differentiable & FloatingPoint>(x: T, y: T) -> (value: T, pullback: (T) -> (T, T)) where T == T.TangentVector {
   return (x, { ($0, $0) })
 }
 
@@ -122,11 +122,11 @@ func invalidDiffWrtFunction(_ fn: @differentiable(Float) -> Float) -> Float {
 // expected-error @+2 {{type 'T' does not conform to protocol 'FloatingPoint'}}
 // expected-error @+1 {{could not find function 'foo' with expected type '<T where T : AdditiveArithmetic, T : Differentiable> (T) -> T'}}
 @differentiating(foo)
-func vjpFoo<T : AdditiveArithmetic & Differentiable>(_ x: T) -> (value: T, pullback: (T.CotangentVector) -> (T.CotangentVector)) {
+func vjpFoo<T : AdditiveArithmetic & Differentiable>(_ x: T) -> (value: T, pullback: (T.TangentVector) -> (T.TangentVector)) {
   return (x, { $0 })
 }
 @differentiating(foo)
-func vjpFooExtraGenericRequirements<T : FloatingPoint & Differentiable & BinaryInteger>(_ x: T) -> (value: T, pullback: (T) -> (T)) where T == T.CotangentVector {
+func vjpFooExtraGenericRequirements<T : FloatingPoint & Differentiable & BinaryInteger>(_ x: T) -> (value: T, pullback: (T) -> (T)) where T == T.TangentVector {
   return (x, { $0 })
 }
 
@@ -135,12 +135,12 @@ func vjpFooExtraGenericRequirements<T : FloatingPoint & Differentiable & BinaryI
 extension AdditiveArithmetic where Self : Differentiable {
   // expected-error @+1 {{derivative not in the same file as the original function}}
   @differentiating(+)
-  static func vjpPlus(x: Self, y: Self) -> (value: Self, pullback: (Self.CotangentVector) -> (Self.CotangentVector, Self.CotangentVector)) {
+  static func vjpPlus(x: Self, y: Self) -> (value: Self, pullback: (Self.TangentVector) -> (Self.TangentVector, Self.TangentVector)) {
     return (x + y, { v in (v, v) })
   }
 }
 
-extension FloatingPoint where Self : Differentiable, Self == Self.CotangentVector {
+extension FloatingPoint where Self : Differentiable, Self == Self.TangentVector {
   // expected-error @+1 {{derivative not in the same file as the original function}}
   @differentiating(+)
   static func vjpPlus(x: Self, y: Self) -> (value: Self, pullback: (Self) -> (Self, Self)) {
@@ -151,13 +151,13 @@ extension FloatingPoint where Self : Differentiable, Self == Self.CotangentVecto
 extension Differentiable where Self : AdditiveArithmetic {
   // expected-error @+1 {{'+' is not defined in the current type context}}
   @differentiating(+)
-  static func vjpPlus(x: Self, y: Self) -> (value: Self, pullback: (Self.CotangentVector) -> (Self.CotangentVector, Self.CotangentVector)) {
+  static func vjpPlus(x: Self, y: Self) -> (value: Self, pullback: (Self.TangentVector) -> (Self.TangentVector, Self.TangentVector)) {
     return (x + y, { v in (v, v) })
   }
 }
 
-extension AdditiveArithmetic where Self : Differentiable, Self == Self.CotangentVector {
-  // expected-error @+1 {{could not find function '+' with expected type '<Self where Self : Differentiable, Self == Self.CotangentVector> (Self) -> (Self, Self) -> Self'}}
+extension AdditiveArithmetic where Self : Differentiable, Self == Self.TangentVector {
+  // expected-error @+1 {{could not find function '+' with expected type '<Self where Self : Differentiable, Self == Self.TangentVector> (Self) -> (Self, Self) -> Self'}}
   @differentiating(+)
   func vjpPlusInstanceMethod(x: Self, y: Self) -> (value: Self, pullback: (Self) -> (Self, Self)) {
     return (x + y, { v in (v, v) })
@@ -178,9 +178,9 @@ protocol InstanceMethod : Differentiable {
 extension InstanceMethod {
   // If `Self` conforms to `Differentiable`, then `Self` is currently always inferred to be a differentiation parameter.
   // expected-error @+2 {{function result's 'pullback' type does not match 'foo'}}
-  // expected-note @+2 {{'pullback' does not have expected type '(Self.CotangentVector) -> (Self.CotangentVector, Self.CotangentVector)'}}
+  // expected-note @+2 {{'pullback' does not have expected type '(Self.TangentVector) -> (Self.TangentVector, Self.TangentVector)'}}
   @differentiating(foo)
-  func vjpFoo(x: Self) -> (value: Self, pullback: (CotangentVector) -> CotangentVector) {
+  func vjpFoo(x: Self) -> (value: Self, pullback: (TangentVector) -> TangentVector) {
     return (x, { $0 })
   }
 
@@ -190,21 +190,21 @@ extension InstanceMethod {
   }
 
   @differentiating(foo, wrt: (self, x))
-  func vjpFooWrt(x: Self) -> (value: Self, pullback: (CotangentVector) -> (CotangentVector, CotangentVector)) {
+  func vjpFooWrt(x: Self) -> (value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)) {
     return (x, { ($0, $0) })
   }
 }
 
 extension InstanceMethod {
   // expected-error @+2 {{function result's 'pullback' type does not match 'bar'}}
-  // expected-note @+2 {{'pullback' does not have expected type '(Self.CotangentVector) -> (Self.CotangentVector, T.CotangentVector)'}}
+  // expected-note @+2 {{'pullback' does not have expected type '(Self.TangentVector) -> (Self.TangentVector, T.TangentVector)'}}
   @differentiating(bar)
-  func vjpBar<T : Differentiable>(_ x: T) -> (value: Self, pullback: (CotangentVector) -> T.CotangentVector) {
+  func vjpBar<T : Differentiable>(_ x: T) -> (value: Self, pullback: (TangentVector) -> T.TangentVector) {
     return (self, { _ in .zero })
   }
 
   @differentiating(bar)
-  func vjpBar<T : Differentiable>(_ x: T) -> (value: Self, pullback: (CotangentVector) -> (CotangentVector, T.CotangentVector)) {
+  func vjpBar<T : Differentiable>(_ x: T) -> (value: Self, pullback: (TangentVector) -> (TangentVector, T.TangentVector)) {
     return (self, { ($0, .zero) })
   }
 
@@ -214,7 +214,7 @@ extension InstanceMethod {
   }
 }
 
-extension InstanceMethod where Self == Self.TangentVector, Self == Self.CotangentVector {
+extension InstanceMethod where Self == Self.TangentVector {
   @differentiating(foo2)
   func vjpFooExtraRequirements(x: Self) -> (value: Self, pullback: (Self) -> (Self, Self)) {
     return (x, { ($0, $0) })
@@ -226,7 +226,7 @@ extension InstanceMethod where Self == Self.TangentVector, Self == Self.Cotangen
   }
 
   @differentiating(bar2)
-  func vjpBarExtraRequirements<T : Differentiable>(x: T) -> (value: Self, pullback: (Self) -> (Self, T.CotangentVector)) {
+  func vjpBarExtraRequirements<T : Differentiable>(x: T) -> (value: Self, pullback: (Self) -> (Self, T.TangentVector)) {
     return (self, { ($0, .zero) })
   }
 
@@ -236,7 +236,7 @@ extension InstanceMethod where Self == Self.TangentVector, Self == Self.Cotangen
   }
 }
 
-protocol GenericInstanceMethod : Differentiable where Self == Self.TangentVector, Self == Self.CotangentVector {
+protocol GenericInstanceMethod : Differentiable where Self == Self.TangentVector {
   func instanceMethod<T : Differentiable>(_ x: T) -> T
 }
 
@@ -245,7 +245,7 @@ extension GenericInstanceMethod {
     return (x, { v in (self, v) })
   }
 
-  func vjpInstanceMethod<T : Differentiable>(_ x: T) -> (T, (T.CotangentVector) -> (CotangentVector, T.CotangentVector)) {
+  func vjpInstanceMethod<T : Differentiable>(_ x: T) -> (T, (T.TangentVector) -> (TangentVector, T.TangentVector)) {
     return (x, { v in (self, v) })
   }
 }
@@ -256,7 +256,7 @@ func bar<T>(_ x: T) -> T {
   return x
 }
 @differentiating(bar)
-func vjpBar<T : Differentiable & VectorNumeric>(_ x: T) -> (value: T, pullback: (T.CotangentVector) -> T.CotangentVector) {
+func vjpBar<T : Differentiable & VectorNumeric>(_ x: T) -> (value: T, pullback: (T.TangentVector) -> T.TangentVector) {
   return (x, { $0 })
 }
 
@@ -266,7 +266,7 @@ func baz<T, U>(_ x: T, _ y: U) -> T {
 @differentiating(baz)
 func vjpBaz<T : Differentiable & VectorNumeric, U : Differentiable>(_ x: T, _ y: U)
     -> (value: T, pullback: (T) -> (T, U))
-  where T == T.CotangentVector, U == U.CotangentVector
+  where T == T.TangentVector, U == U.TangentVector
 {
   return (x, { ($0, .zero) })
 }
@@ -276,7 +276,7 @@ protocol InstanceMethodProto {
 }
 extension InstanceMethodProto where Self : Differentiable {
   @differentiating(bar)
-  func vjpBar() -> (value: Float, pullback: (Float) -> CotangentVector) {
+  func vjpBar() -> (value: Float, pullback: (Float) -> TangentVector) {
     return (bar(), { _ in .zero })
   }
 }

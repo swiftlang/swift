@@ -33,7 +33,7 @@ public func foo_indir_ret<T: Differentiable>(_ x: Float, _ y: T) -> T {
 // CHECK: bb0(%0 : $*T, %1 : $Float, %2 : $*T):
 
 @_silgen_name("dfoo_indir_ret")
-public func dfoo_indir_ret<T: Differentiable>(_ x: Float, _ y: T) -> (T, (T.CotangentVector) -> (Float, T.CotangentVector)) {
+public func dfoo_indir_ret<T: Differentiable>(_ x: Float, _ y: T) -> (T, (T.TangentVector) -> (Float, T.TangentVector)) {
   return (y, { v in (x, v) })
 }
 
@@ -111,7 +111,6 @@ extension DiffStoredProp : VectorNumeric {
 
 extension DiffStoredProp : Differentiable {
   typealias TangentVector = DiffStoredProp
-  typealias CotangentVector = DiffStoredProp
 }
 
 //===----------------------------------------------------------------------===//
@@ -151,7 +150,6 @@ extension DiffComputedProp : VectorNumeric {
 
 extension DiffComputedProp : Differentiable {
   typealias TangentVector = DiffComputedProp
-  typealias CotangentVector = DiffComputedProp
 }
 
 // CHECK-LABEL: DiffComputedProp.computedProp.getter

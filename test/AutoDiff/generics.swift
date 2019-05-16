@@ -1,4 +1,22 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -verify %s | %FileCheck %s -check-prefix=CHECK-SIL
+
+@_silgen_name("identity")
+func identity<T : Differentiable>(_ x: T) -> T {
+  return x
+}
+_ = gradient(at: Float(1), in: { x in identity(x) })
+
+// Test AdjointEmitter local buffer allocation.
+// Verify that local buffers are immediately set to zero.
+
+// CHECK-SIL-LABEL: sil hidden @AD__identity__adjoint_src_0_wrt_0
+// CHECK-SIL:      [[ORIG_COTAN:%.*]] = alloc_stack $τ_0_0.TangentVector
+// CHECK-SIL-NEXT: [[ORIG_COTAN_BEGIN:%.*]] = begin_access [init] [static] [no_nested_conflict] [[ORIG_COTAN]]
+// CHECK-SIL-NEXT: [[ZERO_WITNESS:%.*]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic.zero!getter.1
+// CHECK-SIL-NEXT: [[ORIG_COTAN_METATYPE:%.*]] = metatype $@thick τ_0_0.TangentVector.Type
+// CHECK-SIL-NEXT: [[EMIT_ZERO_INDIRECT:%.*]] = apply [[ZERO_WITNESS]]<τ_0_0.TangentVector>([[ORIG_COTAN_BEGIN]], [[ORIG_COTAN_METATYPE]])
+// CHECK-SIL-NEXT: end_access [[ORIG_COTAN_BEGIN]]
+// CHECK-SIL: }
 
 struct Tensor<Scalar : FloatingPoint & Differentiable> : VectorNumeric, Differentiable {
   // NOTE: `value` must have type with known size (e.g. `Float`, not `Scalar`)
@@ -11,21 +29,6 @@ func generic<T : FloatingPoint & Differentiable>(_ x: Tensor<T>) -> Float {
   return x.value + x.value
 }
 _ = gradient(at: Tensor<Float>(1), in: generic)
-
-// Test case where associated derivative function's requirements are unmet.
-
-@differentiable(vjp: vjpWeirdExtraRequirements where T : CaseIterable, T.AllCases : ExpressibleByStringLiteral)
-func weird<T : FloatingPoint & Differentiable>(_ x: Tensor<T>) -> Tensor<T> {
-  return x
-}
-func vjpWeirdExtraRequirements<T : FloatingPoint & Differentiable>(_ x: Tensor<T>) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) where T : CaseIterable, T.AllCases : ExpressibleByStringLiteral {
-  return (x, { $0 })
-}
-func weirdWrapper<T : FloatingPoint & Differentiable>(_ x: Tensor<T>) -> Tensor<T> {
-  return weird(x) // expected-note {{function call is not differentiable because generic requirements are not met}}
-}
-_ = pullback(at: Tensor<Float>(1), in: weirdWrapper) // expected-error {{function is not differentiable}}
-_ = pullback(at: Tensor<Float>(3), in: weirdWrapper)
 
 // Test case where associated derivative function's requirements are met.
 extension Tensor where Scalar : Numeric {
@@ -49,8 +52,7 @@ struct SupervisedTrainer<Model : Layer> {
   var model: Model
   var lossFunction: @differentiable (Model.Output, Model.Output) -> Float
   func fit(y: Model.Output) {
-    // expected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to add '.withoutDerivative()'?}} {{64-64=.withoutDerivative()}}
-    _ = gradient(at: Float(1)) { _ in return lossFunction(y, y) }
+    _ = gradient(at: y) { y in return lossFunction(y, y) }
   }
 }
 

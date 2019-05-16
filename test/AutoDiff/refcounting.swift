@@ -99,7 +99,7 @@ _ = pullback(at: .zero, in: subset_adjoint_releases_unused_ones)
 
 struct FakeMaxPool : Differentiable {
   @differentiable(wrt: (self, input))
-  func applied(to input: Vector) -> Vector { return .zero }
+  func applied(to input: Vector) -> Vector { return input }
 }
 
 struct UsesMethodOfNoDerivativeMember : Differentiable {
@@ -116,6 +116,6 @@ _ = UsesMethodOfNoDerivativeMember().pullback(at: .zero) { $0.applied(to: $1) }
 // CHECK-LABEL: @{{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__adjoint_src_0_wrt_0_1
 // CHECK: bb0([[SEED:%.*]] : $Vector, [[PRIMVALS:%.*]] : ${{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__Type__src_0_wrt_0_1):
 // CHECK:   [[PB:%.*]] = struct_extract [[PRIMVALS]] : ${{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__Type__src_0_wrt_0_1
-// CHECK:   [[TUPLE:%.*]] = apply [[PB]]([[SEED]]) : $@callee_guaranteed (@guaranteed Vector) -> (FakeMaxPool.AllDifferentiableVariables, @owned Vector)
-// CHECK:   [[UNNEEDED_SELF_COTAN:%.*]] = tuple_extract [[TUPLE]] : $(FakeMaxPool.AllDifferentiableVariables, Vector), 0
+// CHECK:   [[TUPLE:%.*]] = apply [[PB]]([[SEED]]) : $@callee_guaranteed (@guaranteed Vector) -> (@owned Vector, FakeMaxPool.AllDifferentiableVariables)
+// CHECK:   [[UNNEEDED_SELF_COTAN:%.*]] = tuple_extract [[TUPLE]] : $(Vector, FakeMaxPool.AllDifferentiableVariables), 1
 // CHECK:   release_value [[UNNEEDED_SELF_COTAN]] : $FakeMaxPool.AllDifferentiableVariables

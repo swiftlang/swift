@@ -683,7 +683,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         getDecl()->getInterfaceType()->castTo<AnyFunctionType>();
     auto silParameterIndices =
         autoDiffAssociatedFunctionIdentifier->getParameterIndices()->getLowered(
-            functionTy);
+            functionTy->getASTContext(), functionTy);
     SILAutoDiffIndices indices(/*source*/ 0, silParameterIndices);
     std::string mangledKind;
     switch (autoDiffAssociatedFunctionIdentifier->getKind()) {
