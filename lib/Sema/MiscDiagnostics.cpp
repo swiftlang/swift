@@ -135,8 +135,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         }
       }
 
-      if (cast_or_null<CallExpr>(E)) {
-        funcCallExpr = cast<CallExpr>(E);
+      if (auto CE = dyn_cast<CallExpr>(E)) {
+        funcCallExpr = CE;
       }
 
       // Check function calls, looking through implicit conversions on the
@@ -254,10 +254,13 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (auto *tupleExpr = dyn_cast<TupleExpr>(E)) {
         // FIXME: Duplicate labels on enum payloads should be diagnosed
         // when declared, not when called.
-        bool isEnumCase = funcCallExpr
-                              ? cast_or_null<EnumElementDecl>(
-                                    funcCallExpr->getCalledValue()) != nullptr
-                              : false;
+        bool isEnumCase = false;
+        if (funcCallExpr) {
+          auto calledValue = funcCallExpr->getCalledValue();
+          if (calledValue) {
+            isEnumCase = isa<EnumElementDecl>(calledValue);
+          }
+        }
 
         if (!funcCallExpr || isEnumCase) {
           auto diagnose = false;
