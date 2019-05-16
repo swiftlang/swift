@@ -2438,6 +2438,12 @@ ERROR(assoc_conformance_from_implementation_only_module,none,
       "%4); %2 has been imported as implementation-only",
       (Type, DeclName, Identifier, Type, Type))
 
+WARNING(warn_implementation_only_conflict,none,
+        "%0 inconsistently imported as implementation-only",
+        (Identifier))
+NOTE(implementation_only_conflict_here,none,
+     "imported as implementation-only here", ())
+
 // Derived conformances
 ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
       "implementation of %0 for non-final class cannot be automatically "

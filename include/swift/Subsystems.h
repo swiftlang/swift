@@ -216,6 +216,14 @@ namespace swift {
   /// emitted.
   void performWholeModuleTypeChecking(SourceFile &SF);
 
+  /// Checks to see if any of the imports in \p M use `@_implementationOnly` in
+  /// one file and not in another.
+  ///
+  /// Like redeclaration checking, but for imports. This isn't part of
+  /// swift::performWholeModuleTypeChecking because it's linear in the number
+  /// of declarations in the module.
+  void checkInconsistentImplementationOnlyImports(ModuleDecl *M);
+
   /// Incrementally type-check only added external definitions.
   void typeCheckExternalDefinitions(SourceFile &SF);
 
