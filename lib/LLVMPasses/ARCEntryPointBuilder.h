@@ -220,7 +220,7 @@ private:
     Retain = getRuntimeFn(
         getModule(), cache,
         isNonAtomic(OrigI) ? "swift_nonatomic_retain" : "swift_retain",
-        DefaultCC, {ObjectPtrTy}, {ObjectPtrTy},
+        DefaultCC, false, {ObjectPtrTy}, {ObjectPtrTy},
         {NoUnwind, FirstParamReturned});
 
     return Retain.get();
@@ -237,7 +237,7 @@ private:
     Release = getRuntimeFn(
         getModule(), cache,
         isNonAtomic(OrigI) ? "swift_nonatomic_release" : "swift_release",
-        DefaultCC, {VoidTy}, {ObjectPtrTy}, {NoUnwind});
+        DefaultCC, false, {VoidTy}, {ObjectPtrTy}, {NoUnwind});
 
     return Release.get();
   }
@@ -273,7 +273,7 @@ private:
     RetainN = getRuntimeFn(
         getModule(), cache,
         isNonAtomic(OrigI) ? "swift_nonatomic_retain_n" : "swift_retain_n",
-        DefaultCC, {ObjectPtrTy}, {ObjectPtrTy, Int32Ty},
+        DefaultCC, false, {ObjectPtrTy}, {ObjectPtrTy, Int32Ty},
         {NoUnwind, FirstParamReturned});
 
     return RetainN.get();
@@ -291,7 +291,7 @@ private:
     ReleaseN = getRuntimeFn(
         getModule(), cache,
         isNonAtomic(OrigI) ? "swift_nonatomic_release_n" : "swift_release_n",
-        DefaultCC, {VoidTy}, {ObjectPtrTy, Int32Ty}, {NoUnwind});
+        DefaultCC, false, {VoidTy}, {ObjectPtrTy, Int32Ty}, {NoUnwind});
 
     return ReleaseN.get();
   }
@@ -310,7 +310,7 @@ private:
                      isNonAtomic(OrigI)
                        ? "swift_nonatomic_unknownObjectRetain_n"
                        : "swift_unknownObjectRetain_n",
-                     DefaultCC, {ObjectPtrTy}, {ObjectPtrTy, Int32Ty},
+                     DefaultCC, false, {ObjectPtrTy}, {ObjectPtrTy, Int32Ty},
                      {NoUnwind, FirstParamReturned});
 
     return UnknownObjectRetainN.get();
@@ -330,7 +330,8 @@ private:
                      isNonAtomic(OrigI)
                        ? "swift_nonatomic_unknownObjectRelease_n"
                        : "swift_unknownObjectRelease_n",
-                     DefaultCC, {VoidTy}, {ObjectPtrTy, Int32Ty}, {NoUnwind});
+                     DefaultCC, false,
+                     {VoidTy}, {ObjectPtrTy, Int32Ty}, {NoUnwind});
 
     return UnknownObjectReleaseN.get();
   }
@@ -347,7 +348,7 @@ private:
         getRuntimeFn(getModule(), cache,
                      isNonAtomic(OrigI) ? "swift_nonatomic_bridgeObjectRetain_n"
                                         : "swift_bridgeObjectRetain_n",
-                     DefaultCC, {BridgeObjectPtrTy},
+                     DefaultCC, false, {BridgeObjectPtrTy},
                      {BridgeObjectPtrTy, Int32Ty}, {NoUnwind});
     return BridgeRetainN.get();
   }
@@ -366,7 +367,7 @@ private:
         getModule(), cache,
         isNonAtomic(OrigI) ? "swift_nonatomic_bridgeObjectRelease_n"
                            : "swift_bridgeObjectRelease_n",
-        DefaultCC, {VoidTy}, {BridgeObjectPtrTy, Int32Ty}, {NoUnwind});
+        DefaultCC, false, {VoidTy}, {BridgeObjectPtrTy, Int32Ty}, {NoUnwind});
     return BridgeReleaseN.get();
   }
 
