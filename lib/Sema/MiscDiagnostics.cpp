@@ -64,12 +64,15 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
   class DiagnoseWalker : public ASTWalker {
     SmallPtrSet<Expr*, 4> AlreadyDiagnosedMetatypes;
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
-    
-    // Keep track of acceptable DiscardAssignmentExpr's.
+
+    /// Keep track of acceptable DiscardAssignmentExpr's.
     SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
 
     /// Keep track of the arguments to CallExprs.
     SmallPtrSet<Expr *, 2> CallArgs;
+
+    /// Keep track of function call
+    ApplyExpr *applyExpr;
 
     bool IsExprStmt;
 
@@ -137,6 +140,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // Check function calls, looking through implicit conversions on the
       // function and inspecting the arguments directly.
       if (auto *Call = dyn_cast<ApplyExpr>(E)) {
+        applyExpr = Call;
         // Record call arguments.
         CallArgs.insert(Call->getArg());
 
@@ -247,25 +251,27 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // Diagnose tuple expressions with duplicate element label
       if (auto *tupleExpr = dyn_cast<TupleExpr>(E)) {
-        auto diagnose = false;
+        if (!applyExpr) {
+          auto diagnose = false;
 
-        llvm::SmallDenseSet<Identifier> names;
-        names.reserve(tupleExpr->getNumElements());
+          llvm::SmallDenseSet<Identifier> names;
+          names.reserve(tupleExpr->getNumElements());
 
-        for (auto name : tupleExpr->getElementNames()) {
-          if (name.empty())
-            continue;
+          for (auto name : tupleExpr->getElementNames()) {
+            if (name.empty())
+              continue;
 
-          if (names.count(name) == 1) {
-            diagnose = true;
-            break;
+            if (names.count(name) == 1) {
+              diagnose = true;
+              break;
+            }
+
+            names.insert(name);
           }
 
-          names.insert(name);
-        }
-
-        if (diagnose) {
-          TC.diagnose(tupleExpr->getLoc(), diag::tuple_duplicate_label);
+          if (diagnose) {
+            TC.diagnose(tupleExpr->getLoc(), diag::tuple_duplicate_label);
+          }
         }
       }
 
