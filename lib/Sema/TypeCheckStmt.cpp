@@ -24,6 +24,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -1942,10 +1943,10 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*implicit=*/true);
 
   TypeChecker &tc = *static_cast<TypeChecker *>(Context.getLazyResolver());
+  DiagnosticSuppression suppression(tc.Diags);
   auto resultTy =
       tc.typeCheckExpression(r, ctor, TypeLoc(), CTP_Unused,
-                             TypeCheckExprFlags::IsDiscarded |
-                               TypeCheckExprFlags::SuppressDiagnostics);
+                             TypeCheckExprFlags::IsDiscarded);
   if (!resultTy)
     return nullptr;
   
