@@ -417,8 +417,10 @@ bool swift::emitParseableInterface(raw_ostream &out,
   SmallVector<Decl *, 16> topLevelDecls;
   M->getTopLevelDecls(topLevelDecls);
   for (const Decl *D : topLevelDecls) {
+    InheritedProtocolCollector::collectProtocols(inheritedProtocolMap, D);
+
     if (!D->shouldPrintInContext(printOptions) ||
-        !printOptions.CurrentPrintabilityChecker->shouldPrint(D, printOptions)){
+        !printOptions.shouldPrint(D)) {
       InheritedProtocolCollector::collectSkippedConditionalConformances(
           inheritedProtocolMap, D);
       continue;
@@ -426,8 +428,6 @@ bool swift::emitParseableInterface(raw_ostream &out,
 
     D->print(out, printOptions);
     out << "\n";
-
-    InheritedProtocolCollector::collectProtocols(inheritedProtocolMap, D);
   }
 
   // Print dummy extensions for any protocols that were indirectly conformed to.

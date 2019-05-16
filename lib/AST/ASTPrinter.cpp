@@ -1606,7 +1606,9 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
     auto Ext = cast<ExtensionDecl>(D);
     // If the extension doesn't add protocols or has no members that we should
     // print then skip printing it.
-    if (Ext->getLocalProtocols().empty()) {
+    SmallVector<TypeLoc, 8> ProtocolsToPrint;
+    getInheritedForPrinting(Ext, Options, ProtocolsToPrint);
+    if (ProtocolsToPrint.empty()) {
       bool HasMemberToPrint = false;
       for (auto Member : Ext->getMembers()) {
         if (shouldPrint(Member, Options)) {
@@ -1977,8 +1979,7 @@ void PrintAST::printGenericDeclGenericRequirements(GenericContext *decl) {
 
 void PrintAST::printInherited(const Decl *decl) {
   SmallVector<TypeLoc, 6> TypesToPrint;
-  getInheritedForPrinting(decl, [this](const Decl* D) { return shouldPrint(D); },
-                          TypesToPrint);
+  getInheritedForPrinting(decl, Options, TypesToPrint);
   if (TypesToPrint.empty())
     return;
 
@@ -4686,8 +4687,7 @@ void swift::printEnumElementsAsCases(
 }
 
 void
-swift::getInheritedForPrinting(const Decl *decl,
-                               llvm::function_ref<bool(const Decl*)> shouldPrint,
+swift::getInheritedForPrinting(const Decl *decl, const PrintOptions &options,
                                llvm::SmallVectorImpl<TypeLoc> &Results) {
   ArrayRef<TypeLoc> inherited;
   if (auto td = dyn_cast<TypeDecl>(decl)) {
@@ -4699,11 +4699,11 @@ swift::getInheritedForPrinting(const Decl *decl,
   // Collect explicit inherited types.
   for (auto TL: inherited) {
     if (auto ty = TL.getType()) {
-      bool foundUnprintable = ty.findIf([shouldPrint](Type subTy) {
+      bool foundUnprintable = ty.findIf([&options](Type subTy) {
         if (auto aliasTy = dyn_cast<TypeAliasType>(subTy.getPointer()))
-          return !shouldPrint(aliasTy->getDecl());
+          return !options.shouldPrint(aliasTy->getDecl());
         if (auto NTD = subTy->getAnyNominal())
-          return !shouldPrint(NTD);
+          return !options.shouldPrint(NTD);
         return false;
       });
       if (foundUnprintable)
@@ -4716,7 +4716,7 @@ swift::getInheritedForPrinting(const Decl *decl,
   auto &ctx = decl->getASTContext();
   for (auto attr : decl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
     if (auto *proto = ctx.getProtocol(attr->getProtocolKind())) {
-      if (!shouldPrint(proto))
+      if (!options.shouldPrint(proto))
         continue;
       if (attr->getProtocolKind() == KnownProtocolKind::RawRepresentable &&
           isa<EnumDecl>(decl) &&
