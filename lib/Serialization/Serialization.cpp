@@ -2697,22 +2697,39 @@ void Serializer::writeForeignErrorConvention(const ForeignErrorConvention &fec){
 /// - \p decl is declared in an extension of a type that depends on
 ///   \p problemContext
 static bool contextDependsOn(const NominalTypeDecl *decl,
-                             const ModuleDecl *problemModule) {
-  return decl->getParentModule() == problemModule;
+                             const DeclContext *problemContext) {
+  SmallPtrSet<const ExtensionDecl *, 8> seenExtensionDCs;
+
+  const DeclContext *dc = decl;
+  do {
+    if (dc == problemContext)
+      return true;
+
+    if (auto *extension = dyn_cast<ExtensionDecl>(dc)) {
+      if (extension->isChildContextOf(problemContext))
+        return true;
+
+      // Avoid cycles when Left.Nested depends on Right.Nested somehow.
+      bool isNewlySeen = seenExtensionDCs.insert(extension).second;
+      if (!isNewlySeen)
+        break;
+      dc = extension->getSelfNominalTypeDecl();
+
+    } else {
+      dc = dc->getParent();
+    }
+  } while (dc);
+
+  return false;
 }
 
 static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
                                         Type ty,
-                                        const ModuleDecl *excluding) {
+                                        const DeclContext *excluding) {
   ty.visit([&](Type next) {
     auto *nominal = next->getAnyNominal();
     if (!nominal)
       return;
-    // FIXME: Types in the same module are still important for enums. It's
-    // possible an enum element has a payload that references a type declaration
-    // from the same module that can't be imported (for whatever reason).
-    // However, we need a more robust handling of deserialization dependencies
-    // that can handle circularities. rdar://problem/32359173
     if (contextDependsOn(nominal, excluding))
       return;
     seen.insert(nominal->getDeclaredInterfaceType());
@@ -2722,7 +2739,7 @@ static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
 static void
 collectDependenciesFromRequirement(llvm::SmallSetVector<Type, 4> &seen,
                                    const Requirement &req,
-                                   const ModuleDecl *excluding) {
+                                   const DeclContext *excluding) {
   collectDependenciesFromType(seen, req.getFirstType(), excluding);
   if (req.getKind() != RequirementKind::Layout)
     collectDependenciesFromType(seen, req.getSecondType(), excluding);
@@ -3175,6 +3192,11 @@ void Serializer::writeDecl(const Decl *D) {
     for (const EnumElementDecl *nextElt : theEnum->getAllElements()) {
       if (!nextElt->hasAssociatedValues())
         continue;
+      // FIXME: Types in the same module are still important for enums. It's
+      // possible an enum element has a payload that references a type
+      // declaration from the same module that can't be imported (for whatever
+      // reason). However, we need a more robust handling of deserialization
+      // dependencies that can handle circularities. rdar://problem/32359173
       collectDependenciesFromType(dependencyTypes,
                                   nextElt->getArgumentInterfaceType(),
                                   /*excluding*/theEnum->getParentModule());
@@ -3219,11 +3241,28 @@ void Serializer::writeDecl(const Decl *D) {
     auto conformances = theClass->getLocalConformances(
                           ConformanceLookupKind::NonInherited, nullptr);
 
-    SmallVector<TypeID, 4> inheritedTypes;
+    SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     for (auto inherited : theClass->getInherited()) {
       assert(!inherited.getType()->hasArchetype());
-      inheritedTypes.push_back(addTypeRef(inherited.getType()));
+      inheritedAndDependencyTypes.push_back(addTypeRef(inherited.getType()));
     }
+
+    llvm::SmallSetVector<Type, 4> dependencyTypes;
+    if (theClass->hasSuperclass()) {
+      // FIXME: Nested types can still be a problem here: it's possible that (for
+      // whatever reason) they won't be able to be deserialized, in which case
+      // we'll be in trouble forming the actual superclass type. However, we
+      // need a more robust handling of deserialization dependencies that can
+      // handle circularities. rdar://problem/50835214
+      collectDependenciesFromType(dependencyTypes, theClass->getSuperclass(),
+                                  /*excluding*/theClass);
+    }
+    for (Requirement req : theClass->getGenericRequirements()) {
+      collectDependenciesFromRequirement(dependencyTypes, req,
+                                         /*excluding*/nullptr);
+    }
+    for (Type ty : dependencyTypes)
+      inheritedAndDependencyTypes.push_back(addTypeRef(ty));
 
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(theClass->getFormalAccess());
@@ -3245,7 +3284,8 @@ void Serializer::writeDecl(const Decl *D) {
                             addTypeRef(theClass->getSuperclass()),
                             rawAccessLevel,
                             conformances.size(),
-                            inheritedTypes);
+                            theClass->getInherited().size(),
+                            inheritedAndDependencyTypes);
 
     writeGenericParams(theClass->getGenericParams());
     writeMembers(id, theClass->getMembers(), true);
