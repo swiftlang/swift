@@ -4364,13 +4364,12 @@ makeFunctionType(AnyFunctionType *copy, ArrayRef<AnyFunctionType::Param> params,
   return FunctionType::get(params, retTy, copy->getExtInfo());
 }
 
-Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
-    AutoDiffAssociatedVectorSpaceKind kind,
+Optional<VectorSpace> TypeBase::getAutoDiffAssociatedTangentSpace(
     LookupConformanceFn lookupConformance) {
   assert(lookupConformance);
   auto &ctx = getASTContext();
 
-  std::pair<Type, unsigned> cacheKey {this, (unsigned)kind};
+  Type cacheKey = this;
   auto lookup = ctx.AutoDiffVectorSpaces.find(cacheKey);
   if (lookup != ctx.AutoDiffVectorSpaces.end())
     return lookup->getSecond();
@@ -4379,11 +4378,11 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
     return vs;
   };
 
-  // Functions' tangent/cotangent is the same function except the innermost
-  // return type being replaced by its tangent/cotangent.
+  // Functions' tangent is the same function except the innermost return type
+  // being replaced by its tangent.
   if (auto *fnTy = getAs<AnyFunctionType>()) {
-    auto resultSpace = fnTy->getResult()->getAutoDiffAssociatedVectorSpace(
-        kind, lookupConformance);
+    auto resultSpace = fnTy->getResult()->getAutoDiffAssociatedTangentSpace(
+        lookupConformance);
     if (!resultSpace)
       return cache(None);
     return cache(VectorSpace::getFunction(
@@ -4391,12 +4390,12 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
                          fnTy->getOptGenericSignature())));
   }
 
-  // Tuples' tangent/cotangent is a tuple of each element's Tangent/Cotangent.
+  // Tuples' tangent is a tuple of each element's Tangent.
   if (auto *tupleTy = getAs<TupleType>()) {
     SmallVector<TupleTypeElt, 8> newElts;
     for (auto elt : tupleTy->getElements()) {
       auto eltSpace = elt.getType()
-          ->getAutoDiffAssociatedVectorSpace(kind, lookupConformance);
+          ->getAutoDiffAssociatedTangentSpace(lookupConformance);
       if (!eltSpace)
         continue;
       newElts.push_back(elt.getWithType(eltSpace->getType()));
@@ -4410,22 +4409,12 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
     return cache(VectorSpace::getTuple(tupleType));
   }
 
-  // Find the TangentVector/CotangentVector associated type on the
-  // Differentiable protocol.
+  // Find the TangentVector associated type on the Differentiable protocol.
   auto *differentiableProtocol =
-      ctx.getProtocol(KnownProtocolKind::__Differentiable);
-  assert(differentiableProtocol && "Could not find __Differentiable protocol");
-  Identifier associatedTypeIdentifier;
-  switch (kind) {
-  case AutoDiffAssociatedVectorSpaceKind::Tangent:
-    associatedTypeIdentifier = ctx.Id_TangentVector;
-    break;
-  case AutoDiffAssociatedVectorSpaceKind::Cotangent:
-    associatedTypeIdentifier = ctx.Id_CotangentVector;
-    break;
-  }
+      ctx.getProtocol(KnownProtocolKind::Differentiable);
+  assert(differentiableProtocol && "Could not find Differentiable protocol");
   auto associatedTypeLookup =
-      differentiableProtocol->lookupDirect(associatedTypeIdentifier);
+      differentiableProtocol->lookupDirect(ctx.Id_TangentVector);
   assert(associatedTypeLookup.size() == 1);
   auto *dependentType = DependentMemberType::get(
       differentiableProtocol->getDeclaredInterfaceType(),
@@ -4448,7 +4437,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
-  //                 (R.CotangentVector...) -> (T.CotangentVector...))
+  //                 (R.TangentVector...) -> (T.TangentVector...))
   //
   // Note that both can be written as "(T...) -> ((R...), Closure)", so we build
   // "Closure" and then use common code to wrap "Closure" in the outer function
@@ -4487,23 +4476,20 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
     SmallVector<AnyFunctionType::Param, 8> differentialParams;
     for (auto wrtParamType : wrtParamTypes)
       differentialParams.push_back(
-          AnyFunctionType::Param(wrtParamType->getAutoDiffAssociatedVectorSpace(
-              AutoDiffAssociatedVectorSpaceKind::Tangent, lookupConformance)
+          AnyFunctionType::Param(
+              wrtParamType->getAutoDiffAssociatedTangentSpace(lookupConformance)
                   ->getType()));
 
     SmallVector<TupleTypeElt, 8> differentialResults;
     if (auto *resultTuple = originalResult->getAs<TupleType>()) {
       auto resultTupleEltType = resultTuple->getElementType(resultIndex);
-      differentialResults.push_back(
-          resultTupleEltType->getAutoDiffAssociatedVectorSpace(
-              AutoDiffAssociatedVectorSpaceKind::Tangent, lookupConformance)
-                  ->getType());
+      differentialResults.push_back(resultTupleEltType
+          ->getAutoDiffAssociatedTangentSpace(lookupConformance)->getType());
     } else {
       assert(resultIndex == 0 && "resultIndex out of bounds");
       differentialResults.push_back(
-          originalResult->getAutoDiffAssociatedVectorSpace(
-              AutoDiffAssociatedVectorSpaceKind::Tangent, lookupConformance)
-                  ->getType());
+          originalResult->getAutoDiffAssociatedTangentSpace(lookupConformance)
+              ->getType());
     }
     Type differentialResult =
         differentialResults.size() > 1
@@ -4515,28 +4501,26 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   }
   case AutoDiffAssociatedFunctionKind::VJP: {
     // closure is the VJP "pullback":
-    //   (R.CotangentVector...) -> (T.CotangentVector...)
+    //   (R.TangentVector...) -> (T.TangentVector...)
     SmallVector<AnyFunctionType::Param, 8> pullbackParams;
     if (auto *resultTuple = originalResult->getAs<TupleType>()) {
       auto resultTupleEltType = resultTuple->getElementType(resultIndex);
       pullbackParams.push_back(
-          AnyFunctionType::Param(
-              resultTupleEltType->getAutoDiffAssociatedVectorSpace(
-                  AutoDiffAssociatedVectorSpaceKind::Cotangent,
-                  lookupConformance)->getType()));
+          AnyFunctionType::Param(resultTupleEltType
+              ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+                  ->getType()));
     } else {
       assert(resultIndex == 0 && "resultIndex out of bounds");
       pullbackParams.push_back(
-          AnyFunctionType::Param(
-              originalResult->getAutoDiffAssociatedVectorSpace(
-                  AutoDiffAssociatedVectorSpaceKind::Cotangent,
-                  lookupConformance)->getType()));
+          AnyFunctionType::Param(originalResult
+              ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+                  ->getType()));
     }
 
     SmallVector<TupleTypeElt, 8> pullbackResults;
     for (auto wrtParamType : wrtParamTypes)
-      pullbackResults.push_back(wrtParamType->getAutoDiffAssociatedVectorSpace(
-          AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance)
+      pullbackResults.push_back(wrtParamType
+          ->getAutoDiffAssociatedTangentSpace(lookupConformance)
               ->getType());
     Type pullbackResult = pullbackResults.size() > 1
                               ? TupleType::get(pullbackResults, ctx)

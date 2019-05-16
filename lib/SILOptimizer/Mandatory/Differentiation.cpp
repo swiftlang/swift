@@ -489,8 +489,8 @@ enum class StructExtractDifferentiationStrategy {
   Inactive,
 
   // The `struct_extract` is extracting a field from a Differentiable struct
-  // with @_fieldwiseProductSpace cotangent space. Therefore, differentiate the
-  // `struct_extract` by setting the adjoint to a vector in the cotangent space
+  // with @_fieldwiseProductSpace tangent space. Therefore, differentiate the
+  // `struct_extract` by setting the adjoint to a vector in the tangent space
   // that is zero except along the direction of the corresponding field.
   //
   // Fields correspond by matching name.
@@ -1369,8 +1369,7 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
             if (assocGenSig && projType->hasArchetype())
               projType = assocGenSig->getCanonicalTypeInContext(
                   projType->mapTypeOutOfContext());
-            if (projType->getAutoDiffAssociatedVectorSpace(
-                AutoDiffAssociatedVectorSpaceKind::Cotangent,
+            if (projType->getAutoDiffAssociatedTangentSpace(
                 LookUpConformanceInSignature(*assocGenSig)))
               setVaried(teai, i);
           }
@@ -3617,17 +3616,16 @@ private:
                     adjointGenEnv->getForwardingSubstitutionMap());
   }
 
-  Optional<VectorSpace> getCotangentSpace(CanType type) {
-    return type->getAutoDiffAssociatedVectorSpace(
-        AutoDiffAssociatedVectorSpaceKind::Cotangent,
+  Optional<VectorSpace> getTangentSpace(CanType type) {
+    return type->getAutoDiffAssociatedTangentSpace(
         LookUpConformanceInModule(getModule().getSwiftModule()));
   }
 
   /// Assuming the given type conforms to `Differentiable` after remapping,
-  /// returns the associated cotangent space type.
-  SILType getRemappedCotangentType(SILType type) {
+  /// returns the associated tangent space type.
+  SILType getRemappedTangentType(SILType type) {
     return SILType::getPrimitiveObjectType(
-        getCotangentSpace(remapType(type).getASTType())->getCanonicalType());
+        getTangentSpace(remapType(type).getASTType())->getCanonicalType());
   }
 
   //--------------------------------------------------------------------------//
@@ -3659,7 +3657,7 @@ private:
     assert(originalValue->getFunction() == &getOriginal());
     auto insertion = valueMap.try_emplace(
         originalValue, makeZeroAdjointValue(
-            getRemappedCotangentType(originalValue->getType())));
+            getRemappedTangentType(originalValue->getType())));
     auto it = insertion.first;
     SWIFT_DEFER { valueMap.erase(it); };
     return std::move(it->getSecond());
@@ -3673,12 +3671,11 @@ private:
     LLVM_DEBUG(getADDebugStream() << "Adding adjoint for " << originalValue);
 #ifndef NDEBUG
     auto origTy = remapType(originalValue->getType()).getASTType();
-    auto cotanSpace = origTy->getAutoDiffAssociatedVectorSpace(
-        AutoDiffAssociatedVectorSpaceKind::Cotangent,
+    auto tanSpace = origTy->getAutoDiffAssociatedTangentSpace(
         LookUpConformanceInModule(getModule().getSwiftModule()));
-    // The adjoint value must be in the cotangent space.
-    assert(cotanSpace && newAdjointValue.getType().getASTType()->isEqual(
-               cotanSpace->getCanonicalType()));
+    // The adjoint value must be in the tangent space.
+    assert(tanSpace && newAdjointValue.getType().getASTType()->isEqual(
+               tanSpace->getCanonicalType()));
 #endif
     auto insertion =
         valueMap.try_emplace(originalValue, std::move(newAdjointValue));
@@ -3710,14 +3707,14 @@ private:
     // Handle `struct_element_addr`.
     if (auto *seai = dyn_cast<StructElementAddrInst>(originalProjection)) {
       auto adjSource = getAdjointBuffer(seai->getOperand());
-      auto *cotangentVectorDecl =
+      auto *tangentVectorDecl =
           adjSource.getType().getStructOrBoundGenericStruct();
-      auto cotanFieldLookup =
-          cotangentVectorDecl->lookupDirect(seai->getField()->getName());
-      assert(cotanFieldLookup.size() == 1);
-      auto *cotanField = cast<VarDecl>(cotanFieldLookup.front());
+      auto tanFieldLookup =
+          tangentVectorDecl->lookupDirect(seai->getField()->getName());
+      assert(tanFieldLookup.size() == 1);
+      auto *tanField = cast<VarDecl>(tanFieldLookup.front());
       return builder.createStructElementAddr(
-         seai->getLoc(), adjSource.getValue(), cotanField);
+         seai->getLoc(), adjSource.getValue(), tanField);
     }
     // Handle `tuple_element_addr`.
     if (auto *teai = dyn_cast<TupleElementAddrInst>(originalProjection)) {
@@ -3728,7 +3725,7 @@ private:
       auto origTupleTy = source->getType().castTo<TupleType>();
       unsigned adjIndex = 0;
       for (unsigned i : range(teai->getFieldNo())) {
-        if (getCotangentSpace(
+        if (getTangentSpace(
                 origTupleTy->getElement(i).getType()->getCanonicalType()))
           ++adjIndex;
       }
@@ -3786,7 +3783,7 @@ private:
     // Allocate local buffer and initialize to zero.
     auto *newBuf = localAllocBuilder.createAllocStack(
         originalBuffer.getLoc(),
-        getRemappedCotangentType(originalBuffer->getType()));
+        getRemappedTangentType(originalBuffer->getType()));
     auto *access = localAllocBuilder.createBeginAccess(
         newBuf->getLoc(), newBuf, SILAccessKind::Init,
         SILAccessEnforcement::Static, /*noNestedConflict*/ true,
@@ -4153,23 +4150,23 @@ public:
     auto allResultsIt = allResults.begin();
     for (unsigned i : applyInfo.actualIndices.parameters->getIndices()) {
       auto origArg = ai->getArgument(origNumIndRes + i);
-      auto cotan = *allResultsIt++;
-      // If a cotangent value corresponds to a non-desired parameter, it won't
+      auto tan = *allResultsIt++;
+      // If a tangent value corresponds to a non-desired parameter, it won't
       // be used, so release it.
       if (!applyInfo.desiredIndices.parameters->contains(i)) {
-        emitCleanup(builder, loc, cotan);
+        emitCleanup(builder, loc, tan);
         continue;
       }
-      if (cotan->getType().isAddress()) {
-        addToAdjointBuffer(origArg, cotan);
-        emitCleanup(builder, loc, cotan);
+      if (tan->getType().isAddress()) {
+        addToAdjointBuffer(origArg, tan);
+        emitCleanup(builder, loc, tan);
       } else {
         if (origArg->getType().isAddress()) {
           auto adjBuf = getAdjointBuffer(origArg);
           if (errorOccurred)
             return;
-          auto *tmpBuf = builder.createAllocStack(loc, cotan->getType());
-          builder.createStore(loc, cotan, tmpBuf,
+          auto *tmpBuf = builder.createAllocStack(loc, tan->getType());
+          builder.createStore(loc, tan, tmpBuf,
               getBufferSOQ(tmpBuf->getType().getASTType(), getAdjoint()));
           auto *readAccess = builder.createBeginAccess(
               loc, tmpBuf, SILAccessKind::Read, SILAccessEnforcement::Static,
@@ -4181,7 +4178,7 @@ public:
         }
         else
           addAdjointValue(origArg, makeConcreteAdjointValue(ValueWithCleanup(
-              cotan, makeCleanup(cotan, emitCleanup, {seed.getCleanup()}))));
+              tan, makeCleanup(tan, emitCleanup, {seed.getCleanup()}))));
       }
     }
     // Deallocate pullback indirect results.
@@ -4204,51 +4201,50 @@ public:
       for (auto *field : structDecl->getStoredProperties()) {
         auto fv = si->getFieldValue(field);
         addAdjointValue(fv, makeZeroAdjointValue(
-            getRemappedCotangentType(fv->getType())));
+            getRemappedTangentType(fv->getType())));
       }
       break;
     case AdjointValueKind::Concrete: {
       auto adjStruct = materializeAdjointDirect(std::move(av), loc);
       if (structDecl->getAttrs().hasAttribute<FieldwiseDifferentiableAttr>()) {
-        // Find the struct `CotangentVector` type.
+        // Find the struct `TangentVector` type.
         auto structTy = remapType(si->getType()).getASTType();
-        auto cotangentVectorTy = structTy->getAutoDiffAssociatedVectorSpace(
-            AutoDiffAssociatedVectorSpaceKind::Cotangent,
+        auto tangentVectorTy = structTy->getAutoDiffAssociatedTangentSpace(
             LookUpConformanceInModule(getModule().getSwiftModule()))
                 ->getType()->getCanonicalType();
         assert(!getModule().Types.getTypeLowering(
-                   cotangentVectorTy, ResilienceExpansion::Minimal)
+                   tangentVectorTy, ResilienceExpansion::Minimal)
                        .isAddressOnly());
-        auto *cotangentVectorDecl =
-            cotangentVectorTy->getStructOrBoundGenericStruct();
-        assert(cotangentVectorDecl);
+        auto *tangentVectorDecl =
+            tangentVectorTy->getStructOrBoundGenericStruct();
+        assert(tangentVectorDecl);
 
         // Accumulate adjoints for the fields of the `struct` operand.
         for (auto *field : structDecl->getStoredProperties()) {
-          // There does not exist a corresponding cotangent field for original
+          // There does not exist a corresponding tangent field for original
           // fields with `@noDerivative` attribute. Emit an error.
           if (field->getAttrs().hasAttribute<NoDerivativeAttr>())
             continue;
-          // Find the corresponding field in the cotangent space.
-          VarDecl *cotanField = nullptr;
-          if (cotangentVectorDecl == structDecl)
-            cotanField = field;
+          // Find the corresponding field in the tangent space.
+          VarDecl *tanField = nullptr;
+          if (tangentVectorDecl == structDecl)
+            tanField = field;
           // Otherwise, look up the field by name.
           else {
-            auto cotanFieldLookup =
-                cotangentVectorDecl->lookupDirect(field->getName());
-            assert(cotanFieldLookup.size() == 1);
-            cotanField = cast<VarDecl>(cotanFieldLookup.front());
+            auto tanFieldLookup =
+                tangentVectorDecl->lookupDirect(field->getName());
+            assert(tanFieldLookup.size() == 1);
+            tanField = cast<VarDecl>(tanFieldLookup.front());
           }
           auto *adjStructElt =
-              builder.createStructExtract(loc, adjStruct, cotanField);
+              builder.createStructExtract(loc, adjStruct, tanField);
           addAdjointValue(
               si->getFieldValue(field),
               makeConcreteAdjointValue(ValueWithCleanup(
                   adjStructElt, makeCleanup(adjStructElt, emitCleanup))));
         }
       } else {
-        // FIXME(TF-21): If `CotangentVector` is not marked
+        // FIXME(TF-21): If `TangentVector` is not marked
         // `@_fieldwiseProductSpace`, call the VJP of the memberwise initializer.
         llvm_unreachable("Unhandled. Are you trying to differentiate a "
                          "memberwise initializer?");
@@ -4256,7 +4252,7 @@ public:
       break;
     }
     case AdjointValueKind::Aggregate: {
-      // FIXME(TF-21): If `CotangentVector` is not marked
+      // FIXME(TF-21): If `TangentVector` is not marked
       // `@_fieldwiseProductSpace`, call the VJP of the memberwise initializer.
       // for (auto pair : llvm::zip(si->getElements(), av.getAggregateElements()))
       //   addAdjointValue(std::get<0>(pair), std::get<1>(pair));
@@ -4282,48 +4278,47 @@ public:
       // Compute adjoint as follows:
       //   y = struct_extract x, #key
       //   adj[x] += struct (0, ..., #key': adj[y], ..., 0)
-      // where `#key'` is the field in the cotangent space corresponding to
+      // where `#key'` is the field in the tangent space corresponding to
       // `#key`.
       auto structTy = remapType(sei->getOperand()->getType()).getASTType();
-      auto cotangentVectorTy = structTy->getAutoDiffAssociatedVectorSpace(
-          AutoDiffAssociatedVectorSpaceKind::Cotangent,
+      auto tangentVectorTy = structTy->getAutoDiffAssociatedTangentSpace(
           LookUpConformanceInModule(getModule().getSwiftModule()))
               ->getType()->getCanonicalType();
       assert(!getModule().Types.getTypeLowering(
-                 cotangentVectorTy, ResilienceExpansion::Minimal)
+                 tangentVectorTy, ResilienceExpansion::Minimal)
                      .isAddressOnly());
-      auto cotangentVectorSILTy =
-          SILType::getPrimitiveObjectType(cotangentVectorTy);
-      auto *cotangentVectorDecl =
-          cotangentVectorTy->getStructOrBoundGenericStruct();
-      assert(cotangentVectorDecl);
-      // Find the corresponding field in the cotangent space.
-      VarDecl *cotanField = nullptr;
-      // If the cotangent space is the original struct, then field is the same.
-      if (cotangentVectorDecl == sei->getStructDecl())
-        cotanField = sei->getField();
+      auto tangentVectorSILTy =
+          SILType::getPrimitiveObjectType(tangentVectorTy);
+      auto *tangentVectorDecl =
+          tangentVectorTy->getStructOrBoundGenericStruct();
+      assert(tangentVectorDecl);
+      // Find the corresponding field in the tangent space.
+      VarDecl *tanField = nullptr;
+      // If the tangent space is the original struct, then field is the same.
+      if (tangentVectorDecl == sei->getStructDecl())
+        tanField = sei->getField();
       // Otherwise, look up the field by name.
       else {
-        auto cotanFieldLookup =
-            cotangentVectorDecl->lookupDirect(sei->getField()->getName());
-        assert(cotanFieldLookup.size() == 1);
-        cotanField = cast<VarDecl>(cotanFieldLookup.front());
+        auto tanFieldLookup =
+            tangentVectorDecl->lookupDirect(sei->getField()->getName());
+        assert(tanFieldLookup.size() == 1);
+        tanField = cast<VarDecl>(tanFieldLookup.front());
       }
       // Accumulate adjoint for the `struct_extract` operand.
       auto av = takeAdjointValue(sei);
       switch (av.getKind()) {
       case AdjointValueKind::Zero:
         addAdjointValue(sei->getOperand(),
-                        makeZeroAdjointValue(cotangentVectorSILTy));
+                        makeZeroAdjointValue(tangentVectorSILTy));
         break;
       case AdjointValueKind::Concrete:
       case AdjointValueKind::Aggregate: {
         SmallVector<AdjointValue, 8> eltVals;
-        for (auto *field : cotangentVectorDecl->getStoredProperties()) {
-          if (field == cotanField) {
+        for (auto *field : tangentVectorDecl->getStoredProperties()) {
+          if (field == tanField) {
             eltVals.push_back(av);
           } else {
-            auto substMap = cotangentVectorTy->getMemberSubstitutionMap(
+            auto substMap = tangentVectorTy->getMemberSubstitutionMap(
                 field->getModuleContext(), field);
             auto fieldTy = field->getType().subst(substMap);
             auto fieldSILTy =
@@ -4334,7 +4329,7 @@ public:
           }
         }
         addAdjointValue(sei->getOperand(),
-            makeAggregateAdjointValue(cotangentVectorSILTy, eltVals));
+            makeAggregateAdjointValue(tangentVectorSILTy, eltVals));
       }
       }
       return;
@@ -4373,17 +4368,17 @@ public:
     switch (av.getKind()) {
     case AdjointValueKind::Zero:
       for (auto eltVal : ti->getElements()) {
-        if (!getCotangentSpace(eltVal->getType().getASTType()))
+        if (!getTangentSpace(eltVal->getType().getASTType()))
           continue;
         addAdjointValue(eltVal, makeZeroAdjointValue(
-            getRemappedCotangentType(eltVal->getType())));
+            getRemappedTangentType(eltVal->getType())));
       }
       break;
     case AdjointValueKind::Concrete: {
       auto val = av.getConcreteValue();
       unsigned adjIdx = 0;
       for (auto i : range(ti->getNumOperands())) {
-        if (!getCotangentSpace(ti->getOperand(i)->getType().getASTType()))
+        if (!getTangentSpace(ti->getOperand(i)->getType().getASTType()))
           continue;
         auto adjElt = val;
         if (val.getType().is<TupleType>())
@@ -4396,7 +4391,7 @@ public:
     case AdjointValueKind::Aggregate:
       unsigned adjIdx = 0;
       for (auto i : range(ti->getElements().size())) {
-        if (!getCotangentSpace(ti->getElement(i)->getType().getASTType()))
+        if (!getTangentSpace(ti->getElement(i)->getType().getASTType()))
           continue;
         addAdjointValue(ti->getElement(i), av.takeAggregateElement(adjIdx++));
       }
@@ -4409,32 +4404,32 @@ public:
   ///                         |--- n-th element
   ///   adj[x] += tuple (0, 0, ..., adj[y], ..., 0, 0)
   void visitTupleExtractInst(TupleExtractInst *tei) {
-    auto tupleCotanTy = getRemappedCotangentType(tei->getOperand()->getType());
+    auto tupleTanTy = getRemappedTangentType(tei->getOperand()->getType());
     auto av = takeAdjointValue(tei);
     switch (av.getKind()) {
     case AdjointValueKind::Zero:
-      addAdjointValue(tei->getOperand(), makeZeroAdjointValue(tupleCotanTy));
+      addAdjointValue(tei->getOperand(), makeZeroAdjointValue(tupleTanTy));
       break;
     case AdjointValueKind::Aggregate:
     case AdjointValueKind::Concrete: {
       auto tupleTy = tei->getTupleType();
-      auto tupleCotanTupleTy = tupleCotanTy.getAs<TupleType>();
-      if (!tupleCotanTupleTy) {
+      auto tupleTanTupleTy = tupleTanTy.getAs<TupleType>();
+      if (!tupleTanTupleTy) {
         addAdjointValue(tei->getOperand(), std::move(av));
         break;
       }
       SmallVector<AdjointValue, 8> elements;
       unsigned adjIdx = 0;
       for (unsigned i : range(tupleTy->getNumElements())) {
-        if (!getCotangentSpace(
+        if (!getTangentSpace(
                 tupleTy->getElement(i).getType()->getCanonicalType()))
           continue;
         if (tei->getFieldNo() == i)
           elements.push_back(av);
         else
           elements.push_back(makeZeroAdjointValue(
-              getRemappedCotangentType(SILType::getPrimitiveObjectType(
-                  tupleCotanTupleTy->getElementType(adjIdx++)
+              getRemappedTangentType(SILType::getPrimitiveObjectType(
+                  tupleTanTupleTy->getElementType(adjIdx++)
                       ->getCanonicalType()))));
       }
       if (elements.size() == 1) {
@@ -4442,7 +4437,7 @@ public:
         break;
       }
       addAdjointValue(tei->getOperand(),
-          makeAggregateAdjointValue(tupleCotanTy, elements));
+          makeAggregateAdjointValue(tupleTanTy, elements));
       break;
     }
     }
@@ -4462,9 +4457,9 @@ public:
 
   // Handle `dealloc_stack` instruction.
   //   Original: dealloc_stack y
-  //    Adjoint: adj[y] = alloc_stack $T.CotangentVector
+  //    Adjoint: adj[y] = alloc_stack $T.TangentVector
   void visitDeallocStackInst(DeallocStackInst *dsi) {
-    auto bufType = getRemappedCotangentType(dsi->getOperand()->getType());
+    auto bufType = getRemappedTangentType(dsi->getOperand()->getType());
     auto *adjBuf = builder.createAllocStack(dsi->getLoc(), bufType);
     auto *access = builder.createBeginAccess(dsi->getLoc(), adjBuf,
                                              SILAccessKind::Init,
@@ -4832,11 +4827,10 @@ void AdjointEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
   auto *swiftMod = getModule().getSwiftModule();
   // TODO(TF-202): Diagnose no `AdditiveArithmetic` due to generic signature
   // minimization bug.
-  auto cotangentSpace = type->getAutoDiffAssociatedVectorSpace(
-      AutoDiffAssociatedVectorSpaceKind::Cotangent,
+  auto tangentSpace = type->getAutoDiffAssociatedTangentSpace(
       LookUpConformanceInModule(swiftMod));
-  assert(cotangentSpace && "No tangent space for this type");
-  switch (cotangentSpace->getKind()) {
+  assert(tangentSpace && "No tangent space for this type");
+  switch (tangentSpace->getKind()) {
   case VectorSpace::Kind::Vector: {
     // Look up conformance to `AdditiveArithmetic`.
     auto *additiveArithmeticProto =
@@ -4867,7 +4861,7 @@ void AdjointEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
     return;
   }
   case VectorSpace::Kind::Tuple: {
-    auto tupleType = cotangentSpace->getTuple();
+    auto tupleType = tangentSpace->getTuple();
     SmallVector<SILValue, 8> zeroElements;
     for (unsigned i : range(tupleType->getNumElements())) {
       auto eltAddr = builder.createTupleElementAddr(loc, bufferAccess, i);
@@ -4996,11 +4990,10 @@ SILValue AdjointEmitter::accumulateDirect(SILValue lhs, SILValue rhs) {
   auto adjointASTTy = adjointTy.getASTType();
   auto loc = lhs.getLoc();
   auto *swiftMod = getModule().getSwiftModule();
-  auto cotangentSpace = adjointASTTy->getAutoDiffAssociatedVectorSpace(
-      AutoDiffAssociatedVectorSpaceKind::Cotangent,
+  auto tangentSpace = adjointASTTy->getAutoDiffAssociatedTangentSpace(
       LookUpConformanceInModule(swiftMod));
-  assert(cotangentSpace && "No tangent space for this type");
-  switch (cotangentSpace->getKind()) {
+  assert(tangentSpace && "No tangent space for this type");
+  switch (tangentSpace->getKind()) {
   case VectorSpace::Kind::Vector: {
     // Allocate buffers for inputs and output.
     auto *resultBuf = builder.createAllocStack(loc, adjointTy);
@@ -5048,7 +5041,7 @@ SILValue AdjointEmitter::accumulateDirect(SILValue lhs, SILValue rhs) {
     return val;
   }
   case VectorSpace::Kind::Tuple: {
-    auto tupleType = cotangentSpace->getTuple();
+    auto tupleType = tangentSpace->getTuple();
     SmallVector<SILValue, 8> adjElements;
     for (unsigned i : range(tupleType->getNumElements())) {
       auto *eltLHS = builder.createTupleExtract(loc, lhs, i);
@@ -5076,17 +5069,16 @@ void AdjointEmitter::accumulateIndirect(
   auto adjointTy = lhsBufAccess->getType();
   auto adjointASTTy = adjointTy.getASTType();
   auto *swiftMod = getModule().getSwiftModule();
-  auto cotangentSpace = adjointASTTy->getAutoDiffAssociatedVectorSpace(
-      AutoDiffAssociatedVectorSpaceKind::Cotangent,
+  auto tangentSpace = adjointASTTy->getAutoDiffAssociatedTangentSpace(
       LookUpConformanceInModule(swiftMod));
-  assert(cotangentSpace && "No tangent space for this type");
-  switch (cotangentSpace->getKind()) {
+  assert(tangentSpace && "No tangent space for this type");
+  switch (tangentSpace->getKind()) {
   case VectorSpace::Kind::Vector: {
     auto *proto = getContext().getAdditiveArithmeticProtocol();
     auto *combinerFuncDecl = getContext().getPlusDecl();
     // Call the combiner function and return.
-    auto adjointParentModule = cotangentSpace->getNominal()
-        ? cotangentSpace->getNominal()->getModuleContext()
+    auto adjointParentModule = tangentSpace->getNominal()
+        ? tangentSpace->getNominal()->getModuleContext()
         : getModule().getSwiftModule();
     auto confRef = adjointParentModule->lookupConformance(adjointASTTy, proto);
     // TODO(TF-202): Diagnose no `AdditiveArithmetic` due to generic signature
@@ -5112,7 +5104,7 @@ void AdjointEmitter::accumulateIndirect(
     return;
   }
   case VectorSpace::Kind::Tuple: {
-    auto tupleType = cotangentSpace->getTuple();
+    auto tupleType = tangentSpace->getTuple();
     for (unsigned i : range(tupleType->getNumElements())) {
       auto *destAddr = builder.createTupleElementAddr(loc, resultBufAccess, i);
       auto *eltAddrLHS = builder.createTupleElementAddr(loc, lhsBufAccess, i);
@@ -5138,11 +5130,10 @@ void AdjointEmitter::accumulateIndirect(SILValue lhsDestAccess,
   auto type = lhsDestAccess->getType();
   auto astType = type.getASTType();
   auto *swiftMod = getModule().getSwiftModule();
-  auto cotangentSpace = astType->getAutoDiffAssociatedVectorSpace(
-      AutoDiffAssociatedVectorSpaceKind::Cotangent,
+  auto tangentSpace = astType->getAutoDiffAssociatedTangentSpace(
       LookUpConformanceInModule(swiftMod));
-  assert(cotangentSpace && "No tangent space for this type");
-  switch (cotangentSpace->getKind()) {
+  assert(tangentSpace && "No tangent space for this type");
+  switch (tangentSpace->getKind()) {
   case VectorSpace::Kind::Vector: {
     auto *proto = getContext().getAdditiveArithmeticProtocol();
     auto *accumulatorFuncDecl = getContext().getPlusEqualDecl();
@@ -5168,7 +5159,7 @@ void AdjointEmitter::accumulateIndirect(SILValue lhsDestAccess,
     return;
   }
   case VectorSpace::Kind::Tuple: {
-    auto tupleType = cotangentSpace->getTuple();
+    auto tupleType = tangentSpace->getTuple();
     for (unsigned i : range(tupleType->getNumElements())) {
       auto *destAddr = builder.createTupleElementAddr(loc, lhsDestAccess, i);
       auto *eltAddrRHS = builder.createTupleElementAddr(loc, rhsAccess, i);
@@ -5361,10 +5352,10 @@ void DifferentiationTask::createEmptyAdjoint() {
       module.Types, origTy->getGenericSignature());
 
   // Given a type, returns its formal SIL parameter info.
-  auto getCotangentParameterInfoForOriginalResult = [&](
-      CanType cotanType, ResultConvention origResConv) -> SILParameterInfo {
+  auto getTangentParameterInfoForOriginalResult = [&](
+      CanType tanType, ResultConvention origResConv) -> SILParameterInfo {
     auto &tl = context.getTypeConverter().getTypeLowering(
-        cotanType, ResilienceExpansion::Minimal);
+        tanType, ResilienceExpansion::Minimal);
     ParameterConvention conv;
     switch (origResConv) {
     case ResultConvention::Owned:
@@ -5381,14 +5372,14 @@ void DifferentiationTask::createEmptyAdjoint() {
       conv = ParameterConvention::Indirect_In_Guaranteed;
       break;
     }
-    return {cotanType, conv};
+    return {tanType, conv};
   };
 
   // Given a type, returns its formal SIL result info.
-  auto getCotangentResultInfoForOriginalParameter = [&](
-      CanType cotanType, ParameterConvention origParamConv) -> SILResultInfo {
+  auto getTangentResultInfoForOriginalParameter = [&](
+      CanType tanType, ParameterConvention origParamConv) -> SILResultInfo {
     auto &tl = context.getTypeConverter().getTypeLowering(
-        cotanType, ResilienceExpansion::Minimal);
+        tanType, ResilienceExpansion::Minimal);
     ResultConvention conv;
     switch (origParamConv) {
     case ParameterConvention::Direct_Owned:
@@ -5406,7 +5397,7 @@ void DifferentiationTask::createEmptyAdjoint() {
       conv = ResultConvention::Indirect;
       break;
     }
-    return {cotanType, conv};
+    return {tanType, conv};
   };
 
   // Parameters of the adjoint are:
@@ -5414,7 +5405,7 @@ void DifferentiationTask::createEmptyAdjoint() {
   // - a primal value struct,
   // - original results, and
   // - the original parameters.
-  // Results of the adjoint are in the cotangent space of the original
+  // Results of the adjoint are in the tangent space of the original
   // parameters.
   SmallVector<SILParameterInfo, 8> adjParams;
   SmallVector<SILResultInfo, 8> adjResults;
@@ -5422,10 +5413,9 @@ void DifferentiationTask::createEmptyAdjoint() {
 
   // Add adjoint parameter for the seed.
   auto origResInfo = origTy->getResults()[getIndices().source];
-  adjParams.push_back(getCotangentParameterInfoForOriginalResult(
+  adjParams.push_back(getTangentParameterInfoForOriginalResult(
       origResInfo.getType()
-          ->getAutoDiffAssociatedVectorSpace(
-              AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance)
+          ->getAutoDiffAssociatedTangentSpace(lookupConformance)
           ->getCanonicalType(), origResInfo.getConvention()));
 
   // Accept a primal value struct in the adjoint parameter list. This is the
@@ -5437,10 +5427,9 @@ void DifferentiationTask::createEmptyAdjoint() {
   // Add adjoint results for the original differentiation parameters.
   for (auto i : getIndices().parameters->getIndices()) {
     auto origParam = origParams[i];
-    adjResults.push_back(getCotangentResultInfoForOriginalParameter(
+    adjResults.push_back(getTangentResultInfoForOriginalParameter(
         origParam.getType()
-            ->getAutoDiffAssociatedVectorSpace(
-                AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance)
+            ->getAutoDiffAssociatedTangentSpace(lookupConformance)
             ->getCanonicalType(), origParam.getConvention()));
   }
 

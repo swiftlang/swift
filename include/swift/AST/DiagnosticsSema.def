@@ -2715,7 +2715,7 @@ NOTE(protocol_witness_missing_specific_differentiable_attr,none,
 // @differentiating
 ERROR(differentiating_attr_expected_result_tuple,none,
       "'@differentiating' attribute requires function to return a two-element tuple of type "
-      "'(value: T..., pullback: (U.CotangentVector) -> T.CotangentVector...)' or "
+      "'(value: T..., pullback: (U.TangentVector) -> T.TangentVector...)' or "
       "'(value: T..., differential: (T.TangentVector...) -> U.TangentVector)'", ())
 ERROR(differentiating_attr_invalid_result_tuple_value_label,none,
       "'@differentiating' attribute requires function to return a two-element "

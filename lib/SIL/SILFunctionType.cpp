@@ -154,7 +154,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
-  //                 (R.CotangentVector...) -> (T.CotangentVector...))
+  //                 (R.TangentVector...) -> (T.TangentVector...))
 
   auto &ctx = getASTContext();
   auto &typeConverter = module.Types;
@@ -164,9 +164,10 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     whereClauseGenSig = getGenericSignature();
 
   // Given a type, returns its formal SIL parameter info.
-  auto getCotangentParameterInfoForOriginalResult = [&](
-      CanType cotanType, ResultConvention origResConv) -> SILParameterInfo {
-    auto &tl = typeConverter.getTypeLowering(cotanType, ResilienceExpansion::Minimal);
+  auto getTangentParameterInfoForOriginalResult = [&](
+      CanType tanType, ResultConvention origResConv) -> SILParameterInfo {
+    auto &tl = typeConverter.getTypeLowering(tanType,
+                                             ResilienceExpansion::Minimal);
     ParameterConvention conv;
     switch (origResConv) {
     case ResultConvention::Owned:
@@ -183,13 +184,14 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
       conv = ParameterConvention::Indirect_In_Guaranteed;
       break;
     }
-    return {cotanType, conv};
+    return {tanType, conv};
   };
 
   // Given a type, returns its formal SIL result info.
-  auto getCotangentResultInfoForOriginalParameter = [&](
-      CanType cotanType, ParameterConvention origParamConv) -> SILResultInfo {
-    auto &tl = typeConverter.getTypeLowering(cotanType, ResilienceExpansion::Minimal);
+  auto getTangentResultInfoForOriginalParameter = [&](
+      CanType tanType, ParameterConvention origParamConv) -> SILResultInfo {
+    auto &tl = typeConverter.getTypeLowering(tanType,
+                                             ResilienceExpansion::Minimal);
     ResultConvention conv;
     switch (origParamConv) {
     case ParameterConvention::Direct_Owned:
@@ -207,7 +209,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
       conv = ResultConvention::Indirect;
       break;
     }
-    return {cotanType, conv};
+    return {tanType, conv};
   };
 
   // Helper function testing if we are differentiating wrt this index.
@@ -228,17 +230,15 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     SmallVector<SILParameterInfo, 8> differentialParams;
     for (auto &param : wrtParams) {
       differentialParams.push_back(
-          {param.getType()->getAutoDiffAssociatedVectorSpace(
-               AutoDiffAssociatedVectorSpaceKind::Tangent, lookupConformance)
-                   ->getCanonicalType(),
+          {param.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance)
+              ->getCanonicalType(),
            param.getConvention()});
     }
     SmallVector<SILResultInfo, 8> differentialResults;
     auto &result = getResults()[resultIndex];
     differentialResults.push_back(
-        {result.getType()->getAutoDiffAssociatedVectorSpace(
-             AutoDiffAssociatedVectorSpaceKind::Tangent, lookupConformance)
-                 ->getCanonicalType(),
+        {result.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance)
+            ->getCanonicalType(),
          result.getConvention()});
     closureType = SILFunctionType::get(
         /*genericSignature*/ nullptr, ExtInfo(), SILCoroutineKind::None,
@@ -249,22 +249,20 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   case AutoDiffAssociatedFunctionKind::VJP: {
     SmallVector<SILParameterInfo, 8> pullbackParams;
     auto &origRes = getResults()[resultIndex];
-    auto cotangentAssocTy =
-        origRes.getType()->getAutoDiffAssociatedVectorSpace(
-            AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance)
-                ->getCanonicalType();
+    auto tangentAssocTy =
+        origRes.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance)
+            ->getCanonicalType();
     pullbackParams.push_back(
-        getCotangentParameterInfoForOriginalResult(cotangentAssocTy,
-                                                   origRes.getConvention()));
+        getTangentParameterInfoForOriginalResult(tangentAssocTy,
+                                                 origRes.getConvention()));
     SmallVector<SILResultInfo, 8> pullbackResults;
     for (auto &param : wrtParams) {
-      auto paramCotangentTy =
-          param.getType()->getAutoDiffAssociatedVectorSpace(
-              AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance)
-                  ->getCanonicalType();
+      auto paramTangentTy =
+          param.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance)
+              ->getCanonicalType();
       pullbackResults.push_back(
-          getCotangentResultInfoForOriginalParameter(paramCotangentTy,
-                                                     param.getConvention()));
+          getTangentResultInfoForOriginalParameter(paramTangentTy,
+                                                   param.getConvention()));
     }
     closureType = SILFunctionType::get(
         /*genericSignature*/ nullptr, ExtInfo(), SILCoroutineKind::None,

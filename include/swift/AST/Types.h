@@ -1096,20 +1096,17 @@ public:
   TypeTraitResult canBeClass();
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Return the associated tangent or cotangent type. Return the null type if
-  /// there is no associated tangent/cotangent type.
-  ///
-  /// `kind` specifies whether to return the tangent or cotangent type.
+  /// Return the associated tangent type. Return the null type if there is no
+  /// associated tangent type.
   ///
   /// If the type conforms to `Differentiable`, then the associated
-  /// tangent/cotangent type is the associated `TangentVector`/`CotangentVector`
-  /// from the `Differentiable` requirement. If the type is a tuple, then the
-  /// associated tangent/cotangent type is the elementwise tangent/cotangent
-  /// type of its elements. If the type is a builtin float, then the associated
-  /// tangent/cotangent type is itself. Otherwise, there is no associated type.
+  /// tangent type is the associated `TangentVector` from the `Differentiable`
+  /// requirement. If the type is a tuple, then the associated tangent type is
+  /// the elementwise tangent type of its elements. If the type is a builtin
+  /// float, then the associated tangent type is itself. Otherwise, there is no
+  /// associated type.
   Optional<VectorSpace>
-  getAutoDiffAssociatedVectorSpace(AutoDiffAssociatedVectorSpaceKind kind,
-                                   LookupConformanceFn lookupConformance);
+  getAutoDiffAssociatedTangentSpace(LookupConformanceFn lookupConformance);
 
 private:
   // Make vanilla new/delete illegal for Types.
@@ -3074,12 +3071,12 @@ public:
   ///
   /// By default, if the original type has a self parameter list and parameter
   /// indices include self, the computed associated function type will return a
-  /// linear map taking/returning self's tangent/cotangent *last* instead of
-  /// first, for consistency with SIL.
+  /// linear map taking/returning self's tangent *last* instead of first, for
+  /// consistency with SIL.
   ///
-  /// If `makeSelfParamFirst` is true, self's tangent/cotangent is reordered to
-  /// appear first. This should be used during type-checking, e.g.
-  /// type-checking `@differentiable` and `@differentiating` attributes.
+  /// If `makeSelfParamFirst` is true, self's tangent is reordered to appear
+  /// first. This should be used during type-checking, e.g. type-checking
+  /// `@differentiable` and `@differentiating` attributes.
   ///
   /// \note The original function type (`self`) need not be `@differentiable`.
   /// The resulting function will preserve all `ExtInfo` of the original

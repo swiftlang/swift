@@ -117,15 +117,10 @@ extension Tracked : Strideable where T : Strideable, T.Stride == T.Stride.Magnit
 // For now, `T` must be restricted to trivial types (like `Float` or `Tensor`).
 extension Tracked : Differentiable
   where T : Differentiable, T == T.AllDifferentiableVariables,
-        T == T.TangentVector, T == T.CotangentVector
+        T == T.TangentVector
 {
   public typealias AllDifferentiableVariables = Tracked<T.AllDifferentiableVariables>
   public typealias TangentVector = Tracked<T.TangentVector>
-  public typealias CotangentVector = Tracked<T.CotangentVector>
-  @inlinable @inline(__always)
-  public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
-    return Tracked<T.TangentVector>(value.tangentVector(from: cotangent.value))
-  }
 }
 
 @differentiable(vjp: _vjpAdd)
@@ -146,14 +141,14 @@ public extension Differentiable {
   @inlinable
   func gradient(
     in f: @differentiable (Self) -> Tracked<Float>
-  ) -> CotangentVector {
+  ) -> TangentVector {
     return self.pullback(in: f)(1)
   }
 
   @inlinable
   func gradient<T : Differentiable>(
     at x: T, in f: @differentiable (Self, T) -> Tracked<Float>
-  ) -> (CotangentVector, T.CotangentVector) {
+  ) -> (TangentVector, T.TangentVector) {
     return self.pullback(at: x, in: f)(1)
   }
 }

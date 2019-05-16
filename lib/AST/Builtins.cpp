@@ -985,7 +985,7 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
   //       rethrows -> (R, (...T.TangentVector) -> R.TangentVector)
   // VJP:
   //   <...T...(arity), R> (@differentiable (...T) throws -> R, ...T)
-  //       rethrows -> (R, (R.CotangentVector) -> ...T.CotangentVector)
+  //       rethrows -> (R, (R.TangentVector) -> ...T.TangentVector)
   unsigned numGenericParams = 1 + arity;
   BuiltinGenericSignatureBuilder builder(Context, numGenericParams);
   // Look up the Differentiable protocol.

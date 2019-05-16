@@ -3191,7 +3191,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
 
   // The result type should be a two-element tuple.
   // Either a value and pullback:
-  //     (value: R, pullback: (R.CotangentVector) -> (T.CotangentVector...)
+  //     (value: R, pullback: (R.TangentVector) -> (T.TangentVector...)
   // Or a value and differential:
   //     (value: R, differential: (T.TangentVector...) -> (R.TangentVector)
   auto derivativeResultType = derivative->getResultInterfaceType();
@@ -3219,7 +3219,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     autoDiffAssocTyId = ctx.Id_TangentVector;
   } else if (funcResultElt.getName().str() == "pullback") {
     kind = AutoDiffAssociatedFunctionKind::VJP;
-    autoDiffAssocTyId = ctx.Id_CotangentVector;
+    autoDiffAssocTyId = ctx.Id_TangentVector;
   } else {
     TC.diagnose(attr->getLocation(),
                 diag::differentiating_attr_invalid_result_tuple_func_label);
@@ -3227,7 +3227,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     return;
   }
   // `value: R` result tuple element must conform to `Differentiable`.
-  auto diffableProto = ctx.getProtocol(KnownProtocolKind::__Differentiable);
+  auto diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
   auto valueResultType = valueResultElt.getType();
   if (valueResultType->hasTypeParameter())
     valueResultType = derivative->mapTypeIntoContext(valueResultType);

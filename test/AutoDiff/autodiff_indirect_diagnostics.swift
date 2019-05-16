@@ -24,7 +24,7 @@ func weird<T>(_ x: T) -> T {
 }
 func vjpWeirdExtraRequirements<
   T : Differentiable & CaseIterable
->(_ x: T) -> (T, (T.CotangentVector) -> T.CotangentVector)
+>(_ x: T) -> (T, (T.TangentVector) -> T.TangentVector)
   where T.AllCases : ExpressibleByStringLiteral
 {
   return (x, { $0 })

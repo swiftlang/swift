@@ -551,11 +551,6 @@ public:
   }
 };
 
-/// The kind of an associated type.
-enum class AutoDiffAssociatedVectorSpaceKind : unsigned {
-  Tangent = 0, Cotangent = 1
-};
-
 /// Automatic differentiation utility namespace.
 namespace autodiff {
 

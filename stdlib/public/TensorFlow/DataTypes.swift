@@ -101,7 +101,6 @@ public protocol TensorFlowFloatingPoint :
   TensorFlowScalar & BinaryFloatingPoint & Differentiable
   where Self.RawSignificand: FixedWidthInteger,
         Self == Self.TangentVector,
-        Self == Self.CotangentVector,
         Self == Self.AllDifferentiableVariables {}
 
 extension Float : TensorFlowFloatingPoint {}

@@ -16,4 +16,4 @@ struct Foo : Differentiable {
 // synthesized member types require extra non-trivial work, due to the
 // current type-checker design.
 let randomGlobal = 1
-extension Foo.CotangentVector : Proto {}
+extension Foo.TangentVector : Proto {}
