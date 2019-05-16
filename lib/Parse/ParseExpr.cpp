@@ -3081,7 +3081,7 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
       // Handle call arguments specially because it may need argument labels.
       auto CCExpr = new (Context) CodeCompletionExpr(Tok.getLoc());
       if (CodeCompletion)
-        CodeCompletion->completeCallArg(CCExpr);
+        CodeCompletion->completeCallArg(CCExpr, PreviousLoc == leftLoc);
       consumeIf(tok::code_complete);
       SubExpr = CCExpr;
       Status.setHasCodeCompletion();
