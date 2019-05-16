@@ -150,7 +150,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
     unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
     SILModule &module, LookupConformanceFn lookupConformance,
-    GenericSignature *whereClauseGenSig) {
+    CanGenericSignature whereClauseGenSig) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
@@ -158,10 +158,10 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
 
   auto &ctx = getASTContext();
   auto &typeConverter = module.Types;
-  Lowering::GenericContextScope
-      genericContextScope(module.Types, getGenericSignature());
   if (!whereClauseGenSig)
     whereClauseGenSig = getGenericSignature();
+  Lowering::GenericContextScope genericContextScope(
+      module.Types, whereClauseGenSig);
 
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult = [&](

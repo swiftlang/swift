@@ -6,14 +6,13 @@
 
 // Test unmet generic requirements.
 
-// expected-error @+1 {{function is not differentiable}}
 @differentiable
-// expected-note @+1 {{when differentiating this function definition}}
 func generic<T: Differentiable & FloatingPoint>(_ x: T) -> T {
+  // expected-error @+2 {{expression is not differentiable}}
   // expected-note @+1 {{member is not differentiable because the corresponding protocol requirement is not '@differentiable'}}
   return x + 1
 }
-_ = gradient(at: 1.0, in: generic) // expected-error {{function is not differentiable}}
+_ = gradient(at: 1.0, in: generic)
 
 @differentiable(
   vjp: vjpWeirdExtraRequirements
@@ -30,11 +29,10 @@ func vjpWeirdExtraRequirements<
   return (x, { $0 })
 }
 func weirdWrapper<T : Differentiable>(_ x: T) -> T {
+  // expected-error @+2 {{expression is not differentiable}}
   // expected-note @+1 {{function call is not differentiable because generic requirements are not met}}
   return weird(x)
 }
-// expected-note @+2 {{expression is not differentiable}}
-// expected-error @+1 {{function is not differentiable}}
 _ = gradient(at: Float(1), in: { x in weirdWrapper(x) })
 
 /*
