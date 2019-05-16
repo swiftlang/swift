@@ -38,7 +38,7 @@ namespace immediate {
 /// calls or \c null if an error occurred.
 ///
 /// \param runtimeLibPath Path to search for compiler-relative stdlib dylibs.
-void *loadSwiftRuntime(StringRef runtimeLibPath);
+void *loadSwiftRuntime(const std::vector<std::string> &runtimeLibPaths);
 bool tryLoadLibraries(ArrayRef<LinkLibrary> LinkLibraries,
                       SearchPathOptions SearchPathOpts,
                       DiagnosticEngine &Diags);

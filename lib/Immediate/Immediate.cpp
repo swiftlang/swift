@@ -66,8 +66,18 @@ static void *loadRuntimeLib(StringRef sharedLibName, StringRef runtimeLibPath) {
   return loadRuntimeLib(Path);
 }
 
-void *swift::immediate::loadSwiftRuntime(StringRef runtimeLibPath) {
-  return loadRuntimeLib("libswiftCore" LTDL_SHLIB_EXT, runtimeLibPath);
+static void *loadRuntimeLib(StringRef sharedLibName,
+                            const std::vector<std::string> runtimeLibPaths) {
+  for (auto &runtimeLibPath : runtimeLibPaths) {
+    if (void *handle = loadRuntimeLib(sharedLibName, runtimeLibPath))
+      return handle;
+  }
+  return nullptr;
+}
+
+void *swift::immediate::loadSwiftRuntime(const std::vector<std::string>
+                                         &runtimeLibPaths) {
+  return loadRuntimeLib("libswiftCore" LTDL_SHLIB_EXT, runtimeLibPaths);
 }
 
 static bool tryLoadLibrary(LinkLibrary linkLib,
@@ -105,9 +115,9 @@ static bool tryLoadLibrary(LinkLibrary linkLib,
     if (!success)
       success = loadRuntimeLib(stem);
 
-    // If that fails, try our runtime library path.
+    // If that fails, try our runtime library paths.
     if (!success)
-      success = loadRuntimeLib(stem, searchPathOpts.RuntimeLibraryPath);
+      success = loadRuntimeLib(stem, searchPathOpts.RuntimeLibraryPaths);
     break;
   }
   case LibraryKind::Framework: {
@@ -240,7 +250,7 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   //
   // This must be done here, before any library loading has been done, to avoid
   // racing with the static initializers in user code.
-  auto stdlib = loadSwiftRuntime(Context.SearchPathOpts.RuntimeLibraryPath);
+  auto stdlib = loadSwiftRuntime(Context.SearchPathOpts.RuntimeLibraryPaths);
   if (!stdlib) {
     CI.getDiags().diagnose(SourceLoc(),
                            diag::error_immediate_mode_missing_stdlib);

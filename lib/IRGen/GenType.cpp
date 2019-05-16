@@ -1184,7 +1184,23 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
     if (!doesPlatformUseLegacyLayouts(platformName, archName))
       return;
 
-    defaultPath.append(IGM.Context.SearchPathOpts.RuntimeLibraryPath);
+    // Find the first runtime library path that exists.
+    bool found = false;
+    for (auto &RuntimeLibraryPath
+         : IGM.Context.SearchPathOpts.RuntimeLibraryPaths) {
+      if (llvm::sys::fs::exists(RuntimeLibraryPath)) {
+        defaultPath.append(RuntimeLibraryPath);
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      auto joined = llvm::join(IGM.Context.SearchPathOpts.RuntimeLibraryPaths,
+                               "', '");
+      llvm::report_fatal_error("Unable to find a runtime library path at '"
+                               + joined + "'");
+    }
+
     llvm::sys::path::append(defaultPath, "layouts-");
     defaultPath.append(archName);
     defaultPath.append(".yaml");
