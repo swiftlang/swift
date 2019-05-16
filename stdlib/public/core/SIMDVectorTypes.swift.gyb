@@ -203,15 +203,13 @@ extension SIMD${n} : Differentiable where Scalar : Differentiable & BinaryFloati
 extension SIMD${n}
   where Scalar : Differentiable & BinaryFloatingPoint,
         Scalar.CotangentVector : BinaryFloatingPoint {
-  public func _vjpSubscript(index: Int) ->
-  (Scalar, (Scalar.CotangentVector) -> CotangentVector)
-  {
-    return (self[index], { (v: Scalar.CotangentVector) in
+  public func _vjpSubscript(index: Int)
+  -> (Scalar, (Scalar.CotangentVector) -> CotangentVector) {
+    return (self[index], { v in
       var zeros = Self.zero
       zeros[index] = Scalar(v)
       return zeros
-    }
-    )
+    })
   }
 }
 

@@ -781,6 +781,7 @@ extension SIMD where Scalar: FixedWidthInteger {
 //  be replaced with @_semantics to lower directly to vector IR nodes.
 extension SIMD where Scalar: FloatingPoint {
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpAdd(lhs:rhs:)
     where Self : Differentiable,
           Self.CotangentVector : SIMD,
@@ -793,6 +794,7 @@ extension SIMD where Scalar: FloatingPoint {
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpAdd(lhs:rhs:)
     where Self: Differentiable,
           Self.CotangentVector: SIMD,
@@ -805,6 +807,7 @@ extension SIMD where Scalar: FloatingPoint {
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpMultiply(lhs:rhs:)
     where Self: Differentiable,
           Self.CotangentVector: SIMD,
@@ -858,6 +861,7 @@ extension SIMD where Scalar: FloatingPoint {
   
   /// Returns the sum of the scalars in the vector.
   @_alwaysEmitIntoClient
+  // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpSum
     where Self : Differentiable,
           Self.CotangentVector : SIMD,
@@ -1183,6 +1187,7 @@ extension SIMD where Scalar: FloatingPoint {
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpAdd(lhs:rhs:)
   where Self: Differentiable,
         Self.CotangentVector: SIMD,
@@ -1194,6 +1199,7 @@ extension SIMD where Scalar: FloatingPoint {
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpAdd(lhs:rhs:)
     where Self: Differentiable,
           Self.CotangentVector: SIMD,
@@ -1205,6 +1211,7 @@ extension SIMD where Scalar: FloatingPoint {
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpMultiply(lhs:rhs:)
     where Self : Differentiable,
           Self.CotangentVector : SIMD,
@@ -1216,6 +1223,7 @@ extension SIMD where Scalar: FloatingPoint {
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpDivide(lhs:rhs:)
   where Self : Differentiable,
   Self.CotangentVector : SIMD,
@@ -1227,6 +1235,7 @@ extension SIMD where Scalar: FloatingPoint {
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpAdd(lhs:rhs:)
     where Self: Differentiable,
           Self.CotangentVector: SIMD,
@@ -1238,6 +1247,7 @@ extension SIMD where Scalar: FloatingPoint {
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpAdd(lhs:rhs:)
     where Self: Differentiable,
           Self.CotangentVector: SIMD,
@@ -1249,6 +1259,7 @@ extension SIMD where Scalar: FloatingPoint {
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpMultiply(lhs:rhs:)
     where Self : Differentiable,
           Self.CotangentVector : SIMD,
@@ -1260,6 +1271,7 @@ extension SIMD where Scalar: FloatingPoint {
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpDivide(lhs:rhs:)
     where Self : Differentiable,
           Self.CotangentVector : SIMD,
@@ -1473,7 +1485,7 @@ extension SIMD
   @inlinable
   static func _vjpAdd(
     lhs: Self, rhs: Self
-    ) -> (Self, (CotangentVector) -> (CotangentVector, CotangentVector)) {
+  ) -> (Self, (CotangentVector) -> (CotangentVector, CotangentVector)) {
     return (lhs + rhs, { v in
       return (v, v)
     })
@@ -1482,7 +1494,7 @@ extension SIMD
   @inlinable
   static func _vjpSubtract(
     lhs: Self, rhs: Self
-    ) -> (Self, (CotangentVector) -> (CotangentVector, CotangentVector)) {
+  ) -> (Self, (CotangentVector) -> (CotangentVector, CotangentVector)) {
     return (lhs - rhs, { (v: CotangentVector) in
       return (v, -v)
     })
@@ -1492,15 +1504,13 @@ extension SIMD
 extension SIMD
   where Self: Differentiable,
         CotangentVector: SIMD,
-        // error: generic parameter 'Self' could not be inferred: return (lhs * rhs,...
         Scalar : BinaryFloatingPoint,
-        // binary operator '*' cannot be applied to operands of type 'Self.CotangentVector' and 'Self'
         Self.CotangentVector == Self {
   @inlinable
   static func _vjpMultiply(
     lhs: Self, rhs: Self
-    ) -> (Self, (CotangentVector) -> (CotangentVector, CotangentVector)) {
-    return (lhs * rhs, { (v: CotangentVector) in
+  ) -> (Self, (CotangentVector) -> (CotangentVector, CotangentVector)) {
+    return (lhs * rhs, { v in
       return (v * rhs, v * lhs)
     })
   }
@@ -1508,8 +1518,8 @@ extension SIMD
   @inlinable
   static func _vjpDivide(
     lhs: Self, rhs: Self
-    ) -> (Self, (CotangentVector) -> (CotangentVector, CotangentVector)) {
-    return (lhs / rhs, { (v: CotangentVector) in
+  ) -> (Self, (CotangentVector) -> (CotangentVector, CotangentVector)) {
+    return (lhs / rhs, { v in
       (v / rhs, -lhs / (rhs * rhs) * v)
     })
   }
@@ -1524,8 +1534,8 @@ extension SIMD
   @inlinable
   static func _vjpAdd(
     lhs: Scalar, rhs: Self
-    ) -> (Self, (CotangentVector) -> (Scalar.CotangentVector, CotangentVector)) {
-    return (lhs + rhs, { (v: CotangentVector) in
+  ) -> (Self, (CotangentVector) -> (Scalar.CotangentVector, CotangentVector)) {
+    return (lhs + rhs, { v in
       return (v.sum(), v)
     })
   }
@@ -1533,8 +1543,8 @@ extension SIMD
   @inlinable
   static func _vjpSubtract(
     lhs: Scalar, rhs: Self
-    ) -> (Self, (CotangentVector) -> (Scalar.CotangentVector, CotangentVector)) {
-    return (lhs + rhs, { (v: CotangentVector) in
+  ) -> (Self, (CotangentVector) -> (Scalar.CotangentVector, CotangentVector)) {
+    return (lhs + rhs, { v in
       return (v.sum(), -v)
     })
   }
@@ -1542,8 +1552,8 @@ extension SIMD
   @inlinable
   static func _vjpAdd(
     lhs: Self, rhs: Scalar
-    ) -> (Self, (CotangentVector) -> (CotangentVector, Scalar.CotangentVector)) {
-    return (lhs + rhs, { (v: CotangentVector) in
+  ) -> (Self, (CotangentVector) -> (CotangentVector, Scalar.CotangentVector)) {
+    return (lhs + rhs, { v in
       return (v, v.sum())
     })
   }
@@ -1551,8 +1561,8 @@ extension SIMD
   @inlinable
   static func _vjpSubtract(
     lhs: Self, rhs: Scalar
-    ) -> (Self, (CotangentVector) -> (CotangentVector, Scalar.CotangentVector)) {
-    return (lhs + rhs, { (v: CotangentVector) in
+  ) -> (Self, (CotangentVector) -> (CotangentVector, Scalar.CotangentVector)) {
+    return (lhs + rhs, { v in
       return (v, -v.sum())
     })
   }
@@ -1567,8 +1577,8 @@ extension SIMD
   @inlinable
   static func _vjpMultiply(
     lhs: Self, rhs: Scalar
-    ) -> (Self, (CotangentVector) -> (CotangentVector, Scalar.CotangentVector)) {
-    return (lhs * rhs, { (v: CotangentVector) in
+  ) -> (Self, (CotangentVector) -> (CotangentVector, Scalar.CotangentVector)) {
+    return (lhs * rhs, { v in
       return (v * rhs, (v * lhs).sum())
     })
   }
@@ -1576,8 +1586,8 @@ extension SIMD
   @inlinable
   static func _vjpDivide(
     lhs: Self, rhs: Scalar
-    ) -> (Self, (CotangentVector) -> (CotangentVector, Scalar.CotangentVector)) {
-    return (lhs / rhs, { (v: CotangentVector) in
+  ) -> (Self, (CotangentVector) -> (CotangentVector, Scalar.CotangentVector)) {
+    return (lhs / rhs, { v in
       (-lhs / (rhs * rhs) * v, (v / rhs).sum())
     })
   }
@@ -1585,8 +1595,8 @@ extension SIMD
   @inlinable
   static func _vjpMultiply(
     lhs: Scalar, rhs: Self
-    ) -> (Self, (CotangentVector) -> (Scalar.CotangentVector, CotangentVector)) {
-    return (lhs * rhs, { (v: CotangentVector) in
+  ) -> (Self, (CotangentVector) -> (Scalar.CotangentVector, CotangentVector)) {
+    return (lhs * rhs, { v in
       return ((v * lhs).sum(), v * rhs)
     })
   }
@@ -1594,8 +1604,8 @@ extension SIMD
   @inlinable
   static func _vjpDivide(
     lhs: Scalar, rhs: Self
-    ) -> (Self, (CotangentVector) -> (Scalar.CotangentVector, CotangentVector)) {
-    return (lhs / rhs, { (v: CotangentVector) in
+  ) -> (Self, (CotangentVector) -> (Scalar.CotangentVector, CotangentVector)) {
+    return (lhs / rhs, { v in
       ((v / rhs).sum(), -lhs / (rhs * rhs) * v)
     })
   }
@@ -1609,6 +1619,6 @@ extension SIMD
         CotangentVector == Self {
   @usableFromInline
   func _vjpSum() -> (Scalar, (Scalar.CotangentVector) -> CotangentVector) {
-    return (sum(), { (v: Scalar.CotangentVector)  in Self.init(repeating: Scalar(v)) })
+    return (sum(), { v in Self(repeating: Scalar(v)) })
   }
 }
