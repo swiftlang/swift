@@ -479,12 +479,10 @@ swift::getCascadingDocComment(swift::markup::MarkupContext &MC, const Decl *D) {
   auto *doc = getSingleDocComment(MC, docD);
   assert(doc && "getDocCommentProvidingDecl() returned decl with no comment");
 
-  // Iff the doc is inherited from overridden decl, add a note about that.
-  // FIXME: This is inconsistent <rdar://problem/49043711>, but let's keep the
-  // behavior for now.
+  // If the doc-comment is inherited from other decl, add a note about it.
   if (docD != D)
-    if (auto baseClassD = docD->getDeclContext()->getSelfClassDecl())
-      doc->addInheritanceNote(MC, baseClassD);
+    if (auto baseD = docD->getDeclContext()->getSelfNominalTypeDecl())
+      doc->addInheritanceNote(MC, baseD);
 
   return doc;
 }
