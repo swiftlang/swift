@@ -3684,7 +3684,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
             conformanceBeingChecked->getLoc(),
             diag::conformance_from_implementation_only_module,
             rootConformance->getType(),
-            rootConformance->getProtocol()->getName(), M->getName());
+            rootConformance->getProtocol()->getName(), 0, M->getName());
       } else {
         ctx.Diags.diagnose(
             conformanceBeingChecked->getLoc(),

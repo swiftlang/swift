@@ -2427,12 +2427,17 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
      "construct %0 from unwrapped %1 value", (Type, Type))
 
 ERROR(decl_from_implementation_only_module,none,
-      "cannot use %0 %1 here; %2 has been imported as implementation-only",
-      (DescriptiveDeclKind, DeclName, Identifier))
+      "cannot use %0 %1 %select{here|"
+      "in an extension with public or '@usableFromInline' members|"
+      "in an extension with conditional conformances}2; %3 has been imported "
+      "as implementation-only",
+      (DescriptiveDeclKind, DeclName, unsigned, Identifier))
 ERROR(conformance_from_implementation_only_module,none,
-      "cannot use conformance of %0 to %1 here; %2 has been imported as "
-      "implementation-only",
-      (Type, DeclName, Identifier))
+      "cannot use conformance of %0 to %1 %select{here|"
+      "in an extension with public or '@usableFromInline' members|"
+      "in an extension with conditional conformances}2; %3 has been imported "
+      "as implementation-only",
+      (Type, DeclName, unsigned, Identifier))
 ERROR(assoc_conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 in associated type %3 (inferred as "
       "%4); %2 has been imported as implementation-only",

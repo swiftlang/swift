@@ -568,7 +568,7 @@ public:
       highlightOffendingType(TC, diag, complainRepr);
     });
   }
-                               
+
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
     // TODO(opaque): The constraint class/protocols on the opaque interface, as
     // well as the naming decl for the opaque type, need to be accessible.
@@ -1559,18 +1559,30 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
     });
   }
 
+  // This enum must be kept in sync with
+  // diag::decl_from_implementation_only_module and
+  // diag::conformance_from_implementation_only_module.
+  enum class Reason : unsigned {
+    General,
+    ExtensionWithPublicMembers,
+    ExtensionWithConditionalConformances
+  };
+
   class DiagnoseGenerically {
     TypeChecker &TC;
     const Decl *D;
+    Reason reason;
   public:
-    DiagnoseGenerically(TypeChecker &TC, const Decl *D) : TC(TC), D(D) {}
+    DiagnoseGenerically(TypeChecker &TC, const Decl *D, Reason reason)
+        : TC(TC), D(D), reason(reason) {}
 
     void operator()(const TypeDecl *offendingType,
                     const TypeRepr *complainRepr) {
       ModuleDecl *M = offendingType->getModuleContext();
       auto diag = TC.diagnose(D, diag::decl_from_implementation_only_module,
                               offendingType->getDescriptiveKind(),
-                              offendingType->getFullName(), M->getName());
+                              offendingType->getFullName(),
+                              static_cast<unsigned>(reason), M->getName());
       highlightOffendingType(TC, diag, complainRepr);
     }
 
@@ -1579,7 +1591,7 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
       TC.diagnose(D, diag::conformance_from_implementation_only_module,
                   offendingConformance->getType(),
                   offendingConformance->getProtocol()->getFullName(),
-                  M->getName());
+                  static_cast<unsigned>(reason), M->getName());
     }
   };
 
@@ -1592,14 +1604,20 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
                           CheckExportabilityConformanceCallback>::value,
       "DiagnoseGenerically has wrong call signature for conformance diags");
 
-  DiagnoseGenerically getDiagnoseCallback(const Decl *D) {
-    return DiagnoseGenerically(TC, D);
+  DiagnoseGenerically getDiagnoseCallback(const Decl *D,
+                                          Reason reason = Reason::General) {
+    return DiagnoseGenerically(TC, D, reason);
   }
 
 public:
   explicit ExportabilityChecker(TypeChecker &TC) : TC(TC) {}
 
   static bool shouldSkipChecking(const ValueDecl *VD) {
+    // Accessors are handled as part of their Var or Subscript, and we don't
+    // want to redo extension signature checking for them.
+    if (isa<AccessorDecl>(VD))
+      return true;
+
     // Is this part of the module's API or ABI?
     AccessScope accessScope =
         VD->getFormalAccessScope(nullptr,
@@ -1633,12 +1651,6 @@ public:
         return;
 
     DeclVisitor<ExportabilityChecker>::visit(D);
-
-    if (auto *extension = dyn_cast<ExtensionDecl>(D->getDeclContext())) {
-      checkType(extension->getExtendedTypeLoc(), extension,
-                getDiagnoseCallback(extension), getDiagnoseCallback(extension));
-      checkConstrainedExtensionRequirements(extension);
-    }
   }
 
   // Force all kinds to be handled at a lower level.
@@ -1678,11 +1690,11 @@ public:
   void checkNamedPattern(const NamedPattern *NP,
                          const llvm::DenseSet<const VarDecl *> &seenVars) {
     const VarDecl *theVar = NP->getDecl();
-    if (shouldSkipChecking(theVar))
-      return;
     // Only check individual variables if we didn't check an enclosing
     // TypedPattern.
     if (seenVars.count(theVar) || theVar->isInvalid())
+      return;
+    if (shouldSkipChecking(theVar))
       return;
 
     checkType(theVar->getInterfaceType(), /*typeRepr*/nullptr, theVar,
@@ -1809,12 +1821,13 @@ public:
                 getDiagnoseCallback(EED));
   }
 
-  void checkConstrainedExtensionRequirements(ExtensionDecl *ED) {
+  void checkConstrainedExtensionRequirements(ExtensionDecl *ED,
+                                             Reason reason) {
     if (!ED->getTrailingWhereClause())
       return;
     forAllRequirementTypes(ED, [&](Type type, TypeRepr *typeRepr) {
-      checkType(type, typeRepr, ED, getDiagnoseCallback(ED),
-                getDiagnoseCallback(ED));
+      checkType(type, typeRepr, ED, getDiagnoseCallback(ED, reason),
+                getDiagnoseCallback(ED, reason));
     });
   }
 
@@ -1830,8 +1843,26 @@ public:
                 getDiagnoseCallback(ED));
     });
 
-    if (!ED->getInherited().empty())
-      checkConstrainedExtensionRequirements(ED);
+    bool hasPublicMembers = llvm::any_of(ED->getMembers(),
+                                         [](const Decl *member) -> bool {
+      auto *valueMember = dyn_cast<ValueDecl>(member);
+      if (!valueMember)
+        return false;
+      return !shouldSkipChecking(valueMember);
+    });
+
+    if (hasPublicMembers) {
+      checkType(ED->getExtendedTypeLoc(), ED,
+                getDiagnoseCallback(ED, Reason::ExtensionWithPublicMembers),
+                getDiagnoseCallback(ED, Reason::ExtensionWithPublicMembers));
+    }
+
+    if (hasPublicMembers || !ED->getInherited().empty()) {
+      Reason reason =
+          hasPublicMembers ? Reason::ExtensionWithPublicMembers
+                           : Reason::ExtensionWithConditionalConformances;
+      checkConstrainedExtensionRequirements(ED, reason);
+    }
   }
 
   void checkPrecedenceGroup(const PrecedenceGroupDecl *PGD,
@@ -1844,6 +1875,7 @@ public:
 
     auto diag = TC.diagnose(diagLoc, diag::decl_from_implementation_only_module,
                             PGD->getDescriptiveKind(), PGD->getName(),
+                            static_cast<unsigned>(Reason::General),
                             M->getName());
     if (refRange.isValid())
       diag.highlight(refRange);
