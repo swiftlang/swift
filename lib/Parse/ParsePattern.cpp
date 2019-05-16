@@ -789,9 +789,10 @@ Parser::parseFunctionSignature(Identifier SimpleName,
       throwsLoc = consumeToken();
       rethrows = true;
     } else if (Tok.is(tok::kw_throw)) {
-        throwsLoc = consumeToken();
-        isThrow = true;
-        return diagnose(throwsLoc, diag::throw_in_function_type_and_wrong_position);
+      throwsLoc = consumeToken();
+      isThrow = true;
+      return diagnose(throwsLoc,
+                      diag::throw_in_function_type_and_wrong_position);
     }
 
     if (!throwsLoc.isValid())
@@ -819,13 +820,12 @@ Parser::parseFunctionSignature(Identifier SimpleName,
       assert(arrowLoc.isValid());
       assert(throwsLoc.isValid());
       if (isThrow) {
-          (*diagOpt)
-          .fixItInsert(arrowLoc, "throws ")
-          .fixItRemove(SourceRange(throwsLoc));
+        (*diagOpt)
+            .fixItInsert(arrowLoc, "throws ")
+            .fixItRemove(SourceRange(throwsLoc));
       } else {
-          (*diagOpt).fixItExchange(SourceRange(arrowLoc),
-                                   SourceRange(throwsLoc));
-      } 
+        (*diagOpt).fixItExchange(SourceRange(arrowLoc), SourceRange(throwsLoc));
+      }
     }
 
     ParserResult<TypeRepr> ResultType =
