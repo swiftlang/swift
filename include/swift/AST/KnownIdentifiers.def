@@ -134,10 +134,8 @@ IDENTIFIER_(typeList)
 IDENTIFIER(zero)
 IDENTIFIER(Scalar)
 // Differentiable
-IDENTIFIER(AllDifferentiableVariables)
 IDENTIFIER(CotangentVector)
 IDENTIFIER(TangentVector)
-IDENTIFIER(allDifferentiableVariables)
 IDENTIFIER(moved)
 IDENTIFIER(tangentVector)
 

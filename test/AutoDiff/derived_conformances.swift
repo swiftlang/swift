@@ -22,12 +22,10 @@ DerivedConformanceTests.test("MemberwiseInitializers") {
   expectEqual(AllVarStoredPropertiesHaveInitialValue.zero.y, 0)
 
   struct HasNoDerivativeConstant: Differentiable {
-    @noDerivative let constant1 = Float(1)
-    @noDerivative let constant2 = Double(1)
+    @NoDerivative var constant1 = Float(1)
+    @NoDerivative var constant2 = Double(1)
     var x = Float(1)
   }
-  expectEqual(HasNoDerivativeConstant.AllDifferentiableVariables(x: 0),
-              HasNoDerivativeConstant.AllDifferentiableVariables.zero)
   expectEqual(HasNoDerivativeConstant.CotangentVector(x: 0),
               HasNoDerivativeConstant.CotangentVector.zero)
 }

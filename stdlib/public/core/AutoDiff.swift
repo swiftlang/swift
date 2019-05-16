@@ -68,8 +68,6 @@ public protocol __Differentiable {
   associatedtype TangentVector : AdditiveArithmetic
   /// The cotangent bundle of this differentiable manifold.
   associatedtype CotangentVector : AdditiveArithmetic
-  /// The type of all differentiable variables in this type.
-  typealias AllDifferentiableVariables = Self
 
   /// Returns `self` moved along the value space towards the given tangent
   /// vector. In Riemannian geometry (mathematics), this represents an
@@ -105,6 +103,9 @@ public protocol Differentiable : _Differentiable
 // END DIFFERENTIABLE
 
 public extension Differentiable {
+  @available(*, deprecated, message: "'AllDifferentiableVariables' will be replaced by 'Self'")
+  typealias AllDifferentiableVariables = Self
+  
   @available(*, deprecated, message: "'allDifferentiableVariables' will be replaced by 'self'")
   var allDifferentiableVariables: AllDifferentiableVariables {
     _read { yield self }
@@ -496,10 +497,6 @@ public func gradient<T, U, V, R>(
 @_propertyDelegate
 public struct NoDerivative<Value> {
   public var value: Value
-
-  public init(_ value: Value) {
-    self.value = value
-  }
 }
 
 extension NoDerivative : Differentiable {
