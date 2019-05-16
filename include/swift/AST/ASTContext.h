@@ -50,6 +50,7 @@ namespace clang {
 namespace swift {
   class ASTContext;
   enum class Associativity : unsigned char;
+  class AvailabilityContext;
   class BoundGenericType;
   class ClangNode;
   class ConstructorDecl;
@@ -593,6 +594,9 @@ public:
   void addDestructorCleanup(T &object) {
     addCleanup([&object]{ object.~T(); });
   }
+  
+  /// Get the runtime availability of the opaque types language feature for the target platform.
+  AvailabilityContext getOpaqueTypeAvailability();
 
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
