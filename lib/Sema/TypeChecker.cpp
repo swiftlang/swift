@@ -760,8 +760,7 @@ bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   TypeChecker &TC = createTypeChecker(ctx);
 
   auto resultTy = TC.typeCheckExpression(parsedExpr, DC, TypeLoc(),
-                                    ContextualTypePurpose::CTP_Unused,
-                                    TypeCheckExprFlags::SuppressDiagnostics);
+                                         ContextualTypePurpose::CTP_Unused);
   return !resultTy;
 }
 
