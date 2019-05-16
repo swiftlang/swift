@@ -444,12 +444,6 @@ public enum _RuntimeConfig {
   /// tensor program in this process.
   static public var tensorFlowRuntimeInitialized = false
 
-  /// When true, run the entire tensor computation in
-  /// _TFCStartTensorComputation(), instead of running it on a separate thread.
-  /// - Note: Set to true only for debugging purposes, as it has limited
-  ///   functionality (e.g. no sends/recvs support).
-  static public var usesSynchronousExecution = false
-
   /// For CPU and GPU execution without XLA, use the auto mode. For XLA and/or
   /// TPU execution, set the enum value accordingly.
   static public var executionMode: _ExecutionMode = .auto
@@ -515,12 +509,6 @@ private func configureRuntimeFromEnvironment() {
     String(cString: value).lowercased() == "true" {
       _RuntimeConfig.executionMode = .tpu
       debugLog("Setting TPU execution with infeed from env.")
-  }
-
-  if let value = getenv("SWIFT_TENSORFLOW_SYNC_EXECUTION"),
-    String(cString: value).lowercased() == "true" {
-      _RuntimeConfig.usesSynchronousExecution = true
-      debugLog("Using sync execution from env.")
   }
 
   if let value = getenv("SWIFT_TENSORFLOW_SERVER_ADDRESS") {
@@ -1060,7 +1048,7 @@ public func _tffunc<In : TensorGroup, Out : TensorGroup>(
       let symbolicOut = escapableFn(symbolicIn)
       return symbolicOut.cTensorHandles
     }
-    
+
     let dtypes = In._typeList.map { $0._cDataType }
     return _trace(with: dtypes, in: wrappedFn)
   }
@@ -1343,13 +1331,7 @@ public final class _TensorComputation {
   /// when the tensor computation involves N device functions. In non-eager
   /// mode, we use a single thread (that's sufficient as these N device
   /// functions can be sent to the same TF_SessionRun() call.)
-  ///
-  /// The global config flag '_RuntimeConfig.usesSynchronousExecution' decides
-  /// whether tensor computation should be synchronous: if true, this property
-  /// will always be empty. Otherwise, this property is non-empty only when the
-  /// tensor computation is on-going.
-  /// TODO: Remove the `usesSynchronousExecution` mode as it is very limiting
-  /// (e.g. does not support running multiple device functions).
+  /// This property is non-empty only when the tensor computation is on-going.
   private var pthreads: [pthread_t] = []
 
   /// The data structure to pass into pthread creation API.
@@ -1432,52 +1414,43 @@ public final class _TensorComputation {
 
     debugLog("Starting TF graph execution.")
 
-    // If it's asynchronous, we execute the tensor computation via threads.
-    if !_RuntimeConfig.usesSynchronousExecution {
-      let threadCount = helperFunctionCount + 1
-      for threadIndex in 0..<threadCount {
-        // The function to launch in the parallel thread.
+    let threadCount = helperFunctionCount + 1
+    for threadIndex in 0..<threadCount {
+      // The function to launch in the parallel thread.
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-        typealias ThreadBody = @convention(c)
-          (UnsafeMutableRawPointer) -> UnsafeMutableRawPointer?
+      typealias ThreadBody = @convention(c)
+        (UnsafeMutableRawPointer) -> UnsafeMutableRawPointer?
 #else
-        typealias ThreadBody = @convention(c)
-          (UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer?
+      typealias ThreadBody = @convention(c)
+        (UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer?
 #endif
-        let body: ThreadBody = { arg in
-          // Set the cancelability of the detached thread.
-          pthread_setcanceltype(Int32(PTHREAD_CANCEL_DEFERRED), nil)
-          // Execute the tensor computation.
+      let body: ThreadBody = { arg in
+        // Set the cancelability of the detached thread.
+        pthread_setcanceltype(Int32(PTHREAD_CANCEL_DEFERRED), nil)
+        // Execute the tensor computation.
 #if !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS))
-          let arg = arg!
+        let arg = arg!
 #endif
-          let param: ThreadParam =
-            Unmanaged.fromOpaque(arg).takeRetainedValue()
-          param.computation.execute(threadIndex: param.threadIndex)
-          checkOk(param.computation.status)
-          return nil
-        }
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-        var newThread: pthread_t!
-#else
-        var newThread = pthread_t()
-#endif
-        let creationStatus = pthread_create(
-          &newThread, nil, body,
-          Unmanaged.passRetained(
-            ThreadParam(computation: self,
-                        threadIndex: threadIndex)).toOpaque()
-        )
-        // TODO(hongm): do error handling.
-        internalConsistencyCheck(creationStatus == 0)
-        pthreads.append(newThread)
+        let param: ThreadParam =
+          Unmanaged.fromOpaque(arg).takeRetainedValue()
+        param.computation.execute(threadIndex: param.threadIndex)
+        checkOk(param.computation.status)
+        return nil
       }
-    }
-    // If it's synchronous, we call execute() on the main thread directly.
-    else {
-      // Log a debug message to differentiate from async computation.
-      debugLog("Running tensor computation synchronously.")
-      execute(threadIndex: 0)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+      var newThread: pthread_t!
+#else
+      var newThread = pthread_t()
+#endif
+      let creationStatus = pthread_create(
+        &newThread, nil, body,
+        Unmanaged.passRetained(
+          ThreadParam(computation: self,
+                      threadIndex: threadIndex)).toOpaque()
+      )
+      // TODO(hongm): do error handling.
+      internalConsistencyCheck(creationStatus == 0)
+      pthreads.append(newThread)
     }
     debugLog("Exiting _TensorComputation.init().")
   }
@@ -1534,8 +1507,7 @@ public extension _TensorComputation {
   func finish() -> [CTensorHandle] {
     debugLog("Calling _TensorComputation.finish().")
     if pthreads.isEmpty {
-      internalConsistencyCheck(
-        _RuntimeConfig.usesSynchronousExecution, """
+      fatalError("""
           finish() is called in async execution mode with pthread == nil -- \
           Was finish() already called?
           """)
