@@ -510,12 +510,12 @@ public func %=(lhs: inout CGFloat, rhs: CGFloat) {
 }
 
 //===----------------------------------------------------------------------===//
-// Real conformance
+// RealProtocol conformance
 //===----------------------------------------------------------------------===//
 
 %from SwiftMathFunctions import *
 
-extension CGFloat: ElementaryFunctions {
+extension CGFloat: Real {
 % for func in ElementaryFunctions + RealFunctions:
 
   @_alwaysEmitIntoClient
