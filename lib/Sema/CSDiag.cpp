@@ -867,9 +867,8 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
   if (constraint->getKind() == ConstraintKind::Disjunction) {
     for (auto elt : constraint->getNestedConstraints()) {
       if (elt->getKind() != ConstraintKind::BindOverload) continue;
-      if (!elt->getOverloadChoice().isDecl()) continue;
-      auto candidate = elt->getOverloadChoice().getDecl();
-      diagnose(candidate, diag::found_candidate);
+      if (auto *candidate = elt->getOverloadChoice().getDeclOrNull())
+        diagnose(candidate, diag::found_candidate);
     }
   }
 
@@ -4663,7 +4662,11 @@ static bool isViableOverloadSet(const CalleeCandidateInfo &CCI,
   for (unsigned i = 0; i < CCI.size(); ++i) {
     auto &&cand = CCI[i];
     auto funcDecl = dyn_cast_or_null<AbstractFunctionDecl>(cand.getDecl());
-    if (!funcDecl)
+
+    // If we don't have a func decl or we haven't resolved its parameters,
+    // continue. The latter case can occur with `type(of:)`, which is introduced
+    // as a type variable.
+    if (!funcDecl || !cand.hasParameters())
       continue;
 
     auto params = cand.getParameters();
