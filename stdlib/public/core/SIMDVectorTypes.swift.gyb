@@ -205,7 +205,8 @@ extension SIMD${n} : Differentiable where Scalar : Differentiable & BinaryFloati
 extension SIMD${n}
   where Scalar : Differentiable & BinaryFloatingPoint,
         Scalar.TangentVector : BinaryFloatingPoint {
-  public func _vjpSubscript(index: Int)
+  @usableFromInline
+  internal func _vjpSubscript(index: Int)
   -> (Scalar, (Scalar.TangentVector) -> TangentVector) {
     return (self[index], { v in
       var zeros = Self.zero
