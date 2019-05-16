@@ -1474,6 +1474,7 @@ where T: SIMD, T.Scalar: FloatingPoint {
   return result
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 extension SIMD
   where Self: Differentiable,
         TangentVector: SIMD,

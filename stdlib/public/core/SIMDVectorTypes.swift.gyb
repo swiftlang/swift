@@ -44,6 +44,8 @@ public struct SIMD${n}<Scalar>: SIMD where Scalar: SIMDScalar {
     _storage = Scalar.SIMD${storageN}Storage()
   }
 
+  /// Accesses the scalar at the specified position.
+  // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpSubscript
     where Scalar : Differentiable & BinaryFloatingPoint,
           Scalar.TangentVector : BinaryFloatingPoint)
@@ -187,6 +189,7 @@ extension SIMD${n} where Scalar: BinaryFloatingPoint {
   }
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 extension SIMD${n} : AdditiveArithmetic where Scalar : FloatingPoint {}
 
 extension SIMD${n} : VectorNumeric where Scalar : FloatingPoint {}
