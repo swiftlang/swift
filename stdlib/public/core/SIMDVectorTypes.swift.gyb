@@ -44,7 +44,9 @@ public struct SIMD${n}<Scalar>: SIMD where Scalar: SIMDScalar {
     _storage = Scalar.SIMD${storageN}Storage()
   }
 
-  /// Accesses the scalar at the specified position.
+  @differentiable(vjp: _vjpSubscript
+    where Scalar : Differentiable & BinaryFloatingPoint,
+          Scalar.CotangentVector : BinaryFloatingPoint)
   public subscript(index: Int) -> Scalar {
     @_transparent get {
       _precondition(indices.contains(index))
@@ -189,12 +191,27 @@ extension SIMD${n} : AdditiveArithmetic where Scalar : FloatingPoint {}
 
 extension SIMD${n} : VectorNumeric where Scalar : FloatingPoint {}
 
-extension SIMD${n} : Differentiable where Scalar : Differentiable & FloatingPoint {
+extension SIMD${n} : Differentiable where Scalar : Differentiable & BinaryFloatingPoint {
   public typealias TangentVector = SIMD${n}
   public typealias CotangentVector = SIMD${n}
   public typealias AllDifferentiableVariables = SIMD${n}
   public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
     return cotangent
+  }
+}
+
+extension SIMD${n}
+  where Scalar : Differentiable & BinaryFloatingPoint,
+        Scalar.CotangentVector : BinaryFloatingPoint {
+  public func _vjpSubscript(index: Int) ->
+  (Scalar, (Scalar.CotangentVector) -> CotangentVector)
+  {
+    return (self[index], { (v: Scalar.CotangentVector) in
+      var zeros = Self.zero
+      zeros[index] = Scalar(v)
+      return zeros
+    }
+    )
   }
 }
 
