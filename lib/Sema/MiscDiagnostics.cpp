@@ -71,14 +71,12 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     /// Keep track of the arguments to CallExprs.
     SmallPtrSet<Expr *, 2> CallArgs;
 
-    /// Keep track of function call
-    ApplyExpr *applyExpr;
-
     bool IsExprStmt;
 
   public:
     TypeChecker &TC;
     const DeclContext *DC;
+    CallExpr *funcCallExpr = nullptr;
 
     DiagnoseWalker(TypeChecker &TC, const DeclContext *DC, bool isExprStmt)
       : IsExprStmt(isExprStmt), TC(TC), DC(DC) {}
@@ -137,10 +135,13 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         }
       }
 
+      if (cast_or_null<CallExpr>(E)) {
+        funcCallExpr = cast<CallExpr>(E);
+      }
+
       // Check function calls, looking through implicit conversions on the
       // function and inspecting the arguments directly.
       if (auto *Call = dyn_cast<ApplyExpr>(E)) {
-        applyExpr = Call;
         // Record call arguments.
         CallArgs.insert(Call->getArg());
 
@@ -251,7 +252,14 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // Diagnose tuple expressions with duplicate element label
       if (auto *tupleExpr = dyn_cast<TupleExpr>(E)) {
-        if (!applyExpr) {
+        // FIXME: Duplicate labels on enum payloads should be diagnosed
+        // when declared, not when called.
+        bool isEnumCase = funcCallExpr
+                              ? cast_or_null<EnumElementDecl>(
+                                    funcCallExpr->getCalledValue()) != nullptr
+                              : false;
+
+        if (!funcCallExpr || isEnumCase) {
           auto diagnose = false;
 
           llvm::SmallDenseSet<Identifier> names;
