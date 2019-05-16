@@ -337,8 +337,7 @@ void printEnumElementsAsCases(
     llvm::DenseSet<EnumElementDecl *> &UnhandledElements,
     llvm::raw_ostream &OS);
 
-void getInheritedForPrinting(const Decl *decl,
-                             llvm::function_ref<bool(const Decl*)> shouldPrint,
+void getInheritedForPrinting(const Decl *decl, const PrintOptions &options,
                              llvm::SmallVectorImpl<TypeLoc> &Results);
 
 } // namespace swift

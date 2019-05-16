@@ -547,7 +547,7 @@ static void reportRelated(ASTContext &Ctx, const Decl *D,
     passInheritsAndConformancesForValueDecl(TAD, Consumer);
   } else if (const auto *TD = dyn_cast<TypeDecl>(D)) {
     llvm::SmallVector<TypeLoc, 4> AllInherits;
-    getInheritedForPrinting(TD, [](const Decl* d) { return true; }, AllInherits);
+    getInheritedForPrinting(TD, PrintOptions(), AllInherits);
     passInherits(AllInherits, Consumer);
     passConforms(TD->getSatisfiedProtocolRequirements(/*Sorted=*/true),
                  Consumer);
