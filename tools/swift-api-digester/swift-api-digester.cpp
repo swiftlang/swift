@@ -1942,10 +1942,9 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     return;
   }
   case NodeAnnotation::Rename: {
-    auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
     Node->emitDiag(diag::renamed_decl,
-        Ctx.buffer((Twine(getDeclKindStr(Count->getDeclKind())) + " " +
-          Count->getFullyQualifiedName()).str()));
+        Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind())) + " " +
+          Node->getAnnotateComment(NodeAnnotation::RenameNewName)).str()));
     return;
   }
   default:
