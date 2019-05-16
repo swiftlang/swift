@@ -52,7 +52,7 @@ public struct B2: PublicBaseProto, PrivateSubProto {}
 // CHECK-END: extension conformances.B3 : conformances.PublicBaseProto {}
 public struct B3: PublicBaseProto & PrivateSubProto {}
 // CHECK: public struct B4 : PublicBaseProto {
-// CHECK: extension B4 {
+// NEGATIVE-NOT: extension B4 {
 // NEGATIVE-NOT: extension conformances.B4
 public struct B4: PublicBaseProto {}
 extension B4: PrivateSubProto {}
@@ -62,7 +62,7 @@ extension B4: PrivateSubProto {}
 public struct B5: PrivateSubProto {}
 extension B5: PublicBaseProto {}
 // CHECK: public struct B6 {
-// CHECK: extension B6 {
+// NEGATIVE-NOT: extension B6 {
 // CHECK: extension B6 : PublicBaseProto {
 // NEGATIVE-NOT: extension conformances.B6
 public struct B6 {}
@@ -70,7 +70,7 @@ extension B6: PrivateSubProto {}
 extension B6: PublicBaseProto {}
 // CHECK: public struct B7 {
 // CHECK: extension B7 : PublicBaseProto {
-// CHECK: extension B7 {
+// NEGATIVE-NOT: extension B7 {
 // NEGATIVE-NOT: extension conformances.B7
 public struct B7 {}
 extension B7: PublicBaseProto {}
@@ -107,7 +107,7 @@ public struct C1: PrivateSubProto, AnotherPrivateSubProto {}
 // CHECK-END: extension conformances.C2 : conformances.PublicBaseProto {}
 public struct C2: PrivateSubProto & AnotherPrivateSubProto {}
 // CHECK: public struct C3 {
-// CHECK: extension C3 {
+// NEGATIVE-NOT: extension C3 {
 // CHECK-END: extension conformances.C3 : conformances.PublicBaseProto {}
 public struct C3: PrivateSubProto {}
 extension C3: AnotherPrivateSubProto {}
@@ -135,7 +135,7 @@ public struct D4: APublicSubProto & PrivateSubProto {}
 public struct D5: PrivateSubProto {}
 extension D5: PublicSubProto {}
 // CHECK: public struct D6 : PublicSubProto {
-// CHECK: extension D6 {
+// NEGATIVE-NOT: extension D6 {
 // NEGATIVE-NOT: extension conformances.D6
 public struct D6: PublicSubProto {}
 extension D6: PrivateSubProto {}
@@ -211,6 +211,18 @@ extension VeryNewMacProto: PrivateSubProto {}
 // CHECK: public struct VeryNewMacProto {
 // CHECK-END: @available(OSX, introduced: 10.98)
 // CHECK-END-NEXT: extension conformances.VeryNewMacProto : conformances.PublicBaseProto {}
+
+public struct PrivateProtoConformer {}
+extension PrivateProtoConformer : PrivateProto {
+  public var member: Int { return 0 }
+}
+// CHECK: public struct PrivateProtoConformer {
+// CHECK: extension PrivateProtoConformer {
+// CHECK-NEXT: public var member: Int {
+// CHECK-NEXT:   get
+// CHECK-NEXT: }
+// CHECK-NEXT: {{^}$}}
+// NEGATIVE-NOT: extension conformances.PrivateProtoConformer
 
 // NEGATIVE-NOT: extension {{(Swift.)?}}Bool{{.+}}Hashable
 // NEGATIVE-NOT: extension {{(Swift.)?}}Bool{{.+}}Equatable
