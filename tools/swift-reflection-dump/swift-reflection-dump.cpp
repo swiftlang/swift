@@ -26,6 +26,7 @@
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Object/MachOUniversal.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Error.h"
 
 #if defined(_WIN32)
 #include <io.h>
@@ -137,11 +138,11 @@ public:
     for (SectionRef S : O->sections()) {
       if (!needToRelocate(S))
         continue;
-      StringRef Content;
-      if (auto EC = S.getContents(Content))
-        reportError(EC);
-      std::memcpy(&Memory[getSectionAddress(S)], Content.data(),
-                  Content.size());
+      llvm::Expected<llvm::StringRef> Content = S.getContents();
+      if (!Content)
+        reportError(errorToErrorCode(Content.takeError()));
+      std::memcpy(&Memory[getSectionAddress(S)], Content->data(),
+                  Content->size());
     }
   }
 

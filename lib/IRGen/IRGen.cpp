@@ -385,26 +385,28 @@ static bool needsRecompile(StringRef OutputFilename, ArrayRef<uint8_t> HashData,
     StringRef SectionName;
     Section.getName(SectionName);
     if (SectionName == HashSectionName) {
-      StringRef SectionData;
-      Section.getContents(SectionData);
+      llvm::Expected<llvm::StringRef> SectionData = Section.getContents();
+      if (!SectionData) {
+        return true;
+      }
       ArrayRef<uint8_t> PrevHashData(
-          reinterpret_cast<const uint8_t *>(SectionData.data()),
-          SectionData.size());
+          reinterpret_cast<const uint8_t *>(SectionData->data()),
+          SectionData->size());
       LLVM_DEBUG(if (PrevHashData.size() == sizeof(MD5::MD5Result)) {
-        if (DiagMutex) DiagMutex->lock();
+        if (DiagMutex)
+          DiagMutex->lock();
         SmallString<32> HashStr;
         MD5::stringifyResult(
             *reinterpret_cast<MD5::MD5Result *>(
                 const_cast<unsigned char *>(PrevHashData.data())),
             HashStr);
-        llvm::dbgs() << OutputFilename << ": prev MD5=" << HashStr <<
-          (HashData == PrevHashData ? " skipping\n" : " recompiling\n");
-        if (DiagMutex) DiagMutex->unlock();
+        llvm::dbgs() << OutputFilename << ": prev MD5=" << HashStr
+                     << (HashData == PrevHashData ? " skipping\n"
+                                                  : " recompiling\n");
+        if (DiagMutex)
+          DiagMutex->unlock();
       });
-      if (HashData == PrevHashData)
-        return false;
-
-      return true;
+      return HashData != PrevHashData;
     }
   }
   return true;
