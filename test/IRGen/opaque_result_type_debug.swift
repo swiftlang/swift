@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -g -emit-ir -enable-anonymous-context-mangled-names %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-availability-checking -g -emit-ir -enable-anonymous-context-mangled-names %s | %FileCheck %s
 
 public protocol P {}
 extension Int: P {} 
