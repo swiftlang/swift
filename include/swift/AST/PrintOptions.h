@@ -505,10 +505,10 @@ struct PrintOptions {
 
   void clearSynthesizedExtension();
 
-  bool shouldPrint(const Decl* D) {
+  bool shouldPrint(const Decl* D) const {
     return CurrentPrintabilityChecker->shouldPrint(D, *this);
   }
-  bool shouldPrint(const Pattern* P) {
+  bool shouldPrint(const Pattern* P) const {
     return CurrentPrintabilityChecker->shouldPrint(P, *this);
   }
 
