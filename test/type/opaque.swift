@@ -349,3 +349,19 @@ func closure() -> some P {
   }
   return 42
 }
+
+protocol HasAssocType {
+  associatedtype Assoc
+
+  func assoc() -> Assoc
+}
+
+struct GenericWithOpaqueAssoc<T>: HasAssocType {
+  func assoc() -> some Any { return 0 }
+}
+
+struct OtherGeneric<X, Y, Z> {
+  var x: GenericWithOpaqueAssoc<X>.Assoc
+  var y: GenericWithOpaqueAssoc<Y>.Assoc
+  var z: GenericWithOpaqueAssoc<Z>.Assoc
+}
