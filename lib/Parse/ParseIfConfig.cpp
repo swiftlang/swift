@@ -17,6 +17,7 @@
 #include "swift/Parse/Parser.h"
 
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Version.h"
@@ -641,6 +642,7 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     } else if (SyntaxContext->isEnabled()) {
       // We shouldn't skip code if we are building syntax tree.
       // The parser will keep running and we just discard the AST part.
+      DiagnosticSuppression suppression(Context.Diags);
       SmallVector<ASTNode, 16> dropedElements;
       parseElements(dropedElements, false);
     } else {
