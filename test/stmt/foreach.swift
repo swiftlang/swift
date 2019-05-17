@@ -61,7 +61,7 @@ func patterns(gir: GoodRange<Int>, gtr: GoodTupleIterator) {
   for i : Int in gir { sum = sum + i }
   for i in gir { sum = sum + i }
   for f : Float in gir { sum = sum + f } // expected-error{{cannot convert sequence element type 'Int' to expected type 'Float'}}
-  for f : ElementProtocol in gir { } // expected-error {{sequence element type 'Int' does not conform to expected type 'ElementProtocol'}}
+  for f : ElementProtocol in gir { } // expected-error {{sequence element type 'Int' does not conform to expected protocol 'ElementProtocol'}}
 
   for (i, f) : (Int, Float) in gtr { sum = sum + i }
 

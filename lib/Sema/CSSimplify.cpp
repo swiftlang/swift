@@ -2192,6 +2192,11 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::SequenceElementType: {
+    // This is going to be diagnosed as `missing conformance`,
+    // so no need to create duplicate fixes.
+    if (rhs->isExistentialType())
+      break;
+
     conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
     break;
