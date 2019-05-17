@@ -7228,7 +7228,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   auto selected = solution.getOverloadChoice(cs.getConstraintLocator(loc));
   auto choice = selected.choice;
   auto *callMethod = dyn_cast<FuncDecl>(selected.choice.getDecl());
-  if (callMethod && callMethod->isCallable()) {
+  if (callMethod && callMethod->isCallFunction()) {
     auto methodType =
         simplifyType(selected.openedType)->castTo<AnyFunctionType>();
     auto selfParam = callMethod->getImplicitSelfDecl();

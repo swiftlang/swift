@@ -4804,7 +4804,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     auto hasCallMethods = nominal &&
       llvm::any_of(nominal->getMembers(), [](Decl *member) {
           auto funcDecl = dyn_cast<FuncDecl>(member);
-          return funcDecl && funcDecl->isCallable();
+          return funcDecl && funcDecl->isCallFunction();
         });
 
     // Diagnose @dynamicCallable errors.

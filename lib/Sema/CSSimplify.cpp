@@ -5794,7 +5794,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     // Get all call methods of the nominal type.
     // TODO: Consider caching?
     SmallVector<FuncDecl *, 4> callMethods;
-    auto candidates = lookupMember(desugar2, DeclName(ctx.Id_call));
+    auto candidates = lookupMember(desugar2, DeclName(ctx.Id_callFunction));
     for (auto entry : candidates) {
       auto callMethod = dyn_cast<FuncDecl>(entry.getValueDecl());
       if (!callMethod)
