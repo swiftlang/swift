@@ -20,7 +20,6 @@ struct S : Proto, VectorNumeric {
   static func * (lhs: Float, rhs: S) -> S { return S(p: lhs * rhs.p) }
 
   typealias TangentVector = S
-  typealias CotangentVector = S
 
   @differentiable(wrt: (self), vjp: vjpP)
   let p: Float

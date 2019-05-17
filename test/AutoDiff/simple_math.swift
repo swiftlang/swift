@@ -185,7 +185,7 @@ SimpleMathTests.test("StructMemberwiseInitializer") {
   let 𝛁foo = pullback(at: Float(4), in: { input -> Foo in
     let foo = Foo(stored: input)
     return foo + foo
-  })(Foo.CotangentVector(stored: 1))
+  })(Foo.TangentVector(stored: 1))
   expectEqual(2, 𝛁foo)
 
   let 𝛁computed = gradient(at: Float(4)) { input -> Float in
@@ -214,7 +214,7 @@ SimpleMathTests.test("StructMemberwiseInitializer") {
   let 𝛁custom = pullback(at: Float(4), in: { input -> Custom in
     let foo = Custom(x: input)
     return foo + foo
-  })(Custom.CotangentVector(x: 1))
+  })(Custom.TangentVector(x: 1))
   expectEqual(2, 𝛁custom)
 }
 
@@ -238,7 +238,7 @@ SimpleMathTests.test("StructConstantStoredProperty") {
     let model = TF_319(x: 10)
     return model.applied(to: input)
   }
-  expectEqual(TF_319.CotangentVector(x: 6),
+  expectEqual(TF_319.TangentVector(x: 6),
               gradient(at: TF_319(x: 10), in: { $0.applied(to: 3) }))
   expectEqual(20, gradient(at: 3, in: testStructInit))
 }
@@ -282,7 +282,8 @@ SimpleMathTests.test("StructSideEffects") {
     }
   }
   let model = Add(bias: 1)
-  expectEqual(Add.CotangentVector(bias: 1), gradient(at: model) { m in m.applied(to: 1) })
+  expectEqual(Add.TangentVector(bias: 1),
+              gradient(at: model) { m in m.applied(to: 1) })
 }
 
 SimpleMathTests.test("StructGeneric") {
@@ -295,7 +296,7 @@ SimpleMathTests.test("StructGeneric") {
   let 𝛁generic = pullback(at: Float(3), in: { input -> Generic<Float> in
     var generic = Generic(x: input, y: input, z: input)
     return generic
-  })(Generic<Float>.CotangentVector(x: 1, y: 1, z: 1))
+  })(Generic<Float>.TangentVector(x: 1, y: 1, z: 1))
   expectEqual(3, 𝛁generic)
 
   func fifthPower(_ input: Float) -> Float {

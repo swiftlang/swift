@@ -28,8 +28,8 @@ DerivedConformanceTests.test("MemberwiseInitializers") {
   }
   expectEqual(HasNoDerivativeConstant.AllDifferentiableVariables(x: 0),
               HasNoDerivativeConstant.AllDifferentiableVariables.zero)
-  expectEqual(HasNoDerivativeConstant.CotangentVector(x: 0),
-              HasNoDerivativeConstant.CotangentVector.zero)
+  expectEqual(HasNoDerivativeConstant.TangentVector(x: 0),
+              HasNoDerivativeConstant.TangentVector.zero)
 }
 
 runAllTests()

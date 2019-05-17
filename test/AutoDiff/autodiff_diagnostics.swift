@@ -36,7 +36,6 @@ extension S : Differentiable, VectorNumeric {
   static func * (lhs: Float, rhs: S) -> S { return S(p: lhs * rhs.p) }
 
   typealias TangentVector = S
-  typealias CotangentVector = S
 }
 
 // expected-error @+2 {{function is not differentiable}}
