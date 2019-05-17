@@ -22,4 +22,7 @@ class { // expected-error {{unknown declaration syntax exists in the source}}
 
 #if swift(<1)
 print("Wat")
+class { // expected-error {{unknown declaration syntax exists in the source}}
+
+}
 #endif
