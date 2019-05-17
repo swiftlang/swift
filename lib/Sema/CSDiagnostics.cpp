@@ -2829,6 +2829,11 @@ bool MissingContextualConformanceFailure::diagnoseAsError() {
       diagnostic = getDiagnosticFor(Context);
       break;
 
+    case ConstraintLocator::SequenceElementType: {
+      diagnostic = diag::cannot_convert_sequence_element_protocol;
+      break;
+    }
+
     default:
       break;
     }
