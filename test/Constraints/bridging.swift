@@ -349,7 +349,7 @@ func forceUniversalBridgeToAnyObject<T, U: KnownClassProtocol>(a: T, b: U, c: An
 
   z = a // expected-error{{does not conform to 'AnyObject'}}
   z = b
-  z = c // expected-error{{does not conform to 'AnyObject'}} expected-note {{cast 'Any' to 'AnyObject'}} {{8-8= as AnyObject}}
+  z = c // expected-error{{does not conform to 'AnyObject'}}
   z = d // expected-error{{does not conform to 'AnyObject'}}
   z = e
   z = f
