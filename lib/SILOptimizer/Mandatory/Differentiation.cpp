@@ -292,26 +292,20 @@ namespace {
 class ADContext;
 
 /// The invoker of a differentiation task. It can be some user syntax, e.g.
-/// `AutoDiffFunctionExpr` expression, the differentiation pass, or nothing at
-/// all. This will be used to emit informative diagnostics.
+/// an `autodiff_function` instruction lowered from an `AutoDiffFunctionExpr`
+/// expression, the differentiation pass, or nothing at all. This will be used
+/// to emit informative diagnostics.
 struct DifferentiationInvoker {
 public:
   /// The kind of the invoker of a differentiation task.
   enum class Kind {
-    // No known invoker. This is the case when the differentiation is requested
-    // from SIL source via a `autodiff_function` instruction **without** being
-    // linked to a Swift AST node.
+    // Invoked by an `autodiff_function` instruction, which may or may not be
+    // linked to a Swift AST node (e.g. an `AutoDiffFunctionExpr` expression).
     AutoDiffFunctionInst,
 
     // Invoked by the indirect application of differentiation. This case has an
     // associated original `apply` instruction and `[differentiable]` attribute.
     IndirectDifferentiation,
-
-    // Invoked by function conversion from a non-differentiable function to a
-    // differentiable one. The corresponding AST node is an
-    // `AutoDiffFunctionExpr`.
-    // TODO(TF-505): Remove this case and merge into `AutoDiffFunctionInst`.
-    FunctionConversion,
 
     // Invoker by a `[differentiable]` attribute in SIL **without** being linked
     // to a Swift AST attribute. This case has an associated `[differentiable]`
@@ -333,10 +327,6 @@ private:
     Value(ApplyInst *applyInst, SILDifferentiableAttr *attr)
         : indirectDifferentiation({applyInst, attr}) {}
 
-    /// The conversion expression associated with the `FunctionConversion` case.
-    AutoDiffFunctionExpr *functionConversion;
-    Value(AutoDiffFunctionExpr *expr) : functionConversion(expr) {}
-
     /// The `[differentiable]` attribute associated with the
     /// `SILDifferentiableAttribute` case.
     SILDifferentiableAttr *silDifferentiableAttribute;
@@ -352,8 +342,6 @@ public:
   DifferentiationInvoker(ApplyInst *applyInst, SILDifferentiableAttr *attr)
       : kind(Kind::IndirectDifferentiation),
         value({applyInst, attr}) {}
-  DifferentiationInvoker(AutoDiffFunctionExpr *expr)
-      : kind(Kind::FunctionConversion), value(expr) {}
   DifferentiationInvoker(SILDifferentiableAttr *attr)
       : kind(Kind::SILDifferentiableAttribute), value(attr) {}
 
@@ -370,10 +358,6 @@ public:
     return value.indirectDifferentiation;
   }
 
-  AutoDiffFunctionExpr *getFunctionConversion() const {
-    assert(kind == Kind::FunctionConversion);
-    return value.functionConversion;
-  }
 
   SILDifferentiableAttr *getSILDifferentiableAttribute() const {
     assert(kind == Kind::SILDifferentiableAttribute);
@@ -386,8 +370,6 @@ public:
       return getAutoDiffFunctionInst()->getLoc().getSourceLoc();
     case Kind::IndirectDifferentiation:
       return getIndirectDifferentiation().first->getLoc().getSourceLoc();
-    case Kind::FunctionConversion:
-      return getFunctionConversion()->getLoc();
     case Kind::SILDifferentiableAttribute:
       return getSILDifferentiableAttribute()->getOriginal()
           ->getLocation().getSourceLoc();
@@ -527,14 +509,6 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
     auto invokerLookup = invokers.find(attr); // No access to ADContext?
     assert(invokerLookup != invokers.end() && "Expected parent invoker");
     */
-    break;
-  }
-  case Kind::FunctionConversion: {
-    StreamPrinter printer(os);
-    PrintOptions options;
-    os << "differential_operator=(";
-    getFunctionConversion()->print(printer, options);
-    os << ')';
     break;
   }
   case Kind::SILDifferentiableAttribute: {
@@ -1051,16 +1025,6 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
     emitNondifferentiabilityError(inst, invokerLookup->second, None);
     return diagnose(loc,
         diag.getValueOr(diag::autodiff_when_differentiating_function_call));
-  }
-
-  // For a function conversion, emit a "not differentiable" error on the
-  // attribute first and a note on the non-differentiable operation.
-  case DifferentiationInvoker::Kind::FunctionConversion: {
-    auto *expr = invoker.getFunctionConversion();
-    diagnose(expr->getLoc(), diag::autodiff_function_not_differentiable_error)
-        .highlight(expr->getSubExpr()->getSourceRange());
-    return diagnose(loc,
-        diag.getValueOr(diag::autodiff_expression_not_differentiable_note));
   }
   }
 }
@@ -6021,14 +5985,8 @@ bool ADContext::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
   auto loc = parent->getLocation();
   SILBuilder builder(adfi);
 
-  auto getInvoker = [&](AutoDiffFunctionInst *inst) -> DifferentiationInvoker {
-    if (auto *expr = findDifferentialOperator(inst))
-      return expr;
-    return inst;
-  };
-  auto invoker = getInvoker(adfi);
   auto differentiableFnValue =
-      promoteToDifferentiableFunction(adfi, builder, loc, invoker);
+      promoteToDifferentiableFunction(adfi, builder, loc, adfi);
   if (!differentiableFnValue)
     return true;
   // Delete all worklist occurrences of `adfi` by setting them to nullptr.
