@@ -35,7 +35,7 @@ extension Tensor where Scalar : Differentiable & FloatingPoint {
   func foo(_ x: Scalar) -> Scalar {
     return x
   }
-  func vjpFoo(_ x: Scalar) -> (Scalar, (Scalar.CotangentVector) -> Scalar.CotangentVector) {
+  func vjpFoo(_ x: Scalar) -> (Scalar, (Scalar.TangentVector) -> Scalar.TangentVector) {
     return (x, { v in v })
   }
 }
@@ -163,7 +163,7 @@ TensorADTests.testAllBackends("GenericLayerMembers") {
       rhs.applied(to: lhs.applied(to: input))
     }(seed)
     let 𝛁combined = pullback(at: combined) { $0.applied(to: input) }(seed)
-    expectEqual(Sequential.CotangentVector(lhs: 𝛁lhs, rhs: 𝛁rhs), 𝛁combined)
+    expectEqual(Sequential.TangentVector(lhs: 𝛁lhs, rhs: 𝛁rhs), 𝛁combined)
   }
   testFixedInput()
 
@@ -178,7 +178,7 @@ TensorADTests.testAllBackends("GenericLayerMembers") {
       rhs.applied(to: lhs.applied(to: input))
     }(seed)
     let 𝛁combined = pullback(at: combined) { $0.applied(to: input) }(seed)
-    expectEqual(Sequential.CotangentVector(lhs: 𝛁lhs, rhs: 𝛁rhs), 𝛁combined)
+    expectEqual(Sequential.TangentVector(lhs: 𝛁lhs, rhs: 𝛁rhs), 𝛁combined)
   }
   testWrtInput(Tensor(randomUniform: [2, 3]))
 }
@@ -203,7 +203,7 @@ TensorADTests.testAllBackends("GenericWrapperLayer") {
 
   let 𝛁wrapper = pullback(at: wrapper) { $0.applied(to: input) }(seed)
   let 𝛁dense = pullback(at: dense) { $0.applied(to: input) }(seed)
-  expectEqual(Wrapper.CotangentVector(layer: 𝛁dense), 𝛁wrapper)
+  expectEqual(Wrapper.TangentVector(layer: 𝛁dense), 𝛁wrapper)
 }
 
 runAllTests()

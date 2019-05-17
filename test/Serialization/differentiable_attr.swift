@@ -7,58 +7,51 @@
 
 // BCANALYZER-NOT: UnknownCode
 
-@differentiable(jvp: jvpSimpleJVP)
-func jvpSimple(x: Float) -> Float {
+// CHECK: @differentiable(wrt: x, jvp: jvpSimple, vjp: vjpSimple)
+// CHECK-NEXT: func simple(x: Float) -> Float
+@differentiable(jvp: jvpSimple, vjp: vjpSimple)
+func simple(x: Float) -> Float {
   return x
 }
 
-// CHECK-DAG: @differentiable(wrt: x, jvp: jvpSimpleJVP)
-// CHECK-DAG: func jvpSimpleJVP(x: Float) -> (Float, (Float) -> Float)
-func jvpSimpleJVP(x: Float) -> (Float, (Float) -> Float) {
+func jvpSimple(x: Float) -> (Float, (Float) -> Float) {
   return (x, { v in v })
 }
 
-@differentiable(vjp: vjpSimpleVJP)
-func vjpSimple(x: Float) -> Float {
-  return x
-}
-
-// CHECK-DAG: @differentiable(wrt: x, vjp: vjpSimpleVJP)
-// CHECK-DAG: func vjpSimpleVJP(x: Float) -> (Float, (Float) -> Float)
-func vjpSimpleVJP(x: Float) -> (Float, (Float) -> Float) {
+func vjpSimple(x: Float) -> (Float, (Float) -> Float) {
   return (x, { v in v })
 }
 
-// CHECK-DAG: @differentiable(wrt: x)
-// CHECK-DAG: func testWrtClause(x: Float, y: Float) -> Float
+// CHECK: @differentiable(wrt: x)
+// CHECK-NEXT: func testWrtClause(x: Float, y: Float) -> Float
 @differentiable(wrt: x)
 func testWrtClause(x: Float, y: Float) -> Float {
   return x + y
 }
 
 struct InstanceMethod : Differentiable {
-  // CHECK-DAG: @differentiable(wrt: (self, y))
-  // CHECK-DAG: func testWrtClause(x: Float, y: Float) -> Float
+  // CHECK: @differentiable(wrt: (self, y))
+  // CHECK-NEXT: func testWrtClause(x: Float, y: Float) -> Float
   @differentiable(wrt: (self, y))
   func testWrtClause(x: Float, y: Float) -> Float {
     return x + y
   }
 }
 
-// CHECK-DAG: @differentiable(wrt: x where T : Differentiable)
-// CHECK-DAG: func testOnlyWhereClause<T>(x: T) -> T where T : Numeric
+// CHECK: @differentiable(wrt: x where T : Differentiable)
+// CHECK-NEXT: func testOnlyWhereClause<T>(x: T) -> T where T : Numeric
 @differentiable(where T : Differentiable)
 func testOnlyWhereClause<T : Numeric>(x: T) -> T {
   return x
 }
 
-// CHECK-DAG: @differentiable(wrt: x, vjp: vjpTestWhereClause where T : Differentiable)
-// CHECK-DAG: func testWhereClause<T>(x: T) -> T where T : Numeric
+// CHECK: @differentiable(wrt: x, vjp: vjpTestWhereClause where T : Differentiable)
+// CHECK-NEXT: func testWhereClause<T>(x: T) -> T where T : Numeric
 @differentiable(vjp: vjpTestWhereClause where T : Differentiable)
 func testWhereClause<T : Numeric>(x: T) -> T {
   return x
 }
-func vjpTestWhereClause<T>(x: T) -> (T, (T.CotangentVector) -> T.CotangentVector)
+func vjpTestWhereClause<T>(x: T) -> (T, (T.TangentVector) -> T.TangentVector)
   where T : Numeric, T : Differentiable
 {
   return (x, { v in v })
@@ -66,41 +59,41 @@ func vjpTestWhereClause<T>(x: T) -> (T, (T.CotangentVector) -> T.CotangentVector
 
 protocol P {}
 extension P {
-  // CHECK-DAG: @differentiable(wrt: self, vjp: vjpTestWhereClause where Self : Differentiable)
-  // CHECK-DAG: func testWhereClause() -> Self
-  @differentiable(wrt: self, vjp: vjpTestWhereClause where Self : Differentiable)
-  func testWhereClause() -> Self {
+  // CHECK: @differentiable(wrt: self, vjp: vjpTestWhereClauseMethod where Self : Differentiable)
+  // CHECK-NEXT: func testWhereClauseMethod() -> Self
+  @differentiable(wrt: self, vjp: vjpTestWhereClauseMethod where Self : Differentiable)
+  func testWhereClauseMethod() -> Self {
     return self
   }
 }
 extension P where Self : Differentiable {
-  func vjpTestWhereClause() -> (Self, (Self.CotangentVector) -> Self.CotangentVector) {
+  func vjpTestWhereClauseMethod() -> (Self, (Self.TangentVector) -> Self.TangentVector) {
     return (self, { v in v })
   }
 }
 
-// CHECK-DAG: @differentiable(wrt: x, vjp: vjpTestWhereClauseMemberTypeConstraint where T : Differentiable, T == T.CotangentVector)
-// CHECK-DAG: func testWhereClauseMemberTypeConstraint<T>(x: T) -> T where T : Numeric
-@differentiable(vjp: vjpTestWhereClauseMemberTypeConstraint where T : Differentiable, T == T.CotangentVector)
-func testWhereClauseMemberTypeConstraint<T : Numeric>(x: T) -> T {
+// CHECK: @differentiable(wrt: x, vjp: vjpTestWhereClauseMethodTypeConstraint where T : Differentiable, T == T.TangentVector)
+// CHECK-NEXT: func testWhereClauseMethodTypeConstraint<T>(x: T) -> T where T : Numeric
+@differentiable(vjp: vjpTestWhereClauseMethodTypeConstraint where T : Differentiable, T == T.TangentVector)
+func testWhereClauseMethodTypeConstraint<T : Numeric>(x: T) -> T {
   return x
 }
-func vjpTestWhereClauseMemberTypeConstraint<T>(x: T) -> (T, (T) -> T)
-  where T : Numeric, T : Differentiable, T == T.CotangentVector
+func vjpTestWhereClauseMethodTypeConstraint<T>(x: T) -> (T, (T) -> T)
+  where T : Numeric, T : Differentiable, T == T.TangentVector
 {
   return (x, { v in v })
 }
 
 extension P {
-  // CHECK-DAG: @differentiable(wrt: self, vjp: vjpTestWhereClauseMemberTypeConstraint where Self : Differentiable, Self == Self.CotangentVector)
-  // CHECK-DAG: func testWhereClauseMemberTypeConstraint() -> Self
-  @differentiable(wrt: self, vjp: vjpTestWhereClauseMemberTypeConstraint where Self.CotangentVector == Self, Self : Differentiable)
-  func testWhereClauseMemberTypeConstraint() -> Self {
+  // CHECK: @differentiable(wrt: self, vjp: vjpTestWhereClauseMethodTypeConstraint where Self : Differentiable, Self == Self.TangentVector)
+  // CHECK-NEXT: func testWhereClauseMethodTypeConstraint() -> Self
+  @differentiable(wrt: self, vjp: vjpTestWhereClauseMethodTypeConstraint where Self.TangentVector == Self, Self : Differentiable)
+  func testWhereClauseMethodTypeConstraint() -> Self {
     return self
   }
 }
-extension P where Self : Differentiable, Self == Self.CotangentVector {
-  func vjpTestWhereClauseMemberTypeConstraint() -> (Self, (Self.CotangentVector) -> Self.CotangentVector) {
+extension P where Self : Differentiable, Self == Self.TangentVector {
+  func vjpTestWhereClauseMethodTypeConstraint() -> (Self, (Self.TangentVector) -> Self.TangentVector) {
     return (self, { v in v })
   }
 }

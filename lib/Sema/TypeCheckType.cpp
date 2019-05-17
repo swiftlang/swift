@@ -2629,8 +2629,7 @@ bool TypeResolver::isDifferentiableType(Type ty) {
     ty = DC->mapTypeIntoContext(ty);
   }
   return ty
-      ->getAutoDiffAssociatedVectorSpace(
-          AutoDiffAssociatedVectorSpaceKind::Tangent,
+      ->getAutoDiffAssociatedTangentSpace(
           LookUpConformanceInModule(DC->getParentModule()))
       .hasValue();
 }

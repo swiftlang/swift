@@ -182,6 +182,16 @@ public:
                                            CanSILFunctionType toType,
                                            CanType dynamicSelfType);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Get or create a thunk for reordering autodiff associated functions with a
+  /// self parameter, so that self appears as:
+  /// - The last parameter in the returned differential.
+  /// - The last result in the returned pullback.
+  SILFunction *getOrCreateAutoDiffAssociatedFunctionReorderingThunk(
+      SILFunction *original, SILAutoDiffIndices &indices,
+      SILFunction *assocFn, AutoDiffAssociatedFunctionKind assocFnKind,
+      IsSerialized_t isSerialized);
+
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.
   bool hasNonTrivialIVars(ClassDecl *cd);

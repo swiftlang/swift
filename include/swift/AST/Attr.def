@@ -418,12 +418,10 @@ DECL_ATTR(differentiating, Differentiating,
 SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
                  OnAccessor | OnFunc | OnConstructor | OnSubscript,
                  /* Not serialized */ 89)
-SIMPLE_DECL_ATTR(TensorFlowGraph, TensorFlowGraph,
-                 OnFunc, 90)
 SIMPLE_DECL_ATTR(_fieldwiseDifferentiable, FieldwiseDifferentiable,
-                 OnNominalType | UserInaccessible, 91)
+                 OnNominalType | UserInaccessible, 90)
 SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
-                 OnVar, 92)
+                 OnVar, 91)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

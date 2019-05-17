@@ -15,6 +15,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/StringMap.h"
 #include <string>
 
 namespace sourcekitd_test {
@@ -110,6 +111,7 @@ struct TestOptions {
   bool isAsyncRequest = false;
   bool timeRequest = false;
   unsigned repeatRequest = 1;
+  llvm::StringMap<std::string> VFSFiles;
   llvm::Optional<bool> CancelOnSubsequentRequest;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
   void printHelp(bool ShowHidden) const;

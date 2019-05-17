@@ -9,15 +9,14 @@ protocol DiffReq : Differentiable {
   func f(_ x: Float) -> Float
 }
 
-extension DiffReq where TangentVector : AdditiveArithmetic, CotangentVector : AdditiveArithmetic {
-  func gradF(at x: Float) -> (Self.CotangentVector, Float) {
+extension DiffReq where TangentVector : AdditiveArithmetic {
+  func gradF(at x: Float) -> (Self.TangentVector, Float) {
     return (valueWithPullback(at: x) { s, x in s.f(x) }).1(1)
   }
 }
 
 struct Quadratic : DiffReq, Equatable {
   typealias TangentVector = Quadratic
-  typealias CotangentVector = Quadratic
 
   @differentiable(wrt: (self), vjp: vjpA)
   let a: Float
@@ -60,6 +59,18 @@ extension Quadratic : VectorNumeric {
   typealias Scalar = Float
   static func * (lhs: Float, rhs: Quadratic) -> Quadratic {
     return Quadratic(lhs * rhs.a, lhs * rhs.b, lhs * rhs.c)
+  }
+}
+
+// Test witness method SIL type computation.
+protocol P : Differentiable {
+  @differentiable(wrt: (x, y))
+  func foo(_ x: Float, _ y: Double) -> Float
+}
+struct S : P {
+  @differentiable(wrt: (x, y))
+  func foo(_ x: Float, _ y: Double) -> Float {
+    return x
   }
 }
 

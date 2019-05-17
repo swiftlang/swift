@@ -147,8 +147,6 @@ llvm::CallingConv::ID irgen::expandCallingConv(IRGenModule &IGM,
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Block:
-  // SWIFT_ENABLE_TENSORFLOW
-  case SILFunctionTypeRepresentation::TensorFlow:
     return llvm::CallingConv::C;
 
   case SILFunctionTypeRepresentation::Method:
@@ -1078,8 +1076,6 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     paramTys.push_back(clangCtx.VoidPtrTy);
     break;
 
-  // SWIFT_ENABLE_TENSORFLOW
-  case SILFunctionTypeRepresentation::TensorFlow:
   case SILFunctionTypeRepresentation::CFunctionPointer:
     // No implicit arguments.
     break;
@@ -1374,8 +1370,6 @@ void SignatureExpansion::expandParameters() {
       case SILFunctionType::Representation::ObjCMethod:
       case SILFunctionType::Representation::Thin:
       case SILFunctionType::Representation::Closure:
-        // SWIFT_ENABLE_TENSORFLOW
-      case SILFunctionType::Representation::TensorFlow:
         return FnType->hasErrorResult();
 
       case SILFunctionType::Representation::Thick:
@@ -1887,8 +1881,6 @@ Callee::Callee(CalleeInfo &&info, const FunctionPointer &fn,
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::CFunctionPointer:
-  // SWIFT_ENABLE_TENSORFLOW
-  case SILFunctionTypeRepresentation::TensorFlow:
     assert(!FirstData && !SecondData);
     break;
   }
@@ -1903,8 +1895,6 @@ llvm::Value *Callee::getSwiftContext() const {
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Closure:
-  // SWIFT_ENABLE_TENSORFLOW
-  case SILFunctionTypeRepresentation::TensorFlow:
     return nullptr;
 
   case SILFunctionTypeRepresentation::WitnessMethod:
@@ -2765,8 +2755,6 @@ void CallEmission::setArgs(Explosion &original, bool isOutlined,
 
   case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::Method:
-  // SWIFT_ENABLE_TENSORFLOW
-  case SILFunctionTypeRepresentation::TensorFlow:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Thick: {
     // Check for value arguments that need to be passed indirectly.

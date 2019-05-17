@@ -20,6 +20,7 @@
 
 #include "ASTContext.h"
 #include "llvm/ADT/SmallBitVector.h"
+#include "swift/Basic/Range.h"
 
 namespace swift {
 
@@ -73,8 +74,10 @@ public:
 };
 
 class AnyFunctionType;
+class AutoDiffIndexSubset;
 class AutoDiffParameterIndicesBuilder;
 class Type;
+enum class SILLinkage : uint8_t;
 
 /// Identifies a subset of a function's parameters.
 ///
@@ -146,14 +149,17 @@ public:
   ///
   ///   functionType = (A, B) -> (C, D) -> R
   ///   if "A", "C", and "D" are in the set,
-  ///   ==> pushes {A, C, D} to `paramTypes`.
+  ///   ==> pushes {A, C, D} to `paramTypes` if `reverseCurryLevels` is false,
+  ///    or pushes {C, D, A} otherwise.
   ///
   ///   functionType = (Self) -> (A, B, C) -> R
   ///   if "Self" and "C" are in the set,
-  ///   ==> pushes {Self, C} to `paramTypes`.
+  ///   ==> pushes {Self, C} to `paramTypes` if `reverseCurryLevels` is false,
+  ///    or pushes {C, Self} otherwise.
   ///
   void getSubsetParameterTypes(AnyFunctionType *functionType,
-                               SmallVectorImpl<Type> &paramTypes) const;
+                               SmallVectorImpl<Type> &paramTypes,
+                               bool reverseCurryLevels = false) const;
 
   /// Returns a bitvector for the SILFunction parameters corresponding to the
   /// parameters in this set. In particular, this explodes tuples. For example,
@@ -173,7 +179,8 @@ public:
   ///   ==> returns 1110
   ///   (because the lowered SIL type is (A, B, C, D) -> R)
   ///
-  llvm::SmallBitVector getLowered(AnyFunctionType *functionType) const;
+  AutoDiffIndexSubset *getLowered(ASTContext &ctx,
+                                  AnyFunctionType *functionType) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
     ID.AddInteger(parameters.size());
@@ -219,6 +226,216 @@ public:
   unsigned size() { return parameters.size(); }
 };
 
+class AutoDiffIndexSubset : public llvm::FoldingSetNode {
+public:
+  typedef uint64_t BitWord;
+
+  static constexpr unsigned bitWordSize = sizeof(BitWord);
+  static constexpr unsigned numBitsPerBitWord = bitWordSize * 8;
+
+  static std::pair<unsigned, unsigned>
+  getBitWordIndexAndOffset(unsigned index) {
+    auto bitWordIndex = index / numBitsPerBitWord;
+    auto bitWordOffset = index % numBitsPerBitWord;
+    return {bitWordIndex, bitWordOffset};
+  }
+
+  static unsigned getNumBitWordsNeededForCapacity(unsigned capacity) {
+    if (capacity == 0) return 0;
+    return capacity / numBitsPerBitWord + 1;
+  }
+  
+private:
+  /// The total capacity of the index subset, which is `1` less than the largest
+  /// index.
+  unsigned capacity;
+  /// The number of bit words in the index subset.
+  unsigned numBitWords;
+
+  BitWord *getBitWordsData() {
+    return reinterpret_cast<BitWord *>(this + 1);
+  }
+
+  const BitWord *getBitWordsData() const {
+    return reinterpret_cast<const BitWord *>(this + 1);
+  }
+
+  ArrayRef<BitWord> getBitWords() const {
+    return {getBitWordsData(), getNumBitWords()};
+  }
+
+  BitWord getBitWord(unsigned i) const {
+    return getBitWordsData()[i];
+  }
+
+  BitWord &getBitWord(unsigned i) {
+    return getBitWordsData()[i];
+  }
+
+  MutableArrayRef<BitWord> getMutableBitWords() {
+    return {const_cast<BitWord *>(getBitWordsData()), getNumBitWords()};
+  }
+
+  explicit AutoDiffIndexSubset(unsigned capacity, ArrayRef<unsigned> indices)
+      : capacity(capacity),
+        numBitWords(getNumBitWordsNeededForCapacity(capacity)) {
+    std::uninitialized_fill_n(getBitWordsData(), numBitWords, 0);
+    for (auto i : indices) {
+      unsigned bitWordIndex, offset;
+      std::tie(bitWordIndex, offset) = getBitWordIndexAndOffset(i);
+      getBitWord(bitWordIndex) |= (1 << offset);
+    }
+  }
+
+public:
+  AutoDiffIndexSubset() = delete;
+  AutoDiffIndexSubset(const AutoDiffIndexSubset &) = delete;
+  AutoDiffIndexSubset &operator=(const AutoDiffIndexSubset &) = delete;
+
+  // Defined in ASTContext.h.
+  static AutoDiffIndexSubset *get(ASTContext &ctx,
+                                  unsigned capacity,
+                                  ArrayRef<unsigned> indices);
+
+  static AutoDiffIndexSubset *getDefault(ASTContext &ctx,
+                                         unsigned capacity,
+                                         bool includeAll = false) {
+    if (includeAll)
+      return getFromRange(ctx, capacity, IntRange<>(capacity));
+    return get(ctx, capacity, {});
+  }
+
+  static AutoDiffIndexSubset *getFromRange(ASTContext &ctx,
+                                           unsigned capacity,
+                                           IntRange<> range) {
+    return get(ctx, capacity,
+               SmallVector<unsigned, 8>(range.begin(), range.end()));
+  }
+
+  unsigned getNumBitWords() const {
+    return numBitWords;
+  }
+
+  unsigned getCapacity() const {
+    return capacity;
+  }
+
+  class iterator;
+
+  iterator begin() const {
+    return iterator(this);
+  }
+  
+  iterator end() const {
+    return iterator(this, (int)capacity);
+  }
+  
+  iterator_range<iterator> getIndices() const {
+    return make_range(begin(), end());
+  }
+
+  unsigned getNumIndices() const {
+    return (unsigned)std::distance(begin(), end());
+  }
+
+  bool contains(unsigned index) const {
+    unsigned bitWordIndex, offset;
+    std::tie(bitWordIndex, offset) = getBitWordIndexAndOffset(index);
+    return getBitWord(bitWordIndex) & (1 << offset);
+  }
+
+  bool isEmpty() const {
+    return llvm::all_of(getBitWords(), [](BitWord bw) { return !(bool)bw; });
+  }
+  
+  bool equals(AutoDiffIndexSubset *other) const {
+    return capacity == other->getCapacity() &&
+        getBitWords().equals(other->getBitWords());
+  }
+
+  bool isSubsetOf(AutoDiffIndexSubset *other) const;
+  bool isSupersetOf(AutoDiffIndexSubset *other) const;
+
+  AutoDiffIndexSubset *adding(unsigned index, ASTContext &ctx) const;
+  AutoDiffIndexSubset *extendingCapacity(ASTContext &ctx,
+                                         unsigned newCapacity) const;
+
+  void Profile(llvm::FoldingSetNodeID &id) const {
+    id.AddInteger(capacity);
+    for (auto index : getIndices())
+      id.AddInteger(index);
+  }
+
+  void print(llvm::raw_ostream &s = llvm::outs()) const {
+    s << '{';
+    interleave(range(capacity), [this, &s](unsigned i) { s << contains(i); },
+               [&s] { s << ", "; });
+    s << '}';
+  }
+
+  void dump(llvm::raw_ostream &s = llvm::errs()) const {
+    s << "(autodiff_index_subset capacity=" << capacity << " indices=(";
+    interleave(getIndices(), [&s](unsigned i) { s << i; },
+               [&s] { s << ", "; });
+    s << "))";
+  }
+
+  int findNext(int startIndex) const;
+  int findFirst() const { return findNext(-1); }
+  int findPrevious(int endIndex) const;
+  int findLast() const { return findPrevious(capacity); }
+
+  class iterator {
+  public:
+    typedef unsigned value_type;
+    typedef unsigned difference_type;
+    typedef unsigned * pointer;
+    typedef unsigned & reference;
+    typedef std::forward_iterator_tag iterator_category;
+
+  private:
+    const AutoDiffIndexSubset *parent;
+    int current = 0;
+
+    void advance() {
+      assert(current != -1 && "Trying to advance past end.");
+      current = parent->findNext(current);
+    }
+
+  public:
+    iterator(const AutoDiffIndexSubset *parent, int current)
+        : parent(parent), current(current) {}
+    explicit iterator(const AutoDiffIndexSubset *parent)
+        : iterator(parent, parent->findFirst()) {}
+    iterator(const iterator &) = default;
+
+    iterator operator++(int) {
+      auto prev = *this;
+      advance();
+      return prev;
+    }
+
+    iterator &operator++() {
+      advance();
+      return *this;
+    }
+
+    unsigned operator*() const { return current; }
+
+    bool operator==(const iterator &other) const {
+      assert(parent == other.parent &&
+             "Comparing iterators from different AutoDiffIndexSubsets");
+      return current == other.current;
+    }
+
+    bool operator!=(const iterator &other) const {
+      assert(parent == other.parent &&
+             "Comparing iterators from different AutoDiffIndexSubsets");
+      return current != other.current;
+    }
+  };
+};
+
 /// SIL-level automatic differentiation indices. Consists of a source index,
 /// i.e. index of the dependent result to differentiate from, and parameter
 /// indices, i.e. index of independent parameters to differentiate with
@@ -242,38 +459,37 @@ struct SILAutoDiffIndices {
   ///   Function type: (A, B) -> (C, D) -> R
   ///   Bits: [C][D][A][B]
   ///
-  llvm::SmallBitVector parameters;
+  AutoDiffIndexSubset *parameters;
 
   /// Creates a set of AD indices from the given source index and a bit vector
   /// representing parameter indices.
   /*implicit*/ SILAutoDiffIndices(unsigned source,
-                                  llvm::SmallBitVector parameters)
+                                  AutoDiffIndexSubset *parameters)
       : source(source), parameters(parameters) {}
 
-  /// Creates a set of AD indices from the given source index and an array of
-  /// parameter indices. Elements in `parameters` must be ascending integers.
-  /*implicit*/ SILAutoDiffIndices(unsigned source,
-                                  ArrayRef<unsigned> parameters);
-
   bool operator==(const SILAutoDiffIndices &other) const;
+
+  bool operator!=(const SILAutoDiffIndices &other) const {
+    return !(*this == other);
+  };
 
   /// Queries whether the function's parameter with index `parameterIndex` is
   /// one of the parameters to differentiate with respect to.
   bool isWrtParameter(unsigned parameterIndex) const {
-    return parameterIndex < parameters.size() &&
-           parameters.test(parameterIndex);
+    return parameterIndex < parameters->getCapacity() &&
+           parameters->contains(parameterIndex);
   }
 
   void print(llvm::raw_ostream &s = llvm::outs()) const {
     s << "(source=" << source << " parameters=(";
-    interleave(parameters.set_bits(),
+    interleave(parameters->getIndices(),
                [&s](unsigned p) { s << p; }, [&s]{ s << ' '; });
     s << "))";
   }
 
   std::string mangle() const {
     std::string result = "src_" + llvm::utostr(source) + "_wrt_";
-    interleave(parameters.set_bits(),
+    interleave(parameters->getIndices(),
                [&](unsigned idx) { result += llvm::utostr(idx); },
                [&] { result += '_'; });
     return result;
@@ -335,11 +551,6 @@ public:
   }
 };
 
-/// The kind of an associated type.
-enum class AutoDiffAssociatedVectorSpaceKind : unsigned {
-  Tangent = 0, Cotangent = 1
-};
-
 /// Automatic differentiation utility namespace.
 namespace autodiff {
 
@@ -359,13 +570,21 @@ getOffsetForAutoDiffAssociatedFunction(unsigned order,
 unsigned
 getNumAutoDiffAssociatedFunctions(unsigned differentiationOrder);
 
-// Retrieve config from the function name of a variant of
-// `Builtin.autodiffApply`, e.g. `Builtin.autodiffApply_jvp_arity2_order1`.
-// Returns true if the function name is parsed successfully.
+/// Retrieve config from the function name of a variant of
+/// `Builtin.autodiffApply`, e.g. `Builtin.autodiffApply_jvp_arity2_order1`.
+/// Returns true if the function name is parsed successfully.
 bool getBuiltinAutoDiffApplyConfig(StringRef operationName,
                                    AutoDiffAssociatedFunctionKind &kind,
                                    unsigned &arity, unsigned &order,
                                    bool &rethrows);
+
+/// Computes the correct linkage for an associated function given the linkage of
+/// the original function. If the original linkage is not external and
+/// `isAssocFnExported` is true, use the original function's linkage. Otherwise,
+/// return hidden linkage.
+SILLinkage getAutoDiffAssociatedFunctionLinkage(SILLinkage originalLinkage,
+                                                bool isAssocFnExported);
+
 } // end namespace autodiff
 
 class BuiltinFloatType;
@@ -449,19 +668,18 @@ template<typename T> struct DenseMapInfo;
 
 template<> struct DenseMapInfo<SILAutoDiffIndices> {
   static SILAutoDiffIndices getEmptyKey() {
-    return { DenseMapInfo<unsigned>::getEmptyKey(), SmallBitVector() };
+    return { DenseMapInfo<unsigned>::getEmptyKey(), nullptr };
   }
 
   static SILAutoDiffIndices getTombstoneKey() {
-    return { DenseMapInfo<unsigned>::getTombstoneKey(),
-             SmallBitVector(sizeof(intptr_t), true) };
+    return { DenseMapInfo<unsigned>::getTombstoneKey(), nullptr };
   }
 
   static unsigned getHashValue(const SILAutoDiffIndices &Val) {
-    auto params = Val.parameters.set_bits();
     unsigned combinedHash =
       hash_combine(~1U, DenseMapInfo<unsigned>::getHashValue(Val.source),
-                   hash_combine_range(params.begin(), params.end()));
+                   hash_combine_range(Val.parameters->begin(),
+                                      Val.parameters->end()));
     return combinedHash;
   }
 

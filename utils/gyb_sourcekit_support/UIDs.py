@@ -169,6 +169,8 @@ UID_KEYS = [
     KEY('ExpressionOffset', 'key.expression_offset'),
     KEY('ExpressionLength', 'key.expression_length'),
     KEY('ExpressionType', 'key.expression_type'),
+    KEY('VFSName', 'key.vfs.name'),
+    KEY('VFSArgs', 'key.vfs.args'),
 ]
 
 

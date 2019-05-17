@@ -504,7 +504,7 @@ public:
 
   /// SWIFT_ENABLE_TENSORFLOW
   AutoDiffFunctionInst *createAutoDiffFunction(
-      SILLocation loc, const llvm::SmallBitVector &parameterIndices,
+      SILLocation loc, AutoDiffIndexSubset *parameterIndices,
       unsigned differentiationOrder, SILValue original,
       ArrayRef<SILValue> associatedFunctions = {}) {
     return insert(AutoDiffFunctionInst::create(getModule(),

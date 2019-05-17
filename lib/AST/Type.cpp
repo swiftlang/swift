@@ -2474,12 +2474,36 @@ getArchetypeAndRootOpaqueArchetype(Type maybeOpaqueType) {
 
 bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
     OpaqueTypeDecl *opaque) const {
-  return shouldPerformSubstitution(opaque, context);
+  return shouldPerformSubstitution(opaque, contextModule, contextExpansion);
 }
 
-static Type substOpaqueTypesWithUnderlyingTypes(
-    Type ty, SILFunction *context) {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(context);
+bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
+    OpaqueTypeDecl *opaque, ModuleDecl *contextModule,
+    ResilienceExpansion contextExpansion) {
+  auto namingDecl = opaque->getNamingDecl();
+
+  // Allow replacement of opaque result types of inlineable function regardless
+  // of resilience and in which context.
+  if (namingDecl->getAttrs().hasAttribute<InlinableAttr>()) {
+    return true;
+  }
+  // Allow replacement of opaque result types in the context of maximal
+  // resilient expansion if the context's and the opaque type's module are the
+  // same.
+  auto module = namingDecl->getModuleContext();
+  if (contextExpansion == ResilienceExpansion::Maximal &&
+      module == contextModule)
+    return true;
+
+  // Allow general replacement from non resilient modules. Otherwise, disallow.
+  return !module->isResilient();
+}
+
+static Type
+substOpaqueTypesWithUnderlyingTypes(Type ty, ModuleDecl *contextModule,
+                                    ResilienceExpansion contextExpansion) {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(contextModule,
+                                                 contextExpansion);
   return ty.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
 }
 
@@ -2512,15 +2536,18 @@ operator()(SubstitutableType *maybeOpaqueType) const {
 
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
-    return substOpaqueTypesWithUnderlyingTypes(substTy, context);
+    return substOpaqueTypesWithUnderlyingTypes(substTy, contextModule,
+                                               contextExpansion);
   }
   return substTy;
 }
 
 static ProtocolConformanceRef
 substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
-                                    SILFunction *context) {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(context);
+                                    ModuleDecl *contextModule,
+                                    ResilienceExpansion contextExpansion) {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(contextModule,
+                                                 contextExpansion);
   return ref.subst(origType, replacer, replacer,
                    SubstFlags::SubstituteOpaqueArchetypes);
 }
@@ -2562,7 +2589,8 @@ operator()(CanType maybeOpaqueType, Type replacementType,
 
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
-    return substOpaqueTypesWithUnderlyingTypes(substRef, substTy, context);
+    return substOpaqueTypesWithUnderlyingTypes(substRef, substTy, contextModule,
+                                               contextExpansion);
   }
   return substRef;
 }
@@ -4336,13 +4364,12 @@ makeFunctionType(AnyFunctionType *copy, ArrayRef<AnyFunctionType::Param> params,
   return FunctionType::get(params, retTy, copy->getExtInfo());
 }
 
-Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
-    AutoDiffAssociatedVectorSpaceKind kind,
+Optional<VectorSpace> TypeBase::getAutoDiffAssociatedTangentSpace(
     LookupConformanceFn lookupConformance) {
   assert(lookupConformance);
   auto &ctx = getASTContext();
 
-  std::pair<Type, unsigned> cacheKey {this, (unsigned)kind};
+  Type cacheKey = this;
   auto lookup = ctx.AutoDiffVectorSpaces.find(cacheKey);
   if (lookup != ctx.AutoDiffVectorSpaces.end())
     return lookup->getSecond();
@@ -4351,11 +4378,11 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
     return vs;
   };
 
-  // Functions' tangent/cotangent is the same function except the innermost
-  // return type being replaced by its tangent/cotangent.
+  // Functions' tangent is the same function except the innermost return type
+  // being replaced by its tangent.
   if (auto *fnTy = getAs<AnyFunctionType>()) {
-    auto resultSpace = fnTy->getResult()->getAutoDiffAssociatedVectorSpace(
-        kind, lookupConformance);
+    auto resultSpace = fnTy->getResult()->getAutoDiffAssociatedTangentSpace(
+        lookupConformance);
     if (!resultSpace)
       return cache(None);
     return cache(VectorSpace::getFunction(
@@ -4363,12 +4390,12 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
                          fnTy->getOptGenericSignature())));
   }
 
-  // Tuples' tangent/cotangent is a tuple of each element's Tangent/Cotangent.
+  // Tuples' tangent is a tuple of each element's Tangent.
   if (auto *tupleTy = getAs<TupleType>()) {
     SmallVector<TupleTypeElt, 8> newElts;
     for (auto elt : tupleTy->getElements()) {
       auto eltSpace = elt.getType()
-          ->getAutoDiffAssociatedVectorSpace(kind, lookupConformance);
+          ->getAutoDiffAssociatedTangentSpace(lookupConformance);
       if (!eltSpace)
         continue;
       newElts.push_back(elt.getWithType(eltSpace->getType()));
@@ -4382,22 +4409,12 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
     return cache(VectorSpace::getTuple(tupleType));
   }
 
-  // Find the TangentVector/CotangentVector associated type on the
-  // Differentiable protocol.
+  // Find the TangentVector associated type on the Differentiable protocol.
   auto *differentiableProtocol =
-      ctx.getProtocol(KnownProtocolKind::__Differentiable);
-  assert(differentiableProtocol && "Could not find __Differentiable protocol");
-  Identifier associatedTypeIdentifier;
-  switch (kind) {
-  case AutoDiffAssociatedVectorSpaceKind::Tangent:
-    associatedTypeIdentifier = ctx.Id_TangentVector;
-    break;
-  case AutoDiffAssociatedVectorSpaceKind::Cotangent:
-    associatedTypeIdentifier = ctx.Id_CotangentVector;
-    break;
-  }
+      ctx.getProtocol(KnownProtocolKind::Differentiable);
+  assert(differentiableProtocol && "Could not find Differentiable protocol");
   auto associatedTypeLookup =
-      differentiableProtocol->lookupDirect(associatedTypeIdentifier);
+      differentiableProtocol->lookupDirect(ctx.Id_TangentVector);
   assert(associatedTypeLookup.size() == 1);
   auto *dependentType = DependentMemberType::get(
       differentiableProtocol->getDeclaredInterfaceType(),
@@ -4416,11 +4433,11 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
     AutoDiffParameterIndices *indices, unsigned resultIndex,
     unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
     LookupConformanceFn lookupConformance,
-    GenericSignature *whereClauseGenSig) {
+    GenericSignature *whereClauseGenSig, bool makeSelfParamFirst) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
-  //                 (R.CotangentVector...) -> (T.CotangentVector...))
+  //                 (R.TangentVector...) -> (T.TangentVector...))
   //
   // Note that both can be written as "(T...) -> ((R...), Closure)", so we build
   // "Closure" and then use common code to wrap "Closure" in the outer function
@@ -4432,12 +4449,17 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   auto &ctx = getASTContext();
 
   SmallVector<Type, 8> wrtParamTypes;
-  indices->getSubsetParameterTypes(this, wrtParamTypes);
+  indices->getSubsetParameterTypes(
+      this, wrtParamTypes, /*reverseCurryLevels*/ !makeSelfParamFirst);
 
-  // Unwrap curry levels.
+  // Unwrap curry levels. At most, two parameter lists are necessary, for
+  // curried method types with a `(Self)` parameter list.
   SmallVector<AnyFunctionType *, 2> curryLevels;
-  auto *currentLevel = this->eraseDynamicSelfType()->castTo<AnyFunctionType>();
-  while (currentLevel != nullptr) {
+  auto *currentLevel = eraseDynamicSelfType()->castTo<AnyFunctionType>();
+  for (unsigned i : range(2)) {
+    (void)i;
+    if (currentLevel == nullptr)
+      break;
     curryLevels.push_back(currentLevel);
     currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
   }
@@ -4454,23 +4476,20 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
     SmallVector<AnyFunctionType::Param, 8> differentialParams;
     for (auto wrtParamType : wrtParamTypes)
       differentialParams.push_back(
-          AnyFunctionType::Param(wrtParamType->getAutoDiffAssociatedVectorSpace(
-              AutoDiffAssociatedVectorSpaceKind::Tangent, lookupConformance)
+          AnyFunctionType::Param(
+              wrtParamType->getAutoDiffAssociatedTangentSpace(lookupConformance)
                   ->getType()));
 
     SmallVector<TupleTypeElt, 8> differentialResults;
     if (auto *resultTuple = originalResult->getAs<TupleType>()) {
       auto resultTupleEltType = resultTuple->getElementType(resultIndex);
-      differentialResults.push_back(
-          resultTupleEltType->getAutoDiffAssociatedVectorSpace(
-              AutoDiffAssociatedVectorSpaceKind::Tangent, lookupConformance)
-                  ->getType());
+      differentialResults.push_back(resultTupleEltType
+          ->getAutoDiffAssociatedTangentSpace(lookupConformance)->getType());
     } else {
       assert(resultIndex == 0 && "resultIndex out of bounds");
       differentialResults.push_back(
-          originalResult->getAutoDiffAssociatedVectorSpace(
-              AutoDiffAssociatedVectorSpaceKind::Tangent, lookupConformance)
-                  ->getType());
+          originalResult->getAutoDiffAssociatedTangentSpace(lookupConformance)
+              ->getType());
     }
     Type differentialResult =
         differentialResults.size() > 1
@@ -4482,28 +4501,26 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   }
   case AutoDiffAssociatedFunctionKind::VJP: {
     // closure is the VJP "pullback":
-    //   (R.CotangentVector...) -> (T.CotangentVector...)
+    //   (R.TangentVector...) -> (T.TangentVector...)
     SmallVector<AnyFunctionType::Param, 8> pullbackParams;
     if (auto *resultTuple = originalResult->getAs<TupleType>()) {
       auto resultTupleEltType = resultTuple->getElementType(resultIndex);
       pullbackParams.push_back(
-          AnyFunctionType::Param(
-              resultTupleEltType->getAutoDiffAssociatedVectorSpace(
-                  AutoDiffAssociatedVectorSpaceKind::Cotangent,
-                  lookupConformance)->getType()));
+          AnyFunctionType::Param(resultTupleEltType
+              ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+                  ->getType()));
     } else {
       assert(resultIndex == 0 && "resultIndex out of bounds");
       pullbackParams.push_back(
-          AnyFunctionType::Param(
-              originalResult->getAutoDiffAssociatedVectorSpace(
-                  AutoDiffAssociatedVectorSpaceKind::Cotangent,
-                  lookupConformance)->getType()));
+          AnyFunctionType::Param(originalResult
+              ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+                  ->getType()));
     }
 
     SmallVector<TupleTypeElt, 8> pullbackResults;
     for (auto wrtParamType : wrtParamTypes)
-      pullbackResults.push_back(wrtParamType->getAutoDiffAssociatedVectorSpace(
-          AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance)
+      pullbackResults.push_back(wrtParamType
+          ->getAutoDiffAssociatedTangentSpace(lookupConformance)
               ->getType());
     Type pullbackResult = pullbackResults.size() > 1
                               ? TupleType::get(pullbackResults, ctx)
@@ -4536,6 +4553,45 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   }
 
   return associatedFunction;
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+// Compute the original function type corresponding to the given derivative
+// function type.
+AnyFunctionType *
+AnyFunctionType::getAutoDiffOriginalFunctionType() {
+  // Unwrap curry levels. At most, two parameter lists are necessary, for
+  // curried method types with a `(Self)` parameter list.
+  SmallVector<AnyFunctionType *, 2> curryLevels;
+  auto *currentLevel = this;
+  for (unsigned i : range(2)) {
+    (void)i;
+    if (currentLevel == nullptr)
+      break;
+    curryLevels.push_back(currentLevel);
+    currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
+  }
+
+  auto derivativeResult = curryLevels.back()->getResult()->getAs<TupleType>();
+  assert(derivativeResult && derivativeResult->getNumElements() == 2 &&
+         "Expected derivative result to be a two-element tuple");
+  auto originalResult = derivativeResult->getElement(0).getType();
+  auto *originalType = makeFunctionType(
+      curryLevels.back(), curryLevels.back()->getParams(), originalResult,
+      curryLevels.size() == 1 ? getOptGenericSignature() : nullptr);
+
+  // Wrap the associated function type in additional curry levels.
+  auto curryLevelsWithoutLast =
+      ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
+  for (auto pair : enumerate(reversed(curryLevelsWithoutLast))) {
+    unsigned i = pair.index();
+    AnyFunctionType *curryLevel = pair.value();
+    originalType = makeFunctionType(
+        curryLevel, curryLevel->getParams(), originalType,
+        i == curryLevelsWithoutLast.size() - 1 ? getOptGenericSignature()
+                                               : nullptr);
+  }
+  return originalType;
 }
 
 AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {

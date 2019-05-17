@@ -134,7 +134,6 @@ public:
   IGNORED_ATTR(Differentiable)
   IGNORED_ATTR(Differentiating)
   IGNORED_ATTR(CompilerEvaluable)
-  IGNORED_ATTR(TensorFlowGraph)
   IGNORED_ATTR(FieldwiseDifferentiable)
   IGNORED_ATTR(NoDerivative)
 #undef IGNORED_ATTR
@@ -876,7 +875,6 @@ public:
   void visitDifferentiableAttr(DifferentiableAttr *attr);
   void visitDifferentiatingAttr(DifferentiatingAttr *attr);
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
-  void visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr);
   void visitFieldwiseDifferentiableAttr(FieldwiseDifferentiableAttr *attr);
   void visitNoDerivativeAttr(NoDerivativeAttr *attr);
 };
@@ -3122,7 +3120,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         originalFnTy->getAutoDiffAssociatedFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
             /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP,
-            lookupConformance, whereClauseGenSig);
+            lookupConformance, whereClauseGenSig, /*makeSelfParamFirst*/ true);
 
     auto isValidJVP = [&](FuncDecl *jvpCandidate) {
       TC.validateDeclForNameLookup(jvpCandidate);
@@ -3148,7 +3146,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         originalFnTy->getAutoDiffAssociatedFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
             /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP,
-            lookupConformance, whereClauseGenSig);
+            lookupConformance, whereClauseGenSig, /*makeSelfParamFirst*/ true);
 
     auto isValidVJP = [&](FuncDecl *vjpCandidate) {
       TC.validateDeclForNameLookup(vjpCandidate);
@@ -3179,56 +3177,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-// Makes a function with the same generic signature and extinfo as `copy`, but
-// with `params` parameters and `retTy` return type.
-static AnyFunctionType *
-makeFunctionType(AnyFunctionType *copy, ArrayRef<AnyFunctionType::Param> params,
-                 Type retTy, GenericSignature *genericSignature) {
-  if (!genericSignature)
-    if (auto *genericFunctionType = copy->getAs<GenericFunctionType>())
-      genericSignature = genericFunctionType->getGenericSignature();
-  if (genericSignature)
-    return GenericFunctionType::get(genericSignature, params, retTy,
-                                    copy->getExtInfo());
-  return FunctionType::get(params, retTy, copy->getExtInfo());
-}
-
-// SWIFT_ENABLE_TENSORFLOW
-// Compute the original function type corresponding to the given derivative
-// function type.
-static AnyFunctionType *
-computeAutoDiffOriginalFunctionType(AnyFunctionType *derivativeType) {
-  // Unwrap curry levels.
-  SmallVector<AnyFunctionType *, 2> curryLevels;
-  auto *currentLevel = derivativeType;
-  while (currentLevel != nullptr) {
-    curryLevels.push_back(currentLevel);
-    currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
-  }
-
-  auto derivativeResult = curryLevels.back()->getResult()->getAs<TupleType>();
-  assert(derivativeResult && derivativeResult->getNumElements() == 2 &&
-         "Expected derivative result to be a two-element tuple");
-  auto originalResult = derivativeResult->getElement(0).getType();
-  auto genericSignature = derivativeType->getOptGenericSignature();
-  auto *originalType = makeFunctionType(
-      curryLevels.back(), curryLevels.back()->getParams(), originalResult,
-      curryLevels.size() == 1 ? genericSignature : nullptr);
-
-  // Wrap the associated function type in additional curry levels.
-  auto curryLevelsWithoutLast =
-      ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
-  for (auto pair : enumerate(reversed(curryLevelsWithoutLast))) {
-    unsigned i = pair.index();
-    AnyFunctionType *curryLevel = pair.value();
-    originalType = makeFunctionType(
-        curryLevel, curryLevel->getParams(), originalType,
-        i == curryLevelsWithoutLast.size() - 1 ? genericSignature : nullptr);
-  }
-  return originalType;
-}
-
-// SWIFT_ENABLE_TENSORFLOW
 void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   auto &ctx = TC.Context;
   FuncDecl *derivative = dyn_cast<FuncDecl>(D);
@@ -3243,7 +3191,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
 
   // The result type should be a two-element tuple.
   // Either a value and pullback:
-  //     (value: R, pullback: (R.CotangentVector) -> (T.CotangentVector...)
+  //     (value: R, pullback: (R.TangentVector) -> (T.TangentVector...)
   // Or a value and differential:
   //     (value: R, differential: (T.TangentVector...) -> (R.TangentVector)
   auto derivativeResultType = derivative->getResultInterfaceType();
@@ -3259,7 +3207,6 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   auto funcResultElt = derivativeResultTupleType->getElement(1);
   // Get derivative kind and associated function identifier.
   AutoDiffAssociatedFunctionKind kind;
-  Identifier autoDiffAssocTyId;
   if (valueResultElt.getName().str() != "value") {
     TC.diagnose(attr->getLocation(),
                 diag::differentiating_attr_invalid_result_tuple_value_label);
@@ -3268,10 +3215,8 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   }
   if (funcResultElt.getName().str() == "differential") {
     kind = AutoDiffAssociatedFunctionKind::JVP;
-    autoDiffAssocTyId = ctx.Id_TangentVector;
   } else if (funcResultElt.getName().str() == "pullback") {
     kind = AutoDiffAssociatedFunctionKind::VJP;
-    autoDiffAssocTyId = ctx.Id_CotangentVector;
   } else {
     TC.diagnose(attr->getLocation(),
                 diag::differentiating_attr_invalid_result_tuple_func_label);
@@ -3279,7 +3224,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     return;
   }
   // `value: R` result tuple element must conform to `Differentiable`.
-  auto diffableProto = ctx.getProtocol(KnownProtocolKind::__Differentiable);
+  auto diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
   auto valueResultType = valueResultElt.getType();
   if (valueResultType->hasTypeParameter())
     valueResultType = derivative->mapTypeIntoContext(valueResultType);
@@ -3296,7 +3241,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
 
   // Compute expected original function type and look up original function.
   auto *originalFnType =
-      computeAutoDiffOriginalFunctionType(derivativeInterfaceType);
+      derivativeInterfaceType->getAutoDiffOriginalFunctionType();
 
   std::function<bool(GenericSignature *, GenericSignature *)>
     checkGenericSignatureSatisfied =
@@ -3428,14 +3373,14 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
         assert(conf &&
                "Expected checked parameter to conform to `Differentiable`");
         auto paramAssocType = ProtocolConformanceRef::getTypeWitnessByName(
-            paramType, *conf, autoDiffAssocTyId, ctx.getLazyResolver());
+            paramType, *conf, ctx.Id_TangentVector, ctx.getLazyResolver());
         return TupleTypeElt(paramAssocType);
       });
 
   // Check differential/pullback type.
   // Get vector type: the associated type of the value result type.
   auto vectorTy = ProtocolConformanceRef::getTypeWitnessByName(
-      valueResultType, *valueResultConf, autoDiffAssocTyId,
+      valueResultType, *valueResultConf, ctx.Id_TangentVector,
       ctx.getLazyResolver());
 
   // Compute expected differential/pullback type.
@@ -3627,12 +3572,6 @@ void AttributeChecker::visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr) {
   // follow certain rules. We can only check these rules after the body is type
   // checked, and it's not type checked yet, so we check these rules later in
   // TypeChecker::checkFunctionBodyCompilerEvaluable().
-}
-
-// SWIFT_ENABLE_TENSORFLOW
-void AttributeChecker::visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr) {
-  diagnoseAndRemoveAttr(attr, diag::tf_graph_deprecated_please_remove);
-  return;
 }
 
 // SWIFT_ENABLE_TENSORFLOW

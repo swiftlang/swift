@@ -3732,9 +3732,6 @@ static uint8_t getRawStableSILFunctionTypeRepresentation(
   SIMPLE_CASE(SILFunctionTypeRepresentation, ObjCMethod)
   SIMPLE_CASE(SILFunctionTypeRepresentation, WitnessMethod)
   SIMPLE_CASE(SILFunctionTypeRepresentation, Closure)
-
-  // SWIFT_ENABLE_TENSORFLOW
-  SIMPLE_CASE(SILFunctionTypeRepresentation, TensorFlow)
   }
   llvm_unreachable("bad calling convention");
 }

@@ -90,7 +90,7 @@ public protocol Optimizer {
   associatedtype Scalar: FloatingPoint
   var learningRate: Scalar { get }
   mutating func update(_ variables: inout Model.AllDifferentiableVariables,
-                       along vector: Model.CotangentVector)
+                       along vector: Model.TangentVector)
 }
 
 public class RiemannSGD<Model: Layer, Scalar: FloatingPoint>: Optimizer
@@ -107,9 +107,9 @@ public class RiemannSGD<Model: Layer, Scalar: FloatingPoint>: Optimizer
   }
 
   public func update(_ model: inout Model.AllDifferentiableVariables,
-                     along vector: Model.CotangentVector) {
+                     along vector: Model.TangentVector) {
     model = model.moved(
-      along: learningRate * (.zero - model.tangentVector(from: vector)))
+      along: learningRate * (.zero - vector))
   }
 }
 
@@ -161,7 +161,7 @@ ModelADTests.testAllBackends("WithRespectToModel") {
     }
   }
   let x = Tensor<Float>(0)
-  var model = Foo<Float>(bar: x, baz: x)
+  let model = Foo<Float>(bar: x, baz: x)
   let d = gradient(at: model) { model in
     model.applied(to: x)
   }
@@ -191,9 +191,9 @@ ModelADTests.testAllBackends("TF437") {
 
   func tf437Step<Model: Layer>(_ model: inout Model,
                                inputs: Model.Input) -> ()
-    where Model.AllDifferentiableVariables == Model.CotangentVector,
+    where Model.AllDifferentiableVariables == Model.TangentVector,
           Model.Output == Tensor<Float> {
-    gradient(at: model) { model -> Model.Output in
+    _ = gradient(at: model) { model -> Model.Output in
       let logits = model.applied(to: inputs)
       return logits.mean()
     }

@@ -4,9 +4,9 @@
 // Top-level (before primal/adjoint synthesis)
 //===----------------------------------------------------------------------===//
 
-// expected-note @+2 {{opaque non-'@differentiable' function is not differentiable}}
-// expected-error @+1 {{expression is not differentiable}}
+// expected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}
 func foo(_ f: (Float) -> Float) -> Float {
+  // expected-error @+1 {{function is not differentiable}}
   return gradient(at: 0, in: f)
 }
 
@@ -36,7 +36,6 @@ extension S : Differentiable, VectorNumeric {
   static func * (lhs: Float, rhs: S) -> S { return S(p: lhs * rhs.p) }
 
   typealias TangentVector = S
-  typealias CotangentVector = S
 }
 
 // expected-error @+2 {{function is not differentiable}}
@@ -67,42 +66,46 @@ _ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) {
 // Function composition
 //===----------------------------------------------------------------------===//
 
-// FIXME: Figure out why diagnostics no longer accumulate after we removed
-// gradient synthesis. When it's fixed, replace "xpected" with "expected" below.
-#if false
-
 func uses_optionals(_ x: Float) -> Float {
   var maybe: Float? = 10
   maybe = x
-  // xpected-note @+1 {{differentiating control flow is not yet supported}}
+  // expected-note @+1 {{differentiating control flow is not yet supported}}
   return maybe!
 }
 
-_ = gradient(at: 0, in: uses_optionals) // xpected-error {{function is not differentiable}}
+// expected-error @+1 {{function is not differentiable}}
+_ = gradient(at: 0, in: uses_optionals)
 
-func f0(_ x: Float) -> Float {
-  return x // okay!
+func base(_ x: Float) -> Float {
+  // expected-error @+2 {{expression is not differentiable}}
+  // expected-note @+1 {{cannot differentiate through a non-differentiable result; do you want to add '.withoutDerivative()'?}}
+  return Float(Int(x))
 }
 
+// TODO: Fix nested differentiation diagnostics. Need to fix indirect differentiation invokers.
 func nested(_ x: Float) -> Float {
-  return gradient(at: x, in: f0) // xpected-note {{nested differentiation is not supported yet}}
+  // xpected-note @+1 {{when differentiating this function call}}
+  return base(x)
 }
 
 func middle(_ x: Float) -> Float {
-  let y = uses_optionals(x)
-  return nested(y) // xpected-note {{when differentiating this function call}}
+  // xpected-note @+1 {{when differentiating this function call}}
+  return nested(x)
 }
 
 func middle2(_ x: Float) -> Float {
-  return middle(x) // xpected-note {{when differentiating this function call}}
+  // xpected-note @+1 {{when differentiating this function call}}
+  return middle(x)
 }
 
 func func_to_diff(_ x: Float) -> Float {
-  return middle2(x) // xpected-note {{expression is not differentiable}}
+  // xpected-note @+1 {{expression is not differentiable}}
+  return middle2(x)
 }
 
 func calls_grad_of_nested(_ x: Float) -> Float {
-  return gradient(at: x, in: func_to_diff) // xpected-error {{function is not differentiable}}
+  // xpected-error @+1 {{function is not differentiable}}
+  return gradient(at: x, in: func_to_diff)
 }
 
 //===----------------------------------------------------------------------===//
@@ -111,7 +114,8 @@ func calls_grad_of_nested(_ x: Float) -> Float {
 
 func if_else(_ x: Float, _ flag: Bool) -> Float {
   let y: Float
-  // xpected-note @+1 {{differentiating control flow is not supported yet}}
+  // expected-error @+2 {{expression is not differentiable}}
+  // expected-note @+1 {{differentiating control flow is not yet supported}}
   if flag {
     y = x + 1
   } else {
@@ -120,10 +124,7 @@ func if_else(_ x: Float, _ flag: Bool) -> Float {
   return y
 }
 
-// xpected-error @+1 {{function is not differentiable}}
-_ = gradient(at: 0) { x in if_else(0, true) }
-
-#endif
+_ = gradient(at: 0) { x in if_else(x, true) }
 
 //===----------------------------------------------------------------------===//
 // @differentiable attributes
@@ -187,15 +188,14 @@ class Foo {
 }
 
 // Nested call case.
-// expected-error @+1 {{function is not differentiable}}
 @differentiable
-// expected-note @+1 {{when differentiating this function definition}}
 func triesToDifferentiateClassMethod(x: Float) -> Float {
+  // expected-error @+2 {{expression is not differentiable}}
   // expected-note @+1 {{differentiating class members is not yet supported}}
   return Foo().class_method(x)
 }
 
-// expected-error @+2 {{expression is not differentiable}}
+// expected-error @+2 {{function is not differentiable}}
 // expected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}
 _ = gradient(at: .zero, in: Foo().class_method)
 

@@ -264,7 +264,6 @@ extension JVPStruct : VectorNumeric {
 
 extension JVPStruct : Differentiable {
   typealias TangentVector = JVPStruct
-  typealias CotangentVector = JVPStruct
 }
 
 extension JVPStruct {
@@ -353,7 +352,7 @@ func vjp2ParamsVJP(x: Float, y: Float) -> (Float, (Float) -> (Float, Float)) {
   return (x + y, { v in (v, v) })
 }
 
-// expected-error @+1 {{'vjpWrongTypeVJP' does not have expected type '(Float) -> (Float, (Float.CotangentVector) -> Float.CotangentVector)' (aka '(Float) -> (Float, (Float) -> Float)'}}
+// expected-error @+1 {{'vjpWrongTypeVJP' does not have expected type '(Float) -> (Float, (Float.TangentVector) -> Float.TangentVector)' (aka '(Float) -> (Float, (Float) -> Float)'}}
 @differentiable(vjp: vjpWrongTypeVJP)
 func vjpWrongType(x: Float) -> Float {
   return x
@@ -387,14 +386,14 @@ struct VJPStruct {
   @differentiable(vjp: storedPropVJP)
   let storedImmutableOk: Float
 
-  // expected-error @+1 {{'storedPropVJP' does not have expected type '(VJPStruct) -> () -> (Double, (Double.CotangentVector) -> VJPStruct.CotangentVector)' (aka '(VJPStruct) -> () -> (Double, (Double) -> VJPStruct)'}}
+  // expected-error @+1 {{'storedPropVJP' does not have expected type '(VJPStruct) -> () -> (Double, (Double.TangentVector) -> VJPStruct.TangentVector)' (aka '(VJPStruct) -> () -> (Double, (Double) -> VJPStruct)'}}
   @differentiable(vjp: storedPropVJP)
   let storedImmutableWrongType: Double
 
   @differentiable(vjp: storedPropVJP)
   var storedMutableOk: Float
 
-  // expected-error @+1 {{'storedPropVJP' does not have expected type '(VJPStruct) -> () -> (Double, (Double.CotangentVector) -> VJPStruct.CotangentVector)' (aka '(VJPStruct) -> () -> (Double, (Double) -> VJPStruct)'}}
+  // expected-error @+1 {{'storedPropVJP' does not have expected type '(VJPStruct) -> () -> (Double, (Double.TangentVector) -> VJPStruct.TangentVector)' (aka '(VJPStruct) -> () -> (Double, (Double) -> VJPStruct)'}}
   @differentiable(vjp: storedPropVJP)
   var storedMutableWrongType: Double
 }
@@ -421,7 +420,6 @@ extension VJPStruct : VectorNumeric {
 
 extension VJPStruct : Differentiable {
   typealias TangentVector = VJPStruct
-  typealias CotangentVector = VJPStruct
 }
 
 extension VJPStruct {
@@ -459,7 +457,7 @@ extension VJPStruct {
     }
   }
 
-  // expected-error @+1 {{'computedPropVJP' does not have expected type '(VJPStruct) -> () -> (Double, (Double.CotangentVector) -> VJPStruct.CotangentVector)' (aka '(VJPStruct) -> () -> (Double, (Double) -> VJPStruct)'}}
+  // expected-error @+1 {{'computedPropVJP' does not have expected type '(VJPStruct) -> () -> (Double, (Double.TangentVector) -> VJPStruct.TangentVector)' (aka '(VJPStruct) -> () -> (Double, (Double) -> VJPStruct)'}}
   @differentiable(vjp: computedPropVJP)
   var computedPropWrongType: Double {
     return 0
@@ -501,7 +499,7 @@ func where1<T>(x: T) -> T {
 func jvpWhere1<T : Differentiable>(x: T) -> (T, (T.TangentVector) -> T.TangentVector) {
   return (x, { v in v })
 }
-func vjpWhere1<T : Differentiable>(x: T) -> (T, (T.CotangentVector) -> T.CotangentVector) {
+func vjpWhere1<T : Differentiable>(x: T) -> (T, (T.TangentVector) -> T.TangentVector) {
   return (x, { v in v })
 }
 
@@ -543,10 +541,8 @@ struct ResultLabelTest {
 struct Tensor<Scalar> : AdditiveArithmetic {}
 extension Tensor : Differentiable where Scalar : Differentiable {
   typealias TangentVector = Tensor
-  typealias CotangentVector = Tensor
   typealias AllDifferentiableVariables = Tensor
   func moved(along direction: Tensor) -> Tensor { return self }
-  func tangentVector(from cotangent: Tensor) -> Tensor { return cotangent }
 }
 @differentiable(where Scalar : Differentiable)
 func where2<Scalar : Numeric>(x: Tensor<Scalar>) -> Tensor<Scalar> {
@@ -584,12 +580,12 @@ protocol MethodDiffReq {
 }
 
 extension MethodDiffReq where Self : Differentiable {
-  func vjpFoo(x: Self) -> (Self, (Self.CotangentVector) -> Self.CotangentVector) {
+  func vjpFoo(x: Self) -> (Self, (Self.TangentVector) -> Self.TangentVector) {
     return (self, { $0 })
   }
 }
 
-// expected-error @+1 {{'vjpNonvariadic' does not have expected type '(Float, Int32...) -> (Float, (Float.CotangentVector) -> Float.CotangentVector)' (aka '(Float, Int32...) -> (Float, (Float) -> Float)')}}
+// expected-error @+1 {{'vjpNonvariadic' does not have expected type '(Float, Int32...) -> (Float, (Float.TangentVector) -> Float.TangentVector)' (aka '(Float, Int32...) -> (Float, (Float) -> Float)')}}
 @differentiable(wrt: x, vjp: vjpNonvariadic)
 func variadic(_ x: Float, indices: Int32...) -> Float {
   return x

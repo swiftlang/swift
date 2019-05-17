@@ -12,71 +12,149 @@
 // SWIFT_ENABLE_TENSORFLOW
 
 #include "swift/AST/AutoDiff.h"
+#include "TestContext.h"
 #include "gtest/gtest.h"
 
 using namespace swift;
+using namespace swift::unittest;
 
-TEST(SILAutoDiffIndices, EqualityAndHash) {
-  using IndicesDenseMapInfo = llvm::DenseMapInfo<SILAutoDiffIndices>;
+TEST(AutoDiffIndexSubset, NumBitWordsNeeded) {
+  EXPECT_EQ(AutoDiffIndexSubset::getNumBitWordsNeededForCapacity(0), 0u);
+  EXPECT_EQ(AutoDiffIndexSubset::getNumBitWordsNeededForCapacity(1), 1u);
+  EXPECT_EQ(AutoDiffIndexSubset::getNumBitWordsNeededForCapacity(5), 1u);
+  EXPECT_EQ(AutoDiffIndexSubset::getNumBitWordsNeededForCapacity(
+                AutoDiffIndexSubset::numBitsPerBitWord - 1), 1u);
+  EXPECT_EQ(AutoDiffIndexSubset::getNumBitWordsNeededForCapacity(
+                AutoDiffIndexSubset::numBitsPerBitWord), 2u);
+  EXPECT_EQ(AutoDiffIndexSubset::getNumBitWordsNeededForCapacity(
+                AutoDiffIndexSubset::numBitsPerBitWord * 2 - 1), 2u);
+  EXPECT_EQ(AutoDiffIndexSubset::getNumBitWordsNeededForCapacity(
+                AutoDiffIndexSubset::numBitsPerBitWord * 2), 3u);
+}
 
-  std::array<unsigned, 0> empty;
-  // Each example is distinct.
-  SILAutoDiffIndices examples[] = {
-    {0, empty},
-    {1, empty},
-    {0, {0}},
-    {0, {0, 1}},
-    {0, {1}},
-    {0, {1, 2}},
-    {0, {100}},
-    {0, {0, 100}},
-    {0, {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}}
-  };
-  size_t exampleCount = std::extent<decltype(examples)>::value;
-  for (size_t i = 0; i < exampleCount; ++i) {
-    auto example1 = examples[i];
-    auto grownExample1 = example1;
-    grownExample1.parameters.resize(grownExample1.parameters.size() + 1);
+TEST(AutoDiffIndexSubset, BitWordIndexAndOffset) {
+  EXPECT_EQ(AutoDiffIndexSubset::getBitWordIndexAndOffset(0),
+            std::make_pair(0u, 0u));
+  EXPECT_EQ(AutoDiffIndexSubset::getBitWordIndexAndOffset(5),
+            std::make_pair(0u, 5u));
+  EXPECT_EQ(AutoDiffIndexSubset::getBitWordIndexAndOffset(8),
+            std::make_pair(0u, 8u));
+  EXPECT_EQ(AutoDiffIndexSubset::getBitWordIndexAndOffset(
+            AutoDiffIndexSubset::numBitsPerBitWord - 1),
+            std::make_pair(0u, AutoDiffIndexSubset::numBitsPerBitWord - 1));
+  EXPECT_EQ(AutoDiffIndexSubset::getBitWordIndexAndOffset(
+                AutoDiffIndexSubset::numBitsPerBitWord),
+            std::make_pair(1u, 0u));
+}
 
-    // Make sure that the grown example is actually grown.
-    EXPECT_TRUE(example1.parameters.size() < grownExample1.parameters.size());
+TEST(AutoDiffIndexSubset, Equality) {
+  TestContext ctx;
+  EXPECT_EQ(AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                     /*indices*/ {0}),
+            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                     /*indices*/ {0}));
+  EXPECT_EQ(AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                     /*indices*/ {0, 2, 4}),
+            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                     /*indices*/ {0, 2, 4}));
+  EXPECT_EQ(AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                     /*indices*/ {}),
+            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                     /*indices*/ {}));
+  EXPECT_NE(AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 1,
+                                     /*indices*/ {}),
+            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 0,
+                                     /*indices*/ {}));
+  EXPECT_NE(AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                     /*indices*/ {0}),
+            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                     /*indices*/ {}));
+}
 
-    // Test that the example is equal to itself and to the grown version of
-    // itself, using both operator== and IndicesDenseMapInfo::isEqual.
-    EXPECT_TRUE(example1 == example1);
-    EXPECT_TRUE(example1 == grownExample1);
-    EXPECT_TRUE(grownExample1 == example1);
-    EXPECT_TRUE(IndicesDenseMapInfo::isEqual(example1, example1));
-    EXPECT_TRUE(IndicesDenseMapInfo::isEqual(example1, grownExample1));
-    EXPECT_TRUE(IndicesDenseMapInfo::isEqual(grownExample1, example1));
+TEST(AutoDiffIndexSubset, Bits) {
+  TestContext ctx;
+  auto *indices1 = AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                            /*indices*/ {0, 2, 4});
+  EXPECT_EQ(indices1->getNumBitWords(), 1u);
+  EXPECT_EQ(indices1->getCapacity(), 5u);
+  EXPECT_TRUE(indices1->contains(0));
+  EXPECT_FALSE(indices1->contains(1));
+  EXPECT_TRUE(indices1->contains(2));
+  EXPECT_FALSE(indices1->contains(3));
+  EXPECT_TRUE(indices1->contains(4));
 
-    // Test that the grown version has the same hash as the original.
-    EXPECT_EQ(IndicesDenseMapInfo::getHashValue(example1),
-              IndicesDenseMapInfo::getHashValue(grownExample1));
+  auto *indices2 = AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                            /*indices*/ {1, 3});
+  EXPECT_EQ(indices2->getNumBitWords(), 1u);
+  EXPECT_EQ(indices2->getCapacity(), 5u);
+  EXPECT_FALSE(indices2->contains(0));
+  EXPECT_TRUE(indices2->contains(1));
+  EXPECT_FALSE(indices2->contains(2));
+  EXPECT_TRUE(indices2->contains(3));
+  EXPECT_FALSE(indices2->contains(4));
+}
 
-    // Test that the example is not equal to any of the others.
-    for (size_t j = i + 1; j < exampleCount; ++j) {
-      auto example2 = examples[j];
-      auto grownExample2 = example2;
-      grownExample2.parameters.resize(grownExample2.parameters.size() + 1);
-
-      // Make sure that the grown example is actually grown.
-      EXPECT_TRUE(example2.parameters.size() < grownExample2.parameters.size());
-
-      EXPECT_FALSE(example1 == example2);
-      EXPECT_FALSE(example2 == example1);
-      EXPECT_FALSE(IndicesDenseMapInfo::isEqual(example1, example2));
-      EXPECT_FALSE(IndicesDenseMapInfo::isEqual(example2, example1));
-
-      EXPECT_FALSE(example1 == grownExample2);
-      EXPECT_FALSE(grownExample2 == example1);
-      EXPECT_FALSE(IndicesDenseMapInfo::isEqual(example1, grownExample2));
-      EXPECT_FALSE(IndicesDenseMapInfo::isEqual(grownExample2, example1));
-
-      EXPECT_FALSE(example2 == grownExample1);
-      EXPECT_FALSE(grownExample1 == example2);
-      EXPECT_FALSE(IndicesDenseMapInfo::isEqual(example2, grownExample1));
-      EXPECT_FALSE(IndicesDenseMapInfo::isEqual(grownExample1, example2));
-    }
+TEST(AutoDiffIndexSubset, Iteration) {
+  TestContext ctx;
+  // Test 1
+  {
+    auto *indices1 = AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                              /*indices*/ {0, 2, 4});
+    // Check forward iteration.
+    EXPECT_EQ(indices1->findFirst(), 0);
+    EXPECT_EQ(indices1->findNext(0), 2);
+    EXPECT_EQ(indices1->findNext(2), 4);
+    EXPECT_EQ(indices1->findNext(4), (int)indices1->getCapacity());
+    // Check reverse iteration.
+    EXPECT_EQ(indices1->findLast(), 4);
+    EXPECT_EQ(indices1->findPrevious(4), 2);
+    EXPECT_EQ(indices1->findPrevious(2), 0);
+    EXPECT_EQ(indices1->findPrevious(0), -1);
+    // Check range.
+    unsigned indices1Elements[3] = {0, 2, 4};
+    EXPECT_TRUE(std::equal(indices1->begin(), indices1->end(),
+                           indices1Elements));
   }
+  // Test 2
+  {
+    auto *indices2 = AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                              /*indices*/ {1, 3});
+    // Check forward iteration.
+    EXPECT_EQ(indices2->findFirst(), 1);
+    EXPECT_EQ(indices2->findNext(1), 3);
+    EXPECT_EQ(indices2->findNext(3), (int)indices2->getCapacity());
+    // Check reverse iteration.
+    EXPECT_EQ(indices2->findLast(), 3);
+    EXPECT_EQ(indices2->findPrevious(3), 1);
+    EXPECT_EQ(indices2->findPrevious(1), -1);
+    // Check range.
+    unsigned indices2Elements[2] = {1, 3};
+    EXPECT_TRUE(std::equal(indices2->begin(), indices2->end(),
+                           indices2Elements));
+  }
+}
+
+TEST(AutoDiffIndexSubset, SupersetAndSubset) {
+  TestContext ctx;
+  auto *indices1 = AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                            /*indices*/ {0, 2, 4});
+  EXPECT_TRUE(indices1->isSupersetOf(indices1));
+  EXPECT_TRUE(indices1->isSubsetOf(indices1));
+  auto *indices2 = AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                            /*indices*/ {2});
+  EXPECT_TRUE(indices2->isSupersetOf(indices2));
+  EXPECT_TRUE(indices2->isSubsetOf(indices2));
+
+  EXPECT_TRUE(indices1->isSupersetOf(indices2));
+  EXPECT_TRUE(indices2->isSubsetOf(indices1));
+}
+
+TEST(AutoDiffIndexSubset, Insertion) {
+  TestContext ctx;
+  auto *indices1 = AutoDiffIndexSubset::get(ctx.Ctx, 5, {0, 2, 4});
+  EXPECT_EQ(indices1->adding(0, ctx.Ctx), indices1);
+  EXPECT_EQ(indices1->adding(1, ctx.Ctx),
+            AutoDiffIndexSubset::get(ctx.Ctx, 5, {0, 1, 2, 4}));
+  EXPECT_EQ(indices1->adding(3, ctx.Ctx),
+            AutoDiffIndexSubset::get(ctx.Ctx, 5, {0, 2, 3, 4}));
 }

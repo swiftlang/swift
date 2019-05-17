@@ -4,7 +4,7 @@ import StdlibUnittest
 
 var ArrayAutodiffTests = TestSuite("ArrayAutodiff")
 
-typealias FloatArrayGrad = Array<Float>.CotangentVector
+typealias FloatArrayGrad = Array<Float>.TangentVector
 
 ArrayAutodiffTests.test("ArrayIdentity") {
   func arrayIdentity(_ x: [Float]) -> [Float] {
@@ -39,21 +39,21 @@ ArrayAutodiffTests.test("ArrayConcat") {
   }
 
   expectEqual(
-    TwoArrays.CotangentVector(
+    TwoArrays.TangentVector(
       a: FloatArrayGrad([1, 1]),
       b: FloatArrayGrad([1, 0])),
     gradient(
       at: TwoArrays(a: [0, 0], b: [0, 0]),
       in: sumFirstThreeConcatted))
   expectEqual(
-    TwoArrays.CotangentVector(
+    TwoArrays.TangentVector(
       a: FloatArrayGrad([1, 1, 1, 0]),
       b: FloatArrayGrad([0, 0])),
     gradient(
       at: TwoArrays(a: [0, 0, 0, 0], b: [0, 0]),
       in: sumFirstThreeConcatted))
   expectEqual(
-    TwoArrays.CotangentVector(
+    TwoArrays.TangentVector(
       a: FloatArrayGrad([]),
       b: FloatArrayGrad([1, 1, 1, 0])),
     gradient(

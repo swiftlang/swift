@@ -559,8 +559,6 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
     kind = CFunctionPointer;
     break;
 
-  // SWIFT_ENABLE_TENSORFLOW
-  case SILFunctionType::Representation::TensorFlow:
   case SILFunctionType::Representation::Thick:
   case SILFunctionType::Representation::Thin:
   case SILFunctionType::Representation::Method:

@@ -89,6 +89,7 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
       // Get lowered argument indices.
       auto paramIndices = A->getParameterIndices();
       auto loweredParamIndices = paramIndices->getLowered(
+          F->getASTContext(),
           decl->getInterfaceType()->castTo<AnyFunctionType>());
       SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
       auto silDiffAttr = SILDifferentiableAttr::create(

@@ -592,32 +592,9 @@ bool SILType::isLoweringOf(SILModule &Mod, CanType formalType) {
   return loweredType.getASTType() == formalType;
 }
 
-bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
-    OpaqueTypeDecl *opaque, SILFunction *context) {
-  auto namingDecl = opaque->getNamingDecl();
-
-  // Allow replacement of opaque result types of inlineable function regardless
-  // of resilience and in which context.
-  if (namingDecl->getAttrs().hasAttribute<InlinableAttr>()) {
-    return true;
-  }
-  // Allow replacement of opaque result types in the context of maximal
-  // resilient expansion if the context's and the opaque type's module are the
-  // same.
-  auto expansion = context->getResilienceExpansion();
-  auto module = namingDecl->getModuleContext();
-  if (expansion == ResilienceExpansion::Maximal &&
-      module == context->getModule().getSwiftModule())
-    return true;
-
-  // Allow general replacement from non resilient modules. Otherwise, disallow.
-  return !module->isResilient();
-}
-
 // SWIFT_ENABLE_TENSORFLOW
 /// Returns true if this SILType is a differentiable type.
 bool SILType::isDifferentiable(SILModule &M) const {
-  return getASTType()->getAutoDiffAssociatedVectorSpace(
-      AutoDiffAssociatedVectorSpaceKind::Tangent,
+  return getASTType()->getAutoDiffAssociatedTangentSpace(
       LookUpConformanceInModule(M.getSwiftModule())).hasValue();
 }

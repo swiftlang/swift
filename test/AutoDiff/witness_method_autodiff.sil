@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -differentiation %s | %FileCheck %s
+// RUN: %target-sil-opt -differentiation -differentiation-skip-folding-autodiff-function-extraction %s | %FileCheck %s
 
 sil_stage raw
 
