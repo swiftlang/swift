@@ -670,6 +670,29 @@ public protocol Collection: Sequence {
   /// - Complexity: O(1).
   func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>)
 
+  /// Returns an index `distance` positions prior to `i` if it exists.
+  ///
+  /// Other methods such as `index(_:offetBy:)` must not be passed a negative
+  /// offset if the collection is bidirectional. This method will perform a
+  /// negative offset even if the collection is not bidirectional, by using a
+  /// less efficient means. `BidirectionalCollection` customizes this with a
+  /// more efficient implementation.
+  ///
+  /// - Parameters
+  ///   - i: a valid index of the collection.
+  ///   - distance: The distance to offset `i` backwards. `distance` must be
+  ///     positive or zero.
+  /// - Returns: The index `distance` positions prior to `i` if in bounds, else
+  ///   `nil`.
+  ///
+  /// - Complexity:
+  ///   - O(1) if the collection conforms to `RandomAccessCollection`.
+  ///   - O(*k*), where *k* is equal to `distance` if the collection conforms
+  ///     to `BidirectionalCollection`.
+  ///   - Otherwise, O(*n*), where *n* is the length of the collection.
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  func _reverseOffsetIndex(_ i: Index, by distance: Int) -> Index?
+
   /// Returns the position immediately after the given index.
   ///
   /// The successor of an index must be well defined. For an index `i` into a
@@ -737,6 +760,17 @@ extension Collection {
     _precondition(
       range.upperBound <= bounds.upperBound,
       "Out of bounds: range begins after bounds.upperBound")
+  }
+
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @inlinable
+  public func _reverseOffsetIndex(_ i: Index, by distance: Int) -> Index? {
+    if distance == 0 { return i }
+    _precondition(distance > 0, "Negative distance")
+    let amount = self.distance(from: startIndex, to: i) - distance
+    guard amount >= 0 else { return nil }
+
+    return index(startIndex, offsetBy: amount)
   }
 
   /// Returns an index that is the specified distance from the given index.
@@ -1250,19 +1284,22 @@ extension Collection {
   /// - Returns: A subsequence that leaves off the specified number of elements
   ///   at the end.
   ///
-  /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
-  ///   the collection.
+  /// - Complexity:
+  ///   - O(1) if the collection conforms to `RandomAccessCollection`.
+  ///   - O(*k*), where *k* is equal to `distance` if the collection conforms
+  ///     to `BidirectionalCollection`.
+  ///   - Otherwise, O(*n*), where *n* is the length of the collection.
   @inlinable
   public __consuming func dropLast(_ k: Int = 1) -> SubSequence {
+    guard #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) else {
+      fatalError()
+    }
     _precondition(
       k >= 0, "Can't drop a negative number of elements from a collection")
-    let amount = Swift.max(0, count - k)
-    let end = index(startIndex,
-      offsetBy: amount, limitedBy: endIndex) ?? endIndex
+    let end = _reverseOffsetIndex(self.endIndex, by: k) ?? startIndex
     return self[startIndex..<end]
   }
-    
+
   /// Returns a subsequence by skipping elements while `predicate` returns
   /// `true` and returning the remaining elements.
   ///
@@ -1350,17 +1387,20 @@ extension Collection {
   /// - Returns: A subsequence terminating at the end of the collection with at
   ///   most `maxLength` elements.
   ///
-  /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
-  ///   the collection.
+  /// - Complexity:
+  ///   - O(1) if the collection conforms to `RandomAccessCollection`.
+  ///   - O(*k*), where *k* is equal to `maxLength` if the collection conforms
+  ///     to `BidirectionalCollection`.
+  ///   - Otherwise, O(*n*), where *n* is the length of the collection.
   @inlinable
   public __consuming func suffix(_ maxLength: Int) -> SubSequence {
+    guard #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) else {
+      fatalError()
+    }
     _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
-    let amount = Swift.max(0, count - maxLength)
-    let start = index(startIndex,
-      offsetBy: amount, limitedBy: endIndex) ?? endIndex
+    let start = _reverseOffsetIndex(self.endIndex, by: maxLength) ?? startIndex
     return self[start..<endIndex]
   }
 

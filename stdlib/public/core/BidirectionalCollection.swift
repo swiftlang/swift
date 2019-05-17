@@ -220,6 +220,13 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
 /// Default implementation for bidirectional collections.
 extension BidirectionalCollection {
 
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @inlinable
+  public func _reverseOffsetIndex(_ i: Index, by distance: Int) -> Index? {
+    _precondition(distance >= 0, "Negative distance")
+    return index(i, offsetBy: -distance, limitedBy: startIndex)
+  }
+
   @inlinable // protocol-only
   @inline(__always)
   public func formIndex(before i: inout Index) {
@@ -347,68 +354,3 @@ extension BidirectionalCollection where SubSequence == Self {
     self = self[startIndex..<index(endIndex, offsetBy: -k)]
   }
 }
-
-extension BidirectionalCollection {
-  /// Returns a subsequence containing all but the specified number of final
-  /// elements.
-  ///
-  /// If the number of elements to drop exceeds the number of elements in the
-  /// collection, the result is an empty subsequence.
-  ///
-  ///     let numbers = [1, 2, 3, 4, 5]
-  ///     print(numbers.dropLast(2))
-  ///     // Prints "[1, 2, 3]"
-  ///     print(numbers.dropLast(10))
-  ///     // Prints "[]"
-  ///
-  /// - Parameter k: The number of elements to drop off the end of the
-  ///   collection. `k` must be greater than or equal to zero.
-  /// - Returns: A subsequence that leaves off `k` elements from the end.
-  ///
-  /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
-  ///   elements to drop.
-  @inlinable // protocol-only
-  public __consuming func dropLast(_ k: Int) -> SubSequence {
-    _precondition(
-      k >= 0, "Can't drop a negative number of elements from a collection")
-    let end = index(
-      endIndex,
-      offsetBy: -k,
-      limitedBy: startIndex) ?? startIndex
-    return self[startIndex..<end]
-  }
-
-  /// Returns a subsequence, up to the given maximum length, containing the
-  /// final elements of the collection.
-  ///
-  /// If the maximum length exceeds the number of elements in the collection,
-  /// the result contains the entire collection.
-  ///
-  ///     let numbers = [1, 2, 3, 4, 5]
-  ///     print(numbers.suffix(2))
-  ///     // Prints "[4, 5]"
-  ///     print(numbers.suffix(10))
-  ///     // Prints "[1, 2, 3, 4, 5]"
-  ///
-  /// - Parameter maxLength: The maximum number of elements to return.
-  ///   `maxLength` must be greater than or equal to zero.
-  /// - Returns: A subsequence terminating at the end of the collection with at
-  ///   most `maxLength` elements.
-  ///
-  /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is equal to
-  ///   `maxLength`.
-  @inlinable // protocol-only
-  public __consuming func suffix(_ maxLength: Int) -> SubSequence {
-    _precondition(
-      maxLength >= 0,
-      "Can't take a suffix of negative length from a collection")
-    let start = index(
-      endIndex,
-      offsetBy: -maxLength,
-      limitedBy: startIndex) ?? startIndex
-    return self[start..<endIndex]
-  }
-}
-

@@ -87,6 +87,7 @@ set(SWIFTLIB_ESSENTIAL
   LazySequence.swift
   LegacyABI.swift
   LifetimeManager.swift
+  OffsetBound.swift
   ManagedBuffer.swift
   Map.swift
   MemoryLayout.swift

@@ -61,6 +61,107 @@ extension Substring {
   }
 }
 
+extension BidirectionalCollection {
+  /// Returns a subsequence, up to the given maximum length, containing the
+  /// final elements of the collection.
+  ///
+  /// If the maximum length exceeds the number of elements in the collection,
+  /// the result contains the entire collection.
+  ///
+  ///     let numbers = [1, 2, 3, 4, 5]
+  ///     print(numbers.suffix(2))
+  ///     // Prints "[4, 5]"
+  ///     print(numbers.suffix(10))
+  ///     // Prints "[1, 2, 3, 4, 5]"
+  ///
+  /// - Parameter maxLength: The maximum number of elements to return.
+  ///   `maxLength` must be greater than or equal to zero.
+  /// - Returns: A subsequence terminating at the end of the collection with at
+  ///   most `maxLength` elements.
+  ///
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is equal to
+  ///   `maxLength`.
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  @available(macOS, obsoleted: 9999)
+  @available(iOS, obsoleted: 9999)
+  @available(tvOS, obsoleted: 9999)
+  @available(watchOS, obsoleted: 9999)
+  @inlinable
+  public __consuming func suffix(_ maxLength: Int) -> SubSequence {
+    _precondition(
+      maxLength >= 0,
+      "Can't take a suffix of negative length from a collection")
+    let start = index(
+      endIndex,
+      offsetBy: -maxLength,
+      limitedBy: startIndex) ?? startIndex
+    return self[start..<endIndex]
+  }
+#else
+  @available(*, unavailable)
+  @inlinable
+  public __consuming func suffix(_ maxLength: Int) -> SubSequence {
+    _precondition(
+      maxLength >= 0,
+      "Can't take a suffix of negative length from a collection")
+    let start = index(
+      endIndex,
+      offsetBy: -maxLength,
+      limitedBy: startIndex) ?? startIndex
+    return self[start..<endIndex]
+  }
+#endif
+
+  /// Returns a subsequence containing all but the specified number of final
+  /// elements.
+  ///
+  /// If the number of elements to drop exceeds the number of elements in the
+  /// collection, the result is an empty subsequence.
+  ///
+  ///     let numbers = [1, 2, 3, 4, 5]
+  ///     print(numbers.dropLast(2))
+  ///     // Prints "[1, 2, 3]"
+  ///     print(numbers.dropLast(10))
+  ///     // Prints "[]"
+  ///
+  /// - Parameter k: The number of elements to drop off the end of the
+  ///   collection. `k` must be greater than or equal to zero.
+  /// - Returns: A subsequence that leaves off `k` elements from the end.
+  ///
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
+  ///   elements to drop.
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  @available(macOS, obsoleted: 9999)
+  @available(iOS, obsoleted: 9999)
+  @available(tvOS, obsoleted: 9999)
+  @available(watchOS, obsoleted: 9999)
+  @inlinable
+  public __consuming func dropLast(_ k: Int) -> SubSequence {
+    _precondition(
+      k >= 0, "Can't drop a negative number of elements from a collection")
+    let end = index(
+      endIndex,
+      offsetBy: -k,
+      limitedBy: startIndex) ?? startIndex
+    return self[startIndex..<end]
+  }
+#else
+  @available(*, unavailable)
+  @inlinable
+  public __consuming func dropLast(_ k: Int) -> SubSequence {
+    _precondition(
+      k >= 0, "Can't drop a negative number of elements from a collection")
+    let end = index(
+      endIndex,
+      offsetBy: -k,
+      limitedBy: startIndex) ?? startIndex
+    return self[startIndex..<end]
+  }
+#endif
+}
+
 // This function is no longer used but must be kept for ABI compatibility
 // because references to it may have been inlined.
 @usableFromInline

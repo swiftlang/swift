@@ -70,6 +70,7 @@
     "Sort.swift",
     "Range.swift",
     "ClosedRange.swift",
+    "OffsetBound.swift",
     "CollectionOfOne.swift",
     "BridgingBuffer.swift",
     "Sequence.swift",
