@@ -40,7 +40,6 @@ extension Parameter {
 
 extension Parameter : Differentiable, VectorNumeric {
   typealias TangentVector = Parameter
-  typealias CotangentVector = Parameter
   typealias Scalar = Float
   typealias Shape = ()
   init(repeating repeatedValue: Float, shape: ()) {
@@ -150,7 +149,7 @@ struct DiffWrtSelf : Differentiable {
     return (x, { (dself, dx, dy) in dx })
   }
   func _vjpCall<T : Differentiable, U : Differentiable>(_ x: T, _ y: U)
-    -> (T, (T.CotangentVector) -> (DiffWrtSelf.CotangentVector, T.CotangentVector, U.CotangentVector)) {
+    -> (T, (T.TangentVector) -> (DiffWrtSelf.TangentVector, T.TangentVector, U.TangentVector)) {
     return (x, { (.zero, $0, .zero) })
   }
 }
@@ -166,7 +165,6 @@ struct CustomParameter : Equatable {
 
 extension CustomParameter : Differentiable, VectorNumeric {
   typealias TangentVector = CustomParameter
-  typealias CotangentVector = CustomParameter
   typealias Scalar = Float
   typealias Shape = ()
   init(repeating repeatedValue: Float, shape: ()) {

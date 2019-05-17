@@ -58,9 +58,9 @@ extension Wrapper {
 
   @differentiating(multiply)
   func _vjpMultiply(_ x: Float)
-    -> (value: Float, pullback: (Float) -> (Wrapper.CotangentVector, Float)) {
+    -> (value: Float, pullback: (Float) -> (Wrapper.TangentVector, Float)) {
     return (float * x, { v in
-      (Wrapper.CotangentVector(float: v * x), v * self.float)
+      (Wrapper.TangentVector(float: v * x), v * self.float)
     })
   }
 }
@@ -68,7 +68,7 @@ DerivativeRegistrationTests.test("InstanceMethod") {
   let x: Float = 2
   let wrapper = Wrapper(float: 3)
   let (𝛁wrapper, 𝛁x) = wrapper.gradient(at: x) { wrapper, x in wrapper.multiply(x) }
-  expectEqual(Wrapper.CotangentVector(float: 2), 𝛁wrapper)
+  expectEqual(Wrapper.TangentVector(float: 2), 𝛁wrapper)
   expectEqual(3, 𝛁x)
 }
 
