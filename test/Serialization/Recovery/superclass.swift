@@ -30,9 +30,13 @@ public class A1_Sub: DisappearingSuperclass {}
 // CHECK-RECOVERY-NOT: class A2_Grandchild
 public class A2_Grandchild: A1_Sub {}
 
-// CHECK-LABEL: class B_ConstrainedGeneric<T> where T : DisappearingSuperclass {
-// CHECK-RECOVERY-NOT: class B_ConstrainedGeneric
-public class B_ConstrainedGeneric<T> where T: DisappearingSuperclass {}
+// CHECK-LABEL: class B1_ConstrainedGeneric<T> where T : DisappearingSuperclass {
+// CHECK-RECOVERY-NOT: class B1_ConstrainedGeneric
+public class B1_ConstrainedGeneric<T> where T: DisappearingSuperclass {}
+
+// CHECK-LABEL: struct B2_ConstrainedGeneric<T> where T : DisappearingSuperclass {
+// CHECK-RECOVERY-NOT: struct B2_ConstrainedGeneric
+public struct B2_ConstrainedGeneric<T> where T: DisappearingSuperclass {}
 
 // CHECK-ALWAYS-LABEL: class C1_GenericBase<T> {
 public class C1_GenericBase<T> {}

@@ -3145,11 +3145,19 @@ void Serializer::writeDecl(const Decl *D) {
     auto conformances = theStruct->getLocalConformances(
                           ConformanceLookupKind::All, nullptr);
 
-    SmallVector<TypeID, 4> inheritedTypes;
+    SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     for (auto inherited : theStruct->getInherited()) {
       assert(!inherited.getType()->hasArchetype());
-      inheritedTypes.push_back(addTypeRef(inherited.getType()));
+      inheritedAndDependencyTypes.push_back(addTypeRef(inherited.getType()));
     }
+
+    llvm::SmallSetVector<Type, 4> dependencyTypes;
+    for (Requirement req : theStruct->getGenericRequirements()) {
+      collectDependenciesFromRequirement(dependencyTypes, req,
+                                         /*excluding*/nullptr);
+    }
+    for (Type ty : dependencyTypes)
+      inheritedAndDependencyTypes.push_back(addTypeRef(ty));
 
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(theStruct->getFormalAccess());
@@ -3164,7 +3172,8 @@ void Serializer::writeDecl(const Decl *D) {
                                             theStruct->getGenericEnvironment()),
                              rawAccessLevel,
                              conformances.size(),
-                             inheritedTypes);
+                             theStruct->getInherited().size(),
+                             inheritedAndDependencyTypes);
 
 
     writeGenericParams(theStruct->getGenericParams());
