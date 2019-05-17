@@ -9,3 +9,4 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // REQUIRES: swift_stable_abi
+// REQUIRES: CPU=i386 || CPU=x86_64
