@@ -545,7 +545,9 @@ struct Score {
 };
 
 /// An AST node that can gain type information while solving.
-using TypedNode = llvm::PointerUnion3<Expr *, TypeLoc *, ParamDecl *>;
+using TypedNode =
+    llvm::PointerUnion3<const Expr *, const TypeLoc *,
+                        const ParamDecl *>;
 
 /// Display a score.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &out, const Score &score);
@@ -1738,12 +1740,12 @@ public:
     assert(type && "Expected non-null type");
 
     // Record the type.
-    if (auto expr = node.dyn_cast<Expr *>()) {
+    if (auto expr = node.dyn_cast<const Expr *>()) {
       ExprTypes[expr] = type.getPointer();
-    } else if (auto typeLoc = node.dyn_cast<TypeLoc *>()) {
+    } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
       TypeLocTypes[typeLoc] = type.getPointer();
     } else {
-      auto param = node.get<ParamDecl *>();
+      auto param = node.get<const ParamDecl *>();
       ParamTypes[param] = type.getPointer();
     }
 
@@ -1757,26 +1759,18 @@ public:
   /// map is used throughout the expression type checker in order to
   /// avoid mutating expressions until we know we have successfully
   /// type-checked them.
-  void setType(Expr *E, Type T) {
-    setType(TypedNode(E), T);
-  }
-
   void setType(TypeLoc &L, Type T) {
     setType(TypedNode(&L), T);
   }
 
-  void setType(ParamDecl *P, Type T) {
-    setType(TypedNode(P), T);
-  }
-
   /// Erase the type for the given node.
   void eraseType(TypedNode node) {
-    if (auto expr = node.dyn_cast<Expr *>()) {
+    if (auto expr = node.dyn_cast<const Expr *>()) {
       ExprTypes.erase(expr);
-    } else if (auto typeLoc = node.dyn_cast<TypeLoc *>()) {
+    } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
       TypeLocTypes.erase(typeLoc);
     } else {
-      auto param = node.get<ParamDecl *>();
+      auto param = node.get<const ParamDecl *>();
       ParamTypes.erase(param);
     }
   }
@@ -1788,12 +1782,20 @@ public:
   }
 
   bool hasType(const TypeLoc &L) const {
-    return TypeLocTypes.find(&L) != TypeLocTypes.end();
+    return hasType(TypedNode(&L));
   }
 
-  bool hasType(const ParamDecl *P) const {
-    assert(P != nullptr && "Expected non-null parameter!");
-    return ParamTypes.find(P) != ParamTypes.end();
+  /// Check to see if we have a type for a node.
+  bool hasType(TypedNode node) const {
+    assert(!node.isNull() && "Expected non-null node");
+    if (auto expr = node.dyn_cast<const Expr *>()) {
+      return ExprTypes.find(expr) != ExprTypes.end();
+    } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
+      return TypeLocTypes.find(typeLoc) != TypeLocTypes.end();
+    } else {
+      auto param = node.get<const ParamDecl *>();
+      return ParamTypes.find(param) != ParamTypes.end();
+    }
   }
 
   /// Get the type for an expression.

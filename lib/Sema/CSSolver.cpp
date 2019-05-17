@@ -250,7 +250,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Add the node types back.
   for (auto &nodeType : solution.addedNodeTypes) {
-    setType(nodeType.first, nodeType.second);
+    if (!hasType(nodeType.first))
+      setType(nodeType.first, nodeType.second);
   }
 
   // Register the conformances checked along the way to arrive to solution.
