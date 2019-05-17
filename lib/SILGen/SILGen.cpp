@@ -1747,16 +1747,15 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF) {
   // Emitting these may in turn force more definitions, so we have to take care
   // to keep pumping the queues.
   while (!SGM.forcedFunctions.empty()
-         || !SGM.forcedConformances.empty()) {
+         || !SGM.pendingConformances.empty()) {
     while (!SGM.forcedFunctions.empty()) {
       auto &front = SGM.forcedFunctions.front();
       front.second.emitter(SGM.getFunction(front.first, ForDefinition));
       SGM.forcedFunctions.pop_front();
     }
-    while (!SGM.forcedConformances.empty()) {
-      auto &front = SGM.forcedConformances.front();
-      SGM.getWitnessTable(front.first);
-      SGM.forcedConformances.pop_front();
+    while (!SGM.pendingConformances.empty()) {
+      SGM.getWitnessTable(SGM.pendingConformances.front());
+      SGM.pendingConformances.pop_front();
     }
   }
 

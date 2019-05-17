@@ -77,28 +77,16 @@ public:
   /// The most recent declaration we considered for emission.
   SILDeclRef lastEmittedFunction;
 
-  /// Set of used conformances for which witness tables need to be emitted.
-  llvm::DenseSet<RootProtocolConformance *> usedConformances;
-
   /// Bookkeeping to ensure that useConformancesFrom{ObjectiveC,}Type() is
   /// only called once for each unique type, as an optimization.
   llvm::DenseSet<TypeBase *> usedConformancesFromTypes;
   llvm::DenseSet<TypeBase *> usedConformancesFromObjectiveCTypes;
 
-  struct DelayedWitnessTable {
-    NormalProtocolConformance *insertAfter;
-  };
+  /// Queue of delayed conformances that need to be emitted.
+  std::deque<NormalProtocolConformance *> pendingConformances;
 
-  /// Set of conformances we delayed emitting witness tables for.
-  llvm::DenseMap<NormalProtocolConformance *, DelayedWitnessTable>
-    delayedConformances;
-
-  /// Queue of delayed conformances that need to be forced.
-  std::deque<std::pair<NormalProtocolConformance *, DelayedWitnessTable>>
-    forcedConformances;
-
-  /// The most recent conformance...
-  NormalProtocolConformance *lastEmittedConformance = nullptr;
+  /// Set of delayed conformances that have already been forced.
+  llvm::DenseSet<NormalProtocolConformance *> forcedConformances;
 
   /// Profiler instances for constructors, grouped by associated decl.
   /// Each profiler is shared by all member initializers for a nominal type.
@@ -278,9 +266,6 @@ public:
   
   /// Emit SIL related to a Clang-imported declaration.
   void emitExternalDefinition(Decl *d);
-
-  /// Emit SIL related to a Clang-imported declaration.
-  void emitExternalWitnessTable(NormalProtocolConformance *d);
 
   /// Emit the ObjC-compatible entry point for a method.
   void emitObjCMethodThunk(FuncDecl *method);

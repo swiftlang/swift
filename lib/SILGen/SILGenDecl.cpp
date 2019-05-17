@@ -1391,17 +1391,6 @@ CleanupHandle SILGenFunction::enterDeinitExistentialCleanup(
   return Cleanups.getTopCleanup();
 }
 
-void SILGenModule::emitExternalWitnessTable(NormalProtocolConformance *c) {
-  // Emit the witness table right now if we used it.
-  if (usedConformances.count(c)) {
-    getWitnessTable(c);
-    return;
-  }
-  // Otherwise, remember it for later.
-  delayedConformances.insert({c, {lastEmittedConformance}});
-  lastEmittedConformance = c;
-}
-
 static bool isDeclaredInPrimaryFile(SILModule &M, Decl *d) {
   auto *dc = d->getDeclContext();
   if (auto *sf = dyn_cast<SourceFile>(dc->getModuleScopeContext()))
@@ -1433,22 +1422,9 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   }
   case DeclKind::Enum:
   case DeclKind::Struct:
-  case DeclKind::Class: {
-    // Emit witness tables.
-    auto nom = cast<NominalTypeDecl>(d);
-    for (auto c : nom->getLocalConformances(ConformanceLookupKind::NonInherited,
-                                            nullptr)) {
-      auto *proto = c->getProtocol();
-      if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto) &&
-          isa<NormalProtocolConformance>(c)) {
-        emitExternalWitnessTable(cast<NormalProtocolConformance>(c));
-      }
-    }
-    break;
-  }
-
+  case DeclKind::Class:
   case DeclKind::Protocol:
-    // Nothing to do in SILGen for other external types.
+    // Nothing to do in SILGen for external types.
     break;
 
   case DeclKind::Var:
