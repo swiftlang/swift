@@ -41,8 +41,8 @@ f0(f)
 f0(b)
 f1(i)
 
-f1(f) // expected-error{{argument type 'Float' does not conform to expected type 'Fooable'}}
-f1(b) // expected-error{{argument type 'Barable' does not conform to expected type 'Fooable'}}
+f1(f) // expected-error{{argument type 'Float' does not conform to expected type 'Barable & Fooable'}}
+f1(b) // expected-error{{argument type 'Barable' does not conform to expected type 'Barable & Fooable'}}
 
 //===----------------------------------------------------------------------===//
 // Subtyping

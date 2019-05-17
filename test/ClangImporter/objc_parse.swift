@@ -201,7 +201,7 @@ func testProtocols(_ b: B, bp: BProto) {
   var c1 : Cat1Proto = b
   var bcat1 = b.getAsProtoWithCat()!
   c1 = bcat1
-  bcat1 = c1 // expected-error{{value of type 'Cat1Proto' does not conform to 'BProto' in assignment}}
+  bcat1 = c1 // expected-error{{value of type 'Cat1Proto' does not conform to 'BProto & Cat1Proto' in assignment}}
 }
 
 // Methods only defined in a protocol
