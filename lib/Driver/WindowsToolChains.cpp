@@ -100,6 +100,12 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(Target));
   }
 
+  // Rely on `-libc` to correctly identify the MSVC Runtime Library.  We use
+  // `-nostartfiles` as that limits the difference to just the
+  // `-defaultlib:libcmt` which is passed unconditionally with the `clang++`
+  // driver rather than the `clang-cl` driver.
+  Arguments.push_back("-nostartfiles");
+
   SmallString<128> SharedRuntimeLibPath;
   getRuntimeLibraryPath(SharedRuntimeLibPath, context.Args,
                         /*Shared=*/true);
