@@ -333,7 +333,7 @@ private:
 
     /// The `[differentiable]` attribute associated with the
     /// `SILDifferentiableAttribute` case.
-    SILDifferentiableAttr * silDifferentiableAttribute;
+    SILDifferentiableAttr *silDifferentiableAttribute;
     Value(SILDifferentiableAttr *attr) : silDifferentiableAttribute(attr) {}
   } value;
 
@@ -896,10 +896,10 @@ public:
   /// Get or create an associated function index subset thunk from
   /// `actualIndices` to `desiredIndices` for the given associated function
   /// value and original function operand.
-  /// Calls `getOrCreateLinearMapIndexSubsetThunk` to thunk the linear map
-  /// returned by the associated function.
+  /// Calls `getOrCreateSubsetParametersThunkForLinearMap` to thunk the linear
+  /// map returned by the associated function.
   std::pair<SILFunction *, SubstitutionMap>
-  getOrCreateAssociatedFunctionIndexSubsetThunk(
+  getOrCreateSubsetParametersThunkForAssociatedFunction(
       SILValue origFnOperand, SILValue assocFn,
       AutoDiffAssociatedFunctionKind kind, SILAutoDiffIndices desiredIndices,
       SILAutoDiffIndices actualIndices);
@@ -907,7 +907,7 @@ public:
   /// Get or create an associated function index subset thunk from
   /// `actualIndices` to `desiredIndices` for the given associated function
   /// value and original function operand.
-  SILFunction *getOrCreateLinearMapIndexSubsetThunk(
+  SILFunction *getOrCreateSubsetParametersThunkForLinearMap(
       SILFunction *assocFn, CanSILFunctionType linearMapType,
       CanSILFunctionType targetType, AutoDiffAssociatedFunctionKind kind,
       SILAutoDiffIndices desiredIndices, SILAutoDiffIndices actualIndices);
@@ -1984,6 +1984,41 @@ emitAssociatedFunctionReference(
   context.emitNondifferentiabilityError(original, invoker,
       diag::autodiff_opaque_function_not_differentiable);
   return None;
+}
+
+/// Emit a zero value into the given buffer access by calling
+/// `AdditiveArithmetic.zero`. The given type must conform to
+/// `AdditiveArithmetic`.
+static void emitZeroIntoBuffer(
+    SILBuilder &builder, CanType type, SILValue bufferAccess,
+    SILLocation loc) {
+  auto &astCtx = builder.getASTContext();
+  auto *swiftMod = builder.getModule().getSwiftModule();
+  auto &typeConverter = builder.getModule().Types;
+  // Look up conformance to `AdditiveArithmetic`.
+  auto *additiveArithmeticProto =
+      astCtx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
+  auto confRef = swiftMod->lookupConformance(type, additiveArithmeticProto);
+  assert(confRef.hasValue() && "Missing conformance to `AdditiveArithmetic`");
+  // Look up `AdditiveArithmetic.zero.getter`.
+  auto zeroDeclLookup = additiveArithmeticProto->lookupDirect(astCtx.Id_zero);
+  auto *zeroDecl = cast<VarDecl>(zeroDeclLookup.front());
+  assert(zeroDecl->isProtocolRequirement());
+  auto *accessorDecl = zeroDecl->getAccessor(AccessorKind::Get);
+  SILDeclRef accessorDeclRef(accessorDecl, SILDeclRef::Kind::Func);
+  auto silFnType = typeConverter.getConstantType(accessorDeclRef);
+  // %wm = witness_method ...
+  auto *getter = builder.createWitnessMethod(
+      loc, type, *confRef, accessorDeclRef, silFnType);
+  // %metatype = metatype $T
+  auto metatypeType = CanMetatypeType::get(
+      type, MetatypeRepresentation::Thick);
+  auto metatype = builder.createMetatype(
+      loc, SILType::getPrimitiveObjectType(metatypeType));
+  auto subMap = SubstitutionMap::getProtocolSubstitutions(
+      additiveArithmeticProto, type, *confRef);
+  builder.createApply(loc, getter, subMap, {bufferAccess, metatype},
+                      /*isNonThrowing*/ false);
 }
 
 //===----------------------------------------------------------------------===//
@@ -4823,35 +4858,9 @@ void AdjointEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
       LookUpConformanceInModule(swiftMod));
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
-  case VectorSpace::Kind::Vector: {
-    // Look up conformance to `AdditiveArithmetic`.
-    auto *additiveArithmeticProto =
-        getASTContext().getProtocol(KnownProtocolKind::AdditiveArithmetic);
-    auto confRef = swiftMod->lookupConformance(type, additiveArithmeticProto);
-    assert(confRef.hasValue() && "Missing conformance to `AdditiveArithmetic`");
-    // Look up `AdditiveArithmetic.zero.getter`.
-    auto zeroDeclLookup =
-        additiveArithmeticProto->lookupDirect(getASTContext().Id_zero);
-    auto *zeroDecl = cast<VarDecl>(zeroDeclLookup.front());
-    assert(zeroDecl->isProtocolRequirement());
-    auto *accessorDecl = zeroDecl->getAccessor(AccessorKind::Get);
-    SILDeclRef accessorDeclRef(accessorDecl, SILDeclRef::Kind::Func);
-    auto silFnType =
-        getContext().getTypeConverter().getConstantType(accessorDeclRef);
-    // %wm = witness_method ...
-    auto *getter = builder.createWitnessMethod(
-        loc, type, *confRef, accessorDeclRef, silFnType);
-    // %metatype = metatype $T
-    auto metatypeType = CanMetatypeType::get(
-        type, MetatypeRepresentation::Thick);
-    auto metatype = builder.createMetatype(
-        loc, SILType::getPrimitiveObjectType(metatypeType));
-    auto subMap = SubstitutionMap::getProtocolSubstitutions(
-        additiveArithmeticProto, type, *confRef);
-    builder.createApply(loc, getter, subMap, {bufferAccess, metatype},
-                        /*isNonThrowing*/ false);
+  case VectorSpace::Kind::Vector:
+    emitZeroIntoBuffer(builder, type, bufferAccess, loc);
     return;
-  }
   case VectorSpace::Kind::Tuple: {
     auto tupleType = tangentSpace->getTuple();
     SmallVector<SILValue, 8> zeroElements;
@@ -5173,8 +5182,8 @@ bool VJPEmitter::run() {
   // Create entry BB and arguments.
   auto *entry = vjp->createBasicBlock();
   createEntryArguments(vjp);
-  auto entryArgs = map<SmallVector<SILValue, 4>>(
-      entry->getArguments(), [](SILArgument *arg) { return arg; });
+  SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
+                                     entry->getArguments().end());
 
   auto vjpGenericSig = vjp->getLoweredFunctionType()->getGenericSignature();
   auto *primalValueStructDecl =
@@ -5313,7 +5322,7 @@ static SILFunction* createJVP(
       jvpGenericSig);
 
   SILOptFunctionBuilder fb(context.getTransform());
-  auto linkage = autodiff::getAutoDiffFunctionLinkage(
+  auto linkage = autodiff::getAutoDiffAssociatedFunctionLinkage(
       original->getLinkage(), isExported);
   auto *jvp = fb.createFunction(linkage, jvpName, jvpType, jvpGenericEnv,
                                 original->getLocation(), original->isBare(),
@@ -5372,7 +5381,7 @@ static SILFunction *createEmptyVJP(
       LookUpConformanceInModule(module.getSwiftModule()), vjpGenericSig);
 
   SILOptFunctionBuilder fb(context.getTransform());
-  auto linkage = autodiff::getAutoDiffFunctionLinkage(
+  auto linkage = autodiff::getAutoDiffAssociatedFunctionLinkage(
       original->getLinkage(), isExported);
   auto *vjp = fb.createFunction(linkage, vjpName, vjpType, vjpGenericEnv,
                                 original->getLocation(), original->isBare(),
@@ -5475,12 +5484,10 @@ public:
 } // end anonymous namespace
 
 SILFunction *
-ADContext::getOrCreateLinearMapIndexSubsetThunk(
+ADContext::getOrCreateSubsetParametersThunkForLinearMap(
     SILFunction *parentThunk, CanSILFunctionType linearMapType,
     CanSILFunctionType targetType, AutoDiffAssociatedFunctionKind kind,
     SILAutoDiffIndices desiredIndices, SILAutoDiffIndices actualIndices) {
-  auto &astCtx = getASTContext();
-
   SubstitutionMap interfaceSubs = parentThunk->getForwardingSubstitutionMap();
   GenericEnvironment *genericEnv = parentThunk->getGenericEnvironment();
   auto thunkType = buildThunkType(
@@ -5536,53 +5543,26 @@ ADContext::getOrCreateLinearMapIndexSubsetThunk(
       LookUpConformanceInModule(swiftMod));
     assert(tangentSpace && "No tangent space for this type");
     switch (tangentSpace->getKind()) {
-      case VectorSpace::Kind::Vector: {
-        auto *buff = builder.createAllocStack(loc, zeroSILObjType);
-        localAllocations.push_back(buff);
-        // Look up conformance to `AdditiveArithmetic`.
-        auto *additiveArithmeticProto =
-          astCtx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-        auto confRef = swiftMod->lookupConformance(
-            zeroType, additiveArithmeticProto);
-        assert(confRef.hasValue() &&
-               "Missing conformance to `AdditiveArithmetic`");
-        // Look up `AdditiveArithmetic.zero.getter`.
-        auto zeroDeclLookup =
-            additiveArithmeticProto->lookupDirect(astCtx.Id_zero);
-        auto *zeroDecl = cast<VarDecl>(zeroDeclLookup.front());
-        assert(zeroDecl->isProtocolRequirement());
-        auto *accessorDecl = zeroDecl->getAccessor(AccessorKind::Get);
-        SILDeclRef accessorDeclRef(accessorDecl, SILDeclRef::Kind::Func);
-        auto silFnType =
-            getTypeConverter().getConstantType(accessorDeclRef);
-        // %wm = witness_method ...
-        auto *getter = builder.createWitnessMethod(
-            loc, zeroType, *confRef, accessorDeclRef, silFnType);
-        // %metatype = metatype $T
-        auto metatypeType = CanMetatypeType::get(
-            zeroType, MetatypeRepresentation::Thick);
-        auto metatype = builder.createMetatype(
-            loc, SILType::getPrimitiveObjectType(metatypeType));
-        auto subMap = SubstitutionMap::getProtocolSubstitutions(
-            additiveArithmeticProto, zeroType, *confRef);
-        builder.createApply(loc, getter, subMap, {buff, metatype},
-                            /*isNonThrowing*/ false);
-        if (zeroSILType.isAddress())
-          arguments.push_back(buff);
-        else {
-          auto loq = getBufferLOQ(buff->getType().getASTType(), *thunk);
-          auto *arg = builder.createLoad(loc, buff, loq);
-          arguments.push_back(arg);
-        }
-        break;
+    case VectorSpace::Kind::Vector: {
+      auto *buf = builder.createAllocStack(loc, zeroSILObjType);
+      localAllocations.push_back(buf);
+      emitZeroIntoBuffer(builder, zeroType, buf, loc);
+      if (zeroSILType.isAddress())
+        arguments.push_back(buf);
+      else {
+        auto loq = getBufferLOQ(buf->getType().getASTType(), *thunk);
+        auto *arg = builder.createLoad(loc, buf, loq);
+        arguments.push_back(arg);
       }
-      case VectorSpace::Kind::Tuple: {
-        llvm_unreachable(
-            "Unimplemented: Handle zero initialization for tuples");
-      }
-      case VectorSpace::Kind::Function:
-        llvm_unreachable(
-            "Unimplemented: Emit thunks for abstracting zero initialization");
+      break;
+    }
+    case VectorSpace::Kind::Tuple: {
+      llvm_unreachable(
+          "Unimplemented: Handle zero initialization for tuples");
+    }
+    case VectorSpace::Kind::Function:
+      llvm_unreachable(
+          "Unimplemented: Emit thunks for abstracting zero initialization");
     }
   };
 
@@ -5698,7 +5678,7 @@ ADContext::getOrCreateLinearMapIndexSubsetThunk(
 }
 
 std::pair<SILFunction *, SubstitutionMap>
-ADContext::getOrCreateAssociatedFunctionIndexSubsetThunk(
+ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
     SILValue origFnOperand, SILValue assocFn,
     AutoDiffAssociatedFunctionKind kind, SILAutoDiffIndices desiredIndices,
     SILAutoDiffIndices actualIndices) {
@@ -5819,7 +5799,7 @@ ADContext::getOrCreateAssociatedFunctionIndexSubsetThunk(
   auto linearMapTargetType = targetType->getResults().back().getSILStorageType()
       .castTo<SILFunctionType>();
 
-  auto *innerThunk = getOrCreateLinearMapIndexSubsetThunk(
+  auto *innerThunk = getOrCreateSubsetParametersThunkForLinearMap(
       thunk, linearMapType, linearMapTargetType, kind,
       desiredIndices, actualIndices);
 
@@ -5903,8 +5883,8 @@ SILValue ADContext::promoteToDifferentiableFunction(
           return nullptr;
 
         auto *newThunkRef = builder.createFunctionRef(loc, newThunk);
-        auto arguments = map<SmallVector<SILValue, 8>>(
-            ai->getArguments(), [](SILValue v) { return v; });
+        SmallVector<SILValue, 8> arguments(ai->getArguments().begin(),
+                                           ai->getArguments().end());
         auto *newApply = builder.createApply(
             ai->getLoc(), newThunkRef, ai->getSubstitutionMap(), arguments,
             ai->isNonThrowing());
@@ -5947,7 +5927,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
       SILFunction *thunk;
       SubstitutionMap interfaceSubs;
       std::tie(thunk, interfaceSubs) =
-          getOrCreateAssociatedFunctionIndexSubsetThunk(
+          getOrCreateSubsetParametersThunkForAssociatedFunction(
               origFnOperand, assocFn, assocFnKind, desiredIndices,
               actualIndices);
       auto *thunkFRI = builder.createFunctionRef(loc, thunk);
@@ -6078,8 +6058,8 @@ void Differentiation::run() {
     context.getAutoDiffFunctionInsts().pop_back();
     // Skip instructions that have been set to nullptr by
     // `processAutoDiffFunctionInst`.
-    if (adfi)
-      errorOccurred |= context.processAutoDiffFunctionInst(adfi);
+    if (!adfi) continue;
+    errorOccurred |= context.processAutoDiffFunctionInst(adfi);
   }
 
   // If any error occurred while processing `[differentiable]` attributes or
