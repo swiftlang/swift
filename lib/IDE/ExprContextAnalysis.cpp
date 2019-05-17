@@ -451,6 +451,7 @@ bool collectPossibleCalleesForSubscript(
   if (subscriptExpr->hasDecl()) {
     if (auto SD = dyn_cast<SubscriptDecl>(subscriptExpr->getDecl().getDecl())) {
       auto declType = SD->getInterfaceType();
+      declType = declType.subst(subscriptExpr->getDecl().getSubstitutions());
       if (auto *funcType = declType->getAs<AnyFunctionType>())
         candidates.emplace_back(funcType, SD);
     }

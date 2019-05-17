@@ -925,12 +925,9 @@ ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
                                         rSquareLoc,
                                         trailingClosure,
                                         SyntaxKind::FunctionCallArgumentList);
-    if (status.hasCodeCompletion())
-      return makeParserCodeCompletionResult<Expr>();
-    if (status.isError())
-      return nullptr;
     SyntaxContext->createNodeInPlace(SyntaxKind::SubscriptExpr);
     return makeParserResult(
+      status,
       SubscriptExpr::create(Context, superRef, lSquareLoc, indexArgs,
                             indexArgLabels, indexArgLabelLocs, rSquareLoc,
                             trailingClosure, ConcreteDeclRef(),
