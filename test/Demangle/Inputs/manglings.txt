@@ -326,6 +326,7 @@ _$S3BBBBf0602365061_ ---> _$S3BBBBf0602365061_
 _$S3BBBBi0602365061_ ---> _$S3BBBBi0602365061_
 _$S3BBBBv0602365061_ ---> _$S3BBBBv0602365061_
 _T0lxxxmmmTk ---> _T0lxxxmmmTk
+$s4test3fooV4blahyAA1SV1fQryFQOy_Qo_AHF ---> test.foo.blah(<<opaque return type of test.S.f() -> some>>.0) -> <<opaque return type of test.S.f() -> some>>.0
 $S3nix8MystructV1xACyxGx_tcfc7MyaliasL_ayx__GD ---> Myalias #1 in nix.Mystruct<A>.init(x: A) -> nix.Mystruct<A>
 $S3nix7MyclassCfd7MyaliasL_ayx__GD ---> Myalias #1 in nix.Myclass<A>.deinit
 $S3nix8MystructVyS2icig7MyaliasL_ayx__GD ---> Myalias #1 in nix.Mystruct<A>.subscript.getter : (Swift.Int) -> Swift.Int

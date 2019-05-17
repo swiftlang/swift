@@ -25,10 +25,10 @@
 AVAILABILITY_PLATFORM(iOS, "iOS")
 AVAILABILITY_PLATFORM(tvOS, "tvOS")
 AVAILABILITY_PLATFORM(watchOS, "watchOS")
-AVAILABILITY_PLATFORM(OSX, "OS X")
-AVAILABILITY_PLATFORM(iOSApplicationExtension, "iOS application extension")
-AVAILABILITY_PLATFORM(tvOSApplicationExtension, "tvOS application extension")
-AVAILABILITY_PLATFORM(watchOSApplicationExtension, "watchOS application extension")
-AVAILABILITY_PLATFORM(OSXApplicationExtension, "OS X application extension")
+AVAILABILITY_PLATFORM(OSX, "macOS")
+AVAILABILITY_PLATFORM(iOSApplicationExtension, "application extensions for iOS")
+AVAILABILITY_PLATFORM(tvOSApplicationExtension, "application extensions for tvOS")
+AVAILABILITY_PLATFORM(watchOSApplicationExtension, "application extensions for watchOS")
+AVAILABILITY_PLATFORM(OSXApplicationExtension, "application extensions for macOS")
 
 #undef AVAILABILITY_PLATFORM

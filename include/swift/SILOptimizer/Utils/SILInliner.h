@@ -120,6 +120,29 @@ public:
   std::pair<SILBasicBlock::iterator, SILBasicBlock *>
   inlineFunction(SILFunction *calleeFunction, FullApplySite apply,
                  ArrayRef<SILValue> appliedArgs);
+
+  /// Inline the function called by the given full apply site. This creates
+  /// an instance of SILInliner by constructing a substitution map and
+  /// OpenedArchetypesTracker from the given apply site, and invokes
+  /// `inlineFunction` method on the SILInliner instance to inline the callee.
+  /// This requires the full apply site to be a direct call i.e., the apply
+  /// instruction must have a function ref.
+  ///
+  /// *NOTE*:This attempts to perform inlining unconditionally and thus asserts
+  /// if inlining will fail. All users /must/ check that a function is allowed
+  /// to be inlined using SILInliner::canInlineApplySite before calling this
+  /// function.
+  ///
+  /// *NOTE*: Inlining can result in improperly nested stack allocations, which
+  /// must be corrected after inlining. See needsUpdateStackNesting().
+  ///
+  /// Returns an iterator to the first inlined instruction (or the end of the
+  /// caller block for empty functions) and the last block in function order
+  /// containing inlined instructions (the original caller block for
+  /// single-block functions).
+  static std::pair<SILBasicBlock::iterator, SILBasicBlock *>
+  inlineFullApply(FullApplySite apply, SILInliner::InlineKind inlineKind,
+                  SILOptFunctionBuilder &funcBuilder);
 };
 
 } // end namespace swift

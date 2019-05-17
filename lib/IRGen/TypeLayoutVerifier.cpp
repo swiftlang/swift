@@ -115,7 +115,7 @@ IRGenTypeVerifierFunction::emit(ArrayRef<CanType> formalTypes) {
         auto fixedXIOpaque = Builder.CreateBitCast(fixedXIBuf,
                                                        IGM.OpaquePtrTy);
         auto xiMask = fixedTI->getFixedExtraInhabitantMask(IGM);
-        auto xiSchema = EnumPayloadSchema::withBitSize(xiMask.getBitWidth());
+        auto xiSchema = EnumPayloadSchema(xiMask.getBitWidth());
 
         auto maxXiCount = std::min(xiCount, 256u);
         auto numCases = llvm::ConstantInt::get(IGM.Int32Ty, maxXiCount);

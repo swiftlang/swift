@@ -2361,6 +2361,9 @@ void Remangler::mangleOpaqueReturnTypeOf(Node *node) {
   Buffer << "QO";
 }
 void Remangler::mangleOpaqueType(Node *node) {
+  SubstitutionEntry entry;
+  if (trySubstitution(node, entry)) return;
+
   mangle(node->getChild(0));
   auto boundGenerics = node->getChild(2);
   for (unsigned i = 0; i < boundGenerics->getNumChildren(); ++i) {
@@ -2375,6 +2378,8 @@ void Remangler::mangleOpaqueType(Node *node) {
   }
   Buffer << "Qo";
   mangleIndex(node->getChild(1)->getIndex());
+
+  addSubstitution(entry);
 }
 void Remangler::mangleAccessorFunctionReference(Node *node) {
   unreachable("can't remangle");

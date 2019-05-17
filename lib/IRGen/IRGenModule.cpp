@@ -543,8 +543,18 @@ namespace RuntimeConstants {
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
   const auto FirstParamReturned = llvm::Attribute::Returned;
-  // SWIFT_ENABLE_TENSORFLOW
-  const auto FirstParamStructRet = llvm::Attribute::StructRet;
+  
+  bool AlwaysAvailable(ASTContext &Context) {
+    return false;
+  }
+  
+  bool OpaqueTypeAvailability(ASTContext &Context) {
+    auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(Context);
+    auto featureAvailability = Context.getOpaqueTypeAvailability();
+    
+    return !deploymentAvailability.isContainedIn(featureAvailability);
+  }
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
@@ -594,6 +604,7 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
                       llvm::Constant *&cache,
                       const char *name,
                       llvm::CallingConv::ID cc,
+                      bool isWeakLinked,
                       llvm::ArrayRef<llvm::Type*> retTypes,
                       llvm::ArrayRef<llvm::Type*> argTypes,
                       ArrayRef<Attribute::AttrKind> attrs) {
@@ -625,6 +636,10 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
     if (!isStandardLibrary(Module) && IsExternal &&
         ::useDllStorage(llvm::Triple(Module.getTargetTriple())))
       fn->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
+    
+    if (IsExternal && isWeakLinked
+        && !::useDllStorage(llvm::Triple(Module.getTargetTriple())))
+      fn->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
 
     llvm::AttrBuilder buildFnAttr;
     llvm::AttrBuilder buildRetAttr;
@@ -650,8 +665,8 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
 #define QUOTE(...) __VA_ARGS__
 #define STR(X)     #X
 
-#define FUNCTION(ID, NAME, CC, RETURNS, ARGS, ATTRS)                           \
-  FUNCTION_IMPL(ID, NAME, CC, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
+#define FUNCTION(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS) \
+  FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
 
 #define RETURNS(...) { __VA_ARGS__ }
 #define ARGS(...) { __VA_ARGS__ }
@@ -659,10 +674,12 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
 #define ATTRS(...) { __VA_ARGS__ }
 #define NO_ATTRS {}
 
-#define FUNCTION_IMPL(ID, NAME, CC, RETURNS, ARGS, ATTRS)                      \
+#define FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS)        \
   llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
     using namespace RuntimeConstants;                                          \
-    return getRuntimeFn(Module, ID##Fn, #NAME, CC, RETURNS, ARGS, ATTRS);      \
+    return getRuntimeFn(Module, ID##Fn, #NAME, CC,                             \
+                        (AVAILABILITY)(this->Context),                         \
+                        RETURNS, ARGS, ATTRS);                                 \
   }
 
 #include "swift/Runtime/RuntimeFunctions.def"

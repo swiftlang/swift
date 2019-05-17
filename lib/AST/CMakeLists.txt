@@ -4,9 +4,9 @@ if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
 endif()
 
 if(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
-  set(SWIFTAST_LLVM_COMPONENT_DEPENDS)
+  set(SWIFTAST_LLVM_LINK_COMPONENTS)
 else()
-  set(SWIFTAST_LLVM_COMPONENT_DEPENDS
+  set(SWIFTAST_LLVM_LINK_COMPONENTS
     bitreader bitwriter coroutines coverage irreader debuginfoDWARF
     profiledata instrumentation object objcarcopts mc mcparser
     bitreader bitwriter lto ipo option core support ${LLVM_TARGETS_TO_BUILD}
@@ -77,8 +77,8 @@ add_swift_host_library(swiftAST STATIC
   UnqualifiedLookup.cpp
   USRGeneration.cpp
 
-  LLVM_COMPONENT_DEPENDS
-    ${SWIFTAST_LLVM_COMPONENT_DEPENDS}
+  LLVM_LINK_COMPONENTS
+  ${SWIFTAST_LLVM_LINK_COMPONENTS}
 
   ${EXTRA_AST_FLAGS}
   )

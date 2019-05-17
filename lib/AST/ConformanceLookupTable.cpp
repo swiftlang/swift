@@ -989,10 +989,30 @@ void ConformanceLookupTable::lookupConformances(
                        return true;
 
                      // If we are to filter out this result, do so now.
-                     if (lookupKind == ConformanceLookupKind::OnlyExplicit &&
-                         entry->getKind() != ConformanceEntryKind::Explicit &&
-                         entry->getKind() != ConformanceEntryKind::Synthesized)
-                       return false;
+                     switch (lookupKind) {
+                     case ConformanceLookupKind::OnlyExplicit:
+                       switch (entry->getKind()) {
+                       case ConformanceEntryKind::Explicit:
+                       case ConformanceEntryKind::Synthesized:
+                         break;
+                       case ConformanceEntryKind::Implied:
+                       case ConformanceEntryKind::Inherited:
+                         return false;
+                       }
+                       break;
+                     case ConformanceLookupKind::NonInherited:
+                       switch (entry->getKind()) {
+                       case ConformanceEntryKind::Explicit:
+                       case ConformanceEntryKind::Synthesized:
+                       case ConformanceEntryKind::Implied:
+                         break;
+                       case ConformanceEntryKind::Inherited:
+                         return false;
+                       }
+                       break;
+                     case ConformanceLookupKind::All:
+                       break;
+                     }
 
                      // Record the protocol.
                      if (protocols)

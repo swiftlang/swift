@@ -2180,6 +2180,12 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       << boundType->getString() << " := "
       << refType->getString() << ")\n";
   }
+
+  // If this overload is disfavored, note that.
+  if (choice.isDecl() &&
+      choice.getDecl()->getAttrs().hasAttribute<DisfavoredOverloadAttr>()) {
+    increaseScore(SK_DisfavoredOverload);
+  }
 }
 
 template <typename Fn>
@@ -2205,6 +2211,8 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
       // FIXME: It's kind of weird in general that we have to look
       // through lvalue, inout and IUO types here
       Type lookupBaseType = newBase->getWithoutSpecifierType();
+      if (auto selfType = lookupBaseType->getAs<DynamicSelfType>())
+        lookupBaseType = selfType->getSelfType();
 
       if (lookupBaseType->mayHaveMembers() ||
           lookupBaseType->is<DynamicSelfType>()) {
@@ -2265,7 +2273,7 @@ size_t Solution::getTotalMemory() const {
          llvm::capacity_in_bytes(Fixes) + DisjunctionChoices.getMemorySize() +
          OpenedTypes.getMemorySize() + OpenedExistentialTypes.getMemorySize() +
          (DefaultedConstraints.size() * sizeof(void *)) +
-         llvm::capacity_in_bytes(Conformances);
+         Conformances.size() * sizeof(std::pair<ConstraintLocator *, ProtocolConformanceRef>);
 }
 
 DeclName OverloadChoice::getName() const {
@@ -2690,6 +2698,18 @@ Expr *constraints::getArgumentExpr(Expr *expr, unsigned index) {
 
   assert(isa<TupleExpr>(argExpr));
   return cast<TupleExpr>(argExpr)->getElement(index);
+}
+
+bool constraints::isAutoClosureArgument(Expr *argExpr) {
+  if (!argExpr)
+    return false;
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(argExpr)) {
+    if (auto *param = dyn_cast<ParamDecl>(DRE->getDecl()))
+      return param->isAutoClosure();
+  }
+
+  return false;
 }
 
 void ConstraintSystem::generateConstraints(

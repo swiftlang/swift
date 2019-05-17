@@ -936,6 +936,25 @@ RValue RValueEmitter::visitOtherConstructorDeclRefExpr(
 }
 
 RValue RValueEmitter::visitNilLiteralExpr(NilLiteralExpr *E, SGFContext C) {
+  // Peephole away the call to Optional<T>(nilLiteral: ()).
+  if (E->getType()->getOptionalObjectType()) {
+    auto *noneDecl = SGF.getASTContext().getOptionalNoneDecl();
+    auto enumTy = SGF.getLoweredType(E->getType());
+
+    ManagedValue noneValue;
+    if (enumTy.isLoadable(SGF.F) || !SGF.silConv.useLoweredAddresses()) {
+      noneValue = ManagedValue::forUnmanaged(
+        SGF.B.createEnum(E, SILValue(), noneDecl, enumTy));
+    } else {
+      noneValue =
+          SGF.B.bufferForExpr(E, enumTy, SGF.getTypeLowering(enumTy), C,
+                              [&](SILValue newAddr) {
+                                SGF.B.createInjectEnumAddr(E, newAddr, noneDecl);
+                              });
+    }
+    return RValue(SGF, E, noneValue);
+  }
+
   return SGF.emitLiteral(E, C);
 }
 

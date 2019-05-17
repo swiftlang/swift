@@ -542,7 +542,7 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
   unsigned AccessKindForMain =
       static_cast<unsigned>(MainAccess.getAccessKind());
 
-  if (const ValueDecl *VD = Storage.getDecl(F)) {
+  if (const ValueDecl *VD = Storage.getDecl()) {
     // We have a declaration, so mention the identifier in the diagnostic.
     SILType BaseType = FirstAccess.getInstruction()->getType().getAddressType();
     SILModule &M = FirstAccess.getInstruction()->getModule();

@@ -951,6 +951,8 @@ class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
   SDKContext &Ctx;
   UpdatedNodesMap &UpdateMap;
   llvm::StringSet<> ProtocolReqWhitelist;
+  SDKNodeRoot *LeftRoot;
+  SDKNodeRoot *RightRoot;
 
   static void printSpaces(llvm::raw_ostream &OS, SDKNode *N) {
     assert(N);
@@ -1028,6 +1030,12 @@ public:
         auto *TD = Conf->getNominalTypeDecl();
         if (TD->isProtocol()) {
           TD->emitDiag(diag::conformance_added, Conf->getName());
+        } else {
+          // Adding conformance to an existing type can be ABI breaking.
+          if (Ctx.checkingABI() &&
+              !LeftRoot->getDescendantsByUsr(Conf->getUsr()).empty()) {
+            TD->emitDiag(diag::existing_conformance_added, Conf->getName());
+          }
         }
       }
 
@@ -1128,6 +1136,8 @@ public:
   }
 
   void pass(NodePtr Left, NodePtr Right) override {
+    LeftRoot = Left->getAs<SDKNodeRoot>();
+    RightRoot = Right->getAs<SDKNodeRoot>();
     foundMatch(Left, Right, NodeMatchReason::Root);
   }
 };
@@ -1932,10 +1942,9 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     return;
   }
   case NodeAnnotation::Rename: {
-    auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
     Node->emitDiag(diag::renamed_decl,
-        Ctx.buffer((Twine(getDeclKindStr(Count->getDeclKind())) + " " +
-          Count->getFullyQualifiedName()).str()));
+        Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind())) + " " +
+          Node->getAnnotateComment(NodeAnnotation::RenameNewName)).str()));
     return;
   }
   default:
@@ -2258,6 +2267,10 @@ static int prepareForDump(const char *Main,
 
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
+
+  // Ensure the tool works on linux properly
+  InitInvok.getLangOptions().EnableObjCInterop =
+    InitInvok.getLangOptions().Target.isOSDarwin();
   InitInvok.getClangImporterOptions().ModuleCachePath =
   options::ModuleCachePath;
 

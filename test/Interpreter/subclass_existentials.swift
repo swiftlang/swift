@@ -16,6 +16,9 @@
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
+// SR-10641 rdar://problem/50553481
+// REQUIRES: swift_test_mode_optimize_none
+
 import StdlibUnittest
 
 protocol P {

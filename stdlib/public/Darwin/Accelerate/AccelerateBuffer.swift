@@ -26,7 +26,7 @@ public protocol AccelerateBuffer {
     /// Calls a closure with a pointer to the object's contiguous storage.
     func withUnsafeBufferPointer<R>(
         _ body: (UnsafeBufferPointer<Element>) throws -> R
-        ) rethrows -> R
+    ) rethrows -> R
 }
 
 /// A mutable object composed of count elements that are stored contiguously
@@ -40,23 +40,25 @@ public protocol AccelerateMutableBuffer: AccelerateBuffer {
     /// contiguous storage.
     mutating func withUnsafeMutableBufferPointer<R>(
         _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-        ) rethrows -> R
+    ) rethrows -> R
 }
 
 @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 public extension AccelerateBuffer where Self: Collection {
+    @inlinable
     func withUnsafeBufferPointer<R>(
         _ body: (UnsafeBufferPointer<Element>) throws -> R
-        ) rethrows -> R {
+    ) rethrows -> R {
         return try withContiguousStorageIfAvailable(body)!
     }
 }
 
 @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 extension AccelerateMutableBuffer where Self: MutableCollection {
+    @inlinable
     public mutating func withUnsafeMutableBufferPointer<R>(
         _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-        ) rethrows -> R {
+    ) rethrows -> R {
         return try withContiguousMutableStorageIfAvailable(body)!
     }
 }

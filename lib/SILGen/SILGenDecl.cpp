@@ -205,7 +205,7 @@ copyOrInitValueIntoSingleBuffer(SILGenFunction &SGF, SILLocation loc,
     assert(value.getValue() != destAddr && "copying in place?!");
     SILValue accessAddr =
       UnenforcedFormalAccess::enter(SGF, loc, destAddr, SILAccessKind::Modify);
-    value.copyInto(SGF, accessAddr, loc);
+    value.copyInto(SGF, loc, accessAddr);
     return;
   }
   
@@ -627,7 +627,7 @@ public:
     if (isInit)
       value.forwardInto(SGF, loc, address);
     else
-      value.copyInto(SGF, address, loc);
+      value.copyInto(SGF, loc, address);
   }
 
   void finishUninitialized(SILGenFunction &SGF) override {
@@ -1436,7 +1436,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::Class: {
     // Emit witness tables.
     auto nom = cast<NominalTypeDecl>(d);
-    for (auto c : nom->getLocalConformances(ConformanceLookupKind::All,
+    for (auto c : nom->getLocalConformances(ConformanceLookupKind::NonInherited,
                                             nullptr)) {
       auto *proto = c->getProtocol();
       if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto) &&

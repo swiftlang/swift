@@ -13,6 +13,7 @@
       key.name: "SwiftOnoneSupport",
       key.filepath: SwiftOnoneSupport.swiftmodule,
       key.hash: <hash>,
+      key.is_system: 1,
       key.dependencies: [
         {
           key.kind: source.lang.swift.import.module.swift,

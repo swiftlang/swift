@@ -130,6 +130,7 @@ public:
   IGNORED_ATTR(PrivateImport)
   IGNORED_ATTR(Custom)
   IGNORED_ATTR(PropertyDelegate)
+  IGNORED_ATTR(DisfavoredOverload)
   // SWIFT_ENABLE_TENSORFLOW
   IGNORED_ATTR(Differentiable)
   IGNORED_ATTR(Differentiating)
@@ -818,6 +819,7 @@ public:
     IGNORED_ATTR(Transparent)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(WeakLinked)
+    IGNORED_ATTR(DisfavoredOverload)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
@@ -1423,7 +1425,7 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   }
 
   if (VD->hasInterfaceType()) {
-    if (TC.checkConformanceToNSCopying(VD)) {
+    if (!TC.checkConformanceToNSCopying(VD)) {
       attr->setInvalid();
       return;
     }

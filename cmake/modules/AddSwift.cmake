@@ -230,15 +230,13 @@ function(_add_variant_c_compile_flags)
 
   if("${CFLAGS_SDK}" STREQUAL "WINDOWS")
     # MSVC doesn't support -Xclang. We don't need to manually specify
-    # -D_MD or D_MDd either, as CMake does this automatically.
+    # the dependent libraries as `cl` does so.
     if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
       list(APPEND result -Xclang;--dependent-lib=oldnames)
       # TODO(compnerd) handle /MT, /MTd
       if("${CFLAGS_BUILD_TYPE}" STREQUAL "Debug")
-        list(APPEND result "-D_MDd")
         list(APPEND result -Xclang;--dependent-lib=msvcrtd)
       else()
-        list(APPEND result "-D_MD")
         list(APPEND result -Xclang;--dependent-lib=msvcrt)
       endif()
     endif()
@@ -260,6 +258,7 @@ function(_add_variant_c_compile_flags)
     if("${CFLAGS_ARCH}" MATCHES arm)
       list(APPEND result "-D_ARM_WINAPI_PARTITION_DESKTOP_SDK_AVAILABLE")
     endif()
+    list(APPEND result "-D_MT")
     # TODO(compnerd) handle /MT
     list(APPEND result "-D_DLL")
     # NOTE: We assume that we are using VS 2015 U2+
@@ -399,6 +398,12 @@ function(_add_variant_swift_compile_flags
 
   if(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
     list(APPEND result "-D" "SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS")
+  endif()
+
+  if(sdk STREQUAL WINDOWS)
+    list(APPEND result "-Xcc" "-D_MT")
+    # TODO(compnerd) handle /MT /MTd
+    list(APPEND result "-Xcc" "-D_DLL")
   endif()
 
   set("${result_var_name}" "${result}" PARENT_SCOPE)
@@ -642,7 +647,7 @@ endfunction()
 #     [LINK_LIBRARIES dep1 ...]
 #     [FRAMEWORK_DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS_WEAK dep1 ...]
-#     [LLVM_COMPONENT_DEPENDS comp1 ...]
+#     [LLVM_LINK_COMPONENTS comp1 ...]
 #     [C_COMPILE_FLAGS flag1...]
 #     [SWIFT_COMPILE_FLAGS flag1...]
 #     [LINK_FLAGS flag1...]
@@ -691,7 +696,7 @@ endfunction()
 # FRAMEWORK_DEPENDS_WEAK
 #   System frameworks this library depends on that should be weakly-linked.
 #
-# LLVM_COMPONENT_DEPENDS
+# LLVM_LINK_COMPONENTS
 #   LLVM components this library depends on.
 #
 # C_COMPILE_FLAGS
@@ -747,6 +752,7 @@ function(_add_swift_library_single target name)
         DEPLOYMENT_VERSION_TVOS
         DEPLOYMENT_VERSION_WATCHOS
         INSTALL_IN_COMPONENT
+        DARWIN_INSTALL_NAME_DIR
         MODULE_TARGET
         SDK)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
@@ -761,10 +767,9 @@ function(_add_swift_library_single target name)
         GYB_SOURCES
         INCORPORATE_OBJECT_LIBRARIES
         INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
-        INTERFACE_LINK_LIBRARIES
         LINK_FLAGS
         LINK_LIBRARIES
-        LLVM_COMPONENT_DEPENDS
+        LLVM_LINK_COMPONENTS
         PRIVATE_LINK_LIBRARIES
         SWIFT_COMPILE_FLAGS)
 
@@ -903,7 +908,6 @@ function(_add_swift_library_single target name)
         ${SWIFTLIB_SINGLE_DEPENDS}
         ${SWIFTLIB_SINGLE_FILE_DEPENDS}
         ${SWIFTLIB_SINGLE_LINK_LIBRARIES}
-        ${SWIFTLIB_SINGLE_INTERFACE_LINK_LIBRARIES}
       SDK ${SWIFTLIB_SINGLE_SDK}
       ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
       MODULE_NAME ${module_name}
@@ -1065,6 +1069,10 @@ function(_add_swift_library_single target name)
       set(install_name_dir "@rpath")
     endif()
 
+    if(SWIFTLIB_SINGLE_DARWIN_INSTALL_NAME_DIR)
+      set(install_name_dir "${SWIFTLIB_SINGLE_DARWIN_INSTALL_NAME_DIR}")
+    endif()
+
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_NAME_DIR "${install_name_dir}")
@@ -1223,7 +1231,7 @@ function(_add_swift_library_single target name)
 
   if(NOT SWIFTLIB_SINGLE_TARGET_LIBRARY)
     # Call llvm_config() only for libraries that are part of the compiler.
-    swift_common_llvm_config("${target}" ${SWIFTLIB_SINGLE_LLVM_COMPONENT_DEPENDS})
+    swift_common_llvm_config("${target}" ${SWIFTLIB_SINGLE_LLVM_LINK_COMPONENTS})
   endif()
 
   # Collect compile and link flags for the static and non-static targets.
@@ -1346,7 +1354,7 @@ function(_add_swift_library_single target name)
   # import library targets when the library was added.  Use that to adjust the
   # link libraries.
   if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS AND NOT CMAKE_SYSTEM_NAME STREQUAL Windows)
-    foreach(library_list LINK_LIBRARIES INTERFACE_LINK_LIBRARIES PRIVATE_LINK_LIBRARIES)
+    foreach(library_list LINK_LIBRARIES PRIVATE_LINK_LIBRARIES)
       set(import_libraries)
       foreach(library ${SWIFTLIB_SINGLE_${library_list}})
         # Ensure that the library is a target.  If an absolute path was given,
@@ -1375,14 +1383,6 @@ function(_add_swift_library_single target name)
     target_link_libraries("${target}" PRIVATE
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
   endif()
-  if("${libkind}" STREQUAL "OBJECT")
-    precondition_list_empty(
-        "${SWIFTLIB_SINGLE_INTERFACE_LINK_LIBRARIES}"
-        "OBJECT_LIBRARY may not link to anything")
-  else()
-    target_link_libraries("${target}" INTERFACE
-        ${SWIFTLIB_SINGLE_INTERFACE_LINK_LIBRARIES})
-  endif()
 
   set_property(TARGET "${target}" PROPERTY
       LINKER_LANGUAGE "CXX")
@@ -1409,7 +1409,7 @@ endfunction()
 #   add_swift_host_library(name
 #     [SHARED]
 #     [STATIC]
-#     [LLVM_COMPONENT_DEPENDS comp1 ...]
+#     [LLVM_LINK_COMPONENTS comp1 ...]
 #     [FILE_DEPENDS target1 ...]
 #     source1 [source2 source3 ...])
 #
@@ -1422,7 +1422,7 @@ endfunction()
 # STATIC
 #   Build a static library.
 #
-# LLVM_COMPONENT_DEPENDS
+# LLVM_LINK_COMPONENTS
 #   LLVM components this library depends on.
 #
 # FILE_DEPENDS
@@ -1440,9 +1440,8 @@ function(add_swift_host_library name)
         C_COMPILE_FLAGS
         DEPENDS
         FILE_DEPENDS
-        INTERFACE_LINK_LIBRARIES
         LINK_LIBRARIES
-        LLVM_COMPONENT_DEPENDS)
+        LLVM_LINK_COMPONENTS)
 
   cmake_parse_arguments(ASHL
                         "${options}"
@@ -1456,9 +1455,6 @@ function(add_swift_host_library name)
   endif()
   if(ASHL_DEPENDS)
     message(SEND_ERROR "library ${name} is using DEPENDS parameter which is deprecated.  Please use add_dependencies instead")
-  endif()
-  if(ASHL_INTERFACE_LINK_LIBRARIES)
-    message(SEND_ERROR "library ${name} is using INTERFACE_LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead.")
   endif()
   if(ASHL_LINK_LIBRARIES)
     message(SEND_ERROR "library ${name} is using LINK_LIBRARIES parameter which is deprecated.  Please use target_link_libraries instead")
@@ -1479,7 +1475,7 @@ function(add_swift_host_library name)
     ${ASHL_FORCE_BUILD_OPTIMIZED_keyword}
     SDK ${SWIFT_HOST_VARIANT_SDK}
     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
-    LLVM_COMPONENT_DEPENDS ${ASHL_LLVM_COMPONENT_DEPENDS}
+    LLVM_LINK_COMPONENTS ${ASHL_LLVM_LINK_COMPONENTS}
     FILE_DEPENDS ${ASHL_FILE_DEPENDS}
     INSTALL_IN_COMPONENT "dev"
     )
@@ -1511,11 +1507,10 @@ endfunction()
 #     [STATIC]
 #     [DEPENDS dep1 ...]
 #     [LINK_LIBRARIES dep1 ...]
-#     [INTERFACE_LINK_LIBRARIES dep1 ...]
 #     [SWIFT_MODULE_DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS_WEAK dep1 ...]
-#     [LLVM_COMPONENT_DEPENDS comp1 ...]
+#     [LLVM_LINK_COMPONENTS comp1 ...]
 #     [FILE_DEPENDS target1 ...]
 #     [TARGET_SDKS sdk1...]
 #     [C_COMPILE_FLAGS flag1...]
@@ -1581,7 +1576,7 @@ endfunction()
 # FRAMEWORK_DEPENDS_WEAK
 #   System frameworks this library depends on that should be weak-linked
 #
-# LLVM_COMPONENT_DEPENDS
+# LLVM_LINK_COMPONENTS
 #   LLVM components this library depends on.
 #
 # FILE_DEPENDS
@@ -1652,7 +1647,8 @@ function(add_swift_target_library name)
         DEPLOYMENT_VERSION_OSX
         DEPLOYMENT_VERSION_TVOS
         DEPLOYMENT_VERSION_WATCHOS
-        INSTALL_IN_COMPONENT)
+        INSTALL_IN_COMPONENT
+        DARWIN_INSTALL_NAME_DIR)
   set(SWIFTLIB_multiple_parameter_options
         C_COMPILE_FLAGS
         DEPENDS
@@ -1664,10 +1660,9 @@ function(add_swift_target_library name)
         GYB_SOURCES
         INCORPORATE_OBJECT_LIBRARIES
         INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
-        INTERFACE_LINK_LIBRARIES
         LINK_FLAGS
         LINK_LIBRARIES
-        LLVM_COMPONENT_DEPENDS
+        LLVM_LINK_COMPONENTS
         PRIVATE_LINK_LIBRARIES
         SWIFT_COMPILE_FLAGS
         SWIFT_COMPILE_FLAGS_IOS
@@ -1939,7 +1934,7 @@ function(add_swift_target_library name)
         LINK_LIBRARIES ${swiftlib_link_libraries}
         FRAMEWORK_DEPENDS ${swiftlib_framework_depends_flattened}
         FRAMEWORK_DEPENDS_WEAK ${SWIFTLIB_FRAMEWORK_DEPENDS_WEAK}
-        LLVM_COMPONENT_DEPENDS ${SWIFTLIB_LLVM_COMPONENT_DEPENDS}
+        LLVM_LINK_COMPONENTS ${SWIFTLIB_LLVM_LINK_COMPONENTS}
         FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS} ${swiftlib_module_dependency_targets}
         C_COMPILE_FLAGS ${swiftlib_c_compile_flags_all}
         SWIFT_COMPILE_FLAGS ${swiftlib_swift_compile_flags_all} ${swiftlib_swift_compile_flags_arch} ${swiftlib_swift_compile_private_frameworks_flag}
@@ -1954,6 +1949,7 @@ function(add_swift_target_library name)
         ${SWIFTLIB_TARGET_LIBRARY_keyword}
         ${SWIFTLIB_FORCE_BUILD_OPTIMIZED_keyword}
         ${SWIFTLIB_NOSWIFTRT_keyword}
+        DARWIN_INSTALL_NAME_DIR "${SWIFTLIB_DARWIN_INSTALL_NAME_DIR}"
         INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
         DEPLOYMENT_VERSION_OSX "${SWIFTLIB_DEPLOYMENT_VERSION_OSX}"
         DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
@@ -2155,7 +2151,7 @@ function(_add_swift_executable_single name)
   cmake_parse_arguments(SWIFTEXE_SINGLE
     "EXCLUDE_FROM_ALL"
     "SDK;ARCHITECTURE"
-    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;COMPILE_FLAGS"
+    "DEPENDS;LLVM_LINK_COMPONENTS;LINK_LIBRARIES;COMPILE_FLAGS"
     ${ARGN})
 
   set(SWIFTEXE_SINGLE_SOURCES ${SWIFTEXE_SINGLE_UNPARSED_ARGUMENTS})
@@ -2268,7 +2264,7 @@ function(_add_swift_executable_single name)
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
   target_link_libraries("${name}" PRIVATE ${SWIFTEXE_SINGLE_LINK_LIBRARIES})
-  swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_LLVM_COMPONENT_DEPENDS})
+  swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_LLVM_LINK_COMPONENTS})
 
   set_target_properties(${name} PROPERTIES FOLDER "Swift executables")
 

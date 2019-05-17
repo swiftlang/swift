@@ -112,7 +112,7 @@ SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info):
 
 SDKNodeConformance::SDKNodeConformance(SDKNodeInitInfo Info):
   SDKNode(Info, SDKNodeKind::Conformance),
-  IsABIPlaceholder(Info.IsABIPlaceholder) {}
+  Usr(Info.Usr), IsABIPlaceholder(Info.IsABIPlaceholder) {}
 
 SDKNodeTypeWitness::SDKNodeTypeWitness(SDKNodeInitInfo Info):
   SDKNode(Info, SDKNodeKind::TypeWitness) {}
@@ -845,10 +845,7 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
 }
 
 bool SDKContext::isEqual(const SDKNode &Left, const SDKNode &Right) {
-  if (!EqualCache[&Left].count(&Right)) {
-    EqualCache[&Left][&Right] = isSDKNodeEqual(*this, Left, Right);
-  }
-  return EqualCache[&Left][&Right];
+  return isSDKNodeEqual(*this, Left, Right);
 }
 
 AccessLevel SDKContext::getAccessLevel(const ValueDecl *VD) const {
@@ -1613,7 +1610,8 @@ void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
         continue;
       KnownDecls.insert(D);
       if (auto VD = dyn_cast<ValueDecl>(D))
-        foundDecl(VD, DeclVisibilityKind::DynamicLookup);
+        foundDecl(VD, DeclVisibilityKind::DynamicLookup,
+                  DynamicLookupInfo::AnyObject);
       else
         processDecl(D);
     }
@@ -1676,7 +1674,8 @@ void SwiftDeclCollector::processValueDecl(ValueDecl *VD) {
   }
 }
 
-void SwiftDeclCollector::foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) {
+void SwiftDeclCollector::foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                                   DynamicLookupInfo) {
   if (VD->getClangMacro()) {
     // Collect macros, we will sort them afterwards.
     ClangMacros.push_back(VD);
@@ -1706,6 +1705,7 @@ void SDKNode::jsonize(json::Output &out) {
 
 void SDKNodeConformance::jsonize(json::Output &out) {
   SDKNode::jsonize(out);
+  output(out, KeyKind::KK_usr, Usr);
   output(out, KeyKind::KK_isABIPlaceholder, IsABIPlaceholder);
 }
 

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/opaque_result_type.swift
-// RUN: %target-swift-frontend -emit-ir %t/opaque_result_type.swift | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-NODEBUG %t/opaque_result_type.swift
+// RUN: %target-swift-frontend -disable-availability-checking -emit-ir %t/opaque_result_type.swift | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-NODEBUG %t/opaque_result_type.swift
 
 public protocol O {
   func bar()
@@ -132,6 +132,16 @@ func baz<T: P & Q>(z: T) -> some P & Q {
   return z
 }
 
+// Ensure the local type's opaque descriptor gets emitted.
+// CHECK-LABEL: @"$s18opaque_result_type11localOpaqueQryF0D0L_QryFQOMQ" = 
+func localOpaque() -> some P {
+  func local() -> some P {
+    return "local"
+  }
+
+  return local()
+}
+
 public func useFoo(x: String, y: C) {
   let p = foo(x: x)
   let pa = p.poo()
@@ -181,3 +191,4 @@ struct X<T: R, U: R>: R {
     return Wrapper(wrapped: u)
   }
 }
+

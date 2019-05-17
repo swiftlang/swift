@@ -22,7 +22,7 @@ module ClangModuleUser {
   export *
 }
 
-module ClangModuleWithAdapter {
+module ClangModuleWithOverlay {
   link "UnderlyingClangLibrary"
 }
 

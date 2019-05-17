@@ -39,6 +39,11 @@ struct StoresClosure {
     return [fn] // expected-error{{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
   }
 
+  func dictPack(_ fn: () -> Int) -> [String: () -> Int] {
+    // expected-note@-1{{parameter 'fn' is implicitly non-escaping}} {{23-23=@escaping }}
+    return ["ultimate answer": fn] // expected-error{{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
+  }
+
   func arrayPack(_ fn: @escaping () -> Int, _ fn2 : () -> Int) -> [() -> Int] {
     // expected-note@-1{{parameter 'fn2' is implicitly non-escaping}} {{53-53=@escaping }}
 
@@ -147,7 +152,8 @@ class FooClass {
   }
   var computedEscaping : (@escaping ()->Int)->Void {
     get { return stored! }
-    set(newValue) { stored = newValue } // expected-error{{cannot assign value of type '(@escaping () -> Int) -> Void' to type 'Optional<(() -> Int) -> Void>'}}
+    set(newValue) { stored = newValue } // expected-error{{assigning non-escaping parameter 'newValue' to an @escaping closure}}
+    // expected-note@-1 {{parameter 'newValue' is implicitly non-escaping}}
   }
 }
 
