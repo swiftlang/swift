@@ -8,12 +8,7 @@ import differentiable_requirement_other_module
 // The `foo` protocol requirement is `@differentiable` and has an `Empty` parameter.
 extension Empty : Differentiable {
   public typealias TangentVector = Empty
-  public typealias CotangentVector = Empty
   public typealias AllDifferentiableVariables = Empty
-
-  public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
-    return cotangent
-  }
 }
 
 // expected-error @+1 {{type 'Conforming' does not conform to protocol 'DifferentiableRequirement'}}

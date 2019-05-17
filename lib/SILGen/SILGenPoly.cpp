@@ -3534,7 +3534,7 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionReorderingThunk(
 
   auto loc = assocFn->getLocation();
   SILGenFunctionBuilder fb(*this);
-  auto linkage = autodiff::getAutoDiffFunctionLinkage(
+  auto linkage = autodiff::getAutoDiffAssociatedFunctionLinkage(
       original->getLinkage(), /*isAssocFnExported*/ true);
   auto *thunk = fb.getOrCreateFunction(
       loc, name, linkage, targetType, IsBare, IsNotTransparent,

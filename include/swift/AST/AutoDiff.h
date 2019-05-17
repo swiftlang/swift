@@ -578,12 +578,12 @@ bool getBuiltinAutoDiffApplyConfig(StringRef operationName,
                                    unsigned &arity, unsigned &order,
                                    bool &rethrows);
 
-/// Computes the correct linkage for associated functions given the linkage of
+/// Computes the correct linkage for an associated function given the linkage of
 /// the original function. If the original linkage is not external and
 /// `isAssocFnExported` is true, use the original function's linkage. Otherwise,
 /// return hidden linkage.
-SILLinkage getAutoDiffFunctionLinkage(SILLinkage originalLinkage,
-                                      bool isAssocFnExported);
+SILLinkage getAutoDiffAssociatedFunctionLinkage(SILLinkage originalLinkage,
+                                                bool isAssocFnExported);
 
 } // end namespace autodiff
 

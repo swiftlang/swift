@@ -89,8 +89,8 @@ bool autodiff::getBuiltinAutoDiffApplyConfig(
   return operationName.empty();
 }
 
-SILLinkage autodiff::getAutoDiffFunctionLinkage(SILLinkage originalLinkage,
-                                                bool isAssocFnExported) {
+SILLinkage autodiff::getAutoDiffAssociatedFunctionLinkage(
+    SILLinkage originalLinkage, bool isAssocFnExported) {
   // If the original is defined externally, then the AD pass is just generating
   // associated functions for use in the current module and therefore these
   // associated functions should not be visible outside the module.

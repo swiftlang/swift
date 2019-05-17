@@ -461,13 +461,20 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
   SILOptFunctionBuilder FuncBuilder(*this);
   if (auto *NewFunc = getSpecializedWithDeadParams(FuncBuilder,
           PAI, SubstF, PAI->getNumArguments(), GenericSpecialized)) {
-    rewritePartialApply(PAI, NewFunc);
-    if (GenericSpecialized.first) {
-      // Notify the pass manager about the new function.
-      addFunctionToPassManagerWorklist(GenericSpecialized.first,
-                                       GenericSpecialized.second);
+    // SWIFT_ENABLE_TENSORFLOW
+    // Add a previously unexercised check to prevent AD crash. Rewrite
+    // `partial_apply` only if the specialized function is `@convention(thin)`.
+    // Revert check when `VJPEmitter::visitApplyInst` no longer produces
+    // argumentless `partial_apply` instructions.
+    if (NewFunc->getRepresentation() == SILFunctionTypeRepresentation::Thin) {
+      rewritePartialApply(PAI, NewFunc);
+      if (GenericSpecialized.first) {
+        // Notify the pass manager about the new function.
+        addFunctionToPassManagerWorklist(GenericSpecialized.first,
+                                         GenericSpecialized.second);
+      }
+      return true;
     }
-    return true;
   }
 
   // Second possibility: Are all partially applied arguments constant?

@@ -352,7 +352,7 @@
                 "libcxx": "swift-DEVELOPMENT-SNAPSHOT-2019-05-15-a",
                 "tensorflow": "447e512d332ab86172a3b13119900b4d021d0c65",
                 "tensorflow-swift-bindings": "330ea66bd06ad9df911673bd263a787c63a51597",
-                "tensorflow-swift-apis": "ffba6939c605ae89f7da567247a4789c06872080",
+                "tensorflow-swift-apis": "5883af609ff29b06bb6b415dd9be0724a70174eb",
                 "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2019-05-15-a",
                 "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2019-05-15-a"
             }

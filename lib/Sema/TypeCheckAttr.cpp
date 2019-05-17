@@ -3209,7 +3209,6 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   auto funcResultElt = derivativeResultTupleType->getElement(1);
   // Get derivative kind and associated function identifier.
   AutoDiffAssociatedFunctionKind kind;
-  Identifier autoDiffAssocTyId;
   if (valueResultElt.getName().str() != "value") {
     TC.diagnose(attr->getLocation(),
                 diag::differentiating_attr_invalid_result_tuple_value_label);
@@ -3218,10 +3217,8 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   }
   if (funcResultElt.getName().str() == "differential") {
     kind = AutoDiffAssociatedFunctionKind::JVP;
-    autoDiffAssocTyId = ctx.Id_TangentVector;
   } else if (funcResultElt.getName().str() == "pullback") {
     kind = AutoDiffAssociatedFunctionKind::VJP;
-    autoDiffAssocTyId = ctx.Id_TangentVector;
   } else {
     TC.diagnose(attr->getLocation(),
                 diag::differentiating_attr_invalid_result_tuple_func_label);
@@ -3378,14 +3375,14 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
         assert(conf &&
                "Expected checked parameter to conform to `Differentiable`");
         auto paramAssocType = conf->getTypeWitnessByName(
-            paramType, autoDiffAssocTyId);
+            paramType, ctx.Id_TangentVector);
         return TupleTypeElt(paramAssocType);
       });
 
   // Check differential/pullback type.
   // Get vector type: the associated type of the value result type.
   auto vectorTy = valueResultConf->getTypeWitnessByName(
-      valueResultType, autoDiffAssocTyId);
+      valueResultType, ctx.Id_TangentVector);
 
   // Compute expected differential/pullback type.
   auto funcEltType = funcResultElt.getType();

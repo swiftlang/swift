@@ -74,7 +74,15 @@ static bool foldInverseReabstractionThunks(PartialApplyInst *PAI,
 SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
   // partial_apply without any substitutions or arguments is just a
   // thin_to_thick_function.
-  if (!PAI->hasSubstitutions() && (PAI->getNumArguments() == 0)) {
+  if (!PAI->hasSubstitutions() && (PAI->getNumArguments() == 0) &&
+      // SWIFT_ENABLE_TENSORFLOW
+      // Add check that was previously unexercised, necessary for AD.
+      // Otherwise, `thin_to_thick` instruction will be created on
+      // `@convention(method)` values, which is invalid.
+      // Revert check when `VJPEmitter::visitApplyInst` no longer produces
+      // argument-less `partial_apply` instructions.
+      PAI->getSubstCalleeType()->getRepresentation() ==
+          SILFunctionTypeRepresentation::Thin) {
     if (!PAI->isOnStack())
       return Builder.createThinToThickFunction(PAI->getLoc(), PAI->getCallee(),
                                                PAI->getType());

@@ -23,9 +23,6 @@ struct DifferentiableSubset : Differentiable {
     typealias TangentVector = DifferentiableSubset.TangentVector
     var w: Float
     var b: Float
-    func tangentVector(from cotan: TangentVector) -> TangentVector {
-      return TangentVector(w: cotan.w, b: cotan.b)
-    }
   }
   func moved(along v: TangentVector) -> DifferentiableSubset {
     return DifferentiableSubset(w: w.moved(along: v.w), b: b.moved(along: v.b), flag: flag)
