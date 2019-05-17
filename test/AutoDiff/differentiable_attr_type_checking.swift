@@ -543,7 +543,6 @@ extension Tensor : Differentiable where Scalar : Differentiable {
   typealias TangentVector = Tensor
   typealias AllDifferentiableVariables = Tensor
   func moved(along direction: Tensor) -> Tensor { return self }
-  func tangentVector(from cotangent: Tensor) -> Tensor { return cotangent }
 }
 @differentiable(where Scalar : Differentiable)
 func where2<Scalar : Numeric>(x: Tensor<Scalar>) -> Tensor<Scalar> {

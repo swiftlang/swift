@@ -21,7 +21,6 @@ struct DenseLayer : Equatable {
 
 extension DenseLayer : Differentiable, VectorNumeric {
   typealias TangentVector = DenseLayer
-  typealias CotangentVector = DenseLayer
   typealias Scalar = Float
   static var zero: DenseLayer {
     return DenseLayer(w: 0, b: 0)
@@ -68,7 +67,6 @@ struct Model : Equatable {
 
 extension Model : Differentiable, VectorNumeric {
   typealias TangentVector = Model
-  typealias CotangentVector = Model
   typealias Scalar = Float
   static var zero: Model {
     return Model(l1: DenseLayer.zero, l2: DenseLayer.zero, l3: DenseLayer.zero)

@@ -25,18 +25,16 @@ public func closureCaptureMutable() {
 
 // CHECK-LABEL: @AD__{{.*}}closureCaptureMutable{{.*}}___vjp_src_0_wrt_0
 // CHECK: bb0({{%.*}} : $Float, [[BOXED_ARG:%.*]] : ${ var Float }):
-// CHECK:   [[PRIMAL:%.*]] = function_ref @AD__{{.*}}closureCaptureMutable{{.*}}___primal_src_0_wrt_0
-// CHECK:   {{.*}} = apply [[PRIMAL]]({{.*}}, [[BOXED_ARG]])
 // CHECK:   [[ADJOINT:%.*]] = function_ref @AD__{{.*}}closureCaptureMutabley{{.*}}___adjoint_src_0_wrt_0
 // CHECK:   {{.*}} = partial_apply [callee_guaranteed] [[ADJOINT]]({{.*}})
 
 // TF-30: VJP return value should match the return type.
-struct TF30 : Differentiable {
+struct TF_30 : Differentiable {
   var x: Float
   @noDerivative var y: @differentiable (Float) -> Float
 }
 // Make sure this passes SIL verification.
-let _: @differentiable (TF30) -> Float = { x in x.x }
+let _: @differentiable (TF_30) -> Float = { s in s.x }
 
 // Make sure `@nondiff` gets propagated through SIL.
 // Make sure `@nondiff` with non-`Differentiable` also works.

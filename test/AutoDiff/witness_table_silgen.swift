@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -verify -Xllvm -differentiation-skip-folding-autodiff-function-extraction %s | %FileCheck %s
 
 protocol Proto : Differentiable {
   @differentiable(wrt: (x, y))
@@ -20,7 +20,6 @@ struct S : Proto, VectorNumeric {
   static func * (lhs: Float, rhs: S) -> S { return S(p: lhs * rhs.p) }
 
   typealias TangentVector = S
-  typealias CotangentVector = S
 
   @differentiable(wrt: (self), vjp: vjpP)
   let p: Float
