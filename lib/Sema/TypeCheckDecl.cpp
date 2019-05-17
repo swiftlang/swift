@@ -2957,6 +2957,16 @@ public:
         TC.inferDefaultWitnesses(PD);
 
     if (TC.Context.LangOpts.DebugGenericSignatures) {
+      auto *sig = PD->getGenericSignature();
+      PD->printContext(llvm::errs());
+      llvm::errs() << "\n";
+      llvm::errs() << "Generic signature: ";
+      sig->print(llvm::errs());
+      llvm::errs() << "\n";
+      llvm::errs() << "Canonical generic signature: ";
+      sig->getCanonicalSignature()->print(llvm::errs());
+      llvm::errs() << "\n";
+
       auto requirementsSig =
         GenericSignature::get({PD->getProtocolSelfType()},
                               PD->getRequirementSignature());

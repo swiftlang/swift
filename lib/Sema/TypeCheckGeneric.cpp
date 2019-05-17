@@ -764,22 +764,6 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
     // The generic signature and environment is created lazily by
     // GenericContext::getGenericSignature(), so there is nothing we
     // need to do.
-
-    // Debugging of the generic signature builder and generic signature
-    // generation.
-    if (Context.LangOpts.DebugGenericSignatures) {
-      auto *sig = proto->getGenericSignature();
-
-      proto->printContext(llvm::errs());
-      llvm::errs() << "\n";
-      llvm::errs() << "Generic signature: ";
-      sig->print(llvm::errs());
-      llvm::errs() << "\n";
-      llvm::errs() << "Canonical generic signature: ";
-      sig->getCanonicalSignature()->print(llvm::errs());
-      llvm::errs() << "\n";
-    }
-
     return;
   }
 
