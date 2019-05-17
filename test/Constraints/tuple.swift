@@ -307,3 +307,15 @@ if case (foo: let x, foo: let y) = zeroTuple { print(x+y) } // expected-error {{
 
 enum BishBash { case bar(foo: Int, foo: String) }
 let enumLabelDup: BishBash = .bar(foo: 0, foo: "") // expected-error {{cannot create a tuple with a duplicate element label}}
+
+func dupLabelClosure(_ fn: () -> Void) {}
+dupLabelClosure { print((bar: "", bar: 5).bar) } // expected-error {{cannot create a tuple with a duplicate element label}}
+
+struct DupLabelSubscript {
+  subscript(foo x: Int, foo y: Int) -> Int {
+    return 0
+  }
+}
+
+let dupLabelSubscriptStruct = DupLabelSubscript()
+let _ = dupLabelSubscriptStruct[foo: 5, foo: 5] // ok

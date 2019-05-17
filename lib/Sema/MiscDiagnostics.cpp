@@ -76,7 +76,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
   public:
     TypeChecker &TC;
     const DeclContext *DC;
-    CallExpr *funcCallExpr = nullptr;
 
     DiagnoseWalker(TypeChecker &TC, const DeclContext *DC, bool isExprStmt)
       : IsExprStmt(isExprStmt), TC(TC), DC(DC) {}
@@ -133,10 +132,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           if (auto *Arg = Comp.getIndexExpr())
             CallArgs.insert(Arg);
         }
-      }
-
-      if (auto CE = dyn_cast<CallExpr>(E)) {
-        funcCallExpr = CE;
       }
 
       // Check function calls, looking through implicit conversions on the
@@ -255,14 +250,14 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         // FIXME: Duplicate labels on enum payloads should be diagnosed
         // when declared, not when called.
         bool isEnumCase = false;
-        if (funcCallExpr) {
-          auto calledValue = funcCallExpr->getCalledValue();
+        if (auto CE = dyn_cast_or_null<CallExpr>(Parent.getAsExpr())) {
+          auto calledValue = CE->getCalledValue();
           if (calledValue) {
             isEnumCase = isa<EnumElementDecl>(calledValue);
           }
         }
 
-        if (!funcCallExpr || isEnumCase) {
+        if ((!CallArgs.count(tupleExpr)) || isEnumCase) {
           auto diagnose = false;
 
           llvm::SmallDenseSet<Identifier> names;
