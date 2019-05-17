@@ -8,6 +8,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: CPU=i386 || CPU=x86_64
 
 // See also archive_attributes_stable_abi.swift, for the stable ABI
 // deployment target test.
