@@ -263,9 +263,6 @@ public:
   
   /// Add a global variable to the SILModule.
   void addGlobalVariable(VarDecl *global);
-  
-  /// Emit SIL related to a Clang-imported declaration.
-  void emitExternalDefinition(Decl *d);
 
   /// Emit the ObjC-compatible entry point for a method.
   void emitObjCMethodThunk(FuncDecl *method);
