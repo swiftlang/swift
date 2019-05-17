@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -verify -Xllvm -differentiation-skip-folding-autodiff-function-extraction %s | %FileCheck %s
 
 protocol Proto : Differentiable {
   @differentiable(wrt: (x, y))
