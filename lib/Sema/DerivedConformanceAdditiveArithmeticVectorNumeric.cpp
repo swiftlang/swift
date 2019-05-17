@@ -90,8 +90,7 @@ static Type getVectorNumericScalarAssocType(VarDecl *varDecl, DeclContext *DC) {
                                               ConformanceCheckFlags::Used);
   if (!conf)
     return nullptr;
-  Type scalarType = ProtocolConformanceRef::getTypeWitnessByName(
-      varType, *conf, C.Id_Scalar, C.getLazyResolver());
+  Type scalarType = conf->getTypeWitnessByName(varType, C.Id_Scalar);
   assert(scalarType && "'Scalar' associated type not found");
   return scalarType;
 }

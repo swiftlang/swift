@@ -3377,16 +3377,15 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
                                           ConformanceCheckFlags::Used);
         assert(conf &&
                "Expected checked parameter to conform to `Differentiable`");
-        auto paramAssocType = ProtocolConformanceRef::getTypeWitnessByName(
-            paramType, *conf, autoDiffAssocTyId, ctx.getLazyResolver());
+        auto paramAssocType = conf->getTypeWitnessByName(
+            paramType, autoDiffAssocTyId);
         return TupleTypeElt(paramAssocType);
       });
 
   // Check differential/pullback type.
   // Get vector type: the associated type of the value result type.
-  auto vectorTy = ProtocolConformanceRef::getTypeWitnessByName(
-      valueResultType, *valueResultConf, autoDiffAssocTyId,
-      ctx.getLazyResolver());
+  auto vectorTy = valueResultConf->getTypeWitnessByName(
+      valueResultType, autoDiffAssocTyId);
 
   // Compute expected differential/pullback type.
   auto funcEltType = funcResultElt.getType();
