@@ -117,6 +117,10 @@ fileprivate struct AtomicBool {
     func orAndFetch(_ b: Bool) -> Bool {
         return _value.orAndFetch(b ? 1 : 0) != 0
     }
+
+    func fetchAndClear() -> Bool {
+        return _value.fetchAndAnd(0) != 0
+    }
 }
 
 func _printStackTrace(_ stackTrace: SourceLocStack?) {
@@ -139,11 +143,9 @@ public func expectFailure(
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line, invoking body: () -> Void) {
-  let startAnyExpectFailed = _anyExpectFailed.load()
-  _anyExpectFailed.store(false)
+  let startAnyExpectFailed = _anyExpectFailed.fetchAndClear()
   body()
-  let endAnyExpectFailed = _anyExpectFailed.load()
-  _anyExpectFailed.store(false)
+  let endAnyExpectFailed = _anyExpectFailed.fetchAndClear()
   expectTrue(
     endAnyExpectFailed, "running `body` should produce an expected failure",
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)
