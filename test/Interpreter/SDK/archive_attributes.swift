@@ -3,7 +3,7 @@
 // RUN: %target-run %t/encode %t/test.arc
 // RUN: plutil -p %t/test.arc | %FileCheck -check-prefix=CHECK-ARCHIVE %s
 
-// RUN: %target-build-swift %s -module-name=test -o %t/decode -target %target-pre-stable-abi-triple
+// RUN: %target-build-swift %s -module-name=test -o %t/decode
 // RUN: %target-run %t/decode %t/test.arc --stdlib-unittest-in-process
 
 // REQUIRES: executable_test
