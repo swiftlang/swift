@@ -117,5 +117,12 @@ func testOverloading(name: String) {
   _ = overloadedTuplify(true) { b in
     b ? "Hello, \(name)" : "Goodbye"
     42
+    overloadedTuplify(false) {
+      $0 ? "Hello, \(name)" : "Goodbye"
+      42
+      if b {
+        "Hello, \(name)" 
+      }
+    }
   }
 }
