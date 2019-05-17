@@ -56,6 +56,12 @@ using llvm::SmallDenseMap;
 using llvm::SmallDenseSet;
 using llvm::SmallSet;
 
+// This flag is used to disable `autodiff_function_extract` instruction folding
+// for SIL testing purposes.
+static llvm::cl::opt<bool> SkipFoldingAutoDiffFunctionExtraction(
+    "differentiation-skip-folding-autodiff-function-extraction",
+    llvm::cl::init(false));
+
 //===----------------------------------------------------------------------===//
 // Helpers
 //===----------------------------------------------------------------------===//
@@ -5965,6 +5971,44 @@ SILValue ADContext::promoteToDifferentiableFunction(
   return adfi;
 }
 
+/// Fold `autodiff_function_extract` users of the given `autodiff_function`
+/// instruction, directly replacing them with `autodiff_function` instruction
+/// operands. If the `autodiff_function` instruction has no
+/// non-`autodiff_function_extract` users, delete the instruction itself after
+/// folding.
+///
+/// Folding can be disabled by the `SkipFoldingAutoDiffFunctionExtraction` flag
+/// for SIL testing purposes.
+static void foldAutoDiffFunctionExtraction(AutoDiffFunctionInst *source) {
+  bool hasOnlyAutoDiffFunctionExtractUsers = true;
+  // Iterate through all `autodiff_function` instruction uses.
+  for (auto use : source->getUses()) {
+    auto *adfei = dyn_cast<AutoDiffFunctionExtractInst>(use->getUser());
+    // If user is not an `autodiff_function_extract` instruction, set flag to
+    // false.
+    if (!adfei) {
+      hasOnlyAutoDiffFunctionExtractUsers = false;
+      continue;
+    }
+    // Fold original function extractors.
+    if (adfei->getExtractee() == AutoDiffFunctionExtractee::Original) {
+      auto originalFnValue = source->getOriginalFunction();
+      adfei->replaceAllUsesWith(originalFnValue);
+      adfei->eraseFromParent();
+      continue;
+    }
+    // Fold associated function extractors.
+    auto assocFnValue = source->getAssociatedFunction(
+        adfei->getDifferentiationOrder(), adfei->getAssociatedFunctionKind());
+    adfei->replaceAllUsesWith(assocFnValue);
+    adfei->eraseFromParent();
+  }
+  // If all users are `autodiff_function_extract` instructions, erase the
+  // `autodiff_function` instruction itself.
+  if (hasOnlyAutoDiffFunctionExtractUsers)
+    source->eraseFromParent();
+}
+
 bool ADContext::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
   if (adfi->getNumAssociatedFunctions() ==
       autodiff::getNumAutoDiffAssociatedFunctions(
@@ -5995,6 +6039,13 @@ bool ADContext::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
   // Replace all uses of `adfi`.
   adfi->replaceAllUsesWith(differentiableFnValue);
   adfi->eraseFromParent();
+  // If the promoted `@differentiable` function-typed value is an
+  // `autodiff_function` instruction, fold `autodiff_function_extract`
+  // instructions.
+  // If `autodiff_function_extract` folding is disabled, return.
+  if (!SkipFoldingAutoDiffFunctionExtraction)
+    if (auto *newADFI = dyn_cast<AutoDiffFunctionInst>(differentiableFnValue))
+      foldAutoDiffFunctionExtraction(newADFI);
   transform.invalidateAnalysis(
       parent, SILAnalysis::InvalidationKind::FunctionBody);
   return false;

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -Xllvm -differentiation-skip-folding-autodiff-function-extraction %s | %FileCheck %s
 
 public class NonTrivialStuff : Equatable {
   public init() {}
