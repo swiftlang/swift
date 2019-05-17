@@ -120,7 +120,7 @@ func testOverloading(name: String) {
     overloadedTuplify(false) {
       $0 ? "Hello, \(name)" : "Goodbye"
       42
-      if b {
+      if $0 {
         "Hello, \(name)" 
       }
     }

@@ -2796,7 +2796,11 @@ namespace {
                       builderType->hasTypeVariable() ? Type() : builderType);
 
       auto typeExpr = new (ctx) TypeExpr(typeLoc);
-      if (cs) cs->setType(typeExpr, builderType);
+      if (cs) {
+        cs->setType(typeExpr, MetatypeType::get(builderType));
+        cs->setType(&typeExpr->getTypeLoc(), builderType);
+      }
+
       typeExpr->setImplicit();
       auto memberRef = new (ctx) UnresolvedDotExpr(
           typeExpr, loc, fnName, DeclNameLoc(loc), /*implicit=*/true);
