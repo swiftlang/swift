@@ -1406,12 +1406,12 @@ namespace {
       Type type;
       // If this is an implicit TypeExpr, don't validate its contents.
       auto &typeLoc = E->getTypeLoc();
-      if (E->isImplicit() && CS.hasType(E)) {
-        type = CS.getType(E);
-      } else if (typeLoc.wasValidated()) {
+      if (typeLoc.wasValidated()) {
         type = typeLoc.getType();
       } else if (typeLoc.hasLocation()) {
         type = resolveTypeReferenceInExpression(typeLoc);
+      } else if (E->isImplicit() && CS.hasType(&typeLoc)) {
+        type = CS.getType(typeLoc);
       }
 
       if (!type || type->hasError()) return Type();
@@ -3627,8 +3627,6 @@ namespace {
           // system.
           if (closureTy && closureTy->hasError())
             return nullptr;
-
-          CS.setType(closure, closureTy);
 
           // Visit the body. It's type needs to be convertible to the function's
           // return type.
