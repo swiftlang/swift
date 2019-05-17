@@ -3,15 +3,14 @@
 // RUN: %target-run %t/encode %t/test.arc
 // RUN: plutil -p %t/test.arc | %FileCheck -check-prefix=CHECK-ARCHIVE %s
 
-// RUN: %target-build-swift %s -module-name=test -o %t/decode
+// RUN: %target-build-swift %s -module-name=test -o %t/decode -target %target-pre-stable-abi-triple
 // RUN: %target-run %t/decode %t/test.arc --stdlib-unittest-in-process
-
-// RUN: %target-build-swift %s -module-name=test -o %t/decode -target x86_64-apple-macosx10.14.4 -link-objc-runtime
-// RUN: %target-run %t/decode %t/test.arc NEW --stdlib-unittest-in-process
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
-// REQUIRES: OS=macosx
+
+// See also archive_attributes_stable_abi.swift, for the stable ABI
+// deployment target test.
 
 import Foundation
 import StdlibUnittest
@@ -158,7 +157,7 @@ DecodeTestSuite.test("Decode") {
   }
 
   if CommandLine.arguments[2] == "NEW" {
-    if #available(macOS 10.14.4, *) {
+    if #available(macOS 10.14.4, iOS 12.2, tvOS 12.2, watchOS 5.2, *) {
       doIt()
     }
     return
