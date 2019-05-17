@@ -444,12 +444,6 @@ public enum _RuntimeConfig {
   /// tensor program in this process.
   static public var tensorFlowRuntimeInitialized = false
 
-  /// When true, run the entire tensor computation in
-  /// _TFCStartTensorComputation(), instead of running it on a separate thread.
-  /// - Note: Set to true only for debugging purposes, as it has limited
-  ///   functionality (e.g. no sends/recvs support).
-  static public var usesSynchronousExecution = false
-
   /// For CPU and GPU execution without XLA, use the auto mode. For XLA and/or
   /// TPU execution, set the enum value accordingly.
   static public var executionMode: _ExecutionMode = .auto
@@ -515,12 +509,6 @@ private func configureRuntimeFromEnvironment() {
     String(cString: value).lowercased() == "true" {
       _RuntimeConfig.executionMode = .tpu
       debugLog("Setting TPU execution with infeed from env.")
-  }
-
-  if let value = getenv("SWIFT_TENSORFLOW_SYNC_EXECUTION"),
-    String(cString: value).lowercased() == "true" {
-      _RuntimeConfig.usesSynchronousExecution = true
-      debugLog("Using sync execution from env.")
   }
 
   if let value = getenv("SWIFT_TENSORFLOW_SERVER_ADDRESS") {
@@ -1060,7 +1048,7 @@ public func _tffunc<In : TensorGroup, Out : TensorGroup>(
       let symbolicOut = escapableFn(symbolicIn)
       return symbolicOut.cTensorHandles
     }
-    
+
     let dtypes = In._typeList.map { $0._cDataType }
     return _trace(with: dtypes, in: wrappedFn)
   }
@@ -1343,13 +1331,7 @@ public final class _TensorComputation {
   /// when the tensor computation involves N device functions. In non-eager
   /// mode, we use a single thread (that's sufficient as these N device
   /// functions can be sent to the same TF_SessionRun() call.)
-  ///
-  /// The global config flag '_RuntimeConfig.usesSynchronousExecution' decides
-  /// whether tensor computation should be synchronous: if true, this property
-  /// will always be empty. Otherwise, this property is non-empty only when the
-  /// tensor computation is on-going.
-  /// TODO: Remove the `usesSynchronousExecution` mode as it is very limiting
-  /// (e.g. does not support running multiple device functions).
+  /// This property is non-empty only when the tensor computation is on-going.
   private var pthreads: [pthread_t] = []
 
   /// The data structure to pass into pthread creation API.
@@ -1432,52 +1414,43 @@ public final class _TensorComputation {
 
     debugLog("Starting TF graph execution.")
 
-    // If it's asynchronous, we execute the tensor computation via threads.
-    if !_RuntimeConfig.usesSynchronousExecution {
-      let threadCount = helperFunctionCount + 1
-      for threadIndex in 0..<threadCount {
-        // The function to launch in the parallel thread.
+    let threadCount = helperFunctionCount + 1
+    for threadIndex in 0..<threadCount {
+      // The function to launch in the parallel thread.
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-        typealias ThreadBody = @convention(c)
-          (UnsafeMutableRawPointer) -> UnsafeMutableRawPointer?
+      typealias ThreadBody = @convention(c)
+        (UnsafeMutableRawPointer) -> UnsafeMutableRawPointer?
 #else
-        typealias ThreadBody = @convention(c)
-          (UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer?
+      typealias ThreadBody = @convention(c)
+        (UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer?
 #endif
-        let body: ThreadBody = { arg in
-          // Set the cancelability of the detached thread.
-          pthread_setcanceltype(Int32(PTHREAD_CANCEL_DEFERRED), nil)
-          // Execute the tensor computation.
+      let body: ThreadBody = { arg in
+        // Set the cancelability of the detached thread.
+        pthread_setcanceltype(Int32(PTHREAD_CANCEL_DEFERRED), nil)
+        // Execute the tensor computation.
 #if !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS))
-          let arg = arg!
+        let arg = arg!
 #endif
-          let param: ThreadParam =
-            Unmanaged.fromOpaque(arg).takeRetainedValue()
-          param.computation.execute(threadIndex: param.threadIndex)
-          checkOk(param.computation.status)
-          return nil
-        }
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-        var newThread: pthread_t!
-#else
-        var newThread = pthread_t()
-#endif
-        let creationStatus = pthread_create(
-          &newThread, nil, body,
-          Unmanaged.passRetained(
-            ThreadParam(computation: self,
-                        threadIndex: threadIndex)).toOpaque()
-        )
-        // TODO(hongm): do error handling.
-        internalConsistencyCheck(creationStatus == 0)
-        pthreads.append(newThread)
+        let param: ThreadParam =
+          Unmanaged.fromOpaque(arg).takeRetainedValue()
+        param.computation.execute(threadIndex: param.threadIndex)
+        checkOk(param.computation.status)
+        return nil
       }
-    }
-    // If it's synchronous, we call execute() on the main thread directly.
-    else {
-      // Log a debug message to differentiate from async computation.
-      debugLog("Running tensor computation synchronously.")
-      execute(threadIndex: 0)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+      var newThread: pthread_t!
+#else
+      var newThread = pthread_t()
+#endif
+      let creationStatus = pthread_create(
+        &newThread, nil, body,
+        Unmanaged.passRetained(
+          ThreadParam(computation: self,
+                      threadIndex: threadIndex)).toOpaque()
+      )
+      // TODO(hongm): do error handling.
+      internalConsistencyCheck(creationStatus == 0)
+      pthreads.append(newThread)
     }
     debugLog("Exiting _TensorComputation.init().")
   }
@@ -1534,8 +1507,7 @@ public extension _TensorComputation {
   func finish() -> [CTensorHandle] {
     debugLog("Calling _TensorComputation.finish().")
     if pthreads.isEmpty {
-      internalConsistencyCheck(
-        _RuntimeConfig.usesSynchronousExecution, """
+      fatalError("""
           finish() is called in async execution mode with pthread == nil -- \
           Was finish() already called?
           """)
@@ -1573,138 +1545,6 @@ func _TFCEagerExecute(_ op: CTFEOp,
     debugLog("Executing eager op \(op).")
     TFE_Execute(op, retvals, retvalCount, status)
   }
-}
-
-//===----------------------------------------------------------------------===//
-// - MARK: Compiler runtime entrypoints
-//===----------------------------------------------------------------------===//
-// These are the entrypoints that are well-known to the compiler internals.  The
-// signatures and forms must not be changed without updating the compiler.  Any
-// code put into the body of these functions will end up being inlined into the
-// user code, so they are generally just wrappers around the implementation
-// above.
-
-/// Loads the TF computation from a binary TF FunctionDef proto given by 'bytes'
-/// and 'size', start the computation, and return a _TensorComputation object as
-/// a unique identifier for that computation.
-///
-/// - Parameters:
-///   - programByteAddress: The address of the raw program.
-///   - programByteCount: The number of bytes in the program.
-///   - entryFunctionBaseNameAddress: The base name of the functions to run.
-///   - tensorArgumentAddress: The address to the buffer containing tensor
-///     arguments as CTensorHandle.
-///   - tensorArgumentCount: The number of tensor arguments to pass in.
-///   - helperFunctionCount: The number of helper functions to run.
-///   - resultCount: The number of output tensors.
-@inlinable
-@_silgen_name("_swift_tfc_StartTensorComputation")
-public func _TFCStartTensorComputation(
-  _ programByteAddress: UnsafeRawPointer,
-  _ programByteCount: Int,
-  _ entryFunctionBaseNameAddress: UnsafePointer<Int8>,
-  _ tensorArgumentAddress: UnsafePointer<CTensorHandle>,
-  _ tensorArgumentCount: Int,
-  _ helperFunctionCount: Int,
-  _ resultCount: Int
-) -> _TensorComputation {
-
-  debugLog("""
-    _TFCStartTensorComputation() is called with \(programByteCount) \
-    program bytes, \(tensorArgumentCount) input tensors \
-    \(String(cString:entryFunctionBaseNameAddress)) as the func base name, \
-    \(helperFunctionCount) helper functions, and \(resultCount) output tensors.
-    """)
-
-  internalConsistencyCheck(programByteCount > 0, "Cannot run an empty graph!")
-
-  return _TensorComputation(programByteAddress: programByteAddress,
-                            programByteCount: programByteCount,
-                            entryFunctionBaseNameAddress: entryFunctionBaseNameAddress,
-                            tensorArgumentAddress: tensorArgumentAddress,
-                            tensorArgumentCount: tensorArgumentCount,
-                            helperFunctionCount: helperFunctionCount,
-                            resultCount: resultCount)
-}
-
-/// Waits for completion of the computation as given by `computation`, and
-/// returns results.
-/// Aborts the process on error, and emits an error string to STDERR.
-///
-/// - Parameters:
-///   - computation: The tensor computation to finish.
-///   - tensorResultAddress: The address to an uninitialized buffer to accept
-///     results of the computation, where the output tensors may live on CPU or
-///     GPU.
-///   - tensorResultCount: The number of results to accept from the computation.
-/// - Note: The result address as passed in is pointing to uninitialized memory,
-///   this must initialize the memory, transferring ownership of the tensor
-///   handles to the caller.
-@inlinable
-@_silgen_name("_swift_tfc_FinishTensorComputation")
-public func _TFCFinishTensorComputation(
-  _ computation: _TensorComputation,
-  _ tensorResultAddress: UnsafeMutablePointer<CTensorHandle>,
-  _ tensorResultCount: Int
-) {
-  debugLog("Expecting \(tensorResultCount) output tensors.")
-  let results = computation.finish()
-  internalConsistencyCheck(results.count == tensorResultCount,
-    "internal compiler error: result count mismatch!")
-  tensorResultAddress.initialize(from: results, count: tensorResultCount)
-}
-
-/// Terminates the computation as given by 'program', and clean up the state.
-///
-/// - Parameters:
-///   - program: The tensor program to terminate.
-/// - Note: If the execution was synchronous, then this function does nothing.
-@inlinable
-@_silgen_name("_swift_tfc_TerminateTensorComputation")
-public func _TFCTerminateTensorComputation(_ computation: _TensorComputation) {
-  computation.terminate()
-}
-
-/// Registers all functions in a graph into the eager context if in eager mode.
-///
-/// - Parameters:
-///   - programByteAddress: The address of the raw program.
-///   - programByteCount: The number of bytes in the program.
-@inlinable
-@_silgen_name("_swift_tfc_RegisterTensorFunctions")
-public func _TFCRegisterTensorFunctions(
-  _ programByteAddress: UnsafeRawPointer,
-  _ programByteCount: Int
-) {
-  _ExecutionContext.global.loadFunctionsFromGraph(byteAddress: programByteAddress,
-                                                  byteCount: programByteCount)
-}
-
-/// Creates a scalar CTensorHandle value for the given data type.
-///
-/// - Parameters:
-///   - value: The scalar value.
-///   - dtype: The TF data type of the tensor handle to create.
-/// - Returns: A new CTensorHandle representing the scalar.
-/// - Precondition: T must conform to _TensorFlowDataTypeCompatible and 'dtype'
-///   must be equal to T's corresponding data type.
-/// - TODO(rxwei): Constrain T to _TensorFlowDataTypeCompatible and remove the
-///   precondition. This requires the compiler to emit a call to the generic
-///   function.
-@inlinable
-@_silgen_name("_swift_tfc_CreateCTensorHandle")
-public func _TFCCreateCTensorHandle<T>(_ value: T,
-                                       _ dtype: TF_DataType) -> CTensorHandle {
-  // Create a new CTensor and initialize it to the scalar value.
-  let tensor = TF_AllocateTensor(dtype, nil, 0, MemoryLayout<T>.stride)
-  TF_TensorData(tensor).assumingMemoryBound(to: T.self).initialize(to: value)
-  // Create a new CTensorHandle from the CTensor.
-  let status = TF_NewStatus()
-  let cTensorHandle = TFE_NewTensorHandle(tensor, status)
-  checkOk(status)
-  TF_DeleteStatus(status)
-  TF_DeleteTensor(tensor)
-  return cTensorHandle!
 }
 
 //===----------------------------------------------------------------------===//
@@ -1774,41 +1614,6 @@ func _TFCOpAddInputFromAnyTensors(
   }
 }
 
-/// Initializes a TensorGroup value, taking ownership of all the tensor
-/// handles in `tensorHandles`.
-@usableFromInline
-@_silgen_name("_swift_tfc_InitTensorGroup")
-func _TFCInitTensorGroup<T : TensorGroup>(
-    _ tensorHandles: UnsafeMutablePointer<CTensorHandle>
-) -> T {
-  return T(_owning: tensorHandles)
-}
-
-/// Allocates a buffer of CTensorHandles on the heap.
-@usableFromInline
-@_silgen_name("_swift_tfc_AllocateCHandleBuffer")
-func _TFCAllocateCHandleBuffer(_ capacity: Int32)
-    -> UnsafeMutablePointer<CTensorHandle> {
-  return UnsafeMutablePointer.allocate(capacity: Int(capacity))
-}
-
-/// Deallocates a buffer of CTensorHandles.
-@usableFromInline
-@_silgen_name("_swift_tfc_DeallocateCHandleBuffer")
-func _TFCDeallocateCHandleBuffer(
-    _ buffer: UnsafeMutablePointer<CTensorHandle>
-) {
-  buffer.deallocate()
-}
-
-/// Returns the number of CTensorHandles in a TensorGroup of type T.
-@_silgen_name("_swift_tfc_GetTensorGroupCHandleCount")
-public func _TFCGetTensorGroupCHandleCount<T : TensorGroup>(
-    _ type: T.Type
-) -> Int32 {
-  return T._tensorHandleCount
-}
-
 @inlinable
 @_silgen_name("_swift_tfc_CreateTensorHandleFromC")
 public func _TFCCreateTensorHandleFromC(
@@ -1840,56 +1645,6 @@ public func _TFCCreateTensorHandleFromC(
 // into buffers that TFE_OpSetAttr*List functions can read.
 
 @usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrBoolArray")
-func _TFCOpSetAttrBoolArray(_ op: CTFEOp,
-                            _ attrName: UnsafePointer<Int8>,
-                            _ value: Array<Bool>) {
-  value.map({ $0 ? UInt8(1) : UInt8(0) }).withUnsafeBufferPointer { buffer in
-    TFE_OpSetAttrBoolList(op, attrName, buffer.baseAddress, Int32(buffer.count))
-  }
-}
-
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrInt32Array")
-func _TFCOpSetAttrInt32Array(_ op: CTFEOp,
-                             _ attrName: UnsafePointer<Int8>,
-                             _ value: Array<Int32>) {
-  value.map(Int64.init).withUnsafeBufferPointer { buffer in
-    TFE_OpSetAttrIntList(op, attrName, buffer.baseAddress, Int32(buffer.count))
-  }
-}
-
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrInt64Array")
-func _TFCOpSetAttrInt64Array(_ op: CTFEOp,
-                             _ attrName: UnsafePointer<Int8>,
-                             _ value: Array<Int64>) {
-  value.withUnsafeBufferPointer { buffer in
-    TFE_OpSetAttrIntList(op, attrName, buffer.baseAddress, Int32(buffer.count))
-  }
-}
-
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrDoubleArray")
-func _TFCOpSetAttrDoubleArray(_ op: CTFEOp,
-                              _ attrName: UnsafePointer<Int8>,
-                              _ value: Array<Double>) {
-  value.map(Float.init).withUnsafeBufferPointer { buffer in
-    TFE_OpSetAttrFloatList(op, attrName, buffer.baseAddress, Int32(buffer.count))
-  }
-}
-
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrFloatArray")
-func _TFCOpSetAttrFloatArray(_ op: CTFEOp,
-                             _ attrName: UnsafePointer<Int8>,
-                             _ value: Array<Float>) {
-  value.withUnsafeBufferPointer { buffer in
-    TFE_OpSetAttrFloatList(op, attrName, buffer.baseAddress, Int32(buffer.count))
-  }
-}
-
-@usableFromInline
 @_silgen_name("_swift_tfc_OpSetAttrTypeArray")
 func _TFCOpSetAttrTypeArray(_ op: CTFEOp,
                             _ attrName: UnsafePointer<Int8>,
@@ -1900,61 +1655,6 @@ func _TFCOpSetAttrTypeArray(_ op: CTFEOp,
                             Int32(reboundBuffer.count))
     }
   }
-}
-
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrTensorShape")
-func _TFCOpSetAttrTensorShape(_ op: CTFEOp,
-                              _ attrName: UnsafePointer<Int8>,
-                              _ shape: TensorShape,
-                              _ status: CTFStatus) {
-  let dimensions: [Int64] = shape.dimensions.map(Int64.init)
-  dimensions.withUnsafeBufferPointer { buffer in
-    TFE_OpSetAttrShape(op, attrName, buffer.baseAddress, Int32(buffer.count),
-                       status)
-  }
-}
-
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrOptionalTensorShape")
-func _TFCOpSetAttrOptionalTensorShape(_ op: CTFEOp,
-                                      _ attrName: UnsafePointer<Int8>,
-                                      _ optionalShape: TensorShape?,
-                                      _ status: CTFStatus) {
-  guard let shape = optionalShape else {
-    TFE_OpSetAttrShape(op, attrName, nil, -1, status)
-    return
-  }
-  _TFCOpSetAttrTensorShape(op, attrName, shape, status)
-}
-
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrTensorShapeArray")
-func _TFCOpSetAttrTensorShapeArray(_ op: CTFEOp,
-                                   _ attrName: UnsafePointer<Int8>,
-                                   _ value: Array<TensorShape>,
-                                   _ status: CTFStatus) {
-  let flattenedDims = value.flatMap { $0.dimensions.map(Int64.init) }
-  let ranks = value.map { Int32($0.rank) }
-  setAttrShapeList(op: op, attrName: attrName, flattenedDims: flattenedDims,
-                   ranks: ranks, status: status)
-}
-
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrOptionalTensorShapeArray")
-func _TFCOpSetAttrOptionalTensorShapeArray(_ op: CTFEOp,
-                                           _ attrName: UnsafePointer<Int8>,
-                                           _ value: Array<TensorShape?>,
-                                           _ status: CTFStatus) {
-  let flattenedDims = value.flatMap { (tensorShapeOpt) -> [Int64] in
-    if let tensorShape = tensorShapeOpt {
-      return tensorShape.dimensions.map(Int64.init)
-    }
-    return []
-  }
-  let ranks = value.map { shape in (shape?.rank).map(Int32.init) ?? -1 }
-  setAttrShapeList(op: op, attrName: attrName, flattenedDims: flattenedDims,
-                   ranks: ranks, status: status)
 }
 
 /// Given dimensions and ranks in the form described below, makes the
@@ -1982,74 +1682,6 @@ fileprivate func setAttrShapeList(
         TFE_OpSetAttrShapeList(op, attrName, dimsBuffer.baseAddress,
                                ranksBuffer.baseAddress,
                                Int32(ranksBuffer.count), status)
-      }
-    }
-  }
-}
-
-/// Wrapper around TFE_OpSetAttrString that handles converting the Swift Stdlib
-/// String into a buffer that TFE_OpSetAttrString can read.
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrString")
-func _TFCOpSetAttrString(_ op: CTFEOp,
-                         _ attrName: UnsafePointer<Int8>,
-                         _ value: String) {
-  value.utf8CString.withUnsafeBufferPointer { buffer in
-    // utf8CString is null-terminated; TFE_OpSetAttrString wants
-    // non-null-terminated.
-    TFE_OpSetAttrString(op, attrName, buffer.baseAddress, buffer.count - 1)
-  }
-}
-
-/// Wrapper around TFE_OpSetAttrFunctionName that handles converting the Swift
-/// Stdlib String into a buffer that TFE_OpSetAttrFunctionName can read.
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrFunctionName")
-func _TFCOpSetAttrFunctionName(_ op: CTFEOp,
-                               _ attrName: UnsafePointer<Int8>,
-                               _ value: String) {
-  value.utf8CString.withUnsafeBufferPointer { buffer in
-    // utf8CString is null-terminated; TFE_OpSetAttrFunctionName wants
-    // non-null-terminated.
-    TFE_OpSetAttrFunctionName(op, attrName, buffer.baseAddress, buffer.count - 1)
-  }
-}
-
-/// Wrapper around TFE_OpSetAttrStringList that handles converting the Swift
-/// Strings into buffers that TFE_OpSetAttrStringList can read.
-@usableFromInline
-@_silgen_name("_swift_tfc_OpSetAttrStringArray")
-func _TFCOpSetAttrStringArray(_ op: CTFEOp,
-                             _ attrName: UnsafePointer<Int8>,
-                             _ strings: [String]) {
-  // Collect all the strings' utf8 bytes into a single array so that we can
-  // address all the strings with a single
-  // `flattenedStringBytes.withUnsafeBufferPointer`.
-  var flattenedStringBytes: [CChar] = []
-  var lengths: [Int] = []
-  for string in strings {
-    // Don't include the null-terminator because TFE_OpSetAttrStringList uses
-    // lengths instead of null-terminators.
-    let stringBytes = string.utf8CString.dropLast()
-    flattenedStringBytes.append(contentsOf: stringBytes)
-    lengths.append(stringBytes.count)
-  }
-
-  // Calculate the addresses of all the strings within our single buffer, and
-  // then call TFE_OpSetAttrStringList.
-  flattenedStringBytes.withUnsafeBufferPointer { flattenedStringBytesBuffer in
-    var stringAddrs: [UnsafeRawPointer?] = []
-    var currentStringAddr =
-        flattenedStringBytesBuffer.baseAddress.map(UnsafeRawPointer.init)
-    for length in lengths {
-      stringAddrs.append(currentStringAddr)
-      currentStringAddr = currentStringAddr?.advanced(by: length)
-    }
-
-    stringAddrs.withUnsafeBufferPointer { stringAddrsBuffer in
-      lengths.withUnsafeBufferPointer { lengthsBuffer in
-        TFE_OpSetAttrStringList(op, attrName, stringAddrsBuffer.baseAddress,
-                                lengthsBuffer.baseAddress, Int32(strings.count))
       }
     }
   }
@@ -2102,10 +1734,4 @@ func _TFCOpSetDeviceFromScope(_ op: CTFEOp, _ status: CTFStatus) {
   if let deviceName = _ExecutionContext.global.currentDeviceName {
     TFE_OpSetDevice(op, deviceName, status)
   }
-}
-
-@usableFromInline
-@_cdecl("_swift_tfc_CheckOk")
-func _TFCCheckOk(_ s: CTFStatus) {
-  checkOk(s)
 }
