@@ -603,11 +603,6 @@ public final class _ExecutionContext {
   /// The TFE_Context object.
   @usableFromInline let eagerContext: CTFEContext
 
-  // NOTE: the following properties are intentionally not implemented as an enum
-  // due to high churn, *please do not refactor for Swiftiness*.
-  /// The set of all loaded programs indexed by their unique address.
-  private var loadedPrograms: [UnsafeRawPointer : CTFGraph] = [:]
-
   /// The status for checking TensorFlow errors.
   private let status: CTFStatus = TF_NewStatus()
 
@@ -1091,66 +1086,6 @@ internal extension _ExecutionContext {
       pthread_testcancel()
     }
     return try body()
-  }
-}
-
-fileprivate extension _ExecutionContext {
-  /// Load the graph functions of a serialized TensorFlow GraphDef binary proto
-  /// into the context, if that has not been done yet. Return the graph.
-  /// - Parameters:
-  ///   - address: The address of the serialized program in memory.
-  ///   - count: The size of the program in bytes.
-  func loadProgramInBytes(_ address: UnsafeRawPointer, count: Int) -> CTFGraph {
-    return sync {
-      debugLog("Loading a program.")
-       // If the program is already loaded, do nothing.
-      if let graph = loadedPrograms[address] {
-        return graph
-      }
-      // Here we have to do a fairly awkward dance to load the graph functions
-      // and populate them into the TFE_Context.  We load the program as a
-      // TF_Graph, then copy the functions out of it, then copy them into the
-      // TFE_Context.
-      debugLog("Loading graph functions.")
-      let graph = TF_NewGraph()!
-      // TensorFlow loads things through TF_Buffer.  Create one that avoids
-      // redundantly copying the program bytes.
-      var programBuf = TF_Buffer(data: address, length: count,
-                                 data_deallocator: nil)
-      let graphDefOptions = TF_NewImportGraphDefOptions()
-      TF_GraphImportGraphDef(graph, &programBuf, graphDefOptions, self.status)
-      TF_DeleteImportGraphDefOptions(graphDefOptions)
-      checkOk(self.status)
-      // Now that we have all of the TF_Function objects in the graph, copy them
-      // to standalone TF_Function's.
-      let funcCount = TF_GraphNumFunctions(graph)
-      // Allocate an array to accept functions.
-      var funcs: [CTFFunction?] = Array(repeating: nil, count: Int(funcCount))
-      TF_GraphGetFunctions(graph, &funcs, funcCount, self.status)
-      checkOk(self.status)
-
-      // Add functions to the context.
-      debugLog("Adding \(funcCount) functions to context.")
-      for function in UnsafeBufferPointer(start: funcs, count: Int(funcCount)) {
-        TFE_ContextAddFunction(self.eagerContext, function, self.status)
-        checkOk(self.status)
-        debugLog("Added func \(String(cString: TF_FunctionName(function))).")
-        TF_DeleteFunction(function)
-      }
-
-       // Memorize the loaded program by address.
-      loadedPrograms[address] = graph
-      debugLog("Done loading a new program.")
-      return graph
-    }
-  }
-}
-
-public extension _ExecutionContext {
-  /// Load functions from a graph encoded as a byte-pointer and length into the
-  /// tensorflow eagerContext.
-  func loadFunctionsFromGraph(byteAddress: UnsafeRawPointer, byteCount: Int) {
-    _ = loadProgramInBytes(byteAddress, count: byteCount)
   }
 }
 
