@@ -462,7 +462,7 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
   if (auto *NewFunc = getSpecializedWithDeadParams(FuncBuilder,
           PAI, SubstF, PAI->getNumArguments(), GenericSpecialized)) {
     // SWIFT_ENABLE_TENSORFLOW
-    // Add an previously unexercised check to prevent AD crash. Rewrite
+    // Add a previously unexercised check to prevent AD crash. Rewrite
     // `partial_apply` only if the specialized function is `@convention(thin)`.
     // Revert check when `VJPEmitter::visitApplyInst` no longer produces
     // argumentless `partial_apply` instructions.
