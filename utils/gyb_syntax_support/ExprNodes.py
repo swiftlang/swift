@@ -28,7 +28,7 @@ EXPR_NODES = [
     Node('DictionaryElementList', kind='SyntaxCollection',
          element='DictionaryElement'),
 
-    Node('StringInterpolationSegments', kind='SyntaxCollection',
+    Node('StringLiteralSegments', kind='SyntaxCollection',
          element='Syntax', element_name='Segment',
          element_choices=['StringSegment', 'ExpressionSegment']),
 
@@ -267,11 +267,6 @@ EXPR_NODES = [
              Child('Digits', kind='IntegerLiteralToken'),
          ]),
 
-    Node('StringLiteralExpr', kind='Expr',
-         children=[
-             Child("StringLiteral", kind='StringLiteralToken')
-         ]),
-
     # true or false
     Node('BooleanLiteralExpr', kind='Expr',
          children=[
@@ -467,28 +462,35 @@ EXPR_NODES = [
          traits=['Parenthesized'],
          children=[
              Child('Backslash', kind='BackslashToken'),
+             Child('Delimiter', kind='RawStringDelimiterToken', 
+                   is_optional=True),
              Child('LeftParen', kind='LeftParenToken',
                    classification='StringInterpolationAnchor',
                    force_classification=True),
-             Child('Expression', kind='Expr'),
+             Child('Expressions', kind='FunctionCallArgumentList',
+                   collection_element_name='Expression'),
              Child('RightParen', kind='StringInterpolationAnchorToken'),
          ]),
 
     # e.g. "abc \(foo()) def"
-    Node('StringInterpolationExpr', kind='Expr',
+    Node('StringLiteralExpr', kind='Expr',
          children=[
+             Child('OpenDelimiter', kind='RawStringDelimiterToken', 
+                   is_optional=True),
              Child('OpenQuote', kind='Token',
                    token_choices=[
                        'StringQuoteToken',
                        'MultilineStringQuoteToken',
                    ]),
-             Child('Segments', kind='StringInterpolationSegments',
+             Child('Segments', kind='StringLiteralSegments',
                    collection_element_name='Segment'),
              Child('CloseQuote', kind='Token',
                    token_choices=[
                        'StringQuoteToken',
                        'MultilineStringQuoteToken',
                    ]),
+             Child('CloseDelimiter', kind='RawStringDelimiterToken', 
+                   is_optional=True),
          ]),
 
     # e.g. "\a.b[2].a"

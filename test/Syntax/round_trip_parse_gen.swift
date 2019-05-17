@@ -434,11 +434,12 @@ extension ext where A == Int, B: Numeric {}
 extension ext.a.b {}
 
 func foo() {
-  var a = "abc \(foo()) def \(a + b + "a \(3)") gh"
+  var a = "abc \(foo()) def \(a + b + "a \(3)") gh \(bar, default: 1)"
   var a = """
   abc \( foo() + bar() )
   de \(3 + 3 + "abc \(foo()) def")
   fg
+  \(bar, default: 1)
   """
 }
 
@@ -567,3 +568,10 @@ func foo() {}
 public func anyFoo() -> some Foo {}
 public func qoo() -> some O & O2 {}
 func zlop() -> some C & AnyObject & P {}
+
+"abc"
+"abc \(foo)"
+#"abc"#
+#"abc \#(foo)"#
+##"abc"##
+##"abc \##(foo)"##
