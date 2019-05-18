@@ -510,7 +510,7 @@ public func %=(lhs: inout CGFloat, rhs: CGFloat) {
 }
 
 //===----------------------------------------------------------------------===//
-// RealProtocol conformance
+// Real protocol conformance
 //===----------------------------------------------------------------------===//
 
 %from SwiftMathFunctions import *
