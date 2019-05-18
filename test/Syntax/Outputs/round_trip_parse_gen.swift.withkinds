@@ -581,8 +581,7 @@ func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSigna
 #"<StringSegment>abc</StringSegment>"#</StringLiteralExpr><StringLiteralExpr>
 #"<StringSegment>abc </StringSegment><ExpressionSegment>\#(<FunctionCallArgument><IdentifierExpr>foo</IdentifierExpr></FunctionCallArgument>)</ExpressionSegment><StringSegment></StringSegment>"#</StringLiteralExpr><StringLiteralExpr>
 ##"<StringSegment>abc</StringSegment>"##</StringLiteralExpr><StringLiteralExpr>
-##"<StringSegment>abc </StringSegment><ExpressionSegment>\##(<FunctionCallArgument><IdentifierExpr>foo</IdentifierExpr></FunctionCallArgument>)</ExpressionSegment><StringSegment></StringSegment>"##</StringLiteralExpr>
-func zlop<FunctionSignature><ParameterClause>() </ParameterClause><ReturnClause>-> <SomeType>some <CompositionType><CompositionTypeElement><SimpleTypeIdentifier>C </SimpleTypeIdentifier>& </CompositionTypeElement><CompositionTypeElement><SimpleTypeIdentifier>AnyObject </SimpleTypeIdentifier>& </CompositionTypeElement><CompositionTypeElement><SimpleTypeIdentifier>P </SimpleTypeIdentifier></CompositionTypeElement></CompositionType></SomeType></ReturnClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><FunctionDecl><Attribute>
+##"<StringSegment>abc </StringSegment><ExpressionSegment>\##(<FunctionCallArgument><IdentifierExpr>foo</IdentifierExpr></FunctionCallArgument>)</ExpressionSegment><StringSegment></StringSegment>"##</StringLiteralExpr><FunctionDecl><Attribute>
 
 // SWIFT_ENABLE_TENSORFLOW
 @differentiable(<DifferentiableAttributeArguments><DifferentiableAttributeFuncSpecifier>jvp: <FunctionDeclName>foo<DeclNameArguments>(<DeclNameArgument>_:</DeclNameArgument><DeclNameArgument>_:</DeclNameArgument>)</DeclNameArguments></FunctionDeclName></DifferentiableAttributeFuncSpecifier></DifferentiableAttributeArguments>)</Attribute>
