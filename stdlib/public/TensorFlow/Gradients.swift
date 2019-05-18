@@ -658,19 +658,7 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
       v.unbroadcast(to: origShape)
     })
   }
-  
-  @inlinable
-  func _vjpBroadcast<OtherScalar>(
-    like other: Tensor<OtherScalar>
-  ) -> (Tensor, (Tensor) -> Tensor)
-    where OtherScalar : TensorFlowScalar {
-    return (broadcast(like: other), { [origShape = self.shapeTensor] v in
-      v.unbroadcast(like: origShape)
-    })
-  }
-}
 
-extension Tensor where Scalar : Numeric {
   @inlinable
   func _vjpUnbroadcast(
     toShape shape: Tensor<Int32>
@@ -686,16 +674,6 @@ extension Tensor where Scalar : Numeric {
   ) -> (Tensor, (Tensor) -> Tensor) {
     return (unbroadcast(to: shape), { [origShape = self.shape] v in
       v.broadcast(to: origShape)
-    })
-  }
-  
-  @inlinable
-  func _vjpUnbroadcast<OtherScalar>(
-    like other: Tensor<OtherScalar>
-  ) -> (Tensor, (Tensor) -> Tensor)
-    where OtherScalar : TensorFlowScalar {
-    return (unbroadcast(like: other), { [origShape = self.shapeTensor] v in
-      v.broadcast(like: origShape)
     })
   }
 }
