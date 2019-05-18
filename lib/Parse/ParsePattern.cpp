@@ -791,8 +791,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     } else if (Tok.is(tok::kw_throw)) {
       throwsLoc = consumeToken();
       isThrow = true;
-      return diagnose(throwsLoc,
-                      diag::throw_in_function_type_and_wrong_position);
+      return diagnose(throwsLoc, diag::throws_in_wrong_position);
     }
 
     if (!throwsLoc.isValid())
@@ -820,7 +819,9 @@ Parser::parseFunctionSignature(Identifier SimpleName,
       assert(arrowLoc.isValid());
       assert(throwsLoc.isValid());
       if (isThrow) {
-        (*diagOpt)
+        (*diagOpt).flush();
+        diagnose(throwsLoc,
+                 diag::throw_in_function_type_and_wrong_position_note)
             .fixItInsert(arrowLoc, "throws ")
             .fixItRemove(SourceRange(throwsLoc));
       } else {
@@ -847,11 +848,20 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   if (auto diagOpt = diagnoseInvalidThrows()) {
     assert(arrowLoc.isValid());
     assert(retType);
-    SourceLoc typeEndLoc = Lexer::getLocForEndOfToken(SourceMgr,
-                                                      retType->getEndLoc());
+    SourceLoc typeEndLoc =
+        Lexer::getLocForEndOfToken(SourceMgr, retType->getEndLoc());
     SourceLoc throwsEndLoc = Lexer::getLocForEndOfToken(SourceMgr, throwsLoc);
-    (*diagOpt).fixItInsert(arrowLoc, rethrows ? "rethrows " : "throws ")
-              .fixItRemoveChars(typeEndLoc, throwsEndLoc);
+
+    if (isThrow) {
+      (*diagOpt).flush();
+      diagnose(throwsLoc, diag::throw_in_function_type_and_wrong_position_note)
+          .fixItInsert(arrowLoc, rethrows ? "rethrows " : "throws ")
+          .fixItRemoveChars(typeEndLoc, throwsEndLoc);
+    } else {
+      (*diagOpt)
+          .fixItInsert(arrowLoc, rethrows ? "rethrows " : "throws ")
+          .fixItRemoveChars(typeEndLoc, throwsEndLoc);
+    }
   }
 
   return Status;

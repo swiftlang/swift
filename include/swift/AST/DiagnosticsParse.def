@@ -724,9 +724,8 @@ ERROR(rethrows_in_wrong_position,none,
       "'rethrows' may only occur before '->'", ())
 ERROR(throw_in_function_type,none,
       "expected throwing specifier; did you mean 'throws'?", ())
-ERROR(throw_in_function_type_and_wrong_position,none,
-      "expected throwing specifier; did you mean 'throws'? "
-      "'throws' may only occur before '->'", ())
+NOTE(throw_in_function_type_and_wrong_position_note,none,
+      "expected throwing specifier; did you mean 'throws'?", ())
 ERROR(expected_type_before_arrow,none,
       "expected type before '->'", ())
 ERROR(expected_type_after_arrow,none,
