@@ -5937,23 +5937,19 @@ SILValue ADContext::promoteToDifferentiableFunction(
 
 /// Fold `autodiff_function_extract` users of the given `autodiff_function`
 /// instruction, directly replacing them with `autodiff_function` instruction
-/// operands. If the `autodiff_function` instruction has no
-/// non-`autodiff_function_extract` users, delete the instruction itself after
-/// folding.
+/// operands. If the `autodiff_function` instruction has no remaining uses,
+/// delete the instruction itself after folding.
 ///
 /// Folding can be disabled by the `SkipFoldingAutoDiffFunctionExtraction` flag
 /// for SIL testing purposes.
 static void foldAutoDiffFunctionExtraction(AutoDiffFunctionInst *source) {
-  bool hasOnlyAutoDiffFunctionExtractUsers = true;
   // Iterate through all `autodiff_function` instruction uses.
   for (auto use : source->getUses()) {
     auto *adfei = dyn_cast<AutoDiffFunctionExtractInst>(use->getUser());
     // If user is not an `autodiff_function_extract` instruction, set flag to
     // false.
-    if (!adfei) {
-      hasOnlyAutoDiffFunctionExtractUsers = false;
+    if (!adfei)
       continue;
-    }
     // Fold original function extractors.
     if (adfei->getExtractee() == AutoDiffFunctionExtractee::Original) {
       auto originalFnValue = source->getOriginalFunction();
@@ -5967,9 +5963,8 @@ static void foldAutoDiffFunctionExtraction(AutoDiffFunctionInst *source) {
     adfei->replaceAllUsesWith(assocFnValue);
     adfei->eraseFromParent();
   }
-  // If all users are `autodiff_function_extract` instructions, erase the
-  // `autodiff_function` instruction itself.
-  if (hasOnlyAutoDiffFunctionExtractUsers)
+  // If the `autodiff_function` instruction has no remaining uses, erase it.
+  if (isInstructionTriviallyDead(source))
     source->eraseFromParent();
 }
 
