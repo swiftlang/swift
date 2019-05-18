@@ -1600,18 +1600,23 @@ public extension Tensor {
 
 public extension Tensor {
   @inlinable
+  @differentiable(wrt: self, vjp: _vjpBroadcast(toShape:)
+    where Scalar : TensorFlowFloatingPoint)
   func broadcast(toShape shape: Tensor<Int32>) -> Tensor {
     return Raw.broadcastTo(self, shape: shape)
   }
 
   @inlinable
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func broadcast(to shape: TensorShape) -> Tensor {
-    return broadcast(toShape: Tensor<Int32>(shape.dimensions.map(Int32.init)))
+    return broadcast(toShape: Tensor<Int32>({ shape.dimensions.map(Int32.init) }()))
   }
 
   /// Broadcast to the same shape as the specified `Tensor`.
   /// - Precondition: The specified shape must be compatible for broadcasting.
   @inlinable
+  @differentiable(wrt: self
+    where Scalar : TensorFlowFloatingPoint)
   func broadcast<OtherScalar>(like other: Tensor<OtherScalar>) -> Tensor {
     return broadcast(toShape: other.shapeTensor)
   }
@@ -1619,6 +1624,8 @@ public extension Tensor {
 
 public extension Tensor where Scalar : Numeric {
   @inlinable
+  @differentiable(wrt: self, vjp: _vjpUnbroadcast(toShape:)
+    where Scalar : TensorFlowFloatingPoint)
   func unbroadcast(toShape otherShape: Tensor<Int32>) -> Tensor {
     let rankDiff = (rankTensor - otherShape.scalarCountTensor).rankLifted()
     let ones: Tensor<Int32> = Raw.fill(dims: rankDiff, value: Tensor<Int32>(1))
@@ -1631,13 +1638,15 @@ public extension Tensor where Scalar : Numeric {
   }
 
   @inlinable
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func unbroadcast<OtherScalar>(like other: Tensor<OtherScalar>) -> Tensor {
     return unbroadcast(toShape: other.shapeTensor)
   }
 
   @inlinable
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func unbroadcast(to shape: TensorShape) -> Tensor {
-    return unbroadcast(toShape: Tensor<Int32>(shape.dimensions.map(Int32.init)))
+    return unbroadcast(toShape: Tensor<Int32>({ shape.dimensions.map(Int32.init) }()))
   }
 
   @inlinable

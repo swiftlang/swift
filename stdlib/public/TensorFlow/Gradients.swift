@@ -635,3 +635,27 @@ func _vjpRelu<T : TensorFlowFloatingPoint>(
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   return (relu(x), { v in Tensor(x .> 0) * v })
 }
+
+//===----------------------------------------------------------------------===//
+// Broadcasting
+//===----------------------------------------------------------------------===//
+
+extension Tensor where Scalar : TensorFlowFloatingPoint {
+  @inlinable
+  func _vjpBroadcast(
+    toShape shape: Tensor<Int32>
+  ) -> (Tensor, (Tensor) -> Tensor) {
+    return (broadcast(toShape: shape), { [origShape = self.shapeTensor] v in
+      v.unbroadcast(toShape: origShape)
+    })
+  }
+
+  @inlinable
+  func _vjpUnbroadcast(
+    toShape shape: Tensor<Int32>
+  ) -> (Tensor, (Tensor) -> Tensor) {
+    return (unbroadcast(toShape: shape), { [origShape = self.shapeTensor] v in
+      v.broadcast(toShape: origShape)
+    })
+  }
+}
