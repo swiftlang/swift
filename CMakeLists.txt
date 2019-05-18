@@ -117,8 +117,6 @@ endif()
 
 set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
     "Build Swift with code coverage instrumenting enabled [FALSE, NOT-MERGED, MERGED]")
-set_property(CACHE SWIFT_ANALYZE_CODE_COVERAGE PROPERTY
-    STRINGS FALSE "NOT-MERGED" "MERGED")
 
 # SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
 # can be reused when a new version of Swift comes out (assuming the user hasn't
@@ -171,8 +169,6 @@ endif()
 
 set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
     "Build type for the Swift standard library and SDK overlays [Debug, RelWithDebInfo, Release, MinSizeRel]")
-set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
-    STRINGS "Debug" "RelWithDebInfo" "Release" "MinSizeRel")
 # Allow the user to specify the standard library CMAKE_MSVC_RUNTIME_LIBRARY
 # value.  The following values are valid:
 #   - MultiThreaded (/MT)
