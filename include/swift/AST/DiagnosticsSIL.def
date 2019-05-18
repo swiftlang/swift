@@ -409,8 +409,8 @@ ERROR(autodiff_expression_not_differentiable_error,none,
 NOTE(autodiff_expression_not_differentiable_note,none,
      "expression is not differentiable", ())
 NOTE(autodiff_external_nondifferentiable_function,none,
-     "cannot differentiate an external function that has not been marked "
-     "'@differentiable'", ())
+     "cannot differentiate functions that have not been marked "
+     "'@differentiable' and that are defined in other files", ())
 NOTE(autodiff_nondifferentiable_argument,none,
      "cannot differentiate through a non-differentiable argument; do you want "
      "to add '.withoutDerivative()'?", ())
