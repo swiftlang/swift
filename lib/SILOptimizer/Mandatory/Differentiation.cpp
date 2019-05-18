@@ -317,8 +317,9 @@ private:
   Kind kind;
   union Value {
     /// The instruction associated with the `AutoDiffFunctionInst` case.
-    AutoDiffFunctionInst *adFuncInst;
-    Value(AutoDiffFunctionInst *inst) : adFuncInst(inst) {}
+    std::pair<AutoDiffFunctionInst *, DifferentiationInvoker *> adFuncInst;
+    Value(AutoDiffFunctionInst *inst, DifferentiationInvoker *invoker)
+        : adFuncInst({inst, invoker}) {}
 
     /// The parent `apply` instruction and `[differentiable]` attribute
     /// associated with the `IndirectDifferentiation` case.
@@ -336,18 +337,45 @@ private:
   /*implicit*/
   DifferentiationInvoker(Kind kind, Value value) : kind(kind), value(value) {}
 
-public:
-  DifferentiationInvoker(AutoDiffFunctionInst *inst)
-      : kind(Kind::AutoDiffFunctionInst), value(inst) {}
+private:
+  DifferentiationInvoker(AutoDiffFunctionInst *inst,
+                         DifferentiationInvoker *invoker)
+      : kind(Kind::AutoDiffFunctionInst), value(inst, invoker) {}
   DifferentiationInvoker(ApplyInst *applyInst, SILDifferentiableAttr *attr)
       : kind(Kind::IndirectDifferentiation),
-        value({applyInst, attr}) {}
+        value(applyInst, attr) {}
   DifferentiationInvoker(SILDifferentiableAttr *attr)
       : kind(Kind::SILDifferentiableAttribute), value(attr) {}
 
+public:
+  DifferentiationInvoker(const DifferentiationInvoker *) = delete;
+  DifferentiationInvoker *operator=(const DifferentiationInvoker *) = delete;
+  // DifferentiationInvoker(DifferentiationInvoker *&val) = default;
+  // DifferentiationInvoker *operator=(DifferentiationInvoker *&) = default;
+
+  static DifferentiationInvoker *getAutoDiffFunctionInst(
+      llvm::BumpPtrAllocator &allocator, AutoDiffFunctionInst *inst,
+      DifferentiationInvoker *parentInvoker) {
+    auto *buf = allocator.Allocate<DifferentiationInvoker>();
+    return new (buf) DifferentiationInvoker(inst, parentInvoker);
+  }
+
+  static DifferentiationInvoker *getDifferentiableAttribute(
+      llvm::BumpPtrAllocator &allocator, SILDifferentiableAttr *attr) {
+    auto *buf = allocator.Allocate<DifferentiationInvoker>();
+    return new (buf) DifferentiationInvoker(attr);
+  }
+
   Kind getKind() const { return kind; }
 
+/*
   AutoDiffFunctionInst *getAutoDiffFunctionInst() const {
+    assert(kind == Kind::AutoDiffFunctionInst);
+    return value.adFuncInst;
+  }
+*/
+  std::pair<AutoDiffFunctionInst *, DifferentiationInvoker *>
+  getAutoDiffFunctionInst() const {
     assert(kind == Kind::AutoDiffFunctionInst);
     return value.adFuncInst;
   }
@@ -367,7 +395,7 @@ public:
   SourceLoc getLocation() const {
     switch (kind) {
     case Kind::AutoDiffFunctionInst:
-      return getAutoDiffFunctionInst()->getLoc().getSourceLoc();
+      return getAutoDiffFunctionInst().first->getLoc().getSourceLoc();
     case Kind::IndirectDifferentiation:
       return getIndirectDifferentiation().first->getLoc().getSourceLoc();
     case Kind::SILDifferentiableAttribute:
@@ -493,9 +521,13 @@ static inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
   os << "(differentiation_invoker ";
   switch (kind) {
-  case Kind::AutoDiffFunctionInst:
-    os << "autodiff_function_inst=(" << *getAutoDiffFunctionInst() << ")";
+  case Kind::AutoDiffFunctionInst: {
+    AutoDiffFunctionInst *inst;
+    DifferentiationInvoker *parentInvoker;
+    std::tie(inst, parentInvoker) = getAutoDiffFunctionInst();
+    os << "autodiff_function_inst=(" << *inst << ")";
     break;
+  }
   case Kind::IndirectDifferentiation: {
     auto indDiff = getIndirectDifferentiation();
     os << "indirect_differentiation=(" << *std::get<0>(indDiff) << ')';
@@ -611,11 +643,23 @@ private:
   /// Shared pass manager.
   SILPassManager &passManager;
 
+  /// Allocator. Used for differentiation invokers.
+  llvm::BumpPtrAllocator allocator;
+
   /// The worklist (stack) of `autodiff_function` instructions to be processed.
-  SmallVector<AutoDiffFunctionInst *, 32> autoDiffFunctionInsts;
+  SmallVector<std::pair<AutoDiffFunctionInst *, DifferentiationInvoker *>, 32>
+  autoDiffFunctionInsts;
+  // SmallVector<AutoDiffFunctionInst *, 32> autoDiffFunctionInsts;
 
   /// Mapping from `[differentiable]` attributes to invokers.
-  DenseMap<SILDifferentiableAttr *, DifferentiationInvoker> invokers;
+  DenseMap<SILDifferentiableAttr *, DifferentiationInvoker *>
+  differentiableAttributeInvokers;
+
+  /*
+  /// Mapping from `autodiff_function` instructions to invokers.
+  DenseMap<AutoDiffFunctionInst *, DifferentiationInvoker>
+  autoDiffFunctionInstInvokers;
+  */
 
   /// Mapping from `autodiff_function` instructions to result indices.
   DenseMap<AutoDiffFunctionInst *, unsigned> resultIndices;
@@ -664,15 +708,30 @@ public:
   SILModule &getModule() const { return module; }
   ASTContext &getASTContext() const { return module.getASTContext(); }
   SILPassManager &getPassManager() const { return passManager; }
+  llvm::BumpPtrAllocator &getAllocator() { return allocator; }
   Lowering::TypeConverter &getTypeConverter() { return module.Types; }
 
+  /*
   SmallVectorImpl<AutoDiffFunctionInst *> &getAutoDiffFunctionInsts() {
     return autoDiffFunctionInsts;
   }
-
-  DenseMap<SILDifferentiableAttr *, DifferentiationInvoker> &getInvokers() {
-    return invokers;
+  */
+  SmallVectorImpl<std::pair<AutoDiffFunctionInst *, DifferentiationInvoker *>>
+  &getAutoDiffFunctionInsts() {
+    return autoDiffFunctionInsts;
   }
+
+  DenseMap<SILDifferentiableAttr *, DifferentiationInvoker *>
+  &getDifferentiableAttributeInvokers() {
+    return differentiableAttributeInvokers;
+  }
+
+  /*
+  DenseMap<AutoDiffFunctionInst *, DifferentiationInvoker>
+  &getAutoDiffFunctionInstInvokers() {
+    return autoDiffFunctionInstInvokers;
+  }
+ */
 
   DenseMap<AutoDiffFunctionInst *, unsigned> &getResultIndices() {
     return resultIndices;
@@ -730,7 +789,7 @@ public:
   }
 
   void cleanUp() {
-    for (auto invokerInfo : invokers) {
+    for (auto &invokerInfo : differentiableAttributeInvokers) {
       auto *attr = invokerInfo.getFirst();
       auto *original = attr->getOriginal();
       LLVM_DEBUG(getADDebugStream()
@@ -738,6 +797,15 @@ public:
                  << original->getName() << '\n');
       original->removeDifferentiableAttr(attr);
     }
+    /*
+    for (auto ^invokerInfo : autoDiffFunctionInstInvokers) {
+      auto *inst = invokerInfo.getFirst();
+      LLVM_DEBUG(getADDebugStream()
+                 << "Erasing `autodiff_function` instruction for " << *inst
+                 << '\n');
+      inst->replaceAllUsesWithUndef();
+    }
+     */
     // Delete all references to generated functions.
     for (auto assocFn : generatedAssociatedFunctionReferences) {
       if (auto *fnRef =
@@ -860,18 +928,19 @@ private:
   /// `@differentiable` function-typed value.
   SILValue promoteToDifferentiableFunction(
       AutoDiffFunctionInst *inst, SILBuilder &builder, SILLocation loc,
-      DifferentiationInvoker invoker);
+      DifferentiationInvoker *invoker);
 
 public:
   /// Process the given `[differentiable]` attribute, filling in JVP/VJPs if
   /// missing.
   bool processDifferentiableAttribute(
       SILFunction *original, SILDifferentiableAttr *attr,
-      DifferentiationInvoker invoker);
+      DifferentiationInvoker *invoker);
 
   /// Process the given `autodiff_function` instruction, filling in missing
   /// associated functions if necessary.
-  bool processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi);
+  bool processAutoDiffFunctionInst(
+      AutoDiffFunctionInst *adfi, DifferentiationInvoker *invoker);
 
   /// Get or create an associated function index subset thunk from
   /// `actualIndices` to `desiredIndices` for the given associated function
@@ -912,7 +981,7 @@ public:
   /// the task is indirect, emits notes all the way up to the outermost task,
   /// and emits an error at the outer task. Otherwise, emits an error directly.
   InFlightDiagnostic emitNondifferentiabilityError(
-      SILInstruction *inst, DifferentiationInvoker invoker,
+      SILInstruction *inst, DifferentiationInvoker *invoker,
       Optional<Diag<>> diag = None);
 
   /// Given a value and a differentiation task associated with the parent
@@ -920,13 +989,13 @@ public:
   /// task is indirect, emits notes all the way up to the outermost task, and
   /// emits an error at the outer task. Otherwise, emits an error directly.
   InFlightDiagnostic emitNondifferentiabilityError(
-      SILValue value, DifferentiationInvoker invoker,
+      SILValue value, DifferentiationInvoker *invoker,
       Optional<Diag<>> diag = None);
 
   /// Emit a "not differentiable" error based on the given differentiation task
   /// and diagnostic.
   InFlightDiagnostic emitNondifferentiabilityError(
-      SourceLoc loc, DifferentiationInvoker invoker,
+      SourceLoc loc, DifferentiationInvoker *invoker,
       Optional<Diag<>> diag = None);
 };
 } // end anonymous namespace
@@ -937,12 +1006,12 @@ ADContext::ADContext(SILModuleTransform &transform)
 
 InFlightDiagnostic
 ADContext::emitNondifferentiabilityError(SILValue value,
-                                         DifferentiationInvoker invoker,
+                                         DifferentiationInvoker *invoker,
                                          Optional<Diag<>> diag) {
   LLVM_DEBUG({
     getADDebugStream() << "Diagnosing non-differentiability.\n";
     getADDebugStream() << "For value:\n" << value;
-    getADDebugStream() << "With invoker:\n" << invoker << '\n';
+    getADDebugStream() << "With invoker:\n" << &invoker << '\n';
   });
   auto valueLoc = value.getLoc().getSourceLoc();
   return emitNondifferentiabilityError(valueLoc, invoker, diag);
@@ -950,12 +1019,12 @@ ADContext::emitNondifferentiabilityError(SILValue value,
 
 InFlightDiagnostic
 ADContext::emitNondifferentiabilityError(SILInstruction *inst,
-                                         DifferentiationInvoker invoker,
+                                         DifferentiationInvoker *invoker,
                                          Optional<Diag<>> diag) {
   LLVM_DEBUG({
     getADDebugStream() << "Diagnosing non-differentiability.\n";
     getADDebugStream() << "For instruction:\n" << *inst;
-    getADDebugStream() << "With invoker:\n" << invoker << '\n';
+    getADDebugStream() << "With invoker:\n" << &invoker << '\n';
   });
   auto instLoc = inst->getLoc().getSourceLoc();
   return emitNondifferentiabilityError(instLoc, invoker, diag);
@@ -963,15 +1032,26 @@ ADContext::emitNondifferentiabilityError(SILInstruction *inst,
 
 InFlightDiagnostic
 ADContext::emitNondifferentiabilityError(SourceLoc loc,
-                                         DifferentiationInvoker invoker,
+                                         DifferentiationInvoker *invoker,
                                          Optional<Diag<>> diag) {
-  switch (invoker.getKind()) {
+  switch (invoker->getKind()) {
   // For `autodiff_function` instructions: if the `autodiff_function`
   // instruction comes from a differential operator, emit an error on the
   // expression and a note on the non-differentiable operation. Otherwise, emit
   // both an error and note on the non-differentiation operation.
   case DifferentiationInvoker::Kind::AutoDiffFunctionInst: {
-    auto *inst = invoker.getAutoDiffFunctionInst();
+    AutoDiffFunctionInst *inst;
+    DifferentiationInvoker *parentInvoker;
+    // auto *inst = invoker->getAutoDiffFunctionInst().first;
+    std::tie(inst, parentInvoker) = invoker->getAutoDiffFunctionInst();
+    llvm::errs() << "PARENT INVOKER? " << parentInvoker << "\n";
+    if (parentInvoker) {
+      llvm::errs() << "YES!\n";
+      // parentInvoker->print(llvm::errs());
+      emitNondifferentiabilityError(inst, parentInvoker, None);
+      return diagnose(loc,
+          diag.getValueOr(diag::autodiff_when_differentiating_function_call));
+    }
     if (auto *expr = findDifferentialOperator(inst)) {
       diagnose(expr->getLoc(), diag::autodiff_function_not_differentiable_error)
           .highlight(expr->getSubExpr()->getSourceRange());
@@ -988,7 +1068,7 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
   // `@differentiable` attribute; otherwise, emit an error on the SIL function.
   // Emit a note at the non-differentiable operation.
   case DifferentiationInvoker::Kind::SILDifferentiableAttribute: {
-    auto *attr = invoker.getSILDifferentiableAttribute();
+    auto *attr = invoker->getSILDifferentiableAttribute();
     auto *original = attr->getOriginal();
     bool foundAttr = false;
     if (auto *declContext = original->getDeclContext()) {
@@ -1019,9 +1099,10 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
   case DifferentiationInvoker::Kind::IndirectDifferentiation: {
     SILInstruction *inst;
     SILDifferentiableAttr *attr;
-    std::tie(inst, attr) = invoker.getIndirectDifferentiation();
-    auto invokerLookup = invokers.find(attr);
-    assert(invokerLookup != invokers.end() && "Expected parent invoker");
+    std::tie(inst, attr) = invoker->getIndirectDifferentiation();
+    auto invokerLookup = differentiableAttributeInvokers.find(attr);
+    assert(invokerLookup != differentiableAttributeInvokers.end() &&
+           "Expected parent invoker");
     emitNondifferentiabilityError(inst, invokerLookup->second, None);
     return diagnose(loc,
         diag.getValueOr(diag::autodiff_when_differentiating_function_call));
@@ -1480,7 +1561,7 @@ static void dumpActivityInfo(SILFunction &fn,
 
 /// If the original function doesn't have a return, it cannot be differentiated.
 static bool diagnoseNoReturn(ADContext &context, SILFunction *original,
-                             DifferentiationInvoker invoker) {
+                             DifferentiationInvoker *invoker) {
   if (original->findReturnBB() != original->end())
     return false;
   context.emitNondifferentiabilityError(
@@ -1494,7 +1575,7 @@ static bool diagnoseNoReturn(ADContext &context, SILFunction *original,
 /// locations. Returns true if error is emitted.
 static bool diagnoseUnsupportedControlFlow(ADContext &context,
                                            SILFunction *original,
-                                           DifferentiationInvoker invoker) {
+                                           DifferentiationInvoker *invoker) {
   if (original->getBlocks().size() <= 1)
     return false;
   // Find any control flow node and diagnose.
@@ -1685,7 +1766,7 @@ static Optional<std::pair<SILValue, SILAutoDiffIndices>>
 emitAssociatedFunctionReference(
     ADContext &context, SILBuilder &builder, SILAutoDiffIndices desiredIndices,
     AutoDiffAssociatedFunctionKind kind, SILValue original,
-    DifferentiationInvoker invoker) {
+    DifferentiationInvoker *invoker) {
 
   SILValue functionSource = original;
 
@@ -1765,10 +1846,10 @@ emitAssociatedFunctionReference(
       // Sanity check passed. Create a new `[differentiable]` attribute and
       // process it it.
       ArrayRef<Requirement> contextualRequirements;
-      if (invoker.getKind() ==
+      if (invoker->getKind() ==
           DifferentiationInvoker::Kind::IndirectDifferentiation)
         contextualRequirements =
-            invoker.getIndirectDifferentiation().second->getRequirements();
+            invoker->getIndirectDifferentiation().second->getRequirements();
       auto *newAttr = context.getOrCreateDifferentiableAttr(
           originalFn, desiredIndices, contextualRequirements);
       if (context.processDifferentiableAttribute(originalFn, newAttr, invoker))
@@ -1849,10 +1930,10 @@ emitAssociatedFunctionReference(
           return None;
         }
         ArrayRef<Requirement> contextualRequirements;
-        if (invoker.getKind() ==
+        if (invoker->getKind() ==
             DifferentiationInvoker::Kind::IndirectDifferentiation)
           contextualRequirements =
-              invoker.getIndirectDifferentiation().second->getRequirements();
+              invoker->getIndirectDifferentiation().second->getRequirements();
         auto *newAttr = context.getOrCreateDifferentiableAttr(
             initialFn, desiredIndices, contextualRequirements);
         bool error = context.processDifferentiableAttribute(
@@ -2583,7 +2664,7 @@ private:
   std::unique_ptr<PrimalInfo> primalInfo = nullptr;
 
   /// The differentiation invoker.
-  DifferentiationInvoker invoker;
+  DifferentiationInvoker *invoker;
 
   /// Info from activity analysis on the original function.
   const DifferentiableActivityInfo &activityInfo;
@@ -2599,12 +2680,16 @@ private:
     return vjp->getASTContext();
   }
 
+  llvm::BumpPtrAllocator &getAllocator() const {
+    return context.getAllocator();
+  }
+
   SILFunction *getOriginal() const { return original; }
   SILFunction *getVJP() const { return vjp; }
 
   const SILAutoDiffIndices &getIndices() const { return attr->getIndices(); }
 
-  DifferentiationInvoker getInvoker() const { return invoker; }
+  DifferentiationInvoker *getInvoker() const { return invoker; }
 
   PrimalInfo &getPrimalInfo() const {
     return *primalInfo.get();
@@ -2638,7 +2723,7 @@ public:
                       SILFunction *original,
                       SILDifferentiableAttr *attr,
                       SILFunction *vjp,
-                      DifferentiationInvoker invoker)
+                      DifferentiationInvoker *invoker)
       : TypeSubstCloner(*vjp, *original, getSubstitutionMap(original, vjp)),
         context(context), original(original), attr(attr), vjp(vjp),
         invoker(invoker),
@@ -3095,7 +3180,15 @@ public:
           loc, indices.parameters, /*differentiationOrder*/ 1, original);
 
       // Record the `autodiff_function` instruction.
-      context.getAutoDiffFunctionInsts().push_back(autoDiffFuncInst);
+      // context.getAutoDiffFunctionInsts().push_back(autoDiffFuncInst);
+#if 0
+      DifferentiationInvoker newInvoker(
+          autoDiffFuncInst, /*parentInvoker*/ &invoker);
+#endif
+      auto *childInvoker = DifferentiationInvoker::getAutoDiffFunctionInst(
+          getAllocator(), autoDiffFuncInst, /*parentInvoker*/ invoker);
+      context.getAutoDiffFunctionInsts().push_back(
+          {autoDiffFuncInst, childInvoker});
       context.getResultIndices()[autoDiffFuncInst] =
           activeResultIndices.front();
 
@@ -3468,7 +3561,7 @@ private:
   PrimalInfo &primalInfo;
 
   /// The differentiation invoker.
-  DifferentiationInvoker invoker;
+  DifferentiationInvoker *invoker;
 
   /// Info from activity analysis on the original function.
   const DifferentiableActivityInfo &activityInfo;
@@ -3501,16 +3594,18 @@ private:
   /// An auxiliary local allocation builder.
   SILBuilder localAllocBuilder;
 
-  llvm::BumpPtrAllocator allocator;
-
   bool errorOccurred = false;
 
   ADContext &getContext() const { return context; }
 
-  SILModule &getModule() const { return getContext().getModule(); }
+  SILModule &getModule() const { return context.getModule(); }
 
   ASTContext &getASTContext() const {
     return adjoint->getASTContext();
+  }
+
+  llvm::BumpPtrAllocator &getAllocator() const {
+    return context.getAllocator();
   }
 
   PrimalInfo &getPrimalInfo() {
@@ -3529,7 +3624,7 @@ public:
                           SILFunction *adjoint,
                           SILFunction *vjp,
                           PrimalInfo &primalInfo,
-                          DifferentiationInvoker invoker,
+                          DifferentiationInvoker *invoker,
                           const DifferentiableActivityInfo &activityInfo,
                           PostDominanceInfo &postDomInfo)
       : context(context), attr(attr), original(original), adjoint(adjoint),
@@ -4672,7 +4767,7 @@ Cleanup *AdjointEmitter::makeCleanup(SILValue value, Cleanup::Func func,
   SmallVector<Cleanup *, 2> nonnullChildren;
   for (auto *c : children)
     if (c) nonnullChildren.push_back(c);
-  return Cleanup::create(allocator, value, func, nonnullChildren);
+  return Cleanup::create(getAllocator(), value, func, nonnullChildren);
 }
 
 Cleanup *AdjointEmitter::makeCleanupFromChildren(ArrayRef<Cleanup *> children) {
@@ -4685,19 +4780,19 @@ Cleanup *AdjointEmitter::makeCleanupFromChildren(ArrayRef<Cleanup *> children) {
 }
 
 AdjointValue AdjointEmitter::makeZeroAdjointValue(SILType type) {
-  return AdjointValue::createZero(allocator, remapType(type));
+  return AdjointValue::createZero(getAllocator(), remapType(type));
 }
 
 AdjointValue
 AdjointEmitter::makeConcreteAdjointValue(ValueWithCleanup value) {
-  return AdjointValue::createConcrete(allocator, value);
+  return AdjointValue::createConcrete(getAllocator(), value);
 }
 
 template<typename EltMoveRange>
 AdjointValue AdjointEmitter::makeAggregateAdjointValue(
     SILType type, EltMoveRange &&elements) {
   return AdjointValue::createAggregate(
-      allocator, remapType(type), std::move(elements));
+      getAllocator(), remapType(type), std::move(elements));
 }
 
 ValueWithCleanup AdjointEmitter::materializeAdjointDirect(
@@ -5369,7 +5464,7 @@ static SILFunction *createEmptyVJP(
 /// Returns true on error.
 bool ADContext::processDifferentiableAttribute(
     SILFunction *original, SILDifferentiableAttr *attr,
-    DifferentiationInvoker invoker) {
+    DifferentiationInvoker *invoker) {
   auto &module = getModule();
   // Try to look up JVP only if attribute specifies JVP name or if original
   // function is an external declaration. If JVP function cannot be found,
@@ -5416,7 +5511,7 @@ bool ADContext::processDifferentiableAttribute(
   // If differentiation is triggered by `[differentiable]`, associated function
   // should share linkage of original function.
   auto isAssocFnExported =
-      invoker.getKind() ==
+      invoker->getKind() ==
           DifferentiationInvoker::Kind::SILDifferentiableAttribute;
 
   // Create empty JVP, if it does not exist.
@@ -5793,7 +5888,7 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
 
 SILValue ADContext::promoteToDifferentiableFunction(
     AutoDiffFunctionInst *inst, SILBuilder &builder, SILLocation loc,
-    DifferentiationInvoker invoker) {
+    DifferentiationInvoker *invoker) {
   auto origFnOperand = inst->getOriginalFunction();
   auto origFnTy = origFnOperand->getType().castTo<SILFunctionType>();
   auto parameterIndices = inst->getParameterIndices();
@@ -5848,8 +5943,10 @@ SILValue ADContext::promoteToDifferentiableFunction(
         }
         retInst->eraseFromParent();
 
-        getAutoDiffFunctionInsts().push_back(adfi);
-        if (processAutoDiffFunctionInst(adfi))
+        auto *childInvoker = DifferentiationInvoker::getAutoDiffFunctionInst(
+            allocator, adfi, invoker);
+        getAutoDiffFunctionInsts().push_back({adfi, childInvoker});
+        if (processAutoDiffFunctionInst(adfi, invoker))
           return nullptr;
 
         auto *newThunkRef = builder.createFunctionRef(loc, newThunk);
@@ -5931,7 +6028,9 @@ SILValue ADContext::promoteToDifferentiableFunction(
   auto *adfi = builder.createAutoDiffFunction(
       loc, parameterIndices, differentiationOrder, origFnOperand, assocFns);
   resultIndices[adfi] = resultIndex;
-  getAutoDiffFunctionInsts().push_back(adfi);
+  auto *childInvoker = DifferentiationInvoker::getAutoDiffFunctionInst(
+      allocator, adfi, invoker);
+  getAutoDiffFunctionInsts().push_back({adfi, childInvoker});
   return adfi;
 }
 
@@ -5968,7 +6067,8 @@ static void foldAutoDiffFunctionExtraction(AutoDiffFunctionInst *source) {
     source->eraseFromParent();
 }
 
-bool ADContext::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
+bool ADContext::processAutoDiffFunctionInst(
+    AutoDiffFunctionInst *adfi, DifferentiationInvoker *invoker) {
   if (adfi->getNumAssociatedFunctions() ==
       autodiff::getNumAutoDiffAssociatedFunctions(
           adfi->getDifferentiationOrder()))
@@ -5980,15 +6080,51 @@ bool ADContext::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
   auto loc = parent->getLocation();
   SILBuilder builder(adfi);
 
+  // auto invoker = autoDiffFunctionInstInvokers[adfi];
+  /*
+  auto invoker = autoDiffFunctionInstInvokers.find(adfi);
+  assert(invoker != autoDiffFunctionInstInvokers.end());
   auto differentiableFnValue =
-      promoteToDifferentiableFunction(adfi, builder, loc, adfi);
+      promoteToDifferentiableFunction(adfi, builder, loc, invoker->getSecond());
+  */
+#if 0
+  auto *childInvoker = DifferentiationInvoker::getAutoDiffFunctionInst(
+      allocator, adfi, /*parentInvoker*/ invoker);
+  auto differentiableFnValue =
+      promoteToDifferentiableFunction(adfi, builder, loc, childInvoker);
+#endif
+  auto differentiableFnValue =
+      promoteToDifferentiableFunction(adfi, builder, loc, invoker);
   if (!differentiableFnValue)
     return true;
   // Delete all worklist occurrences of `adfi` by setting them to nullptr.
   // This is more efficient than APIs like `llvm::erase_if`.
-  for (auto &inst : getAutoDiffFunctionInsts())
-    if (inst == adfi)
+  for (auto &pair : getAutoDiffFunctionInsts()) {
+    auto &inst = pair.first;
+    auto &invoker = pair.second;
+    // FIXME: `invoker` here store an `AutoDiffFunctionInst *` pointer, which
+    // also needs to be invalidated/update here.
+    //
+    // Option 1: change `promoteToDifferentiableFunction` to return a tuple:
+    //       (SILValue differentiableFnValue, AutoDiffFunctionInst *newAutoDiffFunctionInst)
+    //    and use the `newAutoDiffFunctionInst` to replace `inst`.
+    //
+    // Option 2: cast `differentiableFnValue` in this function to `AutoDiffFunctionInst *`, and assign `inst` to it.
+    //       (SILValue differentiableFnValue, AutoDiffFunctionInst *newAutoDiffFunctionInst)
+    //    and use the `newAutoDiffFunctionInst` to replace `inst`.
+    if (inst == adfi) {
       inst = nullptr;
+      if (auto *newADFI = dyn_cast<AutoDiffFunctionInst>(differentiableFnValue)) {
+        auto pair = invoker->getAutoDiffFunctionInst();
+        auto *oldADFI = pair.first;
+        // NOTE: consider changing `ADContext::autoDiffFunctionInsts` to just
+        // a `SmallVector<DifferentiationInvoker *, n>`, where the invokers
+        // all store `AutoDiffFunctionInst`. Otherwise, there is redundancy:
+        // pair.first == pair.second->getAutoDiffFunctionInst().first
+        oldADFI = newADFI;
+      }
+    }
+  }
   // Replace all uses of `adfi`.
   adfi->replaceAllUsesWith(differentiableFnValue);
   adfi->eraseFromParent();
@@ -6019,21 +6155,31 @@ void Differentiation::run() {
     // If `f` has a `[differentiable]` attribute, register `f` and the attribute
     // with an invoker.
     for (auto *diffAttr : f.getDifferentiableAttrs()) {
-      DifferentiationInvoker invoker(diffAttr);
-      auto insertion =
-          context.getInvokers().try_emplace(diffAttr, invoker);
+      auto *invoker = DifferentiationInvoker::getDifferentiableAttribute(
+          context.getAllocator(), diffAttr);
+      // NOTE: consider changing `getDifferentiableAttributeInvokers` to just
+      // a `SmallVector<DifferentiationInvoker *, n>`, where the invokers
+      // all store `SILDifferentiableAttribute`. Otherwise, there is redundancy.
+      auto insertion = context.getDifferentiableAttributeInvokers().try_emplace(
+          diffAttr, invoker);
       assert(insertion.second &&
              "[differentiable] attribute already has an invoker");
       continue;
     }
-    for (SILBasicBlock &bb : f)
-      for (SILInstruction &i : bb)
-        if (auto *adfi = dyn_cast<AutoDiffFunctionInst>(&i))
-          context.getAutoDiffFunctionInsts().push_back(adfi);
+    for (SILBasicBlock &bb : f) {
+      for (SILInstruction &i : bb) {
+        if (auto *adfi = dyn_cast<AutoDiffFunctionInst>(&i)) {
+          // TODO: Add `ADContext::registerAutoDiffFunctionInst(parentInvoker = nullptr`)
+          auto *invoker = DifferentiationInvoker::getAutoDiffFunctionInst(
+              context.getAllocator(), adfi, /*parentInvoker*/ nullptr);
+          context.getAutoDiffFunctionInsts().push_back({adfi, invoker});
+        }
+      }
+    }
   }
 
   // If nothing has triggered differentiation, there's nothing to do.
-  if (context.getInvokers().empty() &&
+  if (context.getDifferentiableAttributeInvokers().empty() &&
       context.getAutoDiffFunctionInsts().empty())
     return;
 
@@ -6048,22 +6194,28 @@ void Differentiation::run() {
   bool errorOccurred = false;
 
   // Process all `[differentiable]` attributes.
-  for (auto invokerInfo : context.getInvokers()) {
+  for (auto &invokerInfo : context.getDifferentiableAttributeInvokers()) {
     auto *attr = invokerInfo.first;
     auto *original = attr->getOriginal();
-    auto invoker = invokerInfo.second;
+    auto *invoker = invokerInfo.second;
     errorOccurred |=
         context.processDifferentiableAttribute(original, attr, invoker);
   }
 
   // Iteratively process `autodiff_function` instruction worklist.
   while (!context.getAutoDiffFunctionInsts().empty()) {
-    auto *adfi = context.getAutoDiffFunctionInsts().back();
+    auto &pair = context.getAutoDiffFunctionInsts().back();
+    auto *adfi = pair.first;
+    auto &invoker = pair.second;
     context.getAutoDiffFunctionInsts().pop_back();
     // Skip instructions that have been set to nullptr by
     // `processAutoDiffFunctionInst`.
     if (!adfi) continue;
-    errorOccurred |= context.processAutoDiffFunctionInst(adfi);
+    LLVM_DEBUG({
+      getADDebugStream() << "Processing `autodiff_function` instruction: " << adfi << "\n";
+      // adfi->dump();
+    });
+    errorOccurred |= context.processAutoDiffFunctionInst(adfi, invoker);
   }
 
   // If any error occurred while processing `[differentiable]` attributes or
