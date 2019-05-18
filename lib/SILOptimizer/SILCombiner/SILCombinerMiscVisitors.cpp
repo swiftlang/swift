@@ -91,8 +91,16 @@ SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
   if (SingleStore && SingleRelease) {
     assert(SingleProjection && "store without a projection");
     // Release the value that was stored into the existential box. The box
-    // is going away so we need to release the stored value now.
-    Builder.setInsertionPoint(SingleStore);
+    // is going away so we need to release the stored value.
+    // NOTE: It's important that the release is inserted at the single
+    // release of the box and not at the store, because a balancing retain could
+    // be _after_ the store, e.g:
+    //      %box = alloc_existential_box
+    //      %addr = project_existential_box %box
+    //      store %value to %addr
+    //      retain_value %value    // must insert the release after this retain
+    //      strong_release %box
+    Builder.setInsertionPoint(SingleRelease);
     Builder.createReleaseValue(AEBI->getLoc(), SingleStore->getSrc(),
                                SingleRelease->getAtomicity());
 
