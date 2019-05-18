@@ -1158,13 +1158,13 @@ def main_preset():
     if args.cmake_cxx_launcher:
         build_script_args += ["--cmake-cxx-launcher", args.cmake_cxx_launcher]
 
-    diagnostics.note('using preset "{}", which expands to \n\n{}\n'.format(
-        args.preset, shell.quote_command(build_script_args)))
-
+    printable_command = shell.quote_command(build_script_args)
     if args.expand_build_script_invocation:
-        return 0
-
-    shell.call_without_sleeping(build_script_args)
+        print(printable_command)
+    else:
+        diagnostics.note('using preset "{}", which expands to \n\n{}\n'.format(
+            args.preset, printable_command))
+        shell.call_without_sleeping(build_script_args)
     return 0
 
 
