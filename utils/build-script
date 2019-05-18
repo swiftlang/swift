@@ -1092,6 +1092,11 @@ def main_preset():
     parser.add_argument(
         "--build-dir",
         help="specify the directory where build artifact should be stored")
+    parser.add_argument(
+        "--print-build-dir",
+        help="Print the build directory and exit without building",
+        action="store_true",
+        default=False)
     args = parser.parse_args()
     if len(args.preset_file_names) == 0:
         args.preset_file_names = [
@@ -1141,6 +1146,8 @@ def main_preset():
     build_script_args = [sys.argv[0]]
     if args.dry_run:
         build_script_args += ["--dry-run"]
+    if args.print_build_dir:
+        build_script_args += ["--print-build-dir"]
 
     build_script_args += preset_args
     if args.distcc:
@@ -1225,6 +1232,10 @@ def main_normal():
     # Show SDKs, if requested.
     if args.show_sdks:
         debug.print_xcodebuild_versions()
+
+    if args.print_build_dir:
+        print(invocation.workspace.build_root)
+        return 0
 
     # Clean build directory if requested.
     if args.clean:

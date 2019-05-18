@@ -333,6 +333,8 @@ def create_argument_parser():
            metavar='PATH',
            help='name of the directory under $SWIFT_BUILD_ROOT where the '
                 'build products will be placed')
+    option('--print-build-dir', toggle_true,
+           help='print the build directory and exit without building')
     option('--install-prefix', store_path,
            default=targets.install_prefix(),
            help='The installation prefix. This is where built Swift products '
