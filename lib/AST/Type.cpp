@@ -2932,8 +2932,11 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
   }
 
   // If the parent is a type variable or a member rooted in a type variable,
-  // we're done.
-  if (substBase->isTypeVariableOrMember())
+  // or if the parent is a type parameter, we're done. Also handle
+  // UnresolvedType here, which can come up in diagnostics.
+  if (substBase->isTypeVariableOrMember() ||
+      substBase->isTypeParameter() ||
+      substBase->is<UnresolvedType>())
     return getDependentMemberType(substBase);
 
   // Retrieve the member type with the given name.
@@ -2941,10 +2944,6 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
   // Tuples don't have member types.
   if (substBase->is<TupleType>())
     return failed();
-
-  // If the parent is dependent, create a dependent member type.
-  if (substBase->isTypeParameter())
-    return getDependentMemberType(substBase);
 
   // If we know the associated type, look in the witness table.
   LazyResolver *resolver = substBase->getASTContext().getLazyResolver();
