@@ -2286,15 +2286,14 @@ public:
     Builder.addRightParen();
   }
 
-  SemanticContextKind getSemanticContextKind(const AbstractFunctionDecl *AFD) {
+  SemanticContextKind getSemanticContextKind(const ValueDecl *VD) {
     // FIXME: to get the corect semantic context we need to know how lookup
-    // would have found the declaration AFD. For now, just infer a reasonable
-    // semantics.
+    // would have found the VD. For now, just infer a reasonable semantics.
 
-    if (!AFD)
+    if (!VD)
       return SemanticContextKind::CurrentModule;
 
-    DeclContext *calleeDC = AFD->getDeclContext();
+    DeclContext *calleeDC = VD->getDeclContext();
     
     if (calleeDC->isTypeContext())
       // FIXME: We should distinguish CurrentNominal and Super. We need to
@@ -2307,6 +2306,37 @@ public:
       return SemanticContextKind::CurrentModule;
 
     return SemanticContextKind::OtherModule;
+  }
+
+  void addSubscriptCallPattern(const AnyFunctionType *AFT,
+                               const SubscriptDecl *SD) {
+    foundFunction(AFT);
+    auto genericSig =
+        SD->getInnermostDeclContext()->getGenericSignatureOfContext();
+    AFT = eraseArchetypes(CurrDeclContext->getParentModule(),
+                          const_cast<AnyFunctionType *>(AFT), genericSig)
+              ->castTo<AnyFunctionType>();
+
+    CommandWordsPairs Pairs;
+    CodeCompletionResultBuilder Builder(
+        Sink, CodeCompletionResult::ResultKind::Declaration,
+        getSemanticContextKind(SD), expectedTypeContext);
+    Builder.setAssociatedDecl(SD);
+    setClangDeclKeywords(SD, Pairs, Builder);
+    if (!HaveLParen)
+      Builder.addLeftBracket();
+    else
+      Builder.addAnnotatedLeftBracket();
+    addCallArgumentPatterns(Builder, AFT, SD->getIndices());
+    if (!HaveLParen)
+      Builder.addRightBracket();
+    else
+      Builder.addAnnotatedRightBracket();
+    if (SD && SD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+      addTypeAnnotationForImplicitlyUnwrappedOptional(Builder,
+                                                      AFT->getResult());
+    else
+      addTypeAnnotation(Builder, AFT->getResult());
   }
 
   void addFunctionCallPattern(const AnyFunctionType *AFT,
@@ -2328,14 +2358,15 @@ public:
           AFD ? CodeCompletionResult::ResultKind::Declaration
               : CodeCompletionResult::ResultKind::Pattern,
           getSemanticContextKind(AFD), expectedTypeContext);
-      if (!HaveLParen)
-        Builder.addLeftParen();
-      else
-        Builder.addAnnotatedLeftParen();
       if (AFD) {
         Builder.setAssociatedDecl(AFD);
         setClangDeclKeywords(AFD, Pairs, Builder);
       }
+
+      if (!HaveLParen)
+        Builder.addLeftParen();
+      else
+        Builder.addAnnotatedLeftParen();
 
       addCallArgumentPatterns(Builder, AFT->getParams(), declParams,
                               includeDefaultArgs);
@@ -5363,9 +5394,15 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (ShouldCompleteCallPatternAfterParen &&
         !ContextInfo.getPossibleCallees().empty()) {
       Lookup.setHaveLParen(true);
-      for (auto &typeAndDecl : ContextInfo.getPossibleCallees())
-        Lookup.tryFunctionCallCompletions(typeAndDecl.first,
-                                          typeAndDecl.second);
+      for (auto &typeAndDecl : ContextInfo.getPossibleCallees()) {
+        if (auto SD = dyn_cast_or_null<SubscriptDecl>(typeAndDecl.second)) {
+          Lookup.addSubscriptCallPattern(typeAndDecl.first, SD);
+        } else {
+          Lookup.addFunctionCallPattern(
+              typeAndDecl.first,
+              dyn_cast_or_null<AbstractFunctionDecl>(typeAndDecl.second));
+        }
+      }
       Lookup.setHaveLParen(false);
 
       shouldPerformGlobalCompletion =
