@@ -455,7 +455,7 @@ func _vjpRsqrt<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   let value = rsqrt(x)
-  return (value, { v in -v / 2 * value })
+  return (value, { v in -v / (2 * pow(x, 3 / 2)})
 }
 
 @inlinable
