@@ -1607,10 +1607,9 @@ public extension Tensor {
   }
 
   @inlinable
-  @differentiable(wrt: self, vjp: _vjpBroadcast(to:)
-    where Scalar : TensorFlowFloatingPoint)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func broadcast(to shape: TensorShape) -> Tensor {
-    return broadcast(toShape: Tensor<Int32>(shape.dimensions.map(Int32.init)))
+    return broadcast(toShape: Tensor<Int32>({ shape.dimensions.map(Int32.init) }()))
   }
 
   /// Broadcast to the same shape as the specified `Tensor`.
@@ -1645,10 +1644,9 @@ public extension Tensor where Scalar : Numeric {
   }
 
   @inlinable
-  @differentiable(wrt: self, vjp: _vjpUnbroadcast(to:)
-    where Scalar : TensorFlowFloatingPoint)
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func unbroadcast(to shape: TensorShape) -> Tensor {
-    return unbroadcast(toShape: Tensor<Int32>(shape.dimensions.map(Int32.init)))
+    return unbroadcast(toShape: Tensor<Int32>({ shape.dimensions.map(Int32.init) }()))
   }
 
   @inlinable
