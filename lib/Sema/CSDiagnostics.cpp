@@ -384,6 +384,104 @@ bool MissingConformanceFailure::diagnoseAsError() {
   return RequirementFailure::diagnoseAsError();
 }
 
+Optional<GenericArgumentsMismatchFailure::GenericMismatchDiag>
+GenericArgumentsMismatchFailure::getDiagnosticFor(
+    ContextualTypePurpose context) {
+  switch (context) {
+  case CTP_Initialization:
+  case CTP_AssignSource:
+    return diag::cannot_convert_generic_type_assign;
+  case CTP_ReturnStmt:
+  case CTP_ReturnSingleExpr:
+    return diag::cannot_convert_generic_type_return;
+  case CTP_DefaultParameter:
+    return diag::cannot_convert_generic_type_default_argument;
+  case CTP_YieldByValue:
+    return diag::cannot_convert_generic_type_yield;
+  case CTP_CallArgument:
+    return diag::cannot_convert_generic_type_argument;
+  case CTP_ClosureResult:
+    return diag::cannot_convert_generic_type_closure_result;
+  case CTP_ArrayElement:
+    return diag::cannot_convert_generic_type_array_element;
+  case CTP_DictionaryKey:
+    return diag::cannot_convert_generic_type_dict_key;
+  case CTP_DictionaryValue:
+    return diag::cannot_convert_generic_type_dict_value;
+  case CTP_CoerceOperand:
+    return diag::cannot_convert_generic_type_coerce;
+
+  case CTP_ThrowStmt:
+  case CTP_Unused:
+  case CTP_CannotFail:
+  case CTP_YieldByReference:
+  case CTP_CalleeResult:
+  case CTP_EnumCaseRawValue:
+    break;
+  }
+  return None;
+}
+
+void GenericArgumentsMismatchFailure::emitDiagnosticForMismatch(
+    GenericMismatchDiag diagnostic, int position) {
+  auto genericTypeDecl = getActual()->getCanonicalType()->getAnyGeneric();
+  auto param = genericTypeDecl->getGenericParams()->getParams()[position];
+
+  auto lhs = resolveType(getActual()->getGenericArgs()[position]);
+  auto rhs = resolveType(getRequired()->getGenericArgs()[position]);
+
+  emitDiagnostic(getAnchor()->getLoc(), diagnostic, resolveType(getActual()),
+                 resolveType(getRequired()), param->getName(), lhs, rhs);
+  emitDiagnostic(param->getLoc(), diag::kind_declname_declared_here,
+                 DescriptiveDeclKind::GenericTypeParam, param->getName());
+}
+
+bool GenericArgumentsMismatchFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+  auto path = getLocator()->getPath();
+
+  Optional<GenericMismatchDiag> diagnostic;
+  if (path.empty()) {
+    assert(isa<AssignExpr>(anchor));
+    diagnostic = getDiagnosticFor(CTP_AssignSource);
+  } else {
+    const auto &last = path.back();
+    switch (last.getKind()) {
+    case ConstraintLocator::ContextualType: {
+      auto purpose = getConstraintSystem().getContextualTypePurpose();
+      assert(purpose != CTP_Unused);
+      diagnostic = getDiagnosticFor(purpose);
+      break;
+    }
+
+    case ConstraintLocator::AutoclosureResult:
+    case ConstraintLocator::ApplyArgument: {
+      diagnostic = diag::cannot_convert_generic_type_argument;
+      break;
+    }
+    
+    case ConstraintLocator::ParentType: {
+      diagnostic = diag::cannot_convert_generic_type_parent_type;
+      break;
+    }
+    
+    case ConstraintLocator::ClosureResult: {
+      diagnostic = diag::cannot_convert_generic_type_closure_result;
+      break;
+    }
+    
+    default:
+      break;
+    }
+  }
+
+  if (!diagnostic)
+    return false;
+
+  emitDiagnosticForMismatches(*diagnostic);
+  return true;
+}
+
 bool LabelingFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
   auto *anchor = getRawAnchor();

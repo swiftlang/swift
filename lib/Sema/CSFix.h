@@ -88,6 +88,10 @@ enum class FixKind : uint8_t {
   /// like the types are aligned.
   ContextualMismatch,
 
+  /// Fix up the generic arguments of a type so they match
+  /// those enforced by a conditional requirement.
+  GenericArgumentsMismatch,
+
   /// Fix up @autoclosure argument to the @autoclosure parameter,
   /// to for a call to be able to foward it properly, since
   /// @autoclosure conversions are unsupported starting from
@@ -486,6 +490,38 @@ public:
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
+};
+
+class GenericArgumentsMismatch : public ConstraintFix {
+  BoundGenericType *Actual;
+  BoundGenericType *Required;
+  llvm::SmallVector<int, 4> Mismatches;
+
+protected:
+  GenericArgumentsMismatch(ConstraintSystem &cs, BoundGenericType *actual,
+                           BoundGenericType *required,
+                           llvm::SmallVector<int, 4> mismatches,
+                           ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::GenericArgumentsMismatch, locator),
+        Actual(actual), Required(required), Mismatches(mismatches) {}
+
+public:
+  std::string getName() const override {
+    return "fix generic argument mismatch";
+  }
+
+  BoundGenericType *getActual() const { return Actual; }
+  BoundGenericType *getRequired() const { return Required; }
+
+  llvm::SmallVector<int, 4> getMismatches() const { return Mismatches; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static GenericArgumentsMismatch *create(ConstraintSystem &cs,
+                                          BoundGenericType *actual,
+                                          BoundGenericType *required,
+                                          llvm::SmallVector<int, 4> mismatches,
+                                          ConstraintLocator *locator);
 };
 
 /// Detect situations where key path doesn't have capability required

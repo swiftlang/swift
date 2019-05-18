@@ -29,7 +29,7 @@ class Deli<Spices> { // expected-note {{'Spices' declared as parameter to type '
   struct Sausage {}
 }
 
-struct Pizzas<Spices> {
+struct Pizzas<Spices> { // expected-note {{generic parameter 'Spices' declared here}}
   class NewYork {
   }
 
@@ -54,7 +54,7 @@ func eatDinnerConcrete(d: Pizzas<Pepper>.DeepDish,
 func badDiagnostic1() {
 
   _ = Lunch<Pizzas<Pepper>.NewYork>.Dinner<HotDog>(
-      leftovers: Pizzas<ChiliFlakes>.NewYork(),  // expected-error {{cannot convert value of type 'Pizzas<ChiliFlakes>.NewYork' to expected argument type 'Pizzas<Pepper>.NewYork'}}
+      leftovers: Pizzas<ChiliFlakes>.NewYork(),  // expected-error {{cannot convert parent type 'Pizzas<ChiliFlakes>' to expected type 'Pizzas<Pepper>'}}
       transformation: { _ in HotDog() })
 }
 
@@ -69,8 +69,7 @@ func badDiagnostic2() {
   let topping = Deli<Pepper>.Pepperoni()
 
   eatDinnerConcrete(d: firstCourse, t: topping)
-  // expected-error@-1 {{cannot invoke 'eatDinnerConcrete' with an argument list of type '(d: Pizzas<ChiliFlakes>.NewYork, t: Deli<Pepper>.Pepperoni)'}}
-  // expected-note@-2 {{overloads for 'eatDinnerConcrete' exist with these partially matching parameter lists: (d: Pizzas<ChiliFlakes>.NewYork, t: Deli<ChiliFlakes>.Pepperoni), (d: Pizzas<Pepper>.DeepDish, t: Deli<Pepper>.Pepperoni)}}
+  // expected-error@-1 {{cannot convert parent type 'Deli<Pepper>' to expected type 'Deli<ChiliFlakes>', arguments to generic parameter 'Spices' ('Pepper' and 'ChiliFlakes') are expected to be equal}}
 
 }
 

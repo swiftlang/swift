@@ -69,6 +69,8 @@ public:
   bool diagnose(bool asNote = false);
 
   /// Try to produce an error diagnostic for the problem at hand.
+  ///
+  /// \returns true If anything was diagnosed, false otherwise.
   virtual bool diagnoseAsError() = 0;
 
   /// Instead of producing an error diagnostic, attempt to
@@ -357,6 +359,51 @@ protected:
   DiagAsNote getDiagnosticAsNote() const override {
     return diag::candidate_types_conformance_requirement;
   }
+};
+
+/// Diagnostics for mismatched generic arguments e.g
+/// ```swift
+/// struct F<G> {}
+/// extension F where G == Int {
+///  func foo() {}
+/// }
+/// F<Bool>().foo()
+/// ```
+class GenericArgumentsMismatchFailure final : public FailureDiagnostic {
+  using GenericMismatchDiag = Diag<Type, Type, Identifier, Type, Type>;
+
+  BoundGenericType *Actual;
+  BoundGenericType *Required;
+  llvm::SmallVector<int, 4> Mismatches;
+
+public:
+  GenericArgumentsMismatchFailure(Expr *expr, ConstraintSystem &cs,
+                                  BoundGenericType *actual,
+                                  BoundGenericType *required,
+                                  llvm::SmallVector<int, 4> mismatches,
+                                  ConstraintLocator *locator)
+      : FailureDiagnostic(expr, cs, locator), Actual(actual),
+        Required(required), Mismatches(mismatches) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  void emitDiagnosticForMismatches(GenericMismatchDiag diagnostic) {
+    for (int position : Mismatches) {
+      emitDiagnosticForMismatch(diagnostic, position);
+    }
+  }
+
+  void emitDiagnosticForMismatch(GenericMismatchDiag diagnostic,
+                                 int mismatchPosition);
+
+  Optional<GenericMismatchDiag> getDiagnosticFor(ContextualTypePurpose context);
+
+  /// The actual type being used.
+  BoundGenericType *getActual() const { return Actual; }
+
+  /// The type needed by the generic requirement.
+  BoundGenericType *getRequired() const { return Required; }
 };
 
 /// Diagnose failures related to same-type generic requirements, e.g.
