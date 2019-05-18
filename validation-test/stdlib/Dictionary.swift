@@ -3004,7 +3004,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
-  do {
+  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    // Identity of empty dictionaries changed in
+    // https://github.com/apple/swift/pull/22527
     var d = getBridgedNonverbatimDictionary([:])
     assert(isNativeDictionary(d))
     assert(d.count == 0)
@@ -3087,7 +3089,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     assert(d2[TestBridgedKeyTy(10)] == nil)
   }
 }
-
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Count") {
   let d = getBridgedVerbatimDictionary()
@@ -3298,6 +3299,12 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+    // Identity of empty dictionaries changed in
+    // https://github.com/apple/swift/pull/22527
+    return
+  }
+
   let d1 = getBridgedNonverbatimEquatableDictionary([:])
   let identity1 = d1._rawIdentifier()
   assert(isNativeDictionary(d1))
@@ -3319,7 +3326,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
   assert(identity1 == d1._rawIdentifier())
   assert(identity2 != d2._rawIdentifier())
 }
-
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
   func helper(_ nd1: Dictionary<Int, Int>, _ nd2: Dictionary<Int, Int>, _ expectedEq: Bool) {

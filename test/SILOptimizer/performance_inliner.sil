@@ -1,4 +1,3 @@
-
 // RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-combine | %FileCheck %s
 
 sil_stage canonical
@@ -907,7 +906,6 @@ bb1(%6 : $()):
 
 bb2:
   strong_release %2 : $@callee_owned () -> (@out T, @error Error)
-  destroy_addr %1 : $*T
   %10 = tuple ()
   return %10 : $()
 

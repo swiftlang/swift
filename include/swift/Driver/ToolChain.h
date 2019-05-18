@@ -209,6 +209,14 @@ protected:
   /// set to match the behavior of Clang.
   virtual bool shouldStoreInvocationInDebugInfo() const { return false; }
 
+  /// Gets the response file path and command line argument for an invocation
+  /// if the tool supports response files and if the command line length would
+  /// exceed system limits.
+  Optional<Job::ResponseFileInfo>
+  getResponseFileInfo(const Compilation &C, const char *executablePath,
+                      const InvocationInfo &invocationInfo,
+                      const JobContext &context) const;
+
 public:
   virtual ~ToolChain() = default;
 

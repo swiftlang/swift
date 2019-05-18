@@ -1,0 +1,3 @@
+module EvilClass {
+  header "EvilClass.h"
+}

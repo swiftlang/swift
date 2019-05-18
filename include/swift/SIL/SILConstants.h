@@ -90,6 +90,14 @@ enum class UnknownReason {
   /// A top-level value has multiple writers. This is only relevant in the
   /// non-flow-sensitive evaluation mode,  which is used by #assert.
   MutipleTopLevelWriters,
+
+  /// Indicates the return value of an instruction that was not evaluated during
+  /// interpretation.
+  ReturnedByUnevaluatedInstruction,
+
+  /// Indicates that the value was possibly modified by an instruction
+  /// that was not evaluated during the interpretation.
+  MutatedByUnevaluatedInstruction,
 };
 
 /// An abstract class that exposes functions for allocating symbolic values.
@@ -415,6 +423,8 @@ public:
   /// context about what the problem is.  If there is no location for some
   /// reason, we fall back to using the specified location.
   void emitUnknownDiagnosticNotes(SILLocation fallbackLoc);
+
+  bool isUnknownDueToUnevaluatedInstructions();
 
   /// Clone this SymbolicValue into the specified Allocator and return the new
   /// version. This only works for valid constants.

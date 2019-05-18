@@ -178,7 +178,8 @@ def run_once_with_primary(args, ast, rng, primary_idx):
             else:
                 r = merge_all_jobstats(load_stats_dir(d)).stats
     finally:
-        shutil.rmtree(d)
+        if not args.save_temps:
+            shutil.rmtree(d)
 
     return {k: v for (k, v) in r.items() if args.select in k}
 
@@ -754,6 +755,9 @@ def main():
     parser.add_argument(
         '--tmpdir', type=str,
         default=None, help='directory to create tempfiles in')
+    parser.add_argument(
+        '--save-temps', action='store_true',
+        default=False, help='save files in tempfiles')
     parser.add_argument(
         '--select',
         default="", help='substring of counters/symbols to limit attention to')

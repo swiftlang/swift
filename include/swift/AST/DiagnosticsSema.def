@@ -447,6 +447,13 @@ ERROR(cannot_convert_assign_protocol,none,
 ERROR(cannot_convert_assign_nil,none,
       "'nil' cannot be assigned to type %0", (Type))
 
+// for ... in expression
+ERROR(cannot_convert_sequence_element_value,none,
+      "cannot convert sequence element type %0 to expected type %1",
+      (Type, Type))
+ERROR(cannot_convert_sequence_element_protocol,none,
+      "sequence element type %0 does not conform to expected type %1",
+      (Type, Type))
 
 ERROR(throws_functiontype_mismatch,none,
       "invalid conversion from throwing function of type %0 to "
@@ -473,13 +480,15 @@ ERROR(expr_keypath_type_of_property,none,
 ERROR(expr_keypath_generic_type,none,
       "key path cannot refer to generic type %0", (DeclName))
 ERROR(expr_keypath_not_property,none,
-      "key path cannot refer to %0 %1", (DescriptiveDeclKind, DeclName))
+      "%select{key path|dynamic key path member lookup}2 cannot refer to %0 %1",
+      (DescriptiveDeclKind, DeclName, bool))
 ERROR(expr_keypath_mutating_getter,none,
-      "key path cannot refer to %0, which has a mutating getter",
-      (DeclName))
+      "%select{key path|dynamic key path member lookup}1 cannot refer to %0, "
+      "which has a mutating getter",
+      (DeclName, bool))
 ERROR(expr_keypath_static_member,none,
-      "key path cannot refer to static member %0",
-      (DeclName))
+      "%select{key path|dynamic key path member lookup}1 cannot refer to static member %0",
+      (DeclName, bool))
 ERROR(expr_keypath_empty,none,
       "empty key path does not refer to a property", ())
 ERROR(expr_unsupported_objc_key_path_component,none,
@@ -623,7 +632,7 @@ ERROR(serialization_missing_dependencies,Fatal,
 ERROR(serialization_circular_dependency,Fatal,
       "circular dependency between modules '%0' and %1",
       (StringRef, Identifier))
-ERROR(serialization_missing_shadowed_module,Fatal,
+ERROR(serialization_missing_underlying_module,Fatal,
       "cannot load underlying module for %0", (Identifier))
 ERROR(serialization_name_mismatch,Fatal,
       "cannot load module '%0' as '%1'", (StringRef, StringRef))
@@ -854,6 +863,10 @@ ERROR(did_not_call_function,none,
 ERROR(did_not_call_method,none,
       "method %0 was used as a property; add () to call it",
       (Identifier))
+
+ERROR(init_not_instance_member_use_assignment,none,
+      "'init' is a member of the type; use assignment "
+      "to initalize the value instead", ())
 
 ERROR(init_not_instance_member,none,
       "'init' is a member of the type; use 'type(of: ...)' to initialize "
@@ -2428,16 +2441,27 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
      "construct %0 from unwrapped %1 value", (Type, Type))
 
 ERROR(decl_from_implementation_only_module,none,
-      "cannot use %0 %1 here; %2 has been imported as implementation-only",
-      (DescriptiveDeclKind, DeclName, Identifier))
+      "cannot use %0 %1 %select{here|"
+      "in an extension with public or '@usableFromInline' members|"
+      "in an extension with conditional conformances}2; %3 has been imported "
+      "as implementation-only",
+      (DescriptiveDeclKind, DeclName, unsigned, Identifier))
 ERROR(conformance_from_implementation_only_module,none,
-      "cannot use conformance of %0 to %1 here; %2 has been imported as "
-      "implementation-only",
-      (Type, DeclName, Identifier))
+      "cannot use conformance of %0 to %1 %select{here|"
+      "in an extension with public or '@usableFromInline' members|"
+      "in an extension with conditional conformances}2; %3 has been imported "
+      "as implementation-only",
+      (Type, DeclName, unsigned, Identifier))
 ERROR(assoc_conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 in associated type %3 (inferred as "
       "%4); %2 has been imported as implementation-only",
       (Type, DeclName, Identifier, Type, Type))
+
+WARNING(warn_implementation_only_conflict,none,
+        "%0 inconsistently imported as implementation-only",
+        (Identifier))
+NOTE(implementation_only_conflict_here,none,
+     "imported as implementation-only here", ())
 
 // Derived conformances
 ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
@@ -2936,8 +2960,6 @@ ERROR(object_literal_broken_proto,none,
 ERROR(discard_expr_outside_of_assignment,none,
       "'_' can only appear in a pattern or on the left side of an assignment",
       ())
-ERROR(inout_expr_outside_of_call,none,
-      "'&' can only appear immediately in a call argument list", ())
 ERROR(collection_literal_heterogeneous,none,
       "heterogeneous collection literal could only be inferred to %0; add"
       " explicit type annotation if this is intentional", (Type))
@@ -3221,10 +3243,15 @@ NOTE(silence_debug_description_in_interpolation_segment_call,none,
 NOTE(noescape_parameter,none,
     "parameter %0 is implicitly non-escaping",
      (Identifier))
+NOTE(generic_parameters_always_escaping,none,
+     "generic parameters are always considered '@escaping'", ())
 
 ERROR(passing_noescape_to_escaping,none,
       "passing non-escaping parameter %0 to function expecting an @escaping closure",
       (Identifier))
+ERROR(converting_noespace_param_to_generic_type,none,
+      "converting non-escaping parameter %0 to generic parameter %1 may allow it to escape",
+      (Identifier, Type))
 ERROR(assigning_noescape_to_escaping,none,
       "assigning non-escaping parameter %0 to an @escaping closure",
       (Identifier))
@@ -4140,8 +4167,9 @@ ERROR(dynamic_replacement_replaced_constructor_is_not_convenience, none,
 //------------------------------------------------------------------------------
 
 ERROR(availability_decl_unavailable, none,
-      "%select{getter for |setter for |}0%1 is unavailable",
-      (unsigned, DeclName))
+      "%select{getter for |setter for |}0%1 is unavailable"
+      "%select{ in %3|}2",
+      (unsigned, DeclName, bool, StringRef))
 
 #define REPLACEMENT_DECL_KIND_SELECT "select{| instance method| property}"
 ERROR(availability_decl_unavailable_rename, none,
@@ -4157,16 +4185,9 @@ ERROR(availability_decl_unavailable_rename_msg, none,
       (unsigned, DeclName, bool, unsigned, StringRef, StringRef))
 
 ERROR(availability_decl_unavailable_msg, none,
-      "%select{getter for |setter for |}0%1 is unavailable: %2",
-      (unsigned, DeclName, StringRef))
-
-ERROR(availability_decl_unavailable_in_swift, none,
-      "%select{getter for |setter for |}0%1 is unavailable in Swift",
-      (unsigned, DeclName))
-
-ERROR(availability_decl_unavailable_in_swift_msg, none,
-      "%select{getter for |setter for |}0%1 is unavailable in Swift: %2",
-      (unsigned, DeclName, StringRef))
+      "%select{getter for |setter for |}0%1 is unavailable"
+      "%select{ in %3|}2: %4",
+      (unsigned, DeclName, bool, StringRef, StringRef))
 
 NOTE(availability_marked_unavailable, none,
      "%select{getter for |setter for |}0%1 has been explicitly marked "
@@ -4182,18 +4203,18 @@ NOTE(availability_obsoleted, none,
 
 WARNING(availability_deprecated, none,
         "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
-        "deprecated%select{| %select{on|in}4 %3%select{| %5}4}2",
+        "deprecated%select{| in %3%select{| %5}4}2",
         (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple))
 
 WARNING(availability_deprecated_msg, none,
         "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
-        "deprecated%select{| %select{on|in}4 %3%select{| %5}4}2: %6",
+        "deprecated%select{| in %3%select{| %5}4}2: %6",
         (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple,
          StringRef))
 
 WARNING(availability_deprecated_rename, none,
         "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
-        "deprecated%select{| %select{on|in}4 %3%select{| %5}4}2: "
+        "deprecated%select{| in %3%select{| %5}4}2: "
         "%select{renamed to|replaced by}6%" REPLACEMENT_DECL_KIND_SELECT "7 "
         "'%8'",
         (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple, bool,
@@ -4210,8 +4231,12 @@ NOTE(availability_decl_more_than_enclosing_enclosing_here, none,
      "enclosing scope here", ())
 
 ERROR(availability_decl_only_version_newer, none,
-      "%0 is only available on %1 %2 or newer",
+      "%0 is only available in %1 %2 or newer",
       (DeclName, StringRef, llvm::VersionTuple))
+
+ERROR(availability_opaque_types_only_version_newer, none,
+      "'some' return types are only available in %0 %1 or newer",
+      (StringRef, llvm::VersionTuple))
 
 NOTE(availability_guard_with_version_check, none,
      "add 'if #available' version check", ())
@@ -4220,13 +4245,13 @@ NOTE(availability_add_attribute, none,
      "add @available attribute to enclosing %0", (DescriptiveDeclKind))
 
 ERROR(availability_accessor_only_version_newer, none,
-      "%select{getter|setter}0 for %1 is only available on %2 %3"
+      "%select{getter|setter}0 for %1 is only available in %2 %3"
       " or newer",
       (/*AccessorKind*/unsigned, DeclName, StringRef, llvm::VersionTuple))
 
 ERROR(availability_inout_accessor_only_version_newer, none,
       "cannot pass as inout because %select{getter|setter}0 for %1 is only "
-      "available on %2 %3 or newer",
+      "available in %2 %3 or newer",
       (/*AccessorKind*/unsigned, DeclName, StringRef, llvm::VersionTuple))
 
 ERROR(availability_query_required_for_platform, none,
@@ -4248,7 +4273,7 @@ ERROR(availability_stored_property_no_potential,
       "'@available'", ())
 
 ERROR(availability_protocol_requires_version,
-      none, "protocol %0 requires %1 to be available on %2 %3 and newer",
+      none, "protocol %0 requires %1 to be available in %2 %3 and newer",
       (DeclName, DeclName, StringRef, llvm::VersionTuple))
 
 NOTE(availability_protocol_requirement_here, none,
@@ -4493,10 +4518,12 @@ ERROR(property_delegate_ambiguous_value_property, none,
 ERROR(property_delegate_wrong_initial_value_init, none,
       "'init(initialValue:)' parameter type (%0) must be the same as its "
       "'value' property type (%1) or an @autoclosure thereof", (Type, Type))
-ERROR(property_delegate_failable_initial_value_init, none,
-      "'init(initialValue:)' cannot be failable", ())
+ERROR(property_delegate_failable_init, none,
+      "%0 cannot be failable", (DeclName))
 ERROR(property_delegate_ambiguous_initial_value_init, none,
   "property delegate type %0 has multiple initial-value initializers", (Type))
+ERROR(property_delegate_ambiguous_default_value_init, none,
+  "property delegate type %0 has multiple default-value initializers", (Type))
 ERROR(property_delegate_type_requirement_not_accessible,none,
       "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
       "more restrictive access than its enclosing property delegate type %3 "

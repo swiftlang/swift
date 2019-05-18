@@ -484,3 +484,38 @@ KeyPathContextualMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
   return new (cs.getAllocator())
       KeyPathContextualMismatch(cs, lhs, rhs, locator);
 }
+
+bool RemoveAddressOf::diagnose(Expr *root, bool asNote) const {
+  InvalidUseOfAddressOf failure(root, getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+RemoveAddressOf *RemoveAddressOf::create(ConstraintSystem &cs,
+                                         ConstraintLocator *locator) {
+  return new (cs.getAllocator()) RemoveAddressOf(cs, locator);
+}
+
+bool RemoveReturn::diagnose(Expr *root, bool asNote) const {
+  ExtraneousReturnFailure failure(root, getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+RemoveReturn *RemoveReturn::create(ConstraintSystem &cs,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) RemoveReturn(cs, locator);
+}
+
+bool CollectionElementContextualMismatch::diagnose(Expr *root,
+                                                   bool asNote) const {
+  CollectionElementContextualFailure failure(
+      root, getConstraintSystem(), getFromType(), getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+CollectionElementContextualMismatch *
+CollectionElementContextualMismatch::create(ConstraintSystem &cs, Type srcType,
+                                            Type dstType,
+                                            ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      CollectionElementContextualMismatch(cs, srcType, dstType, locator);
+}

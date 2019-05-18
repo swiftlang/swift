@@ -46,7 +46,9 @@ enum class WellKnownFunction {
   // static String.append (_: String, _: inout String)
   StringAppend,
   // static String.== infix(_: String)
-  StringEquals
+  StringEquals,
+  // String.percentEscapedString.getter
+  StringEscapePercent
 };
 
 static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
@@ -61,6 +63,8 @@ static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
     return WellKnownFunction::StringAppend;
   if (fn->hasSemanticsAttr("string.equals"))
     return WellKnownFunction::StringEquals;
+  if (fn->hasSemanticsAttr("string.escapePercent.get"))
+    return WellKnownFunction::StringEscapePercent;
   return None;
 }
 
@@ -277,8 +281,11 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
 
     for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
       auto val = getConstantValue(inst->getOperand(i));
-      if (!val.isConstant())
+      if (!val.isConstant() && !val.isUnknownDueToUnevaluatedInstructions())
         return val;
+      // Unknown values due to unevaluated instructions can be assigned to
+      // struct properties as they are not indicative of a fatal error or
+      // trap.
       elts.push_back(val);
     }
 
@@ -755,6 +762,38 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     auto result = SymbolicValue::getAggregate(ArrayRef<SymbolicValue>(intVal),
                                               evaluator.getAllocator());
     setValue(apply, result);
+    return None;
+  }
+  case WellKnownFunction::StringEscapePercent: {
+    // String.percentEscapedString.getter
+    assert(conventions.getNumDirectSILResults() == 1 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           conventions.getNumParameters() == 1 &&
+           "unexpected String.percentEscapedString signature");
+
+    auto stringArgument = getConstantValue(apply->getOperand(1));
+    if (!stringArgument.isConstant()) {
+      return stringArgument;
+    }
+
+    if (stringArgument.getKind() != SymbolicValue::String) {
+      return evaluator.getUnknown((SILInstruction *)apply,
+                                  UnknownReason::InvalidOperandValue);
+    }
+
+    // Replace all precent symbol (%) in the string with double percents (%%)
+    StringRef stringVal = stringArgument.getStringValue();
+    SmallString<4> percentEscapedString;
+    for (auto charElem : stringVal) {
+      percentEscapedString.push_back(charElem);
+      if (charElem == '%') {
+        percentEscapedString.push_back('%');
+      }
+    }
+
+    auto resultVal = SymbolicValue::getString(percentEscapedString.str(),
+                                              evaluator.getAllocator());
+    setValue(apply, resultVal);
     return None;
   }
   }
@@ -1551,36 +1590,139 @@ void ConstExprEvaluator::computeConstantValues(
 
 ConstExprStepEvaluator::ConstExprStepEvaluator(SymbolicValueAllocator &alloc,
                                                SILFunction *fun)
-    : evaluator(ConstExprEvaluator(alloc)),
-      internalState(
-          new ConstExprFunctionState(evaluator, fun, {}, stepsEvaluated)) {
+    : evaluator(alloc), internalState(new ConstExprFunctionState(
+                            evaluator, fun, {}, stepsEvaluated)) {
   assert(fun);
 }
 
 ConstExprStepEvaluator::~ConstExprStepEvaluator() { delete internalState; }
 
-Optional<SymbolicValue> ConstExprStepEvaluator::incrementStepsAndCheckLimit(
-    SILInstruction *inst, bool includeInInstructionLimit) {
-  if (includeInInstructionLimit && ++stepsEvaluated > ConstExprLimit) {
-    // Note that there is no call stack to associate with the unknown value
-    // as the interpreter is at the top-level here.
-    return SymbolicValue::getUnknown(inst, UnknownReason::TooManyInstructions,
-                                     {}, evaluator.getAllocator());
-  }
-  return None;
+std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+ConstExprStepEvaluator::evaluate(SILBasicBlock::iterator instI) {
+  // Reset `stepsEvaluated` to zero.
+  stepsEvaluated = 0;
+  return internalState->evaluateInstructionAndGetNext(instI, visitedBlocks);
 }
 
 std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
-ConstExprStepEvaluator::evaluate(SILBasicBlock::iterator instI,
-                                 bool includeInInstructionLimit) {
-  // Diagnose whether evaluating this instruction exceeds the instruction
-  // limit, unless asked to not include this instruction in the limit.
-  auto limitError =
-      incrementStepsAndCheckLimit(&(*instI), includeInInstructionLimit);
-  if (limitError) {
-    return {None, limitError.getValue()};
+ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
+    SILBasicBlock::iterator instI) {
+  SILInstruction *inst = &(*instI);
+
+  // Set all constant state that could be mutated by the instruction
+  // to an unknown symbolic value.
+  for (auto &operand : inst->getAllOperands()) {
+    auto constValOpt = lookupConstValue(operand.get());
+    if (!constValOpt) {
+      continue;
+    }
+    auto constVal = constValOpt.getValue();
+    auto constKind = constVal.getKind();
+
+    // Skip can only be invoked on value types or addresses of value types.
+    // Note that adding a new kind of symbolic value may require handling its
+    // side-effects, especially if that symbolic value does not represent a
+    // value type.
+    assert(constKind == SymbolicValue::Address ||
+           constKind == SymbolicValue::Unknown ||
+           constKind == SymbolicValue::Metatype ||
+           constKind == SymbolicValue::Function ||
+           constKind == SymbolicValue::Integer ||
+           constKind == SymbolicValue::String ||
+           constKind == SymbolicValue::Aggregate ||
+           constKind == SymbolicValue::Enum ||
+           constKind == SymbolicValue::EnumWithPayload ||
+           constKind == SymbolicValue::UninitMemory);
+
+    if (constKind != SymbolicValue::Address) {
+      continue;
+    }
+
+    // If the address is only used @in_guaranteed or @in_constant, there
+    // can be no mutation through this address. Therefore, ignore it.
+    if (ApplyInst *applyInst = dyn_cast<ApplyInst>(inst)) {
+      ApplySite applySite(applyInst);
+      SILArgumentConvention convention =
+        applySite.getArgumentConvention(operand);
+      if (convention == SILArgumentConvention::Indirect_In_Guaranteed ||
+          convention == SILArgumentConvention::Indirect_In_Constant) {
+        continue;
+      }
+    }
+
+    // Write an unknown value into the address.
+    SmallVector<unsigned, 4> accessPath;
+    auto *memoryObject = constVal.getAddressValue(accessPath);
+    auto unknownValue = SymbolicValue::getUnknown(
+        inst, UnknownReason::MutatedByUnevaluatedInstruction, {},
+        evaluator.getAllocator());
+
+    auto memoryContent = memoryObject->getValue();
+    if (memoryContent.getKind() == SymbolicValue::Aggregate) {
+      memoryObject->setIndexedElement(accessPath, unknownValue,
+                                      evaluator.getAllocator());
+    } else {
+      memoryObject->setValue(unknownValue);
+    }
   }
-  return internalState->evaluateInstructionAndGetNext(instI, visitedBlocks);
+
+  // Map the results of this instruction to unknown values.
+  for (auto result : inst->getResults()) {
+    internalState->setValue(
+        result, SymbolicValue::getUnknown(
+                    inst, UnknownReason::ReturnedByUnevaluatedInstruction, {},
+                    evaluator.getAllocator()));
+  }
+
+  // If we have a next instruction in the basic block return it.
+  // Otherwise, return None for the next instruction.
+  // Note that we can find the next instruction in the case of unconditional
+  // branches. But, there is no real need to do that as of now.
+  if (!isa<TermInst>(inst)) {
+    return {++instI, None};
+  }
+  return {None, None};
+}
+
+bool ConstExprStepEvaluator::isFailStopError(SymbolicValue errorVal) {
+  assert(errorVal.isUnknown());
+
+  switch (errorVal.getUnknownReason()) {
+  case UnknownReason::TooManyInstructions:
+  case UnknownReason::Loop:
+  case UnknownReason::Overflow:
+  case UnknownReason::Trap:
+    return true;
+  default:
+    return false;
+  }
+}
+
+std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+ConstExprStepEvaluator::tryEvaluateOrElseMakeEffectsNonConstant(
+    SILBasicBlock::iterator instI) {
+
+  auto evaluateResult = evaluate(instI);
+  Optional<SILBasicBlock::iterator> nextI = evaluateResult.first;
+  Optional<SymbolicValue> errorVal = evaluateResult.second;
+
+  if (!errorVal) {
+    assert(nextI);
+    return evaluateResult;
+  }
+  assert(!nextI);
+
+  if (isFailStopError(*errorVal)) {
+    return evaluateResult;
+  }
+
+  // Evaluation cannot fail on unconditional branches.
+  assert(!isa<BranchInst>(&(*instI)));
+
+  // Since the evaluation has failed, make the effects of this instruction
+  // unknown.
+  auto result = skipByMakingEffectsNonConstant(instI);
+  return {result.first, errorVal};
 }
 
 Optional<SymbolicValue>

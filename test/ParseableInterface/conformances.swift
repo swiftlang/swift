@@ -52,7 +52,7 @@ public struct B2: PublicBaseProto, PrivateSubProto {}
 // CHECK-END: extension conformances.B3 : conformances.PublicBaseProto {}
 public struct B3: PublicBaseProto & PrivateSubProto {}
 // CHECK: public struct B4 : PublicBaseProto {
-// CHECK: extension B4 {
+// NEGATIVE-NOT: extension B4 {
 // NEGATIVE-NOT: extension conformances.B4
 public struct B4: PublicBaseProto {}
 extension B4: PrivateSubProto {}
@@ -62,7 +62,7 @@ extension B4: PrivateSubProto {}
 public struct B5: PrivateSubProto {}
 extension B5: PublicBaseProto {}
 // CHECK: public struct B6 {
-// CHECK: extension B6 {
+// NEGATIVE-NOT: extension B6 {
 // CHECK: extension B6 : PublicBaseProto {
 // NEGATIVE-NOT: extension conformances.B6
 public struct B6 {}
@@ -70,7 +70,7 @@ extension B6: PrivateSubProto {}
 extension B6: PublicBaseProto {}
 // CHECK: public struct B7 {
 // CHECK: extension B7 : PublicBaseProto {
-// CHECK: extension B7 {
+// NEGATIVE-NOT: extension B7 {
 // NEGATIVE-NOT: extension conformances.B7
 public struct B7 {}
 extension B7: PublicBaseProto {}
@@ -87,12 +87,14 @@ public struct OuterGeneric<T> {
 public protocol ConditionallyConformed {}
 public protocol ConditionallyConformedAgain {}
 
-// CHECK-END: extension conformances.OuterGeneric : conformances.ConditionallyConformed, conformances.ConditionallyConformedAgain where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
+// CHECK-END: @available(*, unavailable)
+// CHECK-END-NEXT: extension conformances.OuterGeneric : conformances.ConditionallyConformed, conformances.ConditionallyConformedAgain where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
 extension OuterGeneric: ConditionallyConformed where T: PrivateProto {}
 extension OuterGeneric: ConditionallyConformedAgain where T == PrivateProto {}
 
 // CHECK-END: extension conformances.OuterGeneric.Inner : conformances.PublicBaseProto {}
-// CHECK-END: extension conformances.OuterGeneric.Inner : conformances.ConditionallyConformed, conformances.ConditionallyConformedAgain where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
+// CHECK-END: @available(*, unavailable)
+// CHECK-END-NEXT: extension conformances.OuterGeneric.Inner : conformances.ConditionallyConformed, conformances.ConditionallyConformedAgain where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
 extension OuterGeneric.Inner: ConditionallyConformed where T: PrivateProto {}
 extension OuterGeneric.Inner: ConditionallyConformedAgain where T == PrivateProto {}
 
@@ -105,7 +107,7 @@ public struct C1: PrivateSubProto, AnotherPrivateSubProto {}
 // CHECK-END: extension conformances.C2 : conformances.PublicBaseProto {}
 public struct C2: PrivateSubProto & AnotherPrivateSubProto {}
 // CHECK: public struct C3 {
-// CHECK: extension C3 {
+// NEGATIVE-NOT: extension C3 {
 // CHECK-END: extension conformances.C3 : conformances.PublicBaseProto {}
 public struct C3: PrivateSubProto {}
 extension C3: AnotherPrivateSubProto {}
@@ -120,10 +122,12 @@ public struct D1: PublicSubProto, PrivateSubProto {}
 // NEGATIVE-NOT: extension conformances.D2
 public struct D2: PrivateSubProto, PublicSubProto {}
 // CHECK: public struct D3 {
-// CHECK-END: extension conformances.D3 : conformances.PublicBaseProto, conformances.PublicSubProto {}
+// CHECK-END: extension conformances.D3 : conformances.PublicBaseProto {}
+// CHECK-END: extension conformances.D3 : conformances.PublicSubProto {}
 public struct D3: PrivateSubProto & PublicSubProto {}
 // CHECK: public struct D4 {
-// CHECK-END: extension conformances.D4 : conformances.APublicSubProto, conformances.PublicBaseProto {}
+// CHECK-END: extension conformances.D4 : conformances.APublicSubProto {}
+// CHECK-END: extension conformances.D4 : conformances.PublicBaseProto {}
 public struct D4: APublicSubProto & PrivateSubProto {}
 // CHECK: public struct D5 {
 // CHECK: extension D5 : PublicSubProto {
@@ -131,7 +135,7 @@ public struct D4: APublicSubProto & PrivateSubProto {}
 public struct D5: PrivateSubProto {}
 extension D5: PublicSubProto {}
 // CHECK: public struct D6 : PublicSubProto {
-// CHECK: extension D6 {
+// NEGATIVE-NOT: extension D6 {
 // NEGATIVE-NOT: extension conformances.D6
 public struct D6: PublicSubProto {}
 extension D6: PrivateSubProto {}
@@ -165,7 +169,8 @@ public struct MultiGeneric<T, U, V> {}
 extension MultiGeneric: PublicProto where U: PrivateProto {}
 
 // CHECK: public struct MultiGeneric<T, U, V> {
-// CHECK-END: extension conformances.MultiGeneric : conformances.PublicProto where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
+// CHECK-END: @available(*, unavailable)
+// CHECK-END-NEXT: extension conformances.MultiGeneric : conformances.PublicProto where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
 
 
 internal struct InternalImpl_BAD: PrivateSubProto {}
@@ -185,6 +190,39 @@ extension WrapperForInternal.InternalImplConstrained2_BAD: PublicProto where T: 
 
 internal protocol ExtraHashable: Hashable {}
 extension Bool: ExtraHashable {}
+
+@available(iOS, unavailable)
+@available(macOS, unavailable)
+public struct CoolTVType: PrivateSubProto {}
+// CHECK: public struct CoolTVType {
+// CHECK-END: @available(OSX, unavailable)
+// CHECK-END-NEXT: @available(iOS, unavailable)
+// CHECK-END-NEXT: extension conformances.CoolTVType : conformances.PublicBaseProto {}
+
+@available(macOS 10.99, *)
+public struct VeryNewMacType: PrivateSubProto {}
+// CHECK: public struct VeryNewMacType {
+// CHECK-END: @available(OSX, introduced: 10.99)
+// CHECK-END-NEXT: extension conformances.VeryNewMacType : conformances.PublicBaseProto {}
+
+public struct VeryNewMacProto {}
+@available(macOS 10.98, *)
+extension VeryNewMacProto: PrivateSubProto {}
+// CHECK: public struct VeryNewMacProto {
+// CHECK-END: @available(OSX, introduced: 10.98)
+// CHECK-END-NEXT: extension conformances.VeryNewMacProto : conformances.PublicBaseProto {}
+
+public struct PrivateProtoConformer {}
+extension PrivateProtoConformer : PrivateProto {
+  public var member: Int { return 0 }
+}
+// CHECK: public struct PrivateProtoConformer {
+// CHECK: extension PrivateProtoConformer {
+// CHECK-NEXT: public var member: Int {
+// CHECK-NEXT:   get
+// CHECK-NEXT: }
+// CHECK-NEXT: {{^}$}}
+// NEGATIVE-NOT: extension conformances.PrivateProtoConformer
 
 // NEGATIVE-NOT: extension {{(Swift.)?}}Bool{{.+}}Hashable
 // NEGATIVE-NOT: extension {{(Swift.)?}}Bool{{.+}}Equatable

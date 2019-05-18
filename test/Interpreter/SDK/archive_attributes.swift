@@ -6,7 +6,7 @@
 // RUN: %target-build-swift %s -module-name=test -o %t/decode
 // RUN: %target-run %t/decode %t/test.arc --stdlib-unittest-in-process
 
-// RUN: %target-build-swift %s -module-name=test -o %t/decode -target x86_64-apple-macosx10.14.4
+// RUN: %target-build-swift %s -module-name=test -o %t/decode -target x86_64-apple-macosx10.14.4 -link-objc-runtime
 // RUN: %target-run %t/decode %t/test.arc NEW --stdlib-unittest-in-process
 
 // REQUIRES: executable_test

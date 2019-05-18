@@ -94,8 +94,8 @@ public:
   /// and this is not set, clang will rebuild the module.
   bool DisableModulesValidateSystemHeaders = false;
 
-  /// When set, don't look for or load adapter modules.
-  bool DisableAdapterModules = false;
+  /// When set, don't look for or load overlays.
+  bool DisableOverlayModules = false;
 
   /// When set, don't enforce warnings with -Werror.
   bool DebuggerSupport = false;
@@ -118,7 +118,7 @@ public:
     Code = hash_combine(Code, InferImportAsMember);
     Code = hash_combine(Code, DisableSwiftBridgeAttr);
     Code = hash_combine(Code, DisableModulesValidateSystemHeaders);
-    Code = hash_combine(Code, DisableAdapterModules);
+    Code = hash_combine(Code, DisableOverlayModules);
     return Code;
   }
 };

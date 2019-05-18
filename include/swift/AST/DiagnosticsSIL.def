@@ -462,6 +462,13 @@ NOTE(autodiff_class_member_not_supported,none,
 NOTE(autodiff_missing_return,none,
      "missing return for differentiation", ())
 
+NOTE(constexpr_unknown_control_flow_due_to_skip,none, "branch depends on "
+     "non-constant value produced by an unevaluated instructions", ())
+NOTE(constexpr_returned_by_unevaluated_instruction,none,
+     "return value of an unevaluated instruction is not a constant", ())
+NOTE(constexpr_mutated_by_unevaluated_instruction,none, "value mutable by an "
+    "unevaluated instruction is not a constant", ())
+
 ERROR(non_physical_addressof,none,
       "addressof only works with purely physical lvalues; "
       "use `withUnsafePointer` or `withUnsafeBytes` unless you're implementing "
@@ -529,6 +536,27 @@ NOTE(switch_value_case_doesnt_yield, none, "missing yield in the %0 case",
 
 NOTE(try_branch_doesnt_yield, none, "missing yield when error is "
      "%select{not |}0thrown", (bool))
+
+// OS log optimization dianostics.
+
+ERROR(oslog_message_argument_not_found, none, "no argument of type %0 in "
+  " the os log call", (Identifier))
+
+ERROR(oslog_dynamic_message, none, "os log methods must be passed a string "
+      "interpolation literal. 'OSLogMessage' must not be constructed explicitly",
+      ())
+
+ERROR(oslog_const_evaluation_error, none, "constant evaluating 'OSLogMessage'"
+  "implementation failed.", ())
+
+ERROR(oslog_non_constant_message, none, "'OSLogMessage' struct is "
+      "unoptimizable: 'init' is not constant evaluable", ())
+
+ERROR(oslog_non_constant_interpolation, none, "'OSLogInterpolation' struct is "
+      "unoptimizable: 'init' is not constant evaluable", ())
+
+ERROR(oslog_property_not_constant, none, "'OSLogInterpolation.%0' is not a "
+      "constant: formatting and privacy options must be literals", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

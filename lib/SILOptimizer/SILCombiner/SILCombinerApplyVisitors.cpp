@@ -821,11 +821,12 @@ static bool canReplaceCopiedArg(FullApplySite Apply, SILValue Arg,
   if (!IEA)
     return false;
 
-  // If the witness method mutates Arg, we cannot replace Arg with
-  // the source of a copy. Otherwise the call would modify another value than
-  // the original argument.
+  // If the witness method does not take the value as guaranteed, we cannot
+  // replace Arg with the source of a copy. Otherwise the call would modify
+  // another value than the original argument (in the case of indirect mutating)
+  // or create a use-after-free (in the case of indirect consuming).
   auto origConv = Apply.getOrigCalleeConv();
-  if (origConv.getParamInfoForSILArg(ArgIdx).isIndirectMutating())
+  if (!origConv.getParamInfoForSILArg(ArgIdx).isIndirectInGuaranteed())
     return false;
 
   auto *DT = DA->get(Apply.getFunction());
