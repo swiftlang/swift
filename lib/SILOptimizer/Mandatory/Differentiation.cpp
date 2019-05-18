@@ -3945,12 +3945,18 @@ public:
 
     builder.setInsertionPoint(adjointEntry);
     if (seed->getType().isAddress()) {
-      if (seed->getType().isLoadable(builder.getFunction())) {
-        builder.createRetainValueAddr(adjLoc, seed,
+      // Create a local copy so that it can be written to by later adjoint
+      // zero'ing logic.
+      auto *seedBufCopy = builder.createAllocStack(adjLoc, seed->getType());
+      builder.createCopyAddr(adjLoc, seed, seedBufCopy, IsNotTake,
+                             IsInitialization);
+      if (seed->getType().isLoadable(builder.getFunction()))
+        builder.createRetainValueAddr(adjLoc, seedBufCopy,
                                       builder.getDefaultAtomicity());
-      }
-      setAdjointBuffer(origResult,
-                       ValueWithCleanup(seed, makeCleanup(seed, emitCleanup)));
+      ValueWithCleanup seedBufferCopyWithCleanup(
+          seedBufCopy, makeCleanup(seedBufCopy, emitCleanup));
+      setAdjointBuffer(origResult, seedBufferCopyWithCleanup);
+      localAllocations.push_back(seedBufferCopyWithCleanup);
     } else {
       builder.createRetainValue(adjLoc, seed, builder.getDefaultAtomicity());
       initializeAdjointValue(origResult, makeConcreteAdjointValue(
