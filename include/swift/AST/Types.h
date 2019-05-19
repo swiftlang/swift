@@ -4153,7 +4153,7 @@ public:
       AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
       SILModule &module, LookupConformanceFn lookupConformance,
-      GenericSignature *whereClauseGenericSignature = nullptr);
+      CanGenericSignature whereClauseGenericSignature = nullptr);
 
   /// Returns a bit vector that specifices which parameters you can
   /// differentiate with respect to for this differentiable function type. (e.g.
@@ -4967,6 +4967,18 @@ public:
   
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpaqueTypeArchetype;
+  }
+  
+  /// Get the ordinal of the type within the declaration's opaque signature.
+  ///
+  /// If a method declared its return type as:
+  ///
+  ///   func foo() -> (some P, some Q)
+  ///
+  /// then the underlying type of `some P` would be ordinal 0, and `some Q` would be ordinal 1.
+  unsigned getOrdinal() const {
+    // TODO: multiple opaque types
+    return 0;
   }
   
   static void Profile(llvm::FoldingSetNodeID &ID,

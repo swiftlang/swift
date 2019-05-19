@@ -24,7 +24,7 @@ extension vDSP {
     /// `result[0] = (10 * 2²) + (20 * 2¹) + (30 * 2⁰) // 110`
     ///
     /// `result[1] = (10 * 5²) + (20 * 5¹) + (30 * 5⁰) // 380`
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func evaluatePolynomial<U>(usingCoefficients coefficients: [Float],
                                              withVariables variables: U) -> [Float]
@@ -57,7 +57,7 @@ extension vDSP {
     /// `result[0] = (10 * 2²) + (20 * 2¹) + (30 * 2⁰) // 110`
     ///
     /// `result[1] = (10 * 5²) + (20 * 5¹) + (30 * 5⁰) // 380`
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func evaluatePolynomial<U, V>(usingCoefficients coefficients: [Float],
                                                 withVariables variables: U,
@@ -95,7 +95,7 @@ extension vDSP {
     /// `result[0] = (10 * 2²) + (20 * 2¹) + (30 * 2⁰) // 110`
     ///
     /// `result[1] = (10 * 5²) + (20 * 5¹) + (30 * 5⁰) // 380`
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func evaluatePolynomial<U>(usingCoefficients coefficients: [Double],
                                              withVariables variables: U) -> [Double]
@@ -128,7 +128,7 @@ extension vDSP {
     /// `result[0] = (10 * 2²) + (20 * 2¹) + (30 * 2⁰) // 110`
     ///
     /// `result[1] = (10 * 5²) + (20 * 5¹) + (30 * 5⁰) // 380`
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func evaluatePolynomial<U, V>(usingCoefficients coefficients: [Double],
                                                 withVariables variables: U,

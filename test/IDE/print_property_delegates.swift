@@ -5,14 +5,28 @@
 
 @_propertyDelegate
 struct Delegate<Value> {
-  var value: Value
+  var _stored: Value?
+
+  var value: Value {
+    get {
+      return _stored!
+    }
+
+    set {
+      _stored = newValue
+    }
+  }
+
+  init() {
+    self._stored = nil
+  }
 
   init(initialValue: Value) {
-    self.value = initialValue
+    self._stored = initialValue
   }
 
   init(closure: () -> Value) {
-    self.value = closure()
+    self._stored = closure()
   }
 }
 
@@ -29,8 +43,11 @@ struct HasDelegates {
   @Delegate
   var y = true
 
+  @Delegate
+  var z: String
+
   // Memberwise initializer.
-  // CHECK: init(x: Delegate<Int> = Delegate(closure: foo), y: Bool = true)
+  // CHECK: init(x: Delegate<Int> = Delegate(closure: foo), y: Bool = true, z: String = Delegate())
 }
 
 func trigger() {

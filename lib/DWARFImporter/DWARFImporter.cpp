@@ -127,7 +127,7 @@ public:
     ModuleWrappers.insert({name, wrapperUnit});
     decl->addFile(*wrapperUnit);
 
-    // Force load adapter modules for all imported modules.
+    // Force load overlay modules for all imported modules.
     decl->forAllVisibleModules({}, [](ModuleDecl::ImportedModule import) {});
 
     return decl;
@@ -141,6 +141,9 @@ DWARFImporter::DWARFImporter(ASTContext &ctx,
       Impl(*new Implementation(ctx, clangImporterOpts)) {}
 
 DWARFImporter::~DWARFImporter() { delete &Impl; }
+
+void DWARFImporter::collectVisibleTopLevelModuleNames(
+    SmallVectorImpl<Identifier> &names) const {}
 
 bool DWARFImporter::canImportModule(std::pair<Identifier, SourceLoc> named) {
   return false;

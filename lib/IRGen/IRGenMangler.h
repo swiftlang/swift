@@ -123,13 +123,6 @@ public:
     return mangleNominalTypeSymbol(Decl, "Mn");
   }
   
-  std::string mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl) {
-    beginMangling();
-    appendOpaqueDeclName(decl);
-    appendOperator("MQ");
-    return finalize();
-  }
-
   std::string mangleOpaqueTypeDescriptorAccessor(const OpaqueTypeDecl *decl) {
     beginMangling();
     appendOpaqueDeclName(decl);
@@ -193,9 +186,27 @@ public:
     return finalize();
   }
   
-  std::string mangleAnonymousDescriptor(const DeclContext *DC) {
+  void appendAnonymousDescriptorName(PointerUnion<DeclContext*, VarDecl*> Name){
+    if (auto DC = Name.dyn_cast<DeclContext *>()) {
+      return appendContext(DC);
+    }
+    if (auto VD = Name.dyn_cast<VarDecl *>()) {
+      return appendEntity(VD);
+    }
+    llvm_unreachable("unknown kind");
+  }
+  
+  std::string mangleAnonymousDescriptorName(
+                                    PointerUnion<DeclContext*, VarDecl*> Name) {
     beginMangling();
-    appendContext(DC);
+    appendAnonymousDescriptorName(Name);
+    return finalize();
+  }
+  
+  std::string mangleAnonymousDescriptor(
+                                    PointerUnion<DeclContext*, VarDecl*> Name) {
+    beginMangling();
+    appendAnonymousDescriptorName(Name);
     appendOperator("MXX");
     return finalize();
   }

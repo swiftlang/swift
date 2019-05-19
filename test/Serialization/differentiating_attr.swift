@@ -26,7 +26,7 @@ func generic<T : Numeric>(x: T) -> T {
   return x
 }
 @differentiating(generic)
-func vjpGeneric<T>(x: T) -> (value: T, pullback: (T.CotangentVector) -> T.CotangentVector)
+func vjpGeneric<T>(x: T) -> (value: T, pullback: (T.TangentVector) -> T.TangentVector)
   where T : Numeric, T : Differentiable
 {
   return (x, { v in v })
@@ -40,7 +40,7 @@ protocol InstanceMethod : Differentiable {
 }
 extension InstanceMethod {
   @differentiating(foo)
-  func vjpFoo(x: Self) -> (value: Self, pullback: (Self.CotangentVector) -> (Self.CotangentVector, Self.CotangentVector)) {
+  func vjpFoo(x: Self) -> (value: Self, pullback: (Self.TangentVector) -> (Self.TangentVector, Self.TangentVector)) {
     return (x, { ($0, $0) })
   }
 

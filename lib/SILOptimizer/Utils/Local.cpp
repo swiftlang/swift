@@ -170,16 +170,8 @@ namespace {
   using CallbackTy = llvm::function_ref<void(SILInstruction *)>;
 } // end anonymous namespace
 
-void swift::
-recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
-                                           bool Force, CallbackTy Callback) {
-  SILBasicBlock::iterator instIter;
-  recursivelyDeleteTriviallyDeadInstructions(IA, instIter, Force, Callback);
-}
-
 void swift::recursivelyDeleteTriviallyDeadInstructions(
-    ArrayRef<SILInstruction *> IA, SILBasicBlock::iterator &InstIter,
-    bool Force, CallbackTy Callback) {
+    ArrayRef<SILInstruction *> IA, bool Force, CallbackTy Callback) {
   // Delete these instruction and others that become dead after it's deleted.
   llvm::SmallPtrSet<SILInstruction *, 8> DeadInsts;
   for (auto I : IA) {
@@ -230,7 +222,7 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
 
     for (auto I : DeadInsts) {
       // This will remove this instruction and all its uses.
-      eraseFromParentWithDebugInsts(I, InstIter);
+      eraseFromParentWithDebugInsts(I, Callback);
     }
 
     NextInsts.swap(DeadInsts);
@@ -244,13 +236,11 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
 /// \param I The instruction to be deleted.
 /// \param Force If Force is set, don't check if the top level instruction is
 ///        considered dead - delete it regardless.
-SILBasicBlock::iterator
-swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I, bool Force,
-                                                  CallbackTy Callback) {
-  SILBasicBlock::iterator nextI = std::next(I->getIterator());
+void swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
+                                                       bool Force,
+                                                       CallbackTy Callback) {
   ArrayRef<SILInstruction *> AI = ArrayRef<SILInstruction *>(I);
-  recursivelyDeleteTriviallyDeadInstructions(AI, nextI, Force, Callback);
-  return nextI;
+  recursivelyDeleteTriviallyDeadInstructions(AI, Force, Callback);
 }
 
 void swift::eraseUsesOfInstruction(SILInstruction *Inst,

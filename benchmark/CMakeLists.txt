@@ -92,6 +92,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Hash
     single-source/Histogram
     single-source/InsertCharacter  
+    single-source/IntegerParsing
     single-source/Integrate
     single-source/IterateData
     single-source/Join
@@ -107,6 +108,7 @@ set(SWIFT_BENCH_MODULES
     single-source/NSError
     single-source/NSStringConversion
     single-source/NibbleSort
+    single-source/NIOChannelPipeline
     single-source/NopDeinit
     single-source/ObjectAllocation
     single-source/ObjectiveCBridging

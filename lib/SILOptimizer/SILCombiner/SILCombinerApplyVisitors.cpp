@@ -74,7 +74,15 @@ static bool foldInverseReabstractionThunks(PartialApplyInst *PAI,
 SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
   // partial_apply without any substitutions or arguments is just a
   // thin_to_thick_function.
-  if (!PAI->hasSubstitutions() && (PAI->getNumArguments() == 0)) {
+  if (!PAI->hasSubstitutions() && (PAI->getNumArguments() == 0) &&
+      // SWIFT_ENABLE_TENSORFLOW
+      // Add check that was previously unexercised, necessary for AD.
+      // Otherwise, `thin_to_thick` instruction will be created on
+      // `@convention(method)` values, which is invalid.
+      // Revert check when `VJPEmitter::visitApplyInst` no longer produces
+      // argument-less `partial_apply` instructions.
+      PAI->getSubstCalleeType()->getRepresentation() ==
+          SILFunctionTypeRepresentation::Thin) {
     if (!PAI->isOnStack())
       return Builder.createThinToThickFunction(PAI->getLoc(), PAI->getCallee(),
                                                PAI->getType());
@@ -813,11 +821,12 @@ static bool canReplaceCopiedArg(FullApplySite Apply, SILValue Arg,
   if (!IEA)
     return false;
 
-  // If the witness method mutates Arg, we cannot replace Arg with
-  // the source of a copy. Otherwise the call would modify another value than
-  // the original argument.
+  // If the witness method does not take the value as guaranteed, we cannot
+  // replace Arg with the source of a copy. Otherwise the call would modify
+  // another value than the original argument (in the case of indirect mutating)
+  // or create a use-after-free (in the case of indirect consuming).
   auto origConv = Apply.getOrigCalleeConv();
-  if (origConv.getParamInfoForSILArg(ArgIdx).isIndirectMutating())
+  if (!origConv.getParamInfoForSILArg(ArgIdx).isIndirectInGuaranteed())
     return false;
 
   auto *DT = DA->get(Apply.getFunction());

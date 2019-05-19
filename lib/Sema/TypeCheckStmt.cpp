@@ -1884,6 +1884,9 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   // HACK: don't type-check the same function body twice.  This is
   // supposed to be handled by just not enqueuing things twice,
   // but that gets tricky with synthesized function bodies.
+  validateDecl(AFD);
+  (void) AFD->getBody();
+
   if (AFD->isBodyTypeChecked())
     return false;
 

@@ -2711,16 +2711,23 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     // globals. Note that the field offset vector is *not* updated;
     // however we should not be using it for anything in a non-generic
     // class.
-    if (auto *stub = description->getObjCResilientClassStub()) {
-      if (_objc_realizeClassFromSwift == nullptr ||
-          objc_loadClassref == nullptr) {
-        fatalError(0, "class %s requires missing Objective-C runtime feature; "
-                  "the deployment target was newer than this OS\n",
-                  self->getDescription()->Name.get());
-      }
+    auto *stub = description->getObjCResilientClassStub();
+
+    // On a new enough runtime, register the class as a replacement for
+    // its stub if we have one, which attaches any categories referencing
+    // the stub.
+    //
+    // On older runtimes, just register the class via the usual mechanism.
+    // The compiler enforces that @objc methods in extensions of classes
+    // with resilient ancestry have the correct availability, so it should
+    // be safe to ignore the stub in this case.
+    if (stub != nullptr &&
+        objc_loadClassref != nullptr &&
+        _objc_realizeClassFromSwift != nullptr) {
       _objc_realizeClassFromSwift((Class) self, const_cast<void *>(stub));
-    } else
+    } else {
       swift_instantiateObjCClass(self);
+    }
   }
 #else
   assert(!description->hasObjCResilientClassStub());

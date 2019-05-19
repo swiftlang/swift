@@ -24,6 +24,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/PropertyDelegates.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -834,6 +835,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(input_block, MODULE_FLAGS);
   BLOCK_RECORD(input_block, SEARCH_PATH);
   BLOCK_RECORD(input_block, FILE_DEPENDENCY);
+  BLOCK_RECORD(input_block, DEPENDENCY_DIRECTORY);
   BLOCK_RECORD(input_block, PARSEABLE_INTERFACE_PATH);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
@@ -1065,6 +1067,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   input_block::ImportedHeaderContentsLayout ImportedHeaderContents(Out);
   input_block::SearchPathLayout SearchPath(Out);
   input_block::FileDependencyLayout FileDependency(Out);
+  input_block::DependencyDirectoryLayout DependencyDirectory(Out);
   input_block::ParseableInterfaceLayout ParseableInterface(Out);
 
   if (options.SerializeOptionsForDebugging) {
@@ -1078,13 +1081,24 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
       SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false, path);
   }
 
+  // Note: We're not using StringMap here because we don't need to own the
+  // strings.
+  llvm::DenseMap<StringRef, unsigned> dependencyDirectories;
   for (auto const &dep : options.Dependencies) {
+    StringRef directoryName = llvm::sys::path::parent_path(dep.getPath());
+    unsigned &dependencyDirectoryIndex = dependencyDirectories[directoryName];
+    if (!dependencyDirectoryIndex) {
+      // This name must be newly-added. Give it a new ID (and skip 0).
+      dependencyDirectoryIndex = dependencyDirectories.size();
+      DependencyDirectory.emit(ScratchRecord, directoryName);
+    }
     FileDependency.emit(ScratchRecord,
                         dep.getSize(),
                         getRawModTimeOrHash(dep),
                         dep.isHashBased(),
                         dep.isSDKRelative(),
-                        dep.getPath());
+                        dependencyDirectoryIndex,
+                        llvm::sys::path::filename(dep.getPath()));
   }
 
   if (!options.ParseableInterface.empty())
@@ -3240,7 +3254,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(theClass->getDeclContext());
 
     auto conformances = theClass->getLocalConformances(
-                          ConformanceLookupKind::All, nullptr);
+                          ConformanceLookupKind::NonInherited, nullptr);
 
     SmallVector<TypeID, 4> inheritedTypes;
     for (auto inherited : theClass->getInherited()) {
@@ -3307,6 +3321,7 @@ void Serializer::writeDecl(const Decl *D) {
                                rawAccessLevel,
                                inherited);
 
+    const_cast<ProtocolDecl*>(proto)->createGenericParamsIfMissing();
     writeGenericParams(proto->getGenericParams());
     writeGenericRequirements(
       proto->getRequirementSignature(), DeclTypeAbbrCodes);
@@ -3328,12 +3343,23 @@ void Serializer::writeDecl(const Decl *D) {
       rawSetterAccessLevel =
         getRawStableAccessLevel(var->getSetterFormalAccess());
 
+    unsigned numBackingProperties = 0;
     Type ty = var->getInterfaceType();
-    SmallVector<TypeID, 2> accessorsAndDependencies;
+    SmallVector<TypeID, 2> arrayFields;
     for (auto accessor : accessors.Decls)
-      accessorsAndDependencies.push_back(addDeclRef(accessor));
+      arrayFields.push_back(addDeclRef(accessor));
+    if (auto backingInfo = var->getPropertyDelegateBackingPropertyInfo()) {
+      if (backingInfo.backingVar) {
+        ++numBackingProperties;
+        arrayFields.push_back(addDeclRef(backingInfo.backingVar));
+      }
+      if (backingInfo.storageDelegateVar) {
+        ++numBackingProperties;
+        arrayFields.push_back(addDeclRef(backingInfo.storageDelegateVar));
+      }
+    }
     for (Type dependency : collectDependenciesFromType(ty->getCanonicalType()))
-      accessorsAndDependencies.push_back(addTypeRef(dependency));
+      arrayFields.push_back(addTypeRef(dependency));
 
     unsigned abbrCode = DeclTypeAbbrCodes[VarLayout::Code];
     VarLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -3355,7 +3381,8 @@ void Serializer::writeDecl(const Decl *D) {
                           addDeclRef(var->getOverriddenDecl()),
                           rawAccessLevel, rawSetterAccessLevel,
                           addDeclRef(var->getOpaqueResultTypeDecl()),
-                          accessorsAndDependencies);
+                          numBackingProperties,
+                          arrayFields);
     break;
   }
 

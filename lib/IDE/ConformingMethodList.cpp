@@ -147,7 +147,8 @@ void ConformingMethodListCallbacks::getMatchingMethods(
         : CurModule(DC->getParentModule()), T(T), ExpectedTypes(expectedTypes),
           Result(result) {}
 
-    void foundDecl(ValueDecl *VD, DeclVisibilityKind reason) {
+    void foundDecl(ValueDecl *VD, DeclVisibilityKind reason,
+                   DynamicLookupInfo) {
       if (isMatchingMethod(VD) && !VD->shouldHideFromEditor())
         Result.push_back(VD);
     }

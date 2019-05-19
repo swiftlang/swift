@@ -35,3 +35,31 @@ func test2<T: Differentiable, U: Differentiable>(_: @differentiable (T) -> (U) -
 func test3<T: Differentiable, U: Differentiable>(_: @differentiable (T) -> @differentiable (U) -> Int) {}
 // expected-error @+1 {{result is not differentiable, but the function type is marked '@differentiable'}}
 func test4<T: Differentiable, U: Differentiable>(_: @differentiable (T) -> (U) -> Int) {}
+
+let diffFunc: @differentiable (Float) -> Float
+func inferredConformances<T, U>(_: @differentiable (T) -> U) {}
+inferredConformances(diffFunc)
+
+func inferredConformancesResult<T, U>() -> @differentiable (T) -> U {}
+
+let diffFuncWithNondiff: @differentiable (Float, @nondiff Int) -> Float
+func inferredConformances<T, U, V>(_: @differentiable (T, @nondiff U) -> V) {}
+inferredConformances(diffFuncWithNondiff)
+
+struct Vector<T> {
+  var x, y: T
+}
+extension Vector: Differentiable where T: Differentiable {}
+
+// expected-note @+2 {{where 'T' = 'Int'}}
+// expected-note @+1 {{where 'U' = 'Int'}}
+func inferredConformancesGeneric<T, U>(_: @differentiable (Vector<T>) -> Vector<U>) {}
+
+let nondiffVectorFunc: (Vector<Int>) -> Vector<Int>
+// expected-error @+1 2 {{global function 'inferredConformancesGeneric' requires that 'Int' conform to 'Differentiable}}
+inferredConformancesGeneric(nondiffVectorFunc)
+
+let diffVectorFunc: (Vector<Float>) -> Vector<Float>
+inferredConformancesGeneric(diffVectorFunc) // okay!
+
+func inferredConformancesGenericResult<T, U>() -> @differentiable (Vector<T>) -> Vector<U> {}

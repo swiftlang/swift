@@ -85,7 +85,6 @@ while [ $# -ne 0 ]; do
     INSTALLER_PACKAGE=1
     if [ "$(uname -s)" == "Darwin" ]; then
       SWIFT_PACKAGE_INSTALLER=,installer
-      SWIFT_PACKAGE_NOTEST=
     else
       echo "--pkg is not supported on \"$(uname -s)\". See --help"
       exit 1

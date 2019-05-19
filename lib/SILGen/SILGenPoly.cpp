@@ -1120,9 +1120,13 @@ namespace {
 
           // Load if necessary.
           if (elt.getType().isAddress()) {
+            // This code assumes that we have each element at +1. So, if we do
+            // not have a cleanup, we emit a load [copy]. This can occur if we
+            // are translating in_guaranteed parameters.
+            IsTake_t isTakeVal = elt.isPlusZero() ? IsNotTake : IsTake;
             elt = SGF.emitLoad(Loc, elt.forward(SGF),
-                               SGF.getTypeLowering(elt.getType()),
-                               SGFContext(), IsTake);
+                               SGF.getTypeLowering(elt.getType()), SGFContext(),
+                               isTakeVal);
           }
         }
 
@@ -3530,7 +3534,7 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionReorderingThunk(
 
   auto loc = assocFn->getLocation();
   SILGenFunctionBuilder fb(*this);
-  auto linkage = autodiff::getAutoDiffFunctionLinkage(
+  auto linkage = autodiff::getAutoDiffAssociatedFunctionLinkage(
       original->getLinkage(), /*isAssocFnExported*/ true);
   auto *thunk = fb.getOrCreateFunction(
       loc, name, linkage, targetType, IsBare, IsNotTransparent,

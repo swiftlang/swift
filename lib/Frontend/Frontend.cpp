@@ -349,13 +349,11 @@ bool CompilerInstance::setUpModuleLoaders() {
   if (MLM != ModuleLoadingMode::OnlySerialized) {
     auto const &Clang = clangImporter->getClangInstance();
     std::string ModuleCachePath = getModuleCachePathFromClang(Clang);
-    StringRef PrebuiltModuleCachePath =
-        Invocation.getFrontendOptions().PrebuiltModuleCachePath;
-    auto PIML = ParseableInterfaceModuleLoader::create(*Context,
-                                                       ModuleCachePath,
-                                                       PrebuiltModuleCachePath,
-                                                       getDependencyTracker(),
-                                                       MLM);
+    auto &FEOpts = Invocation.getFrontendOptions();
+    StringRef PrebuiltModuleCachePath = FEOpts.PrebuiltModuleCachePath;
+    auto PIML = ParseableInterfaceModuleLoader::create(
+        *Context, ModuleCachePath, PrebuiltModuleCachePath,
+        getDependencyTracker(), MLM, FEOpts.RemarkOnRebuildFromModuleInterface);
     Context->addModuleLoader(std::move(PIML));
   }
   Context->addModuleLoader(std::move(SML));
@@ -1002,6 +1000,8 @@ void CompilerInstance::finishTypeChecking(
       performWholeModuleTypeChecking(SF);
     });
   }
+
+  checkInconsistentImplementationOnlyImports(MainModule);
 }
 
 SourceFile *CompilerInstance::createSourceFileForMainModule(

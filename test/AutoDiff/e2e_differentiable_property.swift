@@ -14,7 +14,6 @@ struct TangentSpace : VectorNumeric {
 
 extension TangentSpace : Differentiable {
   typealias TangentVector = TangentSpace
-  typealias CotangentVector = TangentSpace
 }
 
 struct Space {
@@ -48,12 +47,8 @@ struct Space {
 
 extension Space : Differentiable {
   typealias TangentVector = TangentSpace
-  typealias CotangentVector = TangentSpace
   func moved(along: TangentSpace) -> Space {
     return Space(x: x + along.dx, y: y + along.dy)
-  }
-  func tangentVector(from cotangent: CotangentVector) -> TangentVector {
-    return cotangent
   }
 }
 
@@ -78,8 +73,8 @@ struct GenericMemberWrapper<T : Differentiable> : Differentiable {
   @differentiable(vjp: vjpX)
   var x: T
 
-  func vjpX() -> (T, (T.CotangentVector) -> GenericMemberWrapper.CotangentVector) {
-    return (x, { CotangentVector(x: $0) })
+  func vjpX() -> (T, (T.TangentVector) -> GenericMemberWrapper.TangentVector) {
+    return (x, { TangentVector(x: $0) })
   }
 }
 
@@ -87,7 +82,7 @@ E2EDifferentiablePropertyTests.test("generic stored property") {
   let actualGrad = gradient(at: GenericMemberWrapper<Float>(x: 1)) { point in
     return 2 * point.x
   }
-  let expectedGrad = GenericMemberWrapper<Float>.CotangentVector(x: 2)
+  let expectedGrad = GenericMemberWrapper<Float>.TangentVector(x: 2)
   expectEqual(expectedGrad, actualGrad)
 }
 
@@ -98,7 +93,6 @@ struct ProductSpaceSelfTangent : VectorNumeric {
 
 extension ProductSpaceSelfTangent : Differentiable {
   typealias TangentVector = ProductSpaceSelfTangent
-  typealias CotangentVector = ProductSpaceSelfTangent
 }
 
 E2EDifferentiablePropertyTests.test("fieldwise product space, self tangent") {
@@ -115,7 +109,6 @@ struct ProductSpaceOtherTangentTangentSpace : VectorNumeric {
 
 extension ProductSpaceOtherTangentTangentSpace : Differentiable {
   typealias TangentVector = ProductSpaceOtherTangentTangentSpace
-  typealias CotangentVector = ProductSpaceOtherTangentTangentSpace
 }
 
 @_fieldwiseDifferentiable
@@ -125,12 +118,8 @@ struct ProductSpaceOtherTangent {
 
 extension ProductSpaceOtherTangent : Differentiable {
   typealias TangentVector = ProductSpaceOtherTangentTangentSpace
-  typealias CotangentVector = ProductSpaceOtherTangentTangentSpace
   func moved(along: ProductSpaceOtherTangentTangentSpace) -> ProductSpaceOtherTangent {
     return ProductSpaceOtherTangent(x: x + along.x, y: y + along.y)
-  }
-  func tangentVector(from cotangent: CotangentVector) -> TangentVector {
-    return cotangent
   }
 }
 

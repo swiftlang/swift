@@ -1,10 +1,12 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_2.swift -module-name External -emit-module -emit-module-path %t/External.swiftmodule
-// RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_3.swift -enable-library-evolution -module-name External2 -emit-module -emit-module-path %t/External2.swiftmodule
-// RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_4.swift -I %t -enable-library-evolution -module-name External3 -emit-module -emit-module-path %t/External3.swiftmodule
-// RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_3.swift -I %t -enable-library-evolution -module-name External2 -Osize -emit-module -o - | %target-sil-opt -module-name External2 | %FileCheck --check-prefix=RESILIENT %s
-// RUN: %target-swift-frontend -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil  -sil-verify-all %s | %FileCheck %s
-// RUN: %target-swift-frontend -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -emit-sil -sil-verify-all %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_2.swift -module-name External -emit-module -emit-module-path %t/External.swiftmodule
+// RUN: %target-swift-frontend -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_3.swift -enable-library-evolution -module-name External2 -emit-module -emit-module-path %t/External2.swiftmodule
+// RUN: %target-swift-frontend -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_4.swift -I %t -enable-library-evolution -module-name External3 -emit-module -emit-module-path %t/External3.swiftmodule
+// RUN: %target-swift-frontend -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_3.swift -I %t -enable-library-evolution -module-name External2 -Osize -emit-module -o - | %target-sil-opt -module-name External2 | %FileCheck --check-prefix=RESILIENT %s
+// RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil  -sil-verify-all %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -emit-sil -sil-verify-all %s | %FileCheck %s
+
 import External
 import External2
 import External3
@@ -335,6 +337,17 @@ public func testResilientInlinableProperty() {
   useP(r.inlineableProperty.myValue3())
 }
 
+// CHECK-LABEL: sil @$s1A31testResilientInlinableProperty3yyF
+// CHECK:  [[CONTAINER:%.*]] = alloc_stack $ResilientContainer
+// CHECK:  [[RES:%.*]] = alloc_stack $Int64
+// CHECK:  [[FUN:%.*]] = function_ref @$s9External218ResilientContainerV19inlineableProperty2Qrvg
+// CHECK:  [[RES2:%.*]] = unchecked_addr_cast [[RES]] : $*Int64 to $*@_opaqueReturnTypeOf("$s9External218ResilientContainerV19inlineableProperty2Qrvp", 0)
+// CHECK:  apply [[FUN]]([[RES2]], [[CONTAINER]])
+public func testResilientInlinableProperty3() {
+  let r = ResilientContainer()
+  useP(r.inlineableProperty2.myValue3())
+}
+
 // CHECK-LABEL: sil @$s1A22testResilientProperty2yyF
 // CHECK:  [[CONTAINER:%.*]] = alloc_stack $ResilientContainer2
 // CHECK:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External319ResilientContainer2V16computedPropertyQrvp", 0)
@@ -374,15 +387,29 @@ public func testResilientInlinablePropertyCallsResilientInlinable() {
 // RESILIENT:  apply [[FUN]]([[RES]], %0)
 
 
-protocol P4 {
+public protocol P4 {
   associatedtype AT
   func foo(_ x: Int64) -> AT
+  func test()
 }
+
 struct PA : P4 {
   func foo(_ x: Int64)  -> some P {
     return Int64(x)
   }
 }
+
+// CHECK-LABEL: sil private [transparent] [thunk] @$s1A2PAVAA2P4A2aDP4testyyFTW
+// CHECK:   [[V:%.*]] = load %0 : $*PA
+// CHECK:   [[F:%.*]] = function_ref @$s1A2PAV4testyyF
+// CHECK:   apply [[F]]([[V]])
+
+// CHECK-64-LABEL: sil hidden @$s1A2PAV4testyyF : $@convention(method) (PA) -> ()
+// CHECK-64:   [[V:%.*]] = integer_literal $Builtin.Int64, 5
+// CHECK-64:   [[I:%.*]] = struct $Int64 ([[V]] : $Builtin.Int64)
+// CHECK-64:   [[F:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5
+// CHECK-64:   apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
+// CHECK-64:   apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
 
 @inline(never)
 func testIt<T>(cl: (Int64) throws -> T) {
@@ -442,4 +469,73 @@ public func testTuple() {
   let t = createTuple(s)
   useP(t.0)
   useP(t.1)
+}
+
+extension PA {
+  func test() {
+    var p = (foo, foo)
+    useP(p.0(5))
+    useP(p.1(5))
+  }
+}
+
+public struct Foo {
+  var id : Int = 0
+  var p : Int64 = 1
+}
+
+struct Test : RandomAccessCollection {
+    struct Index : Comparable, Hashable {
+        var identifier: AnyHashable?
+        var offset: Int
+
+        static func < (lhs: Index, rhs: Index) -> Bool {
+            return lhs.offset < rhs.offset
+        }
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(identifier)
+            hasher.combine(offset)
+        }
+    }
+
+    let foos: [Foo]
+    let ids: [AnyHashable]
+
+    init(foos: [Foo]) {
+        self.foos = foos
+        self.ids = foos.map { $0.id }
+    }
+
+    func _index(atOffset n: Int) -> Index {
+        return Index(identifier: ids.isEmpty ? nil : ids[n], offset: n)
+    }
+
+    var startIndex: Index {
+        return _index(atOffset: 0)
+    }
+
+    var endIndex: Index {
+        return Index(identifier: nil, offset: ids.endIndex)
+    }
+
+    func index(after i: Index) -> Index {
+        return _index(atOffset: i.offset + 1)
+    }
+
+    func index(before i: Index) -> Index {
+        return _index(atOffset: i.offset - 1)
+    }
+
+    func distance(from start: Index, to end: Index) -> Int {
+        return end.offset - start.offset
+    }
+
+    func index(_ i: Index, offsetBy n: Int) -> Index {
+        return _index(atOffset: i.offset + n)
+    }
+
+   subscript(i: Index) -> some P {
+        return foos[i.offset].p
+    }
 }

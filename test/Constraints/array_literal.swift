@@ -107,8 +107,7 @@ func longArray() {
 
 // <rdar://problem/25563498> Type checker crash assigning array literal to type conforming to ArrayProtocol
 func rdar25563498<T : ExpressibleByArrayLiteral>(t: T) {
-  var x: T = [1] // expected-error {{cannot convert value of type '[Int]' to specified type 'T'}}
-  // expected-warning@-1{{variable 'x' was never used; consider replacing with '_' or removing it}}
+  var x: T = [1] // expected-error {{cannot convert value of type 'Int' to expected element type 'T.ArrayLiteralElement'}}
 }
 
 func rdar25563498_ok<T : ExpressibleByArrayLiteral>(t: T) -> T

@@ -96,8 +96,7 @@ static Type getAssociatedType(VarDecl *decl, DeclContext *DC, Identifier id) {
                                               ConformanceCheckFlags::Used);
   if (!conf)
     return nullptr;
-  Type assocType = ProtocolConformanceRef::getTypeWitnessByName(
-      varType, *conf, id, C.getLazyResolver());
+  Type assocType = conf->getTypeWitnessByName(varType, id);
   return assocType;
 }
 
@@ -112,8 +111,7 @@ static StructDecl *getAssociatedStructDecl(DeclContext *DC, Identifier id) {
                                               diffableProto,
                                               DC, ConformanceCheckFlags::Used);
   assert(conf && "Nominal must conform to `Differentiable`");
-  Type assocType = ProtocolConformanceRef::getTypeWitnessByName(
-      DC->getSelfTypeInContext(), *conf, id, C.getLazyResolver());
+  Type assocType = conf->getTypeWitnessByName(DC->getSelfTypeInContext(), id);
   assert(assocType && "`Differentiable` protocol associated type not found");
   auto structDecl = dyn_cast<StructDecl>(assocType->getAnyNominal());
   assert(structDecl && "Associated type must be a struct type");
@@ -663,8 +661,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
                                           ConformanceCheckFlags::Used);
         if (!conf)
           return false;
-        Type scalarType = ProtocolConformanceRef::getTypeWitnessByName(
-            vd->getType(), *conf, C.Id_Scalar, C.getLazyResolver());
+        Type scalarType = conf->getTypeWitnessByName(vd->getType(), C.Id_Scalar);
         if (!sameScalarType) {
           sameScalarType = scalarType;
           return true;

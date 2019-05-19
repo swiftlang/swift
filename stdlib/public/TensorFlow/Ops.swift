@@ -972,7 +972,7 @@ public extension Tensor {
                   vjp: _vjpReplacing where Scalar : TensorFlowFloatingPoint)
   func replacing(with other: Tensor,
                  where mask: Tensor<Bool>) -> Tensor {
-    return Raw.select(condition: mask, t: self, e: other)
+    return Raw.select(condition: mask, t: other, e: self)
   }
 }
 

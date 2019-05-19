@@ -692,3 +692,37 @@ bb0(%0 : $*T):
   %13 = tuple ()
   return %13 : $()
 } // end sil function 'testSelfRecursiveFunction'
+
+sil @id : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $*T, %1 :$*T):
+  copy_addr [take] %1 to [initialization] %0 : $*T
+  %t = tuple ()
+  return %t : $()
+}
+
+// This should not assert.
+// CHECK-LABEL: sil shared @$s26specialize_no_return_applys5NeverO_Tg5
+// CHECK:      apply
+// CHECK-NEXT: unreachable
+
+sil @specialize_no_return_apply: $@convention(thin) <T> (@thick T.Type) -> () {
+bb0(%0 : $@thick T.Type):
+  %in = alloc_stack $T
+  %out = alloc_stack $T
+  %f = function_ref @id : $@convention(thin) <T> (@in T) -> @out T
+  %r = apply %f<T>(%out, %in) : $@convention(thin) <T> (@in T) -> @out T
+  dealloc_stack %out : $*T
+  dealloc_stack %in : $*T
+  %t = tuple ()
+  return %t : $()
+}
+
+sil @test_specialize_noreturn_apply : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @specialize_no_return_apply : $@convention(thin) <T> (@thick T.Type) -> ()
+  %m = metatype $@thick Never.Type
+  %r = apply %f<Never>(%m) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %t = tuple ()
+  return %t : $()
+
+}

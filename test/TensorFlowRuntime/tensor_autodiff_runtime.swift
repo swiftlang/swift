@@ -504,7 +504,6 @@ TensorADTests.testAllBackends("unbroadcast(like:") {
   expectEqual(expected, pb(inputTensor))
 }
 
-// ............................................................................................
 TensorADTests.testAllBackends("broadcast(to:)") {
   func foo(tensor: Tensor<Float>, shape: TensorShape) -> Tensor<Float> {
     tensor.broadcast(to: shape)
