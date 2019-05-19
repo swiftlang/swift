@@ -5721,9 +5721,9 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
 
   auto loc = origFnOperand.getLoc();
   SILOptFunctionBuilder fb(getTransform());
-  auto *thunk = fb.getOrCreateFunction(
-      loc, thunkName, SILLinkage::Hidden, thunkType, IsBare, IsTransparent,
-      caller->isSerialized(), IsNotDynamic, ProfileCounter(), IsThunk);
+  auto *thunk = fb.getOrCreateSharedFunction(
+      loc, thunkName, thunkType, IsBare, IsTransparent, caller->isSerialized(),
+      ProfileCounter(), IsThunk, IsNotDynamic);
 
   if (!thunk->empty())
     return {thunk, interfaceSubs};
