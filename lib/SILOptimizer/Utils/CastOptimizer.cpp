@@ -91,7 +91,7 @@ convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
   bool isConditional = dynamicCast.isConditional();
 
   SILValue load =
-      builder.createLoad(loc, src, LoadOwnershipQualifier::Unqualified);
+      builder.emitLoadValueOperation(loc, src, LoadOwnershipQualifier::Take);
 
   SILType silBridgedTy = *dynamicCast.getLoweredBridgedTargetObjectType();
 
@@ -295,11 +295,11 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   }
 
   // Emit a retain.
-  Builder.createRetainValue(Loc, srcOp, Builder.getDefaultAtomicity());
+  SILValue srcArg = Builder.emitCopyValueOperation(Loc, srcOp);
 
   SmallVector<SILValue, 1> Args;
   Args.push_back(InOutOptionalParam);
-  Args.push_back(srcOp);
+  Args.push_back(srcArg);
   Args.push_back(MetaTyVal);
 
   auto *AI = Builder.createApply(Loc, funcRef, subMap, Args);
@@ -307,13 +307,13 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   // If we have guaranteed normal arguments, insert the destroy.
   //
   // TODO: Is it safe to just eliminate the initial retain?
-  Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
+  Builder.emitDestroyValueOperation(Loc, srcArg);
 
   // If we have an unconditional_checked_cast_addr, return early. We do not need
   // to handle any conditional code.
   if (isa<UnconditionalCheckedCastAddrInst>(Inst)) {
     // Destroy the source value as unconditional_checked_cast_addr would.
-    Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
+    Builder.emitDestroyValueOperation(Loc, srcOp);
     eraseInstAction(Inst);
     return (newI) ? newI : AI;
   }
