@@ -5311,6 +5311,23 @@ public:
       return Action::Continue;
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
+    if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
+      if (fnTy->getExtInfo().isDifferentiable()) {
+        auto *diffableProto = Builder.getASTContext()
+            .getProtocol(KnownProtocolKind::Differentiable);
+        auto constrainToDifferentiable = [&](Type typeToConstrain) {
+          Requirement req(RequirementKind::Conformance, typeToConstrain,
+                          diffableProto->getDeclaredType());
+          Builder.addRequirement(req, source, nullptr);
+        };
+        for (auto &param : fnTy->getParams())
+          if (!param.isNonDifferentiable())
+            constrainToDifferentiable(param.getPlainType());
+        constrainToDifferentiable(fnTy->getResult());
+      }
+    }
+
     if (!ty->isSpecialized())
       return Action::Continue;
 
