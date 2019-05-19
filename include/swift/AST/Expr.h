@@ -953,15 +953,23 @@ public:
 class InterpolatedStringLiteralExpr : public LiteralExpr {
   /// Points at the beginning quote.
   SourceLoc Loc;
+  /// Points at the ending quote.
+  /// Needed for the upcoming ASTScope subsystem because lookups can be targeted
+  /// to inside an InterpolatedStringLiteralExpr.
+  SourceLoc TrailingQuoteLoc;
   TapExpr *AppendingExpr;
   Expr *SemanticExpr;
   
 public:
-  InterpolatedStringLiteralExpr(SourceLoc Loc, unsigned LiteralCapacity, 
+  InterpolatedStringLiteralExpr(SourceLoc Loc,
+                                SourceLoc TrailingQuoteLoc,
+                                unsigned LiteralCapacity,
                                 unsigned InterpolationCount,
                                 TapExpr *AppendingExpr)
       : LiteralExpr(ExprKind::InterpolatedStringLiteral, /*Implicit=*/false),
-        Loc(Loc), AppendingExpr(AppendingExpr), SemanticExpr() {
+        Loc(Loc),
+        TrailingQuoteLoc(TrailingQuoteLoc),
+        AppendingExpr(AppendingExpr), SemanticExpr() {
     Bits.InterpolatedStringLiteralExpr.InterpolationCount = InterpolationCount;
     Bits.InterpolatedStringLiteralExpr.LiteralCapacity = LiteralCapacity;
   }
@@ -997,6 +1005,11 @@ public:
     // SourceLocs are token based, and the interpolated string is one string
     // token, so the range should be (Start == End).
     return Loc;
+  }
+  SourceLoc getTrailingQuoteLoc() const {
+    // Except when computing a SourceRange for an ASTScope. Then the range
+    // must be (Start - TrainingQuoteLoc).
+    return TrailingQuoteLoc;
   }
 
   /// Call the \c callback with information about each segment in turn.

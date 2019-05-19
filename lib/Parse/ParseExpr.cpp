@@ -2040,7 +2040,9 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
     // so that parseDeclPoundDiagnostic() can figure out why this string
     // literal was bad.
     return makeParserErrorResult(
-        new (Context) InterpolatedStringLiteralExpr(Loc, 0, 0, nullptr));
+        new (Context) InterpolatedStringLiteralExpr(Loc,
+                                                    EndLoc.getAdvancedLoc(-1),
+                                                    0, 0, nullptr));
   }
 
   unsigned LiteralCapacity = 0;
@@ -2093,7 +2095,8 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   }
 
   return makeParserResult(Status, new (Context) InterpolatedStringLiteralExpr(
-                                      Loc, LiteralCapacity, InterpolationCount,
+                                      Loc, EndLoc.getAdvancedLoc(-1),
+                                      LiteralCapacity, InterpolationCount,
                                       AppendingExpr));
 }
 

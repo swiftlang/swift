@@ -813,6 +813,7 @@ static LiteralExpr *
 shallowCloneImpl(const InterpolatedStringLiteralExpr *E, ASTContext &Ctx,
                  llvm::function_ref<Type(const Expr *)> getType) {
   auto res = new (Ctx) InterpolatedStringLiteralExpr(E->getLoc(),
+                                                     E->getTrailingQuoteLoc(),
                                                      E->getLiteralCapacity(),
                                                      E->getInterpolationCount(),
                                                      E->getAppendingExpr());
