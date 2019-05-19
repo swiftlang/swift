@@ -1082,7 +1082,7 @@ def main_preset():
         nargs="*",
         metavar="SUBSTITUTION")
     parser.add_argument(
-        "--expand-build-script-invocation",
+        "--expand-invocation", "--expand-build-script-invocation",
         help="Print the expanded build-script invocation generated "
              "by the preset, but do not run the preset",
         action=arguments.action.optional_bool)
@@ -1166,7 +1166,7 @@ def main_preset():
         build_script_args += ["--cmake-cxx-launcher", args.cmake_cxx_launcher]
 
     printable_command = shell.quote_command(build_script_args)
-    if args.expand_build_script_invocation:
+    if args.expand_invocation:
         print(printable_command)
     else:
         diagnostics.note('using preset "{}", which expands to \n\n{}\n'.format(
