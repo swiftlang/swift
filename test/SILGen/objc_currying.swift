@@ -210,3 +210,17 @@ func curry_returnsInnerPointer_AnyObject(_ x: AnyObject) -> () -> UnsafeMutableR
   return x.returnsInnerPointer!
 }
 
+// Make sure we don't crash if the same imported declaration is referenced
+// normally and as a curry thunk
+
+// CHECK-LABEL: sil hidden [ossa] @$s13objc_currying17curry_initializerSo5GizmoCSgSicyF : $@convention(thin) () -> @owned @callee_guaranteed (Int) -> @owned Optional<Gizmo> {
+func curry_initializer() -> (Int) -> Gizmo? {
+  _ = Gizmo.init(bellsOn: 10)
+  return Gizmo.init(bellsOn:)
+}
+
+// CHECK-LABEL: sil shared [serializable] [ossa] @$sSo5GizmoC7bellsOnABSgSi_tcfC : $@convention(method) (Int, @thick Gizmo.Type) -> @owned Optional<Gizmo> {
+
+// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo5GizmoC7bellsOnABSgSi_tcfcTO : $@convention(method) (Int, @owned Gizmo) -> @owned Optional<Gizmo> {
+
+// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo5GizmoC7bellsOnABSgSi_tcfCTcTd : $@convention(thin) (@thick Gizmo.Type) -> @owned @callee_guaranteed (Int) -> @owned Optional<Gizmo> {
