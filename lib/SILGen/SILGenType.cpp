@@ -545,27 +545,6 @@ public:
 
 } // end anonymous namespace
 
-static SILWitnessTable *
-getWitnessTableToInsertAfter(SILGenModule &SGM,
-                             NormalProtocolConformance *insertAfter) {
-  while (insertAfter) {
-    // If the table was emitted, emit after it.
-    auto found = SGM.emittedWitnessTables.find(insertAfter);
-    if (found != SGM.emittedWitnessTables.end())
-      return found->second;
-
-    // Otherwise, try inserting after the table we would transitively be
-    // inserted after.
-    auto foundDelayed = SGM.delayedConformances.find(insertAfter);
-    if (foundDelayed != SGM.delayedConformances.end())
-      insertAfter = foundDelayed->second.insertAfter;
-    else
-      break;
-  }
-
-  return nullptr;
-}
-
 SILWitnessTable *
 SILGenModule::getWitnessTable(NormalProtocolConformance *conformance) {
   // If we've already emitted this witness table, return it.
@@ -576,23 +555,6 @@ SILGenModule::getWitnessTable(NormalProtocolConformance *conformance) {
   SILWitnessTable *table = SILGenConformance(*this, conformance).emit();
   emittedWitnessTables.insert({conformance, table});
 
-  // If we delayed emission of this witness table, move it to its rightful
-  // place within the module.
-  auto foundDelayed = delayedConformances.find(conformance);
-  if (foundDelayed != delayedConformances.end()) {
-    M.witnessTables.remove(table);
-    auto insertAfter = getWitnessTableToInsertAfter(*this,
-                                              foundDelayed->second.insertAfter);
-    if (!insertAfter) {
-      M.witnessTables.push_front(table);
-    } else {
-      M.witnessTables.insertAfter(insertAfter->getIterator(), table);
-    }
-  } else {
-    // We would have marked a delayed conformance as "last emitted" when it
-    // was delayed.
-    lastEmittedConformance = conformance;
-  }
   return table;
 }
 
