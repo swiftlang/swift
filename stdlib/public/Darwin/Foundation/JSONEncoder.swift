@@ -1376,10 +1376,13 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
             // In this case we can attempt to recover the original value by reversing the transform
             let original = key.stringValue
             let converted = JSONEncoder.KeyEncodingStrategy._convertToSnakeCase(original)
+            let roundtrip = JSONDecoder.KeyDecodingStrategy._convertFromSnakeCase(converted)
             if converted == original {
                 return "\(key) (\"\(original)\")"
-            } else {
+            } else if roundtrip == original {
                 return "\(key) (\"\(original)\"), converted to \(converted)"
+            } else {
+                return "\(key) (\"\(original)\"), with divergent representation \(roundtrip), converted to \(converted)"
             }
         default:
             // Otherwise, just report the converted string
