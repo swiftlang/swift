@@ -1,0 +1,38 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnostic-constant-propagation | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-constant-propagation | %FileCheck %s
+
+// REQUIRES: objc_interop
+
+sil_stage canonical
+
+import Swift
+import Foundation
+import Builtin
+
+sil @$ss11AnyHashableVyABxcSHRzlufC : $@convention(method) <τ_0_0 where τ_0_0 : Hashable> (@in τ_0_0, @thin AnyHashable.Type) -> @out AnyHashable
+
+// CHECK-LABEL: sil [ossa] @bridged_cast_anyhashable : $@convention(method) (@guaranteed NSArray) -> @out Optional<AnyHashable> {
+// CHECK: [[FUNC:%.*]] = function_ref @$ss37_forceBridgeFromObjectiveC_bridgeableyx01_D5CTypeQz_xmts01_D11CBridgeableRzlF :
+// CHECK: apply [[FUNC]]<Array<AnyHashable>>(
+// CHECK: } // end sil function 'bridged_cast_anyhashable'
+sil [ossa] @bridged_cast_anyhashable : $@convention(method) (@guaranteed NSArray) -> @out Optional<AnyHashable> {
+bb0(%0 : $*Optional<AnyHashable>, %1 : @guaranteed $NSArray):
+  %3 = init_enum_data_addr %0 : $*Optional<AnyHashable>, #Optional.some!enumelt.1
+  %4 = metatype $@thin AnyHashable.Type
+  %5 = alloc_stack $NSArray
+  %6 = copy_value %1 : $NSArray
+  store %6 to [init] %5 : $*NSArray
+  %8 = alloc_stack $Array<AnyHashable>
+  unconditional_checked_cast_addr NSArray in %5 : $*NSArray to Array<AnyHashable> in %8 : $*Array<AnyHashable>
+  %10 = load [take] %8 : $*Array<AnyHashable>
+  %11 = alloc_stack $Array<AnyHashable>
+  store %10 to [init] %11 : $*Array<AnyHashable>
+  %13 = function_ref @$ss11AnyHashableVyABxcSHRzlufC : $@convention(method) <τ_0_0 where τ_0_0 : Hashable> (@in τ_0_0, @thin AnyHashable.Type) -> @out AnyHashable
+  %14 = apply %13<[AnyHashable]>(%3, %11, %4) : $@convention(method) <τ_0_0 where τ_0_0 : Hashable> (@in τ_0_0, @thin AnyHashable.Type) -> @out AnyHashable
+  dealloc_stack %11 : $*Array<AnyHashable>
+  dealloc_stack %8 : $*Array<AnyHashable>
+  dealloc_stack %5 : $*NSArray
+  inject_enum_addr %0 : $*Optional<AnyHashable>, #Optional.some!enumelt.1
+  %19 = tuple ()
+  return %19 : $()
+}
