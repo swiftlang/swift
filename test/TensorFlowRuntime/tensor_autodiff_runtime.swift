@@ -266,120 +266,28 @@ TensorADTests.testAllBackends("broadcast(toShape:)") {
   func foo(tensor: Tensor<Float>, shape: Tensor<Int32>) -> Tensor<Float> {
     tensor.broadcast(toShape: shape)
   }
-
-  var inputTensor: Tensor<Float>
-  var expected: Tensor<Float>
-  var pb: (Tensor<Float>) -> Tensor<Float>
-
-  // [3,] -> [3,3]
-  pb = pullback(at: Tensor([99, 33, 55])) { x in 
+  let pb: (Tensor<Float>) -> Tensor<Float> = pullback(at: Tensor([99, 33, 55])) { x in 
     foo(tensor: x, shape: Tensor([3, 3])) 
   }
-
-  // Test 1: same shape as parameter of pullback
-  inputTensor = Tensor([
-    [1, 2, 3], 
-    [1, 2, 3], 
-    [1, 2, 3]]
-  )
-  expected = Tensor([3, 6, 9])
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 2: different shape than parameter of pullback
-  inputTensor = Tensor([
+  let inputTensor: Tensor<Float> = Tensor([
     [1, 2, 3], 
     [1, 2, 3], 
     [1, 2, 3],
     [1, 2, 3]]
   )
-  expected = Tensor([4, 8, 12])
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 3: same shape as tensor we are differentiating at
-  inputTensor = Tensor([1, 2, 3])
-  expected = Tensor([1, 2, 3])
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 4: extremely padded shape as tensor we are differentiating at
-  inputTensor = Tensor([[[[[[1, 2, 3]]]]]])
-  expected = Tensor([1, 2, 3])
-  expectEqual(expected, pb(inputTensor))
-
-  // [3,1] -> [3x3]
-  pb = pullback(at: Tensor([[99, 33, 55]])) { x in 
-    foo(tensor: x, shape: Tensor([3, 3])) 
-  }
-
-  // Test 5: same shape as parameter of pullback
-  inputTensor = Tensor([
-    [1, 2, 3], 
-    [1, 2, 3], 
-    [1, 2, 3]]
-  )
-  expected = Tensor([[3, 6, 9]])
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 6: different shape than parameter of pullback
-  inputTensor = Tensor([
-    [1, 2, 3], 
-    [1, 2, 3], 
-    [1, 2, 3],
-    [1, 2, 3]]
-  )
-  expected = Tensor([[4, 8, 12]])
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 7: same shape as tensor we are differentiating at
-  inputTensor = Tensor([[1, 2, 3]])
-  expected = Tensor([[1, 2, 3]])
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 8: extremely padded shape of tensor we are differentiating at
-  inputTensor = Tensor([[[[[[1, 2, 3]]]]]])
-  expected = Tensor([[1, 2, 3]])
+  let expected: Tensor<Float> = Tensor([[4, 8, 12]])
   expectEqual(expected, pb(inputTensor))
 }
 
-TensorADTests.testAllBackends("unbroadcast(toShape:") {
-  func foo(tensor: Tensor<Float>, shape: Tensor<Int32>) -> Tensor<Float> {
-    tensor.unbroadcast(toShape: shape)
+TensorADTests.testAllBackends("broadcast(to:") {
+  func foo(tensor: Tensor<Float>, shape: TensorShape) -> Tensor<Float> {
+    tensor.broadcast(to: shape)
   }
-
-  var inputTensor: Tensor<Float>
-  var expected: Tensor<Float>
-  var pb: (Tensor<Float>) -> Tensor<Float>
-
-  // [3,3] -> [1,3]
-  let atTensor: Tensor<Float> = Tensor([
-    [1, 2, 3], 
-    [1, 2, 3], 
-    [1, 2, 3]]
-  )
-  pb = pullback(at: atTensor) { x in 
-    foo(tensor: x, shape: Tensor([1, 3])) 
+  let pb: (Tensor<Float>) -> Tensor<Float> = pullback(at: Tensor([99, 33, 55])) { x in 
+    foo(tensor: x, shape: TensorShape([3, 3])) 
   }
-
-  // Test 1: same shape as parameter of pullback
-  inputTensor = Tensor([[1, 2, 3]])
-  expected = atTensor
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 2: different shape than parameter of pullback
-  inputTensor = Tensor([2])
-  expected = Tensor([
-    [2, 2, 2], 
-    [2, 2, 2], 
-    [2, 2, 2]]
-  )
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 3: same shape as tensor we are differentiating at
-  inputTensor = Tensor([
-    [8, 1, 3], 
-    [8, 1, 3], 
-    [8, 1, 3]]
-  )
-  expected = inputTensor
+  let inputTensor: Tensor<Float> = Tensor([1, 2, 3])
+  let expected: Tensor<Float> = Tensor([1, 2, 3])
   expectEqual(expected, pb(inputTensor))
 }
 
@@ -387,198 +295,28 @@ TensorADTests.testAllBackends("broadcast(like:)") {
   func foo(tensor: Tensor<Float>, other: Tensor<Double>) -> Tensor<Float> {
     tensor.broadcast(like: other)
   }
-
-  var inputTensor: Tensor<Float>
-  var expected: Tensor<Float>
-  var pb: (Tensor<Float>) -> Tensor<Float>
-
-  // [3,] -> [3,3]
-  pb = pullback(at: Tensor([99, 33, 55])) { x in 
+  let pb: (Tensor<Float>) -> Tensor<Float> = pullback(at: Tensor([99, 33, 55])) { x in 
     foo(tensor: x, other: Tensor([[1, 2, 3], [1, 2, 3], [1, 2, 3]])) 
   }
-
-  // Test 1: same shape as parameter of pullback
-  inputTensor = Tensor([
-    [1, 2, 3], 
-    [1, 2, 3], 
-    [1, 2, 3]]
-  )
-  expected = Tensor([3, 6, 9])
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 2: different shape than parameter of pullback
-  inputTensor = Tensor([
-    [1, 2, 3], 
-    [1, 2, 3], 
-    [1, 2, 3],
-    [1, 2, 3]]
-  )
-  expected = Tensor([4, 8, 12])
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 3: same shape as tensor we are differentiating at
-  inputTensor = Tensor([1, 2, 3])
-  expected = Tensor([1, 2, 3])
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 4: extremely padded shape as tensor we are differentiating at
-  inputTensor = Tensor([[[[[[1, 2, 3]]]]]])
-  expected = Tensor([1, 2, 3])
-  expectEqual(expected, pb(inputTensor))
-
-  // [3,1] -> [3x3]
-  pb = pullback(at: Tensor([[99, 33, 55]])) { x in 
-    foo(tensor: x, other: Tensor([[1, 2, 3], [1, 2, 3], [1, 2, 3]])) 
-  }
-
-  // Test 5: same shape as parameter of pullback
-  inputTensor = Tensor([
-    [1, 2, 3], 
-    [1, 2, 3], 
-    [1, 2, 3]]
-  )
-  expected = Tensor([[3, 6, 9]])
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 6: different shape than parameter of pullback
-  inputTensor = Tensor([
-    [1, 2, 3], 
-    [1, 2, 3], 
-    [1, 2, 3],
-    [1, 2, 3]]
-  )
-  expected = Tensor([[4, 8, 12]])
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 7: same shape as tensor we are differentiating at
-  inputTensor = Tensor([[1, 2, 3]])
-  expected = Tensor([[1, 2, 3]])
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 8: extremely padded shape of tensor we are differentiating at
-  inputTensor = Tensor([[[[[[1, 2, 3]]]]]])
-  expected = Tensor([[1, 2, 3]])
+  let inputTensor: Tensor<Float> = Tensor([[[[[[1, 2, 3]]]]]])
+  let expected: Tensor<Float> = Tensor([[1, 2, 3]])
   expectEqual(expected, pb(inputTensor))
 }
 
-TensorADTests.testAllBackends("unbroadcast(like:") {
-  func foo(tensor: Tensor<Float>, other: Tensor<Double>) -> Tensor<Float> {
-    tensor.unbroadcast(like: other)
+TensorADTests.testAllBackends("unbroadcast(toShape:)") {
+  func foo(tensor: Tensor<Float>, shape: Tensor<Int32>) -> Tensor<Float> {
+    tensor.unbroadcast(toShape: shape)
   }
-
-  var inputTensor: Tensor<Float>
-  var expected: Tensor<Float>
-  var pb: (Tensor<Float>) -> Tensor<Float>
-
-  // [3,3] -> [1,3]
   let atTensor: Tensor<Float> = Tensor([
     [1, 2, 3], 
     [1, 2, 3], 
     [1, 2, 3]]
   )
-  pb = pullback(at: atTensor) { x in 
-    foo(tensor: x, other: Tensor([[1, 2, 3]])) 
+  let pb: (Tensor<Float>) -> Tensor<Float> = pullback(at: atTensor) { x in 
+    foo(tensor: x, shape: Tensor([1, 3])) 
   }
-
-  // Test 1: same shape as parameter of pullback
-  inputTensor = Tensor([[1, 2, 3]])
-  expected = atTensor
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 2: different shape than parameter of pullback
-  inputTensor = Tensor([2])
-  expected = Tensor([
-    [2, 2, 2], 
-    [2, 2, 2], 
-    [2, 2, 2]]
-  )
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 3: same shape as tensor we are differentiating at
-  inputTensor = Tensor([
-    [8, 1, 3], 
-    [8, 1, 3], 
-    [8, 1, 3]]
-  )
-  expected = inputTensor
-  expectEqual(expected, pb(inputTensor))
-}
-
-TensorADTests.testAllBackends("broadcast(to:)") {
-  func foo(tensor: Tensor<Float>, shape: TensorShape) -> Tensor<Float> {
-    tensor.broadcast(to: shape)
-  }
-
-  var inputTensor: Tensor<Float>
-  var expected: Tensor<Float>
-  var pb: (Tensor<Float>) -> Tensor<Float>
-
-  // [3,] -> [3,3]
-  pb = pullback(at: Tensor([99, 33, 55])) { x in 
-    foo(tensor: x, shape: TensorShape([3, 3])) 
-  }
-
-  // Test 1: same shape as parameter of pullback
-  inputTensor = Tensor([
-    [1, 2, 3], 
-    [1, 2, 3], 
-    [1, 2, 3]]
-  )
-  expected = Tensor([3, 6, 9])
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 2: different shape than parameter of pullback
-  inputTensor = Tensor([
-    [1, 2, 3], 
-    [1, 2, 3], 
-    [1, 2, 3],
-    [1, 2, 3]]
-  )
-  expected = Tensor([4, 8, 12])
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 3: same shape as tensor we are differentiating at
-  inputTensor = Tensor([1, 2, 3])
-  expected = Tensor([1, 2, 3])
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 4: extremely padded shape as tensor we are differentiating at
-  inputTensor = Tensor([[[[[[1, 2, 3]]]]]])
-  expected = Tensor([1, 2, 3])
-  expectEqual(expected, pb(inputTensor))
-
-  // [3,1] -> [3x3]
-  pb = pullback(at: Tensor([[99, 33, 55]])) { x in 
-    foo(tensor: x, shape: TensorShape([3, 3])) 
-  }
-
-  // Test 5: same shape as parameter of pullback
-  inputTensor = Tensor([
-    [1, 2, 3], 
-    [1, 2, 3], 
-    [1, 2, 3]]
-  )
-  expected = Tensor([[3, 6, 9]])
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 6: different shape than parameter of pullback
-  inputTensor = Tensor([
-    [1, 2, 3], 
-    [1, 2, 3], 
-    [1, 2, 3],
-    [1, 2, 3]]
-  )
-  expected = Tensor([[4, 8, 12]])
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 7: same shape as tensor we are differentiating at
-  inputTensor = Tensor([[1, 2, 3]])
-  expected = Tensor([[1, 2, 3]])
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 8: extremely padded shape of tensor we are differentiating at
-  inputTensor = Tensor([[[[[[1, 2, 3]]]]]])
-  expected = Tensor([[1, 2, 3]])
+  let expected = atTensor
+  let inputTensor: Tensor<Float> = Tensor([[1, 2, 3]])
   expectEqual(expected, pb(inputTensor))
 }
 
@@ -586,42 +324,41 @@ TensorADTests.testAllBackends("unbroadcast(to:") {
   func foo(tensor: Tensor<Float>, shape: TensorShape) -> Tensor<Float> {
     tensor.unbroadcast(to: shape)
   }
-
-  var inputTensor: Tensor<Float>
-  var expected: Tensor<Float>
-  var pb: (Tensor<Float>) -> Tensor<Float>
-
-  // [3,3] -> [1,3]
   let atTensor: Tensor<Float> = Tensor([
     [1, 2, 3], 
     [1, 2, 3], 
     [1, 2, 3]]
   )
-  pb = pullback(at: atTensor) { x in 
+  let pb: (Tensor<Float>) -> Tensor<Float> = pullback(at: atTensor) { x in 
     foo(tensor: x, shape: TensorShape([1, 3])) 
   }
-
-  // Test 1: same shape as parameter of pullback
-  inputTensor = Tensor([[1, 2, 3]])
-  expected = atTensor
-  expectEqual(expected, pb(inputTensor))
-
-  // Test 2: different shape than parameter of pullback
-  inputTensor = Tensor([2])
-  expected = Tensor([
+  let inputTensor: Tensor<Float> = Tensor([2])
+  let expected: Tensor<Float> = Tensor([
     [2, 2, 2], 
     [2, 2, 2], 
     [2, 2, 2]]
   )
   expectEqual(expected, pb(inputTensor))
+}
 
-  // Test 3: same shape as tensor we are differentiating at
-  inputTensor = Tensor([
+TensorADTests.testAllBackends("unbroadcast(like:") {
+  func foo(tensor: Tensor<Float>, other: Tensor<Double>) -> Tensor<Float> {
+    tensor.unbroadcast(like: other)
+  }
+  let atTensor: Tensor<Float> = Tensor([
+    [1, 2, 3], 
+    [1, 2, 3], 
+    [1, 2, 3]]
+  )
+  let pb: (Tensor<Float>) -> Tensor<Float> = pullback(at: atTensor) { x in 
+    foo(tensor: x, other: Tensor([[1, 2, 3]])) 
+  }
+  let inputTensor: Tensor<Float> = Tensor([
     [8, 1, 3], 
     [8, 1, 3], 
     [8, 1, 3]]
   )
-  expected = inputTensor
+  let expected: Tensor<Float> = inputTensor
   expectEqual(expected, pb(inputTensor))
 }
 
