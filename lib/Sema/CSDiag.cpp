@@ -735,7 +735,7 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
 
   ValueDecl *member = nullptr;
   for (auto cand : result.UnviableCandidates) {
-    if (member == nullptr)
+    if (member == nullptr && cand.isDecl())
       member = cand.getDecl();
   }
 
