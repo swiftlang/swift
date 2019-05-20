@@ -2147,9 +2147,9 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     // to replace the metatype with 'Self'
     // error saying the lookup cannot be on a protocol metatype
     Optional<InFlightDiagnostic> Diag;
-    auto baseObjTy = BaseType;
+    auto baseTy = BaseType;
 
-    if (auto metatypeTy = baseObjTy->getAs<AnyMetatypeType>()) {
+    if (auto metatypeTy = baseTy->getAs<AnyMetatypeType>()) {
       auto instanceTy = metatypeTy->getInstanceType();
 
       // This will only happen if we have an unresolved dot expression
@@ -2157,7 +2157,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
       // an optional protocol metatype.
       if (auto objectTy = instanceTy->getOptionalObjectType()) {
         instanceTy = objectTy;
-        baseObjTy = MetatypeType::get(objectTy);
+        baseTy = MetatypeType::get(objectTy);
       }
 
       if (instanceTy->isExistentialType()) {
@@ -2175,8 +2175,8 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
                                       instanceTy));
         } else {
           Diag.emplace(emitDiagnostic(
-              loc, diag::could_not_use_type_member_on_protocol_metatype,
-              baseObjTy, Name));
+              loc, diag::could_not_use_type_member_on_protocol_metatype, baseTy,
+              Name));
         }
 
         Diag->highlight(baseRange).highlight(getAnchor()->getSourceRange());
@@ -2200,8 +2200,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     // components, let's provide a tailored diagnostic and return because
     // that is unsupported so there is no fix-it.
     if (locator->isForKeyPathComponent()) {
-      InvalidStaticMemberRefInKeyPath failure(expr, getConstraintSystem(),
-                                              member, locator);
+      InvalidStaticMemberRefInKeyPath failure(expr, cs, member, locator);
       return failure.diagnoseAsError();
     }
 
@@ -2210,13 +2209,13 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
           loc, diag::could_not_use_enum_element_on_instance, Name));
     } else {
       Diag.emplace(emitDiagnostic(
-          loc, diag::could_not_use_type_member_on_instance, baseObjTy, Name));
+          loc, diag::could_not_use_type_member_on_instance, baseTy, Name));
     }
 
     Diag->highlight(getAnchor()->getSourceRange());
 
     if (Name.isSimpleName(DeclBaseName::createConstructor()) &&
-        !baseObjTy->is<AnyMetatypeType>()) {
+        !baseTy->is<AnyMetatypeType>()) {
       if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(getRawAnchor())) {
         SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
         Diag->fixItInsert(fixItRng.Start, "type(of: ");
@@ -2234,7 +2233,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     
     // Try to provide a fix-it that only contains a '.'
     if (contextualType) {
-      if (baseObjTy->isEqual(contextualType)) {
+      if (baseTy->isEqual(contextualType)) {
         Diag->fixItInsert(loc, ".");
         return true;
       }
@@ -2264,7 +2263,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
             // since the type can be inferred
             Type secondArgType =
             lastCS->getType(binaryExpr->getArg()->getElement(1));
-            if (secondArgType->isEqual(baseObjTy)) {
+            if (secondArgType->isEqual(baseTy)) {
               Diag->fixItInsert(loc, ".");
               return true;
             }
