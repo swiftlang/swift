@@ -69,7 +69,7 @@ _ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) {
 func uses_optionals(_ x: Float) -> Float {
   var maybe: Float? = 10
   maybe = x
-  // expected-note @+1 {{differentiating control flow is not yet supported}}
+  // expected-note @+1 {{cannot differentiate function containing unsupported control flow}}
   return maybe!
 }
 
@@ -115,7 +115,7 @@ func calls_grad_of_nested(_ x: Float) -> Float {
 func if_else(_ x: Float, _ flag: Bool) -> Float {
   let y: Float
   // expected-error @+2 {{expression is not differentiable}}
-  // expected-note @+1 {{differentiating control flow is not yet supported}}
+  // expected-note @+1 {{cannot differentiate function containing unsupported control flow}}
   if flag {
     y = x + 1
   } else {

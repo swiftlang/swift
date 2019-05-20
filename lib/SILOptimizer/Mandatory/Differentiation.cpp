@@ -56,11 +56,18 @@ using llvm::SmallDenseMap;
 using llvm::SmallDenseSet;
 using llvm::SmallSet;
 
-// This flag is used to disable `autodiff_function_extract` instruction folding
-// for SIL testing purposes.
+/// This flag is used to disable `autodiff_function_extract` instruction folding
+/// for SIL testing purposes.
 static llvm::cl::opt<bool> SkipFoldingAutoDiffFunctionExtraction(
     "differentiation-skip-folding-autodiff-function-extraction",
     llvm::cl::init(false));
+
+/// This flag is used to skip adjoint generation, replacing adjoint function
+/// references with undef. This is used for SIL testing purposes, specifically
+/// testing generated VJP code before adjoint generation logic supports control
+/// flow.
+static llvm::cl::opt<bool> DisableAdjointGeneration(
+    "differentiation-disable-adjoint-gen", llvm::cl::init(false));
 
 //===----------------------------------------------------------------------===//
 // Helpers
@@ -244,19 +251,14 @@ static GenericParamList *cloneGenericParameters(ASTContext &ctx,
                                                 CanGenericSignature sig) {
   SmallVector<GenericTypeParamDecl *, 2> clonedParams;
   for (auto paramType : sig->getGenericParams()) {
-    auto clonedParam = new (ctx) GenericTypeParamDecl(dc, paramType->getName(),
-                                                      SourceLoc(),
-                                                      paramType->getDepth(),
-                                                      paramType->getIndex());
+    auto clonedParam = new (ctx) GenericTypeParamDecl(
+        dc, paramType->getName(), SourceLoc(), paramType->getDepth(),
+        paramType->getIndex());
     clonedParam->setDeclContext(dc);
     clonedParam->setImplicit(true);
     clonedParams.push_back(clonedParam);
   }
   return GenericParamList::create(ctx, SourceLoc(), clonedParams, SourceLoc());
-}
-
-static ReturnInst *getSingleReturn(SILFunction *f) {
-  return cast<ReturnInst>(f->findReturnBB()->getTerminator());
 }
 
 /// Given an `autodiff_function` instruction, find the corresponding
@@ -391,38 +393,291 @@ public:
 class PrimalInfo {
 private:
   /// The primal value struct declaration.
-  StructDecl *primalValueStruct = nullptr;
+  DenseMap<SILBasicBlock *, std::pair<StructDecl *, EnumDecl *>>
+      primalDataStructures;
 
   /// Mapping from `apply` and `struct_extract` instructions in the original
   /// function to the corresponding pullback decl in the primal struct.
   DenseMap<SILInstruction *, VarDecl *> pullbackValueMap;
 
+  /// Mapping from predecessor+succcessor basic block pairs in original function
+  /// to the corresponding predecessor enum case.
+  DenseMap<std::pair<SILBasicBlock *, SILBasicBlock *>, EnumElementDecl *>
+      predecessorEnumCases;
+
+  /// Mapping from primal value structs to their predecessor enum fields.
+  DenseMap<StructDecl *, VarDecl *> primalValueStructPredecessorFields;
+
+  /// A type converter, used to compute struct/enum SIL types.
+  Lowering::TypeConverter &typeConverter;
+
 private:
-  VarDecl *addVarDecl(StringRef name, Type type) {
-    auto &ctx = primalValueStruct->getASTContext();
-    auto id = ctx.getIdentifier(name);
-    auto *varDecl = new (ctx) VarDecl(
+  VarDecl *addVarDecl(NominalTypeDecl *nominal, StringRef name, Type type) {
+    auto &astCtx = nominal->getASTContext();
+    auto id = astCtx.getIdentifier(name);
+    auto *varDecl = new (astCtx) VarDecl(
         /*IsStatic*/ false, VarDecl::Specifier::Var,
-        /*IsCaptureList*/ false, SourceLoc(), id, primalValueStruct);
-    varDecl->setAccess(primalValueStruct->getEffectiveAccess());
+        /*IsCaptureList*/ false, SourceLoc(), id, nominal);
+    varDecl->setAccess(nominal->getEffectiveAccess());
     if (type->hasArchetype())
       varDecl->setInterfaceType(type->mapTypeOutOfContext());
     else
       varDecl->setInterfaceType(type);
-    primalValueStruct->addMember(varDecl);
+    nominal->addMember(varDecl);
     return varDecl;
+  }
+
+  /// Retrieves the file unit that contains implicit declarations in the
+  /// current Swift module. If it does not exist, create one.
+  ///
+  // FIXME: Currently it defaults to the file containing `origFn`, if it can be
+  // determined. Otherwise, it defaults to any file unit in the module. To
+  // handle this more properly, we should make a DerivedFileUnit class to
+  // contain all synthesized implicit type declarations.
+  SourceFile &getPrimalValueDeclContainer(SILFunction *origFn) {
+    if (origFn->hasLocation())
+      if (auto *declContext = origFn->getLocation().getAsDeclContext())
+        if (auto *parentSourceFile = declContext->getParentSourceFile())
+          return *parentSourceFile;
+    for (auto *file : origFn->getModule().getSwiftModule()->getFiles())
+      if (auto *src = dyn_cast<SourceFile>(file))
+        return *src;
+    llvm_unreachable("No files?");
+  }
+
+  /// Compute and set the access level for the given primal data structure,
+  /// given the original function linkage.
+  void computeAccessLevel(
+      NominalTypeDecl *nominal, SILLinkage originalLinkage) {
+    auto &astCtx = nominal->getASTContext();
+    switch (originalLinkage) {
+    case swift::SILLinkage::Public:
+    case swift::SILLinkage::PublicNonABI:
+      nominal->setAccess(AccessLevel::Internal);
+      nominal->getAttrs().add(
+          new (astCtx) UsableFromInlineAttr(/*Implicit*/ true));
+      break;
+    case swift::SILLinkage::Hidden:
+    case swift::SILLinkage::Shared:
+      nominal->setAccess(AccessLevel::Internal);
+      break;
+    case swift::SILLinkage::Private:
+      nominal->setAccess(AccessLevel::FilePrivate);
+      break;
+    default:
+      // When the original function has external linkage, we create an internal
+      // struct for use by our own module. This is neccessary for cross-cell
+      // differentiation in Jupyter.
+      // TODO: Add a test in the compiler that exercises a similar situation as
+      // cross-cell differentiation in Jupyter.
+      nominal->setAccess(AccessLevel::Internal);
+    }
+  }
+
+  /// Creates an enum declaration with the given VJP generic signature, whose
+  /// cases represent the predecessors of the given original block.
+  EnumDecl *
+  createBasicBlockPredecessorEnum(SILBasicBlock *originalBB,
+                                  SILAutoDiffIndices indices,
+                                  CanGenericSignature vjpGenericSig) {
+    auto *original = originalBB->getParent();
+    auto *moduleDecl = original->getModule().getSwiftModule();
+    auto &astCtx = original->getASTContext();
+    auto &file = getPrimalValueDeclContainer(original);
+    // Create a `_AD__<fn_name>_bb<bb_id>__Enum__` enum.
+    std::string predEnumName =
+        "_AD__" + original->getName().str() +
+        "_bb" + std::to_string(originalBB->getDebugID()) +
+         "__Enum__" + indices.mangle();
+    auto enumId = astCtx.getIdentifier(predEnumName);
+    auto loc = original->getLocation().getSourceLoc();
+    auto *predecessorEnum = new (astCtx) EnumDecl(
+        /*EnumLoc*/ loc, /*Name*/ enumId, /*NameLoc*/ loc, /*Inherited*/ {},
+        /*GenericParams*/ /*set later*/ nullptr, /*DC*/ &file);
+    if (vjpGenericSig) {
+      auto *genericParams =
+          cloneGenericParameters(astCtx, predecessorEnum, vjpGenericSig);
+      predecessorEnum->setGenericParams(genericParams);
+      predecessorEnum->setGenericEnvironment(
+          vjpGenericSig->createGenericEnvironment());
+    }
+    predecessorEnum->setBraces(loc);
+    computeAccessLevel(predecessorEnum, original->getEffectiveSymbolLinkage());
+    predecessorEnum->computeType();
+    assert(predecessorEnum->hasInterfaceType());
+    file.addVisibleDecl(predecessorEnum);
+    // Add predecessor block enum cases.
+    for (auto *predBB : originalBB->getPredecessorBlocks()) {
+      auto bbId = "bb" + std::to_string(predBB->getDebugID());
+      auto *predPVStruct = getPrimalValueStruct(predBB);
+      auto predPVStructTy =
+          predPVStruct->getDeclaredInterfaceType()->getCanonicalType();
+      // Create dummy declaration representing enum case parameter.
+      auto *decl = new (astCtx)
+          ParamDecl(VarDecl::Specifier::Default, loc, loc, Identifier(), loc,
+                    Identifier(), moduleDecl);
+      if (predPVStructTy->hasArchetype())
+        decl->setInterfaceType(predPVStructTy->mapTypeOutOfContext());
+      else
+        decl->setInterfaceType(predPVStructTy);
+
+      // Create enum element and enum case declarations.
+      auto *paramList = ParameterList::create(astCtx, {decl});
+      auto *enumEltDecl = new (astCtx) EnumElementDecl(
+          /*IdentifierLoc*/ loc, DeclName(astCtx.getIdentifier(bbId)),
+          paramList, loc, /*RawValueExpr*/ nullptr, predecessorEnum);
+      enumEltDecl->setImplicit();
+      enumEltDecl->computeType();
+      auto *enumCaseDecl = EnumCaseDecl::create(
+          /*CaseLoc*/ loc, {enumEltDecl}, predecessorEnum);
+      enumCaseDecl->setImplicit();
+      predecessorEnum->addMember(enumEltDecl);
+      predecessorEnum->addMember(enumCaseDecl);
+      // Cache predecessor/successor enum element declarations.
+      predecessorEnumCases.insert({{predBB, originalBB}, enumEltDecl});
+    }
+    LLVM_DEBUG({
+      auto &s = getADDebugStream();
+      s << "Predecessor enum created for function @" << original->getName()
+        << " bb" << originalBB->getDebugID() << '\n';
+      predecessorEnum->print(s);
+      s << '\n';
+    });
+    return predecessorEnum;
+  }
+
+  /// Creates a struct declaration with the given VJP generic signature, for
+  /// storing the primal values and predecessor of the given original block.
+  std::pair<StructDecl *, VarDecl *>
+  createPrimalValueStruct(SILBasicBlock *originalBB,
+                          SILAutoDiffIndices indices,
+                          EnumDecl *predecessorEnum,
+                          CanGenericSignature vjpGenericSig) {
+    auto *original = originalBB->getParent();
+    auto &astCtx = original->getASTContext();
+    auto &file = getPrimalValueDeclContainer(original);
+    // Create a `_AD__<fn_name>_bb<bb_id>__Struct__` struct.
+    std::string pvStructName =
+        "_AD__" + original->getName().str() +
+        "_bb" + std::to_string(originalBB->getDebugID()) +
+         "__Struct__" + indices.mangle();
+    auto structId = astCtx.getIdentifier(pvStructName);
+    SourceLoc loc = original->getLocation().getSourceLoc();
+    auto *primalValueStruct = new (astCtx) StructDecl(
+        /*StructLoc*/ loc, /*Name*/ structId, /*NameLoc*/ loc, /*Inherited*/ {},
+        /*GenericParams*/ /*set later*/ nullptr, /*DC*/ &file);
+    if (vjpGenericSig) {
+      auto *genericParams =
+          cloneGenericParameters(astCtx, primalValueStruct, vjpGenericSig);
+      primalValueStruct->setGenericParams(genericParams);
+      primalValueStruct->setGenericEnvironment(
+          vjpGenericSig->createGenericEnvironment());
+    }
+    primalValueStruct->setBraces(loc);
+    computeAccessLevel(
+        primalValueStruct, original->getEffectiveSymbolLinkage());
+    primalValueStruct->computeType();
+    assert(primalValueStruct->hasInterfaceType());
+    file.addVisibleDecl(primalValueStruct);
+    // Add predecessor field if not entry block.
+    VarDecl *predecessorEnumField = nullptr;
+    if (!originalBB->isEntry()) {
+      predecessorEnumField = addVarDecl(
+          primalValueStruct, astCtx.getIdentifier("predecessor").str(),
+          predecessorEnum->getDeclaredInterfaceType());
+      primalValueStructPredecessorFields.insert(
+          {primalValueStruct, predecessorEnumField});
+    }
+    LLVM_DEBUG({
+      auto &s = getADDebugStream();
+      s << "Primal value struct created for function @" << original->getName()
+        << " bb" << originalBB->getDebugID() << '\n';
+      primalValueStruct->print(s);
+      s << '\n';
+    });
+    return {primalValueStruct, predecessorEnumField};
   }
 
 public:
   PrimalInfo(const PrimalInfo &) = delete;
   PrimalInfo &operator=(const PrimalInfo &) = delete;
 
-  explicit PrimalInfo(StructDecl *primalValueStruct)
-      : primalValueStruct(&*primalValueStruct) {}
+  explicit PrimalInfo(SILFunction *original, SILFunction *vjp,
+                      const SILAutoDiffIndices &indices,
+                      Lowering::TypeConverter &typeConverter)
+      : typeConverter(typeConverter) {
+    // Get VJP generic signature.
+    CanGenericSignature vjpGenSig = nullptr;
+    if (auto *vjpGenEnv = vjp->getGenericEnvironment())
+      vjpGenSig = vjpGenEnv->getGenericSignature()->getCanonicalSignature();
+    // Create predecessor enum and primal value struct for each original block.
+    for (auto &origBB : *original) {
+      auto *predEnum = createBasicBlockPredecessorEnum(
+          &origBB, indices, vjpGenSig);
+      StructDecl *pvStruct;
+      VarDecl *predecessorEnumField;
+      std::tie(pvStruct, predecessorEnumField) = createPrimalValueStruct(
+          &origBB, indices, predEnum, vjpGenSig);
+      primalDataStructures.insert({&origBB, {pvStruct, predEnum}});
+    }
+  }
 
-  /// Returns the primal value struct that the primal info is established
-  /// around.
-  StructDecl *getPrimalValueStruct() const { return primalValueStruct; }
+  /// Returns the primal value struct and predecessor enum associated with the
+  /// given original block.
+  std::pair<StructDecl *, EnumDecl *>
+  getPrimalDataStructures(SILBasicBlock *origBB) {
+    return primalDataStructures.lookup(origBB);
+  }
+
+  /// Returns the primal value struct associated with the given original block.
+  StructDecl *getPrimalValueStruct(SILBasicBlock *origBB) const {
+    return primalDataStructures.lookup(origBB).first;
+  }
+
+  /// Returns the lowered SIL type of the primal value struct associated with
+  /// the given original block.
+  SILType getPrimalValueStructLoweredType(SILBasicBlock *origBB) const {
+    auto *pvStruct = getPrimalValueStruct(origBB);
+    auto pvStructType = pvStruct->getDeclaredInterfaceType()
+        ->getCanonicalType();
+    return typeConverter.getLoweredType(
+        pvStructType, ResilienceExpansion::Minimal);
+  }
+
+  /// Returns the predecessor enum associated with the given original block.
+  EnumDecl *getPredecessorEnum(SILBasicBlock *origBB) const {
+    return primalDataStructures.lookup(origBB).second;
+  }
+
+  /// Returns the lowered SIL type of the primal value struct associated with
+  /// the given original block.
+  SILType getPredecessorEnumLoweredType(SILBasicBlock *origBB) const {
+    auto *predEnum = getPredecessorEnum(origBB);
+    auto predEnumType = predEnum->getDeclaredInterfaceType()
+        ->getCanonicalType();
+    return typeConverter.getLoweredType(
+        predEnumType, ResilienceExpansion::Minimal);
+  }
+
+  /// Returns the enum element in the given successor block's predecessor enum,
+  /// corresponding to the given predecessor block.
+  EnumElementDecl *lookUpPredecessorEnumElement(
+      SILBasicBlock *origPredBB, SILBasicBlock *origSuccBB) {
+    return predecessorEnumCases.lookup({origPredBB, origSuccBB});
+  }
+
+  /// Returns the mapping from primal value structs to their predecessor enum
+  /// fields.
+  DenseMap<StructDecl *, VarDecl *> &getPrimalValueStructPredecessorFields() {
+    return primalValueStructPredecessorFields;
+  }
+
+  /// Returns the predecessor enum field for the primal value struct of the
+  /// given original block.
+  VarDecl *lookUpPrimalValueStructPredecessorField(SILBasicBlock *origBB) {
+    auto *primalValueStruct = getPrimalDataStructures(origBB).first;
+    return primalValueStructPredecessorFields.lookup(primalValueStruct);
+  }
 
   /// Add a pullback to the primal value struct.
   VarDecl *addPullbackDecl(SILInstruction *inst, SILType pullbackType) {
@@ -441,10 +696,12 @@ public:
       astFnTy = FunctionType::get(
           params, silFnTy->getAllResultsType().getASTType());
 
-    auto *decl = addVarDecl("pullback_" + llvm::itostr(pullbackValueMap.size()),
-                            astFnTy);
-    pullbackValueMap.insert({inst, decl});
-    return decl;
+    auto *origBB = inst->getParent();
+    auto *pvStruct = getPrimalValueStruct(origBB);
+    auto pullbackName = "pullback_" + llvm::itostr(pullbackValueMap.size());
+    auto *pullbackDecl = addVarDecl(pvStruct, pullbackName, astFnTy);
+    pullbackValueMap.insert({inst, pullbackDecl});
+    return pullbackDecl;
   }
 
   /// Finds the pullback decl in the primal value struct for an `apply` or
@@ -627,7 +884,7 @@ private:
   /// Mapping from original `struct_extract` and `struct_element_addr`
   /// instructions to their strategies.
   DenseMap<SILInstruction *, StructExtractDifferentiationStrategy>
-  structExtractDifferentiationStrategies;
+      structExtractDifferentiationStrategies;
 
   /// List of generated functions (JVPs, VJPs, adjoints, and thunks).
   /// Saved for deletion during cleanup.
@@ -659,6 +916,10 @@ private:
 public:
   /// Construct an ADContext for the given module.
   explicit ADContext(SILModuleTransform &transform);
+
+  //--------------------------------------------------------------------------//
+  // General utilities
+  //--------------------------------------------------------------------------//
 
   SILModuleTransform &getTransform() const { return transform; }
   SILModule &getModule() const { return module; }
@@ -778,12 +1039,9 @@ public:
     llvm_unreachable("No files?");
   }
 
-  /// Creates a struct declaration (without contents) for storing primal values
-  /// of a function. The newly created struct will have the same generic
-  /// signature as the given primal generic signature.
-  StructDecl *createPrimalValueStruct(SILFunction *original,
-                                      SILAutoDiffIndices indices,
-                                      CanGenericSignature primalGenericSig);
+  //--------------------------------------------------------------------------//
+  // `[differentiable]` attribute lookup and registration
+  //--------------------------------------------------------------------------//
 
   /// Finds the `[differentiable]` attribute on the specified original function
   /// corresponding to the specified parameter indices. Returns nullptr if it
@@ -1292,6 +1550,26 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
   PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(StructElementAddr)
 #undef VISIT_STRUCT_ELEMENT_INNS
 
+        // Handle `br`.
+        else if (auto *bi = dyn_cast<BranchInst>(&inst)) {
+          for (auto &op : bi->getAllOperands())
+            if (isVaried(op.get(), i))
+              setVaried(bi->getArgForOperand(&op), i);
+        }
+        // Handle `cond_br`.
+        else if (auto *cbi = dyn_cast<CondBranchInst>(&inst)) {
+          for (unsigned opIdx : indices(cbi->getTrueOperands())) {
+            auto &op = cbi->getTrueOperands()[opIdx];
+            if (isVaried(op.get(), i))
+              setVaried(cbi->getTrueBB()->getArgument(opIdx), i);
+          }
+          for (unsigned opIdx : indices(cbi->getFalseOperands())) {
+            auto &op = cbi->getFalseOperands()[opIdx];
+            if (isVaried(op.get(), i))
+              setVaried(cbi->getFalseBB()->getArgument(opIdx), i);
+          }
+        }
+
         // Handle everything else.
         else {
           for (auto &op : inst.getAllOperands())
@@ -1362,6 +1640,17 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
             if (isUseful(result, i))
               for (auto &op : inst.getAllOperands())
                 setUseful(op.get(), i);
+        }
+      }
+    }
+    // Propagate usefulness from basic block arguments to incoming phi values.
+    for (auto i : indices(outputValues)) {
+      for (auto *arg : block->getArguments()) {
+        if (isUseful(arg, i)) {
+          SmallVector<SILValue, 4> incomingValues;
+          arg->getIncomingPhiValues(incomingValues);
+          for (auto incomingValue : incomingValues)
+            setUseful(incomingValue, i);
         }
       }
     }
@@ -1479,6 +1768,7 @@ static void dumpActivityInfo(SILFunction &fn,
 }
 
 /// If the original function doesn't have a return, it cannot be differentiated.
+/// Returns true if error is emitted.
 static bool diagnoseNoReturn(ADContext &context, SILFunction *original,
                              DifferentiationInvoker invoker) {
   if (original->findReturnBB() != original->end())
@@ -1489,17 +1779,44 @@ static bool diagnoseNoReturn(ADContext &context, SILFunction *original,
   return true;
 }
 
-/// If the original function in the differentiation task has more than one basic
-/// blocks, emit a "control flow unsupported" error at appropriate source
-/// locations. Returns true if error is emitted.
+/// If the original function contains unsupported control flow, emit a "control
+/// flow unsupported" error at appropriate source locations. Returns true if
+/// error is emitted.
+///
+/// Update as control flow support is added. Currently, loops and branching
+/// terminators other than `br` and `cond_br` are not supported.
 static bool diagnoseUnsupportedControlFlow(ADContext &context,
                                            SILFunction *original,
                                            DifferentiationInvoker invoker) {
   if (original->getBlocks().size() <= 1)
     return false;
-  // Find any control flow node and diagnose.
+  // Diagnose loops first, to provide a more specific diagnostic.
+  auto *domAnalysis = context.getPassManager().getAnalysis<DominanceAnalysis>();
+  auto *domInfo = domAnalysis->get(original);
+  SILLoopInfo loopInfo(original, domInfo);
+  if (!loopInfo.empty()) {
+    auto *loop = *loopInfo.getTopLevelLoops().begin();
+    context.emitNondifferentiabilityError(
+        loop->getHeader()->getTerminator(), invoker,
+        diag::autodiff_loops_not_supported);
+    return true;
+  }
+  // Diagnose unsupported terminators.
   for (auto &bb : *original) {
     auto *term = bb.getTerminator();
+    // Adjoint generation does not yet support control flow.
+    // `br` and `cond_br` instructions are supported terminators if adjoint
+    // generation is disabled. Otherwise, emit an error.
+    // TODO: Remove the diagnostic here when adjoint generation does support
+    // control flow.
+    if (isa<BranchInst>(term) || isa<CondBranchInst>(term)) {
+      if (DisableAdjointGeneration)
+        continue;
+      context.emitNondifferentiabilityError(
+          term, invoker, diag::autodiff_control_flow_not_supported);
+      return true;
+    }
+    // If terminator is an unsupported branching terminator, emit an error.
     if (term->isBranch()) {
       context.emitNondifferentiabilityError(
           term, invoker, diag::autodiff_control_flow_not_supported);
@@ -2409,68 +2726,6 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   return thunk;
 }
 
-StructDecl *
-ADContext::createPrimalValueStruct(SILFunction *original,
-                                   const SILAutoDiffIndices indices,
-                                   CanGenericSignature primalGenericSig) {
-  auto *function = original;
-  assert(&function->getModule() == &module &&
-         "The function must be in the same module");
-  auto &file = getPrimalValueDeclContainer(function);
-  // Create a `_<fn_name>__Type` struct.
-  std::string pvStructName =
-      "_AD__" + function->getName().str() + "__Type__" + indices.mangle();
-  auto structId = astCtx.getIdentifier(pvStructName);
-  SourceLoc loc = function->getLocation().getSourceLoc();
-  auto pvStruct =
-      new (astCtx) StructDecl(/*StructLoc*/ loc, /*Name*/ structId,
-                              /*NameLoc*/ loc, /*Inherited*/ {},
-                              /*GenericParams*/ nullptr, // to be set later
-                              /*DC*/ &file);
-  // Set braces so that `pvStruct` can be dumped.
-  pvStruct->setBraces(loc);
-  if (primalGenericSig) {
-    auto genericParams =
-        cloneGenericParameters(astCtx, pvStruct, primalGenericSig);
-    pvStruct->setGenericParams(genericParams);
-    pvStruct->setGenericEnvironment(
-        primalGenericSig->createGenericEnvironment());
-  }
-  switch (function->getEffectiveSymbolLinkage()) {
-  case swift::SILLinkage::Public:
-  case swift::SILLinkage::PublicNonABI:
-    pvStruct->setAccess(AccessLevel::Internal);
-    pvStruct->getAttrs().add(
-        new (astCtx) UsableFromInlineAttr(/*Implicit*/ true));
-    break;
-  case swift::SILLinkage::Hidden:
-  case swift::SILLinkage::Shared:
-    pvStruct->setAccess(AccessLevel::Internal);
-    break;
-  case swift::SILLinkage::Private:
-    pvStruct->setAccess(AccessLevel::FilePrivate);
-    break;
-  default:
-    // When the original function has external linkage, we create an internal
-    // struct for use by our own module. This is neccessary for cross-cell
-    // differentiation in Jupyter.
-    // TODO: Add a test in the compiler that exercises a similar situation as
-    // cross-cell differentiation in Jupyter.
-    pvStruct->setAccess(AccessLevel::Internal);
-  }
-  pvStruct->computeType();
-  assert(pvStruct->hasInterfaceType());
-  file.addVisibleDecl(pvStruct);
-  LLVM_DEBUG({
-    auto &s = getADDebugStream();
-    s << "Primal value struct created for function " << function->getName()
-      << '\n';
-    pvStruct->print(s);
-    s << '\n';
-  });
-  return pvStruct;
-}
-
 /// Given an parameter argument (not indirect result) and some differentiation
 /// indices, figure out whether the parent function is being differentiated with
 /// respect to this parameter, according to the indices.
@@ -2579,6 +2834,9 @@ private:
   /// The VJP function.
   SILFunction *vjp;
 
+  /// The adjoint function.
+  SILFunction *adjoint;
+
   /// The primal info.
   std::unique_ptr<PrimalInfo> primalInfo = nullptr;
 
@@ -2588,12 +2846,18 @@ private:
   /// Info from activity analysis on the original function.
   const DifferentiableActivityInfo &activityInfo;
 
+  /// Caches basic blocks whose phi arguments have been remapped (adding a
+  /// predecessor enum argument).
+  SmallPtrSet<SILBasicBlock *, 4> remappedBasicBlocks;
+
   bool errorOccurred = false;
 
   /// Global context.
   ADContext &getContext() { return context; }
 
-  SmallVector<SILValue, 8> primalValues;
+  /// Mapping from original blocks to primal values. Used to construct primal
+  /// value struct instances.
+  DenseMap<SILBasicBlock *, SmallVector<SILValue, 8>> primalValues;
 
   ASTContext &getASTContext() const {
     return vjp->getASTContext();
@@ -2641,9 +2905,14 @@ public:
                       DifferentiationInvoker invoker)
       : TypeSubstCloner(*vjp, *original, getSubstitutionMap(original, vjp)),
         context(context), original(original), attr(attr), vjp(vjp),
-        invoker(invoker),
-        activityInfo(
-            getActivityInfo(context, original, attr->getIndices(), vjp)) {}
+        primalInfo(std::unique_ptr<PrimalInfo>(new PrimalInfo(
+            original, vjp, attr->getIndices(), context.getTypeConverter()))),
+        invoker(invoker), activityInfo(getActivityInfo(
+                              context, original, attr->getIndices(), vjp)) {
+    // Create empty adjoint function.
+    adjoint = createEmptyAdjoint();
+    context.getGeneratedFunctions().push_back(adjoint);
+  }
 
   SILFunction *createEmptyAdjoint() {
     auto &module = context.getModule();
@@ -2726,9 +2995,11 @@ public:
 
     // Accept a primal value struct in the adjoint parameter list. This is the
     // pullback's closure context.
-    auto pvType = primalInfo->getPrimalValueStruct()
-        ->getDeclaredInterfaceType()->getCanonicalType();
-    adjParams.push_back({pvType, ParameterConvention::Direct_Guaranteed});
+    auto *origExit = &*original->findReturnBB();
+    auto *pvStruct = primalInfo->getPrimalValueStruct(origExit);
+    auto pvStructType = pvStruct->getDeclaredInterfaceType()
+        ->getCanonicalType();
+    adjParams.push_back({pvStructType, ParameterConvention::Direct_Guaranteed});
 
     // Add adjoint results for the requested wrt parameters.
     for (auto i : indices.parameters->getIndices()) {
@@ -2753,9 +3024,8 @@ public:
         original->getASTContext());
 
     SILOptFunctionBuilder fb(context.getTransform());
-    // We set generated adjoint linkage to Hidden because generated adjoints are
-    // never called cross-module in VJP mode: all cross-module calls to associated
-    // functions call the VJP.
+    // The generated adjoint linkage is set to Hidden because generated adjoints
+    // are never called cross-module.
     auto linkage = SILLinkage::Hidden;
     auto *adjoint = fb.createFunction(
         linkage, adjName, adjType, adjGenericEnv, original->getLocation(),
@@ -2776,6 +3046,23 @@ public:
     SILClonerWithScopes::postProcess(orig, cloned);
   }
 
+  SILBasicBlock *remapBasicBlock(SILBasicBlock *bb) {
+    auto *vjpBB = BBMap[bb];
+    // If error has occurred, or if block has already been remapped, return
+    // remapped, return remapped block.
+    if (errorOccurred || remappedBasicBlocks.count(bb))
+      return vjpBB;
+    // Add predecessor enum argument to the remapped block.
+    auto *predEnum = primalInfo->getPredecessorEnum(bb);
+    auto enumTy = getOpASTType(predEnum->getDeclaredInterfaceType()
+                                 ->getCanonicalType());
+    auto enumLoweredTy = context.getTypeConverter().getLoweredType(
+        enumTy, ResilienceExpansion::Minimal);
+    vjpBB->createPhiArgument(enumLoweredTy, ValueOwnershipKind::Guaranteed);
+    remappedBasicBlocks.insert(bb);
+    return vjpBB;
+  }
+
   /// General visitor for all instruction. If there is any error emitted by
   /// previous visits, bail out.
   void visit(SILInstruction *inst) {
@@ -2789,9 +3076,121 @@ public:
     errorOccurred = true;
   }
 
+private:
+  /// Get the lowered SIL type of the given nominal type declaration.
+  SILType getNominalDeclLoweredType(NominalTypeDecl *nominal) {
+    auto nomType = getOpASTType(
+        nominal->getDeclaredInterfaceType()->getCanonicalType());
+    auto nomSILType = getContext().getTypeConverter().getLoweredType(
+        nomType, ResilienceExpansion::Minimal);
+    return nomSILType;
+  }
+
+  /// Build a primal value struct value for the original block corresponding
+  /// to the given terminator.
+  StructInst *buildPrimalValueStructValue(TermInst *termInst) {
+    auto loc = termInst->getFunction()->getLocation();
+    auto *origBB = termInst->getParent();
+    auto *vjpBB = BBMap[origBB];
+    auto *pvStruct = primalInfo->getPrimalValueStruct(origBB);
+    auto structLoweredTy = getNominalDeclLoweredType(pvStruct);
+    auto bbPrimalValues = primalValues[origBB];
+    if (!origBB->isEntry()) {
+      auto *predEnumArg = vjpBB->getArguments().back();
+      bbPrimalValues.insert(bbPrimalValues.begin(), predEnumArg);
+    }
+    return getBuilder().createStruct(loc, structLoweredTy, bbPrimalValues);
+  }
+
+  /// Build a predecessor enum instance for the given original
+  /// predecessor/successor blocks and primal value struct value.
+  EnumInst *buildPredecessorEnumValue(
+      SILBasicBlock *predBB, SILBasicBlock *succBB, StructInst *pvStructVal) {
+    auto loc = pvStructVal->getLoc();
+    auto *succEnum = primalInfo->getPredecessorEnum(succBB);
+    auto enumLoweredTy = getNominalDeclLoweredType(succEnum);
+    auto *enumEltDecl =
+        primalInfo->lookUpPredecessorEnumElement(predBB, succBB);
+    return getBuilder().createEnum(
+       loc, pvStructVal, enumEltDecl, enumLoweredTy);
+  }
+
+public:
+  void visitBranchInst(BranchInst *bi) {
+    // Build primal value struct value for original block.
+    // Build predecessor enum value for destination block.
+    auto *origBB = bi->getParent();
+    auto *pvStructVal = buildPrimalValueStructValue(bi);
+    auto *enumVal = buildPredecessorEnumValue(
+        origBB, bi->getDestBB(), pvStructVal);
+
+    // Remap arguments, appending the new enum values.
+    SmallVector<SILValue, 8> args;
+    for (auto origArg : bi->getArgs())
+      args.push_back(getOpValue(origArg));
+    args.push_back(enumVal);
+
+    // Create a new `br` instruction.
+    getBuilder().createBranch(
+        bi->getLoc(), getOpBasicBlock(bi->getDestBB()), args);
+  }
+
+  void visitCondBranchInst(CondBranchInst *cbi) {
+    // Build primal value struct value for original block.
+    // Build predecessor enum values for true/false blocks.
+    auto *origBB = cbi->getParent();
+    auto *pvStructVal = buildPrimalValueStructValue(cbi);
+    auto *trueEnumVal = buildPredecessorEnumValue(
+        origBB, cbi->getTrueBB(), pvStructVal);
+    auto *falseEnumVal = buildPredecessorEnumValue(
+        origBB, cbi->getFalseBB(), pvStructVal);
+
+    // Remap arguments, appending the new enum values.
+    SmallVector<SILValue, 8> trueArgs;
+    for (auto &origTrueOp : cbi->getTrueOperands())
+      trueArgs.push_back(getOpValue(origTrueOp.get()));
+    trueArgs.push_back(trueEnumVal);
+
+    SmallVector<SILValue, 8> falseArgs;
+    for (auto &origFalseOp : cbi->getFalseOperands())
+      falseArgs.push_back(getOpValue(origFalseOp.get()));
+    falseArgs.push_back(falseEnumVal);
+
+    // Create a new `cond_br` instruction.
+    getBuilder().createCondBranch(
+        cbi->getLoc(), getOpValue(cbi->getCondition()),
+        getOpBasicBlock(cbi->getTrueBB()), trueArgs,
+        getOpBasicBlock(cbi->getFalseBB()), falseArgs);
+  }
+
   void visitReturnInst(ReturnInst *ri) {
-    // The original return is not to be cloned.
-    return;
+    auto loc = ri->getOperand().getLoc();
+    auto *origExit = ri->getParent();
+    auto &builder = getBuilder();
+    auto *pvStructVal = buildPrimalValueStructValue(ri);
+
+    // Get the VJP value corresponding to the original functions's return value.
+    auto *origRetInst = cast<ReturnInst>(origExit->getTerminator());
+    auto origResult = getOpValue(origRetInst->getOperand());
+    SmallVector<SILValue, 8> origResults;
+    extractAllElements(origResult, builder, origResults);
+
+    // Get and partially apply the adjoint to get a pullback.
+    auto vjpGenericEnv = vjp->getGenericEnvironment();
+    auto vjpSubstMap = vjpGenericEnv
+        ? vjpGenericEnv->getForwardingSubstitutionMap()
+        : vjp->getForwardingSubstitutionMap();
+    auto *adjointRef = builder.createFunctionRef(loc, adjoint);
+    auto *adjointPartialApply = builder.createPartialApply(
+        loc, adjointRef, vjpSubstMap, {pvStructVal},
+        ParameterConvention::Direct_Guaranteed);
+
+    // Return a tuple of the original result and pullback.
+    SmallVector<SILValue, 8> directResults;
+    directResults.append(origResults.begin(), origResults.end());
+    directResults.push_back(adjointPartialApply);
+    builder.createReturn(
+        ri->getLoc(), joinElements(directResults, builder, loc));
   }
 
   void visitStructExtractInst(StructExtractInst *sei) {
@@ -2860,8 +3259,8 @@ public:
     // Checkpoint the pullback.
     SILValue pullback = vjpDirectResults.back();
     // TODO: Check whether it's necessary to reabstract getter pullbacks.
-    getPrimalInfo().addPullbackDecl(sei, getOpType(pullback->getType()));
-    primalValues.push_back(pullback);
+    primalInfo->addPullbackDecl(sei, getOpType(pullback->getType()));
+    primalValues[sei->getParent()].push_back(pullback);
   }
 
   void visitStructElementAddrInst(StructElementAddrInst *seai) {
@@ -2906,11 +3305,11 @@ public:
       return;
     }
     // Set generic context scope before getting VJP function type.
-    auto canGenSig = SubsMap.getGenericSignature()
+    auto vjpGenSig = SubsMap.getGenericSignature()
         ? SubsMap.getGenericSignature()->getCanonicalSignature()
         : nullptr;
     Lowering::GenericContextScope genericContextScope(
-        getContext().getTypeConverter(), canGenSig);
+        getContext().getTypeConverter(), vjpGenSig);
     // Reference the getter VJP.
     auto loc = seai->getLoc();
     auto *getterVJP = context.getModule().lookUpFunction(attr->getVJPName());
@@ -2948,8 +3347,8 @@ public:
     // Checkpoint the pullback.
     SILValue pullback = vjpDirectResults.back();
     // TODO: Check whether it's necessary to reabstract getter pullbacks.
-    getPrimalInfo().addPullbackDecl(seai, getOpType(pullback->getType()));
-    primalValues.push_back(pullback);
+    primalInfo->addPullbackDecl(seai, getOpType(pullback->getType()));
+    primalValues[seai->getParent()].push_back(pullback);
   }
 
   // If an `apply` has active results or active inout parameters, replace it
@@ -3142,17 +3541,17 @@ public:
 
     // Checkpoint the pullback.
     auto *pullbackDecl =
-        getPrimalInfo().addPullbackDecl(ai, getOpType(pullback->getType()));
+        primalInfo->addPullbackDecl(ai, getOpType(pullback->getType()));
 
     // If actual pullback type does not match lowered pullback type, reabstract
     // the pullback using a thunk.
     auto actualPullbackType =
         getOpType(pullback->getType()).getAs<SILFunctionType>();
-    auto canGenSig = SubsMap.getGenericSignature()
+    auto vjpGenSig = SubsMap.getGenericSignature()
         ? SubsMap.getGenericSignature()->getCanonicalSignature()
         : nullptr;
     Lowering::GenericContextScope genericContextScope(
-        context.getTypeConverter(), canGenSig);
+        context.getTypeConverter(), vjpGenSig);
     auto loweredPullbackType =
         getOpType(context.getTypeConverter().getLoweredType(
                       pullbackDecl->getInterfaceType()->getCanonicalType(),
@@ -3170,7 +3569,7 @@ public:
           ai->getLoc(), thunkRef, thunk->getForwardingSubstitutionMap(),
           {pullback}, actualPullbackType->getCalleeConvention());
     }
-    primalValues.push_back(pullback);
+    primalValues[ai->getParent()].push_back(pullback);
 
     // Some instructions that produce the callee may have been cloned.
     // If the original callee did not have any users beyond this `apply`,
@@ -3473,7 +3872,10 @@ private:
   /// Info from activity analysis on the original function.
   const DifferentiableActivityInfo &activityInfo;
 
-  /// Post-dominance info.
+  /// Dominance info for the original function.
+  const DominanceInfo &domInfo;
+
+  /// Post-dominance info for the original function.
   const PostDominanceInfo &postDomInfo;
 
   /// Mapping from original values to their corresponding adjoint values.
@@ -3487,10 +3889,11 @@ private:
   DenseMap<SILBasicBlock *, SILBasicBlock *> adjointBBMap;
 
   /// Local stack allocations.
-  SmallVector<ValueWithCleanup, 8> localAllocations;
+  DenseMap<SILBasicBlock *, SmallVector<ValueWithCleanup, 8>> localAllocations;
 
-  /// The primal value aggregate passed to the adjoint function.
-  SILArgument *primalValueAggregateInAdj = nullptr;
+  /// Mapping from original basic blocks with multiple successors to primal
+  /// value struct allocations in the adjoint.
+  DenseMap<SILBasicBlock *, AllocStackInst *> primalValueStructAllocations;
 
   /// The seed argument in the adjoint function.
   SILArgument *seed = nullptr;
@@ -3517,6 +3920,10 @@ private:
     return primalInfo;
   }
 
+  SILArgument *getPrimalValueStructArg(SILBasicBlock *origBB) {
+    return getAdjointBlock(origBB)->getArguments().back();
+  }
+
   SILFunction &getOriginal() const { return *original; }
   SILFunction &getAdjoint() const { return *adjoint; }
 
@@ -3531,10 +3938,11 @@ public:
                           PrimalInfo &primalInfo,
                           DifferentiationInvoker invoker,
                           const DifferentiableActivityInfo &activityInfo,
+                          DominanceInfo &domInfo,
                           PostDominanceInfo &postDomInfo)
       : context(context), attr(attr), original(original), adjoint(adjoint),
         vjp(vjp), primalInfo(primalInfo), invoker(invoker),
-        activityInfo(activityInfo), postDomInfo(postDomInfo),
+        activityInfo(activityInfo), domInfo(domInfo), postDomInfo(postDomInfo),
         builder(getAdjoint()), localAllocBuilder(getAdjoint()) {}
 
 private:
@@ -3783,12 +4191,14 @@ private:
     // Set insertion point for local allocation builder: before the last local
     // allocation, or at the start of the adjoint entry BB if no local
     // allocations exist yet.
-    if (localAllocations.empty())
-      localAllocBuilder.setInsertionPoint(
-          getAdjoint().getEntryBlock(), getAdjoint().getEntryBlock()->begin());
+    auto *origBB = originalBuffer->getParentBlock();
+    auto *adjBB = getAdjointBlock(origBB);
+    auto &localBlockAllocations = localAllocations[origBB];
+    if (localBlockAllocations.empty())
+      localAllocBuilder.setInsertionPoint(adjBB, adjBB->begin());
     else
       localAllocBuilder.setInsertionPoint(
-          localAllocations.back().getValue()->getDefiningInstruction());
+          localBlockAllocations.back().getValue()->getDefiningInstruction());
     // Allocate local buffer and initialize to zero.
     auto *newBuf = localAllocBuilder.createAllocStack(
         originalBuffer.getLoc(),
@@ -3800,14 +4210,15 @@ private:
     // Temporarily change global builder insertion point and emit zero into the
     // local buffer.
     auto insertionPoint = builder.getInsertionBB();
-    builder.setInsertionPoint(localAllocBuilder.getInsertionPoint());
+    // builder.setInsertionPoint(localAllocBuilder.getInsertionPoint());
+    builder.setInsertionPoint(localAllocBuilder.getInsertionBB(), localAllocBuilder.getInsertionPoint());
     emitZeroIndirect(access->getType().getASTType(), access, access->getLoc());
     builder.setInsertionPoint(insertionPoint);
     localAllocBuilder.createEndAccess(
         access->getLoc(), access, /*aborted*/ false);
     // Create cleanup for local buffer.
     ValueWithCleanup bufWithCleanup(newBuf, makeCleanup(newBuf, emitCleanup));
-    localAllocations.push_back(bufWithCleanup);
+    localBlockAllocations.push_back(bufWithCleanup);
     return (insertion.first->getSecond() = bufWithCleanup);
   }
 
@@ -3880,16 +4291,48 @@ public:
     auto &adjoint = getAdjoint();
     auto adjLoc = getAdjoint().getLocation();
     LLVM_DEBUG(getADDebugStream() << "Running AdjointGen on\n" << original);
-    // Create entry BB and arguments.
-    auto *adjointEntry = adjoint.createBasicBlock();
+    auto *di = const_cast<DominanceInfo *>(&domInfo);
+    auto *pdi = const_cast<PostDominanceInfo *>(&postDomInfo);
+
+    // Create adjoint blocks and arguments.
+    {
+      PostDominanceOrder postDomOrder(&*original.findReturnBB(), pdi);
+      while (auto *origBB = postDomOrder.getNext()) {
+        auto *adjointBB = adjoint.createBasicBlock();
+        adjointBBMap.insert({origBB, adjointBB});
+        postDomOrder.pushChildren(origBB);
+        // If adjoint block is the adjoint entry, continue.
+        if (adjointBB->isEntry())
+          continue;
+        // Otherwise, add a primal value struct argument to the adjoint block.
+        auto pvStructLoweredType =
+            primalInfo.getPrimalValueStructLoweredType(origBB);
+        adjointBB->createPhiArgument(
+            pvStructLoweredType, ValueOwnershipKind::Guaranteed);
+      }
+    }
+
+    // Create primal value struct allocations for adjoint basic blocks with
+    // multiple predecessors.
+    for (auto &bb : original) {
+      if (bb.getSuccessors().size() < 1)
+        continue;
+      auto pvStructSILType = primalInfo.getPrimalValueStructLoweredType(&bb);
+      auto *postDomBB = pdi->getNode(&bb)->getIDom()->getBlock();
+      auto *adjPostDomBB = adjointBBMap[postDomBB];
+      SILBuilder allocBuilder(adjPostDomBB, adjPostDomBB->begin());
+      auto *alloc = allocBuilder.createAllocStack(adjLoc, pvStructSILType);
+      primalValueStructAllocations[&bb] = alloc;
+      ValueWithCleanup bufWithCleanup(alloc, makeCleanup(alloc, emitCleanup));
+      localAllocations[&bb].push_back(bufWithCleanup);
+    }
+
+    auto *origExit = &*original.findReturnBB();
+    auto *adjointEntry = adjoint.getEntryBlock();
     createEntryArguments(&adjoint);
-    auto *origRet = getSingleReturn(&original);
-    auto *origRetBB = origRet->getParent();
-    adjointBBMap.insert({origRetBB, adjointEntry});
-    // The adjoint function has type (seed, pv) -> ([arg0], ..., [argn]).
+    // The adjoint function has type (seed, pv_exit) -> ([arg0], ..., [argn]).
     auto adjParamArgs = adjoint.getArgumentsWithoutIndirectResults();
     seed = adjParamArgs[0];
-    primalValueAggregateInAdj = adjParamArgs[1];
 
     // Assign adjoint for original result.
     SmallVector<SILValue, 8> origFormalResults;
@@ -3920,7 +4363,7 @@ public:
       ValueWithCleanup seedBufferCopyWithCleanup(
           seedBufCopy, makeCleanup(seedBufCopy, emitCleanup));
       setAdjointBuffer(origResult, seedBufferCopyWithCleanup);
-      localAllocations.push_back(seedBufferCopyWithCleanup);
+      localAllocations[origExit].push_back(seedBufferCopyWithCleanup);
     } else {
       builder.createRetainValue(adjLoc, seed, builder.getDefaultAtomicity());
       initializeAdjointValue(origResult, makeConcreteAdjointValue(
@@ -3932,21 +4375,24 @@ public:
 
     // From the original exit, emit a reverse control flow graph and perform
     // differentiation in each block.
-    // NOTE: For now we just assume single basic block.
-    for (auto *bb : llvm::breadth_first(origRetBB)) {
+    PostDominanceOrder postDomOrder(&*original.findReturnBB(), pdi);
+    while (auto *bb = postDomOrder.getNext()) {
       if (errorOccurred)
         break;
       // Get the corresponding adjoint basic block.
       auto adjBB = getAdjointBlock(bb);
       builder.setInsertionPoint(adjBB);
+
       LLVM_DEBUG({
         auto &s = getADDebugStream()
-            << "To differentiate or not to differentiate?\n";
+            << "bb" + std::to_string(bb->getDebugID())
+            << ": To differentiate or not to differentiate?\n";
         for (auto &inst : reversed(*bb)) {
           s << (shouldBeDifferentiated(&inst, getIndices()) ? "[∂] " : "[ ] ")
             << inst;
         }
       });
+
       // Visit each instruction in reverse order.
       for (auto &inst : reversed(*bb)) {
         if (!shouldBeDifferentiated(&inst, getIndices()))
@@ -3956,15 +4402,49 @@ public:
         if (errorOccurred)
           return true;
       }
+
+      // If the original block is the original entry, then the adjoint block is
+      // the adjoint exit, which is handled specially below this loop. Continue.
+      if (bb->isEntry())
+        continue;
+
+      // Otherwise, add a `switch_enum` terminator for non-exit adjoint blocks.
+      // - Get the primal value struct adjoint bb argument.
+      // - Extract the predecessor enum value.
+      // - Do `switch_enum` on the predecessor value to branch to a predecessor
+      //   adjoint block.
+      // Note: This requires more design. In particular, generated `switch_enum`
+      // instructions may have critical edges, which are invalid (only `cond_br`
+      // instructions can have critical edges).
+      auto *pvStructVal = adjBB->getArguments().back();
+      StructDecl *pvStruct;
+      EnumDecl *predEnum;
+      std::tie(pvStruct, predEnum) = primalInfo.getPrimalDataStructures(bb);
+      auto *predEnumField =
+          primalInfo.lookUpPrimalValueStructPredecessorField(bb);
+      auto *predEnumVal =
+          builder.createStructExtract(adjLoc, pvStructVal, predEnumField);
+      SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 4>
+          predecessorCases;
+      for (auto *predBB : bb->getPredecessorBlocks()) {
+        auto *adjointPredBB = getAdjointBlock(predBB);
+        auto *enumEltDecl =
+            primalInfo.lookUpPredecessorEnumElement(predBB, bb);
+        predecessorCases.push_back({enumEltDecl, adjointPredBB});
+      }
+      assert(predecessorCases.size() == predEnum->getNumElements());
+      builder.createSwitchEnum(
+          adjLoc, predEnumVal, /*DefaultBB*/ nullptr, predecessorCases);
+      postDomOrder.pushChildren(bb);
     }
 
     // If errors occurred, back out.
     if (errorOccurred)
       return true;
 
-    // Place the builder at the adjoint block corresponding to the original
-    // entry. This block is going to be our exit block and we emit a `return`
-    // there.
+    // Place the builder at the adjoint exit, i.e. the adjoint block
+    // corresponding to the original entry. Return the adjoints wrt parameters
+    // in the adjoint exit.
     builder.setInsertionPoint(getAdjointBlock(original.getEntryBlock()));
 
     // This vector will contain all the materialized return elements.
@@ -4014,14 +4494,25 @@ public:
     }
 
     // Deallocate local allocations.
-    for (auto alloc : localAllocations) {
-      // Assert that local allocations have at least one use.
-      // Buffers should not be allocated needlessly.
-      assert(!alloc.getValue()->use_empty());
-      if (auto *cleanup = alloc.getCleanup())
-        cleanup->applyRecursively(builder, adjLoc);
-      builder.createDeallocStack(adjLoc, alloc);
+    for (auto pair : localAllocations) {
+      auto *origBB = pair.getFirst();
+      auto localBlockAllocations = pair.getSecond();
+
+      auto *domBB = di->getNode(origBB)->getBlock();
+      if (auto *dom = di->getNode(origBB)->getIDom())
+        domBB = dom->getBlock();
+      auto *adjDomBB = getAdjointBlock(domBB);
+      builder.setInsertionPoint(adjDomBB);
+      for (auto alloc : localBlockAllocations) {
+        // Assert that local allocations have at least one use.
+        // Buffers should not be allocated needlessly.
+        // assert(!alloc.getValue()->use_empty());
+        if (auto *cleanup = alloc.getCleanup())
+          cleanup->applyRecursively(builder, adjLoc);
+        builder.createDeallocStack(adjLoc, alloc);
+      }
     }
+    builder.setInsertionPoint(getAdjointBlock(original.getEntryBlock()));
 
     builder.createReturn(adjLoc, joinElements(retElts, builder, adjLoc));
 
@@ -4071,8 +4562,8 @@ public:
     auto *field = getPrimalInfo().lookUpPullbackDecl(ai);
     assert(field);
     auto loc = ai->getLoc();
-    SILValue pullback =
-        builder.createStructExtract(loc, primalValueAggregateInAdj, field);
+    SILValue pullback = builder.createStructExtract(
+        loc, getPrimalValueStructArg(ai->getParent()), field);
 
     // Get the original result of the `apply` instruction.
     SmallVector<SILValue, 8> args;
@@ -4344,7 +4835,7 @@ public:
       auto *pullbackField = getPrimalInfo().lookUpPullbackDecl(sei);
       assert(pullbackField);
       auto pullback = builder.createStructExtract(
-          loc, primalValueAggregateInAdj, pullbackField);
+          loc, getPrimalValueStructArg(sei->getParent()), pullbackField);
 
       // Construct the pullback arguments.
       auto av = takeAdjointValue(sei);
@@ -4655,7 +5146,12 @@ public:
 
 #define NO_ADJOINT(INST) \
   void visit##INST##Inst(INST##Inst *inst) {}
+  // Terminators.
   NO_ADJOINT(Return)
+  NO_ADJOINT(Branch)
+  NO_ADJOINT(CondBranch)
+
+  // Debugging/reference counting instructions.
   NO_ADJOINT(DebugValue)
   NO_ADJOINT(DebugValueAddr)
   NO_ADJOINT(RetainValue)
@@ -5158,82 +5654,42 @@ bool VJPEmitter::run() {
   // Create entry BB and arguments.
   auto *entry = vjp->createBasicBlock();
   createEntryArguments(vjp);
-  SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
-                                     entry->getArguments().end());
-
-  auto vjpGenericSig = vjp->getLoweredFunctionType()->getGenericSignature();
-  auto *primalValueStructDecl =
-      context.createPrimalValueStruct(original, getIndices(), vjpGenericSig);
-  primalInfo =
-      std::unique_ptr<PrimalInfo>(new PrimalInfo(primalValueStructDecl));
 
   // Clone.
+  SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
+                                     entry->getArguments().end());
   cloneFunctionBody(original, entry, entryArgs);
   // If errors occurred, back out.
   if (errorOccurred)
     return true;
-  auto *origExit = &*original->findReturnBB();
-  auto *exit = BBMap.lookup(origExit);
-  assert(exit->getParent() == getVJP());
-  // Get the original's return value's corresponding value in the vjp.
-  auto *origRetInst = cast<ReturnInst>(origExit->getTerminator());
-  auto origResult = getOpValue(origRetInst->getOperand());
 
-  // Create a primal value struct containing all static primal values and
-  // tapes.
-  auto loc = getVJP()->getLocation();
-  auto structTy = getOpASTType(getPrimalInfo()
-                                   .getPrimalValueStruct()
-                                   ->getDeclaredInterfaceType()
-                                   ->getCanonicalType());
-  auto &builder = getBuilder();
-  builder.setInsertionPoint(exit);
-  auto structLoweredTy = getContext().getTypeConverter().getLoweredType(
-      structTy, ResilienceExpansion::Minimal);
-  auto primValsVal = builder.createStruct(loc, structLoweredTy, primalValues);
-  // If the original result was a tuple, return a tuple of all elements in the
-  // original result tuple and the primal value struct value.
-  SmallVector<SILValue, 8> origResults;
-  extractAllElements(origResult, builder, origResults);
-  LLVM_DEBUG({
-    auto &s = getADDebugStream()
-              << "Primal values in $"
-              << getPrimalInfo().getPrimalValueStruct()->getName() << ":\n";
-    for (auto *var : getPrimalInfo().getPrimalValueStruct()->getMembers())
-      var->dump(s);
-  });
-
-  // Generate adjoint code.
-  auto &passManager = context.getPassManager();
-  auto *postDomAnalysis =
-      passManager.getAnalysis<PostDominanceAnalysis>();
-  SILFunction *adjoint = createEmptyAdjoint();
-  context.getGeneratedFunctions().push_back(adjoint);
-  AdjointEmitter adjointEmitter(context, original, attr, adjoint, getVJP(),
-                                *primalInfo.get(), invoker, activityInfo,
-                                *postDomAnalysis->get(original));
-  // Run the adjoint emitter.
-  if (adjointEmitter.run()) {
-    errorOccurred = true;
-    return true;
+  // If adjoint generation is disabled, return undef in adjoint body.
+  if (DisableAdjointGeneration) {
+    auto *adjointEntry = adjoint->createBasicBlock();
+    createEntryArguments(adjoint);
+    SILBuilder adjointBuilder(adjointEntry);
+    auto adjointConv = adjoint->getConventions();
+    adjointBuilder.createReturn(
+        adjoint->getLocation(),
+        SILUndef::get(
+            adjoint->mapTypeIntoContext(adjointConv.getSILResultType()),
+            *adjoint));
   }
-  // Get and partially apply the adjoint.
-  auto vjpGenericEnv = vjp->getGenericEnvironment();
-  auto vjpSubstMap = vjpGenericEnv
-      ? vjpGenericEnv->getForwardingSubstitutionMap()
-      : vjp->getForwardingSubstitutionMap();
-  auto *adjointRef = builder.createFunctionRef(loc, adjoint);
-  auto *adjointPartialApply = builder.createPartialApply(
-      loc, adjointRef, vjpSubstMap, {primValsVal},
-      ParameterConvention::Direct_Guaranteed);
-
-  // Return the direct results. Note that indirect results have already been
-  // filled in by the application of the primal.
-  SmallVector<SILValue, 8> directResults;
-  directResults.append(origResults.begin(), origResults.end());
-  directResults.push_back(adjointPartialApply);
-  builder.createReturn(loc, joinElements(directResults, builder, loc));
-
+  // Generate adjoint code.
+  else {
+    auto &passManager = context.getPassManager();
+    auto *domAnalysis = passManager.getAnalysis<DominanceAnalysis>();
+    auto *postDomAnalysis = passManager.getAnalysis<PostDominanceAnalysis>();
+    AdjointEmitter adjointEmitter(context, original, attr, adjoint, getVJP(),
+                                  *primalInfo.get(), invoker, activityInfo,
+                                  *domAnalysis->get(original),
+                                  *postDomAnalysis->get(original));
+    // Run the adjoint emitter.
+    if (adjointEmitter.run()) {
+      errorOccurred = true;
+      return true;
+    }
+  }
   LLVM_DEBUG(getADDebugStream() << "Finished VJPGen for function "
                                 << original->getName() << ":\n"
                                 << *getVJP());
@@ -5433,12 +5889,12 @@ bool ADContext::processDifferentiableAttribute(
   if (vjp)
     return false;
 
-  // TODO(TF-384): If the original function has multiple basic blocks, bail out
-  // since AD does not support control flow yet.
+  // Diagnose:
+  // - Functions with no return.
+  // - Functions with unsupported control flow.
   if (diagnoseNoReturn(*this, original, invoker) ||
-      diagnoseUnsupportedControlFlow(*this, original, invoker)) {
+      diagnoseUnsupportedControlFlow(*this, original, invoker))
     return true;
-  }
 
   vjp = createEmptyVJP(*this, original, attr, isAssocFnExported);
   getGeneratedFunctions().push_back(vjp);
