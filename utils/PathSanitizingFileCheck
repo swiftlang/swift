@@ -60,9 +60,11 @@ constants.""")
 
     if args.enable_windows_compatibility:
         if args.enable_yaml_compatibility:
-            slashes_re = r'(/|\\\\|\\\\\\\\)'
+            slashes_re = r'(/|\\\\\\\\|\\\\)'
+            undo_slashes_re = re.compile(r'\\\\|\\')
         else:
             slashes_re = r'(/|\\\\)'
+            undo_slashes_re = re.compile(r'\\')
     else:
         slashes_re = r'/'
 
@@ -72,7 +74,18 @@ constants.""")
         # We are replacing the Unix path separators in the paths passed as
         # arguments with a broader pattern to also allow forward slashes and
         # double escaped slashes in the result that we are checking. Sigh.
-        stdin = re.sub(re.sub(r'/', slashes_re, pattern), replacement, stdin)
+        pattern = re.sub(r'/', slashes_re, pattern)
+        stdin = re.sub(pattern, replacement, stdin)
+
+        if args.enable_windows_compatibility:
+            # For making easier to write the tests, we also look in the
+            # possible subpath attached to the replacement.
+            extended_replacement = replacement + r'[^\s\'"]+'
+
+            def replace_slashes(matchobj):
+                return re.sub(undo_slashes_re, r'/', matchobj.group(0))
+
+            stdin = re.sub(extended_replacement, replace_slashes, stdin)
 
     p = subprocess.Popen(
         [args.file_check_path] + unknown_args, stdin=subprocess.PIPE)
