@@ -187,3 +187,19 @@ func dontCrash() {
     fatalError("baz \(k)")
   }
 }
+
+func switchLoopWithPartialApplyCallee(reportError: ((String) -> (Void))?) {
+  let reportError = reportError ?? { error in
+    print(error)
+  }
+
+  for _ in 0..<1 {
+    reportError("foo bar baz")
+  }
+}
+
+func switchLoopWithPartialApplyCaller() {
+  switchLoopWithPartialApplyCallee { error in
+      print(error)
+  }
+}
