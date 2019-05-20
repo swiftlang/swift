@@ -645,16 +645,14 @@ extension Tensor where Scalar : TensorFlowFloatingPoint {
   func _vjpBroadcast(
     toShape shape: Tensor<Int32>
   ) -> (Tensor, (Tensor) -> Tensor) {
-    return (broadcast(toShape: shape), { [origShape = self.shapeTensor] v in
+    return (broadcast(toShape: shape), { [origShape = shapeTensor] v in
       v.unbroadcast(toShape: origShape)
     })
   }
 
   @inlinable
-  func _vjpUnbroadcast(
-    toShape shape: Tensor<Int32>
-  ) -> (Tensor, (Tensor) -> Tensor) {
-    return (unbroadcast(toShape: shape), { [origShape = self.shapeTensor] v in
+  func _vjpUnbroadcast(to shape: TensorShape) -> (Tensor, (Tensor) -> Tensor) {
+    return (unbroadcast(to: shape), { [origShape = shapeTensor] v in
       v.broadcast(toShape: origShape)
     })
   }
