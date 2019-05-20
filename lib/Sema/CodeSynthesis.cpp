@@ -1794,7 +1794,7 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   VarDecl *storageVar = nullptr;
   if (delegateInfo.delegateValueVar) {
     storageVar = synthesizePropertyDelegateStorageDelegateProperty(
-        ctx, var, delegateType, delegateInfo.delegateValueVar);
+        ctx, var, storageType, delegateInfo.delegateValueVar);
   }
 
   // Get the property delegate information.
