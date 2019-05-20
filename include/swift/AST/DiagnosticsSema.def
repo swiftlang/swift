@@ -3513,6 +3513,8 @@ ERROR(tuple_single_element,none,
       "cannot create a single-element tuple with an element label", ())
 ERROR(tuple_ellipsis,none,
       "cannot create a variadic tuple", ())
+ERROR(tuple_duplicate_label,none,
+      "cannot create a tuple with a duplicate element label", ())
 ERROR(enum_element_ellipsis,none,
       "variadic enum cases are not supported", ())
 
