@@ -1914,6 +1914,20 @@ function(add_swift_target_library name)
         GYB_SOURCES ${SWIFTLIB_GYB_SOURCES}
       )
 
+      if(sdk STREQUAL WINDOWS)
+        if(SWIFT_COMPILER_IS_MSVC_LIKE)
+          if (SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY MATCHES MultiThreadedDebugDLL)
+            target_compile_options(${VARIANT_NAME} PRIVATE /MDd /D_DLL /D_DEBUG)
+          elseif (SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY MATCHES MultiThreadedDebug)
+            target_compile_options(${VARIANT_NAME} PRIVATE /MTd /U_DLL /D_DEBUG)
+          elseif (SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY MATCHES MultiThreadedDLL)
+            target_compile_options(${VARIANT_NAME} PRIVATE /MD /D_DLL /U_DEBUG)
+          elseif (SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY MATCHES MultiThreaded)
+            target_compile_options(${VARIANT_NAME} PRIVATE /MT /U_DLL /U_DEBUG)
+          endif()
+        endif()
+      endif()
+
       if(NOT SWIFTLIB_OBJECT_LIBRARY)
         # Add dependencies on the (not-yet-created) custom lipo target.
         foreach(DEP ${SWIFTLIB_LINK_LIBRARIES})
