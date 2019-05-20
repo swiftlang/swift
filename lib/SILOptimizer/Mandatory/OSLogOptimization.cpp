@@ -390,7 +390,7 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
     return newStructInst;
   }
   default: {
-    assert(false && "Symbolic value kind is not supported");
+    llvm_unreachable("Symbolic value kind is not supported");
   }
   }
 }
