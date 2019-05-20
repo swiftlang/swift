@@ -291,6 +291,27 @@ public:
   }
 };
 
+class ConformanceXRefError : public llvm::ErrorInfo<XRefError, DeclDeserializationError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+  NominalTypeDecl *nominal;
+  ProtocolDecl *proto;
+public:
+  ConformanceXRefError(NominalTypeDecl *nominal, ProtocolDecl *proto)
+      : nominal(nominal), proto(proto) {}
+
+  void log(raw_ostream &OS) const override {
+    OS << "cannot deserialize conformance of " << nominal->getName()
+       << " to " << proto->getName() << "\n";
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
 class XRefNonLoadedModuleError :
     public llvm::ErrorInfo<XRefNonLoadedModuleError, DeclDeserializationError> {
   friend ErrorInfo;

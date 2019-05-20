@@ -126,6 +126,8 @@ const char DeclDeserializationError::ID = '\0';
 void DeclDeserializationError::anchor() {}
 const char XRefError::ID = '\0';
 void XRefError::anchor() {}
+const char ConformanceXRefError::ID = '\0';
+void ConformanceXRefError::anchor() {}
 const char XRefNonLoadedModuleError::ID = '\0';
 void XRefNonLoadedModuleError::anchor() {}
 const char OverrideError::ID = '\0';
@@ -456,6 +458,17 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
 }
 
 ProtocolConformanceRef ModuleFile::readConformance(
+                                   llvm::BitstreamCursor &Cursor,
+                                   GenericEnvironment *genericEnv) {
+  auto maybeConformance = readConformanceChecked(Cursor, genericEnv);
+  if (!maybeConformance) {
+    fatal(maybeConformance.takeError());
+  }
+
+  return maybeConformance.get();
+}
+
+Expected<ProtocolConformanceRef> ModuleFile::readConformanceChecked(
                                              llvm::BitstreamCursor &Cursor,
                                              GenericEnvironment *genericEnv) {
   using namespace decls_block;
@@ -477,14 +490,20 @@ ProtocolConformanceRef ModuleFile::readConformance(
   case ABSTRACT_PROTOCOL_CONFORMANCE: {
     DeclID protoID;
     AbstractProtocolConformanceLayout::readRecord(scratch, protoID);
-    auto proto = cast<ProtocolDecl>(getDecl(protoID));
+    auto maybeProto = getDeclChecked(protoID);
+    if (!maybeProto)
+      return maybeProto.takeError();
+    auto proto = cast<ProtocolDecl>(maybeProto.get());
     return ProtocolConformanceRef(proto);
   }
 
   case SELF_PROTOCOL_CONFORMANCE: {
     DeclID protoID;
     SelfProtocolConformanceLayout::readRecord(scratch, protoID);
-    auto proto = cast<ProtocolDecl>(getDecl(protoID));
+    auto maybeProto = getDeclChecked(protoID);
+    if (!maybeProto)
+      return maybeProto.takeError();
+    auto proto = cast<ProtocolDecl>(maybeProto.get());
     auto conformance = getContext().getSelfConformance(proto);
     return ProtocolConformanceRef(conformance);
   }
@@ -496,7 +515,10 @@ ProtocolConformanceRef ModuleFile::readConformance(
                                                      substitutionMapID);
 
     ASTContext &ctx = getContext();
-    Type conformingType = getType(conformingTypeID);
+    auto maybeConformingType = getTypeChecked(conformingTypeID);
+    if (!maybeConformingType)
+      return maybeConformingType.takeError();
+    auto conformingType = maybeConformingType.get();
     if (genericEnv) {
       conformingType = genericEnv->mapTypeIntoContext(conformingType);
     }
@@ -505,10 +527,15 @@ ProtocolConformanceRef ModuleFile::readConformance(
                                "reading specialized conformance for",
                                conformingType);
 
-    auto subMap = getSubstitutionMap(substitutionMapID);
+    auto maybeSubMap = getSubstitutionMapChecked(substitutionMapID);
+    if (!maybeSubMap)
+      return maybeSubMap.takeError();
+    auto subMap = maybeSubMap.get();
 
-    ProtocolConformanceRef genericConformance =
-      readConformance(Cursor, genericEnv);
+    auto maybeGenericConformance = readConformanceChecked(Cursor, genericEnv);
+    if (!maybeGenericConformance)
+      return maybeGenericConformance.takeError();
+    auto genericConformance = maybeGenericConformance.get();
     PrettyStackTraceDecl traceTo("... to", genericConformance.getRequirement());
 
     assert(genericConformance.isConcrete() && "Abstract generic conformance?");
@@ -524,7 +551,10 @@ ProtocolConformanceRef ModuleFile::readConformance(
     InheritedProtocolConformanceLayout::readRecord(scratch, conformingTypeID);
 
     ASTContext &ctx = getContext();
-    Type conformingType = getType(conformingTypeID);
+    auto maybeConformingType = getTypeChecked(conformingTypeID);
+    if (!maybeConformingType)
+      return maybeConformingType.takeError();
+    auto conformingType = maybeConformingType.get();
     if (genericEnv) {
       conformingType = genericEnv->mapTypeIntoContext(conformingType);
     }
@@ -533,8 +563,10 @@ ProtocolConformanceRef ModuleFile::readConformance(
                                "reading inherited conformance for",
                                conformingType);
 
-    ProtocolConformanceRef inheritedConformance =
-      readConformance(Cursor, genericEnv);
+    auto maybeInheritedConformance = readConformanceChecked(Cursor, genericEnv);
+    if (!maybeInheritedConformance)
+      return maybeInheritedConformance.takeError();
+    auto inheritedConformance = maybeInheritedConformance.get();
     PrettyStackTraceDecl traceTo("... to",
                                  inheritedConformance.getRequirement());
 
@@ -549,7 +581,10 @@ ProtocolConformanceRef ModuleFile::readConformance(
   case NORMAL_PROTOCOL_CONFORMANCE_ID: {
     NormalConformanceID conformanceID;
     NormalProtocolConformanceIdLayout::readRecord(scratch, conformanceID);
-    return ProtocolConformanceRef(readNormalConformance(conformanceID));
+    auto maybeNormal = readNormalConformanceChecked(conformanceID);
+    if (!maybeNormal)
+      return maybeNormal.takeError();
+    return ProtocolConformanceRef(maybeNormal.get());
   }
 
   case PROTOCOL_CONFORMANCE_XREF: {
@@ -564,21 +599,16 @@ ProtocolConformanceRef ModuleFile::readConformance(
     auto proto = cast<ProtocolDecl>(getDecl(protoID));
     PrettyStackTraceDecl traceTo("... to", proto);
     auto module = getModule(moduleID);
-
-    // FIXME: If the module hasn't been loaded, we probably don't want to fall
-    // back to the current module like this.
     if (!module)
-      module = getAssociatedModule();
+      return llvm::make_error<XRefNonLoadedModuleError>(getIdentifier(moduleID));
 
     SmallVector<ProtocolConformance *, 2> conformances;
     nominal->lookupConformance(module, proto, conformances);
     PrettyStackTraceModuleFile traceMsg(
         "If you're seeing a crash here, check that your SDK and dependencies "
         "are at least as new as the versions used to build", *this);
-    // This would normally be an assertion but it's more useful to print the
-    // PrettyStackTrace here even in no-asserts builds.
     if (conformances.empty())
-      abort();
+      return llvm::make_error<ConformanceXRefError>(nominal, proto);
     return ProtocolConformanceRef(conformances.front());
   }
 
@@ -590,8 +620,8 @@ ProtocolConformanceRef ModuleFile::readConformance(
   }
 }
 
-NormalProtocolConformance *ModuleFile::readNormalConformance(
-                             NormalConformanceID conformanceID) {
+Expected<NormalProtocolConformance *>
+ModuleFile::readNormalConformanceChecked(NormalConformanceID conformanceID) {
   auto &conformanceEntry = NormalConformances[conformanceID-1];
   if (conformanceEntry.isComplete()) {
     return conformanceEntry.get();
@@ -631,7 +661,11 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   Type conformingType = dc->getDeclaredInterfaceType();
   PrettyStackTraceType trace(ctx, "reading conformance for", conformingType);
 
-  auto proto = cast<ProtocolDecl>(getDecl(protoID));
+  auto maybeProto = getDeclChecked(protoID);
+  if (!maybeProto)
+    return maybeProto.takeError();
+  auto proto = cast<ProtocolDecl>(maybeProto.get());
+
   PrettyStackTraceDecl traceTo("... to", proto);
   ++NumNormalProtocolConformancesLoaded;
 
@@ -1025,6 +1059,15 @@ GenericEnvironment *ModuleFile::getGenericEnvironment(
 
 SubstitutionMap ModuleFile::getSubstitutionMap(
                                         serialization::SubstitutionMapID id) {
+  auto maybeSubMap = getSubstitutionMapChecked(id);
+  if (!maybeSubMap) {
+    fatal(maybeSubMap.takeError());
+  }
+  return maybeSubMap.get();
+}
+
+Expected<SubstitutionMap> ModuleFile::getSubstitutionMapChecked(
+                                        serialization::SubstitutionMapID id) {
   using namespace decls_block;
 
   // Zero is a sentinel for having an empty substitution map.
@@ -1075,7 +1118,10 @@ SubstitutionMap ModuleFile::getSubstitutionMap(
   SmallVector<Type, 4> replacementTypes;
   replacementTypes.reserve(replacementTypeIDs.size());
   for (auto typeID : replacementTypeIDs) {
-    replacementTypes.push_back(getType(typeID));
+    auto maybeType = getTypeChecked(typeID);
+    if (!maybeType)
+      return maybeType.takeError();
+    replacementTypes.push_back(maybeType.get());
   }
 
   // Read the conformances.
@@ -1083,7 +1129,10 @@ SubstitutionMap ModuleFile::getSubstitutionMap(
   conformances.reserve(numConformances);
   for (unsigned i : range(numConformances)) {
     (void)i;
-    conformances.push_back(readConformance(DeclTypeCursor));
+    auto maybeConformance = readConformanceChecked(DeclTypeCursor);
+    if (!maybeConformance)
+      return maybeConformance.takeError();
+    conformances.push_back(maybeConformance.get());
   }
 
   // Form the substitution map and record it.
@@ -5460,7 +5509,12 @@ ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
   DeclTypeCursor.JumpToBit(bitPosition);
 
   while (numConformances--) {
-    auto conf = readConformance(DeclTypeCursor);
+    auto maybeConf = readConformanceChecked(DeclTypeCursor);
+    if (!maybeConf) {
+      llvm::consumeError(maybeConf.takeError());
+      return;
+    }
+    auto conf = maybeConf.get();
     if (conf.isConcrete())
       conformances.push_back(conf.getConcrete());
   }

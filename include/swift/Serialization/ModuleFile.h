@@ -925,19 +925,28 @@ public:
 
   /// Returns the substitution map for the given ID, deserializing it if
   /// needed.
+  llvm::Expected<SubstitutionMap>
+  getSubstitutionMapChecked(serialization::SubstitutionMapID id);
+
+  /// Returns the substitution map for the given ID, deserializing it if
+  /// needed.
   SubstitutionMap getSubstitutionMap(serialization::SubstitutionMapID id);
 
   /// Recursively reads a protocol conformance from the given cursor.
-  ProtocolConformanceRef readConformance(llvm::BitstreamCursor &Cursor,
-                                         GenericEnvironment *genericEnv =
-                                           nullptr);
-  
+  llvm::Expected<ProtocolConformanceRef>
+  readConformanceChecked(llvm::BitstreamCursor &Cursor,
+                         GenericEnvironment *genericEnv = nullptr);
+
+  ProtocolConformanceRef
+  readConformance(llvm::BitstreamCursor &Cursor,
+                  GenericEnvironment *genericEnv = nullptr);
+
   /// Read a SILLayout from the given cursor.
   SILLayout *readSILLayout(llvm::BitstreamCursor &Cursor);
 
   /// Read the given normal conformance from the current module file.
-  NormalProtocolConformance *
-  readNormalConformance(serialization::NormalConformanceID id);
+  llvm::Expected<NormalProtocolConformance *>
+  readNormalConformanceChecked(serialization::NormalConformanceID id);
 
   /// Reads a foreign error conformance from \c DeclTypeCursor, if present.
   Optional<ForeignErrorConvention> maybeReadForeignErrorConvention();
