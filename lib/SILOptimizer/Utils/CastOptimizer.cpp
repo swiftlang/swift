@@ -592,7 +592,8 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
   auto ParamTypes = SubstFnTy.castTo<SILFunctionType>()->getParameters();
   if (Src->getType().isAddress() && !substConv.isSILIndirect(ParamTypes[0])) {
     // Create load
-    Src = Builder.createLoad(Loc, Src, LoadOwnershipQualifier::Unqualified);
+    Src =
+        Builder.emitLoadValueOperation(Loc, Src, LoadOwnershipQualifier::Take);
   }
 
   // Compensate different owning conventions of the replaced cast instruction
@@ -682,7 +683,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
     if (AddressOnlyType) {
       Builder.createDestroyAddr(Loc, Src);
     } else {
-      Builder.createReleaseValue(Loc, Src, Builder.getDefaultAtomicity());
+      Builder.emitDestroyValueOperation(Loc, Src);
     }
   };
 
