@@ -2310,13 +2310,23 @@ class swift::DeclDeserializer {
     AttrsNext = Attr->getMutableNext();
   };
 
-  void handleInherited(TypeDecl *nominal, ArrayRef<uint64_t> rawInheritedIDs) {
-    auto inheritedTypes = ctx.Allocate<TypeLoc>(rawInheritedIDs.size());
-    for_each(inheritedTypes, rawInheritedIDs,
-             [this](TypeLoc &tl, uint64_t rawID) {
-       tl = TypeLoc::withoutLoc(MF.getType(rawID));
-    });
-    nominal->setInherited(inheritedTypes);
+  void handleInherited(llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+                       ArrayRef<uint64_t> rawInheritedIDs) {
+    SmallVector<TypeLoc, 2> inheritedTypes;
+    for (auto rawID : rawInheritedIDs) {
+      auto maybeType = MF.getTypeChecked(rawID);
+      if (!maybeType) {
+        llvm::consumeError(maybeType.takeError());
+        continue;
+      }
+      inheritedTypes.push_back(TypeLoc::withoutLoc(MF.getType(rawID)));
+    }
+
+    auto inherited = ctx.AllocateCopy(inheritedTypes);
+    if (auto *typeDecl = decl.dyn_cast<TypeDecl *>())
+      typeDecl->setInherited(inherited);
+    else
+      decl.get<ExtensionDecl *>()->setInherited(inherited);
   }
 
 public:
@@ -3492,13 +3502,13 @@ public:
     GenericEnvironmentID genericEnvID;
     TypeID rawTypeID;
     uint8_t rawAccessLevel;
-    unsigned numConformances, numInheritedTypes;
+    unsigned numConformances, numInherited;
     ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
 
     decls_block::EnumLayout::readRecord(scratch, nameID, contextID,
                                         isImplicit, isObjC, genericEnvID,
                                         rawTypeID, rawAccessLevel,
-                                        numConformances, numInheritedTypes,
+                                        numConformances, numInherited,
                                         rawInheritedAndDependencyIDs);
 
     auto DC = MF.getDeclContext(contextID);
@@ -3507,7 +3517,7 @@ public:
 
     Identifier name = MF.getIdentifier(nameID);
     for (TypeID dependencyID :
-           rawInheritedAndDependencyIDs.slice(numInheritedTypes)) {
+           rawInheritedAndDependencyIDs.slice(numInherited)) {
       auto dependency = MF.getTypeChecked(dependencyID);
       if (!dependency) {
         return llvm::make_error<TypeError>(
@@ -3542,8 +3552,8 @@ public:
 
     theEnum->computeType();
 
-    handleInherited(theEnum,
-                    rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
+    auto rawInheritedIDs = rawInheritedAndDependencyIDs.slice(0, numInherited);
+    handleInherited(theEnum, rawInheritedIDs);
 
     theEnum->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
     skipRecord(MF.DeclTypeCursor, decls_block::MEMBERS);
@@ -3810,12 +3820,8 @@ public:
     if (isImplicit)
       extension->setImplicit();
 
-    auto inheritedTypes = ctx.Allocate<TypeLoc>(numInherited);
-    for_each(inheritedTypes, inheritedAndDependencyIDs.slice(0, numInherited),
-             [this](TypeLoc &tl, uint64_t rawID) {
-      tl = TypeLoc::withoutLoc(MF.getType(rawID));
-    });
-    extension->setInherited(inheritedTypes);
+    auto rawInheritedIDs = inheritedAndDependencyIDs.slice(0, numInherited);
+    handleInherited(extension, rawInheritedIDs);
 
     extension->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
     skipRecord(MF.DeclTypeCursor, decls_block::MEMBERS);
