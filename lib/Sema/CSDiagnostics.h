@@ -810,11 +810,12 @@ class AllowTypeOrInstanceMemberFailure final : public FailureDiagnostic {
   DeclName Name;
 
 public:
-  AllowTypeOrInstanceMemberFailure(Expr *root, ConstraintSystem &cs, Type baseType,
-                                   DeclName memberName, ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), BaseType(baseType),
-        Name(memberName) {}
-    
+  AllowTypeOrInstanceMemberFailure(Expr *root, ConstraintSystem &cs,
+                                   Type baseType, DeclName memberName,
+                                   ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator),
+        BaseType(baseType->getRValueType()), Name(memberName) {}
+
   bool diagnoseAsError() override;
 };
 class PartialApplicationFailure final : public FailureDiagnostic {
