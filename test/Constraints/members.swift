@@ -577,3 +577,35 @@ extension S_Min : CustomStringConvertible {
     return "\(min)" // Ok
   }
 }
+
+// rdar://problem/50679161
+
+func rdar50679161() {
+  struct Point {}
+
+  struct S {
+    var w, h: Point
+  }
+
+  struct Q {
+    init(a: Int, b: Int) {}
+    init(a: Point, b: Point) {}
+  }
+
+  func foo() {
+    _ = { () -> Void in
+      var foo = S
+      // expected-error@-1 {{expected member name or constructor call after type name}}
+      // expected-note@-2 {{add arguments after the type to construct a value of the type}}
+      // expected-note@-3 {{use '.self' to reference the type object}}
+      if let v = Int?(1) {
+        var _ = Q(
+          a: v + foo.w,
+          // expected-error@-1 {{instance member 'w' cannot be used on type 'S'}}
+          b: v + foo.h
+          // expected-error@-1 {{instance member 'h' cannot be used on type 'S'}}
+        )
+      }
+    }
+  }
+}
