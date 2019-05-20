@@ -19,3 +19,10 @@ class { // expected-error {{unknown declaration syntax exists in the source}}
   // expected-error@-4 {{top-level statement cannot begin with a closure expression}}
 
 }
+
+#if swift(<1)
+print("Wat")
+class { // expected-error {{unknown declaration syntax exists in the source}}
+
+}
+#endif
