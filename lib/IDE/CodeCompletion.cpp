@@ -1481,6 +1481,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   ASTContext &Ctx;
   LazyResolver *TypeResolver = nullptr;
   const DeclContext *CurrDeclContext;
+  ModuleDecl *CurrModule;
   ClangImporter *Importer;
   CodeCompletionContext *CompletionContext;
 
@@ -1629,6 +1630,8 @@ public:
                    const DeclContext *CurrDeclContext,
                    CodeCompletionContext *CompletionContext = nullptr)
       : Sink(Sink), Ctx(Ctx), CurrDeclContext(CurrDeclContext),
+        CurrModule(CurrDeclContext ? CurrDeclContext->getParentModule()
+                                   : nullptr),
         Importer(static_cast<ClangImporter *>(CurrDeclContext->getASTContext().
           getClangModuleLoader())),
         CompletionContext(CompletionContext) {
@@ -3514,9 +3517,73 @@ public:
         addPostfixBang(ValueT);
   }
 
+  void addTypeRelationFromProtocol(CodeCompletionResultBuilder &builder,
+                                   CodeCompletionLiteralKind kind,
+                                   StringRef defaultTypeName) {
+    // Check for matching ExpectedTypes.
+    auto *P = Ctx.getProtocol(protocolForLiteralKind(kind));
+    for (auto T : expectedTypeContext.possibleTypes) {
+      if (!T)
+        continue;
+
+      auto typeRelation = CodeCompletionResult::Identical;
+      // Convert through optional types unless we're looking for a protocol
+      // that Optional itself conforms to.
+      if (kind != CodeCompletionLiteralKind::NilLiteral) {
+        if (auto optionalObjT = T->getOptionalObjectType()) {
+          T = optionalObjT;
+          typeRelation = CodeCompletionResult::Convertible;
+        }
+      }
+
+      // Check for conformance to the literal protocol.
+      if (auto *NTD = T->getAnyNominal()) {
+        SmallVector<ProtocolConformance *, 2> conformances;
+        if (NTD->lookupConformance(CurrModule, P, conformances)) {
+          addTypeAnnotation(builder, T);
+          builder.setExpectedTypeRelation(typeRelation);
+          return;
+        }
+      }
+    }
+
+    // Fallback to showing the default type.
+    if (!defaultTypeName.empty())
+      builder.addTypeAnnotation(defaultTypeName);
+  }
+
+  /// Add '#file', '#line', et at.
+  void addPoundLiteralCompletions(bool needPound) {
+    auto addFromProto = [&](StringRef name, CodeCompletionKeywordKind kwKind,
+                            CodeCompletionLiteralKind literalKind,
+                            StringRef defaultTypeName) {
+      if (!needPound)
+        name = name.substr(1);
+
+      CodeCompletionResultBuilder builder(
+          Sink, CodeCompletionResult::ResultKind::Keyword,
+          SemanticContextKind::None, {});
+      builder.setLiteralKind(literalKind);
+      builder.setKeywordKind(kwKind);
+      builder.addTextChunk(name);
+      addTypeRelationFromProtocol(builder, literalKind, defaultTypeName);
+    };
+
+    addFromProto("#function", CodeCompletionKeywordKind::pound_function,
+                 CodeCompletionLiteralKind::StringLiteral, "String");
+    addFromProto("#file", CodeCompletionKeywordKind::pound_file,
+                 CodeCompletionLiteralKind::StringLiteral, "String");
+    addFromProto("#line", CodeCompletionKeywordKind::pound_line,
+                 CodeCompletionLiteralKind::IntegerLiteral, "Int");
+    addFromProto("#column", CodeCompletionKeywordKind::pound_column,
+                 CodeCompletionLiteralKind::IntegerLiteral, "Int");
+
+    addKeyword(needPound ? "#dsohandle" : "dsohandle", "UnsafeRawPointer",
+               CodeCompletionKeywordKind::pound_dsohandle);
+  }
+
   void addValueLiteralCompletions() {
     auto &context = CurrDeclContext->getASTContext();
-    auto *module = CurrDeclContext->getParentModule();
 
     auto addFromProto = [&](
         CodeCompletionLiteralKind kind, StringRef defaultTypeName,
@@ -3528,38 +3595,7 @@ public:
       builder.setLiteralKind(kind);
 
       consumer(builder);
-
-      // Check for matching ExpectedTypes.
-      auto *P = context.getProtocol(protocolForLiteralKind(kind));
-      bool foundConformance = false;
-      for (auto T : expectedTypeContext.possibleTypes) {
-        if (!T)
-          continue;
-
-        auto typeRelation = CodeCompletionResult::Identical;
-        // Convert through optional types unless we're looking for a protocol
-        // that Optional itself conforms to.
-        if (kind != CodeCompletionLiteralKind::NilLiteral) {
-          if (auto optionalObjT = T->getOptionalObjectType()) {
-            T = optionalObjT;
-            typeRelation = CodeCompletionResult::Convertible;
-          }
-        }
-
-        // Check for conformance to the literal protocol.
-        if (auto *NTD = T->getAnyNominal()) {
-          SmallVector<ProtocolConformance *, 2> conformances;
-          if (NTD->lookupConformance(module, P, conformances)) {
-            foundConformance = true;
-            addTypeAnnotation(builder, T);
-            builder.setExpectedTypeRelation(typeRelation);
-          }
-        }
-      }
-
-      // Fallback to showing the default type.
-      if (!foundConformance && !defaultTypeName.empty())
-        builder.addTypeAnnotation(defaultTypeName);
+      addTypeRelationFromProtocol(builder, kind, defaultTypeName);
     };
 
     // FIXME: the pedantically correct way is to resolve Swift.*LiteralType.
@@ -3708,8 +3744,11 @@ public:
           });
     }
 
-    if (LiteralCompletions)
+    if (LiteralCompletions) {
       addValueLiteralCompletions();
+      addPoundLiteralCompletions(/*needPound=*/true);
+    }
+
 
     // If the expected type is ObjectiveC.Selector, add #selector. If
     // it's String, add #keyPath.
@@ -4842,14 +4881,6 @@ static void addExprKeywords(CodeCompletionResultSink &Sink) {
   addKeyword(Sink, "try", CodeCompletionKeywordKind::kw_try);
   addKeyword(Sink, "try!", CodeCompletionKeywordKind::kw_try);
   addKeyword(Sink, "try?", CodeCompletionKeywordKind::kw_try);
-  // FIXME: The pedantically correct way to find the type is to resolve the
-  // Swift.StringLiteralType type.
-  addKeyword(Sink, "#function", CodeCompletionKeywordKind::pound_function, "String");
-  addKeyword(Sink, "#file", CodeCompletionKeywordKind::pound_file, "String");
-  // Same: Swift.IntegerLiteralType.
-  addKeyword(Sink, "#line", CodeCompletionKeywordKind::pound_line, "Int");
-  addKeyword(Sink, "#column", CodeCompletionKeywordKind::pound_column, "Int");
-  addKeyword(Sink, "#dsohandle", CodeCompletionKeywordKind::pound_dsohandle, "UnsafeMutableRawPointer");
 }
 
 static void addOpaqueTypeKeyword(CodeCompletionResultSink &Sink) {
@@ -5448,7 +5479,12 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::AfterPoundExpr: {
+    ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
+    Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
+                            ContextInfo.isSingleExpressionBody());
+
     Lookup.addPoundAvailable(ParentStmtKind);
+    Lookup.addPoundLiteralCompletions(/*needPound=*/false);
     Lookup.addPoundSelector(/*needPound=*/false);
     Lookup.addPoundKeyPath(/*needPound=*/false);
     break;
