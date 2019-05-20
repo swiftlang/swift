@@ -39,6 +39,10 @@ public protocol TensorArrayProtocol {
   var _typeList: [TensorDataType] { get }
 
   init(_owning tensorHandles: UnsafePointer<CTensorHandle>?, count: Int)
+  
+  init(handles: [_AnyTensorHandle])
+  
+  func tensorHandles() -> ([_AnyTensorHandle])
 }
 
 /// A protocol representing types that can be mapped to and from
@@ -65,6 +69,8 @@ public protocol TensorGroup : TensorArrayProtocol {
   /// Initializes a value of this type, taking ownership of the
   /// `_tensorHandleCount` tensors starting at address `tensorHandles`.
   init(_owning tensorHandles: UnsafePointer<CTensorHandle>?)
+
+  override init(handles: [_AnyTensorHandle])
 }
 
 public extension TensorGroup {
@@ -110,6 +116,14 @@ extension TensorHandle : TensorGroup {
   public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
     self.init(_owning: tensorHandles!.pointee)
   }
+
+  public func tensorHandles() -> ([_AnyTensorHandle]){
+    return [self.handle]
+  }
+
+  public convenience init(handles: [_AnyTensorHandle]) {
+    self.init(handle: handles[0])
+  }
 }
 
 extension ResourceHandle : TensorGroup {
@@ -130,6 +144,14 @@ extension ResourceHandle : TensorGroup {
 
   public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
     self.init(owning: tensorHandles!.pointee)
+  }
+
+  public func tensorHandles() -> ([_AnyTensorHandle]){
+    return [self.handle]
+  }
+
+  public convenience init(handles: [_AnyTensorHandle]) {
+    self.init(handle: handles[0])
   }
 }
 
@@ -152,6 +174,14 @@ extension VariantHandle : TensorGroup {
   public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
     self.init(owning: tensorHandles!.pointee)
   }
+
+  public func tensorHandles() -> ([_AnyTensorHandle]){
+    return [self.handle]
+  }
+
+  public convenience init(handles: [_AnyTensorHandle]) {
+    self.init(handle: handles[0])
+  }
 }
 
 extension Tensor : TensorGroup {
@@ -172,6 +202,14 @@ extension Tensor : TensorGroup {
 
   public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
     self.init(handle: TensorHandle(_owning: tensorHandles!.pointee))
+  }
+
+  public func tensorHandles() -> ([_AnyTensorHandle]){
+    return [self.handle.handle]
+  }
+
+  public init(handles: [_AnyTensorHandle]) {
+    self.init(handle: TensorHandle(handle: handles[0]))
   }
 }
 
@@ -194,6 +232,14 @@ extension _TensorElementLiteral : TensorGroup {
   public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
     self.init(handle: TensorHandle(_owning: tensorHandles!.pointee))
   }
+
+  public func tensorHandles() -> ([_AnyTensorHandle]){
+    return [self.handle.handle]
+  }
+
+  public init(handles: [_AnyTensorHandle]) {
+    self.init(handle: TensorHandle(handle: handles[0]))
+  }
 }
 
 extension StringTensor : TensorGroup {
@@ -214,6 +260,14 @@ extension StringTensor : TensorGroup {
 
   public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
     self.init(handle: TensorHandle(_owning: tensorHandles!.pointee))
+  }
+
+  public func tensorHandles() -> ([_AnyTensorHandle]){
+    return [self.handle.handle]
+  }
+
+  public init(handles: [_AnyTensorHandle]) {
+    self.init(handle: TensorHandle(handle: handles[0]))
   }
 }
 
@@ -241,5 +295,24 @@ extension Array : TensorArrayProtocol where Element : TensorGroup {
     self = Array((0..<size).map { Element.init(
       _owning: tensorHandles?.advanced(by: $0 * Int(Element._tensorHandleCount)))
     })
+  }
+
+  public func tensorHandles() -> ([_AnyTensorHandle]){
+    var result: [_AnyTensorHandle] = []
+    result.reserveCapacity(Int(self._tensorHandleCount))
+    for elem in self {
+      result += (elem.tensorHandles())
+    }
+    return result
+  }
+
+  public init(handles: [_AnyTensorHandle]) {
+    let size = handles.count / Int(Element._tensorHandleCount)
+    self = Array((0..<size).map {
+        let start = $0 * Int(Element._tensorHandleCount)
+        let end = start + Int(Element._tensorHandleCount)
+        let elemHandles = Array<_AnyTensorHandle>(handles[start..<end])
+        return Element.init(handles: elemHandles)
+      })
   }
 }

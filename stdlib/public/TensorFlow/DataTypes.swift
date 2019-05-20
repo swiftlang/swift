@@ -27,12 +27,16 @@ import CTensorFlow
 // `TF_DataType` without importing CTensorFlow, which pollutes the namespace
 // with TensorFlow C API declarations.
 @_fixed_layout
-public struct TensorDataType {
+public struct TensorDataType: Equatable, Hashable {
   public var _cDataType: TF_DataType
 
   @inlinable
   internal init(_ cDataType: TF_DataType) {
     self._cDataType = cDataType
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(Int(_cDataType.rawValue))
   }
 }
 

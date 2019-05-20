@@ -64,6 +64,10 @@ public struct TensorHandle<Scalar>
     self.handle = TFETensorHandle(_owning: cTensorHandle)
   }
 
+  public init(handle: _AnyTensorHandle) {
+    self.handle = handle
+  }
+
   @usableFromInline
   init(copyingFromCTensor cTensor: CTensor) {
     let status = TF_NewStatus()
@@ -171,6 +175,12 @@ public struct ResourceHandle {
   init(owning cTensorHandle: CTensorHandle) {
     self.handle = TFETensorHandle(_owning: cTensorHandle)
   }
+
+  @usableFromInline
+  init(handle: _AnyTensorHandle) {
+    self.handle = handle
+
+  }
 }
 
 /// `VariantHandle` is the type used by ops to represent TensorFlow "variant"
@@ -184,5 +194,10 @@ public struct VariantHandle {
   @usableFromInline
   init(owning cTensorHandle: CTensorHandle) {
     self.handle = TFETensorHandle(_owning: cTensorHandle)
+  }
+
+  @usableFromInline
+  init(handle: _AnyTensorHandle) {
+    self.handle = handle
   }
 }
