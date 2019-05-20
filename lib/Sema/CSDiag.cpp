@@ -6545,16 +6545,20 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
 
     // Depending on how we matched, produce tailored diagnostics.
     switch (candidateInfo.closeness) {
+    case CC_SelfMismatch:         // Self argument mismatches.
+      llvm_unreachable("These aren't produced by filterContextualMemberList");
+      return false;
+
     case CC_NonLValueInOut: // First argument is inout but no lvalue present.
     case CC_OneArgumentMismatch: // All arguments except one match.
     case CC_OneArgumentNearMismatch:
     case CC_OneGenericArgumentMismatch:
     case CC_OneGenericArgumentNearMismatch:
     case CC_GenericNonsubstitutableMismatch:
-    case CC_SelfMismatch:         // Self argument mismatches.
     case CC_ArgumentNearMismatch: // Argument list mismatch.
     case CC_ArgumentMismatch:     // Argument list mismatch.
-      llvm_unreachable("These aren't produced by filterContextualMemberList");
+      // Candidate filtering can produce these now, but they can't
+      // be properly diagnosed here at the moment.
       return false;
 
     case CC_ExactMatch: { // This is a perfect match for the arguments.
