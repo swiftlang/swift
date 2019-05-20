@@ -82,7 +82,8 @@ public:
   void recordScope(PartialApplyInst *PAI) {
     // Only track scopes of non-escaping closures.
     auto closureTy = PAI->getCallee()->getType().castTo<SILFunctionType>();
-    if (!isNonEscapingClosure(closureTy))
+    if (!isNonEscapingClosure(closureTy) ||
+        PAI->isCalleeDynamicallyReplaceable())
       return;
 
     auto closureFunc = PAI->getCalleeFunction();
