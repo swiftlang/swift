@@ -954,8 +954,10 @@ class InterpolatedStringLiteralExpr : public LiteralExpr {
   /// Points at the beginning quote.
   SourceLoc Loc;
   /// Points at the ending quote.
-  /// Needed for the upcoming ASTScope subsystem because lookups can be targeted
-  /// to inside an InterpolatedStringLiteralExpr.
+  /// Needed for the upcoming \c ASTScope subsystem because lookups can be
+  /// targeted to inside an \c InterpolatedStringLiteralExpr. It would be nicer
+  /// to use \c EndLoc for this value, but then \c Lexer::getLocForEndOfToken()
+  /// would not work for \c stringLiteral->getEndLoc().
   SourceLoc TrailingQuoteLoc;
   TapExpr *AppendingExpr;
   Expr *SemanticExpr;
