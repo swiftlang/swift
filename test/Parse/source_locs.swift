@@ -5,4 +5,4 @@ func string_interpolation() {
 }
 
 // RUN: %target-swift-frontend -dump-ast %s | %FileCheck %s
-// CHECK: (interpolated_string_literal_expr {{.*}} trailing_quote_loc=SOURCE_DIR/test/Parse/source_locs.swift:4:12 {{.*}}
+// CHECK: (interpolated_string_literal_expr {{.*}} trailing_quote_loc=SOURCE_DIR{{/|\\}}test{{/|\\}}Parse{{/|\\}}source_locs.swift:4:12 {{.*}}
