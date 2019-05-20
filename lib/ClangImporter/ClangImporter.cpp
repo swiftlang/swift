@@ -636,7 +636,9 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.back().append(moduleCachePath);
   }
 
-  if (!importerOpts.DisableModulesValidateSystemHeaders) {
+  if (importerOpts.DisableModulesValidateSystemHeaders) {
+    invocationArgStrs.push_back("-fno-modules-validate-system-headers");
+  } else {
     invocationArgStrs.push_back("-fmodules-validate-system-headers");
   }
 
