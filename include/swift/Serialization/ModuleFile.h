@@ -589,8 +589,12 @@ private:
   GenericParamList *maybeReadGenericParams(DeclContext *DC);
 
   /// Reads a set of requirements from \c DeclTypeCursor.
-  void readGenericRequirements(SmallVectorImpl<Requirement> &requirements,
-                               llvm::BitstreamCursor &Cursor);
+  llvm::Expected<SmallVector<Requirement, 2>>
+  readGenericRequirementsChecked(llvm::BitstreamCursor &Cursor);
+
+  /// Reads a set of requirements from \c DeclTypeCursor.
+  SmallVector<Requirement, 2>
+  readGenericRequirements(llvm::BitstreamCursor &Cursor);
 
   /// Set up a (potentially lazy) generic environment for the given type,
   /// function or extension.

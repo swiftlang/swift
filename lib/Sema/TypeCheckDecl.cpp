@@ -1388,6 +1388,12 @@ llvm::Expected<ArrayRef<Requirement>>
 RequirementSignatureRequest::evaluate(Evaluator &evaluator, ProtocolDecl *proto) const {
   GenericSignatureBuilder builder(proto->getASTContext());
 
+  auto *mod = cast<FileUnit>(proto->getModuleScopeContext());
+  assert(mod->getKind() == FileUnitKind::ClangModule ||
+         mod->getKind() == FileUnitKind::DWARFModule ||
+         mod->getKind() == FileUnitKind::Source);
+  (void) mod;
+
   // Add all of the generic parameters.
   proto->createGenericParamsIfMissing();
   for (auto gp : *proto->getGenericParams())

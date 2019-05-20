@@ -727,10 +727,19 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
                                   SourceLoc());
 }
 
-void ModuleFile::readGenericRequirements(
-                   SmallVectorImpl<Requirement> &requirements,
-                   llvm::BitstreamCursor &Cursor) {
+SmallVector<Requirement, 2>
+ModuleFile::readGenericRequirements(llvm::BitstreamCursor &Cursor) {
+  auto maybeRequirements = readGenericRequirementsChecked(Cursor);
+  if (!maybeRequirements)
+    fatal(maybeRequirements.takeError());
+  return maybeRequirements.get();
+}
+
+Expected<SmallVector<Requirement, 2>>
+ModuleFile::readGenericRequirementsChecked(llvm::BitstreamCursor &Cursor) {
   using namespace decls_block;
+
+  SmallVector<Requirement, 2> requirements;
 
   BCOffsetRAII lastRecordOffset(Cursor);
   SmallVector<uint64_t, 8> scratch;
@@ -753,29 +762,28 @@ void ModuleFile::readGenericRequirements(
       GenericRequirementLayout::readRecord(scratch, rawKind,
                                            rawTypeIDs[0], rawTypeIDs[1]);
 
+      auto maybeFirst = getTypeChecked(rawTypeIDs[0]);
+      if (!maybeFirst)
+        return maybeFirst.takeError();
+      Type first = maybeFirst.get();
+
+      auto maybeSecond = getTypeChecked(rawTypeIDs[1]);
+      if (!maybeSecond)
+        return maybeSecond.takeError();
+      Type second = maybeSecond.get();
+
       switch (rawKind) {
       case GenericRequirementKind::Conformance: {
-        auto subject = getType(rawTypeIDs[0]);
-        auto constraint = getType(rawTypeIDs[1]);
-
-        requirements.push_back(Requirement(RequirementKind::Conformance,
-                                           subject, constraint));
+        requirements.emplace_back(RequirementKind::Conformance, first, second);
         break;
       }
       case GenericRequirementKind::Superclass: {
-        auto subject = getType(rawTypeIDs[0]);
-        auto constraint = getType(rawTypeIDs[1]);
 
-        requirements.push_back(Requirement(RequirementKind::Superclass,
-                                           subject, constraint));
+        requirements.emplace_back(RequirementKind::Superclass, first, second);
         break;
       }
       case GenericRequirementKind::SameType: {
-        auto first = getType(rawTypeIDs[0]);
-        auto second = getType(rawTypeIDs[1]);
-
-        requirements.push_back(Requirement(RequirementKind::SameType,
-                                           first, second));
+        requirements.emplace_back(RequirementKind::SameType, first, second);
         break;
       }
       default:
@@ -793,7 +801,11 @@ void ModuleFile::readGenericRequirements(
       LayoutRequirementLayout::readRecord(scratch, rawKind, rawTypeID,
                                           size, alignment);
 
-      auto first = getType(rawTypeID);
+      auto maybeFirst = getTypeChecked(rawTypeID);
+      if (!maybeFirst)
+        return maybeFirst.takeError();
+      Type first = maybeFirst.get();
+
       LayoutConstraint layout;
       LayoutConstraintKind kind = LayoutConstraintKind::UnknownLayout;
       switch (rawKind) {
@@ -849,6 +861,8 @@ void ModuleFile::readGenericRequirements(
     if (!shouldContinue)
       break;
   }
+
+  return requirements;
 }
 
 void ModuleFile::configureGenericEnvironment(
@@ -919,8 +933,7 @@ GenericSignature *ModuleFile::getGenericSignature(
   }
 
   // Read the generic requirements.
-  SmallVector<Requirement, 4> requirements;
-  readGenericRequirements(requirements, DeclTypeCursor);
+  auto requirements = readGenericRequirements(DeclTypeCursor);
 
   // Construct the generic signature from the loaded parameters and
   // requirements.
@@ -1027,8 +1040,7 @@ ModuleFile::getGenericSignatureOrEnvironment(
     }
 
     // Read the generic requirements.
-    SmallVector<Requirement, 4> requirements;
-    readGenericRequirements(requirements, DeclTypeCursor);
+    auto requirements = readGenericRequirements(DeclTypeCursor);
 
     // Construct the generic signature from the loaded parameters and
     // requirements.
@@ -3330,8 +3342,14 @@ public:
     // Establish the requirement signature.
     {
       SmallVector<Requirement, 4> requirements;
-      MF.readGenericRequirements(requirements, MF.DeclTypeCursor);
-      proto->setRequirementSignature(requirements);
+      auto maybeRequirements =
+        MF.readGenericRequirementsChecked(MF.DeclTypeCursor);
+      if (!maybeRequirements) {
+        consumeError(maybeRequirements.takeError());
+        proto->setHasMissingRequirements(true);
+      } else {
+        proto->setRequirementSignature(maybeRequirements.get());
+      }
     }
 
     proto->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
@@ -4156,7 +4174,6 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         unsigned exported;
         SpecializeAttr::SpecializationKind specializationKind;
         unsigned specializationKindVal;
-        SmallVector<Requirement, 8> requirements;
 
         serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
           scratch, exported, specializationKindVal);
@@ -4165,7 +4182,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
                                  ? SpecializeAttr::SpecializationKind::Partial
                                  : SpecializeAttr::SpecializationKind::Full;
 
-        MF.readGenericRequirements(requirements, MF.DeclTypeCursor);
+        auto requirements = MF.readGenericRequirements(MF.DeclTypeCursor);
 
         Attr = SpecializeAttr::create(ctx, SourceLoc(), SourceRange(),
                                       requirements, exported != 0,

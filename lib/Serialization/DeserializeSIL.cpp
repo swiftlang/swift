@@ -630,8 +630,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
         specializationKindVal ? SILSpecializeAttr::SpecializationKind::Partial
                               : SILSpecializeAttr::SpecializationKind::Full;
 
-    SmallVector<Requirement, 8> requirements;
-    MF->readGenericRequirements(requirements, SILCursor);
+    auto requirements = MF->readGenericRequirements(SILCursor);
 
     // Read the substitution list and construct a SILSpecializeAttr.
     fn->addSpecializeAttr(SILSpecializeAttr::create(
@@ -2423,8 +2422,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       components.push_back(*readKeyPathComponent(ListOfValues, nextValue));
     }
     
-    SmallVector<Requirement, 4> requirements;
-    MF->readGenericRequirements(requirements, SILCursor);
+    auto requirements = MF->readGenericRequirements(SILCursor);
     
     CanGenericSignature sig = nullptr;
     if (!genericParams.empty() || !requirements.empty())
