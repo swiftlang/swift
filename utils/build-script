@@ -12,6 +12,7 @@
 from __future__ import print_function
 
 import argparse
+import json
 import os
 import pipes
 import platform
@@ -54,6 +55,15 @@ def exit_rejecting_arguments(message, parser=None):
     if parser:
         parser.print_usage(sys.stderr)
     sys.exit(2)  # 2 is the same as `argparse` error exit code.
+
+
+class JSONDumper(json.JSONEncoder):
+    def __init__(self, *args, **kwargs):
+        json.JSONEncoder.__init__(self, indent=2, separators=(',', ': '),
+                                  *args, **kwargs)
+    
+    def default(self, o):
+        return vars(o)
 
 
 class HostSpecificConfiguration(object):
@@ -1093,8 +1103,9 @@ def main_preset():
         "--build-dir",
         help="specify the directory where build artifact should be stored")
     parser.add_argument(
-        "--print-build-dir",
-        help="Print the build directory and exit without building",
+        "--dump-config",
+        help="instead of building, write JSON to stdout containing "
+             "various values used to build in this configuration",
         action="store_true",
         default=False)
     args = parser.parse_args()
@@ -1146,8 +1157,8 @@ def main_preset():
     build_script_args = [sys.argv[0]]
     if args.dry_run:
         build_script_args += ["--dry-run"]
-    if args.print_build_dir:
-        build_script_args += ["--print-build-dir"]
+    if args.dump_config:
+        build_script_args += ["--dump-config"]
 
     build_script_args += preset_args
     if args.distcc:
@@ -1233,8 +1244,8 @@ def main_normal():
     if args.show_sdks:
         debug.print_xcodebuild_versions()
 
-    if args.print_build_dir:
-        print(invocation.workspace.build_root)
+    if args.dump_config:
+        print(JSONDumper().encode(invocation))
         return 0
 
     # Clean build directory if requested.
