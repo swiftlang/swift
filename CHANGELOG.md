@@ -28,8 +28,8 @@ Swift Next
 
 * [SR-8974][]:
 
-  Duplicate tuple element labels are no longer allowed, as they lead to
-  undefined behavior. For example:
+  Duplicate tuple element labels are no longer allowed, because it leads
+  to incorrect behavior. For example:
 
   ```
   let dupLabels: (foo: Int, foo: Int) = (foo: 1, foo: 2)
