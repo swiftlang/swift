@@ -733,12 +733,6 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
         return problem == firstProblem;
       });
 
-  ValueDecl *member = nullptr;
-  for (auto cand : result.UnviableCandidates) {
-    if (member == nullptr && cand.isDecl())
-      member = cand.getDecl();
-  }
-
   auto instanceTy = baseObjTy;
   if (auto *MTT = instanceTy->getAs<AnyMetatypeType>())
     instanceTy = MTT->getInstanceType();
