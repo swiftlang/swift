@@ -79,7 +79,6 @@ extension TestSuite {
   public func testCPUOrGPU(_ name: String, _ body: @escaping () -> Void) {
 #if !TPU
     test(name + (TestSuite.willTargetGPU ? "_GPU" : "_CPU")) {
-      _RuntimeConfig.executionMode = .auto
       _RuntimeConfig.gpuMemoryAllowGrowth = true
       _RuntimeConfig.printsDebugLog = false
       withDevice(TestSuite.willTargetGPU ? .gpu : .cpu) {
@@ -91,9 +90,7 @@ extension TestSuite {
   public func testTPU(_ name: String, _ body: @escaping () -> Void) {
 #if TPU
     test(name + "_TPU") {
-      _RuntimeConfig.executionMode = .tpu
-      _RuntimeConfig.printsDebugLog = false
-      body()
+      fatalError("TPU not supported")
     }
 #endif // TPU
   }

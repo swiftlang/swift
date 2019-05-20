@@ -32,26 +32,6 @@ import Glibc
 #endif
 import CTensorFlow
 
-// @_frozen // SR-9739
-public enum _ExecutionMode : Equatable {
-  /// CPU or GPU execution.
-  case auto
-  /// TPU execution.
-  // TODO: assess if we can pass this bit of info from compiler settings (when
-  // enableTPU() is called), and avoid having this additional runtime bit.
-  case tpu
-  /// XLA jit-compilation backend (will use GPU when available, and otherwise
-  /// CPU).
-  case xla
-
-  public var isTPU: Bool {
-    switch self {
-    case .tpu: return true
-    default: return false
-    }
-  }
-}
-
 /// TraceContext contains the state needed to build a trace graph function
 /// (TF_Function). As eager ops are executed in tracing mode, their
 /// corresponding nodes are added to the trace graph (via
@@ -444,10 +424,6 @@ public enum _RuntimeConfig {
   /// tensor program in this process.
   static public var tensorFlowRuntimeInitialized = false
 
-  /// For CPU and GPU execution without XLA, use the auto mode. For XLA and/or
-  /// TPU execution, set the enum value accordingly.
-  static public var executionMode: _ExecutionMode = .auto
-
   /// When true, let TensorFlow GPU memory allocation start small and grow as
   /// needed. Otherwise, The entire GPU memory region is pre-allocated.
   static public var gpuMemoryAllowGrowth = true
@@ -503,12 +479,6 @@ private func configureRuntimeFromEnvironment() {
     }
     _RuntimeConfig.tensorflowVerboseLogLevel = verboseLevel
     debugLog("Setting TF logging verbose level to \(verboseLevel) from env.")
-  }
-
-  if let value = getenv("SWIFT_TENSORFLOW_USE_TPU_INFEED"),
-    String(cString: value).lowercased() == "true" {
-      _RuntimeConfig.executionMode = .tpu
-      debugLog("Setting TPU execution with infeed from env.")
   }
 
   if let value = getenv("SWIFT_TENSORFLOW_SERVER_ADDRESS") {
@@ -632,14 +602,11 @@ public final class _ExecutionContext {
     }
 
     // Create TF config object.
-    if _RuntimeConfig.executionMode == .xla {
-      debugLog("Enable XLA execution.")
-    }
     if _RuntimeConfig.gpuMemoryAllowGrowth {
       debugLog("Allowing growth for GPU memory allocator.")
     }
     self.tensorFlowConfig = TF_CreateConfig(
-      _RuntimeConfig.executionMode == .xla ? 1 : 0,
+      /* enable_xla_compilation */ 0,
       _RuntimeConfig.gpuMemoryAllowGrowth ? 1 : 0,
       _RuntimeConfig.cpuDeviceCount)
     TFE_ContextOptionsSetConfig(opts,
@@ -666,9 +633,6 @@ public final class _ExecutionContext {
     }
 
     // Initialize GPU device.
-    // While the code here is only needed when _RuntimeConfig.executionMode is
-    // set to .gpu, running it in all code paths helps keep things simple
-    // (e.g. so that the cpuDeviceNamePrefix property is always set.)
     let devices = TFE_ContextListDevices(eagerContext, status)
     checkOk(status)
     defer { TF_DeleteDeviceList(devices!) }

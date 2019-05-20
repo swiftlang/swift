@@ -14,9 +14,6 @@ import StdlibUnittest
 var ModelTests = TestSuite("Model")
 
 ModelTests.testAllBackends("StraightLineXORTraining") {
-  // FIXME: TPU execution on TAP is timing out. (b/74155319)
-  guard !_RuntimeConfig.executionMode.isTPU else { return }
-
   // Hyper-parameters
   let iterationCount = 2000
   let learningRate: Float = 0.2
@@ -57,9 +54,6 @@ ModelTests.testAllBackends("StraightLineXORTraining") {
 }
 
 ModelTests.testAllBackends("XORClassifierTraining") {
-  // FIXME: XORClassifierTraining_TPU crashes with SIGSEGV. (b/74155319)
-  guard !_RuntimeConfig.executionMode.isTPU else { return }
-
   // The classifier struct.
   struct MLPClassifier {
     var w1, w2, b1, b2: Tensor<Float>

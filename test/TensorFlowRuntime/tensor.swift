@@ -55,9 +55,6 @@ TensorTests.testAllBackends("ArrayConversion") {
 }
 
 TensorTests.testAllBackends("DataTypeCast_NonTPU") {
-  // TPU does not support Int8 or 16 casting.
-  guard !_RuntimeConfig.executionMode.isTPU else { return }
-
   let x = Tensor<Int32>(ones: [5, 5])
   let ints = Tensor<Int64>(x)
   let floats = Tensor<Float>(x)
@@ -68,9 +65,6 @@ TensorTests.testAllBackends("DataTypeCast_NonTPU") {
 }
 
 TensorTests.testAllBackends("DataTypeCast_TPU") {
-  // Non-TPU mode (e.g. eager) does not support Uint32 casting.
-  guard _RuntimeConfig.executionMode.isTPU else { return }
-
   let x = Tensor<Int32>(ones: [5, 5])
   let ints = Tensor<Int64>(x)
   let floats = Tensor<Float>(x)
@@ -81,12 +75,6 @@ TensorTests.testAllBackends("DataTypeCast_TPU") {
 }
 
 TensorTests.testAllBackends("BoolToNumericCast_NonTPU") {
-  // TPU does not support Int8 or 16 casting.
-  //
-  // When changing to UInt32, got another TPU/XLA compilation error when
-  // converting from bools to Uint32 (different from missing kernel error).
-  if _RuntimeConfig.executionMode.isTPU { return }
-
   let bools = Tensor<Bool>(shape: [2, 2], scalars: [true, false, true, false])
   let ints = Tensor<Int64>(bools)
   let floats = Tensor<Float>(bools)
@@ -344,7 +332,7 @@ TensorTests.testAllBackends("StridedSliceIndexing") {
   /// Test scalars
   expectEqual(Array(stride(from: 40.0, to: 60, by: 1)), array3D.scalars)
   expectEqual(
-    Array(stride(from: 20.0, to: 25, by: 1)) + 
+    Array(stride(from: 20.0, to: 25, by: 1)) +
     Array(stride(from: 30.0, to: 35, by: 1)), array2D.scalars)
   expectEqual(Array(stride(from: 1.0, to: 5, by: 2)), array1D.scalars)
 }
@@ -375,9 +363,9 @@ TensorTests.testAllBackends("StridedSliceIndexingAssignment") {
 
   /// Test scalars
   expectEqual(
-    Array(stride(from: 20.0, to: 30, by: 2)) + 
-    Array(stride(from: 45.0, to: 50, by: 1)) + 
-    Array(stride(from: 30.0, to: 40, by: 2)) + 
+    Array(stride(from: 20.0, to: 30, by: 2)) +
+    Array(stride(from: 45.0, to: 50, by: 1)) +
+    Array(stride(from: 30.0, to: 40, by: 2)) +
     Array(stride(from: 55.0, to: 60, by: 1)), array3D.scalars)
   expectEqual(Array(stride(from: 20.0, to: 30, by: 1)), array2D.scalars)
   expectEqual(Array(stride(from: 3.0, to: 5, by: 1)), array1D.scalars)
@@ -649,7 +637,7 @@ TensorTests.testAllBackends("ExpandingShape") {
 
   expectEqual([1, 2, 1, 3, 1], reshaped.shape)
   expectEqual(Array(0..<6), reshaped.scalars)
-  
+
   // 1 x 2 x 1 x 3 x 1 -> 2 x 3
   let rereshaped = reshaped.squeezingShape(at: 0,2,4)
   expectEqual([2, 3], rereshaped.shape)

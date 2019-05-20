@@ -22,10 +22,6 @@
 @_transparent
 @available(*, deprecated)
 public func enableTPU(serverAddress: String? = nil, infeed: Bool = true) {
-  _RuntimeConfig.executionMode = .tpu
-  if let serverAddress = serverAddress {
-    _RuntimeConfig.session = .remote(serverDef: serverAddress)
-  }
 }
 
 // FIXME: Extend the interface to support multiple GPU devices, and unify it
