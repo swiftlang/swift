@@ -4,6 +4,10 @@
 import Swift
 import Builtin
 
+//////////////////
+// Declarations //
+//////////////////
+
 struct UInt {
   var value: Builtin.Word
 }
@@ -19,6 +23,15 @@ struct Int64 {
 struct UInt64 {
   var value: Builtin.Int64
 }
+
+class Klass {}
+
+sil @klass_allocator : $@convention(method) (@thick Klass.Type) -> @owned Klass
+sil @generic_user : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+
+///////////
+// Tests //
+///////////
 
 sil [ossa] @count_leading_zeros_corner_case : $@convention(thin) () -> Builtin.Int64 {
 bb0:
@@ -1131,4 +1144,40 @@ bb2(%8 : @owned $AnSubObject):
 
 bb3(%11 : $Builtin.Int1):
   return %11 : $Builtin.Int1
+}
+
+sil [ossa] @do_not_infinite_loop : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 1
+  %1 = struct $Int (%0 : $Builtin.Word)
+  %2 = metatype $@thick Klass.Type
+  %3 = function_ref @klass_allocator : $@convention(method) (@thick Klass.Type) -> @owned Klass
+  %4 = apply %3(%2) : $@convention(method) (@thick Klass.Type) -> @owned Klass
+  // We can never in constant propagation forward %5 today since we would need
+  // to know that we are eliminting all of its uses. But the pass doesn't
+  // understand that today and so destroy_value %5 in bb2 stops our ability to
+  // optimize.
+  %5 = tuple (%1 : $Int, %4 : $Klass)
+  cond_br undef, bb1, bb2
+
+bb1:
+  %6 = alloc_stack $(Int, Klass)
+  %7 = tuple_element_addr %6 : $*(Int, Klass), 0
+  %8 = tuple_element_addr %6 : $*(Int, Klass), 1
+  (%9, %10) = destructure_tuple %5 : $(Int, Klass)
+  store %1 to [trivial] %7 : $*Int
+  store %10 to [init] %8 : $*Klass
+  %13 = function_ref @generic_user : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %14 = apply %13<(Int, Klass)>(%6) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %6 : $*(Int, Klass)
+  dealloc_stack %6 : $*(Int, Klass)
+  br bb3
+
+bb2:
+  destroy_value %5 : $(Int, Klass)
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
 }
