@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt  -wmo -enable-sil-verify-all %s -enable-sil-existential-specializer -existential-specializer  -inline -sil-combine -generic-specializer -devirtualizer
+// RUN: %target-sil-opt  -wmo -enable-sil-verify-all %s -enable-existential-specializer -existential-specializer  -inline -sil-combine -generic-specializer -devirtualizer
 
 // This file tests existential specializer transformation followed by concrete type propagation  and generic specialization leading to a devirtualization of a witness method call.
 

@@ -28,6 +28,11 @@
 
 using namespace swift;
 
+static llvm::cl::opt<bool>
+EnableExistentialSpecializer("enable-existential-specializer",
+                             llvm::cl::Hidden,
+                             llvm::cl::init(false));
+
 STATISTIC(NumFunctionsWithExistentialArgsSpecialized,
           "Number of functions with existential args specialized");
 
@@ -66,7 +71,7 @@ public:
     auto *F = getFunction();
 
     /// Don't optimize functions that should not be optimized.
-    if (!F->shouldOptimize() || !F->getModule().getOptions().ExistentialSpecializer) {
+    if (!F->shouldOptimize() || !EnableExistentialSpecializer) {
       return;
     }
 
