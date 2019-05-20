@@ -977,6 +977,9 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
   unsigned Index = OpNo - 1 + closureConv.getNumSILArguments();
 
   auto *Fn = PAI->getReferencedFunction();
+
+  // It is not safe to look at the content of dynamically replaceable functions
+  // since this pass looks at the content of Fn.
   if (!Fn || !Fn->isDefinition() || Fn->isDynamicallyReplaceable()) {
     LLVM_DEBUG(llvm::dbgs() << "        FAIL! Not a direct function definition "
                           "reference.\n");
