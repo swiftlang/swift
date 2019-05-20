@@ -2497,14 +2497,25 @@ public:
     bool isObjC;
     GenericEnvironmentID genericEnvID;
     uint8_t rawAccessLevel;
-    unsigned numConformances;
-    ArrayRef<uint64_t> rawInheritedIDs;
+    unsigned numConformances, numInheritedTypes;
+    ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
 
     decls_block::StructLayout::readRecord(scratch, nameID, contextID,
                                           isImplicit, isObjC, genericEnvID,
                                           rawAccessLevel,
-                                          numConformances,
-                                          rawInheritedIDs);
+                                          numConformances, numInheritedTypes,
+                                          rawInheritedAndDependencyIDs);
+
+    Identifier name = MF.getIdentifier(nameID);
+
+    for (TypeID dependencyID :
+           rawInheritedAndDependencyIDs.slice(numInheritedTypes)) {
+      auto dependency = MF.getTypeChecked(dependencyID);
+      if (!dependency) {
+        return llvm::make_error<TypeError>(
+            name, takeErrorInfo(dependency.takeError()));
+      }
+    }
 
     auto DC = MF.getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2514,10 +2525,8 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto theStruct = MF.createDecl<StructDecl>(SourceLoc(),
-                                               MF.getIdentifier(nameID),
-                                               SourceLoc(), None, genericParams,
-                                               DC);
+    auto theStruct = MF.createDecl<StructDecl>(SourceLoc(), name, SourceLoc(),
+                                               None, genericParams, DC);
     declOrOffset = theStruct;
 
     // Read the generic environment.
@@ -2537,7 +2546,8 @@ public:
 
     theStruct->computeType();
 
-    handleInherited(theStruct, rawInheritedIDs);
+    handleInherited(theStruct,
+                    rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
 
     theStruct->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
     skipRecord(MF.DeclTypeCursor, decls_block::MEMBERS);
@@ -3424,15 +3434,27 @@ public:
     GenericEnvironmentID genericEnvID;
     TypeID superclassID;
     uint8_t rawAccessLevel;
-    unsigned numConformances;
-    ArrayRef<uint64_t> rawInheritedIDs;
+    unsigned numConformances, numInheritedTypes;
+    ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC,
                                          requiresStoredPropertyInits,
                                          inheritsSuperclassInitializers,
                                          genericEnvID, superclassID,
                                          rawAccessLevel, numConformances,
-                                         rawInheritedIDs);
+                                         numInheritedTypes,
+                                         rawInheritedAndDependencyIDs);
+
+    Identifier name = MF.getIdentifier(nameID);
+
+    for (TypeID dependencyID :
+           rawInheritedAndDependencyIDs.slice(numInheritedTypes)) {
+      auto dependency = MF.getTypeChecked(dependencyID);
+      if (!dependency) {
+        return llvm::make_error<TypeError>(
+            name, takeErrorInfo(dependency.takeError()));
+      }
+    }
 
     auto DC = MF.getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -3442,10 +3464,8 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto theClass = MF.createDecl<ClassDecl>(SourceLoc(),
-                                             MF.getIdentifier(nameID),
-                                             SourceLoc(), None, genericParams,
-                                             DC);
+    auto theClass = MF.createDecl<ClassDecl>(SourceLoc(), name, SourceLoc(),
+                                             None, genericParams, DC);
     declOrOffset = theClass;
 
     MF.configureGenericEnvironment(theClass, genericEnvID);
@@ -3469,7 +3489,8 @@ public:
 
     theClass->computeType();
 
-    handleInherited(theClass, rawInheritedIDs);
+    handleInherited(theClass,
+                    rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
 
     theClass->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
     theClass->setHasDestructor();
