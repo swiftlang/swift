@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all -swift-version 4 %s -O
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all -swift-version 4 %s -enable-testing -O
 
-// TODO: These tests are disabled because the primal value struct makes the TBDGen be different before/after SILGen.
+// TODO: These tests are disabled because the pullback struct makes the TBDGen be different before/after SILGen.
 // UN: %empty-directory(%t)
 // UN: %target-swift-frontend -typecheck -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/typecheck.tbd
 // UN: %target-swift-frontend -emit-ir -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/emit-ir.tbd
