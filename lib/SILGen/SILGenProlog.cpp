@@ -199,7 +199,7 @@ public:
         if (element.hasCleanup())
           element.forwardInto(SGF, loc, elementBuffer);
         else
-          element.copyInto(SGF, elementBuffer, loc);
+          element.copyInto(SGF, loc, elementBuffer);
       }
       return SGF.emitManagedRValueWithCleanup(buffer);
     }

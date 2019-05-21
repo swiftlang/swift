@@ -1193,12 +1193,11 @@ void PatternMatchEmission::bindVariable(Pattern *pattern, VarDecl *var,
 
   // Initialize the variable value.
   InitializationPtr init = SGF.emitInitializationForVarDecl(var, immutable);
-  CanType formalValueType = pattern->getType()->getCanonicalType();
-  RValue rv(SGF, pattern, formalValueType, value.getFinalManagedValue());
+  auto mv = value.getFinalManagedValue();
   if (shouldTake(value, isIrrefutable)) {
-    std::move(rv).forwardInto(SGF, pattern, init.get());
+    mv.forwardInto(SGF, pattern, init.get());
   } else {
-    std::move(rv).copyInto(SGF, pattern, init.get());
+    mv.copyInto(SGF, pattern, init.get());
   }
 }
 
