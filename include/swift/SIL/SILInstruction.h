@@ -1806,6 +1806,8 @@ public:
   /// issues. It is at the bottom of the file.
   SILFunction *getCalleeFunction() const;
 
+  bool isCalleeDynamicallyReplaceable() const;
+
   /// Gets the referenced function if the callee is a function_ref instruction.
   SILFunction *getReferencedFunction() const {
     if (auto *FRI = dyn_cast<FunctionRefBaseInst>(getCallee()))
@@ -7680,6 +7682,27 @@ SILValue ApplyInstBase<Impl, Base, false>::getCalleeOrigin() const {
       continue;
     }
     return Callee;
+  }
+}
+
+template <class Impl, class Base>
+bool ApplyInstBase<Impl, Base, false>::isCalleeDynamicallyReplaceable() const {
+  SILValue Callee = getCalleeOrigin();
+
+  while (true) {
+    if (auto *FRI = dyn_cast<FunctionRefInst>(Callee))
+      return false;
+
+    if (auto *FRI = dyn_cast<DynamicFunctionRefInst>(Callee))
+      return true;
+    if (auto *FRI = dyn_cast<PreviousDynamicFunctionRefInst>(Callee))
+      return true;
+
+    if (auto *PAI = dyn_cast<PartialApplyInst>(Callee)) {
+      Callee = PAI->getCalleeOrigin();
+      continue;
+    }
+    return false;
   }
 }
 
