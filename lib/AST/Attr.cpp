@@ -1076,6 +1076,11 @@ const AvailableAttr *AvailableAttr::isUnavailable(const Decl *D) {
   if (auto ext = dyn_cast<ExtensionDecl>(D->getDeclContext()))
     return AvailableAttr::isUnavailable(ext);
 
+  // Extensions inherit the unavailability from the extended type.
+  if (auto *extension = dyn_cast<ExtensionDecl>(D))
+    if (auto *extended = extension->getExtendedNominal())
+      return AvailableAttr::isUnavailable(extended);
+
   return nullptr;
 }
 

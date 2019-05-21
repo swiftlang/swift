@@ -71,3 +71,10 @@ public func useConditionallyAvailableMethod(s: ConditionallyAvailableStruct) {
 
 // CHECK-OLD-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper28ConditionallyAvailableStructV013conditionallyF6MethodyyF"(%swift.opaque* noalias nocapture swiftself)
 // CHECK-NEW-LABEL: declare swiftcc void @"$s31weak_import_availability_helper28ConditionallyAvailableStructV013conditionallyF6MethodyyF"(%swift.opaque* noalias nocapture swiftself)
+
+@available(macOS 10.50, *)
+public func useConditionallyAvailableNestedStruct() {
+  blackHole(ConditionallyAvailableStruct.NestedStruct.self)
+}
+// CHECK-OLD-LABEL: declare extern_weak swiftcc %swift.metadata_response @"$s31weak_import_availability_helper28ConditionallyAvailableStructV06NestedG0VMa"(i64)
+// CHECK-NEW-LABEL: declare swiftcc %swift.metadata_response @"$s31weak_import_availability_helper28ConditionallyAvailableStructV06NestedG0VMa"(i64)

@@ -644,6 +644,11 @@ bool Decl::isWeakImported(ModuleDecl *fromModule,
     return cast<ClassDecl>(dtor->getDeclContext())->isWeakImported(
         fromModule, fromContext);
 
+  if (auto *extension = dyn_cast<ExtensionDecl>(this))
+    if (auto *extended = extension->getExtendedNominal())
+      if (extended->isWeakImported(fromModule, fromContext))
+        return true;
+
   auto *dc = getDeclContext();
   if (auto *ext = dyn_cast<ExtensionDecl>(dc))
     return ext->isWeakImported(fromModule, fromContext);

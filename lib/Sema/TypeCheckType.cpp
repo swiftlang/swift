@@ -1604,11 +1604,14 @@ static Type resolveIdentTypeComponent(
 
 static bool diagnoseAvailability(IdentTypeRepr *IdType,
                                  DeclContext *DC,
-                                 bool AllowPotentiallyUnavailableProtocol) {
+                                 bool AllowPotentiallyUnavailableProtocol,
+                                 bool AllowPotentiallyUnavailable) {
   DeclAvailabilityFlags flags =
     DeclAvailabilityFlag::ContinueOnPotentialUnavailability;
   if (AllowPotentiallyUnavailableProtocol)
     flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
+  if (AllowPotentiallyUnavailable)
+    flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailable;
   ASTContext &ctx = DC->getASTContext();
   auto componentRange = IdType->getComponentRange();
   for (auto comp : componentRange) {
@@ -1694,7 +1697,8 @@ Type TypeChecker::resolveIdentifierType(
   if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
       !options.contains(TypeResolutionFlags::AllowUnavailable) &&
       diagnoseAvailability(IdType, DC,
-             options.contains(TypeResolutionFlags::AllowUnavailableProtocol))) {
+             options.contains(TypeResolutionFlags::AllowUnavailableProtocol),
+             options.is(TypeResolverContext::ExtensionBinding))) {
     Components.back()->setInvalid();
     return ErrorType::get(ctx);
   }

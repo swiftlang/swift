@@ -928,8 +928,7 @@ func GenericSignature<T : ProtocolAvailableOn10_51>(_ t: T) { // expected-error 
 
 // Extensions
 
-extension ClassAvailableOn10_51 { } // expected-error {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
-    // expected-note@-1 {{add @available attribute to enclosing extension}}
+extension ClassAvailableOn10_51 { }
 
 @available(OSX, introduced: 10.51)
 extension ClassAvailableOn10_51 {
@@ -1606,4 +1605,61 @@ func useShortFormAvailable() {
       // expected-note@-1 {{add 'if #available' version check}}
 
   unavailableWins() // expected-error {{'unavailableWins()' is unavailable}}
+}
+
+// Test availability inherited by extensions
+@available(macOS, introduced: 10.30)
+func availableFrom10_30() {}
+
+@available(macOS, introduced: 10.60)
+func availableFrom10_60() {}
+
+@available(macOS, introduced: 10.10, deprecated: 10.40)
+func availablePre10_40() {}
+
+@available(macOS, introduced: 10.30, deprecated: 10.40)
+struct InheritedAvailabilityStruct {
+  func introFunc() {}
+}
+
+extension InheritedAvailabilityStruct { // expected-note{{add @available attribute to enclosing extension}}
+  func extensionFunc() { // expected-note{{add @available attribute to enclosing instance method}}
+    introFunc()
+    availableFrom10_30()
+    availableFrom10_60() // expected-error{{'availableFrom10_60()' is only available in macOS 10.60 or newer}}
+      // expected-note@-1{{add 'if #available' version check}}
+    availablePre10_40()
+  }
+}
+
+@available(macOS, unavailable)
+func unavailableOnMacOS() {}
+
+@available(macOS, unavailable)
+struct StructUnavailableOnMacOS {
+  func bar() {
+    unavailableOnMacOS()
+  }
+}
+
+extension StructUnavailableOnMacOS {
+  func foo() {
+    unavailableOnMacOS()
+  }
+}
+
+@available(macOS, deprecated: 10.0)
+func deprecatedOnMacOS() {}
+
+@available(macOS, deprecated: 10.0)
+struct StructDeprecatedOnMacOS {
+  func bar() {
+    deprecatedOnMacOS()
+  }
+}
+
+extension StructDeprecatedOnMacOS {
+  func foo() {
+    deprecatedOnMacOS()
+  }
 }

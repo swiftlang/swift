@@ -656,6 +656,18 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
     }
 
     DC = D->getDeclContext();
+
+    // Look for the availability of the extended type of an ExtensionDecl.
+    if (auto extension = dyn_cast<ExtensionDecl>(DC)) {
+      if (auto extended = extension->getExtendedNominal()) {
+        Optional<AvailabilityContext> Info =
+          AvailabilityInference::annotatedAvailableRange(extended, Context);
+
+        if (Info.hasValue()) {
+          OverApproximateContext.constrainWith(Info.getValue());
+        }
+      }
+    }
   }
 
   if (SF && loc.isValid()) {
@@ -1416,6 +1428,12 @@ const AvailableAttr *TypeChecker::getDeprecated(const Decl *D) {
   if (auto *Attr = D->getAttrs().getDeprecated(D->getASTContext()))
     return Attr;
 
+  // Extensions inherit the deprecation of the extended type.
+  if (auto *ED = dyn_cast<ExtensionDecl>(D))
+    if (auto *Extended = ED->getExtendedNominal())
+      if (auto *Attr = getDeprecated(Extended))
+        return Attr;
+
   // Treat extensions methods as deprecated if their extension
   // is deprecated.
   DeclContext *DC = D->getDeclContext();
@@ -1494,7 +1512,7 @@ static bool isInsideImplicitFunction(SourceRange ReferenceRange,
 static bool isInsideUnavailableDeclaration(SourceRange ReferenceRange,
                                            const DeclContext *ReferenceDC) {
   auto IsUnavailable = [](const Decl *D) {
-    return D->getAttrs().getUnavailable(D->getASTContext());
+    return AvailableAttr::isUnavailable(D);
   };
 
   return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, IsUnavailable);
@@ -1518,8 +1536,7 @@ static bool isInsideCompatibleUnavailableDeclaration(
   }
 
   auto IsUnavailable = [platform](const Decl *D) {
-    auto EnclosingUnavailable =
-        D->getAttrs().getUnavailable(D->getASTContext());
+    auto EnclosingUnavailable = AvailableAttr::isUnavailable(D);
     return EnclosingUnavailable && EnclosingUnavailable->Platform == platform;
   };
 
@@ -1531,7 +1548,7 @@ static bool isInsideCompatibleUnavailableDeclaration(
 static bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
                                           const DeclContext *ReferenceDC){
   auto IsDeprecated = [](const Decl *D) {
-    return D->getAttrs().getDeprecated(D->getASTContext());
+    return TypeChecker::getDeprecated(D);
   };
 
   return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, IsDeprecated);

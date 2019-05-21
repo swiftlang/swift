@@ -12,6 +12,10 @@ public struct ConditionallyAvailableStruct {
   public func conditionallyAvailableMethod() {}
 }
 
+extension ConditionallyAvailableStruct {
+  public struct NestedStruct {}
+}
+
 public protocol AlwaysAvailableProtocol {}
 
 public struct AlwaysAvailableStruct {}

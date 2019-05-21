@@ -131,7 +131,7 @@ enum EnumWithDeprecatedCasePayload {
   case AnnotatedWithDeprecatedPayload(p: ClassDeprecatedIn10_51)
 }
 
-extension ClassDeprecatedIn10_51 { // expected-warning {{'ClassDeprecatedIn10_51' was deprecated in macOS 10.51}}
+extension ClassDeprecatedIn10_51 {
 
 }
 
