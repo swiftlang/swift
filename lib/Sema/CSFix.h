@@ -585,13 +585,17 @@ public:
 	
 class AllowTypeOrInstanceMember final : public ConstraintFix {
   Type BaseType;
-  DeclName Name;
+  ValueDecl *Member;
+  DeclName UsedName;
 
 public:
-  AllowTypeOrInstanceMember(ConstraintSystem &cs, Type baseType, DeclName member,
+  AllowTypeOrInstanceMember(ConstraintSystem &cs, Type baseType,
+                            ValueDecl *member, DeclName name,
                             ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AllowTypeOrInstanceMember, locator),
-        BaseType(baseType), Name(member) {}
+        BaseType(baseType), Member(member), UsedName(name) {
+    assert(member);
+  }
 
   std::string getName() const override {
     return "allow access to instance member on type or a type member on instance";
@@ -600,7 +604,7 @@ public:
   bool diagnose(Expr *root, bool asNote = false) const override;
 
   static AllowTypeOrInstanceMember *create(ConstraintSystem &cs, Type baseType,
-                                           DeclName member,
+                                           ValueDecl *member, DeclName usedName,
                                            ConstraintLocator *locator);
 };
 
