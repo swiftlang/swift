@@ -1763,7 +1763,7 @@ public:
     llvm::StringSet<> ImportedModules;
     collectImportedModules(ImportedModules);
 
-    auto mainModuleName = CurrDeclContext->getParentModule()->getName();
+    auto mainModuleName = CurrModule->getName();
     for (auto ModuleName : ModuleNames) {
       if (ModuleName.str().startswith("_") ||
           ModuleName == mainModuleName ||
@@ -1820,8 +1820,7 @@ public:
       return SemanticContextKind::OutsideNominal;
 
     case DeclVisibilityKind::VisibleAtTopLevel:
-      if (CurrDeclContext &&
-          D->getModuleContext() == CurrDeclContext->getParentModule()) {
+      if (CurrDeclContext && D->getModuleContext() == CurrModule) {
         // Treat global variables from the same source file as local when
         // completing at top-level.
         if (isa<VarDecl>(D) && isTopLevelContext(CurrDeclContext) &&
@@ -1934,7 +1933,7 @@ public:
   /// protocol compositions.
   ///
   /// FIXME: Perhaps this should be an option in PrintOptions instead.
-  Type eraseArchetypes(ModuleDecl *M, Type type, GenericSignature *genericSig) {
+  Type eraseArchetypes(Type type, GenericSignature *genericSig) {
     if (!genericSig)
       return type;
 
@@ -1942,20 +1941,20 @@ public:
       SmallVector<Type, 2> types;
       for (auto proto : protos)
         types.push_back(proto->getDeclaredInterfaceType());
-      return ProtocolCompositionType::get(M->getASTContext(), types,
+      return ProtocolCompositionType::get(Ctx, types,
                                           /*HasExplicitAnyObject=*/false);
     };
 
     if (auto *genericFuncType = type->getAs<GenericFunctionType>()) {
       SmallVector<AnyFunctionType::Param, 8> erasedParams;
       for (const auto &param : genericFuncType->getParams()) {
-        auto erasedTy = eraseArchetypes(M, param.getPlainType(), genericSig);
+        auto erasedTy = eraseArchetypes(param.getPlainType(), genericSig);
         erasedParams.emplace_back(erasedTy, param.getLabel(),
                                   param.getParameterFlags());
       }
       return GenericFunctionType::get(genericSig,
           erasedParams,
-          eraseArchetypes(M, genericFuncType->getResult(), genericSig),
+          eraseArchetypes(genericFuncType->getResult(), genericSig),
           genericFuncType->getExtInfo());
     }
 
@@ -1994,7 +1993,6 @@ public:
   }
 
   Type getTypeOfMember(const ValueDecl *VD, Type ExprType) {
-    auto *M = CurrDeclContext->getParentModule();
     auto *GenericSig = VD->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
 
@@ -2035,7 +2033,7 @@ public:
           return T;
 
         // For everything else, substitute in the base type.
-        auto Subs = MaybeNominalType->getMemberSubstitutionMap(M, VD);
+        auto Subs = MaybeNominalType->getMemberSubstitutionMap(CurrModule, VD);
 
         // Pass in DesugarMemberTypes so that we see the actual
         // concrete type witnesses instead of type alias types.
@@ -2045,7 +2043,7 @@ public:
       }
     }
 
-    return eraseArchetypes(M, T, GenericSig);
+    return eraseArchetypes(T, GenericSig);
   }
 
   Type getAssociatedTypeType(const AssociatedTypeDecl *ATD) {
@@ -2305,7 +2303,7 @@ public:
 
     if (calleeDC->isLocalContext())
       return SemanticContextKind::Local;
-    if (calleeDC->getParentModule() == CurrDeclContext->getParentModule())
+    if (calleeDC->getParentModule() == CurrModule)
       return SemanticContextKind::CurrentModule;
 
     return SemanticContextKind::OtherModule;
@@ -2316,8 +2314,7 @@ public:
     foundFunction(AFT);
     auto genericSig =
         SD->getInnermostDeclContext()->getGenericSignatureOfContext();
-    AFT = eraseArchetypes(CurrDeclContext->getParentModule(),
-                          const_cast<AnyFunctionType *>(AFT), genericSig)
+    AFT = eraseArchetypes(const_cast<AnyFunctionType *>(AFT), genericSig)
               ->castTo<AnyFunctionType>();
 
     CommandWordsPairs Pairs;
@@ -2347,8 +2344,7 @@ public:
     if (AFD) {
       auto genericSig =
           AFD->getInnermostDeclContext()->getGenericSignatureOfContext();
-      AFT = eraseArchetypes(CurrDeclContext->getParentModule(),
-                            const_cast<AnyFunctionType *>(AFT), genericSig)
+      AFT = eraseArchetypes(const_cast<AnyFunctionType *>(AFT), genericSig)
                 ->castTo<AnyFunctionType>();
     }
 
@@ -3171,7 +3167,7 @@ public:
   bool tryModuleCompletions(Type ExprType) {
     if (auto MT = ExprType->getAs<ModuleType>()) {
       ModuleDecl *M = MT->getModule();
-      if (CurrDeclContext->getParentModule() != M) {
+      if (CurrModule != M) {
         // Only use the cache if it is not the current module.
         RequestedCachedResults.push_back(
           RequestedResultsTy::fromModule(M).needLeadingDot(needDot()));
@@ -3718,7 +3714,7 @@ public:
       if (auto NT = T->getAs<NominalType>()) {
         if (auto NTD = NT->getDecl()) {
           if (!isa<ProtocolDecl>(NTD) &&
-              NTD->getModuleContext() != CurrDeclContext->getParentModule()) {
+              NTD->getModuleContext() != CurrModule) {
             addNominalTypeRef(NT->getDecl(),
                               DeclVisibilityKind::VisibleAtTopLevel, {});
           }
@@ -3779,7 +3775,6 @@ public:
     if (!T->mayHaveMembers())
       return;
 
-    ModuleDecl *CurrModule = CurrDeclContext->getParentModule();
     DeclContext *DC = const_cast<DeclContext *>(CurrDeclContext);
 
     // We can only say .foo where foo is a static member of the contextual
@@ -3922,10 +3917,8 @@ public:
   void collectPrecedenceGroups() {
     assert(CurrDeclContext);
 
-    auto M = CurrDeclContext->getParentModule();
-
-    if (M) {
-      for (auto FU: M->getFiles()) {
+    if (CurrModule) {
+      for (auto FU: CurrModule->getFiles()) {
         // We are looking through the current module,
         // inspect only source files.
         if (FU->getKind() != FileUnitKind::Source)
@@ -3941,7 +3934,7 @@ public:
     CurrDeclContext->getParentSourceFile()
       ->forAllVisibleModules([&](ModuleDecl::ImportedModule Import) {
       auto Module = Import.second;
-      if (Module == M)
+      if (Module == CurrModule)
         return;
 
       RequestedCachedResults.push_back(
@@ -3995,9 +3988,9 @@ public:
     Kind = OnlyTypes ? LookupKind::TypeInDeclContext
                      : LookupKind::ValueInDeclContext;
     NeedLeadingDot = false;
-    ModuleDecl *M = CurrDeclContext->getParentModule();
     AccessFilteringDeclConsumer FilteringConsumer(CurrDeclContext, *this);
-    M->lookupVisibleDecls({}, FilteringConsumer, NLKind::UnqualifiedLookup);
+    CurrModule->lookupVisibleDecls({}, FilteringConsumer,
+                                   NLKind::UnqualifiedLookup);
   }
 
   void getVisibleDeclsOfModule(const ModuleDecl *TheModule,
