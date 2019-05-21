@@ -1306,7 +1306,8 @@ static void printNameTranslationInfo(sourcekitd_variant_t Info,
   const char *InternalDiagnostic =
       sourcekitd_variant_dictionary_get_string(Info, KeyInternalDiagnostic);
   if (InternalDiagnostic) {
-    OS << "<diagnostic \"" << InternalDiagnostic << "\">\n";
+    OS << "<empty name translation info; internal diagnostic: \""
+       << InternalDiagnostic << "\">\n";
     return;
   }
   sourcekitd_uid_t KindUID = sourcekitd_variant_dictionary_get_uid(Info,
@@ -1371,7 +1372,8 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   const char *InternalDiagnostic =
       sourcekitd_variant_dictionary_get_string(Info, KeyInternalDiagnostic);
   if (InternalDiagnostic) {
-    OS << "<diagnostic \"" << InternalDiagnostic << "\">\n";
+    OS << "<empty cursor info; internal diagnostic: \""
+       << InternalDiagnostic << "\">\n";
     return;
   }
   sourcekitd_uid_t KindUID = sourcekitd_variant_dictionary_get_uid(Info,

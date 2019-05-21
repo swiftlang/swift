@@ -12,6 +12,6 @@ func foo2 () {
 // RUN: %sourcekitd-test -req=translate -objc-selector initWithFloat2:second2:third: -pos=5:15 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK-DIAG %s
 // RUN: %sourcekitd-test -req=translate -objc-selector initFloat2:second2: -pos=5:15 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK2 %s
 
-// CHECK-DIAG: <diagnostic "Unable to resolve ObjC declaration name.">
+// CHECK-DIAG: <empty name translation info; internal diagnostic: "Unable to resolve ObjC declaration name.">
 // CHECK1: init(float2:)
 // CHECK2: init(float2:second2:)

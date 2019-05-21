@@ -302,13 +302,17 @@ public:
 struct Statistic;
 typedef std::function<void(ArrayRef<Statistic *> stats)> StatisticsReceiver;
 
-// Used to wrap the result of a request. There are three possibilities:
-// - The request succeeded (`value` is valid)
-// - The request was cancelled
-// - The request failed (with an `error`)
+/// Used to wrap the result of a request. There are three possibilities:
+/// - The request succeeded (`value` is valid)
+/// - The request was cancelled
+/// - The request failed (with an `error`)
+///
+/// NOTE: This type does not own its `value` or `error`. Therefore, it's not
+/// safe to store this type, nor is it safe to store its `value` or `error`.
+/// Instead, any needed information should be fetched and stored (e.g. reading
+/// properties from `value` or getting a `std::string` from `error`).
 template <typename T>
 class RequestResult {
-private:
   enum Type {
     Value,
     Error,
