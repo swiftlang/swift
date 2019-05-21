@@ -2248,15 +2248,9 @@ public:
     // #selector is only available when the Objective-C runtime is.
     if (!Ctx.LangOpts.EnableObjCInterop) return;
 
-    // After #, this is a very likely result. When just in a String context,
-    // it's not.
-    auto semanticContext = needPound ? SemanticContextKind::None
-    : SemanticContextKind::ExpressionSpecific;
-
     CodeCompletionResultBuilder Builder(
-                                  Sink,
-                                  CodeCompletionResult::ResultKind::Keyword,
-                                  semanticContext, expectedTypeContext);
+        Sink, CodeCompletionResult::ResultKind::Keyword,
+        SemanticContextKind::None, {});
     if (needPound)
       Builder.addTextChunk("#selector");
     else
@@ -2264,21 +2258,19 @@ public:
     Builder.addLeftParen();
     Builder.addSimpleTypedParameter("@objc method", /*IsVarArg=*/false);
     Builder.addRightParen();
+    Builder.addTypeAnnotation("Selector");
+    // This function is called only if the context type is 'Selector'.
+    Builder.setExpectedTypeRelation(
+        CodeCompletionResult::ExpectedTypeRelation::Identical);
   }
 
   void addPoundKeyPath(bool needPound) {
     // #keyPath is only available when the Objective-C runtime is.
     if (!Ctx.LangOpts.EnableObjCInterop) return;
 
-    // After #, this is a very likely result. When just in a String context,
-    // it's not.
-    auto semanticContext = needPound ? SemanticContextKind::None
-                                     : SemanticContextKind::ExpressionSpecific;
-
     CodeCompletionResultBuilder Builder(
-                                  Sink,
-                                  CodeCompletionResult::ResultKind::Keyword,
-                                  semanticContext, expectedTypeContext);
+        Sink, CodeCompletionResult::ResultKind::Keyword,
+        SemanticContextKind::None, {});
     if (needPound)
       Builder.addTextChunk("#keyPath");
     else
@@ -2287,6 +2279,10 @@ public:
     Builder.addSimpleTypedParameter("@objc property sequence",
                                     /*IsVarArg=*/false);
     Builder.addRightParen();
+    Builder.addTypeAnnotation("String");
+    // This function is called only if the context type is 'String'.
+    Builder.setExpectedTypeRelation(
+        CodeCompletionResult::ExpectedTypeRelation::Identical);
   }
 
   SemanticContextKind getSemanticContextKind(const ValueDecl *VD) {
@@ -3682,6 +3678,38 @@ public:
     }
   }
 
+  void addObjCPoundKeywordCompletions(bool needPound) {
+    if (!Ctx.LangOpts.EnableObjCInterop)
+      return;
+
+    // If the expected type is ObjectiveC.Selector, add #selector. If
+    // it's String, add #keyPath.
+    bool addedSelector = false;
+    bool addedKeyPath = false;
+
+    for (auto T : expectedTypeContext.possibleTypes) {
+      T = T->lookThroughAllOptionalTypes();
+      if (auto structDecl = T->getStructOrBoundGenericStruct()) {
+        if (!addedSelector && structDecl->getName() == Ctx.Id_Selector &&
+            structDecl->getParentModule()->getName() == Ctx.Id_ObjectiveC) {
+          addPoundSelector(needPound);
+          if (addedKeyPath)
+            break;
+          addedSelector = true;
+          continue;
+        }
+      }
+
+      if (!addedKeyPath && T->getAnyNominal() == Ctx.getStringDecl()) {
+        addPoundKeyPath(needPound);
+        if (addedSelector)
+          break;
+        addedKeyPath = true;
+        continue;
+      }
+    }
+  }
+
   struct FilteredDeclConsumer : public swift::VisibleDeclConsumer {
     swift::VisibleDeclConsumer &Consumer;
     DeclFilter Filter;
@@ -3745,33 +3773,7 @@ public:
       addPoundLiteralCompletions(/*needPound=*/true);
     }
 
-
-    // If the expected type is ObjectiveC.Selector, add #selector. If
-    // it's String, add #keyPath.
-    if (Ctx.LangOpts.EnableObjCInterop) {
-      bool addedSelector = false;
-      bool addedKeyPath = false;
-      for (auto T : expectedTypeContext.possibleTypes) {
-        T = T->lookThroughAllOptionalTypes();
-        if (auto structDecl = T->getStructOrBoundGenericStruct()) {
-          if (!addedSelector &&
-              structDecl->getName() == Ctx.Id_Selector &&
-              structDecl->getParentModule()->getName() == Ctx.Id_ObjectiveC) {
-            addPoundSelector(/*needPound=*/true);
-            if (addedKeyPath) break;
-            addedSelector = true;
-            continue;
-          }
-        }
-
-        if (!addedKeyPath && T->getAnyNominal() == Ctx.getStringDecl()) {
-          addPoundKeyPath(/*needPound=*/true);
-          if (addedSelector) break;
-          addedKeyPath = true;
-          continue;
-        }
-      }
-    }
+    addObjCPoundKeywordCompletions(/*needPound=*/true);
   }
 
   void getUnresolvedMemberCompletions(Type T) {
@@ -5478,8 +5480,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
     Lookup.addPoundAvailable(ParentStmtKind);
     Lookup.addPoundLiteralCompletions(/*needPound=*/false);
-    Lookup.addPoundSelector(/*needPound=*/false);
-    Lookup.addPoundKeyPath(/*needPound=*/false);
+    Lookup.addObjCPoundKeywordCompletions(/*needPound=*/false);
     break;
   }
 
