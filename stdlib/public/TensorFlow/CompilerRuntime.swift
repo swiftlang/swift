@@ -533,23 +533,6 @@ private func configureRuntimeFromEnvironment() {
   }
 }
 
-/// Initialize the TPU system.
-/// - Note: This should be called only once.
-/// - Precondition: The given session must contain the given graph.
-// TODO(b/77572335): Reassess how to reset TPU after execution error.
-private func initializeTPU(withSession session: CTFSession, graph: CTFGraph,
-                           status: CTFStatus) {
-  debugLog("Initializing TPU.")
-  let configOp = TF_GraphOperationByName(graph, "ConfigureDistributedTPU")
-  internalConsistencyCheck(configOp != nil)
-  var configNode = TF_Output(oper: configOp, index: 0)
-  var dummyOutput: CTensor?
-  TF_SessionRun(session, nil, nil, nil, 0, &configNode, &dummyOutput, 1, nil,
-                0, nil, status)
-  checkOk(status)
-  TF_DeleteTensor(dummyOutput)
-}
-
 /// The host of any tensor computation.
 @_fixed_layout
 public final class _ExecutionContext {
@@ -563,9 +546,6 @@ public final class _ExecutionContext {
 
   /// Only set when there is some usable GPU.
   fileprivate let gpuDeviceNamePrefix: String?
-
-  /// Only set when there is some usable TPU.
-  fileprivate let tpuDeviceNamePrefix: String?
 
   /// The buffer storing a serialized TensorFlow config proto.
   public let tensorFlowConfig: UnsafeMutablePointer<TF_Buffer>
@@ -643,7 +623,6 @@ public final class _ExecutionContext {
     debugLog("There are \(deviceCount) devices.")
     var foundCPU = false
     var gpuCount = 0
-    var tpuCount = 0
     for deviceId in 0..<deviceCount {
       let cDeviceName = TF_DeviceListName(devices, deviceId, status)
       checkOk(status)
@@ -660,9 +639,6 @@ public final class _ExecutionContext {
       if deviceType == "GPU" {
         gpuCount += 1
       }
-      if deviceType == "TPU" {
-        tpuCount += 1
-      }
     }
     guard foundCPU else {
       fatalError("CPU should always be an available device.")
@@ -674,14 +650,6 @@ public final class _ExecutionContext {
       self.gpuDeviceNamePrefix = "/job:localhost/replica:0/task:0/device:GPU:"
     } else {
       self.gpuDeviceNamePrefix = nil
-    }
-
-    if tpuCount > 0 {
-      // According to server def generated when you set
-      // SWIFT_TENSORFLOW_SERVER_ADDRESS, the TPUs will all be on task 1.
-      self.tpuDeviceNamePrefix = "/job:localhost/replica:0/task:1/device:TPU:"
-    } else {
-      self.tpuDeviceNamePrefix = nil
     }
 
     // Initialize the mutex.
@@ -1027,8 +995,6 @@ internal extension _ExecutionContext {
         return "\(cpuDeviceNamePrefix)\(index)"
       case .gpu:
         return "\(gpuDeviceNamePrefix!)\(index)"
-      case .tpu:
-        return "\(tpuDeviceNamePrefix!)\(index)"
       }
     }
     return nil

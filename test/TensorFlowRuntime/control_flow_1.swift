@@ -28,10 +28,6 @@ public func weighPet(_ pet: Pet,
   case .fish: break // no tensor code here
   }
   expectNearlyEqualWithScalarTensor(expectedVal, weight)
-  // TODO: remove the extra code below once TPU execution supports 0 output
-  // tensors (b/111123797)
-  let extra = Tensor<Float>(1.0)
-  print(extra)
 }
 // TODO: fix the disabled GPU tests below.
 #if !CUDA
@@ -54,10 +50,6 @@ public func weighPetWithDefault(_ pet: Pet,
     weight += 3.0
   }
   expectNearlyEqualWithScalarTensor(expectedVal, weight)
-  // TODO: remove the extra code below once TPU execution supports 0 output
-  // tensors (b/111123797)
-  let extra = Tensor<Float>(1.0)
-  print(extra)
 }
 ControlFlowTests.testAllBackends("weighPetWithDefault") {
   weighPetWithDefault(.cat, 6.0)
