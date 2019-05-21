@@ -3181,6 +3181,14 @@ public:
         recursivelyDeleteTriviallyDeadInstructions(
             getOpValue(origCallee)->getDefiningInstruction());
   }
+
+  void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
+    // Clone `autodiff_function` from original to VJP, then add the cloned
+    // instruction to the `autodiff_function` worklist.
+    SILClonerWithScopes::visitAutoDiffFunctionInst(adfi);
+    auto *newADFI = cast<AutoDiffFunctionInst>(getOpValue(adfi));
+    context.getAutoDiffFunctionInsts().push_back(newADFI);
+  }
 };
 } // end anonymous namespace
 
@@ -5948,7 +5956,8 @@ SILValue ADContext::promoteToDifferentiableFunction(
 ///
 /// Folding can be disabled by the `SkipFoldingAutoDiffFunctionExtraction` flag
 /// for SIL testing purposes.
-static void foldAutoDiffFunctionExtraction(AutoDiffFunctionInst *source) {
+static void foldAutoDiffFunctionExtraction(
+    ADContext &context, AutoDiffFunctionInst *source) {
   // Iterate through all `autodiff_function` instruction uses.
   for (auto use : source->getUses()) {
     auto *adfei = dyn_cast<AutoDiffFunctionExtractInst>(use->getUser());
@@ -5970,8 +5979,14 @@ static void foldAutoDiffFunctionExtraction(AutoDiffFunctionInst *source) {
     adfei->eraseFromParent();
   }
   // If the `autodiff_function` instruction has no remaining uses, erase it.
-  if (isInstructionTriviallyDead(source))
-    source->eraseFromParent();
+  if (!isInstructionTriviallyDead(source))
+    return;
+  source->eraseFromParent();
+  // Delete all worklist occurrences of `source` by setting them to nullptr.
+  // This is more efficient than APIs like `llvm::erase_if`.
+  for (auto &inst : context.getAutoDiffFunctionInsts())
+    if (inst == source)
+      inst = nullptr;
 }
 
 bool ADContext::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
@@ -6000,11 +6015,10 @@ bool ADContext::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
   adfi->eraseFromParent();
   // If the promoted `@differentiable` function-typed value is an
   // `autodiff_function` instruction, fold `autodiff_function_extract`
-  // instructions.
-  // If `autodiff_function_extract` folding is disabled, return.
+  // instructions. If `autodiff_function_extract` folding is disabled, return.
   if (!SkipFoldingAutoDiffFunctionExtraction)
     if (auto *newADFI = dyn_cast<AutoDiffFunctionInst>(differentiableFnValue))
-      foldAutoDiffFunctionExtraction(newADFI);
+      foldAutoDiffFunctionExtraction(*this, newADFI);
   transform.invalidateAnalysis(
       parent, SILAnalysis::InvalidationKind::FunctionBody);
   return false;
