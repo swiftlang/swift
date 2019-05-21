@@ -859,6 +859,21 @@ public:
     return createDifferentiableAttr(original, indices, contextualRequirements);
   }
 
+  /// Creates an `autodiff_function` instruction using the given builder and
+  /// arguments. Erase the newly created instruction from the processed set, if
+  /// it exists - it may exist in the processed set if it has the same pointer
+  /// value as a previously processed and deleted instruction.
+  AutoDiffFunctionInst *createAutoDiffFunction(
+      SILBuilder &builder, SILLocation loc,
+      AutoDiffIndexSubset *parameterIndices, unsigned differentiationOrder,
+      SILValue original, ArrayRef<SILValue> associatedFunctions = {}) {
+    auto *adfi = builder.createAutoDiffFunction(
+        loc, parameterIndices, differentiationOrder, original,
+        associatedFunctions);
+    processedAutoDiffFunctionInsts.erase(adfi);
+    return adfi;
+  }
+
 private:
   /// Promotes the given `autodiff_function` instruction to a valid
   /// `@differentiable` function-typed value.
@@ -2596,7 +2611,7 @@ private:
   SILFunction *adjoint;
 
   /// The pullback info.
-  std::unique_ptr<PullbackInfo> pullbackInfo;
+  std::unique_ptr<PullbackInfo> pullbackInfo = nullptr;
 
   /// The differentiation invoker.
   DifferentiationInvoker invoker;
@@ -2606,8 +2621,9 @@ private:
 
   bool errorOccurred = false;
 
-  /// List of pullbacks, used to build the pullback struct.
-  SmallVector<SILValue, 8> pullbacks;
+  /// List of pullback values gathered from callee VJP calls. Used to build the
+  /// pullback struct.
+  SmallVector<SILValue, 8> pullbackValues;
 
   SILModule &getModule() const { return vjp->getModule(); }
   ASTContext &getASTContext() const { return vjp->getASTContext(); }
@@ -2875,7 +2891,7 @@ public:
     auto pullback = vjpDirectResults.back();
     // TODO: Check whether it's necessary to reabstract getter pullbacks.
     getPullbackInfo().addPullbackDecl(sei, getOpType(pullback->getType()));
-    pullbacks.push_back(pullback);
+    pullbackValues.push_back(pullback);
   }
 
   void visitStructElementAddrInst(StructElementAddrInst *seai) {
@@ -2963,7 +2979,7 @@ public:
     SILValue pullback = vjpDirectResults.back();
     // TODO: Check whether it's necessary to reabstract getter pullbacks.
     getPullbackInfo().addPullbackDecl(seai, getOpType(pullback->getType()));
-    pullbacks.push_back(pullback);
+    pullbackValues.push_back(pullback);
   }
 
   // If an `apply` has active results or active inout parameters, replace it
@@ -3104,8 +3120,9 @@ public:
         original = vjpPartialApply;
       }
 
-      auto *autoDiffFuncInst = getBuilder().createAutoDiffFunction(
-          loc, indices.parameters, /*differentiationOrder*/ 1, original);
+      auto *autoDiffFuncInst = context.createAutoDiffFunction(
+          getBuilder(), loc, indices.parameters, /*differentiationOrder*/ 1,
+          original);
 
       // Record the `autodiff_function` instruction.
       context.getAutoDiffFunctionInsts().push_back(autoDiffFuncInst);
@@ -3183,7 +3200,7 @@ public:
           ai->getLoc(), thunkRef, thunk->getForwardingSubstitutionMap(),
           {pullback}, actualPullbackType->getCalleeConvention());
     }
-    pullbacks.push_back(pullback);
+    pullbackValues.push_back(pullback);
 
     // Some instructions that produce the callee may have been cloned.
     // If the original callee did not have any users beyond this `apply`,
@@ -5177,7 +5194,7 @@ bool VJPEmitter::run() {
   auto structLoweredTy = context.getTypeConverter().getLoweredType(
       structTy, ResilienceExpansion::Minimal);
   auto pullbackStructVal =
-      builder.createStruct(loc, structLoweredTy, pullbacks);
+      builder.createStruct(loc, structLoweredTy, pullbackValues);
   // If the original result was a tuple, return a tuple of all elements in the
   // original result tuple and the pullback struct value.
   SmallVector<SILValue, 8> origResults;
@@ -5826,9 +5843,9 @@ SILValue ADContext::promoteToDifferentiableFunction(
         AutoDiffFunctionInst *adfi;
         {
           SILBuilder builder(retInst);
-          adfi = builder.createAutoDiffFunction(loc, parameterIndices,
-                                                differentiationOrder,
-                                                retInst->getOperand());
+          adfi = createAutoDiffFunction(builder, loc, parameterIndices,
+                                        differentiationOrder,
+                                        retInst->getOperand());
           resultIndices[adfi] = resultIndex;
           builder.createReturn(loc, adfi);
         }
@@ -5914,8 +5931,9 @@ SILValue ADContext::promoteToDifferentiableFunction(
     assocFns.push_back(assocFn);
   }
 
-  auto *adfi = builder.createAutoDiffFunction(
-      loc, parameterIndices, differentiationOrder, origFnOperand, assocFns);
+  auto *adfi = createAutoDiffFunction(
+      builder, loc, parameterIndices, differentiationOrder, origFnOperand,
+      assocFns);
   resultIndices[adfi] = resultIndex;
   getAutoDiffFunctionInsts().push_back(adfi);
   return adfi;
