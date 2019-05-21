@@ -609,3 +609,21 @@ func rdar50679161() {
     }
   }
 }
+
+
+func rdar_50467583_and_50909555() {
+  // rdar://problem/50467583
+  let _: Set = [Int][]
+  // expected-error@-1 {{instance member 'subscript' cannot be used on type '[Int]'}}
+
+  // rdar://problem/50909555
+  struct S {
+    static subscript(x: Int, y: Int) -> Int {
+      return 1
+    }
+  }
+
+  func test(_ s: S) {
+    s[1] // expected-error {{static member 'subscript' cannot be used on instance of type 'S'}} {{5-6=S}}
+  }
+}

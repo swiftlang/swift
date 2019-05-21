@@ -802,12 +802,17 @@ class AllowTypeOrInstanceMemberFailure final : public FailureDiagnostic {
   Type BaseType;
   DeclName Name;
 
+  /// The choice associated with given member name, if known.
+  ValueDecl *KnownChoice;
+
 public:
   AllowTypeOrInstanceMemberFailure(Expr *root, ConstraintSystem &cs,
                                    Type baseType, DeclName memberName,
-                                   ConstraintLocator *locator)
+                                   ConstraintLocator *locator,
+                                   ValueDecl *choice = nullptr)
       : FailureDiagnostic(root, cs, locator),
-        BaseType(baseType->getRValueType()), Name(memberName) {}
+        BaseType(baseType->getRValueType()), Name(memberName),
+        KnownChoice(choice) {}
 
   bool diagnoseAsError() override;
 };
