@@ -99,7 +99,24 @@ bb0:
   return %9 : $()
 }
 
+sil [dynamically_replacable] [ossa] @closureCapturingByStorageAddress2 : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
 
+// Make sure that we handle dynamic_function_ref.
+sil hidden [ossa] @escapeAsArgumentToPartialApplyDynamic : $@convention(thin) () -> () {
+bb0:
+  %2 = alloc_box ${ var Builtin.Int64 }, var, name "x"
+  %3 = project_box %2 : ${ var Builtin.Int64 }, 0
+  %4 = function_ref @takesInoutAndClosure : $@convention(thin) (@inout Builtin.Int64, @guaranteed @callee_guaranteed () -> ()) -> ()
+  %5 = dynamic_function_ref @closureCapturingByStorageAddress2 : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %6 = partial_apply [callee_guaranteed] %5(%3) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %7 = begin_access [modify] [unknown] %3 : $*Builtin.Int64
+  %8 = apply %4(%7, %6) : $@convention(thin) (@inout Builtin.Int64, @guaranteed @callee_guaranteed () -> ()) -> ()
+  end_access %7 : $*Builtin.Int64
+  destroy_value %6 : $@callee_guaranteed () -> ()
+  destroy_value %2 : ${ var Builtin.Int64 }
+  %9 = tuple ()
+  return %9 : $()
+}
 // Test static enforcement of copied boxes.
 // FIXME: Oops... We make this dynamic.
 //
