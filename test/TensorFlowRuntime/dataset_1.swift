@@ -28,7 +28,6 @@ struct SimpleOutput : TensorGroup {
   let b: TensorHandle<Int32>
 }
 DatasetTests.testAllBackends("MultiValue") {
-  enableCPU()
   let elements1: Tensor<Int32> = [0, 1, 2]
   let elements2: Tensor<Int32> = [10, 11, 12]
   let outputTypes = [Int32.tensorFlowDataType, Int32.tensorFlowDataType]
