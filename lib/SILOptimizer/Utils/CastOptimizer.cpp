@@ -1198,10 +1198,19 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   auto replaceCastHelper = [](SILBuilderWithScope &B,
                               SILDynamicCastInst dynamicCast,
                               MetatypeInst *mi) -> SILInstruction * {
+    // Make sure that the failure block has the new metatype type for
+    // its default argument as required when we are in ossa
+    // mode. Without ossa, failure blocks do not have args, so we do
+    // not need to do anything.
+    auto *fBlock = dynamicCast.getFailureBlock();
+    if (B.hasOwnership()) {
+      fBlock->replacePhiArgumentAndReplaceAllUses(0, mi->getType(),
+                                                  ValueOwnershipKind::Any);
+    }
     return B.createCheckedCastBranch(
         dynamicCast.getLocation(), false /*isExact*/, mi,
         dynamicCast.getLoweredTargetType(), dynamicCast.getSuccessBlock(),
-        dynamicCast.getFailureBlock(), *dynamicCast.getSuccessBlockCount(),
+        fBlock, *dynamicCast.getSuccessBlockCount(),
         *dynamicCast.getFailureBlockCount());
   };
 

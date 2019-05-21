@@ -600,3 +600,15 @@ void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
 
   createEndBorrow(loc, original);
 }
+
+CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
+    SILLocation Loc, bool isExact, SILValue op, SILType destTy,
+    SILBasicBlock *successBB, SILBasicBlock *failureBB,
+    ProfileCounter target1Count, ProfileCounter target2Count) {
+  assert((!hasOwnership() || !failureBB->getNumArguments() ||
+          failureBB->getArgument(0)->getType() == op->getType()) &&
+         "failureBB's argument doesn't match incoming argument type");
+  return insertTerminator(CheckedCastBranchInst::create(
+      getSILDebugLocation(Loc), isExact, op, destTy, successBB, failureBB,
+      getFunction(), C.OpenedArchetypes, target1Count, target2Count));
+}
