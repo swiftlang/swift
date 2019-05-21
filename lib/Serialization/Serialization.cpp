@@ -14,6 +14,7 @@
 #include "SILFormat.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileSystem.h"
@@ -2751,6 +2752,95 @@ static SmallVector<Type, 4> collectDependenciesFromType(Type ty) {
   return result.takeVector();
 }
 
+class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
+  Serializer &S;
+  DeclID id;
+public:
+  DeclSerializer(Serializer &S, DeclID id) : S(S), id(id) {}
+
+  void visitDecl(const Decl *) {
+    llvm_unreachable("I guess we forgot a Decl kind?");
+  }
+
+  void visitExtensionDecl(const ExtensionDecl *extension) {
+    using namespace decls_block;
+
+    auto contextID = S.addDeclContextRef(extension->getDeclContext());
+    Type baseTy = extension->getExtendedType();
+    assert(!baseTy->hasUnboundGenericType());
+    assert(!baseTy->hasArchetype());
+
+    // FIXME: Use the canonical type here in order to minimize circularity
+    // issues at deserialization time. A known problematic case here is
+    // "extension of typealias Foo"; "typealias Foo = SomeKit.Bar"; and then
+    // trying to import Bar accidentally asking for all of its extensions
+    // (perhaps because we're searching for a conformance).
+    //
+    // We could limit this to only the problematic cases, but it seems like a
+    // simpler user model to just always desugar extension types.
+    baseTy = baseTy->getCanonicalType();
+
+    // Make sure the base type has registered itself as a provider of generic
+    // parameters.
+    auto baseNominal = baseTy->getAnyNominal();
+    (void)S.addDeclRef(baseNominal);
+
+    auto conformances = extension->getLocalConformances(
+                          ConformanceLookupKind::All, nullptr);
+
+    SmallVector<TypeID, 8> inheritedAndDependencyTypes;
+    for (auto inherited : extension->getInherited()) {
+      assert(!inherited.getType()->hasArchetype());
+      inheritedAndDependencyTypes.push_back(S.addTypeRef(inherited.getType()));
+    }
+    size_t numInherited = inheritedAndDependencyTypes.size();
+
+    llvm::SmallSetVector<Type, 4> dependencies;
+    collectDependenciesFromType(dependencies, baseTy, /*excluding*/nullptr);
+    for (Requirement req : extension->getGenericRequirements()) {
+      collectDependenciesFromRequirement(dependencies, req,
+                                         /*excluding*/nullptr);
+    }
+    for (auto dependencyTy : dependencies)
+      inheritedAndDependencyTypes.push_back(S.addTypeRef(dependencyTy));
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[ExtensionLayout::Code];
+    ExtensionLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                S.addTypeRef(baseTy),
+                                contextID,
+                                extension->isImplicit(),
+                                S.addGenericEnvironmentRef(
+                                           extension->getGenericEnvironment()),
+                                conformances.size(),
+                                numInherited,
+                                inheritedAndDependencyTypes);
+
+    bool isClassExtension = false;
+    if (baseNominal) {
+      isClassExtension = isa<ClassDecl>(baseNominal) ||
+                         isa<ProtocolDecl>(baseNominal);
+    }
+
+    // Extensions of nested generic types have multiple generic parameter
+    // lists. Collect them all, from the innermost to outermost.
+    SmallVector<GenericParamList *, 2> allGenericParams;
+    for (auto *genericParams = extension->getGenericParams();
+         genericParams != nullptr;
+         genericParams = genericParams->getOuterParameters()) {
+      allGenericParams.push_back(genericParams);
+    }
+
+    // Reverse the list, and write the parameter lists, from outermost
+    // to innermost.
+    std::reverse(allGenericParams.begin(), allGenericParams.end());
+    for (auto *genericParams : allGenericParams)
+      S.writeGenericParams(genericParams);
+
+    S.writeMembers(id, extension->getMembers(), isClassExtension);
+    S.writeConformances(conformances, S.DeclTypeAbbrCodes);
+  }
+};
+
 void Serializer::writeDecl(const Decl *D) {
   using namespace decls_block;
 
@@ -2866,80 +2956,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Extension: {
     auto extension = cast<ExtensionDecl>(D);
     verifyAttrSerializable(extension);
-
-    auto contextID = addDeclContextRef(extension->getDeclContext());
-    Type baseTy = extension->getExtendedType();
-    assert(!baseTy->hasUnboundGenericType());
-    assert(!baseTy->hasArchetype());
-
-    // FIXME: Use the canonical type here in order to minimize circularity
-    // issues at deserialization time. A known problematic case here is
-    // "extension of typealias Foo"; "typealias Foo = SomeKit.Bar"; and then
-    // trying to import Bar accidentally asking for all of its extensions
-    // (perhaps because we're searching for a conformance).
-    //
-    // We could limit this to only the problematic cases, but it seems like a
-    // simpler user model to just always desugar extension types.
-    baseTy = baseTy->getCanonicalType();
-
-    // Make sure the base type has registered itself as a provider of generic
-    // parameters.
-    auto baseNominal = baseTy->getAnyNominal();
-    (void)addDeclRef(baseNominal);
-
-    auto conformances = extension->getLocalConformances(
-                          ConformanceLookupKind::All, nullptr);
-
-    SmallVector<TypeID, 8> inheritedAndDependencyTypes;
-    for (auto inherited : extension->getInherited()) {
-      assert(!inherited.getType()->hasArchetype());
-      inheritedAndDependencyTypes.push_back(addTypeRef(inherited.getType()));
-    }
-    size_t numInherited = inheritedAndDependencyTypes.size();
-
-    llvm::SmallSetVector<Type, 4> dependencies;
-    collectDependenciesFromType(dependencies, baseTy, /*excluding*/nullptr);
-    for (Requirement req : extension->getGenericRequirements()) {
-      collectDependenciesFromRequirement(dependencies, req,
-                                         /*excluding*/nullptr);
-    }
-    for (auto dependencyTy : dependencies)
-      inheritedAndDependencyTypes.push_back(addTypeRef(dependencyTy));
-
-    unsigned abbrCode = DeclTypeAbbrCodes[ExtensionLayout::Code];
-    ExtensionLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                addTypeRef(baseTy),
-                                contextID,
-                                extension->isImplicit(),
-                                addGenericEnvironmentRef(
-                                           extension->getGenericEnvironment()),
-                                conformances.size(),
-                                numInherited,
-                                inheritedAndDependencyTypes);
-
-    bool isClassExtension = false;
-    if (baseNominal) {
-      isClassExtension = isa<ClassDecl>(baseNominal) ||
-                         isa<ProtocolDecl>(baseNominal);
-    }
-
-    // Extensions of nested generic types have multiple generic parameter
-    // lists. Collect them all, from the innermost to outermost.
-    SmallVector<GenericParamList *, 2> allGenericParams;
-    for (auto *genericParams = extension->getGenericParams();
-         genericParams != nullptr;
-         genericParams = genericParams->getOuterParameters()) {
-      allGenericParams.push_back(genericParams);
-    }
-
-    // Reverse the list, and write the parameter lists, from outermost
-    // to innermost.
-    std::reverse(allGenericParams.begin(), allGenericParams.end());
-    for (auto *genericParams : allGenericParams)
-      writeGenericParams(genericParams);
-
-    writeMembers(id, extension->getMembers(), isClassExtension);
-    writeConformances(conformances, DeclTypeAbbrCodes);
+    DeclSerializer(*this, id).visit(const_cast<Decl *>(D));
     break;
   }
 

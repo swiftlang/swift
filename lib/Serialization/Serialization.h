@@ -66,6 +66,8 @@ public:
 };
 
 class Serializer : public SerializerBase {
+  class DeclSerializer;
+  friend class DeclSerializer;
 public:
   /// Stores a declaration or a type to be written to the AST file.
   ///
