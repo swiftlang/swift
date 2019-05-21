@@ -1241,15 +1241,6 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
 
       return ObjCReason(ObjCReason::ExplicitlyDynamic);
     }
-    if (!ctx.isSwiftVersionAtLeast(5)) {
-      // Complain that 'dynamic' requires '@objc', but (quietly) infer @objc
-      // anyway for better recovery.
-      VD->diagnose(diag::dynamic_requires_objc, VD->getDescriptiveKind(),
-                   VD->getFullName())
-          .fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/false),
-                       "@objc ");
-      return ObjCReason(ObjCReason::ImplicitlyObjC);
-    }
   }
 
   // If we aren't provided Swift 3's @objc inference rules, we're done.

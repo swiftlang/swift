@@ -667,6 +667,26 @@ func testStorageRef(tsr: TestStorageRef) {
   _ = tsr.$$x // expected-error{{'$$x' is inaccessible due to 'private' protection level}}
 }
 
+// rdar://problem/50873275 - crash when using wrapper with delegateValue in
+// generic type.
+@_propertyDelegate
+struct InitialValueWrapperWithStorageRef<T> {
+  var value: T
+
+  init(initialValue: T) {
+    value = initialValue
+  }
+
+  var delegateValue: Wrapper<T> {
+    return Wrapper(value: value)
+  }
+}
+
+struct TestGenericStorageRef<T> {
+  struct Inner { }
+  @InitialValueWrapperWithStorageRef var inner: Inner = Inner()
+}
+
 // ---------------------------------------------------------------------------
 // Misc. semantic issues
 // ---------------------------------------------------------------------------
