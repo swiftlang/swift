@@ -385,11 +385,13 @@ static bool needsRecompile(StringRef OutputFilename, ArrayRef<uint8_t> HashData,
     StringRef SectionName;
     Section.getName(SectionName);
     if (SectionName == HashSectionName) {
-      StringRef SectionData;
-      Section.getContents(SectionData);
+      llvm::Expected<llvm::StringRef> SectionData = Section.getContents();
+      if (!SectionData) {
+        return true;
+      }
       ArrayRef<uint8_t> PrevHashData(
-          reinterpret_cast<const uint8_t *>(SectionData.data()),
-          SectionData.size());
+          reinterpret_cast<const uint8_t *>(SectionData->data()),
+          SectionData->size());
       LLVM_DEBUG(if (PrevHashData.size() == sizeof(MD5::MD5Result)) {
         if (DiagMutex) DiagMutex->lock();
         SmallString<32> HashStr;

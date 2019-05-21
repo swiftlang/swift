@@ -36,10 +36,10 @@ namespace swift {
   enum class DeclKind : uint8_t;
   enum class StmtKind;
 
-  struct ASTNode : public llvm::PointerUnion3<Expr*, Stmt*, Decl*> {
+  struct ASTNode : public llvm::PointerUnion<Expr*, Stmt*, Decl*> {
     // Inherit the constructors from PointerUnion.
-    using PointerUnion3::PointerUnion3;
-    
+    using PointerUnion::PointerUnion;
+
     SourceRange getSourceRange() const;
 
     /// Return the location of the start of the statement.
