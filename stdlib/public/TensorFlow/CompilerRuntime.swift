@@ -554,7 +554,7 @@ public final class _ExecutionContext {
   @usableFromInline let eagerContext: CTFEContext
 
   /// The status for checking TensorFlow errors.
-  private let status: CTFStatus = TF_NewStatus()
+  @usableFromInline let status: CTFStatus = TF_NewStatus()
 
   /// The mutex for preventing potential concurrent access.
   private var mutex: pthread_mutex_t = pthread_mutex_t()
