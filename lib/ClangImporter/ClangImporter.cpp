@@ -221,7 +221,7 @@ namespace {
                                                   error);
       assert(!error && "failed to allocated read-only zero-filled memory");
       init(static_cast<char *>(memory.base()),
-           static_cast<char *>(memory.base()) + memory.size() - 1,
+           static_cast<char *>(memory.base()) + memory.allocatedSize() - 1,
            /*null-terminated*/true);
     }
 
