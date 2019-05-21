@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift
 
+// REQUIRES: executable_test
+
 func test(reportError: ((String) -> (Void))? = nil) {
   let reportError = reportError ?? { error in
     print(error)
