@@ -515,6 +515,17 @@ private func configureRuntimeFromEnvironment() {
         protocol: "\(`protocol`)"
         """)
       debugLog("Setting TF server address to \(address) from env.")
+
+      // At the moment, without TF_EAGER_REMOTE_USE_SEND_TENSOR_RPC=1,
+      // running on TPUs freezes. Therefore, we set this environment variable
+      // to 1 unless it's set explicitly.
+      if let value = getenv("TF_EAGER_REMOTE_USE_SEND_TENSOR_RPC") {
+        debugLog("TF_EAGER_REMOTE_USE_SEND_TENSOR_RPC already set:")
+        debugLog(String(cString: value))
+      } else {
+        setenv("TF_EAGER_REMOTE_USE_SEND_TENSOR_RPC", "1", /*override*/ 0)
+        debugLog("Setting TF_EAGER_REMOTE_USE_SEND_TENSOR_RPC to 1")
+      }
     }
   }
 
