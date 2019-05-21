@@ -1071,7 +1071,12 @@ func _TFCEagerExecute(_ op: CTFEOp,
                       _ status: CTFStatus) {
   if _RuntimeConfig.printsDebugLog {
     debugLog("Calling _TFCEagerExecute() over: ")
-    TFE_OpPrintDebugString(op)
+    if let value = getenv("TF_CPP_MIN_LOG_LEVEL"),
+      String(cString: value) == "0" {
+        TFE_OpPrintDebugString(op)
+    } else {
+      debugLog("[Run with TF_CPP_MIN_LOG_LEVEL=0 to have TFEOps printed out]")
+    }
   }
   if let traceContext = _RuntimeConfig.traceState.context {
     // convert this eager op into a trace graph node
