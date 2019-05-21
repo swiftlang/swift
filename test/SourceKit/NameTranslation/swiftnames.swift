@@ -86,7 +86,7 @@ class C3: NSObject {
 // RUN: %sourcekitd-test -req=translate -swift-name "zoo(m:)" -pos=55:14 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK17 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "zoo(m:)" -pos=55:14 %s -print-raw-response -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK_RAW17 %s
 
-// CHECK-DIAG: <diagnostic "Unable to resolve Swift declaration name.">
+// CHECK-DIAG: <empty name translation info; internal diagnostic: "Unable to resolve Swift declaration name.">
 // CHECK1: fooWithA:b:c:
 // CHECK2: fooWithA1:b1:c1:
 // CHECK3: foo:b1:c1:

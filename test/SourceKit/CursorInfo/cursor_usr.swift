@@ -28,11 +28,11 @@ func foo(x: FooStruct1) -> S1 {}
 // RUN: %sourcekitd-test -req=cursor -usr "s:blahblahblah" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck %s -check-prefix=RESOLVE
 // Missing s: prefix.
 // RUN: %sourcekitd-test -req=cursor -usr "10cursor_usr6globalSivp" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck %s -check-prefix=RESOLVE
-// RESOLVE: <diagnostic "Unable to resolve type from USR.">
+// RESOLVE: <empty cursor info; internal diagnostic: "Unable to resolve type from USR.">
 
 // FIXME: no support for clang USRs.
 // RUN: %sourcekitd-test -req=cursor -usr "c:@S@FooStruct1" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck %s -check-prefix=CSUPPORT
-// CSUPPORT: <diagnostic "Lookup for C/C++/ObjC USRs not implemented.">
+// CSUPPORT: <empty cursor info; internal diagnostic: "Lookup for C/C++/ObjC USRs not implemented.">
 
 // RUN: %sourcekitd-test -req=cursor -usr "s:10cursor_usr2S1V" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck %s -check-prefix=CHECK1
 // CHECK1: source.lang.swift.decl.struct (5:8-5:10)

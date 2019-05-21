@@ -56,7 +56,7 @@ class MyDerived: FooClassDerived {
 // RUN: %sourcekitd-test -req=translate -objc-selector fooInstanceFunc01 -pos=23:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK5 %s
 
 // CHECK1: FooClassDerived2
-// CHECK-DIAG: <diagnostic "Unable to resolve ObjC declaration name.">
+// CHECK-DIAG: <empty name translation info; internal diagnostic: "Unable to resolve ObjC declaration name.">
 // CHECK2: fooProperty2
 // CHECK3: fooInstanceFunc1
 // CHECK4: fooBaseInstanceFuncOverridden1

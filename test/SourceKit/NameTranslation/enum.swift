@@ -17,6 +17,6 @@ func foo1() {
 // RUN: %sourcekitd-test -req=translate -objc-name FooRinEnableThird -pos=7:30 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK3 %s
 
 // CHECK1: orderedSome
-// CHECK-DIAG: <diagnostic "Unable to resolve ObjC declaration name.">
+// CHECK-DIAG: <empty name translation info; internal diagnostic: "Unable to resolve ObjC declaration name.">
 // CHECK2: enableThird
 // CHECK3: inEnableThird
