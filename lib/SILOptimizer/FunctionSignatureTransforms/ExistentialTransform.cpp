@@ -143,8 +143,8 @@ cloneArguments(SmallVectorImpl<SILValue> &entryArgs) {
 
   // Setup a NewFBuilder for the new entry block, reusing the cloner's
   // SILBuilderContext.
-  SILBuilder
-    NewFBuilder(ClonedEntryBB, DebugScope, getBuilder().getBuilderContext());
+  SILBuilder NewFBuilder(ClonedEntryBB, DebugScope,
+                         getBuilder().getBuilderContext());
   auto InsertLoc = OrigF->begin()->begin()->getLoc();
 
   auto NewFTy = NewF.getLoweredFunctionType();
@@ -158,11 +158,10 @@ cloneArguments(SmallVectorImpl<SILValue> &entryArgs) {
       auto Ty = params[ArgDesc.Index].getType();
       auto LoweredTy = NewF.getLoweredType(NewF.mapTypeIntoContext(Ty));
       auto MappedTy =
-        LoweredTy.getCategoryType(ArgDesc.Arg->getType().getCategory());
+          LoweredTy.getCategoryType(ArgDesc.Arg->getType().getCategory());
       auto *NewArg =
-        ClonedEntryBB->createFunctionArgument(MappedTy, ArgDesc.Decl);
-      NewArg->setOwnershipKind(
-        ValueOwnershipKind(
+          ClonedEntryBB->createFunctionArgument(MappedTy, ArgDesc.Decl);
+      NewArg->setOwnershipKind(ValueOwnershipKind(
           NewF, MappedTy, ArgDesc.Arg->getArgumentConvention()));
       entryArgs.push_back(NewArg);
       continue;
@@ -170,10 +169,9 @@ cloneArguments(SmallVectorImpl<SILValue> &entryArgs) {
     // Create the generic argument.
     GenericTypeParamType *GenericParam = iter->second;
     SILType GenericSILType =
-      NewF.getLoweredType(NewF.mapTypeIntoContext(GenericParam));
+        NewF.getLoweredType(NewF.mapTypeIntoContext(GenericParam));
     auto *NewArg = ClonedEntryBB->createFunctionArgument(GenericSILType);
-    NewArg->setOwnershipKind(
-      ValueOwnershipKind(
+    NewArg->setOwnershipKind(ValueOwnershipKind(
         NewF, GenericSILType, ArgDesc.Arg->getArgumentConvention()));
     // Determine the Conformances.
     SmallVector<ProtocolConformanceRef, 1> NewConformances;
@@ -183,9 +181,9 @@ cloneArguments(SmallVectorImpl<SILValue> &entryArgs) {
       NewConformances.push_back(ProtocolConformanceRef(proto));
     }
     ArrayRef<ProtocolConformanceRef> Conformances =
-      Ctx.AllocateCopy(NewConformances);
+        Ctx.AllocateCopy(NewConformances);
     auto ExistentialRepr =
-      ArgDesc.Arg->getType().getPreferredExistentialRepresentation(M);
+        ArgDesc.Arg->getType().getPreferredExistentialRepresentation(M);
     switch (ExistentialRepr) {
     case ExistentialRepresentation::Opaque: {
       /// Create this sequence for init_existential_addr.:
@@ -197,13 +195,13 @@ cloneArguments(SmallVectorImpl<SILValue> &entryArgs) {
       /// %7 = open_existential_addr immutable_access %3 : $*P to
       /// $*@opened P
       auto *ASI =
-        NewFBuilder.createAllocStack(InsertLoc, ArgDesc.Arg->getType());
+          NewFBuilder.createAllocStack(InsertLoc, ArgDesc.Arg->getType());
       ArgToAllocStackMap.insert(
-        std::pair<int, AllocStackInst *>(ArgDesc.Index, ASI));
-      
+          std::pair<int, AllocStackInst *>(ArgDesc.Index, ASI));
+
       auto *EAI = NewFBuilder.createInitExistentialAddr(
-        InsertLoc, ASI, NewArg->getType().getASTType(), NewArg->getType(),
-        Conformances);
+          InsertLoc, ASI, NewArg->getType().getASTType(), NewArg->getType(),
+          Conformances);
       /// If DestroyAddr is already there, then do not use [take].
       NewFBuilder.createCopyAddr(
         InsertLoc, NewArg, EAI,
@@ -222,8 +220,8 @@ cloneArguments(SmallVectorImpl<SILValue> &entryArgs) {
       ///  Simple case: Create an init_existential.
       /// %5 = init_existential_ref %0 : $T : $T, $P
       auto *InitRef = NewFBuilder.createInitExistentialRef(
-        InsertLoc, ArgDesc.Arg->getType(), NewArg->getType().getASTType(),
-        NewArg, Conformances);
+          InsertLoc, ArgDesc.Arg->getType(), NewArg->getType().getASTType(),
+          NewArg, Conformances);
       entryArgs.push_back(InitRef);
       break;
     }
