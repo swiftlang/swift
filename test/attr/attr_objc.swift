@@ -1724,8 +1724,7 @@ class HasNSManaged {
   var badManaged: PlainStruct
   // expected-error@-1 {{property cannot be marked @NSManaged because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
-  // expected-error@-3{{'dynamic' property 'badManaged' must also be '@objc'}}
-  // CHECK-LABEL: {{^}}  @NSManaged var badManaged: PlainStruct {
+  // CHECK-LABEL: {{^}}  @NSManaged dynamic var badManaged: PlainStruct {
   // CHECK-NEXT: {{^}} get
   // CHECK-NEXT: {{^}} set
   // CHECK-NEXT: {{^}} }
