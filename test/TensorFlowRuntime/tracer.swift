@@ -4,11 +4,7 @@
 // Tracer tests.
 
 import TensorFlow
-#if TPU
-import TensorFlowUnittestTPU
-#else
 import TensorFlowUnittest
-#endif
 import StdlibUnittest
 
 var TracerTests = TestSuite("Tracer")
@@ -41,7 +37,7 @@ TracerTests.testAllBackends("Basic") {
   let data = Tensor<Float>(3.0)
   let tracedFn = _graph(with: state, in: tracee)
   let (newState, result) = tracedFn(state, data)
-  
+
   print(newState)
   expectNearlyEqualWithScalarTensor(5.0, newState)
 

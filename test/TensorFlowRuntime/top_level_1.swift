@@ -6,17 +6,13 @@
 // specifics, so we can keep it simple and just test CPU.
 
 import TensorFlow
-#if TPU
-import TensorFlowUnittestTPU
-#else
 import TensorFlowUnittest
-#endif
 import StdlibUnittest
 
 var TopLevelTests = TestSuite("TopLevel")
 
 #if !CUDA
-TopLevelTests.testCPUOrGPU("TopLevel") {
+TopLevelTests.testAllBackends("TopLevel") {
   var x = Tensor<Int8>([1,2,3])*2
   x = x + x
   expectEqual(x.array, ShapedArray(shape: [3], scalars: [4, 8, 12]))

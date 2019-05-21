@@ -5,11 +5,7 @@
 // sends/recvs support for variant handles.
 
 import TensorFlow
-#if TPU
-import TensorFlowUnittestTPU
-#else
 import TensorFlowUnittest
-#endif
 import StdlibUnittest
 
 var DatasetGlobalTests = TestSuite("DatasetGlobal")
@@ -20,7 +16,7 @@ var DatasetGlobalTests = TestSuite("DatasetGlobal")
 // Fatal error: No unary variant device copy function found for direction: 1 and Variant type_name: tensorflow::DatasetVariantWrapper
 #if !CUDA
 
-DatasetGlobalTests.testCPUOrGPU("DatasetAsGlobalVar") {
+DatasetGlobalTests.testAllBackends("DatasetAsGlobalVar") {
   let scalars = Tensor<Float>([0, 1, 2])
   let dataset = Dataset(elements: scalars)
 
@@ -32,7 +28,7 @@ DatasetGlobalTests.testCPUOrGPU("DatasetAsGlobalVar") {
   }
 }
 
-DatasetGlobalTests.testCPUOrGPU("IteratorAsGlobalVar") {
+DatasetGlobalTests.testAllBackends("IteratorAsGlobalVar") {
   let scalars = Tensor<Float>([0, 1, 2])
   let dataset = Dataset(elements: scalars)
   var iterator = dataset.makeIterator()

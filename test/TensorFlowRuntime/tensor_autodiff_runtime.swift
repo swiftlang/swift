@@ -5,11 +5,7 @@
 
 import TensorFlow
 import StdlibUnittest
-#if TPU
-import TensorFlowUnittestTPU
-#else
 import TensorFlowUnittest
-#endif
 
 var TensorADTests = TestSuite("TensorAD")
 
@@ -272,14 +268,14 @@ TensorADTests.testAllBackends("broadcast(toShape:)") {
   var pb: (Tensor<Float>) -> Tensor<Float>
 
   // [3,] -> [3,3]
-  pb = pullback(at: Tensor([99, 33, 55])) { x in 
-    foo(tensor: x, shape: Tensor([3, 3])) 
+  pb = pullback(at: Tensor([99, 33, 55])) { x in
+    foo(tensor: x, shape: Tensor([3, 3]))
   }
 
   // Test 1: same shape as parameter of pullback
   inputTensor = Tensor([
-    [1, 2, 3], 
-    [1, 2, 3], 
+    [1, 2, 3],
+    [1, 2, 3],
     [1, 2, 3]]
   )
   expected = Tensor([3, 6, 9])
@@ -287,8 +283,8 @@ TensorADTests.testAllBackends("broadcast(toShape:)") {
 
   // Test 2: different shape than parameter of pullback
   inputTensor = Tensor([
-    [1, 2, 3], 
-    [1, 2, 3], 
+    [1, 2, 3],
+    [1, 2, 3],
     [1, 2, 3],
     [1, 2, 3]]
   )
@@ -306,14 +302,14 @@ TensorADTests.testAllBackends("broadcast(toShape:)") {
   expectEqual(expected, pb(inputTensor))
 
   // [3,1] -> [3x3]
-  pb = pullback(at: Tensor([[99, 33, 55]])) { x in 
-    foo(tensor: x, shape: Tensor([3, 3])) 
+  pb = pullback(at: Tensor([[99, 33, 55]])) { x in
+    foo(tensor: x, shape: Tensor([3, 3]))
   }
 
   // Test 5: same shape as parameter of pullback
   inputTensor = Tensor([
-    [1, 2, 3], 
-    [1, 2, 3], 
+    [1, 2, 3],
+    [1, 2, 3],
     [1, 2, 3]]
   )
   expected = Tensor([[3, 6, 9]])
@@ -321,8 +317,8 @@ TensorADTests.testAllBackends("broadcast(toShape:)") {
 
   // Test 6: different shape than parameter of pullback
   inputTensor = Tensor([
-    [1, 2, 3], 
-    [1, 2, 3], 
+    [1, 2, 3],
+    [1, 2, 3],
     [1, 2, 3],
     [1, 2, 3]]
   )
@@ -351,12 +347,12 @@ TensorADTests.testAllBackends("unbroadcast(toShape:") {
 
   // [3,3] -> [1,3]
   let atTensor: Tensor<Float> = Tensor([
-    [1, 2, 3], 
-    [1, 2, 3], 
+    [1, 2, 3],
+    [1, 2, 3],
     [1, 2, 3]]
   )
-  pb = pullback(at: atTensor) { x in 
-    foo(tensor: x, shape: Tensor([1, 3])) 
+  pb = pullback(at: atTensor) { x in
+    foo(tensor: x, shape: Tensor([1, 3]))
   }
 
   // Test 1: same shape as parameter of pullback
@@ -367,16 +363,16 @@ TensorADTests.testAllBackends("unbroadcast(toShape:") {
   // Test 2: different shape than parameter of pullback
   inputTensor = Tensor([2])
   expected = Tensor([
-    [2, 2, 2], 
-    [2, 2, 2], 
+    [2, 2, 2],
+    [2, 2, 2],
     [2, 2, 2]]
   )
   expectEqual(expected, pb(inputTensor))
 
   // Test 3: same shape as tensor we are differentiating at
   inputTensor = Tensor([
-    [8, 1, 3], 
-    [8, 1, 3], 
+    [8, 1, 3],
+    [8, 1, 3],
     [8, 1, 3]]
   )
   expected = inputTensor
@@ -385,8 +381,8 @@ TensorADTests.testAllBackends("unbroadcast(toShape:") {
   // TODO
   // Test 4: extremely padded shape as tensor we are differentiating at
   // inputTensor = Tensor([
-  //   [[8, 1, 3]], 
-  //   [[8, 1, 3]], 
+  //   [[8, 1, 3]],
+  //   [[8, 1, 3]],
   //   [[8, 1, 3]]]
   // )
   // expected = Tensor([1, 2, 3])

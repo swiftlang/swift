@@ -4,11 +4,7 @@
 // Trivial model tests.
 
 import TensorFlow
-#if TPU
-import TensorFlowUnittestTPU
-#else
 import TensorFlowUnittest
-#endif
 import StdlibUnittest
 
 var ModelTests = TestSuite("Model")
