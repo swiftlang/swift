@@ -32,26 +32,6 @@ import Glibc
 #endif
 import CTensorFlow
 
-// @_frozen // SR-9739
-public enum _ExecutionMode : Equatable {
-  /// CPU or GPU execution.
-  case auto
-  /// TPU execution.
-  // TODO: assess if we can pass this bit of info from compiler settings (when
-  // enableTPU() is called), and avoid having this additional runtime bit.
-  case tpu
-  /// XLA jit-compilation backend (will use GPU when available, and otherwise
-  /// CPU).
-  case xla
-
-  public var isTPU: Bool {
-    switch self {
-    case .tpu: return true
-    default: return false
-    }
-  }
-}
-
 /// TraceContext contains the state needed to build a trace graph function
 /// (TF_Function). As eager ops are executed in tracing mode, their
 /// corresponding nodes are added to the trace graph (via
@@ -444,10 +424,6 @@ public enum _RuntimeConfig {
   /// tensor program in this process.
   static public var tensorFlowRuntimeInitialized = false
 
-  /// For CPU and GPU execution without XLA, use the auto mode. For XLA and/or
-  /// TPU execution, set the enum value accordingly.
-  static public var executionMode: _ExecutionMode = .auto
-
   /// When true, let TensorFlow GPU memory allocation start small and grow as
   /// needed. Otherwise, The entire GPU memory region is pre-allocated.
   static public var gpuMemoryAllowGrowth = true
@@ -505,12 +481,6 @@ private func configureRuntimeFromEnvironment() {
     debugLog("Setting TF logging verbose level to \(verboseLevel) from env.")
   }
 
-  if let value = getenv("SWIFT_TENSORFLOW_USE_TPU_INFEED"),
-    String(cString: value).lowercased() == "true" {
-      _RuntimeConfig.executionMode = .tpu
-      debugLog("Setting TPU execution with infeed from env.")
-  }
-
   if let value = getenv("SWIFT_TENSORFLOW_SERVER_ADDRESS") {
     let address = String(cString: value)
     debugLog("Env var SWIFT_TENSORFLOW_SERVER_ADDRESS has value \(address).")
@@ -563,23 +533,6 @@ private func configureRuntimeFromEnvironment() {
   }
 }
 
-/// Initialize the TPU system.
-/// - Note: This should be called only once.
-/// - Precondition: The given session must contain the given graph.
-// TODO(b/77572335): Reassess how to reset TPU after execution error.
-private func initializeTPU(withSession session: CTFSession, graph: CTFGraph,
-                           status: CTFStatus) {
-  debugLog("Initializing TPU.")
-  let configOp = TF_GraphOperationByName(graph, "ConfigureDistributedTPU")
-  internalConsistencyCheck(configOp != nil)
-  var configNode = TF_Output(oper: configOp, index: 0)
-  var dummyOutput: CTensor?
-  TF_SessionRun(session, nil, nil, nil, 0, &configNode, &dummyOutput, 1, nil,
-                0, nil, status)
-  checkOk(status)
-  TF_DeleteTensor(dummyOutput)
-}
-
 /// The host of any tensor computation.
 @_fixed_layout
 public final class _ExecutionContext {
@@ -593,9 +546,6 @@ public final class _ExecutionContext {
 
   /// Only set when there is some usable GPU.
   fileprivate let gpuDeviceNamePrefix: String?
-
-  /// Only set when there is some usable TPU.
-  fileprivate let tpuDeviceNamePrefix: String?
 
   /// The buffer storing a serialized TensorFlow config proto.
   public let tensorFlowConfig: UnsafeMutablePointer<TF_Buffer>
@@ -632,14 +582,11 @@ public final class _ExecutionContext {
     }
 
     // Create TF config object.
-    if _RuntimeConfig.executionMode == .xla {
-      debugLog("Enable XLA execution.")
-    }
     if _RuntimeConfig.gpuMemoryAllowGrowth {
       debugLog("Allowing growth for GPU memory allocator.")
     }
     self.tensorFlowConfig = TF_CreateConfig(
-      _RuntimeConfig.executionMode == .xla ? 1 : 0,
+      /* enable_xla_compilation */ 0,
       _RuntimeConfig.gpuMemoryAllowGrowth ? 1 : 0,
       _RuntimeConfig.cpuDeviceCount)
     TFE_ContextOptionsSetConfig(opts,
@@ -666,9 +613,6 @@ public final class _ExecutionContext {
     }
 
     // Initialize GPU device.
-    // While the code here is only needed when _RuntimeConfig.executionMode is
-    // set to .gpu, running it in all code paths helps keep things simple
-    // (e.g. so that the cpuDeviceNamePrefix property is always set.)
     let devices = TFE_ContextListDevices(eagerContext, status)
     checkOk(status)
     defer { TF_DeleteDeviceList(devices!) }
@@ -679,7 +623,6 @@ public final class _ExecutionContext {
     debugLog("There are \(deviceCount) devices.")
     var foundCPU = false
     var gpuCount = 0
-    var tpuCount = 0
     for deviceId in 0..<deviceCount {
       let cDeviceName = TF_DeviceListName(devices, deviceId, status)
       checkOk(status)
@@ -696,9 +639,6 @@ public final class _ExecutionContext {
       if deviceType == "GPU" {
         gpuCount += 1
       }
-      if deviceType == "TPU" {
-        tpuCount += 1
-      }
     }
     guard foundCPU else {
       fatalError("CPU should always be an available device.")
@@ -710,14 +650,6 @@ public final class _ExecutionContext {
       self.gpuDeviceNamePrefix = "/job:localhost/replica:0/task:0/device:GPU:"
     } else {
       self.gpuDeviceNamePrefix = nil
-    }
-
-    if tpuCount > 0 {
-      // According to server def generated when you set
-      // SWIFT_TENSORFLOW_SERVER_ADDRESS, the TPUs will all be on task 1.
-      self.tpuDeviceNamePrefix = "/job:localhost/replica:0/task:1/device:TPU:"
-    } else {
-      self.tpuDeviceNamePrefix = nil
     }
 
     // Initialize the mutex.
@@ -1063,8 +995,6 @@ internal extension _ExecutionContext {
         return "\(cpuDeviceNamePrefix)\(index)"
       case .gpu:
         return "\(gpuDeviceNamePrefix!)\(index)"
-      case .tpu:
-        return "\(tpuDeviceNamePrefix!)\(index)"
       }
     }
     return nil

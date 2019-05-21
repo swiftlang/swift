@@ -64,37 +64,16 @@ public func printT(_ message: String) {
 extension TestSuite {
   static let willTargetGPU: Bool =
     CommandLine.arguments.contains("--target=gpu")
-  // If the macro TPU is not specified, run the tests with CPU or GPU. Otherwise
-  // use TPU.
   // For GPU execution, TensorFlow must have been built with --config=cuda,
   // and a gpu device must be available.
   @inline(never)
   public func testAllBackends(_ name: String, _ body: @escaping () -> Void) {
-#if !TPU
-    testCPUOrGPU(name, body)
-#else
-    testTPU(name, body)
-#endif // TPU
-  }
-  public func testCPUOrGPU(_ name: String, _ body: @escaping () -> Void) {
-#if !TPU
     test(name + (TestSuite.willTargetGPU ? "_GPU" : "_CPU")) {
-      _RuntimeConfig.executionMode = .auto
       _RuntimeConfig.gpuMemoryAllowGrowth = true
       _RuntimeConfig.printsDebugLog = false
       withDevice(TestSuite.willTargetGPU ? .gpu : .cpu) {
         body()
       }
     }
-#endif // TPU
-  }
-  public func testTPU(_ name: String, _ body: @escaping () -> Void) {
-#if TPU
-    test(name + "_TPU") {
-      _RuntimeConfig.executionMode = .tpu
-      _RuntimeConfig.printsDebugLog = false
-      body()
-    }
-#endif // TPU
   }
 }

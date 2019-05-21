@@ -4,11 +4,7 @@
 // Loop tests.
 
 import TensorFlow
-#if TPU
-import TensorFlowUnittestTPU
-#else
 import TensorFlowUnittest
-#endif
 import StdlibUnittest
 
 var LoopsTests = TestSuite("Loops")
@@ -85,10 +81,6 @@ LoopsTests.testAllBackends("SR-8191") {
     print(y)
     i += 1
   } while i < 10
-  // TODO: remove the extra code below once TPU execution supports 0 output
-  // tensors (b/111123797)
-  let extra = Tensor<Float>(1.0)
-  print(extra)
 }
 #endif // CUDA
 

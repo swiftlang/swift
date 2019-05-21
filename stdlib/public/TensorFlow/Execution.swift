@@ -14,40 +14,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-// If `serverAddress` is nil, use local session (good for forge testing).
-//
-// FIXME: We need transparent here because deabstraction isn't inlining this
-// function.  We need to inline if a callee contains tensor ops, not only if
-// it takes and returns a TensorFlow value.
-@_transparent
-@available(*, deprecated)
-public func enableTPU(serverAddress: String? = nil, infeed: Bool = true) {
-  _RuntimeConfig.executionMode = .tpu
-  if let serverAddress = serverAddress {
-    _RuntimeConfig.session = .remote(serverDef: serverAddress)
-  }
-}
-
-// FIXME: Extend the interface to support multiple GPU devices, and unify it
-// with enableTPU() above.
-@available(*, deprecated)
-@_transparent
-public func enableGPU() {
-}
-
-@_transparent
-@available(*, deprecated)
-public func enableCPU() {
-}
-
 /// A TensorFlow device kind.
 public enum DeviceKind {
   /// The CPU device kind.
   case cpu
   /// The GPU device kind.
   case gpu
-  /// The TPU device kind.
-  case tpu
 }
 
 /// Executes a closure, making TensorFlow operations run on a specific kind of
