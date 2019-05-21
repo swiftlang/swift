@@ -226,6 +226,7 @@ public:
   SILInstruction *visitRetainValueAddrInst(RetainValueAddrInst *CI);
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitApplyInst(ApplyInst *AI);
+  SILInstruction *visitBeginApplyInst(BeginApplyInst *BAI);
   SILInstruction *visitTryApplyInst(TryApplyInst *AI);
   SILInstruction *optimizeStringObject(BuiltinInst *BI);
   SILInstruction *visitBuiltinInst(BuiltinInst *BI);
@@ -299,6 +300,10 @@ public:
 
   SILInstruction *optimizeApplyOfConvertFunctionInst(FullApplySite AI,
                                                      ConvertFunctionInst *CFI);
+
+  bool tryOptimizeKeypath(ApplyInst *AI);
+  bool tryOptimizeInoutKeypath(BeginApplyInst *AI);
+
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.
   SILInstruction *optimizeConcatenationOfStringLiterals(ApplyInst *AI);
