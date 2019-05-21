@@ -807,22 +807,21 @@ private:
 /// ```
 class AllowTypeOrInstanceMemberFailure final : public FailureDiagnostic {
   Type BaseType;
+  ValueDecl *Member;
   DeclName Name;
-
-  /// The choice associated with given member name, if known.
-  ValueDecl *KnownChoice;
 
 public:
   AllowTypeOrInstanceMemberFailure(Expr *root, ConstraintSystem &cs,
-                                   Type baseType, DeclName memberName,
-                                   ConstraintLocator *locator,
-                                   ValueDecl *choice = nullptr)
+                                   Type baseType, ValueDecl *member,
+                                   DeclName name, ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator),
-        BaseType(baseType->getRValueType()), Name(memberName),
-        KnownChoice(choice) {}
+        BaseType(baseType->getRValueType()), Member(member), Name(name) {
+    assert(member);
+  }
 
   bool diagnoseAsError() override;
 };
+
 class PartialApplicationFailure final : public FailureDiagnostic {
   enum RefKind : unsigned {
     MutatingMethod,

@@ -766,8 +766,8 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
                              ? ConstraintLocator::SubscriptMember
                              : ConstraintLocator::Member;
       AllowTypeOrInstanceMemberFailure failure(
-          expr, CS, baseObjTy, memberName,
-          CS.getConstraintLocator(E, locatorKind), choice->getDecl());
+          expr, CS, baseObjTy, choice->getDecl(), memberName,
+          CS.getConstraintLocator(E, locatorKind));
       auto diagnosed = failure.diagnoseAsError();
       assert(diagnosed &&
              "Failed to produce missing or extraneous metatype diagnostic");
