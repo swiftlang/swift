@@ -379,52 +379,50 @@ public:
   void print(llvm::raw_ostream &os) const;
 };
 
-/// Information about the VJP function produced by VJPGen, e.g. mappings from
-/// the original values to their corresponding ones in the primal value struct
-/// produced by the VJP function.
+/// Information about the VJP function produced during VJP generation, e.g.
+/// mappings from original values to corresponding values in the pullback
+/// struct.
 ///
-/// A primal value struct is an aggregate value containing intermediate values
-/// checkpointed during the primal computation. During VJPGen, such a struct
-/// will be generated for each function being differentiated, and each primal
-/// function will return such a struct value for the adjoint function to
-/// consume.
-class PrimalInfo {
+/// A pullback struct is an aggregate value containing pullbacks checkpointed
+/// during the VJP computation. Pullback structs are generated for every
+/// original function during VJP generation. Pullback struct values are
+/// constructed by VJP functions and consumed by adjoint functions.
+class PullbackInfo {
 private:
-  /// The primal value struct declaration.
-  StructDecl *primalValueStruct = nullptr;
+  /// The pullback struct declaration.
+  StructDecl *pullbackStruct = nullptr;
 
   /// Mapping from `apply` and `struct_extract` instructions in the original
-  /// function to the corresponding pullback decl in the primal struct.
+  /// function to the corresponding pullback declaration in the pullback struct.
   DenseMap<SILInstruction *, VarDecl *> pullbackValueMap;
 
 private:
   VarDecl *addVarDecl(StringRef name, Type type) {
-    auto &ctx = primalValueStruct->getASTContext();
+    auto &ctx = pullbackStruct->getASTContext();
     auto id = ctx.getIdentifier(name);
     auto *varDecl = new (ctx) VarDecl(
         /*IsStatic*/ false, VarDecl::Specifier::Var,
-        /*IsCaptureList*/ false, SourceLoc(), id, primalValueStruct);
-    varDecl->setAccess(primalValueStruct->getEffectiveAccess());
+        /*IsCaptureList*/ false, SourceLoc(), id, pullbackStruct);
+    varDecl->setAccess(pullbackStruct->getEffectiveAccess());
     if (type->hasArchetype())
       varDecl->setInterfaceType(type->mapTypeOutOfContext());
     else
       varDecl->setInterfaceType(type);
-    primalValueStruct->addMember(varDecl);
+    pullbackStruct->addMember(varDecl);
     return varDecl;
   }
 
 public:
-  PrimalInfo(const PrimalInfo &) = delete;
-  PrimalInfo &operator=(const PrimalInfo &) = delete;
+  PullbackInfo(const PullbackInfo &) = delete;
+  PullbackInfo &operator=(const PullbackInfo &) = delete;
 
-  explicit PrimalInfo(StructDecl *primalValueStruct)
-      : primalValueStruct(&*primalValueStruct) {}
+  explicit PullbackInfo(StructDecl *pullbackStruct)
+      : pullbackStruct(&*pullbackStruct) {}
 
-  /// Returns the primal value struct that the primal info is established
-  /// around.
-  StructDecl *getPrimalValueStruct() const { return primalValueStruct; }
+  /// Returns the pullback struct declaration.
+  StructDecl *getPullbackStruct() const { return pullbackStruct; }
 
-  /// Add a pullback to the primal value struct.
+  /// Add a pullback to the pullback struct.
   VarDecl *addPullbackDecl(SILInstruction *inst, SILType pullbackType) {
     // IRGen requires decls to have AST types (not `SILFunctionType`), so we
     // convert the `SILFunctionType` of the pullback to a `FunctionType` with
@@ -447,8 +445,8 @@ public:
     return decl;
   }
 
-  /// Finds the pullback decl in the primal value struct for an `apply` or
-  /// `struct_extract` in the original function.
+  /// Finds the pullback declaration in the pullback struct for an `apply`
+  /// or `struct_extract` in the original function.
   VarDecl *lookUpPullbackDecl(SILInstruction *inst) {
     auto lookup = pullbackValueMap.find(inst);
     return lookup == pullbackValueMap.end() ? nullptr
@@ -456,7 +454,7 @@ public:
   }
 };
 
-/// Stores `apply` instruction information calculated by `PrimalGen`.
+/// Stores `apply` instruction information calculated during VJP generation.
 struct NestedApplyInfo {
   /// The differentiation indices that are used to differentiate this `apply`
   /// instruction.
@@ -563,9 +561,8 @@ static bool checkRequirementsSatisfied(
       // Try substituting requirement type using original substutition map.
       // If the result type is known to conform to protocol in the current
       // module, continue.
-      // This handles cases where the primal caller is non-generic
-      // (specialized with concrete types) but the associated derivative
-      // callee is generic.
+      // This handles cases where the caller is non-generic (specialized with
+      // concrete types) but the associated derivative callee is generic.
       if (auto origFirstType = firstType.subst(substMap)) {
         if (!origFirstType->hasError() &&
             swiftModule->lookupConformance(origFirstType, protocol)) {
@@ -613,6 +610,10 @@ private:
 
   /// The worklist (stack) of `autodiff_function` instructions to be processed.
   SmallVector<AutoDiffFunctionInst *, 32> autoDiffFunctionInsts;
+
+  /// The set of `autodiff_function` instructions that have been processed.
+  /// Used to avoid reprocessing invalidated instructions.
+  SmallPtrSet<AutoDiffFunctionInst *, 32> processedAutoDiffFunctionInsts;
 
   /// Mapping from `[differentiable]` attributes to invokers.
   DenseMap<SILDifferentiableAttr *, DifferentiationInvoker> invokers;
@@ -668,6 +669,10 @@ public:
 
   SmallVectorImpl<AutoDiffFunctionInst *> &getAutoDiffFunctionInsts() {
     return autoDiffFunctionInsts;
+  }
+
+  SmallPtrSetImpl<AutoDiffFunctionInst *> &getProcessedAutoDiffFunctionInsts() {
+    return processedAutoDiffFunctionInsts;
   }
 
   DenseMap<SILDifferentiableAttr *, DifferentiationInvoker> &getInvokers() {
@@ -767,7 +772,7 @@ public:
   // determined. Otherwise, it defaults to any file unit in the module. To
   // handle this more properly, we should make a DerivedFileUnit class to
   // contain all synthesized implicit type declarations.
-  SourceFile &getPrimalValueDeclContainer(SILFunction *origFn) {
+  SourceFile &getDeclarationFileUnit(SILFunction *origFn) {
     if (origFn->hasLocation())
       if (auto *declContext = origFn->getLocation().getAsDeclContext())
         if (auto *parentSourceFile = declContext->getParentSourceFile())
@@ -778,12 +783,11 @@ public:
     llvm_unreachable("No files?");
   }
 
-  /// Creates a struct declaration (without contents) for storing primal values
-  /// of a function. The newly created struct will have the same generic
-  /// signature as the given primal generic signature.
-  StructDecl *createPrimalValueStruct(SILFunction *original,
-                                      SILAutoDiffIndices indices,
-                                      CanGenericSignature primalGenericSig);
+  /// Creates an empty struct declaration with the given VJP generic signature,
+  /// forlstoring the pullbacks of the given function.
+  StructDecl *createPullbackStruct(SILFunction *original,
+                                   SILAutoDiffIndices indices,
+                                   CanGenericSignature vjpGenericSig);
 
   /// Finds the `[differentiable]` attribute on the specified original function
   /// corresponding to the specified parameter indices. Returns nullptr if it
@@ -872,6 +876,15 @@ public:
   /// Process the given `autodiff_function` instruction, filling in missing
   /// associated functions if necessary.
   bool processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi);
+
+  /// Fold `autodiff_function_extract` users of the given `autodiff_function`
+  /// instruction, directly replacing them with `autodiff_function` instruction
+  /// operands. If the `autodiff_function` instruction has no remaining uses,
+  /// delete the instruction itself after folding.
+  ///
+  /// Folding can be disabled by the `SkipFoldingAutoDiffFunctionExtraction` flag
+  /// for SIL testing purposes.
+  void foldAutoDiffFunctionExtraction(AutoDiffFunctionInst *source);
 
   /// Get or create an associated function index subset thunk from
   /// `actualIndices` to `desiredIndices` for the given associated function
@@ -2410,45 +2423,43 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
 }
 
 StructDecl *
-ADContext::createPrimalValueStruct(SILFunction *original,
-                                   const SILAutoDiffIndices indices,
-                                   CanGenericSignature primalGenericSig) {
+ADContext::createPullbackStruct(SILFunction *original,
+                                const SILAutoDiffIndices indices,
+                                CanGenericSignature vjpGenericSig) {
   auto *function = original;
   assert(&function->getModule() == &module &&
          "The function must be in the same module");
-  auto &file = getPrimalValueDeclContainer(function);
+  auto &file = getDeclarationFileUnit(function);
   // Create a `_<fn_name>__Type` struct.
-  std::string pvStructName =
+  std::string pbStructName =
       "_AD__" + function->getName().str() + "__Type__" + indices.mangle();
-  auto structId = astCtx.getIdentifier(pvStructName);
+  auto structId = astCtx.getIdentifier(pbStructName);
   SourceLoc loc = function->getLocation().getSourceLoc();
-  auto pvStruct =
-      new (astCtx) StructDecl(/*StructLoc*/ loc, /*Name*/ structId,
-                              /*NameLoc*/ loc, /*Inherited*/ {},
-                              /*GenericParams*/ nullptr, // to be set later
-                              /*DC*/ &file);
-  // Set braces so that `pvStruct` can be dumped.
-  pvStruct->setBraces(loc);
-  if (primalGenericSig) {
+  auto *pullbackStruct = new (astCtx) StructDecl(
+      /*StructLoc*/ loc, /*Name*/ structId, /*NameLoc*/ loc, /*Inherited*/ {},
+      /*GenericParams*/ /*set later*/ nullptr, /*DC*/ &file);
+  // Set braces so that `pullbackStruct` can be dumped.
+  pullbackStruct->setBraces(loc);
+  if (vjpGenericSig) {
     auto genericParams =
-        cloneGenericParameters(astCtx, pvStruct, primalGenericSig);
-    pvStruct->setGenericParams(genericParams);
-    pvStruct->setGenericEnvironment(
-        primalGenericSig->createGenericEnvironment());
+        cloneGenericParameters(astCtx, pullbackStruct, vjpGenericSig);
+    pullbackStruct->setGenericParams(genericParams);
+    pullbackStruct->setGenericEnvironment(
+        vjpGenericSig->createGenericEnvironment());
   }
   switch (function->getEffectiveSymbolLinkage()) {
   case swift::SILLinkage::Public:
   case swift::SILLinkage::PublicNonABI:
-    pvStruct->setAccess(AccessLevel::Internal);
-    pvStruct->getAttrs().add(
+    pullbackStruct->setAccess(AccessLevel::Internal);
+    pullbackStruct->getAttrs().add(
         new (astCtx) UsableFromInlineAttr(/*Implicit*/ true));
     break;
   case swift::SILLinkage::Hidden:
   case swift::SILLinkage::Shared:
-    pvStruct->setAccess(AccessLevel::Internal);
+    pullbackStruct->setAccess(AccessLevel::Internal);
     break;
   case swift::SILLinkage::Private:
-    pvStruct->setAccess(AccessLevel::FilePrivate);
+    pullbackStruct->setAccess(AccessLevel::FilePrivate);
     break;
   default:
     // When the original function has external linkage, we create an internal
@@ -2456,19 +2467,19 @@ ADContext::createPrimalValueStruct(SILFunction *original,
     // differentiation in Jupyter.
     // TODO: Add a test in the compiler that exercises a similar situation as
     // cross-cell differentiation in Jupyter.
-    pvStruct->setAccess(AccessLevel::Internal);
+    pullbackStruct->setAccess(AccessLevel::Internal);
   }
-  pvStruct->computeType();
-  assert(pvStruct->hasInterfaceType());
-  file.addVisibleDecl(pvStruct);
+  pullbackStruct->computeType();
+  assert(pullbackStruct->hasInterfaceType());
+  file.addVisibleDecl(pullbackStruct);
   LLVM_DEBUG({
     auto &s = getADDebugStream();
-    s << "Primal value struct created for function " << function->getName()
+    s << "Pullback struct created for function " << function->getName()
       << '\n';
-    pvStruct->print(s);
+    pullbackStruct->print(s);
     s << '\n';
   });
-  return pvStruct;
+  return pullbackStruct;
 }
 
 /// Given an parameter argument (not indirect result) and some differentiation
@@ -2566,21 +2577,26 @@ static SILFunction *getAssociatedFunction(
 namespace {
 class VJPEmitter final
     : public TypeSubstCloner<VJPEmitter, SILOptFunctionBuilder> {
+  friend class AdjointEmitter;
+
 private:
   /// The global context.
   ADContext &context;
 
   /// The original function.
-  SILFunction *original;
+  SILFunction *const original;
 
   /// The `[differentiable]` attribute.
-  SILDifferentiableAttr *attr;
+  SILDifferentiableAttr *const attr;
 
   /// The VJP function.
-  SILFunction *vjp;
+  SILFunction *const vjp;
 
-  /// The primal info.
-  std::unique_ptr<PrimalInfo> primalInfo = nullptr;
+  /// The adjoint function.
+  SILFunction *adjoint;
+
+  /// The pullback info.
+  std::unique_ptr<PullbackInfo> pullbackInfo;
 
   /// The differentiation invoker.
   DifferentiationInvoker invoker;
@@ -2590,25 +2606,13 @@ private:
 
   bool errorOccurred = false;
 
-  /// Global context.
-  ADContext &getContext() { return context; }
+  /// List of pullbacks, used to build the pullback struct.
+  SmallVector<SILValue, 8> pullbacks;
 
-  SmallVector<SILValue, 8> primalValues;
-
-  ASTContext &getASTContext() const {
-    return vjp->getASTContext();
-  }
-
-  SILFunction *getOriginal() const { return original; }
-  SILFunction *getVJP() const { return vjp; }
-
+  SILModule &getModule() const { return vjp->getModule(); }
+  ASTContext &getASTContext() const { return vjp->getASTContext(); }
   const SILAutoDiffIndices &getIndices() const { return attr->getIndices(); }
-
-  DifferentiationInvoker getInvoker() const { return invoker; }
-
-  PrimalInfo &getPrimalInfo() const {
-    return *primalInfo.get();
-  }
+  PullbackInfo &getPullbackInfo() const { return *pullbackInfo.get(); }
 
   static SubstitutionMap getSubstitutionMap(SILFunction *original,
                                             SILFunction *vjp) {
@@ -2643,10 +2647,20 @@ public:
         context(context), original(original), attr(attr), vjp(vjp),
         invoker(invoker),
         activityInfo(
-            getActivityInfo(context, original, attr->getIndices(), vjp)) {}
+            getActivityInfo(context, original, attr->getIndices(), vjp)) {
+    // Set pullback info.
+    auto vjpGenericSig = vjp->getLoweredFunctionType()->getGenericSignature();
+    auto *pullbackStructDecl =
+        context.createPullbackStruct(original, getIndices(), vjpGenericSig);
+    pullbackInfo =
+        std::unique_ptr<PullbackInfo>(new PullbackInfo(pullbackStructDecl));
+    // Create empty adjoint function.
+    adjoint = createEmptyAdjoint();
+    context.getGeneratedFunctions().push_back(adjoint);
+  }
 
   SILFunction *createEmptyAdjoint() {
-    auto &module = context.getModule();
+    auto &module = getModule();
     auto origTy = original->getLoweredFunctionType();
     auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
 
@@ -2707,7 +2721,7 @@ public:
 
     // Parameters of the adjoint are:
     // - a seed,
-    // - a primal value struct,
+    // - a pullback struct,
     // - original results, and
     // - the original parameters.
     // Results of the adjoint are in the tangent space of the original
@@ -2724,11 +2738,11 @@ public:
             ->getAutoDiffAssociatedTangentSpace(lookupConformance)
             ->getCanonicalType(), origResInfo.getConvention()));
 
-    // Accept a primal value struct in the adjoint parameter list. This is the
-    // pullback's closure context.
-    auto pvType = primalInfo->getPrimalValueStruct()
+    // Accept a pullback struct in the adjoint parameter list. This is the
+    // returned pullback's closure context.
+    auto pbStructType = pullbackInfo->getPullbackStruct()
         ->getDeclaredInterfaceType()->getCanonicalType();
-    adjParams.push_back({pvType, ParameterConvention::Direct_Guaranteed});
+    adjParams.push_back({pbStructType, ParameterConvention::Direct_Guaranteed});
 
     // Add adjoint results for the requested wrt parameters.
     for (auto i : indices.parameters->getIndices()) {
@@ -2785,7 +2799,7 @@ public:
   }
 
   void visitSILInstruction(SILInstruction *inst) {
-    getContext().emitNondifferentiabilityError(inst, invoker);
+    context.emitNondifferentiabilityError(inst, invoker);
     errorOccurred = true;
   }
 
@@ -2819,19 +2833,19 @@ public:
     // Find the corresponding getter and its VJP.
     auto *getterDecl = sei->getField()->getGetter();
     assert(getterDecl);
-    auto *getterFn = getContext().getModule().lookUpFunction(
+    auto *getterFn = getModule().lookUpFunction(
         SILDeclRef(getterDecl, SILDeclRef::Kind::Func));
     if (!getterFn) {
-      getContext().emitNondifferentiabilityError(
+      context.emitNondifferentiabilityError(
           sei, invoker, diag::autodiff_property_not_differentiable);
       errorOccurred = true;
       return;
     }
     SILAutoDiffIndices indices(/*source*/ 0,
         AutoDiffIndexSubset::getDefault(getASTContext(), 1, true));
-    auto *attr = getContext().lookUpDifferentiableAttr(getterFn, indices);
+    auto *attr = context.lookUpDifferentiableAttr(getterFn, indices);
     if (!attr) {
-      getContext().emitNondifferentiabilityError(
+      context.emitNondifferentiabilityError(
           sei, invoker, diag::autodiff_property_not_differentiable);
       errorOccurred = true;
       return;
@@ -2858,10 +2872,10 @@ public:
                                              getterVJPApply->getLoc());
     mapValue(sei, originalDirectResult);
     // Checkpoint the pullback.
-    SILValue pullback = vjpDirectResults.back();
+    auto pullback = vjpDirectResults.back();
     // TODO: Check whether it's necessary to reabstract getter pullbacks.
-    getPrimalInfo().addPullbackDecl(sei, getOpType(pullback->getType()));
-    primalValues.push_back(pullback);
+    getPullbackInfo().addPullbackDecl(sei, getOpType(pullback->getType()));
+    pullbacks.push_back(pullback);
   }
 
   void visitStructElementAddrInst(StructElementAddrInst *seai) {
@@ -2888,19 +2902,19 @@ public:
     // Find the corresponding getter and its VJP.
     auto *getterDecl = seai->getField()->getGetter();
     assert(getterDecl);
-    auto *getterFn = getContext().getModule().lookUpFunction(
+    auto *getterFn = context.getModule().lookUpFunction(
         SILDeclRef(getterDecl, SILDeclRef::Kind::Func));
     if (!getterFn) {
-      getContext().emitNondifferentiabilityError(
+      context.emitNondifferentiabilityError(
           seai, invoker, diag::autodiff_property_not_differentiable);
       errorOccurred = true;
       return;
     }
     SILAutoDiffIndices indices(/*source*/ 0,
         AutoDiffIndexSubset::getDefault(getASTContext(), 1, true));
-    auto *attr = getContext().lookUpDifferentiableAttr(getterFn, indices);
+    auto *attr = context.lookUpDifferentiableAttr(getterFn, indices);
     if (!attr) {
-      getContext().emitNondifferentiabilityError(
+      context.emitNondifferentiabilityError(
           seai, invoker, diag::autodiff_property_not_differentiable);
       errorOccurred = true;
       return;
@@ -2910,7 +2924,7 @@ public:
         ? SubsMap.getGenericSignature()->getCanonicalSignature()
         : nullptr;
     Lowering::GenericContextScope genericContextScope(
-        getContext().getTypeConverter(), canGenSig);
+        context.getTypeConverter(), canGenSig);
     // Reference the getter VJP.
     auto loc = seai->getLoc();
     auto *getterVJP = context.getModule().lookUpFunction(attr->getVJPName());
@@ -2948,14 +2962,13 @@ public:
     // Checkpoint the pullback.
     SILValue pullback = vjpDirectResults.back();
     // TODO: Check whether it's necessary to reabstract getter pullbacks.
-    getPrimalInfo().addPullbackDecl(seai, getOpType(pullback->getType()));
-    primalValues.push_back(pullback);
+    getPullbackInfo().addPullbackDecl(seai, getOpType(pullback->getType()));
+    pullbacks.push_back(pullback);
   }
 
   // If an `apply` has active results or active inout parameters, replace it
   // with an `apply` of its VJP.
   void visitApplyInst(ApplyInst *ai) {
-    auto &context = getContext();
     // Special handling logic only applies when `apply` has active results or
     // active arguments at an active 'inout' parameter position. If not, just do
     // standard cloning.
@@ -3023,7 +3036,7 @@ public:
     auto &builder = getBuilder();
     auto original = getOpValue(ai->getCallee());
     auto functionSource = original;
-    SILValue vjp;
+    SILValue vjpValue;
     // If functionSource is a @differentiable function, just extract it.
     auto originalFnTy = original->getType().castTo<SILFunctionType>();
     if (originalFnTy->isDifferentiable()) {
@@ -3036,7 +3049,7 @@ public:
           return;
         }
       }
-      vjp = builder.createAutoDiffFunctionExtract(
+      vjpValue = builder.createAutoDiffFunctionExtract(
           original.getLoc(), AutoDiffFunctionExtractInst::Extractee::VJP,
           /*differentiationOrder*/ 1, functionSource);
     }
@@ -3066,7 +3079,7 @@ public:
     // on the remapped original function operand and `autodiff_function_extract`
     // the VJP. The actual JVP/VJP functions will be populated in the
     // `autodiff_function` during the transform main loop.
-    if (!vjp) {
+    if (!vjpValue) {
       // FIXME: Handle indirect differentiation invokers. This may require some
       // redesign: currently, each original function + attribute pair is mapped
       // only to one invoker.
@@ -3099,7 +3112,7 @@ public:
       context.getResultIndices()[autoDiffFuncInst] =
           activeResultIndices.front();
 
-      vjp = getBuilder().createAutoDiffFunctionExtract(
+      vjpValue = getBuilder().createAutoDiffFunctionExtract(
           loc, AutoDiffFunctionExtractInst::Extractee::VJP,
           /*differentiationOrder*/ 1, autoDiffFuncInst);
     }
@@ -3113,7 +3126,7 @@ public:
 
     // Call the VJP using the original parameters.
     SmallVector<SILValue, 8> vjpArgs;
-    auto vjpFnTy = getOpType(vjp->getType()).castTo<SILFunctionType>();
+    auto vjpFnTy = getOpType(vjpValue->getType()).castTo<SILFunctionType>();
     auto numVJPArgs =
         vjpFnTy->getNumParameters() + vjpFnTy->getNumIndirectFormalResults();
     vjpArgs.reserve(numVJPArgs);
@@ -3123,7 +3136,7 @@ public:
     assert(vjpArgs.size() == numVJPArgs);
     // Apply the VJP.
     // The VJP should be specialized, so no substitution map is necessary.
-    auto *vjpCall = getBuilder().createApply(loc, vjp, SubstitutionMap(),
+    auto *vjpCall = getBuilder().createApply(loc, vjpValue, SubstitutionMap(),
                                              vjpArgs, ai->isNonThrowing());
     LLVM_DEBUG(getADDebugStream() << "Applied vjp function\n" << *vjpCall);
 
@@ -3142,7 +3155,7 @@ public:
 
     // Checkpoint the pullback.
     auto *pullbackDecl =
-        getPrimalInfo().addPullbackDecl(ai, getOpType(pullback->getType()));
+        getPullbackInfo().addPullbackDecl(ai, getOpType(pullback->getType()));
 
     // If actual pullback type does not match lowered pullback type, reabstract
     // the pullback using a thunk.
@@ -3161,16 +3174,16 @@ public:
     if (!loweredPullbackType->isEqual(actualPullbackType)) {
       // Set non-reabstracted original pullback type in nested apply info.
       nestedApplyInfo.originalPullbackType = actualPullbackType;
-      SILOptFunctionBuilder fb(getContext().getTransform());
+      SILOptFunctionBuilder fb(context.getTransform());
       auto *thunk = getOrCreateReabstractionThunk(
-          fb, getContext().getModule(), loc, /*caller*/ getVJP(),
-          actualPullbackType, loweredPullbackType);
+          fb, getModule(), loc, /*caller*/ vjp, actualPullbackType,
+          loweredPullbackType);
       auto *thunkRef = getBuilder().createFunctionRef(loc, thunk);
       pullback = getBuilder().createPartialApply(
           ai->getLoc(), thunkRef, thunk->getForwardingSubstitutionMap(),
           {pullback}, actualPullbackType->getCalleeConvention());
     }
-    primalValues.push_back(pullback);
+    pullbacks.push_back(pullback);
 
     // Some instructions that produce the callee may have been cloned.
     // If the original callee did not have any users beyond this `apply`,
@@ -3457,32 +3470,11 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 namespace {
 class AdjointEmitter final : public SILInstructionVisitor<AdjointEmitter> {
 private:
-  /// The global AD context.
-  ADContext &context;
-
-  /// The `[differentiable]` attribute.
-  SILDifferentiableAttr *attr;
-
-  /// The original function.
-  SILFunction *original;
-
-  /// The adjoint function.
-  SILFunction *adjoint;
-
-  /// The VJP function.
-  SILFunction *vjp;
-
-  /// The primal info.
-  PrimalInfo &primalInfo;
-
-  /// The differentiation invoker.
-  DifferentiationInvoker invoker;
-
-  /// Info from activity analysis on the original function.
-  const DifferentiableActivityInfo &activityInfo;
+  /// The parent VJP emitter.
+  VJPEmitter &vjpEmitter;
 
   /// Post-dominance info.
-  const PostDominanceInfo &postDomInfo;
+  PostDominanceInfo *postDomInfo;
 
   /// Mapping from original values to their corresponding adjoint values.
   DenseMap<SILValue, AdjointValue> valueMap;
@@ -3497,8 +3489,8 @@ private:
   /// Local stack allocations.
   SmallVector<ValueWithCleanup, 8> localAllocations;
 
-  /// The primal value aggregate passed to the adjoint function.
-  SILArgument *primalValueAggregateInAdj = nullptr;
+  /// The pullback struct argument of the adjoint function.
+  SILArgument *pullbackStructArgument = nullptr;
 
   /// The seed argument in the adjoint function.
   SILArgument *seed = nullptr;
@@ -3513,37 +3505,31 @@ private:
 
   bool errorOccurred = false;
 
-  ADContext &getContext() const { return context; }
-
+  ADContext &getContext() const { return vjpEmitter.context; }
   SILModule &getModule() const { return getContext().getModule(); }
-
-  ASTContext &getASTContext() const {
-    return adjoint->getASTContext();
+  ASTContext &getASTContext() const { return getAdjoint().getASTContext(); }
+  SILFunction &getOriginal() const { return *vjpEmitter.original; }
+  SILFunction &getAdjoint() const { return *vjpEmitter.adjoint; }
+  SILDifferentiableAttr *getAttr() const { return vjpEmitter.attr; }
+  DifferentiationInvoker getInvoker() const { return vjpEmitter.invoker; }
+  PullbackInfo &getPullbackInfo() { return *vjpEmitter.pullbackInfo.get(); }
+  const SILAutoDiffIndices &getIndices() const {
+    return vjpEmitter.getIndices();
   }
-
-  PrimalInfo &getPrimalInfo() {
-    return primalInfo;
+  const DifferentiableActivityInfo &getActivityInfo() const {
+    return vjpEmitter.activityInfo;
   }
-
-  SILFunction &getOriginal() const { return *original; }
-  SILFunction &getAdjoint() const { return *adjoint; }
-
-  const SILAutoDiffIndices &getIndices() const { return attr->getIndices(); }
 
 public:
-  explicit AdjointEmitter(ADContext &context,
-                          SILFunction *original,
-                          SILDifferentiableAttr *attr,
-                          SILFunction *adjoint,
-                          SILFunction *vjp,
-                          PrimalInfo &primalInfo,
-                          DifferentiationInvoker invoker,
-                          const DifferentiableActivityInfo &activityInfo,
-                          PostDominanceInfo &postDomInfo)
-      : context(context), attr(attr), original(original), adjoint(adjoint),
-        vjp(vjp), primalInfo(primalInfo), invoker(invoker),
-        activityInfo(activityInfo), postDomInfo(postDomInfo),
-        builder(getAdjoint()), localAllocBuilder(getAdjoint()) {}
+  explicit AdjointEmitter(VJPEmitter &vjpEmitter)
+      : vjpEmitter(vjpEmitter), builder(getAdjoint()),
+        localAllocBuilder(getAdjoint()) {
+    // Get post-dominance info for the original function.
+    auto &passManager = getContext().getPassManager();
+    auto *postDomAnalysis =
+        passManager.getAnalysis<PostDominanceAnalysis>();
+    postDomInfo = postDomAnalysis->get(vjpEmitter.original);
+  }
 
 private:
   //--------------------------------------------------------------------------//
@@ -3773,7 +3759,7 @@ private:
     if (auto *seai = dyn_cast<StructElementAddrInst>(originalBuffer)) {
       if (seai->getField()->getAttrs().hasAttribute<NoDerivativeAttr>()) {
         getContext().emitNondifferentiabilityError(
-            originalBuffer, invoker,
+            originalBuffer, getInvoker(),
             diag::autodiff_noderivative_stored_property);
         errorOccurred = true;
         return (bufferMap[originalBuffer] = ValueWithCleanup());
@@ -3854,20 +3840,21 @@ private:
   bool shouldBeDifferentiated(SILInstruction *inst,
                               const SILAutoDiffIndices &indices) {
     // Anything with an active result should be differentiated.
-    if (llvm::any_of(inst->getResults(),
-            [&](SILValue val) { return activityInfo.isActive(val, indices); }))
+    if (llvm::any_of(inst->getResults(), [&](SILValue val) {
+          return getActivityInfo().isActive(val, indices);
+        }))
       return true;
     if (auto *ai = dyn_cast<ApplyInst>(inst)) {
       // Function applications with an active indirect result should be
       // differentiated.
       for (auto indRes : ai->getIndirectSILResults())
-        if (activityInfo.isActive(indRes, indices))
+        if (getActivityInfo().isActive(indRes, indices))
           return true;
       // Function applications with an inout argument should be differentiated.
       auto paramInfos = ai->getSubstCalleeConv().getParameters();
       for (auto i : swift::indices(paramInfos))
         if (paramInfos[i].isIndirectInOut() &&
-            activityInfo.isActive(
+            getActivityInfo().isActive(
                 ai->getArgumentsWithoutIndirectResults()[i], indices))
           return true;
     }
@@ -3875,7 +3862,7 @@ private:
     // be differentiated.
     if (inst->mayWriteToMemory())
       for (auto &op : inst->getAllOperands())
-        if (activityInfo.isActive(op.get(), indices))
+        if (getActivityInfo().isActive(op.get(), indices))
           return true;
     return false;
   }
@@ -3894,10 +3881,10 @@ public:
     auto *origRet = getSingleReturn(&original);
     auto *origRetBB = origRet->getParent();
     adjointBBMap.insert({origRetBB, adjointEntry});
-    // The adjoint function has type (seed, pv) -> ([arg0], ..., [argn]).
+    // The adjoint function has type (seed, pullbacks) -> ([arg0], ..., [argn]).
     auto adjParamArgs = adjoint.getArgumentsWithoutIndirectResults();
     seed = adjParamArgs[0];
-    primalValueAggregateInAdj = adjParamArgs[1];
+    pullbackStructArgument = adjParamArgs[1];
 
     // Assign adjoint for original result.
     SmallVector<SILValue, 8> origFormalResults;
@@ -3905,7 +3892,7 @@ public:
     auto origResult = origFormalResults[getIndices().source];
     // Emit warning if original result is not varied, because it will always
     // have a zero derivative.
-    if (!activityInfo.isVaried(origResult, getIndices().parameters)) {
+    if (!getActivityInfo().isVaried(origResult, getIndices().parameters)) {
       // Emit fixit if original result has a valid source location.
       auto sourceLoc = origResult.getLoc().getEndSourceLoc();
       if (sourceLoc.isValid()) {
@@ -4058,29 +4045,29 @@ public:
   void visitSILInstruction(SILInstruction *inst) {
     LLVM_DEBUG(getADDebugStream()
                << "Unhandled instruction in adjoint emitter: " << *inst);
-    getContext().emitNondifferentiabilityError(inst, invoker);
+    getContext().emitNondifferentiabilityError(inst, getInvoker());
     errorOccurred = true;
   }
 
   void visitApplyInst(ApplyInst *ai) {
     // Replace a call to a function with a call to its pullback.
-    auto &nestedApplyInfo = context.getNestedApplyInfo();
+    auto &nestedApplyInfo = getContext().getNestedApplyInfo();
     auto applyInfoLookup = nestedApplyInfo.find(ai);
     // If no `NestedApplyInfo` was found, then this task doesn't need to be
     // differentiated.
     if (applyInfoLookup == nestedApplyInfo.end()) {
       // Must not be active.
-      assert(!activityInfo.isActive(ai, getIndices()));
+      assert(!getActivityInfo().isActive(ai, getIndices()));
       return;
     }
     auto applyInfo = applyInfoLookup->getSecond();
 
     // Get the pullback.
-    auto *field = getPrimalInfo().lookUpPullbackDecl(ai);
+    auto *field = getPullbackInfo().lookUpPullbackDecl(ai);
     assert(field);
     auto loc = ai->getLoc();
     SILValue pullback =
-        builder.createStructExtract(loc, primalValueAggregateInAdj, field);
+        builder.createStructExtract(loc, pullbackStructArgument, field);
 
     // Get the original result of the `apply` instruction.
     SmallVector<SILValue, 8> args;
@@ -4129,7 +4116,7 @@ public:
       args.push_back(alloc);
     }
 
-    // If pullback was reabstracted in primal, reabstract pullback in adjoint.
+    // If pullback was reabstracted in VJP, reabstract pullback in adjoint.
     if (applyInfo.originalPullbackType) {
       SILOptFunctionBuilder fb(getContext().getTransform());
       auto *thunk = getOrCreateReabstractionThunk(
@@ -4281,11 +4268,11 @@ public:
            "differentiated; activity analysis should not marked as varied");
     auto loc = sei->getLoc();
     auto &differentiationStrategies =
-        context.getStructExtractDifferentiationStrategies();
+        getContext().getStructExtractDifferentiationStrategies();
     auto strategy = differentiationStrategies.lookup(sei);
     switch (strategy) {
     case StructExtractDifferentiationStrategy::Inactive:
-      assert(!activityInfo.isActive(sei, getIndices()));
+      assert(!getActivityInfo().isActive(sei, getIndices()));
       return;
     case StructExtractDifferentiationStrategy::Fieldwise: {
       // Compute adjoint as follows:
@@ -4349,10 +4336,10 @@ public:
     }
     case StructExtractDifferentiationStrategy::Getter: {
       // Get the pullback.
-      auto *pullbackField = getPrimalInfo().lookUpPullbackDecl(sei);
+      auto *pullbackField = getPullbackInfo().lookUpPullbackDecl(sei);
       assert(pullbackField);
       auto pullback = builder.createStructExtract(
-          loc, primalValueAggregateInAdj, pullbackField);
+          loc, pullbackStructArgument, pullbackField);
 
       // Construct the pullback arguments.
       auto av = takeAdjointValue(sei);
@@ -4597,14 +4584,14 @@ public:
     if (bai->getAccessKind() == SILAccessKind::Modify) {
       if (auto *gai = dyn_cast<GlobalAddrInst>(bai->getSource())) {
         getContext()
-            .emitNondifferentiabilityError(bai, invoker,
+            .emitNondifferentiabilityError(bai, getInvoker(),
                 diag::autodiff_cannot_differentiate_writes_to_global_variables);
         errorOccurred = true;
         return;
       }
       if (auto *pbi = dyn_cast<ProjectBoxInst>(bai->getSource())) {
         getContext()
-            .emitNondifferentiabilityError(bai, invoker,
+            .emitNondifferentiabilityError(bai, getInvoker(),
                 diag::autodiff_cannot_differentiate_writes_to_mutable_captures);
         errorOccurred = true;
         return;
@@ -5158,8 +5145,6 @@ void AdjointEmitter::accumulateIndirect(SILValue lhsDestAccess,
 }
 
 bool VJPEmitter::run() {
-  auto *original = getOriginal();
-  auto *vjp = getVJP();
   LLVM_DEBUG(getADDebugStream()
              << "Cloning original @" << original->getName()
              << " to vjp @" << vjp->getName() << '\n');
@@ -5169,12 +5154,6 @@ bool VJPEmitter::run() {
   SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
                                      entry->getArguments().end());
 
-  auto vjpGenericSig = vjp->getLoweredFunctionType()->getGenericSignature();
-  auto *primalValueStructDecl =
-      context.createPrimalValueStruct(original, getIndices(), vjpGenericSig);
-  primalInfo =
-      std::unique_ptr<PrimalInfo>(new PrimalInfo(primalValueStructDecl));
-
   // Clone.
   cloneFunctionBody(original, entry, entryArgs);
   // If errors occurred, back out.
@@ -5182,44 +5161,37 @@ bool VJPEmitter::run() {
     return true;
   auto *origExit = &*original->findReturnBB();
   auto *exit = BBMap.lookup(origExit);
-  assert(exit->getParent() == getVJP());
+  assert(exit->getParent() == vjp);
   // Get the original's return value's corresponding value in the vjp.
   auto *origRetInst = cast<ReturnInst>(origExit->getTerminator());
   auto origResult = getOpValue(origRetInst->getOperand());
 
-  // Create a primal value struct containing all static primal values and
-  // tapes.
-  auto loc = getVJP()->getLocation();
-  auto structTy = getOpASTType(getPrimalInfo()
-                                   .getPrimalValueStruct()
+  // Create a pullback struct containing all pullbacks.
+  auto loc = vjp->getLocation();
+  auto structTy = getOpASTType(getPullbackInfo()
+                                   .getPullbackStruct()
                                    ->getDeclaredInterfaceType()
                                    ->getCanonicalType());
   auto &builder = getBuilder();
   builder.setInsertionPoint(exit);
-  auto structLoweredTy = getContext().getTypeConverter().getLoweredType(
+  auto structLoweredTy = context.getTypeConverter().getLoweredType(
       structTy, ResilienceExpansion::Minimal);
-  auto primValsVal = builder.createStruct(loc, structLoweredTy, primalValues);
+  auto pullbackStructVal =
+      builder.createStruct(loc, structLoweredTy, pullbacks);
   // If the original result was a tuple, return a tuple of all elements in the
-  // original result tuple and the primal value struct value.
+  // original result tuple and the pullback struct value.
   SmallVector<SILValue, 8> origResults;
   extractAllElements(origResult, builder, origResults);
   LLVM_DEBUG({
     auto &s = getADDebugStream()
-              << "Primal values in $"
-              << getPrimalInfo().getPrimalValueStruct()->getName() << ":\n";
-    for (auto *var : getPrimalInfo().getPrimalValueStruct()->getMembers())
+              << "Pullbacks in $"
+              << getPullbackInfo().getPullbackStruct()->getName() << ":\n";
+    for (auto *var : getPullbackInfo().getPullbackStruct()->getMembers())
       var->dump(s);
   });
 
   // Generate adjoint code.
-  auto &passManager = context.getPassManager();
-  auto *postDomAnalysis =
-      passManager.getAnalysis<PostDominanceAnalysis>();
-  SILFunction *adjoint = createEmptyAdjoint();
-  context.getGeneratedFunctions().push_back(adjoint);
-  AdjointEmitter adjointEmitter(context, original, attr, adjoint, getVJP(),
-                                *primalInfo.get(), invoker, activityInfo,
-                                *postDomAnalysis->get(original));
+  AdjointEmitter adjointEmitter(*this);
   // Run the adjoint emitter.
   if (adjointEmitter.run()) {
     errorOccurred = true;
@@ -5232,11 +5204,11 @@ bool VJPEmitter::run() {
       : vjp->getForwardingSubstitutionMap();
   auto *adjointRef = builder.createFunctionRef(loc, adjoint);
   auto *adjointPartialApply = builder.createPartialApply(
-      loc, adjointRef, vjpSubstMap, {primValsVal},
+      loc, adjointRef, vjpSubstMap, {pullbackStructVal},
       ParameterConvention::Direct_Guaranteed);
 
   // Return the direct results. Note that indirect results have already been
-  // filled in by the application of the primal.
+  // computed.
   SmallVector<SILValue, 8> directResults;
   directResults.append(origResults.begin(), origResults.end());
   directResults.push_back(adjointPartialApply);
@@ -5244,8 +5216,8 @@ bool VJPEmitter::run() {
 
   LLVM_DEBUG(getADDebugStream() << "Finished VJPGen for function "
                                 << original->getName() << ":\n"
-                                << *getVJP());
-  debugDump(*getVJP());
+                                << *vjp);
+  debugDump(*vjp);
   return errorOccurred;
 }
 
@@ -5271,7 +5243,7 @@ ADContext::declareExternalAssociatedFunction(
       SILLinkage::PublicExternal, name, assocFnTy,
       /*genericEnv*/ nullptr, originalLoc, original->isBare(), IsNotTransparent,
       original->isSerialized(), original->isDynamicallyReplaceable());
-  // NOTE: Setting debug scope is necessary to prevent crash in TFPartition.
+  // Note: Setting debug scope prevents crashes during later transforms.
   assocFn->setDebugScope(new (module) SILDebugScope(originalLoc, assocFn));
   return assocFn;
 }
@@ -5956,8 +5928,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
 ///
 /// Folding can be disabled by the `SkipFoldingAutoDiffFunctionExtraction` flag
 /// for SIL testing purposes.
-static void foldAutoDiffFunctionExtraction(
-    ADContext &context, AutoDiffFunctionInst *source) {
+void ADContext::foldAutoDiffFunctionExtraction(AutoDiffFunctionInst *source) {
   // Iterate through all `autodiff_function` instruction uses.
   for (auto use : source->getUses()) {
     auto *adfei = dyn_cast<AutoDiffFunctionExtractInst>(use->getUser());
@@ -5982,11 +5953,8 @@ static void foldAutoDiffFunctionExtraction(
   if (!isInstructionTriviallyDead(source))
     return;
   source->eraseFromParent();
-  // Delete all worklist occurrences of `source` by setting them to nullptr.
-  // This is more efficient than APIs like `llvm::erase_if`.
-  for (auto &inst : context.getAutoDiffFunctionInsts())
-    if (inst == source)
-      inst = nullptr;
+  // Mark `source` as processed so that it won't be reprocessed after deletion.
+  processedAutoDiffFunctionInsts.insert(source);
 }
 
 bool ADContext::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
@@ -6005,11 +5973,8 @@ bool ADContext::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
       promoteToDifferentiableFunction(adfi, builder, loc, adfi);
   if (!differentiableFnValue)
     return true;
-  // Delete all worklist occurrences of `adfi` by setting them to nullptr.
-  // This is more efficient than APIs like `llvm::erase_if`.
-  for (auto &inst : getAutoDiffFunctionInsts())
-    if (inst == adfi)
-      inst = nullptr;
+  // Mark `adfi` as processed so that it won't be reprocessed after deletion.
+  processedAutoDiffFunctionInsts.insert(adfi);
   // Replace all uses of `adfi`.
   adfi->replaceAllUsesWith(differentiableFnValue);
   adfi->eraseFromParent();
@@ -6018,7 +5983,7 @@ bool ADContext::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
   // instructions. If `autodiff_function_extract` folding is disabled, return.
   if (!SkipFoldingAutoDiffFunctionExtraction)
     if (auto *newADFI = dyn_cast<AutoDiffFunctionInst>(differentiableFnValue))
-      foldAutoDiffFunctionExtraction(*this, newADFI);
+      foldAutoDiffFunctionExtraction(newADFI);
   transform.invalidateAnalysis(
       parent, SILAnalysis::InvalidationKind::FunctionBody);
   return false;
@@ -6080,9 +6045,8 @@ void Differentiation::run() {
   while (!context.getAutoDiffFunctionInsts().empty()) {
     auto *adfi = context.getAutoDiffFunctionInsts().back();
     context.getAutoDiffFunctionInsts().pop_back();
-    // Skip instructions that have been set to nullptr by
-    // `processAutoDiffFunctionInst`.
-    if (!adfi) continue;
+    // Skip instructions that have been already been processed.
+    if (context.getProcessedAutoDiffFunctionInsts().count(adfi)) continue;
     errorOccurred |= context.processAutoDiffFunctionInst(adfi);
   }
 

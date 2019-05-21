@@ -70,7 +70,7 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK:   release_value [[SEED:%.*]] : $Vector
 // CHECK: }
 
-// The vjp should not release primal values.
+// The vjp should not release pullback values.
 //
 // CHECK-LABEL: sil hidden @{{.*}}testOwnedVector{{.*}}__vjp_src_0_wrt_0 : $@convention(thin) (@guaranteed Vector) -> (@owned Vector, @owned @callee_guaranteed (@guaranteed Vector) -> @owned Vector)
 // CHECK:   [[ADD:%.*]] = function_ref @Vector_plus
@@ -83,13 +83,13 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK-NOT:   release_value [[ADD_VJP_RESULT]]
 // CHECK-NOT:   release_value [[ADD_PULLBACK]]
 
-// The adjoint should not release primal values because they are passed in as @guaranteed.
+// The adjoint should not release pullback struct argument because it has @guaranteed convention.
 //
 // CHECK-LABEL: @{{.*}}testOwnedVector{{.*}}__adjoint_src_0_wrt_0
-// CHECK: bb0({{%.*}} : $Vector, [[PRIMAL_VALUES:%.*]] : ${{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0):
-// CHECK:   [[PULLBACK0:%.*]] = struct_extract [[PRIMAL_VALUES]] : ${{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0, #{{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0.pullback_0
+// CHECK: bb0({{%.*}} : $Vector, [[PULLBACKS_ARG:%.*]] : ${{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0):
+// CHECK:   [[PULLBACK0:%.*]] = struct_extract [[PULLBACKS_ARG]] : ${{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0, #{{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0.pullback_0
 // CHECK-NOT:   release_value [[PULLBACK0]]
-// CHECK-NOT:   release_value [[PRIMAL_VALUES]]
+// CHECK-NOT:   release_value [[PULLBACKS_ARG]]
 // CHECK: }
 
 
