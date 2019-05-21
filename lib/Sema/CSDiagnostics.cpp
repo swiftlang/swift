@@ -1974,25 +1974,31 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   Expr *expr = getParentExpr();
   SourceRange baseRange = expr ? expr->getSourceRange() : SourceRange();
 
-  auto overload = getOverloadChoiceIfAvailable(locator);
-  if (!overload)
-    return false;
+  ValueDecl *member = KnownChoice;
+  // If there is no known member, let's try to find it.
+  if (!member) {
+    auto overload = getOverloadChoiceIfAvailable(locator);
+    if (!overload)
+      return false;
 
-  ValueDecl *decl = nullptr;
-
-  if (!overload->choice.isDecl()) {
-    auto baseTy = overload->choice.getBaseType();
-    if (auto MT = baseTy->getAs<MetatypeType>()) {
-      if (auto VD = dyn_cast<ValueDecl>(
-              MT->getMetatypeInstanceType()->getAnyNominal()->getAsDecl())) {
-        decl = VD;
-      }
+    const auto &choice = overload->choice;
+    if (choice.isDecl()) {
+      member = choice.getDecl();
     } else {
-      return true;
+      auto baseTy = overload->choice.getBaseType();
+      if (!baseTy->is<MetatypeType>())
+        return false;
+
+      auto *MT = baseTy->castTo<MetatypeType>();
+      auto instanceTy = MT->getMetatypeInstanceType();
+      if (!instanceTy->getAnyNominal())
+        return false;
+
+      member = dyn_cast<ValueDecl>(instanceTy->getAnyNominal()->getAsDecl());
+      if (!member)
+        return false;
     }
   }
-
-  auto member = decl ? decl : overload->choice.getDecl();
 
   // If the base is an implicit self type reference, and we're in a
   // an initializer, then the user wrote something like:
@@ -2232,13 +2238,11 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
     
     // Try to provide a fix-it that only contains a '.'
-    if (contextualType) {
-      if (baseTy->isEqual(contextualType)) {
-        Diag->fixItInsert(loc, ".");
-        return true;
-      }
+    if (contextualType && baseTy->isEqual(contextualType)) {
+      Diag->fixItInsert(loc, ".");
+      return true;
     }
-    
+
     // Check if the expression is the matching operator ~=, most often used in
     // case statements. If so, try to provide a single dot fix-it
     const Expr *contextualTypeNode = nullptr;
@@ -2273,12 +2277,16 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
 
     // Fall back to a fix-it with a full type qualifier
-    auto nominal = member->getDeclContext()->getSelfNominalTypeDecl();
-    SmallString<32> typeName;
-    llvm::raw_svector_ostream typeNameStream(typeName);
-    typeNameStream << nominal->getSelfInterfaceType() << ".";
-    
-    Diag->fixItInsert(loc, typeNameStream.str());
+    if (auto *NTD = member->getDeclContext()->getSelfNominalTypeDecl()) {
+      auto typeName = NTD->getSelfInterfaceType()->getString();
+      if (auto *SE = dyn_cast<SubscriptExpr>(getRawAnchor())) {
+        auto *baseExpr = SE->getBase();
+        Diag->fixItReplace(baseExpr->getSourceRange(), typeName);
+      } else {
+        Diag->fixItInsert(loc, typeName + ".");
+      }
+    }
+
     return true;
   }
   
