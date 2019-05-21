@@ -31,7 +31,7 @@ using namespace swift;
 static llvm::cl::opt<bool>
 EnableExistentialSpecializer("enable-existential-specializer",
                              llvm::cl::Hidden,
-                             llvm::cl::init(false));
+                             llvm::cl::init(true));
 
 STATISTIC(NumFunctionsWithExistentialArgsSpecialized,
           "Number of functions with existential args specialized");
