@@ -124,7 +124,7 @@ class RemoteCommandRunner(CommandRunner):
                 [quote(arg) for arg in command])
 
     def sftp_invocation(self):
-        return (['/usr/bin/sftp', '-b', '-', '-q'] +
+        return (['/usr/bin/sftp', '-b', '-', '-q', '-r'] +
                 self.common_options(port_flag='-P') +
                 [self.remote_host])
 
