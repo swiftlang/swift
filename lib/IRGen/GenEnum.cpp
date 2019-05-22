@@ -3595,12 +3595,8 @@ namespace {
       if (CommonSpareBits.empty())
         return APInt();
       
-      APInt v = interleaveSpareBits(IGM, PayloadTagBits,
-                                    PayloadTagBits.size(),
-                                    tag, 0);
-      v |= interleaveSpareBits(IGM, CommonSpareBits,
-                               CommonSpareBits.size(),
-                               0, tagIndex);
+      APInt v = scatterBits(PayloadTagBits.asAPInt(), tag);
+      v |= scatterBits(~CommonSpareBits.asAPInt(), tagIndex);
       return v;
     }
 
@@ -4145,9 +4141,7 @@ namespace {
       // If we have spare bits, pack tag bits into them.
       unsigned numSpareBits = PayloadTagBits.count();
       if (numSpareBits > 0) {
-        APInt tagMaskVal
-          = interleaveSpareBits(IGM, PayloadTagBits,
-                                PayloadTagBits.size(), tag, 0);
+        APInt tagMaskVal = scatterBits(PayloadTagBits.asAPInt(), tag);
         payload.emitApplyOrMask(IGF, tagMaskVal);
       }
 
@@ -4821,9 +4815,7 @@ namespace {
         // enum containing this enum as a payload. Single payload layout
         // unfortunately assumes that tagging the payload case is a no-op.
         auto spareBitMask = ~CommonSpareBits.asAPInt();
-        APInt tagBitMask
-          = interleaveSpareBits(IGM, PayloadTagBits, PayloadTagBits.size(),
-                                spareTagBits, 0);
+        APInt tagBitMask = scatterBits(PayloadTagBits.asAPInt(), spareTagBits);
 
         payload.emitApplyAndMask(IGF, spareBitMask);
         payload.emitApplyOrMask(IGF, tagBitMask);
@@ -5335,8 +5327,8 @@ namespace {
         auto payloadTagMask = payloadBitCount >= 32
           ? ~0u : (1 << payloadBitCount) - 1;
         auto payloadPart = mask & payloadTagMask;
-        auto payloadBits = interleaveSpareBits(IGM, CommonSpareBits,
-                                               bits, payloadPart, 0);
+        auto payloadBits = scatterBits(CommonSpareBits.asAPInt().zextOrTrunc(bits),
+                                       payloadPart);
         if (getExtraTagBitCountForExtraInhabitants() > 0) {
           auto extraBits = APInt(bits,
                                  (mask >> payloadBitCount) & extraTagMask)
@@ -6939,41 +6931,20 @@ llvm::Value *irgen::emitScatterBits(IRGenFunction &IGF,
   return result;
 }
 
-/// Interleave the occupiedValue and spareValue bits, taking a bit from one
-/// or the other at each position based on the spareBits mask.
-APInt
-irgen::interleaveSpareBits(IRGenModule &IGM, const SpareBitVector &spareBits,
-                           unsigned bits,
-                           unsigned spareValue, unsigned occupiedValue) {
-  // FIXME: endianness.
-  SmallVector<llvm::APInt::WordType, 2> valueParts;
-  valueParts.push_back(0);
-
-  llvm::APInt::WordType valueBit = 1;
-  auto advanceValueBit = [&]{
-    valueBit <<= 1;
-    if (valueBit == 0) {
-      valueParts.push_back(0);
-      valueBit = 1;
+/// Unpack bits from the low bits of an integer value and
+/// move them to the bit positions indicated by the mask.
+llvm::APInt irgen::scatterBits(const llvm::APInt &mask, unsigned value) {
+  llvm::APInt result(mask.getBitWidth(), 0);
+  for (unsigned i = 0; i < mask.getBitWidth() && value != 0; ++i) {
+    if (!mask[i]) {
+      continue;
     }
-  };
-
-  for (unsigned i = 0, e = spareBits.size();
-       (occupiedValue || spareValue) && i < e;
-       ++i, advanceValueBit()) {
-    if (spareBits[i]) {
-      if (spareValue & 1)
-        valueParts.back() |= valueBit;
-      spareValue >>= 1;
-    } else {
-      if (occupiedValue & 1)
-        valueParts.back() |= valueBit;
-      occupiedValue >>= 1;
+    if (value & 1) {
+      result.setBit(i);
     }
+    value >>= 1;
   }
-  
-  // Create the value.
-  return llvm::APInt(bits, valueParts);
+  return result;
 }
 
 /// A version of the above where the tag value is dynamic.
