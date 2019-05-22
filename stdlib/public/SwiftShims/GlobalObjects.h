@@ -24,7 +24,10 @@
 #include "Visibility.h"
 
 #ifdef __cplusplus
-namespace swift { extern "C" {
+#ifndef __swift__
+namespace swift {
+#endif
+extern "C" {
 #endif
 
 struct _SwiftArrayBodyStorage {
@@ -102,7 +105,10 @@ static_assert(
     4 * sizeof(__swift_intptr_t) + sizeof(__swift_int64_t),
   "_SwiftSetBodyStorage has unexpected size");
 
-}} // extern "C", namespace swift
+} // extern "C"
+#ifndef __swift__
+} // namespace swift
+#endif
 #endif
 
 #endif

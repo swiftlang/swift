@@ -4,12 +4,7 @@
 // Retain/release tests.
 
 import TensorFlow
-
-#if TPU
-import TensorFlowUnittestTPU
-#else
 import TensorFlowUnittest
-#endif
 import StdlibUnittest
 
 var RetainReleaseTests = TestSuite("RetainRelease")

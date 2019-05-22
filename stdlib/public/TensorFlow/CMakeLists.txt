@@ -57,9 +57,10 @@ set(GYB_SOURCES
 
 # Copy TensorFlow bindings file, if it exists.
 if (TENSORFLOW_SWIFT_BINDINGS)
-  file(GLOB_RECURSE TENSORFLOW_SWIFT_BINDINGS_SOURCES
-    "${TENSORFLOW_SWIFT_BINDINGS}/*.swift")
-  list(APPEND SOURCES "${TENSORFLOW_SWIFT_BINDINGS_SOURCES}")
+  list(APPEND SOURCES "${TENSORFLOW_SWIFT_BINDINGS}/TensorOperation.swift")
+  list(APPEND SOURCES "${TENSORFLOW_SWIFT_BINDINGS}/TFTensorOperation.swift")
+  list(APPEND SOURCES "${TENSORFLOW_SWIFT_BINDINGS}/EagerExecution.swift")
+  list(APPEND SOURCES "${TENSORFLOW_SWIFT_BINDINGS}/RawOpsGenerated.swift")
 endif()
 
 # Copy TensorFlow high-level API sources, if they exist.

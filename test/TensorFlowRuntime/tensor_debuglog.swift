@@ -4,11 +4,7 @@
 // Tensor API tests, with debug logging enabled.
 
 import TensorFlow
-#if TPU
-import TensorFlowUnittestTPU
-#else
 import TensorFlowUnittest
-#endif
 import StdlibUnittest
 
 var TensorTests = TestSuite("TensorDebug")
