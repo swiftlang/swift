@@ -61,7 +61,7 @@ class JSONDumper(json.JSONEncoder):
     def __init__(self, *args, **kwargs):
         json.JSONEncoder.__init__(self, indent=2, separators=(',', ': '),
                                   *args, **kwargs)
-    
+
     def default(self, o):
         return vars(o)
 
