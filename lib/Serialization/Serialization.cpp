@@ -1216,106 +1216,6 @@ static uint8_t getRawStableMetatypeRepresentation(AnyMetatypeType *metatype) {
   llvm_unreachable("bad representation");
 }
 
-void Serializer::writeParameterList(const ParameterList *PL) {
-  using namespace decls_block;
-
-  SmallVector<DeclID, 8> paramIDs;
-  for (const ParamDecl *param : *PL)
-    paramIDs.push_back(addDeclRef(param));
-
-  unsigned abbrCode = DeclTypeAbbrCodes[ParameterListLayout::Code];
-  ParameterListLayout::emitRecord(Out, ScratchRecord, abbrCode, paramIDs);
-}
-
-
-void Serializer::writePattern(const Pattern *pattern, DeclContext *owningDC) {
-  using namespace decls_block;
-
-  // Retrieve the type of the pattern.
-  auto getPatternType = [&] {
-    Type type = pattern->getType();
-
-    // If we have an owning context and a contextual type, map out to an
-    // interface type.
-    if (owningDC && type->hasArchetype())
-      type = type->mapTypeOutOfContext();
-
-    return type;
-  };
-
-  assert(pattern && "null pattern");
-  switch (pattern->getKind()) {
-  case PatternKind::Paren: {
-    unsigned abbrCode = DeclTypeAbbrCodes[ParenPatternLayout::Code];
-    ParenPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   pattern->isImplicit());
-    writePattern(cast<ParenPattern>(pattern)->getSubPattern(), owningDC);
-    break;
-  }
-  case PatternKind::Tuple: {
-    auto tuple = cast<TuplePattern>(pattern);
-
-    unsigned abbrCode = DeclTypeAbbrCodes[TuplePatternLayout::Code];
-    TuplePatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   addTypeRef(getPatternType()),
-                                   tuple->getNumElements(),
-                                   tuple->isImplicit());
-
-    abbrCode = DeclTypeAbbrCodes[TuplePatternEltLayout::Code];
-    for (auto &elt : tuple->getElements()) {
-      // FIXME: Default argument expressions?
-      TuplePatternEltLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, addDeclBaseNameRef(elt.getLabel()));
-      writePattern(elt.getPattern(), owningDC);
-    }
-    break;
-  }
-  case PatternKind::Named: {
-    auto named = cast<NamedPattern>(pattern);
-
-    unsigned abbrCode = DeclTypeAbbrCodes[NamedPatternLayout::Code];
-    NamedPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   addDeclRef(named->getDecl()),
-                                   addTypeRef(getPatternType()),
-                                   named->isImplicit());
-    break;
-  }
-  case PatternKind::Any: {
-    unsigned abbrCode = DeclTypeAbbrCodes[AnyPatternLayout::Code];
-    AnyPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 addTypeRef(getPatternType()),
-                                 pattern->isImplicit());
-    break;
-  }
-  case PatternKind::Typed: {
-    auto typed = cast<TypedPattern>(pattern);
-
-    unsigned abbrCode = DeclTypeAbbrCodes[TypedPatternLayout::Code];
-    TypedPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   addTypeRef(getPatternType()),
-                                   typed->isImplicit());
-    writePattern(typed->getSubPattern(), owningDC);
-    break;
-  }
-  case PatternKind::Is:
-  case PatternKind::EnumElement:
-  case PatternKind::OptionalSome:
-  case PatternKind::Bool:
-  case PatternKind::Expr:
-    llvm_unreachable("Refutable patterns cannot be serialized");
-
-  case PatternKind::Var: {
-    auto var = cast<VarPattern>(pattern);
-
-    unsigned abbrCode = DeclTypeAbbrCodes[VarPatternLayout::Code];
-    VarPatternLayout::emitRecord(Out, ScratchRecord, abbrCode, var->isLet(),
-                                 var->isImplicit());
-    writePattern(var->getSubPattern(), owningDC);
-    break;
-  }
-  }
-}
-
 /// Translate from the requirement kind to the Serialization enum
 /// values, which are guaranteed to be stable.
 static uint8_t getRawStableRequirementKind(RequirementKind kind) {
@@ -1390,41 +1290,6 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
           addTypeRef(req.getFirstType()), size, alignment);
     }
   }
-}
-
-void Serializer::writeInlinableBodyTextIfNeeded(
-  const AbstractFunctionDecl *AFD) {
-  using namespace decls_block;
-  // Only serialize the text for an inlinable function body if we're emitting
-  // a partial module. It's not needed in the final module file, but it's
-  // needed in partial modules so you can emit a parseable interface after
-  // merging them.
-  if (!SF) return;
-
-  if (AFD->getResilienceExpansion() != swift::ResilienceExpansion::Minimal)
-    return;
-
-  if (!AFD->hasInlinableBodyText()) return;
-  SmallString<128> scratch;
-  auto body = AFD->getInlinableBodyText(scratch);
-
-  unsigned abbrCode = DeclTypeAbbrCodes[InlinableBodyTextLayout::Code];
-  InlinableBodyTextLayout::emitRecord(Out, ScratchRecord, abbrCode, body);
-}
-
-void Serializer::writeGenericParams(const GenericParamList *genericParams) {
-  using namespace decls_block;
-
-  // Don't write anything if there are no generic params.
-  if (!genericParams)
-    return;
-
-  SmallVector<DeclID, 4> paramIDs;
-  for (auto next : genericParams->getParams())
-    paramIDs.push_back(addDeclRef(next));
-
-  unsigned abbrCode = DeclTypeAbbrCodes[GenericParamListLayout::Code];
-  GenericParamListLayout::emitRecord(Out, ScratchRecord, abbrCode, paramIDs);
 }
 
 void Serializer::writeGenericSignature(const GenericSignature *sig) {
@@ -1813,79 +1678,6 @@ static bool shouldSerializeMember(Decl *D) {
   }
 
   llvm_unreachable("Unhandled DeclKind in switch.");
-}
-
-void Serializer::writeMembers(DeclID parentID,
-                              DeclRange members, bool isClass) {
-  using namespace decls_block;
-
-  unsigned abbrCode = DeclTypeAbbrCodes[MembersLayout::Code];
-  SmallVector<DeclID, 16> memberIDs;
-  for (auto member : members) {
-    if (!shouldSerializeMember(member))
-      continue;
-
-    DeclID memberID = addDeclRef(member);
-    memberIDs.push_back(memberID);
-
-    if (auto VD = dyn_cast<ValueDecl>(member)) {
-
-      // Record parent->members in subtable of DeclMemberNames
-      if (VD->hasName() &&
-          !VD->getBaseName().empty()) {
-        std::unique_ptr<DeclMembersTable> &memberTable =
-          DeclMemberNames[VD->getBaseName()].second;
-        if (!memberTable) {
-          memberTable = llvm::make_unique<DeclMembersTable>();
-        }
-        (*memberTable)[parentID].push_back(memberID);
-      }
-
-      // Same as above, but for @_implements attributes
-      if (auto A = VD->getAttrs().getAttribute<ImplementsAttr>()) {
-        std::unique_ptr<DeclMembersTable> &memberTable =
-          DeclMemberNames[A->getMemberName().getBaseName()].second;
-        if (!memberTable) {
-          memberTable = llvm::make_unique<DeclMembersTable>();
-        }
-        (*memberTable)[parentID].push_back(memberID);
-      }
-
-      // Possibly add a record to ClassMembersForDynamicLookup too.
-      if (isClass) {
-        if (VD->canBeAccessedByDynamicLookup()) {
-          auto &list = ClassMembersForDynamicLookup[VD->getBaseName()];
-          list.push_back({getKindForTable(VD), memberID});
-        }
-      }
-    }
-  }
-  MembersLayout::emitRecord(Out, ScratchRecord, abbrCode, memberIDs);
-}
-
-void Serializer::writeDefaultWitnessTable(const ProtocolDecl *proto,
-                                   const std::array<unsigned, 256> &abbrCodes) {
-  using namespace decls_block;
-
-  SmallVector<DeclID, 16> witnessIDs;
-
-  unsigned abbrCode = abbrCodes[DefaultWitnessTableLayout::Code];
-  for (auto member : proto->getMembers()) {
-    if (auto *value = dyn_cast<ValueDecl>(member)) {
-      auto witness = proto->getDefaultWitness(value);
-      if (!witness)
-        continue;
-
-      DeclID requirementID = addDeclRef(value);
-      DeclID witnessID = addDeclRef(witness.getDecl());
-      witnessIDs.push_back(requirementID);
-      witnessIDs.push_back(witnessID);
-
-      // FIXME: Substitutions
-    }
-  }
-  DefaultWitnessTableLayout::emitRecord(Out, ScratchRecord,
-                                        abbrCode, witnessIDs);
 }
 
 static serialization::AccessorKind getStableAccessorKind(swift::AccessorKind K){
@@ -2435,37 +2227,6 @@ static uint8_t getRawStableVarDeclSpecifier(swift::VarDecl::Specifier sf) {
   llvm_unreachable("bad variable decl specifier kind");
 }
 
-void Serializer::writeForeignErrorConvention(const ForeignErrorConvention &fec){
-  using namespace decls_block;
-
-  auto kind = getRawStableForeignErrorConventionKind(fec.getKind());
-  uint8_t isOwned = fec.isErrorOwned() == ForeignErrorConvention::IsOwned;
-  uint8_t isReplaced = bool(fec.isErrorParameterReplacedWithVoid());
-  TypeID errorParameterTypeID = addTypeRef(fec.getErrorParameterType());
-  TypeID resultTypeID;
-  switch (fec.getKind()) {
-  case ForeignErrorConvention::ZeroResult:
-  case ForeignErrorConvention::NonZeroResult:
-    resultTypeID = addTypeRef(fec.getResultType());
-    break;
-
-  case ForeignErrorConvention::ZeroPreservedResult:
-  case ForeignErrorConvention::NilResult:
-  case ForeignErrorConvention::NonNilError:
-    resultTypeID = 0;
-    break;
-  }
-
-  auto abbrCode = DeclTypeAbbrCodes[ForeignErrorConventionLayout::Code];
-  ForeignErrorConventionLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                           static_cast<uint8_t>(kind),
-                                           isOwned,
-                                           isReplaced,
-                                           fec.getErrorParameterIndex(),
-                                           errorParameterTypeID,
-                                           resultTypeID);
-}
-
 /// Returns true if the declaration of \p decl depends on \p problemContext
 /// based on lexical nesting.
 ///
@@ -2815,6 +2576,252 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     }
   }
 
+  void writeForeignErrorConvention(const ForeignErrorConvention &fec) {
+    using namespace decls_block;
+
+    auto kind = getRawStableForeignErrorConventionKind(fec.getKind());
+    uint8_t isOwned = fec.isErrorOwned() == ForeignErrorConvention::IsOwned;
+    uint8_t isReplaced = bool(fec.isErrorParameterReplacedWithVoid());
+    TypeID errorParameterTypeID = S.addTypeRef(fec.getErrorParameterType());
+    TypeID resultTypeID;
+    switch (fec.getKind()) {
+    case ForeignErrorConvention::ZeroResult:
+    case ForeignErrorConvention::NonZeroResult:
+      resultTypeID = S.addTypeRef(fec.getResultType());
+      break;
+
+    case ForeignErrorConvention::ZeroPreservedResult:
+    case ForeignErrorConvention::NilResult:
+    case ForeignErrorConvention::NonNilError:
+      resultTypeID = 0;
+      break;
+    }
+
+    auto abbrCode = S.DeclTypeAbbrCodes[ForeignErrorConventionLayout::Code];
+    ForeignErrorConventionLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                             static_cast<uint8_t>(kind),
+                                             isOwned,
+                                             isReplaced,
+                                             fec.getErrorParameterIndex(),
+                                             errorParameterTypeID,
+                                             resultTypeID);
+  }
+
+  void writeGenericParams(const GenericParamList *genericParams) {
+    using namespace decls_block;
+
+    // Don't write anything if there are no generic params.
+    if (!genericParams)
+      return;
+
+    SmallVector<DeclID, 4> paramIDs;
+    for (auto next : genericParams->getParams())
+      paramIDs.push_back(S.addDeclRef(next));
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[GenericParamListLayout::Code];
+    GenericParamListLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                       paramIDs);
+  }
+
+  void writeParameterList(const ParameterList *PL) {
+    using namespace decls_block;
+
+    SmallVector<DeclID, 8> paramIDs;
+    for (const ParamDecl *param : *PL)
+      paramIDs.push_back(S.addDeclRef(param));
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[ParameterListLayout::Code];
+    ParameterListLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode, paramIDs);
+  }
+
+  /// Writes an array of members for a decl context.
+  ///
+  /// \param parentID The DeclID of the context.
+  /// \param members The decls within the context.
+  /// \param isClass True if the context could be a class context (class,
+  ///        class extension, or protocol).
+  void writeMembers(DeclID parentID, DeclRange members, bool isClass) {
+    using namespace decls_block;
+
+    SmallVector<DeclID, 16> memberIDs;
+    for (auto member : members) {
+      if (!shouldSerializeMember(member))
+        continue;
+
+      DeclID memberID = S.addDeclRef(member);
+      memberIDs.push_back(memberID);
+
+      if (auto VD = dyn_cast<ValueDecl>(member)) {
+        // Record parent->members in subtable of DeclMemberNames
+        if (VD->hasName() &&
+            !VD->getBaseName().empty()) {
+          std::unique_ptr<DeclMembersTable> &memberTable =
+            S.DeclMemberNames[VD->getBaseName()].second;
+          if (!memberTable) {
+            memberTable = llvm::make_unique<DeclMembersTable>();
+          }
+          (*memberTable)[parentID].push_back(memberID);
+        }
+
+        // Same as above, but for @_implements attributes
+        if (auto A = VD->getAttrs().getAttribute<ImplementsAttr>()) {
+          std::unique_ptr<DeclMembersTable> &memberTable =
+            S.DeclMemberNames[A->getMemberName().getBaseName()].second;
+          if (!memberTable) {
+            memberTable = llvm::make_unique<DeclMembersTable>();
+          }
+          (*memberTable)[parentID].push_back(memberID);
+        }
+
+        // Possibly add a record to ClassMembersForDynamicLookup too.
+        if (isClass) {
+          if (VD->canBeAccessedByDynamicLookup()) {
+            auto &list = S.ClassMembersForDynamicLookup[VD->getBaseName()];
+            list.push_back({getKindForTable(VD), memberID});
+          }
+        }
+      }
+    }
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[MembersLayout::Code];
+    MembersLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode, memberIDs);
+  }
+
+  /// Writes the given pattern, recursively.
+  void writePattern(const Pattern *pattern, const DeclContext *owningDC) {
+    using namespace decls_block;
+
+    // Retrieve the type of the pattern.
+    auto getPatternType = [&] {
+      Type type = pattern->getType();
+
+      // If we have an owning context and a contextual type, map out to an
+      // interface type.
+      if (owningDC && type->hasArchetype())
+        type = type->mapTypeOutOfContext();
+
+      return type;
+    };
+
+    assert(pattern && "null pattern");
+    switch (pattern->getKind()) {
+    case PatternKind::Paren: {
+      unsigned abbrCode = S.DeclTypeAbbrCodes[ParenPatternLayout::Code];
+      ParenPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                     pattern->isImplicit());
+      writePattern(cast<ParenPattern>(pattern)->getSubPattern(), owningDC);
+      break;
+    }
+    case PatternKind::Tuple: {
+      auto tuple = cast<TuplePattern>(pattern);
+
+      unsigned abbrCode = S.DeclTypeAbbrCodes[TuplePatternLayout::Code];
+      TuplePatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                     S.addTypeRef(getPatternType()),
+                                     tuple->getNumElements(),
+                                     tuple->isImplicit());
+
+      abbrCode = S.DeclTypeAbbrCodes[TuplePatternEltLayout::Code];
+      for (auto &elt : tuple->getElements()) {
+        // FIXME: Default argument expressions?
+        TuplePatternEltLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                          S.addDeclBaseNameRef(elt.getLabel()));
+        writePattern(elt.getPattern(), owningDC);
+      }
+      break;
+    }
+    case PatternKind::Named: {
+      auto named = cast<NamedPattern>(pattern);
+
+      unsigned abbrCode = S.DeclTypeAbbrCodes[NamedPatternLayout::Code];
+      NamedPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                     S.addDeclRef(named->getDecl()),
+                                     S.addTypeRef(getPatternType()),
+                                     named->isImplicit());
+      break;
+    }
+    case PatternKind::Any: {
+      unsigned abbrCode = S.DeclTypeAbbrCodes[AnyPatternLayout::Code];
+      AnyPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                   S.addTypeRef(getPatternType()),
+                                   pattern->isImplicit());
+      break;
+    }
+    case PatternKind::Typed: {
+      auto typed = cast<TypedPattern>(pattern);
+
+      unsigned abbrCode = S.DeclTypeAbbrCodes[TypedPatternLayout::Code];
+      TypedPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                     S.addTypeRef(getPatternType()),
+                                     typed->isImplicit());
+      writePattern(typed->getSubPattern(), owningDC);
+      break;
+    }
+    case PatternKind::Is:
+    case PatternKind::EnumElement:
+    case PatternKind::OptionalSome:
+    case PatternKind::Bool:
+    case PatternKind::Expr:
+      llvm_unreachable("Refutable patterns cannot be serialized");
+
+    case PatternKind::Var: {
+      auto var = cast<VarPattern>(pattern);
+
+      unsigned abbrCode = S.DeclTypeAbbrCodes[VarPatternLayout::Code];
+      VarPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                   var->isLet(), var->isImplicit());
+      writePattern(var->getSubPattern(), owningDC);
+      break;
+    }
+    }
+  }
+
+  void writeDefaultWitnessTable(const ProtocolDecl *proto) {
+    using namespace decls_block;
+
+    SmallVector<DeclID, 16> witnessIDs;
+
+    for (auto member : proto->getMembers()) {
+      if (auto *value = dyn_cast<ValueDecl>(member)) {
+        auto witness = proto->getDefaultWitness(value);
+        if (!witness)
+          continue;
+
+        DeclID requirementID = S.addDeclRef(value);
+        DeclID witnessID = S.addDeclRef(witness.getDecl());
+        witnessIDs.push_back(requirementID);
+        witnessIDs.push_back(witnessID);
+
+        // FIXME: Substitutions
+      }
+    }
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[DefaultWitnessTableLayout::Code];
+    DefaultWitnessTableLayout::emitRecord(S.Out, S.ScratchRecord,
+                                          abbrCode, witnessIDs);
+  }
+
+  /// Writes the body text of the provided funciton, if the function is
+  /// inlinable and has body text.
+  void writeInlinableBodyTextIfNeeded(const AbstractFunctionDecl *AFD) {
+    using namespace decls_block;
+    // Only serialize the text for an inlinable function body if we're emitting
+    // a partial module. It's not needed in the final module file, but it's
+    // needed in partial modules so you can emit a parseable interface after
+    // merging them.
+    if (!S.SF) return;
+
+    if (AFD->getResilienceExpansion() != swift::ResilienceExpansion::Minimal)
+      return;
+
+    if (!AFD->hasInlinableBodyText()) return;
+    SmallString<128> scratch;
+    auto body = AFD->getInlinableBodyText(scratch);
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[InlinableBodyTextLayout::Code];
+    InlinableBodyTextLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode, body);
+  }
+
 public:
   DeclSerializer(Serializer &S, DeclID id) : S(S), id(id) {}
   ~DeclSerializer() {
@@ -2917,9 +2924,9 @@ public:
     // to innermost.
     std::reverse(allGenericParams.begin(), allGenericParams.end());
     for (auto *genericParams : allGenericParams)
-      S.writeGenericParams(genericParams);
+      writeGenericParams(genericParams);
 
-    S.writeMembers(id, extension->getMembers(), isClassExtension);
+    writeMembers(id, extension->getMembers(), isClassExtension);
     S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
@@ -2953,7 +2960,7 @@ public:
       owningDC = binding->getDeclContext();
 
     for (auto entry : binding->getPatternList()) {
-      S.writePattern(entry.getPattern(), owningDC);
+      writePattern(entry.getPattern(), owningDC);
       // Ignore initializer; external clients don't need to know about it.
     }
   }
@@ -3058,7 +3065,7 @@ public:
                                              typeAlias->getGenericEnvironment()),
                                 rawAccessLevel,
                                 dependencyIDs);
-    S.writeGenericParams(typeAlias->getGenericParams());
+    writeGenericParams(typeAlias->getGenericParams());
   }
 
   void visitGenericTypeParamDecl(const GenericTypeParamDecl *genericParam) {
@@ -3133,8 +3140,8 @@ public:
                              inheritedAndDependencyTypes);
 
 
-    S.writeGenericParams(theStruct->getGenericParams());
-    S.writeMembers(id, theStruct->getMembers(), false);
+    writeGenericParams(theStruct->getGenericParams());
+    writeMembers(id, theStruct->getMembers(), false);
     S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
@@ -3190,8 +3197,8 @@ public:
                             theEnum->getInherited().size(),
                             inheritedAndDependencyTypes);
 
-    S.writeGenericParams(theEnum->getGenericParams());
-    S.writeMembers(id, theEnum->getMembers(), false);
+    writeGenericParams(theEnum->getGenericParams());
+    writeMembers(id, theEnum->getMembers(), false);
     S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
@@ -3251,8 +3258,8 @@ public:
                             theClass->getInherited().size(),
                             inheritedAndDependencyTypes);
 
-    S.writeGenericParams(theClass->getGenericParams());
-    S.writeMembers(id, theClass->getMembers(), true);
+    writeGenericParams(theClass->getGenericParams());
+    writeMembers(id, theClass->getMembers(), true);
     S.writeConformances(conformances, S.DeclTypeAbbrCodes);
   }
 
@@ -3287,11 +3294,11 @@ public:
                                inherited);
 
     const_cast<ProtocolDecl*>(proto)->createGenericParamsIfMissing();
-    S.writeGenericParams(proto->getGenericParams());
+    writeGenericParams(proto->getGenericParams());
     S.writeGenericRequirements(
       proto->getRequirementSignature(), S.DeclTypeAbbrCodes);
-    S.writeMembers(id, proto->getMembers(), true);
-    S.writeDefaultWitnessTable(proto, S.DeclTypeAbbrCodes);
+    writeMembers(id, proto->getMembers(), true);
+    writeDefaultWitnessTable(proto);
   }
 
   void visitVarDecl(const VarDecl *var) {
@@ -3428,15 +3435,15 @@ public:
                            S.addDeclRef(fn->getOpaqueResultTypeDecl()),
                            nameComponentsAndDependencies);
 
-    S.writeGenericParams(fn->getGenericParams());
+    writeGenericParams(fn->getGenericParams());
 
     // Write the body parameters.
-    S.writeParameterList(fn->getParameters());
+    writeParameterList(fn->getParameters());
 
     if (auto errorConvention = fn->getForeignErrorConvention())
-      S.writeForeignErrorConvention(*errorConvention);
+      writeForeignErrorConvention(*errorConvention);
 
-    S.writeInlinableBodyTextIfNeeded(fn);
+    writeInlinableBodyTextIfNeeded(fn);
   }
 
   void visitOpaqueTypeDecl(const OpaqueTypeDecl *opaqueDecl) {
@@ -3461,7 +3468,7 @@ public:
                                  contextID, namingDeclID, interfaceSigID,
                                  interfaceTypeID, genericEnvID,
                                  underlyingTypeID);
-    S.writeGenericParams(opaqueDecl->getGenericParams());
+    writeGenericParams(opaqueDecl->getGenericParams());
   }
 
   void visitAccessorDecl(const AccessorDecl *fn) {
@@ -3503,15 +3510,15 @@ public:
                                fn->needsNewVTableEntry(),
                                dependencies);
 
-    S.writeGenericParams(fn->getGenericParams());
+    writeGenericParams(fn->getGenericParams());
 
     // Write the body parameters.
-    S.writeParameterList(fn->getParameters());
+    writeParameterList(fn->getParameters());
 
     if (auto errorConvention = fn->getForeignErrorConvention())
-      S.writeForeignErrorConvention(*errorConvention);
+      writeForeignErrorConvention(*errorConvention);
 
-    S.writeInlinableBodyTextIfNeeded(fn);
+    writeInlinableBodyTextIfNeeded(fn);
   }
 
   void visitEnumElementDecl(const EnumElementDecl *elem) {
@@ -3554,7 +3561,7 @@ public:
                                   elem->getFullName().getArgumentNames().size()+1,
                                   nameComponentsAndDependencies);
     if (auto *PL = elem->getParameterList())
-      S.writeParameterList(PL);
+      writeParameterList(PL);
   }
 
   void visitSubscriptDecl(const SubscriptDecl *subscript) {
@@ -3609,8 +3616,8 @@ public:
                                 S.addDeclRef(subscript->getOpaqueResultTypeDecl()),
                                 nameComponentsAndDependencies);
 
-    S.writeGenericParams(subscript->getGenericParams());
-    S.writeParameterList(subscript->getIndices());
+    writeGenericParams(subscript->getGenericParams());
+    writeParameterList(subscript->getIndices());
   }
 
   void visitConstructorDecl(const ConstructorDecl *ctor) {
@@ -3654,13 +3661,13 @@ public:
                                   ctor->getFullName().getArgumentNames().size(),
                                   nameComponentsAndDependencies);
 
-    S.writeGenericParams(ctor->getGenericParams());
-    S.writeParameterList(ctor->getParameters());
+    writeGenericParams(ctor->getGenericParams());
+    writeParameterList(ctor->getParameters());
 
     if (auto errorConvention = ctor->getForeignErrorConvention())
-      S.writeForeignErrorConvention(*errorConvention);
+      writeForeignErrorConvention(*errorConvention);
 
-    S.writeInlinableBodyTextIfNeeded(ctor);
+    writeInlinableBodyTextIfNeeded(ctor);
   }
 
   void visitDestructorDecl(const DestructorDecl *dtor) {
@@ -3676,7 +3683,7 @@ public:
                                  dtor->isObjC(),
                                  S.addGenericEnvironmentRef(
                                                 dtor->getGenericEnvironment()));
-    S.writeInlinableBodyTextIfNeeded(dtor);
+    writeInlinableBodyTextIfNeeded(dtor);
   }
 
   void visitTopLevelCodeDecl(const TopLevelCodeDecl *) {
