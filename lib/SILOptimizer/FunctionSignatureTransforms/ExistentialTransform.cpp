@@ -33,6 +33,11 @@
 
 using namespace swift;
 
+using llvm::SmallDenseMap;
+using llvm::SmallPtrSet;
+using llvm::SmallVector;
+using llvm::SmallVectorImpl;
+
 /// Create a SILCloner for Existential Specilizer.
 namespace {
 class ExistentialSpecializerCloner
@@ -44,10 +49,17 @@ class ExistentialSpecializerCloner
   friend class SILCloner<ExistentialSpecializerCloner>;
 
   SILFunction *OrigF;
-  llvm::SmallVector<ArgumentDescriptor, 4> &ArgumentDescList;
-  llvm::SmallDenseMap<int, GenericTypeParamType *> &ArgToGenericTypeMap;
-  llvm::SmallDenseMap<int, ExistentialTransformArgumentDescriptor>
+  SmallVector<ArgumentDescriptor, 4> &ArgumentDescList;
+  SmallDenseMap<int, GenericTypeParamType *> &ArgToGenericTypeMap;
+  SmallDenseMap<int, ExistentialTransformArgumentDescriptor>
       &ExistentialArgDescriptor;
+
+  // Use one OpenedArchetypesTracker while cloning.
+  SILOpenedArchetypesTracker OpenedArchetypesTracker;
+
+  // Holds an entry for any indirect argument requiring a new alloc_stack
+  // created during argument cloning.
+  SmallDenseMap<int, AllocStackInst *> ArgToAllocStackMap;
 
 protected:
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
@@ -55,142 +67,43 @@ protected:
                                                                    Cloned);
   }
 
+  void cloneArguments(SmallVectorImpl<SILValue> &entryArgs);
+
 public:
   ExistentialSpecializerCloner(
       SILFunction *OrigF, SILFunction *NewF, SubstitutionMap Subs,
-      llvm::SmallVector<ArgumentDescriptor, 4> &ArgumentDescList,
-      llvm::SmallDenseMap<int, GenericTypeParamType *> &ArgToGenericTypeMap,
-      llvm::SmallDenseMap<int, ExistentialTransformArgumentDescriptor>
+      SmallVector<ArgumentDescriptor, 4> &ArgumentDescList,
+      SmallDenseMap<int, GenericTypeParamType *> &ArgToGenericTypeMap,
+      SmallDenseMap<int, ExistentialTransformArgumentDescriptor>
           &ExistentialArgDescriptor)
       : SuperTy(*NewF, *OrigF, Subs), OrigF(OrigF),
         ArgumentDescList(ArgumentDescList),
         ArgToGenericTypeMap(ArgToGenericTypeMap),
-        ExistentialArgDescriptor(ExistentialArgDescriptor) {}
+        ExistentialArgDescriptor(ExistentialArgDescriptor),
+        OpenedArchetypesTracker(NewF) {
+    getBuilder().setOpenedArchetypesTracker(&OpenedArchetypesTracker);
+  }
+
   void cloneAndPopulateFunction();
 };
 } // end anonymous namespace
 
 /// This function will create the generic version.
 void ExistentialSpecializerCloner::cloneAndPopulateFunction() {
-  // Get the Builder and the NewF
-  SILBuilder &NewFBuilder = getBuilder();
-  SILFunction &NewF = NewFBuilder.getFunction();
-
-  auto NewFTy = NewF.getLoweredFunctionType();
-  SmallVector<SILParameterInfo, 4> params;
-  params.append(NewFTy->getParameters().begin(), NewFTy->getParameters().end());
-
-  /// Builder will have a ScopeClone with a debugscope that is inherited from
-  /// the F.
-  ScopeCloner SC(NewF);
-  auto DebugScope = SC.getOrCreateClonedScope(OrigF->getDebugScope());
-  NewFBuilder.setCurrentDebugScope(DebugScope);
-  SILOpenedArchetypesTracker OpenedArchetypesTrackerNewF(&NewF);
-  NewFBuilder.setOpenedArchetypesTracker(&OpenedArchetypesTrackerNewF);
-
-  // Create the entry basic block with the function arguments.
-  SILBasicBlock *OrigEntryBB = &*OrigF->begin();
-  SILBasicBlock *ClonedEntryBB = NewF.createBasicBlock();
-  SILModule &M = OrigF->getModule();
-  auto &Ctx = M.getASTContext();
-  llvm::SmallDenseMap<int, AllocStackInst *> ArgToAllocStackMap;
-
-  NewFBuilder.setInsertionPoint(ClonedEntryBB);
-
-  llvm::SmallVector<SILValue, 4> entryArgs;
-  entryArgs.reserve(OrigEntryBB->getArguments().size());
-
-  /// Determine the location for the new init_existential_ref.
-  auto InsertLoc = OrigF->begin()->begin()->getLoc();
-  for (auto &ArgDesc : ArgumentDescList) {
-    auto iter = ArgToGenericTypeMap.find(ArgDesc.Index);
-    SILArgument *NewArg = nullptr;
-    /// For all Generic Arguments.
-    if (iter != ArgToGenericTypeMap.end()) {
-      auto GenericParam = iter->second;
-      SILType GenericSILType =
-          NewF.getLoweredType(NewF.mapTypeIntoContext(GenericParam));
-      NewArg = ClonedEntryBB->createFunctionArgument(GenericSILType);
-      NewArg->setOwnershipKind(ValueOwnershipKind(
-          NewF, GenericSILType, ArgDesc.Arg->getArgumentConvention()));
-      /// Determine the Conformances.
-      SmallVector<ProtocolConformanceRef, 1> NewConformances;
-      auto ContextTy = NewF.mapTypeIntoContext(GenericParam);
-      auto OpenedArchetype = ContextTy->castTo<ArchetypeType>();
-      for (auto proto : OpenedArchetype->getConformsTo()) {
-        NewConformances.push_back(ProtocolConformanceRef(proto));
-      }
-      ArrayRef<ProtocolConformanceRef> Conformances =
-          Ctx.AllocateCopy(NewConformances);
-      auto ExistentialRepr =
-          ArgDesc.Arg->getType().getPreferredExistentialRepresentation(M);
-      switch (ExistentialRepr) {
-      case ExistentialRepresentation::Opaque: {
-        /// Create this sequence for init_existential_addr.:
-        /// bb0(%0 : $*T):
-        /// %3 = alloc_stack $P
-        /// %4 = init_existential_addr %3 : $*P, $T
-        /// copy_addr %0 to [initialization] %4 : $*T
-        /// destroy_addr %0 : $*T
-        /// %7 = open_existential_addr immutable_access %3 : $*P to
-        /// $*@opened P
-        auto *ASI =
-            NewFBuilder.createAllocStack(InsertLoc, ArgDesc.Arg->getType());
-        ArgToAllocStackMap.insert(
-            std::pair<int, AllocStackInst *>(ArgDesc.Index, ASI));
-
-        auto *EAI = NewFBuilder.createInitExistentialAddr(
-            InsertLoc, ASI, NewArg->getType().getASTType(), NewArg->getType(),
-            Conformances);
-        /// If DestroyAddr is already there, then do not use [take].
-        NewFBuilder.createCopyAddr(
-            InsertLoc, NewArg, EAI,
-            ExistentialArgDescriptor[ArgDesc.Index].AccessType ==
-                    OpenedExistentialAccess::Immutable
-                ? IsTake_t::IsNotTake
-                : IsTake_t::IsTake,
-            IsInitialization_t::IsInitialization);
-        if (ExistentialArgDescriptor[ArgDesc.Index].DestroyAddrUse) {
-          NewFBuilder.createDestroyAddr(InsertLoc, NewArg);
-        }
-        entryArgs.push_back(ASI);
-        break;
-      }
-      case ExistentialRepresentation::Class: {
-        ///  Simple case: Create an init_existential.
-        /// %5 = init_existential_ref %0 : $T : $T, $P
-        auto *InitRef = NewFBuilder.createInitExistentialRef(
-            InsertLoc, ArgDesc.Arg->getType(), NewArg->getType().getASTType(),
-            NewArg, Conformances);
-        entryArgs.push_back(InitRef);
-        break;
-      }
-      default: {
-        llvm_unreachable("Unhandled existential type in ExistentialTransform!");
-        break;
-      }
-      };
-    } else {
-      /// Arguments that are not rewritten.
-      auto Ty = params[ArgDesc.Index].getType();
-      auto LoweredTy = NewF.getLoweredType(NewF.mapTypeIntoContext(Ty));
-      auto MappedTy = LoweredTy.getCategoryType(ArgDesc.Arg->getType().getCategory());
-      NewArg = ClonedEntryBB->createFunctionArgument(MappedTy, ArgDesc.Decl);
-      NewArg->setOwnershipKind(ValueOwnershipKind(
-          NewF, MappedTy, ArgDesc.Arg->getArgumentConvention()));
-      entryArgs.push_back(NewArg);
-    }
-  }
+  SmallVector<SILValue, 4> entryArgs;
+  entryArgs.reserve(OrigF->getArguments().size());
+  cloneArguments(entryArgs);
 
   // Visit original BBs in depth-first preorder, starting with the
   // entry block, cloning all instructions and terminators.
-  cloneFunctionBody(&Original, ClonedEntryBB, entryArgs);
+  auto *NewEntryBB = getBuilder().getFunction().getEntryBlock();
+  cloneFunctionBody(&Original, NewEntryBB, entryArgs);
 
   /// If there is an argument with no DestroyUse, insert DeallocStack
   /// before return Instruction.
-  llvm::SmallPtrSet<ReturnInst *, 4> ReturnInsts;
+  SmallPtrSet<ReturnInst *, 4> ReturnInsts;
   /// Find the set of return instructions in a function.
-  for (auto &BB : NewF) {
+  for (auto &BB : getBuilder().getFunction()) {
     TermInst *TI = BB.getTerminator();
     if (auto *RI = dyn_cast<ReturnInst>(TI)) {
       ReturnInsts.insert(RI);
@@ -210,6 +123,115 @@ void ExistentialSpecializerCloner::cloneAndPopulateFunction() {
         Builder.createDeallocStack(loc, iter->second);
       }
     }
+  }
+}
+
+// Create the entry basic block with the function arguments.
+void ExistentialSpecializerCloner::
+cloneArguments(SmallVectorImpl<SILValue> &entryArgs) {
+  auto &M = OrigF->getModule();
+  auto &Ctx = M.getASTContext();
+
+  // Create the new entry block.
+  SILFunction &NewF = getBuilder().getFunction();
+  SILBasicBlock *ClonedEntryBB = NewF.createBasicBlock();
+
+  /// Builder will have a ScopeClone with a debugscope that is inherited from
+  /// the F.
+  ScopeCloner SC(NewF);
+  auto DebugScope = SC.getOrCreateClonedScope(OrigF->getDebugScope());
+
+  // Setup a NewFBuilder for the new entry block, reusing the cloner's
+  // SILBuilderContext.
+  SILBuilder
+    NewFBuilder(ClonedEntryBB, DebugScope, getBuilder().getBuilderContext());
+  auto InsertLoc = OrigF->begin()->begin()->getLoc();
+
+  auto NewFTy = NewF.getLoweredFunctionType();
+  SmallVector<SILParameterInfo, 4> params;
+  params.append(NewFTy->getParameters().begin(), NewFTy->getParameters().end());
+
+  for (auto &ArgDesc : ArgumentDescList) {
+    auto iter = ArgToGenericTypeMap.find(ArgDesc.Index);
+    if (iter == ArgToGenericTypeMap.end()) {
+      // Clone arguments that are not rewritten.
+      auto Ty = params[ArgDesc.Index].getType();
+      auto LoweredTy = NewF.getLoweredType(NewF.mapTypeIntoContext(Ty));
+      auto MappedTy =
+        LoweredTy.getCategoryType(ArgDesc.Arg->getType().getCategory());
+      auto *NewArg =
+        ClonedEntryBB->createFunctionArgument(MappedTy, ArgDesc.Decl);
+      NewArg->setOwnershipKind(
+        ValueOwnershipKind(
+          NewF, MappedTy, ArgDesc.Arg->getArgumentConvention()));
+      entryArgs.push_back(NewArg);
+      continue;
+    }
+    // Create the generic argument.
+    GenericTypeParamType *GenericParam = iter->second;
+    SILType GenericSILType =
+      NewF.getLoweredType(NewF.mapTypeIntoContext(GenericParam));
+    auto *NewArg = ClonedEntryBB->createFunctionArgument(GenericSILType);
+    NewArg->setOwnershipKind(
+      ValueOwnershipKind(
+        NewF, GenericSILType, ArgDesc.Arg->getArgumentConvention()));
+    // Determine the Conformances.
+    SmallVector<ProtocolConformanceRef, 1> NewConformances;
+    auto ContextTy = NewF.mapTypeIntoContext(GenericParam);
+    auto OpenedArchetype = ContextTy->castTo<ArchetypeType>();
+    for (auto proto : OpenedArchetype->getConformsTo()) {
+      NewConformances.push_back(ProtocolConformanceRef(proto));
+    }
+    ArrayRef<ProtocolConformanceRef> Conformances =
+      Ctx.AllocateCopy(NewConformances);
+    auto ExistentialRepr =
+      ArgDesc.Arg->getType().getPreferredExistentialRepresentation(M);
+    switch (ExistentialRepr) {
+    case ExistentialRepresentation::Opaque: {
+      /// Create this sequence for init_existential_addr.:
+      /// bb0(%0 : $*T):
+      /// %3 = alloc_stack $P
+      /// %4 = init_existential_addr %3 : $*P, $T
+      /// copy_addr %0 to [initialization] %4 : $*T
+      /// destroy_addr %0 : $*T
+      /// %7 = open_existential_addr immutable_access %3 : $*P to
+      /// $*@opened P
+      auto *ASI =
+        NewFBuilder.createAllocStack(InsertLoc, ArgDesc.Arg->getType());
+      ArgToAllocStackMap.insert(
+        std::pair<int, AllocStackInst *>(ArgDesc.Index, ASI));
+      
+      auto *EAI = NewFBuilder.createInitExistentialAddr(
+        InsertLoc, ASI, NewArg->getType().getASTType(), NewArg->getType(),
+        Conformances);
+      /// If DestroyAddr is already there, then do not use [take].
+      NewFBuilder.createCopyAddr(
+        InsertLoc, NewArg, EAI,
+        ExistentialArgDescriptor[ArgDesc.Index].AccessType ==
+        OpenedExistentialAccess::Immutable
+        ? IsTake_t::IsNotTake
+        : IsTake_t::IsTake,
+        IsInitialization_t::IsInitialization);
+      if (ExistentialArgDescriptor[ArgDesc.Index].DestroyAddrUse) {
+        NewFBuilder.createDestroyAddr(InsertLoc, NewArg);
+      }
+      entryArgs.push_back(ASI);
+      break;
+    }
+    case ExistentialRepresentation::Class: {
+      ///  Simple case: Create an init_existential.
+      /// %5 = init_existential_ref %0 : $T : $T, $P
+      auto *InitRef = NewFBuilder.createInitExistentialRef(
+        InsertLoc, ArgDesc.Arg->getType(), NewArg->getType().getASTType(),
+        NewArg, Conformances);
+      entryArgs.push_back(InitRef);
+      break;
+    }
+    default: {
+      llvm_unreachable("Unhandled existential type in ExistentialTransform!");
+      break;
+    }
+    };
   }
 }
 
@@ -307,7 +329,7 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
 
   /// Create the complete list of parameters.
   int Idx = 0;
-  llvm::SmallVector<SILParameterInfo, 8> InterfaceParams;
+  SmallVector<SILParameterInfo, 8> InterfaceParams;
   InterfaceParams.reserve(params.size());
   for (auto &param : params) {
     auto iter = ArgToGenericTypeMap.find(Idx);
@@ -378,8 +400,8 @@ void ExistentialTransform::populateThunkBody() {
 
   /// Determine arguments to Apply.
   /// Generate opened existentials for generics.
-  llvm::SmallVector<SILValue, 8> ApplyArgs;
-  llvm::SmallDenseMap<GenericTypeParamType *, Type> GenericToOpenedTypeMap;
+  SmallVector<SILValue, 8> ApplyArgs;
+  SmallDenseMap<GenericTypeParamType *, Type> GenericToOpenedTypeMap;
   for (auto &ArgDesc : ArgumentDescList) {
     auto iter = ArgToGenericTypeMap.find(ArgDesc.Index);
     auto it = ExistentialArgDescriptor.find(ArgDesc.Index);

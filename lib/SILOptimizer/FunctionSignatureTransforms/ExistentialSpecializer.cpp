@@ -210,7 +210,7 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
     ExistentialArgDescriptor[Idx] = ETAD;
     LLVM_DEBUG(llvm::dbgs()
                << "ExistentialSpecializer Pass:Function: " << F->getName()
-               << " Arg:" << Idx << "has a concrete type.\n");
+               << " Arg:" << Idx << " has a concrete type.\n");
     returnFlag |= true;
   }
   return returnFlag;
