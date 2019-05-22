@@ -1690,10 +1690,6 @@ public:
   /// Check that the type of the given property conforms to NSCopying.
   Optional<ProtocolConformanceRef> checkConformanceToNSCopying(VarDecl *var);
 
-  /// Mark any _BridgedNSError/_BridgedStoredNSError/related
-  /// conformances in the given type as "used".
-  void useBridgedNSErrorConformances(DeclContext *dc, Type type);
-
   /// Derive an implicit declaration to satisfy a requirement of a derived
   /// protocol conformance.
   ///

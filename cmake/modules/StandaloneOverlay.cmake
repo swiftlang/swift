@@ -65,10 +65,6 @@ option(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES
 set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
   "Build type for the Swift standard library and SDK overlays.")
 
-set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
-  STRINGS
-    "Debug" "RelWithDebInfo" "Release" "MinSizeRel")
-
 # -----------------------------------------------------------------------------
 # Constants
 

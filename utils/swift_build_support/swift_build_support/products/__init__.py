@@ -27,6 +27,7 @@ from .swift import Swift
 from .swiftevolve import SwiftEvolve
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
+from .tsan_libdispatch import TSanLibDispatch
 from .xctest import XCTest
 # SWIFT_ENABLE_TENSORFLOW
 from .tensorflow import TensorFlow
@@ -51,6 +52,7 @@ __all__ = [
     'IndexStoreDB',
     'SourceKitLSP',
     'Benchmarks',
+    'TSanLibDispatch',
     # SWIFT_ENABLE_TENSORFLOW
     'TensorFlow',
 ]

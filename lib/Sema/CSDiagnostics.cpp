@@ -101,33 +101,9 @@ Expr *FailureDiagnostic::getArgumentExprFor(Expr *anchor) const {
   return nullptr;
 }
 
-// TODO: Replace duplications of this logic with calls to this.
-Optional<SelectedOverload> FailureDiagnostic::getChoiceFor(Expr *expr) {
+Optional<SelectedOverload> FailureDiagnostic::getChoiceFor(Expr *expr) const {
   auto &cs = getConstraintSystem();
-  ConstraintLocator *locator = nullptr;
-
-  if (auto *AE = dyn_cast<ApplyExpr>(expr)) {
-    if (auto *TE = dyn_cast<TypeExpr>(AE->getFn())) {
-      locator = cs.getConstraintLocator(AE,
-                                        {ConstraintLocator::ApplyFunction,
-                                         ConstraintLocator::ConstructorMember},
-                                        /*summaryFlags=*/0);
-    }
-    return getChoiceFor(AE->getFn());
-  } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
-    locator = cs.getConstraintLocator(UDE, ConstraintLocator::Member);
-  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(expr)) {
-    locator = cs.getConstraintLocator(UME, ConstraintLocator::UnresolvedMember);
-  } else if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
-    locator = cs.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
-  } else {
-    locator = cs.getConstraintLocator(expr);
-  }
-
-  if (!locator)
-    return None;
-
-  return getOverloadChoiceIfAvailable(locator);
+  return getOverloadChoiceIfAvailable(cs.getCalleeLocator(expr));
 }
 
 Type RequirementFailure::getOwnerType() const {
@@ -179,10 +155,6 @@ ProtocolConformance *RequirementFailure::getConformanceForConditionalReq(
 
 ValueDecl *RequirementFailure::getDeclRef() const {
   auto &cs = getConstraintSystem();
-  auto &TC = getTypeChecker();
-
-  auto *anchor = getRawAnchor();
-  auto *locator = cs.getConstraintLocator(anchor);
 
   // Get a declaration associated with given type (if any).
   // This is used to retrieve affected declaration when
@@ -204,38 +176,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   if (isFromContextualType())
     return getAffectedDeclFromType(cs.getContextualType());
 
-  if (auto *AE = dyn_cast<CallExpr>(anchor)) {
-    // NOTE: In valid code, the function can only be a TypeExpr
-    assert(isa<TypeExpr>(AE->getFn()) ||
-           isa<OverloadedDeclRefExpr>(AE->getFn()));
-    ConstraintLocatorBuilder ctor(locator);
-    locator = cs.getConstraintLocator(
-        ctor.withPathElement(PathEltKind::ApplyFunction)
-            .withPathElement(PathEltKind::ConstructorMember));
-  } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
-    ConstraintLocatorBuilder member(locator);
-
-    if (TC.getSelfForInitDelegationInConstructor(getDC(), UDE)) {
-      member = member.withPathElement(PathEltKind::ConstructorMember);
-    } else {
-      member = member.withPathElement(PathEltKind::Member);
-    }
-
-    locator = cs.getConstraintLocator(member);
-  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
-    locator = cs.getConstraintLocator(locator, PathEltKind::UnresolvedMember);
-  } else if (isa<SubscriptExpr>(anchor)) {
-    ConstraintLocatorBuilder subscript(locator);
-    locator = cs.getConstraintLocator(
-        subscript.withPathElement(PathEltKind::SubscriptMember));
-  } else if (isa<MemberRefExpr>(anchor)) {
-    ConstraintLocatorBuilder memberRef(locator);
-    locator =
-        cs.getConstraintLocator(memberRef.withPathElement(PathEltKind::Member));
-  }
-
-  auto overload = getOverloadChoiceIfAvailable(locator);
-  if (overload)
+  if (auto overload = getChoiceFor(getRawAnchor()))
     return overload->choice.getDecl();
 
   return getAffectedDeclFromType(getOwnerType());
@@ -568,32 +509,7 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
 
 Type NoEscapeFuncToTypeConversionFailure::getParameterTypeFor(
     Expr *expr, unsigned paramIdx) const {
-  auto &cs = getConstraintSystem();
-  ConstraintLocator *locator = nullptr;
-
-  if (auto *call = dyn_cast<CallExpr>(expr)) {
-    auto *fnExpr = call->getFn();
-    if (isa<UnresolvedDotExpr>(fnExpr)) {
-      locator = cs.getConstraintLocator(fnExpr, ConstraintLocator::Member);
-    } else if (isa<UnresolvedMemberExpr>(fnExpr)) {
-      locator =
-          cs.getConstraintLocator(fnExpr, ConstraintLocator::UnresolvedMember);
-    } else if (auto *TE = dyn_cast<TypeExpr>(fnExpr)) {
-      locator = cs.getConstraintLocator(call,
-                                        {ConstraintLocator::ApplyFunction,
-                                         ConstraintLocator::ConstructorMember},
-                                        /*summaryFlags=*/0);
-    } else {
-      locator = cs.getConstraintLocator(fnExpr);
-    }
-  } else if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
-    locator = cs.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
-  }
-
-  if (!locator)
-    return Type();
-
-  auto choice = getOverloadChoiceIfAvailable(locator);
+  auto choice = getChoiceFor(expr);
   if (!choice)
     return Type();
 
@@ -2895,4 +2811,89 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   (void)trySequenceSubsequenceFixIts(*diagnostic, getConstraintSystem(),
                                      eltType, contextualType, anchor);
   return true;
+}
+
+bool MissingContextualConformanceFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+  auto path = getLocator()->getPath();
+
+  Optional<Diag<Type, Type>> diagnostic;
+  if (path.empty()) {
+    assert(isa<AssignExpr>(anchor));
+    diagnostic = getDiagnosticFor(CTP_AssignSource);
+  } else {
+    const auto &last = path.back();
+    switch (last.getKind()) {
+    case ConstraintLocator::ContextualType:
+      assert(Context != CTP_Unused);
+      diagnostic = getDiagnosticFor(Context);
+      break;
+
+    case ConstraintLocator::SequenceElementType: {
+      diagnostic = diag::cannot_convert_sequence_element_protocol;
+      break;
+    }
+
+    default:
+      break;
+    }
+  }
+
+  if (!diagnostic)
+    return false;
+
+  auto srcType = getFromType();
+  auto dstType = getToType();
+
+  emitDiagnostic(anchor->getLoc(), *diagnostic, srcType, dstType);
+
+  if (isa<InOutExpr>(anchor))
+    return true;
+
+  if (srcType->isAny() && dstType->isAnyObject()) {
+    emitDiagnostic(anchor->getLoc(), diag::any_as_anyobject_fixit)
+        .fixItInsertAfter(anchor->getEndLoc(), " as AnyObject");
+  }
+
+  return true;
+}
+
+Optional<Diag<Type, Type>>
+MissingContextualConformanceFailure::getDiagnosticFor(
+    ContextualTypePurpose context) {
+  switch (context) {
+  case CTP_Initialization:
+    return diag::cannot_convert_initializer_value_protocol;
+  case CTP_ReturnStmt:
+  case CTP_ReturnSingleExpr:
+    return diag::cannot_convert_to_return_type_protocol;
+  case CTP_EnumCaseRawValue:
+    return diag::cannot_convert_raw_initializer_value;
+  case CTP_DefaultParameter:
+    return diag::cannot_convert_default_arg_value_protocol;
+  case CTP_YieldByValue:
+    return diag::cannot_convert_yield_value_protocol;
+  case CTP_CallArgument:
+    return diag::cannot_convert_argument_value_protocol;
+  case CTP_ClosureResult:
+    return diag::cannot_convert_closure_result_protocol;
+  case CTP_ArrayElement:
+    return diag::cannot_convert_array_element_protocol;
+  case CTP_DictionaryKey:
+    return diag::cannot_convert_dict_key_protocol;
+  case CTP_DictionaryValue:
+    return diag::cannot_convert_dict_value_protocol;
+  case CTP_CoerceOperand:
+    return diag::cannot_convert_coerce_protocol;
+  case CTP_AssignSource:
+    return diag::cannot_convert_assign_protocol;
+
+  case CTP_ThrowStmt:
+  case CTP_Unused:
+  case CTP_CannotFail:
+  case CTP_YieldByReference:
+  case CTP_CalleeResult:
+    break;
+  }
+  return None;
 }

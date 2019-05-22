@@ -69,6 +69,12 @@ void ManagedValue::copyInto(SILGenFunction &SGF, SILLocation loc,
   lowering.emitStoreOfCopy(SGF.B, loc, copy, dest, IsInitialization);
 }
 
+void ManagedValue::copyInto(SILGenFunction &SGF, SILLocation loc,
+                            Initialization *dest) {
+  dest->copyOrInitValueInto(SGF, loc, *this, /*isInit*/ false);
+  dest->finishInitialization(SGF);
+}
+
 /// This is the same operation as 'copy', but works on +0 values that don't
 /// have cleanups.  It returns a +1 value with one.
 ManagedValue ManagedValue::copyUnmanaged(SILGenFunction &SGF, SILLocation loc) {
