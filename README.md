@@ -23,8 +23,8 @@ To build from source you will need 2 GB of disk space for the source code and ov
 
 ### System Requirements
 
-macOS, Ubuntu Linux LTS 14.04, and Ubuntu Linux LTS 16.04 are the current
-supported host development operating systems.
+macOS and Ubuntu Linux LTS 18.04 are the current supported host development
+operating systems.
 
 Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
