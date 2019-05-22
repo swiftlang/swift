@@ -841,7 +841,7 @@ SILDeclRef SILDeclRef::getOverridden() const {
   if (!overridden)
     return SILDeclRef();
 
-  return SILDeclRef(overridden, kind, isCurried);
+  return SILDeclRef(overridden, kind, isCurried, isForeign, autoDiffAssociatedFunctionIdentifier);
 }
 
 SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
@@ -899,7 +899,7 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
 SILDeclRef SILDeclRef::getOverriddenWitnessTableEntry() const {
   auto bestOverridden =
     getOverriddenWitnessTableEntry(cast<AbstractFunctionDecl>(getDecl()));
-  return SILDeclRef(bestOverridden, kind, isCurried);
+  return SILDeclRef(bestOverridden, kind, isCurried, isForeign, autoDiffAssociatedFunctionIdentifier);
 }
 
 AbstractFunctionDecl *SILDeclRef::getOverriddenWitnessTableEntry(

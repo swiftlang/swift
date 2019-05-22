@@ -40,6 +40,9 @@ using namespace Lowering;
 Optional<SILVTable::Entry>
 SILGenModule::emitVTableMethod(ClassDecl *theClass,
                                SILDeclRef derived, SILDeclRef base) {
+  llvm::dbgs() << "emitVTableMethod\n";
+  llvm::dbgs() << "derived " << derived << "\nbase " << base << "\n";
+
   assert(base.kind == derived.kind);
 
   auto *baseDecl = base.getDecl();
@@ -84,14 +87,33 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
       && derived.kind != SILDeclRef::Kind::Allocator) {
     implFn = getDynamicThunk(derived, Types.getConstantInfo(derived).SILFnType);
     implLinkage = SILLinkage::Public;
+  } else if (auto *adafi = derived.autoDiffAssociatedFunctionIdentifier) {
+    // quite hacky and wrong
+    auto *decl = derived.getDecl();
+    auto *DA = decl->getAttrs().getAttribute<DifferentiableAttr>();
+    assert(DA);
+    FuncDecl *assocDecl = nullptr;
+    if (adafi->getKind() == AutoDiffAssociatedFunctionKind::JVP) {
+      assocDecl = DA->getJVPFunction();
+    }
+    if (adafi->getKind() == AutoDiffAssociatedFunctionKind::VJP) {
+      assocDecl = DA->getVJPFunction();
+    }
+    assert(assocDecl);
+    SILDeclRef assocRef(assocDecl, SILDeclRef::Kind::Func);
+    implFn = getFunction(assocRef, NotForDefinition);
+    implLinkage = stripExternalFromLinkage(implFn->getLinkage());
   } else {
     implFn = getFunction(derived, NotForDefinition);
     implLinkage = stripExternalFromLinkage(implFn->getLinkage());
   }
 
+
   // As a fast path, if there is no override, definitely no thunk is necessary.
   if (derived == base)
     return SILVTable::Entry(base, implFn, implKind, implLinkage);
+
+  llvm::dbgs() << "maybe we'll thunk it\n";
 
   // Determine the derived thunk type by lowering the derived type against the
   // abstraction pattern of the base.
@@ -252,6 +274,7 @@ public:
 
   // Try to find an overridden entry.
   void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {
+    llvm::dbgs() << "addMethodOverride " << baseRef << " " << declRef << "\n";
     auto found = baseToIndexMap.find(baseRef);
     assert(found != baseToIndexMap.end());
     auto &method = vtableMethods[found->second];
