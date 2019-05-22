@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
 
-// Test `switch_enum` terminator.
+// Test currently unsupported `switch_enum` terminator.
 
 enum Enum {
   case a(Float)
@@ -11,7 +11,7 @@ enum Enum {
 @differentiable
 // expected-note @+1 {{when differentiating this function definition}}
 func switch_enum(_ e: Enum, _ x: Float) -> Float {
-  // expected-note @+1 {{cannot differentiate function containing unsupported control flow}}
+  // expected-note @+1 {{differentiating control flow is not yet supported}}
   switch e {
     case let .a(a): return a
     case let .b(b): return b
