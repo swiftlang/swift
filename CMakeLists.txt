@@ -360,6 +360,10 @@ option(SWIFT_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING
   "Build stdlibCore with exclusivity checking enabled"
   FALSE)
 
+option(SWIFT_ENABLE_OWNERSHIP_STRIPPING_AFTER_DIAGNOSTIC_PASSES
+  "Build the stdlib with ownership stripping after the diagnostic passes run."
+  FALSE)
+
 #
 # End of user-configurable options.
 #

@@ -1715,6 +1715,10 @@ function(add_swift_target_library name)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-warn-implicit-overrides")
   endif()
 
+  if (SWIFTLIB_IS_STDLIB AND SWIFT_ENABLE_OWNERSHIP_STRIPPING_AFTER_DIAGNOSTICS)
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-enable-ownership-stripping-after-diagnostics")
+  endif()
+
   if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER AND NOT BUILD_STANDALONE)
     list(APPEND SWIFTLIB_DEPENDS clang)
   endif()

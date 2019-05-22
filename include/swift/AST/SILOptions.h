@@ -134,7 +134,7 @@ public:
 
   /// Should the default pass pipelines strip ownership during the diagnostic
   /// pipeline or after serialization.
-  bool StripOwnershipAfterSerialization = false;
+  bool StripOwnershipAfterDiagnosticPasses = false;
 
   /// The name of the file to which the backend should save YAML optimization
   /// records.
