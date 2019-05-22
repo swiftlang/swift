@@ -141,3 +141,60 @@ func testAccessors() {
   t.unavailableSetter = .init() // expected-error {{setter for 'unavailableSetter' is unavailable in macOS: bad setter}}
   t.unavailableSetter.mutate() // expected-error {{setter for 'unavailableSetter' is unavailable in macOS: bad setter}}
 }
+
+// Check available on extensions
+
+@available(macOS, unavailable)
+extension TestStruct {
+  func unavailInExtension() {} // expected-note 2 {{'unavailInExtension()' has been explicitly marked unavailable here}}
+}
+
+@available(macOS, obsoleted: 10.0)
+extension TestStruct {
+  func obsoletedInExtension() {} // expected-note 2 {{'obsoletedInExtension()' was obsoleted in macOS 10.0}}
+}
+
+@available(macOS, deprecated: 10.0)
+extension TestStruct {
+  func deprecatedInExtension() {}
+}
+
+@available(swift, introduced: 50.0)
+extension TestStruct {
+  func introducedInExtensionSwift() {} // expected-note 2 {{'introducedInExtensionSwift()' was introduced in Swift 50.0}}
+}
+
+@available(macOS, introduced: 10.50)
+extension TestStruct {
+  func introducedInExtensionMacOS() {}
+}
+
+TestStruct().unavailInExtension() // expected-error {{'unavailInExtension()' is unavailable in macOS}}
+TestStruct().obsoletedInExtension() // expected-error {{'obsoletedInExtension()' is unavailable}}
+TestStruct().deprecatedInExtension() // expected-warning {{'deprecatedInExtension()' was deprecated in macOS 10.0}}
+TestStruct().introducedInExtensionSwift() // expected-error {{'introducedInExtensionSwift()' is unavailable}}
+TestStruct().introducedInExtensionMacOS() // expected-error {{'introducedInExtensionMacOS()' is only available in macOS 10.50 or newer}}
+// expected-note@-1{{add 'if #available' version check}}
+
+extension TestStruct {
+  func availableFunc() {
+    unavailInExtension() // expected-error {{'unavailInExtension()' is unavailable in macOS}}
+    obsoletedInExtension() // expected-error {{'obsoletedInExtension()' is unavailable}}
+    deprecatedInExtension() // expected-warning {{'deprecatedInExtension()' was deprecated in macOS 10.0}}
+    introducedInExtensionSwift() // expected-error {{'introducedInExtensionSwift()' is unavailable}}
+  }
+}
+
+extension TestStruct { // expected-note{{add @available attribute to enclosing extension}}
+  func availableFuncMacOS() { // expected-note{{add @available attribute to enclosing instance method}}
+    introducedInExtensionMacOS() // expected-error {{'introducedInExtensionMacOS()' is only available in macOS 10.50 or newer}}
+    // expected-note@-1{{add 'if #available' version check}}
+  }
+}
+
+@available(macOS, introduced: 10.50)
+extension TestStruct {
+  func futureFuncMacOS() {
+    introducedInExtensionMacOS()
+  }
+}
