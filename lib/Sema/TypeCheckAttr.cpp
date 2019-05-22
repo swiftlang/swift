@@ -3252,12 +3252,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
-  // Class members are not supported by differentiation yet.
-  if (original->getInnermostTypeContext() &&
-      isa<ClassDecl>(original->getInnermostTypeContext())) {
-    diagnoseAndRemoveAttr(attr, diag::differentiable_attr_class_unsupported);
-    return;
-  }
+  // // Class members are not supported by differentiation yet.
+  // if (original->getInnermostTypeContext() &&
+  //     isa<ClassDecl>(original->getInnermostTypeContext())) {
+  //   diagnoseAndRemoveAttr(attr, diag::differentiable_attr_class_unsupported);
+  //   return;
+  // }
 
   TC.resolveDeclSignature(original);
   auto *originalFnTy = original->getInterfaceType()->castTo<AnyFunctionType>();

@@ -2155,11 +2155,39 @@ emitAssociatedFunctionReference(
   }
 
   // Reject class methods.
-  if (auto *classMethod =
+  if (auto *classMethodInst =
           peerThroughFunctionConversions<ClassMethodInst>(original)) {
-    context.emitNondifferentiabilityError(original, invoker,
-        diag::autodiff_class_member_not_supported);
-    return None;
+    auto loc = classMethodInst->getLoc();
+    auto methodRef = classMethodInst->getMember();
+    auto methodDecl = methodRef.getDecl();
+    auto *diffAttr = methodDecl->getAttrs().getAttribute<DifferentiableAttr>();
+    if (!diffAttr) {
+      context.emitNondifferentiabilityError(original, invoker,
+          diag::autodiff_protocol_member_not_differentiable);  // TODO: change to a class method diagnostic
+      return None;
+    }
+
+    auto *methodParameterIndices = diffAttr->getParameterIndices();
+
+    // TODO: need to check that the method parameter indices are compatible with
+    // the desired ones.
+
+    auto originalType = classMethodInst->getType().castTo<SILFunctionType>();
+    auto assocType = originalType->getAutoDiffAssociatedFunctionType(
+        desiredIndices.parameters, desiredIndices.source,  // TODO: using desired here is very dangerous. should use the ones from the method declaration
+        /*differentiationOrder*/ 1, kind, builder.getModule(),
+        LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+
+    // Emit a class_method instruction pointing at the associated function.
+    auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
+        kind, /*differentiationOrder*/ 1, methodParameterIndices,
+        context.getASTContext());
+    auto *ref = builder.createClassMethod(
+        loc, classMethodInst->getOperand(),
+        methodRef.asAutoDiffAssociatedFunction(autoDiffFuncId), SILType::getPrimitiveObjectType(assocType));
+    auto convertedRef =
+        reapplyFunctionConversion(ref, classMethodInst, original, builder, loc);
+    return std::make_pair(convertedRef, desiredIndices);  // TODO: using desired here is very dangerous. should use the ones from the method declaration
   }
 
   // Emit the general opaque function error.

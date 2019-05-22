@@ -87,6 +87,20 @@ template <class T> class SILVTableVisitor {
     assert(!fd->hasClangNode());
 
     maybeAddEntry(SILDeclRef(fd, SILDeclRef::Kind::Func));
+
+    if (auto *DA = fd->getAttrs().getAttribute<DifferentiableAttr>()) {
+      auto jvpConstant = constant.asAutoDiffAssociatedFunction(
+          AutoDiffAssociatedFunctionIdentifier::get(
+          AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+          DA->getParameterIndices(), fd->getASTContext()));
+      maybeAddEntry(jvpConstant, jvpConstant.requiresNewVTableEntry());
+
+      auto vjpConstant = constant.asAutoDiffAssociatedFunction(
+          AutoDiffAssociatedFunctionIdentifier::get(
+          AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+          DA->getParameterIndices(), fd->getASTContext()));
+      maybeAddEntry(vjpConstant, vjpConstant.requiresNewVTableEntry());
+    }
   }
 
   void maybeAddConstructor(ConstructorDecl *cd) {

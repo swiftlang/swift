@@ -135,6 +135,9 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
   if (!name.empty()) {
     entry = &*M.FunctionTable.insert(std::make_pair(name, nullptr)).first;
     PrettyStackTraceSILFunction trace("creating", entry->getValue());
+    if (entry->getValue()) {
+      entry->getValue()->dump();
+    }
     assert(!entry->getValue() && "function already exists");
     name = entry->getKey();
   }
