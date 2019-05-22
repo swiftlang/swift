@@ -855,6 +855,18 @@ class TestReportFormatter(OldAndNewLog):
         self.assertNotIn('No Changes', html)
         self.assertNotIn('AngryPhonebook', html)
 
+    def test_single_table_report(self):
+        """Single table report has bold inline headers and no sections."""
+        rf = ReportFormatter(self.tc, changes_only=True, single_table=True)
+        markdown = rf.markdown()
+        self.assertNotIn('<details', markdown)
+        self.assert_report_contains([
+            '**Regression**', '**Added**',
+            '| OLD', '| NEW', '| DELTA', '| RATIO'
+        ], markdown)
+        self.assertIn('\n--- ', markdown)  # first column
+        self.assertEqual(markdown.count('| ---'), 4)
+
 
 class Test_parse_args(unittest.TestCase):
     required = ['--old-file', 'old.log', '--new-file', 'new.log']
