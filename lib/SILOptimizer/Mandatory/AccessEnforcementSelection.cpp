@@ -107,6 +107,10 @@ public:
   void recordCapture(AddressCapture capture) {
     LLVM_DEBUG(llvm::dbgs() << "Dynamic Capture: " << capture);
 
+    // *NOTE* For dynamically replaceable local functions, getCalleeFunction()
+    // returns nullptr. This assert verifies the assumption that a captured
+    // local variable can never be promoted to capture-by-address for
+    // dynamically replaceable local functions.
     auto callee = capture.site.getCalleeFunction();
     assert(callee && "cannot locate function ref for nonescaping closure");
 

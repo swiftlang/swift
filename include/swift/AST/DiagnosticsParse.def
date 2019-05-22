@@ -731,6 +731,8 @@ ERROR(expected_type_after_arrow,none,
 ERROR(function_type_argument_label,none,
       "function types cannot have argument labels; use '_' before %0",
       (Identifier))
+ERROR(expected_dynamic_func_attr,none,
+      "expected a dynamically_replaceable function", ())
 
 // Enum Types
 ERROR(expected_expr_enum_case_raw_value,PointsToFirstBadToken,
