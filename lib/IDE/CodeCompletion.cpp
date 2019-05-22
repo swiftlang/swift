@@ -1479,6 +1479,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   ASTContext &Ctx;
   LazyResolver *TypeResolver = nullptr;
   const DeclContext *CurrDeclContext;
+  ModuleDecl *CurrModule;
   ClangImporter *Importer;
   CodeCompletionContext *CompletionContext;
 
@@ -1627,6 +1628,8 @@ public:
                    const DeclContext *CurrDeclContext,
                    CodeCompletionContext *CompletionContext = nullptr)
       : Sink(Sink), Ctx(Ctx), CurrDeclContext(CurrDeclContext),
+        CurrModule(CurrDeclContext ? CurrDeclContext->getParentModule()
+                                   : nullptr),
         Importer(static_cast<ClangImporter *>(CurrDeclContext->getASTContext().
           getClangModuleLoader())),
         CompletionContext(CompletionContext) {
@@ -1760,7 +1763,7 @@ public:
     llvm::StringSet<> ImportedModules;
     collectImportedModules(ImportedModules);
 
-    auto mainModuleName = CurrDeclContext->getParentModule()->getName();
+    auto mainModuleName = CurrModule->getName();
     for (auto ModuleName : ModuleNames) {
       if (ModuleName.str().startswith("_") ||
           ModuleName == mainModuleName ||
@@ -1817,8 +1820,7 @@ public:
       return SemanticContextKind::OutsideNominal;
 
     case DeclVisibilityKind::VisibleAtTopLevel:
-      if (CurrDeclContext &&
-          D->getModuleContext() == CurrDeclContext->getParentModule()) {
+      if (CurrDeclContext && D->getModuleContext() == CurrModule) {
         // Treat global variables from the same source file as local when
         // completing at top-level.
         if (isa<VarDecl>(D) && isTopLevelContext(CurrDeclContext) &&
@@ -1931,7 +1933,7 @@ public:
   /// protocol compositions.
   ///
   /// FIXME: Perhaps this should be an option in PrintOptions instead.
-  Type eraseArchetypes(ModuleDecl *M, Type type, GenericSignature *genericSig) {
+  Type eraseArchetypes(Type type, GenericSignature *genericSig) {
     if (!genericSig)
       return type;
 
@@ -1939,20 +1941,20 @@ public:
       SmallVector<Type, 2> types;
       for (auto proto : protos)
         types.push_back(proto->getDeclaredInterfaceType());
-      return ProtocolCompositionType::get(M->getASTContext(), types,
+      return ProtocolCompositionType::get(Ctx, types,
                                           /*HasExplicitAnyObject=*/false);
     };
 
     if (auto *genericFuncType = type->getAs<GenericFunctionType>()) {
       SmallVector<AnyFunctionType::Param, 8> erasedParams;
       for (const auto &param : genericFuncType->getParams()) {
-        auto erasedTy = eraseArchetypes(M, param.getPlainType(), genericSig);
+        auto erasedTy = eraseArchetypes(param.getPlainType(), genericSig);
         erasedParams.emplace_back(erasedTy, param.getLabel(),
                                   param.getParameterFlags());
       }
       return GenericFunctionType::get(genericSig,
           erasedParams,
-          eraseArchetypes(M, genericFuncType->getResult(), genericSig),
+          eraseArchetypes(genericFuncType->getResult(), genericSig),
           genericFuncType->getExtInfo());
     }
 
@@ -1991,7 +1993,6 @@ public:
   }
 
   Type getTypeOfMember(const ValueDecl *VD, Type ExprType) {
-    auto *M = CurrDeclContext->getParentModule();
     auto *GenericSig = VD->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
 
@@ -2032,7 +2033,7 @@ public:
           return T;
 
         // For everything else, substitute in the base type.
-        auto Subs = MaybeNominalType->getMemberSubstitutionMap(M, VD);
+        auto Subs = MaybeNominalType->getMemberSubstitutionMap(CurrModule, VD);
 
         // Pass in DesugarMemberTypes so that we see the actual
         // concrete type witnesses instead of type alias types.
@@ -2042,7 +2043,7 @@ public:
       }
     }
 
-    return eraseArchetypes(M, T, GenericSig);
+    return eraseArchetypes(T, GenericSig);
   }
 
   Type getAssociatedTypeType(const AssociatedTypeDecl *ATD) {
@@ -2245,15 +2246,9 @@ public:
     // #selector is only available when the Objective-C runtime is.
     if (!Ctx.LangOpts.EnableObjCInterop) return;
 
-    // After #, this is a very likely result. When just in a String context,
-    // it's not.
-    auto semanticContext = needPound ? SemanticContextKind::None
-    : SemanticContextKind::ExpressionSpecific;
-
     CodeCompletionResultBuilder Builder(
-                                  Sink,
-                                  CodeCompletionResult::ResultKind::Keyword,
-                                  semanticContext, expectedTypeContext);
+        Sink, CodeCompletionResult::ResultKind::Keyword,
+        SemanticContextKind::None, {});
     if (needPound)
       Builder.addTextChunk("#selector");
     else
@@ -2261,21 +2256,19 @@ public:
     Builder.addLeftParen();
     Builder.addSimpleTypedParameter("@objc method", /*IsVarArg=*/false);
     Builder.addRightParen();
+    Builder.addTypeAnnotation("Selector");
+    // This function is called only if the context type is 'Selector'.
+    Builder.setExpectedTypeRelation(
+        CodeCompletionResult::ExpectedTypeRelation::Identical);
   }
 
   void addPoundKeyPath(bool needPound) {
     // #keyPath is only available when the Objective-C runtime is.
     if (!Ctx.LangOpts.EnableObjCInterop) return;
 
-    // After #, this is a very likely result. When just in a String context,
-    // it's not.
-    auto semanticContext = needPound ? SemanticContextKind::None
-                                     : SemanticContextKind::ExpressionSpecific;
-
     CodeCompletionResultBuilder Builder(
-                                  Sink,
-                                  CodeCompletionResult::ResultKind::Keyword,
-                                  semanticContext, expectedTypeContext);
+        Sink, CodeCompletionResult::ResultKind::Keyword,
+        SemanticContextKind::None, {});
     if (needPound)
       Builder.addTextChunk("#keyPath");
     else
@@ -2284,6 +2277,10 @@ public:
     Builder.addSimpleTypedParameter("@objc property sequence",
                                     /*IsVarArg=*/false);
     Builder.addRightParen();
+    Builder.addTypeAnnotation("String");
+    // This function is called only if the context type is 'String'.
+    Builder.setExpectedTypeRelation(
+        CodeCompletionResult::ExpectedTypeRelation::Identical);
   }
 
   SemanticContextKind getSemanticContextKind(const ValueDecl *VD) {
@@ -2302,7 +2299,7 @@ public:
 
     if (calleeDC->isLocalContext())
       return SemanticContextKind::Local;
-    if (calleeDC->getParentModule() == CurrDeclContext->getParentModule())
+    if (calleeDC->getParentModule() == CurrModule)
       return SemanticContextKind::CurrentModule;
 
     return SemanticContextKind::OtherModule;
@@ -2313,8 +2310,7 @@ public:
     foundFunction(AFT);
     auto genericSig =
         SD->getInnermostDeclContext()->getGenericSignatureOfContext();
-    AFT = eraseArchetypes(CurrDeclContext->getParentModule(),
-                          const_cast<AnyFunctionType *>(AFT), genericSig)
+    AFT = eraseArchetypes(const_cast<AnyFunctionType *>(AFT), genericSig)
               ->castTo<AnyFunctionType>();
 
     CommandWordsPairs Pairs;
@@ -2344,8 +2340,7 @@ public:
     if (AFD) {
       auto genericSig =
           AFD->getInnermostDeclContext()->getGenericSignatureOfContext();
-      AFT = eraseArchetypes(CurrDeclContext->getParentModule(),
-                            const_cast<AnyFunctionType *>(AFT), genericSig)
+      AFT = eraseArchetypes(const_cast<AnyFunctionType *>(AFT), genericSig)
                 ->castTo<AnyFunctionType>();
     }
 
@@ -3168,7 +3163,7 @@ public:
   bool tryModuleCompletions(Type ExprType) {
     if (auto MT = ExprType->getAs<ModuleType>()) {
       ModuleDecl *M = MT->getModule();
-      if (CurrDeclContext->getParentModule() != M) {
+      if (CurrModule != M) {
         // Only use the cache if it is not the current module.
         RequestedCachedResults.push_back(
           RequestedResultsTy::fromModule(M).needLeadingDot(needDot()));
@@ -3511,9 +3506,73 @@ public:
         addPostfixBang(ValueT);
   }
 
+  void addTypeRelationFromProtocol(CodeCompletionResultBuilder &builder,
+                                   CodeCompletionLiteralKind kind,
+                                   StringRef defaultTypeName) {
+    // Check for matching ExpectedTypes.
+    auto *P = Ctx.getProtocol(protocolForLiteralKind(kind));
+    for (auto T : expectedTypeContext.possibleTypes) {
+      if (!T)
+        continue;
+
+      auto typeRelation = CodeCompletionResult::Identical;
+      // Convert through optional types unless we're looking for a protocol
+      // that Optional itself conforms to.
+      if (kind != CodeCompletionLiteralKind::NilLiteral) {
+        if (auto optionalObjT = T->getOptionalObjectType()) {
+          T = optionalObjT;
+          typeRelation = CodeCompletionResult::Convertible;
+        }
+      }
+
+      // Check for conformance to the literal protocol.
+      if (auto *NTD = T->getAnyNominal()) {
+        SmallVector<ProtocolConformance *, 2> conformances;
+        if (NTD->lookupConformance(CurrModule, P, conformances)) {
+          addTypeAnnotation(builder, T);
+          builder.setExpectedTypeRelation(typeRelation);
+          return;
+        }
+      }
+    }
+
+    // Fallback to showing the default type.
+    if (!defaultTypeName.empty())
+      builder.addTypeAnnotation(defaultTypeName);
+  }
+
+  /// Add '#file', '#line', et at.
+  void addPoundLiteralCompletions(bool needPound) {
+    auto addFromProto = [&](StringRef name, CodeCompletionKeywordKind kwKind,
+                            CodeCompletionLiteralKind literalKind,
+                            StringRef defaultTypeName) {
+      if (!needPound)
+        name = name.substr(1);
+
+      CodeCompletionResultBuilder builder(
+          Sink, CodeCompletionResult::ResultKind::Keyword,
+          SemanticContextKind::None, {});
+      builder.setLiteralKind(literalKind);
+      builder.setKeywordKind(kwKind);
+      builder.addTextChunk(name);
+      addTypeRelationFromProtocol(builder, literalKind, defaultTypeName);
+    };
+
+    addFromProto("#function", CodeCompletionKeywordKind::pound_function,
+                 CodeCompletionLiteralKind::StringLiteral, "String");
+    addFromProto("#file", CodeCompletionKeywordKind::pound_file,
+                 CodeCompletionLiteralKind::StringLiteral, "String");
+    addFromProto("#line", CodeCompletionKeywordKind::pound_line,
+                 CodeCompletionLiteralKind::IntegerLiteral, "Int");
+    addFromProto("#column", CodeCompletionKeywordKind::pound_column,
+                 CodeCompletionLiteralKind::IntegerLiteral, "Int");
+
+    addKeyword(needPound ? "#dsohandle" : "dsohandle", "UnsafeRawPointer",
+               CodeCompletionKeywordKind::pound_dsohandle);
+  }
+
   void addValueLiteralCompletions() {
     auto &context = CurrDeclContext->getASTContext();
-    auto *module = CurrDeclContext->getParentModule();
 
     auto addFromProto = [&](
         CodeCompletionLiteralKind kind, StringRef defaultTypeName,
@@ -3525,38 +3584,7 @@ public:
       builder.setLiteralKind(kind);
 
       consumer(builder);
-
-      // Check for matching ExpectedTypes.
-      auto *P = context.getProtocol(protocolForLiteralKind(kind));
-      bool foundConformance = false;
-      for (auto T : expectedTypeContext.possibleTypes) {
-        if (!T)
-          continue;
-
-        auto typeRelation = CodeCompletionResult::Identical;
-        // Convert through optional types unless we're looking for a protocol
-        // that Optional itself conforms to.
-        if (kind != CodeCompletionLiteralKind::NilLiteral) {
-          if (auto optionalObjT = T->getOptionalObjectType()) {
-            T = optionalObjT;
-            typeRelation = CodeCompletionResult::Convertible;
-          }
-        }
-
-        // Check for conformance to the literal protocol.
-        if (auto *NTD = T->getAnyNominal()) {
-          SmallVector<ProtocolConformance *, 2> conformances;
-          if (NTD->lookupConformance(module, P, conformances)) {
-            foundConformance = true;
-            addTypeAnnotation(builder, T);
-            builder.setExpectedTypeRelation(typeRelation);
-          }
-        }
-      }
-
-      // Fallback to showing the default type.
-      if (!foundConformance && !defaultTypeName.empty())
-        builder.addTypeAnnotation(defaultTypeName);
+      addTypeRelationFromProtocol(builder, kind, defaultTypeName);
     };
 
     // FIXME: the pedantically correct way is to resolve Swift.*LiteralType.
@@ -3647,6 +3675,38 @@ public:
     }
   }
 
+  void addObjCPoundKeywordCompletions(bool needPound) {
+    if (!Ctx.LangOpts.EnableObjCInterop)
+      return;
+
+    // If the expected type is ObjectiveC.Selector, add #selector. If
+    // it's String, add #keyPath.
+    bool addedSelector = false;
+    bool addedKeyPath = false;
+
+    for (auto T : expectedTypeContext.possibleTypes) {
+      T = T->lookThroughAllOptionalTypes();
+      if (auto structDecl = T->getStructOrBoundGenericStruct()) {
+        if (!addedSelector && structDecl->getName() == Ctx.Id_Selector &&
+            structDecl->getParentModule()->getName() == Ctx.Id_ObjectiveC) {
+          addPoundSelector(needPound);
+          if (addedKeyPath)
+            break;
+          addedSelector = true;
+          continue;
+        }
+      }
+
+      if (!addedKeyPath && T->getAnyNominal() == Ctx.getStringDecl()) {
+        addPoundKeyPath(needPound);
+        if (addedSelector)
+          break;
+        addedKeyPath = true;
+        continue;
+      }
+    }
+  }
+
   struct FilteredDeclConsumer : public swift::VisibleDeclConsumer {
     swift::VisibleDeclConsumer &Consumer;
     DeclFilter Filter;
@@ -3682,7 +3742,7 @@ public:
       if (auto NT = T->getAs<NominalType>()) {
         if (auto NTD = NT->getDecl()) {
           if (!isa<ProtocolDecl>(NTD) &&
-              NTD->getModuleContext() != CurrDeclContext->getParentModule()) {
+              NTD->getModuleContext() != CurrModule) {
             addNominalTypeRef(NT->getDecl(),
                               DeclVisibilityKind::VisibleAtTopLevel, {});
           }
@@ -3705,42 +3765,18 @@ public:
           });
     }
 
-    if (LiteralCompletions)
+    if (LiteralCompletions) {
       addValueLiteralCompletions();
-
-    // If the expected type is ObjectiveC.Selector, add #selector. If
-    // it's String, add #keyPath.
-    if (Ctx.LangOpts.EnableObjCInterop) {
-      bool addedSelector = false;
-      bool addedKeyPath = false;
-      for (auto T : expectedTypeContext.possibleTypes) {
-        T = T->lookThroughAllOptionalTypes();
-        if (auto structDecl = T->getStructOrBoundGenericStruct()) {
-          if (!addedSelector &&
-              structDecl->getName() == Ctx.Id_Selector &&
-              structDecl->getParentModule()->getName() == Ctx.Id_ObjectiveC) {
-            addPoundSelector(/*needPound=*/true);
-            if (addedKeyPath) break;
-            addedSelector = true;
-            continue;
-          }
-        }
-
-        if (!addedKeyPath && T->getAnyNominal() == Ctx.getStringDecl()) {
-          addPoundKeyPath(/*needPound=*/true);
-          if (addedSelector) break;
-          addedKeyPath = true;
-          continue;
-        }
-      }
+      addPoundLiteralCompletions(/*needPound=*/true);
     }
+
+    addObjCPoundKeywordCompletions(/*needPound=*/true);
   }
 
   void getUnresolvedMemberCompletions(Type T) {
     if (!T->mayHaveMembers())
       return;
 
-    ModuleDecl *CurrModule = CurrDeclContext->getParentModule();
     DeclContext *DC = const_cast<DeclContext *>(CurrDeclContext);
 
     // We can only say .foo where foo is a static member of the contextual
@@ -3883,10 +3919,8 @@ public:
   void collectPrecedenceGroups() {
     assert(CurrDeclContext);
 
-    auto M = CurrDeclContext->getParentModule();
-
-    if (M) {
-      for (auto FU: M->getFiles()) {
+    if (CurrModule) {
+      for (auto FU: CurrModule->getFiles()) {
         // We are looking through the current module,
         // inspect only source files.
         if (FU->getKind() != FileUnitKind::Source)
@@ -3902,7 +3936,7 @@ public:
     CurrDeclContext->getParentSourceFile()
       ->forAllVisibleModules([&](ModuleDecl::ImportedModule Import) {
       auto Module = Import.second;
-      if (Module == M)
+      if (Module == CurrModule)
         return;
 
       RequestedCachedResults.push_back(
@@ -3956,9 +3990,9 @@ public:
     Kind = OnlyTypes ? LookupKind::TypeInDeclContext
                      : LookupKind::ValueInDeclContext;
     NeedLeadingDot = false;
-    ModuleDecl *M = CurrDeclContext->getParentModule();
     AccessFilteringDeclConsumer FilteringConsumer(CurrDeclContext, *this);
-    M->lookupVisibleDecls({}, FilteringConsumer, NLKind::UnqualifiedLookup);
+    CurrModule->lookupVisibleDecls({}, FilteringConsumer,
+                                   NLKind::UnqualifiedLookup);
   }
 
   void getVisibleDeclsOfModule(const ModuleDecl *TheModule,
@@ -4839,14 +4873,6 @@ static void addExprKeywords(CodeCompletionResultSink &Sink) {
   addKeyword(Sink, "try", CodeCompletionKeywordKind::kw_try);
   addKeyword(Sink, "try!", CodeCompletionKeywordKind::kw_try);
   addKeyword(Sink, "try?", CodeCompletionKeywordKind::kw_try);
-  // FIXME: The pedantically correct way to find the type is to resolve the
-  // Swift.StringLiteralType type.
-  addKeyword(Sink, "#function", CodeCompletionKeywordKind::pound_function, "String");
-  addKeyword(Sink, "#file", CodeCompletionKeywordKind::pound_file, "String");
-  // Same: Swift.IntegerLiteralType.
-  addKeyword(Sink, "#line", CodeCompletionKeywordKind::pound_line, "Int");
-  addKeyword(Sink, "#column", CodeCompletionKeywordKind::pound_column, "Int");
-  addKeyword(Sink, "#dsohandle", CodeCompletionKeywordKind::pound_dsohandle, "UnsafeMutableRawPointer");
 }
 
 static void addOpaqueTypeKeyword(CodeCompletionResultSink &Sink) {
@@ -5445,9 +5471,13 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::AfterPoundExpr: {
+    ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
+    Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
+                            ContextInfo.isSingleExpressionBody());
+
     Lookup.addPoundAvailable(ParentStmtKind);
-    Lookup.addPoundSelector(/*needPound=*/false);
-    Lookup.addPoundKeyPath(/*needPound=*/false);
+    Lookup.addPoundLiteralCompletions(/*needPound=*/false);
+    Lookup.addObjCPoundKeywordCompletions(/*needPound=*/false);
     break;
   }
 
