@@ -2608,6 +2608,14 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   return None;
 }
 
+static bool shouldBlockImplicitDynamic(Decl *D) {
+  if (D->getAttrs().hasAttribute<NonObjCAttr>() ||
+      D->getAttrs().hasAttribute<SILGenNameAttr>() ||
+      D->getAttrs().hasAttribute<TransparentAttr>() ||
+      D->getAttrs().hasAttribute<InlinableAttr>())
+    return true;
+  return false;
+}
 void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
   if (!D->getModuleContext()->isImplicitDynamicEnabled())
     return;
@@ -2618,10 +2626,9 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
       isa<AccessorDecl>(D))
     return;
 
-  if (D->getAttrs().hasAttribute<NonObjCAttr>() ||
-      D->getAttrs().hasAttribute<TransparentAttr>() ||
-      D->getAttrs().hasAttribute<InlinableAttr>())
-    return;
+  // Don't add dynamic if decl is inlinable or tranparent.
+  if (shouldBlockImplicitDynamic(D))
+   return;
 
   if (auto *FD = dyn_cast<FuncDecl>(D)) {
     // Don't add dynamic to defer bodies.
@@ -2630,6 +2637,14 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
     // Don't add dynamic to functions with a cdecl.
     if (FD->getAttrs().hasAttribute<CDeclAttr>())
       return;
+  }
+
+  // Don't add dynamic if accessor is inlinable or tranparent.
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
+    for (auto *accessor : asd->getAllAccessors()) {
+      if (!accessor->isImplicit() && shouldBlockImplicitDynamic(accessor))
+        return;
+    }
   }
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
