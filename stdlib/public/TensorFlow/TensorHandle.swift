@@ -20,18 +20,25 @@ import CTensorFlow
 /// that conforms to this protocol can be used as a `TensorHandle` in the
 /// `TensorFlow` library, as it much provide a way to convert the underlying tensor
 /// handle into a `ConcreteTensorHandle`, which wraps a `TFE_TensorHandle *`
-public protocol TFTensorHandle {
-  var tensorHandle: ConcreteTensorHandle { get }
+public protocol _AnyTensorHandle {
+  var tfeTensorHandle: TFETensorHandle { get }
+}
+
+extension _AnyTensorHandle {
+  /// The underlying `TFE_TensorHandle *`.
+  public var _cTensorHandle: CTensorHandle {
+    return tfeTensorHandle._cTensorHandle
+  }
 }
 
 /// Class wrapping a C pointer to a TensorHandle.  This class owns the
 /// TensorHandle and is responsible for destroying it.
-public class ConcreteTensorHandle : TFTensorHandle {
+public class TFETensorHandle : _AnyTensorHandle {
   public let _cTensorHandle: CTensorHandle
 
-  public var tensorHandle: ConcreteTensorHandle { return self }
+  public var tfeTensorHandle: TFETensorHandle { return self }
 
-  fileprivate init(_owning base: CTensorHandle) {
+  public init(_owning base: CTensorHandle) {
     self._cTensorHandle = base
   }
 
@@ -42,33 +49,17 @@ public class ConcreteTensorHandle : TFTensorHandle {
   }
 }
 
-/// `_AnyTensorHandle` is the scalar-agnostic base type for `TensorHandle`, used
-/// specifically for low-level, type-erased passings of Swift-level tensor
-/// handles in the compiler.
-@_fixed_layout // required because the compiler accesses _cTensorHandle directly.
-public class _AnyTensorHandle {
-  let handle: TFTensorHandle
-
-  /// The underlying `TFE_TensorHandle *`.
-  public var _cTensorHandle: CTensorHandle {
-    return handle.tensorHandle._cTensorHandle
-  }
-
-  /// Private initializer from a `CTensorHandle`. Should only be called from
-  /// `TensorHandle<Scalar>.init`.
-  fileprivate init(base: CTensorHandle) {
-    self.handle = ConcreteTensorHandle(_owning: base)
-  }
-}
-
 /// `TensorHandle` is the type used by ops. It includes a `Scalar` type, which 
 /// compiler internals use to determine the datatypes of parameters when they 
 /// are extracted into a tensor program.
 @_fixed_layout // required because the compiler accesses _cTensorHandle directly.
-public final class TensorHandle<Scalar> : _AnyTensorHandle
-  where Scalar : _TensorFlowDataTypeCompatible {
+public final class TensorHandle<Scalar> where Scalar : _TensorFlowDataTypeCompatible {
+  let handle: _AnyTensorHandle
+
+  public var _cTensorHandle: CTensorHandle { handle._cTensorHandle }
+  
   public init(_owning cTensorHandle: CTensorHandle) {
-    super.init(base: cTensorHandle)
+    self.handle = TFETensorHandle(_owning: cTensorHandle)
   }
 
   @usableFromInline
@@ -168,18 +159,28 @@ internal extension ShapedArray where Scalar : _TensorFlowDataTypeCompatible {
 
 /// `ResourceHandle` is the type used by ops to represent TensorFlow "resource" 
 /// values.
-public final class ResourceHandle : _AnyTensorHandle {
+public final class ResourceHandle {
+  let handle: _AnyTensorHandle
+
+  @usableFromInline
+  var _cTensorHandle: CTensorHandle { handle._cTensorHandle }
+  
   @usableFromInline
   init(owning cTensorHandle: CTensorHandle) {
-    super.init(base: cTensorHandle)
+    self.handle = TFETensorHandle(_owning: cTensorHandle)
   }
 }
 
 /// `VariantHandle` is the type used by ops to represent TensorFlow "variant"
 /// values.
-public final class VariantHandle : _AnyTensorHandle {
+public final class VariantHandle {
+  let handle: _AnyTensorHandle
+  
+  @usableFromInline
+  var _cTensorHandle: CTensorHandle { handle._cTensorHandle }
+  
   @usableFromInline
   init(owning cTensorHandle: CTensorHandle) {
-    super.init(base: cTensorHandle)
+    self.handle = TFETensorHandle(_owning: cTensorHandle)
   }
 }
