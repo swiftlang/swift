@@ -1101,7 +1101,7 @@ func _TFCEagerExecute(_ op: CTFEOp,
     debugLog("Calling _TFCEagerExecute() over: ")
     if let value = getenv("TF_CPP_MIN_LOG_LEVEL"),
       String(cString: value) == "0" {
-        TFE_OpPrintDebugString(op)
+      TFE_OpPrintDebugString(op)
     } else {
       debugLog("[Run with TF_CPP_MIN_LOG_LEVEL=0 to have TFEOps printed out]")
     }
