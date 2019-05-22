@@ -16,22 +16,48 @@
 
 import CTensorFlow
 
+/// This protocol abstracts the underlying representation of a tensor. Any type
+/// that conforms to this protocol can be used as a `TensorHandle` in the
+/// `TensorFlow` library, as it much provide a way to convert the underlying tensor
+/// handle into a `ConcreteTensorHandle`, which wraps a `TFE_TensorHandle *`
+public protocol TFTensorHandle {
+  var tensorHandle: ConcreteTensorHandle { get }
+}
+
+/// Class wrapping a C pointer to a TensorHandle.  This class owns the
+/// TensorHandle and is responsible for destroying it.
+public class ConcreteTensorHandle : TFTensorHandle {
+  public let _cTensorHandle: CTensorHandle
+
+  public var tensorHandle: ConcreteTensorHandle { return self }
+
+  fileprivate init(_owning base: CTensorHandle) {
+    self._cTensorHandle = base
+  }
+
+  deinit {
+    debugLog("De-initializing TensorHandle.")
+    TFE_DeleteTensorHandle(_cTensorHandle)
+    debugLog("Returning from deinit of TensorHandle.")
+  }
+}
+
 /// `_AnyTensorHandle` is the scalar-agnostic base type for `TensorHandle`, used
 /// specifically for low-level, type-erased passings of Swift-level tensor
 /// handles in the compiler.
 @_fixed_layout // required because the compiler accesses _cTensorHandle directly.
 public class _AnyTensorHandle {
+  let handle: TFTensorHandle
+
   /// The underlying `TFE_TensorHandle *`.
-  ///
-  /// - Note: The compiler knows that `_AnyTensorHandle` has a single stored
-  /// property, and assumes that this is it. Changing the design of
-  /// `TensorHandle` will require tweaking the compiler.
-  public let _cTensorHandle: CTensorHandle
+  public var _cTensorHandle: CTensorHandle {
+    return handle.tensorHandle._cTensorHandle
+  }
 
   /// Private initializer from a `CTensorHandle`. Should only be called from
   /// `TensorHandle<Scalar>.init`.
   fileprivate init(base: CTensorHandle) {
-    self._cTensorHandle = base
+    self.handle = ConcreteTensorHandle(_owning: base)
   }
 }
 
@@ -52,12 +78,6 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
     checkOk(status)
     self.init(_owning: cTensorHandle!)
     TF_DeleteStatus(status)
-  }
-
-  deinit {
-    debugLog("De-initializing TensorHandle.")
-    TFE_DeleteTensorHandle(_cTensorHandle)
-    debugLog("Returning from deinit of TensorHandle.")
   }
 
   /// Create a `TensorHandle` with a closure that initializes the underlying
@@ -153,12 +173,6 @@ public final class ResourceHandle : _AnyTensorHandle {
   init(owning cTensorHandle: CTensorHandle) {
     super.init(base: cTensorHandle)
   }
-
-  deinit {
-    debugLog("De-initializing TensorHandle.")
-    TFE_DeleteTensorHandle(_cTensorHandle)
-    debugLog("Returning from deinit of ResourceHandle.")
-  }
 }
 
 /// `VariantHandle` is the type used by ops to represent TensorFlow "variant"
@@ -167,11 +181,5 @@ public final class VariantHandle : _AnyTensorHandle {
   @usableFromInline
   init(owning cTensorHandle: CTensorHandle) {
     super.init(base: cTensorHandle)
-  }
-
-  deinit {
-    debugLog("De-initializing TensorHandle.")
-    TFE_DeleteTensorHandle(_cTensorHandle)
-    debugLog("Returning from deinit of VariantHandle.")
   }
 }
