@@ -5554,7 +5554,10 @@ Decl *SwiftDeclConverter::importEnumCaseAlias(
   auto constantRef =
       new (Impl.SwiftContext) DeclRefExpr(original, DeclNameLoc(),
                                           /*implicit*/ true);
+  constantRef->setType(original->getInterfaceType());
+
   Type importedEnumTy = importedEnum->getDeclaredInterfaceType();
+
   auto typeRef = TypeExpr::createImplicit(importedEnumTy, Impl.SwiftContext);
   auto instantiate = new (Impl.SwiftContext)
       DotSyntaxCallExpr(constantRef, SourceLoc(), typeRef);
@@ -8147,6 +8150,21 @@ ClangImporter::Implementation::importDeclContextOf(
   return ext;
 }
 
+static Type getConstantLiteralType(ClangImporter::Implementation &Impl,
+                                   Type type, ConstantConvertKind convertKind) {
+  switch (convertKind) {
+  case ConstantConvertKind::Construction:
+  case ConstantConvertKind::ConstructionWithUnwrap: {
+    auto found = Impl.RawTypes.find(type->getAnyNominal());
+    assert(found != Impl.RawTypes.end());
+    return found->second;
+  }
+
+  default:
+    return type;
+  }
+}
+
 ValueDecl *
 ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               Type type,
@@ -8188,20 +8206,49 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     if (isNegative)
       printedValue = printedValue.drop_front();
 
+    auto literalType = getConstantLiteralType(*this, type, convertKind);
+
     // Create the expression node.
     StringRef printedValueCopy(context.AllocateCopy(printedValue));
     if (value.getKind() == clang::APValue::Int) {
       if (type->getCanonicalType()->isBool()) {
-        expr = new (context) BooleanLiteralExpr(value.getInt().getBoolValue(),
-                                                SourceLoc(),
-                                                /**Implicit=*/true);
+        auto *boolExpr =
+            new (context) BooleanLiteralExpr(value.getInt().getBoolValue(),
+                                             SourceLoc(),
+                                             /**Implicit=*/true);
+
+        boolExpr->setBuiltinInitializer(
+          context.getBoolBuiltinInitDecl());
+        boolExpr->setType(literalType);
+
+        expr = boolExpr;
       } else {
-        expr = new (context) IntegerLiteralExpr(printedValueCopy, SourceLoc(),
-                                                /*Implicit=*/true);
+        auto *intExpr =
+            new (context) IntegerLiteralExpr(printedValueCopy, SourceLoc(),
+                                             /*Implicit=*/true);
+
+        auto *intDecl = literalType->getAnyNominal();
+        intExpr->setBuiltinInitializer(
+          context.getIntBuiltinInitDecl(intDecl));
+        intExpr->setType(literalType);
+
+        expr = intExpr;
       }
     } else {
-      expr = new (context) FloatLiteralExpr(printedValueCopy, SourceLoc(),
-                                            /*Implicit=*/true);
+      auto *floatExpr =
+          new (context) FloatLiteralExpr(printedValueCopy, SourceLoc(),
+                                         /*Implicit=*/true);
+
+      auto maxFloatTypeDecl = context.get_MaxBuiltinFloatTypeDecl();
+      floatExpr->setBuiltinType(
+          maxFloatTypeDecl->getUnderlyingTypeLoc().getType());
+
+      auto *floatDecl = literalType->getAnyNominal();
+      floatExpr->setBuiltinInitializer(
+        context.getFloatBuiltinInitDecl(floatDecl));
+      floatExpr->setType(literalType);
+
+      expr = floatExpr;
     }
 
     if (isNegative)
@@ -8223,6 +8270,13 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               bool isStatic,
                                               ClangNode ClangN) {
   auto expr = new (SwiftContext) StringLiteralExpr(value, SourceRange());
+
+  auto literalType = getConstantLiteralType(*this, type, convertKind);
+  auto *stringDecl = literalType->getAnyNominal();
+  expr->setBuiltinInitializer(
+      SwiftContext.getStringBuiltinInitDecl(stringDecl));
+  expr->setType(literalType);
+
   return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN);
 }
 
@@ -8287,10 +8341,42 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     case ConstantConvertKind::Construction:
     case ConstantConvertKind::ConstructionWithUnwrap: {
       auto typeRef = TypeExpr::createImplicit(type, C);
-      
-      expr = CallExpr::createImplicit(C, typeRef, { expr }, { C.Id_rawValue });
-      if (convertKind == ConstantConvertKind::ConstructionWithUnwrap)
+
+      // Reference init(rawValue: T)
+      auto found = RawInits.find(type->getAnyNominal());
+      assert(found != RawInits.end());
+
+      auto *init = found->second;
+      auto initTy = init->getInterfaceType()->removeArgumentLabels(1);
+      auto declRef =
+          new (C) DeclRefExpr(init, DeclNameLoc(), /*Implicit=*/true,
+                              AccessSemantics::Ordinary, initTy);
+
+      // (Self) -> ...
+      initTy = initTy->castTo<FunctionType>()->getResult();
+      auto initRef = new (C) DotSyntaxCallExpr(declRef, SourceLoc(),
+                                               typeRef, initTy);
+      initRef->setThrows(false);
+
+      // (rawValue: T) -> ...
+      initTy = initTy->castTo<FunctionType>()->getResult();
+
+      auto initCall = CallExpr::createImplicit(C, initRef, { expr },
+                                               { C.Id_rawValue });
+      initCall->setType(initTy);
+      initCall->setThrows(false);
+
+      expr = initCall;
+
+      // Force unwrap if our init(rawValue:) is failable, which is currently
+      // the case with enums.
+      if (convertKind == ConstantConvertKind::ConstructionWithUnwrap) {
+        initTy = initTy->getOptionalObjectType();
         expr = new (C) ForceValueExpr(expr, SourceLoc());
+        expr->setType(initTy);
+      }
+
+      assert(initTy->isEqual(type));
       break;
     }
     }
@@ -8302,6 +8388,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     func->setBody(BraceStmt::create(C, SourceLoc(),
                                     ASTNode(ret),
                                     SourceLoc()));
+    func->setBodyTypeCheckedIfPresent();
   }
 
   // Mark the function transparent so that we inline it away completely.
