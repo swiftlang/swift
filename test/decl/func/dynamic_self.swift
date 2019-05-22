@@ -419,3 +419,20 @@ func useSelfOperator() {
   let s = SelfOperator()
   _ = s + s
 }
+
+// for ... in loops
+
+struct DummyIterator : IteratorProtocol {
+  func next() -> Int? { return nil }
+}
+
+class Iterable : Sequence {
+  func returnsSelf() -> Self {
+    for _ in self {}
+    return self
+  }
+
+  func makeIterator() -> DummyIterator {
+    return DummyIterator()
+  }
+}

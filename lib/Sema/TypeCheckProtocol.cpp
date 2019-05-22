@@ -708,7 +708,7 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
     auto missingConform = (MissingConformance *)fix;
     requirementKind = RequirementKind::Conformance;
     type = missingConform->getNonConformingType();
-    missingType = missingConform->getProtocol()->getDeclaredType();
+    missingType = missingConform->getProtocolType();
     break;
   }
   case FixKind::SkipSameTypeRequirement: {

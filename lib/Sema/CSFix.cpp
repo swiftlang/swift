@@ -160,16 +160,35 @@ RelabelArguments::create(ConstraintSystem &cs,
 }
 
 bool MissingConformance::diagnose(Expr *root, bool asNote) const {
-  MissingConformanceFailure failure(root, getConstraintSystem(), getLocator(),
-                                    {NonConformingType, Protocol});
+  auto &cs = getConstraintSystem();
+  auto *locator = getLocator();
+
+  if (IsContextual) {
+    auto context = cs.getContextualTypePurpose();
+    MissingContextualConformanceFailure failure(
+        root, cs, context, NonConformingType, ProtocolType, locator);
+    return failure.diagnose(asNote);
+  }
+
+  MissingConformanceFailure failure(
+      root, cs, locator, std::make_pair(NonConformingType, ProtocolType));
   return failure.diagnose(asNote);
 }
 
-MissingConformance *MissingConformance::create(ConstraintSystem &cs, Type type,
-                                               ProtocolDecl *protocol,
-                                               ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      MissingConformance(cs, type, protocol, locator);
+MissingConformance *
+MissingConformance::forContextual(ConstraintSystem &cs, Type type,
+                                  Type protocolType,
+                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator()) MissingConformance(
+      cs, /*isContextual=*/true, type, protocolType, locator);
+}
+
+MissingConformance *
+MissingConformance::forRequirement(ConstraintSystem &cs, Type type,
+                                   Type protocolType,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) MissingConformance(
+      cs, /*isContextual=*/false, type, protocolType, locator);
 }
 
 bool SkipSameTypeRequirement::diagnose(Expr *root, bool asNote) const {
@@ -505,4 +524,19 @@ bool RemoveReturn::diagnose(Expr *root, bool asNote) const {
 RemoveReturn *RemoveReturn::create(ConstraintSystem &cs,
                                    ConstraintLocator *locator) {
   return new (cs.getAllocator()) RemoveReturn(cs, locator);
+}
+
+bool CollectionElementContextualMismatch::diagnose(Expr *root,
+                                                   bool asNote) const {
+  CollectionElementContextualFailure failure(
+      root, getConstraintSystem(), getFromType(), getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+CollectionElementContextualMismatch *
+CollectionElementContextualMismatch::create(ConstraintSystem &cs, Type srcType,
+                                            Type dstType,
+                                            ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      CollectionElementContextualMismatch(cs, srcType, dstType, locator);
 }

@@ -1731,8 +1731,28 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
       case SolutionKind::Unsolved:
         break;
 
-      case SolutionKind::Error:
-        return getTypeMatchFailure(locator);
+      case SolutionKind::Error: {
+        if (!shouldAttemptFixes())
+          return getTypeMatchFailure(locator);
+
+        if (auto last = locator.last()) {
+          // TODO(diagnostics): Diagnosing missing conformances
+          // associated with arguments requires having general
+          // conversion failures implemented first, otherwise
+          // we would be misdiagnosing ambiguous cases associated
+          // with overloaded declarations.
+          if (last->getKind() == ConstraintLocator::ApplyArgToParam)
+            return getTypeMatchFailure(locator);
+        }
+
+        auto *fix = MissingConformance::forContextual(
+            *this, type1, proto, getConstraintLocator(locator));
+
+        if (recordFix(fix))
+          return getTypeMatchFailure(locator);
+
+        break;
+      }
     }
   }
 
@@ -2003,6 +2023,15 @@ bool ConstraintSystem::repairFailures(
     return false;
   };
 
+  auto repairByAnyToAnyObjectCast = [&](Type lhs, Type rhs) -> bool {
+    if (!(lhs->isAny() && rhs->isAnyObject()))
+      return false;
+
+    conversionsOrFixes.push_back(MissingConformance::forContextual(
+        *this, lhs, rhs, getConstraintLocator(locator)));
+    return true;
+  };
+
   if (path.empty()) {
     if (!anchor)
       return false;
@@ -2027,6 +2056,9 @@ bool ConstraintSystem::repairFailures(
             RemoveAddressOf::create(*this, getConstraintLocator(locator)));
         return true;
       }
+
+      if (repairByAnyToAnyObjectCast(lhs, rhs))
+        return true;
     }
 
     return false;
@@ -2113,6 +2145,9 @@ bool ConstraintSystem::repairFailures(
     if (repairByInsertingExplicitCall(lhs, rhs))
       return true;
 
+    if (repairByAnyToAnyObjectCast(lhs, rhs))
+      return true;
+
     // If both types are key path, the only differences
     // between them are mutability and/or root, value type mismatch.
     if (isKnownKeyPathType(lhs) && isKnownKeyPathType(rhs)) {
@@ -2145,6 +2180,25 @@ bool ConstraintSystem::repairFailures(
   case ConstraintLocator::AutoclosureResult: {
     if (repairByInsertingExplicitCall(lhs, rhs))
       return true;
+    break;
+  }
+
+  case ConstraintLocator::TupleElement: {
+    if (anchor && (isa<ArrayExpr>(anchor) || isa<DictionaryExpr>(anchor))) {
+      conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
+          *this, lhs, rhs, getConstraintLocator(locator)));
+    }
+    break;
+  }
+
+  case ConstraintLocator::SequenceElementType: {
+    // This is going to be diagnosed as `missing conformance`,
+    // so no need to create duplicate fixes.
+    if (rhs->isExistentialType())
+      break;
+
+    conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
+        *this, lhs, rhs, getConstraintLocator(locator)));
     break;
   }
 
@@ -3321,8 +3375,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           return SolutionKind::Error;
       }
 
-      auto *fix = MissingConformance::create(*this, type, protocol,
-                                             getConstraintLocator(locator));
+      auto *fix = MissingConformance::forRequirement(
+          *this, type, protocol->getDeclaredType(),
+          getConstraintLocator(locator));
       if (!recordFix(fix))
         return SolutionKind::Solved;
     }
@@ -6537,6 +6592,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
 
   case FixKind::InsertCall:
   case FixKind::RemoveReturn:
+  case FixKind::AddConformance:
   case FixKind::RemoveAddressOf:
   case FixKind::SkipSameTypeRequirement:
   case FixKind::SkipSuperclassRequirement:
@@ -6549,7 +6605,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::ExplicitlyEscaping:
   case FixKind::CoerceToCheckedCast:
   case FixKind::RelabelArguments:
-  case FixKind::AddConformance:
   case FixKind::RemoveUnwrap:
   case FixKind::DefineMemberBasedOnUse:
   case FixKind::AllowTypeOrInstanceMember:

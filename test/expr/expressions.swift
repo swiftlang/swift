@@ -739,8 +739,8 @@ func invalidDictionaryLiteral() {
 }
 
 
-[4].joined(separator: [1]) // expected-error {{referencing instance method 'joined(separator:)' on 'Sequence' requires that 'Int' conform to 'StringProtocol'}}
-[4].joined(separator: [[[1]]]) // expected-error {{referencing instance method 'joined(separator:)' on 'Sequence' requires that 'Int' conform to 'StringProtocol'}}
+[4].joined(separator: [1]) // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+[4].joined(separator: [[[1]]]) // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
 
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
