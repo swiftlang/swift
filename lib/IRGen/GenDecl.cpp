@@ -2450,7 +2450,8 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
 
 static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
                                                  llvm::Constant *global,
-                                                 LinkEntity entity) {
+                                                 LinkEntity entity)
+{
   // Determine the name of this entity.
   llvm::SmallString<64> globalName;
   entity.mangle(globalName);
@@ -2473,7 +2474,17 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
                                       llvm::GlobalValue::PrivateLinkage,
                                       global,
                                       llvm::Twine("got.") + globalName);
-  gotEquivalent->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+  
+  // rdar://problem/50968433: Unnamed_addr constants appear to get emitted
+  // with incorrect alignment by the LLVM JIT in some cases. Don't use
+  // unnamed_addr as a workaround.
+  if (!IGM.getOptions().UseJIT) {
+    gotEquivalent->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+  } else {
+    ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
+      .to(gotEquivalent);
+  }
+  
   return gotEquivalent;
 }
 
