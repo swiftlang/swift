@@ -20,6 +20,8 @@ public enum DeviceKind {
   case cpu
   /// The GPU device kind.
   case gpu
+  /// The TPU device kind.
+  case tpu
 }
 
 /// Executes a closure, making TensorFlow operations run on a specific kind of
