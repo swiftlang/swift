@@ -1127,7 +1127,7 @@ public:
     Receiver(std::move(Receiver)), OS(ErrBuffer), DiagConsumer(OS) {}
   ~Implementation() {
     if (DiagConsumer.didErrorOccur()) {
-      Receiver(RequestResult<ArrayRef<CategorizedEdits>>::fromError(OS.str()));
+      Receiver({}, OS.str());
       return;
     }
     assert(UIds.size() == StartEnds.size());
@@ -1138,7 +1138,7 @@ public:
                          llvm::makeArrayRef(AllEdits.data() + Pair.first,
                                              Pair.second - Pair.first)});
     }
-    Receiver(RequestResult<ArrayRef<CategorizedEdits>>::fromResult(Results));
+    Receiver(Results, "");
   }
   void accept(SourceManager &SM, RegionType RegionType,
               ArrayRef<Replacement> Replacements) {
@@ -1205,10 +1205,10 @@ public:
 
   ~Implementation() {
     if (DiagConsumer.didErrorOccur()) {
-      Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromError(OS.str()));
+      Receiver({}, OS.str());
       return;
     }
-    Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromResult(CategorizedRanges));
+    Receiver(CategorizedRanges, "");
   }
 
   void accept(SourceManager &SM, RegionType RegionType,
@@ -1277,7 +1277,7 @@ syntacticRename(llvm::MemoryBuffer *InputBuf,
   ParseCI.addDiagnosticConsumer(&PrintDiags);
   SourceFile *SF = getSyntacticSourceFile(InputBuf, Args, ParseCI, Error);
   if (!SF) {
-    Receiver(RequestResult<ArrayRef<CategorizedEdits>>::fromError(Error));
+    Receiver({}, Error);
     return;
   }
 
@@ -1295,7 +1295,7 @@ void SwiftLangSupport::findRenameRanges(
   ParseCI.addDiagnosticConsumer(&PrintDiags);
   SourceFile *SF = getSyntacticSourceFile(InputBuf, Args, ParseCI, Error);
   if (!SF) {
-    Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromError(Error));
+    Receiver({}, Error);
     return;
   }
 
@@ -1310,8 +1310,9 @@ void SwiftLangSupport::findLocalRenameRanges(
   std::string Error;
   SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, Filename, Error);
   if (!Invok) {
+    // FIXME: Report it as failed request.
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
-    Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromError(Error));
+    Receiver({}, Error);
     return;
   }
 
@@ -1331,13 +1332,9 @@ void SwiftLangSupport::findLocalRenameRanges(
       swift::ide::findLocalRenameRanges(&SF, Range, Consumer, Consumer);
     }
 
-    void cancelled() override {
-      Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::cancelled());
-    }
+    void cancelled() override { Receiver({}, "The refactoring is canceled."); }
 
-    void failed(StringRef Error) override {
-      Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromError(Error));
-    }
+    void failed(StringRef Error) override { Receiver({}, Error); }
   };
 
   auto ASTConsumer = std::make_shared<LocalRenameRangeASTConsumer>(
@@ -1432,7 +1429,8 @@ void SwiftLangSupport::getDocInfo(llvm::MemoryBuffer *InputBuf,
 
 void SwiftLangSupport::
 findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
-                 std::function<void(const RequestResult<ArrayRef<StringRef>> &)> Receiver) {
+                 std::function<void(ArrayRef<StringRef>,
+                                    StringRef Error)> Receiver) {
   CompilerInvocation Invocation;
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
   Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
@@ -1445,12 +1443,12 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
   std::string Error;
   if (getASTManager()->initCompilerInvocationNoInputs(Invocation, Args,
                                                      CI.getDiags(), Error)) {
-    Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
+    Receiver(Groups, Error);
     return;
   }
   if (CI.setup(Invocation)) {
     Error = "Compiler invocation set up fails.";
-    Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
+    Receiver(Groups, Error);
     return;
   }
 
@@ -1462,16 +1460,15 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
   auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);
   if (!Stdlib) {
     Error = "Cannot load stdlib.";
-    Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
+    Receiver(Groups, Error);
     return;
   }
   auto *M = getModuleByFullName(Ctx, ModuleName);
   if (!M) {
     Error = "Cannot find the module.";
-    Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
+    Receiver(Groups, Error);
     return;
   }
   std::vector<StringRef> Scratch;
-  Receiver(RequestResult<ArrayRef<StringRef>>::fromResult(
-      collectModuleGroups(M, Scratch)));
+  Receiver(collectModuleGroups(M, Scratch), Error);
 }

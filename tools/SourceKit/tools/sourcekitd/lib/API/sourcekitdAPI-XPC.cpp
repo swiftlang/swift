@@ -379,8 +379,7 @@ sourcekitd::createErrorRequestInvalid(const char *Description) {
   return CustomXPCData::createErrorRequestInvalid(Description).getXObj();
 }
 sourcekitd_response_t
-sourcekitd::createErrorRequestFailed(StringRef DescRef) {
-  const char *Description = DescRef.str().c_str();
+sourcekitd::createErrorRequestFailed(const char *Description) {
   return CustomXPCData::createErrorRequestFailed(Description).getXObj();
 }
 sourcekitd_response_t
