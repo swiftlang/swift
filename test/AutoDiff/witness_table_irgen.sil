@@ -57,12 +57,6 @@ bb0(%0 : $Float, %1 : $*DifferentiableConformance):
   return undef : $(Float, @callee_guaranteed (Float) -> Float)
 } // end sil function 'AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_vjp_SU'
 
-// AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__primal_src_0_wrt_0
-sil hidden @AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__primal_src_0_wrt_0 : $@convention(method) (Float, DifferentiableConformance) -> (@owned AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__Type__src_0_wrt_0, Float) {
-bb0(%0 : $Float, %1 : $DifferentiableConformance):
-  return undef : $(AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__Type__src_0_wrt_0, Float)
-} // end sil function 'AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__primal_src_0_wrt_0'
-
 // AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__adjoint_src_0_wrt_0
 sil hidden @AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__adjoint_src_0_wrt_0 : $@convention(method) (Float, AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__Type__src_0_wrt_0, Float, Float, DifferentiableConformance) -> Float {
 bb0(%0 : $Float, %1 : $AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__Type__src_0_wrt_0, %2 : $Float, %3 : $Float, %4 : $DifferentiableConformance):

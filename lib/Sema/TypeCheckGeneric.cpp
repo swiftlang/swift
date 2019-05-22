@@ -158,9 +158,9 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
   tl.setType(Type());
 }
 
-///
-/// Generic functions
-///
+//
+// Generic functions
+//
 
 /// Get the opaque type representing the return type of a declaration, or
 /// create it if it does not yet exist.
@@ -170,6 +170,18 @@ Type TypeChecker::getOrCreateOpaqueResultType(TypeResolution resolution,
   // If the decl already has an opaque type decl for its return type, use it.
   if (auto existingDecl = originatingDecl->getOpaqueResultTypeDecl()) {
     return existingDecl->getDeclaredInterfaceType();
+  }
+  
+  // Check the availability of the opaque type runtime support.
+  if (!Context.LangOpts.DisableAvailabilityChecking) {
+    auto runningOS = overApproximateAvailabilityAtLocation(repr->getLoc(),
+                                    originatingDecl->getInnermostDeclContext());
+    auto availability = Context.getOpaqueTypeAvailability();
+    if (!runningOS.isContainedIn(availability)) {
+      diagnosePotentialOpaqueTypeUnavailability(repr->getSourceRange(),
+       originatingDecl->getInnermostDeclContext(),
+       UnavailabilityReason::requiresVersionRange(availability.getOSVersion()));
+    }
   }
   
   // Try to resolve the constraint repr. It should be some kind of existential
@@ -194,49 +206,52 @@ Type TypeChecker::getOrCreateOpaqueResultType(TypeResolution resolution,
   // Create a generic signature for the opaque environment. This is the outer
   // generic signature with an added generic parameter representing the opaque
   // type and its interface constraints.
-  SmallVector<GenericTypeParamType *, 4> interfaceGenericParams;
-  SmallVector<Requirement, 4> interfaceRequirements;
+  GenericSignatureBuilder builder(Context);
 
   auto originatingDC = originatingDecl->getInnermostDeclContext();
-  auto outerGenericSignature = originatingDC->getGenericSignatureOfContext();
-  if (outerGenericSignature) {
-    std::copy(outerGenericSignature->getGenericParams().begin(),
-              outerGenericSignature->getGenericParams().end(),
-              std::back_inserter(interfaceGenericParams));
-    std::copy(outerGenericSignature->getRequirements().begin(),
-              outerGenericSignature->getRequirements().end(),
-              std::back_inserter(interfaceRequirements));
-  }
-
   unsigned returnTypeDepth = 0;
-  if (!interfaceGenericParams.empty())
-    returnTypeDepth = interfaceGenericParams.back()->getDepth() + 1;
+  auto outerGenericSignature = originatingDC->getGenericSignatureOfContext();
+  
+  if (outerGenericSignature) {
+    builder.addGenericSignature(outerGenericSignature);
+    returnTypeDepth =
+               outerGenericSignature->getGenericParams().back()->getDepth() + 1;
+  }
+  
   auto returnTypeParam = GenericTypeParamType::get(returnTypeDepth, 0,
                                                    Context);
-  interfaceGenericParams.push_back(returnTypeParam);
+
+  builder.addGenericParameter(returnTypeParam);
 
   if (constraintType->getClassOrBoundGenericClass()) {
-    // Use the type as a superclass constraint.
-    interfaceRequirements.push_back(Requirement(RequirementKind::Superclass,
-                                              returnTypeParam, constraintType));
+    builder.addRequirement(Requirement(RequirementKind::Superclass,
+                                       returnTypeParam, constraintType),
+             GenericSignatureBuilder::FloatingRequirementSource::forAbstract(),
+             originatingDC->getParentModule());
   } else {
     auto constraints = constraintType->getExistentialLayout();
     if (auto superclass = constraints.getSuperclass()) {
-      interfaceRequirements.push_back(Requirement(RequirementKind::Superclass,
-                                                  returnTypeParam, superclass));
+      builder.addRequirement(Requirement(RequirementKind::Superclass,
+                                         returnTypeParam, superclass),
+             GenericSignatureBuilder::FloatingRequirementSource::forAbstract(),
+             originatingDC->getParentModule());
     }
     for (auto protocol : constraints.getProtocols()) {
-      interfaceRequirements.push_back(Requirement(RequirementKind::Conformance,
-                                                  returnTypeParam, protocol));
+      builder.addRequirement(Requirement(RequirementKind::Conformance,
+                                         returnTypeParam, protocol),
+             GenericSignatureBuilder::FloatingRequirementSource::forAbstract(),
+             originatingDC->getParentModule());
     }
     if (auto layout = constraints.getLayoutConstraint()) {
-      interfaceRequirements.push_back(Requirement(RequirementKind::Layout,
-                                                  returnTypeParam, layout));
+      builder.addRequirement(Requirement(RequirementKind::Layout,
+                                         returnTypeParam, layout),
+             GenericSignatureBuilder::FloatingRequirementSource::forAbstract(),
+             originatingDC->getParentModule());
     }
   }
   
-  auto interfaceSignature = GenericSignature::get(interfaceGenericParams,
-                                                  interfaceRequirements);
+  auto interfaceSignature = std::move(builder)
+                                          .computeGenericSignature(SourceLoc());
   
   // Create the OpaqueTypeDecl for the result type.
   // It has the same parent context and generic environment as the originating
@@ -726,10 +741,8 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
 
 void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
   if (auto *proto = dyn_cast<ProtocolDecl>(typeDecl)) {
-    // Compute the requirement signature first.
-    if (!proto->isRequirementSignatureComputed())
-      proto->computeRequirementSignature();
-
+    // The requirement signature is created lazily by
+    // ProtocolDecl::getRequirementSignature().
     // The generic signature and environment is created lazily by
     // GenericContext::getGenericSignature(), so there is nothing we
     // need to do.

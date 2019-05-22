@@ -3,11 +3,7 @@
 // REQUIRES: tensorflow
 
 import TensorFlow
-#if TPU
-import TensorFlowUnittestTPU
-#else
 import TensorFlowUnittest
-#endif
 import StdlibUnittest
 
 var DynamicAttributeTests = TestSuite("DynamicAttribute")
@@ -207,7 +203,7 @@ DynamicAttributeTests.testAllBackends("NormalAttribute String") {
   let result = Raw.conv2D(
     convImage,
     filter: convFilter,
-    strides: [1, 1, 1, 1] as [Int32], 
+    strides: [1, 1, 1, 1] as [Int32],
     padding: loadVALID(),
     explicitPaddings: [])
   expectPointwiseNearlyEqual(convExpectedResult, result.array)
@@ -353,7 +349,7 @@ DynamicAttributeTests.testAllBackends("ShapeAttribute TensorShape? nil") {
   expectEqual(t, result)
 }
 
-// A tensor typed attribute with a scalar string value  
+// A tensor typed attribute with a scalar string value
 DynamicAttributeTests.testAllBackends("StringTensorAttribute SR-9555") {
   func foo() {
     _ = StringTensor("string")

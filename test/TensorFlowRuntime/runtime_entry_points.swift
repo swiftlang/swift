@@ -3,16 +3,12 @@
 
 import CTensorFlow
 import TensorFlow
-#if TPU
-import TensorFlowUnittestTPU
-#else
 import TensorFlowUnittest
-#endif
 import StdlibUnittest
 
 var RuntimeEntryPointTests = TestSuite("RuntimeEntryPoint")
 
-RuntimeEntryPointTests.testCPUOrGPU("RoundTrip_CTensorHandle_AnyTensorHandle") {
+RuntimeEntryPointTests.testAllBackends("RoundTrip_CTensorHandle_AnyTensorHandle") {
   let zero: TensorHandle<Float> = Tensor<Float>(0.0).handle
   var cHandle = zero._cTensorHandle
   let status = TF_NewStatus()

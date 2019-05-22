@@ -12,36 +12,9 @@ public func externalResilient() -> some ExternalP2 {
   return Int64(6)
 }
 
-@usableFromInline
-@inline(never)
-func preventInlining() {}
-
 @inlinable
+@inline(never)
 public func inlinableExternalResilient() -> some ExternalP2 {
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
-  preventInlining()
   return Int64(6)
 }
 
@@ -56,33 +29,17 @@ public struct ResilientContainer {
   }
 
   @inlinable
+  @inline(never)
   public var inlineableProperty : some ExternalP2 {
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
-    preventInlining()
     return x
   }
+
+  @_alwaysEmitIntoClient
+  @inline(never)
+  public var inlineableProperty2 : some ExternalP2 {
+    return x
+  }
+
 
   @inlinable
   public func inlineableContext() {

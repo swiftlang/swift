@@ -9,8 +9,8 @@ import func C.c // expected-warning {{scoped imports are not yet supported in mo
 import D
 @_implementationOnly import Secret_BAD
 
-@_implementationOnly import NotSoSecret
-import NotSoSecret2
+@_implementationOnly import NotSoSecret // expected-note {{imported as implementation-only here}}
+import NotSoSecret2 // expected-warning {{'NotSoSecret2' inconsistently imported as implementation-only}}
 
 // CHECK-NOT: import
 // CHECK: {{^}}import A{{$}}

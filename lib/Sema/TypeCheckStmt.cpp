@@ -550,8 +550,7 @@ public:
       Type contextType = yieldType;
       if (yieldResults[i].isInOut()) {
         contextTypePurpose = CTP_YieldByReference;
-        if (!contextType->hasError())
-          contextType = LValueType::get(contextType);
+        contextType = LValueType::get(contextType);
 
         // Check that the yielded expression is a &.
         if ((inout = dyn_cast<InOutExpr>(exprToCheck))) {
@@ -1884,6 +1883,9 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   // HACK: don't type-check the same function body twice.  This is
   // supposed to be handled by just not enqueuing things twice,
   // but that gets tricky with synthesized function bodies.
+  validateDecl(AFD);
+  (void) AFD->getBody();
+
   if (AFD->isBodyTypeChecked())
     return false;
 

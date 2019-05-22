@@ -234,7 +234,7 @@ std::string LinkEntity::mangleAsString() const {
     return mangler.mangleExtensionDescriptor(getExtension());
 
   case Kind::AnonymousDescriptor:
-    return mangler.mangleAnonymousDescriptor(getDeclContext());
+    return mangler.mangleAnonymousDescriptor(getAnonymousDeclContext());
 
   case Kind::ProtocolDescriptor:
     return mangler.mangleProtocolDescriptor(cast<ProtocolDecl>(getDecl()));

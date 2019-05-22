@@ -155,6 +155,7 @@ class TestMeasurement : TestMeasurementSuper {
     }
 
     func testHashing() {
+        guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else { return }
         let lengths: [[Measurement<UnitLength>]] = [
             [
                 Measurement(value: 5, unit: UnitLength.kilometers),

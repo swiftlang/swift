@@ -197,7 +197,9 @@ Swift 5.1
   }
   ```
 
-* `weak` and `unowned` stored properties no longer inhibit the
+* [SR-9827][]:
+
+  `weak` and `unowned` stored properties no longer inhibit the
    automatic synthesis of `Equatable` or `Hashable` conformance.
 
 * [SR-2688][]:
@@ -7695,3 +7697,4 @@ Swift 1.0
 [SR-8109]: <https://bugs.swift.org/browse/SR-8109>
 [SR-8546]: <https://bugs.swift.org/browse/SR-8546>
 [SR-9043]: <https://bugs.swift.org/browse/SR-9043>
+[SR-9827]: <https://bugs.swift.org/browse/SR-9827>

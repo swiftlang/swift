@@ -202,6 +202,9 @@ IDENTIFIER_(ErrorType)
 IDENTIFIER(Code)
 IDENTIFIER_(nsError)
 
+// Custom string interpolation type used by os log APIs.
+IDENTIFIER(OSLogMessage)
+
 #undef IDENTIFIER
 #undef IDENTIFIER_
 #undef IDENTIFIER_WITH_NAME

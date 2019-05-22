@@ -39,6 +39,9 @@ func forgotCall() {
   // With overloading: only one succeeds.
   a = createB // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}}
 
+  let _: A = createB // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}} {{21-21=()}}
+  let _: B = createB // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}} {{21-21=()}}
+
   // With overloading, pick the fewest number of fixes.
   var b = f7(f4, f1) // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}}
   b.iAmAB()

@@ -71,6 +71,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     self.bridgedKeys = nil
     self.nextBucket = base.hashTable.startBucket
     self.endBucket = base.hashTable.endBucket
+    super.init()
   }
 
   @nonobjc
@@ -80,6 +81,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     self.bridgedKeys = deferred.bridgeKeys()
     self.nextBucket = base.hashTable.startBucket
     self.endBucket = base.hashTable.endBucket
+    super.init()
   }
 
   private func bridgedKey(at bucket: _HashTable.Bucket) -> AnyObject {

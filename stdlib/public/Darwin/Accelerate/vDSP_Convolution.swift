@@ -19,7 +19,7 @@ extension vDSP {
     /// - Parameter vector: The vector to convolve.
     /// - Parameter kernel: Single-precision convolution kernel.
     /// - Returns: Convolution result.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convolve<T, U>(_ vector: T,
                                       withKernel kernel: U) -> [Float]
@@ -49,7 +49,7 @@ extension vDSP {
     /// - Parameter kernel: Single-precision convolution kernel.
     /// - Parameter result: Destination vector.
     
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convolve<T, U, V>(_ vector: T,
                                          withKernel kernel: U,
@@ -82,7 +82,7 @@ extension vDSP {
     /// - Parameter vector: The vector to convolve.
     /// - Parameter kernel: Double-precision convolution kernel.
     /// - Returns: Convolution result.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convolve<T, U>(_ vector: T,
                                       withKernel kernel: U) -> [Double]
@@ -112,7 +112,7 @@ extension vDSP {
     /// - Parameter kernel: Double-precision convolution kernel.
     /// - Parameter result: Destination vector.
     
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convolve<T, U, V>(_ vector: T,
                                          withKernel kernel: U,
@@ -147,7 +147,7 @@ extension vDSP {
     /// - Parameter vector: The vector to correlate.
     /// - Parameter kernel: Single-precision convolution kernel.
     /// - Returns: Correlation result.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func correlate<T, U>(_ vector: T,
                                        withKernel kernel: U) -> [Float]
@@ -177,7 +177,7 @@ extension vDSP {
     /// - Parameter kernel: Single-precision convolution kernel.
     /// - Parameter result: Destination vector.
     
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func correlate<T, U, V>(_ vector: T,
                                           withKernel kernel: U,
@@ -210,7 +210,7 @@ extension vDSP {
     /// - Parameter vector: The vector to correlate.
     /// - Parameter kernel: Single-precision convolution kernel.
     /// - Returns: Correlation result.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func correlate<T, U>(_ vector: T,
                                        withKernel kernel: U) -> [Double]
@@ -240,7 +240,7 @@ extension vDSP {
     /// - Parameter kernel: Single-precision convolution kernel.
     /// - Parameter result: Destination vector.
     
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func correlate<T, U, V>(_ vector: T,
                                           withKernel kernel: U,
@@ -282,7 +282,7 @@ extension vDSP {
     /// - Parameter columnCount: The number of columns in the input vector.
     /// - Parameter kernel: Single-precision 3x3 convolution kernel.
     /// - Returns: Convolution result.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convolve<T, U>(_ vector: T,
                                       rowCount: Int, columnCount: Int,
@@ -314,7 +314,7 @@ extension vDSP {
     /// - Parameter kernel: Single-precision 3x3 convolution kernel.
     /// - Parameter result: Destination vector.
     
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convolve<T, U, V>(_ vector: T,
                                          rowCount: Int, columnCount: Int,
@@ -357,7 +357,7 @@ extension vDSP {
     /// - Parameter columnCount: The number of columns in the input vector.
     /// - Parameter kernel: Double-precision 3x3 convolution kernel.
     /// - Returns: Convolution result.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convolve<T, U>(_ vector: T,
                                       rowCount: Int, columnCount: Int,
@@ -389,7 +389,7 @@ extension vDSP {
     /// - Parameter kernel: Double-precision 3x3 convolution kernel.
     /// - Parameter result: Destination vector.
     
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convolve<T, U, V>(_ vector: T,
                                          rowCount: Int, columnCount: Int,
@@ -432,7 +432,7 @@ extension vDSP {
     /// - Parameter columnCount: The number of columns in the input vector.
     /// - Parameter kernel: Single-precision 5x5 convolution kernel.
     /// - Returns: Convolution result.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convolve<T, U>(_ vector: T,
                                       rowCount: Int, columnCount: Int,
@@ -464,7 +464,7 @@ extension vDSP {
     /// - Parameter kernel: Single-precision 5x5 convolution kernel.
     /// - Parameter result: Destination vector.
     
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convolve<T, U, V>(_ vector: T,
                                          rowCount: Int, columnCount: Int,
@@ -507,7 +507,7 @@ extension vDSP {
     /// - Parameter columnCount: The number of columns in the input vector.
     /// - Parameter kernel: Double-precision 3x3 convolution kernel.
     /// - Returns: Convolution result.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convolve<T, U>(_ vector: T,
                                       rowCount: Int, columnCount: Int,
@@ -539,7 +539,7 @@ extension vDSP {
     /// - Parameter kernel: Double-precision 5x5 convolution kernel.
     /// - Parameter result: Destination vector.
     
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convolve<T, U, V>(_ vector: T,
                                          rowCount: Int, columnCount: Int,
@@ -584,7 +584,7 @@ extension vDSP {
     /// - Parameter kernelRowCount: The number of rows in the kernel.
     /// - Parameter kernelColumnCount: The number of columns in the kernel.
     /// - Returns: Convolution result.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convolve<T, U>(_ vector: T,
                                       rowCount: Int, columnCount: Int,
@@ -619,7 +619,7 @@ extension vDSP {
     /// - Parameter kernelRowCount: The number of rows in the kernel.
     /// - Parameter kernelColumnCount: The number of columns in the kernel.
     /// - Parameter result: Destination vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convolve<T, U, V>(_ vector: T,
                                          rowCount: Int, columnCount: Int,
@@ -669,7 +669,7 @@ extension vDSP {
     /// - Parameter kernelRowCount: The number of rows in the kernel.
     /// - Parameter kernelColumnCount: The number of columns in the kernel.
     /// - Returns: Convolution result.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convolve<T, U>(_ vector: T,
                                       rowCount: Int, columnCount: Int,
@@ -705,7 +705,7 @@ extension vDSP {
     /// - Parameter kernelColumnCount: The number of columns in the kernel.
     /// - Parameter result: Destination vector.
     
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convolve<T, U, V>(_ vector: T,
                                          rowCount: Int, columnCount: Int,

@@ -38,7 +38,7 @@ public let FOF_NO_UI: FILEOP_FLAGS =
 
 // WinSock2.h
 public let INVALID_SOCKET: SOCKET = SOCKET(bitPattern: -1)
-public let FIONBIO: Int32 = 0x4667e
+public let FIONBIO: Int32 = Int32(bitPattern: 0x8004667e)
 
 // WinUser.h
 public let CW_USEDEFAULT: Int32 = Int32(truncatingIfNeeded: 2147483648)

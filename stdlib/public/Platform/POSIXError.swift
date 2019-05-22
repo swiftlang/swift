@@ -550,6 +550,10 @@ public enum POSIXErrorCode : Int32 {
   case EOWNERDEAD      = 130
   /// State not recoverable
   case ENOTRECOVERABLE = 131
+  /// Operation not possible due to RF-kill
+  case ERFKILL         = 132
+  /// Memory page has hardware error
+  case EHWPOISON       = 133
 }
 
 #elseif os(Windows)

@@ -467,7 +467,7 @@ public func checkOneLevelOfForwardCollection<
       }
     }
 
-    var allIndices = Array(collection.indices)
+    let allIndices = Array(collection.indices)
 
     if expectedArray.count >= 2 {
       for i in 0..<allIndices.count-1 {
@@ -693,7 +693,7 @@ public func checkOneLevelOfBidirectionalCollection<
       }
     }
 
-    var allIndices = Array(collection.indices)
+    let allIndices = Array(collection.indices)
 
     if expectedArray.count >= 2 {
       for i in 0..<allIndices.count-1 {
@@ -978,7 +978,7 @@ public func checkOneLevelOfRandomAccessCollection<
       }
     }
 
-    var allIndices = Array(collection.indices)
+    let allIndices = Array(collection.indices)
 
     if expectedArray.count >= 2 {
       for i in 0..<allIndices.count-1 {
@@ -1237,7 +1237,7 @@ public func checkOneLevelOfForwardCollection<
       }
     }
 
-    var allIndices = Array(collection.indices)
+    let allIndices = Array(collection.indices)
 
     if expectedArray.count >= 2 {
       for i in 0..<allIndices.count-1 {
@@ -1463,7 +1463,7 @@ public func checkOneLevelOfBidirectionalCollection<
       }
     }
 
-    var allIndices = Array(collection.indices)
+    let allIndices = Array(collection.indices)
 
     if expectedArray.count >= 2 {
       for i in 0..<allIndices.count-1 {
@@ -1748,7 +1748,7 @@ public func checkOneLevelOfRandomAccessCollection<
       }
     }
 
-    var allIndices = Array(collection.indices)
+    let allIndices = Array(collection.indices)
 
     if expectedArray.count >= 2 {
       for i in 0..<allIndices.count-1 {

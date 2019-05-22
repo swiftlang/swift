@@ -130,6 +130,7 @@ public:
   IGNORED_ATTR(PrivateImport)
   IGNORED_ATTR(Custom)
   IGNORED_ATTR(PropertyDelegate)
+  IGNORED_ATTR(DisfavoredOverload)
   // SWIFT_ENABLE_TENSORFLOW
   IGNORED_ATTR(Differentiable)
   IGNORED_ATTR(Differentiating)
@@ -818,6 +819,7 @@ public:
     IGNORED_ATTR(Transparent)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(WeakLinked)
+    IGNORED_ATTR(DisfavoredOverload)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
@@ -1423,7 +1425,7 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   }
 
   if (VD->hasInterfaceType()) {
-    if (TC.checkConformanceToNSCopying(VD)) {
+    if (!TC.checkConformanceToNSCopying(VD)) {
       attr->setInvalid();
       return;
     }
@@ -3372,16 +3374,15 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
                                           ConformanceCheckFlags::Used);
         assert(conf &&
                "Expected checked parameter to conform to `Differentiable`");
-        auto paramAssocType = ProtocolConformanceRef::getTypeWitnessByName(
-            paramType, *conf, ctx.Id_TangentVector, ctx.getLazyResolver());
+        auto paramAssocType = conf->getTypeWitnessByName(
+            paramType, ctx.Id_TangentVector);
         return TupleTypeElt(paramAssocType);
       });
 
   // Check differential/pullback type.
   // Get vector type: the associated type of the value result type.
-  auto vectorTy = ProtocolConformanceRef::getTypeWitnessByName(
-      valueResultType, *valueResultConf, ctx.Id_TangentVector,
-      ctx.getLazyResolver());
+  auto vectorTy = valueResultConf->getTypeWitnessByName(
+      valueResultType, ctx.Id_TangentVector);
 
   // Compute expected differential/pullback type.
   auto funcEltType = funcResultElt.getType();

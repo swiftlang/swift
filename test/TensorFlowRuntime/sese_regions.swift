@@ -3,11 +3,7 @@
 // REQUIRES: executable_test
 
 import TensorFlow
-#if TPU
-import TensorFlowUnittestTPU
-#else
 import TensorFlowUnittest
-#endif
 import StdlibUnittest
 
 var SESERegionTests = TestSuite("SESERegion")
@@ -41,7 +37,7 @@ public func testSharedRegion(_ count : Int32) -> Tensor<Int32> {
   return result
 }
 
-SESERegionTests.testAllBackends("testSharedRegion") { 
+SESERegionTests.testAllBackends("testSharedRegion") {
   expectEqualWithScalarTensor(1, testSharedRegion(99))
   expectEqualWithScalarTensor(7, testSharedRegion(101))
   expectEqualWithScalarTensor(3, testSharedRegion(-99))
@@ -96,7 +92,7 @@ public func testSharedRegionWithLoop(_ count : Int32) -> Tensor<Int32> {
   return result
 }
 
-SESERegionTests.testAllBackends("testSharedRegionWithLoop") { 
+SESERegionTests.testAllBackends("testSharedRegionWithLoop") {
   expectEqualWithScalarTensor(1, testSharedRegionWithLoop(99))
 #if !CUDA
   // TODO fix.

@@ -5,11 +5,7 @@
 // TensorFlow Raw Ops API tests.
 
 import TensorFlow
-#if TPU
-import TensorFlowUnittestTPU
-#else
 import TensorFlowUnittest
-#endif
 import StdlibUnittest
 
 var RawOpsTests = TestSuite("RawOps")

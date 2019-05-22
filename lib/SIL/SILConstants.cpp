@@ -568,6 +568,12 @@ SymbolicValue SymbolicValue::lookThroughSingleElementAggregates() const {
   }
 }
 
+bool SymbolicValue::isUnknownDueToUnevaluatedInstructions() {
+  auto unknownReason = getUnknownReason();
+  return (unknownReason == UnknownReason::ReturnedByUnevaluatedInstruction ||
+          unknownReason == UnknownReason::MutatedByUnevaluatedInstruction);
+}
+
 /// Given that this is an 'Unknown' value, emit diagnostic notes providing
 /// context about what the problem is. Specifically, point to interesting
 /// source locations and function calls in the call stack.
@@ -676,6 +682,12 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
     if (emitTriggerLocInDiag)
       diagnose(ctx, *triggerLoc, diag::constexpr_witness_call_found_here);
     return;
+  case UnknownReason::ReturnedByUnevaluatedInstruction:
+    diagnose(ctx, diagLoc, diag::constexpr_returned_by_unevaluated_instruction);
+    break;
+  case UnknownReason::MutatedByUnevaluatedInstruction:
+    diagnose(ctx, diagLoc, diag::constexpr_mutated_by_unevaluated_instruction);
+    break;
   }
   // TODO: print the call-stack in a controlled way if needed.
 }

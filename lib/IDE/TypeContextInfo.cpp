@@ -39,7 +39,7 @@ public:
   void completeForEachSequenceBeginning(CodeCompletionExpr *E) override;
   void completeCaseStmtBeginning() override;
 
-  void completeCallArg(CodeCompletionExpr *E) override;
+  void completeCallArg(CodeCompletionExpr *E, bool isFirst) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
                          Optional<unsigned> yieldIndex) override;
@@ -61,7 +61,8 @@ void ContextInfoCallbacks::completeForEachSequenceBeginning(
   CurDeclContext = P.CurDeclContext;
   ParsedExpr = E;
 }
-void ContextInfoCallbacks::completeCallArg(CodeCompletionExpr *E) {
+void ContextInfoCallbacks::completeCallArg(CodeCompletionExpr *E,
+                                           bool isFirst) {
   CurDeclContext = P.CurDeclContext;
   ParsedExpr = E;
 }
@@ -163,7 +164,8 @@ void ContextInfoCallbacks::getImplicitMembers(
         : DC(DC), TypeResolver(DC->getASTContext().getLazyResolver()),
           CurModule(DC->getParentModule()), T(T), Result(Result) {}
 
-    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) {
+    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                   DynamicLookupInfo) {
       if (canBeImplictMember(VD) && !VD->shouldHideFromEditor())
         Result.push_back(VD);
     }

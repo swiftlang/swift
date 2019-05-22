@@ -324,6 +324,7 @@ SYNTAX_TOKENS = [
 
     Misc('ContextualKeyword', 'contextual_keyword', classification='Keyword',
          serialization_code=114),
+    Misc('RawStringDelimiter', 'raw_string_delimiter', serialization_code=119),
     Misc('StringSegment', 'string_segment', classification='StringLiteral',
          serialization_code=104),
     Misc('StringInterpolationAnchor', 'string_interpolation_anchor',

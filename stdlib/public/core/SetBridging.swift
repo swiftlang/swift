@@ -74,6 +74,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
     self.bridgedElements = nil
     self.nextBucket = base.hashTable.startBucket
     self.endBucket = base.hashTable.endBucket
+    super.init()
   }
 
   @nonobjc
@@ -83,6 +84,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
     self.bridgedElements = deferred.bridgeElements()
     self.nextBucket = base.hashTable.startBucket
     self.endBucket = base.hashTable.endBucket
+    super.init()
   }
 
   private func bridgedElement(at bucket: _HashTable.Bucket) -> AnyObject {

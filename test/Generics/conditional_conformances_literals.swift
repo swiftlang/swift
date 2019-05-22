@@ -26,7 +26,7 @@ func arraySameType() {
 
     let _: SameType = [works]
     let _: SameType = [fails]
-    // expected-error@-1 {{value of type '[Fails]' does not conform to specified type 'SameType'}}
+    // expected-error@-1 {{cannot convert value of type 'Fails' to expected element type 'Works'}}
 
     let _: SameType = arrayWorks
     let _: SameType = arrayFails
@@ -51,7 +51,7 @@ func dictionarySameType() {
 
     let _: SameType = [0 : works]
     let _: SameType = [0 : fails]
-    // expected-error@-1 {{contextual type 'SameType' cannot be used with dictionary literal}}
+    // expected-error@-1 {{cannot convert value of type 'Fails' to expected dictionary value type 'Works'}}
 
     let _: SameType = dictWorks
     let _: SameType = dictFails

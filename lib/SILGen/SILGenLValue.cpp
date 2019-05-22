@@ -1813,7 +1813,7 @@ makeBaseConsumableMaterializedRValue(SILGenFunction &SGF,
   if (!base.getType().isAddress() || isBorrowed) {
     auto tmp = SGF.emitTemporaryAllocation(loc, base.getType());
     if (isBorrowed)
-      base.copyInto(SGF, tmp, loc);
+      base.copyInto(SGF, loc, tmp);
     else
       base.forwardInto(SGF, loc, tmp);
     return SGF.emitManagedBufferWithCleanup(tmp);
