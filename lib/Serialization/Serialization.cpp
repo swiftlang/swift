@@ -2233,216 +2233,6 @@ static inline unsigned getOptionalOrZero(const llvm::Optional<unsigned> &X) {
   return 0;
 }
 
-void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
-  using namespace decls_block;
-
-  // Completely ignore attributes that aren't serialized.
-  if (DA->isNotSerialized())
-    return;
-
-  // Ignore attributes that have been marked invalid. (This usually means
-  // type-checking removed them, but only provided a warning rather than an
-  // error.)
-  if (DA->isInvalid())
-    return;
-
-  switch (DA->getKind()) {
-  case DAK_RawDocComment:
-  case DAK_ReferenceOwnership: // Serialized as part of the type.
-  case DAK_AccessControl:
-  case DAK_SetterAccess:
-  case DAK_ObjCBridged:
-  case DAK_SynthesizedProtocol:
-  case DAK_Implements:
-  case DAK_ObjCRuntimeName:
-  case DAK_RestatedObjCConformance:
-  case DAK_ClangImporterSynthesizedType:
-  case DAK_PrivateImport:
-    llvm_unreachable("cannot serialize attribute");
-
-  case DAK_Count:
-    llvm_unreachable("not a real attribute");
-
-#define SIMPLE_DECL_ATTR(_, CLASS, ...)\
-  case DAK_##CLASS: { \
-    auto abbrCode = DeclTypeAbbrCodes[CLASS##DeclAttrLayout::Code]; \
-    CLASS##DeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode, \
-                                      DA->isImplicit()); \
-    return; \
-  }
-#include "swift/AST/Attr.def"
-
-  case DAK_SILGenName: {
-    auto *theAttr = cast<SILGenNameAttr>(DA);
-    auto abbrCode = DeclTypeAbbrCodes[SILGenNameDeclAttrLayout::Code];
-    SILGenNameDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                      theAttr->isImplicit(),
-                                      theAttr->Name);
-    return;
-  }
-
-  case DAK_CDecl: {
-    auto *theAttr = cast<CDeclAttr>(DA);
-    auto abbrCode = DeclTypeAbbrCodes[CDeclDeclAttrLayout::Code];
-    CDeclDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    theAttr->isImplicit(),
-                                    theAttr->Name);
-    return;
-  }
-
-  case DAK_Alignment: {
-    auto *theAlignment = cast<AlignmentAttr>(DA);
-    auto abbrCode = DeclTypeAbbrCodes[AlignmentDeclAttrLayout::Code];
-    AlignmentDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                        theAlignment->isImplicit(),
-                                        theAlignment->getValue());
-    return;
-  }
-  
-  case DAK_SwiftNativeObjCRuntimeBase: {
-    auto *theBase = cast<SwiftNativeObjCRuntimeBaseAttr>(DA);
-    auto abbrCode
-      = DeclTypeAbbrCodes[SwiftNativeObjCRuntimeBaseDeclAttrLayout::Code];
-    auto nameID = addDeclBaseNameRef(theBase->BaseClassName);
-    
-    SwiftNativeObjCRuntimeBaseDeclAttrLayout::emitRecord(Out, ScratchRecord,
-                                                     abbrCode,
-                                                     theBase->isImplicit(),
-                                                     nameID);
-    return;
-  }
-  
-  case DAK_Semantics: {
-    auto *theAttr = cast<SemanticsAttr>(DA);
-    auto abbrCode = DeclTypeAbbrCodes[SemanticsDeclAttrLayout::Code];
-    SemanticsDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                      theAttr->isImplicit(),
-                                      theAttr->Value);
-    return;
-  }
-
-  case DAK_Inline: {
-    auto *theAttr = cast<InlineAttr>(DA);
-    auto abbrCode = DeclTypeAbbrCodes[InlineDeclAttrLayout::Code];
-    InlineDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                     (unsigned)theAttr->getKind());
-    return;
-  }
-
-  case DAK_Optimize: {
-    auto *theAttr = cast<OptimizeAttr>(DA);
-    auto abbrCode = DeclTypeAbbrCodes[OptimizeDeclAttrLayout::Code];
-    OptimizeDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                       (unsigned)theAttr->getMode());
-    return;
-  }
-
-  case DAK_Effects: {
-    auto *theAttr = cast<EffectsAttr>(DA);
-    auto abbrCode = DeclTypeAbbrCodes[EffectsDeclAttrLayout::Code];
-    EffectsDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                     (unsigned)theAttr->getKind());
-    return;
-  }
-
-  case DAK_Available: {
-#define LIST_VER_TUPLE_PIECES(X)\
-  X##_Major, X##_Minor, X##_Subminor, X##_HasMinor, X##_HasSubminor
-#define DEF_VER_TUPLE_PIECES(X, X_Expr)\
-  unsigned X##_Major = 0, X##_Minor = 0, X##_Subminor = 0,\
-           X##_HasMinor = 0, X##_HasSubminor = 0;\
-  const auto &X##_Val = X_Expr;\
-  if (X##_Val.hasValue()) {\
-    const auto &Y = X##_Val.getValue();\
-    X##_Major = Y.getMajor();\
-    X##_Minor = getOptionalOrZero(Y.getMinor());\
-    X##_Subminor = getOptionalOrZero(Y.getSubminor());\
-    X##_HasMinor = Y.getMinor().hasValue();\
-    X##_HasSubminor = Y.getSubminor().hasValue();\
-  }
-
-    auto *theAttr = cast<AvailableAttr>(DA);
-    DEF_VER_TUPLE_PIECES(Introduced, theAttr->Introduced)
-    DEF_VER_TUPLE_PIECES(Deprecated, theAttr->Deprecated)
-    DEF_VER_TUPLE_PIECES(Obsoleted, theAttr->Obsoleted)
-
-    llvm::SmallString<32> blob;
-    blob.append(theAttr->Message);
-    blob.append(theAttr->Rename);
-    auto abbrCode = DeclTypeAbbrCodes[AvailableDeclAttrLayout::Code];
-    AvailableDeclAttrLayout::emitRecord(
-        Out, ScratchRecord, abbrCode,
-        theAttr->isImplicit(),
-        theAttr->isUnconditionallyUnavailable(),
-        theAttr->isUnconditionallyDeprecated(),
-        theAttr->isPackageDescriptionVersionSpecific(),
-        LIST_VER_TUPLE_PIECES(Introduced),
-        LIST_VER_TUPLE_PIECES(Deprecated),
-        LIST_VER_TUPLE_PIECES(Obsoleted),
-        static_cast<unsigned>(theAttr->Platform),
-        theAttr->Message.size(),
-        theAttr->Rename.size(),
-        blob);
-    return;
-#undef LIST_VER_TUPLE_PIECES
-#undef DEF_VER_TUPLE_PIECES
-  }
-
-  case DAK_ObjC: {
-    auto *theAttr = cast<ObjCAttr>(DA);
-    SmallVector<IdentifierID, 4> pieces;
-    unsigned numArgs = 0;
-    if (auto name = theAttr->getName()) {
-      numArgs = name->getNumArgs() + 1;
-      for (auto piece : name->getSelectorPieces()) {
-        pieces.push_back(addDeclBaseNameRef(piece));
-      }
-    }
-    auto abbrCode = DeclTypeAbbrCodes[ObjCDeclAttrLayout::Code];
-    ObjCDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   theAttr->isImplicit(),
-                                   theAttr->isSwift3Inferred(),
-                                   theAttr->isNameImplicit(), numArgs, pieces);
-    return;
-  }
-
-  case DAK_Specialize: {
-    auto abbrCode = DeclTypeAbbrCodes[SpecializeDeclAttrLayout::Code];
-    auto SA = cast<SpecializeAttr>(DA);
-
-    SpecializeDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                         (unsigned)SA->isExported(),
-                                         (unsigned)SA->getSpecializationKind());
-    writeGenericRequirements(SA->getRequirements(), DeclTypeAbbrCodes);
-    return;
-  }
-
-  case DAK_DynamicReplacement: {
-    auto abbrCode = DeclTypeAbbrCodes[DynamicReplacementDeclAttrLayout::Code];
-    auto theAttr = cast<DynamicReplacementAttr>(DA);
-    auto replacedFun = theAttr->getReplacedFunctionName();
-    SmallVector<IdentifierID, 4> pieces;
-    pieces.push_back(addDeclBaseNameRef(replacedFun.getBaseName()));
-    for (auto argName : replacedFun.getArgumentNames())
-      pieces.push_back(addDeclBaseNameRef(argName));
-    assert(theAttr->getReplacedFunction());
-    DynamicReplacementDeclAttrLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, false, /*implicit flag*/
-        addDeclRef(theAttr->getReplacedFunction()), pieces.size(), pieces);
-    return;
-  }
-
-    case DAK_Custom: {
-      auto abbrCode = DeclTypeAbbrCodes[CustomDeclAttrLayout::Code];
-      auto theAttr = cast<CustomAttr>(DA);
-      CustomDeclAttrLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, theAttr->isImplicit(),
-        addTypeRef(theAttr->getTypeLoc().getType()));
-      return;
-    }
-  }
-}
-
 bool Serializer::isDeclXRef(const Decl *D) const {
   const DeclContext *topLevel = D->getDeclContext()->getModuleScopeContext();
   if (topLevel->getParentModule() != M)
@@ -2749,6 +2539,217 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     didVerifyAttrs = true;
   }
 
+  void writeDeclAttribute(const DeclAttribute *DA) {
+    using namespace decls_block;
+
+    // Completely ignore attributes that aren't serialized.
+    if (DA->isNotSerialized())
+      return;
+
+    // Ignore attributes that have been marked invalid. (This usually means
+    // type-checking removed them, but only provided a warning rather than an
+    // error.)
+    if (DA->isInvalid())
+      return;
+
+    switch (DA->getKind()) {
+    case DAK_RawDocComment:
+    case DAK_ReferenceOwnership: // Serialized as part of the type.
+    case DAK_AccessControl:
+    case DAK_SetterAccess:
+    case DAK_ObjCBridged:
+    case DAK_SynthesizedProtocol:
+    case DAK_Implements:
+    case DAK_ObjCRuntimeName:
+    case DAK_RestatedObjCConformance:
+    case DAK_ClangImporterSynthesizedType:
+    case DAK_PrivateImport:
+      llvm_unreachable("cannot serialize attribute");
+
+    case DAK_Count:
+      llvm_unreachable("not a real attribute");
+
+  #define SIMPLE_DECL_ATTR(_, CLASS, ...)\
+    case DAK_##CLASS: { \
+      auto abbrCode = S.DeclTypeAbbrCodes[CLASS##DeclAttrLayout::Code]; \
+      CLASS##DeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode, \
+                                        DA->isImplicit()); \
+      return; \
+    }
+  #include "swift/AST/Attr.def"
+
+    case DAK_SILGenName: {
+      auto *theAttr = cast<SILGenNameAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[SILGenNameDeclAttrLayout::Code];
+      SILGenNameDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+  	                                       theAttr->isImplicit(),
+  	                                       theAttr->Name);
+      return;
+    }
+
+    case DAK_CDecl: {
+      auto *theAttr = cast<CDeclAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[CDeclDeclAttrLayout::Code];
+      CDeclDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                      theAttr->isImplicit(),
+                                      theAttr->Name);
+      return;
+    }
+
+    case DAK_Alignment: {
+      auto *theAlignment = cast<AlignmentAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[AlignmentDeclAttrLayout::Code];
+      AlignmentDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                          theAlignment->isImplicit(),
+                                          theAlignment->getValue());
+      return;
+    }
+
+    case DAK_SwiftNativeObjCRuntimeBase: {
+      auto *theBase = cast<SwiftNativeObjCRuntimeBaseAttr>(DA);
+      auto abbrCode
+        = S.DeclTypeAbbrCodes[SwiftNativeObjCRuntimeBaseDeclAttrLayout::Code];
+      auto nameID = S.addDeclBaseNameRef(theBase->BaseClassName);
+
+      SwiftNativeObjCRuntimeBaseDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          theBase->isImplicit(), nameID);
+      return;
+    }
+
+    case DAK_Semantics: {
+      auto *theAttr = cast<SemanticsAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[SemanticsDeclAttrLayout::Code];
+      SemanticsDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                        theAttr->isImplicit(),
+                                        theAttr->Value);
+      return;
+    }
+
+    case DAK_Inline: {
+      auto *theAttr = cast<InlineAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[InlineDeclAttrLayout::Code];
+      InlineDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                       (unsigned)theAttr->getKind());
+      return;
+    }
+
+    case DAK_Optimize: {
+      auto *theAttr = cast<OptimizeAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[OptimizeDeclAttrLayout::Code];
+      OptimizeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                         (unsigned)theAttr->getMode());
+      return;
+    }
+
+    case DAK_Effects: {
+      auto *theAttr = cast<EffectsAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[EffectsDeclAttrLayout::Code];
+      EffectsDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                       (unsigned)theAttr->getKind());
+      return;
+    }
+
+    case DAK_Available: {
+#define LIST_VER_TUPLE_PIECES(X)\
+    X##_Major, X##_Minor, X##_Subminor, X##_HasMinor, X##_HasSubminor
+#define DEF_VER_TUPLE_PIECES(X, X_Expr)\
+    unsigned X##_Major = 0, X##_Minor = 0, X##_Subminor = 0,\
+             X##_HasMinor = 0, X##_HasSubminor = 0;\
+    const auto &X##_Val = X_Expr;\
+    if (X##_Val.hasValue()) {\
+      const auto &Y = X##_Val.getValue();\
+      X##_Major = Y.getMajor();\
+      X##_Minor = getOptionalOrZero(Y.getMinor());\
+      X##_Subminor = getOptionalOrZero(Y.getSubminor());\
+      X##_HasMinor = Y.getMinor().hasValue();\
+      X##_HasSubminor = Y.getSubminor().hasValue();\
+    }
+
+      auto *theAttr = cast<AvailableAttr>(DA);
+      DEF_VER_TUPLE_PIECES(Introduced, theAttr->Introduced)
+      DEF_VER_TUPLE_PIECES(Deprecated, theAttr->Deprecated)
+      DEF_VER_TUPLE_PIECES(Obsoleted, theAttr->Obsoleted)
+
+      llvm::SmallString<32> blob;
+      blob.append(theAttr->Message);
+      blob.append(theAttr->Rename);
+      auto abbrCode = S.DeclTypeAbbrCodes[AvailableDeclAttrLayout::Code];
+      AvailableDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          theAttr->isImplicit(),
+          theAttr->isUnconditionallyUnavailable(),
+          theAttr->isUnconditionallyDeprecated(),
+          theAttr->isPackageDescriptionVersionSpecific(),
+          LIST_VER_TUPLE_PIECES(Introduced),
+          LIST_VER_TUPLE_PIECES(Deprecated),
+          LIST_VER_TUPLE_PIECES(Obsoleted),
+          static_cast<unsigned>(theAttr->Platform),
+          theAttr->Message.size(),
+          theAttr->Rename.size(),
+          blob);
+      return;
+#undef LIST_VER_TUPLE_PIECES
+#undef DEF_VER_TUPLE_PIECES
+    }
+
+    case DAK_ObjC: {
+      auto *theAttr = cast<ObjCAttr>(DA);
+      SmallVector<IdentifierID, 4> pieces;
+      unsigned numArgs = 0;
+      if (auto name = theAttr->getName()) {
+        numArgs = name->getNumArgs() + 1;
+        for (auto piece : name->getSelectorPieces()) {
+          pieces.push_back(S.addDeclBaseNameRef(piece));
+        }
+      }
+      auto abbrCode = S.DeclTypeAbbrCodes[ObjCDeclAttrLayout::Code];
+      ObjCDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                     theAttr->isImplicit(),
+                                     theAttr->isSwift3Inferred(),
+                                     theAttr->isNameImplicit(), numArgs, pieces);
+      return;
+    }
+
+    case DAK_Specialize: {
+      auto abbrCode = S.DeclTypeAbbrCodes[SpecializeDeclAttrLayout::Code];
+      auto SA = cast<SpecializeAttr>(DA);
+
+      SpecializeDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          (unsigned)SA->isExported(),
+          (unsigned)SA->getSpecializationKind());
+      S.writeGenericRequirements(SA->getRequirements(), S.DeclTypeAbbrCodes);
+      return;
+    }
+
+    case DAK_DynamicReplacement: {
+      auto abbrCode =
+          S.DeclTypeAbbrCodes[DynamicReplacementDeclAttrLayout::Code];
+      auto theAttr = cast<DynamicReplacementAttr>(DA);
+      auto replacedFun = theAttr->getReplacedFunctionName();
+      SmallVector<IdentifierID, 4> pieces;
+      pieces.push_back(S.addDeclBaseNameRef(replacedFun.getBaseName()));
+      for (auto argName : replacedFun.getArgumentNames())
+        pieces.push_back(S.addDeclBaseNameRef(argName));
+      assert(theAttr->getReplacedFunction());
+      DynamicReplacementDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, false, /*implicit flag*/
+          S.addDeclRef(theAttr->getReplacedFunction()), pieces.size(), pieces);
+      return;
+    }
+
+    case DAK_Custom: {
+      auto abbrCode = S.DeclTypeAbbrCodes[CustomDeclAttrLayout::Code];
+      auto theAttr = cast<CustomAttr>(DA);
+      CustomDeclAttrLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
+        S.addTypeRef(theAttr->getTypeLoc().getType()));
+      return;
+    }
+    }
+  }
+
   void writeDiscriminatorsIfNeeded(const ValueDecl *value) {
     using namespace decls_block;
 
@@ -2823,12 +2824,12 @@ public:
   void visit(const Decl *D) {
     // Emit attributes (if any).
     for (auto Attr : D->getAttrs())
-      S.writeDeclAttribute(Attr);
+      writeDeclAttribute(Attr);
 
     if (auto VD = dyn_cast<ValueDecl>(D)) {
       // Hack: synthesize a 'final' attribute if finality was inferred.
       if (VD->isFinal() && !D->getAttrs().hasAttribute<FinalAttr>())
-        S.writeDeclAttribute(
+        writeDeclAttribute(
             new (D->getASTContext()) FinalAttr(/*Implicit=*/false));
     }
 

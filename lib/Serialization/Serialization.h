@@ -382,9 +382,6 @@ private:
   /// Writes a reference to a decl in another module.
   void writeCrossReference(const Decl *D);
 
-  /// Writes out a declaration attribute.
-  void writeDeclAttribute(const DeclAttribute *DA);
-
   /// Writes out a foreign error convention.
   void writeForeignErrorConvention(const ForeignErrorConvention &fec);
 
