@@ -115,19 +115,6 @@ bool ExistentialSpecializer::findConcreteTypeFromSoleConformingType(
   return true;
 }
 
-/// Check if the argument Arg is used in a destroy_use instruction.
-static void
-findIfCalleeUsesArgInDestroyUse(SILValue Arg,
-                                ExistentialTransformArgumentDescriptor &ETAD) {
-  for (Operand *ArgUse : Arg->getUses()) {
-    auto *ArgUser = ArgUse->getUser();
-    if (isa<DestroyAddrInst>(ArgUser)) {
-      ETAD.DestroyAddrUse = true;
-      break;
-    }
-  }
-}
-
 /// Helper function to ensure that the argument is not InOut or InOut_Aliasable
 static bool isNonInoutIndirectArgument(SILValue Arg,
                                        SILArgumentConvention ArgConvention) {
@@ -193,18 +180,21 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
       continue;
     }
 
-    /// Determine attributes of the existential addr arguments such as
-    /// destroy_use, immutable_access. 
+    /// Determine attributes of the existential addr argument.
     ExistentialTransformArgumentDescriptor ETAD;
     auto paramInfo = origCalleeConv.getParamInfoForSILArg(Idx);
-    ETAD.AccessType = (paramInfo.isIndirectMutating() || paramInfo.isConsumed())
+    // The ExistentialSpecializerCloner copies the incoming generic argument
+    // into an existential. This won't work if the original argument is
+    // mutated. Furthermore, SILCombine would not be able to replace a mutated
+    // existential with a concrete value, so the specialization thunk could not
+    // be optimized away.
+    if (paramInfo.isIndirectMutating())
+      continue;
+
+    ETAD.AccessType = paramInfo.isConsumed()
                           ? OpenedExistentialAccess::Mutable
                           : OpenedExistentialAccess::Immutable;
-    ETAD.DestroyAddrUse = false;
-    if ((CalleeArgs[Idx]->getType().getPreferredExistentialRepresentation(
-            F->getModule()))
-        != ExistentialRepresentation::Class)
-      findIfCalleeUsesArgInDestroyUse(CalleeArg, ETAD);
+    ETAD.isConsumed = paramInfo.isConsumed();
 
     /// Save the attributes
     ExistentialArgDescriptor[Idx] = ETAD;

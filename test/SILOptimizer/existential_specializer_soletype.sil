@@ -180,3 +180,203 @@ bb0(%0 : $*SubProtocol):
   %80 = tuple ()
   return %80 : $()
 }
+
+//===----------------------------------------------------------------------===//
+// Test an existential argument that is consumed and explicitly destroyed.
+// <rdar://problem/50595630> Multiple leaks detected
+//===----------------------------------------------------------------------===//
+public protocol P {}
+
+public struct S : P {
+  init()
+
+  var o: AnyObject // nontrivial to check ownership conventions
+}
+
+// Check the thunk.
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @$s6test2_6storePyyAA1P_p_AaC_pztF : $@convention(thin) (@in P, @inout P) -> () {
+// CHECK: bb0(%0 : $*P, %1 : $*P):
+// CHECK: [[F:%.*]] = function_ref @$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0, @inout P) -> ()
+// CHECK: [[ADR:%.*]] = open_existential_addr mutable_access %0 : $*P to $*@opened([[TY:".*"]]) P
+// CHECK: [[ALLOC:%.*]] = alloc_stack $@opened([[TY]]) P
+// CHECK: copy_addr [[ADR]] to [initialization] [[ALLOC]] : $*@opened([[TY]]) P
+// CHECK: apply [[F]]<@opened("{{.*}}") P>([[ALLOC]], %1) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0, @inout P) -> ()
+// CHECK: destroy_addr %0 : $*P
+// CHECK: dealloc_stack [[ALLOC]] : $*@opened([[TY]]) P
+// CHECK: return
+// CHECK-LABEL: } // end sil function '$s6test2_6storePyyAA1P_p_AaC_pztF'
+
+
+// Check the existential to generic specialization.
+// CHECK-LABEL: sil shared [noinline] @$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0, @inout P) -> () {
+// CHECK: bb0(%0 : $*τ_0_0, %1 : $*P):
+// CHECK:   [[ALLOC:%.*]] = alloc_stack $P
+// CHECK:   [[IEA:%.*]] = init_existential_addr [[ALLOC]] : $*P, $τ_0_0
+// CHECK:   copy_addr [take] %0 to [initialization] [[IEA]] : $*τ_0_0
+// CHECK-NOT: destroy
+// CHECK:   copy_addr [[ALLOC]] to [initialization] %1 : $*P
+// CHECK-NOT: destroy
+// CHECK:   destroy_addr [[ALLOC]] : $*P
+// CHECK-NOT: destroy
+// CHECK-LABEL: } // end sil function '$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n'
+
+// Check the generic to concrete specialization.
+// CHECK-LABEL: sil shared [noinline] @$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n4main1SV_Tg5 : $@convention(thin) (@owned S, @inout P) -> () {
+// CHECK: bb0(%0 : $S, %1 : $*P):
+// CHECK:   [[ALLOCS:%.*]] = alloc_stack $S
+// CHECK:   [[ALLOCP:%.*]] = alloc_stack $P
+// CHECK:   [[IEA:%.*]] = init_existential_addr [[ALLOCP]] : $*P, $S
+// CHECK:   copy_addr [take] [[ALLOCS]] to [initialization] [[IEA]] : $*S
+// CHECK-NOT: destroy
+// CHECK:   copy_addr [[ALLOCP]] to [initialization] %1 : $*P
+// CHECK:   destroy_addr [[ALLOCP]] : $*P
+// CHECK:   dealloc_stack [[ALLOCP]]
+// CHECK:   dealloc_stack [[ALLOCS]]
+// CHECK-LABEL: } // end sil function '$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n4main1SV_Tg5'
+sil hidden [noinline] @$s6test2_6storePyyAA1P_p_AaC_pztF : $@convention(thin) (@in P, @inout P) -> () {
+bb0(%0 : $*P, %1 : $*P):
+  copy_addr %0 to [initialization] %1 : $*P
+  destroy_addr %0 : $*P
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil @$s6test2_6storeS1s1qyAA1SV_AA1P_pztF : $@convention(thin) (S, @inout P) -> () {
+// CHECK: bb0(%0 : $S, %1 : $*P):
+// CHECK:   [[ALLOCS1:%.*]] = alloc_stack $S
+// CHECK:   store %0 to [[ALLOCS1]] : $*S
+// CHECK:   [[ALLOCS2:%.*]] = alloc_stack $S
+// CHECK:   copy_addr [[ALLOCS1]] to [initialization] [[ALLOCS2]] : $*S
+// CHECK:   [[F:%.*]] = function_ref @$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n4main1SV_Tg5 : $@convention(thin) (@owned S, @inout P) -> ()
+// CHECK:   [[S:%.*]] = load [[ALLOCS2]] : $*S
+// CHECK:   apply [[F]]([[S]], %1) : $@convention(thin) (@owned S, @inout P) -> ()
+// CHECK-NEXT: dealloc_stack [[ALLOCS2]] : $*S
+// CHECK-NEXT: destroy_addr [[ALLOCS1]] : $*S
+// CHECK-NEXT: dealloc_stack [[ALLOCS1]] : $*S
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-LABEL: } // end sil function '$s6test2_6storeS1s1qyAA1SV_AA1P_pztF'
+sil @$s6test2_6storeS1s1qyAA1SV_AA1P_pztF : $@convention(thin) (S, @inout P) -> () {
+bb0(%0 : $S, %1 : $*P):
+  %4 = alloc_stack $P
+  %5 = init_existential_addr %4 : $*P, $S
+  store %0 to %5 : $*S
+  %7 = function_ref @$s6test2_6storePyyAA1P_p_AaC_pztF : $@convention(thin) (@in P, @inout P) -> ()
+  %8 = apply %7(%4, %1) : $@convention(thin) (@in P, @inout P) -> ()
+  dealloc_stack %4 : $*P
+  %10 = tuple ()
+  return %10 : $()
+}
+
+sil_witness_table S: P module test {}
+
+//===----------------------------------------------------------------------===//
+// Test an existential in_guaranteed argument.
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @$s6test3_6storePyyAA1P_pz_AaC_pztF : $@convention(thin) (@in_guaranteed P, @inout P) -> () {
+// CHECK: bb0(%0 : $*P, %1 : $*P):
+// CHECK: [[F:%.*]] = function_ref @$s6test3_6storePyyAA1P_pz_AaC_pztFTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0, @inout P) -> ()
+// CHECK: [[ADR:%.*]] = open_existential_addr immutable_access %0 : $*P to $*@opened("{{.*}}") P
+// CHECK: apply [[F]]<@opened("{{.*}}") P>([[ADR]], %1) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0, @inout P) -> ()
+// CHECK-LABEL: } // end sil function '$s6test3_6storePyyAA1P_pz_AaC_pztF'
+
+// The guaranteed concrete argument cannot be consumed. The
+// existential created in the prolog must be destroyed before
+// returing.
+//
+// CHECK-LABEL: sil shared @$s6test3_6storePyyAA1P_pz_AaC_pztFTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0, @inout P) -> () {
+// CHECK: bb0(%0 : $*τ_0_0, %1 : $*P):
+// CHECK:   [[ALLOCP1:%.*]] = alloc_stack $P
+// CHECK:   [[ADR:%.*]] = init_existential_addr [[ALLOCP1]] : $*P, $τ_0_0
+// CHECK:   copy_addr %0 to [initialization] [[ADR]] : $*τ_0_0
+// CHECK:   [[ALLOCP2:%.*]] = alloc_stack $P
+// CHECK:   copy_addr [[ALLOCP1]] to [initialization] [[ALLOCP2]] : $*P
+// CHECK:   copy_addr [take] [[ALLOCP2]] to %1 : $*P
+// CHECK:   destroy_addr [[ALLOCP1]] : $*P
+// CHECK:   dealloc_stack [[ALLOCP1]] : $*P
+// CHECK-LABEL: } // end sil function '$s6test3_6storePyyAA1P_pz_AaC_pztFTf4en_n'
+sil hidden @$s6test3_6storePyyAA1P_pz_AaC_pztF : $@convention(thin) (@in_guaranteed P, @inout P) -> () {
+bb0(%0 : $*P, %1 : $*P):
+  %5 = alloc_stack $P
+  copy_addr %0 to [initialization] %5 : $*P
+  copy_addr [take] %5 to %1 : $*P
+  dealloc_stack %5 : $*P
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil shared @$s6test3_6storePyyAA1P_pz_AaC_pztFTf4en_n4main1SV_Tg5 : $@convention(thin) (@guaranteed S, @inout P) -> () {
+// CHECK: bb0(%0 : $S, %1 : $*P):
+// CHECK: [[ALLOC1:%.*]] = alloc_stack $S
+// CHECK: store %0 to [[ALLOC1]] : $*S
+// CHECK: [[ALLOC2:%.*]] = alloc_stack $P
+// CHECK: [[ADR:%.*]] = init_existential_addr [[ALLOC2]] : $*P, $S
+// CHECK: copy_addr [[ALLOC1]] to [initialization] [[ADR]] : $*S
+// CHECK: [[ALLOC3:%.*]] = alloc_stack $P
+// CHECK: copy_addr [[ALLOC2]] to [initialization] [[ALLOC3]] : $*P
+// CHECK: copy_addr [take] [[ALLOC3]] to %1 : $*P
+// CHECK: dealloc_stack [[ALLOC3]] : $*P
+// CHECK: destroy_addr [[ALLOC2]] : $*P
+// CHECK: dealloc_stack %4 : $*P
+// CHECK: dealloc_stack %2 : $*S
+// CHECK-LABEL: } // end sil function '$s6test3_6storePyyAA1P_pz_AaC_pztFTf4en_n4main1SV_Tg5'
+sil hidden @$s6test3_6storeS1s1qyAA1SV_AA1P_pztF : $@convention(thin) (S, @inout P) -> () {
+bb0(%0 : $S, %1 : $*P):
+  %4 = alloc_stack $P, var, name "sp"
+  %5 = init_existential_addr %4 : $*P, $S
+  store %0 to %5 : $*S
+  %9 = function_ref @$s6test3_6storePyyAA1P_pz_AaC_pztF : $@convention(thin) (@in_guaranteed P, @inout P) -> ()
+  %10 = apply %9(%4, %1) : $@convention(thin) (@in_guaranteed P, @inout P) -> ()
+  destroy_addr %4 : $*P
+  dealloc_stack %4 : $*P
+  %15 = tuple ()
+  return %15 : $()
+}
+
+//===----------------------------------------------------------------------===//
+// Test an existential inout argument.
+//===----------------------------------------------------------------------===//
+
+// The ExistentialSpecializer cannot specialize on an @inout argument
+// CHECK-LABEL: sil hidden @$s6test4_6storePyyAA1P_pz_AaC_pztF : $@convention(thin) (@inout P, @inout P) -> () {
+// CHECK: bb0(%0 : $*P, %1 : $*P):
+// CHECK: [[ALLOC:%.*]] = alloc_stack $P
+// CHECK:   copy_addr %0 to [initialization] [[ALLOC]] : $*P
+// CHECK:   copy_addr [take] [[ALLOC]] to %1 : $*P
+// CHECK:   dealloc_stack [[ALLOC]] : $*P
+// CHECK-LABEL: } // end sil function '$s6test4_6storePyyAA1P_pz_AaC_pztF'
+sil hidden @$s6test4_6storePyyAA1P_pz_AaC_pztF : $@convention(thin) (@inout P, @inout P) -> () {
+bb0(%0 : $*P, %1 : $*P):
+  %5 = alloc_stack $P
+  copy_addr %0 to [initialization] %5 : $*P
+  copy_addr [take] %5 to %1 : $*P
+  dealloc_stack %5 : $*P
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// ...and there's currently no way to propagate the concrete value to the inout argument!
+// CHECK-LABEL: sil hidden @$s6test4_6storeS1s1qyAA1SV_AA1P_pztF : $@convention(thin) (S, @inout P) -> () {
+// CHECK: bb0(%0 : $S, %1 : $*P):
+// CHECK:   [[ALLOC:%.*]] = alloc_stack $P, var, name "sp"
+// CHECK:   [[ADR1:%.*]] = init_existential_addr [[ALLOC]] : $*P, $S
+// CHECK:   store %0 to [[ADR1]] : $*S
+// CHECK:   [[ALLOC2:%.*]] = alloc_stack $P
+// CHECK:   copy_addr %2 to [initialization] %5 : $*P
+// CHECK:   copy_addr [take] %5 to %1 : $*P
+// CHECK:   destroy_addr [[ALLOC]] : $*P
+// CHECK:   dealloc_stack [[ALLOC]] : $*P
+// CHECK-LABEL: } // end sil function '$s6test4_6storeS1s1qyAA1SV_AA1P_pztF'
+sil hidden @$s6test4_6storeS1s1qyAA1SV_AA1P_pztF : $@convention(thin) (S, @inout P) -> () {
+bb0(%0 : $S, %1 : $*P):
+  %4 = alloc_stack $P, var, name "sp"
+  %5 = init_existential_addr %4 : $*P, $S
+  store %0 to %5 : $*S
+  %9 = function_ref @$s6test4_6storePyyAA1P_pz_AaC_pztF : $@convention(thin) (@inout P, @inout P) -> ()
+  %10 = apply %9(%4, %1) : $@convention(thin) (@inout P, @inout P) -> ()
+  destroy_addr %4 : $*P
+  dealloc_stack %4 : $*P
+  %15 = tuple ()
+  return %15 : $()
+}
