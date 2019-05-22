@@ -2914,34 +2914,29 @@ public:
 
   }
 
-  void visitPrefixOperatorDecl(const PrefixOperatorDecl *op) {
-    using namespace decls_block;
-    verifyAttrSerializable(op);
-
+  template <typename Layout>
+  void visitUnaryOperatorDecl(const OperatorDecl *op) {
     auto contextID = S.addDeclContextRef(op->getDeclContext());
     SmallVector<DeclID, 1> designatedNominalTypeDeclIDs;
     for (auto *decl : op->getDesignatedNominalTypes())
       designatedNominalTypeDeclIDs.push_back(S.addDeclRef(decl));
 
-    unsigned abbrCode = S.DeclTypeAbbrCodes[PrefixOperatorLayout::Code];
-    PrefixOperatorLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                     S.addDeclBaseNameRef(op->getName()),
-                                     contextID, designatedNominalTypeDeclIDs);
+    unsigned abbrCode = S.DeclTypeAbbrCodes[Layout::Code];
+    Layout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                       S.addDeclBaseNameRef(op->getName()),
+                       contextID, designatedNominalTypeDeclIDs);
+  }
+
+  void visitPrefixOperatorDecl(const PrefixOperatorDecl *op) {
+    using namespace decls_block;
+    verifyAttrSerializable(op);
+    visitUnaryOperatorDecl<PrefixOperatorLayout>(op);
   }
 
   void visitPostfixOperatorDecl(const PostfixOperatorDecl *op) {
     using namespace decls_block;
     verifyAttrSerializable(op);
-
-    auto contextID = S.addDeclContextRef(op->getDeclContext());
-    SmallVector<DeclID, 1> designatedNominalTypeDeclIDs;
-    for (auto *decl : op->getDesignatedNominalTypes())
-      designatedNominalTypeDeclIDs.push_back(S.addDeclRef(decl));
-
-    unsigned abbrCode = S.DeclTypeAbbrCodes[PostfixOperatorLayout::Code];
-    PostfixOperatorLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                      S.addDeclBaseNameRef(op->getName()),
-                                      contextID, designatedNominalTypeDeclIDs);
+    visitUnaryOperatorDecl<PostfixOperatorLayout>(op);
   }
 
   void visitTypeAliasDecl(const TypeAliasDecl *typeAlias) {
