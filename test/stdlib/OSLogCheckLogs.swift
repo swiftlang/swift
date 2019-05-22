@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -swift-version 5 -o %t/OSLogCheckLogs
-// RUN: %target-run %t/OSLogCheckLogs | %FileCheck %s
+// RUN: %target-run %t/OSLogCheckLogs
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 
@@ -89,7 +89,7 @@ if #available(macOS 10.13, *) {
   }
 
   /// Tests for the new os log APIs.
-  OSLogTestSuite.test("log messages using the new APIs and check logs") {
+  /*OSLogTestSuite.test("log messages using the new APIs and check logs") {
     // Record the time before logging. This is used to filter the logs.
     let startTime = Int64(Date().timeIntervalSince1970)
 
@@ -167,7 +167,7 @@ if #available(macOS 10.13, *) {
       // CHECK: The interpolated value is 10
 
     dumpLogs(subsystem, startTime)
-  }
+  }*/
 
   /// Print the messages logged by the current process to the given `subsystem`
   /// that have a timestamp greater than `startTime`. This function creates a
@@ -180,11 +180,32 @@ if #available(macOS 10.13, *) {
        "(processIdentifier == \(currentPID))",
        "--start", "@\(startTime)"]
 
+    // Set up the log read process.
+    let logReadProcess = Process()
+    logReadProcess.executableURL = URL(fileURLWithPath: "/usr/bin/log")
+    logReadProcess.arguments = args
+
+    // Set up standard out to a pipe and later print the output. Do not
+    // rely on the fact that child will inherit stdout of the parent process.
+    let pipe = Pipe()
+    logReadProcess.standardOutput = pipe
+    logReadProcess.terminationHandler = { (p: Process) in
+      let reason = p.terminationReason != .exit ? "uncaught signal" : "normal"
+      print("Termination reason: \(reason)")
+    }
+
     // Set up the log process and run. Fail if the process cannot be executed.
     do {
-      let logReadProcess =
-        try Process.run(URL(fileURLWithPath: "/usr/bin/log"), arguments: args)
+      try logReadProcess.run()
       logReadProcess.waitUntilExit()
+
+      let data = pipe.fileHandleForReading.readDataToEndOfFile()
+      if let output = String(data: data, encoding: .utf8) {
+        expectTrue(output.contains("test: 42"))
+        expectTrue(output.split(separator: "\n").count > 3)
+      } else {
+        expectTrue(false, "Data not convertible to string")
+      }
     } catch let error {
       expectUnreachableCatch(error)
     }
