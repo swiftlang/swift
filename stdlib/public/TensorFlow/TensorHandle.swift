@@ -49,10 +49,9 @@ public class TFETensorHandle : _AnyTensorHandle {
   }
 }
 
-/// `TensorHandle` is the type used by ops. It includes a `Scalar` type, which 
-/// compiler internals use to determine the datatypes of parameters when they 
-/// are extracted into a tensor program.
-@_fixed_layout // required because the compiler accesses _cTensorHandle directly.
+/// `TensorHandle` is the type used by ops. It includes a `Scalar` type, which
+/// compiler internals can use to determine the datatypes of parameters when
+/// they are extracted into a tensor program.
 public final class TensorHandle<Scalar> where Scalar : _TensorFlowDataTypeCompatible {
   let handle: _AnyTensorHandle
 
