@@ -28,7 +28,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // Check integer constants passed to the withCString closure: buffersize,
     // premable and argument count.
 
-    // CHECK-DAG: {{%.*}} = partial_apply [callee_guaranteed] [on_stack] [[OSLOGCLOSURE:%[0-9]+]]({{%.*}}, {{%.*}}, [[BUFFERSIZE:%[0-9]+]], [[PREAMBLE:%[0-9]+]], [[ARGCOUNT:%[0-9]+]], {{%.*}}) : $@convention(thin) (UnsafePointer<Int8>, @guaranteed OSLog, OSLogType, Int, UInt8, UInt8, @inout_aliasable OSLogArguments) -> ()
+    // CHECK-DAG: {{%.*}} = partial_apply [callee_guaranteed] [on_stack] [[OSLOGCLOSURE:%[0-9]+]]({{%.*}}, {{%.*}}, [[BUFFERSIZE:%[0-9]+]], [[PREAMBLE:%[0-9]+]], [[ARGCOUNT:%[0-9]+]], {{%.*}}) : $@convention(thin) (UnsafePointer<Int8>, @guaranteed OSLog, OSLogType, Int, UInt8, UInt8, @guaranteed OSLogArguments) -> ()
     // CHECK-DAG: [[OSLOGCLOSURE]] = function_ref @$s14OSLogPrototype5osLogyySo03OS_C4_logC_So0c1_F7_type_taAA0A7MessageVtFySPys4Int8VGXEfU_
     // CHECK-DAG: [[BUFFERSIZE]] = struct $Int ([[BUFFERSIZELIT:%[0-9]+]]
     // CHECK-64-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int64, 12
@@ -55,7 +55,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // Check integer constants passed to the withCString closure: buffersize,
     // premable and argument count.
 
-    // CHECK-DAG: {{%.*}} = partial_apply [callee_guaranteed] [on_stack] [[OSLOGCLOSURE:%[0-9]+]]({{%.*}}, {{%.*}}, [[BUFFERSIZE:%[0-9]+]], [[PREAMBLE:%[0-9]+]], [[ARGCOUNT:%[0-9]+]], {{%.*}}) : $@convention(thin) (UnsafePointer<Int8>, @guaranteed OSLog, OSLogType, Int, UInt8, UInt8, @inout_aliasable OSLogArguments) -> ()
+    // CHECK-DAG: {{%.*}} = partial_apply [callee_guaranteed] [on_stack] [[OSLOGCLOSURE:%[0-9]+]]({{%.*}}, {{%.*}}, [[BUFFERSIZE:%[0-9]+]], [[PREAMBLE:%[0-9]+]], [[ARGCOUNT:%[0-9]+]], {{%.*}}) : $@convention(thin) (UnsafePointer<Int8>, @guaranteed OSLog, OSLogType, Int, UInt8, UInt8, @guaranteed OSLogArguments) -> ()
     // CHECK-DAG: [[OSLOGCLOSURE]] = function_ref @$s14OSLogPrototype5osLogyySo03OS_C4_logC_So0c1_F7_type_taAA0A7MessageVtFySPys4Int8VGXEfU_
     // CHECK-DAG: [[BUFFERSIZE]] = struct $Int ([[BUFFERSIZELIT:%[0-9]+]]
     // CHECK-64-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int64, 12
@@ -85,7 +85,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // Check integer constants passed to the withCString closure: buffersize,
     // premable and argument count.
 
-    // CHECK-DAG: {{%.*}} = partial_apply [callee_guaranteed] [on_stack] [[OSLOGCLOSURE:%[0-9]+]]({{%.*}}, {{%.*}}, [[BUFFERSIZE:%[0-9]+]], [[PREAMBLE:%[0-9]+]], [[ARGCOUNT:%[0-9]+]], {{%.*}}) : $@convention(thin) (UnsafePointer<Int8>, @guaranteed OSLog, OSLogType, Int, UInt8, UInt8, @inout_aliasable OSLogArguments) -> ()
+    // CHECK-DAG: {{%.*}} = partial_apply [callee_guaranteed] [on_stack] [[OSLOGCLOSURE:%[0-9]+]]({{%.*}}, {{%.*}}, [[BUFFERSIZE:%[0-9]+]], [[PREAMBLE:%[0-9]+]], [[ARGCOUNT:%[0-9]+]], {{%.*}}) : $@convention(thin) (UnsafePointer<Int8>, @guaranteed OSLog, OSLogType, Int, UInt8, UInt8, @guaranteed OSLogArguments) -> ()
     // CHECK-DAG: [[OSLOGCLOSURE]] = function_ref @$s14OSLogPrototype5osLogyySo03OS_C4_logC_So0c1_F7_type_taAA0A7MessageVtFySPys4Int8VGXEfU_
     // CHECK-DAG: [[BUFFERSIZE]] = struct $Int ([[BUFFERSIZELIT:%[0-9]+]]
     // CHECK-64-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int64, 12
@@ -119,7 +119,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // Check integer constants passed to the withCString closure: buffersize,
     // premable and argument count.
 
-    // CHECK-DAG: {{%.*}} = partial_apply [callee_guaranteed] [on_stack] [[OSLOGCLOSURE:%[0-9]+]]({{%.*}}, {{%.*}}, [[BUFFERSIZE:%[0-9]+]], [[PREAMBLE:%[0-9]+]], [[ARGCOUNT:%[0-9]+]], {{%.*}}) : $@convention(thin) (UnsafePointer<Int8>, @guaranteed OSLog, OSLogType, Int, UInt8, UInt8, @inout_aliasable OSLogArguments) -> ()
+    // CHECK-DAG: {{%.*}} = partial_apply [callee_guaranteed] [on_stack] [[OSLOGCLOSURE:%[0-9]+]]({{%.*}}, {{%.*}}, [[BUFFERSIZE:%[0-9]+]], [[PREAMBLE:%[0-9]+]], [[ARGCOUNT:%[0-9]+]], {{%.*}}) : $@convention(thin) (UnsafePointer<Int8>, @guaranteed OSLog, OSLogType, Int, UInt8, UInt8, @guaranteed OSLogArguments) -> ()
     // CHECK-DAG: [[OSLOGCLOSURE]] = function_ref @$s14OSLogPrototype5osLogyySo03OS_C4_logC_So0c1_F7_type_taAA0A7MessageVtFySPys4Int8VGXEfU_
     // CHECK-DAG: [[BUFFERSIZE]] = struct $Int ([[BUFFERSIZELIT:%[0-9]+]]
     // CHECK-64-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int64, 32
@@ -152,7 +152,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // Check other constants passed to the withCString closure: buffersize,
     // premable and argument count.
 
-    // CHECK-DAG: {{%.*}} = partial_apply [callee_guaranteed] [on_stack] [[OSLOGCLOSURE:%[0-9]+]]({{%.*}}, {{%.*}}, [[BUFFERSIZE:%[0-9]+]], [[PREAMBLE:%[0-9]+]], [[ARGCOUNT:%[0-9]+]], {{%.*}}) : $@convention(thin) (UnsafePointer<Int8>, @guaranteed OSLog, OSLogType, Int, UInt8, UInt8, @inout_aliasable OSLogArguments) -> ()
+    // CHECK-DAG: {{%.*}} = partial_apply [callee_guaranteed] [on_stack] [[OSLOGCLOSURE:%[0-9]+]]({{%.*}}, {{%.*}}, [[BUFFERSIZE:%[0-9]+]], [[PREAMBLE:%[0-9]+]], [[ARGCOUNT:%[0-9]+]], {{%.*}}) : $@convention(thin) (UnsafePointer<Int8>, @guaranteed OSLog, OSLogType, Int, UInt8, UInt8, @guaranteed OSLogArguments) -> ()
     // CHECK-DAG: [[OSLOGCLOSURE]] = function_ref @$s14OSLogPrototype5osLogyySo03OS_C4_logC_So0c1_F7_type_taAA0A7MessageVtFySPys4Int8VGXEfU_
     // CHECK-DAG: [[BUFFERSIZE]] = struct $Int ([[BUFFERSIZELIT:%[0-9]+]]
     // CHECK-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int{{[0-9]+}}, 2
@@ -223,7 +223,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // Check integer constants passed to the withCString closure: buffersize,
     // premable and argument count.
 
-    // CHECK-DAG: {{%.*}} = partial_apply [callee_guaranteed] [on_stack] [[OSLOGCLOSURE:%[0-9]+]]({{%.*}}, {{%.*}}, [[BUFFERSIZE:%[0-9]+]], [[PREAMBLE:%[0-9]+]], [[ARGCOUNT:%[0-9]+]], {{%.*}}) : $@convention(thin) (UnsafePointer<Int8>, @guaranteed OSLog, OSLogType, Int, UInt8, UInt8, @inout_aliasable OSLogArguments) -> ()
+    // CHECK-DAG: {{%.*}} = partial_apply [callee_guaranteed] [on_stack] [[OSLOGCLOSURE:%[0-9]+]]({{%.*}}, {{%.*}}, [[BUFFERSIZE:%[0-9]+]], [[PREAMBLE:%[0-9]+]], [[ARGCOUNT:%[0-9]+]], {{%.*}}) : $@convention(thin) (UnsafePointer<Int8>, @guaranteed OSLog, OSLogType, Int, UInt8, UInt8, @guaranteed OSLogArguments) -> ()
     // CHECK-DAG: [[OSLOGCLOSURE]] = function_ref @$s14OSLogPrototype5osLogyySo03OS_C4_logC_So0c1_F7_type_taAA0A7MessageVtFySPys4Int8VGXEfU_
     // CHECK-DAG: [[BUFFERSIZE]] = struct $Int ([[BUFFERSIZELIT:%[0-9]+]]
     // CHECK-64-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int64, 482
