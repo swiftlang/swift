@@ -451,6 +451,12 @@ public:
   llvm::DenseMap<std::pair<ObjCSelector, char>, unsigned>
     ActiveSelectors;
 
+  // Mapping from imported types to their raw value types.
+  llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
+
+  // Mapping from imported types to their init(rawValue:) initializers.
+  llvm::DenseMap<const NominalTypeDecl *, ConstructorDecl *> RawInits;
+
   clang::CompilerInstance *getClangInstance() {
     return Instance.get();
   }

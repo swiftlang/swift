@@ -1499,15 +1499,19 @@ static void makeStructRawValued(
         createValueConstructor(Impl, structDecl, var,
                                /*wantCtorParamNames=*/false,
                                /*wantBody=*/!Impl.hasFinishedTypeChecking()));
-  structDecl->addMember(
+
+  auto *initRawValue =
       createValueConstructor(Impl, structDecl, var,
                              /*wantCtorParamNames=*/true,
-                             /*wantBody=*/!Impl.hasFinishedTypeChecking()));
+                             /*wantBody=*/!Impl.hasFinishedTypeChecking());
+  structDecl->addMember(initRawValue);
   structDecl->addMember(patternBinding);
   structDecl->addMember(var);
   structDecl->addMember(varGetter);
 
   addSynthesizedTypealias(structDecl, ctx.Id_RawValue, underlyingType);
+  Impl.RawTypes[structDecl] = underlyingType;
+  Impl.RawInits[structDecl] = initRawValue;
 }
 
 /// Create a rawValue-ed constructor that bridges to its underlying storage.
@@ -1650,6 +1654,8 @@ static void makeStructRawValuedWithBridge(
   structDecl->addMember(computedVarGetter);
 
   addSynthesizedTypealias(structDecl, ctx.Id_RawValue, bridgedType);
+  Impl.RawTypes[structDecl] = bridgedType;
+  Impl.RawInits[structDecl] = init;
 }
 
 /// Build a declaration for an Objective-C subscript getter.
@@ -2852,6 +2858,8 @@ namespace {
         enumDecl->addMember(rawValueBinding);
 
         addSynthesizedTypealias(enumDecl, C.Id_RawValue, underlyingType);
+        Impl.RawTypes[enumDecl] = underlyingType;
+        Impl.RawInits[enumDecl] = rawValueConstructor;
 
         // If we have an error wrapper, finish it up now that its
         // nested enum has been constructed.
