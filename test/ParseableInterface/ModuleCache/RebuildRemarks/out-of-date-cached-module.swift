@@ -11,7 +11,7 @@
 // RUN: %target-swift-frontend -typecheck %s -I %t/Build -module-cache-path %t/ModuleCache
 
 // 4. Touch the interface so the cached module is no longer up-to-date
-// RUN: touch %t/Build/TestModule.swiftinterface
+// RUN: %{python} %S/../Inputs/make-old.py %t/Build/TestModule.swiftinterface
 
 // 5. Try to import the now out-of-date cached module
 // RUN: %target-swift-frontend -typecheck -verify %s -I %t/Build -Rmodule-interface-rebuild -module-cache-path %t/ModuleCache
