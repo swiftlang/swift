@@ -172,7 +172,7 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
 
         llvm::Expected<llvm::StringRef> ContentsReference = Section.getContents();
         if (!ContentsReference) {
-          llvm::outs() << "error: " << name << " "
+          llvm::errs() << "error: " << name << " "
             << errorToErrorCode(OF.takeError()).message() << "\n";
           return false;
         }
