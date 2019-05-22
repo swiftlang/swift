@@ -2001,26 +2001,6 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   Expr *expr = getParentExpr();
   SourceRange baseRange = expr ? expr->getSourceRange() : SourceRange();
 
-  auto overload = getOverloadChoiceIfAvailable(locator);
-  if (!overload)
-    return false;
-
-  ValueDecl *decl = nullptr;
-
-  if (!overload->choice.isDecl()) {
-    auto baseTy = overload->choice.getBaseType();
-    if (auto MT = baseTy->getAs<MetatypeType>()) {
-      if (auto VD = dyn_cast<ValueDecl>(
-              MT->getMetatypeInstanceType()->getAnyNominal()->getAsDecl())) {
-        decl = VD;
-      }
-    } else {
-      return true;
-    }
-  }
-
-  auto member = decl ? decl : overload->choice.getDecl();
-
   // If the base is an implicit self type reference, and we're in a
   // an initializer, then the user wrote something like:
   //
@@ -2043,7 +2023,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   // comes up and is otherwise non-obvious what is going on.
 
   if (Name.isSimpleName(DeclBaseName::createConstructor()) &&
-      !BaseType->getRValueType()->is<AnyMetatypeType>()) {
+      !BaseType->is<AnyMetatypeType>()) {
     if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(getRawAnchor())) {
       if (isa<SuperRefExpr>(ctorRef->getBase())) {
         emitDiagnostic(loc, diag::super_initializer_not_in_initializer);
@@ -2089,9 +2069,9 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
   }
 
-  if (BaseType->is<AnyMetatypeType>() && !member->isStatic()) {
-    auto instanceTy = BaseType->getRValueType();
-    
+  if (BaseType->is<AnyMetatypeType>() && !Member->isStatic()) {
+    auto instanceTy = BaseType;
+
     if (auto *AMT = instanceTy->getAs<AnyMetatypeType>()) {
       instanceTy = AMT->getInstanceType();
     }
@@ -2144,7 +2124,8 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
 
     // Check whether the instance member is declared on parent context and if so
     // provide more specialized message.
-    auto memberTypeContext = member->getDeclContext()->getInnermostTypeContext();
+    auto memberTypeContext =
+        Member->getDeclContext()->getInnermostTypeContext();
     auto currentTypeContext = cs.DC->getInnermostTypeContext();
     
     if (memberTypeContext && currentTypeContext &&
@@ -2154,7 +2135,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
                      currentTypeContext->getDeclaredInterfaceType(), Name,
                      memberTypeContext->getDeclaredInterfaceType(), true)
           .highlight(baseRange)
-          .highlight(member->getSourceRange());
+          .highlight(Member->getSourceRange());
       return true;
     }
 
@@ -2174,75 +2155,75 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     // to replace the metatype with 'Self'
     // error saying the lookup cannot be on a protocol metatype
     Optional<InFlightDiagnostic> Diag;
-    auto baseObjTy = BaseType->getRValueType();
-    
-    if (auto metatypeTy = baseObjTy->getAs<MetatypeType>()) {
+    auto baseTy = BaseType;
+
+    if (auto metatypeTy = baseTy->getAs<AnyMetatypeType>()) {
       auto instanceTy = metatypeTy->getInstanceType();
-      
+
       // This will only happen if we have an unresolved dot expression
       // (.foo) where foo is a protocol member and the contextual type is
       // an optional protocol metatype.
       if (auto objectTy = instanceTy->getOptionalObjectType()) {
         instanceTy = objectTy;
-        baseObjTy = MetatypeType::get(objectTy);
+        baseTy = MetatypeType::get(objectTy);
       }
-      assert(instanceTy->isExistentialType());
-      
-      // Give a customized message if we're accessing a member type
-      // of a protocol -- otherwise a diagnostic talking about
-      // static members doesn't make a whole lot of sense
-      if (auto TAD = dyn_cast<TypeAliasDecl>(member)) {
-        Diag.emplace(emitDiagnostic(loc, diag::typealias_outside_of_protocol,
-                                    TAD->getName()));
-      } else if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
-        Diag.emplace(emitDiagnostic(loc, diag::assoc_type_outside_of_protocol,
-                                    ATD->getName()));
-      } else if (isa<ConstructorDecl>(member)) {
-        Diag.emplace(emitDiagnostic(loc, diag::construct_protocol_by_name,
-                                    instanceTy));
-      } else {
-        Diag.emplace(emitDiagnostic(loc,
-                                    diag::could_not_use_type_member_on_protocol_metatype,
-                                    baseObjTy, Name));
-      }
-      
-      Diag->highlight(baseRange).highlight(getAnchor()->getSourceRange());
-      
-      // See through function decl context
-      if (auto parent = cs.DC->getInnermostTypeContext()) {
-        // If we are in a protocol extension of 'Proto' and we see
-        // 'Proto.static', suggest 'Self.static'
-        if (auto extensionContext = parent->getExtendedProtocolDecl()) {
-          if (extensionContext->getDeclaredType()->isEqual(instanceTy)) {
-            Diag->fixItReplace(getAnchor()->getSourceRange(), "Self");
+
+      if (instanceTy->isExistentialType()) {
+        // Give a customized message if we're accessing a member type
+        // of a protocol -- otherwise a diagnostic talking about
+        // static members doesn't make a whole lot of sense
+        if (auto TAD = dyn_cast<TypeAliasDecl>(Member)) {
+          Diag.emplace(emitDiagnostic(loc, diag::typealias_outside_of_protocol,
+                                      TAD->getName()));
+        } else if (auto ATD = dyn_cast<AssociatedTypeDecl>(Member)) {
+          Diag.emplace(emitDiagnostic(loc, diag::assoc_type_outside_of_protocol,
+                                      ATD->getName()));
+        } else if (isa<ConstructorDecl>(Member)) {
+          Diag.emplace(emitDiagnostic(loc, diag::construct_protocol_by_name,
+                                      instanceTy));
+        } else {
+          Diag.emplace(emitDiagnostic(
+              loc, diag::could_not_use_type_member_on_protocol_metatype, baseTy,
+              Name));
+        }
+
+        Diag->highlight(baseRange).highlight(getAnchor()->getSourceRange());
+
+        // See through function decl context
+        if (auto parent = cs.DC->getInnermostTypeContext()) {
+          // If we are in a protocol extension of 'Proto' and we see
+          // 'Proto.static', suggest 'Self.static'
+          if (auto extensionContext = parent->getExtendedProtocolDecl()) {
+            if (extensionContext->getDeclaredType()->isEqual(instanceTy)) {
+              Diag->fixItReplace(getAnchor()->getSourceRange(), "Self");
+            }
           }
         }
+
+        return true;
       }
-      
-      return true;
     }
 
     // If this is a reference to a static member by one of the key path
     // components, let's provide a tailored diagnostic and return because
     // that is unsupported so there is no fix-it.
     if (locator->isForKeyPathComponent()) {
-      InvalidStaticMemberRefInKeyPath failure(expr, getConstraintSystem(),
-                                              member, locator);
+      InvalidStaticMemberRefInKeyPath failure(expr, cs, Member, locator);
       return failure.diagnoseAsError();
     }
 
-    if (isa<EnumElementDecl>(member)) {
+    if (isa<EnumElementDecl>(Member)) {
       Diag.emplace(emitDiagnostic(
           loc, diag::could_not_use_enum_element_on_instance, Name));
     } else {
       Diag.emplace(emitDiagnostic(
-          loc, diag::could_not_use_type_member_on_instance, baseObjTy, Name));
+          loc, diag::could_not_use_type_member_on_instance, baseTy, Name));
     }
 
     Diag->highlight(getAnchor()->getSourceRange());
 
     if (Name.isSimpleName(DeclBaseName::createConstructor()) &&
-        !baseObjTy->is<AnyMetatypeType>()) {
+        !baseTy->is<AnyMetatypeType>()) {
       if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(getRawAnchor())) {
         SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
         Diag->fixItInsert(fixItRng.Start, "type(of: ");
@@ -2259,13 +2240,11 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
     
     // Try to provide a fix-it that only contains a '.'
-    if (contextualType) {
-      if (baseObjTy->isEqual(contextualType)) {
-        Diag->fixItInsert(loc, ".");
-        return true;
-      }
+    if (contextualType && baseTy->isEqual(contextualType)) {
+      Diag->fixItInsert(loc, ".");
+      return true;
     }
-    
+
     // Check if the expression is the matching operator ~=, most often used in
     // case statements. If so, try to provide a single dot fix-it
     const Expr *contextualTypeNode = nullptr;
@@ -2290,7 +2269,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
             // since the type can be inferred
             Type secondArgType =
             lastCS->getType(binaryExpr->getArg()->getElement(1));
-            if (secondArgType->isEqual(baseObjTy)) {
+            if (secondArgType->isEqual(baseTy)) {
               Diag->fixItInsert(loc, ".");
               return true;
             }
@@ -2300,17 +2279,22 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
 
     // Fall back to a fix-it with a full type qualifier
-    auto nominal = member->getDeclContext()->getSelfNominalTypeDecl();
-    SmallString<32> typeName;
-    llvm::raw_svector_ostream typeNameStream(typeName);
-    typeNameStream << nominal->getSelfInterfaceType() << ".";
-    
-    Diag->fixItInsert(loc, typeNameStream.str());
+    if (auto *NTD = Member->getDeclContext()->getSelfNominalTypeDecl()) {
+      auto typeName = NTD->getSelfInterfaceType()->getString();
+      if (auto *SE = dyn_cast<SubscriptExpr>(getRawAnchor())) {
+        auto *baseExpr = SE->getBase();
+        Diag->fixItReplace(baseExpr->getSourceRange(), typeName);
+      } else {
+        Diag->fixItInsert(loc, typeName + ".");
+      }
+    }
+
     return true;
   }
-  
+
   return false;
 }
+
 bool PartialApplicationFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
   auto *anchor = cast<UnresolvedDotExpr>(getRawAnchor());

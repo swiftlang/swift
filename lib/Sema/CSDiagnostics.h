@@ -800,16 +800,21 @@ private:
 /// ```
 class AllowTypeOrInstanceMemberFailure final : public FailureDiagnostic {
   Type BaseType;
+  ValueDecl *Member;
   DeclName Name;
 
 public:
-  AllowTypeOrInstanceMemberFailure(Expr *root, ConstraintSystem &cs, Type baseType,
-                                   DeclName memberName, ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), BaseType(baseType),
-        Name(memberName) {}
-    
+  AllowTypeOrInstanceMemberFailure(Expr *root, ConstraintSystem &cs,
+                                   Type baseType, ValueDecl *member,
+                                   DeclName name, ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator),
+        BaseType(baseType->getRValueType()), Member(member), Name(name) {
+    assert(member);
+  }
+
   bool diagnoseAsError() override;
 };
+
 class PartialApplicationFailure final : public FailureDiagnostic {
   enum RefKind : unsigned {
     MutatingMethod,
