@@ -547,15 +547,6 @@ class ReportFormatter(object):
         self.changes_only = changes_only
         self.single_table = single_table
 
-    MARKDOWN_DETAIL = """
-<details {3}>
-  <summary>{0} ({1})</summary>
-  {2}
-</details>
-"""
-    GIT_DETAIL = """
-{0} ({1}): {2}"""
-
     PERFORMANCE_TEST_RESULT_HEADER = ('TEST', 'MIN', 'MAX', 'MEAN', 'MAX_RSS')
     RESULT_COMPARISON_HEADER = ('TEST', 'OLD', 'NEW', 'DELTA', 'RATIO')
 
@@ -589,16 +580,26 @@ class ReportFormatter(object):
     def markdown(self):
         """Report results of benchmark comparisons in Markdown format."""
         return self._formatted_text(
+            label_formatter=lambda s: ('**' + s + '**'),
             COLUMN_SEPARATOR=' | ',
-            HEADER_SEPARATOR='---',
-            DETAIL=self.MARKDOWN_DETAIL)
+            DELIMITER_ROW=([':---'] + ['---:'] * 4),
+            SEPARATOR='&nbsp; | | | | \n',
+            SECTION="""
+<details {3}>
+  <summary>{0} ({1})</summary>
+  {2}
+</details>
+""")
 
     def git(self):
         """Report results of benchmark comparisons in 'git' format."""
         return self._formatted_text(
+            label_formatter=lambda s: s.upper(),
             COLUMN_SEPARATOR='   ',
-            HEADER_SEPARATOR='   ',
-            DETAIL=self.GIT_DETAIL)
+            DELIMITER_ROW=None,
+            SEPARATOR='\n',
+            SECTION="""
+{0} ({1}): \n{2}""")
 
     def _column_widths(self):
         changed = self.comparator.decreased + self.comparator.increased
@@ -618,7 +619,8 @@ class ReportFormatter(object):
 
         return reduce(max_widths, widths, [0] * 5)
 
-    def _formatted_text(self, COLUMN_SEPARATOR, HEADER_SEPARATOR, DETAIL):
+    def _formatted_text(self, label_formatter, COLUMN_SEPARATOR,
+                        DELIMITER_ROW, SEPARATOR, SECTION):
         widths = self._column_widths()
         self.header_printed = False
 
@@ -626,16 +628,15 @@ class ReportFormatter(object):
             return [c.ljust(w) for w, c in zip(widths, contents)]
 
         def row(contents):
-            return COLUMN_SEPARATOR.join(justify_columns(contents)) + ' \n'
+            return ('' if not contents else
+                    COLUMN_SEPARATOR.join(justify_columns(contents)) + '\n')
 
         def header(title, column_labels):
-            h = ''
-            if not self.header_printed:
-                h = '\n' + row(column_labels)
-                h += row([':' + HEADER_SEPARATOR] +  # left align 1st column
-                         ([HEADER_SEPARATOR + ':']) * 4)  # right align rest
-            if self.single_table:
-                h += row(('**' + title + '**', '', '', '', ''))
+            labels = (column_labels if not self.single_table else
+                      map(label_formatter, (title, ) + column_labels[1:]))
+            h = (('' if not self.header_printed else SEPARATOR) +
+                 row(labels) +
+                 (row(DELIMITER_ROW) if not self.header_printed else ''))
             if self.single_table and not self.header_printed:
                 self.header_printed = True
             return h
@@ -645,6 +646,8 @@ class ReportFormatter(object):
                     r[:-1] + ('**' + r[-1] + '**', ))
 
         def table(title, results, is_strong=False, is_open=False):
+            if not results:
+                return ''
             rows = [
                 row(format_columns(ReportFormatter.values(r), is_strong))
                 for r in results
@@ -652,12 +655,11 @@ class ReportFormatter(object):
             table = (header(title if self.single_table else '',
                             ReportFormatter.header_for(results[0])) +
                      ''.join(rows))
-            return '' if not rows else (
-                (table if self.single_table else
-                 DETAIL.format(
-                     title, len(results), table, 'open' if is_open else '')))
+            return (table if self.single_table else
+                    SECTION.format(
+                        title, len(results), table, 'open' if is_open else ''))
 
-        return ''.join([
+        return '\n' + ''.join([
             table('Regression', self.comparator.decreased, True, True),
             table('Improvement', self.comparator.increased, True),
             ('' if self.changes_only else
