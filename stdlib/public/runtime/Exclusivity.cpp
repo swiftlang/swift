@@ -157,8 +157,16 @@ static_assert(sizeof(Access) <= sizeof(ValueBuffer) &&
               "Access doesn't fit in a value buffer!");
 
 /// A set of accesses that we're tracking.  Just a singly-linked list.
+/// TODO: rename this class to something like SwiftTLSContext, because it also
+/// contains fields not related to access tracking.
 class AccessSet {
   Access *Head = nullptr;
+
+  // Not related to access tracking: The "implicit" boolean parameter which is
+  // passed to a dynamically replaceable function.
+  // If true, the original function should be executed instead of the
+  // replacement function.
+  bool CallOriginalOfReplacedFunction = false;
 public:
   constexpr AccessSet() {}
 
@@ -221,6 +229,21 @@ public:
     }
   }
 #endif
+
+  /// Called immediately before a replacement function calls its original
+  /// function.
+  void aboutToCallOriginalOfReplacedFunction() {
+    CallOriginalOfReplacedFunction = true;
+  }
+
+  /// Checked in the prolog of a replaceable function. Returns true if the
+  /// original function should be called instead of the replacement function.
+  /// Also clears the CallOriginalOfReplacedFunction flag.
+  bool shouldCallOriginalOfReplacedFunction() {
+    bool callOrig = CallOriginalOfReplacedFunction;
+    CallOriginalOfReplacedFunction = false;
+    return callOrig;
+  }
 };
 
 } // end anonymous namespace
@@ -325,6 +348,22 @@ void swift::swift_endAccess(ValueBuffer *buffer) {
   }
 
   getAccessSet().remove(access);
+}
+
+char *swift::swift_getFunctionReplacement(char **ReplFnPtr, char *CurrFn) {
+  char *ReplFn = *ReplFnPtr;
+  if (ReplFn == CurrFn)
+    return nullptr;
+  if (getAccessSet().shouldCallOriginalOfReplacedFunction()) {
+    return nullptr;
+  }
+  return ReplFn;
+}
+
+char *swift::swift_getOrigOfReplaceable(char **OrigFnPtr) {
+  char *OrigFn = *OrigFnPtr;
+  getAccessSet().aboutToCallOriginalOfReplacedFunction();
+  return OrigFn;
 }
 
 #ifndef NDEBUG
