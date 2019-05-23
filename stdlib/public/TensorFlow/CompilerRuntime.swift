@@ -564,19 +564,8 @@ public final class _ExecutionContext {
 
   /// List of devices available to this execution context.
   /// Devices are represented by their names in TensorFlow notation.
-  /// See documentation for the top-level `withDevice` function for details
-  /// about device names.
+  /// See documentation for `withDevice(_:perform:)` to learn about device names.
   private var deviceNames: [String] = []
-
-  /// Stack of devices that models nested calls to withDevice/withDefaultDevice.
-  /// Devices are represented by their names in TensorFlow notation.
-  /// See documentation for the top-level `withDevice` function for details
-  /// about device names.
-  ///
-  /// All TensorFlow operations will be put on the topmost device on the stack.
-  /// When the stack is empty or the topmost device is `nil`, that allows
-  /// TensorFlow to place operations on any device that it sees fit.
-  private var deviceScopes: [String?] = []
 
   /// Initializes a new execution context by initializing available devices.
   @usableFromInline
@@ -981,14 +970,15 @@ public func _tffunc<In : TensorGroup, Out : TensorGroup>(
 
 internal extension _ExecutionContext {
   /// Returns a valid TensorFlow device name such as, which corresponds to the
-  /// closest enclosing `withDevice(_:perform:)` call.
-  /// A return value of `nil` indicates the absence of `withDevice(_:perform:)` or the
-  /// immediately enclosing withDefaultDevice() call.
+  /// closest enclosing call to one of the overloads of withDevice.
+  /// A return value of `nil` indicates the absence of a withDevice call on
+  /// the call stack or the presence of an immediately enclosing
+  /// `withDefaultDevice(perform)` call.
   var currentDeviceName: String? {
-    return deviceScopes.last ?? nil
+    return _ThreadLocalState.value._currentDevice
   }
 
-  /// See documentation for the top-level `withDevice` function.
+  /// See documentation for the top-level `withDevice(_:_:perform)`.
   func withDevice<R>(_ kind: DeviceKind, _ index: UInt = 0,
                      perform body: () throws -> R) rethrows -> R {
     let name: String
@@ -1005,28 +995,23 @@ internal extension _ExecutionContext {
     return try withDevice(name, perform: body)
   }
 
-  /// See documentation for the top-level `withDevice` function.
+  /// See documentation for the top-level `withDevice(_:perform)`.
   func withDevice<R>(_ name: String,
                      perform body: () throws -> R) rethrows -> R {
     guard deviceNames.contains(name) else {
       fatalError("Device \(name) not found")
     }
-    deviceScopes.append(name)
-    ...
-      deviceScopes.append(name)
-      let result = try body()
-      internalConsistencyCheck(deviceScopes.popLast() != nil)
-      return result
-    } else {
-      fatalError("Device \(name) not found")
-    }
+    _ThreadLocalState.value.pushDevice(name)
+    let result = try body()
+    _ThreadLocalState.value.popDevice()
+    return result
   }
 
-  /// See documentation for the top-level `withDefaultDevice` function.
+  /// See documentation for the top-level `withDefaultDevice(perform)`.
   func withDefaultDevice<R>(perform body: () throws -> R) rethrows -> R {
-    deviceScopes.append(nil)
+    _ThreadLocalState.value.pushDevice(nil)
     let result = try body()
-    internalConsistencyCheck(deviceScopes.popLast() != nil)
+    _ThreadLocalState.value.popDevice()
     return result
   }
 }
@@ -1256,6 +1241,54 @@ fileprivate func setAttrShapeList(
                                Int32(ranksBuffer.count), status)
       }
     }
+  }
+}
+
+/// Stack of devices that models nested calls to withDevice/withDefaultDevice.
+/// Devices are represented by their names in TensorFlow notation.
+/// See documentation for `withDevice(_:perform:)` to learn about device names.
+///
+/// All TensorFlow operations will be put on the topmost device on the stack.
+/// When the stack is empty or the topmost device is `nil`, that allows
+/// TensorFlow to place operations on any device that it sees fit.
+@usableFromInline
+class _ThreadLocalState {
+  var deviceScopes: [String?] = []
+
+  private static let key: pthread_key_t = {
+    var key = pthread_key_t()
+    pthread_key_create(&key) {
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+      let _: AnyObject = Unmanaged.fromOpaque($0).takeRetainedValue()
+#else
+      let _: AnyObject = Unmanaged.fromOpaque($0!).takeRetainedValue()
+#endif
+    }
+    return key
+  }()
+
+  var _currentDevice: String? {
+    return deviceScopes.last ?? nil
+  }
+
+  @usableFromInline
+  func pushDevice(_ device: String?) {
+    deviceScopes.append(device)
+  }
+
+  @usableFromInline
+  func popDevice() {
+    internalConsistencyCheck(deviceScopes.popLast() != nil)
+  }
+
+  @usableFromInline
+  static var value: _ThreadLocalState {
+    if let state = pthread_getspecific(key) {
+      return Unmanaged.fromOpaque(state).takeUnretainedValue()
+    }
+    let state = _ThreadLocalState()
+    pthread_setspecific(key, Unmanaged.passRetained(state).toOpaque())
+    return state
   }
 }
 
