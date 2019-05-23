@@ -2337,7 +2337,7 @@ assign_by_delegate
 ``````````````````
 ::
 
-  sil-instruction ::= 'assign_by_delegate' sil-operand 'to' sil-operand ',' 'init' sil-operand ',' 'set' sil-operand 
+  sil-instruction ::= 'assign_by_delegate' sil-operand 'to' sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
 
   assign_by_delegate %0 : $S to %1 : $*T, init %2 : $F, set %3 : $G
   // $S can be a value or address type
@@ -3054,7 +3054,7 @@ function_ref
 Creates a reference to a SIL function.
 
 dynamic_function_ref
-````````````
+````````````````````
 ::
 
   sil-instruction ::= 'dynamic_function_ref' sil-function-name ':' sil-type
@@ -3091,7 +3091,7 @@ We will generate::
   }
 
 prev_dynamic_function_ref
-````````````
+`````````````````````````
 ::
 
   sil-instruction ::= 'prev_dynamic_function_ref' sil-function-name ':' sil-type
