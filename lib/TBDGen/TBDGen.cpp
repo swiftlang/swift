@@ -197,8 +197,6 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(
         AFD, useAllocator));
     addSymbol(
-        LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD, useAllocator));
-    addSymbol(
         LinkEntity::forDynamicallyReplaceableFunctionKey(AFD, useAllocator));
 
   }

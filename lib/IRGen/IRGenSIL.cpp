@@ -1244,6 +1244,10 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
   if (f->getDynamicallyReplacedFunction()) {
     IGM.emitDynamicReplacementOriginalFunctionThunk(f);
   }
+
+  if (f->isDynamicallyReplaceable()) {
+    IGM.createReplaceableProlog(*this, f);
+  }
 }
 
 IRGenSILFunction::~IRGenSILFunction() {
@@ -1646,7 +1650,7 @@ void IRGenSILFunction::emitSILFunction() {
     IGM.DebugInfo->emitFunction(*CurSILFn, CurFn);
 
   // Map the entry bb.
-  LoweredBBs[&*CurSILFn->begin()] = LoweredBB(&*CurFn->begin(), {});
+  LoweredBBs[&*CurSILFn->begin()] = LoweredBB(&CurFn->back(), {});
   // Create LLVM basic blocks for the other bbs.
   for (auto bi = std::next(CurSILFn->begin()), be = CurSILFn->end(); bi != be;
        ++bi) {
