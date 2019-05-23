@@ -37,10 +37,31 @@ public enum DeviceKind {
 @inline(never)
 public func withDevice<R>(_ kind: DeviceKind, _ index: UInt = 0,
                           perform body: () throws -> R) rethrows -> R {
-  _ThreadLocalState.value.pushDevice((kind, index))
-  let result = try body()
-  _ThreadLocalState.value.popDevice()
-  return result
+  return try _ExecutionContext.global.withDevice(kind, index, perform: body)
+}
+
+/// Executes a closure, making TensorFlow operations run on a device with
+/// a specific name.
+///
+/// - Parameters:
+///   - name: Device name.
+///   - body: A closure whose TensorFlow operations are to be executed on the
+///     specified kind of device.
+///
+/// A few examples of device names from https://www.tensorflow.org/alpha/guide/using_gpu
+/// (I haven't been able to find a specification for device names):
+///
+/// 1) "/device:CPU:0": The CPU of your machine.
+///
+/// 2) "/GPU:0": Short-hand notation for the first GPU of your machine that
+/// is visible to TensorFlow
+///
+/// 3) "/job:localhost/replica:0/task:0/device:GPU:1": Fully qualified name of
+/// the second GPU of your machine that is visible to TensorFlow.
+@inline(never)
+public func withDevice<R>(_ name: String,
+                          perform body: () throws -> R) rethrows -> R {
+  return try _ExecutionContext.global.withDevice(name, perform: body)
 }
 
 /// Executes a closure, allowing TensorFlow to place TensorFlow operations on
@@ -51,8 +72,5 @@ public func withDevice<R>(_ kind: DeviceKind, _ index: UInt = 0,
 ///     specified kind of device.
 @inline(never)
 public func withDefaultDevice<R>(perform body: () throws -> R) rethrows -> R {
-  _ThreadLocalState.value.pushDevice(nil)
-  let result = try body()
-  _ThreadLocalState.value.popDevice()
-  return result
+  return try _ExecutionContext.global.withDefaultDevice(perform: body)
 }
