@@ -552,7 +552,7 @@ public final class _ExecutionContext {
 
   /// List of devices available to this execution context.
   /// Devices are represented by their names in TensorFlow notation.
-  /// See documentation for `withDevice(_:perform:)` to learn about device names.
+  /// See documentation for `withDevice(named:perform:)` to learn about device names.
   private var deviceNames: [String] = []
 
   /// The buffer storing a serialized TensorFlow config proto.
@@ -975,7 +975,7 @@ internal extension _ExecutionContext {
   /// the call stack or the presence of an immediately enclosing
   /// `withDefaultDevice(perform)` call.
   var currentDeviceName: String? {
-    return _ThreadLocalState.value._currentDevice
+    return _ThreadLocalState.local._currentDevice
   }
 
   /// See documentation for the top-level `withDevice(_:_:perform)`.
@@ -992,26 +992,26 @@ internal extension _ExecutionContext {
       // SWIFT_TENSORFLOW_SERVER_ADDRESS, the TPUs will all be on task 1.
       name = "/job:localhost/replica:0/task:1/device:TPU:\(index)"
     }
-    return try withDevice(name, perform: body)
+    return try withDevice(named: name, perform: body)
   }
 
-  /// See documentation for the top-level `withDevice(_:perform)`.
-  func withDevice<R>(_ name: String,
+  /// See documentation for the top-level `withDevice(named:perform)`.
+  func withDevice<R>(named name: String,
                      perform body: () throws -> R) rethrows -> R {
     guard deviceNames.contains(name) else {
       fatalError("Device \(name) not found")
     }
-    _ThreadLocalState.value.pushDevice(name)
+    _ThreadLocalState.local.pushDevice(name)
     let result = try body()
-    _ThreadLocalState.value.popDevice()
+    _ThreadLocalState.local.popDevice()
     return result
   }
 
   /// See documentation for the top-level `withDefaultDevice(perform)`.
   func withDefaultDevice<R>(perform body: () throws -> R) rethrows -> R {
-    _ThreadLocalState.value.pushDevice(nil)
+    _ThreadLocalState.local.pushDevice(nil)
     let result = try body()
-    _ThreadLocalState.value.popDevice()
+    _ThreadLocalState.local.popDevice()
     return result
   }
 }
@@ -1246,7 +1246,7 @@ fileprivate func setAttrShapeList(
 
 /// Stack of devices that models nested calls to withDevice/withDefaultDevice.
 /// Devices are represented by their names in TensorFlow notation.
-/// See documentation for `withDevice(_:perform:)` to learn about device names.
+/// See documentation for `withDevice(named:perform:)` to learn about device names.
 ///
 /// All TensorFlow operations will be put on the topmost device on the stack.
 /// When the stack is empty or the topmost device is `nil`, that allows
@@ -1282,7 +1282,7 @@ class _ThreadLocalState {
   }
 
   @usableFromInline
-  static var value: _ThreadLocalState {
+  static var local: _ThreadLocalState {
     if let state = pthread_getspecific(key) {
       return Unmanaged.fromOpaque(state).takeUnretainedValue()
     }

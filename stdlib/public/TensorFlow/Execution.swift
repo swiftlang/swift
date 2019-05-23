@@ -51,9 +51,9 @@ public func withDevice<R>(_ kind: DeviceKind, _ index: UInt = 0,
 ///     is visible to TensorFlow
 ///   - "/job:localhost/replica:0/task:0/device:GPU:1": Fully qualified name of
 ///     the second GPU of your machine that is visible to TensorFlow.
-public func withDevice<R>(_ name: String,
+public func withDevice<R>(named name: String,
                           perform body: () throws -> R) rethrows -> R {
-  return try _ExecutionContext.global.withDevice(name, perform: body)
+  return try _ExecutionContext.global.withDevice(named: name, perform: body)
 }
 
 /// Executes a closure, allowing TensorFlow to place TensorFlow operations on
