@@ -1176,7 +1176,11 @@ static bool knowHowToEmitReferenceCountInsts(ApplyInst *Call) {
   if (Call->getNumArguments() != 1)
     return false;
 
-  FunctionRefInst *FRI = cast<FunctionRefInst>(Call->getCallee());
+  // FIXME: We could handle dynamic_function_ref instructions here because the
+  // code only looks at the function type.
+  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Call->getCallee());
+  if (!FRI)
+    return false;
   SILFunction *F = FRI->getReferencedFunction();
   auto FnTy = F->getLoweredFunctionType();
 

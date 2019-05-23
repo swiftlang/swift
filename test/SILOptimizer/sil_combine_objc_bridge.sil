@@ -64,6 +64,23 @@ bb0(%0 : $AnNSArray):
   return %4 : $AnNSArray
 }
 
+sil [_semantics "convertFromObjectiveC"] [dynamically_replacable] @bridgeFromObjectiveC2 :
+  $@convention(thin) <τ_0_0> (@owned AnNSArray) -> @owned AnArray<τ_0_0>
+
+sil [_semantics "convertToObjectiveC"] [dynamically_replacable] @bridgeToObjectiveC2:
+  $@convention(method) <τ_0_0> (@owned AnArray<τ_0_0>) -> @owned AnNSArray
+
+// This should not crash.
+sil @bridge_from_to_owned_dynamic : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
+bb0(%0 : $AnNSArray):
+  %1 = dynamic_function_ref @bridgeFromObjectiveC2 : $@convention(thin) <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  %2 = apply %1<AnyObject>(%0) : $@convention(thin) <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>
+  retain_value %2 : $AnArray<AnyObject>
+  release_value %2 : $AnArray<AnyObject>
+  %3 = dynamic_function_ref @bridgeToObjectiveC2 : $@convention(method) <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
+  %4 = apply %3<AnyObject>(%2) : $@convention(method) <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
+  return %4 : $AnNSArray
+}
 // CHECK-LABEL: sil @bridge_to_from_owned
 // CHECK-NOT: apply
 // CHECK: retain_value
