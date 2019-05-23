@@ -9,8 +9,6 @@ import StdlibUnittest
 var StringTensorTests = TestSuite("String")
 
 StringTensorTests.test("StringComparison") {
-  // Const op over a String tensor cannot live on GPU.
-  TensorFlow.enableCPU()
   let t1 = StringTensor("foo")
   let result1 = t1.elementsEqual(t1)
   expectEqual(ShapedArray(shape: [], scalars: [true]), result1.array)
@@ -27,9 +25,6 @@ StringTensorTests.test("StringComparison") {
 }
 
 StringTensorTests.test("StringTFOP") {
-  // Const op over a String tensor cannot live on GPU.
-  TensorFlow.enableCPU()
-
   let encoded = StringTensor("aGVsbG8gd29ybGQ=")
   let decoded: StringTensor = Raw.decodeBase64(encoded)
   let expectedDecoded = StringTensor("hello world")

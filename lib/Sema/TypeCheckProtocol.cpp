@@ -731,7 +731,7 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
     auto missingConform = (MissingConformance *)fix;
     requirementKind = RequirementKind::Conformance;
     type = missingConform->getNonConformingType();
-    missingType = missingConform->getProtocol()->getDeclaredType();
+    missingType = missingConform->getProtocolType();
     break;
   }
   case FixKind::SkipSameTypeRequirement: {
@@ -4333,55 +4333,6 @@ TypeChecker::LookUpConformance::operator()(
                          (ConformanceCheckFlags::Used|
                           ConformanceCheckFlags::InExpression|
                           ConformanceCheckFlags::SkipConditionalRequirements));
-}
-
-void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
-  auto errorProto = Context.getProtocol(KnownProtocolKind::Error);
-  auto bridgedStoredNSError = Context.getProtocol(
-                                    KnownProtocolKind::BridgedStoredNSError);
-  auto errorCodeProto = Context.getProtocol(
-                              KnownProtocolKind::ErrorCodeProtocol);
-  auto rawProto = Context.getProtocol(
-                        KnownProtocolKind::RawRepresentable);
-
-  if (!errorProto || !bridgedStoredNSError || !errorCodeProto || !rawProto)
-    return;
-
-  // The NSError: Error conformance.
-  if (auto nsError = Context.getNSErrorDecl()) {
-    validateDecl(nsError);
-    (void)conformsToProtocol(nsError->TypeDecl::getDeclaredInterfaceType(),
-                             errorProto, dc, ConformanceCheckFlags::Used);
-  }
-
-  // _BridgedStoredNSError.
-  auto conformance = conformsToProtocol(type, bridgedStoredNSError, dc,
-                                        ConformanceCheckFlags::Used);
-  if (conformance && conformance->isConcrete()) {
-    // Hack: If we've used a conformance to the _BridgedStoredNSError
-    // protocol, also use the RawRepresentable and _ErrorCodeProtocol
-    // conformances on the Code associated type witness.
-    if (auto codeType = conformance->getTypeWitnessByName(
-                          type, Context.Id_Code)) {
-      (void)conformsToProtocol(codeType, errorCodeProto, dc,
-                               ConformanceCheckFlags::Used);
-      (void)conformsToProtocol(codeType, rawProto, dc,
-                               ConformanceCheckFlags::Used);
-    }
-  }
-
-  // _ErrorCodeProtocol.
-  conformance =
-  conformsToProtocol(type, errorCodeProto, dc,
-                     (ConformanceCheckFlags::SuppressDependencyTracking|
-                      ConformanceCheckFlags::Used));
-  if (conformance && conformance->isConcrete()) {
-    if (Type errorType = conformance->getTypeWitnessByName(
-          type, Context.Id_ErrorType)) {
-      (void)conformsToProtocol(errorType, bridgedStoredNSError, dc,
-                               ConformanceCheckFlags::Used);
-    }
-  }
 }
 
 void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {

@@ -4,12 +4,7 @@
 // Dataset API tests.
 
 import TensorFlow
-
-#if TPU
-import TensorFlowUnittestTPU
-#else
 import TensorFlowUnittest
-#endif
 import StdlibUnittest
 
 var DatasetAPITests = TestSuite("DatasetAPI")
@@ -58,7 +53,7 @@ DatasetAPITests.testAllBackends("SingleValueHOFs") {
   let addedOne: Dataset = dataset.map { $0 + 1 }
   expectEqual([1, 2, 3, 4, 5], addedOne.flatMap { $0.scalars })
   // Use '.==' in the following closure to avoid any conversions to
-  // host data types, which is not handled correctly in tracing. 
+  // host data types, which is not handled correctly in tracing.
   let evens: Dataset = dataset.filter { Tensor($0 % 2) .== Tensor(0) }
   expectEqual([0, 2, 4], evens.flatMap { $0.scalars })
 }

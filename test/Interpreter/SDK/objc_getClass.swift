@@ -225,6 +225,7 @@ testSuite.test("ResilientNSObject")
                 reason: "objc_getClass hook not present"))
   .requireOwnProcess()
   .code {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else { return }
   requireClass(named: "_TtC4main27ResilientSubclassOfNSObject",
                demangledName: "main.ResilientSubclassOfNSObject")
   requireClass(named: "_TtC4main34ResilientSubclassOfGenericNSObject",

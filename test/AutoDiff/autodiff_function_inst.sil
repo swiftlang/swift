@@ -10,11 +10,10 @@ sil_stage raw
 import Swift
 import Builtin
 
-// The pullback function emitted by the compiler. Parameter are a vector, as in
-// vector-Jacobian products, and primal values. The function is not itself a
-// pullback, but to be partially applied to form a pullback, which takes a
-// vector and returns vector-Jacobian products evaluated at the original
-// parameter.
+// The adjoint function emitted by the compiler. Parameter are a vector, as in
+// vector-Jacobian products, and pullback values. The function is partially
+// applied to a pullback struct to form a pullback, which takes a vector and
+// returns vector-Jacobian products evaluated at the original parameter.
 sil hidden @foo_adj : $@convention(thin) (Float, Float, Float) -> Float {
 bb0(%0 : $Float, %1 : $Float, %2 : $Float):
   return %2 : $Float

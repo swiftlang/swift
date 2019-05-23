@@ -16,7 +16,7 @@ struct B : A {
   func a(_ x: Float) -> Float { return x * 5.0 }
 }
 
-ExistentialTests.test("primal/adjoint constructed with existentials.") {
+ExistentialTests.test("vjp/adjoint constructed with existentials.") {
   expectEqual(5.0, b(g: B()))
 }
 

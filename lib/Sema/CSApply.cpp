@@ -285,18 +285,6 @@ namespace {
     const Solution &solution;
     bool SuppressDiagnostics;
 
-    /// Recognize used conformances from an imported type when we must emit
-    /// the witness table.
-    ///
-    /// This arises in _BridgedStoredNSError, where we wouldn't
-    /// otherwise pull in the witness table, causing dynamic casts to
-    /// perform incorrectly, and _ErrorCodeProtocol, where we need to
-    /// check for _BridgedStoredNSError conformances on the
-    /// corresponding ErrorType.
-    void checkForImportedUsedConformances(Type toType) {
-      cs.getTypeChecker().useBridgedNSErrorConformances(dc, toType);
-    }
-
     /// Coerce the given tuple to another tuple type.
     ///
     /// \param expr The expression we're converting.
@@ -3190,7 +3178,6 @@ namespace {
       auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
       auto sub = cs.coerceToRValue(expr->getSubExpr());
 
-      checkForImportedUsedConformances(toType);
       expr->setSubExpr(sub);
 
       // Set the type we checked against.
@@ -3558,7 +3545,6 @@ namespace {
       // Simplify the type we're casting to.
       auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
       expr->getCastTypeLoc().setType(toType);
-      checkForImportedUsedConformances(toType);
 
       auto &tc = cs.getTypeChecker();
 
@@ -3651,7 +3637,6 @@ namespace {
         toType = toType->getOptionalObjectType();
 
       expr->getCastTypeLoc().setType(toType);
-      checkForImportedUsedConformances(toType);
 
       // The subexpression is always an rvalue.
       auto &tc = cs.getTypeChecker();
@@ -3730,7 +3715,6 @@ namespace {
                                            bool isInsideIsExpr = false) {
       // Simplify the type we're casting to.
       auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
-      checkForImportedUsedConformances(toType);
       expr->getCastTypeLoc().setType(toType);
 
       // The subexpression is always an rvalue.
@@ -4480,8 +4464,7 @@ namespace {
     buildKeyPathPropertyComponent(const SelectedOverload &overload,
                                   SourceLoc componentLoc,
                                   ConstraintLocator *locator) {
-      if (overload.choice.isDecl()) {
-        auto property = overload.choice.getDecl();
+      if (auto *property = overload.choice.getDeclOrNull()) {
         // Key paths can only refer to properties currently.
         auto varDecl = cast<VarDecl>(property);
         // Key paths don't work with mutating-get properties.
@@ -4785,10 +4768,8 @@ static ConcreteDeclRef resolveLocatorToDecl(
     // Overloaded and unresolved cases: find the resolved overload.
     auto anchorLocator = cs.getConstraintLocator(anchor);
     if (auto selected = findOvlChoice(anchorLocator)) {
-      if (selected->choice.isDecl())
-        return getConcreteDeclRef(selected->choice.getDecl(),
-                                  selected->openedType,
-                                  anchorLocator);
+      if (auto *decl = selected->choice.getDeclOrNull())
+        return getConcreteDeclRef(decl, selected->openedType, anchorLocator);
     }
   }
   
@@ -4797,10 +4778,8 @@ static ConcreteDeclRef resolveLocatorToDecl(
     auto anchorLocator = cs.getConstraintLocator(anchor,
                            ConstraintLocator::UnresolvedMember);
     if (auto selected = findOvlChoice(anchorLocator)) {
-      if (selected->choice.isDecl())
-        return getConcreteDeclRef(selected->choice.getDecl(),
-                                  selected->openedType,
-                                  anchorLocator);
+      if (auto *decl = selected->choice.getDeclOrNull())
+        return getConcreteDeclRef(decl, selected->openedType, anchorLocator);
     }
   }
 
@@ -4809,10 +4788,8 @@ static ConcreteDeclRef resolveLocatorToDecl(
     auto anchorLocator = cs.getConstraintLocator(anchor,
                                                  ConstraintLocator::Member);
     if (auto selected = findOvlChoice(anchorLocator)) {
-      if (selected->choice.isDecl())
-        return getConcreteDeclRef(selected->choice.getDecl(),
-                                  selected->openedType,
-                                  anchorLocator);
+      if (auto *decl = selected->choice.getDeclOrNull())
+        return getConcreteDeclRef(decl, selected->openedType, anchorLocator);
     }
   }
 
@@ -4825,10 +4802,8 @@ static ConcreteDeclRef resolveLocatorToDecl(
     auto anchorLocator =
       cs.getConstraintLocator(anchor, ConstraintLocator::SubscriptMember);
     if (auto selected = findOvlChoice(anchorLocator)) {
-      if (selected->choice.isDecl())
-        return getConcreteDeclRef(selected->choice.getDecl(),
-                                  selected->openedType,
-                                  anchorLocator);
+      if (auto *decl = selected->choice.getDeclOrNull())
+        return getConcreteDeclRef(decl, selected->openedType, anchorLocator);
     }
   }
 
@@ -7597,11 +7572,7 @@ namespace {
     }
 
     Expr *walkToExprPost(Expr *expr) override {
-      Expr *result = Rewriter.walkToExprPost(expr);
-      auto &cs = Rewriter.getConstraintSystem();
-      if (result && cs.hasType(result))
-        Rewriter.checkForImportedUsedConformances(cs.getType(result));
-      return result;
+      return Rewriter.walkToExprPost(expr);
     }
 
     /// Ignore statements.

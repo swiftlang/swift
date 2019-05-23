@@ -4,11 +4,7 @@
 // Tests on collective ops, as a building block for data/model parallel programs.
 
 import TensorFlow
-#if TPU
-import TensorFlowUnittestTPU
-#else
 import TensorFlowUnittest
-#endif
 import StdlibUnittest
 
 var WithDeviceTests = TestSuite("WithDevice")

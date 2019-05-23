@@ -36,29 +36,31 @@ func testOwnedVector(_ x: Vector) -> Vector {
 }
 _ = pullback(at: Vector.zero, in: testOwnedVector)
 
-// CHECK-LABEL: struct {{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0 {
+// CHECK-LABEL: enum {{.*}}testOwnedVector{{.*}}__Pred__src_0_wrt_0 {
+// CHECK-NEXT: }
+// CHECK-LABEL: struct {{.*}}testOwnedVector{{.*}}__PB__src_0_wrt_0 {
 // CHECK-NEXT:   @_hasStorage var pullback_0: (Vector) -> (Vector, Vector) { get set }
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil hidden @{{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__adjoint_src_0_wrt_0_1
-// CHECK: bb0([[SEED:%.*]] : $Vector, [[PRIMVALS:%.*]] : ${{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__Type__src_0_wrt_0_1):
-// CHECK:   [[PB:%.*]] = struct_extract [[PRIMVALS]] : ${{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__Type__src_0_wrt_0_1
+// CHECK: bb0([[SEED:%.*]] : $Vector, [[PB_STRUCT:%.*]] : ${{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__PB__src_0_wrt_0_1):
+// CHECK:   [[PB:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__PB__src_0_wrt_0_1
 // CHECK:   [[NEEDED_COTAN:%.*]] = apply [[PB]]([[SEED]]) : $@callee_guaranteed (@guaranteed Vector) -> @owned Vector
 // CHECK:   release_value [[SEED:%.*]] : $Vector
 
 // CHECK-LABEL sil hidden @{{.*}}subset_adjoint_releases_unused_ones{{.*}}__adjoint_src_0_wrt_0
-// CHECK: bb0([[SEED:%.*]] : $Vector, [[PRIMVALS:%.*]] : ${{.*}}subset_adjoint_releases_unused_ones{{.*}}__Type__src_0_wrt_0):
-// CHECK:   [[PB0:%.*]] = struct_extract [[PRIMVALS]] : ${{.*}}subset_adjoint_releases_unused_ones{{.*}}, #{{.*}}subset_adjoint_releases_unused_ones{{.*}}__Type__src_0_wrt_0.pullback_1
+// CHECK: bb0([[SEED:%.*]] : $Vector, [[PB_STRUCT:%.*]] : ${{.*}}subset_adjoint_releases_unused_ones{{.*}}__PB__src_0_wrt_0):
+// CHECK:   [[PB0:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}subset_adjoint_releases_unused_ones{{.*}}, #{{.*}}subset_adjoint_releases_unused_ones{{.*}}__PB__src_0_wrt_0.pullback_1
 // CHECK:   [[NEEDED_COTAN0:%.*]] = apply [[PB0]]([[SEED]]) : $@callee_guaranteed (@guaranteed Vector) -> @owned Vector
 // CHECK-NOT:  release_value [[NEEDED_COTAN0]] : $Vector
-// CHECK:   [[PB1:%.*]] = struct_extract [[PRIMVALS]] : ${{.*}}subset_adjoint_releases_unused_ones{{.*}}__Type__src_0_wrt_0, #{{.*}}subset_adjoint_releases_unused_ones{{.*}}__Type__src_0_wrt_0.pullback_0
+// CHECK:   [[PB1:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}subset_adjoint_releases_unused_ones{{.*}}__PB__src_0_wrt_0, #{{.*}}subset_adjoint_releases_unused_ones{{.*}}__PB__src_0_wrt_0.pullback_0
 // CHECK:   [[NEEDED_COTAN1:%.*]] = apply [[PB1]]([[NEEDED_COTAN0]]) : $@callee_guaranteed (@guaranteed Vector) -> @owned Vector
 // CHECK:   release_value [[NEEDED_COTAN0]] : $Vector
 // CHECK:   release_value [[SEED]] : $Vector
 // CHECK:   return [[NEEDED_COTAN1]] : $Vector
 
 // CHECK-LABEL: sil hidden @{{.*}}side_effect_release_zero{{.*}}__adjoint_src_0_wrt_0
-// CHECK: bb0([[X:%.*]] : $Vector, %1 : $_AD__$s11refcounting24side_effect_release_zeroyAA6VectorVADF__Type__src_0_wrt_0):
+// CHECK: bb0([[X:%.*]] : $Vector, %1 : ${{.*}}side_effect_release_zero{{.*}}_bb0__PB__src_0_wrt_0):
 // CHECK:   retain_value [[SEED:%.*]] : $Vector
 // CHECK:   [[BUF:%.*]] = alloc_stack $Vector
 // CHECK:   [[BUF_ACCESS:%.*]] = begin_access [init] [static] [no_nested_conflict] [[BUF]] : $*Vector
@@ -70,7 +72,7 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK:   release_value [[SEED:%.*]] : $Vector
 // CHECK: }
 
-// The vjp should not release primal values.
+// The vjp should not release pullback values.
 //
 // CHECK-LABEL: sil hidden @{{.*}}testOwnedVector{{.*}}__vjp_src_0_wrt_0 : $@convention(thin) (@guaranteed Vector) -> (@owned Vector, @owned @callee_guaranteed (@guaranteed Vector) -> @owned Vector)
 // CHECK:   [[ADD:%.*]] = function_ref @Vector_plus
@@ -83,13 +85,13 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK-NOT:   release_value [[ADD_VJP_RESULT]]
 // CHECK-NOT:   release_value [[ADD_PULLBACK]]
 
-// The adjoint should not release primal values because they are passed in as @guaranteed.
+// The adjoint should not release pullback struct argument because it has @guaranteed convention.
 //
 // CHECK-LABEL: @{{.*}}testOwnedVector{{.*}}__adjoint_src_0_wrt_0
-// CHECK: bb0({{%.*}} : $Vector, [[PRIMAL_VALUES:%.*]] : ${{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0):
-// CHECK:   [[PULLBACK0:%.*]] = struct_extract [[PRIMAL_VALUES]] : ${{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0, #{{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0.pullback_0
+// CHECK: bb0({{%.*}} : $Vector, [[PB_STRUCT:%.*]] : ${{.*}}testOwnedVector{{.*}}__PB__src_0_wrt_0):
+// CHECK:   [[PULLBACK0:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}testOwnedVector{{.*}}__PB__src_0_wrt_0, #{{.*}}testOwnedVector{{.*}}__PB__src_0_wrt_0.pullback_0
 // CHECK-NOT:   release_value [[PULLBACK0]]
-// CHECK-NOT:   release_value [[PRIMAL_VALUES]]
+// CHECK-NOT:   release_value [[PB_STRUCT]]
 // CHECK: }
 
 
@@ -109,7 +111,7 @@ _ = pullback(at: .zero, in: subset_adjoint_releases_unused_ones)
 
 struct FakeMaxPool : Differentiable {
   @differentiable(wrt: (self, input))
-  func applied(to input: Vector) -> Vector { return .zero }
+  func applied(to input: Vector) -> Vector { return input }
 }
 
 struct UsesMethodOfNoDerivativeMember : Differentiable {

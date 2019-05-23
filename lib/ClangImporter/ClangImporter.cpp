@@ -518,7 +518,12 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       });
 
   } else {
-    invocationArgStrs.insert(invocationArgStrs.end(), {"-x", "c", "-std=gnu11"});
+    bool EnableCXXInterop = LangOpts.EnableCXXInterop;
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+        "-x",
+        EnableCXXInterop ? "c++" : "c",
+        EnableCXXInterop ? "-std=c++17" : "-std=gnu11"
+    });
   }
 
   // Set C language options.
@@ -650,7 +655,9 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.back().append(moduleCachePath);
   }
 
-  if (!importerOpts.DisableModulesValidateSystemHeaders) {
+  if (importerOpts.DisableModulesValidateSystemHeaders) {
+    invocationArgStrs.push_back("-fno-modules-validate-system-headers");
+  } else {
     invocationArgStrs.push_back("-fmodules-validate-system-headers");
   }
 

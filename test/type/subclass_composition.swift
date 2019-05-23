@@ -97,8 +97,8 @@ func basicSubtyping(
   anyObject: AnyObject) {
 
   // Errors
-  let _: Base & P2 = base // expected-error {{value of type 'Base<Int>' does not conform to specified type 'Base & P2'}}
-  let _: Base<Int> & P2 = base // expected-error {{value of type 'Base<Int>' does not conform to specified type 'Base<Int> & P2'}}
+  let _: Base & P2 = base // expected-error {{value of type 'Base<Int>' does not conform to specified type 'P2'}}
+  let _: Base<Int> & P2 = base // expected-error {{value of type 'Base<Int>' does not conform to specified type 'P2'}}
   let _: P3 = baseAndP1 // expected-error {{value of type 'Base<Int> & P1' does not conform to specified type 'P3'}}
   let _: P3 = baseAndP2 // expected-error {{value of type 'Base<Int> & P2' does not conform to specified type 'P3'}}
   let _: Derived = baseAndP1 // expected-error {{cannot convert value of type 'Base<Int> & P1' to specified type 'Derived'}}

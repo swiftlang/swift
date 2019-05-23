@@ -5,11 +5,7 @@
 
 import TensorFlow
 import StdlibUnittest
-#if TPU
-import TensorFlowUnittestTPU
-#else
 import TensorFlowUnittest
-#endif
 
 var TensorADTests = TestSuite("TensorAD")
 
@@ -266,6 +262,7 @@ TensorADTests.testAllBackends("broadcast(toShape:)") {
   func foo(tensor: Tensor<Float>, shape: Tensor<Int32>) -> Tensor<Float> {
     tensor.broadcast(toShape: shape)
   }
+
   let pb: (Tensor<Float>) -> Tensor<Float> = pullback(at: Tensor([99, 33, 55])) { x in 
     foo(tensor: x, shape: Tensor([3, 3])) 
   }
@@ -300,6 +297,7 @@ TensorADTests.testAllBackends("broadcast(like:)") {
   }
   let inputTensor: Tensor<Float> = Tensor([[[[[[1, 2, 3]]]]]])
   let expected: Tensor<Float> = Tensor([[1, 2, 3]])
+
   expectEqual(expected, pb(inputTensor))
 }
 
@@ -325,8 +323,8 @@ TensorADTests.testAllBackends("unbroadcast(to:") {
     tensor.unbroadcast(to: shape)
   }
   let atTensor: Tensor<Float> = Tensor([
-    [1, 2, 3], 
-    [1, 2, 3], 
+    [1, 2, 3],
+    [1, 2, 3],
     [1, 2, 3]]
   )
   let pb: (Tensor<Float>) -> Tensor<Float> = pullback(at: atTensor) { x in 
