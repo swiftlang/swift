@@ -5480,7 +5480,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       validateDecl(classDecl);
       if (auto ctor = createDesignatedInitOverride(
                         *this, classDecl, superclassCtor, kind)) {
-        Context.addSynthesizedDecl(ctor);
         classDecl->addMember(ctor);
       }
     }
@@ -5657,11 +5656,14 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   // Add the constructor.
   decl->addMember(ctor);
 
-  // Create an empty body for the default constructor. The type-check of the
-  // constructor body will introduce default initializations of the members.
-  ctor->setBody(BraceStmt::create(Context, SourceLoc(), { }, SourceLoc()));
+  // Create an empty body for the default constructor.
+  SmallVector<ASTNode, 1> stmts;
+  stmts.push_back(new (Context) ReturnStmt(decl->getLoc(), nullptr));
+  ctor->setBody(BraceStmt::create(Context, SourceLoc(), stmts, SourceLoc()));
+  ctor->setBodyTypeCheckedIfPresent();
 
-  // Make sure we type check the constructor later.
+  // FIXME: This is still needed so that DI can check captures for
+  // initializer expressions. Rethink that completely.
   Context.addSynthesizedDecl(ctor);
 }
 

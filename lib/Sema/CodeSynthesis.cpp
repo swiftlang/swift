@@ -838,12 +838,14 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   auto DSCE = new (Ctx) DotSyntaxCallExpr(DRE, SourceLoc(), Val);
   DSCE->setImplicit();
   DSCE->setType(copyMethodType);
+  DSCE->setThrows(false);
 
   Expr *Nil = new (Ctx) NilLiteralExpr(SourceLoc(), /*implicit*/true);
   Nil->setType(copyMethodType->getParams()[0].getParameterType());
 
-  Expr *Call = CallExpr::createImplicit(Ctx, DSCE, { Nil }, { Ctx.Id_with });
+  auto *Call = CallExpr::createImplicit(Ctx, DSCE, { Nil }, { Ctx.Id_with });
   Call->setType(copyMethodType->getResult());
+  Call->setThrows(false);
 
   TypeLoc ResultTy;
   ResultTy.setType(VD->getType());
@@ -1308,11 +1310,13 @@ static void synthesizeObservedSetterBody(AccessorDecl *Set,
       auto *SelfDRE = buildSelfReference(SelfDecl, SelfAccessorKind::Peer,
                                          IsSelfLValue, Ctx);
       SelfDRE = maybeWrapInOutExpr(SelfDRE, Ctx);
-      Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
+      auto *DSCE = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
 
       if (auto funcType = type->getAs<FunctionType>())
         type = funcType->getResult();
-      Callee->setType(type);
+      DSCE->setType(type);
+      DSCE->setThrows(false);
+      Callee = DSCE;
     }
 
     auto *Call = CallExpr::createImplicit(Ctx, Callee, { ValueDRE },
@@ -1320,6 +1324,7 @@ static void synthesizeObservedSetterBody(AccessorDecl *Set,
     if (auto funcType = type->getAs<FunctionType>())
       type = funcType->getResult();
     Call->setType(type);
+    Call->setThrows(false);
 
     SetterBody.push_back(Call);
   };
@@ -1884,8 +1889,6 @@ void swift::triggerAccessorSynthesis(TypeChecker &TC,
 
     if (!accessor->hasBody()) {
       accessor->setBodySynthesizer(&synthesizeAccessorBody);
-
-      TC.Context.addSynthesizedDecl(accessor);
       TC.DeclsToFinalize.insert(accessor);
     }
   });
@@ -2386,9 +2389,10 @@ static void synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
   column->setType(uintType);
   column->setBuiltinInitializer(uintInit);
 
-  Expr *call = CallExpr::createImplicit(
+  auto *call = CallExpr::createImplicit(
       ctx, ref, { className, initName, file, line, column }, {});
   call->setType(ctx.getNeverType());
+  call->setThrows(false);
 
   SmallVector<ASTNode, 2> stmts;
   stmts.push_back(call);
@@ -2601,10 +2605,11 @@ static void synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn,
   auto *superclassCtorRefExpr =
       new (ctx) DotSyntaxCallExpr(ctorRefExpr, SourceLoc(), superRef, type);
   superclassCtorRefExpr->setIsSuper(true);
+  superclassCtorRefExpr->setThrows(false);
 
   auto *bodyParams = ctor->getParameters();
   auto ctorArgs = buildArgumentForwardingExpr(bodyParams->getArray(), ctx);
-  Expr *superclassCallExpr =
+  auto *superclassCallExpr =
     CallExpr::create(ctx, superclassCtorRefExpr, ctorArgs,
                      superclassCtor->getFullName().getArgumentNames(), { },
                      /*hasTrailingClosure=*/false, /*implicit=*/true);
@@ -2612,15 +2617,16 @@ static void synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn,
   if (auto *funcTy = type->getAs<FunctionType>())
     type = funcTy->getResult();
   superclassCallExpr->setType(type);
+  superclassCallExpr->setThrows(superclassCtor->hasThrows());
+
+  Expr *expr = superclassCallExpr;
 
   if (superclassCtor->hasThrows()) {
-    superclassCallExpr = new (ctx) TryExpr(SourceLoc(), superclassCallExpr,
-                                           type, /*implicit=*/true);
+    expr = new (ctx) TryExpr(SourceLoc(), expr, type, /*implicit=*/true);
   }
 
   auto *rebindSelfExpr =
-    new (ctx) RebindSelfInConstructorExpr(superclassCallExpr,
-                                          selfDecl);
+    new (ctx) RebindSelfInConstructorExpr(expr, selfDecl);
 
   SmallVector<ASTNode, 2> stmts;
   stmts.push_back(rebindSelfExpr);
