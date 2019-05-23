@@ -942,8 +942,6 @@ static void synthesizeTrivialGetterBody(AccessorDecl *getter,
 
   getter->setBody(BraceStmt::create(ctx, loc, returnStmt, loc, true));
   getter->setBodyTypeCheckedIfPresent();
-
-  maybeMarkTransparent(getter, ctx);
 }
 
 /// Synthesize the body of a getter which just directly accesses the
@@ -1009,8 +1007,6 @@ synthesizeTrivialSetterBodyWithStorage(AccessorDecl *setter,
                                             target, setterBody, ctx);
   setter->setBody(BraceStmt::create(ctx, loc, setterBody, loc, true));
   setter->setBodyTypeCheckedIfPresent();
-
-  maybeMarkTransparent(setter, ctx);
 }
 
 static void synthesizeTrivialSetterBody(AccessorDecl *setter,
@@ -1065,8 +1061,6 @@ static void synthesizeCoroutineAccessorBody(AccessorDecl *accessor,
 
   accessor->setBody(BraceStmt::create(ctx, loc, body, loc, true));
   accessor->setBodyTypeCheckedIfPresent();
-
-  maybeMarkTransparent(accessor, ctx);
 }
 
 /// Synthesize the body of a read coroutine.
@@ -1263,6 +1257,8 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
       // linkage, and if its defined in a different translation unit from the
       // conformance we cannot simply generate an external declaration.
       Context.addExternalDecl(accessor);
+
+      maybeMarkTransparent(accessor, Context);
       DeclsToFinalize.insert(accessor);
     }
   });
@@ -1888,6 +1884,7 @@ void swift::triggerAccessorSynthesis(TypeChecker &TC,
       return;
 
     if (!accessor->hasBody()) {
+      maybeMarkTransparent(accessor, TC.Context);
       accessor->setBodySynthesizer(&synthesizeAccessorBody);
       TC.DeclsToFinalize.insert(accessor);
     }
