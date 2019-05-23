@@ -13,7 +13,7 @@
 // RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/Lib-*.swiftmodule
 
 // Now invalidate a dependency of the prebuilt module, and make sure the forwarding file is replaced with a real module.
-// RUN: %{python} %S/../Inputs/make-old.py %t/Lib.swiftinterface
+// RUN: %{python} %S/Inputs/make-old.py %t/Lib.swiftinterface
 // RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -sdk %S/Inputs -I %S/Inputs/prebuilt-module-cache/ -prebuilt-module-cache-path %t/prebuilt-cache %s 2>&1 | %FileCheck -check-prefix=FROM-INTERFACE %s
 
 // Delete the cached module we just created, and create the forwarding module again
