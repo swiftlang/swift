@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-// REQUIRES: rdar51080373
-
 struct X {
   var i : Int, j : Int
 }
