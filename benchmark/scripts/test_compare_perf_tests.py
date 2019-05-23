@@ -856,7 +856,7 @@ class TestReportFormatter(OldAndNewLog):
         self.assertNotIn('AngryPhonebook', html)
 
     def test_single_table_report(self):
-        """Single table report has bold inline headers and no sections."""
+        """Single table report has inline headers and no elaborate sections."""
         self.tc.removed = []  # test handling empty section
         rf = ReportFormatter(self.tc, changes_only=True, single_table=True)
         markdown = rf.markdown()

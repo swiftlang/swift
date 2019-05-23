@@ -648,10 +648,8 @@ class ReportFormatter(object):
         def table(title, results, is_strong=False, is_open=False):
             if not results:
                 return ''
-            rows = [
-                row(format_columns(ReportFormatter.values(r), is_strong))
-                for r in results
-            ]
+            rows = [row(format_columns(ReportFormatter.values(r), is_strong))
+                    for r in results]
             table = (header(title if self.single_table else '',
                             ReportFormatter.header_for(results[0])) +
                      ''.join(rows))
