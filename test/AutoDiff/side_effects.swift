@@ -58,13 +58,13 @@ func noEscapePartialApplyTest() {
 }
 
 // TF-529: Crash when apply's result is active but arguments aren't.
-struct Vector<T: Numeric & Differentiable>: AdditiveArithmetic & Differentiable {
+struct TF_529_Vector<T: Numeric & Differentiable>: AdditiveArithmetic & Differentiable {
   var x, y: T
 }
 
 @differentiable
-func TF_529<T>(x: Vector<T>) -> Vector<T> {
-  var zero = Vector<T>.zero
+func TF_529<T>(x: TF_529_Vector<T>) -> TF_529_Vector<T> {
+  var zero = TF_529_Vector<T>.zero
   zero = x
   return zero
 }

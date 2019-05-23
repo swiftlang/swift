@@ -2511,8 +2511,6 @@ static void collectMinimalIndicesForFunctionCall(
       paramIndices.push_back(currentParamIdx);
     ++currentParamIdx;
   }
-  assert((currentParamIdx > 0 || !paramIndices.empty())
-         && "Parameter indices cannot be empty");
   // Result indices are indices (in the type signature) of results that are
   // useful.
   //
