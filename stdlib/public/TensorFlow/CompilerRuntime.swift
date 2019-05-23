@@ -991,7 +991,7 @@ internal extension _ExecutionContext {
   /// See documentation for the top-level `withDevice` function.
   func withDevice<R>(_ kind: DeviceKind, _ index: UInt = 0,
                      perform body: () throws -> R) rethrows -> R {
-    var name: String
+    let name: String
     switch kind {
     case .cpu:
       name = "/job:localhost/replica:0/task:0/device:CPU:\(index)"
