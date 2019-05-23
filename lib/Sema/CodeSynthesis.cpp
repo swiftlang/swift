@@ -302,31 +302,11 @@ static void maybeMarkTransparent(AccessorDecl *accessor, ASTContext &ctx) {
   if (!nominalDecl)
     return;
 
+  auto *storage = accessor->getStorage();
+
   // Accessors for resilient properties are not @_transparent.
-  if (accessor->getStorage()->isResilient())
+  if (storage->isResilient())
     return;
-
-  // Setters for lazy properties are not @_transparent (because the storage
-  // is not ABI-exposed).
-  if (accessor->getStorage()->getAttrs().hasAttribute<LazyAttr>() &&
-      accessor->getAccessorKind() == AccessorKind::Set)
-    return;
-
-  // Getters/setters for a property with a delegate are not @_transparent if
-  // the backing variable has more-restrictive access than the original
-  // property. The same goes for its storage delegate.
-  if (auto var = dyn_cast<VarDecl>(accessor->getStorage())) {
-    if (auto backingVar = var->getPropertyDelegateBackingProperty()) {
-      if (backingVar->getFormalAccess() < var->getFormalAccess())
-        return;
-    }
-
-    if (auto original = var->getOriginalDelegatedProperty(
-            PropertyDelegateSynthesizedPropertyKind::StorageDelegate)) {
-      if (var->getFormalAccess() < original->getFormalAccess())
-        return;
-    }
-  }
 
   // Accessors for protocol storage requirements are never @_transparent
   // since they do not have bodies.
@@ -344,6 +324,82 @@ static void maybeMarkTransparent(AccessorDecl *accessor, ASTContext &ctx) {
   // Accessors synthesized on-demand are never transaprent.
   if (accessor->hasForcedStaticDispatch())
     return;
+
+  if (accessor->getAccessorKind() == AccessorKind::Get ||
+      accessor->getAccessorKind() == AccessorKind::Set) {
+    // Getters/setters for a property with a delegate are not @_transparent if
+    // the backing variable has more-restrictive access than the original
+    // property. The same goes for its storage delegate.
+    if (auto var = dyn_cast<VarDecl>(storage)) {
+      if (auto backingVar = var->getPropertyDelegateBackingProperty()) {
+        if (backingVar->getFormalAccess() < var->getFormalAccess())
+          return;
+      }
+
+      if (auto original = var->getOriginalDelegatedProperty(
+              PropertyDelegateSynthesizedPropertyKind::StorageDelegate)) {
+        if (var->getFormalAccess() < original->getFormalAccess())
+          return;
+      }
+    }
+  }
+
+  switch (accessor->getAccessorKind()) {
+  case AccessorKind::Get:
+    break;
+
+  case AccessorKind::Set:
+
+    switch (storage->getWriteImpl()) {
+    case WriteImplKind::Set:
+      // Setters for lazy properties are not @_transparent (because the storage
+      // is not ABI-exposed).
+      //
+      // FIXME: This should be folded into the WriteImplKind below.
+      if (storage->getAttrs().hasAttribute<LazyAttr>())
+        return;
+
+      // Setters for property delegates are OK, unless there are observers.
+      // FIXME: This should be folded into the WriteImplKind below.
+      if (auto var = dyn_cast<VarDecl>(storage)) {
+        if (var->getAttachedPropertyDelegate()) {
+          if (var->getAccessor(AccessorKind::DidSet) ||
+              var->getAccessor(AccessorKind::WillSet))
+            return;
+
+          break;
+        }
+      }
+
+      // Anything else should not have a synthesized setter.
+      LLVM_FALLTHROUGH;
+    case WriteImplKind::Immutable:
+      llvm_unreachable("should not be synthesizing accessor in this case");
+
+    case WriteImplKind::StoredWithObservers:
+    case WriteImplKind::InheritedWithObservers:
+      // Setters for observed properties are not @_transparent (because the
+      // observers are private) and cannot be referenced from a transparent
+      // method).
+      return;
+
+    case WriteImplKind::Stored:
+    case WriteImplKind::MutableAddress:
+    case WriteImplKind::Modify:
+      break;
+    }
+    break;
+
+  case AccessorKind::Read:
+  case AccessorKind::Modify:
+    break;
+
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
+    llvm_unreachable("bad synthesized function kind");
+  }
 
   accessor->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
 }
@@ -404,8 +460,6 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
       asAvailableAs.push_back(setter);
     }
   }
-
-  maybeMarkTransparent(accessor, ctx);
 
   AvailabilityInference::applyInferredAvailableAttrs(accessor,
                                                      asAvailableAs, ctx);
@@ -942,8 +996,6 @@ static void synthesizeTrivialGetterBody(AccessorDecl *getter,
 
   getter->setBody(BraceStmt::create(ctx, loc, returnStmt, loc, true));
   getter->setBodyTypeCheckedIfPresent();
-
-  maybeMarkTransparent(getter, ctx);
 }
 
 /// Synthesize the body of a getter which just directly accesses the
@@ -1009,8 +1061,6 @@ synthesizeTrivialSetterBodyWithStorage(AccessorDecl *setter,
                                             target, setterBody, ctx);
   setter->setBody(BraceStmt::create(ctx, loc, setterBody, loc, true));
   setter->setBodyTypeCheckedIfPresent();
-
-  maybeMarkTransparent(setter, ctx);
 }
 
 static void synthesizeTrivialSetterBody(AccessorDecl *setter,
@@ -1065,8 +1115,6 @@ static void synthesizeCoroutineAccessorBody(AccessorDecl *accessor,
 
   accessor->setBody(BraceStmt::create(ctx, loc, body, loc, true));
   accessor->setBodyTypeCheckedIfPresent();
-
-  maybeMarkTransparent(accessor, ctx);
 }
 
 /// Synthesize the body of a read coroutine.
@@ -1263,6 +1311,8 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
       // linkage, and if its defined in a different translation unit from the
       // conformance we cannot simply generate an external declaration.
       Context.addExternalDecl(accessor);
+
+      maybeMarkTransparent(accessor, Context);
       DeclsToFinalize.insert(accessor);
     }
   });
@@ -1887,7 +1937,11 @@ void swift::triggerAccessorSynthesis(TypeChecker &TC,
     if (!accessor)
       return;
 
+    if (!accessor->isImplicit())
+      return;
+
     if (!accessor->hasBody()) {
+      maybeMarkTransparent(accessor, TC.Context);
       accessor->setBodySynthesizer(&synthesizeAccessorBody);
       TC.DeclsToFinalize.insert(accessor);
     }
