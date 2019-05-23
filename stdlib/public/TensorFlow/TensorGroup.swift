@@ -121,7 +121,7 @@ extension TensorHandle : TensorGroup {
     return [self.handle]
   }
 
-  public convenience init(handles: [_AnyTensorHandle]) {
+  public init(handles: [_AnyTensorHandle]) {
     self.init(handle: handles[0])
   }
 }
@@ -150,7 +150,7 @@ extension ResourceHandle : TensorGroup {
     return [self.handle]
   }
 
-  public convenience init(handles: [_AnyTensorHandle]) {
+  public init(handles: [_AnyTensorHandle]) {
     self.init(handle: handles[0])
   }
 }
@@ -179,7 +179,7 @@ extension VariantHandle : TensorGroup {
     return [self.handle]
   }
 
-  public convenience init(handles: [_AnyTensorHandle]) {
+  public init(handles: [_AnyTensorHandle]) {
     self.init(handle: handles[0])
   }
 }
