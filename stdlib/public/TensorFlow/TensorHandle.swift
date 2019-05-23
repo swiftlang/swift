@@ -52,7 +52,7 @@ public class TFETensorHandle : _AnyTensorHandle {
 /// `TensorHandle` is the type used by ops. It includes a `Scalar` type, which
 /// compiler internals can use to determine the datatypes of parameters when
 /// they are extracted into a tensor program.
-public final class TensorHandle<Scalar>
+public struct TensorHandle<Scalar>
   where Scalar : _TensorFlowDataTypeCompatible {
   let handle: _AnyTensorHandle
 
@@ -63,7 +63,7 @@ public final class TensorHandle<Scalar>
   }
 
   @usableFromInline
-  convenience init(copyingFromCTensor cTensor: CTensor) {
+  init(copyingFromCTensor cTensor: CTensor) {
     let status = TF_NewStatus()
     let cTensorHandle = TFE_NewTensorHandle(cTensor, status)
     checkOk(status)
@@ -82,7 +82,7 @@ public final class TensorHandle<Scalar>
   /// `bufferInitializer` receives a buffer with exactly `byteCount` bytes of
   /// capacity. `bufferInitializer` must initialize the entire buffer.
   @usableFromInline
-  convenience init(
+  init(
     shape: [Int],
     byteCount: Int,
     bufferInitializer: (UnsafeMutableRawPointer) -> Void
@@ -115,7 +115,7 @@ extension TensorHandle where Scalar : TensorFlowScalar {
   /// must initialize the entire buffer, with contiguous scalars in row-major
   /// order.
   @usableFromInline
-  convenience init(
+  init(
     shape: [Int],
     scalarsInitializer: (UnsafeMutablePointer<Scalar>) -> Void
   ) {
@@ -159,7 +159,7 @@ internal extension ShapedArray where Scalar : _TensorFlowDataTypeCompatible {
 
 /// `ResourceHandle` is the type used by ops to represent TensorFlow "resource" 
 /// values.
-public final class ResourceHandle {
+public struct ResourceHandle {
   let handle: _AnyTensorHandle
 
   @usableFromInline
@@ -173,7 +173,7 @@ public final class ResourceHandle {
 
 /// `VariantHandle` is the type used by ops to represent TensorFlow "variant"
 /// values.
-public final class VariantHandle {
+public struct VariantHandle {
   let handle: _AnyTensorHandle
   
   @usableFromInline
