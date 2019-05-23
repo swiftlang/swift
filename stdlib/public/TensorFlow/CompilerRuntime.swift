@@ -981,7 +981,7 @@ public func _tffunc<In : TensorGroup, Out : TensorGroup>(
 
 internal extension _ExecutionContext {
   /// Returns a valid TensorFlow device name such as, which corresponds to the
-  /// closest enclosing withDevice() call.
+  /// closest enclosing `withDevice(_:perform:)` call.
   /// A return value of nil indicates the absence of withDevice() or the
   /// immediately enclosing withDefaultDevice() call.
   var currentDeviceName: String? {
