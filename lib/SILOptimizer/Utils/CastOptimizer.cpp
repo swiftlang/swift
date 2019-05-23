@@ -271,7 +271,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   // Now emit the a cast from the casted ObjC object into a target type.
   // This is done by means of calling _forceBridgeFromObjectiveC or
   // _conditionallyBridgeFromObjectiveC_bridgeable from the Target type.
-  auto *funcRef = Builder.createFunctionRef(Loc, bridgingFunc);
+  auto *funcRef = Builder.createFunctionRefFor(Loc, bridgingFunc);
   SubstitutionMap subMap = lookupBridgeToObjCProtocolSubs(mod, target);
 
   auto MetaTy = MetatypeType::get(target, MetatypeRepresentation::Thick);
@@ -588,7 +588,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
   }
 
   SILBuilderWithScope Builder(Inst, builderContext);
-  auto FnRef = Builder.createFunctionRef(Loc, bridgedFunc);
+  auto FnRef = Builder.createFunctionRefFor(Loc, bridgedFunc);
   auto ParamTypes = SubstFnTy.castTo<SILFunctionType>()->getParameters();
   if (Src->getType().isAddress() && !substConv.isSILIndirect(ParamTypes[0])) {
     // Create load
