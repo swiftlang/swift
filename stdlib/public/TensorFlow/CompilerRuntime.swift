@@ -550,6 +550,11 @@ public final class _ExecutionContext {
   /// Global context storing all available devices, loaded functions, etc.
   public static let global: _ExecutionContext = _ExecutionContext()
 
+  /// List of devices available to this execution context.
+  /// Devices are represented by their names in TensorFlow notation.
+  /// See documentation for `withDevice(_:perform:)` to learn about device names.
+  private var deviceNames: [String] = []
+
   /// The buffer storing a serialized TensorFlow config proto.
   public let tensorFlowConfig: UnsafeMutablePointer<TF_Buffer>
 
@@ -561,11 +566,6 @@ public final class _ExecutionContext {
 
   /// The mutex for preventing potential concurrent access.
   private var mutex: pthread_mutex_t = pthread_mutex_t()
-
-  /// List of devices available to this execution context.
-  /// Devices are represented by their names in TensorFlow notation.
-  /// See documentation for `withDevice(_:perform:)` to learn about device names.
-  private var deviceNames: [String] = []
 
   /// Initializes a new execution context by initializing available devices.
   @usableFromInline
@@ -969,7 +969,7 @@ public func _tffunc<In : TensorGroup, Out : TensorGroup>(
 }
 
 internal extension _ExecutionContext {
-  /// Returns a valid TensorFlow device name such as, which corresponds to the
+  /// Returns a valid TensorFlow device name, which corresponds to the
   /// closest enclosing call to one of the overloads of withDevice.
   /// A return value of `nil` indicates the absence of a withDevice call on
   /// the call stack or the presence of an immediately enclosing
