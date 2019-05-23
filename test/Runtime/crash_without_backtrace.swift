@@ -6,6 +6,8 @@
 // doesn't pass through the crash, and `not` may not be available when running
 // on a remote host.
 
+// REQUIRES: rdar51076215
+
 // UNSUPPORTED: OS=watchos
 // UNSUPPORTED: OS=ios
 // UNSUPPORTED: OS=tvos
