@@ -64,8 +64,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
   class DiagnoseWalker : public ASTWalker {
     SmallPtrSet<Expr*, 4> AlreadyDiagnosedMetatypes;
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
-    
-    // Keep track of acceptable DiscardAssignmentExpr's.
+
+    /// Keep track of acceptable DiscardAssignmentExpr's.
     SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
 
     /// Keep track of the arguments to CallExprs.
@@ -241,6 +241,42 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
                         diag::tuple_single_element)
               .fixItRemoveChars(tupleExpr->getElementNameLoc(0),
                                 tupleExpr->getElement(0)->getStartLoc());
+          }
+        }
+      }
+
+      // Diagnose tuple expressions with duplicate element label
+      if (auto *tupleExpr = dyn_cast<TupleExpr>(E)) {
+        // FIXME: Duplicate labels on enum payloads should be diagnosed
+        // when declared, not when called.
+        bool isEnumCase = false;
+        if (auto CE = dyn_cast_or_null<CallExpr>(Parent.getAsExpr())) {
+          auto calledValue = CE->getCalledValue();
+          if (calledValue) {
+            isEnumCase = isa<EnumElementDecl>(calledValue);
+          }
+        }
+
+        if ((!CallArgs.count(tupleExpr)) || isEnumCase) {
+          auto diagnose = false;
+
+          llvm::SmallDenseSet<Identifier> names;
+          names.reserve(tupleExpr->getNumElements());
+
+          for (auto name : tupleExpr->getElementNames()) {
+            if (name.empty())
+              continue;
+
+            if (names.count(name) == 1) {
+              diagnose = true;
+              break;
+            }
+
+            names.insert(name);
+          }
+
+          if (diagnose) {
+            TC.diagnose(tupleExpr->getLoc(), diag::tuple_duplicate_label);
           }
         }
       }

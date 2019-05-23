@@ -570,10 +570,6 @@ static SILFunction *getFunctionToInsertAfter(SILGenModule &SGM,
   return nullptr;
 }
 
-static bool hasSILBody(FuncDecl *fd) {
-  return fd->getBody(/*canSynthesize=*/false);
-}
-
 static bool haveProfiledAssociatedFunction(SILDeclRef constant) {
   return constant.isDefaultArgGenerator() || constant.isForeign ||
          constant.isCurried;
@@ -612,7 +608,7 @@ static void setUpForProfiling(SILDeclRef constant, SILFunction *F,
   if (!haveProfiledAssociatedFunction(constant)) {
     if (constant.hasDecl()) {
       if (auto *fd = constant.getFuncDecl()) {
-        if (hasSILBody(fd)) {
+        if (fd->hasBody()) {
           F->createProfiler(fd, forDefinition);
           profiledNode = fd->getBody(/*canSynthesize=*/false);
         }
@@ -625,6 +621,32 @@ static void setUpForProfiling(SILDeclRef constant, SILFunction *F,
     if (SILProfiler *SP = F->getProfiler())
       F->setEntryCount(SP->getExecutionCount(profiledNode));
   }
+}
+
+static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
+  if (!constant.hasDecl())
+    return false;
+
+  if (constant.isCurried ||
+      constant.isForeign ||
+      constant.isDirectReference)
+    return false;
+
+  auto *d = constant.getDecl();
+  auto *dc = d->getDeclContext()->getModuleScopeContext();
+
+  if (isa<ClangModuleUnit>(dc))
+    return true;
+
+  if (auto *sf = dyn_cast<SourceFile>(dc))
+    if (M.isWholeModule() || M.getAssociatedContext() == dc)
+      return false;
+
+  if (auto *func = dyn_cast<FuncDecl>(d))
+    if (func->hasForcedStaticDispatch())
+      return true;
+
+  return false;
 }
 
 SILFunction *SILGenModule::getFunction(SILDeclRef constant,
@@ -646,6 +668,21 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
   assert(F && "SILFunction should have been defined");
 
   emittedFunctions[constant] = F;
+
+  if (isEmittedOnDemand(M, constant) &&
+      !delayedFunctions.count(constant)) {
+    auto *d = constant.getDecl();
+    if (auto *func = dyn_cast<FuncDecl>(d)) {
+      if (constant.kind == SILDeclRef::Kind::Func)
+        emitFunction(func);
+    } else if (auto *ctor = dyn_cast<ConstructorDecl>(d)) {
+      // For factories, we don't need to emit a special thunk; the normal
+      // foreign-to-native thunk is sufficient.
+      if (!ctor->isFactoryInit() &&
+          constant.kind == SILDeclRef::Kind::Allocator)
+        emitConstructor(ctor);
+    }
+  }
 
   // If we delayed emitting this function previously, we need it now.
   auto foundDelayed = delayedFunctions.find(constant);
@@ -876,7 +913,7 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
 
   emitAbstractFuncDecl(fd);
 
-  if (hasSILBody(fd)) {
+  if (fd->hasBody()) {
     FrontendStatsTracer Tracer(getASTContext().Stats, "SILGen-funcdecl", fd);
     PrettyStackTraceDecl stackTrace("emitting SIL for", fd);
 
@@ -1796,27 +1833,19 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF) {
       M->getSILLoader()->getAllForModule(mod->getName(), nullptr);
   }
 
-  // Emit external definitions used by this module.
-  for (size_t i = 0, e = mod->getASTContext().LastCheckedExternalDefinition;
-       i != e; ++i) {
-    auto def = mod->getASTContext().ExternalDefinitions[i];
-    SGM.emitExternalDefinition(def);
-  }
-
   // Emit any delayed definitions that were forced.
   // Emitting these may in turn force more definitions, so we have to take care
   // to keep pumping the queues.
   while (!SGM.forcedFunctions.empty()
-         || !SGM.forcedConformances.empty()) {
+         || !SGM.pendingConformances.empty()) {
     while (!SGM.forcedFunctions.empty()) {
       auto &front = SGM.forcedFunctions.front();
       front.second.emitter(SGM.getFunction(front.first, ForDefinition));
       SGM.forcedFunctions.pop_front();
     }
-    while (!SGM.forcedConformances.empty()) {
-      auto &front = SGM.forcedConformances.front();
-      SGM.getWitnessTable(front.first);
-      SGM.forcedConformances.pop_front();
+    while (!SGM.pendingConformances.empty()) {
+      SGM.getWitnessTable(SGM.pendingConformances.front());
+      SGM.pendingConformances.pop_front();
     }
   }
 

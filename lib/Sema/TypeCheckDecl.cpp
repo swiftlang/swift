@@ -2958,7 +2958,9 @@ public:
         break;
       }
 
-      if (!isInvalidSuperclass && Super->hasMissingVTableEntries()) {
+      if (!isInvalidSuperclass && Super->hasMissingVTableEntries() &&
+          !Super->isResilient(CD->getParentModule(),
+                              ResilienceExpansion::Minimal)) {
         auto *superFile = Super->getModuleScopeContext();
         if (auto *serialized = dyn_cast<SerializedASTFile>(superFile)) {
           if (serialized->getLanguageVersionBuiltWith() !=
