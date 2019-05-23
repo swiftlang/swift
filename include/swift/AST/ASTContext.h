@@ -53,6 +53,7 @@ namespace swift {
   class AvailabilityContext;
   class BoundGenericType;
   class ClangNode;
+  class ConcreteDeclRef;
   class ConstructorDecl;
   class Decl;
   class DeclContext;
@@ -514,7 +515,20 @@ public:
   bool hasArrayLiteralIntrinsics() const;
 
   /// Retrieve the declaration of Swift.Bool.init(_builtinBooleanLiteral:)
-  ConstructorDecl *getBoolBuiltinInitDecl() const;
+  ConcreteDeclRef getBoolBuiltinInitDecl() const;
+
+  /// Retrieve the witness for init(_builtinIntegerLiteral:).
+  ConcreteDeclRef getIntBuiltinInitDecl(NominalTypeDecl *intDecl) const;
+
+  /// Retrieve the witness for init(_builtinFloatLiteral:).
+  ConcreteDeclRef getFloatBuiltinInitDecl(NominalTypeDecl *floatDecl) const;
+
+  /// Retrieve the witness for (_builtinStringLiteral:utf8CodeUnitCount:isASCII:).
+  ConcreteDeclRef getStringBuiltinInitDecl(NominalTypeDecl *stringDecl) const;
+
+  ConcreteDeclRef getBuiltinInitDecl(NominalTypeDecl *decl,
+                                     KnownProtocolKind builtinProtocol,
+                llvm::function_ref<DeclName (ASTContext &ctx)> initName) const;
 
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
   FuncDecl *getEqualIntDecl() const;

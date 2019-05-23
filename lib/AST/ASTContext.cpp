@@ -183,9 +183,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"
   
-  /// Swift.Bool.init(_builtinBooleanLiteral:)
-  ConstructorDecl *BoolBuiltinInitDecl = nullptr;
-  
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
@@ -276,6 +273,10 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// A mapping from the backing storage of a property that has a delegate
   /// to the original property with the delegate.
   llvm::DenseMap<const VarDecl *, VarDecl *> OriginalDelegatedProperties;
+
+  /// The builtin initializer witness for a literal. Used when building
+  /// LiteralExprs in fully-checked AST.
+  llvm::DenseMap<const NominalTypeDecl *, ConcreteDeclRef> BuiltinInitWitness;
 
   /// Structure that captures data that is segregated into different
   /// arenas.
@@ -963,27 +964,80 @@ lookupOperatorFunc(const ASTContext &ctx, StringRef oper, Type contextType,
   return nullptr;
 }
 
-ConstructorDecl *ASTContext::getBoolBuiltinInitDecl() const {
-  if (getImpl().BoolBuiltinInitDecl)
-    return getImpl().BoolBuiltinInitDecl;
-
-  if (!getBoolDecl())
-    return nullptr;
-
-  DeclName initName(*const_cast<ASTContext *>(this),
-                    DeclBaseName::createConstructor(),
+ConcreteDeclRef ASTContext::getBoolBuiltinInitDecl() const {
+  auto fn = [&](ASTContext &ctx) {
+    return DeclName(ctx, DeclBaseName::createConstructor(),
                     { Id_builtinBooleanLiteral });
-  auto members = getBoolDecl()->lookupDirect(initName);
+  };
+  auto builtinProtocolKind =
+    KnownProtocolKind::ExpressibleByBuiltinBooleanLiteral;
+  return getBuiltinInitDecl(getBoolDecl(), builtinProtocolKind, fn);
+}
 
-  if (members.size() != 1)
-    return nullptr;
+ConcreteDeclRef
+ASTContext::getIntBuiltinInitDecl(NominalTypeDecl *intDecl) const {
+  auto fn = [&](ASTContext &ctx) {
+    return DeclName(ctx, DeclBaseName::createConstructor(),
+                    { Id_builtinIntegerLiteral });
+  };
+  auto builtinProtocolKind =
+    KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral;
+  return getBuiltinInitDecl(intDecl, builtinProtocolKind, fn);
+}
 
-  if (auto init = dyn_cast<ConstructorDecl>(members[0])) {
-    getImpl().BoolBuiltinInitDecl = init;
-    return init;
+ConcreteDeclRef
+ASTContext::getFloatBuiltinInitDecl(NominalTypeDecl *floatDecl) const {
+  auto fn = [&](ASTContext &ctx) {
+    return DeclName(ctx, DeclBaseName::createConstructor(),
+                    { Id_builtinFloatLiteral });
+  };
+
+  auto builtinProtocolKind =
+    KnownProtocolKind::ExpressibleByBuiltinFloatLiteral;
+  return getBuiltinInitDecl(floatDecl, builtinProtocolKind, fn);
+}
+
+ConcreteDeclRef
+ASTContext::getStringBuiltinInitDecl(NominalTypeDecl *stringDecl) const {
+  auto fn = [&](ASTContext &ctx) {
+    return DeclName(ctx, DeclBaseName::createConstructor(),
+                    { Id_builtinStringLiteral,
+                      getIdentifier("utf8CodeUnitCount"),
+                      getIdentifier("isASCII") });
+  };
+
+  auto builtinProtocolKind =
+    KnownProtocolKind::ExpressibleByBuiltinStringLiteral;
+  return getBuiltinInitDecl(stringDecl, builtinProtocolKind, fn);
+}
+
+ConcreteDeclRef
+ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
+                               KnownProtocolKind builtinProtocolKind,
+               llvm::function_ref<DeclName (ASTContext &ctx)> initName) const {
+  auto &witness = getImpl().BuiltinInitWitness[decl];
+  if (witness)
+    return witness;
+
+  auto type = decl->getDeclaredType();
+  auto builtinProtocol = getProtocol(builtinProtocolKind);
+  auto builtinConformance = getStdlibModule()->lookupConformance(
+      type, builtinProtocol);
+  if (!builtinConformance) {
+    assert(false && "Missing required conformance");
+    witness = ConcreteDeclRef();
+    return witness;
   }
 
-  return nullptr;
+  auto *ctx = const_cast<ASTContext *>(this);
+  witness = builtinConformance->getWitnessByName(type, initName(*ctx));
+  if (!witness) {
+    assert(false && "Missing required witness");
+    witness = ConcreteDeclRef();
+    return witness;
+  }
+
+  return witness;
 }
 
 FuncDecl *ASTContext::getEqualIntDecl() const {
