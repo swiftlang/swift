@@ -3,11 +3,12 @@
 // RUN: %target-run %t/encode %t/test.arc
 // RUN: plutil -p %t/test.arc | %FileCheck -check-prefix=CHECK-ARCHIVE %s
 
-// RUN: %target-build-swift %s -module-name=test -o %t/decode -target %target-pre-stable-abi-triple
+// RUN: %target-build-swift %s -module-name=test -o %t/decode
 // RUN: %target-run %t/decode %t/test.arc --stdlib-unittest-in-process
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: CPU=i386 || CPU=x86_64
 
 // See also archive_attributes_stable_abi.swift, for the stable ABI
 // deployment target test.

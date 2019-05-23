@@ -285,18 +285,6 @@ namespace {
     const Solution &solution;
     bool SuppressDiagnostics;
 
-    /// Recognize used conformances from an imported type when we must emit
-    /// the witness table.
-    ///
-    /// This arises in _BridgedStoredNSError, where we wouldn't
-    /// otherwise pull in the witness table, causing dynamic casts to
-    /// perform incorrectly, and _ErrorCodeProtocol, where we need to
-    /// check for _BridgedStoredNSError conformances on the
-    /// corresponding ErrorType.
-    void checkForImportedUsedConformances(Type toType) {
-      cs.getTypeChecker().useBridgedNSErrorConformances(dc, toType);
-    }
-
     /// Coerce the given tuple to another tuple type.
     ///
     /// \param expr The expression we're converting.
@@ -3189,7 +3177,6 @@ namespace {
       auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
       auto sub = cs.coerceToRValue(expr->getSubExpr());
 
-      checkForImportedUsedConformances(toType);
       expr->setSubExpr(sub);
 
       // Set the type we checked against.
@@ -3557,7 +3544,6 @@ namespace {
       // Simplify the type we're casting to.
       auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
       expr->getCastTypeLoc().setType(toType);
-      checkForImportedUsedConformances(toType);
 
       auto &tc = cs.getTypeChecker();
 
@@ -3650,7 +3636,6 @@ namespace {
         toType = toType->getOptionalObjectType();
 
       expr->getCastTypeLoc().setType(toType);
-      checkForImportedUsedConformances(toType);
 
       // The subexpression is always an rvalue.
       auto &tc = cs.getTypeChecker();
@@ -3729,7 +3714,6 @@ namespace {
                                            bool isInsideIsExpr = false) {
       // Simplify the type we're casting to.
       auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
-      checkForImportedUsedConformances(toType);
       expr->getCastTypeLoc().setType(toType);
 
       // The subexpression is always an rvalue.
@@ -7505,11 +7489,7 @@ namespace {
     }
 
     Expr *walkToExprPost(Expr *expr) override {
-      Expr *result = Rewriter.walkToExprPost(expr);
-      auto &cs = Rewriter.getConstraintSystem();
-      if (result && cs.hasType(result))
-        Rewriter.checkForImportedUsedConformances(cs.getType(result));
-      return result;
+      return Rewriter.walkToExprPost(expr);
     }
 
     /// Ignore statements.

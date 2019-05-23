@@ -696,70 +696,6 @@ EnumPayload::emitApplyOrMask(IRGenFunction &IGF,
   }
 }
 
-/// Gather spare bits into the low bits of a smaller integer value.
-llvm::Value *irgen::emitGatherSpareBits(IRGenFunction &IGF,
-                                        const SpareBitVector &spareBitMask,
-                                        llvm::Value *spareBits,
-                                        unsigned resultLowBit,
-                                        unsigned resultBitWidth) {
-  auto destTy
-    = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), resultBitWidth);
-  unsigned usedBits = resultLowBit;
-  llvm::Value *result = nullptr;
-
-  auto spareBitEnumeration = spareBitMask.enumerateSetBits();
-  for (auto optSpareBit = spareBitEnumeration.findNext();
-       optSpareBit.hasValue() && usedBits < resultBitWidth;
-       optSpareBit = spareBitEnumeration.findNext()) {
-    unsigned u = optSpareBit.getValue();
-    assert(u >= (usedBits - resultLowBit) &&
-           "used more bits than we've processed?!");
-
-    // Shift the bits into place.
-    llvm::Value *newBits;
-    if (u > usedBits)
-      newBits = IGF.Builder.CreateLShr(spareBits, u - usedBits);
-    else if (u < usedBits) {
-      newBits = IGF.Builder.CreateZExtOrTrunc(spareBits, destTy);
-      newBits = IGF.Builder.CreateShl(newBits, usedBits - u);
-    } else
-      newBits = spareBits;
-    newBits = IGF.Builder.CreateZExtOrTrunc(newBits, destTy);
-
-    // See how many consecutive bits we have.
-    unsigned numBits = 1;
-    ++u;
-    // We don't need more bits than the size of the result.
-    unsigned maxBits = resultBitWidth - usedBits;
-    for (unsigned e = spareBitMask.size();
-         u < e && numBits < maxBits && spareBitMask[u];
-         ++u) {
-      ++numBits;
-      (void) spareBitEnumeration.findNext();
-    }
-
-    // Mask out the selected bits.
-    auto val = APInt::getAllOnesValue(numBits);
-    if (numBits < resultBitWidth)
-      val = val.zext(resultBitWidth);
-    val = val.shl(usedBits);
-    auto *mask = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), val);
-    newBits = IGF.Builder.CreateAnd(newBits, mask);
-
-    // Accumulate the result.
-    if (result)
-      result = IGF.Builder.CreateOr(result, newBits);
-    else
-      result = newBits;
-
-    usedBits += numBits;
-  }
-
-  return result;
-}
-
-
-
 llvm::Value *
 EnumPayload::emitGatherSpareBits(IRGenFunction &IGF,
                                  const SpareBitVector &spareBits,
@@ -798,8 +734,8 @@ EnumPayload::emitGatherSpareBits(IRGenFunction &IGF,
       break;
 
     // Get the spare bits from this part.
-    auto bits = irgen::emitGatherSpareBits(IGF, spareBitsPart,
-                                           v, firstBitOffset, bitWidth);
+    auto bits = irgen::emitGatherBits(IGF, spareBitsPart.asAPInt(),
+                                      v, firstBitOffset, bitWidth);
     firstBitOffset += numBitsInPart;
     
     // Accumulate it into the full set.

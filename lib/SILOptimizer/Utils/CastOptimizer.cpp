@@ -91,7 +91,7 @@ convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
   bool isConditional = dynamicCast.isConditional();
 
   SILValue load =
-      builder.createLoad(loc, src, LoadOwnershipQualifier::Unqualified);
+      builder.emitLoadValueOperation(loc, src, LoadOwnershipQualifier::Take);
 
   SILType silBridgedTy = *dynamicCast.getLoweredBridgedTargetObjectType();
 
@@ -295,11 +295,11 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   }
 
   // Emit a retain.
-  Builder.createRetainValue(Loc, srcOp, Builder.getDefaultAtomicity());
+  SILValue srcArg = Builder.emitCopyValueOperation(Loc, srcOp);
 
   SmallVector<SILValue, 1> Args;
   Args.push_back(InOutOptionalParam);
-  Args.push_back(srcOp);
+  Args.push_back(srcArg);
   Args.push_back(MetaTyVal);
 
   auto *AI = Builder.createApply(Loc, funcRef, subMap, Args);
@@ -307,13 +307,13 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   // If we have guaranteed normal arguments, insert the destroy.
   //
   // TODO: Is it safe to just eliminate the initial retain?
-  Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
+  Builder.emitDestroyValueOperation(Loc, srcArg);
 
   // If we have an unconditional_checked_cast_addr, return early. We do not need
   // to handle any conditional code.
   if (isa<UnconditionalCheckedCastAddrInst>(Inst)) {
     // Destroy the source value as unconditional_checked_cast_addr would.
-    Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
+    Builder.emitDestroyValueOperation(Loc, srcOp);
     eraseInstAction(Inst);
     return (newI) ? newI : AI;
   }
@@ -592,7 +592,8 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
   auto ParamTypes = SubstFnTy.castTo<SILFunctionType>()->getParameters();
   if (Src->getType().isAddress() && !substConv.isSILIndirect(ParamTypes[0])) {
     // Create load
-    Src = Builder.createLoad(Loc, Src, LoadOwnershipQualifier::Unqualified);
+    Src =
+        Builder.emitLoadValueOperation(Loc, Src, LoadOwnershipQualifier::Take);
   }
 
   // Compensate different owning conventions of the replaced cast instruction
@@ -682,7 +683,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
     if (AddressOnlyType) {
       Builder.createDestroyAddr(Loc, Src);
     } else {
-      Builder.createReleaseValue(Loc, Src, Builder.getDefaultAtomicity());
+      Builder.emitDestroyValueOperation(Loc, Src);
     }
   };
 
@@ -1197,10 +1198,19 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   auto replaceCastHelper = [](SILBuilderWithScope &B,
                               SILDynamicCastInst dynamicCast,
                               MetatypeInst *mi) -> SILInstruction * {
+    // Make sure that the failure block has the new metatype type for
+    // its default argument as required when we are in ossa
+    // mode. Without ossa, failure blocks do not have args, so we do
+    // not need to do anything.
+    auto *fBlock = dynamicCast.getFailureBlock();
+    if (B.hasOwnership()) {
+      fBlock->replacePhiArgumentAndReplaceAllUses(0, mi->getType(),
+                                                  ValueOwnershipKind::Any);
+    }
     return B.createCheckedCastBranch(
         dynamicCast.getLocation(), false /*isExact*/, mi,
         dynamicCast.getLoweredTargetType(), dynamicCast.getSuccessBlock(),
-        dynamicCast.getFailureBlock(), *dynamicCast.getSuccessBlockCount(),
+        fBlock, *dynamicCast.getSuccessBlockCount(),
         *dynamicCast.getFailureBlockCount());
   };
 

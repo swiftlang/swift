@@ -1650,6 +1650,31 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   }
 
+  if (TC.getTriple().isOSWindows()) {
+    if (const Arg *A = Args.getLastArg(options::OPT_libc)) {
+      OI.RuntimeVariant =
+          llvm::StringSwitch<Optional<OutputInfo::MSVCRuntime>>(A->getValue())
+              .Cases("MD", "MultiThreadedDLL", "shared-ucrt",
+                     OutputInfo::MSVCRuntime::MultiThreadedDLL)
+              .Cases("MDd", "MultiThreadedDebugDLL", "shared-debug-ucrt",
+                     OutputInfo::MSVCRuntime::MultiThreadedDebugDLL)
+              .Cases("MT", "MultiThreaded", "static-ucrt",
+                     OutputInfo::MSVCRuntime::MultiThreaded)
+              .Cases("MTd", "MultiThreadedDebug", "static-debug-ucrt",
+                     OutputInfo::MSVCRuntime::MultiThreadedDebug)
+              .Default(llvm::None);
+      if (!OI.RuntimeVariant)
+        Diags.diagnose({}, diag::error_invalid_arg_value, A->getSpelling(),
+                       A->getValue());
+    } else {
+      // NOTE: default to `/MD`.  This is different from `cl`'s default
+      // behaviour of `/MT` on the command line, however, Visual Studio 2015 and
+      // newer will default `/MD` as well.  Furthermore, this is far more useful
+      // of a mode since the `/MT` mode requires that everything is statically
+      // linked.
+      OI.RuntimeVariant = OutputInfo::MSVCRuntime::MultiThreadedDLL;
+    }
+  }
 }
 
 OutputInfo::Mode

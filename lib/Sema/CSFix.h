@@ -363,13 +363,19 @@ private:
 
 /// Add a new conformance to the type to satisfy a requirement.
 class MissingConformance final : public ConstraintFix {
-  Type NonConformingType;
-  ProtocolDecl *Protocol;
+  // Determines whether given protocol type comes from the context e.g.
+  // assignment destination or argument comparison.
+  bool IsContextual;
 
-  MissingConformance(ConstraintSystem &cs, Type type, ProtocolDecl *protocol,
-                     ConstraintLocator *locator)
+  Type NonConformingType;
+  // This could either be a protocol or protocol composition.
+  Type ProtocolType;
+
+  MissingConformance(ConstraintSystem &cs, bool isContextual, Type type,
+                     Type protocolType, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AddConformance, locator),
-        NonConformingType(type), Protocol(protocol) {}
+        IsContextual(isContextual), NonConformingType(type),
+        ProtocolType(protocolType) {}
 
 public:
   std::string getName() const override {
@@ -378,13 +384,17 @@ public:
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static MissingConformance *create(ConstraintSystem &cs, Type type,
-                                    ProtocolDecl *protocol,
-                                    ConstraintLocator *locator);
+  static MissingConformance *forRequirement(ConstraintSystem &cs, Type type,
+                                            Type protocolType,
+                                            ConstraintLocator *locator);
+
+  static MissingConformance *forContextual(ConstraintSystem &cs, Type type,
+                                           Type protocolType,
+                                           ConstraintLocator *locator);
 
   Type getNonConformingType() { return NonConformingType; }
 
-  ProtocolDecl *getProtocol() { return Protocol; }
+  Type getProtocolType() { return ProtocolType; }
 };
 
 /// Skip same-type generic requirement constraint,
@@ -585,13 +595,17 @@ public:
 	
 class AllowTypeOrInstanceMember final : public ConstraintFix {
   Type BaseType;
-  DeclName Name;
+  ValueDecl *Member;
+  DeclName UsedName;
 
 public:
-  AllowTypeOrInstanceMember(ConstraintSystem &cs, Type baseType, DeclName member,
+  AllowTypeOrInstanceMember(ConstraintSystem &cs, Type baseType,
+                            ValueDecl *member, DeclName name,
                             ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AllowTypeOrInstanceMember, locator),
-        BaseType(baseType), Name(member) {}
+        BaseType(baseType), Member(member), UsedName(name) {
+    assert(member);
+  }
 
   std::string getName() const override {
     return "allow access to instance member on type or a type member on instance";
@@ -600,7 +614,7 @@ public:
   bool diagnose(Expr *root, bool asNote = false) const override;
 
   static AllowTypeOrInstanceMember *create(ConstraintSystem &cs, Type baseType,
-                                           DeclName member,
+                                           ValueDecl *member, DeclName usedName,
                                            ConstraintLocator *locator);
 };
 

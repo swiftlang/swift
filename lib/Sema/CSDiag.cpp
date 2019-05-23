@@ -733,17 +733,22 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
         return problem == firstProblem;
       });
 
-  ValueDecl *member = nullptr;
-  for (auto cand : result.UnviableCandidates) {
-    if (member == nullptr)
-      member = cand.getDecl();
-  }
-
   auto instanceTy = baseObjTy;
   if (auto *MTT = instanceTy->getAs<AnyMetatypeType>())
     instanceTy = MTT->getInstanceType();
   
   if (sameProblem) {
+    // If the problem is the same for all of the choices, let's
+    // just pick one which has a declaration.
+    auto choice = llvm::find_if(
+        result.UnviableCandidates,
+        [&](const OverloadChoice &choice) { return choice.isDecl(); });
+
+    // This code can't currently diagnose key path application
+    // related failures.
+    if (!choice)
+      return;
+
     switch (firstProblem) {
     case MemberLookupResult::UR_LabelMismatch:
     case MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember:
@@ -761,7 +766,7 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
                              ? ConstraintLocator::SubscriptMember
                              : ConstraintLocator::Member;
       AllowTypeOrInstanceMemberFailure failure(
-          nullptr, CS, baseObjTy, memberName,
+          expr, CS, baseObjTy, choice->getDecl(), memberName,
           CS.getConstraintLocator(E, locatorKind));
       auto diagnosed = failure.diagnoseAsError();
       assert(diagnosed &&
@@ -784,7 +789,6 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
     }
         
     case MemberLookupResult::UR_Inaccessible: {
-      auto decl = result.UnviableCandidates[0].getDecl();
       // FIXME: What if the unviable candidates have different levels of access?
       //
       // If we found an inaccessible member of a protocol extension, it might
@@ -792,16 +796,20 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
       // visible to us, but the conforming type is. In this case, we need to
       // clamp the formal access for diagnostics purposes to the formal access
       // of the protocol itself.
-      InaccessibleMemberFailure failure(expr, CS, decl,
+      InaccessibleMemberFailure failure(expr, CS, choice->getDecl(),
                                         CS.getConstraintLocator(E));
       auto diagnosed = failure.diagnoseAsError();
       assert(diagnosed && "failed to produce expected diagnostic");
       for (auto cand : result.UnviableCandidates) {
-        auto *choice = cand.getDecl();
+        if (!cand.isDecl())
+          continue;
+
+        auto *candidate = cand.getDecl();
         // failure is going to highlight candidate given to it,
         // we just need to handle the rest here.
-        if (choice != decl)
-          diagnose(choice, diag::decl_declared_here, choice->getFullName());
+        if (candidate != choice->getDecl())
+          diagnose(candidate, diag::decl_declared_here,
+                   candidate->getFullName());
       }
       return;
     }
@@ -2052,7 +2060,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   // system had a contextual type specified, we use it - it will have a purpose
   // indicator which allows us to give a very "to the point" diagnostic.
   Diag<Type, Type> diagID;
-  Diag<Type, Type> diagIDProtocol;
   Diag<Type> nilDiag;
   std::function<void(void)> nilFollowup;
 
@@ -2069,7 +2076,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
                      "contextual type");
   case CTP_Initialization:
     diagID = diag::cannot_convert_initializer_value;
-    diagIDProtocol = diag::cannot_convert_initializer_value_protocol;
     nilDiag = diag::cannot_convert_initializer_value_nil;
     nilFollowup = [this] {
       TypeRepr *patternTR = CS.getContextualTypeLoc().getTypeRepr();
@@ -2095,7 +2101,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     }
 
     diagID = diag::cannot_convert_to_return_type;
-    diagIDProtocol = diag::cannot_convert_to_return_type_protocol;
     nilDiag = diag::cannot_convert_to_return_type_nil;
     break;
   case CTP_ThrowStmt: {
@@ -2143,12 +2148,10 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
 
   case CTP_EnumCaseRawValue:
     diagID = diag::cannot_convert_raw_initializer_value;
-    diagIDProtocol = diag::cannot_convert_raw_initializer_value;
     nilDiag = diag::cannot_convert_raw_initializer_value_nil;
     break;
   case CTP_DefaultParameter:
     diagID = diag::cannot_convert_default_arg_value;
-    diagIDProtocol = diag::cannot_convert_default_arg_value_protocol;
     nilDiag = diag::cannot_convert_default_arg_value_nil;
     break;
 
@@ -2168,42 +2171,34 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     return true;
   case CTP_YieldByValue:
     diagID = diag::cannot_convert_yield_value;
-    diagIDProtocol = diag::cannot_convert_yield_value_protocol;
     nilDiag = diag::cannot_convert_yield_value_nil;
     break;
   case CTP_CallArgument:
     diagID = diag::cannot_convert_argument_value;
-    diagIDProtocol = diag::cannot_convert_argument_value_protocol;
     nilDiag = diag::cannot_convert_argument_value_nil;
     break;
   case CTP_ClosureResult:
     diagID = diag::cannot_convert_closure_result;
-    diagIDProtocol = diag::cannot_convert_closure_result_protocol;
     nilDiag = diag::cannot_convert_closure_result_nil;
     break;
   case CTP_ArrayElement:
     diagID = diag::cannot_convert_array_element;
-    diagIDProtocol = diag::cannot_convert_array_element_protocol;
     nilDiag = diag::cannot_convert_array_element_nil;
     break;
   case CTP_DictionaryKey:
     diagID = diag::cannot_convert_dict_key;
-    diagIDProtocol = diag::cannot_convert_dict_key_protocol;
     nilDiag = diag::cannot_convert_dict_key_nil;
     break;
   case CTP_DictionaryValue:
     diagID = diag::cannot_convert_dict_value;
-    diagIDProtocol = diag::cannot_convert_dict_value_protocol;
     nilDiag = diag::cannot_convert_dict_value_nil;
     break;
   case CTP_CoerceOperand:
     diagID = diag::cannot_convert_coerce;
-    diagIDProtocol = diag::cannot_convert_coerce_protocol;
     nilDiag = diag::cannot_convert_coerce_nil;
     break;
   case CTP_AssignSource:
     diagID = diag::cannot_convert_assign;
-    diagIDProtocol = diag::cannot_convert_assign_protocol;
     nilDiag = diag::cannot_convert_assign_nil;
     break;
   }
@@ -2315,10 +2310,13 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
 
   // When complaining about conversion to a protocol type, complain about
   // conformance instead of "conversion".
-  if (contextualType->is<ProtocolType>() ||
-      contextualType->is<ProtocolCompositionType>())
-    diagID = diagIDProtocol;
-  
+  if (contextualType->isExistentialType()) {
+    MissingContextualConformanceFailure failure(
+        expr, CS, CTP, exprType, contextualType,
+        CS.getConstraintLocator(expr, ConstraintLocator::ContextualType));
+    return failure.diagnoseAsError();
+  }
+
   // Try to simplify irrelevant details of function types.  For example, if
   // someone passes a "() -> Float" function to a "() throws -> Int"
   // parameter, then uttering the "throws" may confuse them into thinking that
@@ -6518,16 +6516,20 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
 
     // Depending on how we matched, produce tailored diagnostics.
     switch (candidateInfo.closeness) {
+    case CC_SelfMismatch:         // Self argument mismatches.
+      llvm_unreachable("These aren't produced by filterContextualMemberList");
+      return false;
+
     case CC_NonLValueInOut: // First argument is inout but no lvalue present.
     case CC_OneArgumentMismatch: // All arguments except one match.
     case CC_OneArgumentNearMismatch:
     case CC_OneGenericArgumentMismatch:
     case CC_OneGenericArgumentNearMismatch:
     case CC_GenericNonsubstitutableMismatch:
-    case CC_SelfMismatch:         // Self argument mismatches.
     case CC_ArgumentNearMismatch: // Argument list mismatch.
     case CC_ArgumentMismatch:     // Argument list mismatch.
-      llvm_unreachable("These aren't produced by filterContextualMemberList");
+      // Candidate filtering can produce these now, but they can't
+      // be properly diagnosed here at the moment.
       return false;
 
     case CC_ExactMatch: { // This is a perfect match for the arguments.

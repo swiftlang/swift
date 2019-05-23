@@ -406,6 +406,11 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   if (auto *bai = dyn_cast<BeginAccessInst>(value))
     return getConstantValue(bai->getOperand());
 
+  // Look through copy_value and begin_borrow since the interpreter doesn't
+  // model these memory management instructions.
+  if (isa<CopyValueInst>(value) || isa<BeginBorrowInst>(value))
+    return getConstantValue(cast<SingleValueInstruction>(value)->getOperand(0));
+
   LLVM_DEBUG(llvm::dbgs() << "ConstExpr Unknown simple: " << *value << "\n");
 
   // Otherwise, we don't know how to handle this.
@@ -1292,13 +1297,23 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
       // skip them.
       isa<DestroyAddrInst>(inst) || isa<RetainValueInst>(inst) ||
       isa<ReleaseValueInst>(inst) || isa<StrongRetainInst>(inst) ||
-      isa<StrongReleaseInst>(inst))
+      isa<StrongReleaseInst>(inst) || isa<DestroyValueInst>(inst) ||
+      isa<EndBorrowInst>(inst))
     return None;
 
   // If this is a special flow-sensitive instruction like a stack allocation,
   // store, copy_addr, etc, we handle it specially here.
   if (auto asi = dyn_cast<AllocStackInst>(inst)) {
     createMemoryObject(asi, SymbolicValue::getUninitMemory());
+    return None;
+  }
+
+  // Make sure that our copy_value, begin_borrow form constants. Otherwise,
+  // return why.
+  if (isa<CopyValueInst>(inst) || isa<BeginBorrowInst>(inst)) {
+    auto result = getConstantValue(inst->getOperand(0));
+    if (!result.isConstant())
+      return result;
     return None;
   }
 

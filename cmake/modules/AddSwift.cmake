@@ -400,12 +400,6 @@ function(_add_variant_swift_compile_flags
     list(APPEND result "-D" "SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS")
   endif()
 
-  if(sdk STREQUAL WINDOWS)
-    list(APPEND result "-Xcc" "-D_MT")
-    # TODO(compnerd) handle /MT /MTd
-    list(APPEND result "-Xcc" "-D_DLL")
-  endif()
-
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -873,13 +867,8 @@ function(_add_swift_library_single target name)
     if("${SWIFTLIB_SINGLE_ARCHITECTURE}" MATCHES arm)
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;-D_ARM_WINAPI_PARTITION_DESKTOP_SDK_AVAILABLE)
     endif()
-    list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-autolink-library;-Xfrontend;oldnames)
-    # TODO(compnerd) handle /MT and /MTd
-    if(CMAKE_BUILD_TYPE MATCHES Debug)
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-autolink-library;-Xfrontend;msvcrtd)
-    else()
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-autolink-library;-Xfrontend;msvcrt)
-    endif()
+    list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
+      -libc;${SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY})
   endif()
 
   # FIXME: don't actually depend on the libraries in SWIFTLIB_SINGLE_LINK_LIBRARIES,
@@ -1924,6 +1913,20 @@ function(add_swift_target_library name)
         DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
         GYB_SOURCES ${SWIFTLIB_GYB_SOURCES}
       )
+
+      if(sdk STREQUAL WINDOWS)
+        if(SWIFT_COMPILER_IS_MSVC_LIKE)
+          if (SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY MATCHES MultiThreadedDebugDLL)
+            target_compile_options(${VARIANT_NAME} PRIVATE /MDd /D_DLL /D_DEBUG)
+          elseif (SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY MATCHES MultiThreadedDebug)
+            target_compile_options(${VARIANT_NAME} PRIVATE /MTd /U_DLL /D_DEBUG)
+          elseif (SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY MATCHES MultiThreadedDLL)
+            target_compile_options(${VARIANT_NAME} PRIVATE /MD /D_DLL /U_DEBUG)
+          elseif (SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY MATCHES MultiThreaded)
+            target_compile_options(${VARIANT_NAME} PRIVATE /MT /U_DLL /U_DEBUG)
+          endif()
+        endif()
+      endif()
 
       if(NOT SWIFTLIB_OBJECT_LIBRARY)
         # Add dependencies on the (not-yet-created) custom lipo target.

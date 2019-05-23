@@ -287,6 +287,10 @@ def create_argument_parser():
     option(['-n', '--dry-run'], store_true,
            help='print the commands that would be executed, but do not '
                 'execute them')
+    option('--dump-config', toggle_true,
+           help='instead of building, write JSON to stdout containing '
+                'various values used to build in this configuration')
+
     option('--legacy-impl', store_true('legacy_impl'),
            help='use legacy implementation')
 
@@ -787,6 +791,15 @@ def create_argument_parser():
            default=3,
            help='if the Swift Benchmark Suite is run after building, run N '
                 'iterations with -Onone')
+
+    # We want to run the TSan (compiler-rt) libdispatch tests on Linux, where
+    # libdispatch is just another library and not available by default. To do
+    # so we build Clang/LLVM/libdispatch and use it to compile/run the TSan
+    # libdispatch tests.
+    option('--tsan-libdispatch-test', toggle_true,
+           help='Builds a new toolchain including the libdispatch C library. '
+                'Then re-builds the TSan runtime (compiler-rt) using this '
+                'freshly-built Clang and runs the TSan libdispatch tests.')
 
     option('--skip-test-osx', toggle_false('test_osx'),
            help='skip testing Swift stdlibs for Mac OS X')

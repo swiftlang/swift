@@ -1110,36 +1110,14 @@ static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D,
   return true;
 }
 
-/// Try to make the given declaration 'dynamic', checking any semantic
-/// constraints before doing so.
-///
-/// \returns true if it can be made dynamic, false otherwise.
-static bool makeObjCDynamic(ValueDecl *decl) {
-  // Only  members of classes can be dynamic.
-  auto classDecl = decl->getDeclContext()->getSelfClassDecl();
-  if (!classDecl) {
-    auto attr = decl->getAttrs().getAttribute<DynamicAttr>();
-    decl->diagnose(diag::dynamic_not_in_class)
-      .fixItRemove(attr ? SourceRange(attr->getLocation()) : SourceRange());
-    return false;
-  }
-
-  // '@objc dynamic' is only supported through the Objective-C runtime.
-  if (!decl->isObjC()) {
-    decl->diagnose(diag::dynamic_requires_objc,
-                   decl->getDescriptiveKind(), decl->getFullName())
-      .fixItInsert(decl->getAttributeInsertionLoc(/*forModifier=*/false),
-                   "@objc ");
-    return false;
-  }
-
+/// Make the given declaration 'dynamic', if it isn't already marked as such.
+static void makeDynamic(ValueDecl *decl) {
   // If there isn't already a 'dynamic' attribute, add an inferred one.
-  if (!decl->getAttrs().hasAttribute<DynamicAttr>()) {
-    auto attr = new (decl->getASTContext()) DynamicAttr(/*implicit=*/true);
-    decl->getAttrs().add(attr);
-  }
-
-  return true;
+  if (decl->getAttrs().hasAttribute<DynamicAttr>())
+    return;
+  
+  auto attr = new (decl->getASTContext()) DynamicAttr(/*implicit=*/true);
+  decl->getAttrs().add(attr);
 }
 
 static llvm::Expected<bool> isStorageDynamic(Evaluator &evaluator,
@@ -1301,9 +1279,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
   // If 'dynamic' was explicitly specified, check it.
   if (decl->getAttrs().hasAttribute<DynamicAttr>()) {
-    if (decl->getASTContext().LangOpts.isSwiftVersionAtLeast(5))
-      return true;
-    return makeObjCDynamic(decl);
+    return true;
   }
 
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
@@ -1319,15 +1295,11 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case AccessorKind::Get:
     case AccessorKind::Set: {
       auto isDynamicResult = evaluator(
-        IsDynamicRequest{accessor->getStorage()});
-
-      if (!isDynamicResult)
-        return isDynamicResult;
-
-      if (*isDynamicResult)
-        return makeObjCDynamic(decl);
-
-      return false;
+          IsDynamicRequest{accessor->getStorage()});
+      if (isDynamicResult && *isDynamicResult)
+        makeDynamic(decl);
+      
+      return isDynamicResult;  
     }
 
 #define OBJC_ACCESSOR(ID, KEYWORD)
@@ -1342,7 +1314,8 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // FIXME: Use a semantic check for NSManaged rather than looking for the
   // attribute (which could be ill-formed).
   if (decl->getAttrs().hasAttribute<NSManagedAttr>()) {
-    return makeObjCDynamic(decl);
+    makeDynamic(decl);
+    return true;
   }
 
   // The presence of 'final' blocks the inference of 'dynamic'.
@@ -1361,7 +1334,8 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // This is intended to enable overriding the declarations.
   auto dc = decl->getDeclContext();
   if (isa<ExtensionDecl>(dc) && dc->getSelfClassDecl()) {
-    return makeObjCDynamic(decl);
+    makeDynamic(decl);
+    return true;
   }
 
   // If any of the declarations overridden by this declaration are dynamic
@@ -1372,13 +1346,10 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   auto overriddenDecls = evaluateOrDefault(evaluator,
     OverriddenDeclsRequest{decl}, {});
   for (auto overridden : overriddenDecls) {
-    if (overridden->isDynamic() &&
-        (!decl->getASTContext().LangOpts.isSwiftVersionAtLeast(5) ||
-         overridden->isObjC()))
-      return makeObjCDynamic(decl);
-
-    if (overridden->hasClangNode())
-      return makeObjCDynamic(decl);
+    if (overridden->isDynamic() || overridden->hasClangNode()) {
+      makeDynamic(decl);
+      return true;
+    }
   }
 
   return false;
@@ -2958,7 +2929,9 @@ public:
         break;
       }
 
-      if (!isInvalidSuperclass && Super->hasMissingVTableEntries()) {
+      if (!isInvalidSuperclass && Super->hasMissingVTableEntries() &&
+          !Super->isResilient(CD->getParentModule(),
+                              ResilienceExpansion::Minimal)) {
         auto *superFile = Super->getModuleScopeContext();
         if (auto *serialized = dyn_cast<SerializedASTFile>(superFile)) {
           if (serialized->getLanguageVersionBuiltWith() !=

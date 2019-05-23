@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
@@ -1899,6 +1900,10 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
 
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   auto *vd = c.loc.dyn_cast<ValueDecl *>();
+
+  if (vd && !vd->hasInterfaceType()) {
+    Context.getLazyResolver()->resolveDeclSignature(vd);
+  }
 
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {

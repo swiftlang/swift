@@ -761,8 +761,13 @@ emitKeyPathComponent(IRGenModule &IGM,
       assert(currentBaseTy->getClassOrBoundGenericClass() == propertyBaseDecl);
       loweredBaseTy =
           IGM.getLoweredType(AbstractionPattern::getOpaque(), currentBaseTy);
+      
+      auto loweredBaseContextTy = SILType::getPrimitiveObjectType(
+            GenericEnvironment::mapTypeIntoContext(genericEnv,
+                                                   loweredBaseTy.getASTType())
+              ->getCanonicalType());
 
-      switch (getClassFieldAccess(IGM, loweredBaseTy, property)) {
+      switch (getClassFieldAccess(IGM, loweredBaseContextTy, property)) {
       case FieldAccess::ConstantDirect: {
         // Known constant fixed offset.
         auto offset = tryEmitConstantClassFragilePhysicalMemberOffset(IGM,

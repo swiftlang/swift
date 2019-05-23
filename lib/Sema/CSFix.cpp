@@ -160,16 +160,35 @@ RelabelArguments::create(ConstraintSystem &cs,
 }
 
 bool MissingConformance::diagnose(Expr *root, bool asNote) const {
-  MissingConformanceFailure failure(root, getConstraintSystem(), getLocator(),
-                                    {NonConformingType, Protocol});
+  auto &cs = getConstraintSystem();
+  auto *locator = getLocator();
+
+  if (IsContextual) {
+    auto context = cs.getContextualTypePurpose();
+    MissingContextualConformanceFailure failure(
+        root, cs, context, NonConformingType, ProtocolType, locator);
+    return failure.diagnose(asNote);
+  }
+
+  MissingConformanceFailure failure(
+      root, cs, locator, std::make_pair(NonConformingType, ProtocolType));
   return failure.diagnose(asNote);
 }
 
-MissingConformance *MissingConformance::create(ConstraintSystem &cs, Type type,
-                                               ProtocolDecl *protocol,
-                                               ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      MissingConformance(cs, type, protocol, locator);
+MissingConformance *
+MissingConformance::forContextual(ConstraintSystem &cs, Type type,
+                                  Type protocolType,
+                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator()) MissingConformance(
+      cs, /*isContextual=*/true, type, protocolType, locator);
+}
+
+MissingConformance *
+MissingConformance::forRequirement(ConstraintSystem &cs, Type type,
+                                   Type protocolType,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) MissingConformance(
+      cs, /*isContextual=*/false, type, protocolType, locator);
 }
 
 bool SkipSameTypeRequirement::diagnose(Expr *root, bool asNote) const {
@@ -265,17 +284,19 @@ DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
 }
 
 bool AllowTypeOrInstanceMember::diagnose(Expr *root, bool asNote) const {
-  auto failure = AllowTypeOrInstanceMemberFailure(root, getConstraintSystem(),
-                                                  BaseType, Name, getLocator());
+  auto failure = AllowTypeOrInstanceMemberFailure(
+      root, getConstraintSystem(), BaseType, Member, UsedName, getLocator());
   return failure.diagnose(asNote);
 }
 
-AllowTypeOrInstanceMember *AllowTypeOrInstanceMember::create(ConstraintSystem &cs,
-                                                             Type baseType,
-                                                             DeclName member,
-                                                             ConstraintLocator *locator) {
-  return new (cs.getAllocator()) AllowTypeOrInstanceMember(cs, baseType, member, locator);
+AllowTypeOrInstanceMember *
+AllowTypeOrInstanceMember::create(ConstraintSystem &cs, Type baseType,
+                                  ValueDecl *member, DeclName usedName,
+                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowTypeOrInstanceMember(cs, baseType, member, usedName, locator);
 }
+
 bool AllowInvalidPartialApplication::diagnose(Expr *root, bool asNote) const {
   auto failure = PartialApplicationFailure(root, isWarning(),
                                            getConstraintSystem(), getLocator());
