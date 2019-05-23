@@ -1253,11 +1253,6 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
       assert(!accessor->hasBody());
       accessor->setBodySynthesizer(&synthesizeAccessorBody);
 
-      // Make sure SILGen emits the accessor; on-demand accessors have shared
-      // linkage, and if its defined in a different translation unit from the
-      // conformance we cannot simply generate an external declaration.
-      Context.addExternalDecl(accessor);
-
       maybeMarkTransparent(accessor, Context);
       DeclsToFinalize.insert(accessor);
     }

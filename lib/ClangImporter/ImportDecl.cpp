@@ -538,9 +538,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   
   ctorDecl->setBody(body);
   ctorDecl->setBodyTypeCheckedIfPresent();
-  
-  Impl.registerExternalDecl(ctorDecl);
-  
+
   return ctorDecl;
 }
 
@@ -616,7 +614,7 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   
   getterDecl->setBody(body);
   getterDecl->setBodyTypeCheckedIfPresent();
-  Impl.registerExternalDecl(getterDecl);
+
   return getterDecl;
 }
 
@@ -694,7 +692,6 @@ static AccessorDecl *makeStructRawValueGetter(
   getterDecl->setBody(body);
   getterDecl->setBodyTypeCheckedIfPresent();
 
-  Impl.registerExternalDecl(getterDecl);
   return getterDecl;
 }
 
@@ -854,7 +851,6 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
     getterDecl->setBody(body);
     getterDecl->setBodyTypeCheckedIfPresent();
     getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-    Impl.registerExternalDecl(getterDecl);
   }
 
   // Synthesize the setter body
@@ -886,7 +882,6 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
     setterDecl->setBody(body);
     setterDecl->setBodyTypeCheckedIfPresent();
     setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-    Impl.registerExternalDecl(setterDecl);
   }
 
   return { getterDecl, setterDecl };
@@ -964,7 +959,6 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
     getterDecl->setBody(body);
     getterDecl->setBodyTypeCheckedIfPresent();
     getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-    Impl.registerExternalDecl(getterDecl);
   }
 
   // Synthesize the setter body
@@ -1026,7 +1020,6 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
     setterDecl->setBody(body);
     setterDecl->setBodyTypeCheckedIfPresent();
     setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-    Impl.registerExternalDecl(setterDecl);
   }
 
   return { getterDecl, setterDecl };
@@ -1160,8 +1153,6 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                    cGetterExpr,
                                                    nullptr);
     cGetterDecl->setBody(cGetterBody);
-
-    Impl.registerExternalDecl(getterDecl);
   }
 
   // Synthesize the setter body
@@ -1218,8 +1209,6 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                        clang::FPOptions());
     
     cSetterDecl->setBody(cSetterExpr);
-
-    Impl.registerExternalDecl(setterDecl);
   }
 
   return { getterDecl, setterDecl };
@@ -1295,9 +1284,6 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
                                 SourceLoc());
   constructor->setBody(body);
   constructor->setBodyTypeCheckedIfPresent();
-
-  // Add this as an external definition.
-  Impl.registerExternalDecl(constructor);
 
   // We're done.
   return constructor;
@@ -1418,9 +1404,6 @@ createValueConstructor(ClangImporter::Implementation &Impl,
     constructor->setBody(body);
     constructor->setBodyTypeCheckedIfPresent();
   }
-
-  // Add this as an external definition.
-  Impl.registerExternalDecl(constructor);
 
   // We're done.
   return constructor;
@@ -1930,8 +1913,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   getterDecl->setBody(
       BraceStmt::create(C, SourceLoc(), {ret}, SourceLoc(), isImplicit));
   getterDecl->setBodyTypeCheckedIfPresent();
-  
-  importer.registerExternalDecl(getterDecl);
+
   return true;
 }
 
@@ -3080,12 +3062,6 @@ namespace {
         }
       }
 
-      // Add the type decl to ExternalDefinitions so that we can type-check
-      // raw values and SILGen can emit witness tables for derived conformances.
-      // FIXME: There might be better ways to do this.
-      Impl.registerExternalDecl(result);
-      if (errorWrapper)
-        Impl.registerExternalDecl(errorWrapper);
       return result;
     }
 
@@ -3326,11 +3302,6 @@ namespace {
       }
 
       result->setHasUnreferenceableStorage(hasUnreferenceableStorage);
-
-      // Add the struct decl to ExternalDefinitions so that IRGen can emit
-      // metadata for it.
-      // FIXME: There might be better ways to do this.
-      Impl.registerExternalDecl(result);
 
       return result;
     }
@@ -3644,14 +3615,6 @@ namespace {
 
     void finishFuncDecl(const clang::FunctionDecl *decl,
                         AbstractFunctionDecl *result) {
-      // Keep track of inline function bodies so that we can generate
-      // IR from them using Clang's IR generator.
-      if ((decl->isInlined() || decl->hasAttr<clang::AlwaysInlineAttr>() ||
-           !decl->isExternallyVisible()) &&
-          decl->hasBody()) {
-        Impl.registerExternalDecl(result);
-      }
-
       // Set availability.
       if (decl->isVariadic()) {
         Impl.markUnavailable(result, "Variadic function is unavailable");
@@ -3818,9 +3781,6 @@ namespace {
       if (dc->getSelfClassDecl())
         result->getAttrs().add(new (Impl.SwiftContext)
                                  FinalAttr(/*IsImplicit=*/true));
-
-      if (!decl->hasExternalStorage())
-        Impl.registerExternalDecl(result);
 
       // If this is a compatibility stub, mark it as such.
       if (correctSwiftName)
@@ -4533,11 +4493,6 @@ namespace {
 
       result->setMemberLoader(&Impl, 0);
 
-      // Add the protocol decl to ExternalDefinitions so that IRGen can emit
-      // metadata for it.
-      // FIXME: There might be better ways to do this.
-      Impl.registerExternalDecl(result);
-
       return result;
     }
 
@@ -5149,7 +5104,6 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
   theClass->setAddedImplicitInitializers(); // suppress all initializers
   theClass->setForeignClassKind(ClassDecl::ForeignKind::CFType);
   addObjCAttribute(theClass, None);
-  Impl.registerExternalDecl(theClass);
 
   if (superclass) {
     SmallVector<TypeLoc, 4> inheritedTypes;
@@ -5438,7 +5392,6 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   }
 
   Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = structDecl;
-  Impl.registerExternalDecl(structDecl);
   return structDecl;
 }
 
@@ -6340,9 +6293,6 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // If this constructor overrides another constructor, mark it as such.
   recordObjCOverride(result);
-
-  // Inform the context that we have external definitions.
-  Impl.registerExternalDecl(result);
 
   return result;
 }
@@ -8399,9 +8349,6 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   
   // Set the function up as the getter.
   makeComputed(var, func, nullptr);
-
-  // Register this thunk as an external definition.
-  registerExternalDecl(func);
 
   return var;
 }
