@@ -255,13 +255,6 @@ public:
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
 #include "swift/AST/KnownIdentifiers.def"
 
-  /// The list of external definitions imported by this context.
-  llvm::SetVector<Decl *> ExternalDefinitions;
-
-  /// FIXME: HACK HACK HACK
-  /// This state should be tracked somewhere else.
-  unsigned LastCheckedExternalDefinition = 0;
-
   /// A consumer of type checker debug output.
   std::unique_ptr<TypeCheckerDebugConsumer> TypeCheckerDebug;
 
@@ -580,14 +573,8 @@ public:
                                ForeignLanguage language,
                                const DeclContext *dc);
 
-  /// Add a declaration to a list of declarations that need to be emitted
-  /// as part of the current module or source file, but are otherwise not
-  /// nested within it.
-  void addExternalDecl(Decl *decl);
-
   /// Add a declaration that was synthesized to a per-source file list if
-  /// if is part of a source file, or the external declarations list if
-  /// it is part of an imported type context.
+  /// if is part of a source file.
   void addSynthesizedDecl(Decl *decl);
 
   /// Add a cleanup function to be called when the ASTContext is deallocated.
