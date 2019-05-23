@@ -21,13 +21,13 @@ import CTensorFlow
 /// `TensorFlow` library, as it much provide a way to convert the underlying tensor
 /// handle into a `ConcreteTensorHandle`, which wraps a `TFE_TensorHandle *`
 public protocol _AnyTensorHandle {
-  var tfeTensorHandle: TFETensorHandle { get }
+  var _tfeTensorHandle: TFETensorHandle { get }
 }
 
 extension _AnyTensorHandle {
   /// The underlying `TFE_TensorHandle *`.
   public var _cTensorHandle: CTensorHandle {
-    return tfeTensorHandle._cTensorHandle
+    return _tfeTensorHandle._cTensorHandle
   }
 }
 
@@ -36,7 +36,7 @@ extension _AnyTensorHandle {
 public class TFETensorHandle : _AnyTensorHandle {
   public let _cTensorHandle: CTensorHandle
 
-  public var tfeTensorHandle: TFETensorHandle { return self }
+  public var _tfeTensorHandle: TFETensorHandle { return self }
 
   public init(_owning base: CTensorHandle) {
     self._cTensorHandle = base
@@ -52,7 +52,8 @@ public class TFETensorHandle : _AnyTensorHandle {
 /// `TensorHandle` is the type used by ops. It includes a `Scalar` type, which
 /// compiler internals can use to determine the datatypes of parameters when
 /// they are extracted into a tensor program.
-public final class TensorHandle<Scalar> where Scalar : _TensorFlowDataTypeCompatible {
+public final class TensorHandle<Scalar>
+where Scalar : _TensorFlowDataTypeCompatible {
   let handle: _AnyTensorHandle
 
   public var _cTensorHandle: CTensorHandle { handle._cTensorHandle }
