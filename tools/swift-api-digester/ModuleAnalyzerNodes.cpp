@@ -1553,6 +1553,8 @@ SwiftDeclCollector::addMembersToRoot(SDKNode *Root, IterableDeclContext *Context
       // All containing variables should have been handled.
     } else if (isa<DestructorDecl>(Member)) {
       // deinit has no impact.
+    } else if (isa<MissingMemberDecl>(Member)) {
+      // avoid adding MissingMemberDecl
     } else {
       llvm_unreachable("unhandled member decl kind.");
     }
