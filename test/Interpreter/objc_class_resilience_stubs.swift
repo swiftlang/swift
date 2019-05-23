@@ -36,7 +36,10 @@ class ResilientNSObjectSubclass : ResilientNSObjectOutsideParent {}
 
 // This should not crash on older runtimes because we check before
 // attempting to register the class stub.
-ResilientClassTestSuite.test("RealizeResilientClass") {
+ResilientClassTestSuite.test("RealizeResilientClass")
+  .xfail(.osxMinor(10, 10, reason:
+         "Fails on 10.9 and 10.10 -- rdar://51036773"))
+  .code {
   forceMetadata()
 }
 
