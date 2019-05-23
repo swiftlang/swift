@@ -32,9 +32,6 @@ public enum DeviceKind {
 ///   - index: The device to run the ops on.
 ///   - body: A closure whose TensorFlow operations are to be executed on the
 ///     specified kind of device.
-// Use `@inline(never)` to ensure correctness in scoped device placement. See
-// https://bugs.swift.org/browse/SR-9535 for more context.
-@inline(never)
 public func withDevice<R>(_ kind: DeviceKind, _ index: UInt = 0,
                           perform body: () throws -> R) rethrows -> R {
   return try _ExecutionContext.global.withDevice(kind, index, perform: body)
@@ -54,7 +51,6 @@ public func withDevice<R>(_ kind: DeviceKind, _ index: UInt = 0,
 ///     is visible to TensorFlow
 ///   - "/job:localhost/replica:0/task:0/device:GPU:1": Fully qualified name of
 ///     the second GPU of your machine that is visible to TensorFlow.
-@inline(never)
 public func withDevice<R>(_ name: String,
                           perform body: () throws -> R) rethrows -> R {
   return try _ExecutionContext.global.withDevice(name, perform: body)
@@ -66,7 +62,6 @@ public func withDevice<R>(_ name: String,
 /// - Parameters:
 ///   - body: A closure whose TensorFlow operations are to be executed on the
 ///     specified kind of device.
-@inline(never)
 public func withDefaultDevice<R>(perform body: () throws -> R) rethrows -> R {
   return try _ExecutionContext.global.withDefaultDevice(perform: body)
 }
