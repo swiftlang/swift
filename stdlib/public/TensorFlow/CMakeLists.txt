@@ -34,7 +34,6 @@ set(SOURCES
   ArrayOps.swift
   CompilerRuntime.swift
   CompositeMath.swift
-  Dataset.swift
   DataTypes.swift
   Execution.swift
   Gradients.swift
@@ -60,6 +59,9 @@ if (TENSORFLOW_SWIFT_BINDINGS)
   file(GLOB_RECURSE TENSORFLOW_SWIFT_BINDINGS_SOURCES
     "${TENSORFLOW_SWIFT_BINDINGS}/*.swift")
   list(APPEND SOURCES "${TENSORFLOW_SWIFT_BINDINGS_SOURCES}")
+  file(GLOB_RECURSE TENSORFLOW_SWIFT_BINDINGS_SOURCES_CORE
+    "${TENSORFLOW_SWIFT_BINDINGS}/Core/*.swift")
+  list(APPEND SOURCES "${TENSORFLOW_SWIFT_BINDINGS_SOURCES_CORE}")
 endif()
 
 # Copy TensorFlow high-level API sources, if they exist.
