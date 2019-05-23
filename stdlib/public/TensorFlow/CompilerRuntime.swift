@@ -574,7 +574,7 @@ public final class _ExecutionContext {
   /// about device names.
   ///
   /// All TensorFlow operations will be put on the topmost device on the stack.
-  /// When the stack is empty or the topmost device is Nil, that allows
+  /// When the stack is empty or the topmost device is `nil`, that allows
   /// TensorFlow to place operations on any device that it sees fit.
   private var deviceScopes: [String?] = []
 
