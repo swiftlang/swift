@@ -4797,12 +4797,12 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     auto isDynamicCallable =
         CS.DynamicCallableCache[fnType->getCanonicalType()].isValid();
 
-    // TODO: Consider caching?
+    // Note: Consider caching `hasCallAsFunctionMethods` in `NominalTypeDecl`.
     auto *nominal = fnType->getAnyNominal();
-    auto hasCallMethods = nominal &&
+    auto hasCallAsFunctionMethods = nominal &&
       llvm::any_of(nominal->getMembers(), [](Decl *member) {
           auto funcDecl = dyn_cast<FuncDecl>(member);
-          return funcDecl && funcDecl->isCallFunction();
+          return funcDecl && funcDecl->isCallAsFunctionMethod();
         });
 
     // Diagnose @dynamicCallable errors.
@@ -4862,7 +4862,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         }
       }
 
-    if (!isDynamicCallable && !hasCallMethods)
+    if (!isDynamicCallable && !hasCallAsFunctionMethods)
       return true;
   }
   

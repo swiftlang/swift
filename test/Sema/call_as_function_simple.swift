@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 struct SimpleCallable {
-  func callFunction(_ x: Float) -> Float {
+  func callAsFunction(_ x: Float) -> Float {
     return x
   }
 }
@@ -12,20 +12,20 @@ let foo = SimpleCallable()
 _ = foo(1)
 _ = foo(foo(1))
 
-// TODO: Improve this error to match the error using a direct `call` member reference.
+// TODO: Improve this error to match the error using a direct `callAsFunction` member reference.
 // expected-error @+2 {{cannot call value of non-function type 'SimpleCallable'}}
 // expected-error @+1 {{cannot invoke 'foo' with an argument list of type '(Int, Int)'}}
 _ = foo(1, 1)
 // expected-error @+1 {{cannot convert value of type 'SimpleCallable' to specified type '(Float) -> Float'}}
 let _: (Float) -> Float = foo
 
-// Test direct `call` member references.
+// Test direct `callAsFunction` member references.
 
-_ = foo.callFunction(1)
-_ = [1, 2, 3].map(foo.callFunction)
-_ = foo.callFunction(foo(1))
-_ = foo(foo.callFunction(1))
-let _: (Float) -> Float = foo.callFunction
+_ = foo.callAsFunction(1)
+_ = [1, 2, 3].map(foo.callAsFunction)
+_ = foo.callAsFunction(foo(1))
+_ = foo(foo.callAsFunction(1))
+let _: (Float) -> Float = foo.callAsFunction
 
 func callable() -> SimpleCallable {
   return SimpleCallable()
@@ -42,38 +42,38 @@ extension SimpleCallable {
 _ = foo.foo(1)
 _ = foo.bar()(1)
 _ = callable()(1)
-_ = [1, 2, 3].map(foo.foo.callFunction)
-_ = [1, 2, 3].map(foo.bar().callFunction)
-_ = [1, 2, 3].map(callable().callFunction)
+_ = [1, 2, 3].map(foo.foo.callAsFunction)
+_ = [1, 2, 3].map(foo.bar().callAsFunction)
+_ = [1, 2, 3].map(callable().callAsFunction)
 
 struct MultipleArgsCallable {
-  func callFunction(x: Int, y: Float) -> [Int] {
+  func callAsFunction(x: Int, y: Float) -> [Int] {
     return [x]
   }
 }
 
 let bar = MultipleArgsCallable()
 _ = bar(x: 1, y: 1)
-_ = bar.callFunction(x: 1, y: 1)
-_ = bar(x: bar.callFunction(x: 1, y: 1)[0], y: 1)
-_ = bar.callFunction(x: bar(x: 1, y: 1)[0], y: 1)
+_ = bar.callAsFunction(x: 1, y: 1)
+_ = bar(x: bar.callAsFunction(x: 1, y: 1)[0], y: 1)
+_ = bar.callAsFunction(x: bar(x: 1, y: 1)[0], y: 1)
 _ = bar(1, 1) // expected-error {{missing argument labels 'x:y:' in call}}
 
 struct Extended {}
 extension Extended {
   @discardableResult
-  func callFunction() -> Extended {
+  func callAsFunction() -> Extended {
     return self
   }
 }
 var extended = Extended()
-extended()().callFunction()()
+extended()().callAsFunction()()
 
 struct TakesTrailingClosure {
-  func callFunction(_ fn: () -> Void) {
+  func callAsFunction(_ fn: () -> Void) {
     fn()
   }
-  func callFunction(_ x: Int, label y: Float, _ fn: (Int, Float) -> Void) {
+  func callAsFunction(_ x: Int, label y: Float, _ fn: (Int, Float) -> Void) {
     fn(x, y)
   }
 }
@@ -83,15 +83,15 @@ takesTrailingClosure() { print("Hi") }
 takesTrailingClosure(1, label: 2) { _ = Float($0) + $1 }
 
 struct OptionalCallable {
-  func callFunction() -> OptionalCallable? {
+  func callAsFunction() -> OptionalCallable? {
     return self
   }
 }
 var optional = OptionalCallable()
-_ = optional()?.callFunction()?()
+_ = optional()?.callAsFunction()?()
 
 struct Variadic {
-  func callFunction(_ args: Int...) -> [Int] {
+  func callAsFunction(_ args: Int...) -> [Int] {
     return args
   }
 }
@@ -101,35 +101,35 @@ _ = variadic(1, 2, 3)
 
 struct Mutating {
   var x: Int
-  mutating func callFunction() {
+  mutating func callAsFunction() {
     x += 1
   }
 }
 func testMutating(_ x: Mutating, _ y: inout Mutating) {
   _ = x() // expected-error {{cannot use mutating member on immutable value: 'x' is a 'let' constant}}
-  _ = x.callFunction() // expected-error {{cannot use mutating member on immutable value: 'x' is a 'let' constant}}
+  _ = x.callAsFunction() // expected-error {{cannot use mutating member on immutable value: 'x' is a 'let' constant}}
   _ = y()
-  _ = y.callFunction()
+  _ = y.callAsFunction()
 }
 
 struct Inout {
-  func callFunction(_ x: inout Int) {
+  func callAsFunction(_ x: inout Int) {
     x += 5
   }
 }
 func testInout(_ x: Inout, _ arg: inout Int) {
   x(&arg)
-  x.callFunction(&arg)
-  // TODO: Improve this error to match the error using a direct `call` member reference.
+  x.callAsFunction(&arg)
+  // TODO: Improve this error to match the error using a direct `callAsFunction` member reference.
   // expected-error @+2 {{cannot invoke 'x' with an argument list of type '(Int)'}}
   // expected-error @+1 {{cannot call value of non-function type 'Inout'}}
   x(arg)
   // expected-error @+1 {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
-  x.callFunction(arg)
+  x.callAsFunction(arg)
 }
 
 struct Autoclosure {
-  func callFunction(_ condition: @autoclosure () -> Bool,
+  func callAsFunction(_ condition: @autoclosure () -> Bool,
             _ message: @autoclosure () -> String) {
     if condition() {
       print(message())
@@ -142,10 +142,10 @@ func testAutoclosure(_ x: Autoclosure) {
 }
 
 struct Throwing {
-  func callFunction() throws -> Throwing {
+  func callAsFunction() throws -> Throwing {
     return self
   }
-  func callFunction(_ f: () throws -> ()) rethrows {
+  func callAsFunction(_ f: () throws -> ()) rethrows {
     try f()
   }
 }
@@ -158,7 +158,7 @@ enum BinaryOperation {
   case add, subtract, multiply, divide
 }
 extension BinaryOperation {
-  func callFunction(_ lhs: Float, _ rhs: Float) -> Float {
+  func callAsFunction(_ lhs: Float, _ rhs: Float) -> Float {
     switch self {
     case .add: return lhs + rhs
     case .subtract: return lhs - rhs
@@ -170,12 +170,12 @@ extension BinaryOperation {
 _ = BinaryOperation.add(1, 2)
 
 class BaseClass {
-  func callFunction() -> Self {
+  func callAsFunction() -> Self {
     return self
   }
 }
 class SubClass : BaseClass {
-  override func callFunction() -> Self {
+  override func callAsFunction() -> Self {
     return self
   }
 }
@@ -186,10 +186,10 @@ func testIUO(a: SimpleCallable!, b: MultipleArgsCallable!, c: Extended!,
   _ = a(1)
   _ = b(x: 1, y: 1)
   _ = c()
-  _ = d()?.callFunction()?()
+  _ = d()?.callAsFunction()?()
   _ = e()
   _ = e(1, 2, 3)
-  // FIXME(TF-444): `mutating func callFunction` and IUO doesn't work.
+  // FIXME(TF-444): `mutating func callAsFunction` and IUO doesn't work.
   // _ = f()
   _ = g(&inoutInt)
   _ = try? h()

@@ -5958,8 +5958,8 @@ public:
   bool isConsuming() const {
     return getSelfAccessKind() == SelfAccessKind::__Consuming;
   }
-  bool isCallFunction() const {
-    return getName().str() == "callFunction" && isInstanceMember();
+  bool isCallAsFunctionMethod() const {
+    return getName().str() == "callAsFunction" && isInstanceMember();
   }
 
   SelfAccessKind getSelfAccessKind() const {

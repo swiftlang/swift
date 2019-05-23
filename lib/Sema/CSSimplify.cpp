@@ -5833,13 +5833,13 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     return simplified;
   }
 
-  // Handle applications of types with call methods.
+  // Handle applications of types with `callAsFunction` methods.
   if (desugar2->mayHaveMembers()) {
     auto &ctx = getASTContext();
-    // Get all call methods of the nominal type.
-    // TODO: Consider caching?
+    // Get all `callAsFunction` methods of the nominal type.
+    // Note: Consider caching `callAsFunction` methods.
     SmallVector<FuncDecl *, 4> callMethods;
-    auto candidates = lookupMember(desugar2, DeclName(ctx.Id_callFunction));
+    auto candidates = lookupMember(desugar2, DeclName(ctx.Id_callAsFunction));
     for (auto entry : candidates) {
       auto callMethod = dyn_cast<FuncDecl>(entry.getValueDecl());
       if (!callMethod)
@@ -5847,13 +5847,13 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       callMethods.push_back(callMethod);
     }
 
-    // Handle call methods calls.
+    // Handle `callAsFunction` methods calls.
     if (!callMethods.empty()) {
-      // Create a type variable for the call method.
+      // Create a type variable for the `callAsFunction` method.
       auto loc = getConstraintLocator(locator);
       auto tv = createTypeVariable(loc, TVO_CanBindToLValue);
 
-      // Record the call method overload set.
+      // Record the `callAsFunction` method overload set.
       SmallVector<OverloadChoice, 4> choices;
       for (auto candidate : callMethods) {
         TC.validateDecl(candidate);
