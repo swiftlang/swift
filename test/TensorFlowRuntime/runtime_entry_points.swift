@@ -17,7 +17,7 @@ RuntimeEntryPointTests.testAllBackends("RoundTrip_CTensorHandle_AnyTensorHandle"
   cHandle = TFE_TensorHandleCopySharingTensor(cHandle, status)
   expectEqual(TF_OK, TF_GetCode(status))
   TF_DeleteStatus(status)
-  let anyHandle = _TFCCreateTensorHandleFromC(cHandle)
+  let anyHandle = TFETensorHandle(_owning: cHandle)
   let tensor = Tensor(handle: anyHandle as! TensorHandle<Float>)
   print(tensor)
   // This line hangs in GPE
