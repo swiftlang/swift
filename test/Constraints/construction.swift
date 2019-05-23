@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-// REQUIRES: rdar51080373
-
 struct X {
   var i : Int, j : Int
 }
@@ -218,7 +216,7 @@ func rdar_50668864() {
     init(anchors: [Int]) {
       // TODO: This would be improved when argument conversions are diagnosed via new diagnostic framework,
       // actual problem here is that `[Int]` cannot be converted to function type represented by a closure.
-      self = .init { _ in [] } // expected-error {{cannot convert value of type '(_) -> [Any]' to expected argument type '[Int]'}}
+      self = .init { _ in [] } // expected-error {{type of expression is ambiguous without more context}}
     }
   }
 }
