@@ -628,8 +628,15 @@ class ReportFormatter(object):
         def row(contents):
             return COLUMN_SEPARATOR.join(justify_columns(contents)) + ' \n'
 
-        def header(header):
-            return '\n' + row(header) + row([HEADER_SEPARATOR] * 5)
+        def header(title, column_labels):
+            h = ''
+            if not self.header_printed:
+                h = '\n' + row(column_labels) + row([HEADER_SEPARATOR] * 5)
+            if self.single_table:
+                h += row(('**' + title + '**', '', '', '', ''))
+            if self.single_table and not self.header_printed:
+                self.header_printed = True
+            return h
 
         def format_columns(r, is_strong):
             return (r if not is_strong else
@@ -640,25 +647,13 @@ class ReportFormatter(object):
                 row(format_columns(ReportFormatter.values(r), is_strong))
                 for r in results
             ]
-            if not rows:
-                return ''
-
-            if self.single_table:
-                t = ''
-                if not self.header_printed:
-                    t += header(ReportFormatter.header_for(results[0]))
-                    self.header_printed = True
-                t += row(('**' + title + '**', '', '', '', ''))
-                t += ''.join(rows)
-                return t
-
-            return DETAIL.format(
-                *[
-                    title, len(results),
-                    (header(ReportFormatter.header_for(results[0])) +
-                     ''.join(rows)),
-                    ('open' if is_open else '')
-                ])
+            table = (header(title if self.single_table else '',
+                            ReportFormatter.header_for(results[0])) +
+                     ''.join(rows))
+            return '' if not rows else (
+                (table if self.single_table else
+                 DETAIL.format(
+                     title, len(results), table, 'open' if is_open else '')))
 
         return ''.join([
             table('Regression', self.comparator.decreased, True, True),
