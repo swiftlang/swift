@@ -53,7 +53,7 @@ public class TFETensorHandle : _AnyTensorHandle {
 /// compiler internals can use to determine the datatypes of parameters when
 /// they are extracted into a tensor program.
 public final class TensorHandle<Scalar>
-where Scalar : _TensorFlowDataTypeCompatible {
+  where Scalar : _TensorFlowDataTypeCompatible {
   let handle: _AnyTensorHandle
 
   public var _cTensorHandle: CTensorHandle { handle._cTensorHandle }
