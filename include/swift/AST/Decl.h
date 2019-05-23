@@ -5958,9 +5958,7 @@ public:
   bool isConsuming() const {
     return getSelfAccessKind() == SelfAccessKind::__Consuming;
   }
-  bool isCallAsFunctionMethod() const {
-    return getName().str() == "callAsFunction" && isInstanceMember();
-  }
+  bool isCallAsFunctionMethod() const;
 
   SelfAccessKind getSelfAccessKind() const {
     return static_cast<SelfAccessKind>(Bits.FuncDecl.SelfAccess);

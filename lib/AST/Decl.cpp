@@ -6666,6 +6666,10 @@ bool FuncDecl::isBinaryOperator() const {
     !params->get(1)->isVariadic();
 }
 
+bool FuncDecl::isCallAsFunctionMethod() const {
+  return getName() == getASTContext().Id_callAsFunction && isInstanceMember();
+}
+
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                                  OptionalTypeKind Failability, 
                                  SourceLoc FailabilityLoc,
