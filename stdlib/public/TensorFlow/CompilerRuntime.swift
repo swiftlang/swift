@@ -1008,7 +1008,11 @@ internal extension _ExecutionContext {
   /// See documentation for the top-level `withDevice` function.
   func withDevice<R>(_ name: String,
                      perform body: () throws -> R) rethrows -> R {
-    if (deviceNames.contains(name)) {
+    guard deviceNames.contains(name) else {
+      fatalError("Device \(name) not found")
+    }
+    deviceScopes.append(name)
+    ...
       deviceScopes.append(name)
       let result = try body()
       internalConsistencyCheck(deviceScopes.popLast() != nil)
