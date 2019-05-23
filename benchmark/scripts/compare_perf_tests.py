@@ -589,14 +589,14 @@ class ReportFormatter(object):
     def markdown(self):
         """Report results of benchmark comparisons in Markdown format."""
         return self._formatted_text(
-            ROW='{0} | {1} | {2} | {3} | {4} \n',
+            COLUMN_SEPARATOR=' | ',
             HEADER_SEPARATOR='---',
             DETAIL=self.MARKDOWN_DETAIL)
 
     def git(self):
         """Report results of benchmark comparisons in 'git' format."""
         return self._formatted_text(
-            ROW='{0}   {1}   {2}   {3}   {4} \n',
+            COLUMN_SEPARATOR='   ',
             HEADER_SEPARATOR='   ',
             DETAIL=self.GIT_DETAIL)
 
@@ -618,7 +618,7 @@ class ReportFormatter(object):
 
         return reduce(max_widths, widths, [0] * 5)
 
-    def _formatted_text(self, ROW, HEADER_SEPARATOR, DETAIL):
+    def _formatted_text(self, COLUMN_SEPARATOR, HEADER_SEPARATOR, DETAIL):
         widths = self._column_widths()
         self.header_printed = False
 
@@ -626,14 +626,14 @@ class ReportFormatter(object):
             return [c.ljust(w) for w, c in zip(widths, contents)]
 
         def row(contents):
-            return ROW.format(*justify_columns(contents))
+            return COLUMN_SEPARATOR.join(justify_columns(contents)) + ' \n'
 
         def header(header):
             return '\n' + row(header) + row([HEADER_SEPARATOR] * 5)
 
-        def format_columns(r, strong):
-            return (r if not strong else
-                    r[:-1] + ('**{0}**'.format(r[-1]), ))
+        def format_columns(r, is_strong):
+            return (r if not is_strong else
+                    r[:-1] + ('**' + r[-1] + '**', ))
 
         def table(title, results, is_strong=False, is_open=False):
             rows = [
