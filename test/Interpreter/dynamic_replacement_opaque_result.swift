@@ -33,6 +33,10 @@ private func target_library_name(_ name: String) -> String {
 #endif
 }
 
+func testAssociatedType<T: Assoc> (_ t: T) {
+  print(T.A.self)
+}
+
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 func test() {
   print(MemoryLayout.size(ofValue: bar(5)))
@@ -78,8 +82,10 @@ executablePath.removeLast(4)
 // CHECK: 1
 // CHECK: 16
 // CHECK: 1
+// CHECK: NewType
 if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
   test()
+  testAssociatedType(Test())
 } else {
-  print("16 16 1 1 16 1 16 1")
+  print("16 16 1 1 16 1 16 1 NewType")
 }
