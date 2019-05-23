@@ -663,9 +663,11 @@ public extension Tensor {
   ///   specified axis.
   /// - Precondition: The axis must be in the range `-rank..<rank`.
   @inlinable
+  // TODO(TF-462): Remove custom VJP when differentiation supports array literal
+  // initialization.
   @differentiable(vjp: _vjpConcatenated where Scalar : TensorFlowFloatingPoint)
   func concatenated(with other: Tensor, alongAxis axis: Int = 0) -> Tensor {
-    return Raw.concatV2([self, other], axis: Tensor<Int32>(Int32(axis)))
+    return Tensor(concatenating: [self, other], alongAxis: axis)
   }
 
   /// Concatenation operator.
@@ -686,7 +688,7 @@ internal extension Tensor where Scalar : TensorFlowFloatingPoint {
     concatenating tensors: [Tensor<Scalar>], alongAxis axis: Int
   ) -> (Tensor, (Tensor) -> Array<Tensor<Scalar>>.DifferentiableView) {
     let splits = Tensor<Int32>(tensors.map { $0.shapeTensor[axis] })
-    return (.init(concatenating: tensors, alongAxis: axis), { v in
+    return (Tensor(concatenating: tensors, alongAxis: axis), { v in
       let result = Raw.splitV(
         value: v,
         sizeSplits: splits,
@@ -702,9 +704,9 @@ internal extension Tensor where Scalar : TensorFlowFloatingPoint {
     let posAxis = axis < 0 ? axis + rank: axis
     let splits = Tensor<Int32>([shapeTensor[posAxis],
                                 other.shapeTensor[posAxis]])
-    return (concatenated(with: other, alongAxis: axis), { v in
+    return (concatenated(with: other, alongAxis: axis), { result in
       let gradients = Raw.splitV(
-        value: v,
+        value: result,
         sizeSplits: splits,
         splitDim: Tensor<Int32>(Int32(axis)),
         numSplit: Int64(splits.shape[0]))

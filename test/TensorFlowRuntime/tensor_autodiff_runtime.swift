@@ -161,12 +161,25 @@ TensorADTests.testAllBackends("Tensor.init(concatenating:)") {
   let c = Tensor<Float>([8,  9, 10, 11])
   let d = Tensor<Float>([12, 13, 14, 15])
 
-  let grads = gradient(at: [a, b], [c, d]) { xs, ys in
-    return (Tensor(concatenating: xs) * Tensor(concatenating: ys)).sum()
+  do {
+    let grads = gradient(at: [a, b], [c, d]) { xs, ys in
+      return (Tensor(concatenating: xs) * Tensor(concatenating: ys)).sum()
+    }
+    expectEqual([[8, 9, 10, 11], [12, 13, 14, 15]], grads.0.base)
+    expectEqual([[0, 1, 2, 3], [4, 5, 6, 7]], grads.1.base)
   }
 
-  expectEqual([[8, 9, 10, 11], [12, 13, 14, 15]], grads.0.base)
-  expectEqual([[0, 1, 2, 3], [4, 5, 6, 7]], grads.1.base)
+  // TODO(TF-462): Re-enable test when differentiation supports array literal initialization.
+  /*
+  do {
+    let grads = gradient(at: a, b, c) { a, b, c in
+      return (Tensor(concatenating: [a, b]) * Tensor(concatenating: [c])).sum()
+    }
+    expectEqual([8, 9, 10, 11], grads.0)
+    expectEqual([12, 13, 14, 15], grads.1)
+    expectEqual([0, 1, 2, 3], grads.2)
+  }
+  */
 }
 
 TensorADTests.testAllBackends("concatenation (++)") {
