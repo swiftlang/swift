@@ -3032,7 +3032,7 @@ for host in "${ALL_HOSTS[@]}"; do
             # SWIFT_ENABLE_TENSORFLOW
             tensorflow)
                 # Configure TensorFlow and build using bazel.
-                echo yes "" | "${source_dir}/configure"
+                (cd "${source_dir}"; echo yes "" | ./configure)
                 with_pushd "${source_dir}" \
                     call bazel build -c opt "${TENSORFLOW_BAZEL_OPTIONS[@]}" --define framework_shared_object=false //tensorflow:libtensorflow.so //tensorflow:libtensorflow_framework.so
 
