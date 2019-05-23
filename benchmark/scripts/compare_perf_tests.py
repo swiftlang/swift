@@ -614,22 +614,22 @@ class ReportFormatter(object):
         ]
 
         def max_widths(maximum, widths):
-            return tuple(map(max, zip(maximum, widths)))
+            return map(max, zip(maximum, widths))
 
-        return reduce(max_widths, widths, tuple([0] * 5))
+        return reduce(max_widths, widths, [0] * 5)
 
     def _formatted_text(self, ROW, HEADER_SEPARATOR, DETAIL):
         widths = self._column_widths()
         self.header_printed = False
 
         def justify_columns(contents):
-            return tuple([c.ljust(w) for w, c in zip(widths, contents)])
+            return [c.ljust(w) for w, c in zip(widths, contents)]
 
         def row(contents):
             return ROW.format(*justify_columns(contents))
 
         def header(header):
-            return '\n' + row(header) + row(tuple([HEADER_SEPARATOR] * 5))
+            return '\n' + row(header) + row([HEADER_SEPARATOR] * 5)
 
         def format_columns(r, strong):
             return (r if not strong else
