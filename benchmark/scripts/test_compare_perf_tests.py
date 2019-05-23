@@ -759,7 +759,7 @@ class TestReportFormatter(OldAndNewLog):
         )
         self.assert_markdown_contains([
             'TEST                  | OLD    | NEW    | DELTA   | RATIO',
-            '---                   | ---    | ---    | ---     | ---    ',
+            ':---                  | ---:   | ---:   | ---:    | ---:   ',
             'TEST                  | MIN    | MAX    | MEAN    | MAX_RSS'])
         self.assert_git_contains([
             'TEST                    OLD      NEW      DELTA     RATIO',
@@ -864,8 +864,8 @@ class TestReportFormatter(OldAndNewLog):
             '**Regression**', '**Added**',
             '| OLD', '| NEW', '| DELTA', '| RATIO'
         ], markdown)
-        self.assertIn('\n--- ', markdown)  # first column
-        self.assertEqual(markdown.count('| ---'), 4)
+        self.assertIn('\n:---', markdown)  # first column is left aligned
+        self.assertEqual(markdown.count('| ---:'), 4)  # other, right aligned
 
 
 class Test_parse_args(unittest.TestCase):

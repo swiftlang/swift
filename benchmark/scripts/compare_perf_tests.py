@@ -631,7 +631,9 @@ class ReportFormatter(object):
         def header(title, column_labels):
             h = ''
             if not self.header_printed:
-                h = '\n' + row(column_labels) + row([HEADER_SEPARATOR] * 5)
+                h = '\n' + row(column_labels)
+                h += row([':' + HEADER_SEPARATOR] +  # left align 1st column
+                         ([HEADER_SEPARATOR + ':']) * 4)  # right align rest
             if self.single_table:
                 h += row(('**' + title + '**', '', '', '', ''))
             if self.single_table and not self.header_printed:
