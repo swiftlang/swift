@@ -650,6 +650,10 @@ public extension Tensor {
   /// - Precondition: The tensors must have the same dimensions, except for the
   ///   specified axis.
   /// - Precondition: The axis must be in the range `-rank..<rank`.
+  @differentiable(
+    vjp: _vjpInit(concatenating:alongAxis:)
+    where Scalar : TensorFlowFloatingPoint
+  )
   init(concatenating tensors: [Tensor<Scalar>], alongAxis axis: Int = 0) {
     self = Raw.concatV2(tensors, axis: Tensor<Int32>(Int32(axis)))
   }
@@ -678,14 +682,29 @@ public extension Tensor {
 
 internal extension Tensor where Scalar : TensorFlowFloatingPoint {
   @inlinable
+  static func _vjpInit(
+    concatenating tensors: [Tensor<Scalar>], alongAxis axis: Int
+  ) -> (Tensor, (Tensor) -> Array<Tensor<Scalar>>.DifferentiableView) {
+    let splits = Tensor<Int32>(tensors.map { $0.shapeTensor[axis] })
+    return (.init(concatenating: tensors, alongAxis: axis), { v in
+      let result = Raw.splitV(
+        value: v,
+        sizeSplits: splits,
+        splitDim: Tensor<Int32>(Int32(axis)),
+        numSplit: Int64(splits.shape[0]))
+      return [Tensor<Scalar>].DifferentiableView(result)
+    })
+  }
+
+  @inlinable
   func _vjpConcatenated(with other: Tensor, alongAxis axis: Int)
     -> (Tensor, (Tensor) -> (Tensor, Tensor)) {
     let posAxis = axis < 0 ? axis + rank: axis
     let splits = Tensor<Int32>([shapeTensor[posAxis],
                                 other.shapeTensor[posAxis]])
-    return (concatenated(with: other, alongAxis: axis), { result in
+    return (concatenated(with: other, alongAxis: axis), { v in
       let gradients = Raw.splitV(
-        value: result,
+        value: v,
         sizeSplits: splits,
         splitDim: Tensor<Int32>(Int32(axis)),
         numSplit: Int64(splits.shape[0]))

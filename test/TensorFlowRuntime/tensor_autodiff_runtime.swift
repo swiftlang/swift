@@ -155,6 +155,20 @@ TensorADTests.testAllBackends("reshaped") {
   expectEqual(input, reshapedPullback(reshaped))
 }
 
+TensorADTests.testAllBackends("Tensor.init(concatenating:)") {
+  let a = Tensor<Float>([0,  1,  2,  3])
+  let b = Tensor<Float>([4,  5,  6,  7])
+  let c = Tensor<Float>([8,  9, 10, 11])
+  let d = Tensor<Float>([12, 13, 14, 15])
+
+  let grads = gradient(at: [a, b], [c, d]) { xs, ys in
+    return (Tensor(concatenating: xs) * Tensor(concatenating: ys)).sum()
+  }
+
+  expectEqual([[8, 9, 10, 11], [12, 13, 14, 15]], grads.0.base)
+  expectEqual([[0, 1, 2, 3], [4, 5, 6, 7]], grads.1.base)
+}
+
 TensorADTests.testAllBackends("concatenation (++)") {
   let a1 = Tensor<Float>([1,2,3,4])
   let b1 = Tensor<Float>([5,6,7,8,9,10])
