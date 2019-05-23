@@ -34,8 +34,8 @@ print("[\(x, foo: x)]")
 // expected-warning@-2{{interpolating multiple values will not form a tuple in Swift 5}}
 // expected-note@-3{{insert parentheses to keep current behavior}} {{11-11=(}} {{20-20=)}}
 
-print("[\(foo: x, foo: x)]")
-// CHECK-NEXT: [(foo: 1, foo: 1)]
+print("[\(foo: x, bar: x)]")
+// CHECK-NEXT: [(foo: 1, bar: 1)]
 // expected-warning@-2{{interpolating multiple values will not form a tuple in Swift 5}}
 // expected-note@-3{{insert parentheses to keep current behavior}} {{11-11=(}} {{25-25=)}}
 
