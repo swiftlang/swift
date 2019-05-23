@@ -1001,6 +1001,7 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
                                                 { inoutSelf },
                                                 { Identifier() });
     selfPointer->setType(C.TheRawPointerType);
+    selfPointer->setThrows(false);
 
     auto initializeFn = cast<FuncDecl>(getBuiltinValueDecl(
       C, C.getIdentifier("initialize")));
@@ -1018,6 +1019,7 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
                                                { newValueRef, selfPointer },
                                                { Identifier(), Identifier() });
     initialize->setType(TupleType::getEmpty(C));
+    initialize->setThrows(false);
 
     auto body = BraceStmt::create(C, SourceLoc(), { initialize }, SourceLoc(),
                                   /*implicit*/ true);
@@ -5562,6 +5564,7 @@ Decl *SwiftDeclConverter::importEnumCaseAlias(
   auto instantiate = new (Impl.SwiftContext)
       DotSyntaxCallExpr(constantRef, SourceLoc(), typeRef);
   instantiate->setType(importedEnumTy);
+  instantiate->setThrows(false);
 
   Decl *CD = Impl.createConstant(name, importIntoDC, importedEnumTy,
                                  instantiate, ConstantConvertKind::None,
