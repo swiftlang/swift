@@ -23,8 +23,21 @@
 
 import Swift
 
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
+#elseif os(Windows)
+  import MSVCRT
+#else
+#error("Unsupported platform")
+#endif
+
 func foo() -> Int {
   return UnsafePointer<Int>(bitPattern: 0)!.pointee
 }
 
+// Give FileCheck something to look at to keep it happy. It fails on
+// empty output even if the only directive is a CHECK-NOT.
+fputs("Running test.\n", stderr)
 foo()
