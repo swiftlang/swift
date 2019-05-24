@@ -91,13 +91,11 @@ public:
     }
 
     // Add the associated types.
-    for (Decl *member : protocol->getMembers()) {
-      if (auto associatedType = dyn_cast<AssociatedTypeDecl>(member)) {
-        // If this is a new associated type (which does not override an
-        // existing associated type), add it.
-        if (associatedType->getOverriddenDecls().empty())
-          asDerived().addAssociatedType(AssociatedType(associatedType));
-      }
+    for (auto *associatedType : protocol->getAssociatedTypeMembers()) {
+      // If this is a new associated type (which does not override an
+      // existing associated type), add it.
+      if (associatedType->getOverriddenDecls().empty())
+        asDerived().addAssociatedType(AssociatedType(associatedType));
     }
 
     if (asDerived().shouldVisitRequirementSignatureOnly())

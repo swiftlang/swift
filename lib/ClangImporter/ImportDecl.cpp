@@ -7681,40 +7681,38 @@ static void finishTypeWitnesses(
   auto *proto = conformance->getProtocol();
   auto selfType = conformance->getType();
 
-  for (auto *req : proto->getMembers()) {
-    if (auto *assocType = dyn_cast<AssociatedTypeDecl>(req)) {
-      // FIXME: This should not happen?
-      if (conformance->hasTypeWitness(assocType)) continue;
+  for (auto *assocType : proto->getAssociatedTypeMembers()) {
+    // FIXME: This should not happen?
+    if (conformance->hasTypeWitness(assocType)) continue;
 
-      bool satisfied = false;
+    bool satisfied = false;
 
-      SmallVector<ValueDecl *, 4> lookupResults;
-      NLOptions options = (NL_QualifiedDefault |
-                           NL_OnlyTypes |
-                           NL_ProtocolMembers);
+    SmallVector<ValueDecl *, 4> lookupResults;
+    NLOptions options = (NL_QualifiedDefault |
+                          NL_OnlyTypes |
+                          NL_ProtocolMembers);
 
-      dc->lookupQualified(nominal, assocType->getFullName(), options,
-                          lookupResults);
-      for (auto member : lookupResults) {
-        auto typeDecl = cast<TypeDecl>(member);
-        if (isa<AssociatedTypeDecl>(typeDecl)) continue;
+    dc->lookupQualified(nominal, assocType->getFullName(), options,
+                        lookupResults);
+    for (auto member : lookupResults) {
+      auto typeDecl = cast<TypeDecl>(member);
+      if (isa<AssociatedTypeDecl>(typeDecl)) continue;
 
-        auto memberType = typeDecl->getDeclaredInterfaceType();
-        auto subMap = selfType->getContextSubstitutionMap(
-            module, typeDecl->getDeclContext());
-        memberType = memberType.subst(subMap);
-        conformance->setTypeWitness(assocType, memberType, typeDecl);
-        satisfied = true;
-        break;
-      }
+      auto memberType = typeDecl->getDeclaredInterfaceType();
+      auto subMap = selfType->getContextSubstitutionMap(
+          module, typeDecl->getDeclContext());
+      memberType = memberType.subst(subMap);
+      conformance->setTypeWitness(assocType, memberType, typeDecl);
+      satisfied = true;
+      break;
+    }
 
-      if (!satisfied) {
-        llvm::errs() << ("Cannot look up associated type for "
-                         "imported conformance:\n");
-        conformance->getType().dump(llvm::errs());
-        assocType->dump(llvm::errs());
-        abort();
-      }
+    if (!satisfied) {
+      llvm::errs() << ("Cannot look up associated type for "
+                        "imported conformance:\n");
+      conformance->getType().dump(llvm::errs());
+      assocType->dump(llvm::errs());
+      abort();
     }
   }
 }
