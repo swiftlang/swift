@@ -1331,6 +1331,7 @@ static std::string getDynamicReplacementSomeSection(IRGenModule &IGM) {
   case llvm::Triple::Wasm:
     sectionName = "swift5_replac2";
     break;
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     sectionName = ".sw5reps$B";
     break;
