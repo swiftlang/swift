@@ -29,6 +29,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/STLExtras.h"
@@ -1200,7 +1201,8 @@ static uint8_t getRawStableDefaultArgumentKind(swift::DefaultArgumentKind kind) 
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
 }
 
-static uint8_t getRawStableMetatypeRepresentation(AnyMetatypeType *metatype) {
+static uint8_t
+getRawStableMetatypeRepresentation(const AnyMetatypeType *metatype) {
   if (!metatype->hasRepresentation()) {
     return serialization::MetatypeRepresentation::MR_None;
   }
@@ -3865,6 +3867,388 @@ static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx, Type T) {
   return cast<TypeAliasDecl>(CurModuleResults[0]);
 }
 
+class Serializer::TypeSerializer : public TypeVisitor<TypeSerializer> {
+  Serializer &S;
+
+public:
+  explicit TypeSerializer(Serializer &S) : S(S) {}
+
+  /// If this gets referenced, we forgot to handle a type.
+  void visitType(const TypeBase *) = delete;
+
+  void visitErrorType(const ErrorType *) {
+    llvm_unreachable("should not serialize an invalid type");
+  }
+
+  void visitUnresolvedType(const UnresolvedType *) {
+    llvm_unreachable("should not serialize an invalid type");
+  }
+
+  void visitModuleType(const ModuleType *) {
+    llvm_unreachable("modules are currently not first-class values");
+  }
+
+  void visitInOutType(const InOutType *) {
+    llvm_unreachable("inout types are only used in function type parameters");
+  }
+
+  void visitLValueType(const LValueType *) {
+    llvm_unreachable("lvalue types are only used in function bodies");
+  }
+
+  void visitTypeVariableType(const TypeVariableType *) {
+    llvm_unreachable("type variables should not escape the type checker");
+  }
+
+  void visitBuiltinTypeImpl(Type ty) {
+    using namespace decls_block;
+    TypeAliasDecl *typeAlias =
+      findTypeAliasForBuiltin(S.M->getASTContext(), ty);
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[BuiltinAliasTypeLayout::Code];
+    BuiltinAliasTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                       S.addDeclRef(typeAlias,
+                                                    /*allowTypeAliasXRef*/true),
+                                       TypeID());
+  }
+
+  void visitBuiltinType(BuiltinType *ty) {
+    visitBuiltinTypeImpl(ty);
+  }
+
+  void visitSILTokenType(SILTokenType *ty) {
+    // This is serialized like a BuiltinType, even though it isn't one.
+    visitBuiltinTypeImpl(ty);
+  }
+
+  void visitTypeAliasType(const TypeAliasType *alias) {
+    using namespace decls_block;
+    const TypeAliasDecl *typeAlias = alias->getDecl();
+    auto underlyingType = typeAlias->getUnderlyingTypeLoc().getType();
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[TypeAliasTypeLayout::Code];
+    TypeAliasTypeLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode,
+        S.addDeclRef(typeAlias, /*allowTypeAliasXRef*/true),
+        S.addTypeRef(alias->getParent()),
+        S.addTypeRef(underlyingType),
+        S.addTypeRef(alias->getSinglyDesugaredType()),
+        S.addSubstitutionMapRef(alias->getSubstitutionMap()));
+  }
+
+  void visitParenType(const ParenType *parenTy) {
+    using namespace decls_block;
+    assert(parenTy->getParameterFlags().isNone());
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[ParenTypeLayout::Code];
+    ParenTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                S.addTypeRef(parenTy->getUnderlyingType()));
+  }
+
+  void visitTupleType(const TupleType *tupleTy) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[TupleTypeLayout::Code];
+    TupleTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode);
+
+    abbrCode = S.DeclTypeAbbrCodes[TupleTypeEltLayout::Code];
+    for (auto &elt : tupleTy->getElements()) {
+      assert(elt.getParameterFlags().isNone());
+      TupleTypeEltLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          S.addDeclBaseNameRef(elt.getName()),
+          S.addTypeRef(elt.getType()));
+    }
+  }
+
+  void visitNominalType(const NominalType *nominalTy) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[NominalTypeLayout::Code];
+    NominalTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                  S.addDeclRef(nominalTy->getDecl()),
+                                  S.addTypeRef(nominalTy->getParent()));
+  }
+
+  void visitExistentialMetatypeType(const ExistentialMetatypeType *metatypeTy) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[ExistentialMetatypeTypeLayout::Code];
+
+    // Map the metatype representation.
+    auto repr = getRawStableMetatypeRepresentation(metatypeTy);
+    ExistentialMetatypeTypeLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode,
+        S.addTypeRef(metatypeTy->getInstanceType()),
+        static_cast<uint8_t>(repr));
+  }
+
+  void visitMetatypeType(const MetatypeType *metatypeTy) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[MetatypeTypeLayout::Code];
+
+    // Map the metatype representation.
+    auto repr = getRawStableMetatypeRepresentation(metatypeTy);
+    MetatypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                   S.addTypeRef(metatypeTy->getInstanceType()),
+                                   static_cast<uint8_t>(repr));
+  }
+
+  void visitDynamicSelfType(const DynamicSelfType *dynamicSelfTy) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[DynamicSelfTypeLayout::Code];
+    DynamicSelfTypeLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode,
+        S.addTypeRef(dynamicSelfTy->getSelfType()));
+  }
+
+  void visitPrimaryArchetypeType(const PrimaryArchetypeType *archetypeTy) {
+    using namespace decls_block;
+    auto env = archetypeTy->getGenericEnvironment();
+
+    GenericEnvironmentID envID = S.addGenericEnvironmentRef(env);
+    auto interfaceType = archetypeTy->getInterfaceType()
+      ->castTo<GenericTypeParamType>();
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[PrimaryArchetypeTypeLayout::Code];
+    PrimaryArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                           envID,
+                                           interfaceType->getDepth(),
+                                           interfaceType->getIndex());
+  }
+
+  void visitOpenedArchetypeType(const OpenedArchetypeType *archetypeTy) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[OpenedArchetypeTypeLayout::Code];
+    OpenedArchetypeTypeLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode,
+        S.addTypeRef(archetypeTy->getOpenedExistentialType()));
+  }
+
+  void
+  visitOpaqueTypeArchetypeType(const OpaqueTypeArchetypeType *archetypeTy) {
+    using namespace decls_block;
+    auto declID = S.addDeclRef(archetypeTy->getDecl());
+    auto substMapID = S.addSubstitutionMapRef(archetypeTy->getSubstitutions());
+    unsigned abbrCode = S.DeclTypeAbbrCodes[OpaqueArchetypeTypeLayout::Code];
+    OpaqueArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                          declID, substMapID);
+  }
+
+  void visitNestedArchetypeType(const NestedArchetypeType *archetypeTy) {
+    using namespace decls_block;
+    auto rootTypeID = S.addTypeRef(archetypeTy->getRoot());
+    auto interfaceTypeID = S.addTypeRef(archetypeTy->getInterfaceType());
+    unsigned abbrCode = S.DeclTypeAbbrCodes[NestedArchetypeTypeLayout::Code];
+    NestedArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                          rootTypeID, interfaceTypeID);
+  }
+
+  void visitGenericTypeParamType(const GenericTypeParamType *genericParam) {
+    using namespace decls_block;
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[GenericTypeParamTypeLayout::Code];
+    DeclID declIDOrDepth;
+    unsigned indexPlusOne;
+    if (genericParam->getDecl() &&
+        !(genericParam->getDecl()->getDeclContext()->isModuleScopeContext() &&
+          S.isDeclXRef(genericParam->getDecl()))) {
+      declIDOrDepth = S.addDeclRef(genericParam->getDecl());
+      indexPlusOne = 0;
+    } else {
+      declIDOrDepth = genericParam->getDepth();
+      indexPlusOne = genericParam->getIndex() + 1;
+    }
+    GenericTypeParamTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                           declIDOrDepth, indexPlusOne);
+  }
+
+  void visitDependentMemberType(const DependentMemberType *dependent) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[DependentMemberTypeLayout::Code];
+    assert(dependent->getAssocType() && "Unchecked dependent member type");
+    DependentMemberTypeLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode,
+        S.addTypeRef(dependent->getBase()),
+        S.addDeclRef(dependent->getAssocType()));
+  }
+
+  void visitAnyFunctionType(const AnyFunctionType *fnTy) {
+    using namespace decls_block;
+
+    if (isa<FunctionType>(fnTy)) {
+      unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
+      FunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+             S.addTypeRef(fnTy->getResult()),
+             getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
+             fnTy->isNoEscape(),
+             fnTy->throws());
+    } else {
+      assert(!fnTy->isNoEscape());
+
+      auto *genericSig = cast<GenericFunctionType>(fnTy)->getGenericSignature();
+      unsigned abbrCode = S.DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
+      GenericFunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+              S.addTypeRef(fnTy->getResult()),
+              getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
+              fnTy->throws(),
+              S.addGenericSignatureRef(genericSig));
+    }
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionParamLayout::Code];
+    for (auto &param : fnTy->getParams()) {
+      auto paramFlags = param.getParameterFlags();
+      auto rawOwnership =
+          getRawStableValueOwnership(paramFlags.getValueOwnership());
+      FunctionParamLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          S.addDeclBaseNameRef(param.getLabel()),
+          S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
+          paramFlags.isAutoClosure(), rawOwnership);
+    }
+  }
+
+  void visitSILBlockStorageType(const SILBlockStorageType *storageTy) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[SILBlockStorageTypeLayout::Code];
+    SILBlockStorageTypeLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode,
+        S.addTypeRef(storageTy->getCaptureType()));
+  }
+
+  void visitSILBoxType(const SILBoxType *boxTy) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[SILBoxTypeLayout::Code];
+    SILLayoutID layoutRef = S.addSILLayoutRef(boxTy->getLayout());
+
+    SILBoxTypeLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode, layoutRef,
+        S.addSubstitutionMapRef(boxTy->getSubstitutions()));
+  }
+
+  void visitSILFunctionType(const SILFunctionType *fnTy) {
+    using namespace decls_block;
+
+    auto representation = fnTy->getRepresentation();
+    auto stableRepresentation =
+      getRawStableSILFunctionTypeRepresentation(representation);
+
+    SmallVector<TypeID, 8> variableData;
+    for (auto param : fnTy->getParameters()) {
+      variableData.push_back(S.addTypeRef(param.getType()));
+      unsigned conv = getRawStableParameterConvention(param.getConvention());
+      variableData.push_back(TypeID(conv));
+    }
+    for (auto yield : fnTy->getYields()) {
+      variableData.push_back(S.addTypeRef(yield.getType()));
+      unsigned conv = getRawStableParameterConvention(yield.getConvention());
+      variableData.push_back(TypeID(conv));
+    }
+    for (auto result : fnTy->getResults()) {
+      variableData.push_back(S.addTypeRef(result.getType()));
+      unsigned conv = getRawStableResultConvention(result.getConvention());
+      variableData.push_back(TypeID(conv));
+    }
+    if (fnTy->hasErrorResult()) {
+      auto abResult = fnTy->getErrorResult();
+      variableData.push_back(S.addTypeRef(abResult.getType()));
+      unsigned conv = getRawStableResultConvention(abResult.getConvention());
+      variableData.push_back(TypeID(conv));
+    }
+
+    auto sig = fnTy->getGenericSignature();
+
+    auto stableCoroutineKind =
+      getRawStableSILCoroutineKind(fnTy->getCoroutineKind());
+
+    auto stableCalleeConvention =
+      getRawStableParameterConvention(fnTy->getCalleeConvention());
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
+    SILFunctionTypeLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode,
+        stableCoroutineKind, stableCalleeConvention,
+        stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
+        fnTy->hasErrorResult(), fnTy->getParameters().size(),
+        fnTy->getNumYields(), fnTy->getNumResults(),
+        S.addGenericSignatureRef(sig), variableData);
+
+    if (auto conformance = fnTy->getWitnessMethodConformanceOrNone())
+      S.writeConformance(*conformance, S.DeclTypeAbbrCodes);
+  }
+
+  void visitArraySliceType(const ArraySliceType *sliceTy) {
+    using namespace decls_block;
+    Type base = sliceTy->getBaseType();
+    unsigned abbrCode = S.DeclTypeAbbrCodes[ArraySliceTypeLayout::Code];
+    ArraySliceTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                     S.addTypeRef(base));
+  }
+
+  void visitDictionaryType(const DictionaryType *dictTy) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[DictionaryTypeLayout::Code];
+    DictionaryTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                     S.addTypeRef(dictTy->getKeyType()),
+                                     S.addTypeRef(dictTy->getValueType()));
+  }
+
+  void visitOptionalType(const OptionalType *optionalTy) {
+    using namespace decls_block;
+    Type base = optionalTy->getBaseType();
+    unsigned abbrCode = S.DeclTypeAbbrCodes[OptionalTypeLayout::Code];
+    OptionalTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                   S.addTypeRef(base));
+  }
+
+  void
+  visitProtocolCompositionType(const ProtocolCompositionType *composition) {
+    using namespace decls_block;
+
+    SmallVector<TypeID, 4> protocols;
+    for (auto proto : composition->getMembers())
+      protocols.push_back(S.addTypeRef(proto));
+
+    unsigned abbrCode =
+        S.DeclTypeAbbrCodes[ProtocolCompositionTypeLayout::Code];
+    ProtocolCompositionTypeLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode,
+        composition->hasExplicitAnyObject(),
+        protocols);
+  }
+
+  void visitReferenceStorageType(const ReferenceStorageType *refTy) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[ReferenceStorageTypeLayout::Code];
+    auto stableOwnership =
+        getRawStableReferenceOwnership(refTy->getOwnership());
+    ReferenceStorageTypeLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode,
+        stableOwnership,
+        S.addTypeRef(refTy->getReferentType()));
+  }
+
+  void visitUnboundGenericType(const UnboundGenericType *generic) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[UnboundGenericTypeLayout::Code];
+    UnboundGenericTypeLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode,
+        S.addDeclRef(generic->getDecl(), /*allowTypeAliasXRef*/true),
+        S.addTypeRef(generic->getParent()));
+  }
+
+  void visitBoundGenericType(const BoundGenericType *generic) {
+    using namespace decls_block;
+    SmallVector<TypeID, 8> genericArgIDs;
+
+    for (auto next : generic->getGenericArgs())
+      genericArgIDs.push_back(S.addTypeRef(next));
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[BoundGenericTypeLayout::Code];
+    BoundGenericTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                       S.addDeclRef(generic->getDecl()),
+                                       S.addTypeRef(generic->getParent()),
+                                       genericArgIDs);
+  }
+};
+
 void Serializer::writeType(Type ty) {
   using namespace decls_block;
   PrettyStackTraceType traceRAII(ty->getASTContext(), "serializing", ty);
@@ -3885,405 +4269,7 @@ void Serializer::writeType(Type ty) {
     }
   };
 
-  switch (ty->getKind()) {
-  case TypeKind::Error:
-  case TypeKind::Unresolved:
-    llvm_unreachable("should not serialize an invalid type");
-
-  case TypeKind::BuiltinInteger:
-  case TypeKind::BuiltinIntegerLiteral:
-  case TypeKind::BuiltinFloat:
-  case TypeKind::BuiltinRawPointer:
-  case TypeKind::BuiltinNativeObject:
-  case TypeKind::BuiltinBridgeObject:
-  case TypeKind::BuiltinUnknownObject:
-  case TypeKind::BuiltinUnsafeValueBuffer:
-  case TypeKind::BuiltinVector:
-  case TypeKind::SILToken: {
-    TypeAliasDecl *typeAlias =
-      findTypeAliasForBuiltin(M->getASTContext(), ty);
-
-    unsigned abbrCode = DeclTypeAbbrCodes[BuiltinAliasTypeLayout::Code];
-    BuiltinAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                       addDeclRef(typeAlias,
-                                                  /*allowTypeAliasXRef*/true),
-                                       TypeID());
-    break;
-  }
-  case TypeKind::TypeAlias: {
-    auto alias = cast<TypeAliasType>(ty.getPointer());
-    const TypeAliasDecl *typeAlias = alias->getDecl();
-    auto underlyingType = typeAlias->getUnderlyingTypeLoc().getType();
-
-    unsigned abbrCode = DeclTypeAbbrCodes[TypeAliasTypeLayout::Code];
-    TypeAliasTypeLayout::emitRecord(
-                           Out, ScratchRecord, abbrCode,
-                           addDeclRef(typeAlias, /*allowTypeAliasXRef*/true),
-                           addTypeRef(alias->getParent()),
-                           addTypeRef(underlyingType),
-                           addTypeRef(alias->getSinglyDesugaredType()),
-                           addSubstitutionMapRef(alias->getSubstitutionMap()));
-    break;
-  }
-
-  case TypeKind::Paren: {
-    auto parenTy = cast<ParenType>(ty.getPointer());
-    assert(parenTy->getParameterFlags().isNone());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[ParenTypeLayout::Code];
-    ParenTypeLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, addTypeRef(parenTy->getUnderlyingType()));
-    break;
-  }
-
-  case TypeKind::Tuple: {
-    auto tupleTy = cast<TupleType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[TupleTypeLayout::Code];
-    TupleTypeLayout::emitRecord(Out, ScratchRecord, abbrCode);
-
-    abbrCode = DeclTypeAbbrCodes[TupleTypeEltLayout::Code];
-    for (auto &elt : tupleTy->getElements()) {
-      assert(elt.getParameterFlags().isNone());
-      TupleTypeEltLayout::emitRecord(
-          Out, ScratchRecord, abbrCode,
-          addDeclBaseNameRef(elt.getName()),
-          addTypeRef(elt.getType()));
-    }
-
-    break;
-  }
-
-  case TypeKind::Struct:
-  case TypeKind::Enum:
-  case TypeKind::Class:
-  case TypeKind::Protocol: {
-    auto nominalTy = cast<NominalType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[NominalTypeLayout::Code];
-    NominalTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                  addDeclRef(nominalTy->getDecl()),
-                                  addTypeRef(nominalTy->getParent()));
-    break;
-  }
-
-  case TypeKind::ExistentialMetatype: {
-    auto metatypeTy = cast<ExistentialMetatypeType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[ExistentialMetatypeTypeLayout::Code];
-
-    // Map the metatype representation.
-    auto repr = getRawStableMetatypeRepresentation(metatypeTy);
-    ExistentialMetatypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                     addTypeRef(metatypeTy->getInstanceType()),
-                                              static_cast<uint8_t>(repr));
-    break;
-  }
-
-  case TypeKind::Metatype: {
-    auto metatypeTy = cast<MetatypeType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[MetatypeTypeLayout::Code];
-
-    // Map the metatype representation.
-    auto repr = getRawStableMetatypeRepresentation(metatypeTy);
-    MetatypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   addTypeRef(metatypeTy->getInstanceType()),
-                                   static_cast<uint8_t>(repr));
-    break;
-  }
-
-  case TypeKind::Module:
-    llvm_unreachable("modules are currently not first-class values");
-
-  case TypeKind::DynamicSelf: {
-    auto dynamicSelfTy = cast<DynamicSelfType>(ty.getPointer());
-    unsigned abbrCode = DeclTypeAbbrCodes[DynamicSelfTypeLayout::Code];
-    DynamicSelfTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                      addTypeRef(dynamicSelfTy->getSelfType()));
-    break;
-  }
-      
-  case TypeKind::PrimaryArchetype: {
-    auto archetypeTy = cast<PrimaryArchetypeType>(ty.getPointer());
-    auto env = archetypeTy->getGenericEnvironment();
-
-    GenericEnvironmentID envID = addGenericEnvironmentRef(env);
-    auto interfaceType = archetypeTy->getInterfaceType()
-      ->castTo<GenericTypeParamType>();
-
-    unsigned abbrCode = DeclTypeAbbrCodes[PrimaryArchetypeTypeLayout::Code];
-    PrimaryArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                           envID,
-                                           interfaceType->getDepth(),
-                                           interfaceType->getIndex());
-    break;
-  }
-
-  case TypeKind::OpenedArchetype: {
-    auto archetypeTy = cast<OpenedArchetypeType>(ty.getPointer());
-    unsigned abbrCode = DeclTypeAbbrCodes[OpenedArchetypeTypeLayout::Code];
-    OpenedArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                           addTypeRef(archetypeTy->getOpenedExistentialType()));
-    break;
-  }
-
-  case TypeKind::OpaqueTypeArchetype: {
-    auto archetypeTy = cast<OpaqueTypeArchetypeType>(ty.getPointer());
-    auto declID = addDeclRef(archetypeTy->getDecl());
-    auto substMapID = addSubstitutionMapRef(archetypeTy->getSubstitutions());
-    unsigned abbrCode = DeclTypeAbbrCodes[OpaqueArchetypeTypeLayout::Code];
-    OpaqueArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                          declID, substMapID);
-    break;
-  }
-  case TypeKind::NestedArchetype: {
-    auto archetypeTy = cast<NestedArchetypeType>(ty.getPointer());
-    auto rootTypeID = addTypeRef(archetypeTy->getRoot());
-    auto interfaceTypeID = addTypeRef(archetypeTy->getInterfaceType());
-    unsigned abbrCode = DeclTypeAbbrCodes[NestedArchetypeTypeLayout::Code];
-    NestedArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                          rootTypeID, interfaceTypeID);
-    break;
-  }
-
-  case TypeKind::GenericTypeParam: {
-    auto genericParam = cast<GenericTypeParamType>(ty.getPointer());
-    unsigned abbrCode = DeclTypeAbbrCodes[GenericTypeParamTypeLayout::Code];
-    DeclID declIDOrDepth;
-    unsigned indexPlusOne;
-    if (genericParam->getDecl() &&
-        !(genericParam->getDecl()->getDeclContext()->isModuleScopeContext() &&
-          isDeclXRef(genericParam->getDecl()))) {
-      declIDOrDepth = addDeclRef(genericParam->getDecl());
-      indexPlusOne = 0;
-    } else {
-      declIDOrDepth = genericParam->getDepth();
-      indexPlusOne = genericParam->getIndex() + 1;
-    }
-    GenericTypeParamTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                           declIDOrDepth, indexPlusOne);
-    break;
-  }
-
-  case TypeKind::DependentMember: {
-    auto dependent = cast<DependentMemberType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[DependentMemberTypeLayout::Code];
-    assert(dependent->getAssocType() && "Unchecked dependent member type");
-    DependentMemberTypeLayout::emitRecord(
-      Out, ScratchRecord, abbrCode,
-      addTypeRef(dependent->getBase()),
-      addDeclRef(dependent->getAssocType()));
-    break;
-  }
-
-  case TypeKind::Function:
-  case TypeKind::GenericFunction: {
-    auto *fnTy = cast<AnyFunctionType>(ty.getPointer());
-
-    if (isa<FunctionType>(fnTy)) {
-      unsigned abbrCode = DeclTypeAbbrCodes[FunctionTypeLayout::Code];
-      FunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-             addTypeRef(fnTy->getResult()),
-             getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-             fnTy->isNoEscape(),
-             fnTy->throws());
-    } else {
-      assert(!fnTy->isNoEscape());
-
-      auto *genericSig = cast<GenericFunctionType>(fnTy)->getGenericSignature();
-      unsigned abbrCode = DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
-      GenericFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-              addTypeRef(fnTy->getResult()),
-              getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-              fnTy->throws(),
-              addGenericSignatureRef(genericSig));
-    }
-
-    unsigned abbrCode = DeclTypeAbbrCodes[FunctionParamLayout::Code];
-    for (auto &param : fnTy->getParams()) {
-      auto paramFlags = param.getParameterFlags();
-      auto rawOwnership =
-          getRawStableValueOwnership(paramFlags.getValueOwnership());
-      FunctionParamLayout::emitRecord(
-          Out, ScratchRecord, abbrCode, addDeclBaseNameRef(param.getLabel()),
-          addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
-          paramFlags.isAutoClosure(), rawOwnership);
-    }
-
-    break;
-  }
-      
-  case TypeKind::SILBlockStorage: {
-    auto storageTy = cast<SILBlockStorageType>(ty.getPointer());
-    
-    unsigned abbrCode = DeclTypeAbbrCodes[SILBlockStorageTypeLayout::Code];
-    SILBlockStorageTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                      addTypeRef(storageTy->getCaptureType()));
-    break;
-  }
-      
-  case TypeKind::SILBox: {
-    auto boxTy = cast<SILBoxType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[SILBoxTypeLayout::Code];
-    SILLayoutID layoutRef = addSILLayoutRef(boxTy->getLayout());
-
-    SILBoxTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, layoutRef,
-                          addSubstitutionMapRef(boxTy->getSubstitutions()));
-    break;
-  }
-      
-  case TypeKind::SILFunction: {
-    auto fnTy = cast<SILFunctionType>(ty.getPointer());
-
-    auto representation = fnTy->getRepresentation();
-    auto stableRepresentation =
-      getRawStableSILFunctionTypeRepresentation(representation);
-    
-    SmallVector<TypeID, 8> variableData;
-    for (auto param : fnTy->getParameters()) {
-      variableData.push_back(addTypeRef(param.getType()));
-      unsigned conv = getRawStableParameterConvention(param.getConvention());
-      variableData.push_back(TypeID(conv));
-    }
-    for (auto yield : fnTy->getYields()) {
-      variableData.push_back(addTypeRef(yield.getType()));
-      unsigned conv = getRawStableParameterConvention(yield.getConvention());
-      variableData.push_back(TypeID(conv));
-    }
-    for (auto result : fnTy->getResults()) {
-      variableData.push_back(addTypeRef(result.getType()));
-      unsigned conv = getRawStableResultConvention(result.getConvention());
-      variableData.push_back(TypeID(conv));
-    }
-    if (fnTy->hasErrorResult()) {
-      auto abResult = fnTy->getErrorResult();
-      variableData.push_back(addTypeRef(abResult.getType()));
-      unsigned conv = getRawStableResultConvention(abResult.getConvention());
-      variableData.push_back(TypeID(conv));
-    }
-
-    auto sig = fnTy->getGenericSignature();
-
-    auto stableCoroutineKind = 
-      getRawStableSILCoroutineKind(fnTy->getCoroutineKind());
-
-    auto stableCalleeConvention =
-      getRawStableParameterConvention(fnTy->getCalleeConvention());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
-    SILFunctionTypeLayout::emitRecord(
-        Out, ScratchRecord, abbrCode,
-        stableCoroutineKind, stableCalleeConvention,
-        stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
-        fnTy->hasErrorResult(), fnTy->getParameters().size(),
-        fnTy->getNumYields(), fnTy->getNumResults(),
-        addGenericSignatureRef(sig), variableData);
-
-    if (auto conformance = fnTy->getWitnessMethodConformanceOrNone())
-      writeConformance(*conformance, DeclTypeAbbrCodes);
-
-    break;
-  }
-      
-  case TypeKind::ArraySlice: {
-    auto sliceTy = cast<ArraySliceType>(ty.getPointer());
-
-    Type base = sliceTy->getBaseType();
-
-    unsigned abbrCode = DeclTypeAbbrCodes[ArraySliceTypeLayout::Code];
-    ArraySliceTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                     addTypeRef(base));
-    break;
-  }
-
-  case TypeKind::Dictionary: {
-    auto dictTy = cast<DictionaryType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[DictionaryTypeLayout::Code];
-    DictionaryTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                     addTypeRef(dictTy->getKeyType()),
-                                     addTypeRef(dictTy->getValueType()));
-    break;
-  }
-
-  case TypeKind::Optional: {
-    auto optionalTy = cast<OptionalType>(ty.getPointer());
-
-    Type base = optionalTy->getBaseType();
-
-    unsigned abbrCode = DeclTypeAbbrCodes[OptionalTypeLayout::Code];
-    OptionalTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   addTypeRef(base));
-    break;
-  }
-
-  case TypeKind::ProtocolComposition: {
-    auto composition = cast<ProtocolCompositionType>(ty.getPointer());
-
-    SmallVector<TypeID, 4> protocols;
-    for (auto proto : composition->getMembers())
-      protocols.push_back(addTypeRef(proto));
-
-    unsigned abbrCode = DeclTypeAbbrCodes[ProtocolCompositionTypeLayout::Code];
-    ProtocolCompositionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                              composition->hasExplicitAnyObject(),
-                                              protocols);
-    break;
-  }
-
-#define REF_STORAGE(Name, ...) \
-  case TypeKind::Name##Storage:
-#include "swift/AST/ReferenceStorage.def"
-  {
-    auto refTy = cast<ReferenceStorageType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[ReferenceStorageTypeLayout::Code];
-    auto stableOwnership =
-        getRawStableReferenceOwnership(refTy->getOwnership());
-    ReferenceStorageTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                           stableOwnership,
-                                  addTypeRef(refTy->getReferentType()));
-    break;
-  }
-
-  case TypeKind::UnboundGeneric: {
-    auto generic = cast<UnboundGenericType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[UnboundGenericTypeLayout::Code];
-    UnboundGenericTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                         addDeclRef(generic->getDecl(),
-                                                    /*allowTypeAliasXRef*/true),
-                                         addTypeRef(generic->getParent()));
-    break;
-  }
-
-  case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericEnum:
-  case TypeKind::BoundGenericStruct: {
-    auto generic = cast<BoundGenericType>(ty.getPointer());
-    SmallVector<TypeID, 8> genericArgIDs;
-
-    for (auto next : generic->getGenericArgs())
-      genericArgIDs.push_back(addTypeRef(next));
-
-    unsigned abbrCode = DeclTypeAbbrCodes[BoundGenericTypeLayout::Code];
-    BoundGenericTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                       addDeclRef(generic->getDecl()),
-                                       addTypeRef(generic->getParent()),
-                                       genericArgIDs);
-    break;
-  }
-
-  case TypeKind::InOut:
-    llvm_unreachable("inout types are only used in function type parameters");
-  case TypeKind::LValue:
-    llvm_unreachable("lvalue types are only used in function bodies");
-  case TypeKind::TypeVariable:
-    llvm_unreachable("type variables should not escape the type checker");
-  }
+  TypeSerializer(*this).visit(ty);
 }
 
 void Serializer::writeAllDeclsAndTypes() {
