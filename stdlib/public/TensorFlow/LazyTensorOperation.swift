@@ -113,12 +113,19 @@ public class LazyTensorOperation : TensorOperation {
     materializationCallback = f
   }
 
+  public static var liveOperations: Int = 0
+
   public required init(_ name: String, _ outputCount: Int) {
     self.name = name
     self.inputs = []
     self.attrs = [:]
     self.outputCount = outputCount
     self.outputs = nil
+    LazyTensorOperation.liveOperations += 1
+  }
+
+  deinit {
+    LazyTensorOperation.liveOperations -= 1
   }
 
   public func evaluate() -> [LazyTensor] {
