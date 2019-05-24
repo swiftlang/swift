@@ -74,10 +74,6 @@ public:
 
   /// Resolve an implicitly-generated member with the given name.
   virtual void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) = 0;
-
-  /// Mark the given conformance as "used" from the given declaration context.
-  virtual void markConformanceUsed(ProtocolConformanceRef conformance,
-                                   DeclContext *dc) = 0;
 };
 
 class LazyMemberLoader;

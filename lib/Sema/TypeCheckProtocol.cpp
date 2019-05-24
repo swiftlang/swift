@@ -4240,19 +4240,6 @@ ModuleDecl::conformsToProtocol(Type sourceTy, ProtocolDecl *targetProtocol) {
   return TypeChecker::conformsToProtocol(sourceTy, targetProtocol, this, flags);
 }
 
-void TypeChecker::markConformanceUsed(ProtocolConformanceRef conformance,
-                                      DeclContext *dc) {
-  if (conformance.isAbstract()) return;
-
-  if (auto normalConformance =
-        dyn_cast<NormalProtocolConformance>(
-          conformance.getConcrete()->getRootConformance())) {;
-    // Make sure that the type checker completes this conformance.
-    if (normalConformance->isIncomplete())
-      UsedConformances.insert(normalConformance);
-  }
-}
-
 Optional<ProtocolConformanceRef>
 TypeChecker::LookUpConformance::operator()(
                                        CanType dependentType,

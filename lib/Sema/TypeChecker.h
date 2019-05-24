@@ -547,10 +547,6 @@ public:
   /// Declarations that need their conformances checked.
   llvm::SmallVector<Decl *, 8> ConformanceContexts;
 
-  /// The list of protocol conformances that were "used" and will need to be
-  /// completed before type checking is considered complete.
-  llvm::SetVector<NormalProtocolConformance *> UsedConformances;
-
   /// The list of protocol conformances whose requirements could not be
   /// fully checked and, therefore, should be checked again at the top
   /// level.
@@ -1651,11 +1647,6 @@ public:
                                            DeclContext *DC,
                                            ConformanceCheckOptions options,
                                            SourceLoc ComplainLoc = SourceLoc());
-
-  /// Mark the given protocol conformance as "used" from the given declaration
-  /// context.
-  void markConformanceUsed(ProtocolConformanceRef conformance,
-                           DeclContext *dc) override final;
 
   /// Functor class suitable for use as a \c LookupConformanceFn to look up a
   /// conformance through a particular declaration context using the given
