@@ -336,7 +336,7 @@ extension LazyTensorOperation {
 
     // On all the live operations rewrite the inputs so that we drop references
     // to the LazyTensorOperations..
-    LazyTensor.onLiveOperations { $0.maybeMaterializeInputs() }
+    LazyTensor.onAllOperations { $0.maybeMaterializeInputs() }
     // Cleanup
     TFGraphFactory.removeFunction(function)
   }

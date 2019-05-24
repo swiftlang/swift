@@ -2,7 +2,8 @@ public class LazyTensor : _AnyTensorHandle {
   enum Handle {
     // Bool indicates if this was a result of materialization.
     case conc(TFETensorHandle, Bool)
-    // Bool indiciates whether this is a live tensor.
+    // Bool indicates whether this is a live tensor. i.e.,
+    // is this held by a swift variable.
     case sym(LazyTensorOperation, Int, Bool)
   }
 
@@ -27,60 +28,81 @@ public class LazyTensor : _AnyTensorHandle {
 
   init(_lazy op: LazyTensorOperation, index: Int) {
     handle = Handle.sym(op, index, false)
-    LazyTensor.incrementLiveCount(op)
+    LazyTensor.incrementRefCount(op, isLive: false)
   }
 
   init(_lazyLive op: LazyTensorOperation, index: Int) {
     handle = Handle.sym(op, index, true)
-    LazyTensor.incrementLiveCount(op)
+    LazyTensor.incrementRefCount(op, isLive: true)
   }
 
   deinit {
-    if case let Handle.sym(op, _, _) = handle {
-      LazyTensor.decrementLiveCount(op)
+    if case let Handle.sym(op, _, isLive) = handle {
+      LazyTensor.decrementRefCount(op, isLive: isLive)
     }
   }
 
   // Liveness tracking for LazyTensorOperations
   //
+  struct LazyTensorOperationRefCounts {
+    let op: LazyTensorOperation
+    let live: Int
+    let all: Int
+  }
 
-  private static var liveOperations: [
-    ObjectIdentifier: (LazyTensorOperation,Int)] = [:]
+  private static var operationRefCounts: [
+    ObjectIdentifier: LazyTensorOperationRefCounts] = [:]
 
-  static func incrementLiveCount(_ op: LazyTensorOperation) {
+  static func incrementRefCount(_ op: LazyTensorOperation, isLive: Bool) {
     let opId = ObjectIdentifier(op)
-    if let (lazyOp, count) = liveOperations[opId] {
-      liveOperations[opId] = (lazyOp, count + 1)
+    if let counts = operationRefCounts[opId] {
+      operationRefCounts[opId] = LazyTensorOperationRefCounts(
+        op: op,
+        live: isLive ? counts.live + 1 : counts.live,
+        all: counts.all + 1)
     } else {
-      liveOperations[opId] = (op, 1)
+      operationRefCounts[opId] = LazyTensorOperationRefCounts(
+        op: op, live: isLive ? 1 : 0, all: 1)
     }
   }
 
-  static func decrementLiveCount(_ op: LazyTensorOperation) {
+  static func decrementRefCount(_ op: LazyTensorOperation, isLive: Bool) {
     let opId = ObjectIdentifier(op)
-    if let (lazyOp, count) = liveOperations[opId] {
-      if count > 1 {
-        liveOperations[opId] = (lazyOp, count - 1)
+    if let counts = operationRefCounts[opId] {
+      if counts.all > 1 {
+        operationRefCounts[opId] = LazyTensorOperationRefCounts(
+          op: op,
+          live: isLive ? counts.live - 1 : counts.live,
+          all: counts.all - 1)
       } else {
-        liveOperations.removeValue(forKey: opId)
+        operationRefCounts.removeValue(forKey: opId)
       }
     }
   }
 
   static func isLive(_ op: LazyTensorOperation) -> Bool {
     let opId = ObjectIdentifier(op)
-    if let (_, count) = liveOperations[opId] {
-      return count > 0
+    if let counts = operationRefCounts[opId] {
+      return counts.live > 0
     }
     return false
   }
 
   static func onLiveOperations(_ perform: (LazyTensorOperation) -> ()) {
-    for (_, (op,_)) in liveOperations { perform(op) }
+    for (_, counts) in operationRefCounts {
+      if (counts.live > 0) { perform(counts.op) }
+    }
   }
 
-  public static func printLiveCount() {
-    print("Live tensors: \(liveOperations.count)")
+  static func onAllOperations(_ perform: (LazyTensorOperation) -> ()) {
+    for (_, counts) in operationRefCounts { perform(counts.op) }
+  }
+
+  public static func printRefCounts() {
+    let live = operationRefCounts.values.reduce(0, { (sum, element) in
+        return sum + (element.live > 0 ? 1 : 0)
+      })
+    print("LazyTensorOperations: \(operationRefCounts.count) (\(live) live)")
   }
 }
 
