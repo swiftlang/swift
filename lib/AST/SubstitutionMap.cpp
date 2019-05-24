@@ -416,17 +416,6 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
       // to use that.
       if (normal->getState() == ProtocolConformanceState::CheckingTypeWitnesses)
         return None;
-
-      auto lazyResolver = type->getASTContext().getLazyResolver();
-      if (lazyResolver == nullptr)
-        return None;
-
-      lazyResolver->resolveTypeWitness(normal, nullptr);
-
-      // Error case: the conformance is broken, so we cannot handle this
-      // substitution.
-      if (normal->getSignatureConformances().empty())
-        return None;
     }
 
     // Get the associated conformance.
