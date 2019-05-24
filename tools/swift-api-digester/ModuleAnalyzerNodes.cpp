@@ -89,7 +89,9 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
         IsOpen(Info.IsOpen),
         IsInternal(Info.IsInternal), IsABIPlaceholder(Info.IsABIPlaceholder),
         ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
-        GenericSig(Info.GenericSig), FixedBinaryOrder(Info.FixedBinaryOrder) {}
+        GenericSig(Info.GenericSig), FixedBinaryOrder(Info.FixedBinaryOrder),
+        introVersions({Info.IntromacOS, Info.IntroiOS, Info.IntrotvOS,
+                       Info.IntrowatchOS, Info.Introswift}){}
 
 SDKNodeType::SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind):
   SDKNode(Info, Kind), TypeAttributes(Info.TypeAttrs),
@@ -1134,6 +1136,28 @@ static bool isABIPlaceholderRecursive(Decl *D) {
   return false;
 }
 
+StringRef SDKContext::getPlatformIntroVersion(Decl *D, PlatformKind Kind) {
+  for (auto *ATT: D->getAttrs()) {
+    if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
+      if (AVA->Platform == Kind && AVA->Introduced) {
+        return buffer(AVA->Introduced->getAsString());
+      }
+    }
+  }
+  return StringRef();
+}
+
+StringRef SDKContext::getLanguageIntroVersion(Decl *D) {
+  for (auto *ATT: D->getAttrs()) {
+    if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
+      if (AVA->isLanguageVersionSpecific() && AVA->Introduced) {
+        return buffer(AVA->Introduced->getAsString());
+      }
+    }
+  }
+  return StringRef();
+}
+
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info) :
     Ctx(Ctx), Name(getTypeName(Ctx, Ty, Info.IsImplicitlyUnwrappedOptional)),
     PrintedName(getPrintedName(Ctx, Ty, Info.IsImplicitlyUnwrappedOptional)),
@@ -1152,6 +1176,11 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       Location(calculateLocation(Ctx, D)),
       ModuleName(D->getModuleContext()->getName().str()),
       GenericSig(printGenericSignature(Ctx, D)),
+      IntromacOS(Ctx.getPlatformIntroVersion(D, PlatformKind::OSX)),
+      IntroiOS(Ctx.getPlatformIntroVersion(D, PlatformKind::iOS)),
+      IntrotvOS(Ctx.getPlatformIntroVersion(D, PlatformKind::tvOS)),
+      IntrowatchOS(Ctx.getPlatformIntroVersion(D, PlatformKind::watchOS)),
+      Introswift(Ctx.getLanguageIntroVersion(D)),
       IsImplicit(D->isImplicit()),
       IsDeprecated(D->getAttrs().getDeprecated(D->getASTContext())),
       IsABIPlaceholder(isABIPlaceholderRecursive(D)) {
@@ -1726,6 +1755,11 @@ void SDKNodeDecl::jsonize(json::Output &out) {
   output(out, KeyKind::KK_isOpen, IsOpen);
   output(out, KeyKind::KK_isInternal, IsInternal);
   output(out, KeyKind::KK_isABIPlaceholder, IsABIPlaceholder);
+  output(out, KeyKind::KK_intro_Macosx, introVersions.macos);
+  output(out, KeyKind::KK_intro_iOS, introVersions.ios);
+  output(out, KeyKind::KK_intro_tvOS, introVersions.tvos);
+  output(out, KeyKind::KK_intro_watchOS, introVersions.watchos);
+  output(out, KeyKind::KK_intro_swift, introVersions.swift);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_declAttributes).data(), DeclAttributes);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_fixedbinaryorder).data(), FixedBinaryOrder);
   // Strong reference is implied, no need for serialization.
