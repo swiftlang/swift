@@ -1092,6 +1092,10 @@
           "usr": "s:4cake15FutureContainerC9futureFooyyF",
           "moduleName": "cake",
           "isABIPlaceholder": true,
+          "intro_Macosx": "9999",
+          "intro_iOS": "9999",
+          "intro_tvOS": "9999",
+          "intro_watchOS": "9999",
           "declAttributes": [
             "Available",
             "Available",
@@ -1114,6 +1118,7 @@
           "declKind": "Func",
           "usr": "s:4cake15FutureContainerC12NotfutureFooyyF",
           "moduleName": "cake",
+          "intro_Macosx": "9999",
           "declAttributes": [
             "Available"
           ],
@@ -1137,6 +1142,36 @@
           "printedName": "P2",
           "usr": "s:4cake2P2P"
         }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "PlatformIntroClass",
+      "printedName": "PlatformIntroClass",
+      "declKind": "Class",
+      "usr": "s:4cake18PlatformIntroClassC",
+      "moduleName": "cake",
+      "intro_Macosx": "10.1",
+      "intro_iOS": "10.2",
+      "intro_tvOS": "10.3",
+      "intro_watchOS": "3.4",
+      "declAttributes": [
+        "Available",
+        "Available",
+        "Available",
+        "Available"
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "SwiftIntroClass",
+      "printedName": "SwiftIntroClass",
+      "declKind": "Class",
+      "usr": "s:4cake15SwiftIntroClassC",
+      "moduleName": "cake",
+      "intro_swift": "5",
+      "declAttributes": [
+        "Available"
       ]
     },
     {

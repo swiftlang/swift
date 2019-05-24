@@ -187,6 +187,8 @@ public:
   DiagnosticEngine &getDiags() {
     return Diags;
   }
+  StringRef getPlatformIntroVersion(Decl *D, PlatformKind Kind);
+  StringRef getLanguageIntroVersion(Decl *D);
   bool isEqual(const SDKNode &Left, const SDKNode &Right);
   bool checkingABI() const { return Opts.ABI; }
   AccessLevel getAccessLevel(const ValueDecl *VD) const;
@@ -285,6 +287,14 @@ public:
   }
 };
 
+struct PlatformIntroVersion {
+  StringRef macos;
+  StringRef ios;
+  StringRef tvos;
+  StringRef watchos;
+  StringRef swift;
+};
+
 class SDKNodeDecl: public SDKNode {
   DeclKind DKind;
   StringRef Usr;
@@ -302,6 +312,7 @@ class SDKNodeDecl: public SDKNode {
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
   Optional<uint8_t> FixedBinaryOrder;
+  PlatformIntroVersion introVersions;
 
 protected:
   SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind);
