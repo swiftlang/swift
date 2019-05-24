@@ -75,6 +75,10 @@
 using namespace swift;
 using namespace irgen;
 
+llvm::cl::opt<bool> UseBasicDynamicReplacement(
+    "basic-dynamic-replacement", llvm::cl::init(false),
+    llvm::cl::desc("Basic implementation of dynamic replacement"));
+
 namespace {
   
 /// Add methods, properties, and protocol conformances from a JITed extension
@@ -2207,12 +2211,20 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
   auto *FnAddr = llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(
       IGF.CurFn, FunctionPtrTy);
 
-  // Call swift_getFunctionReplacement to check which function to call.
-  auto *ReplFn = IGF.Builder.CreateCall(getGetReplacementFn(),
-                                        { ReplAddr, FnAddr });
-  ReplFn->setDoesNotThrow();
-  auto *hasReplFn = IGF.Builder.CreateICmpEQ(ReplFn,
-          llvm::ConstantExpr::getNullValue(ReplFn->getType()));
+  llvm::Value *ReplFn = nullptr, *rhs = nullptr;
+
+  if (UseBasicDynamicReplacement) {
+    ReplFn = IGF.Builder.CreateLoad(fnPtrAddr, getPointerAlignment());
+    rhs = FnAddr;
+  } else {
+    // Call swift_getFunctionReplacement to check which function to call.
+    auto *callRTFunc = IGF.Builder.CreateCall(getGetReplacementFn(),
+                                             { ReplAddr, FnAddr });
+    callRTFunc->setDoesNotThrow();
+    ReplFn = callRTFunc;
+    rhs = llvm::ConstantExpr::getNullValue(ReplFn->getType());
+  }
+  auto *hasReplFn = IGF.Builder.CreateICmpEQ(ReplFn, rhs);
 
   auto *replacedBB = IGF.createBasicBlock("forward_to_replaced");
   auto *origEntryBB = IGF.createBasicBlock("original_entry");
@@ -2344,6 +2356,9 @@ void IRGenModule::emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
 /// active.
 void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
   assert(f->getDynamicallyReplacedFunction());
+
+  if (UseBasicDynamicReplacement)
+    return;
 
   auto entity = LinkEntity::forSILFunction(f, true);
 

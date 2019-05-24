@@ -60,6 +60,7 @@
 #include "GenCast.h"
 #include "GenClass.h"
 #include "GenConstant.h"
+#include "GenDecl.h"
 #include "GenEnum.h"
 #include "GenExistential.h"
 #include "GenFunc.h"
@@ -1874,6 +1875,11 @@ void IRGenSILFunction::visitDynamicFunctionRefInst(DynamicFunctionRefInst *i) {
 
 void IRGenSILFunction::visitPreviousDynamicFunctionRefInst(
     PreviousDynamicFunctionRefInst *i) {
+  if (UseBasicDynamicReplacement) {
+    IGM.unimplemented(i->getLoc().getSourceLoc(),
+      ": calling the original implementation of a dynamic function is not "
+      "supported with -Xllvm -basic-dynamic-replacement");
+  }
   visitFunctionRefBaseInst(i);
 }
 
