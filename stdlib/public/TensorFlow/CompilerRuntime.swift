@@ -444,6 +444,9 @@ public enum _RuntimeConfig {
   }
   static public var session: RuntimeSession = .local
 
+  /// Use lazy evaluation if this is set to true.
+  static public var useLazyTensor: Bool = false
+
   /// When true, prints various debug messages on the runtime state.
   ///
   /// If the value is true when running tensor computation for the first time in
@@ -468,6 +471,12 @@ private func configureRuntimeFromEnvironment() {
     String(cString: value).lowercased() == "true" {
       _RuntimeConfig.printsDebugLog = true
       debugLog("Turning on debug logging from env.")
+  }
+
+  if let value = getenv("SWIFT_TENSORFLOW_ENABLE_LAZY_TENSOR"),
+    String(cString: value).lowercased() == "true" {
+      _RuntimeConfig.useLazyTensor = true
+      debugLog("Turning on lazy tensor from env.")
   }
 
   if let value = getenv("SWIFT_TENSORFLOW_VERBOSE_LOG_LEVEL") {
@@ -649,6 +658,17 @@ public final class _ExecutionContext {
     TF_DeleteBuffer(tensorFlowConfig)
     TF_DeleteStatus(status)
     pthread_mutex_destroy(&mutex)
+  }
+}
+
+extension _ExecutionContext {
+  // The execution mode is effectively encoded in the TensorOperation.
+  // We can use this to switch between different execution modes.
+  // TODO: Can we interop between modes?
+  public static func makeOp(_ name: String, _ outputCount: Int) -> TFTensorOperation {
+    return _RuntimeConfig.useLazyTensor
+      ? LazyTensorOperation(name, outputCount)
+      : TFE_Op(name, outputCount)
   }
 }
 
