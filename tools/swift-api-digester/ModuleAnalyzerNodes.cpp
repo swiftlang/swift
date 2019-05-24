@@ -110,7 +110,7 @@ SDKNodeTypeAlias::SDKNodeTypeAlias(SDKNodeInitInfo Info):
 SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info):
   SDKNodeDecl(Info, SDKNodeKind::DeclType), SuperclassUsr(Info.SuperclassUsr),
   SuperclassNames(Info.SuperclassNames),
-  EnumRawTypeName(Info.EnumRawTypeName) {}
+  EnumRawTypeName(Info.EnumRawTypeName), IsExternal(Info.IsExternal) {}
 
 SDKNodeConformance::SDKNodeConformance(SDKNodeInitInfo Info):
   SDKNode(Info, SDKNodeKind::Conformance),
@@ -1483,7 +1483,9 @@ SwiftDeclCollector::constructTypeDeclNode(NominalTypeDecl *NTD) {
 SDKNode *swift::ide::api::
 SwiftDeclCollector::constructExternalExtensionNode(NominalTypeDecl *NTD,
                                             ArrayRef<ExtensionDecl*> AllExts) {
-  auto *TypeNode = SDKNodeInitInfo(Ctx, NTD).createSDKNode(SDKNodeKind::DeclType);
+  SDKNodeInitInfo initInfo(Ctx, NTD);
+  initInfo.IsExternal = true;
+  auto *TypeNode = initInfo.createSDKNode(SDKNodeKind::DeclType);
   addConformancesToTypeDecl(cast<SDKNodeDeclType>(TypeNode), NTD);
 
   bool anyConformancesAdded = false;
@@ -1785,6 +1787,7 @@ void SDKNodeDeclType::jsonize(json::Output &out) {
   SDKNodeDecl::jsonize(out);
   output(out, KeyKind::KK_superclassUsr, SuperclassUsr);
   output(out, KeyKind::KK_enumRawTypeName, EnumRawTypeName);
+  output(out, KeyKind::KK_isExternal, IsExternal);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_superclassNames).data(), SuperclassNames);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_conformances).data(), Conformances);
 }

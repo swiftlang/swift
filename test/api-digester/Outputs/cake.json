@@ -1218,6 +1218,7 @@
       "declAttributes": [
         "Frozen"
       ],
+      "isExternal": true,
       "conformances": [
         {
           "kind": "Conformance",

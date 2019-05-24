@@ -469,6 +469,9 @@ class SDKNodeDeclType: public SDKNodeDecl {
   std::vector<StringRef> SuperclassNames;
   std::vector<SDKNode*> Conformances;
   StringRef EnumRawTypeName;
+  // Check whether the type declaration is pulled from an external module so we
+  // can incorporate extensions in the interested module.
+  bool IsExternal;
 public:
   SDKNodeDeclType(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
@@ -477,6 +480,7 @@ public:
   void addConformance(SDKNode *Conf);
   ArrayRef<SDKNode*> getConformances() const { return Conformances; }
   NodeVector getConformances() { return Conformances; }
+  bool isExternal() const { return IsExternal; }
   StringRef getSuperClassName() const {
     return SuperclassNames.empty() ? StringRef() : SuperclassNames.front();
   };
