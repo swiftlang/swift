@@ -3968,27 +3968,25 @@ public:
                                   S.addTypeRef(nominalTy->getParent()));
   }
 
-  void visitExistentialMetatypeType(const ExistentialMetatypeType *metatypeTy) {
-    using namespace decls_block;
-    unsigned abbrCode = S.DeclTypeAbbrCodes[ExistentialMetatypeTypeLayout::Code];
+  template <typename Layout>
+  void visitMetatypeImpl(const AnyMetatypeType *metatypeTy) {
+    unsigned abbrCode = S.DeclTypeAbbrCodes[Layout::Code];
 
     // Map the metatype representation.
     auto repr = getRawStableMetatypeRepresentation(metatypeTy);
-    ExistentialMetatypeTypeLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode,
-        S.addTypeRef(metatypeTy->getInstanceType()),
-        static_cast<uint8_t>(repr));
+    Layout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                       S.addTypeRef(metatypeTy->getInstanceType()),
+                       static_cast<uint8_t>(repr));
+  }
+
+  void visitExistentialMetatypeType(const ExistentialMetatypeType *metatypeTy) {
+    using namespace decls_block;
+    visitMetatypeImpl<ExistentialMetatypeTypeLayout>(metatypeTy);
   }
 
   void visitMetatypeType(const MetatypeType *metatypeTy) {
     using namespace decls_block;
-    unsigned abbrCode = S.DeclTypeAbbrCodes[MetatypeTypeLayout::Code];
-
-    // Map the metatype representation.
-    auto repr = getRawStableMetatypeRepresentation(metatypeTy);
-    MetatypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                   S.addTypeRef(metatypeTy->getInstanceType()),
-                                   static_cast<uint8_t>(repr));
+    visitMetatypeImpl<MetatypeTypeLayout>(metatypeTy);
   }
 
   void visitDynamicSelfType(const DynamicSelfType *dynamicSelfTy) {
@@ -4070,28 +4068,8 @@ public:
         S.addDeclRef(dependent->getAssocType()));
   }
 
-  void visitAnyFunctionType(const AnyFunctionType *fnTy) {
+  void serializeFunctionTypeParams(const AnyFunctionType *fnTy) {
     using namespace decls_block;
-
-    if (isa<FunctionType>(fnTy)) {
-      unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
-      FunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-             S.addTypeRef(fnTy->getResult()),
-             getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-             fnTy->isNoEscape(),
-             fnTy->throws());
-    } else {
-      assert(!fnTy->isNoEscape());
-
-      auto *genericSig = cast<GenericFunctionType>(fnTy)->getGenericSignature();
-      unsigned abbrCode = S.DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
-      GenericFunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-              S.addTypeRef(fnTy->getResult()),
-              getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-              fnTy->throws(),
-              S.addGenericSignatureRef(genericSig));
-    }
-
     unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionParamLayout::Code];
     for (auto &param : fnTy->getParams()) {
       auto paramFlags = param.getParameterFlags();
@@ -4103,6 +4081,34 @@ public:
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), rawOwnership);
     }
+  }
+
+  void visitFunctionType(const FunctionType *fnTy) {
+    using namespace decls_block;
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
+    FunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+        S.addTypeRef(fnTy->getResult()),
+        getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
+        fnTy->isNoEscape(),
+        fnTy->throws());
+
+    serializeFunctionTypeParams(fnTy);
+  }
+
+  void visitGenericFunctionType(const GenericFunctionType *fnTy) {
+    using namespace decls_block;
+    assert(!fnTy->isNoEscape());
+
+    auto *genericSig = fnTy->getGenericSignature();
+    unsigned abbrCode = S.DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
+    GenericFunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+        S.addTypeRef(fnTy->getResult()),
+        getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
+        fnTy->throws(),
+        S.addGenericSignatureRef(genericSig));
+
+    serializeFunctionTypeParams(fnTy);
   }
 
   void visitSILBlockStorageType(const SILBlockStorageType *storageTy) {
