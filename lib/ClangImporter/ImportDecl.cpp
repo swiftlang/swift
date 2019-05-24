@@ -8185,10 +8185,11 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   case clang::APValue::ComplexFloat:
   case clang::APValue::ComplexInt:
   case clang::APValue::FixedPoint:
+  case clang::APValue::Indeterminate:
   case clang::APValue::LValue:
   case clang::APValue::MemberPointer:
+  case clang::APValue::None:
   case clang::APValue::Struct:
-  case clang::APValue::Uninitialized:
   case clang::APValue::Union:
   case clang::APValue::Vector:
     llvm_unreachable("Unhandled APValue kind");
