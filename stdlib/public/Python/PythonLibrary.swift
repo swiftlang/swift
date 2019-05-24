@@ -88,8 +88,8 @@ public struct PythonLibrary {
 public extension PythonLibrary {
   static func useVersion(_ major: Int, _ minor: Int? = nil) {
     precondition(!librarySymbolsLoaded, """
-      Error: \(#function) should not be called after any Python library
-      symbols have already been loaded.
+      Error: \(#function) should not be called after any Python library \
+      has already been loaded.
       """)
     let version = PythonVersion(major: major, minor: minor)
     PythonLibrary.Environment.version.set(version.versionString)
