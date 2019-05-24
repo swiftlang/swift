@@ -4484,13 +4484,16 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     // We need the superclass vtable layout as well.
     TC.requestSuperclassLayout(CD);
 
-    auto useConformance = [&](ProtocolDecl *protocol) {
+    auto forceConformance = [&](ProtocolDecl *protocol) {
       if (auto ref = TC.conformsToProtocol(
             CD->getDeclaredInterfaceType(), protocol, CD,
             ConformanceCheckFlags::SkipConditionalRequirements,
             SourceLoc())) {
-        if (ref->getConcrete()->getDeclContext() == CD)
-          TC.markConformanceUsed(*ref, CD);
+        auto conformance = ref->getConcrete();
+        if (conformance->getDeclContext() == CD &&
+            conformance->getState() == ProtocolConformanceState::Incomplete) {
+          TC.checkConformance(conformance->getRootNormalConformance());
+        }
       }
     };
 
@@ -4499,9 +4502,9 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     //
     // FIXME: Generalize this to other protocols for which
     // we can derive conformances.
-    useConformance(TC.Context.getProtocol(KnownProtocolKind::Decodable));
-    useConformance(TC.Context.getProtocol(KnownProtocolKind::Encodable));
-    useConformance(TC.Context.getProtocol(KnownProtocolKind::Hashable));
+    forceConformance(TC.Context.getProtocol(KnownProtocolKind::Decodable));
+    forceConformance(TC.Context.getProtocol(KnownProtocolKind::Encodable));
+    forceConformance(TC.Context.getProtocol(KnownProtocolKind::Hashable));
   }
 
   // validateDeclForNameLookup will not trigger an immediate full
