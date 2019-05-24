@@ -606,7 +606,8 @@ Type ConstraintSystem::openFunctionType(
        OpenedTypeMap &replacements,
        DeclContext *innerDC,
        DeclContext *outerDC,
-       bool skipProtocolSelfConstraint) {
+       bool skipProtocolSelfConstraint,
+       bool skipGenericRequirements) {
   Type type;
 
   if (auto *genericFn = funcType->getAs<GenericFunctionType>()) {
@@ -616,7 +617,8 @@ Type ConstraintSystem::openFunctionType(
                 genericFn->getGenericSignature(),
                 skipProtocolSelfConstraint,
                 locator,
-                replacements);
+                replacements,
+                skipGenericRequirements);
 
     // Transform the parameters and output type.
     llvm::SmallVector<AnyFunctionType::Param, 4> openedParams;
@@ -1072,7 +1074,8 @@ void ConstraintSystem::openGeneric(
        GenericSignature *sig,
        bool skipProtocolSelfConstraint,
        ConstraintLocatorBuilder locator,
-       OpenedTypeMap &replacements) {
+       OpenedTypeMap &replacements,
+       bool skipGenericRequirements) {
   if (sig == nullptr)
     return;
 
@@ -1098,6 +1101,9 @@ void ConstraintSystem::openGeneric(
       locator.withPathElement(LocatorPathElt::getOpenedGeneric(sig)));
 
   bindArchetypesFromContext(*this, outerDC, locatorPtr, replacements);
+
+  if (skipGenericRequirements)
+    return;
 
   // Add the requirements as constraints.
   openGenericRequirements(
@@ -1302,9 +1308,12 @@ ConstraintSystem::getTypeOfMemberReference(
     }
   }
 
+  // While opening member function type, let's delay opening requirements
+  // to allow contextual types to affect the situation.
   openedType = openFunctionType(funcType, numRemovedArgumentLabels,
                                 locator, replacements, innerDC, outerDC,
-                                /*skipProtocolSelfConstraint=*/true);
+                                /*skipProtocolSelfConstraint=*/true,
+                                /*skipGenericRequirements=*/true);
 
   if (!outerDC->getSelfProtocolDecl()) {
     // Class methods returning Self as well as constructors get the
@@ -1346,6 +1355,19 @@ ConstraintSystem::getTypeOfMemberReference(
                   getConstraintLocator(locator));
   } else if (!isDynamicResult) {
     addSelfConstraint(*this, baseOpenedTy, selfObjTy, locator);
+  }
+
+  // Open generic requirements after self constraint has been
+  // applied and contextual types have been propagated. This
+  // helps diagnostics because instead of self type conversion
+  // failing we'll get a generic requirement constraint failure
+  // if mismatch is related to generic parameters which is much
+  // easier to diagnose.
+  if (auto *genericFn = funcType->getAs<GenericFunctionType>()) {
+    openGenericRequirements(
+        outerDC, genericFn->getGenericSignature(),
+        /*skipProtocolSelfConstraint=*/true, locator,
+        [&](Type type) { return openType(type, replacements); });
   }
 
   // Compute the type of the reference.
