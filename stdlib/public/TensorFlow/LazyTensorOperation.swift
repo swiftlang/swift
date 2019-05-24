@@ -1,6 +1,8 @@
 public class LazyTensor : _AnyTensorHandle {
   enum Handle {
-    case conc(TFETensorHandle)
+    // Bool indicates if this was a result of materialization.
+    case conc(TFETensorHandle, Bool)
+    // Bool indiciates whether this is a live tensor.
     case sym(LazyTensorOperation, Int, Bool)
   }
 
@@ -8,7 +10,7 @@ public class LazyTensor : _AnyTensorHandle {
 
   public var _tfeTensorHandle: TFETensorHandle {
     switch (handle) {
-      case Handle.conc(let h):
+      case Handle.conc(let h, _):
         return h
       case Handle.sym(let op, let index, _):
         return op.materialized(index: index)
@@ -16,11 +18,16 @@ public class LazyTensor : _AnyTensorHandle {
   }
 
   init(_ base: TFETensorHandle) {
-    handle = Handle.conc(base)
+    handle = Handle.conc(base, false)
+  }
+
+  init(_materialized base: TFETensorHandle) {
+    handle = Handle.conc(base, true)
   }
 
   init(_lazy op: LazyTensorOperation, index: Int) {
     handle = Handle.sym(op, index, false)
+    LazyTensor.incrementLiveCount(op)
   }
 
   init(_lazyLive op: LazyTensorOperation, index: Int) {
@@ -29,7 +36,7 @@ public class LazyTensor : _AnyTensorHandle {
   }
 
   deinit {
-    if case let Handle.sym(op, _, true) = handle {
+    if case let Handle.sym(op, _, _) = handle {
       LazyTensor.decrementLiveCount(op)
     }
   }

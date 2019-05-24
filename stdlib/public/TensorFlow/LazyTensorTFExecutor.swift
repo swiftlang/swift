@@ -241,8 +241,8 @@ class TFGraphDescription {
 
   private func formTFOutput(_ lazyHandle: LazyTensor) -> TF_Output {
     switch lazyHandle.handle {
-      case LazyTensor.Handle.conc(let h):
-        return formTFOutput(h, asConst: true)
+       case LazyTensor.Handle.conc(let h, let materialized):
+        return formTFOutput(h, asConst: !materialized)
       case LazyTensor.Handle.sym(let lazyOp, let index, _): do {
         if let outputs = lazyOp.outputs {
           return formTFOutput(outputs[index], asConst: false)
@@ -295,6 +295,31 @@ extension LazyTensorOperation {
     return outputs!
   }
 
+  func maybeMaterializeInputs() {
+    func maybeMaterialized(lazyTensor: LazyTensor) -> LazyTensor {
+      let handle = lazyTensor.handle
+      if case let LazyTensor.Handle.sym(lazyOp, index, _) = handle {
+        if let outputs = lazyOp.outputs {
+          return LazyTensor(_materialized: outputs[index])
+        }
+      }
+      return lazyTensor
+    }
+
+    func maybeMaterialized(input: Input) -> Input {
+      switch input {
+      case Input.single(let h):
+        return Input.single(maybeMaterialized(lazyTensor: h))
+      case LazyTensorOperation.Input.list(let elements):
+        return Input.list(elements.map { maybeMaterialized(lazyTensor: $0) })
+      }
+    }
+    debugLog("Materializing inputs for \(self)")
+    inputs = inputs.map { maybeMaterialized(input: $0) }
+    debugLog("After: \(self)")
+  }
+
+
   private static func materializeLiveTensors(_ lazyOp: LazyTensorOperation) {
     LazyTensorOperation.materializationCallback("materialize")
     let graphDescription = TFGraphDescription(lazyOp)
@@ -308,6 +333,11 @@ extension LazyTensorOperation {
       lazyOp.outputs = Array(allOutputs[start..<end])
       start = end
     }
+
+    // On all the live operations rewrite the inputs so that we drop references
+    // to the LazyTensorOperations..
+    LazyTensor.onLiveOperations { $0.maybeMaterializeInputs() }
+    // Cleanup
     TFGraphFactory.removeFunction(function)
   }
 }
