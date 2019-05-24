@@ -1,0 +1,313 @@
+import CTensorFlow
+
+/// The `TF_Operation *` type.
+typealias CTFOperation = OpaquePointer
+
+struct TFGraphFactory {
+  enum Input {
+    case single(TF_Output)
+    case list([TF_Output])
+  }
+
+  struct FunctionDescription {
+    let name: String
+    let function: CTFFunction
+    let outputCount: Int
+    let outputGroups: [Int]
+  }
+
+  /// A status object to pass to TF graph building operations.
+  internal static let status: CTFStatus = TF_NewStatus()
+
+  internal static var nodeCounter: Int = 0
+
+  static func newNodeName(base: String) -> String {
+    let name = "\(base)_\(nodeCounter)"
+    nodeCounter += 1
+    return name
+  }
+
+  static func updateAttribute(
+    _ desc: CTFOperationDescription,
+    _ name: String,
+    _  attrValue: LazyTensorOperation.Attribute) {
+    switch attrValue {
+      case LazyTensorOperation.Attribute.TensorDataTypeValue(let value):
+        TF_SetAttrType(desc, name, value._cDataType)
+      case LazyTensorOperation.Attribute.BoolValue(let value):
+        TF_SetAttrBool(desc, name, value ? 1 : 0)
+      case LazyTensorOperation.Attribute.IntValue(let value):
+        TF_SetAttrInt(desc, name, Int64(value))
+      case LazyTensorOperation.Attribute.FloatValue(let value):
+        TF_SetAttrFloat(desc, name, value)
+      case LazyTensorOperation.Attribute.StringValue(let value): do {
+        value.utf8CString.withUnsafeBufferPointer { buffer in
+          // utf8CString is null-terminated; TF_SetAttrString wants
+          // non-null-terminated.
+          TF_SetAttrString(desc, name, buffer.baseAddress, buffer.count - 1)
+        }
+      }
+      case LazyTensorOperation.Attribute.IntArray(let values): do {
+        let values64 = values.map { Int64($0) }
+        values64.withUnsafeBufferPointer { buffer in
+          TF_SetAttrIntList(desc, name, buffer.baseAddress, Int32(buffer.count))
+        }
+      }
+      default:
+        assert(false, "Unhandled attribute \(name):\(attrValue)")
+    }
+  }
+
+  static func graphNode(
+    graph: CTFGraph,
+    name: String,
+    attrs: [String: LazyTensorOperation.Attribute],
+    inputs: [Input]) -> CTFOperation? {
+    // Create a new graph node now.
+    let desc: CTFOperationDescription! = TF_NewOperation(
+      graph, name, newNodeName(base: name))
+
+    // Set Attributes
+    for (name, value) in attrs {
+      updateAttribute(desc, name, value)
+    }
+
+    // Add Inputs
+    for input in inputs {
+      switch input {
+        case Input.single(let singleInput):
+          TF_AddInput(desc, singleInput)
+        case Input.list(let inputList): do {
+          inputList.withUnsafeBufferPointer { buffer in
+              TF_AddInputList(desc, buffer.baseAddress, Int32(buffer.count))
+          }
+        }
+      }
+    }
+
+    // Finalize operation.
+    let graphNode = TF_FinishOperation(desc, status)
+    checkOk(status)
+    return graphNode!
+  }
+
+  static func tfFunction(
+    _ graphDescription: TFGraphDescription) -> FunctionDescription {
+    let graph = graphDescription.graph
+    let tracedFunctionName = newNodeName(base: "lazyTrace")
+    let eagerContext = _TFCGetGlobalEagerContext()
+    let inputs = graphDescription.inputs
+    let outputs = graphDescription.tfOutputs
+    let tracedGraphFn = graphDescription.graphNodes.withUnsafeBufferPointer {
+      operations -> CTFFunction in
+      let base = operations.baseAddress
+      let tracedGraphFn = TF_GraphToFunction(graph, tracedFunctionName,
+        /*append_hash_to_fn_name*/ 0,
+        /*num_opers*/ Int32(operations.count),
+        /*opers*/ base,
+        /*numinputs*/ Int32(inputs.count),
+        /*inputs*/ inputs,
+        /*noutputs*/ Int32(outputs.count),
+        /*outputs*/ outputs,
+        /*outputnames*/ nil,
+        /*functionoptions*/ nil, "", status)
+      checkOk(status)
+      if _RuntimeConfig.printsDebugLog {
+        var len: Int = 0
+        let funcDebugStr = TF_FunctionDebugString(tracedGraphFn, &len)!
+        debugLog("The traced function is:\n\(String(cString: funcDebugStr))")
+        free(funcDebugStr)
+        debugLog("Corresponding lazy tensor operations:\n")
+        for output in graphDescription.outputs {
+          debugLog("  \(output)")
+        }
+      }
+      return tracedGraphFn!
+    }
+    TFE_ContextAddFunction(eagerContext, tracedGraphFn, status)
+
+    let outputGroups = graphDescription.outputs.map { $0.outputCount }
+
+    return FunctionDescription(
+      name: tracedFunctionName,
+      function: tracedGraphFn,
+      outputCount: outputs.count,
+      outputGroups: outputGroups
+    )
+  }
+
+  static func execute(
+    _ function: FunctionDescription,
+    _ inputs: [TFETensorHandle]) -> [TFETensorHandle] {
+    let eagerContext = _TFCGetGlobalEagerContext()
+    let eagerOp: CTFEOp! = TFE_NewOp(eagerContext, function.name, status)
+    defer { TFE_DeleteOp(eagerOp) }
+    checkOk(status)
+
+    let deviceName = _ExecutionContext.global.currentDeviceName
+    if let deviceName = deviceName {
+      debugLog("Placing the trace func on device \(deviceName).")
+      TFE_OpSetDevice(eagerOp, deviceName, status)
+      checkOk(status)
+    }
+
+    for input in inputs {
+      TFE_OpAddInput(eagerOp, input._cTensorHandle, status)
+      checkOk(status)
+    }
+
+    var returnValues = [CTensorHandle?](repeating: nil, count: function.outputCount)
+    var outputReturnValueCount = Int32(function.outputCount)
+    TFE_Execute(eagerOp, &returnValues, &outputReturnValueCount, status)
+    checkOk(status)
+
+    return returnValues.map  { TFETensorHandle(_owning: $0!) }
+  }
+
+  static func removeFunction(_ function: FunctionDescription) {
+    let eagerContext = _TFCGetGlobalEagerContext()
+    TFE_ContextRemoveFunction(eagerContext, function.name, status)
+    checkOk(status)
+    TF_DeleteFunction(function.function)
+  }
+
+  static func tfConstNode(_ graph: CTFGraph, _ handle: TFETensorHandle) -> TF_Output {
+    let cTensorHandle = handle._cTensorHandle
+    let cTensor = TFE_TensorHandleResolve(cTensorHandle, status)
+    checkOk(status)
+    let desc = TF_NewOperation(graph, "Const", newNodeName(base: "Const"))
+    checkOk(status)
+    TF_SetAttrType(desc, "dtype", TFE_TensorHandleDataType(cTensorHandle))
+    TF_SetAttrTensor(desc, "value", cTensor, status)
+    checkOk(status)
+    let constNode = TF_FinishOperation(desc, status)
+    return TF_Output(oper: constNode, index: 0)
+  }
+}
+
+class TFGraphDescription {
+  let graph: CTFGraph = TF_NewGraph()
+  var inputs: [TF_Output] = []
+  var inputValues: [TFETensorHandle] = []
+  var graphNodes: [CTFOperation?] = []
+  var outputs: [LazyTensorOperation] = []
+  var tfOutputs: [TF_Output] = []
+
+  init(_ lazyOp: LazyTensorOperation) {
+    // LazyTensor.onLiveOperations { let _ = formGraphNode($0) }
+    let _ = formGraphNode(lazyOp)
+    graphNodes = graphNodesCache.map { $0.value }
+    tfOutputs = []
+    for output in outputs {
+      let graphNode = formGraphNode(output)
+      tfOutputs += Array((0..<output.outputCount).map {
+          TF_Output(oper: graphNode, index: Int32($0)) })
+    }
+    graphNodesCache.removeAll()
+  }
+
+  deinit {
+    TF_DeleteGraph(graph)
+  }
+
+  private var graphNodesCache: [ObjectIdentifier: CTFOperation?] = [:]
+
+  private func formTFOutput(_ conc: TFETensorHandle, asConst: Bool) -> TF_Output {
+    let id = ObjectIdentifier(conc)
+    if let graphNode = graphNodesCache[id] {
+      return TF_Output(oper: graphNode, index: 0)
+    }
+
+    if asConst {
+      let result = TFGraphFactory.tfConstNode(graph, conc)
+      graphNodesCache[id] = result.oper
+      return result
+    } else {
+      let dtype = TensorDataType(TFE_TensorHandleDataType(conc._cTensorHandle))
+      let dtypeAttr = LazyTensorOperation.Attribute.TensorDataTypeValue(dtype)
+      let placeHolder = TFGraphFactory.graphNode(
+        graph: graph,
+        name: "Placeholder",
+        attrs: ["dtype": dtypeAttr],
+        inputs: [])
+
+      let result = TF_Output(oper: placeHolder!, index: 0)
+      inputs.append(result)
+      inputValues.append(conc)
+      graphNodesCache[id] = placeHolder!
+      return result
+    }
+  }
+
+  private func formTFOutput(_ lazyHandle: LazyTensor) -> TF_Output {
+    switch lazyHandle.handle {
+      case LazyTensor.Handle.conc(let h):
+        return formTFOutput(h, asConst: true)
+      case LazyTensor.Handle.sym(let lazyOp, let index, _): do {
+        if let outputs = lazyOp.outputs {
+          return formTFOutput(outputs[index], asConst: false)
+        } else {
+          return TF_Output(oper: formGraphNode(lazyOp), index: Int32(index))
+        }
+      }
+    }
+  }
+
+  private func tfGraphFactoryInput(
+    _ input: LazyTensorOperation.Input) -> TFGraphFactory.Input {
+    switch input {
+      case LazyTensorOperation.Input.single(let h):
+        return TFGraphFactory.Input.single(formTFOutput(h))
+      case LazyTensorOperation.Input.list(let elements):
+        return TFGraphFactory.Input.list(elements.map { formTFOutput($0) })
+    }
+  }
+
+  private func formGraphNode(_ lazyOp: LazyTensorOperation) -> CTFOperation? {
+    let id = ObjectIdentifier(lazyOp)
+    if let graphNode = graphNodesCache[id] {
+      return graphNode
+    }
+
+    if LazyTensor.isLive(lazyOp) { outputs.append(lazyOp) }
+
+    let inputs = lazyOp.inputs.map { tfGraphFactoryInput($0) }
+    let graphNode = TFGraphFactory.graphNode(
+      graph: graph, name: lazyOp.name, attrs: lazyOp.attrs, inputs: inputs)
+    graphNodesCache[id] = graphNode
+    return graphNode
+  }
+}
+
+extension LazyTensorOperation {
+  func materialized(index: Int) -> TFETensorHandle {
+    return materialized()[index]
+  }
+
+  func materialized() -> [TFETensorHandle] {
+    if let outputs = outputs { return outputs }
+
+    LazyTensorOperation.materializeLiveTensors(self)
+
+    // Our outputs should have been updated by now. Otherwise,
+    // something terrible happened!
+    assert(outputs != nil, "Materialization failed!")
+    return outputs!
+  }
+
+  private static func materializeLiveTensors(_ lazyOp: LazyTensorOperation) {
+    LazyTensorOperation.materializationCallback("materialize")
+    let graphDescription = TFGraphDescription(lazyOp)
+    let function = TFGraphFactory.tfFunction(graphDescription)
+    let allOutputs = TFGraphFactory.execute(function, graphDescription.inputValues)
+
+    // Slice up the outputs to various lazy tensors
+    var start: Int = 0
+    for lazyOp in graphDescription.outputs {
+      let end = start + lazyOp.outputCount
+      lazyOp.outputs = Array(allOutputs[start..<end])
+      start = end
+    }
+    TFGraphFactory.removeFunction(function)
+  }
+}

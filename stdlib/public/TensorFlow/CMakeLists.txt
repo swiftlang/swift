@@ -79,6 +79,10 @@ if (SWIFT_PYTHON_EXISTS)
   list(APPEND TENSORFLOW_DEPENDS_PYTHON SWIFT_MODULE_DEPENDS Python)
 endif()
 
+# Add lazy tensor code
+list(APPEND SOURCES LazyTensorOperation.swift)
+list(APPEND SOURCES LazyTensorTFExecutor.swift)
+
 add_swift_target_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   "${SOURCES}"
   GYB_SOURCES "${GYB_SOURCES}"
