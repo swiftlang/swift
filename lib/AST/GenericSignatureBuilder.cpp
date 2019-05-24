@@ -3730,12 +3730,8 @@ GenericSignatureBuilder::lookupConformance(CanType dependentType,
   // FIXME: When lookupConformance() starts respecting modules, we'll need
   // to do some filtering here.
   ModuleDecl *searchModule = conformedProtocol->getParentModule();
-  auto result = searchModule->lookupConformance(conformingReplacementType,
-                                                conformedProtocol);
-  if (result && getLazyResolver())
-    getLazyResolver()->markConformanceUsed(*result, searchModule);
-
-  return result;
+  return searchModule->lookupConformance(conformingReplacementType,
+                                         conformedProtocol);
 }
 
 LazyResolver *GenericSignatureBuilder::getLazyResolver() const { 
