@@ -864,12 +864,12 @@ private func _graphInternal<State : _TensorArrayProtocolEnhanced,
     debugLog("Getting input state tensor handles.")
     let inputStateTensorHandles =  oldState.cTensorHandles
     var inputTensors = inputStateTensorHandles.map {
-      _TFCCreateTensorHandleFromC($0)
+      TFETensorHandle(_owning: $0)
     }
     debugLog("Getting input data tensor handles.")
     let inputDataTensorHandles =  data.cTensorHandles
     inputTensors.append(contentsOf: inputDataTensorHandles.map {
-      _TFCCreateTensorHandleFromC($0)
+      TFETensorHandle(_owning: $0)
     })
 
     debugLog("Executing trace graph function.")
@@ -971,7 +971,7 @@ public func _graph<In : TensorGroup, Out : TensorGroup>(
     debugLog("Getting input state tensor handles.")
     let inputStateTensorHandles =  input.cTensorHandles
     let inputTensors = inputStateTensorHandles.map {
-      _TFCCreateTensorHandleFromC($0)
+      TFETensorHandle(_owning: $0)
     }
     debugLog("Executing trace graph function.")
     let returnValues = traceContext.execute(
@@ -1181,32 +1181,6 @@ func _TFCOpAddInputFromAnyTensors(
     let handle = tensor._rawTensorHandle
     TFE_OpAddInput(op, handle, status)
     checkOk(status)
-  }
-}
-
-@inlinable
-@_silgen_name("_swift_tfc_CreateTensorHandleFromC")
-public func _TFCCreateTensorHandleFromC(
-  _ cHandle: CTensorHandle
-) -> _AnyTensorHandle {
-  let dtype = TFE_TensorHandleDataType(cHandle)
-  switch dtype {
-  case TF_BFLOAT16: return TensorHandle<BFloat16>(_owning: cHandle)
-  case TF_UINT8: return TensorHandle<UInt8>(_owning: cHandle)
-  case TF_INT8: return TensorHandle<Int8>(_owning: cHandle)
-  case TF_UINT16: return TensorHandle<UInt16>(_owning: cHandle)
-  case TF_INT16: return TensorHandle<Int16>(_owning: cHandle)
-  case TF_UINT32: return TensorHandle<UInt32>(_owning: cHandle)
-  case TF_INT32: return TensorHandle<Int32>(_owning: cHandle)
-  case TF_UINT64: return TensorHandle<UInt64>(_owning: cHandle)
-  case TF_INT64: return TensorHandle<Int64>(_owning: cHandle)
-  case TF_FLOAT: return TensorHandle<Float>(_owning: cHandle)
-  case TF_DOUBLE: return TensorHandle<Double>(_owning: cHandle)
-  case TF_BOOL: return TensorHandle<Bool>(_owning: cHandle)
-  case TF_STRING: return TensorHandle<String>(_owning: cHandle)
-  case TF_RESOURCE: return ResourceHandle(owning: cHandle)
-  case TF_VARIANT: return VariantHandle(owning: cHandle)
-  default: fatalError("Unsupported dtype \(dtype)")
   }
 }
 
