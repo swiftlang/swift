@@ -751,6 +751,14 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
   Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
   if (type->isEqual(selfTy)) {
     type = conformance->getType();
+
+    // e.g. `extension P where Self == C { func foo() { ... } }`
+    // and `C` doesn't actually conform to `P`.
+    if (type->isEqual(missingType)) {
+      requirementKind = RequirementKind::Conformance;
+      missingType = proto->getDeclaredType();
+    }
+
     if (auto agt = type->getAs<AnyGenericType>())
       type = agt->getDecl()->getDeclaredInterfaceType();
     return missingRequirementMatch(type);
