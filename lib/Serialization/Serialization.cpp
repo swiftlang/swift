@@ -3936,13 +3936,17 @@ public:
         S.addSubstitutionMapRef(alias->getSubstitutionMap()));
   }
 
+  template <typename Layout>
+  void serializeSimpleWrapper(Type wrappedTy) {
+    unsigned abbrCode = S.DeclTypeAbbrCodes[Layout::Code];
+    Layout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                       S.addTypeRef(wrappedTy));
+  }
+
   void visitParenType(const ParenType *parenTy) {
     using namespace decls_block;
     assert(parenTy->getParameterFlags().isNone());
-
-    unsigned abbrCode = S.DeclTypeAbbrCodes[ParenTypeLayout::Code];
-    ParenTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                S.addTypeRef(parenTy->getUnderlyingType()));
+    serializeSimpleWrapper<ParenTypeLayout>(parenTy->getUnderlyingType());
   }
 
   void visitTupleType(const TupleType *tupleTy) {
@@ -4014,10 +4018,8 @@ public:
 
   void visitOpenedArchetypeType(const OpenedArchetypeType *archetypeTy) {
     using namespace decls_block;
-    unsigned abbrCode = S.DeclTypeAbbrCodes[OpenedArchetypeTypeLayout::Code];
-    OpenedArchetypeTypeLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode,
-        S.addTypeRef(archetypeTy->getOpenedExistentialType()));
+    serializeSimpleWrapper<OpenedArchetypeTypeLayout>(
+        archetypeTy->getOpenedExistentialType());
   }
 
   void
@@ -4113,10 +4115,8 @@ public:
 
   void visitSILBlockStorageType(const SILBlockStorageType *storageTy) {
     using namespace decls_block;
-    unsigned abbrCode = S.DeclTypeAbbrCodes[SILBlockStorageTypeLayout::Code];
-    SILBlockStorageTypeLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode,
-        S.addTypeRef(storageTy->getCaptureType()));
+    serializeSimpleWrapper<SILBlockStorageTypeLayout>(
+        storageTy->getCaptureType());
   }
 
   void visitSILBoxType(const SILBoxType *boxTy) {
@@ -4182,10 +4182,7 @@ public:
 
   void visitArraySliceType(const ArraySliceType *sliceTy) {
     using namespace decls_block;
-    Type base = sliceTy->getBaseType();
-    unsigned abbrCode = S.DeclTypeAbbrCodes[ArraySliceTypeLayout::Code];
-    ArraySliceTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                     S.addTypeRef(base));
+    serializeSimpleWrapper<ArraySliceTypeLayout>(sliceTy->getBaseType());
   }
 
   void visitDictionaryType(const DictionaryType *dictTy) {
@@ -4198,10 +4195,7 @@ public:
 
   void visitOptionalType(const OptionalType *optionalTy) {
     using namespace decls_block;
-    Type base = optionalTy->getBaseType();
-    unsigned abbrCode = S.DeclTypeAbbrCodes[OptionalTypeLayout::Code];
-    OptionalTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                   S.addTypeRef(base));
+    serializeSimpleWrapper<OptionalTypeLayout>(optionalTy->getBaseType());
   }
 
   void
