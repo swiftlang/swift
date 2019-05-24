@@ -32,15 +32,28 @@ public enum DeviceKind {
 ///   - index: The device to run the ops on.
 ///   - body: A closure whose TensorFlow operations are to be executed on the
 ///     specified kind of device.
-// Use `@inline(never)` to ensure correctness in scoped device placement. See
-// https://bugs.swift.org/browse/SR-9535 for more context.
-@inline(never)
 public func withDevice<R>(_ kind: DeviceKind, _ index: UInt = 0,
                           perform body: () throws -> R) rethrows -> R {
-  _ThreadLocalState.value.pushDevice((kind, index))
-  let result = try body()
-  _ThreadLocalState.value.popDevice()
-  return result
+  return try _ExecutionContext.global.withDevice(kind, index, perform: body)
+}
+
+/// Executes a closure, making TensorFlow operations run on a device with
+/// a specific name.
+///
+/// - Parameters:
+///   - name: Device name.
+///   - body: A closure whose TensorFlow operations are to be executed on the
+///     specified kind of device.
+///
+/// Some examples of device names:
+///   - "/device:CPU:0": The CPU of your machine.
+///   - "/GPU:0": Short-hand notation for the first GPU of your machine that
+///     is visible to TensorFlow
+///   - "/job:localhost/replica:0/task:0/device:GPU:1": Fully qualified name of
+///     the second GPU of your machine that is visible to TensorFlow.
+public func withDevice<R>(named name: String,
+                          perform body: () throws -> R) rethrows -> R {
+  return try _ExecutionContext.global.withDevice(named: name, perform: body)
 }
 
 /// Executes a closure, allowing TensorFlow to place TensorFlow operations on
@@ -49,10 +62,6 @@ public func withDevice<R>(_ kind: DeviceKind, _ index: UInt = 0,
 /// - Parameters:
 ///   - body: A closure whose TensorFlow operations are to be executed on the
 ///     specified kind of device.
-@inline(never)
 public func withDefaultDevice<R>(perform body: () throws -> R) rethrows -> R {
-  _ThreadLocalState.value.pushDevice(nil)
-  let result = try body()
-  _ThreadLocalState.value.popDevice()
-  return result
+  return try _ExecutionContext.global.withDefaultDevice(perform: body)
 }

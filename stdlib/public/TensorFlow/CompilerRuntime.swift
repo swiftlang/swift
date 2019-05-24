@@ -550,16 +550,10 @@ public final class _ExecutionContext {
   /// Global context storing all available devices, loaded functions, etc.
   public static let global: _ExecutionContext = _ExecutionContext()
 
-  // TODO: When we use remote session, we need to set cpu device to a local
-  // device.  There is no C API yet to find the local device. So, we are
-  // hard-coding the value for now.
-  fileprivate let cpuDeviceNamePrefix = "/job:localhost/replica:0/task:0/device:CPU:"
-
-  /// Only set when there is some usable GPU.
-  fileprivate let gpuDeviceNamePrefix: String?
-
-  /// Only set when there is some usable GPU.
-  fileprivate let tpuDeviceNamePrefix: String?
+  /// List of devices available to this execution context.
+  /// Devices are represented by their names in TensorFlow notation.
+  /// See documentation for `withDevice(named:perform:)` to learn about device names.
+  private var deviceNames: [String] = []
 
   /// The buffer storing a serialized TensorFlow config proto.
   public let tensorFlowConfig: UnsafeMutablePointer<TF_Buffer>
@@ -626,18 +620,12 @@ public final class _ExecutionContext {
       TF_DeleteBuffer(serverDef)
     }
 
-    // Initialize GPU device.
     let devices = TFE_ContextListDevices(eagerContext, status)
     checkOk(status)
     defer { TF_DeleteDeviceList(devices!) }
 
-    // Sanity check and gather/log device info. When `gpuCount` > 0, set
-    // `self.gpuDeviceNamePrefix`. Likewise with `tpuCount`.
     let deviceCount = TF_DeviceListCount(devices!)
     debugLog("There are \(deviceCount) devices.")
-    var foundCPU = false
-    var gpuCount = 0
-    var tpuCount = 0
     for deviceId in 0..<deviceCount {
       let cDeviceName = TF_DeviceListName(devices, deviceId, status)
       checkOk(status)
@@ -648,37 +636,9 @@ public final class _ExecutionContext {
       debugLog(
         "Device \(deviceId) has type \(deviceType) and name \(deviceName)."
       )
-      if deviceType == "CPU", deviceName.starts(with: cpuDeviceNamePrefix) {
-        foundCPU = true
-      }
-      if deviceType == "GPU" {
-        gpuCount += 1
-      }
-      if deviceType == "TPU" {
-        tpuCount += 1
-      }
-    }
-    guard foundCPU else {
-      fatalError("CPU should always be an available device.")
-    }
-    // We ignore the number of GPUs for now. It might be useful to cross check
-    // that against the number of GPUs that user intends to use (e.g. via the
-    // `withDevice` syntax).
-    if gpuCount > 0 {
-      self.gpuDeviceNamePrefix = "/job:localhost/replica:0/task:0/device:GPU:"
-    } else {
-      self.gpuDeviceNamePrefix = nil
+      deviceNames.append(deviceName)
     }
 
-    if tpuCount > 0 {
-      // According to server def generated when you set
-      // SWIFT_TENSORFLOW_SERVER_ADDRESS, the TPUs will all be on task 1.
-      self.tpuDeviceNamePrefix = "/job:localhost/replica:0/task:1/device:TPU:"
-    } else {
-      self.tpuDeviceNamePrefix = nil
-    }
-
-    // Initialize the mutex.
     pthread_mutex_init(&mutex, nil)
   }
 
@@ -1008,24 +968,51 @@ public func _tffunc<In : TensorGroup, Out : TensorGroup>(
   return traceContext.specializeTFFunction(with: [])
 }
 
-/// Returns a valid TF device string such as
-/// "/job:localhost/replica:0/task:0/device:CPU:0", which corresponds to the
-/// closest enclosing withDevice() construct.
-/// A return value of nil indicates the absence of withDevice().
 internal extension _ExecutionContext {
-  @usableFromInline
+  /// Returns a valid TensorFlow device name, which corresponds to the
+  /// closest enclosing call to one of the overloads of withDevice.
+  /// A return value of `nil` indicates the absence of a withDevice call on
+  /// the call stack or the presence of an immediately enclosing
+  /// `withDefaultDevice(perform)` call.
   var currentDeviceName: String? {
-    if let (kind, index) = _ThreadLocalState.value._currentDevice {
-      switch kind {
-      case .cpu:
-        return "\(cpuDeviceNamePrefix)\(index)"
-      case .gpu:
-        return "\(gpuDeviceNamePrefix!)\(index)"
-      case .tpu:
-        return "\(tpuDeviceNamePrefix!)\(index)"
-      }
+    return _ThreadLocalState.local._currentDevice
+  }
+
+  /// See documentation for the top-level `withDevice(_:_:perform)`.
+  func withDevice<R>(_ kind: DeviceKind, _ index: UInt = 0,
+                     perform body: () throws -> R) rethrows -> R {
+    let name: String
+    switch kind {
+    case .cpu:
+      name = "/job:localhost/replica:0/task:0/device:CPU:\(index)"
+    case .gpu:
+      name = "/job:localhost/replica:0/task:0/device:GPU:\(index)"
+    case .tpu:
+      // According to server def generated when you set
+      // SWIFT_TENSORFLOW_SERVER_ADDRESS, the TPUs will all be on task 1.
+      name = "/job:localhost/replica:0/task:1/device:TPU:\(index)"
     }
-    return nil
+    return try withDevice(named: name, perform: body)
+  }
+
+  /// See documentation for the top-level `withDevice(named:perform)`.
+  func withDevice<R>(named name: String,
+                     perform body: () throws -> R) rethrows -> R {
+    guard deviceNames.contains(name) else {
+      fatalError("Device \(name) not found")
+    }
+    _ThreadLocalState.local.pushDevice(name)
+    let result = try body()
+    _ThreadLocalState.local.popDevice()
+    return result
+  }
+
+  /// See documentation for the top-level `withDefaultDevice(perform)`.
+  func withDefaultDevice<R>(perform body: () throws -> R) rethrows -> R {
+    _ThreadLocalState.local.pushDevice(nil)
+    let result = try body()
+    _ThreadLocalState.local.popDevice()
+    return result
   }
 }
 
@@ -1231,9 +1218,16 @@ fileprivate func setAttrShapeList(
   }
 }
 
+/// Stack of devices that models nested calls to withDevice/withDefaultDevice.
+/// Devices are represented by their names in TensorFlow notation.
+/// See documentation for `withDevice(named:perform:)` to learn about device names.
+///
+/// All TensorFlow operations will be put on the topmost device on the stack.
+/// When the stack is empty or the topmost device is `nil`, that allows
+/// TensorFlow to place operations on any device that it sees fit.
 @usableFromInline
 class _ThreadLocalState {
-  var deviceScopes: [(kind: DeviceKind, index: UInt)?] = []
+  var deviceScopes: [String?] = []
 
   private static let key: pthread_key_t = {
     var key = pthread_key_t()
@@ -1247,12 +1241,12 @@ class _ThreadLocalState {
     return key
   }()
 
-  var _currentDevice: (DeviceKind, UInt)? {
+  var _currentDevice: String? {
     return deviceScopes.last ?? nil
   }
 
   @usableFromInline
-  func pushDevice(_ device: (DeviceKind, UInt)?) {
+  func pushDevice(_ device: String?) {
     deviceScopes.append(device)
   }
 
@@ -1262,7 +1256,7 @@ class _ThreadLocalState {
   }
 
   @usableFromInline
-  static var value: _ThreadLocalState {
+  static var local: _ThreadLocalState {
     if let state = pthread_getspecific(key) {
       return Unmanaged.fromOpaque(state).takeUnretainedValue()
     }
