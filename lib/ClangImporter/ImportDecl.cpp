@@ -7717,29 +7717,6 @@ static void finishTypeWitnesses(
   }
 }
 
-/// Make sure any inherited conformances also get completed, if necessary.
-static void finishInheritedConformances(
-    NormalProtocolConformance *conformance) {
-  auto *proto = conformance->getProtocol();
-
-  SmallVector<ProtocolDecl *, 2> inheritedProtos;
-  for (auto *inherited : proto->getInheritedProtocols())
-    inheritedProtos.push_back(inherited);
-
-  // Sort for deterministic import.
-  ProtocolType::canonicalizeProtocols(inheritedProtos);
-
-  // Schedule any that aren't complete.
-  for (auto *inherited : inheritedProtos) {
-    ModuleDecl *M = conformance->getDeclContext()->getParentModule();
-    auto inheritedConformance = M->lookupConformance(conformance->getType(),
-                                                     inherited);
-    assert(inheritedConformance && inheritedConformance->isConcrete() &&
-           "inherited conformance not found");
-    (void)inheritedConformance;
-  }
-}
-
 /// A stripped-down version of Type::subst that only works on non-generic
 /// associated types.
 ///
@@ -7837,7 +7814,6 @@ void ClangImporter::Implementation::finishNormalConformance(
                                     conformance);
 
   finishTypeWitnesses(conformance);
-  finishInheritedConformances(conformance);
   finishSignatureConformances(conformance);
 
   // Imported conformances to @objc protocols also require additional
