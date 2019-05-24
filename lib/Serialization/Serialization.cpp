@@ -2848,9 +2848,8 @@ public:
     DeclVisitor<DeclSerializer>::visit(const_cast<Decl *>(D));
   }
 
-  void visitDecl(const Decl *) {
-    llvm_unreachable("I guess we forgot a Decl kind?");
-  }
+  /// If this gets referenced, we forgot to handle a decl.
+  void visitDecl(const Decl *) = delete;
 
   void visitExtensionDecl(const ExtensionDecl *extension) {
     using namespace decls_block;
