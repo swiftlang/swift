@@ -3907,8 +3907,8 @@ private:
   /// Post-order info for the original function.
   PostOrderFunctionInfo *postOrderInfo = nullptr;
 
-  /// Mapping from original values to their corresponding adjoint values.
-  // DenseMap<SILValue, AdjointValue> valueMap;
+  /// Mapping from original basic blocks to a mapping from original values to
+  /// their corresponding adjoint values.
   DenseMap<SILBasicBlock *, DenseMap<SILValue, AdjointValue>> valueMap;
 
   /// Mapping from original buffers to their corresponding adjoint buffers.
@@ -3922,10 +3922,10 @@ private:
   DenseMap<SILBasicBlock *, SILArgument *> adjointPullbackStructArguments;
 
   /// Mapping from original basic blocks and successor basic blocks to
-  /// corresponding adjoint forwarding basic blocks. Forwarding basic blocks
+  /// corresponding adjoint trampoline basic blocks. Trampoline basic blocks
   /// take additional arguments in addition to the predecessor enum argument.
   DenseMap<std::pair<SILBasicBlock *, SILBasicBlock *>, SILBasicBlock *>
-      adjointForwardingBBMap;
+      adjointTrampolineBBMap;
 
   /// Mapping from original basic blocks to local stack allocations.
   /// Local allocations should be freed in
@@ -4282,9 +4282,9 @@ private:
     return adjointBBMap.lookup(originalBlock);
   }
 
-  SILBasicBlock *getAdjointForwardingBlock(
+  SILBasicBlock *getAdjointTrampolineBlock(
       SILBasicBlock *originalBlock, SILBasicBlock *successorBlock) {
-    return adjointForwardingBBMap.lookup({originalBlock, successorBlock});
+    return adjointTrampolineBBMap.lookup({originalBlock, successorBlock});
   }
 
   //--------------------------------------------------------------------------//
@@ -4364,15 +4364,15 @@ public:
       for (auto activeValue : activeBBValues)
         adjointBB->createPhiArgument(
             remapType(activeValue->getType()), ValueOwnershipKind::Guaranteed);
-      // - Create adjoint forwarding blocks for each successor block of the
-      //   original block. Adjoint forwarding blocks only have a pullback
+      // - Create adjoint trampoline blocks for each successor block of the
+      //   original block. Adjoint trampoline blocks only have a pullback
       //   struct argument, and branch from the adjoint successor block to the
-      //   adjoint original block, forwarding adjoint values of active values.
+      //   adjoint original block, trampoline adjoint values of active values.
       for (auto *succBB : origBB->getSuccessorBlocks()) {
-        auto *adjointForwardingBB = adjoint.createBasicBlockBefore(adjointBB);
-        adjointForwardingBBMap.insert(
-            {{origBB, succBB}, adjointForwardingBB});
-        adjointForwardingBB->createPhiArgument(
+        auto *adjointTrampolineBB = adjoint.createBasicBlockBefore(adjointBB);
+        adjointTrampolineBBMap.insert(
+            {{origBB, succBB}, adjointTrampolineBB});
+        adjointTrampolineBB->createPhiArgument(
             pbStructLoweredType, ValueOwnershipKind::Guaranteed);
       }
     }
@@ -4497,24 +4497,24 @@ public:
       SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 4>
           adjointSuccessorCases;
       for (auto *predBB : bb->getPredecessorBlocks()) {
-        // Get the adjoint block and optional adjoint forwarding block of the
+        // Get the adjoint block and optional adjoint trampoline block of the
         // predecessor block.
         auto *adjointBB = getAdjointBlock(predBB);
-        auto *adjointForwardingBB = getAdjointForwardingBlock(predBB, bb);
+        auto *adjointTrampolineBB = getAdjointTrampolineBlock(predBB, bb);
         SILBasicBlock *adjointSuccBB = nullptr;
         // If the predecesssor block does not have a corresponding adjoint
-        // forwarding block, then the adjoint successor is the adjoint block.
-        if (!adjointForwardingBB) {
+        // trampoline block, then the adjoint successor is the adjoint block.
+        if (!adjointTrampolineBB) {
           adjointSuccBB = adjointBB;
         }
-        // Otherwise, the adjoint successor is the adjoint forwarding block,
+        // Otherwise, the adjoint successor is the adjoint trampoline block,
         // which branches to the adjoint block and propagates adjoint values of
         // active values.
         else {
-          adjointSuccBB = adjointForwardingBB;
-          adjointSuccBB = getAdjointForwardingBlock(predBB, bb);
+          adjointSuccBB = adjointTrampolineBB;
+          adjointSuccBB = getAdjointTrampolineBlock(predBB, bb);
           assert(adjointSuccBB && adjointSuccBB->getNumArguments() == 1);
-          SILBuilder adjointForwardingBBBuilder(adjointSuccBB);
+          SILBuilder adjointTrampolineBBBuilder(adjointSuccBB);
           // Propagate pullback struct argument.
           SmallVector<SILValue, 8> arguments;
           arguments.push_back(adjointSuccBB->getArguments().front());
@@ -4541,7 +4541,7 @@ public:
               arguments.push_back(activeValueAdjBuf.getValue());
             }
           }
-          adjointForwardingBBBuilder.createBranch(adjLoc, adjointBB, arguments);
+          adjointTrampolineBBBuilder.createBranch(adjLoc, adjointBB, arguments);
         }
         auto *enumEltDecl =
             getPullbackInfo().lookUpPredecessorEnumElement(predBB, bb);
