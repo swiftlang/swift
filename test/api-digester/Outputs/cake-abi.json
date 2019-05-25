@@ -1329,6 +1329,7 @@
       "declAttributes": [
         "FixedLayout"
       ],
+      "isExternal": true,
       "conformances": [
         {
           "kind": "Conformance",

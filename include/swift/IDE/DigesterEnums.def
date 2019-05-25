@@ -135,6 +135,7 @@ KEY_BOOL(HasDidset, hasDidset)
 KEY_BOOL(HasWillset, hasWillset)
 KEY_BOOL(ReqNewWitnessTableEntry, reqNewWitnessTableEntry)
 KEY_BOOL(IsABIPlaceholder, isABIPlaceholder)
+KEY_BOOL(IsExternal, isExternal)
 
 KEY(kind)
 
