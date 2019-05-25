@@ -1126,7 +1126,7 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
         FD = dyn_cast<FuncDecl>(WMI->getMember().getDecl());
       
       // If this is a direct/devirt method application, check the location info.
-      if (auto *Fn = Apply.getReferencedFunction()) {
+      if (auto *Fn = Apply.getReferencedFunctionOrNull()) {
         if (Fn->hasLocation()) {
           auto SILLoc = Fn->getLocation();
           FD = SILLoc.getAsASTNode<FuncDecl>();
@@ -1404,7 +1404,7 @@ findMethodForStoreInitializationOfTemporary(const DIMemoryObjectInfo &TheMemory,
 
   // Otherwise, try to get the func decl from the referenced function if we can
   // find one.
-  auto *Fn = TheApply->getReferencedFunction();
+  auto *Fn = TheApply->getReferencedFunctionOrNull();
   if (!Fn->hasLocation())
     return nullptr;
 
@@ -1542,7 +1542,7 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
       Method = dyn_cast<FuncDecl>(OMI->getMember().getDecl());
 
     // If this is a direct/devirt method application, check the location info.
-    if (auto *Fn = cast<ApplyInst>(Inst)->getReferencedFunction()) {
+    if (auto *Fn = cast<ApplyInst>(Inst)->getReferencedFunctionOrNull()) {
       if (Fn->hasLocation())
         Method = Fn->getLocation().getAsASTNode<FuncDecl>();
     }

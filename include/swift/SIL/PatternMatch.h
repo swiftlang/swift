@@ -518,7 +518,7 @@ struct Callee_match<SILFunction &> {
     if (!AI)
       return false;
 
-    return AI->getReferencedFunction() == &Fun;
+    return AI->getReferencedFunctionOrNull() == &Fun;
   }
 };
 

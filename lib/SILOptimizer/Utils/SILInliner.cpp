@@ -49,7 +49,7 @@ static bool canInlineBeginApply(BeginApplyInst *BA) {
   // potentially after the resumption site when there are un-mergeable
   // values alive across it.
   bool hasYield = false;
-  for (auto &B : BA->getReferencedFunction()->getBlocks()) {
+  for (auto &B : BA->getReferencedFunctionOrNull()->getBlocks()) {
     if (isa<YieldInst>(B.getTerminator())) {
       if (hasYield) return false;
       hasYield = true;

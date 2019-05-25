@@ -143,8 +143,21 @@ public:
 
   /// Return the referenced function if the callee is a function_ref
   /// instruction.
-  SILFunction *getReferencedFunction() const {
-    FOREACH_IMPL_RETURN(getReferencedFunction());
+  SILFunction *getReferencedFunctionOrNull() const {
+    FOREACH_IMPL_RETURN(getReferencedFunctionOrNull());
+  }
+
+  /// Return the referenced function if the callee is a function_ref like
+  /// instruction.
+  ///
+  /// WARNING: This not necessarily the function that will be called at runtime.
+  /// If the callee is a (prev_)dynamic_function_ref the actual function called
+  /// might be different because it could be dynamically replaced at runtime.
+  ///
+  /// If the client of this API wants to look at the content of the returned SIL
+  /// function it should call getReferencedFunctionOrNull() instead.
+  SILFunction *getInitiallyReferencedFunction() const {
+    FOREACH_IMPL_RETURN(getInitiallyReferencedFunction());
   }
 
   /// Should we optimize this call.

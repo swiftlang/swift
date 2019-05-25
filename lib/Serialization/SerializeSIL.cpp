@@ -1310,7 +1310,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // Use SILOneOperandLayout to specify the function type and the function
     // name (IdentifierID).
     const FunctionRefInst *FRI = cast<FunctionRefInst>(&SI);
-    SILFunction *ReferencedFunction = FRI->getReferencedFunction();
+    SILFunction *ReferencedFunction = FRI->getInitiallyReferencedFunction();
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
     SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
         (unsigned)SI.getKind(), 0,
@@ -1324,7 +1324,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // Use SILOneOperandLayout to specify the function type and the function
     // name (IdentifierID).
     const auto *FRI = cast<DynamicFunctionRefInst>(&SI);
-    SILFunction *ReferencedFunction = FRI->getReferencedFunction();
+    SILFunction *ReferencedFunction = FRI->getInitiallyReferencedFunction();
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
     SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
         (unsigned)SI.getKind(), 0,
@@ -1338,7 +1338,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // Use SILOneOperandLayout to specify the function type and the function
     // name (IdentifierID).
     const auto *FRI = cast<PreviousDynamicFunctionRefInst>(&SI);
-    SILFunction *ReferencedFunction = FRI->getReferencedFunction();
+    SILFunction *ReferencedFunction = FRI->getInitiallyReferencedFunction();
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
     SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
         (unsigned)SI.getKind(), 0,

@@ -355,7 +355,7 @@ SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
   if (PAI->getNumArguments() != 1)
     return SILValue();
 
-  auto *Fun = PAI->getReferencedFunction();
+  auto *Fun = PAI->getReferencedFunctionOrNull();
   if (!Fun)
     return SILValue();
 

@@ -1211,7 +1211,7 @@ static bool isSuperInitUse(SILInstruction *User) {
     // super.init call as a hack to allow us to write testcases.
     auto *AI = dyn_cast<ApplyInst>(User);
     if (AI && AI->getLoc().isSILFile())
-      if (auto *Fn = AI->getReferencedFunction())
+      if (auto *Fn = AI->getReferencedFunctionOrNull())
         if (Fn->getName() == "superinit")
           return true;
     return false;
@@ -1293,7 +1293,7 @@ static bool isSelfInitUse(SILInstruction *I) {
   // self.init call as a hack to allow us to write testcases.
   if (I->getLoc().isSILFile()) {
     if (auto *AI = dyn_cast<ApplyInst>(I))
-      if (auto *Fn = AI->getReferencedFunction())
+      if (auto *Fn = AI->getReferencedFunctionOrNull())
         if (Fn->getName().startswith("selfinit"))
           return true;
 

@@ -31,7 +31,7 @@ AccessedStorage::Kind AccessedStorage::classify(SILValue base) {
     return Global;
   case ValueKind::ApplyInst: {
     FullApplySite apply(cast<ApplyInst>(base));
-    if (auto *funcRef = apply.getReferencedFunction()) {
+    if (auto *funcRef = apply.getReferencedFunctionOrNull()) {
       if (getVariableOfGlobalInit(funcRef))
         return Global;
     }
@@ -88,7 +88,7 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
       global = GAI->getReferencedGlobal();
     else {
       FullApplySite apply(cast<ApplyInst>(base));
-      auto *funcRef = apply.getReferencedFunction();
+      auto *funcRef = apply.getReferencedFunctionOrNull();
       assert(funcRef);
       global = getVariableOfGlobalInit(funcRef);
       assert(global);
@@ -177,7 +177,7 @@ void AccessedStorage::dump() const { print(llvm::dbgs()); }
 // module.
 static bool isExternalGlobalAddressor(ApplyInst *AI) {
   FullApplySite apply(AI);
-  auto *funcRef = apply.getReferencedFunction();
+  auto *funcRef = apply.getReferencedFunctionOrNull();
   if (!funcRef)
     return false;
   
