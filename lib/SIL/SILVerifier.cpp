@@ -1642,7 +1642,7 @@ public:
     // Note: in SingleFunction mode, we relax some of these checks because
     // we may not have linked everything yet.
 
-    SILFunction *RefF = FRI->getReferencedFunction();
+    SILFunction *RefF = FRI->getInitiallyReferencedFunction();
 
     if (isa<FunctionRefInst>(FRI))
       require(

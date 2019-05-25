@@ -1844,9 +1844,22 @@ public:
   bool isCalleeDynamicallyReplaceable() const;
 
   /// Gets the referenced function if the callee is a function_ref instruction.
-  SILFunction *getReferencedFunction() const {
+  /// Returns null if the callee is dynamic or a (prev_)dynamic_function_ref
+  /// instruction.
+  SILFunction *getReferencedFunctionOrNull() const {
     if (auto *FRI = dyn_cast<FunctionRefBaseInst>(getCallee()))
-      return FRI->getReferencedFunction();
+      return FRI->getReferencedFunctionOrNull();
+    return nullptr;
+  }
+
+  /// Return the referenced function if the callee is a function_ref like
+  /// instruction.
+  /// WARNING: This not necessarily the function that will be called at runtime.
+  /// If this is a (prev_)dynamic_function_ref the actuall function called might
+  /// be different.
+  SILFunction *getInitiallyReferencedFunction() const {
+    if (auto *FRI = dyn_cast<FunctionRefBaseInst>(getCallee()))
+      return FRI->getInitiallyReferencedFunction();
     return nullptr;
   }
 
@@ -2294,8 +2307,23 @@ protected:
 public:
   ~FunctionRefBaseInst();
 
+  /// Return the referenced function if this is a function_ref instruction and
+  /// therefore a client can rely on the dynamically called function being equal
+  /// to the returned value and null otherwise.
+  SILFunction *getReferencedFunctionOrNull() const {
+    auto kind = getKind();
+    if (kind == SILInstructionKind::FunctionRefInst)
+      return f;
+    assert(kind == SILInstructionKind::DynamicFunctionRefInst ||
+           kind == SILInstructionKind::PreviousDynamicFunctionRefInst);
+    return nullptr;
+  }
+
   /// Return the referenced function.
-  SILFunction *getReferencedFunction() const { return f; }
+  /// WARNING: This not necessarily the function that will be called at runtime.
+  /// If this is a (prev_)dynamic_function_ref the actuall function called might
+  /// be different.
+  SILFunction *getInitiallyReferencedFunction() const { return f; }
 
   void dropReferencedFunction();
 
@@ -7805,7 +7833,7 @@ SILFunction *ApplyInstBase<Impl, Base, false>::getCalleeFunction() const {
     // previous_dynamic_function_ref as the target of those functions is not
     // statically known.
     if (auto *FRI = dyn_cast<FunctionRefInst>(Callee))
-      return FRI->getReferencedFunction();
+      return FRI->getReferencedFunctionOrNull();
 
     if (auto *PAI = dyn_cast<PartialApplyInst>(Callee)) {
       Callee = PAI->getCalleeOrigin();
