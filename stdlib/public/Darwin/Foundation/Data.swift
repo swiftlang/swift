@@ -688,7 +688,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 return Int(length)
             }
             set(newValue) {
-                precondition(newValue <= MemoryLayout<Buffer>.size)
+                assert(newValue <= MemoryLayout<Buffer>.size)
                 length = UInt8(newValue)
             }
         }
@@ -777,7 +777,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             assert(subrange.upperBound <= MemoryLayout<Buffer>.size)
             assert(count - (subrange.upperBound - subrange.lowerBound) + replacementLength <= MemoryLayout<Buffer>.size)
             precondition(subrange.lowerBound <= length, "index \(subrange.lowerBound) is out of bounds of 0..<\(length)")
-            precondition(subrange.upperBound <= length, "index \(subrange.lowerBound) is out of bounds of 0..<\(length)")
+            precondition(subrange.upperBound <= length, "index \(subrange.upperBound) is out of bounds of 0..<\(length)")
             let currentLength = count
             let resultingLength = currentLength - (subrange.upperBound - subrange.lowerBound) + replacementLength
             let shift = resultingLength - currentLength
@@ -2194,7 +2194,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
     @inlinable // This is @inlinable as trivially forwarding.
     internal func _copyBytesHelper(to pointer: UnsafeMutableRawPointer, from range: Range<Int>) {
-        if range.upperBound - range.lowerBound == 0 { return }
+        if range.isEmpty { return }
         _representation.copyBytes(to: pointer, from: range)
     }
     
