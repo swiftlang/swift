@@ -276,11 +276,11 @@ private:
     return {const_cast<BitWord *>(getBitWordsData()), getNumBitWords()};
   }
 
-  explicit AutoDiffIndexSubset(unsigned capacity, ArrayRef<unsigned> indices)
-      : capacity(capacity),
+  explicit AutoDiffIndexSubset(const SmallBitVector &indices)
+      : capacity((unsigned)indices.size()),
         numBitWords(getNumBitWordsNeededForCapacity(capacity)) {
     std::uninitialized_fill_n(getBitWordsData(), numBitWords, 0);
-    for (auto i : indices) {
+    for (auto i : indices.set_bits()) {
       unsigned bitWordIndex, offset;
       std::tie(bitWordIndex, offset) = getBitWordIndexAndOffset(i);
       getBitWord(bitWordIndex) |= (1 << offset);
@@ -294,22 +294,31 @@ public:
 
   // Defined in ASTContext.h.
   static AutoDiffIndexSubset *get(ASTContext &ctx,
+                                  const SmallBitVector &indices);
+
+  static AutoDiffIndexSubset *get(ASTContext &ctx,
                                   unsigned capacity,
-                                  ArrayRef<unsigned> indices);
+                                  ArrayRef<unsigned> indices) {
+    SmallBitVector indicesBitVec(capacity, false);
+    for (auto index : indices)
+      indicesBitVec.set(index);
+    return AutoDiffIndexSubset::get(ctx, indicesBitVec);
+  }
 
   static AutoDiffIndexSubset *getDefault(ASTContext &ctx,
                                          unsigned capacity,
                                          bool includeAll = false) {
-    if (includeAll)
-      return getFromRange(ctx, capacity, IntRange<>(capacity));
-    return get(ctx, capacity, {});
+    return get(ctx, SmallBitVector(capacity, includeAll));
   }
 
   static AutoDiffIndexSubset *getFromRange(ASTContext &ctx,
                                            unsigned capacity,
-                                           IntRange<> range) {
-    return get(ctx, capacity,
-               SmallVector<unsigned, 8>(range.begin(), range.end()));
+                                           unsigned start, unsigned end) {
+    assert(start < capacity);
+    assert(end <= capacity);
+    SmallBitVector bitVec(capacity);
+    bitVec.set(start, end);
+    return get(ctx, bitVec);
   }
 
   unsigned getNumBitWords() const {
