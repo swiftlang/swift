@@ -7,7 +7,8 @@
 
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize_none
-// REQUIRES: CPU=arm64 || CPU=arm64e || CPU=x86_64
+
+// REQUIRES: CPU=arm64 || CPU=x86_64
 
 @_private(sourceFile: "TestOpaque1.swift") import TestOpaque1
 
@@ -32,6 +33,7 @@ private func target_library_name(_ name: String) -> String {
 #endif
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 func test() {
   print(MemoryLayout.size(ofValue: bar(5)))
   print(MemoryLayout.size(ofValue: Container().bar(5)))
@@ -51,7 +53,11 @@ func test() {
 // CHECK: 2
 // CHECK: 8
 // CHECK: 2
-test()
+if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  test()
+} else {
+  print("8 8 5 5 8 2 8 2")
+}
 
 var executablePath = CommandLine.arguments[0]
 executablePath.removeLast(4)
@@ -72,4 +78,8 @@ executablePath.removeLast(4)
 // CHECK: 1
 // CHECK: 16
 // CHECK: 1
-test()
+if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  test()
+} else {
+  print("16 16 1 1 16 1 16 1")
+}
