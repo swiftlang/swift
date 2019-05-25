@@ -143,6 +143,95 @@ Type FailureDiagnostic::resolveInterfaceType(Type type,
                            : resolvedType;
 }
 
+Optional<FunctionArgApplyInfo>
+FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
+  auto &cs = getConstraintSystem();
+  auto *anchor = locator->getAnchor();
+  auto path = locator->getPath();
+
+  // Look for the apply-arg-to-param element in the locator's path. We may
+  // have to look through other elements that are generated from an argument
+  // conversion such as GenericArgument for an optional-to-optional conversion,
+  // and OptionalPayload for a value-to-optional conversion.
+  auto applyArgElt =
+      std::find_if(path.rbegin(), path.rend(), [](LocatorPathElt elt) {
+        return elt.getKind() == ConstraintLocator::ApplyArgToParam;
+      });
+
+  if (applyArgElt == path.rend())
+    return None;
+
+  assert(std::find_if(applyArgElt + 1, path.rend(), [](LocatorPathElt elt) {
+    return elt.getKind() == ConstraintLocator::ApplyArgToParam;
+  }) == path.rend() && "Multiple ApplyArgToParam components?");
+
+  // Form a new locator that ends at the apply-arg-to-param element, and
+  // simplify it to get the full argument expression.
+  auto argPath = path.drop_back(applyArgElt - path.rbegin());
+  auto *argLocator = cs.getConstraintLocator(
+      anchor, argPath, ConstraintLocator::getSummaryFlagsForPath(argPath));
+
+  auto *argExpr = simplifyLocatorToAnchor(cs, argLocator);
+
+  // If we were unable to simplify down to the argument expression, we don't
+  // know what this is.
+  if (!argExpr)
+    return None;
+
+  ValueDecl *callee = nullptr;
+  Type rawFnType;
+  if (auto overload = getChoiceFor(anchor)) {
+    // If we have resolved an overload for the callee, then use that to get the
+    // function type and callee.
+    if (auto *decl = overload->choice.getDeclOrNull())
+      callee = decl;
+
+    rawFnType = overload->openedType;
+  } else {
+    // If we didn't resolve an overload for the callee, we must be dealing with
+    // an apply of an arbitrary function expr.
+    auto *fnExpr = cast<CallExpr>(anchor)->getFn();
+    rawFnType = cs.getType(fnExpr)->getRValueType();
+  }
+
+  auto *fnType = resolveType(rawFnType)->getAs<FunctionType>();
+  if (!fnType)
+    return None;
+
+  // Resolve the interface type for the function. Note that this may not be a
+  // function type, for example it could be a generic parameter.
+  Type fnInterfaceType;
+  if (callee && callee->hasInterfaceType()) {
+    // If we have a callee with an interface type, we can use it. This is
+    // preferable to resolveInterfaceType, as this will allow us to get a
+    // GenericFunctionType for generic decls.
+    //
+    // Note that it's possible to find a callee without an interface type. This
+    // can happen for example with closure parameters, where the interface type
+    // isn't set until the solution is applied. In that case, use
+    // resolveInterfaceType.
+    fnInterfaceType = callee->getInterfaceType();
+
+    // Strip off the curried self parameter if necessary.
+    if (callee->hasCurriedSelf())
+      fnInterfaceType = fnInterfaceType->castTo<AnyFunctionType>()->getResult();
+
+    if (auto *fn = fnInterfaceType->getAs<AnyFunctionType>()) {
+      assert(fn->getNumParams() == fnType->getNumParams() &&
+             "Parameter mismatch?");
+      (void)fn;
+    }
+  } else {
+    fnInterfaceType = resolveInterfaceType(rawFnType);
+  }
+
+  auto argIdx = applyArgElt->getValue();
+  auto paramIdx = applyArgElt->getValue2();
+
+  return FunctionArgApplyInfo(argExpr, argIdx, getType(argExpr), paramIdx,
+                              fnInterfaceType, fnType, callee);
+}
+
 Type RequirementFailure::getOwnerType() const {
   auto *anchor = getRawAnchor();
 
