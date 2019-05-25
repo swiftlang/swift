@@ -317,7 +317,7 @@ extension CollectionDifference where ChangeElement: Hashable {
   /// Returns a new collection difference with associations between individual
   /// elements that have been removed and inserted only once.
   ///
-  /// - Returns: An collection difference with all possible moves inferred.
+  /// - Returns: A collection difference with all possible moves inferred.
   ///
   /// - Complexity: O(*n*) where *n* is the number of collection differences.
   public func inferringMoves() -> CollectionDifference<ChangeElement> {
