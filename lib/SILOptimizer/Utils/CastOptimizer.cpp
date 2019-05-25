@@ -323,11 +323,12 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   case CastConsumptionKind::TakeAlways:
     Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
     break;
-  case CastConsumptionKind::TakeOnSuccess:
+  case CastConsumptionKind::TakeOnSuccess: {
     // Insert a release in the success BB.
-    Builder.setInsertionPoint(SuccessBB->begin());
-    Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
+    SILBuilderWithScope SuccessBuilder(SuccessBB->begin());
+    SuccessBuilder.emitDestroyValueOperation(Loc, srcOp);
     break;
+  }
   case CastConsumptionKind::BorrowAlways:
     llvm_unreachable("checked_cast_addr_br never has BorrowAlways");
   case CastConsumptionKind::CopyOnSuccess:
