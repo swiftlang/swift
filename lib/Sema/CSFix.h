@@ -88,8 +88,7 @@ enum class FixKind : uint8_t {
   /// like the types are aligned.
   ContextualMismatch,
 
-  /// Fix up the generic arguments of a type so they match
-  /// those enforced by a conditional requirement.
+  /// Fix up the generic arguments of two types so they match eachother.
   GenericArgumentsMismatch,
 
   /// Fix up @autoclosure argument to the @autoclosure parameter,
@@ -492,6 +491,13 @@ public:
                                     ConstraintLocator *locator);
 };
 
+/// Detect situations where two type's generic arguments must
+/// match but are not convertible e.g.
+///
+/// ```swift
+/// struct F<G> {}
+/// let _:F<Int> = F<Bool>()
+/// ```
 class GenericArgumentsMismatch : public ConstraintFix {
   BoundGenericType *Actual;
   BoundGenericType *Required;

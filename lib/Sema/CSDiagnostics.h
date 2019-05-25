@@ -364,10 +364,7 @@ protected:
 /// Diagnostics for mismatched generic arguments e.g
 /// ```swift
 /// struct F<G> {}
-/// extension F where G == Int {
-///  func foo() {}
-/// }
-/// F<Bool>().foo()
+/// let _:F<Int> = F<Bool>()
 /// ```
 class GenericArgumentsMismatchFailure final : public FailureDiagnostic {
   using GenericMismatchDiag = Diag<Type, Type, Identifier, Type, Type>;

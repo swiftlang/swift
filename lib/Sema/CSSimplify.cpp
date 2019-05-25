@@ -790,7 +790,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
       argLabels = component.getSubscriptLabels();
       hasTrailingClosure = false; // key paths don't support trailing closures
       break;
-
+      
     case KeyPathExpr::Component::Kind::Invalid:
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
     case KeyPathExpr::Component::Kind::Property:
@@ -851,7 +851,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
       break;
     }
   }
-
+  
   // If we didn't find any matching overloads, we're done.
   if (!choice)
     return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
@@ -1663,14 +1663,14 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
         == arch2->getInterfaceType()->getCanonicalType(
                       opaque2->getGenericEnvironment()->getGenericSignature()));
     assert(opaque1->getDecl() == opaque2->getDecl());
-
+    
     auto args1 = opaque1->getSubstitutions().getReplacementTypes();
     auto args2 = opaque2->getSubstitutions().getReplacementTypes();
     // Match up the replacement types of the respective substitution maps.
     return matchDeepTypeArguments(*this, subflags, nullptr, nullptr, args1,
                                   args2, locator);
   }
-
+  
   // Handle nominal types that are not directly generic.
   if (auto nominal1 = type1->getAs<NominalType>()) {
     auto nominal2 = type2->castTo<NominalType>();
@@ -1849,7 +1849,7 @@ static bool isStringCompatiblePointerBaseType(TypeChecker &TC,
     return true;
   if (baseType->isEqual(TC.Context.TheEmptyTupleType))
     return true;
-
+  
   return false;
 }
 
@@ -2216,13 +2216,13 @@ bool ConstraintSystem::repairFailures(
   case ConstraintLocator::ClosureResult: {
     // If we could record a generic arguments mismatch instead of this fix,
     // don't record a ContextualMismatch here.
-    auto hasDeepEqualityRestriction =
-        llvm::any_of(conversionsOrFixes,
-                     [] (const RestrictionOrFix possibleRestriction) {
-                        auto restriction = possibleRestriction.getRestriction();
-                        if (!restriction) return false;
-                        return restriction == ConversionRestrictionKind::DeepEquality;
-                     });
+    auto hasDeepEqualityRestriction = llvm::any_of(
+        conversionsOrFixes, [](const RestrictionOrFix possibleRestriction) {
+          auto restriction = possibleRestriction.getRestriction();
+          if (!restriction)
+            return false;
+          return restriction == ConversionRestrictionKind::DeepEquality;
+        });
     if (hasDeepEqualityRestriction)
       break;
 
@@ -2284,6 +2284,18 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::TupleElement: {
     if (anchor && (isa<ArrayExpr>(anchor) || isa<DictionaryExpr>(anchor))) {
+      // If we could record a generic arguments mismatch instead of this fix,
+      // don't record a ContextualMismatch here.
+      auto hasDeepEqualityRestriction = llvm::any_of(
+          conversionsOrFixes, [](const RestrictionOrFix possibleRestriction) {
+            auto restriction = possibleRestriction.getRestriction();
+            if (!restriction)
+              return false;
+            return restriction == ConversionRestrictionKind::DeepEquality;
+          });
+      if (hasDeepEqualityRestriction)
+        break;
+
       conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
     }
@@ -2579,7 +2591,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::DynamicSelf:
       // FIXME: Deep equality? What is the rule between two DynamicSelfs?
       break;
-
+       
     case TypeKind::Protocol:
       // Nothing to do here; try existential and user-defined conversions below.
       break;
@@ -2629,11 +2641,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                         ConstraintKind::Bind, subflags,
                         locator.withPathElement(
                           ConstraintLocator::LValueConversion));
-
+    
     case TypeKind::InOut:
       if (kind == ConstraintKind::BindParam)
         return getTypeMatchFailure(locator);
-
+      
       if (kind == ConstraintKind::OperatorArgumentConversion) {
         conversionsOrFixes.push_back(
             RemoveAddressOf::create(*this, getConstraintLocator(locator)));
@@ -2653,7 +2665,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::BoundGenericStruct: {
       auto bound1 = cast<BoundGenericType>(desugar1);
       auto bound2 = cast<BoundGenericType>(desugar2);
-
+      
       if (bound1->getDecl() == bound2->getDecl())
         conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
       break;
@@ -2664,18 +2676,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::OpaqueTypeArchetype: {
       auto opaque1 = cast<OpaqueTypeArchetypeType>(desugar1);
       auto opaque2 = cast<OpaqueTypeArchetypeType>(desugar2);
-
+      
       if (opaque1->getDecl() == opaque2->getDecl()) {
         conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
       }
       break;
     }
-
+    
     // Same for nested archetypes rooted in opaque types.
     case TypeKind::NestedArchetype: {
       auto nested1 = cast<NestedArchetypeType>(desugar1);
       auto nested2 = cast<NestedArchetypeType>(desugar2);
-
+      
       auto rootOpaque1 = dyn_cast<OpaqueTypeArchetypeType>(nested1->getRoot());
       auto rootOpaque2 = dyn_cast<OpaqueTypeArchetypeType>(nested2->getRoot());
       if (rootOpaque1 && rootOpaque2) {
@@ -2770,7 +2782,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     //
     // Class and protocol metatypes are interoperable with certain Objective-C
     // runtime classes, but only when ObjC interop is enabled.
-
+    
     if (TC.getLangOpts().EnableObjCInterop) {
       // These conversions are between concrete types that don't need further
       // resolution, so we can consider them immediately solved.
@@ -2780,7 +2792,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                                   type1, type2, locator);
           return getTypeMatchSuccess();
         };
-
+      
       if (auto meta1 = type1->getAs<MetatypeType>()) {
         if (meta1->getInstanceType()->mayHaveSuperclass()
             && type2->isAnyObject()) {
@@ -2798,7 +2810,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               return true;
           return false;
         };
-
+        
         if (auto protoTy = meta1->getInstanceType()->getAs<ProtocolType>()) {
           if (protoTy->getDecl()->isObjC()
               && isProtocolClassType(type2)) {
@@ -2818,7 +2830,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         }
       }
     }
-
+    
     // Special implicit nominal conversions.
     if (!type1->is<LValueType>() && kind >= ConstraintKind::Subtype) {
       // Array -> Array.
@@ -2835,7 +2847,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       }
     }
   }
-
+  
   if (kind == ConstraintKind::BindToPointerType) {
     if (desugar2->isEqual(getASTContext().TheEmptyTupleType))
       return getTypeMatchSuccess();
@@ -2920,7 +2932,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                 if (type1PointerKind != pointerKind)
                   increaseScore(ScoreKind::SK_ValueToPointerConversion);
                 conversionsOrFixes.push_back(
-                    ConversionRestrictionKind::PointerToPointer);
+                  ConversionRestrictionKind::PointerToPointer);              
               }
             }
             // UnsafePointer and UnsafeRawPointer can also be converted from an
@@ -2945,7 +2957,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                         ConversionRestrictionKind::StringToPointer);
                 }
               }
-
+              
               if (type1IsPointer && optionalityMatches &&
                   (type1PointerKind == PTK_UnsafePointer ||
                    type1PointerKind == PTK_AutoreleasingUnsafeMutablePointer)) {
@@ -3043,7 +3055,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           forceUnwrapPossible = false;
         }
       }
-
+      
       if (auto optTryExpr =
           dyn_cast_or_null<OptionalTryExpr>(locator.trySimplifyToExpr())) {
         auto subExprType = getType(optTryExpr->getSubExpr());
@@ -3215,7 +3227,7 @@ ConstraintSystem::simplifyConstructionConstraint(
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
       llvm_unreachable("artificial type in constraint");
-
+    
   case TypeKind::Unresolved:
   case TypeKind::Error:
     return SolutionKind::Error;
@@ -3286,11 +3298,14 @@ ConstraintSystem::simplifyConstructionConstraint(
   // The constructor will have function type T -> T2, for a fresh type
   // variable T. T2 is the result type provided via the construction
   // constraint itself.
-  addValueMemberConstraint(
-      MetatypeType::get(valueType, TC.Context),
-      DeclBaseName::createConstructor(), memberType, useDC, functionRefKind,
-      /*outerAlternatives=*/{},
-      getConstraintLocator(fnLocator, ConstraintLocator::ConstructorMember));
+  addValueMemberConstraint(MetatypeType::get(valueType, TC.Context),
+                           DeclBaseName::createConstructor(),
+                           memberType,
+                           useDC, functionRefKind,
+                           /*outerAlternatives=*/{},
+                           getConstraintLocator(
+                             fnLocator, 
+                             ConstraintLocator::ConstructorMember));
 
   // FIXME: Once TVO_PrefersSubtypeBinding is replaced with something
   // better, we won't need the second type variable at all.
@@ -3399,7 +3414,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   default:
     llvm_unreachable("bad constraint kind");
   }
-
+  
   if (!shouldAttemptFixes())
     return SolutionKind::Error;
 
@@ -3605,7 +3620,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
       addConstraint(ConstraintKind::Subtype, toType, fromType,
                     getConstraintLocator(locator));
     }
-
+      
     return SolutionKind::Solved;
   }
 
@@ -3639,6 +3654,7 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
 
     return SolutionKind::Unsolved;
   }
+  
 
   Type objectTy = optTy->getOptionalObjectType();
   // If the base type is not optional, let's attempt a fix (if possible)
@@ -3660,7 +3676,7 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
       return SolutionKind::Error;
     }
   }
-
+  
   // The object type is an lvalue if the optional was.
   if (optLValueTy->is<LValueType>())
     objectTy = LValueType::get(objectTy);
@@ -3761,10 +3777,10 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
       parts.pop_back();
       continue;
     }
-
+    
     break;
   }
-
+  
   if (!parts.empty())
     return None;
 
@@ -3824,18 +3840,18 @@ static bool hasDynamicMemberLookupAttribute(Type type,
     for (auto p : nominal->getAllProtocols())
       if (p->getAttrs().hasAttribute<DynamicMemberLookupAttr>())
         return true;
-
+    
     // Walk superclasses, if present.
     llvm::SmallPtrSet<const NominalTypeDecl*, 8> visitedDecls;
     while (1) {
       // If we found a circular parent class chain, reject this.
       if (!visitedDecls.insert(nominal).second)
         return false;
-
+      
       // If this type has the attribute on it, then yes!
       if (nominal->getAttrs().hasAttribute<DynamicMemberLookupAttr>())
         return true;
-
+      
       // If this is a class with a super class, check super classes as well.
       if (auto *cd = dyn_cast<ClassDecl>(nominal)) {
         if (auto superClass = cd->getSuperclassDecl()) {
@@ -3843,11 +3859,11 @@ static bool hasDynamicMemberLookupAttribute(Type type,
           continue;
         }
       }
-
+      
       return false;
     }
   };
-
+  
   auto result = calculate();
   // Cache the result if the type does not contain type variables.
   if (!type->hasTypeVariable())
@@ -3927,10 +3943,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     } else {
       fieldIdx = baseTuple->getNamedElementId(memberName.getBaseIdentifier());
     }
-
+    
     if (fieldIdx == -1)
       return result;    // No result.
-
+    
     // Add an overload set that selects this field.
     result.ViableCandidates.push_back(OverloadChoice(baseTy, fieldIdx));
     return result;
@@ -4001,7 +4017,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // reasonable choice.
   auto addChoice = [&](OverloadChoice candidate) {
     auto decl = candidate.getDecl();
-
+    
     // If the result is invalid, skip it.
     TC.validateDecl(decl);
     if (decl->isInvalid()) {
@@ -4206,16 +4222,16 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // result was found via dynamic lookup.
     if (instanceTy->isAnyObject()) {
       assert(cand->getDeclContext()->isTypeContext() && "Dynamic lookup bug");
-
+      
       // We found this declaration via dynamic lookup, record it as such.
       return OverloadChoice::getDeclViaDynamic(baseTy, cand, functionRefKind);
     }
-
+    
     // If we have a bridged type, we found this declaration via bridging.
     if (isBridged)
       return OverloadChoice::getDeclViaBridge(bridgedType, cand,
                                               functionRefKind);
-
+    
     // If we got the choice by unwrapping an optional type, unwrap the base
     // type.
     if (isUnwrappedOptional) {
@@ -4249,7 +4265,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
     return OverloadChoice(baseTy, cand, functionRefKind);
   };
-
+  
   // Add all results from this lookup.
 retry_after_fail:
   labelMismatch = false;
@@ -4292,7 +4308,7 @@ retry_after_fail:
         foundationModule = module;
         continue;
       }
-
+      
       addChoice(getOverloadChoice(result.getValueDecl(),
                                   /*isBridged=*/true,
                                   /*isUnwrappedOptional=*/false));
@@ -4316,7 +4332,7 @@ retry_after_fail:
       }
     }
   }
-
+  
   // If we're about to fail lookup, but we are looking for members in a type
   // with the @dynamicMemberLookup attribute, then we resolve a reference
   // to a `subscript(dynamicMember:)` method and pass the member name as a
@@ -4371,13 +4387,13 @@ retry_after_fail:
   if (result.ViableCandidates.empty() && result.UnviableCandidates.empty() &&
       includeInaccessibleMembers) {
     NameLookupOptions lookupOptions = defaultMemberLookupOptions;
-
+    
     // Ignore access control so we get candidates that might have been missed
     // before.
     lookupOptions |= NameLookupFlags::IgnoreAccessControl;
     // This is only used for diagnostics, so always use KnownPrivate.
     lookupOptions |= NameLookupFlags::KnownPrivate;
-
+    
     auto lookup = TC.lookupMember(DC, instanceTy,
                                   memberName, lookupOptions);
     for (auto entry : lookup) {
@@ -4399,7 +4415,7 @@ retry_after_fail:
                          MemberLookupResult::UR_Inaccessible);
     }
   }
-
+  
   return result;
 }
 
@@ -4948,7 +4964,7 @@ ConstraintSystem::simplifyOpaqueUnderlyingTypeConstraint(Type type1, Type type2,
   auto underlyingTyVar = openType(opaque2->getInterfaceType(),
                                   replacements);
   assert(underlyingTyVar);
-
+  
   if (auto dcSig = DC->getGenericSignatureOfContext()) {
     for (auto param : dcSig->getGenericParams()) {
       addConstraint(ConstraintKind::Bind,
@@ -4977,7 +4993,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
                            type2, getConstraintLocator(locator)));
       return SolutionKind::Solved;
     }
-
+    
     return SolutionKind::Unsolved;
   };
 
@@ -5195,13 +5211,13 @@ ConstraintSystem::simplifyEscapableFunctionOfConstraint(
   if (!type2->isTypeVariableOrMember())
     // We definitely don't have a function, so bail.
     return SolutionKind::Error;
-
+  
   type1 = getFixedTypeRecursive(type1, flags, /*wantRValue=*/true);
   if (auto fn1 = type1->getAs<FunctionType>()) {
     // We should have the escaping end of the relation.
     if (fn1->getExtInfo().isNoEscape())
       return SolutionKind::Error;
-
+    
     // Solve backward by binding the other type variable to the noescape
     // variation of this type.
     auto fn2 = fn1->withExtInfo(fn1->getExtInfo().withNoEscape(true));
@@ -5239,13 +5255,13 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
   if (!type2->isTypeVariableOrMember())
     // We definitely don't have an existential, so bail.
     return SolutionKind::Error;
-
+  
   // If type1 is constrained to anything concrete, the constraint fails.
   // It can only be bound to a type we opened for it.
   type1 = getFixedTypeRecursive(type1, flags, /*wantRValue=*/true);
   if (!type1->isTypeVariableOrMember())
     return SolutionKind::Error;
-
+  
   if (flags.contains(TMF_GenerateConstraints)) {
     addUnsolvedConstraint(
       Constraint::create(*this, ConstraintKind::OpenedExistentialOf,
@@ -5264,7 +5280,7 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
   auto subflags = getDefaultDecompositionOptions(flags);
   // The constraint ought to have been anchored on a KeyPathExpr.
   auto keyPath = cast<KeyPathExpr>(locator.getBaseLocator()->getAnchor());
-
+  
   // Gather overload choices for any key path components associated with this
   // key path.
   SmallVector<OverloadChoice, 4> choices;
@@ -5278,12 +5294,12 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       choices[locator->getPath()[0].getValue()] = resolvedItem->Choice;
     }
   }
-
+  
   keyPathTy = getFixedTypeRecursive(keyPathTy, /*want rvalue*/ true);
   auto tryMatchRootAndValueFromKeyPathType =
     [&](BoundGenericType *bgt, bool allowPartial) -> SolutionKind {
       Type boundRoot, boundValue;
-
+      
       // We can get root and value from a concrete key path type.
       if (bgt->getDecl() == getASTContext().getKeyPathDecl()
           || bgt->getDecl() == getASTContext().getWritableKeyPathDecl()
@@ -5310,7 +5326,7 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
           && matchTypes(boundValue, valueTy,
                 ConstraintKind::Bind, subflags, locator).isFailure())
         return SolutionKind::Error;
-
+      
       return SolutionKind::Solved;
     };
 
@@ -5343,12 +5359,12 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
 
   for (unsigned i : indices(keyPath->getComponents())) {
     auto &component = keyPath->getComponents()[i];
-
+    
     switch (component.getKind()) {
     case KeyPathExpr::Component::Kind::Invalid:
     case KeyPathExpr::Component::Kind::Identity:
       break;
-
+      
     case KeyPathExpr::Component::Kind::Property:
     case KeyPathExpr::Component::Kind::Subscript:
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
@@ -5364,12 +5380,12 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
         }
         return SolutionKind::Unsolved;
       }
-
+      
       // tuple elements do not change the capability of the key path
       if (choices[i].getKind() == OverloadChoiceKind::TupleIndex) {
         continue;
       }
-
+        
       // Discarded unsupported non-decl member lookups.
       if (!choices[i].isDecl()) {
         return SolutionKind::Error;
@@ -5409,16 +5425,16 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       // Otherwise, the key path maintains its current capability.
       break;
     }
-
+    
     case KeyPathExpr::Component::Kind::OptionalChain:
       // Optional chains force the entire key path to be read-only.
       capability = ReadOnly;
       goto done;
-
+    
     case KeyPathExpr::Component::Kind::OptionalForce:
       // Forcing an optional preserves its lvalue-ness.
       break;
-
+    
     case KeyPathExpr::Component::Kind::OptionalWrap:
       // An optional chain should already have forced the entire key path to
       // be read-only.
@@ -5447,7 +5463,7 @@ done:
     kpDecl = getASTContext().getReferenceWritableKeyPathDecl();
     break;
   }
-
+  
   // FIXME: Allow the type to be upcast if the type system has a concrete
   // KeyPath type assigned to the expression already.
   if (keyPathBGT) {
@@ -5458,7 +5474,7 @@ done:
              capability >= Writable)
       kpDecl = getASTContext().getWritableKeyPathDecl();
   }
-
+  
   auto resolvedKPTy = BoundGenericType::get(kpDecl, nullptr,
                                             {rootTy, valueTy});
   // Let's check whether deduced key path type would match
@@ -5477,7 +5493,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
                                         ConstraintLocatorBuilder locator) {
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
   keyPathTy = getFixedTypeRecursive(keyPathTy, flags, /*wantRValue=*/true);
-
+  
   auto unsolved = [&]() -> SolutionKind {
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(Constraint::create(*this,
@@ -5499,11 +5515,11 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
                         subflags, locator);
     }
   }
-
+  
   if (auto bgt = keyPathTy->getAs<BoundGenericType>()) {
     // We have the key path type. Match it to the other ends of the constraint.
     auto kpRootTy = bgt->getGenericArgs()[0];
-
+    
     // Try to match the root type.
     rootTy = getFixedTypeRecursive(rootTy, flags, /*wantRValue=*/false);
 
@@ -5555,7 +5571,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
       return matchTypes(LValueType::get(kpValueTy), valueTy,
                         ConstraintKind::Bind, subflags, locator);
     };
-
+  
     if (bgt->getDecl() == getASTContext().getKeyPathDecl()) {
       // Read-only keypath.
       if (!matchRoot(ConstraintKind::Conversion))
@@ -5588,7 +5604,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
   }
   if (!keyPathTy->isTypeVariableOrMember())
     return SolutionKind::Error;
-
+  
   return unsolved();
 }
 
@@ -5785,7 +5801,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
                            type2, getConstraintLocator(locator)));
       return SolutionKind::Solved;
     }
-
+    
     return SolutionKind::Unsolved;
 
   };
@@ -6334,7 +6350,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     addContextualScore();
     return SolutionKind::Solved;
   }
-
+  
   // T <p U ===> T[] <a UnsafeMutablePointer<U>
   case ConversionRestrictionKind::ArrayToPointer: {
     addContextualScore();
@@ -6342,7 +6358,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto obj1 = type1->getInOutObjectType();
 
     obj1 = getFixedTypeRecursive(obj1, false);
-
+    
     auto t2 = type2->getDesugaredType();
 
     auto baseType1 = getFixedTypeRecursive(*isArrayType(obj1), false);
@@ -6353,13 +6369,13 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                       ConstraintKind::BindToPointerType,
                       subflags, locator);
   }
-
+      
   // String ===> UnsafePointer<[U]Int8>
   case ConversionRestrictionKind::StringToPointer: {
     addContextualScore();
 
     auto baseType2 = getBaseTypeForPointer(*this, type2->getDesugaredType());
-
+    
     // The pointer element type must be void or a byte-sized type.
     // TODO: Handle different encodings based on pointer element type, such as
     // UTF16 for [U]Int16 or UTF32 for [U]Int32. For now we only interop with
@@ -6379,7 +6395,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
         auto voidCon = Constraint::create(*this, ConstraintKind::Bind,
                                         baseType2, TC.Context.TheEmptyTupleType,
                                         getConstraintLocator(locator));
-
+        
         Constraint *disjunctionChoices[] = {int8Con, uint8Con, voidCon};
         addDisjunctionConstraint(disjunctionChoices, locator);
         return SolutionKind::Solved;
@@ -6387,7 +6403,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
       return SolutionKind::Unsolved;
     }
-
+    
     if (!isStringCompatiblePointerBaseType(TC, DC, baseType2)) {
       return SolutionKind::Error;
     }
@@ -6395,16 +6411,16 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     increaseScore(ScoreKind::SK_ValueToPointerConversion);
     return SolutionKind::Solved;
   }
-
+      
   // T <p U ===> inout T <a UnsafeMutablePointer<U>
   case ConversionRestrictionKind::InoutToPointer: {
     addContextualScore();
 
     auto t2 = type2->getDesugaredType();
-
+    
     auto baseType1 = type1->getInOutObjectType();
     auto baseType2 = getBaseTypeForPointer(*this, t2);
-
+    
     // Set up the disjunction for the array or scalar cases.
 
     increaseScore(ScoreKind::SK_ValueToPointerConversion);
@@ -6412,20 +6428,20 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                       ConstraintKind::BindToPointerType,
                       subflags, locator);
   }
-
+      
   // T <p U ===> UnsafeMutablePointer<T> <a UnsafeMutablePointer<U>
   case ConversionRestrictionKind::PointerToPointer: {
     auto t1 = type1->getDesugaredType();
     auto t2 = type2->getDesugaredType();
-
+    
     Type baseType1 = getBaseTypeForPointer(*this, t1);
     Type baseType2 = getBaseTypeForPointer(*this, t2);
-
+    
     return matchTypes(baseType1, baseType2,
                       ConstraintKind::BindToPointerType,
                       subflags, locator);
   }
-
+    
   // T < U or T is bridged to V where V < U ===> Array<T> <c Array<U>
   case ConversionRestrictionKind::ArrayUpcast: {
     Type baseType1 = *isArrayType(type1);
@@ -6440,10 +6456,10 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                         ConstraintLocator::PathElement::getGenericArgument(0)));
   }
 
-  // K1 < K2 && V1 < V2 || K1 bridges to K2 && V1 bridges to V2 ===>
+  // K1 < K2 && V1 < V2 || K1 bridges to K2 && V1 bridges to V2 ===> 
   //   Dictionary<K1, V1> <c Dictionary<K2, V2>
   case ConversionRestrictionKind::DictionaryUpcast: {
-    auto t1 = type1->getDesugaredType();
+    auto t1 = type1->getDesugaredType();    
     Type key1, value1;
     std::tie(key1, value1) = *isDictionaryType(t1);
 
@@ -6512,7 +6528,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto tv = createTypeVariable(constraintLocator,
                                  TVO_PrefersSubtypeBinding |
                                  TVO_CanBindToNoEscape);
-
+    
     addConstraint(ConstraintKind::ConformsTo, tv,
                   hashableProtocol->getDeclaredType(), constraintLocator);
 
@@ -6551,7 +6567,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                       ConstraintKind::Subtype, subflags, locator);
   }
   }
-
+  
   llvm_unreachable("bad conversion restriction");
 }
 
@@ -6818,21 +6834,21 @@ ConstraintSystem::addKeyPathApplicationRootConstraint(Type root, ConstraintLocat
   // connects the subscript's root type to the root type of the KeyPath.
   SmallVector<LocatorPathElt, 4> path;
   Expr *anchor = locator.getLocatorParts(path);
-
+  
   auto subscript = dyn_cast_or_null<SubscriptExpr>(anchor);
   if (!subscript)
     return;
-
+  
   assert(path.size() == 1 &&
          path[0].getKind() == ConstraintLocator::SubscriptMember);
   auto indexTuple = dyn_cast<TupleExpr>(subscript->getIndex());
   if (!indexTuple || indexTuple->getNumElements() != 1)
     return;
-
+  
   auto keyPathExpr = dyn_cast<KeyPathExpr>(indexTuple->getElement(0));
   if (!keyPathExpr)
     return;
-
+  
   auto typeVar = getType(keyPathExpr)->getAs<TypeVariableType>();
   if (!typeVar)
     return;
@@ -6858,7 +6874,7 @@ ConstraintSystem::addKeyPathApplicationConstraint(Type keypath,
                                               ConstraintLocatorBuilder locator,
                                               bool isFavored) {
   addKeyPathApplicationRootConstraint(root, locator);
-
+  
   switch (simplifyKeyPathApplicationConstraint(keypath, root, value,
                                                TMF_GenerateConstraints,
                                                locator)) {
@@ -6871,10 +6887,10 @@ ConstraintSystem::addKeyPathApplicationConstraint(Type keypath,
       addNewFailingConstraint(c);
     }
     return;
-
+  
   case SolutionKind::Solved:
     return;
-
+    
   case SolutionKind::Unsolved:
     llvm_unreachable("should have generated constraints");
   }
@@ -6897,10 +6913,10 @@ ConstraintSystem::addKeyPathConstraint(Type keypath,
       addNewFailingConstraint(c);
     }
     return;
-
+  
   case SolutionKind::Solved:
     return;
-
+    
   case SolutionKind::Unsolved:
     llvm_unreachable("should have generated constraints");
   }
@@ -7126,7 +7142,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                             constraint.getSecondType(),
                                             TMF_GenerateConstraints,
                                             constraint.getLocator());
-
+      
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
     return simplifyMemberConstraint(constraint.getKind(),

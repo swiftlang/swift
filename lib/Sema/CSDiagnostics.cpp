@@ -404,6 +404,8 @@ GenericArgumentsMismatchFailure::getDiagnosticFor(
     return diag::cannot_convert_generic_type_closure_result;
   case CTP_ArrayElement:
     return diag::cannot_convert_generic_type_array_element;
+  // TODO(diagnostics): Make dictionary related diagnostics take prescedence
+  // over CSDiag. Currently these won't ever be produced.
   case CTP_DictionaryKey:
     return diag::cannot_convert_generic_type_dict_key;
   case CTP_DictionaryValue:
@@ -459,17 +461,17 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       diagnostic = diag::cannot_convert_generic_type_argument;
       break;
     }
-    
+
     case ConstraintLocator::ParentType: {
       diagnostic = diag::cannot_convert_generic_type_parent_type;
       break;
     }
-    
+
     case ConstraintLocator::ClosureResult: {
       diagnostic = diag::cannot_convert_generic_type_closure_result;
       break;
     }
-    
+
     default:
       break;
     }

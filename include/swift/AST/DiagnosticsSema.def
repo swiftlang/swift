@@ -438,11 +438,6 @@ ERROR(cannot_convert_generic_type_parent_type,none,
       "cannot convert parent type %0 to expected type %1, "
       "arguments to generic parameter %2 (%3 and %4) are expected to be equal",
       (Type, Type, Identifier, Type, Type))
-      
-      
-
-
-
 
 ERROR(destructor_not_accessible,none,
       "deinitializers cannot be accessed", ())

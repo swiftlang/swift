@@ -124,3 +124,45 @@ protocol Tail { associatedtype T }
 struct Dog<B, C : Tail> where C.T == B {}
 func foo<B, A>() -> Dog<B, Cat<A>> {}
 // expected-error@-1 {{type 'Cat<A>' does not conform to protocol 'Tail'}}
+
+// Tests for generic argument mismatch diagnosis
+struct X<A> : Hashable {
+  class Foo {}
+  class Bar {}
+}
+// expected-note@-4 {{generic parameter 'A' declared here}}
+// expected-note@-5 {{generic parameter 'A' declared here}}
+// expected-note@-6 {{generic parameter 'A' declared here}}
+// expected-note@-7 {{generic parameter 'A' declared here}}
+// expected-note@-8 {{generic parameter 'A' declared here}}
+// expected-note@-9 {{generic parameter 'A' declared here}}
+// expected-note@-10 {{generic parameter 'A' declared here}}
+// expected-note@-11 {{generic parameter 'A' declared here}}
+// expected-note@-12 {{generic parameter 'A' declared here}}
+
+struct Y<A, B, C>{} // expected-note {{generic parameter 'A' declared here}}
+// expected-note@-1 {{generic parameter 'C' declared here}}
+
+struct YieldValue {
+  var property: X<Bool> {
+    _read {
+      yield X<Int>() // expected-error {{cannot convert value of type 'X<Int>' to expected yield type 'X<Bool>', arguments to generic parameter 'A' ('Int' and 'Bool') are expected to be equal}}
+    }
+  }
+}
+
+func multipleArguments(y: Y<Int, Int, Int>) {
+  let _: Y<Bool, Int, Float> = y // expected-error {{cannot convert value of type 'Y<Int, Int, Int>' to 'Y<Bool, Int, Float>' in assignment, arguments to generic parameter 'A' ('Int' and 'Bool') are expected to be equal}}
+  // expected-error@-1 {{cannot convert value of type 'Y<Int, Int, Int>' to 'Y<Bool, Int, Float>' in assignment, arguments to generic parameter 'C' ('Int' and 'Float') are expected to be equal}}
+}
+
+func errorMessageVariants(x: X<Int>, x2: X<Bool> = X<Int>()) -> X<Bool> {
+  // expected-error@-1 {{default argument value of type 'X<Int>' cannot be converted to type 'X<Bool>'}}
+  let _: X<Bool> = x // expected-error {{cannot convert value of type 'X<Int>' to 'X<Bool>' in assignment, arguments to generic parameter 'A' ('Int' and 'Bool') are expected to be equal}}
+  errorMessageVariants(x: x2, x2: x2) // expected-error {{cannot convert 'X<Bool>' to expected argument type 'X<Int>', arguments to generic parameter 'A' ('Bool' and 'Int') are expected to be equal}}
+  let _: X<Bool> = { return x }() // expected-error {{cannot convert value of type 'X<Int>' to closure result type 'X<Bool>', arguments to generic parameter 'A' ('Int' and 'Bool') are expected to be equal}}
+  let _: [X<Bool>] = [x] // expected-error {{cannot convert value of type 'X<Int>' to expected element type 'X<Bool>', arguments to generic parameter 'A' ('Int' and 'Bool') are expected to be equal}}
+  let _ = x as X<Bool> // expected-error {{cannot convert value of type 'X<Int>' to type 'X<Bool>' in coercion, arguments to generic parameter 'A' ('Int' and 'Bool') are expected to be equal}}
+  let _: X<Int>.Foo = X<Bool>.Foo() // expected-error {{cannot convert parent type 'X<Bool>' to expected type 'X<Int>', arguments to generic parameter 'A' ('Bool' and 'Int') are expected to be equal}}
+  return x // expected-error {{cannot convert return expression of type 'X<Int>' to return type 'X<Bool>', arguments to generic parameter 'A' ('Int' and 'Bool') are expected to be equal}}
+}
