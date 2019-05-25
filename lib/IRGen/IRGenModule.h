@@ -1205,8 +1205,6 @@ public:
   void emitStructDecl(StructDecl *D);
   void emitClassDecl(ClassDecl *D);
   void emitExtension(ExtensionDecl *D);
-  void emitFuncDecl(FuncDecl *D);
-  void emitAbstractStorageDecl(AbstractStorageDecl *D);
   void emitOpaqueTypeDecl(OpaqueTypeDecl *D);
   void emitSILGlobalVariable(SILGlobalVariable *gv);
   void emitCoverageMapping();
@@ -1435,6 +1433,11 @@ public:
   llvm::GlobalVariable *
   getGlobalForDynamicallyReplaceableThunk(LinkEntity &entity, llvm::Type *type,
                                           ForDefinition_t forDefinition);
+
+  llvm::Function *getAddrOfOpaqueTypeDescriptorAccessFunction(
+      OpaqueTypeDecl *decl, ForDefinition_t forDefinition, bool implementation);
+
+  void emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *);
 
 private:
   llvm::Constant *

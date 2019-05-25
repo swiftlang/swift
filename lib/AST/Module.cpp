@@ -1784,8 +1784,11 @@ SourceFile::lookupOpaqueResultType(StringRef MangledName,
 void SourceFile::markDeclWithOpaqueResultTypeAsValidated(ValueDecl *vd) {
   UnvalidatedDeclsWithOpaqueReturnTypes.erase(vd);
   if (auto opaqueDecl = vd->getOpaqueResultTypeDecl()) {
-    ValidatedOpaqueReturnTypes.insert(
+    auto inserted = ValidatedOpaqueReturnTypes.insert(
               {opaqueDecl->getOpaqueReturnTypeIdentifier().str(), opaqueDecl});
+    if (inserted.second) {
+      OpaqueReturnTypes.push_back(opaqueDecl);
+    }
   }
 }
 
