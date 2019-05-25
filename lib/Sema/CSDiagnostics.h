@@ -99,6 +99,10 @@ public:
                : resolvedType;
   }
 
+  /// Resolve type variables present in the raw type, using generic parameter
+  /// types where possible.
+  Type resolveInterfaceType(Type type, bool reconstituteSugar = false) const;
+
   template <typename... ArgTypes>
   InFlightDiagnostic emitDiagnostic(ArgTypes &&... Args) const;
 

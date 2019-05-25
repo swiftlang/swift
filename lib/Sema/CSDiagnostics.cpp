@@ -110,6 +110,39 @@ Optional<SelectedOverload> FailureDiagnostic::getChoiceFor(Expr *expr) const {
   return getOverloadChoiceIfAvailable(cs.getCalleeLocator(expr));
 }
 
+Type FailureDiagnostic::resolveInterfaceType(Type type,
+                                             bool reconstituteSugar) const {
+  auto &cs = getConstraintSystem();
+  auto resolvedType = type.transform([&](Type type) -> Type {
+    if (auto *tvt = type->getAs<TypeVariableType>()) {
+      auto *loc = tvt->getImpl().getLocator();
+
+      // If this type variable is for a generic parameter, return that.
+      if (loc->isForGenericParameter())
+        return loc->getGenericParameter();
+
+      // Otherwise resolve its fixed type, mapped out of context.
+      if (auto fixed = cs.getFixedType(tvt))
+        return resolveInterfaceType(fixed->mapTypeOutOfContext());
+
+      return cs.getRepresentative(tvt);
+    }
+    if (auto *dmt = type->getAs<DependentMemberType>()) {
+      // For a dependent member, first resolve the base.
+      auto newBase = resolveInterfaceType(dmt->getBase());
+
+      // Then reconstruct using its associated type.
+      assert(dmt->getAssocType());
+      return DependentMemberType::get(newBase, dmt->getAssocType());
+    }
+    return type;
+  });
+
+  assert(!resolvedType->hasArchetype());
+  return reconstituteSugar ? resolvedType->reconstituteSugar(/*recursive*/ true)
+                           : resolvedType;
+}
+
 Type RequirementFailure::getOwnerType() const {
   auto *anchor = getRawAnchor();
 
