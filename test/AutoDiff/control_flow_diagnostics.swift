@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -verify -Xllvm -differentiation-enable-control-flow %s
 
 // Test currently unsupported `switch_enum` terminator.
 
