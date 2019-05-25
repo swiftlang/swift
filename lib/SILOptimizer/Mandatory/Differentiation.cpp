@@ -4057,13 +4057,9 @@ private:
 
   /// Remap any archetypes into the current function's context.
   SILType remapType(SILType ty) {
-    if (!ty.hasArchetype())
-      return ty;
-    auto *adjointGenEnv = getAdjoint().getGenericEnvironment();
-    if (!adjointGenEnv)
-      return ty;
-    return ty.subst(getAdjoint().getModule(),
-                    adjointGenEnv->getForwardingSubstitutionMap());
+    if (ty.hasArchetype())
+      return getAdjoint().mapTypeIntoContext(ty.mapTypeOutOfContext());
+    return getAdjoint().mapTypeIntoContext(ty);
   }
 
   Optional<VectorSpace> getTangentSpace(CanType type) {

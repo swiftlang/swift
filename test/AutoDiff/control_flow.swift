@@ -32,9 +32,7 @@ ControlFlowTests.test("Conditional") {
     }
     return y
   }
-  // FIXME: Fix generics crash (related to type remapping) in AdjointEmitter.
-  // SIL verification failed: switch_enum destination bbarg must match case
-  // arg type: eltArgTy == bbArgTy
+  // FIXME: Fix "instruction isn't dominated by its operand" crash in AdjointEmitter.
   /*
   expectEqual((1, 0), gradient(at: 4, 5, in: { x, y in cond_generic(x, y) }))
   expectEqual((0, 1), gradient(at: -4, 5, in: { x, y in cond_generic(x, y) }))
