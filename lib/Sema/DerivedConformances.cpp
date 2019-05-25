@@ -137,6 +137,22 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   return false;
 }
 
+void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
+                                                     NominalTypeDecl *nominal,
+                                                     ProtocolDecl *protocol) {
+  auto knownProtocol = protocol->getKnownProtocolKind();
+  if (!knownProtocol)
+    return;
+
+  if (*knownProtocol == KnownProtocolKind::Equatable) {
+    tryDiagnoseFailedEquatableDerivation(DC, nominal);
+  }
+
+  if (*knownProtocol == KnownProtocolKind::Hashable) {
+    tryDiagnoseFailedHashableDerivation(DC, nominal);
+  }
+}
+
 ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
                                                        NominalTypeDecl *nominal,
                                                        ValueDecl *requirement) {
