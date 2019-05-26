@@ -162,6 +162,8 @@ information, see the inline help:
 
     utils/build-script -h
 
+**Note:**  If you get an error when using Anaconda, you should temporarily set a path to Python 2 to be higher priority, or change PythonInterp to Python2 and PYTHON_EXECUTABLE to Python2_EXECUTABLE in the build system.
+
 #### Xcode
 
 To build using Xcode, specify the `--xcode` argument on any of the above commands.
