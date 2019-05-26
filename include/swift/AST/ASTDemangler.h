@@ -19,8 +19,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef __SWIFT_AST_ASTDEMANGLER_H__
-#define __SWIFT_AST_ASTDEMANGLER_H__
+#ifndef SWIFT_AST_ASTDEMANGLER_H
+#define SWIFT_AST_ASTDEMANGLER_H
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -185,4 +185,4 @@ private:
 
 }  // namespace swift
 
-#endif  // __SWIFT_AST_ASTDEMANGLER_H__
+#endif  // SWIFT_AST_ASTDEMANGLER_H

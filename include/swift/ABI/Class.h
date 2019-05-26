@@ -65,4 +65,4 @@ inline ObjCClassFlags operator|(ObjCClassFlags lhs, ObjCClassFlags rhs) {
 
 }
 
-#endif /* SWIFT_ABI_CLASS_H */
+#endif // SWIFT_ABI_CLASS_H

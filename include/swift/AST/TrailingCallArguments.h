@@ -127,4 +127,4 @@ public:
 
 } // end namespace swift
 
-#endif /* SWIFT_AST_TRAILINGCALLARGUMENTS_H */
+#endif // SWIFT_AST_TRAILINGCALLARGUMENTS_H

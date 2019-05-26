@@ -204,4 +204,4 @@ public:
 } // namespace json
 } // namespace swift
 
-#endif /* SWIFT_SYNTAX_SERIALIZATION_SYNTAXDESERIALIZATION_H */
+#endif // SWIFT_SYNTAX_SERIALIZATION_SYNTAXDESERIALIZATION_H

@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef __SWIFT_AST_ASTMANGLER_H__
-#define __SWIFT_AST_ASTMANGLER_H__
+#ifndef SWIFT_AST_ASTMANGLER_H
+#define SWIFT_AST_ASTMANGLER_H
 
 #include "swift/Basic/Mangler.h"
 #include "swift/AST/Types.h"
@@ -350,4 +350,4 @@ protected:
 } // end namespace Mangle
 } // end namespace swift
 
-#endif // __SWIFT_AST_ASTMANGLER_H__
+#endif // SWIFT_AST_ASTMANGLER_H

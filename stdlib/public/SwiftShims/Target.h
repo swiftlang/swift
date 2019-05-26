@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_ABI_TARGET_H
-#define SWIFT_ABI_TARGET_H
+#ifndef SWIFT_STDLIB_SHIMS_ABI_TARGET_H
+#define SWIFT_STDLIB_SHIMS_ABI_TARGET_H
 
 #if !defined(__has_builtin)
 #define __has_builtin(x) 0
@@ -31,4 +31,4 @@
 # endif
 #endif
 
-#endif /* SWIFT_ABI_TARGET_H */
+#endif // SWIFT_STDLIB_SHIMS_ABI_TARGET_H
