@@ -180,7 +180,7 @@ syn match swiftPreproc /#\(\<file\>\|\<line\>\|\<function\>\)/
 syn match swiftPreproc /^\s*#\(\<if\>\|\<else\>\|\<elseif\>\|\<endif\>\|\<error\>\|\<warning\>\)/
 syn region swiftPreprocFalse start="^\s*#\<if\>\s\+\<false\>" end="^\s*#\(\<else\>\|\<elseif\>\|\<endif\>\)"
 
-syn match swiftAttribute /@\<\w\+\>/ skipwhite skipempty nextgroup=swiftType
+syn match swiftAttribute /@\<\w\+\>/ skipwhite skipempty nextgroup=swiftType,swiftTypeDefinition
 
 syn keyword swiftTodo MARK TODO FIXME contained
 
