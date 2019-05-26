@@ -205,7 +205,7 @@ hi def link swiftTypeAliasName Identifier
 hi def link swiftTypeName Function
 hi def link swiftConstraint Special
 hi def link swiftFuncDefinition Define
-hi def link swiftDefinitionModifier Define
+hi def link swiftDefinitionModifier Operator
 hi def link swiftInOutKeyword Define
 hi def link swiftFuncKeyword Function
 hi def link swiftFuncKeywordGeneral Function
