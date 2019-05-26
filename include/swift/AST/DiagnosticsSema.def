@@ -452,7 +452,7 @@ ERROR(cannot_convert_sequence_element_value,none,
       "cannot convert sequence element type %0 to expected type %1",
       (Type, Type))
 ERROR(cannot_convert_sequence_element_protocol,none,
-      "sequence element type %0 does not conform to expected type %1",
+      "sequence element type %0 does not conform to expected protocol %1",
       (Type, Type))
 
 ERROR(throws_functiontype_mismatch,none,
@@ -3671,6 +3671,8 @@ ERROR(tuple_single_element,none,
       "cannot create a single-element tuple with an element label", ())
 ERROR(tuple_ellipsis,none,
       "cannot create a variadic tuple", ())
+ERROR(tuple_duplicate_label,none,
+      "cannot create a tuple with a duplicate element label", ())
 ERROR(enum_element_ellipsis,none,
       "variadic enum cases are not supported", ())
 

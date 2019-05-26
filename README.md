@@ -23,8 +23,8 @@ To build from source you will need 2 GB of disk space for the source code and ov
 
 ### System Requirements
 
-macOS, Ubuntu Linux LTS 14.04, and Ubuntu Linux LTS 16.04 are the current
-supported host development operating systems.
+macOS and Ubuntu Linux LTS 18.04 are the current supported host development
+operating systems.
 
 Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
@@ -43,7 +43,7 @@ brew install cmake ninja
 brew cask install java # required for Bazel
 ```
 
-Additionally, [Bazel](https://www.bazel.build) v0.22.0 is required to build with TensorFlow support. Instructions to download Bazel directly can be found [below](###bazel). You can find instructions for installing CMake, and Ninja directly [below](#build-dependencies) as well.
+Additionally, [Bazel](https://www.bazel.build) between v0.24.1 and v0.25.2 (inclusive) is required to build with TensorFlow support. Instructions to download Bazel directly can be found [below](#bazel). You can find instructions for installing CMake, and Ninja directly [below](#build-dependencies) as well.
 
 #### Linux
 
@@ -51,7 +51,7 @@ For Ubuntu, you'll need the following development dependencies:
 
     sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-openssl-dev systemtap-sdt-dev tzdata rsync
 
-Additionally, [Bazel](https://www.bazel.build) v0.22.0 is required to build with TensorFlow support. Ubuntu installation instructions can be found [below](###bazel).
+Additionally, [Bazel](https://www.bazel.build) between v0.24.1 and v0.25.2 (inclusive) is required to build with TensorFlow support. Ubuntu installation instructions can be found [below](#bazel).
 
 **Note:** LLDB currently requires at least `swig-1.3.40` but will successfully build
 with version 2 shipped with Ubuntu.
@@ -343,4 +343,4 @@ next to the other projects and it will be bootstrapped automatically:
 The Bazel website has detailed installation instructions for
 [macOS](https://docs.bazel.build/versions/master/install-os-x.html) and
 [Ubuntu](https://docs.bazel.build/versions/master/install-ubuntu.html).
-When picking the version to download in step 2, select v0.22.0 which can be found in the release notes [here](https://github.com/bazelbuild/bazel/releases/tag/0.22.0).
+When picking the version to download in step 2, select a version between v0.24.1 and v0.25.2 (inclusive) which can be found in the release notes [here (v0.25.2)](https://github.com/bazelbuild/bazel/releases/tag/0.25.2).

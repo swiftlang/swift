@@ -43,7 +43,8 @@ endif()
 # Copy TensorFlow high-level API sources, if they exist.
 if (TENSORFLOW_SWIFT_APIS)
   file(GLOB_RECURSE TENSORFLOW_SWIFT_API_SOURCES
-    "${TENSORFLOW_SWIFT_APIS}/Sources/*.swift")
+    "${TENSORFLOW_SWIFT_APIS}/Sources/*.swift"
+    "${TENSORFLOW_SWIFT_APIS}/Sources/Core/*.swift")
   message(STATUS "Using TensorFlow high-level APIs library.")
   list(APPEND SOURCES "${TENSORFLOW_SWIFT_API_SOURCES}")
 endif()

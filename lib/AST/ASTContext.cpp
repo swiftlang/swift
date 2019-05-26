@@ -807,62 +807,20 @@ CanType ASTContext::getAnyObjectType() const {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-/// Retrieve the decl for TensorFlow.TensorHandle iff the TensorFlow module has
-/// been imported.  Otherwise, this returns null.
-ClassDecl *ASTContext::getTensorHandleDecl() const {
-  if (getImpl().TensorHandleDecl)
-    return getImpl().TensorHandleDecl;
 
-  // See if the TensorFlow module was imported.  If not, return null.
-  auto tfModule = getLoadedModule(Id_TensorFlow);
-  if (!tfModule)
-    return nullptr;
-
-  SmallVector<ValueDecl *, 1> results;
-  tfModule->lookupValue({ }, getIdentifier("TensorHandle"),
-                        NLKind::UnqualifiedLookup, results);
-
-  for (auto result : results)
-    if (auto CD = dyn_cast<ClassDecl>(result))
-      return getImpl().TensorHandleDecl = CD;
-  return nullptr;
-}
-
-/// Retrieve the decl for TensorFlow.TensorShape iff the TensorFlow module has
-/// been imported.  Otherwise, this returns null.
-StructDecl *ASTContext::getTensorShapeDecl() const {
-  if (getImpl().TensorShapeDecl)
-    return getImpl().TensorShapeDecl;
-
-  // See if the TensorFlow module was imported.  If not, return null.
-  auto tfModule = getLoadedModule(Id_TensorFlow);
-  if (!tfModule)
-    return nullptr;
-
-  SmallVector<ValueDecl *, 1> results;
-  tfModule->lookupValue({}, getIdentifier("TensorShape"),
-                        NLKind::UnqualifiedLookup, results);
-
-  for (auto result : results)
-    if (auto CD = dyn_cast<StructDecl>(result))
-      return getImpl().TensorShapeDecl = CD;
-  return nullptr;
-}
-
-/// Retrieve the decl for TensorFlow.TensorDataType iff the TensorFlow module has
-/// been imported.  Otherwise, this returns null.
+/// Retrieve the decl for TensorDataType.
 StructDecl *ASTContext::getTensorDataTypeDecl() const {
   if (getImpl().TensorDataTypeDecl)
     return getImpl().TensorDataTypeDecl;
 
-  // See if the TensorFlow module was imported.  If not, return null.
-  auto tfModule = getLoadedModule(Id_TensorFlow);
-  if (!tfModule)
+  // See if the Stdlib module was imported.  If not, return null.
+  auto stdlibModule = getStdlibModule();
+  if (!stdlibModule)
     return nullptr;
 
   SmallVector<ValueDecl *, 1> results;
-  tfModule->lookupValue({}, getIdentifier("TensorDataType"),
-                        NLKind::UnqualifiedLookup, results);
+  stdlibModule->lookupValue({}, getIdentifier("TensorDataType"),
+                            NLKind::UnqualifiedLookup, results);
 
   for (auto result : results)
     if (auto CD = dyn_cast<StructDecl>(result))
@@ -946,10 +904,6 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::TensorArrayProtocol:
   case KnownProtocolKind::TensorGroup:
-  case KnownProtocolKind::TensorFlowDataTypeCompatible:
-  case KnownProtocolKind::TensorProtocol:
-    M = getLoadedModule(Id_TensorFlow);
-    break;
   default:
     M = getStdlibModule();
     break;
@@ -3544,50 +3498,13 @@ DependentMemberType *DependentMemberType::get(Type base,
 
 OpaqueTypeArchetypeType *
 OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
-                             SubstitutionMap Substitutions) {
+                             SubstitutionMap Substitutions)
+{
   // TODO: We could attempt to preserve type sugar in the substitution map.
+  // Currently archetypes are assumed to be always canonical in many places,
+  // though, so doing so would require fixing those places.
   Substitutions = Substitutions.getCanonical();
-  
-  // TODO: Eventually an opaque archetype ought to be arbitrarily substitutable
-  // into any generic environment. However, there isn't currently a good way to
-  // do this with GenericSignatureBuilder; in a situation like this:
-  //
-  // __opaque_type Foo<t_0_0: P>: Q // internal signature <t_0_0: P, t_1_0: Q>
-  //
-  // func bar<t_0_0, t_0_1, t_0_2: P>() -> Foo<t_0_2>
-  //
-  // we'd want to feed the GSB constraints to form:
-  //
-  // <t_0_0: P, t_1_0: Q where t_0_0 == t_0_2>
-  //
-  // even though t_0_2 isn't *in* this generic signature; it represents a type
-  // bound elsewhere from some other generic context. If we knew the generic
-  // environment `t_0_2` came from, then maybe we could map it into that context,
-  // but currently we have no way to know that with certainty.
-  //
-  // For now, opaque types cannot propagate across decls; every declaration
-  // with an opaque type has a unique opaque decl. Therefore, the only
-  // expressions involving opaque types ought to be contextualized inside
-  // function bodies, and the only time we need an opaque interface type should
-  // be for the opaque decl itself and the originating decl with the opaque
-  // result type, in which case the interface type mapping is identity and
-  // this problem can be temporarily avoided.
-#ifndef NDEBUG
-  for (unsigned i : indices(Substitutions.getReplacementTypes())) {
-    auto replacement = Substitutions.getReplacementTypes()[i];
-    
-    if (!replacement->hasTypeParameter())
-      continue;
-    
-    auto replacementParam = replacement->getAs<GenericTypeParamType>();
-    if (!replacementParam)
-      llvm_unreachable("opaque types cannot currently be parameterized by non-identity type parameter mappings");
-    
-    assert(i == Decl->getGenericSignature()->getGenericParamOrdinal(replacementParam)
-           && "opaque types cannot currently be parameterized by non-identity type parameter mappings");
-  }
-#endif
-  
+
   llvm::FoldingSetNodeID id;
   Profile(id, Decl, Substitutions);
   
@@ -3621,7 +3538,34 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
   // decl have all been same-type-bound to the arguments from our substitution
   // map.
   GenericSignatureBuilder builder(ctx);
+
   builder.addGenericSignature(Decl->getOpaqueInterfaceGenericSignature());
+  // TODO: The proper thing to do to build the environment in which the opaque
+  // type's archetype exists would be to take the generic signature of the
+  // decl, feed it into a GenericSignatureBuilder, then add same-type
+  // constraints into the builder to bind the outer generic parameters
+  // to their substituted types provided by \c Substitutions. However,
+  // this is problematic for interface types. In a situation like this:
+  //
+  // __opaque_type Foo<t_0_0: P>: Q // internal signature <t_0_0: P, t_1_0: Q>
+  //
+  // func bar<t_0_0, t_0_1, t_0_2: P>() -> Foo<t_0_2>
+  //
+  // we'd want to feed the GSB constraints to form:
+  //
+  // <t_0_0: P, t_1_0: Q where t_0_0 == t_0_2>
+  //
+  // even though t_0_2 isn't *in* the generic signature being built; it
+  // represents a type
+  // bound elsewhere from some other generic context. If we knew the generic
+  // environment `t_0_2` came from, then maybe we could map it into that context,
+  // but currently we have no way to know that with certainty.
+  //
+  // Because opaque types are currently limited so that they only have immediate
+  // protocol constraints, and therefore don't interact with the outer generic
+  // parameters at all, we can get away without adding these constraints for now.
+  // Adding where clauses would break this hack.
+#if DO_IT_CORRECTLY
   // Same-type-constrain the arguments in the outer signature to their
   // replacements in the substitution map.
   if (auto outerSig = Decl->getGenericSignature()) {
@@ -3633,7 +3577,24 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
          [](Type, Type) { llvm_unreachable("error?"); });
     }
   }
-  
+#else
+  // Assert that there are no same type constraints on the underlying type.
+  // or its associated types.
+  //
+  // This should not be possible until we add where clause support.
+# ifndef NDEBUG
+  for (auto reqt :
+                Decl->getOpaqueInterfaceGenericSignature()->getRequirements()) {
+    auto reqtBase = reqt.getFirstType()->getRootGenericParam();
+    if (reqtBase->isEqual(Decl->getUnderlyingInterfaceType())) {
+      assert(reqt.getKind() != RequirementKind::SameType
+             && "supporting where clauses on opaque types requires correctly "
+                "setting up the generic environment for "
+                "OpaqueTypeArchetypeTypes; see comment above");
+    }
+  }
+# endif
+#endif
   auto signature = std::move(builder)
     .computeGenericSignature(SourceLoc());
   
@@ -4560,21 +4521,13 @@ AutoDiffParameterIndices::get(llvm::SmallBitVector indices, ASTContext &C) {
 }
 
 AutoDiffIndexSubset *
-AutoDiffIndexSubset::get(ASTContext &ctx, unsigned capacity,
-                         ArrayRef<unsigned> indices) {
+AutoDiffIndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
   auto &foldingSet = ctx.getImpl().AutoDiffIndexSubsets;
   llvm::FoldingSetNodeID id;
+  unsigned capacity = indices.size();
   id.AddInteger(capacity);
-#ifndef NDEBUG
-  int last = -1;
-#endif
-  for (unsigned index : indices) {
-#ifndef NDEBUG
-    assert((int)index > last && "Indices must be ascending");
-    last = (int)index;
-#endif
+  for (unsigned index : indices.set_bits())
     id.AddInteger(index);
-  }
   void *insertPos = nullptr;
   auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
   if (existing)
@@ -4583,7 +4536,7 @@ AutoDiffIndexSubset::get(ASTContext &ctx, unsigned capacity,
       getNumBitWordsNeededForCapacity(capacity);
   auto *buf = reinterpret_cast<AutoDiffIndexSubset *>(
       ctx.Allocate(sizeToAlloc, alignof(AutoDiffIndexSubset)));
-  auto *newNode = new (buf) AutoDiffIndexSubset(capacity, indices);
+  auto *newNode = new (buf) AutoDiffIndexSubset(indices);
   foldingSet.InsertNode(newNode, insertPos);
   return newNode;
 }

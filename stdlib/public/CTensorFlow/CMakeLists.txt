@@ -80,6 +80,8 @@ foreach(sdk ${TARGET_SDKS})
     endif()
     copy_tf_headers("${adjusted_tf_include_dir}/tensorflow/c/c_api.h" c_api.h)
     copy_tf_headers("${adjusted_tf_include_dir}/tensorflow/c/c_api_experimental.h" c_api_experimental.h)
+    copy_tf_headers("${adjusted_tf_include_dir}/tensorflow/c/tf_attrtype.h" tf_attrtype.h)
+    copy_tf_headers("${adjusted_tf_include_dir}/tensorflow/c/tf_status.h" tf_status.h)
     copy_tf_headers("${adjusted_tf_include_dir}/tensorflow/c/eager/c_api.h" c_api_eager.h)
     copy_tf_headers("${CMAKE_CURRENT_SOURCE_DIR}/ctensorflow_init.h" ctensorflow_init.h)
 

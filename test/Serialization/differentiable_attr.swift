@@ -97,3 +97,6 @@ extension P where Self : Differentiable, Self == Self.TangentVector {
     return (self, { v in v })
   }
 }
+
+// CHECK: func testDifferentiableParam(f: @differentiable (Float) -> Float)
+func testDifferentiableParam(f: @differentiable (Float) -> Float) {}

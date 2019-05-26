@@ -5,7 +5,9 @@
 // RUN: %target-build-swift -emit-library -emit-module -o %t/libfirst.dylib -emit-objc-header-path %t/first.h %S/Inputs/class-stubs-weak/first.swift -Xlinker -install_name -Xlinker @executable_path/libfirst.dylib -enable-library-evolution
 // RUN: %target-build-swift -emit-library -o %t/libsecond.dylib -emit-objc-header-path %t/second.h -I %t %S/Inputs/class-stubs-weak/second.swift -Xlinker -install_name -Xlinker @executable_path/libsecond.dylib -lfirst -L %t -Xfrontend -enable-resilient-objc-class-stubs -DBEFORE
 // RUN: cp %S/Inputs/class-stubs-weak/module.map %t/
-// RUN: xcrun %clang %s -I %t -L %t -fmodules -fobjc-arc -o %t/main -lfirst -lsecond -Wl,-U,_objc_loadClassref
+
+// Note: This is the just-built Clang, not the system Clang.
+// RUN: xcrun -sdk %sdk %clang %s -I %t -L %t -fmodules -fobjc-arc -o %t/main -lfirst -lsecond -Wl,-U,_objc_loadClassref -target %target-triple
 
 // Now rebuild the library, omitting the weak-exported class
 // RUN: %target-build-swift -emit-library -o %t/libsecond.dylib -I %t %S/Inputs/class-stubs-weak/second.swift -Xlinker -install_name -Xlinker @executable_path/libsecond.dylib -lfirst -L %t -Xfrontend -enable-resilient-objc-class-stubs
@@ -14,7 +16,7 @@
 // RUN: %target-run %t/main %t/libfirst.dylib %t/libsecond.dylib
 
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx
+// REQUIRES: objc_interop
 
 #import <dlfcn.h>
 #import <stdio.h>

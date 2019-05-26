@@ -3372,8 +3372,13 @@ public:
     allResults.push_back(ai);
     allResults.append(ai->getIndirectSILResults().begin(),
                       ai->getIndirectSILResults().end());
-    auto hasActiveResults = llvm::any_of(allResults, [&](SILValue result) {
-      return activityInfo.isActive(result, getIndices());
+    auto hasActiveResults = llvm::any_of(
+        allResults, [this](SILValue res) {
+      return activityInfo.isActive(res, getIndices());
+    });
+    auto hasActiveArguments = llvm::any_of(
+        ai->getArgumentsWithoutIndirectResults(), [this](SILValue arg) {
+      return activityInfo.isActive(arg, getIndices());
     });
     // Check for active 'inout' arguments.
     auto paramInfos = ai->getSubstCalleeConv().getParameters();
@@ -3392,7 +3397,7 @@ public:
     }
     // If there's no active results, this function should not be differentiated.
     // Do standard cloning.
-    if (!hasActiveResults) {
+    if (!hasActiveResults || !hasActiveArguments) {
       LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *ai << '\n');
       SILClonerWithScopes::visitApplyInst(ai);
       return;
