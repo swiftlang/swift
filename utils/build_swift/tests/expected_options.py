@@ -386,9 +386,11 @@ EXPECTED_OPTIONS = [
     SetOption('-s', dest='test_optimize_for_size', value=True),
     SetOption('-y', dest='test_optimize_none_implicit_dynamic', value=True),
     SetOption('-t', dest='test', value=True),
+    SetOption('-a', dest='assertions', value=True),
 
     # FIXME: Convert these options to set_false actions
     SetOption('--no-assertions', dest='assertions', value=False),
+    SetOption('-A', dest='assertions', value=False),
     SetOption('--no-lldb-assertions', dest='lldb_assertions', value=False),
     SetOption('--no-llvm-assertions', dest='llvm_assertions', value=False),
     SetOption('--no-llbuild-assertions',
