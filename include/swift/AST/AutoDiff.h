@@ -296,8 +296,7 @@ public:
   static AutoDiffIndexSubset *get(ASTContext &ctx,
                                   const SmallBitVector &indices);
 
-  static AutoDiffIndexSubset *get(ASTContext &ctx,
-                                  unsigned capacity,
+  static AutoDiffIndexSubset *get(ASTContext &ctx, unsigned capacity,
                                   ArrayRef<unsigned> indices) {
     SmallBitVector indicesBitVec(capacity, false);
     for (auto index : indices)
@@ -305,14 +304,12 @@ public:
     return AutoDiffIndexSubset::get(ctx, indicesBitVec);
   }
 
-  static AutoDiffIndexSubset *getDefault(ASTContext &ctx,
-                                         unsigned capacity,
+  static AutoDiffIndexSubset *getDefault(ASTContext &ctx, unsigned capacity,
                                          bool includeAll = false) {
     return get(ctx, SmallBitVector(capacity, includeAll));
   }
 
-  static AutoDiffIndexSubset *getFromRange(ASTContext &ctx,
-                                           unsigned capacity,
+  static AutoDiffIndexSubset *getFromRange(ASTContext &ctx, unsigned capacity,
                                            unsigned start, unsigned end) {
     assert(start < capacity);
     assert(end <= capacity);
