@@ -217,6 +217,8 @@ enum ContextualTypePurpose {
   CTP_DictionaryValue,  ///< DictionaryExpr values should have a specific type.
   CTP_CoerceOperand,    ///< CoerceExpr operand coerced to specific type.
   CTP_AssignSource,     ///< AssignExpr source operand coerced to result type.
+  CTP_SubscriptAssignSource, ///< AssignExpr source operand coerced to subscript
+                             ///< result type.
 
   CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };

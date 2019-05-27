@@ -2201,6 +2201,10 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     diagID = diag::cannot_convert_assign;
     nilDiag = diag::cannot_convert_assign_nil;
     break;
+  case CTP_SubscriptAssignSource:
+    diagID = diag::cannot_convert_subscript_assign;
+    nilDiag = diag::cannot_convert_subscript_assign_nil;
+    break;
   }
 
   // If we're diagnostic an issue with 'nil', produce a specific diagnostic,
@@ -2356,6 +2360,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   case CTP_DictionaryKey:
   case CTP_DictionaryValue:
   case CTP_AssignSource:
+  case CTP_SubscriptAssignSource:
   case CTP_Initialization:
   case CTP_ReturnStmt:
     tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
@@ -5383,7 +5388,9 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
 
   auto *srcExpr = assignExpr->getSrc();
   auto contextualType = destType->getRValueType();
-
+  auto contextualTypePurpose = isa<SubscriptExpr>(destExpr)
+                                   ? CTP_SubscriptAssignSource
+                                   : CTP_AssignSource;
   // Let's try to type-check assignment source expression without using
   // destination as a contextual type, that allows us to diagnose
   // contextual problems related to source much easier.
@@ -5399,11 +5406,11 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
 
     if (type && !type->isEqual(contextualType))
       return diagnoseContextualConversionError(
-          assignExpr->getSrc(), contextualType, CTP_AssignSource);
+          assignExpr->getSrc(), contextualType, contextualTypePurpose);
   }
 
   srcExpr = typeCheckChildIndependently(assignExpr->getSrc(), contextualType,
-                                        CTP_AssignSource);
+                                        contextualTypePurpose);
   if (!srcExpr)
     return true;
 
