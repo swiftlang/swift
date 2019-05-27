@@ -578,6 +578,12 @@ public:
   /// sequence in a for ... in ... loop.
   bool isForSequenceElementType() const;
 
+  /// Determine whether this locator points to the contextual type.
+  bool isForContextualType() const;
+
+  /// If this locator points to generic parameter return its type.
+  GenericTypeParamType *getGenericParameter() const;
+
   /// Produce a profile of this locator, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
                       ArrayRef<PathElement> path);
