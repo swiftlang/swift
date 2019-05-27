@@ -178,6 +178,7 @@ KNOWN_SETTINGS=(
     skip-test-optimize-none-implicit-dynamic ""  "set to skip testing the test suite in optimize none with implicit dynamic mode"
     skip-test-sourcekit         ""               "set to skip testing SourceKit"
     stress-test-sourcekit       ""               "set to run the stress-SourceKit target"
+    only-executable-test        ""               "only run the executable variant of the swift lit tests"
     workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift"
     enable-llvm-assertions      "1"              "set to enable llvm assertions"
     build-llvm                  "1"              "set to 1 to build LLVM and Clang"
@@ -1482,6 +1483,8 @@ function calculate_targets_for_host() {
             test_target_suffix=""
             if [[ -n "${test_host_only}" ]] ; then
                 test_target_suffix="-only_non_executable"
+            elif [[ -n "${ONLY_EXECUTABLE_TEST}" ]] ; then
+                test_target_suffix="-only_executable"
             fi
 
             test_subset_target_suffix=""
