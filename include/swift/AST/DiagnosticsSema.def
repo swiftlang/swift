@@ -928,6 +928,8 @@ NOTE(note_call_to_operator,none,
      "in call to operator %0", (DeclName))
 NOTE(note_call_to_func,none,
      "in call to function %0", (DeclName))
+NOTE(note_call_to_subscript,none,
+     "in call to %0", (DeclName))
 NOTE(note_call_to_initializer,none,
      "in call to initializer", ())
 NOTE(note_init_parameter,none,

@@ -101,13 +101,9 @@ void ConstraintSystem::incrementLeafScopes() {
 
 bool ConstraintSystem::hasFreeTypeVariables() {
   // Look for any free type variables.
-  for (auto tv : TypeVariables) {
-    if (!tv->getImpl().hasRepresentativeOrFixed()) {
-      return true;
-    }
-  }
-  
-  return false;
+  return llvm::any_of(TypeVariables, [](const TypeVariableType *typeVar) {
+    return !typeVar->getImpl().hasRepresentativeOrFixed();
+  });
 }
 
 void ConstraintSystem::addTypeVariable(TypeVariableType *typeVar) {

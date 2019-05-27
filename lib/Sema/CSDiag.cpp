@@ -7083,125 +7083,6 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   diagnosis.diagnoseAmbiguity(expr);
 }
 
-static bool hasGenericParameter(const GenericTypeDecl *generic,
-                                GenericTypeParamType *paramTy) {
-  auto *decl = paramTy->getDecl();
-  if (!decl)
-    return false;
-
-  return decl->getDeclContext() == generic;
-}
-
-static void noteGenericParameterSource(const TypeLoc &loc,
-                                       GenericTypeParamType *paramTy,
-                                       ConstraintSystem &cs) {
-  const GenericTypeDecl *FoundDecl = nullptr;
-  const ComponentIdentTypeRepr *FoundGenericTypeBase = nullptr;
-
-  // Walk the TypeRepr to find the type in question.
-  if (auto typerepr = loc.getTypeRepr()) {
-    struct FindGenericTypeDecl : public ASTWalker {
-      const GenericTypeDecl *FoundDecl = nullptr;
-      const ComponentIdentTypeRepr *FoundGenericTypeBase = nullptr;
-      GenericTypeParamType *ParamTy;
-
-      FindGenericTypeDecl(GenericTypeParamType *ParamTy)
-          : ParamTy(ParamTy) {}
-      
-      bool walkToTypeReprPre(TypeRepr *T) override {
-        // If we already emitted the note, we're done.
-        if (FoundDecl) return false;
-        
-        if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
-          auto *generic =
-              dyn_cast_or_null<GenericTypeDecl>(ident->getBoundDecl());
-          if (generic && hasGenericParameter(generic, ParamTy)) {
-            FoundDecl = generic;
-            FoundGenericTypeBase = ident;
-            return false;
-          }
-        }
-        // Keep walking.
-        return true;
-      }
-    } findGenericTypeDecl(paramTy);
-
-    typerepr->walk(findGenericTypeDecl);
-    FoundDecl = findGenericTypeDecl.FoundDecl;
-    FoundGenericTypeBase = findGenericTypeDecl.FoundGenericTypeBase;
-  }
-
-  // If we didn't find the type in the TypeRepr, fall back to the type in the
-  // type checked expression.
-  if (!FoundDecl) {
-    if (const GenericTypeDecl *generic = loc.getType()->getAnyGeneric())
-      if (hasGenericParameter(generic, paramTy))
-        FoundDecl = generic;
-  }
-
-  auto &tc = cs.getTypeChecker();
-  if (FoundDecl) {
-    Type type;
-    if (auto *nominal = dyn_cast<NominalTypeDecl>(FoundDecl))
-      type = nominal->getDeclaredType();
-    else if (auto *typeAlias = dyn_cast<TypeAliasDecl>(FoundDecl))
-      type = typeAlias->getUnboundGenericType();
-    else
-      type = FoundDecl->getDeclaredInterfaceType();
-    tc.diagnose(FoundDecl, diag::archetype_declared_in_type, paramTy, type);
-  }
-
-  if (FoundGenericTypeBase && !isa<GenericIdentTypeRepr>(FoundGenericTypeBase)){
-    assert(FoundDecl);
-
-    // If we can, prefer using any types already fixed by the constraint system.
-    // This lets us produce fixes like `Pair<Int, Any>` instead of defaulting to
-    // `Pair<Any, Any>`.
-    // Right now we only handle this when the type that's at fault is the
-    // top-level type passed to this function.
-    auto type = loc.getType();
-    if (!type)
-      type = cs.getType(loc);
-
-    ArrayRef<Type> genericArgs;
-
-    if (auto *boundGenericTy = type->getAs<BoundGenericType>()) {
-      if (boundGenericTy->getDecl() == FoundDecl)
-        genericArgs = boundGenericTy->getGenericArgs();
-    }
-
-    auto getPreferredType =
-        [&](const GenericTypeParamDecl *genericParam) -> Type {
-      // If we were able to get the generic arguments (i.e. the types used at
-      // FoundDecl's use site), we can prefer those...
-      if (genericArgs.empty())
-        return Type();
-
-      Type preferred = genericArgs[genericParam->getIndex()];
-      if (!preferred || preferred->hasError())
-        return Type();
-
-      // ...but only if they were actually resolved by the constraint system
-      // despite the failure.
-      Type maybeFixedType = cs.getFixedTypeRecursive(preferred,
-                                                     /*wantRValue*/true);
-      if (maybeFixedType->hasTypeVariable() ||
-          maybeFixedType->hasUnresolvedType()) {
-        return Type();
-      }
-      return maybeFixedType;
-    };
-
-    SmallString<64> genericParamBuf;
-    if (tc.getDefaultGenericArgumentsString(genericParamBuf, FoundDecl,
-                                            getPreferredType)) {
-      tc.diagnose(FoundGenericTypeBase->getLoc(),
-                  diag::unbound_generic_parameter_explicit_fix)
-        .fixItInsertAfter(FoundGenericTypeBase->getEndLoc(), genericParamBuf);
-    }
-  }
-}
-
 std::pair<Type, ContextualTypePurpose>
 FailureDiagnosis::validateContextualType(Type contextualType,
                                          ContextualTypePurpose CTP) {
@@ -7483,19 +7364,6 @@ bool FailureDiagnosis::diagnoseAmbiguousGenericParameters() {
 void FailureDiagnosis::
 diagnoseAmbiguousGenericParameter(GenericTypeParamType *paramTy,
                                   Expr *anchor) {
-  auto &tc = CS.getTypeChecker();
-
-  // The generic parameter may come from the explicit type in a cast expression.
-  if (auto *ECE = dyn_cast_or_null<ExplicitCastExpr>(anchor)) {
-    tc.diagnose(ECE->getLoc(), diag::unbound_generic_parameter_cast,
-                paramTy, ECE->getCastTypeLoc().getType())
-      .highlight(ECE->getCastTypeLoc().getSourceRange());
-
-    // Emit a note specifying where this came from, if we can find it.
-    noteGenericParameterSource(ECE->getCastTypeLoc(), paramTy, CS);
-    return;
-  }
-
   // A very common cause of this diagnostic is a situation where a closure expr
   // has no inferred type, due to being a multiline closure.  Check to see if
   // this is the case and (if so), speculatively diagnose that as the problem.
@@ -7513,58 +7381,15 @@ diagnoseAmbiguousGenericParameter(GenericTypeParamType *paramTy,
   
   // Otherwise, emit an error message on the expr we have, and emit a note
   // about where the generic parameter came from.
-  tc.diagnose(expr->getLoc(), diag::unbound_generic_parameter, paramTy);
-  
-  // If we have an anchor, drill into it to emit a
-  // "note: generic parameter declared here".
-  if (!anchor) return;
-
-
-  if (auto TE = dyn_cast<TypeExpr>(anchor)) {
-    // Emit a note specifying where this came from, if we can find it.
-    noteGenericParameterSource(TE->getTypeLoc(), paramTy, CS);
+  if (!anchor) {
+    auto &tc = CS.getTypeChecker();
+    tc.diagnose(expr->getLoc(), diag::unbound_generic_parameter, paramTy);
     return;
   }
 
-  ConcreteDeclRef resolved;
-  
-  // Simple case: direct reference to a declaration.
-  if (auto dre = dyn_cast<DeclRefExpr>(anchor))
-    resolved = dre->getDeclRef();
-  
-  // Simple case: direct reference to a declaration.
-  if (auto MRE = dyn_cast<MemberRefExpr>(anchor))
-    resolved = MRE->getMember();
-  
-  if (auto OCDRE = dyn_cast<OtherConstructorDeclRefExpr>(anchor))
-    resolved = OCDRE->getDeclRef();
-
-  
-  // We couldn't resolve the locator to a declaration, so we're done.
-  if (!resolved)
-    return;
-  
-  auto decl = resolved.getDecl();
-  if (auto FD = dyn_cast<FuncDecl>(decl)) {
-    auto name = FD->getFullName();
-    auto diagID = name.isOperator() ? diag::note_call_to_operator
-                                    : diag::note_call_to_func;
-    tc.diagnose(decl, diagID, name);
-    return;
-  }
-  
-  // FIXME: Specialize for implicitly-generated constructors.
-  if (isa<ConstructorDecl>(decl)) {
-    tc.diagnose(decl, diag::note_call_to_initializer);
-    return;
-  }
-  
-  if (auto PD = dyn_cast<ParamDecl>(decl)) {
-    tc.diagnose(decl, diag::note_init_parameter, PD->getName());
-    return;
-  }
-  
-  // FIXME: Other decl types too.
+  MissingGenericArgumentsFailure failure(expr, CS, {paramTy},
+                                         CS.getConstraintLocator(anchor));
+  failure.diagnoseAsError();
 }
 
 
