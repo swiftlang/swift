@@ -181,6 +181,12 @@ bool ConstraintLocator::isForSequenceElementType() const {
          path.back().getKind() == ConstraintLocator::SequenceElementType;
 }
 
+GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
+  assert(isForGenericParameter());
+  auto path = getPath();
+  return path.back().getGenericParameter();
+}
+
 void ConstraintLocator::dump(SourceManager *sm) {
   dump(sm, llvm::errs());
   llvm::errs() << "\n";
