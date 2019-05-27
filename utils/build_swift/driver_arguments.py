@@ -776,6 +776,10 @@ def create_argument_parser():
     option('--host-test', toggle_true,
            help='run executable tests on host devices (such as iOS or tvOS)')
 
+    option('--only-executable-test', toggle_true,
+           help='Only run executable tests. Does nothing if host-test is not '
+                'allowed')
+
     option('--test-paths', append,
            type=argparse.ShellSplitType(),
            help='run tests located in specific directories and/or files '
