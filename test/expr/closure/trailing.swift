@@ -138,6 +138,7 @@ limitXY(someInt, toGamut: intArray) {}  // expected-error{{cannot invoke 'limitX
 // <rdar://problem/23036383> QoI: Invalid trailing closures in stmt-conditions produce lowsy diagnostics
 func retBool(x: () -> Int) -> Bool {}
 func maybeInt(_: () -> Int) -> Int? {}
+func twoClosureArgs(_:()->Void, _:()->Void) -> Bool {}
 class Foo23036383 {
   init() {}
   func map(_: (Int) -> Int) -> Int? {}
@@ -202,7 +203,82 @@ func r23036383(foo: Foo23036383?, obj: Foo23036383) {
 
   if let _ = maybeInt { 1 }, retBool { 1 } { }
   // expected-error@-1 {{trailing closure requires parentheses for disambiguation in this context}} {{22-23=(}} {{28-28=)}} 
-  // expected-error@-2 {{trailing closure requires parentheses for disambiguation in this context}} {{37-38=(x: }} {{43-43=)}} 
+  // expected-error@-2 {{trailing closure requires parentheses for disambiguation in this context}} {{37-38=(x: }} {{43-43=)}}
+
+  if let _ = foo?.map {$0+1}.map {$0+1} {} // expected-error {{trailing closure requires parentheses for disambiguation in this context}}  {{33-34=(}} {{40-40=)}}
+  // expected-error@-1 {{trailing closure requires parentheses for disambiguation in this context}} {{22-23=(}} {{29-29=)}}
+
+  if let _ = foo?.map {$0+1}.map({$0+1}) {} // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{22-23=(}} {{29-29=)}}
+
+  if let _ = foo?.map {$0+1}.map({$0+1}).map{$0+1} {} // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{45-45=(}} {{51-51=)}}
+  // expected-error@-1 {{trailing closure requires parentheses for disambiguation in this context}} {{22-23=(}} {{29-29=)}}
+
+  if twoClosureArgs({}) {} {} // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{23-25=, }} {{27-27=)}}
+
+  if let _ = (foo?.map {$0+1}.map({$0+1}).map{$0+1}) {} // OK
+
+  if let _ = (foo?.map {$0+1}.map({$0+1})).map({$0+1}) {} // OK
+}
+
+func id<T>(fn: () -> T) -> T { return fn() }
+func any<T>(fn: () -> T) -> Any { return fn() }
+
+func testSR8736() {
+  if !id { true } { return } // expected-error {{trailing closure requires parentheses for disambiguation in this context}}
+  
+  if id { true } == true { return } // expected-error {{trailing closure requires parentheses for disambiguation in this context}}
+  
+  if true == id { true } { return } // expected-error {{trailing closure requires parentheses for disambiguation in this context}}
+  
+  if id { true } ? true : false { return } // expected-error {{trailing closure requires parentheses for disambiguation in this context}}
+  
+  if true ? id { true } : false { return } // expected-error {{trailing closure requires parentheses for disambiguation in this context}}
+  
+  if true ? true : id { false } { return } // expected-error {{trailing closure requires parentheses for disambiguation in this context}}
+  
+  if id { [false,true] }[0] { return } // expected-error {{trailing closure requires parentheses for disambiguation in this context}}
+  
+  if id { { true } } () { return } // expected-error {{trailing closure requires parentheses for disambiguation in this context}}
+  
+  if any { true } as! Bool { return } // expected-error {{trailing closure requires parentheses for disambiguation in this context}}
+  
+  if let _ = any { "test" } as? Int { return } // expected-error {{trailing closure requires parentheses for disambiguation in this context}}
+  
+  if any { "test" } is Int { return } // expected-error {{trailing closure requires parentheses for disambiguation in this context}}
+  
+  if let _ = id { [] as [Int]? }?.first { return } // expected-error {{trailing closure requires parentheses for disambiguation in this context}}
+  
+  if id { true as Bool? }! { return } // expected-error {{trailing closure requires parentheses for disambiguation in this context}}
+  
+  if case id { 1 } = 1 { return } // expected-error {{trailing closure requires parentheses for disambiguation in this context}}
+  
+  if case 1 = id { 1 } { return } // expected-error {{trailing closure requires parentheses for disambiguation in this context}}
+  
+  if case 1 = id { 1 } /*comment*/ { return } // expected-error {{trailing closure requires parentheses for disambiguation in this context}}
+  
+  if case (id { 1 }) = 1 { return } // OK
+  
+  if case 1 = (id { 1 }) { return } // OK
+  
+  if [id { true }].count == 0 { return } // OK
+  
+  if [id { true } : "test"].keys.count == 0 { return } // OK
+  
+  if "\(id { true })" == "foo" { return } // OK
+  
+  if (id { true }) { return } // OK
+  
+  if (id { true }) { }
+  [1, 2, 3].count // expected-warning {{expression of type 'Int' is unused}}
+  
+  if true { }
+  () // OK
+  
+  if true
+  {
+    
+  }
+  () // OK
 }
 
 func overloadOnLabel(a: () -> Void) {}
