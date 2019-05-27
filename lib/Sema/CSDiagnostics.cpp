@@ -76,6 +76,10 @@ Type FailureDiagnostic::getType(Expr *expr) const {
   return resolveType(CS.getType(expr));
 }
 
+Type FailureDiagnostic::getType(const TypeLoc &loc) const {
+  return resolveType(CS.getType(loc));
+}
+
 template <typename... ArgTypes>
 InFlightDiagnostic
 FailureDiagnostic::emitDiagnostic(ArgTypes &&... Args) const {
@@ -2880,4 +2884,104 @@ MissingContextualConformanceFailure::getDiagnosticFor(
     break;
   }
   return None;
+}
+
+SourceLoc MissingGenericArgumentsFailure::getLoc() const {
+  return BaseType ? BaseType->getLoc() : getAnchor()->getLoc();
+}
+
+bool MissingGenericArgumentsFailure::hasLoc(GenericTypeParamType *GP) const {
+  return GP->getDecl()->getStartLoc().isValid();
+}
+
+bool MissingGenericArgumentsFailure::diagnoseAsError() {
+  for (auto *GP : Parameters)
+    diagnoseParameter(GP);
+
+  auto *DC = getDeclContext();
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
+    emitDiagnostic(AFD, diag::note_call_to_func, AFD->getFullName());
+    return true;
+  }
+
+  emitGenericSignatureNote();
+  return true;
+}
+
+void MissingGenericArgumentsFailure::diagnoseParameter(
+    GenericTypeParamType *GP) const {
+  if (auto *CE = dyn_cast<ExplicitCastExpr>(getRawAnchor())) {
+    auto castTo = getType(CE->getCastTypeLoc());
+    auto *NTD = castTo->getAnyNominal();
+    emitDiagnostic(getLoc(), diag::unbound_generic_parameter_cast, GP,
+                   NTD ? NTD->getDeclaredType() : castTo);
+  } else {
+    emitDiagnostic(getLoc(), diag::unbound_generic_parameter, GP);
+  }
+
+  auto *DC = getDeclContext();
+  if (DC->isTypeContext() && hasLoc(GP)) {
+    auto *base = DC->getSelfNominalTypeDecl();
+    emitDiagnostic(GP->getDecl(), diag::archetype_declared_in_type, GP,
+                   base->getDeclaredType());
+  }
+}
+
+void MissingGenericArgumentsFailure::emitGenericSignatureNote() const {
+  auto &cs = getConstraintSystem();
+  auto &TC = getTypeChecker();
+  auto *paramDC = getDeclContext();
+
+  assert(paramDC->isTypeContext());
+
+  auto *GTD = dyn_cast<GenericTypeDecl>(paramDC);
+  if (!GTD || !BaseType)
+    return;
+
+  auto getParamDecl =
+      [](const ConstraintLocator *locator) -> GenericTypeParamDecl * {
+    return locator->isForGenericParameter()
+               ? locator->getGenericParameter()->getDecl()
+               : nullptr;
+  };
+
+  llvm::SmallDenseMap<GenericTypeParamDecl *, Type> params;
+  for (auto *typeVar : cs.getTypeVariables()) {
+    if (auto *locator = typeVar->getImpl().getLocator()) {
+      if (auto *GPD = getParamDecl(locator))
+        params[GPD] = resolveType(typeVar);
+    }
+  }
+
+  auto getPreferredType = [&](const GenericTypeParamDecl *GP) -> Type {
+    auto type = params.find(GP);
+    assert(type != params.end());
+
+    // If this is one of the defaulted parameter types, attempt
+    // to emit placeholder for it instead of `Any`.
+    if (std::any_of(cs.DefaultedConstraints.begin(),
+                    cs.DefaultedConstraints.end(),
+                    [&](const ConstraintLocator *locator) {
+                      return GP == getParamDecl(locator);
+                    }))
+      return Type();
+
+    return type->second;
+  };
+
+  SmallString<64> paramsAsString;
+  if (TC.getDefaultGenericArgumentsString(paramsAsString, GTD,
+                                          getPreferredType)) {
+    auto diagnostic =
+        emitDiagnostic(getLoc(), diag::unbound_generic_parameter_explicit_fix);
+
+    if (auto *genericTy = dyn_cast<GenericIdentTypeRepr>(BaseType)) {
+      // If some of the eneric arguments have been specified, we need to
+      // replace existing signature with a new one.
+      diagnostic.fixItReplace(genericTy->getAngleBrackets(), paramsAsString);
+    } else {
+      // Otherwise we can simply insert new generic signature.
+      diagnostic.fixItInsertAfter(BaseType->getEndLoc(), paramsAsString);
+    }
+  }
 }

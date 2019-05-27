@@ -89,6 +89,7 @@ public:
   ConstraintLocator *getLocator() const { return Locator; }
 
   Type getType(Expr *expr) const;
+  Type getType(const TypeLoc &loc) const;
 
   /// Resolve type variables present in the raw type, if any.
   Type resolveType(Type rawType, bool reconstituteSugar = false) const {
@@ -1227,6 +1228,47 @@ public:
 private:
   static Optional<Diag<Type, Type>>
   getDiagnosticFor(ContextualTypePurpose purpose);
+};
+
+/// Diagnose generic argument omission e.g.
+///
+/// ```swift
+/// struct S<T> {}
+///
+/// _ = S()
+/// ```
+class MissingGenericArgumentsFailure final : public FailureDiagnostic {
+  TypeRepr *BaseType;
+  SmallVector<GenericTypeParamType *, 4> Parameters;
+
+public:
+  MissingGenericArgumentsFailure(Expr *root, ConstraintSystem &cs,
+                                 TypeRepr *baseType,
+                                 ArrayRef<TypeVariableType *> missingParams,
+                                 ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), BaseType(baseType) {
+    assert(!missingParams.empty());
+    llvm::transform(missingParams, std::back_inserter(Parameters),
+                    [](const TypeVariableType *GP) {
+                      return GP->getImpl().getGenericParameter();
+                    });
+  }
+
+  SourceLoc getLoc() const;
+
+  bool hasLoc(GenericTypeParamType *GP) const;
+
+  DeclContext *getDeclContext() const {
+    auto *GP = Parameters.front();
+    return GP->getDecl()->getDeclContext();
+  }
+
+  bool diagnoseAsError() override;
+
+  void diagnoseParameter(GenericTypeParamType *GP) const;
+
+private:
+  void emitGenericSignatureNote() const;
 };
 
 } // end namespace constraints
