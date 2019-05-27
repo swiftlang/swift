@@ -778,6 +778,15 @@ func testShapeGetter4() {
 }
 TensorTests.testAllBackends("ShapeGetter4", testShapeGetter4)
 
+@inline(never)
+func testReplacing1() {
+  let original = Tensor<Float>([[1.0, 0.0], [3.0, 0.0], [2.0, 3.0], [1.0, 0.0]])
+  let modified = original.replacing(with: Tensor<Float>(-1).broadcast(like: original), where: original.<3)
+  let expected = Tensor<Float>([[-1.0, -1.0], [3.0, -1.0], [-1.0, 3.0], [-1.0, -1.0]])
+  expectEqual(expected, modified)
+}
+TensorTests.testAllBackends("Replacing1", testReplacing1)
+
 // For now it is sufficient to run remote tests with test cases in this file
 // only. When creating new test files, consider simply calling runAllTests().
 #if CUDA
