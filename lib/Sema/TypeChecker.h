@@ -211,6 +211,7 @@ enum ContextualTypePurpose {
 
   CTP_CalleeResult,     ///< Constraint is placed on the result of a callee.
   CTP_CallArgument,     ///< Call to function or operator requires type.
+  CTP_VariadicCallArg,  ///< Call to function requires variadic argument type.
   CTP_ClosureResult,    ///< Closure result expects a specific type.
   CTP_ArrayElement,     ///< ArrayExpr wants elements to have a specific type.
   CTP_DictionaryKey,    ///< DictionaryExpr keys should have a specific type.

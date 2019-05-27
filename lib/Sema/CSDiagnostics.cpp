@@ -564,6 +564,7 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
   case CTP_YieldByValue:
     return diag::cannot_convert_yield_value;
   case CTP_CallArgument:
+  case CTP_VariadicCallArg:
     return diag::cannot_convert_argument_value;
   case CTP_ClosureResult:
     return diag::cannot_convert_closure_result;
@@ -3182,6 +3183,7 @@ MissingContextualConformanceFailure::getDiagnosticFor(
   case CTP_YieldByValue:
     return diag::cannot_convert_yield_value_protocol;
   case CTP_CallArgument:
+  case CTP_VariadicCallArg:
     return diag::cannot_convert_argument_value_protocol;
   case CTP_ClosureResult:
     return diag::cannot_convert_closure_result_protocol;

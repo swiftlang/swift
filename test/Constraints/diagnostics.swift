@@ -300,6 +300,47 @@ func rdar21784170() {
   (Array.init as (Double...) -> Array<Double>)(initial as (Double, Double)) // expected-error {{cannot convert value of type '(Double, Double)' to expected argument type 'Double'}}
 }
 
+// Diagnose passing an array in lieu of variadic parameters
+func variadic(_ x: Int...) {}
+func variadicArrays(_ x: [Int]...) {}
+func variadicAny(_ x: Any...) {}
+struct HasVariadicSubscript {
+  subscript(_ x: Int...) -> Int {
+    get { 0 }
+  }
+}
+let foo = HasVariadicSubscript()
+
+let array = [1,2,3]
+let arrayWithOtherEltType = ["hello", "world"]
+
+variadic(array) // expected-error {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
+variadic([1,2,3]) // expected-error {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
+// expected-note@-1 {{remove brackets to pass array elements directly}} {{10-11=}} {{16-17=}}
+variadic([1,2,3,]) // expected-error {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
+// expected-note@-1 {{remove brackets to pass array elements directly}} {{10-11=}} {{16-17=}} {{17-18=}}
+variadic(0, array, 4) // expected-error {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
+variadic(0, [1,2,3], 4) // expected-error {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
+// expected-note@-1 {{remove brackets to pass array elements directly}} {{13-14=}} {{19-20=}}
+variadic(0, [1,2,3,], 4) // expected-error {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
+// expected-note@-1 {{remove brackets to pass array elements directly}} {{13-14=}} {{19-20=}} {{20-21=}}
+variadic(arrayWithOtherEltType) // expected-error {{cannot convert value of type '[String]' to expected argument type 'Int'}}
+variadic(1, arrayWithOtherEltType) // expected-error {{cannot convert value of type '[String]' to expected argument type 'Int'}}
+variadic(["hello", "world"]) // expected-error {{cannot convert value of type '[String]' to expected argument type 'Int'}}
+
+foo[array] // expected-error {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
+foo[[1,2,3]] // expected-error {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
+// expected-note@-1 {{remove brackets to pass array elements directly}} {{5-6=}} {{11-12=}}
+foo[0, [1,2,3], 4] // expected-error {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
+// expected-note@-1 {{remove brackets to pass array elements directly}} {{8-9=}} {{14-15=}}
+
+variadicAny(array)
+variadicAny([1,2,3])
+variadicArrays(array)
+variadicArrays([1,2,3])
+variadicArrays(arrayWithOtherEltType) // expected-error {{cannot convert value of type '[String]' to expected argument type '[Int]'}}
+variadicArrays(1,2,3) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
+
 // <rdar://problem/21829141> BOGUS: unexpected trailing closure
 func expect<T, U>(_: T) -> (U.Type) -> Int { return { a in 0 } }
 func expect<T, U>(_: T, _: Int = 1) -> (U.Type) -> String { return { a in "String" } }

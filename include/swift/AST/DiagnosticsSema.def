@@ -356,6 +356,14 @@ ERROR(cannot_convert_default_arg_value_nil,none,
 ERROR(cannot_convert_argument_value,none,
       "cannot convert value of type %0 to expected argument type %1",
       (Type,Type))
+
+ERROR(cannot_convert_array_to_variadic,none,
+      "cannot pass an array of type %0 as variadic arguments of type %1",
+      (Type,Type))
+
+NOTE(suggest_pass_elements_directly,none,
+     "remove brackets to pass array elements directly", ())
+
 ERROR(cannot_convert_argument_value_generic,none,
       "cannot convert value of type %0 (%1) to expected argument type %2 (%3)",
       (Type, StringRef, Type, StringRef))
