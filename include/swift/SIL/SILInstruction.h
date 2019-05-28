@@ -7779,7 +7779,7 @@ private:
                        unsigned differentiationOrder,
                        SILValue originalFunction,
                        ArrayRef<SILValue> associatedFunctions,
-                       bool useNewSILDiffFuncType = false);
+                       SILType type, bool useNewSILDiffFuncType);
 
 public:
   static AutoDiffFunctionInst *create(SILModule &module,
@@ -7788,12 +7788,16 @@ public:
                                       unsigned differentiationOrder,
                                       SILValue originalFunction,
                                       ArrayRef<SILValue> associatedFunctions,
-                                      bool useNewSILDiffFuncType = false);
+                                      SILType type,
+                                      bool useNewSILDiffFuncType);
 
-  static SILType getAutoDiffType(SILValue original,
-                                 unsigned differentiationOrder,
-                                 AutoDiffIndexSubset *parameterIndices,
-                                 bool useNewSILDiffFuncType);
+  static SILType getLegacyDifferentiableFunctionType(
+      SILValue original, unsigned differentiationOrder,
+      AutoDiffIndexSubset *parameterIndices);
+
+  bool usesNewSILDiffFuncType() const {
+    return useNewSILDiffFuncType;
+  }
 
   /// Returns the original function.
   SILValue getOriginalFunction() const { return getAllOperands()[0].get(); }

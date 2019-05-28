@@ -1474,6 +1474,22 @@ public:
   void checkAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
     require(adfi->getDifferentiationOrder() > 0,
             "The differentiation order must be non-zero");
+
+    // Special case for the future 'sil_differentiable' mode. When full
+    // migration is done, the default mode will be this mode.
+    if (adfi->usesNewSILDiffFuncType()) {
+      auto destTy = adfi->getOriginalFunction()->getType()
+          .getAs<SILDifferentiableFunctionType>();
+      require(destTy,
+              "The original function must have a '@sil_differentiable' type");
+      require(destTy->getParameterIndices() == adfi->getParameterIndices(),
+              "Parameter indices must be equal");
+      require(destTy->getMaxOrder() == adfi->getDifferentiationOrder(),
+              "Differentiation order must be equal");
+      // TODO(rxwei): Add more checks.
+      return;
+    }
+
     auto origTy =
         adfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
     require(origTy, "The original function must have a function type");

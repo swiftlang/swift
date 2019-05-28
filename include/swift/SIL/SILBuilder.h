@@ -506,13 +506,16 @@ public:
   AutoDiffFunctionInst *createAutoDiffFunction(
       SILLocation loc, AutoDiffIndexSubset *parameterIndices,
       unsigned differentiationOrder, SILValue original,
-      ArrayRef<SILValue> associatedFunctions = {}) {
+      ArrayRef<SILValue> associatedFunctions = {},
+      bool useNewSILDiffFuncType = false, SILType type = SILType()) {
     return insert(AutoDiffFunctionInst::create(getModule(),
                                                getSILDebugLocation(loc),
                                                parameterIndices,
                                                differentiationOrder,
                                                original,
-                                               associatedFunctions));
+                                               associatedFunctions,
+                                               type,
+                                               useNewSILDiffFuncType));
   }
   
   AutoDiffFunctionExtractInst *createAutoDiffFunctionExtract(

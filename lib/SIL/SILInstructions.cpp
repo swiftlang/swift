@@ -567,10 +567,9 @@ TryApplyInst *TryApplyInst::create(
 
 // SWIFT_ENABLE_TENSORFLOW
 SILType
-AutoDiffFunctionInst::getAutoDiffType(SILValue originalFunction,
-                                      unsigned differentiationOrder,
-                                      AutoDiffIndexSubset *parameterIndices,
-                                      bool useNewSILDiffFuncType) {
+AutoDiffFunctionInst::getLegacyDifferentiableFunctionType(
+    SILValue originalFunction, unsigned differentiationOrder,
+    AutoDiffIndexSubset *parameterIndices) {
   auto fnTy = originalFunction->getType().castTo<SILFunctionType>();
   auto diffTy =
       fnTy->getWithDifferentiability(differentiationOrder, parameterIndices);
@@ -581,11 +580,9 @@ AutoDiffFunctionInst::AutoDiffFunctionInst(
     SILModule &module, SILDebugLocation debugLoc,
     AutoDiffIndexSubset *parameterIndices, unsigned differentiationOrder,
     SILValue originalFunction, ArrayRef<SILValue> associatedFunctions,
-    bool useNewSILDiffFuncType)
+    SILType type, bool useNewSILDiffFuncType)
     : InstructionBaseWithTrailingOperands(
-          originalFunction, associatedFunctions, debugLoc,
-          getAutoDiffType(originalFunction, differentiationOrder,
-                          parameterIndices, useNewSILDiffFuncType),
+          originalFunction, associatedFunctions, debugLoc, type,
           originalFunction.getOwnershipKind()),
       parameterIndices(parameterIndices),
       differentiationOrder(differentiationOrder),
@@ -596,20 +593,22 @@ AutoDiffFunctionInst *AutoDiffFunctionInst::create(
     SILModule &module, SILDebugLocation debugLoc,
     AutoDiffIndexSubset *parameterIndices,
     unsigned differentiationOrder, SILValue originalFunction,
-    ArrayRef<SILValue> associatedFunctions,
+    ArrayRef<SILValue> associatedFunctions, SILType type,
     bool useNewSILDiffFuncType) {
   size_t size = totalSizeToAlloc<Operand>(associatedFunctions.size() + 1);
   void *buffer = module.allocateInst(size, alignof(AutoDiffFunctionInst));
-  return ::new (buffer) AutoDiffFunctionInst(module, debugLoc,
-                                             parameterIndices,
-                                             differentiationOrder,
-                                             originalFunction,
-                                             associatedFunctions,
-                                             useNewSILDiffFuncType);
+  return ::new (buffer) AutoDiffFunctionInst(
+      module, debugLoc, parameterIndices, differentiationOrder,
+      originalFunction, associatedFunctions,
+      type ? type : getLegacyDifferentiableFunctionType(originalFunction,
+                                                        differentiationOrder,
+                                                        parameterIndices),
+      useNewSILDiffFuncType);
 }
 
 std::pair<SILValue, SILValue> AutoDiffFunctionInst::
 getAssociatedFunctionPair(unsigned differentiationOrder) const {
+  assert(!useNewSILDiffFuncType);
   assert(differentiationOrder > 0 &&
          differentiationOrder <= this->differentiationOrder);
   assert(!getAssociatedFunctions().empty() && "No associated functions. Maybe "

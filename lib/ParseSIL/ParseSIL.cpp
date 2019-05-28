@@ -2889,6 +2889,20 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     SourceLoc lastLoc;
     SmallVector<unsigned, 8> parameterIndices;
     unsigned order = 1;
+    bool useNewSILDiffFuncType = false;
+    SILType type;
+    // Parse optional `[sil_differentiable]`.
+    if (P.Tok.is(tok::l_square) &&
+        P.peekToken().is(tok::identifier) &&
+        P.peekToken().getText() == "sil_differentiable") {
+      P.consumeToken(tok::l_square);
+      P.consumeToken(tok::identifier);
+      if (P.parseToken(tok::r_square,
+                       diag::sil_inst_autodiff_attr_expected_rsquare,
+                       "'sil_differentiable' attribute"))
+        return true;
+      useNewSILDiffFuncType = true;
+    }
     // Parse optional `[wrt <integer_literal>...]`
     if (P.Tok.is(tok::l_square) &&
         P.peekToken().is(tok::identifier) &&
@@ -2938,6 +2952,12 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
     }
     SmallVector<SILValue, 16> associatedFunctions;
+    // Parse optional destination type `as <type>`.
+    if (P.Tok.is(tok::identifier) && P.Tok.getText() == "as") {
+      P.consumeToken(tok::identifier);
+      if (parseSILType(type))
+        return true;
+    }
     // Parse optional operand lists `with { <operand> , <operand> }, ...`.
     if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with") {
       P.consumeToken(tok::identifier);
@@ -2972,7 +2992,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         AutoDiffIndexSubset::get(P.Context, fnType->getNumParameters(),
                                  parameterIndices);
     ResultVal = B.createAutoDiffFunction(InstLoc, parameterIndicesSubset, order,
-                                         original, associatedFunctions);
+                                         original, associatedFunctions,
+                                         useNewSILDiffFuncType, type);
     break;
   }
   
