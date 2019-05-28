@@ -580,8 +580,44 @@ public final class _ExecutionContext {
     // Initialize the TF runtime exactly once. Only affects local execution
     // (when _RuntimeConfig.tensorFlowServer is set to "").
     if !_RuntimeConfig.tensorFlowRuntimeInitialized {
-      InitTensorFlowRuntime(_RuntimeConfig.printsDebugLog ? 1 : 0,
-                            _RuntimeConfig.tensorflowVerboseLogLevel)
+      var args = ["dummyProgramName"]
+      if _RuntimeConfig.printsDebugLog {
+        args.append("--alsologtostderr")
+      }
+      if _RuntimeConfig.tensorflowVerboseLogLevel > 0 {
+        args.append("--v=\(_RuntimeConfig.tensorflowVerboseLogLevel)")
+      }
+      // Collect all the strings' utf8 bytes into a single array so that we can
+      // address all the strings with a single `flattenedStringBytes.withUnsafeBufferPointer`.
+      var flattenedStringBytes: [Int8] = []
+      var lengths: [Int] = []
+      for arg in args {
+        let bytes = arg.utf8CString
+        flattenedStringBytes.append(contentsOf: bytes)
+        lengths.append(bytes.count)
+      }
+
+      // Calculate the addresses of all the strings within our single buffer, and then call
+      // TF_InitMain.
+      flattenedStringBytes.withUnsafeMutableBufferPointer { flattenedStringBytesBuffer in
+        var stringAddrs: [UnsafeMutablePointer<Int8>?] = []
+        var currentStringAddr = flattenedStringBytesBuffer.baseAddress.map(UnsafeMutablePointer.init)
+        for length in lengths {
+          stringAddrs.append(currentStringAddr)
+          currentStringAddr = currentStringAddr?.advanced(by: length)
+        }
+
+        stringAddrs.withUnsafeMutableBufferPointer { stringAddrsBuffer in
+          var cArgs = [stringAddrsBuffer.baseAddress.map(UnsafeMutablePointer.init)]
+          var cArgsCount = [Int32(args.count)]
+
+          cArgs.withUnsafeMutableBufferPointer { cArgsBuffer in
+            cArgsCount.withUnsafeMutableBufferPointer { cArgsCountBuffer in
+              TF_InitMain(nil, cArgsCountBuffer.baseAddress, cArgsBuffer.baseAddress)
+            }
+          }
+        }
+      }
       _RuntimeConfig.tensorFlowRuntimeInitialized = true
     }
 
