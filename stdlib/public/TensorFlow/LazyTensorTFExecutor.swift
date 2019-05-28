@@ -9,13 +9,6 @@ class TFGraphBuilder {
     case list([TF_Output])
   }
 
-  struct FunctionDescription {
-    let name: String
-    let function: CTFFunction
-    let outputCount: Int
-    let outputGroups: [Int]
-  }
-
   let graph: CTFGraph = TF_NewGraph()
 
   /// A status object to pass to TF graph building operations.
@@ -97,7 +90,32 @@ class TFGraphBuilder {
     return graphNode!
   }
 
-  func tfFunction(
+  func newTFConstNode(_ handle: TFETensorHandle) -> TF_Output {
+    let cTensorHandle = handle._cTensorHandle
+    let cTensor = TFE_TensorHandleResolve(cTensorHandle, status)
+    checkOk(status)
+    let desc = TF_NewOperation(graph, "Const", newNodeName(base: "Const"))
+    checkOk(status)
+    TF_SetAttrType(desc, "dtype", TFE_TensorHandleDataType(cTensorHandle))
+    TF_SetAttrTensor(desc, "value", cTensor, status)
+    checkOk(status)
+    let constNode = TF_FinishOperation(desc, status)
+    return TF_Output(oper: constNode, index: 0)
+  }
+}
+
+class TFFunctionBuilder {
+  struct FunctionDescription {
+    let name: String
+    let function: CTFFunction
+    let outputCount: Int
+    let outputGroups: [Int]
+  }
+
+  /// A status object to pass to TF graph building operations.
+  private static let status: CTFStatus = TF_NewStatus()
+
+  static func tfFunction(
     _ graphDescription: TFGraphDescription,
     _ tracedFunctionName: String) -> FunctionDescription {
     let graph = graphDescription.graph
@@ -145,8 +163,6 @@ class TFGraphBuilder {
   static func execute(
     _ function: FunctionDescription,
     _ inputs: [TFETensorHandle]) -> [TFETensorHandle] {
-    let status: CTFStatus = TF_NewStatus()
-    defer { TF_DeleteStatus(status) }
     let eagerContext = _TFCGetGlobalEagerContext()
     let eagerOp: CTFEOp! = TFE_NewOp(eagerContext, function.name, status)
     defer { TFE_DeleteOp(eagerOp) }
@@ -173,26 +189,12 @@ class TFGraphBuilder {
   }
 
   static func removeFunction(_ function: FunctionDescription) {
-    let status: CTFStatus = TF_NewStatus()
-    defer { TF_DeleteStatus(status) }
     let eagerContext = _TFCGetGlobalEagerContext()
     TFE_ContextRemoveFunction(eagerContext, function.name, status)
     checkOk(status)
     TF_DeleteFunction(function.function)
   }
 
-  func newTFConstNode(_ handle: TFETensorHandle) -> TF_Output {
-    let cTensorHandle = handle._cTensorHandle
-    let cTensor = TFE_TensorHandleResolve(cTensorHandle, status)
-    checkOk(status)
-    let desc = TF_NewOperation(graph, "Const", newNodeName(base: "Const"))
-    checkOk(status)
-    TF_SetAttrType(desc, "dtype", TFE_TensorHandleDataType(cTensorHandle))
-    TF_SetAttrTensor(desc, "value", cTensor, status)
-    checkOk(status)
-    let constNode = TF_FinishOperation(desc, status)
-    return TF_Output(oper: constNode, index: 0)
-  }
 }
 
 class TFGraphDescription {
@@ -204,8 +206,8 @@ class TFGraphDescription {
 
 
   var graph: CTFGraph { graphBuilder.graph }
-  var tfFunction: TFGraphBuilder.FunctionDescription {
-    graphBuilder.tfFunction(
+  var tfFunction: TFFunctionBuilder.FunctionDescription {
+    TFFunctionBuilder.tfFunction(
       self, graphBuilder.newNodeName(base: "lazyTrace"))
   }
 
@@ -260,7 +262,7 @@ class TFGraphDescription {
 
   private func formTFOutput(_ lazyHandle: LazyTensor) -> TF_Output {
     switch lazyHandle.handle {
-       case LazyTensor.Handle.conc(let h, let materialized):
+      case LazyTensor.Handle.conc(let h, let materialized):
         return formTFOutput(h, asConst: !materialized)
       case LazyTensor.Handle.sym(let lazyOp, let index, _): do {
         if let outputs = lazyOp.outputs {
@@ -345,7 +347,7 @@ extension LazyTensorOperation {
     LazyTensorOperation.materializationCallback("graphdesc")
     let function = graphDescription.tfFunction
     LazyTensorOperation.materializationCallback("tffunction")
-    let allOutputs = TFGraphBuilder.execute(function, graphDescription.inputValues)
+    let allOutputs = TFFunctionBuilder.execute(function, graphDescription.inputValues)
     LazyTensorOperation.materializationCallback("execute")
 
     // Slice up the outputs to various lazy tensors
@@ -360,6 +362,6 @@ extension LazyTensorOperation {
     // to the LazyTensorOperations..
     LazyTensor.onAllOperations { $0.maybeMaterializeInputs() }
     // Cleanup
-    TFGraphBuilder.removeFunction(function)
+    TFFunctionBuilder.removeFunction(function)
   }
 }
