@@ -1003,6 +1003,13 @@ public:
           if (D->hasFixedBinaryOrder()) {
             D->emitDiag(diag::decl_added);
           }
+          // Diagnose the missing of @available attributes.
+          // Decls with @_alwaysEmitIntoClient aren't required to have an
+          // @available attribute.
+          if (!D->getIntroducingVersion().hasOSAvailability() &&
+              !D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient)) {
+            D->emitDiag(diag::new_decl_without_intro);
+          }
         }
       }
       // Complain about added protocol requirements
@@ -1038,7 +1045,6 @@ public:
           }
         }
       }
-
       return;
     case NodeMatchReason::Removed:
       assert(!Right);
