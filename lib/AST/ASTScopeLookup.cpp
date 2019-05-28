@@ -485,7 +485,7 @@ NominalTypeScope::getLookupLimitForDecl() const {
 }
 
 NullablePtr<const ASTScopeImpl> ASTScopeImpl::ancestorWithDeclSatisfying(
-    llvm::function_ref<bool(const Decl *)> predicate) const {
+    function_ref<bool(const Decl *)> predicate) const {
   for (NullablePtr<const ASTScopeImpl> s = getParent(); s;
        s = s.get()->getParent()) {
     if (Decl *d = s.get()->getDecl().getPtrOrNull()) {

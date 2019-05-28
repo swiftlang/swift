@@ -311,13 +311,13 @@ protected:
   /// referenced within this expression.
   static void forEachClosureIn(
       Expr *expr,
-      llvm::function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>);
+      function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>);
   void forEachUniqueClosureIn(
       Expr *expr,
-      llvm::function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>);
+      function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>);
 
   static void forEachSpecializeAttrInSourceOrder(
-      Decl *, llvm::function_ref<void(SpecializeAttr *)> fn);
+      Decl *, function_ref<void(SpecializeAttr *)> fn);
 
   virtual llvm::DenseSet<ClosureExpr *> &getAlreadyHandledClosures();
 
@@ -447,7 +447,7 @@ protected:
   virtual NullablePtr<const ASTScopeImpl> getLookupLimit() const;
 
   NullablePtr<const ASTScopeImpl> ancestorWithDeclSatisfying(
-      llvm::function_ref<bool(const Decl *)> predicate) const;
+      function_ref<bool(const Decl *)> predicate) const;
 
 #pragma mark - general queries
 protected:

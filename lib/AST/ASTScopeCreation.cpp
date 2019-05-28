@@ -715,18 +715,18 @@ TypeAliasScope::createTrailingWhereClauseScope(ASTScopeImpl *parent) {
 
 void ASTScopeImpl::forEachClosureIn(
     Expr *expr,
-    llvm::function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
+    function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
         foundClosure) {
   assert(expr);
 
   /// AST walker that finds top-level closures in an expression.
   class ClosureFinder : public ASTWalker {
-    llvm::function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
+    function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
         foundClosure;
 
   public:
     ClosureFinder(
-        llvm::function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
+        function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
             foundClosure)
         : foundClosure(foundClosure) {}
 
@@ -761,7 +761,7 @@ void ASTScopeImpl::forEachClosureIn(
 
 void ASTScopeImpl::forEachUniqueClosureIn(
     Expr *expr,
-    llvm::function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
+    function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
         foundUniqueClosure) {
   auto &alreadyHandledClosures = getAlreadyHandledClosures();
   forEachClosureIn(expr, [&](NullablePtr<CaptureListExpr> captureList,
@@ -779,7 +779,7 @@ llvm::DenseSet<ClosureExpr *> &ASTSourceFileScope::getAlreadyHandledClosures() {
 }
 
 void ASTScopeImpl::forEachSpecializeAttrInSourceOrder(
-    Decl *declBeingSpecialized, llvm::function_ref<void(SpecializeAttr *)> fn) {
+    Decl *declBeingSpecialized, function_ref<void(SpecializeAttr *)> fn) {
   llvm::SmallVector<SpecializeAttr *, 8> sortedSpecializeAttrs;
   for (auto *attr : declBeingSpecialized->getAttrs())
     if (auto *specializeAttr = dyn_cast<SpecializeAttr>(attr))
