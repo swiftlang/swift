@@ -1,12 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/out
-// RUN: %{python} %S/../Inputs/not.py "%target-run %t/out" 2>&1 | %FileCheck %s
+// RUN: %{python} %S/../Inputs/not.py "%target-run %t/out" 2>&1 | %FileCheck --allow-empty %s
 
 // NOTE: not.py is used above instead of "not --crash" because %target-run
 // doesn't pass through the crash, and `not` may not be available when running
 // on a remote host.
-
-// REQUIRES: rdar51076215
 
 // UNSUPPORTED: OS=watchos
 // UNSUPPORTED: OS=ios
