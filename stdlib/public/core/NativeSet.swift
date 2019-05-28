@@ -117,9 +117,20 @@ extension _NativeSet { // Low-level unchecked operations
   @inline(__always)
   internal func uncheckedInitialize(
     at bucket: Bucket,
-    to element: __owned Element) {
+    to element: __owned Element
+  ) {
     _internalInvariant(hashTable.isValid(bucket))
     (_elements + bucket.offset).initialize(to: element)
+  }
+
+  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  @inline(__always)
+  internal func uncheckedAssign(
+    at bucket: Bucket,
+    to element: __owned Element
+  ) {
+    _internalInvariant(hashTable.isOccupied(bucket))
+    (_elements + bucket.offset).pointee = element
   }
 }
 
@@ -429,6 +440,21 @@ extension _NativeSet { // Insertions
     }
     _unsafeInsertNew(element, at: bucket)
     return nil
+  }
+
+  /// Insert an element into uniquely held storage, replacing an existing value
+  /// (if any).  Storage must be uniquely referenced with adequate capacity.
+  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  internal mutating func _unsafeUpdate(
+    with element: __owned Element
+  ) {
+    let (bucket, found) = find(element)
+    if found {
+      uncheckedAssign(at: bucket, to: element)
+    } else {
+      _precondition(count < capacity)
+      _unsafeInsertNew(element, at: bucket)
+    }
   }
 }
 

@@ -32,9 +32,8 @@ class ConformingMethodListCallbacks : public CodeCompletionCallbacks {
   Expr *ParsedExpr = nullptr;
   DeclContext *CurDeclContext = nullptr;
 
-  void resolveExpectedTypes(ArrayRef<const char *> names, SourceLoc loc,
-                            SmallVectorImpl<ProtocolDecl *> &result);
-  void getMatchingMethods(Type T, ArrayRef<ProtocolDecl *> expectedTypes,
+  void getMatchingMethods(Type T,
+                          llvm::MapVector<ProtocolDecl*, StringRef> &expectedTypes,
                           SmallVectorImpl<ValueDecl *> &result);
 
 public:
@@ -89,9 +88,8 @@ void ConformingMethodListCallbacks::doneParsing() {
   if (!T || T->is<ErrorType>() || T->is<UnresolvedType>())
     return;
 
-  SmallVector<ProtocolDecl *, 4> expectedProtocols;
-  resolveExpectedTypes(ExpectedTypeNames, ParsedExpr->getLoc(),
-                       expectedProtocols);
+  llvm::MapVector<ProtocolDecl*, StringRef> expectedProtocols;
+  resolveProtocolNames(CurDeclContext, ExpectedTypeNames, expectedProtocols);
 
   // Collect the matching methods.
   ConformingMethodListResult result(CurDeclContext, T);
@@ -100,21 +98,8 @@ void ConformingMethodListCallbacks::doneParsing() {
   Consumer.handleResult(result);
 }
 
-void ConformingMethodListCallbacks::resolveExpectedTypes(
-    ArrayRef<const char *> names, SourceLoc loc,
-    SmallVectorImpl<ProtocolDecl *> &result) {
-  auto &ctx = CurDeclContext->getASTContext();
-
-  for (auto name : names) {
-    if (auto ty = Demangle::getTypeForMangling(ctx, name)) {
-      if (auto Proto = dyn_cast_or_null<ProtocolDecl>(ty->getAnyGeneric()))
-        result.push_back(Proto);
-    }
-  }
-}
-
 void ConformingMethodListCallbacks::getMatchingMethods(
-    Type T, ArrayRef<ProtocolDecl *> expectedTypes,
+    Type T, llvm::MapVector<ProtocolDecl*, StringRef> &expectedTypes,
     SmallVectorImpl<ValueDecl *> &result) {
   if (!T->mayHaveMembers())
     return;
@@ -126,7 +111,7 @@ void ConformingMethodListCallbacks::getMatchingMethods(
     Type T;
 
     /// The list of expected types.
-    ArrayRef<ProtocolDecl *> ExpectedTypes;
+    llvm::MapVector<ProtocolDecl*, StringRef> &ExpectedTypes;
 
     /// Result sink to populate.
     SmallVectorImpl<ValueDecl *> &Result;
@@ -149,7 +134,7 @@ void ConformingMethodListCallbacks::getMatchingMethods(
 
       // The return type conforms to any of the requested protocols.
       for (auto Proto : ExpectedTypes) {
-        if (CurModule->conformsToProtocol(declTy, Proto))
+        if (CurModule->conformsToProtocol(declTy, Proto.first))
           return true;
       }
 
@@ -158,12 +143,13 @@ void ConformingMethodListCallbacks::getMatchingMethods(
 
   public:
     LocalConsumer(DeclContext *DC, Type T,
-                  ArrayRef<ProtocolDecl *> expectedTypes,
+                  llvm::MapVector<ProtocolDecl*, StringRef> &expectedTypes,
                   SmallVectorImpl<ValueDecl *> &result)
         : CurModule(DC->getParentModule()), T(T), ExpectedTypes(expectedTypes),
           Result(result) {}
 
-    void foundDecl(ValueDecl *VD, DeclVisibilityKind reason) {
+    void foundDecl(ValueDecl *VD, DeclVisibilityKind reason,
+                   DynamicLookupInfo) {
       if (isMatchingMethod(VD) && !VD->shouldHideFromEditor())
         Result.push_back(VD);
     }

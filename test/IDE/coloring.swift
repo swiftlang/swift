@@ -262,6 +262,9 @@ func bar(x: Int) -> (Int, Float) {
   foo(Float())
 }
 
+// CHECK: <object-literal>#colorLiteral(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)</object-literal>
+#colorLiteral(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)
+
 class GenC<T1,T2> {}
 
 func test() {
@@ -276,6 +279,9 @@ func test2(x: Int) {
   // CHECK: <str>"</str>\<anchor>(</anchor>x<anchor>)</anchor><str>"</str>
   "\(x)"
 }
+
+// CHECK: <kw>#colorLiteral</kw>
+#colorLiteral
 
 // CHECK: <kw>class</kw> Observers {
 class Observers {
@@ -417,3 +423,9 @@ let closure = { [weak x=bindtox, unowned y=bindtoy, unowned(unsafe) z=bindtoz] i
 protocol FakeClassRestrictedProtocol : `class` {}
 // CHECK: <kw>protocol</kw> FakeClassRestrictedProtocol : <type>`class`</type> {}
 // FIXME: rdar://42801404: OLD and NEW should be the same '<type>`class`</type>'.
+
+// CHECK: <kw>func</kw> foo() -> <kw>some</kw> <type>P</type> {}
+func foo() -> some P {}
+
+// CHECK: <kw>func</kw> foo() -> <kw>some</kw> <type>P</type> & <type>Q</type> {}
+func foo() -> some P & Q {}

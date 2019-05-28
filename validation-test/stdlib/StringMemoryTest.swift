@@ -40,7 +40,7 @@ func lowercase(_ str: String) -> String {
 
 @inline(never)
 func runTest() {
-  for _ in 0 ..< 10_0000 {
+  for _ in 0 ..< 15_0000 {
     if lookup("\u{1F1E7}\u{1F1E7}", dict) {
       print("Found?!")
     }
@@ -63,6 +63,7 @@ runTest()
 let firstRun = getMemoryUsage () - baseUsage
 runTest()
 runTest()
+runTest()
 let secondRun = getMemoryUsage () - baseUsage
 
 // CHECK-NOT: Found?!
@@ -73,9 +74,8 @@ print("Not found")
 // CHECK: success
 // CHECK-NOT: failure
 
-// We should not need 50MB for this.
-if firstRun * 2 < secondRun  {
-  print("failure - should not linearly increase")
+if firstRun * 3 < secondRun && firstRun > 10_000 {
+  print("failure - should not linearly increase firstRun: \(firstRun) secondRun: \(secondRun)")
 } else {
-  print("success")
+  print("success firstRun: \(firstRun) secondRun: \(secondRun)")
 }

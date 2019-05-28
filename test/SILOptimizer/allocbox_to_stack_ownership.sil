@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all %s -allocbox-to-stack | %FileCheck %s
+// RUN: %target-sil-opt -verify-sil-ownership -enable-sil-verify-all %s -allocbox-to-stack | %FileCheck %s
 
 import Builtin
 

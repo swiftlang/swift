@@ -49,12 +49,11 @@ public:
 
   GenericCloner(SILOptFunctionBuilder &FuncBuilder,
                 SILFunction *F,
-                IsSerialized_t Serialized,
                 const ReabstractionInfo &ReInfo,
                 SubstitutionMap ParamSubs,
                 StringRef NewName,
                 CloneCollector::CallbackType Callback)
-    : SuperTy(*initCloned(FuncBuilder, F, Serialized, ReInfo, NewName), *F,
+    : SuperTy(*initCloned(FuncBuilder, F, ReInfo, NewName), *F,
 	      ParamSubs), FuncBuilder(FuncBuilder), ReInfo(ReInfo), Callback(Callback) {
     assert(F->getDebugScope()->Parent != getCloned()->getDebugScope()->Parent);
   }
@@ -64,17 +63,18 @@ public:
   static SILFunction *
   cloneFunction(SILOptFunctionBuilder &FuncBuilder,
                 SILFunction *F,
-                IsSerialized_t Serialized,
                 const ReabstractionInfo &ReInfo,
                 SubstitutionMap ParamSubs,
                 StringRef NewName,
                 CloneCollector::CallbackType Callback =nullptr) {
     // Clone and specialize the function.
-    GenericCloner SC(FuncBuilder, F, Serialized, ReInfo, ParamSubs,
+    GenericCloner SC(FuncBuilder, F, ReInfo, ParamSubs,
                      NewName, Callback);
     SC.populateCloned();
     return SC.getCloned();
   }
+
+  void fixUp(SILFunction *calleeFunction);
 
 protected:
   void visitTerminator(SILBasicBlock *BB);
@@ -96,7 +96,6 @@ protected:
 private:
   static SILFunction *initCloned(SILOptFunctionBuilder &FuncBuilder,
                                  SILFunction *Orig,
-                                 IsSerialized_t Serialized,
                                  const ReabstractionInfo &ReInfo,
                                  StringRef NewName);
   /// Clone the body of the function into the empty function that was created

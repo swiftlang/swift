@@ -112,7 +112,7 @@ void ExistentialSpecializerCloner::cloneAndPopulateFunction() {
           NewF.getLoweredType(NewF.mapTypeIntoContext(GenericParam));
       NewArg = ClonedEntryBB->createFunctionArgument(GenericSILType);
       NewArg->setOwnershipKind(ValueOwnershipKind(
-          M, GenericSILType, ArgDesc.Arg->getArgumentConvention()));
+          NewF, GenericSILType, ArgDesc.Arg->getArgumentConvention()));
       /// Determine the Conformances.
       SmallVector<ProtocolConformanceRef, 1> NewConformances;
       auto ContextTy = NewF.mapTypeIntoContext(GenericParam);
@@ -177,7 +177,7 @@ void ExistentialSpecializerCloner::cloneAndPopulateFunction() {
       auto MappedTy = LoweredTy.getCategoryType(ArgDesc.Arg->getType().getCategory());
       NewArg = ClonedEntryBB->createFunctionArgument(MappedTy, ArgDesc.Decl);
       NewArg->setOwnershipKind(ValueOwnershipKind(
-          M, MappedTy, ArgDesc.Arg->getArgumentConvention()));
+          NewF, MappedTy, ArgDesc.Arg->getArgumentConvention()));
       entryArgs.push_back(NewArg);
     }
   }

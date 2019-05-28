@@ -3004,7 +3004,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
-  do {
+  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    // Identity of empty dictionaries changed in
+    // https://github.com/apple/swift/pull/22527
     var d = getBridgedNonverbatimDictionary([:])
     assert(isNativeDictionary(d))
     assert(d.count == 0)
@@ -3087,7 +3089,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     assert(d2[TestBridgedKeyTy(10)] == nil)
   }
 }
-
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Count") {
   let d = getBridgedVerbatimDictionary()
@@ -3298,6 +3299,12 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+    // Identity of empty dictionaries changed in
+    // https://github.com/apple/swift/pull/22527
+    return
+  }
+
   let d1 = getBridgedNonverbatimEquatableDictionary([:])
   let identity1 = d1._rawIdentifier()
   assert(isNativeDictionary(d1))
@@ -3319,7 +3326,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
   assert(identity1 == d1._rawIdentifier())
   assert(identity2 != d2._rawIdentifier())
 }
-
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
   func helper(_ nd1: Dictionary<Int, Int>, _ nd2: Dictionary<Int, Int>, _ expectedEq: Bool) {
@@ -3472,6 +3478,21 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.StringEqualityMismatch") {
   let v = d["Café"]
   expectTrue(v == 42 || v == 23)
 }
+
+DictionaryTestSuite.test("Upcast.StringEqualityMismatch") {
+  // Upcasting from NSString to String keys changes their concept of equality,
+  // resulting in two equal keys, one of which should be discarded by the
+  // downcast. (Along with its associated value.)
+  // rdar://problem/35995647
+  let d: Dictionary<NSString, NSObject> = [
+    "cafe\u{301}": 1 as NSNumber,
+    "café": 2 as NSNumber,
+  ]
+  expectEqual(d.count, 2)
+  let d2 = d as Dictionary<String, NSObject>
+  expectEqual(d2.count, 1)
+}
+
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.OptionalDowncastFailure") {
   let nsd = NSDictionary(
@@ -5700,14 +5721,14 @@ DictionaryTestSuite.test("BulkLoadingInitializer.Unique") {
     let d1 = Dictionary<TestKeyTy, TestEquatableValueTy>(
       _unsafeUninitializedCapacity: c,
       allowingDuplicates: false
-    ) { keys, values, count in
+    ) { keys, values in
       let k = keys.baseAddress!
       let v = values.baseAddress!
       for i in 0 ..< c {
         (k + i).initialize(to: TestKeyTy(i))
         (v + i).initialize(to: TestEquatableValueTy(i))
-        count += 1
       }
+      return c
     }
 
     let d2 = Dictionary(
@@ -5727,14 +5748,14 @@ DictionaryTestSuite.test("BulkLoadingInitializer.Nonunique") {
     let d1 = Dictionary<TestKeyTy, TestEquatableValueTy>(
       _unsafeUninitializedCapacity: c,
       allowingDuplicates: true
-    ) { keys, values, count in
+    ) { keys, values in
       let k = keys.baseAddress!
       let v = values.baseAddress!
       for i in 0 ..< c {
         (k + i).initialize(to: TestKeyTy(i / 2))
         (v + i).initialize(to: TestEquatableValueTy(i / 2))
-        count += 1
       }
+      return c
     }
 
     let d2 = Dictionary(

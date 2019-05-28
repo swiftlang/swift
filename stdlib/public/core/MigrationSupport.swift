@@ -63,16 +63,16 @@ public typealias FlattenBidirectionalCollection<T> = FlattenCollection<T> where 
 public typealias JoinedIterator<T: Sequence> = JoinedSequence<T>.Iterator where T.Element: Sequence
 @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "Zip2Sequence.Iterator")
 public typealias Zip2Iterator<T, U> = Zip2Sequence<T, U>.Iterator where T: Sequence, U: Sequence
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyDropWhileSequence.Iterator")
+@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyPrefixWhileSequence.Iterator")
 public typealias LazyPrefixWhileIterator<T> = LazyPrefixWhileSequence<T>.Iterator where T: Sequence
-@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyDropWhileCollection.Index")
+@available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyPrefixWhileCollection.Index")
 public typealias LazyPrefixWhileIndex<T> = LazyPrefixWhileCollection<T>.Index where T: Collection
 @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyPrefixWhileCollection")
 public typealias LazyPrefixWhileBidirectionalCollection<T> = LazyPrefixWhileCollection<T> where T: BidirectionalCollection
 @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "ReversedCollection")
 public typealias ReversedRandomAccessCollection<T: RandomAccessCollection> = ReversedCollection<T>
 @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "ReversedCollection.Index")
-public typealias ReversedIndex<T: BidirectionalCollection> = ReversedCollection<T>
+public typealias ReversedIndex<T: BidirectionalCollection> = ReversedCollection<T>.Index
 @available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
 public typealias BidirectionalSlice<T> = Slice<T> where T : BidirectionalCollection
 @available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
@@ -535,7 +535,7 @@ extension UnsafeMutableRawBufferPointer {
 // Note that the second overload is declared on a more specific protocol.
 // See: test/stdlib/StringFlatMap.swift for tests.
 extension Sequence {
-  @available(swift, deprecated: 4.1, obsoleted: 5.1, renamed: "compactMap(_:)",
+  @available(swift, deprecated: 4.1/*, obsoleted: 5.1*/, renamed: "compactMap(_:)",
     message: "Please use compactMap(_:) for the case where closure returns an optional value")
   public func flatMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?

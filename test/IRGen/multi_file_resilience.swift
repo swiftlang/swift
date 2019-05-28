@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
 
-// RUN: %target-swift-frontend -emit-module -enable-resilience \
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution \
 // RUN:   -emit-module-path=%t/resilient_struct.swiftmodule \
 // RUN:   -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 

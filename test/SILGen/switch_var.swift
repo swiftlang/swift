@@ -189,7 +189,7 @@ struct X : P { func p() {} }
 struct Y : P { func p() {} }
 struct Z : P { func p() {} }
 
-// CHECK-LABEL: sil hidden [ossa] @$s10switch_var05test_B2_41pyAA1P_p_tF
+// CHECK-LABEL: sil hidden [ossa] @$s10switch_var05test_B2_41pyAA1P_p_tF : $@convention(thin) (@in_guaranteed P) -> () {
 func test_var_4(p p: P) {
   // CHECK:   function_ref @$s10switch_var3fooSiyF
   switch (p, foo()) {
@@ -275,12 +275,14 @@ func test_var_4(p p: P) {
   // CHECK:   tuple_element_addr [[READ]] : {{.*}}, 1
   // CHECK:   function_ref @$s10switch_var1c1xySi_tF
   // CHECK:   destroy_value [[ZADDR]]
+  // CHECK-NEXT: destroy_addr [[PAIR]]
   // CHECK-NEXT: dealloc_stack [[PAIR]]
   // CHECK:   br [[CONT]]
     c(x: z.1)
 
   // CHECK: [[DFLT_NO_CASE3]]:
-  // CHECK:   destroy_value [[ZADDR]]
+  // CHECK-NEXT:   destroy_value [[ZADDR]]
+  // CHECK-NOT: destroy_addr
   case (_, var w):
   // CHECK:   [[PAIR_0:%.*]] = tuple_element_addr [[PAIR]] : $*(P, Int), 0
   // CHECK:   [[WADDR:%.*]] = alloc_box ${ var Int }
@@ -289,9 +291,10 @@ func test_var_4(p p: P) {
   // CHECK:   load [trivial] [[READ]]
   // CHECK:   function_ref @$s10switch_var1d1xySi_tF
   // CHECK:   destroy_value [[WADDR]]
-  // CHECK:   destroy_addr [[PAIR_0]] : $*P
-  // CHECK:   dealloc_stack [[PAIR]]
-  // CHECK:   br [[CONT]]
+  // CHECK-NEXT:   destroy_addr [[PAIR_0]] : $*P
+  // CHECK-NEXT:   dealloc_stack [[PAIR]]
+  // CHECK-NEXT:   dealloc_stack
+  // CHECK-NEXT:   br [[CONT]]
     d(x: w)
   }
   e()
@@ -431,16 +434,17 @@ func test_let() {
   case bars():
   // CHECK: [[YES_CASE3]]:
   // CHECK:   destroy_value [[VAL_COPY_3]]
+  // CHECK:   [[FUNC:%.*]] = function_ref @$s10switch_var1cyyF
+  // CHECK-NEXT: apply [[FUNC]](
   // CHECK:   destroy_value [[VAL]]
-  // CHECK:   function_ref @$s10switch_var1cyyF
   // CHECK:   br [[CONT]]
     c()
-  // CHECK: [[NO_CASE3]]:
-  // CHECK:   destroy_value [[VAL_COPY_3]]
 
   case _:
-    // CHECK:   destroy_value [[VAL]]
+    // CHECK: [[NO_CASE3]]:
+    // CHECK:   destroy_value [[VAL_COPY_3]]
     // CHECK:   function_ref @$s10switch_var1dyyF
+    // CHECK:   destroy_value [[VAL]]
     // CHECK:   br [[CONT]]
     d()
   }
@@ -504,18 +508,17 @@ func test_mixed_let_var() {
   case bars():
   // CHECK: [[CASE3]]:
   // CHECK:   destroy_value [[VAL_COPY]]
-  // CHECK:   destroy_value [[VAL]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$s10switch_var1cyyF : $@convention(thin) () -> ()
   // CHECK:   apply [[FUNC]]()
+  // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT]]
     c()
 
   // CHECK: [[NOCASE3]]:
   // CHECK:   destroy_value [[VAL_COPY]]
-
-  // CHECK:   destroy_value [[VAL]]
   // CHECK:   [[D_FUNC:%.*]] = function_ref @$s10switch_var1dyyF : $@convention(thin) () -> ()
   // CHECK:   apply [[D_FUNC]]()
+  // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT]]
   case _:
     d()

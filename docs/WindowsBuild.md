@@ -280,6 +280,7 @@ cmake -G Ninja^
   -DCMAKE_SWIFT_COMPILER=S:\b\swift\bin\swiftc.exe^
   -DCURL_LIBRARY="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/lib/libcurl_a.lib"^
   -DCURL_INCLUDE_DIR="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/include"^
+  -DENABLE_TESTING=NO^
   -DICU_ROOT="S:/thirdparty/icu4c-63_1-Win64-MSVC2017"^
   -DLIBXML2_LIBRARY="S:/libxml2/win32/bin.msvc/libxml2_a.lib"^
   -DLIBXML2_INCLUDE_DIR="S:/libxml2/include"^
@@ -288,7 +289,6 @@ cmake -G Ninja^
    S:\swift-corelibs-foundation
  popd
  cmake --build S:\b\foundation
-
 ```
 
 - Add Foundation to your path:
@@ -321,7 +321,43 @@ cmake --build S:\b\xctest
 path S:\b\xctest;%PATH%
 ```
 
-### 15. Install Swift on Windows
+### 15. Test XCTest
+
+```cmd
+ninja -C S:\b\xctest check-xctest
+```
+
+### 16. Rebuild Foundation
+
+```cmd
+mkdir "S:\b\foundation"
+pushd "S:\b\foundation
+cmake -G Ninja^
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
+  -DCMAKE_C_COMPILER=clang-cl^
+  -DCMAKE_SWIFT_COMPILER=S:\b\swift\bin\swiftc.exe^
+  -DCURL_LIBRARY="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/lib/libcurl_a.lib"^
+  -DCURL_INCLUDE_DIR="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/include"^
+  -DENABLE_TESTING=YES^
+  -DICU_ROOT="S:/thirdparty/icu4c-63_1-Win64-MSVC2017"^
+  -DLIBXML2_LIBRARY="S:/libxml2/win32/bin.msvc/libxml2_a.lib"^
+  -DLIBXML2_INCLUDE_DIR="S:/libxml2/include"^
+  -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch^
+  -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=S:\b\libdispatch^
+  -DFOUNDATION_PATH_TO_XCTEST_BUILD=S:\b\xctest^
+   S:\swift-corelibs-foundation
+ popd
+ cmake --build S:\b\foundation
+```
+
+### 17. Test Foundation
+
+```cmd
+cmake --build S:\b\foundation
+ninja -C S:\b\foundation test 
+```
+
+### 18. Install Swift on Windows
 
 - Run ninja install:
 

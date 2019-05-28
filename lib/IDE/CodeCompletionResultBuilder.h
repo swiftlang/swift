@@ -31,6 +31,26 @@ class ModuleDecl;
 
 namespace ide {
 
+/// The expected contextual type(s) for code-completion.
+struct ExpectedTypeContext {
+  /// Possible types of the code completion expression.
+  llvm::SmallVector<Type, 4> possibleTypes;
+
+  /// Whether the `ExpectedTypes` comes from a single-expression body, e.g.
+  /// `foo({ here })`.
+  ///
+  /// Since the input may be incomplete, we take into account that the types are
+  /// only a hint.
+  bool isSingleExpressionBody = false;
+
+  bool empty() const { return possibleTypes.empty(); }
+
+  ExpectedTypeContext() = default;
+  ExpectedTypeContext(ArrayRef<Type> types, bool isSingleExpressionBody)
+      : possibleTypes(types.begin(), types.end()),
+        isSingleExpressionBody(isSingleExpressionBody) {}
+};
+
 class CodeCompletionResultBuilder {
   CodeCompletionResultSink &Sink;
   CodeCompletionResult::ResultKind Kind;
@@ -43,7 +63,7 @@ class CodeCompletionResultBuilder {
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
   llvm::PointerUnion<const ModuleDecl *, const clang::Module *>
       CurrentModule;
-  ArrayRef<Type> ExpectedDeclTypes;
+  ExpectedTypeContext declTypeContext;
   CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
       CodeCompletionResult::Unrelated;
   bool Cancelled = false;
@@ -78,9 +98,9 @@ public:
   CodeCompletionResultBuilder(CodeCompletionResultSink &Sink,
                               CodeCompletionResult::ResultKind Kind,
                               SemanticContextKind SemanticContext,
-                              ArrayRef<Type> ExpectedDeclTypes)
+                              const ExpectedTypeContext &declTypeContext)
       : Sink(Sink), Kind(Kind), SemanticContext(SemanticContext),
-        ExpectedDeclTypes(ExpectedDeclTypes) {}
+        declTypeContext(declTypeContext) {}
 
   ~CodeCompletionResultBuilder() {
     finishResult();
@@ -197,9 +217,19 @@ public:
         CodeCompletionString::Chunk::ChunkKind::RightParen, ")");
   }
 
+  void addAnnotatedLeftBracket() {
+    addLeftBracket();
+    getLastChunk().setIsAnnotation();
+  }
+
   void addLeftBracket() {
     addChunkWithTextNoCopy(
         CodeCompletionString::Chunk::ChunkKind::LeftBracket, "[");
+  }
+
+  void addAnnotatedRightBracket() {
+    addRightBracket();
+    getLastChunk().setIsAnnotation();
   }
 
   void addRightBracket() {
@@ -267,9 +297,8 @@ public:
       addTypeAnnotation(Annotation);
   }
 
-  StringRef escapeArgumentLabel(StringRef Word,
-                                bool escapeAllKeywords,
-                                llvm::SmallString<16> &EscapedKeyword) {
+  StringRef escapeKeyword(StringRef Word, bool escapeAllKeywords,
+                          llvm::SmallString<16> &EscapedKeyword) {
     bool shouldEscape = false;
     if (escapeAllKeywords) {
 #define KEYWORD(kw) .Case(#kw, true)
@@ -315,7 +344,7 @@ public:
   }
 
   void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
-                        bool IsVarArg, bool Outermost, bool IsInOut, bool IsIUO,
+                        bool IsVarArg, bool IsInOut, bool IsIUO,
                         bool isAutoClosure) {
     CurrentNestingLevel++;
 
@@ -325,7 +354,7 @@ public:
       llvm::SmallString<16> EscapedKeyword;
       addChunkWithText(
           CodeCompletionString::Chunk::ChunkKind::CallParameterName,
-          escapeArgumentLabel(Name.str(), !Outermost, EscapedKeyword));
+          escapeKeyword(Name.str(), false, EscapedKeyword));
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
     } else if (!LocalName.empty()) {
@@ -333,7 +362,7 @@ public:
       llvm::SmallString<16> EscapedKeyword;
       addChunkWithText(
           CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
-            escapeArgumentLabel(LocalName.str(), !Outermost, EscapedKeyword));
+            escapeKeyword(LocalName.str(), false, EscapedKeyword));
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
     }
@@ -354,6 +383,8 @@ public:
     PrintOptions PO;
     PO.SkipAttributes = true;
     PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
+    PO.OpaqueReturnTypePrinting =
+        PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
     std::string TypeName = Ty->getString(PO);
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallParameterType,
                      TypeName);
@@ -366,6 +397,8 @@ public:
       PrintOptions PO;
       PO.PrintFunctionRepresentationAttrs = false;
       PO.SkipAttributes = true;
+      PO.OpaqueReturnTypePrinting =
+          PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
       addChunkWithText(
           CodeCompletionString::Chunk::ChunkKind::CallParameterClosureType,
           AFT->getString(PO));
@@ -376,10 +409,10 @@ public:
     CurrentNestingLevel--;
   }
 
-  void addCallParameter(Identifier Name, Type Ty, bool IsVarArg, bool Outermost,
-                        bool IsInOut, bool IsIUO, bool isAutoClosure) {
-    addCallParameter(Name, Identifier(), Ty, IsVarArg, Outermost, IsInOut,
-                     IsIUO, isAutoClosure);
+  void addCallParameter(Identifier Name, Type Ty, bool IsVarArg, bool IsInOut,
+                        bool IsIUO, bool isAutoClosure) {
+    addCallParameter(Name, Identifier(), Ty, IsVarArg, IsInOut, IsIUO,
+                     isAutoClosure);
   }
 
   void addGenericParameter(StringRef Name) {

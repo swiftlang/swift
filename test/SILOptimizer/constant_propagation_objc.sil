@@ -1,0 +1,231 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnostic-constant-propagation | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-constant-propagation | %FileCheck %s
+
+// REQUIRES: objc_interop
+
+sil_stage canonical
+
+import Swift
+import Foundation
+import Builtin
+
+sil @$ss11AnyHashableVyABxcSHRzlufC : $@convention(method) <τ_0_0 where τ_0_0 : Hashable> (@in τ_0_0, @thin AnyHashable.Type) -> @out AnyHashable
+
+sil @guaranteed_swift_array_user : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+
+// CHECK-LABEL: sil @array_downcast_copyonsuccess : $@convention(thin) (@guaranteed NSArray) -> () {
+// CHECK: bb0([[ARG:%.*]] : $NSArray):
+// CHECK:   [[INPUT:%.*]] = alloc_stack $NSArray
+// CHECK:   retain_value [[ARG]]
+// CHECK:   store [[ARG]] to [[INPUT]]
+// CHECK:   [[OUTPUT:%.*]] = alloc_stack $Array<String>
+// CHECK:   [[INPUT_VALUE:%.*]] = load [[INPUT]]
+// CHECK:   br [[BRIDGE_BB:bb[0-9]+]]([[INPUT_VALUE]] :
+//
+// CHECK: [[SUCCESS_BB:bb[0-9]+]]:
+// CHECK:   [[SUCCESS_VAL:%.*]] = load [[OUTPUT]]
+// CHECK:   [[CAST_RESULT:%.*]] = apply {{%.*}}<String>([[SUCCESS_VAL]])
+// CHECK-NEXT:   release_value [[SUCCESS_VAL]]
+// CHECK-NEXT:   dealloc_stack [[OUTPUT]]
+// CHECK-NEXT:   destroy_addr [[INPUT]]
+// CHECK-NEXT:   dealloc_stack [[INPUT]]
+// CHECK-NEXT:   br [[EXIT_BB:bb[0-9]+]]
+//
+// CHECK: [[FAIL_BB:bb[0-9]+]]:
+// CHECK-NEXT:   dealloc_stack [[CAST_TMP:%.*]]
+// CHECK-NEXT:   br [[NEXT:bb[0-9]+]]
+//
+// CHECK: [[NEXT]]:
+// CHECK-NEXT:   dealloc_stack [[OUTPUT]]
+// CHECK-NEXT:   destroy_addr [[INPUT]]
+// CHECK-NEXT:   dealloc_stack [[INPUT]]
+// CHECK-NEXT:   br [[EXIT_BB]]
+//
+// CHECK: [[EXIT_BB]]:
+// CHECK:   return
+//
+// CHECK: [[BRIDGE_BB]]([[INPUT_VALUE:%.*]] : $NSArray):
+// CHECK:   [[CAST_TMP:%.*]] = alloc_stack $Optional<Array<String>>
+// CHECK:   retain_value [[INPUT_VALUE]]
+// CHECK:   apply {{%.*}}<Array<String>>([[CAST_TMP]], [[INPUT_VALUE]],
+// CHECK:   release_value [[INPUT_VALUE]]
+// CHECK:   switch_enum_addr [[CAST_TMP]] : $*Optional<Array<String>>, case #Optional.none!enumelt: [[FAIL_BB]], default [[SUCCESS_TRAMPOLINE_BB:bb[0-9]+]]
+//
+// CHECK: [[SUCCESS_TRAMPOLINE_BB]]:
+// CHECK:   [[PROJ_ENUM:%.*]] = unchecked_take_enum_data_addr [[CAST_TMP]]
+// CHECK:   copy_addr [take] [[PROJ_ENUM]] to [initialization] [[OUTPUT]]
+// CHECK:   dealloc_stack [[CAST_TMP]]
+// CHECK:   br [[SUCCESS_BB]]
+// CHECK: } // end sil function 'array_downcast_copyonsuccess'
+sil @array_downcast_copyonsuccess : $@convention(thin) (@guaranteed NSArray) -> () {
+bb0(%0 : $NSArray):
+  %4 = alloc_stack $NSArray
+  retain_value %0 : $NSArray
+  store %0 to %4 : $*NSArray
+  %7 = alloc_stack $Array<String>
+  checked_cast_addr_br copy_on_success NSArray in %4 : $*NSArray to Array<String> in %7 : $*Array<String>, bb2, bb3
+
+bb2:
+  %9 = load %7 : $*Array<String>
+  %10 = function_ref @guaranteed_swift_array_user : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+  apply %10<String>(%9) : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+  release_value %9 : $Array<String>
+  dealloc_stack %7 : $*Array<String>
+  destroy_addr %4 : $*NSArray
+  dealloc_stack %4 : $*NSArray
+  br bb4
+
+bb3:
+  dealloc_stack %7 : $*Array<String>
+  destroy_addr %4 : $*NSArray
+  dealloc_stack %4 : $*NSArray
+  br bb4
+
+bb4:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @array_downcast_takeonsuccess : $@convention(thin) (@guaranteed NSArray) -> () {
+// CHECK: bb0([[ARG:%.*]] : $NSArray):
+// CHECK:   [[INPUT:%.*]] = alloc_stack $NSArray
+// CHECK:   retain_value [[ARG]]
+// CHECK:   store [[ARG]] to [[INPUT]]
+// CHECK:   [[OUTPUT:%.*]] = alloc_stack $Array<String>
+// CHECK:   [[INPUT_VALUE:%.*]] = load [[INPUT]]
+// CHECK:   br [[BRIDGE_BB:bb[0-9]+]]([[INPUT_VALUE]] :
+//
+// CHECK: [[SUCCESS_BB:bb[0-9]+]]:
+// CHECK:   strong_release [[INPUT_VALUE:%.*]] :
+// CHECK:   [[SUCCESS_VAL:%.*]] = load [[OUTPUT]]
+// CHECK:   [[CAST_RESULT:%.*]] = apply {{%.*}}<String>([[SUCCESS_VAL]])
+// CHECK-NEXT:   release_value [[SUCCESS_VAL]]
+// CHECK-NEXT:   dealloc_stack [[OUTPUT]]
+// CHECK-NEXT:   dealloc_stack [[INPUT]]
+// CHECK-NEXT:   br [[EXIT_BB:bb[0-9]+]]
+//
+// CHECK: [[FAIL_BB:bb[0-9]+]]:
+// CHECK-NEXT:   dealloc_stack [[CAST_TMP:%.*]]
+// CHECK-NEXT:   br [[FAIL_NEXT:bb[0-9]+]]
+//
+// CHECK: [[FAIL_NEXT]]:
+// CHECK-NEXT:   dealloc_stack [[OUTPUT]]
+// CHECK-NEXT:   destroy_addr [[INPUT]]
+// CHECK-NEXT:   dealloc_stack [[INPUT]]
+// CHECK-NEXT:   br [[EXIT_BB]]
+//
+// CHECK: [[EXIT_BB]]:
+// CHECK:   return
+//
+// CHECK: [[BRIDGE_BB]]([[INPUT_VALUE]] : $NSArray):
+// CHECK:   [[CAST_TMP:%.*]] = alloc_stack $Optional<Array<String>>
+// CHECK:   retain_value [[INPUT_VALUE]]
+// CHECK:   apply {{%.*}}<Array<String>>([[CAST_TMP]], [[INPUT_VALUE]],
+// CHECK:   release_value [[INPUT_VALUE]]
+// NOTE: In contrast to with take_always, the release_value is above in SUCCESS_BLOCK
+// CHECK:   switch_enum_addr [[CAST_TMP]] : $*Optional<Array<String>>, case #Optional.none!enumelt: [[FAIL_BB]], default [[SUCCESS_TRAMPOLINE_BB:bb[0-9]+]]
+//
+// CHECK: [[SUCCESS_TRAMPOLINE_BB]]:
+// CHECK:   [[PROJ_ENUM:%.*]] = unchecked_take_enum_data_addr [[CAST_TMP]]
+// CHECK:   copy_addr [take] [[PROJ_ENUM]] to [initialization] [[OUTPUT]]
+// CHECK:   dealloc_stack [[CAST_TMP]]
+// CHECK:   br [[SUCCESS_BB]]
+// CHECK: } // end sil function 'array_downcast_takeonsuccess'
+sil @array_downcast_takeonsuccess : $@convention(thin) (@guaranteed NSArray) -> () {
+bb0(%0 : $NSArray):
+  %4 = alloc_stack $NSArray
+  retain_value %0 : $NSArray
+  store %0 to %4 : $*NSArray
+  %7 = alloc_stack $Array<String>
+  checked_cast_addr_br take_on_success NSArray in %4 : $*NSArray to Array<String> in %7 : $*Array<String>, bb2, bb3
+
+bb2:
+  %9 = load %7 : $*Array<String>
+  %10 = function_ref @guaranteed_swift_array_user : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+  apply %10<String>(%9) : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+  release_value %9 : $Array<String>
+  dealloc_stack %7 : $*Array<String>
+  dealloc_stack %4 : $*NSArray
+  br bb4
+
+bb3:
+  dealloc_stack %7 : $*Array<String>
+  destroy_addr %4 : $*NSArray
+  dealloc_stack %4 : $*NSArray
+  br bb4
+
+bb4:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @array_downcast_takealways : $@convention(thin) (@guaranteed NSArray) -> () {
+// CHECK: bb0([[ARG:%.*]] : $NSArray):
+// CHECK:   [[INPUT:%.*]] = alloc_stack $NSArray
+// CHECK:   retain_value [[ARG]]
+// CHECK:   store [[ARG]] to [[INPUT]]
+// CHECK:   [[OUTPUT:%.*]] = alloc_stack $Array<String>
+// CHECK:   [[INPUT_VALUE:%.*]] = load [[INPUT]]
+// CHECK:   br [[BRIDGE_BB:bb[0-9]+]]([[INPUT_VALUE]] :
+//
+// CHECK: [[SUCCESS_BB:bb[0-9]+]]:
+// CHECK:   [[SUCCESS_VAL:%.*]] = load [[OUTPUT]]
+// CHECK:   [[CAST_RESULT:%.*]] = apply {{%.*}}<String>([[SUCCESS_VAL]])
+// CHECK-NEXT:   release_value [[SUCCESS_VAL]]
+// CHECK-NEXT:   dealloc_stack [[OUTPUT]]
+// CHECK-NEXT:   dealloc_stack [[INPUT]]
+// CHECK-NEXT:   br [[EXIT_BB:bb[0-9]+]]
+//
+// CHECK: [[FAIL_BB:bb[0-9]+]]:
+// CHECK-NEXT:   dealloc_stack [[CAST_TMP:%.*]]
+// CHECK-NEXT:   br [[FAIL_NEXT:bb[0-9]+]]
+//
+// CHECK: [[FAIL_NEXT]]:
+// CHECK-NEXT:   dealloc_stack [[OUTPUT]]
+// CHECK-NEXT:   dealloc_stack [[INPUT]]
+// CHECK-NEXT:   br [[EXIT_BB]]
+//
+// CHECK: [[EXIT_BB]]:
+// CHECK:   return
+//
+// CHECK: [[BRIDGE_BB]]([[INPUT_VALUE:%.*]] : $NSArray):
+// CHECK:   [[CAST_TMP:%.*]] = alloc_stack $Optional<Array<String>>
+// CHECK:   retain_value [[INPUT_VALUE]]
+// CHECK:   apply {{%.*}}<Array<String>>([[CAST_TMP]], [[INPUT_VALUE]],
+// CHECK:   release_value [[INPUT_VALUE]]
+// NOTE: When we perform take_always, this is the take of the cast.
+// CHECK:   release_value [[INPUT_VALUE]]
+// CHECK:   switch_enum_addr [[CAST_TMP]] : $*Optional<Array<String>>, case #Optional.none!enumelt: [[FAIL_BB]], default [[SUCCESS_TRAMPOLINE_BB:bb[0-9]+]]
+//
+// CHECK: [[SUCCESS_TRAMPOLINE_BB]]:
+// CHECK:   [[PROJ_ENUM:%.*]] = unchecked_take_enum_data_addr [[CAST_TMP]]
+// CHECK:   copy_addr [take] [[PROJ_ENUM]] to [initialization] [[OUTPUT]]
+// CHECK:   dealloc_stack [[CAST_TMP]]
+// CHECK:   br [[SUCCESS_BB]]
+// CHECK: } // end sil function 'array_downcast_takealways'
+sil @array_downcast_takealways : $@convention(thin) (@guaranteed NSArray) -> () {
+bb0(%0 : $NSArray):
+  %4 = alloc_stack $NSArray
+  retain_value %0 : $NSArray
+  store %0 to %4 : $*NSArray
+  %7 = alloc_stack $Array<String>
+  checked_cast_addr_br take_always NSArray in %4 : $*NSArray to Array<String> in %7 : $*Array<String>, bb2, bb3
+
+bb2:
+  %9 = load %7 : $*Array<String>
+  %10 = function_ref @guaranteed_swift_array_user : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+  apply %10<String>(%9) : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+  release_value %9 : $Array<String>
+  dealloc_stack %7 : $*Array<String>
+  dealloc_stack %4 : $*NSArray
+  br bb4
+
+bb3:
+  dealloc_stack %7 : $*Array<String>
+  dealloc_stack %4 : $*NSArray
+  br bb4
+
+bb4:
+  %9999 = tuple()
+  return %9999 : $()
+}

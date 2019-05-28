@@ -365,6 +365,7 @@ computeNewArgInterfaceTypes(SILFunction *F,
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");
     auto paramBoxedTy = paramBoxTy->getFieldType(F->getModule(), 0);
+    // FIXME: Expansion
     auto &paramTL = Types.getTypeLowering(paramBoxedTy,
                                           ResilienceExpansion::Minimal);
     ParameterConvention convention;
@@ -975,7 +976,7 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
   unsigned Index = OpNo - 1 + closureConv.getNumSILArguments();
 
   auto *Fn = PAI->getReferencedFunction();
-  if (!Fn || !Fn->isDefinition()) {
+  if (!Fn || !Fn->isDefinition() || Fn->isDynamicallyReplaceable()) {
     LLVM_DEBUG(llvm::dbgs() << "        FAIL! Not a direct function definition "
                           "reference.\n");
     return false;
@@ -1223,7 +1224,7 @@ mapMarkDependenceArguments(SingleValueInstruction *root,
         MD->setBase(iter->second);
       }
       // Remove mark_dependence on trivial values.
-      if (MD->getBase()->getType().isTrivial(MD->getModule())) {
+      if (MD->getBase()->getType().isTrivial(*MD->getFunction())) {
         MD->replaceAllUsesWith(MD->getValue());
         Delete.push_back(MD);
       }

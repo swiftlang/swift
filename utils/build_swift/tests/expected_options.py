@@ -123,7 +123,6 @@ EXPECTED_DEFAULTS = {
     'enable_asan': False,
     'enable_lsan': False,
     'enable_sanitize_coverage': False,
-    'enable_sil_ownership': False,
     'disable_guaranteed_normal_arguments': False,
     'enable_stdlibcore_exclusivity_checking': False,
     'enable_tsan': False,
@@ -152,7 +151,7 @@ EXPECTED_DEFAULTS = {
     'llbuild_assertions': True,
     'lldb_assertions': True,
     'lldb_build_variant': 'Debug',
-    'lldb_build_with_xcode': '1',
+    'lldb_build_with_xcode': '0',
     'llvm_assertions': True,
     'llvm_build_variant': 'Debug',
     'llvm_max_parallel_lto_link_jobs':
@@ -184,6 +183,7 @@ EXPECTED_DEFAULTS = {
     'test_ios_simulator': False,
     'test_linux': False,
     'test_optimize_for_size': None,
+    'test_optimize_none_implicit_dynamic': None,
     'test_optimized': None,
     'test_osx': False,
     'test_paths': [],
@@ -380,6 +380,7 @@ EXPECTED_OPTIONS = [
     SetOption('-T', dest='validation_test', value=True),
     SetOption('-o', dest='test_optimized', value=True),
     SetOption('-s', dest='test_optimize_for_size', value=True),
+    SetOption('-y', dest='test_optimize_none_implicit_dynamic', value=True),
     SetOption('-t', dest='test', value=True),
 
     # FIXME: Convert these options to set_false actions
@@ -398,7 +399,6 @@ EXPECTED_OPTIONS = [
     SetTrueOption('--benchmark'),
     SetTrueOption('--clean'),
     SetTrueOption('--dry-run'),
-    SetTrueOption('--enable-sil-ownership'),
     SetTrueOption('--disable-guaranteed-normal-arguments'),
     SetTrueOption('--enable-stdlibcore-exclusivity-checking'),
     SetTrueOption('--force-optimized-typechecker'),
@@ -452,6 +452,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--stress-test'),
     EnableOption('--test'),
     EnableOption('--test-optimize-for-size'),
+    EnableOption('--test-optimize-none-implicit-dynamic'),
     EnableOption('--test-optimized'),
     EnableOption('--tvos'),
     EnableOption('--validation-test'),
@@ -559,6 +560,7 @@ EXPECTED_OPTIONS = [
     UnsupportedOption('--common-cmake-options'),
     UnsupportedOption('--only-execute'),
     UnsupportedOption('--skip-test-optimize-for-size'),
+    UnsupportedOption('--skip-test-optimize-none-implicit-dynamic'),
     UnsupportedOption('--skip-test-optimized'),
 
     # NOTE: LTO flag is a special case that acts both as an option and has

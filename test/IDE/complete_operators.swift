@@ -262,9 +262,8 @@ func testInfix11() {
 func testInfix12() {
   P#^INFIX_12^#
 }
-// INFIX_12: Begin completions, 5 items
+// INFIX_12: Begin completions, 4 items
 // INFIX_12-NEXT: Decl[AssociatedType]/CurrNominal:   .T; name=T
-// INFIX_12-NEXT: Decl[InstanceMethod]/CurrNominal:   .foo({#(self): P#})[#() -> P.T#]; name=foo(self: P)
 // INFIX_12-NEXT: Keyword[self]/CurrNominal:          .self[#P.Protocol#]; name=self
 // INFIX_12-NEXT: Keyword/CurrNominal:                .Protocol[#P.Protocol#]; name=Protocol
 // INFIX_12-NEXT: Keyword/CurrNominal:                .Type[#P.Type#]; name=Type
@@ -293,8 +292,8 @@ func testInfix16<T: P where T.T == S2>() {
 }
 
 // INFIX_16: Begin completions, 2 items
-// INFIX_16-NEXT: Pattern/CurrModule:               ({#(self): T#})[#() -> S2#]; name=(self: T)
-// INFIX_16-NEXT: Keyword[self]/CurrNominal:         .self[#(T) -> () -> S2#]; name=self
+// INFIX_16-NEXT: Decl[InstanceMethod]/CurrNominal: ({#(self): P#})[#() -> S2#]; name=(self: P)
+// INFIX_16-NEXT: Keyword[self]/CurrNominal:        .self[#(T) -> () -> S2#]; name=self
 // INFIX_16: End completions
 
 func testInfix17(x: Void) {

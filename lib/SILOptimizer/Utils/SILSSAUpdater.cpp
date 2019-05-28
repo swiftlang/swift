@@ -34,9 +34,9 @@ void SILSSAUpdater::deallocateSentinel(SILUndef *D) {
   AlignedFree(D);
 }
 
-SILSSAUpdater::SILSSAUpdater(SILModule &M, SmallVectorImpl<SILPhiArgument *> *PHIs)
+SILSSAUpdater::SILSSAUpdater(SmallVectorImpl<SILPhiArgument *> *PHIs)
     : AV(nullptr), PHISentinel(nullptr, deallocateSentinel),
-      InsertedPHIs(PHIs), M(M) {}
+      InsertedPHIs(PHIs) {}
 
 SILSSAUpdater::~SILSSAUpdater() = default;
 
@@ -44,7 +44,7 @@ void SILSSAUpdater::Initialize(SILType Ty) {
   ValType = Ty;
 
   PHISentinel = std::unique_ptr<SILUndef, void (*)(SILUndef *)>(
-      SILUndef::getSentinelValue(Ty, M, this), SILSSAUpdater::deallocateSentinel);
+      SILUndef::getSentinelValue(Ty, this), SILSSAUpdater::deallocateSentinel);
 
   if (!AV)
     AV.reset(new AvailableValsTy());
@@ -213,7 +213,7 @@ SILValue SILSSAUpdater::GetValueInMiddleOfBlock(SILBasicBlock *BB) {
 
   // Return undef for blocks without predecessor.
   if (PredVals.empty())
-    return SILUndef::get(ValType, BB->getModule());
+    return SILUndef::get(ValType, *BB->getParent());
 
   if (SingularValue)
     return SingularValue;
@@ -305,7 +305,7 @@ public:
 
   static SILValue GetUndefVal(SILBasicBlock *BB,
                               SILSSAUpdater *Updater) {
-    return SILUndef::get(Updater->ValType, &BB->getModule());
+    return SILUndef::get(Updater->ValType, *BB->getParent());
   }
 
   /// Add an Argument to the basic block.

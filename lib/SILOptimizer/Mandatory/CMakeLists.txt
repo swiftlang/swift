@@ -2,11 +2,13 @@ silopt_register_sources(
   AccessEnforcementSelection.cpp
   AccessMarkerElimination.cpp
   AddressLowering.cpp
+  ClosureLifetimeFixup.cpp
   ConstantPropagation.cpp
   DefiniteInitialization.cpp
   DIMemoryUseCollector.cpp
   DataflowDiagnostics.cpp
   DiagnoseInfiniteRecursion.cpp
+  DiagnoseInvalidEscapingCaptures.cpp
   DiagnoseStaticExclusivity.cpp
   DiagnoseUnreachable.cpp
   GuaranteedARCOpts.cpp
@@ -14,8 +16,8 @@ silopt_register_sources(
   MandatoryInlining.cpp
   PredictableMemOpt.cpp
   PMOMemoryUseCollector.cpp
-  SemanticARCOpts.cpp
-  ClosureLifetimeFixup.cpp
   RawSILInstLowering.cpp
+  SemanticARCOpts.cpp
+  SILGenCleanup.cpp
   YieldOnceCheck.cpp
 )

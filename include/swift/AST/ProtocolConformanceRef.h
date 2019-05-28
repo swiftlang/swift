@@ -106,7 +106,8 @@ public:
   /// Apply a substitution to the conforming type.
   ProtocolConformanceRef subst(Type origType,
                                TypeSubstitutionFn subs,
-                               LookupConformanceFn conformances) const;
+                               LookupConformanceFn conformances,
+                               SubstOptions options = None) const;
 
   /// Given a dependent type (expressed in terms of this conformance's
   /// protocol), follow it from the conforming type.

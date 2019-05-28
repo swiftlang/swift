@@ -423,8 +423,9 @@ extension __StringStorage {
   private var mutableStart: UnsafeMutablePointer<UInt8> {
     return UnsafeMutablePointer(Builtin.projectTailElems(self, UInt8.self))
   }
+  @inline(__always)
   private var mutableEnd: UnsafeMutablePointer<UInt8> {
-    @inline(__always) get { return mutableStart + count }
+     return mutableStart + count
   }
 
   @inline(__always)
@@ -432,19 +433,20 @@ extension __StringStorage {
      return UnsafePointer(mutableStart)
   }
 
+  @inline(__always)
   private final var end: UnsafePointer<UInt8> {
-    @inline(__always) get { return UnsafePointer(mutableEnd) }
+    return UnsafePointer(mutableEnd)
   }
 
   // Point to the nul-terminator.
+  @inline(__always)
   private final var terminator: UnsafeMutablePointer<UInt8> {
-    @inline(__always) get { return mutableEnd }
+    return mutableEnd
   }
 
+  @inline(__always)
   private var codeUnits: UnsafeBufferPointer<UInt8> {
-    @inline(__always) get {
-      return UnsafeBufferPointer(start: start, count: count)
-    }
+    return UnsafeBufferPointer(start: start, count: count)
   }
 
   // @opaque
@@ -467,18 +469,15 @@ extension __StringStorage {
   // required nul-terminator.
   //
   // NOTE: Callers who wish to mutate this storage should enfore nul-termination
+  @inline(__always)
   private var unusedStorage: UnsafeMutableBufferPointer<UInt8> {
-    @inline(__always) get {
-      return UnsafeMutableBufferPointer(
-        start: mutableEnd, count: unusedCapacity)
-    }
+    return UnsafeMutableBufferPointer(
+      start: mutableEnd, count: unusedCapacity)
   }
 
   // The capacity available for appending. Note that this excludes the required
   // nul-terminator.
-  internal var unusedCapacity: Int {
-    get { return _realCapacity &- count &- 1 }
-  }
+  internal var unusedCapacity: Int { return _realCapacity &- count &- 1 }
 
   #if !INTERNAL_CHECKS_ENABLED
   @inline(__always) internal func _invariantCheck() {}

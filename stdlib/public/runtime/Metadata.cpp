@@ -96,7 +96,15 @@ Metadata *TargetSingletonMetadataInitialization<InProcess>::allocate(
   // If this is a class, we have to initialize the value witness table early
   // so that two-phase initialization can proceed as if this metadata is
   // complete for layout purposes when it appears as part of an aggregate type.
-  if (auto *classMetadata = dyn_cast<ClassMetadata>(metadata)) {
+  //
+  // Note that we can't use (dyn_)cast<ClassMetadata> here because the static
+  // template may have the "wrong" isSwift bit set in its Data pointer, if the
+  // binary was built to deploy back to pre-stable-Swift Objective-C runtimes.
+  // Such a template will fail the `isTypeMetadata` test and we'll think that it
+  // isn't Swift metadata but a plain old ObjC class instead.
+  if (metadata->getKind() == MetadataKind::Class) {
+    auto *classMetadata = static_cast<ClassMetadata*>(metadata);
+    classMetadata->setAsTypeMetadata();
     auto *fullMetadata = asFullMetadata(metadata);
 
     // Begin by initializing the value witness table; everything else is
@@ -593,11 +601,9 @@ MetadataResponse
 swift::swift_getGenericMetadata(MetadataRequest request,
                                 const void * const *arguments,
                                 const TypeContextDescriptor *description) {
-  auto &generics = description->getFullGenericContextHeader();
-  size_t numGenericArgs = generics.Base.NumKeyArguments;
-
   auto &cache = getCache(*description);
-  assert(numGenericArgs == cache.NumKeyParameters + cache.NumWitnessTables);
+  assert(description->getFullGenericContextHeader().Base.NumKeyArguments ==
+         cache.NumKeyParameters + cache.NumWitnessTables);
   auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
                               arguments);
   auto result = cache.getOrInsert(key, request, description, arguments);
@@ -2202,24 +2208,26 @@ static void initGenericClassObjCName(ClassMetadata *theClass) {
   auto globalNode = Dem.createNode(Demangle::Node::Kind::Global);
   globalNode->addChild(typeNode, Dem);
 
-  auto string = Demangle::mangleNodeOld(globalNode, &Dem);
+  llvm::StringRef string = Demangle::mangleNodeOld(globalNode, Dem);
 
   // If the class is in the Swift module, add a $ to the end of the ObjC
   // name. The old and new Swift libraries must be able to coexist in
   // the same process, and this avoids warnings due to the ObjC names
   // colliding.
-  bool addSuffix = strncmp(string.c_str(), "_TtGCs", 6) == 0;
+  bool addSuffix = string.startswith("_TtGCs");
 
   size_t allocationSize = string.size() + 1;
   if (addSuffix)
     allocationSize += 1;
   
   auto fullNameBuf = (char*)swift_slowAlloc(allocationSize, 0);
-  memcpy(fullNameBuf, string.c_str(), string.size() + 1);
+  memcpy(fullNameBuf, string.data(), string.size());
 
   if (addSuffix) {
     fullNameBuf[string.size()] = '$';
     fullNameBuf[string.size() + 1] = '\0';
+  } else {
+    fullNameBuf[string.size()] = '\0';
   }
 
   auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
@@ -2601,6 +2609,7 @@ getSuperclassMetadata(ClassMetadata *self, bool allowDependency) {
                             /*non-blocking*/ allowDependency);
     MetadataResponse response =
       swift_getTypeByMangledName(request, superclassName,
+        substitutions.getGenericArgs(),
         [&substitutions](unsigned depth, unsigned index) {
           return substitutions.getMetadata(depth, index);
         },
@@ -2633,6 +2642,11 @@ getSuperclassMetadata(ClassMetadata *self, bool allowDependency) {
   return {MetadataDependency(), super};
 }
 
+// Suppress diagnostic about the availability of _objc_realizeClassFromSwift.
+// We test availability with a nullptr check, but the compiler doesn't see that.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability-new"
+
 static SWIFT_CC(swift) MetadataDependency
 _swift_initClassMetadataImpl(ClassMetadata *self,
                              ClassLayoutFlags layoutFlags,
@@ -2659,6 +2673,18 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     (void)unused;
     setUpObjCRuntimeGetImageNameFromClass();
   }, nullptr);
+
+#ifndef OBJC_REALIZECLASSFROMSWIFT_DEFINED
+  // Temporary workaround until _objc_realizeClassFromSwift is in the SDK.
+  static auto _objc_realizeClassFromSwift =
+    (Class (*)(Class _Nullable, void *_Nullable))
+    dlsym(RTLD_NEXT, "_objc_realizeClassFromSwift");
+#endif
+
+  // Temporary workaround until objc_loadClassref is in the SDK.
+  static auto objc_loadClassref =
+    (Class (*)(void *))
+    dlsym(RTLD_NEXT, "objc_loadClassref");
 #endif
 
   // Copy field offsets, generic arguments and (if necessary) vtable entries
@@ -2672,10 +2698,13 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
 
   initClassFieldOffsetVector(self, numFields, fieldTypes, fieldOffsets);
 
+  auto *description = self->getDescription();
+
 #if SWIFT_OBJC_INTEROP
-  if (self->getDescription()->isGeneric())
+  if (description->isGeneric()) {
+    assert(!description->hasObjCResilientClassStub());
     initGenericObjCClass(self, numFields, fieldTypes, fieldOffsets);
-  else {
+  } else {
     initObjCClass(self, numFields, fieldTypes, fieldOffsets);
 
     // Register this class with the runtime. This will also cause the
@@ -2683,12 +2712,32 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     // globals. Note that the field offset vector is *not* updated;
     // however we should not be using it for anything in a non-generic
     // class.
-    swift_instantiateObjCClass(self);
+    auto *stub = description->getObjCResilientClassStub();
+
+    // On a new enough runtime, register the class as a replacement for
+    // its stub if we have one, which attaches any categories referencing
+    // the stub.
+    //
+    // On older runtimes, just register the class via the usual mechanism.
+    // The compiler enforces that @objc methods in extensions of classes
+    // with resilient ancestry have the correct availability, so it should
+    // be safe to ignore the stub in this case.
+    if (stub != nullptr &&
+        objc_loadClassref != nullptr &&
+        _objc_realizeClassFromSwift != nullptr) {
+      _objc_realizeClassFromSwift((Class) self, const_cast<void *>(stub));
+    } else {
+      swift_instantiateObjCClass(self);
+    }
   }
+#else
+  assert(!description->hasObjCResilientClassStub());
 #endif
 
   return MetadataDependency();
 }
+
+#pragma clang diagnostic pop
 
 void swift::swift_initClassMetadata(ClassMetadata *self,
                                     ClassLayoutFlags layoutFlags,
@@ -2729,7 +2778,7 @@ _swift_updateClassMetadataImpl(ClassMetadata *self,
 #ifndef OBJC_REALIZECLASSFROMSWIFT_DEFINED
   // Temporary workaround until _objc_realizeClassFromSwift is in the SDK.
   static auto _objc_realizeClassFromSwift =
-    (Class (*)(Class _Nullable, void* _Nullable))
+    (Class (*)(Class _Nullable, void *_Nullable))
     dlsym(RTLD_NEXT, "_objc_realizeClassFromSwift");
 #endif
 
@@ -3660,6 +3709,17 @@ public:
         state = PrivateMetadataState::NonTransitiveComplete;
       }
     } else {
+      if (candidate->getValueWitnesses() == nullptr) {
+        assert(isa<ForeignClassMetadata>(candidate) &&
+               "cannot set default value witnesses for non-class foreign types");
+        // Fill in the default VWT if it was not set in the candidate at build
+        // time.
+#if SWIFT_OBJC_INTEROP
+        candidate->setValueWitnesses(&VALUE_WITNESS_SYM(BO));
+#else
+        candidate->setValueWitnesses(&VALUE_WITNESS_SYM(Bo));
+#endif
+      }
       state = inferStateForMetadata(candidate);
     }
 
@@ -3894,7 +3954,9 @@ StringRef swift::getStringForMetadataKind(MetadataKind kind) {
 }
 
 #ifndef NDEBUG
-template <> void Metadata::dump() const {
+template <>
+LLVM_ATTRIBUTE_USED
+void Metadata::dump() const {
   printf("TargetMetadata.\n");
   printf("Kind: %s.\n", getStringForMetadataKind(getKind()).data());
   printf("Value Witnesses: %p.\n", getValueWitnesses());
@@ -4270,7 +4332,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
     // The protocol's Self is the only generic parameter that can occur in the
     // type.
     response =
-      swift_getTypeByMangledName(request, mangledName,
+      swift_getTypeByMangledName(request, mangledName, nullptr,
         [conformingType](unsigned depth, unsigned index) -> const Metadata * {
           if (depth == 0 && index == 0)
             return conformingType;
@@ -4298,6 +4360,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
                                                            conformance);
     SubstGenericParametersFromMetadata substitutions(originalConformingType);
     response = swift_getTypeByMangledName(request, mangledName,
+      substitutions.getGenericArgs(),
       [&substitutions](unsigned depth, unsigned index) {
         return substitutions.getMetadata(depth, index);
       },
@@ -4719,19 +4782,37 @@ areAllTransitiveMetadataComplete_cheap(const Metadata *type) {
 /// dependencies actually hold, and we can keep going.
 static MetadataDependency
 checkTransitiveCompleteness(const Metadata *initialType) {
-  // TODO: it would nice to avoid allocating memory in common cases here.
-  // In particular, we don't usually add *anything* to the worklist, and we
-  // usually only add a handful of types to the map.
-  std::vector<const Metadata *> worklist;
-  std::unordered_set<const Metadata *> presumedCompleteTypes;
+  llvm::SmallVector<const Metadata *, 8> worklist;
+  
+  // An efficient hash-set implementation in the spirit of llvm's SmallPtrSet:
+  // The first 8 elements are stored in an inline-allocated array to avoid
+  // malloc calls in the common case. Lookup is still reasonable fast because
+  // there are max 8 elements in the array.
+  const int InlineCapacity = 8;
+  const Metadata *inlinedPresumedCompleteTypes[InlineCapacity];
+  int numInlinedTypes = 0;
+  std::unordered_set<const Metadata *> overflowPresumedCompleteTypes;
 
   MetadataDependency dependency;
   auto isIncomplete = [&](const Metadata *type) -> bool {
     // Add the type to the presumed-complete-types set.  If this doesn't
     // succeed, we've already inserted it, which means we must have already
     // decided it was complete.
-    if (!presumedCompleteTypes.insert(type).second)
+    // First, try to find the type in the inline-storage of the set.
+    const Metadata **end = inlinedPresumedCompleteTypes + numInlinedTypes;
+    if (std::find(inlinedPresumedCompleteTypes, end, type) != end)
       return false;
+
+    // We didn't find the type in the inline-storage.
+    if (numInlinedTypes < InlineCapacity) {
+      assert(overflowPresumedCompleteTypes.size() == 0);
+      inlinedPresumedCompleteTypes[numInlinedTypes++] = type;
+    } else {
+      // The inline-storage is full. So try to insert the type into the
+      // overflow set.
+      if (!overflowPresumedCompleteTypes.insert(type).second)
+        return false;
+    }
 
     // Check the metadata's current state with a non-blocking request.
     auto request = MetadataRequest(MetadataState::Complete,
@@ -4759,7 +4840,9 @@ checkTransitiveCompleteness(const Metadata *initialType) {
 
   // Consider the type itself to be presumed-complete.  We're looking for
   // a greatest fixed point.
-  presumedCompleteTypes.insert(initialType);
+  assert(numInlinedTypes == 0 && overflowPresumedCompleteTypes.size() == 0);
+  inlinedPresumedCompleteTypes[0] = initialType;
+  numInlinedTypes = 1;
   if (findAnyTransitiveMetadata(initialType, isIncomplete))
     return dependency;
 
@@ -5047,6 +5130,7 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   auto result =
     swift_getTypeByMangledName(MetadataState::Abstract,
                           mangledName,
+                          nullptr,
                           [](unsigned, unsigned){ return nullptr; },
                           [](const Metadata *, unsigned) { return nullptr; })
       .getMetadata();

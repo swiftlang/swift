@@ -18,12 +18,12 @@
 #include "ConstraintSystem.h"
 #include "DerivedConformances.h"
 #include "MiscDiagnostics.h"
+#include "TypeAccessScopeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/AccessScopeChecker.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -38,6 +38,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ReferencedNameTracker.h"
+#include "swift/AST/TypeDeclFinder.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
@@ -423,7 +424,6 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witnessStorage,
 
 RequirementMatch
 swift::matchWitness(
-             TypeChecker &tc,
              DeclContext *dc, ValueDecl *req, ValueDecl *witness,
              llvm::function_ref<
                      std::tuple<Optional<RequirementMatch>, Type, Type>(void)> 
@@ -439,10 +439,17 @@ swift::matchWitness(
   if (req->getKind() != witness->getKind())
     return RequirementMatch(witness, MatchKind::KindConflict);
 
+  // If the witness has not been validated yet, do so now.
+  if (!witness->hasValidSignature()) {
+    auto &ctx = dc->getASTContext();
+    ctx.getLazyResolver()->resolveDeclSignature(witness);
+  }
+
   // If the witness is invalid, record that and stop now.
   if (witness->isInvalid())
     return RequirementMatch(witness, MatchKind::WitnessInvalid);
 
+  // If we're currently validating the witness, bail out.
   if (!witness->hasValidSignature())
     return RequirementMatch(witness, MatchKind::Circularity);
 
@@ -490,12 +497,10 @@ swift::matchWitness(
   } else if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness)) {
     auto *reqASD = cast<AbstractStorageDecl>(req);
     
-    // If this is a property requirement, check that the static-ness matches.
-    if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
-      if (cast<VarDecl>(req)->isStatic() != vdWitness->isStatic())
-        return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
-    }
-    
+    // Check that the static-ness matches.
+    if (reqASD->isStatic() != witnessASD->isStatic())
+      return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
+
     // If the requirement is settable and the witness is not, reject it.
     if (req->isSettable(req->getDeclContext()) &&
         !witness->isSettable(witness->getDeclContext()))
@@ -703,7 +708,7 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
     auto missingConform = (MissingConformance *)fix;
     requirementKind = RequirementKind::Conformance;
     type = missingConform->getNonConformingType();
-    missingType = missingConform->getProtocol()->getDeclaredType();
+    missingType = missingConform->getProtocolType();
     break;
   }
   case FixKind::SkipSameTypeRequirement: {
@@ -947,7 +952,7 @@ swift::matchWitness(TypeChecker &tc,
     return result;
   };
 
-  return matchWitness(tc, dc, req, witness, setup, matchTypes, finalize);
+  return matchWitness(dc, req, witness, setup, matchTypes, finalize);
 }
 
 static bool
@@ -1149,9 +1154,6 @@ bool WitnessChecker::findBestWitness(
       if (isa<ProtocolDecl>(witness->getDeclContext())) {
         continue;
       }
-
-      if (!witness->hasValidSignature())
-        TC.validateDecl(witness);
 
       auto match = matchWitness(TC, ReqEnvironmentCache, Proto, conformance, DC,
                                 requirement, witness);
@@ -2518,8 +2520,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
       AccessScope requiredAccessScope = getRequiredAccessScope();
 
       if (!TC.Context.isSwiftVersionAtLeast(5) &&
-          DC->getParentModule()->getResilienceStrategy() !=
-              ResilienceStrategy::Resilient) {
+          !DC->getParentModule()->isResilient()) {
         // HACK: In pre-Swift-5, these typealiases were synthesized with the
         // same access level as the conforming type, which might be more
         // visible than the associated type witness. Preserve that behavior
@@ -3603,15 +3604,16 @@ void ConformanceChecker::addUsedConformances(
   if (!visited.insert(conformance).second)
     return;
 
-  auto normalConf = conformance->getRootNormalConformance();
+  if (auto normalConf = dyn_cast<NormalProtocolConformance>(
+        conformance->getRootConformance())) {;
+    if (normalConf->isIncomplete())
+      TC.UsedConformances.insert(normalConf);
 
-  if (normalConf->isIncomplete())
-    TC.UsedConformances.insert(normalConf);
-
-  // Mark each conformance in the signature as used.
-  for (auto sigConformance : normalConf->getSignatureConformances()) {
-    if (sigConformance.isConcrete())
-      addUsedConformances(sigConformance.getConcrete(), visited);
+    // Mark each conformance in the signature as used.
+    for (auto sigConformance : normalConf->getSignatureConformances()) {
+      if (sigConformance.isConcrete())
+        addUsedConformances(sigConformance.getConcrete(), visited);
+    }
   }
 }
 
@@ -3646,23 +3648,69 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
   std::function<void(ProtocolConformanceRef)> writer
     = Conformance->populateSignatureConformances();
 
+  SourceFile *fileForCheckingExportability = nullptr;
+  if (getRequiredAccessScope().isPublic() || isUsableFromInlineRequired())
+    fileForCheckingExportability = DC->getParentSourceFile();
+
   class GatherConformancesListener : public GenericRequirementsCheckListener {
-    NormalProtocolConformance *conformance;
+    NormalProtocolConformance *conformanceBeingChecked;
+    SourceFile *SF;
     std::function<void(ProtocolConformanceRef)> &writer;
+
+    void checkExportability(Type depTy, Type replacementTy,
+                            const ProtocolConformance *conformance) {
+      if (!SF)
+        return;
+
+      SubstitutionMap subs =
+          conformance->getSubstitutions(SF->getParentModule());
+      for (auto &subConformance : subs.getConformances()) {
+        if (!subConformance.isConcrete())
+          continue;
+        checkExportability(depTy, replacementTy, subConformance.getConcrete());
+      }
+
+      const RootProtocolConformance *rootConformance =
+          conformance->getRootConformance();
+      ModuleDecl *M = rootConformance->getDeclContext()->getParentModule();
+      if (!SF->isImportedImplementationOnly(M))
+        return;
+
+      ASTContext &ctx = M->getASTContext();
+
+      Type selfTy = rootConformance->getProtocol()->getProtocolSelfType();
+      if (depTy->isEqual(selfTy)) {
+        ctx.Diags.diagnose(
+            conformanceBeingChecked->getLoc(),
+            diag::conformance_from_implementation_only_module,
+            rootConformance->getType(),
+            rootConformance->getProtocol()->getName(), 0, M->getName());
+      } else {
+        ctx.Diags.diagnose(
+            conformanceBeingChecked->getLoc(),
+            diag::assoc_conformance_from_implementation_only_module,
+            rootConformance->getType(),
+            rootConformance->getProtocol()->getName(), M->getName(),
+            depTy, replacementTy->getCanonicalType());
+      }
+    }
+
   public:
     GatherConformancesListener(
         NormalProtocolConformance *conformance,
-        std::function<void(ProtocolConformanceRef)> &writer)
-      : conformance(conformance), writer(writer) { }
+        std::function<void(ProtocolConformanceRef)> &writer,
+        SourceFile *fileForCheckingExportability)
+      : conformanceBeingChecked(conformance),
+        SF(fileForCheckingExportability), writer(writer) { }
 
     void satisfiedConformance(Type depTy, Type replacementTy,
                               ProtocolConformanceRef conformance) override {
       // The conformance will use contextual types, but we want the
       // interface type equivalent.
-      if (conformance.isConcrete() &&
-          conformance.getConcrete()->getType()->hasArchetype()) {
+      if (conformance.isConcrete()) {
         auto concreteConformance = conformance.getConcrete();
 
+        if (conformance.getConcrete()->getType()->hasArchetype()) {
         // Map the conformance.
         concreteConformance = concreteConformance->subst(
             [](SubstitutableType *type) -> Type {
@@ -3672,7 +3720,11 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
             },
             MakeAbstractConformanceForGenericType());
 
-        conformance = ProtocolConformanceRef(concreteConformance);
+
+          conformance = ProtocolConformanceRef(concreteConformance);
+        }
+
+        checkExportability(depTy, replacementTy, concreteConformance);
       }
 
       writer(conformance);
@@ -3682,13 +3734,13 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
                       const Requirement &req, Type first, Type second,
                       ArrayRef<ParentConditionalConformance> parents) override {
       // Invalidate the conformance to suppress further diagnostics.
-      if (conformance->getLoc().isValid()) {
-        conformance->setInvalid();
+      if (conformanceBeingChecked->getLoc().isValid()) {
+        conformanceBeingChecked->setInvalid();
       }
 
       return false;
     }
-  } listener(Conformance, writer);
+  } listener(Conformance, writer, fileForCheckingExportability);
 
   auto result = TC.checkGenericArguments(
       DC, Loc, Loc,
@@ -4227,17 +4279,18 @@ void TypeChecker::markConformanceUsed(ProtocolConformanceRef conformance,
                                       DeclContext *dc) {
   if (conformance.isAbstract()) return;
 
-  auto normalConformance =
-    conformance.getConcrete()->getRootNormalConformance();
+  if (auto normalConformance =
+        dyn_cast<NormalProtocolConformance>(
+          conformance.getConcrete()->getRootConformance())) {;
+    // Make sure that the type checker completes this conformance.
+    if (normalConformance->isIncomplete())
+      UsedConformances.insert(normalConformance);
 
-  // Make sure that the type checker completes this conformance.
-  if (normalConformance->isIncomplete())
-    UsedConformances.insert(normalConformance);
-
-  // Record the usage of this conformance in the enclosing source
-  // file.
-  if (auto sf = dc->getParentSourceFile()) {
-    sf->addUsedConformance(normalConformance);
+    // Record the usage of this conformance in the enclosing source
+    // file.
+    if (auto sf = dc->getParentSourceFile()) {
+      sf->addUsedConformance(normalConformance);
+    }
   }
 }
 
@@ -4789,11 +4842,16 @@ static bool isNSCoding(ProtocolDecl *protocol) {
 
 /// Whether the given class has an explicit '@objc' name.
 static bool hasExplicitObjCName(ClassDecl *classDecl) {
+  // FIXME: Turn this function into a request instead of computing this
+  // as part of the @objc request.
+  (void) classDecl->isObjC();
+
   if (classDecl->getAttrs().hasAttribute<ObjCRuntimeNameAttr>())
     return true;
 
   auto objcAttr = classDecl->getAttrs().getAttribute<ObjCAttr>();
-  if (!objcAttr) return false;
+  if (!objcAttr)
+    return false;
 
   return objcAttr->hasName() && !objcAttr->isNameImplicit();
 }
@@ -4859,19 +4917,6 @@ diagnoseUnstableName(TypeChecker &tc, ProtocolConformance *conformance,
   }
 }
 
-/// Determine whether a particular class has generic ancestry.
-static bool hasGenericAncestry(ClassDecl *classDecl) {
-  SmallPtrSet<ClassDecl *, 4> visited;
-  while (classDecl && visited.insert(classDecl).second) {
-    if (classDecl->isGenericContext())
-      return true;
-
-    classDecl = classDecl->getSuperclassDecl();
-  }
-
-  return false;
-}
-
 /// Infer the attribute tostatic-initialize the Objective-C metadata for the
 /// given class, if needed.
 static void inferStaticInitializeObjCMetadata(TypeChecker &tc,
@@ -4880,16 +4925,22 @@ static void inferStaticInitializeObjCMetadata(TypeChecker &tc,
   if (classDecl->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
     return;
 
+  // If the class does not have a custom @objc name and the deployment target
+  // supports the objc_getClass() hook, the workaround is unnecessary.
+  if (tc.Context.LangOpts.doesTargetSupportObjCGetClassHook() &&
+      !hasExplicitObjCName(classDecl))
+    return;
+
   // If we know that the Objective-C metadata will be statically registered,
   // there's nothing to do.
-  if (!hasGenericAncestry(classDecl)) {
+  if (!classDecl->checkAncestry(AncestryFlags::Generic)) {
     return;
   }
 
   // If this class isn't always available on the deployment target, don't
   // mark it as statically initialized.
   // FIXME: This is a workaround. The proper solution is for IRGen to
-  // only statically initializae the Objective-C metadata when running on
+  // only statically initialize the Objective-C metadata when running on
   // a new-enough OS.
   if (auto sourceFile = classDecl->getParentSourceFile()) {
     AvailabilityContext availableInfo = AvailabilityContext::alwaysAvailable();
@@ -5039,7 +5090,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     if (auto classDecl = dc->getSelfClassDecl()) {
       if (Context.LangOpts.EnableObjCInterop &&
           isNSCoding(conformance->getProtocol()) &&
-          !classDecl->isGenericContext()) {
+          !classDecl->isGenericContext() &&
+          !classDecl->hasClangNode()) {
         diagnoseUnstableName(*this, conformance, classDecl);
         // Infer @_staticInitializeObjCMetadata if needed.
         inferStaticInitializeObjCMetadata(*this, classDecl);

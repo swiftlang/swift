@@ -30,7 +30,7 @@
 using namespace swift;
 using namespace Lowering;
 
-static bool isTrivialShuffle(TupleShuffleExpr *shuffle) {
+static bool isTrivialShuffle(ArgumentShuffleExpr *shuffle) {
   // Each element must be mapped to the corresponding element of the input.
   auto mapping = shuffle->getElementMapping();
   for (auto index : indices(mapping)) {
@@ -56,7 +56,7 @@ static ArrayRef<Expr*> decomposeArguments(SILGenFunction &SGF,
   // The use of owned parameters can trip up CSApply enough to introduce
   // a trivial tuple shuffle here.
   arg = arg->getSemanticsProvidingExpr();
-  if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg)) {
+  if (auto shuffle = dyn_cast<ArgumentShuffleExpr>(arg)) {
     if (isTrivialShuffle(shuffle))
       arg = shuffle->getSubExpr();
   }
@@ -299,8 +299,7 @@ static ManagedValue emitCastToReferenceType(SILGenFunction &SGF,
   if (!argTy->mayHaveSuperclass() && !argTy->isClassExistentialType()) {
     SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
                      "castToNativeObject source must be a class");
-    SILValue undef = SILUndef::get(objPointerType, SGF.SGM.M);
-    return ManagedValue::forUnmanaged(undef);
+    return SGF.emitUndef(objPointerType);
   }
 
   // Grab the argument.
@@ -362,8 +361,7 @@ static ManagedValue emitCastFromReferenceType(SILGenFunction &SGF,
     SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
                      "castFromNativeObject dest must be an object type");
     // Recover by propagating an undef result.
-    SILValue result = SILUndef::get(destType, SGF.SGM.M);
-    return ManagedValue::forUnmanaged(result);
+    return SGF.emitUndef(destType);
   }
 
   return SGF.B.createUncheckedRefCast(loc, args[0], destType);
@@ -432,7 +430,7 @@ static ManagedValue emitBuiltinAddressOf(SILGenFunction &SGF,
   auto lv = SGF.emitLValue(inout->getSubExpr(), SGFAccessKind::ReadWrite);
   if (!lv.isPhysical() || !lv.isLoadingPure()) {
     SGF.SGM.diagnose(argument->getLoc(), diag::non_physical_addressof);
-    return ManagedValue::forUnmanaged(SILUndef::get(rawPointerTy, &SGF.SGM.M));
+    return SGF.emitUndef(rawPointerTy);
   }
   
   auto addr = SGF.emitAddressOfLValue(argument, std::move(lv))
@@ -459,7 +457,7 @@ static ManagedValue emitBuiltinAddressOfBorrow(SILGenFunction &SGF,
      .getAsSingleValue(SGF, argument);
   if (!borrow.isPlusZero() || !borrow.getType().isAddress()) {
     SGF.SGM.diagnose(argument->getLoc(), diag::non_borrowed_indirect_addressof);
-    return ManagedValue::forUnmanaged(SILUndef::get(rawPointerTy, &SGF.SGM.M));
+    return SGF.emitUndef(rawPointerTy);
   }
   
   addr = borrow.getValue();
@@ -757,7 +755,7 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
   // Create the appropriate bitcast based on the source and dest types.
   ManagedValue in = args[0];
   SILType resultTy = toTL.getLoweredType();
-  if (resultTy.isTrivial(SGF.getModule()))
+  if (resultTy.isTrivial(SGF.F))
     return SGF.B.createUncheckedTrivialBitCast(loc, in, resultTy);
 
   // If we can perform a ref cast, just return.
@@ -788,8 +786,7 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &SGF,
       !sourceType->isClassExistentialType()) {
     SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
                      "castToBridgeObject source must be a class");
-    SILValue undef = SILUndef::get(objPointerType, SGF.SGM.M);
-    return ManagedValue::forUnmanaged(undef);
+    return SGF.emitUndef(objPointerType);
   }
 
   ManagedValue ref = args[0];
@@ -825,8 +822,7 @@ static ManagedValue emitBuiltinCastReferenceFromBridgeObject(
     SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
                  "castReferenceFromBridgeObject dest must be an object type");
     // Recover by propagating an undef result.
-    SILValue result = SILUndef::get(destType, SGF.SGM.M);
-    return ManagedValue::forUnmanaged(result);
+    return SGF.emitUndef(destType);
   }
 
   return SGF.B.createBridgeObjectToRef(loc, args[0], destType);
@@ -873,8 +869,7 @@ static ManagedValue emitBuiltinValueToBridgeObject(SILGenFunction &SGF,
     SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
                      "argument to builtin should be a builtin integer");
     SILType objPointerType = SILType::getBridgeObjectType(SGF.F.getASTContext());
-    SILValue undef = SILUndef::get(objPointerType, SGF.SGM.M);
-    return ManagedValue::forUnmanaged(undef);
+    return SGF.emitUndef(objPointerType);
   }
 
   SILValue result = SGF.B.createValueToBridgeObject(loc, args[0].getValue());

@@ -995,11 +995,14 @@ bool isLossyUnderflow(int srcExponent, uint64_t srcSignificand,
                                   : srcSignificand;
 
   // Compute the significand bits lost due to subnormal form. Note that the
-  // integer part: 1 will use up a significand bit in denormal form.
+  // integer part: 1 will use up a significand bit in subnormal form.
   unsigned additionalLoss = destSem.minExponent - srcExponent + 1;
+  // Lost bits cannot exceed Double.minExponent - Double.significandWidth = 53.
+  // This can happen when truncating from Float80 to Double.
+  assert(additionalLoss <= 53);
 
   // Check whether a set LSB is lost due to subnormal representation.
-  unsigned lostLSBBitMask = (1 << additionalLoss) - 1;
+  uint64_t lostLSBBitMask = ((uint64_t)1 << additionalLoss) - 1;
   return (truncSignificand & lostLSBBitMask);
 }
 

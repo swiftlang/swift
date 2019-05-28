@@ -99,7 +99,7 @@ func setKeyPath(_ c: C, _ kp: ReferenceWritableKeyPath<C, Int>, _ v: Int) {
 // testAccessProp: Access a class property defined in another file.
 //
 // In -primary-file mode, all nonfinal access is behind
-// getter, setter, or materializeForSet calls. The final access remains
+// getter, setter, or begin/end_apply calls. The final access remains
 // dynamic because the property is "visibleExternally". i.e. the compiler can't
 // see how other files are using it.
 // 

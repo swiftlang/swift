@@ -17,6 +17,9 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// Requires swift-version 4
+// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
+
 import Foundation
 import Dispatch
 import ObjectiveC
@@ -1260,10 +1263,13 @@ class TestData : TestDataSuper {
 
         // If we append a sequence of elements larger than a single InlineData, the internal append here should buffer.
         // We want to make sure that buffering in this way does not accidentally drop trailing elements on the floor.
-        d.append(contentsOf: 0x03...0x17)
+        d.append(contentsOf: 0x03...0x2F)
         expectEqual(Data([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
                           0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-                          0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]), d)
+                          0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                          0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
+                          0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
+                          0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F]), d)
     }
 
     // This test is like test_appendingNonContiguousSequence_exactCount but uses a sequence which reports 0 for its `.underestimatedCount`.
@@ -1282,10 +1288,13 @@ class TestData : TestDataSuper {
 
         // If we append a sequence of elements larger than a single InlineData, the internal append here should buffer.
         // We want to make sure that buffering in this way does not accidentally drop trailing elements on the floor.
-        d.append(contentsOf: (0x03...0x17).makeIterator()) // `.makeIterator()` produces a sequence whose `.underestimatedCount` is 0.
+        d.append(contentsOf: (0x03...0x2F).makeIterator()) // `.makeIterator()` produces a sequence whose `.underestimatedCount` is 0.
         expectEqual(Data([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
                           0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-                          0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]), d)
+                          0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                          0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
+                          0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
+                          0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F]), d)
     }
 
     func test_sequenceInitializers() {
@@ -3798,6 +3807,34 @@ class TestData : TestDataSuper {
         let range = slice.range(of: "a".data(using: .ascii)!)
         expectEqual(range, Range<Data.Index>(4..<5))
     }
+
+    func test_nsdataSequence() {
+        let bytes: [UInt8] = Array(0x00...0xFF)
+        let data = bytes.withUnsafeBytes { NSData(bytes: $0.baseAddress, length: $0.count) }
+
+        for byte in bytes {
+            expectEqual(data[Int(byte)], byte)
+        }
+    }
+
+    func test_dispatchSequence() {
+        let bytes1: [UInt8] = Array(0x00..<0xF0)
+        let bytes2: [UInt8] = Array(0xF0..<0xFF)
+        var data = DispatchData.empty
+        bytes1.withUnsafeBytes {
+            data.append($0)
+        }
+        bytes2.withUnsafeBytes {
+            data.append($0)
+        }
+
+        for byte in bytes1 {
+            expectEqual(data[Int(byte)], byte)
+        }
+        for byte in bytes2 {
+            expectEqual(data[Int(byte)], byte)
+        }
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -4117,6 +4154,9 @@ DataTests.test("test_validateMutation_slice_customBacking_withUnsafeMutableBytes
 DataTests.test("test_validateMutation_slice_customMutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound") { TestData().test_validateMutation_slice_customMutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound() }
 DataTests.test("test_byte_access_of_discontiguousData") { TestData().test_byte_access_of_discontiguousData() }
 DataTests.test("test_rangeOfSlice") { TestData().test_rangeOfSlice() }
+DataTests.test("test_nsdataSequence") { TestData().test_nsdataSequence() }
+DataTests.test("test_dispatchSequence") { TestData().test_dispatchSequence() }
+
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {

@@ -144,6 +144,9 @@ FRONTEND_STATISTIC(AST, NumPrecedenceGroups)
 /// Number of conformances used by code processed by this frontend job.
 FRONTEND_STATISTIC(AST, NumUsedConformances)
 
+/// Number of precedence groups in the AST context.
+FRONTEND_STATISTIC(AST, NumStoredPropertiesQueries)
+
 /// Number of full function bodies parsed.
 FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
 

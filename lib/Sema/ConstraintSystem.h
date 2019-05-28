@@ -381,14 +381,18 @@ public:
     rep->getImpl().ParentOrFixed = type.getPointer();
   }
 
-  void setCannotBindToLValue(constraints::SavedTypeVariableBindings *record) {
-    auto rep = getRepresentative(record);
-    if (rep->getImpl().canBindToLValue()) {
-      if (record)
-        rep->getImpl().recordBinding(*record);
-      rep->getImpl().getTypeVariable()->Bits.TypeVariableType.Options
-        &= ~TVO_CanBindToLValue;
-    }
+  void setCanBindToLValue(constraints::SavedTypeVariableBindings *record,
+                          bool enabled) {
+    auto &impl = getRepresentative(record)->getImpl();
+    if (record)
+      impl.recordBinding(*record);
+
+    if (enabled)
+      impl.getTypeVariable()->Bits.TypeVariableType.Options |=
+          TVO_CanBindToLValue;
+    else
+      impl.getTypeVariable()->Bits.TypeVariableType.Options &=
+          ~TVO_CanBindToLValue;
   }
 
   /// Print the type variable to the given output stream.
@@ -816,6 +820,10 @@ enum class ConstraintSystemFlags {
   /// If set, constraint system always reuses type of pre-typechecked
   /// expression, and doesn't dig into its subexpressions.
   ReusePrecheckedType = 0x20,
+  
+  /// If set, the top-level expression may be able to provide an underlying
+  /// type for the contextual opaque archetype.
+  UnderlyingTypeForOpaqueReturnType = 0x40,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -851,33 +859,49 @@ struct MemberLookupResult {
   enum UnviableReason {
     /// Argument labels don't match.
     UR_LabelMismatch,
-    
+
     /// This uses a type like Self in its signature that cannot be used on an
     /// existential box.
     UR_UnavailableInExistential,
-    
+
     /// This is an instance member being accessed through something of metatype
     /// type.
     UR_InstanceMemberOnType,
-    
+
     /// This is a static/class member being accessed through an instance.
     UR_TypeMemberOnInstance,
-    
+
     /// This is a mutating member, being used on an rvalue.
     UR_MutatingMemberOnRValue,
-    
+
     /// The getter for this subscript or computed property is mutating and we
     /// only have an rvalue base.  This is more specific than the former one.
     UR_MutatingGetterOnRValue,
-    
+
     /// The member is inaccessible (e.g. a private member in another file).
     UR_Inaccessible,
-  };
-  
-  /// This is a list of considered (but rejected) candidates, along with a
-  /// reason for their rejection.
-  SmallVector<std::pair<OverloadChoice, UnviableReason>, 4> UnviableCandidates;
 
+    /// This is a `WritableKeyPath` being used to look up read-only member,
+    /// used in situations involving dynamic member lookup via keypath,
+    /// because it's not known upfront what access capability would the
+    /// member have.
+    UR_WritableKeyPathOnReadOnlyMember,
+
+    /// This is a `ReferenceWritableKeyPath` being used to look up mutating
+    /// member, used in situations involving dynamic member lookup via keypath,
+    /// because it's not known upfront what access capability would the
+    /// member have.
+    UR_ReferenceWritableKeyPathOnMutatingMember,
+
+    /// This is a KeyPath whose root type is AnyObject
+    UR_KeyPathWithAnyObjectRootType
+  };
+
+  /// This is a list of considered (but rejected) candidates, along with a
+  /// reason for their rejection. Split into separate collections to make
+  /// it easier to use in conjunction with viable candidates.
+  SmallVector<OverloadChoice, 4> UnviableCandidates;
+  SmallVector<UnviableReason, 4> UnviableReasons;
 
   /// Mark this as being an already-diagnosed error and return itself.
   MemberLookupResult &markErrorAlreadyDiagnosed() {
@@ -890,14 +914,13 @@ struct MemberLookupResult {
   }
   
   void addUnviable(OverloadChoice candidate, UnviableReason reason) {
-    UnviableCandidates.push_back({candidate, reason});
+    UnviableCandidates.push_back(candidate);
+    UnviableReasons.push_back(reason);
   }
-  
-  OverloadChoice *getFavoredChoice() {
-    if (FavoredChoice == ~0U) return nullptr;
-    return &ViableCandidates[FavoredChoice];
+
+  Optional<unsigned> getFavoredIndex() const {
+    return (FavoredChoice == ~0U) ? Optional<unsigned>() : FavoredChoice;
   }
-  
 };
 
 /// Stores the required methods for @dynamicCallable types.
@@ -2007,16 +2030,14 @@ public:
                                        ConstraintLocatorBuilder locator);
 
   /// Add a disjunction constraint.
-  void addDisjunctionConstraint(ArrayRef<Constraint *> constraints,
-                                ConstraintLocatorBuilder locator,
-                                RememberChoice_t rememberChoice = ForgetChoice,
-                                bool isFavored = false) {
+  void
+  addDisjunctionConstraint(ArrayRef<Constraint *> constraints,
+                           ConstraintLocatorBuilder locator,
+                           RememberChoice_t rememberChoice = ForgetChoice) {
     auto constraint =
       Constraint::createDisjunction(*this, constraints,
                                     getConstraintLocator(locator),
                                     rememberChoice);
-    if (isFavored)
-      constraint->setFavored();
 
     addUnsolvedConstraint(constraint);
   }
@@ -2419,8 +2440,10 @@ public:
   /// sets.
   void addOverloadSet(Type boundType, ArrayRef<OverloadChoice> choices,
                       DeclContext *useDC, ConstraintLocator *locator,
-                      OverloadChoice *favored = nullptr,
-                      ArrayRef<OverloadChoice> outerAlternatives = {});
+                      Optional<unsigned> favoredIndex = None);
+
+  void addOverloadSet(ArrayRef<Constraint *> choices,
+                      ConstraintLocator *locator);
 
   /// Retrieve the allocator used by this constraint system.
   llvm::BumpPtrAllocator &getAllocator() { return Allocator; }
@@ -2456,6 +2479,37 @@ public:
   ///
   /// \returns a possibly-sanitized initializer, or null if an error occurred.
   Type generateConstraints(Pattern *P, ConstraintLocatorBuilder locator);
+
+  /// Generate constraints for a given set of overload choices.
+  ///
+  /// \param constraints The container of generated constraint choices.
+  ///
+  /// \param type The type each choice should be bound to.
+  ///
+  /// \param choices The set of choices to convert into bind overload
+  /// constraints so solver could attempt each one.
+  ///
+  /// \param useDC The declaration context where each choice is used.
+  ///
+  /// \param locator The locator to use when generating constraints.
+  ///
+  /// \param favoredIndex If there is a "favored" or preferred choice
+  /// this is its index in the set of choices.
+  ///
+  /// \param requiresFix Determines whether choices require a fix to
+  /// be included in the result. If the fix couldn't be provided by
+  /// `getFix` for any given choice, such choice would be filtered out.
+  ///
+  /// \param getFix Optional callback to determine a fix for a given
+  /// choice (first argument is a position of current choice,
+  /// second - the choice in question).
+  void generateConstraints(
+      SmallVectorImpl<Constraint *> &constraints, Type type,
+      ArrayRef<OverloadChoice> choices, DeclContext *useDC,
+      ConstraintLocator *locator, Optional<unsigned> favoredIndex = None,
+      bool requiresFix = false,
+      llvm::function_ref<ConstraintFix *(unsigned, const OverloadChoice &)>
+          getFix = [](unsigned, const OverloadChoice &) { return nullptr; });
 
   /// Propagate constraints in an effort to enforce local
   /// consistency to reduce the time to solve the system.
@@ -2501,6 +2555,13 @@ public:
   private:
     TypeMatchResult(SolutionKind result) : Kind(result) {}
   };
+
+  /// Attempt to repair typing failures and record fixes if needed.
+  /// \return true if at least some of the failures has been repaired
+  /// successfully, which allows type matcher to continue.
+  bool repairFailures(Type lhs, Type rhs,
+                      SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
+                      ConstraintLocatorBuilder locator);
 
   /// Subroutine of \c matchTypes(), which matches up two tuple types.
   ///
@@ -2717,7 +2778,7 @@ public:
                                          ConstraintLocator *memberLocator,
                                          bool includeInaccessibleMembers);
 
-private:  
+private:
   /// Attempt to simplify the given construction constraint.
   ///
   /// \param valueType The type being constructed.
@@ -2790,6 +2851,12 @@ private:
                                           TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator);
 
+  /// Attempt to simplify an OpaqueUnderlyingType constraint.
+  SolutionKind simplifyOpaqueUnderlyingTypeConstraint(Type type1,
+                                              Type type2,
+                                              TypeMatchOptions flags,
+                                              ConstraintLocatorBuilder locator);
+  
   /// Attempt to simplify the BridgingConversion constraint.
   SolutionKind simplifyBridgingConstraint(Type type1,
                                          Type type2,
@@ -3160,6 +3227,31 @@ private:
   SolutionKind filterDisjunction(Constraint *disjunction,
                                   bool restoreOnFail,
                                   llvm::function_ref<bool(Constraint *)> pred);
+
+  bool isReadOnlyKeyPathComponent(const AbstractStorageDecl *storage) {
+    // See whether key paths can store to this component. (Key paths don't
+    // get any special power from being formed in certain contexts, such
+    // as the ability to assign to `let`s in initialization contexts, so
+    // we pass null for the DC to `isSettable` here.)
+    if (!getASTContext().isSwiftVersionAtLeast(5)) {
+      // As a source-compatibility measure, continue to allow
+      // WritableKeyPaths to be formed in the same conditions we did
+      // in previous releases even if we should not be able to set
+      // the value in this context.
+      if (!storage->isSettable(DC)) {
+        // A non-settable component makes the key path read-only, unless
+        // a reference-writable component shows up later.
+        return true;
+      }
+    } else if (!storage->isSettable(nullptr) ||
+               !storage->isSetterAccessibleFrom(DC)) {
+      // A non-settable component makes the key path read-only, unless
+      // a reference-writable component shows up later.
+      return true;
+    }
+
+    return false;
+  }
 
 public:
   // Given a type variable, attempt to find the disjunction of
@@ -3631,6 +3723,17 @@ Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
 /// wasn't of one of the kinds listed above.
 Expr *getArgumentExpr(Expr *expr, unsigned index);
 
+// Check whether argument of the call at given position refers to
+// parameter marked as `@autoclosure`. This function is used to
+// maintain source compatibility with Swift versions < 5,
+// previously examples like following used to type-check:
+//
+// func foo(_ x: @autoclosure () -> Int) {}
+// func bar(_ y: @autoclosure () -> Int) {
+//   foo(y)
+// }
+bool isAutoClosureArgument(Expr *argExpr);
+
 class DisjunctionChoice {
   unsigned Index;
   Constraint *Choice;
@@ -3648,6 +3751,10 @@ public:
   bool attempt(ConstraintSystem &cs) const;
 
   bool isDisabled() const { return Choice->isDisabled(); }
+
+  bool hasFix() const {
+    return bool(Choice->getFix());
+  }
 
   bool isUnavailable() const {
     if (auto *decl = getDecl(Choice))
@@ -3858,6 +3965,14 @@ public:
                              IsExplicitConversion, isBeginningOfPartition);
   }
 };
+
+/// Determine whether given type is a known one
+/// for a key path `{Writable, ReferenceWritable}KeyPath`.
+bool isKnownKeyPathType(Type type);
+
+/// Determine whether given declaration is one for a key path
+/// `{Writable, ReferenceWritable}KeyPath`.
+bool isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl);
 } // end namespace constraints
 
 template<typename ...Args>

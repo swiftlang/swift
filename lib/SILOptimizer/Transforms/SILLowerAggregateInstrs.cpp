@@ -153,7 +153,7 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
   bool expand = shouldExpand(Module, Type.getObjectType());
 
   // If we have a non-trivial type...
-  if (!Type.isTrivial(Module)) {
+  if (!Type.isTrivial(*F)) {
     // If we have a type with reference semantics, emit a load/strong release.
     LoadInst *LI = Builder.createLoad(DA->getLoc(), Addr,
                                       LoadOwnershipQualifier::Unqualified);

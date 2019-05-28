@@ -359,6 +359,12 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
       }
       // \1 - direct reference, \2 - indirect reference
       baseKind = 1;
+    } else if (auto copaque = symbolic.first.dyn_cast<const OpaqueTypeDecl*>()){
+      auto opaque = const_cast<OpaqueTypeDecl*>(copaque);
+      IRGen.noteUseOfOpaqueTypeDescriptor(opaque);
+      ref = getAddrOfLLVMVariableOrGOTEquivalent(
+                                   LinkEntity::forOpaqueTypeDescriptor(opaque));
+      baseKind = 1;
     } else {
       llvm_unreachable("unhandled symbolic referent");
     }
@@ -508,16 +514,15 @@ irgen::getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
 /// Attempts to return a constant heap metadata reference for a
 /// class type.  This is generally only valid for specific kinds of
 /// ObjC reference, like superclasses or category references.
-llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
-                                                      CanType type,
-                                              bool allowDynamicUninitialized) {
+llvm::Constant *
+irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
+                                      CanType type,
+                                      bool allowDynamicUninitialized) {
   auto theDecl = type->getClassOrBoundGenericClass();
   assert(theDecl && "emitting constant heap metadata ref for non-class type?");
 
   switch (IGM.getClassMetadataStrategy(theDecl)) {
   case ClassMetadataStrategy::Resilient:
-    return nullptr;
-
   case ClassMetadataStrategy::Singleton:
     if (!allowDynamicUninitialized)
       return nullptr;
@@ -637,6 +642,11 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
 bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   assert(!type->hasArchetype());
 
+  // Support dynamically replacing opaque result types. Don't cache the
+  // accessor result.
+  if (!IGM.getOptions().shouldOptimize() && type->hasOpaqueArchetype())
+    return true;
+
   // Value type metadata only requires dynamic initialization on first
   // access if it contains a resilient type.
   if (isa<StructType>(type) || isa<EnumType>(type)) {
@@ -652,24 +662,6 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
       return false;
 
     auto expansion = ResilienceExpansion::Maximal;
-
-    // Normally, if a value type is known to have a fixed layout to us, we will
-    // have emitted fully initialized metadata for it, including a payload size
-    // field for enum metadata for example, allowing the type metadata to be
-    // used in other resilience domains without initialization.
-    //
-    // However, when -enable-resilience-bypass is on, we might be using a value
-    // type from another module built with resilience enabled. In that case, the
-    // type looks like it has fixed size to us, since we're bypassing resilience,
-    // but the metadata still requires runtime initialization, so its incorrect
-    // to reference it directly.
-    //
-    // While unconditionally using minimal expansion is correct, it is not as
-    // efficient as it should be, so only do so if -enable-resilience-bypass is on.
-    //
-    // FIXME: All of this goes away once lldb supports resilience.
-    if (IGM.IRGen.Opts.EnableResilienceBypass)
-      expansion = ResilienceExpansion::Minimal;
 
     // Resiliently-sized metadata access always requires an accessor.
     return (IGM.getTypeInfoForUnlowered(type).isFixedSize(expansion));
@@ -1958,9 +1950,6 @@ llvm::Function *irgen::getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,
 
   switch (getTypeMetadataAccessStrategy(type)) {
   case MetadataAccessStrategy::ForeignAccessor:
-    // Force the foreign candidate to exist.
-    (void) IGM.getAddrOfForeignTypeMetadataCandidate(type);
-    LLVM_FALLTHROUGH;
   case MetadataAccessStrategy::PublicUniqueAccessor:
   case MetadataAccessStrategy::HiddenUniqueAccessor:
   case MetadataAccessStrategy::PrivateAccessor:

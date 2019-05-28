@@ -289,6 +289,9 @@ public:
 
   /// Apply this projection to \p BaseType and return the relevant subfield's
   /// SILType if BaseField has less subtypes than projection's offset.
+  ///
+  /// WARNING: This is not a constant time operation because it is implemented
+  /// in terms of getVarDecl, which requests all BaseType's stored properties.
   SILType getType(SILType BaseType, SILModule &M) const {
     assert(isValid());
     switch (getKind()) {
@@ -314,6 +317,8 @@ public:
     llvm_unreachable("Unhandled ProjectionKind in switch.");
   }
 
+  /// WARNING: This is not a constant time operation because it requests all
+  /// BaseType's stored properties.
   VarDecl *getVarDecl(SILType BaseType) const {
     assert(isValid());
     assert((getKind() == ProjectionKind::Struct ||
@@ -602,7 +607,7 @@ public:
 
   /// Return true if the given projection paths in \p CPaths does not cover
   /// all the fields with non-trivial semantics, false otherwise.
-  static bool hasUncoveredNonTrivials(SILType B, SILModule *Mod,
+  static bool hasUncoveredNonTrivials(SILType B, const SILFunction &F,
                                       ProjectionPathSet &CPaths);
 
   /// Returns true if the two paths have a non-empty symmetric

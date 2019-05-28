@@ -63,14 +63,15 @@ ValueDecl *LookupResultEntry::getBaseDecl() const {
 
 void DebuggerClient::anchor() {}
 
-void AccessFilteringDeclConsumer::foundDecl(ValueDecl *D,
-                                            DeclVisibilityKind reason) {
+void AccessFilteringDeclConsumer::foundDecl(
+    ValueDecl *D, DeclVisibilityKind reason,
+    DynamicLookupInfo dynamicLookupInfo) {
   if (D->isInvalid())
     return;
   if (!D->isAccessibleFrom(DC))
     return;
 
-  ChainedConsumer.foundDecl(D, reason);
+  ChainedConsumer.foundDecl(D, reason, dynamicLookupInfo);
 }
 
 
@@ -1941,6 +1942,9 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Shared:
   case TypeReprKind::SILBox:
     return { };
+      
+  case TypeReprKind::OpaqueReturn:
+    return { };
 
   case TypeReprKind::Fixed:
     llvm_unreachable("Cannot get fixed TypeReprs in name lookup");
@@ -2322,8 +2326,12 @@ void FindLocalVal::visitCaseStmt(CaseStmt *S) {
       }
     }
   }
-  if (!inPatterns && !items.empty())
-    checkPattern(items[0].getPattern(), DeclVisibilityKind::LocalVariable);
+
+  if (!inPatterns && !items.empty()) {
+    for (auto *vd : S->getCaseBodyVariablesOrEmptyArray()) {
+      checkValueDecl(vd, DeclVisibilityKind::LocalVariable);
+    }
+  }
   visit(S->getBody());
 }
 

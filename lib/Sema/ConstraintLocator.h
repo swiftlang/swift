@@ -98,10 +98,8 @@ public:
     ParentType,
     /// The instance of a metatype type.
     InstanceType,
-    /// The generic type of a sequence.
-    SequenceIteratorProtocol,
-    /// The element type of a generator.
-    GeneratorElementType,
+    /// The element type of a sequence in a for ... in ... loop.
+    SequenceElementType,
     /// An argument passed in an autoclosure parameter
     /// position, which must match the autoclosure return type.
     AutoclosureResult,
@@ -127,6 +125,16 @@ public:
     ContextualType,
     /// The missing argument synthesized by the solver.
     SynthesizedArgument,
+    /// The member looked up via keypath based dynamic lookup.
+    KeyPathDynamicMember,
+    /// The type of the key path expression
+    KeyPathType,
+    /// The root of a key path
+    KeyPathRoot,
+    /// The value of a key path
+    KeyPathValue,
+    /// The expected type of the function with a single expression body.
+    SingleExprFuncResultType,
   };
 
   /// Determine the number of numeric values used for the given path
@@ -149,14 +157,17 @@ public:
     case ClosureResult:
     case ParentType:
     case InstanceType:
-    case SequenceIteratorProtocol:
-    case GeneratorElementType:
+    case SequenceElementType:
     case AutoclosureResult:
     case Requirement:
     case Witness:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
     case ContextualType:
+    case KeyPathType:
+    case KeyPathRoot:
+    case KeyPathValue:
+    case SingleExprFuncResultType:
       return 0;
 
     case OpenedGeneric:
@@ -165,6 +176,7 @@ public:
     case TupleElement:
     case KeyPathComponent:
     case SynthesizedArgument:
+    case KeyPathDynamicMember:
       return 1;
 
     case TypeParameterRequirement:
@@ -193,8 +205,7 @@ public:
     case ApplyArgument:
     case ApplyFunction:
     case ApplyArgToParam:
-    case SequenceIteratorProtocol:
-    case GeneratorElementType:
+    case SequenceElementType:
     case ClosureResult:
     case ConstructorMember:
     case InstanceType:
@@ -221,6 +232,11 @@ public:
     case DynamicLookupResult:
     case ContextualType:
     case SynthesizedArgument:
+    case KeyPathDynamicMember:
+    case KeyPathType:
+    case KeyPathRoot:
+    case KeyPathValue:
+    case SingleExprFuncResultType:
       return 0;
 
     case FunctionArgument:
@@ -241,6 +257,7 @@ public:
       StoredRequirement,
       StoredWitness,
       StoredGenericSignature,
+      StoredKeyPathDynamicMemberBase,
       StoredKindAndValue
     };
 
@@ -289,6 +306,10 @@ public:
     PathElement(GenericSignature *sig)
         : storage((reinterpret_cast<uintptr_t>(sig) >> 3)),
           storedKind(StoredGenericSignature) {}
+
+    PathElement(const NominalTypeDecl *keyPath)
+        : storage((reinterpret_cast<uintptr_t>(keyPath) >> 3)),
+          storedKind(StoredKeyPathDynamicMemberBase) {}
 
     friend class ConstraintLocator;
 
@@ -369,6 +390,10 @@ public:
       return PathElement(SynthesizedArgument, position);
     }
 
+    static PathElement getKeyPathDynamicMember(const NominalTypeDecl *base) {
+      return PathElement(base);
+    }
+
     /// Retrieve the kind of path element.
     PathElementKind getKind() const {
       switch (static_cast<StoredKind>(storedKind)) {
@@ -383,6 +408,9 @@ public:
 
       case StoredGenericSignature:
         return OpenedGeneric;
+
+      case StoredKeyPathDynamicMemberBase:
+        return KeyPathDynamicMember;
 
       case StoredKindAndValue:
         return decodeStorage(storage).first;
@@ -443,6 +471,13 @@ public:
       return reinterpret_cast<GenericSignature *>(storage << 3);
     }
 
+    NominalTypeDecl *getKeyPath() const {
+      assert((static_cast<StoredKind>(storedKind) ==
+              StoredKeyPathDynamicMemberBase) &&
+             "Is not a keypath dynamic member");
+      return reinterpret_cast<NominalTypeDecl *>(storage << 3);
+    }
+
     /// Return the summary flags for this particular element.
     unsigned getNewSummaryFlags() const {
       return getSummaryFlagsForPathElement(getKind());
@@ -458,6 +493,14 @@ public:
 
     bool isSynthesizedArgument() const {
       return getKind() == PathElementKind::SynthesizedArgument;
+    }
+
+    bool isKeyPathDynamicMember() const {
+      return getKind() == PathElementKind::KeyPathDynamicMember;
+    }
+
+    bool isKeyPathComponent() const {
+      return getKind() == PathElementKind::KeyPathComponent;
     }
   };
 
@@ -486,6 +529,43 @@ public:
   bool isFunctionConversion() const {
     return (getSummaryFlags() & IsFunctionConversion);
   }
+
+  /// Determine whether given locator points to the subscript reference
+  /// e.g. `foo[0]` or `\Foo.[0]`
+  bool isSubscriptMemberRef() const;
+
+  /// Determine whether give locator points to the type of the
+  /// key path expression.
+  bool isKeyPathType() const;
+
+  /// Determine whether given locator points to the keypath root
+  bool isKeyPathRoot() const;
+
+  /// Determine whether given locator points to the keypath value
+  bool isKeyPathValue() const;
+  
+  /// Determine whether given locator points to the choice picked as
+  /// as result of the key path dynamic member lookup operation.
+  bool isResultOfKeyPathDynamicMemberLookup() const;
+
+  /// Determine whether this locator points to a subscript component
+  /// of the key path at some index.
+  bool isKeyPathSubscriptComponent() const;
+
+  /// Determine whether this locator points to the member found
+  /// via key path dynamic member lookup.
+  bool isForKeyPathDynamicMemberLookup() const;
+
+  /// Determine whether this locator points to one of the key path
+  /// components.
+  bool isForKeyPathComponent() const;
+
+  /// Determine whether this locator points to the generic parameter.
+  bool isForGenericParameter() const;
+
+  /// Determine whether this locator points to the element type of a
+  /// sequence in a for ... in ... loop.
+  bool isForSequenceElementType() const;
 
   /// Produce a profile of this locator, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id, Expr *anchor,

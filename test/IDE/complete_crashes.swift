@@ -67,7 +67,7 @@ while true {
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_PARAM_AND_ASSOC_TYPE | %FileCheck %s -check-prefix=GENERIC_PARAM_AND_ASSOC_TYPE
 struct CustomGenericCollection<Key> : ExpressibleByDictionaryLiteral {
   // GENERIC_PARAM_AND_ASSOC_TYPE: Begin completions
-  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[InstanceVar]/CurrNominal:      count[#Int#]; name=count
+  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]:      count[#Int#]; name=count
   // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[GenericTypeParam]/Local:       Key[#Key#]; name=Key
   // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[TypeAlias]/CurrNominal:        Value[#CustomGenericCollection<Key>.Value#]; name=Value
   // GENERIC_PARAM_AND_ASSOC_TYPE: End completions
@@ -154,7 +154,7 @@ func rdar22835966() {
   }
 }
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22834017 | %FileCheck %s -check-prefix=INVALID_TYPE_INIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22834017 | %FileCheck %s -check-prefix=RDAR_22834017
 struct Foo {
   let a: Anosuchtype
   let b: Bnosuchtype
@@ -164,8 +164,9 @@ struct Foo {
 func rdar22834017() {
   Foo(#^RDAR_22834017^#)
 }
-// FIXME: We could provide a useful completion here. rdar://problem/22846558
-// INVALID_TYPE_INIT-NOT: Begin completions
+// RDAR_22834017: Begin completions, 1 items
+// RDAR_22834017: Decl[Constructor]/CurrNominal:      ['(']{#a: <<error type>>#}, {#b: <<error type>>#}, {#c: <<error type>>#}[')'][#Foo#];
+// RDAR_22834017: End completions
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_23173692 | %FileCheck %s -check-prefix=RDAR_23173692
 func rdar23173692() {

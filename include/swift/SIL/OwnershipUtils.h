@@ -147,7 +147,7 @@ LinearLifetimeError valueHasLinearLifetime(
     SmallVectorImpl<SILBasicBlock *> *leakingBlocks = nullptr);
 
 /// Returns true if v is an address or trivial.
-bool isValueAddressOrTrivial(SILValue v, SILModule &m);
+bool isValueAddressOrTrivial(SILValue v);
 
 /// These operations forward both owned and guaranteed ownership.
 bool isOwnershipForwardingValueKind(SILNodeKind kind);

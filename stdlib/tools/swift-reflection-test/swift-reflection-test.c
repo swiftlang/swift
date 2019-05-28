@@ -551,6 +551,20 @@ int doDumpHeapInstance(const char *BinaryFilename) {
   return EXIT_SUCCESS;
 }
 
+#if defined(__APPLE__) && defined(__MACH__)
+#include <dlfcn.h>
+static unsigned long long computeClassIsSwiftMask(void) {
+  uintptr_t *objc_debug_swift_stable_abi_bit_ptr =
+    (uintptr_t *)dlsym(RTLD_DEFAULT, "objc_debug_swift_stable_abi_bit");
+  return objc_debug_swift_stable_abi_bit_ptr ?
+           *objc_debug_swift_stable_abi_bit_ptr : 1;
+}
+#else
+static unsigned long long computeClassIsSwiftMask(void) {
+  return 1;
+}
+#endif
+
 void printUsageAndExit() {
   fprintf(stderr, "swift-reflection-test <binary filename>\n");
   exit(EXIT_FAILURE);
@@ -561,6 +575,11 @@ int main(int argc, char *argv[]) {
     printUsageAndExit();
 
   const char *BinaryFilename = argv[1];
+  
+  // swift_reflection_classIsSwiftMask is weak linked so we can work
+  // with older Remote Mirror dylibs.
+  if (&swift_reflection_classIsSwiftMask != NULL)
+    swift_reflection_classIsSwiftMask = computeClassIsSwiftMask();
 
   uint16_t Version = swift_reflection_getSupportedMetadataVersion();
   printf("Metadata version: %u\n", Version);

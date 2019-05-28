@@ -137,7 +137,7 @@ struct ValueOwnershipKind {
 
   ValueOwnershipKind(innerty NewValue) : Value(NewValue) {}
   explicit ValueOwnershipKind(unsigned NewValue) : Value(innerty(NewValue)) {}
-  ValueOwnershipKind(SILModule &M, SILType Type,
+  ValueOwnershipKind(const SILFunction &F, SILType Type,
                      SILArgumentConvention Convention);
 
   /// Parse Value into a ValueOwnershipKind.
@@ -157,7 +157,7 @@ struct ValueOwnershipKind {
   /// ownership kind, and a subobject of type Proj is being projected from the
   /// aggregate, return Trivial if Proj has trivial type and the aggregate's
   /// ownership kind otherwise.
-  ValueOwnershipKind getProjectedOwnershipKind(SILModule &M,
+  ValueOwnershipKind getProjectedOwnershipKind(const SILFunction &F,
                                                SILType Proj) const;
 
   /// Return the lifetime constraint semantics for this
@@ -374,8 +374,7 @@ public:
   ValueOwnershipKind getOwnershipKind() const;
 
   /// Verify that this SILValue and its uses respects ownership invariants.
-  void verifyOwnership(SILModule &Mod,
-                       DeadEndBlocks *DEBlocks = nullptr) const;
+  void verifyOwnership(DeadEndBlocks *DEBlocks = nullptr) const;
 };
 
 /// A map from a ValueOwnershipKind that an operand can accept to a

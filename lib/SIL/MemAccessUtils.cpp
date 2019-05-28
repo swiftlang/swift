@@ -425,7 +425,7 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
     }
     // `storage` may still be invalid. If both `storage` and `result` are
     // invalid, this check passes, but we return an invalid storage below.
-    if (!accessingIdenticalLocations(storage.getValue(), result.getStorage()))
+    if (!storage.getValue().hasIdenticalBase(result.getStorage()))
       return AccessedStorage();
   }
   return storage.getValueOr(AccessedStorage());

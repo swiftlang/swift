@@ -155,6 +155,8 @@ protected:
   /// reference or subscript, nullptr otherwise.
   Expr *getArgumentExprFor(Expr *anchor) const;
 
+  Optional<SelectedOverload> getChoiceFor(Expr *);
+
 private:
   /// Compute anchor expression associated with current diagnostic.
   std::pair<Expr *, bool> computeAnchor() const;
@@ -322,14 +324,15 @@ private:
 /// ```
 class MissingConformanceFailure final : public RequirementFailure {
   Type NonConformingType;
-  ProtocolDecl *Protocol;
+  Type ProtocolType;
 
 public:
   MissingConformanceFailure(Expr *expr, ConstraintSystem &cs,
                             ConstraintLocator *locator,
-                            std::pair<Type, ProtocolDecl *> conformance)
+                            std::pair<Type, Type> conformance)
       : RequirementFailure(cs, expr, RequirementKind::Conformance, locator),
-        NonConformingType(conformance.first), Protocol(conformance.second) {}
+        NonConformingType(conformance.first), ProtocolType(conformance.second) {
+  }
 
   bool diagnoseAsError() override;
 
@@ -339,7 +342,7 @@ private:
   Type getLHS() const override { return NonConformingType; }
 
   /// The protocol generic requirement expected associated type to conform to.
-  Type getRHS() const override { return Protocol->getDeclaredType(); }
+  Type getRHS() const override { return ProtocolType; }
 
 protected:
   DiagOnDecl getDiagnosticOnDecl() const override {
@@ -466,6 +469,16 @@ public:
       : FailureDiagnostic(expr, cs, locator), ConvertTo(toType) {}
 
   bool diagnoseAsError() override;
+
+private:
+  /// Emit tailored diagnostics for no-escape parameter conversions e.g.
+  /// passing such parameter as an @escaping argument, or trying to
+  /// assign it to a variable which expects @escaping function.
+  bool diagnoseParameterUse() const;
+
+  /// Retrieve a type of the parameter at give index for call or
+  /// subscript invocation represented by given expression node.
+  Type getParameterTypeFor(Expr *expr, unsigned paramIdx) const;
 };
 
 class MissingForcedDowncastFailure final : public FailureDiagnostic {
@@ -565,6 +578,15 @@ private:
   Type getUnwrappedType() const {
     return resolveType(UnwrappedType, /*reconstituteSugar=*/true);
   }
+
+  /// Suggest a default value via `?? <default value>`
+  void offerDefaultValueUnwrapFixIt(DeclContext *DC, Expr *expr) const;
+  /// Suggest a force optional unwrap via `!`
+  void offerForceUnwrapFixIt(Expr *expr) const;
+
+  /// Determine whether given expression is an argument used in the
+  /// operator invocation, and if so return corresponding parameter.
+  Optional<AnyFunctionType::Param> getOperatorParameterFor(Expr *expr) const;
 };
 
 /// Diagnose errors associated with rvalues in positions
@@ -638,11 +660,15 @@ private:
              isLoadedLValue(ifExpr->getElseExpr());
     return false;
   }
+
+  /// Retrive an member reference associated with given member
+  /// looking through dynamic member lookup on the way.
+  ValueDecl *getMemberRef(ConstraintLocator *locator) const;
 };
 
 /// Intended to diagnose any possible contextual failure
 /// e.g. argument/parameter, closure result, conversions etc.
-class ContextualFailure final : public FailureDiagnostic {
+class ContextualFailure : public FailureDiagnostic {
   Type FromType, ToType;
 
 public:
@@ -650,6 +676,10 @@ public:
                     ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), FromType(resolve(lhs)),
         ToType(resolve(rhs)) {}
+
+  Type getFromType() const { return resolveType(FromType); }
+
+  Type getToType() const { return resolveType(ToType); }
 
   bool diagnoseAsError() override;
 
@@ -672,6 +702,10 @@ private:
     }
     return type;
   }
+
+  /// Try to add a fix-it to convert a stored property into a computed
+  /// property
+  void tryComputedPropertyFixIts(Expr *expr) const;
 };
 
 /// Diagnose situations when @autoclosure argument is passed to @autoclosure
@@ -771,16 +805,21 @@ private:
 /// ```
 class AllowTypeOrInstanceMemberFailure final : public FailureDiagnostic {
   Type BaseType;
+  ValueDecl *Member;
   DeclName Name;
 
 public:
-  AllowTypeOrInstanceMemberFailure(Expr *root, ConstraintSystem &cs, Type baseType,
-                                   DeclName memberName, ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), BaseType(baseType),
-        Name(memberName) {}
-    
+  AllowTypeOrInstanceMemberFailure(Expr *root, ConstraintSystem &cs,
+                                   Type baseType, ValueDecl *member,
+                                   DeclName name, ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator),
+        BaseType(baseType->getRValueType()), Member(member), Name(name) {
+    assert(member);
+  }
+
   bool diagnoseAsError() override;
 };
+
 class PartialApplicationFailure final : public FailureDiagnostic {
   enum RefKind : unsigned {
     MutatingMethod,
@@ -945,6 +984,243 @@ private:
     const auto &param = ContextualType->getParams().front();
     return resolveType(param.getPlainType());
   }
+};
+
+/// Diagnose an attempt to reference inaccessible member e.g.
+///
+/// ```swift
+/// struct S {
+///   var foo: String
+///
+///   private init(_ v: String) {
+///     self.foo = v
+///   }
+/// }
+/// _ = S("ultimate question")
+/// ```
+class InaccessibleMemberFailure final : public FailureDiagnostic {
+  ValueDecl *Member;
+
+public:
+  InaccessibleMemberFailure(Expr *root, ConstraintSystem &cs, ValueDecl *member,
+                            ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), Member(member) {}
+
+  bool diagnoseAsError() override;
+};
+
+
+// Diagnose an attempt to use AnyObject as the root type of a KeyPath
+//
+// ```swift
+// let keyPath = \AnyObject.bar
+// ```
+class AnyObjectKeyPathRootFailure final : public FailureDiagnostic {
+
+public:
+  AnyObjectKeyPathRootFailure(Expr *root, ConstraintSystem &cs,
+                              ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator) {}
+  
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to reference subscript as a keypath component
+/// where at least one of the index arguments doesn't conform to Hashable e.g.
+///
+/// ```swift
+/// protocol P {}
+///
+/// struct S {
+///   subscript<T: P>(x: Int, _ y: T) -> Bool { return true }
+/// }
+///
+/// func foo<T: P>(_ x: Int, _ y: T) {
+///   _ = \S.[x, y]
+/// }
+/// ```
+class KeyPathSubscriptIndexHashableFailure final : public FailureDiagnostic {
+  Type NonConformingType;
+
+public:
+  KeyPathSubscriptIndexHashableFailure(Expr *root, ConstraintSystem &cs,
+                                       Type type, ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), NonConformingType(type) {
+    assert(locator->isResultOfKeyPathDynamicMemberLookup() ||
+           locator->isKeyPathSubscriptComponent());
+  }
+
+  bool diagnoseAsError() override;
+};
+
+class InvalidMemberRefInKeyPath : public FailureDiagnostic {
+  ValueDecl *Member;
+
+public:
+  InvalidMemberRefInKeyPath(Expr *root, ConstraintSystem &cs, ValueDecl *member,
+                            ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), Member(member) {
+    assert(member->hasName());
+    assert(locator->isForKeyPathComponent() ||
+           locator->isForKeyPathDynamicMemberLookup());
+  }
+
+  DescriptiveDeclKind getKind() const { return Member->getDescriptiveKind(); }
+
+  DeclName getName() const { return Member->getFullName(); }
+
+  bool diagnoseAsError() override = 0;
+
+protected:
+  /// Compute location of the failure for diagnostic.
+  SourceLoc getLoc() const;
+
+  bool isForKeyPathDynamicMemberLookup() const {
+    return getLocator()->isForKeyPathDynamicMemberLookup();
+  }
+};
+
+/// Diagnose an attempt to reference a static member as a key path component
+/// e.g.
+///
+/// ```swift
+/// struct S {
+///   static var foo: Int = 42
+/// }
+///
+/// _ = \S.Type.foo
+/// ```
+class InvalidStaticMemberRefInKeyPath final : public InvalidMemberRefInKeyPath {
+public:
+  InvalidStaticMemberRefInKeyPath(Expr *root, ConstraintSystem &cs,
+                                  ValueDecl *member, ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(root, cs, member, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to reference a member which has a mutating getter as a
+/// key path component e.g.
+///
+/// ```swift
+/// struct S {
+///   var foo: Int {
+///     mutating get { return 42 }
+///   }
+///
+///   subscript(_: Int) -> Bool {
+///     mutating get { return false }
+///   }
+/// }
+///
+/// _ = \S.foo
+/// _ = \S.[42]
+/// ```
+class InvalidMemberWithMutatingGetterInKeyPath final
+    : public InvalidMemberRefInKeyPath {
+public:
+  InvalidMemberWithMutatingGetterInKeyPath(Expr *root, ConstraintSystem &cs,
+                                           ValueDecl *member,
+                                           ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(root, cs, member, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to reference a method as a key path component
+/// e.g.
+///
+/// ```swift
+/// struct S {
+///   func foo() -> Int { return 42 }
+///   static func bar() -> Int { return 0 }
+/// }
+///
+/// _ = \S.foo
+/// _ = \S.Type.bar
+/// ```
+class InvalidMethodRefInKeyPath final : public InvalidMemberRefInKeyPath {
+public:
+  InvalidMethodRefInKeyPath(Expr *root, ConstraintSystem &cs, ValueDecl *method,
+                            ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(root, cs, method, locator) {
+    assert(isa<FuncDecl>(method));
+  }
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose extraneous use of address of (`&`) which could only be
+/// associated with arguments to inout parameters e.g.
+///
+/// ```swift
+/// struct S {}
+///
+/// var a: S = ...
+/// var b: S = ...
+///
+/// a = &b
+/// ```
+class InvalidUseOfAddressOf final : public FailureDiagnostic {
+public:
+  InvalidUseOfAddressOf(Expr *root, ConstraintSystem &cs,
+                        ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt return something from a function which
+/// doesn't have a return type specified e.g.
+///
+/// ```swift
+/// func foo() { return 42 }
+/// ```
+class ExtraneousReturnFailure final : public FailureDiagnostic {
+public:
+  ExtraneousReturnFailure(Expr *root, ConstraintSystem &cs,
+                          ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose a contextual mismatch between expected collection element type
+/// and the one provided (e.g. source of the assignment or argument to a call)
+/// e.g.:
+///
+/// ```swift
+/// let _: [Int] = ["hello"]
+/// ```
+class CollectionElementContextualFailure final : public ContextualFailure {
+public:
+  CollectionElementContextualFailure(Expr *root, ConstraintSystem &cs,
+                                     Type eltType, Type contextualType,
+                                     ConstraintLocator *locator)
+      : ContextualFailure(root, cs, eltType, contextualType, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+class MissingContextualConformanceFailure final : public ContextualFailure {
+  ContextualTypePurpose Context;
+
+public:
+  MissingContextualConformanceFailure(Expr *root, ConstraintSystem &cs,
+                                      ContextualTypePurpose context, Type type,
+                                      Type protocolType,
+                                      ConstraintLocator *locator)
+      : ContextualFailure(root, cs, type, protocolType, locator),
+        Context(context) {
+    assert(protocolType->is<ProtocolType>() ||
+           protocolType->is<ProtocolCompositionType>());
+  }
+
+  bool diagnoseAsError() override;
+
+private:
+  static Optional<Diag<Type, Type>>
+  getDiagnosticFor(ContextualTypePurpose purpose);
 };
 
 } // end namespace constraints

@@ -284,11 +284,8 @@ public:
   /// \p F into account (see isLoadable(SILFunction)).
   bool isAddressOnly(const SILFunction &F) const;
 
-  /// True if the type, or the referenced type of an address type, is trivial.
-  bool isTrivial(SILModule &M) const;
-
-  /// Like isTrivial(SILModule), but takes the resilience expansion of
-  /// \p F into account (see isLoadable(SILFunction)).
+  /// True if the type, or the referenced type of an address type, is trivial,
+  /// meaning it is loadable and can be trivially copied, moved or detroyed.
   bool isTrivial(const SILFunction &F) const;
 
   /// True if the type, or the referenced type of an address type, is known to
@@ -468,10 +465,10 @@ public:
   ///
   /// If the replacement types are generic, you must push a generic context
   /// first.
-  SILType subst(SILModule &silModule,
-                TypeSubstitutionFn subs,
+  SILType subst(SILModule &silModule, TypeSubstitutionFn subs,
                 LookupConformanceFn conformances,
-                CanGenericSignature genericSig=CanGenericSignature()) const;
+                CanGenericSignature genericSig = CanGenericSignature(),
+                bool shouldSubstituteOpaqueArchetypes = false) const;
 
   SILType subst(SILModule &silModule, SubstitutionMap subs) const;
 

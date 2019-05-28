@@ -205,7 +205,7 @@ copyOrInitValueIntoSingleBuffer(SILGenFunction &SGF, SILLocation loc,
     assert(value.getValue() != destAddr && "copying in place?!");
     SILValue accessAddr =
       UnenforcedFormalAccess::enter(SGF, loc, destAddr, SILAccessKind::Modify);
-    value.copyInto(SGF, accessAddr, loc);
+    value.copyInto(SGF, loc, accessAddr);
     return;
   }
   
@@ -374,7 +374,7 @@ public:
 
     auto boxType = SGF.SGM.Types
       .getContextBoxTypeForCapture(decl,
-                     SGF.getLoweredType(decl->getType()).getASTType(),
+                     SGF.SGM.Types.getLoweredRValueType(decl->getType()),
                      SGF.F.getGenericEnvironment(),
                      /*mutable*/ true);
 
@@ -627,7 +627,7 @@ public:
     if (isInit)
       value.forwardInto(SGF, loc, address);
     else
-      value.copyInto(SGF, address, loc);
+      value.copyInto(SGF, loc, address);
   }
 
   void finishUninitialized(SILGenFunction &SGF) override {
@@ -1391,16 +1391,15 @@ CleanupHandle SILGenFunction::enterDeinitExistentialCleanup(
   return Cleanups.getTopCleanup();
 }
 
-void SILGenModule::emitExternalWitnessTable(ProtocolConformance *c) {
-  auto root = c->getRootNormalConformance();
+void SILGenModule::emitExternalWitnessTable(NormalProtocolConformance *c) {
   // Emit the witness table right now if we used it.
-  if (usedConformances.count(root)) {
+  if (usedConformances.count(c)) {
     getWitnessTable(c);
     return;
   }
   // Otherwise, remember it for later.
-  delayedConformances.insert({root, {lastEmittedConformance}});
-  lastEmittedConformance = root;
+  delayedConformances.insert({c, {lastEmittedConformance}});
+  lastEmittedConformance = c;
 }
 
 static bool isDeclaredInPrimaryFile(SILModule &M, Decl *d) {
@@ -1437,13 +1436,13 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::Class: {
     // Emit witness tables.
     auto nom = cast<NominalTypeDecl>(d);
-    for (auto c : nom->getLocalConformances(ConformanceLookupKind::All,
+    for (auto c : nom->getLocalConformances(ConformanceLookupKind::NonInherited,
                                             nullptr)) {
       auto *proto = c->getProtocol();
       if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto) &&
           isa<NormalProtocolConformance>(c) &&
           c->isComplete())
-        emitExternalWitnessTable(c);
+        emitExternalWitnessTable(cast<NormalProtocolConformance>(c));
     }
     break;
   }
@@ -1476,6 +1475,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::PrecedenceGroup:
   case DeclKind::Module:
   case DeclKind::MissingMember:
+  case DeclKind::OpaqueType:
     llvm_unreachable("Not a valid external definition for SILGen");
   }
 }

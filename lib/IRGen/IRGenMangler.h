@@ -107,12 +107,58 @@ public:
     return mangleNominalTypeSymbol(Decl, "MU");
   }
 
+  std::string mangleObjCResilientClassStub(const ClassDecl *Decl) {
+    return mangleNominalTypeSymbol(Decl, "Ms");
+  }
+
+  std::string mangleFullObjCResilientClassStub(const ClassDecl *Decl) {
+    return mangleNominalTypeSymbol(Decl, "Mt");
+  }
+
   std::string mangleClassMetadataBaseOffset(const ClassDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Mo");
   }
 
   std::string mangleNominalTypeDescriptor(const NominalTypeDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Mn");
+  }
+  
+  std::string mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl) {
+    beginMangling();
+    appendOpaqueDeclName(decl);
+    appendOperator("MQ");
+    return finalize();
+  }
+
+  std::string mangleOpaqueTypeDescriptorAccessor(const OpaqueTypeDecl *decl) {
+    beginMangling();
+    appendOpaqueDeclName(decl);
+    appendOperator("Mg");
+    return finalize();
+  }
+
+  std::string
+  mangleOpaqueTypeDescriptorAccessorImpl(const OpaqueTypeDecl *decl) {
+    beginMangling();
+    appendOpaqueDeclName(decl);
+    appendOperator("Mh");
+    return finalize();
+  }
+
+  std::string
+  mangleOpaqueTypeDescriptorAccessorKey(const OpaqueTypeDecl *decl) {
+    beginMangling();
+    appendOpaqueDeclName(decl);
+    appendOperator("Mj");
+    return finalize();
+  }
+
+  std::string
+  mangleOpaqueTypeDescriptorAccessorVar(const OpaqueTypeDecl *decl) {
+    beginMangling();
+    appendOpaqueDeclName(decl);
+    appendOperator("Mk");
+    return finalize();
   }
 
   std::string mangleTypeMetadataInstantiationCache(const NominalTypeDecl *Decl){
@@ -147,9 +193,27 @@ public:
     return finalize();
   }
   
-  std::string mangleAnonymousDescriptor(const DeclContext *DC) {
+  void appendAnonymousDescriptorName(PointerUnion<DeclContext*, VarDecl*> Name){
+    if (auto DC = Name.dyn_cast<DeclContext *>()) {
+      return appendContext(DC);
+    }
+    if (auto VD = Name.dyn_cast<VarDecl *>()) {
+      return appendEntity(VD);
+    }
+    llvm_unreachable("unknown kind");
+  }
+  
+  std::string mangleAnonymousDescriptorName(
+                                    PointerUnion<DeclContext*, VarDecl*> Name) {
     beginMangling();
-    appendContext(DC);
+    appendAnonymousDescriptorName(Name);
+    return finalize();
+  }
+  
+  std::string mangleAnonymousDescriptor(
+                                    PointerUnion<DeclContext*, VarDecl*> Name) {
+    beginMangling();
+    appendAnonymousDescriptorName(Name);
     appendOperator("MXX");
     return finalize();
   }

@@ -1408,7 +1408,7 @@ func processArrayOfFunctions(f1: [((Bool, Bool)) -> ()],
   }
 
   f2.forEach { (block: ((Bool, Bool)) -> ()) in
-  // expected-error@-1 {{cannot convert value of type '(((Bool, Bool)) -> ()) -> ()' to expected argument type '((Bool, Bool) -> ()) -> Void}}
+  // expected-error@-1 {{cannot convert value of type '(((Bool, Bool)) -> ()) -> ()' to expected argument type '(@escaping (Bool, Bool) -> ()) -> Void}}
     block(p)
     block((c, c))
     block(c, c)
@@ -1464,7 +1464,9 @@ let _ = sr4745.enumerated().map { (count, element) in "\(count): \(element)" }
 // SR-4738
 
 let sr4738 = (1, (2, 3))
-[sr4738].map { (x, (y, z)) -> Int in x + y + z } // expected-error {{use of undeclared type 'y'}}
+// expected-error @+2{{use of undeclared type 'y'}}
+// expected-error @+1{{use of undeclared type 'z'}}
+[sr4738].map { (x, (y, z)) -> Int in x + y + z }
 // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{20-26=arg1}} {{38-38=let (y, z) = arg1; }}
 
 // rdar://problem/31892961
@@ -1472,6 +1474,7 @@ let r31892961_1 = [1: 1, 2: 2]
 r31892961_1.forEach { (k, v) in print(k + v) }
 
 let r31892961_2 = [1, 2, 3]
+// expected-error @+1{{use of undeclared type 'val'}}
 let _: [Int] = r31892961_2.enumerated().map { ((index, val)) in
   // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{48-60=arg0}} {{3-3=\n  let (index, val) = arg0\n  }}
   // expected-error@-2 {{use of undeclared type 'index'}}
@@ -1688,5 +1691,5 @@ _ = x.map { (_: Void) in return () }
 // https://bugs.swift.org/browse/SR-9470
 do {
   func f(_: Int...) {}
-  let _ = [(1, 2, 3)].map(f) // expected-error {{cannot invoke 'map' with an argument list of type '((Int...) -> ())'}}
+  let _ = [(1, 2, 3)].map(f) // expected-error {{cannot invoke 'map' with an argument list of type '(@escaping (Int...) -> ())'}}
 }

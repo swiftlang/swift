@@ -3,7 +3,7 @@
 // RUN: %target-build-swift %S/Inputs/vtable_symbol_linkage_base.swift -emit-module -emit-module-path=%t/BaseModule.swiftmodule -emit-library -module-name BaseModule -o %t/%target-library-name(BaseModule)
 // RUN: %target-build-swift -I %t %s -o %t/a.out -L%t -lBaseModule
 
-// RUN: %target-build-swift %S/Inputs/vtable_symbol_linkage_base.swift -emit-module -emit-module-path=%t/BaseModule.swiftmodule -emit-library -module-name BaseModule -o %t/%target-library-name(BaseModule) -Xfrontend -enable-resilience
+// RUN: %target-build-swift %S/Inputs/vtable_symbol_linkage_base.swift -emit-module -emit-module-path=%t/BaseModule.swiftmodule -emit-library -module-name BaseModule -o %t/%target-library-name(BaseModule) -enable-library-evolution
 // RUN: %target-build-swift -I %t %s -o %t/a.out -L%t -lBaseModule
 
 // Check if the program can be linked without undefined symbol errors.

@@ -42,19 +42,37 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
   SILLocation FLoc = F->getLocation();
 
   Type ResTy;
+  BraceStmt *BS;
 
   if (auto *FD = FLoc.getAsASTNode<FuncDecl>()) {
     ResTy = FD->getResultInterfaceType();
+    BS = FD->getBody(/*canSynthesize=*/false);
   } else if (auto *CD = FLoc.getAsASTNode<ConstructorDecl>()) {
     ResTy = CD->getResultInterfaceType();
+    BS = FD->getBody();
   } else if (auto *CE = FLoc.getAsASTNode<ClosureExpr>()) {
     ResTy = CE->getResultType();
+    BS = CE->getBody();
   } else {
     llvm_unreachable("unhandled case in MissingReturn");
   }
 
   SILLocation L = UI->getLoc();
   assert(L && ResTy);
+  auto numElements = BS->getNumElements();
+  if (numElements > 0) {
+    auto element = BS->getElement(numElements - 1);
+    if (auto expr = element.dyn_cast<Expr *>()) {
+      if (expr->getType()->isEqual(ResTy)) {
+        Context.Diags.diagnose(
+          expr->getStartLoc(),
+          diag::missing_return_last_expr, ResTy,
+          FLoc.isASTNode<ClosureExpr>() ? 1 : 0)
+        .fixItInsert(expr->getStartLoc(), "return ");
+        return;
+      }
+    }
+  }
   auto diagID = F->isNoReturnFunction() ? diag::missing_never_call
                                         : diag::missing_return;
   diagnose(Context,

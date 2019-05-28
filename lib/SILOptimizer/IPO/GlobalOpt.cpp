@@ -294,8 +294,12 @@ static SILFunction *genGetterFromInit(SILOptFunctionBuilder &FunctionBuilder,
   auto V = Store->getSrc();
 
   SmallVector<SILInstruction *, 8> Insts;
-  if (!analyzeStaticInitializer(V, Insts))
+  if (!analyzeStaticInitializer(V, Insts)) {
+    LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: can't analyze static initializer for "
+                          << SILG->getName() << '\n');
     return nullptr;
+  }
+
   Insts.push_back(cast<SingleValueInstruction>(Store->getDest()));
   Insts.push_back(Store);
 
@@ -637,6 +641,9 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
                          SILFunction *InitF, SILGlobalVariable *SILG,
                          SingleValueInstruction *InitVal,
                          GlobalInitCalls &Calls) {
+  LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: replacing loads with known value for "
+                          << SILG->getName() << '\n');
+
   assert(isAssignedOnlyOnceInInitializer(SILG) &&
          "The value of the initializer should be known at compile-time");
   assert(SILG->getDecl() &&
@@ -736,6 +743,9 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
 
   // Remove "once" call from the addressor.
   if (!isAssignedOnlyOnceInInitializer(SILG) || !SILG->getDecl()) {
+    LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: building static initializer for "
+                            << SILG->getName() << '\n');
+
     removeToken(CallToOnce->getOperand(0));
     CallToOnce->eraseFromParent();
     StaticInitCloner::appendToInitializer(SILG, InitVal);
@@ -816,13 +826,16 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
   if (GlobalVarSkipProcessing.count(SILG))
     return;
 
-  if (!SILG->getLoweredType().isTrivial(*Module)) {
+  auto *F = GAI->getFunction();
+
+  if (!SILG->getLoweredType().isTrivial(*F)) {
+    LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: type is not trivial: "
+                          << SILG->getName() << '\n');
     GlobalVarSkipProcessing.insert(SILG);
     return;
   }
 
   // Ignore any accesses inside addressors for SILG
-  auto *F = GAI->getFunction();
   auto GlobalVar = getVariableOfGlobalInit(F);
   if (GlobalVar == SILG)
     return;
@@ -842,6 +855,9 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
       continue;
     }
 
+    LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: has non-store, non-load use: "
+                            << SILG->getName() << '\n';
+               Op->getUser()->dump());
     // This global is not initialized by a simple
     // constant value at this moment.
     GlobalVarSkipProcessing.insert(SILG);
@@ -857,16 +873,23 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
   LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for "
                           << SILG->getName() << '\n');
 
-  if (GlobalVarSkipProcessing.count(SILG))
-    return;
-
-  if (//!isAssignedOnlyOnceInInitializer(SILG) ||
-      !SILG->getDecl()) {
+  if (GlobalVarSkipProcessing.count(SILG)) {
+    LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: already decided to skip: "
+                          << SILG->getName() << '\n');
     return;
   }
 
-  if (!GlobalLoadMap.count(SILG))
+  if (!SILG->getDecl()) {
+    LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: no AST declaration: "
+                          << SILG->getName() << '\n');
     return;
+  }
+
+  if (!GlobalLoadMap.count(SILG)) {
+    LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: not in load map: "
+                          << SILG->getName() << '\n');
+    return;
+  }
 
   // Generate a getter only if there are any loads from this variable.
   SILFunction *GetterF = genGetterFromInit(FunctionBuilder, SI, SILG);

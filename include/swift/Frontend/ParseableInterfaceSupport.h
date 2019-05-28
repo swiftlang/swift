@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,8 +14,12 @@
 #define SWIFT_FRONTEND_PARSEABLEINTERFACESUPPORT_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Basic/Version.h"
 #include "llvm/Support/Regex.h"
+
+#define SWIFT_INTERFACE_FORMAT_VERSION_KEY "swift-interface-format-version"
+#define SWIFT_TOOLS_VERSION_KEY "swift-tools-version"
+#define SWIFT_MODULE_FLAGS_KEY "swift-module-flags"
 
 namespace swift {
 
@@ -28,6 +32,8 @@ struct ParseableInterfaceOptions {
   /// back .swiftinterface and reconstructing .swiftmodule.
   std::string ParseableInterfaceFlags;
 };
+
+extern version::Version InterfaceFormatVersion;
 
 llvm::Regex getSwiftInterfaceFormatVersionRegex();
 llvm::Regex getSwiftInterfaceModuleFlagsRegex();
@@ -48,71 +54,6 @@ llvm::Regex getSwiftInterfaceModuleFlagsRegex();
 bool emitParseableInterface(raw_ostream &out,
                             ParseableInterfaceOptions const &Opts,
                             ModuleDecl *M);
-
-/// Extract the specified-or-defaulted -module-cache-path that winds up in
-/// the clang importer, for reuse as the .swiftmodule cache path when
-/// building a ParseableInterfaceModuleLoader.
-std::string
-getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
-
-/// A ModuleLoader that runs a subordinate \c CompilerInvocation and \c
-/// CompilerInstance to convert .swiftinterface files to .swiftmodule
-/// files on the fly, caching the resulting .swiftmodules in the module cache
-/// directory, and loading the serialized .swiftmodules from there.
-class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
-  explicit ParseableInterfaceModuleLoader(ASTContext &ctx, StringRef cacheDir,
-                                          StringRef prebuiltCacheDir,
-                                          DependencyTracker *tracker,
-                                          ModuleLoadingMode loadMode)
-    : SerializedModuleLoaderBase(ctx, tracker, loadMode),
-      CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir)
-  {}
-
-  std::string CacheDir;
-  std::string PrebuiltCacheDir;
-
-  /// Wire up the SubInvocation's InputsAndOutputs to contain both input and
-  /// output filenames.
-  ///
-  /// This is a method rather than a helper function in the implementation file
-  /// because it accesses non-public bits of FrontendInputsAndOutputs.
-  static void configureSubInvocationInputsAndOutputs(
-    CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath);
-
-  static bool buildSwiftModuleFromSwiftInterface(
-    llvm::vfs::FileSystem &FS, DiagnosticEngine &Diags, SourceLoc DiagLoc,
-    CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath,
-    StringRef ModuleCachePath, DependencyTracker *OuterTracker,
-    bool ShouldSerializeDeps);
-
-  std::error_code findModuleFilesInDirectory(
-      AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
-      StringRef ModuleDocFilename,
-      std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) override;
-
-public:
-  static std::unique_ptr<ParseableInterfaceModuleLoader>
-  create(ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
-         DependencyTracker *tracker, ModuleLoadingMode loadMode) {
-    return std::unique_ptr<ParseableInterfaceModuleLoader>(
-        new ParseableInterfaceModuleLoader(ctx, cacheDir, prebuiltCacheDir,
-                                           tracker, loadMode));
-  }
-
-  /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as
-  /// a swiftmodule file).
-  ///
-  /// A simplified version of the core logic in #openModuleFiles, mostly for
-  /// testing purposes.
-  static bool buildSwiftModuleFromSwiftInterface(ASTContext &Ctx,
-                                                 StringRef CacheDir,
-                                                 StringRef PrebuiltCacheDir,
-                                                 StringRef ModuleName,
-                                                 StringRef InPath,
-                                                 StringRef OutPath);
-};
-
 
 } // end namespace swift
 

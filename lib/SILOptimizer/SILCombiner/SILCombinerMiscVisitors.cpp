@@ -91,8 +91,16 @@ SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
   if (SingleStore && SingleRelease) {
     assert(SingleProjection && "store without a projection");
     // Release the value that was stored into the existential box. The box
-    // is going away so we need to release the stored value now.
-    Builder.setInsertionPoint(SingleStore);
+    // is going away so we need to release the stored value.
+    // NOTE: It's important that the release is inserted at the single
+    // release of the box and not at the store, because a balancing retain could
+    // be _after_ the store, e.g:
+    //      %box = alloc_existential_box
+    //      %addr = project_existential_box %box
+    //      store %value to %addr
+    //      retain_value %value    // must insert the release after this retain
+    //      strong_release %box
+    Builder.setInsertionPoint(SingleRelease);
     Builder.createReleaseValue(AEBI->getLoc(), SingleStore->getSrc(),
                                SingleRelease->getAtomicity());
 
@@ -671,65 +679,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   if (SILInstruction *I = optimizeLoadFromStringLiteral(LI))
     return I;
 
-  // Given a load with multiple struct_extracts/tuple_extracts and no other
-  // uses, canonicalize the load into several (struct_element_addr (load))
-  // pairs.
-
-  struct ProjInstPair {
-    Projection P;
-    SingleValueInstruction *I;
-
-    // When sorting, just look at the projection and ignore the instruction.
-    bool operator<(const ProjInstPair &RHS) const { return P < RHS.P; }
-  };
-
-  // Go through the loads uses and add any users that are projections to the
-  // projection list.
-  llvm::SmallVector<ProjInstPair, 8> Projections;
-  for (auto *UI : getNonDebugUses(LI)) {
-    auto *User = UI->getUser();
-
-    // If we have any non SEI, TEI instruction, don't do anything here.
-    if (!isa<StructExtractInst>(User) && !isa<TupleExtractInst>(User))
-      return nullptr;
-
-    auto extract = cast<SingleValueInstruction>(User);
-    Projections.push_back({Projection(extract), extract});
-  }
-
-  // The reason why we sort the list is so that we will process projections with
-  // the same value decl and tuples with the same indices together. This makes
-  // it easy to reuse the load from the first such projection for all subsequent
-  // projections on the same value decl or index.
-  std::sort(Projections.begin(), Projections.end());
-
-  // Go through our sorted list creating new GEPs only when we need to.
-  Projection *LastProj = nullptr;
-  LoadInst *LastNewLoad = nullptr;
-  for (auto &Pair : Projections) {
-    auto &Proj = Pair.P;
-    auto *Inst = Pair.I;
-
-    // If this projection is the same as the last projection we processed, just
-    // replace all uses of the projection with the load we created previously.
-    if (LastProj && Proj == *LastProj) {
-      replaceInstUsesWith(*Inst, LastNewLoad);
-      eraseInstFromFunction(*Inst);
-      continue;
-    }
-
-    // Ok, we have started to visit the range of instructions associated with
-    // a new projection. Create the new address projection.
-    auto I = Proj.createAddressProjection(Builder, LI->getLoc(), LI->getOperand());
-    LastProj = &Proj;
-    LastNewLoad = Builder.createLoad(LI->getLoc(), I.get(),
-                                     LoadOwnershipQualifier::Unqualified);
-    replaceInstUsesWith(*Inst, LastNewLoad);
-    eraseInstFromFunction(*Inst);
-  }
-
-  // Erase the old load.
-  return eraseInstFromFunction(*LI);
+  return nullptr;
 }
 
 /// Optimize nested index_addr instructions:
@@ -761,7 +711,7 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
   // Destroy value of an enum with a trivial payload or no-payload is a no-op.
   if (auto *EI = dyn_cast<EnumInst>(Operand)) {
     if (!EI->hasOperand() ||
-        EI->getOperand()->getType().isTrivial(EI->getModule()))
+        EI->getOperand()->getType().isTrivial(*EI->getFunction()))
       return eraseInstFromFunction(*RVI);
 
     // retain_value of an enum_inst where we know that it has a payload can be
@@ -783,7 +733,7 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
                                        RVI->getAtomicity());
 
   // ReleaseValueInst of a trivial type is a no-op.
-  if (OperandTy.isTrivial(RVI->getModule()))
+  if (OperandTy.isTrivial(*RVI->getFunction()))
     return eraseInstFromFunction(*RVI);
 
   // Do nothing for non-trivial non-reference types.
@@ -798,7 +748,7 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
   // RAUW.
   if (auto *EI = dyn_cast<EnumInst>(Operand)) {
     if (!EI->hasOperand() ||
-        EI->getOperand()->getType().isTrivial(RVI->getModule())) {
+        EI->getOperand()->getType().isTrivial(*RVI->getFunction())) {
       return eraseInstFromFunction(*RVI);
     }
 
@@ -822,7 +772,7 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
   }
 
   // RetainValueInst of a trivial type is a no-op + use propagation.
-  if (OperandTy.isTrivial(RVI->getModule())) {
+  if (OperandTy.isTrivial(*RVI->getFunction())) {
     return eraseInstFromFunction(*RVI);
   }
 

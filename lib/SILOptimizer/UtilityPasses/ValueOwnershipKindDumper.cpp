@@ -29,7 +29,6 @@ class ValueOwnershipKindDumper : public SILFunctionTransform {
 
   void run() override {
     SILFunction *F = getFunction();
-    SILModule &M = F->getModule();
     for (auto &BB : *F) {
       // We only verify instructions right now.
       for (auto &II : BB) {
@@ -46,7 +45,7 @@ class ValueOwnershipKindDumper : public SILFunctionTransform {
           if (Kind == ValueOwnershipKind::Any)
             continue;
 
-          if (V->getType().isTrivial(M)) {
+          if (V->getType().isTrivial(*F)) {
             llvm_unreachable(
                 "Error! Non Trivial ownership with trivial type\n");
           }

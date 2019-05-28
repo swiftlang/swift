@@ -5,7 +5,7 @@
 
 // REPL_NO_FILES: REPL mode requires no input files
 
-// RUN: rm -rf %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/usr/bin
 // RUN: %hardlink-or-copy(from: %swift_driver_plain, to: %t/usr/bin/swift)
 

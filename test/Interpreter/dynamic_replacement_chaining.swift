@@ -18,6 +18,9 @@
 
 // REQUIRES: executable_test
 
+// This test flips the chaining flag.
+// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
+
 import A
 
 import StdlibUnittest

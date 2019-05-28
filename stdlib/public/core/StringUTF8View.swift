@@ -121,19 +121,15 @@ extension String.UTF8View: BidirectionalCollection {
   /// nonempty.
   ///
   /// If the UTF-8 view is empty, `startIndex` is equal to `endIndex`.
-  @inlinable
-  public var startIndex: Index {
-    @inline(__always) get { return _guts.startIndex }
-  }
+  @inlinable @inline(__always)
+  public var startIndex: Index { return _guts.startIndex }
 
   /// The "past the end" position---that is, the position one
   /// greater than the last valid subscript argument.
   ///
   /// In an empty UTF-8 view, `endIndex` is equal to `startIndex`.
-  @inlinable
-  public var endIndex: Index {
-    @inline(__always) get { return _guts.endIndex }
-  }
+  @inlinable @inline(__always)
+  public var endIndex: Index { return _guts.endIndex }
 
   /// Returns the next consecutive position after `i`.
   ///
@@ -209,30 +205,26 @@ extension String.UTF8View: BidirectionalCollection {
   ///
   /// - Parameter position: A valid index of the view. `position`
   ///   must be less than the view's end index.
-  @inlinable
+  @inlinable @inline(__always)
   public subscript(i: Index) -> UTF8.CodeUnit {
-    @inline(__always) get {
-      String(_guts)._boundsCheck(i)
-      if _fastPath(_guts.isFastUTF8) {
-        return _guts.withFastUTF8 { utf8 in utf8[_unchecked: i._encodedOffset] }
-      }
-
-      return _foreignSubscript(position: i)
+    String(_guts)._boundsCheck(i)
+    if _fastPath(_guts.isFastUTF8) {
+      return _guts.withFastUTF8 { utf8 in utf8[_unchecked: i._encodedOffset] }
     }
+
+    return _foreignSubscript(position: i)
   }
 }
 
 extension String.UTF8View: CustomStringConvertible {
- @inlinable
- public var description: String {
-   @inline(__always) get { return String(String(_guts)) }
- }
+  @inlinable @inline(__always)
+  public var description: String { return String(_guts) }
 }
 
 extension String.UTF8View: CustomDebugStringConvertible {
- public var debugDescription: String {
-   return "UTF8View(\(self.description.debugDescription))"
- }
+  public var debugDescription: String {
+    return "UTF8View(\(self.description.debugDescription))"
+  }
 }
 
 
@@ -289,14 +281,12 @@ extension String {
 }
 
 extension String.UTF8View {
-  @inlinable
+  @inlinable @inline(__always)
   public var count: Int {
-    @inline(__always) get {
-      if _fastPath(_guts.isFastUTF8) {
-        return _guts.count
-      }
-      return _foreignCount()
+    if _fastPath(_guts.isFastUTF8) {
+      return _guts.count
     }
+    return _foreignCount()
   }
 }
 
@@ -415,7 +405,7 @@ extension String.UTF8View {
 
     let (scalar, scalarLen) = _guts.foreignErrorCorrectedScalar(
       startingAt: i.strippingTranscoding)
-    let utf8Len = _numUTF8CodeUnits(scalar)
+    let utf8Len = UTF8.width(scalar)
 
     if utf8Len == 1 {
       _internalInvariant(i.transcodedOffset == 0)
@@ -442,7 +432,7 @@ extension String.UTF8View {
 
     let (scalar, scalarLen) = _guts.foreignErrorCorrectedScalar(
       endingAt: i)
-    let utf8Len = _numUTF8CodeUnits(scalar)
+    let utf8Len = UTF8.width(scalar)
     return i.encoded(offsetBy: -scalarLen).transcoded(withOffset: utf8Len &- 1)
   }
 

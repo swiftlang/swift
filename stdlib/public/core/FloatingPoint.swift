@@ -366,18 +366,25 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// - `greatestFiniteMagnitude.ulp` is a finite number, even though the next
   ///   greater representable value is `infinity`.
   ///
-  /// This quantity, or a related quantity, is sometimes called *epsilon* or
-  /// *machine epsilon.* Avoid that name because it has different meanings in
-  /// different languages, which can lead to confusion, and because it
-  /// suggests that it is a good tolerance to use for comparisons, which it
-  /// almost never is.
+  /// See also the `ulpOfOne` static property.
   var ulp: Self { get }
 
   /// The unit in the last place of 1.0.
   ///
   /// The positive difference between 1.0 and the next greater representable
-  /// number. The `ulpOfOne` constant corresponds to the C macros
-  /// `FLT_EPSILON`, `DBL_EPSILON`, and others with a similar purpose.
+  /// number. `ulpOfOne` corresponds to the value represented by the C macros
+  /// `FLT_EPSILON`, `DBL_EPSILON`, etc, and is sometimes called *epsilon* or
+  /// *machine epsilon*. Swift deliberately avoids using the term "epsilon"
+  /// because:
+  ///
+  /// - Historically "epsilon" has been used to refer to several different
+  ///   concepts in different languages, leading to confusion and bugs.
+  ///
+  /// - The name "epsilon" suggests that this quantity is a good tolerance to
+  ///   choose for approximate comparisons, but it is almost always unsuitable
+  ///   for that purpose.
+  ///
+  /// See also the `ulp` member property.
   static var ulpOfOne: Self { get }
 
   /// The least positive normal number.

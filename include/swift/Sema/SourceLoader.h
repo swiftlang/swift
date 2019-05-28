@@ -25,14 +25,14 @@ class SourceLoader : public ModuleLoader {
 private:
   ASTContext &Ctx;
   bool SkipBodies;
-  bool EnableResilience;
+  bool EnableLibraryEvolution;
 
   explicit SourceLoader(ASTContext &ctx,
                         bool skipBodies,
                         bool enableResilience,
                         DependencyTracker *tracker)
     : ModuleLoader(tracker), Ctx(ctx),
-      SkipBodies(skipBodies), EnableResilience(enableResilience) {}
+      SkipBodies(skipBodies), EnableLibraryEvolution(enableResilience) {}
 
 public:
   static std::unique_ptr<SourceLoader>
@@ -47,6 +47,11 @@ public:
   SourceLoader(SourceLoader &&) = delete;
   SourceLoader &operator=(const SourceLoader &) = delete;
   SourceLoader &operator=(SourceLoader &&) = delete;
+
+  /// Append visible module names to \p names. Note that names are possibly
+  /// duplicated, and not guaranteed to be ordered in any way.
+  void collectVisibleTopLevelModuleNames(
+      SmallVectorImpl<Identifier> &names) const override;
 
   /// Check whether the module with a given name can be imported without
   /// importing it.

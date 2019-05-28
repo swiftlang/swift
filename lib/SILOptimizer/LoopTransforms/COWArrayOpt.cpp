@@ -410,8 +410,7 @@ class COWArrayOpt {
   // analyzing.
   SILValue CurrentArrayAddr;
 public:
-  COWArrayOpt(RCIdentityFunctionInfo *RCIA, SILLoop *L,
-              DominanceAnalysis *DA)
+  COWArrayOpt(RCIdentityFunctionInfo *RCIA, SILLoop *L, DominanceAnalysis *DA)
       : RCIA(RCIA), Function(L->getHeader()->getParent()), Loop(L),
         Preheader(L->getLoopPreheader()), DomTree(DA->get(Function)),
         ColdBlocks(DA), CachedSafeLoop(false, false) {}
@@ -427,7 +426,8 @@ protected:
   bool checkSafeArrayValueUses(UserList &ArrayValueUsers);
   bool checkSafeArrayElementUse(SILInstruction *UseInst, SILValue ArrayVal);
   bool checkSafeElementValueUses(UserOperList &ElementValueUsers);
-  bool hoistMakeMutable(ArraySemanticsCall MakeMutable);
+  bool hoistMakeMutable(ArraySemanticsCall MakeMutable, bool dominatesExits);
+  bool dominatesExitingBlocks(SILBasicBlock *BB);
   void hoistAddressProjections(Operand &ArrayOp);
   bool hasLoopOnlyDestructorSafeArrayOperations();
   SILValue getArrayAddressBase(SILValue V);
@@ -1037,7 +1037,8 @@ void COWArrayOpt::hoistAddressProjections(Operand &ArrayOp) {
 
 /// Check if this call to "make_mutable" is hoistable, and move it, or delete it
 /// if it's already hoisted.
-bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable) {
+bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable,
+                                   bool dominatesExits) {
   LLVM_DEBUG(llvm::dbgs() << "    Checking mutable array: " <<CurrentArrayAddr);
 
   // We can hoist address projections (even if they are only conditionally
@@ -1056,7 +1057,12 @@ bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable) {
 
   // Check whether we can hoist make_mutable based on the operations that are
   // in the loop.
-  if (hasLoopOnlyDestructorSafeArrayOperations()) {
+  // Note that in this case we don't verify that the array buffer is not aliased
+  // and therefore we must be conservative if the make_mutable is executed
+  // conditionally (i.e. doesn't dominate all exit blocks).
+  // The test SILOptimizer/cowarray_opt.sil: dont_hoist_if_executed_conditionally
+  // shows the problem.
+  if (hasLoopOnlyDestructorSafeArrayOperations() && dominatesExits) {
     // Done. We can hoist the make_mutable.
     // We still need the array uses later to check if we can add loads to
     // HoistableLoads.
@@ -1106,6 +1112,16 @@ bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable) {
   return true;
 }
 
+bool COWArrayOpt::dominatesExitingBlocks(SILBasicBlock *BB) {
+  llvm::SmallVector<SILBasicBlock *, 8> ExitingBlocks;
+  Loop->getExitingBlocks(ExitingBlocks);
+  for (SILBasicBlock *Exiting : ExitingBlocks) {
+    if (!DomTree->dominates(BB, Exiting))
+      return false;
+  }
+  return true;
+}
+
 bool COWArrayOpt::run() {
   LLVM_DEBUG(llvm::dbgs() << "  Array Opts in Loop " << *Loop);
 
@@ -1123,6 +1139,7 @@ bool COWArrayOpt::run() {
   for (auto *BB : Loop->getBlocks()) {
     if (ColdBlocks.isCold(BB))
       continue;
+    bool dominatesExits = dominatesExitingBlocks(BB);
     for (auto II = BB->begin(), IE = BB->end(); II != IE;) {
       // Inst may be moved by hoistMakeMutable.
       SILInstruction *Inst = &*II;
@@ -1134,7 +1151,7 @@ bool COWArrayOpt::run() {
       CurrentArrayAddr = MakeMutableCall.getSelf();
       auto HoistedCallEntry = ArrayMakeMutableMap.find(CurrentArrayAddr);
       if (HoistedCallEntry == ArrayMakeMutableMap.end()) {
-        if (!hoistMakeMutable(MakeMutableCall)) {
+        if (!hoistMakeMutable(MakeMutableCall, dominatesExits)) {
           ArrayMakeMutableMap[CurrentArrayAddr] = nullptr;
           continue;
         }
@@ -1622,7 +1639,7 @@ protected:
   }
 
   void updateSSAForm() {
-    SILSSAUpdater SSAUp(StartBB->getParent()->getModule());
+    SILSSAUpdater SSAUp;
     for (auto *origBB : originalPreorderBlocks()) {
       // Update outside used phi values.
       for (auto *arg : origBB->getArguments())

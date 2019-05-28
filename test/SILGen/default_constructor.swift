@@ -121,3 +121,15 @@ struct I {
   // CHECK: assign [[RESULT]] to [[X_ADDR]] : $*Int
   init<T>(_: T) {}
 }
+
+// https://bugs.swift.org/browse/SR-10075
+func defaultValue<T>() -> T {
+    fatalError()
+}
+
+struct S<T> {
+  let value1: T = defaultValue()
+  let value2: Int
+
+  // CHECK-LABEL: sil hidden [ossa] @$s19default_constructor1SV6value2ACyxGSi_tcfC : $@convention(method) <T> (Int, @thin S<T>.Type) -> @out S<T>
+}

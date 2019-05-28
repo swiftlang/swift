@@ -94,18 +94,28 @@ ProtocolConformanceRef::subst(Type origType,
 ProtocolConformanceRef
 ProtocolConformanceRef::subst(Type origType,
                               TypeSubstitutionFn subs,
-                              LookupConformanceFn conformances) const {
+                              LookupConformanceFn conformances,
+                              SubstOptions options) const {
   if (isInvalid())
     return *this;
 
   // If we have a concrete conformance, we need to substitute the
   // conformance to apply to the new type.
   if (isConcrete())
-    return ProtocolConformanceRef(getConcrete()->subst(subs, conformances));
+    return ProtocolConformanceRef(getConcrete()->subst(subs, conformances,
+                                                       options));
+  // If the type is an opaque archetype, the conformance will remain abstract,
+  // unless we're specifically substituting opaque types.
+  if (auto origArchetype = origType->getAs<ArchetypeType>()) {
+    if (!options.contains(SubstFlags::SubstituteOpaqueArchetypes)
+        && isa<OpaqueTypeArchetypeType>(origArchetype->getRoot())) {
+      return *this;
+    }
+  }
 
   // Otherwise, compute the substituted type.
   auto substType = origType.subst(subs, conformances,
-                                  SubstFlags::UseErrorType);
+                                  options | SubstFlags::UseErrorType);
 
   // Opened existentials trivially conform and do not need to go through
   // substitution map lookup.
@@ -458,12 +468,7 @@ bool NormalProtocolConformance::isResilient() const {
   if (!getType()->getAnyNominal()->isResilient())
     return false;
 
-  switch (getDeclContext()->getParentModule()->getResilienceStrategy()) {
-  case ResilienceStrategy::Resilient:
-    return true;
-  case ResilienceStrategy::Default:
-    return false;
-  }
+  return getDeclContext()->getParentModule()->isResilient();
 }
 
 Optional<ArrayRef<Requirement>>
@@ -1060,12 +1065,12 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
 
   // Local function to determine whether we will end up referring to a
   // tentative witness that may not be chosen.
-  auto normal = GenericConformance->getRootNormalConformance();
+  auto root = GenericConformance->getRootConformance();
   auto isTentativeWitness = [&] {
-    if (normal->getState() != ProtocolConformanceState::CheckingTypeWitnesses)
+    if (root->getState() != ProtocolConformanceState::CheckingTypeWitnesses)
       return false;
 
-    return !normal->hasTypeWitness(assocType, nullptr);
+    return !root->hasTypeWitness(assocType, nullptr);
   };
 
   auto genericWitnessAndDecl
@@ -1207,7 +1212,8 @@ ProtocolConformance::subst(SubstitutionMap subMap) const {
 
 ProtocolConformance *
 ProtocolConformance::subst(TypeSubstitutionFn subs,
-                           LookupConformanceFn conformances) const {
+                           LookupConformanceFn conformances,
+                           SubstOptions options) const {
   switch (getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto origType = getType();
@@ -1217,7 +1223,7 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
 
     auto subMap = SubstitutionMap::get(getGenericSignature(),
                                        subs, conformances);
-    auto substType = origType.subst(subMap, SubstFlags::UseErrorType);
+    auto substType = origType.subst(subMap, options | SubstFlags::UseErrorType);
     if (substType->isEqual(origType))
       return const_cast<ProtocolConformance *>(this);
 
@@ -1243,11 +1249,12 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
     if (origBaseType->hasTypeParameter() ||
         origBaseType->hasArchetype()) {
       // Substitute into the superclass.
-      inheritedConformance = inheritedConformance->subst(subs, conformances);
+      inheritedConformance = inheritedConformance->subst(subs, conformances,
+                                                         options);
     }
 
     auto substType = origType.subst(subs, conformances,
-                                    SubstFlags::UseErrorType);
+                                    options | SubstFlags::UseErrorType);
     return substType->getASTContext()
       .getInheritedConformance(substType, inheritedConformance);
   }
@@ -1259,10 +1266,10 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
 
     auto origType = getType();
     auto substType = origType.subst(subs, conformances,
-                                    SubstFlags::UseErrorType);
+                                    options | SubstFlags::UseErrorType);
     return substType->getASTContext()
       .getSpecializedConformance(substType, genericConformance,
-                                 subMap.subst(subs, conformances));
+                                 subMap.subst(subs, conformances, options));
   }
   }
   llvm_unreachable("bad ProtocolConformanceKind");

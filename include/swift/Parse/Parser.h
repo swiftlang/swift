@@ -230,7 +230,22 @@ public:
     // Cut off parsing by acting as if we reached the end-of-file.
     Tok.setKind(tok::eof);
   }
-  
+
+  /// Use this to assert that the parser has advanced the lexing location, e.g.
+  /// before a specific parser function has returned.
+  class AssertParserMadeProgressBeforeLeavingScopeRAII {
+    Parser &P;
+    SourceLoc InitialLoc;
+  public:
+    AssertParserMadeProgressBeforeLeavingScopeRAII(Parser &parser) : P(parser) {
+      InitialLoc = P.Tok.getLoc();
+    }
+    ~AssertParserMadeProgressBeforeLeavingScopeRAII() {
+      assert(InitialLoc != P.Tok.getLoc() &&
+        "parser did not make progress, this can result in infinite loop");
+    }
+  };
+
   /// A RAII object for temporarily changing CurDeclContext.
   class ContextChange {
   protected:
@@ -425,9 +440,38 @@ public:
     llvm::Optional<SyntaxParsingContext> SynContext;
     bool Backtrack = true;
 
+    /// A token receiver used by the parser in the back tracking scope. This
+    /// receiver will save any consumed tokens during this back tracking scope.
+    /// After the scope ends, it either transfers the saved tokens to the old receiver
+    /// or discard them.
+    struct DelayedTokenReceiver: ConsumeTokenReceiver {
+      /// Keep track of the old token receiver in the parser so that we can recover
+      /// after the backtracking sope ends.
+      llvm::SaveAndRestore<ConsumeTokenReceiver*> savedConsumer;
+
+      // Whether the tokens should be transferred to the original receiver.
+      // When the back tracking scope will actually back track, this should be false;
+      // otherwise true.
+      bool shouldTransfer = false;
+      std::vector<Token> delayedTokens;
+      DelayedTokenReceiver(ConsumeTokenReceiver *&receiver):
+        savedConsumer(receiver, this) {}
+      void receive(Token tok) override {
+        delayedTokens.push_back(tok);
+      }
+      ~DelayedTokenReceiver() {
+        if (!shouldTransfer)
+          return;
+        for (auto tok: delayedTokens) {
+          savedConsumer.get()->receive(tok);
+        }
+      }
+    } TempReceiver;
+
   public:
     BacktrackingScope(Parser &P)
-        : P(P), PP(P.getParserPosition()), DT(P.Diags) {
+        : P(P), PP(P.getParserPosition()), DT(P.Diags),
+          TempReceiver(P.TokReceiver) {
       SynContext.emplace(P.SyntaxContext);
       SynContext->setBackTracking();
     }
@@ -440,8 +484,8 @@ public:
       SynContext->setTransparent();
       SynContext.reset();
       DT.commit();
+      TempReceiver.shouldTransfer = true;
     }
-
   };
 
   /// RAII object that, when it is destructed, restores the parser and lexer to
@@ -645,11 +689,11 @@ public:
   swift::ScopeInfo &getScopeInfo() { return State->getScopeInfo(); }
 
   /// Add the given Decl to the current scope.
-  void addToScope(ValueDecl *D) {
+  void addToScope(ValueDecl *D, bool diagnoseRedefinitions = true) {
     if (Context.LangOpts.EnableASTScopeLookup)
       return;
 
-    getScopeInfo().addToScope(D, *this);
+    getScopeInfo().addToScope(D, *this, diagnoseRedefinitions);
   }
 
   ValueDecl *lookupInScope(DeclName Name) {
@@ -962,7 +1006,8 @@ public:
                                                DeclAttributes &Attributes);
 
   ParserResult<SubscriptDecl>
-  parseDeclSubscript(ParseDeclOptions Flags, DeclAttributes &Attributes,
+  parseDeclSubscript(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
+                     ParseDeclOptions Flags, DeclAttributes &Attributes,
                      SmallVectorImpl<Decl *> &Decls);
 
   ParserResult<ConstructorDecl>
@@ -982,6 +1027,8 @@ public:
 
   ParserResult<PrecedenceGroupDecl>
   parseDeclPrecedenceGroup(ParseDeclOptions flags, DeclAttributes &attributes);
+
+  ParserResult<TypeRepr> parseDeclResultType(Diag<> MessageID);
 
   //===--------------------------------------------------------------------===//
   // Type Parsing
@@ -1099,6 +1146,9 @@ public:
 
     /// The default argument for this parameter.
     Expr *DefaultArg = nullptr;
+
+    /// True if this parameter inherits a default argument via '= super'
+    bool hasInheritedDefaultArg = false;
     
     /// True if we emitted a parse error about this parameter.
     bool isInvalid = false;

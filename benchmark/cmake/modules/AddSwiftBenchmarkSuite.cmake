@@ -77,6 +77,11 @@ macro(configure_sdks_darwin)
   set(appletvos_ver "9.1")
   set(watchos_ver "2.0")
 
+  set(macosx_vendor "apple")
+  set(iphoneos_vendor "apple")
+  set(appletvos_vendor "apple")
+  set(watchos_vendor "apple")
+
   set(macosx_triple_platform "macosx")
   set(iphoneos_triple_platform "ios")
   set(appletvos_triple_platform "tvos")
@@ -309,6 +314,7 @@ function (swift_benchmark_compile_archopts)
 
   set(common_options
       "-c"
+      "-Xfrontend" "-verify-sil-ownership"
       "-target" "${target}"
       "-${BENCH_COMPILE_ARCHOPTS_OPT}" ${PAGE_ALIGNMENT_OPTION})
 
@@ -338,6 +344,7 @@ function (swift_benchmark_compile_archopts)
 
   set(common_options_driver
       "-c"
+      "-Xfrontend" "-verify-sil-ownership"
       "-target" "${target}"
       "-${driver_opt}")
 

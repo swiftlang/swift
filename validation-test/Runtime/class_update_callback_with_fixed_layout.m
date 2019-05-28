@@ -2,7 +2,7 @@
 // Swift runtime a chance to update instance size and ivar offset metadata.
 
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -emit-library -emit-module -o %t/libResilient.dylib %S/Inputs/class-layout-from-objc/Resilient.swift -Xlinker -install_name -Xlinker @executable_path/libResilient.dylib -Xfrontend -enable-resilience -DSMALL
+// RUN: %target-build-swift -emit-library -emit-module -o %t/libResilient.dylib %S/Inputs/class-layout-from-objc/Resilient.swift -Xlinker -install_name -Xlinker @executable_path/libResilient.dylib -enable-library-evolution -DSMALL
 
 // RUN: %target-clang -c %S/Inputs/class-layout-from-objc/OneWordSuperclass.m -fmodules -fobjc-arc -o %t/OneWordSuperclass.o
 // RUN: %target-build-swift -emit-library -o %t/libClasses.dylib -emit-objc-header-path %t/Classes.h -I %t -I %S/Inputs/class-layout-from-objc/ %S/Inputs/class-layout-from-objc/Classes.swift %t/OneWordSuperclass.o -Xlinker -install_name -Xlinker @executable_path/libClasses.dylib -lResilient -L %t -Xfrontend -read-legacy-type-info-path=%S/Inputs/class-layout-from-objc/small.yaml
@@ -10,7 +10,7 @@
 // RUN: %target-codesign %t/main %t/libResilient.dylib %t/libClasses.dylib
 // RUN: %target-run %t/main OLD %t/libResilient.dylib %t/libClasses.dylib
 
-// RUN: %target-build-swift -emit-library -emit-module -o %t/libResilient.dylib %S/Inputs/class-layout-from-objc/Resilient.swift -Xlinker -install_name -Xlinker @executable_path/libResilient.dylib -Xfrontend -enable-resilience -DBIG
+// RUN: %target-build-swift -emit-library -emit-module -o %t/libResilient.dylib %S/Inputs/class-layout-from-objc/Resilient.swift -Xlinker -install_name -Xlinker @executable_path/libResilient.dylib -enable-library-evolution -DBIG
 // RUN: %target-codesign %t/libResilient.dylib
 // RUN: %target-run %t/main NEW %t/libResilient.dylib %t/libClasses.dylib
 
@@ -19,7 +19,7 @@
 // RUN: %target-codesign %t/libClasses.dylib
 // RUN: %target-run %t/main OLD %t/libResilient.dylib %t/libClasses.dylib
 
-// RUN: %target-build-swift -emit-library -emit-module -o %t/libResilient.dylib %S/Inputs/class-layout-from-objc/Resilient.swift -Xlinker -install_name -Xlinker @executable_path/libResilient.dylib -Xfrontend -enable-resilience -DSMALL
+// RUN: %target-build-swift -emit-library -emit-module -o %t/libResilient.dylib %S/Inputs/class-layout-from-objc/Resilient.swift -Xlinker -install_name -Xlinker @executable_path/libResilient.dylib -enable-library-evolution -DSMALL
 // RUN: %target-codesign %t/libResilient.dylib
 // RUN: %target-run %t/main NEW %t/libResilient.dylib %t/libClasses.dylib
 

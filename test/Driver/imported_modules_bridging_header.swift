@@ -4,6 +4,6 @@
 
 // Confirm that the compiler does look for/find the bad overlay during a normal
 // compilation, and thus validate that -emit-imported-modules doesn't.
-// CHECK: malformed module file: {{.*}}InvalidOverlay.swiftmodule
+// CHECK: malformed compiled module: {{.*}}InvalidOverlay.swiftmodule
 
 // REQUIRES: objc_interop

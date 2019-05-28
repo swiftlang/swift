@@ -630,6 +630,18 @@ namespace {
       IGF.Builder.CreateCall(
                     IGF.IGM.getInitEnumMetadataSingleCaseFn(),
                     {metadata, flags, payloadLayout});
+
+      // Pre swift-5.1 runtimes were missing the initialization of the
+      // the extraInhabitantCount field. Do it here instead.
+      auto payloadRef = IGF.Builder.CreateBitOrPointerCast(
+          payloadLayout, IGF.IGM.TypeLayoutTy->getPointerTo());
+      auto payloadExtraInhabitantCount =
+          IGF.Builder.CreateLoad(IGF.Builder.CreateStructGEP(
+              Address(payloadRef, Alignment(1)), 3,
+              Size(IGF.IGM.DataLayout.getTypeAllocSize(IGF.IGM.SizeTy) * 2 +
+                   IGF.IGM.DataLayout.getTypeAllocSize(IGF.IGM.Int32Ty))));
+      emitStoreOfExtraInhabitantCount(IGF, payloadExtraInhabitantCount,
+                                      metadata);
     }
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
@@ -1879,11 +1891,15 @@ namespace {
       // more no-payload case than extra inhabitants in the payload. This could
       // be slightly generalized to cases where there's multiple tag bits and
       // exactly one no-payload case in the highest used tag value.
+      unsigned extraInhabitantCount = getFixedExtraInhabitantCount(IGF.IGM);
       if (!tagBits ||
-        ElementsWithNoPayload.size() != getFixedExtraInhabitantCount(IGF.IGM)+1)
-          payloadResult = payload.emitCompare(IGF,
-                                        ti.getFixedExtraInhabitantMask(IGF.IGM),
-                                        payloadTag);
+          ElementsWithNoPayload.size() != extraInhabitantCount + 1) {
+        payloadResult = payload.emitCompare(
+            IGF,
+            extraInhabitantCount == 0 ? APInt::getAllOnesValue(PayloadBitCount)
+                                      : ti.getFixedExtraInhabitantMask(IGF.IGM),
+            payloadTag);
+      }
 
       // If any tag bits are present, they must match.
       llvm::Value *tagResult = nullptr;
@@ -6699,17 +6715,12 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
 }
 
 void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
-  if (!IRGen.tryEnableLazyTypeMetadata(theEnum))
+  if (!IRGen.hasLazyMetadata(theEnum)) {
     emitEnumMetadata(*this, theEnum);
-
-  emitNestedTypeDecls(theEnum->getMembers());
-
-  if (shouldEmitOpaqueTypeMetadataRecord(theEnum)) {
-    emitOpaqueTypeMetadataRecord(theEnum);
-    return;
+    emitFieldDescriptor(theEnum);
   }
 
-  emitFieldMetadataRecord(theEnum);
+  emitNestedTypeDecls(theEnum->getMembers());
 
   if (!isResilient(theEnum, ResilienceExpansion::Minimal))
     return;

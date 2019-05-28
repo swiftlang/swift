@@ -839,7 +839,7 @@ func _childProcess() {
     var stderr = _Stderr()
     print("\(_stdlibUnittestStreamPrefix);end", to: &stderr)
 
-    if !testSuite._testByName(testName).canReuseChildProcessAfterTest {
+    if testSuite._shouldShutDownChildProcess(forTestNamed: testName) {
       return
     }
   }
@@ -1107,7 +1107,7 @@ class _ParentProcess {
     // Check if the child has sent us "end" markers for the current test.
     if stdoutEnd && stderrEnd {
       var status: ProcessTerminationStatus?
-      if !testSuite._testByName(testName).canReuseChildProcessAfterTest {
+      if testSuite._shouldShutDownChildProcess(forTestNamed: testName) {
         status = _waitForChild()
         switch status! {
         case .exit(0):
@@ -1147,7 +1147,11 @@ class _ParentProcess {
       return (failed: false, ())
     }
 #endif
-    print("\(_stdlibUnittestStreamPrefix);shutdown", to: &_childStdin)
+    // If the child process expects an EOF, its stdin fd has already been closed and
+    // it will shut itself down automatically.
+    if !_childStdin.isClosed {
+      print("\(_stdlibUnittestStreamPrefix);shutdown", to: &_childStdin)
+    }
 
     var childCrashed = false
 
@@ -1208,6 +1212,9 @@ class _ParentProcess {
     if _runTestsInProcess {
       if t.stdinText != nil {
         print("The test \(fullTestName) requires stdin input and can't be run in-process, marking as failed")
+        _anyExpectFailed = true
+      } else if t.requiresOwnProcess {
+        print("The test \(fullTestName) requires running in a child process and can't be run in-process, marking as failed.")
         _anyExpectFailed = true
       } else {
         _anyExpectFailed = false
@@ -1550,6 +1557,17 @@ public final class TestSuite {
     return _tests[_testNameToIndex[testName]!]
   }
 
+  /// Determines if we should shut down the current test process, i.e. if this
+  /// test or the next test requires executing in its own process.
+  func _shouldShutDownChildProcess(forTestNamed testName: String) -> Bool {
+    let index = _testNameToIndex[testName]!
+    if index == _tests.count - 1 { return false }
+    let currentTest = _tests[index]
+    let nextTest = _tests[index + 1]
+    if !currentTest.canReuseChildProcessAfterTest { return true }
+    return currentTest.requiresOwnProcess || nextTest.requiresOwnProcess
+  }
+
   internal enum _TestCode {
     case single(code: () -> Void)
     case parameterized(code: (Int) -> Void, count: Int)
@@ -1564,6 +1582,7 @@ public final class TestSuite {
     let stdinEndsWithEOF: Bool
     let crashOutputMatches: [String]
     let code: _TestCode
+    let requiresOwnProcess: Bool
 
     /// Whether the test harness should stop reusing the child process after
     /// running this test.
@@ -1601,6 +1620,7 @@ public final class TestSuite {
       var _stdinEndsWithEOF: Bool = false
       var _crashOutputMatches: [String] = []
       var _testLoc: SourceLoc?
+      var _requiresOwnProcess: Bool = false
     }
 
     init(testSuite: TestSuite, name: String, loc: SourceLoc) {
@@ -1630,6 +1650,11 @@ public final class TestSuite {
       return self
     }
 
+    public func requireOwnProcess() -> _TestBuilder {
+      _data._requiresOwnProcess = true
+      return self
+    }
+
     internal func _build(_ testCode: _TestCode) {
       _testSuite._tests.append(
         _Test(
@@ -1638,7 +1663,8 @@ public final class TestSuite {
           stdinText: _data._stdinText,
           stdinEndsWithEOF: _data._stdinEndsWithEOF,
           crashOutputMatches: _data._crashOutputMatches,
-          code: testCode))
+          code: testCode,
+          requiresOwnProcess: _data._requiresOwnProcess))
       _testSuite._testNameToIndex[_name] = _testSuite._tests.count - 1
     }
 
@@ -2320,17 +2346,22 @@ internal func _checkEquatableImpl<Instance : Equatable>(
       let isEqualXY = x == y
       expectEqual(
         predictedXY, isEqualXY,
-        (predictedXY
-           ? "expected equal, found not equal\n"
-           : "expected not equal, found equal\n") +
-        "lhs (at index \(i)): \(String(reflecting: x))\n" +
-        "rhs (at index \(j)): \(String(reflecting: y))",
+        """
+        \((predictedXY
+           ? "expected equal, found not equal"
+           : "expected not equal, found equal"))
+        lhs (at index \(i)): \(String(reflecting: x))
+        rhs (at index \(j)): \(String(reflecting: y))
+        """,
         stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 
       // Not-equal is an inverse of equal.
       expectNotEqual(
         isEqualXY, x != y,
-        "lhs (at index \(i)): \(String(reflecting: x))\nrhs (at index \(j)): \(String(reflecting: y))",
+        """
+        lhs (at index \(i)): \(String(reflecting: x))
+        rhs (at index \(j)): \(String(reflecting: y))
+        """,
         stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 
       if !allowBrokenTransitivity {
@@ -2372,6 +2403,10 @@ public func checkEquatable<T : Equatable>(
     showFrame: false)
 }
 
+/// Produce an integer hash value for `value` by feeding it to a dedicated
+/// `Hasher`. This is always done by calling the `hash(into:)` method.
+/// If a non-nil `seed` is given, it is used to perturb the hasher state;
+/// this is useful for resolving accidental hash collisions.
 internal func hash<H: Hashable>(_ value: H, seed: Int? = nil) -> Int {
   var hasher = Hasher()
   if let seed = seed {
@@ -2387,6 +2422,7 @@ internal func hash<H: Hashable>(_ value: H, seed: Int? = nil) -> Int {
 public func checkHashableGroups<Groups: Collection>(
   _ groups: Groups,
   _ message: @autoclosure () -> String = "",
+  allowIncompleteHashing: Bool = false,
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
@@ -2404,6 +2440,7 @@ public func checkHashableGroups<Groups: Collection>(
     equalityOracle: equalityOracle,
     hashEqualityOracle: equalityOracle,
     allowBrokenTransitivity: false,
+    allowIncompleteHashing: allowIncompleteHashing,
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line),
     showFrame: false)
 }
@@ -2415,6 +2452,7 @@ public func checkHashable<Instances: Collection>(
   _ instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   allowBrokenTransitivity: Bool = false,
+  allowIncompleteHashing: Bool = false,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
@@ -2425,6 +2463,7 @@ public func checkHashable<Instances: Collection>(
     equalityOracle: equalityOracle,
     hashEqualityOracle: equalityOracle,
     allowBrokenTransitivity: allowBrokenTransitivity,
+    allowIncompleteHashing: allowIncompleteHashing,
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line),
     showFrame: false)
 }
@@ -2438,6 +2477,7 @@ public func checkHashable<Instances: Collection>(
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   hashEqualityOracle: (Instances.Index, Instances.Index) -> Bool,
   allowBrokenTransitivity: Bool = false,
+  allowIncompleteHashing: Bool = false,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
@@ -2490,12 +2530,12 @@ public func checkHashable<Instances: Collection>(
         expectEqual(
           x._rawHashValue(seed: 0), y._rawHashValue(seed: 0),
           """
-          _rawHashValue expected to match, found to differ
+          _rawHashValue(seed:) expected to match, found to differ
           lhs (at index \(i)): \(x)
           rhs (at index \(j)): \(y)
           """,
           stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-      } else {
+      } else if !allowIncompleteHashing {
         // Try a few different seeds; at least one of them should discriminate
         // between the hashes. It is extremely unlikely this check will fail
         // all ten attempts, unless the type's hash encoding is not unique,

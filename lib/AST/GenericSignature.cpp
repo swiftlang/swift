@@ -1029,8 +1029,41 @@ unsigned GenericParamKey::findIndexIn(
   return genericParams.size();
 }
 
+SubstitutionMap GenericSignature::getIdentitySubstitutionMap() const {
+  return SubstitutionMap::get(const_cast<GenericSignature*>(this),
+                              [](SubstitutableType *t) -> Type {
+                                return Type(cast<GenericTypeParamType>(t));
+                              },
+                              MakeAbstractConformanceForGenericType());
+}
+
 unsigned GenericSignature::getGenericParamOrdinal(GenericTypeParamType *param) {
   return GenericParamKey(param->getDepth(), param->getIndex())
     .findIndexIn(getGenericParams());
+}
+
+bool GenericSignature::hasTypeVariable() const {
+  return hasTypeVariable(getRequirements());
+}
+
+bool GenericSignature::hasTypeVariable(ArrayRef<Requirement> requirements) {
+  for (const auto &req : requirements) {
+    if (req.getFirstType()->hasTypeVariable())
+      return true;
+
+    switch (req.getKind()) {
+    case RequirementKind::Layout:
+      break;
+
+    case RequirementKind::Conformance:
+    case RequirementKind::SameType:
+    case RequirementKind::Superclass:
+      if (req.getSecondType()->hasTypeVariable())
+        return true;
+      break;
+    }
+  }
+
+  return false;
 }
 

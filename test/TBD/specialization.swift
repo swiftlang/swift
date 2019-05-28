@@ -3,11 +3,11 @@
 // RUN: %target-swift-frontend -emit-sil -o- -O -validate-tbd-against-ir=none %s | %FileCheck %s
 
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -O -validate-tbd-against-ir=all %s
-// RUN: %target-swift-frontend -emit-ir -o/dev/null -O -validate-tbd-against-ir=all -enable-resilience %s
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -O -validate-tbd-against-ir=all -enable-library-evolution %s
 
 // With -enable-testing:
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -O -validate-tbd-against-ir=all -enable-testing %s
-// RUN: %target-swift-frontend -emit-ir -o/dev/null -O -validate-tbd-against-ir=all -enable-resilience -enable-testing %s
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -O -validate-tbd-against-ir=all -enable-library-evolution -enable-testing %s
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -typecheck -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/typecheck.tbd

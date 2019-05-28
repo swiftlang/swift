@@ -301,6 +301,11 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   // serialized bodies, but no public symbol in the generated binary.
   if (d->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
     limit = Limit::AlwaysEmitIntoClient;
+  if (auto accessor = dyn_cast<AccessorDecl>(d)) {
+    auto *storage = accessor->getStorage();
+    if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+      limit = Limit::AlwaysEmitIntoClient;
+  }
 
   // ivar initializers and destroyers are completely contained within the class
   // from which they come, and never get seen externally.
@@ -330,8 +335,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     d = cast<NominalTypeDecl>(d->getDeclContext());
 
     // FIXME: This should always be true.
-    if (d->getDeclContext()->getParentModule()->getResilienceStrategy() ==
-        ResilienceStrategy::Resilient)
+    if (d->getModuleContext()->isResilient())
       limit = Limit::NeverPublic;
   }
 
@@ -1038,7 +1042,8 @@ static bool isDesignatedConstructorForClass(ValueDecl *decl) {
 }
 
 bool SILDeclRef::canBeDynamicReplacement() const {
-  if (kind == SILDeclRef::Kind::Destroyer)
+  if (kind == SILDeclRef::Kind::Destroyer ||
+      kind == SILDeclRef::Kind::DefaultArgGenerator)
     return false;
   if (kind == SILDeclRef::Kind::Initializer)
     return isDesignatedConstructorForClass(getDecl());
@@ -1048,6 +1053,8 @@ bool SILDeclRef::canBeDynamicReplacement() const {
 }
 
 bool SILDeclRef::isDynamicallyReplaceable() const {
+  if (kind == SILDeclRef::Kind::DefaultArgGenerator)
+    return false;
   if (isStoredPropertyInitializer())
     return false;
 

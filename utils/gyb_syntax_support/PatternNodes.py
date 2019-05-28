@@ -54,7 +54,8 @@ PATTERN_NODES = [
          traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
-             Child('Elements', kind='TuplePatternElementList'),
+             Child('Elements', kind='TuplePatternElementList',
+                   collection_element_name='Element'),
              Child('RightParen', kind='RightParenToken'),
          ]),
 

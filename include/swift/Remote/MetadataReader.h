@@ -362,6 +362,9 @@ public:
     bool isBridged = false;
 
     auto Meta = readMetadata(*MetadataAddress);
+    if (!Meta)
+      return None;
+
     if (auto ClassMeta = dyn_cast<TargetClassMetadata<Runtime>>(Meta)) {
       if (ClassMeta->isPureObjC()) {
         // If we can determine the Objective-C class name, this is probably an
@@ -720,6 +723,35 @@ public:
     if (!context)
       return nullptr;
     return buildContextMangling(context, Dem);
+  }
+  
+  /// Read the mangled underlying type from an opaque type descriptor.
+  BuiltType
+  readUnderlyingTypeForOpaqueTypeDescriptor(StoredPointer contextAddr,
+                                            unsigned ordinal) {
+    auto context = readContextDescriptor(contextAddr);
+    if (!context)
+      return BuiltType();
+    if (context->getKind() != ContextDescriptorKind::OpaqueType)
+      return BuiltType();
+    
+    auto opaqueType =
+      reinterpret_cast<const TargetOpaqueTypeDescriptor<Runtime> *>(
+                                                      context.getLocalBuffer());
+
+    if (ordinal >= opaqueType->getNumUnderlyingTypeArguments())
+      return BuiltType();
+    
+    auto nameAddr = resolveRelativeField(context,
+                     opaqueType->getUnderlyingTypeArgumentMangledName(ordinal));
+    
+    Demangle::Demangler Dem;
+    auto node = readMangledName(RemoteAddress(nameAddr),
+                                MangledNameKind::Type, Dem);
+    if (!node)
+      return BuiltType();
+    
+    return decodeMangledType(node);
   }
 
   bool isTaggedPointer(StoredPointer objectAddress) {
@@ -1393,6 +1425,12 @@ private:
     case ContextDescriptorKind::Protocol:
       baseSize = sizeof(TargetProtocolDescriptor<Runtime>);
       break;
+    case ContextDescriptorKind::OpaqueType:
+      baseSize = sizeof(TargetOpaqueTypeDescriptor<Runtime>);
+      metadataInitSize =
+        sizeof(typename Runtime::template RelativeDirectPointer<const char>)
+          * flags.getKindSpecificFlags();
+      break;
     default:
       // We don't know about this kind of context.
       return nullptr;
@@ -1650,6 +1688,11 @@ private:
           remoteAddress, innerDemangler);
 
         return cloneDemangleNode(result, dem);
+      }
+      case Demangle::SymbolicReferenceKind::AccessorFunctionReference: {
+        // The symbolic reference points at a resolver function, but we can't
+        // execute code in the target process to resolve it from here.
+        return nullptr;
       }
       }
 
@@ -2067,6 +2110,29 @@ private:
       // The form of module contexts is a little different from other
       // contexts; just create the node directly here and return.
       return dem.createNode(nodeKind, std::move(moduleName));
+    }
+        
+    case ContextDescriptorKind::OpaqueType: {
+      // The opaque type may have a named anonymous context for us to map
+      // back to its defining decl.
+      if (!parentDescriptorResult)
+        return nullptr;
+      auto anonymous =
+        dyn_cast_or_null<TargetAnonymousContextDescriptor<Runtime>>(
+                                    parentDescriptorResult->getLocalBuffer());
+      if (!anonymous)
+        return nullptr;
+      
+      auto mangledNode =
+                    demangleAnonymousContextName(*parentDescriptorResult, dem);
+      if (!mangledNode)
+        return nullptr;
+      if (mangledNode->getKind() == Node::Kind::Global)
+        mangledNode = mangledNode->getChild(0);
+      
+      auto opaqueNode = dem.createNode(Node::Kind::OpaqueReturnTypeOf);
+      opaqueNode->addChild(mangledNode, dem);
+      return opaqueNode;
     }
     
     default:

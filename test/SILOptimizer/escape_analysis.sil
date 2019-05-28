@@ -344,7 +344,7 @@ bb0(%0: $*Int32, %1: $*Int32):
 // CHECK-NEXT:    Arg %1 Esc: A, Succ: (%1.1)
 // CHECK-NEXT:    Con %1.1 Esc: A, Succ:
 // CHECK-NEXT:  End
-sil @copy_addr_take_content : $@convention(thin) (@in_guaranteed Int32) -> @out Int32 {
+sil @copy_addr_take_content : $@convention(thin) (@in Int32) -> @out Int32 {
 bb0(%0: $*Int32, %1: $*Int32):
   copy_addr [take] %1 to [initialization] %0 : $*Int32
   %2 = tuple()
@@ -357,7 +357,7 @@ bb0(%0: $*Int32, %1: $*Int32):
 // CHECK-NEXT:    Arg %1 Esc: G, Succ: (%1.1)
 // CHECK-NEXT:    Con %1.1 Esc: G, Succ:
 // CHECK-NEXT:  End
-sil @copy_addr_noinit_content : $@convention(thin) (@in_guaranteed Int32) -> @out Int32 {
+sil @copy_addr_noinit_content : $@convention(thin) (@in Int32) -> @out Int32 {
 bb0(%0: $*Int32, %1: $*Int32):
   copy_addr [take] %1 to %0 : $*Int32
   %2 = tuple()
@@ -1473,6 +1473,44 @@ bb0:
   %0 = alloc_ref $X
   %1 = function_ref @public_external_func : $@convention(thin) (@owned X) -> ()
   %2 = apply %1(%0) : $@convention(thin) (@owned X) -> ()
+  %7 = tuple ()
+  return %7 : $()
+}
+
+sil hidden [transparent] @test_modifier : $@yield_once @convention(thin) (@guaranteed Y) -> @yields @inout X {
+bb0(%0 : $Y):
+  %2 = ref_element_addr %0 : $Y, #Y.x
+  yield %2 : $*X, resume bb1, unwind bb2
+
+bb1:
+  %6 = tuple ()
+  return %6 : $()
+
+bb2:
+  unwind
+}
+
+// Currently escape analysis treats co-routines conservatively.
+// Ideally there should be a link from %0 -> %2 -> %4. But for now %2 (the
+// begin_apply result) is just marked as escaping.
+
+// CHECK-LABEL: CG of call_coroutine
+// CHECK:         Val %0 Esc: G, Succ: (%0.1)
+// CHECK:         Con %0.1 Esc: G, Succ: (%0.2)
+// CHECK:         Con %0.2 Esc: G, Succ: 
+// CHECK:         Val %2 Esc: G, Succ: (%2.1)
+// CHECK:         Con %2.1 Esc: G, Succ: %4
+// CHECK:         Val %4 Esc: G, Succ: 
+// CHECK:       End
+sil @call_coroutine : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Y
+  %1 = function_ref @test_modifier : $@convention(thin) @yield_once (@guaranteed Y) -> (@yields @inout X)
+  (%2, %3) = begin_apply %1(%0) : $@yield_once @convention(thin) (@guaranteed Y) -> @yields @inout X
+  %4 = alloc_ref $X
+  store %4 to %2 : $*X
+  end_apply %3
+  strong_release %0 : $Y
   %7 = tuple ()
   return %7 : $()
 }

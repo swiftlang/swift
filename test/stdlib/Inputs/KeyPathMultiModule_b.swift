@@ -36,6 +36,16 @@ public struct A {
     set { }
   }
 
+  public internal(set) var w: Int {
+    get { return 0 }
+    set { }
+  }
+  public fileprivate(set) var v: Int {
+    get { return 0 }
+    set { }
+  }
+
+
   public let immutable: Int = 1738
 }
 
@@ -88,6 +98,14 @@ public func A_y_keypath() -> KeyPath<A, Int> {
 
 public func A_z_keypath() -> KeyPath<A, Int> {
   return \A.z
+}
+
+public func A_w_keypath() -> KeyPath<A, Int> {
+  return \A.w
+}
+
+public func A_v_keypath() -> KeyPath<A, Int> {
+  return \A.v
 }
 
 public func A_immutable_keypath() -> KeyPath<A, Int> {

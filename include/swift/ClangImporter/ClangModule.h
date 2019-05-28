@@ -62,7 +62,7 @@ public:
   /// Retrieve the "exported" name of the module, which is usually the module
   /// name, but might be the name of the public module through which this
   /// (private) module is re-exported.
-  std::string getExportedModuleName() const;
+  StringRef getExportedModuleName() const override;
 
   virtual bool isSystemModule() const override;
 

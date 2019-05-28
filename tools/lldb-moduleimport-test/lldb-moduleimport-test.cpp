@@ -279,6 +279,7 @@ int main(int argc, char **argv) {
 
   Invocation.setModuleName("lldbtest");
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
+  Invocation.getLangOptions().EnableMemoryBufferImporter = true;
   Invocation.getLangOptions().EnableDWARFImporter = EnableDWARFImporter;
 
   if (!ResourceDir.empty()) {
@@ -289,7 +290,7 @@ int main(int argc, char **argv) {
     return 1;
 
   for (auto &Module : Modules)
-    if (!parseASTSection(CI.getSerializedModuleLoader(),
+    if (!parseASTSection(*CI.getMemoryBufferSerializedModuleLoader(),
                          StringRef(Module.first, Module.second), modules))
       return 1;
 

@@ -386,7 +386,7 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
     return Builder.createUncheckedBitwiseCast(UBCI->getLoc(), Oper,
                                               UBCI->getType());
   }
-  if (UBCI->getType().isTrivial(UBCI->getModule()))
+  if (UBCI->getType().isTrivial(*UBCI->getFunction()))
     return Builder.createUncheckedTrivialBitCast(UBCI->getLoc(),
                                                  UBCI->getOperand(),
                                                  UBCI->getType());

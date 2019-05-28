@@ -28,6 +28,35 @@ func f6(_: (i: Int, j: Int), k: Int = 15) {}
 // Conversions and shuffles
 //===----------------------------------------------------------------------===//
 
+func foo(a : [(some: Int, (key: Int, value: String))]) -> String {
+  for (i , (j, k)) in a {
+    if i == j { return k }
+  }
+}
+
+func rdar28207648() -> [(Int, CustomStringConvertible)] {
+  let v : [(Int, Int)] = []
+  return v as [(Int, CustomStringConvertible)]
+}
+
+class rdar28207648Base {}
+class rdar28207648Derived : rdar28207648Base {}
+
+func rdar28207648(x: (Int, rdar28207648Derived)) -> (Int, rdar28207648Base) {
+  return x as (Int, rdar28207648Base)
+}
+
+public typealias Success<T, V> = (response: T, data: V?)
+
+public enum Result {
+    case success(Success<Any, Any>)
+    case error(Error)
+}
+
+
+let a = Success<Int, Int>(response: 3, data: 3)
+let success: Result = .success(a)
+
 // Variadic functions.
 f4()
 f4(1)
@@ -260,3 +289,33 @@ func singleElementTuple() {
   let _ = ((label: 123)) // expected-error {{cannot create a single-element tuple with an element label}} {{13-20=}}
   let _ = ((label: 123)).label // expected-error {{cannot create a single-element tuple with an element label}} {{13-20=}}
 }
+
+// Tuples with duplicate labels
+
+let dupLabel1: (foo: Int, foo: Int) = (foo: 1, foo: 2) // expected-error 2{{cannot create a tuple with a duplicate element label}}
+
+func dupLabel2(x a: Int, x b: Int) -> (y: Int, y: Int) { // expected-error {{cannot create a tuple with a duplicate element label}}
+  return (a, b)
+}
+
+let _ = (bar: 0, bar: "") // expected-error {{cannot create a tuple with a duplicate element label}}
+
+let zeroTuple = (0,0)
+
+if case (foo: let x, foo: let y) = zeroTuple { print(x+y) } // expected-error {{cannot create a tuple with a duplicate element label}} 
+// expected-warning@-1 {{'if' condition is always true}}
+
+enum BishBash { case bar(foo: Int, foo: String) }
+let enumLabelDup: BishBash = .bar(foo: 0, foo: "") // expected-error {{cannot create a tuple with a duplicate element label}}
+
+func dupLabelClosure(_ fn: () -> Void) {}
+dupLabelClosure { print((bar: "", bar: 5).bar) } // expected-error {{cannot create a tuple with a duplicate element label}}
+
+struct DupLabelSubscript {
+  subscript(foo x: Int, foo y: Int) -> Int {
+    return 0
+  }
+}
+
+let dupLabelSubscriptStruct = DupLabelSubscript()
+let _ = dupLabelSubscriptStruct[foo: 5, foo: 5] // ok

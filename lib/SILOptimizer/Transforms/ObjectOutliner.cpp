@@ -339,6 +339,7 @@ bool ObjectOutliner::optimizeObjectAllocation(
                           << ARI->getFunction()->getName() << '\n');
 
   SILModule *Module = &ARI->getFunction()->getModule();
+  // FIXME: Expansion
   assert(!Cl->isResilient(Module->getSwiftModule(),
                           ResilienceExpansion::Minimal) &&
     "constructor call of resilient class should prevent static allocation");
@@ -448,6 +449,7 @@ void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
     return;
 
 
+  // FIXME: Expansion
   assert(!cacheDecl->isResilient(Module->getSwiftModule(),
                                  ResilienceExpansion::Minimal));
 

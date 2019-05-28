@@ -86,7 +86,8 @@ static bool hasSingletonMetatype(CanType instanceType) {
   return HasSingletonMetatype().visit(instanceType);
 }
 
-CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
+CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
+                                              ResilienceExpansion expansion) {
   auto decl = capture.getDecl();
   if (auto *var = dyn_cast<VarDecl>(decl)) {
     assert(var->hasStorage() &&
@@ -97,9 +98,7 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
     // by its address (like a var) instead.
     if (var->isImmutable() &&
         (!SILModuleConventions(M).useLoweredAddresses() ||
-         // FIXME: Expansion
-         !getTypeLowering(var->getType(),
-                          ResilienceExpansion::Minimal).isAddressOnly()))
+         !getTypeLowering(var->getType(), expansion).isAddressOnly()))
       return CaptureKind::Constant;
 
     // In-out parameters are captured by address.
@@ -1516,7 +1515,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   // Lower the type.
   auto loweredSubstType = computeLoweredRValueType(origType, substType);
 
-  // If that didn't change the type and the key is cacheable, there's no
+  // If that didn't change the type and the key is cachable, there's no
   // point in re-checking the table, so just construct a type lowering
   // and cache it.
   if (loweredSubstType == substType && key.isCacheable()) {

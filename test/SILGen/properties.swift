@@ -650,12 +650,6 @@ var global_observing_property : Int = zero {
 
   // global_observing_property's setter needs to call didSet.
 
-  // CHECK-LABEL: sil hidden [ossa] @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vs
-  // CHECK: function_ref properties.global_observing_property.unsafeMutableAddressor
-  // CHECK-NEXT:  function_ref @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vau
-  // CHECK: function_ref properties.global_observing_property.didset
-  // CHECK-NEXT: function_ref @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
-
   // CHECK-LABEL: sil private [ossa] @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
   didSet {
     // The didSet implementation needs to call takeInt.
@@ -684,6 +678,12 @@ var global_observing_property : Int = zero {
     // CHECK-NOT: function_ref @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
     // CHECK: end sil function
   }
+  // CHECK-LABEL: sil hidden [ossa] @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vs
+  // CHECK: function_ref properties.global_observing_property.unsafeMutableAddressor
+  // CHECK-NEXT:  function_ref @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vau
+  // CHECK: function_ref properties.global_observing_property.didset
+  // CHECK-NEXT: function_ref @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
+
 }
 
 func force_global_observing_property_setter() {
@@ -1260,4 +1260,35 @@ func assign_to_tuple() {
 
   let v = (3, 4)
   s.vv = v
+}
+
+// CHECK-LABEL: sil private [ossa] @$s10properties8myglobalSivW
+// CHECK-LABEL: sil [ossa] @$s10properties8myglobalSivg
+// CHECK-LABEL: sil [ossa] @$s10properties8myglobalSivs
+public var myglobal : Int = 1 {
+  didSet {
+    print("myglobal.didSet")
+  }
+}
+
+// CHECK-LABEL: sil private [ossa] @$s10properties9myglobal2Sivw
+// CHECK-LABEL: sil [ossa] @$s10properties9myglobal2Sivg
+// CHECK-LABEL: sil [ossa] @$s10properties9myglobal2Sivs
+public var myglobal2 : Int = 1 {
+  willSet {
+    print("myglobal.willSet")
+  }
+}
+
+// CHECK-LABEL: sil private [ossa] @$s10properties9myglobal3Sivw
+// CHECK-LABEL: sil private [ossa] @$s10properties9myglobal3SivW
+// CHECK-LABEL: sil [ossa] @$s10properties9myglobal3Sivg
+// CHECK-LABEL: sil [ossa] @$s10properties9myglobal3Sivs
+public var myglobal3 : Int = 1 {
+  willSet {
+    print("myglobal.willSet")
+  }
+  didSet {
+    print("myglobal.didSet")
+  }
 }

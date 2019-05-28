@@ -50,6 +50,7 @@ namespace clang {
 namespace swift {
   class ASTContext;
   enum class Associativity : unsigned char;
+  class AvailabilityContext;
   class BoundGenericType;
   class ClangNode;
   class ConstructorDecl;
@@ -84,6 +85,7 @@ namespace swift {
   class ModuleLoader;
   class NominalTypeDecl;
   class NormalProtocolConformance;
+  class OpaqueTypeDecl;
   class InheritedProtocolConformance;
   class SelfProtocolConformance;
   class SpecializedProtocolConformance;
@@ -592,6 +594,9 @@ public:
   void addDestructorCleanup(T &object) {
     addCleanup([&object]{ object.~T(); });
   }
+  
+  /// Get the runtime availability of the opaque types language feature for the target platform.
+  AvailabilityContext getOpaqueTypeAvailability();
 
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
@@ -891,9 +896,9 @@ public:
     return getIdentifier(getSwiftName(kind));
   }
 
-  /// Collect visible clang modules from the ClangModuleLoader. These modules are
-  /// not necessarily loaded.
-  void getVisibleTopLevelClangModules(SmallVectorImpl<clang::Module*> &Modules) const;
+  /// Populate \p names with visible top level module names.
+  /// This guarantees that resulted \p names doesn't have duplicated names.
+  void getVisibleTopLevelModuleNames(SmallVectorImpl<Identifier> &names) const;
 
 private:
   /// Register the given generic signature builder to be used as the canonical
@@ -952,6 +957,7 @@ private:
 
   friend TypeBase;
   friend ArchetypeType;
+  friend OpaqueTypeDecl;
 
   /// Provide context-level uniquing for SIL lowered type layouts and boxes.
   friend SILLayout;

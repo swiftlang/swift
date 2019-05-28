@@ -74,12 +74,6 @@ void HackSwiftObject()
 {
     SwiftObjectDemangledName = "Swift._SwiftObject";
     Class cls = objc_getClass(SwiftObjectDemangledName);
-    // FIXME: Remove this fallback after we enable
-    // SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT everywhere.
-    if (!cls) {
-        SwiftObjectDemangledName = "SwiftObject";
-        cls = objc_getClass(SwiftObjectDemangledName);
-    }
 
     class_addMethod(cls, @selector(perform0), (IMP)Perform0, "@@:");
     class_addMethod(cls, @selector(perform1:), (IMP)Perform1, "@@:@");

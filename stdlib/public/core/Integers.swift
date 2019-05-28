@@ -36,7 +36,7 @@ extension ExpressibleByIntegerLiteral
 /// generic constraint.
 ///
 /// The following code declares a method that calculates the total of any
-/// sequence with `Numeric` elements.
+/// sequence with `AdditiveArithmetic` elements.
 ///
 ///     extension Sequence where Element: AdditiveArithmetic {
 ///         func sum() -> Element {

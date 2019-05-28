@@ -509,6 +509,50 @@ static CallExpr *createContainerKeyedByCall(ASTContext &C, DeclContext *DC,
                                   C.AllocateCopy(argLabels));
 }
 
+/// Looks up the property corresponding to the indicated coding key.
+///
+/// \param conformanceDC The DeclContext we're generating code within.
+/// \param elt The CodingKeys enum case.
+/// \param targetDecl The type to look up properties in.
+///
+/// \return A tuple containing the \c VarDecl for the property, the type that
+/// should be passed when decoding it, and a boolean which is true if
+/// \c encodeIfPresent/\c decodeIfPresent should be used for this property.
+static std::tuple<VarDecl *, Type, bool>
+lookupVarDeclForCodingKeysCase(DeclContext *conformanceDC,
+                               EnumElementDecl *elt,
+                               NominalTypeDecl *targetDecl) {
+  ASTContext &C = elt->getASTContext();
+
+  for (auto decl : targetDecl->lookupDirect(DeclName(elt->getName()))) {
+    if (auto *vd = dyn_cast<VarDecl>(decl)) {
+      if (!vd->isStatic()) {
+        // This is the VarDecl we're looking for.
+
+        auto varType =
+            conformanceDC->mapTypeIntoContext(vd->getValueInterfaceType());
+
+        bool useIfPresentVariant =
+            varType->getAnyNominal() == C.getOptionalDecl();
+
+        if (useIfPresentVariant) {
+          // The type we request out of decodeIfPresent needs to be unwrapped
+          // one level.
+          // e.g. String? => decodeIfPresent(String.self, forKey: ...), not
+          //                 decodeIfPresent(String?.self, forKey: ...)
+          auto boundOptionalType =
+              dyn_cast<BoundGenericType>(varType->getCanonicalType());
+          varType = boundOptionalType->getGenericArgs()[0];
+        }
+
+        return std::make_tuple(vd, varType, useIfPresentVariant);
+      }
+    }
+  }
+
+  llvm_unreachable("Should have found at least 1 var decl");
+}
+
 /// Synthesizes the body for `func encode(to encoder: Encoder) throws`.
 ///
 /// \param encodeDecl The function decl whose body to synthesize.
@@ -531,7 +575,8 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *)
   // }
 
   // The enclosing type decl.
-  auto *targetDecl = encodeDecl->getDeclContext()->getSelfNominalTypeDecl();
+  auto conformanceDC = encodeDecl->getDeclContext();
+  auto *targetDecl = conformanceDC->getSelfNominalTypeDecl();
 
   auto *funcDC = cast<DeclContext>(encodeDecl);
   auto &C = funcDC->getASTContext();
@@ -590,16 +635,12 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *)
   // Now need to generate `try container.encode(x, forKey: .x)` for all
   // existing properties. Optional properties get `encodeIfPresent`.
   for (auto *elt : codingKeysEnum->getAllElements()) {
-    VarDecl *varDecl = nullptr;
-    for (auto decl : targetDecl->lookupDirect(DeclName(elt->getName()))) {
-      if (auto *vd = dyn_cast<VarDecl>(decl)) {
-        if (!vd->isStatic()) {
-          varDecl = vd;
-          break;
-        }
-      }
-    }
-    assert(varDecl && "Should have found at least 1 var decl");
+    VarDecl *varDecl;
+    Type varType;                // not used in Encodable synthesis
+    bool useIfPresentVariant;
+
+    std::tie(varDecl, varType, useIfPresentVariant) =
+        lookupVarDeclForCodingKeysCase(conformanceDC, elt, targetDecl);
 
     // self.x
     auto *selfRef = DerivedConformance::createSelfDeclRef(encodeDecl);
@@ -613,16 +654,7 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *)
     auto *keyExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
 
     // encode(_:forKey:)/encodeIfPresent(_:forKey:)
-    auto methodName = C.Id_encode;
-    auto varType = varDecl->getType();
-    if (auto referenceType = varType->getAs<ReferenceStorageType>()) {
-      // This is a weak/unowned/unmanaged var. Get the inner type before
-      // checking optionality.
-      varType = referenceType->getReferentType();
-    }
-
-    if (varType->getAnyNominal() == C.getOptionalDecl())
-      methodName = C.Id_encodeIfPresent;
+    auto methodName = useIfPresentVariant ? C.Id_encodeIfPresent : C.Id_encode;
 
     SmallVector<Identifier, 2> argNames{Identifier(), C.Id_forKey};
     DeclName name(C, methodName, argNames);
@@ -831,42 +863,22 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
     // for all existing properties. Optional properties get `decodeIfPresent`.
     for (auto *elt : enumElements) {
       VarDecl *varDecl;
-      for (auto decl : targetDecl->lookupDirect(DeclName(elt->getName())))
-        if ((varDecl = dyn_cast<VarDecl>(decl)))
-          break;
+      Type varType;
+      bool useIfPresentVariant;
+
+      std::tie(varDecl, varType, useIfPresentVariant) =
+          lookupVarDeclForCodingKeysCase(conformanceDC, elt, targetDecl);
 
       // Don't output a decode statement for a var let with a default value.
       if (varDecl->isLet() && varDecl->getParentInitializer() != nullptr)
         continue;
 
-      // Potentially unwrap a layer of optionality from the var type. If the var
-      // is Optional<T>, we want to decodeIfPresent(T.self, forKey: ...);
-      // otherwise, we can just decode(T.self, forKey: ...).
-      // This is also true if the type is an ImplicitlyUnwrappedOptional.
-      auto varType = conformanceDC->mapTypeIntoContext(
-          varDecl->getInterfaceType());
-      auto methodName = C.Id_decode;
-      if (auto referenceType = varType->getAs<ReferenceStorageType>()) {
-        // This is a weak/unowned/unmanaged var. Get the inner type before
-        // checking optionality.
-        varType = referenceType->getReferentType();
-      }
-
-      if (varType->getAnyNominal() == C.getOptionalDecl()) {
-        methodName = C.Id_decodeIfPresent;
-
-        // The type we request out of decodeIfPresent needs to be unwrapped
-        // one level.
-        // e.g. String? => decodeIfPresent(String.self, forKey: ...), not
-        //                 decodeIfPresent(String?.self, forKey: ...)
-        auto boundOptionalType =
-          dyn_cast<BoundGenericType>(varType->getCanonicalType());
-        varType = boundOptionalType->getGenericArgs()[0];
-      }
+      auto methodName =
+          useIfPresentVariant ? C.Id_decodeIfPresent : C.Id_decode;
 
       // Type.self (where Type === type(of: x))
       // Calculating the metatype needs to happen after potential Optional
-      // unwrapping above.
+      // unwrapping in lookupVarDeclForCodingKeysCase().
       auto *metaTyRef = TypeExpr::createImplicit(varType, C);
       auto *targetExpr = new (C) DotSelfExpr(metaTyRef, SourceLoc(),
                                              SourceLoc(), varType);

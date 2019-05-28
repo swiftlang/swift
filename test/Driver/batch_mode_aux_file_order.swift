@@ -1,5 +1,5 @@
 // Batch-mode is not supported on Windows yet
-// XFAIL: win32
+// XFAIL: windows
 //
 // When multiple additional-outputs on the same command-line are no longer
 // supported (i.e. when we've moved to mandatory use of output file maps for

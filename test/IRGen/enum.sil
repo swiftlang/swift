@@ -1,7 +1,7 @@
 // #if directives don't work with SIL keywords, therefore please put ObjC tests
 // in `enum_objc.sil`.
-// RUN: %target-swift-frontend %s -gnone -emit-ir -enable-objc-interop  | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-objc --check-prefix=CHECK-objc-%target-ptrsize --check-prefix=CHECK-objc-%target-ptrsize-simulator-%target-is-simulator -DWORD=i%target-ptrsize
-// RUN: %target-swift-frontend %s -gnone -emit-ir -disable-objc-interop | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-native --check-prefix=CHECK-native-%target-ptrsize -DWORD=i%target-ptrsize
+// RUN: %target-swift-frontend %s -gnone -emit-ir -disable-diagnostic-passes -enable-objc-interop  | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-objc --check-prefix=CHECK-objc-%target-ptrsize --check-prefix=CHECK-objc-%target-ptrsize-simulator-%target-is-simulator -DWORD=i%target-ptrsize
+// RUN: %target-swift-frontend %s -gnone -emit-ir -disable-diagnostic-passes -disable-objc-interop | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-native --check-prefix=CHECK-native-%target-ptrsize -DWORD=i%target-ptrsize
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 
@@ -472,6 +472,24 @@ enum SinglePayloadNoXI2 {
   case w
   case v
   case u
+}
+
+// CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @select_enum([[WORD:i32]], i8)
+// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @select_enum([[WORD:i64]], i8)
+// CHECK: entry:
+// CHECK:   [[TAG:%.*]] = trunc i8 %1 to i1
+// CHECK:   [[PAYLOAD:%.*]] = icmp eq [[WORD]] %0, 1
+// CHECK:   [[MATCHES:%.*]] = and i1 [[TAG]], [[PAYLOAD]]
+// CHECK:   [[RES:%.*]] = select i1 [[MATCHES]], i1 false, i1 true
+// CHECK:   ret i1 [[RES]]
+// CHECK: }
+
+sil @select_enum : $@convention(method) (SinglePayloadNoXI2) -> Builtin.Int1 {
+bb0(%0 : $SinglePayloadNoXI2):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = select_enum %0 : $SinglePayloadNoXI2, case #SinglePayloadNoXI2.z!enumelt: %2, default %3 : $Builtin.Int1
+  return %4 : $Builtin.Int1
 }
 
 // CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_no_xi_switch([[WORD:i64]], i8) {{.*}} {
@@ -2665,6 +2683,15 @@ entry(%x : $*MyOptional):
 // CHECK:   [[T_VWT:%.*]] = load i8**, i8*** [[T_VWT_ADDR]]
 // CHECK:   [[T_LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[T_VWT]], i32 8
 // CHECK:   call void @swift_initEnumMetadataSingleCase(%swift.type* [[METADATA]], [[WORD]] 0, i8** [[T_LAYOUT]])
+// CHECK:   [[PAYLOAD_TYPELAYOUT:%.*]] = bitcast i8** [[T_LAYOUT]] to %swift.type_layout*
+// CHECK:   [[PAYLOAD_EXTRAINHABITANTCNT:%.*]] = getelementptr inbounds %swift.type_layout, %swift.type_layout* [[PAYLOAD_TYPELAYOUT]], i32 0, i32 3
+// CHECK:   [[CNT:%.*]] = load i32, i32* [[PAYLOAD_EXTRAINHABITANTCNT]]
+// CHECK:   [[METADATA2:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
+// CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA2]], [[WORD]] -1
+// CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+// CHECK:   [[VWT2:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
+// CHECK:   [[XIC_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT2]], i32 0, i32 11
+// CHECK:   store i32 [[CNT]], i32* [[XIC_ADDR]]
 // CHECK:   ret %swift.metadata_response
 
 // -- Fill function for dynamic single-payload. Call into the runtime to

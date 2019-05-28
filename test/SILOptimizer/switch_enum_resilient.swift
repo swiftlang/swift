@@ -9,10 +9,10 @@
 // RUN: %target-swift-frontend -emit-sil -Osize -primary-file %s -emit-module-path %t/Osize-fragile.swiftmodule | %FileCheck -check-prefix CHECK-ALL -check-prefix CHECK-NOINLINE -check-prefix CHECK-FRAGILE -check-prefix CHECK-FRAGILE-NOINLINE %s
 // RUN: %target-sil-opt %t/Osize-fragile.swiftmodule -module-name switch_enum_resilient -emit-sorted-sil -disable-sil-linking | %FileCheck -check-prefix CHECK-ALL -check-prefix CHECK-FRAGILE %s
 
-// RUN: %target-swift-frontend -emit-sil -enable-resilience -O -primary-file %s -emit-module-path %t/O-resilient.swiftmodule | %FileCheck -check-prefix CHECK-ALL -check-prefix CHECK-NOINLINE -check-prefix=CHECK-RESILIENT -check-prefix=CHECK-RESILIENT-NOINLINE %s
+// RUN: %target-swift-frontend -emit-sil -enable-library-evolution -O -primary-file %s -emit-module-path %t/O-resilient.swiftmodule | %FileCheck -check-prefix CHECK-ALL -check-prefix CHECK-NOINLINE -check-prefix=CHECK-RESILIENT -check-prefix=CHECK-RESILIENT-NOINLINE %s
 // RUN: %target-sil-opt %t/O-resilient.swiftmodule -module-name switch_enum_resilient -emit-sorted-sil -disable-sil-linking | %FileCheck -check-prefix CHECK-ALL -check-prefix=CHECK-RESILIENT -check-prefix CHECK-RESILIENT-INLINE %s
 
-// RUN: %target-swift-frontend -emit-sil -enable-resilience -Osize -primary-file %s -emit-module-path %t/Osize-resilient.swiftmodule | %FileCheck -check-prefix CHECK-ALL -check-prefix CHECK-NOINLINE -check-prefix=CHECK-RESILIENT -check-prefix=CHECK-RESILIENT-NOINLINE %s
+// RUN: %target-swift-frontend -emit-sil -enable-library-evolution -Osize -primary-file %s -emit-module-path %t/Osize-resilient.swiftmodule | %FileCheck -check-prefix CHECK-ALL -check-prefix CHECK-NOINLINE -check-prefix=CHECK-RESILIENT -check-prefix=CHECK-RESILIENT-NOINLINE %s
 // RUN: %target-sil-opt %t/Osize-resilient.swiftmodule -module-name switch_enum_resilient -emit-sorted-sil -disable-sil-linking | %FileCheck -check-prefix CHECK-ALL -check-prefix=CHECK-RESILIENT -check-prefix CHECK-RESILIENT-INLINE %s
 
 public enum Alpha : Int {

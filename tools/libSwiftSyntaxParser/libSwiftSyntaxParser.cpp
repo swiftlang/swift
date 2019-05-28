@@ -229,11 +229,12 @@ struct SynParserDiagConsumer: public DiagnosticConsumer {
   const unsigned BufferID;
   SynParserDiagConsumer(SynParser &Parser, unsigned BufferID):
     Parser(Parser), BufferID(BufferID) {}
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info) override {
+  void
+  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+                   StringRef FormatString,
+                   ArrayRef<DiagnosticArgument> FormatArgs,
+                   const DiagnosticInfo &Info,
+                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
     assert(Kind != DiagnosticKind::Remark && "Shouldn't see this in parser.");
     // The buffer where all char* will point into.
     llvm::SmallString<256> Buffer;
@@ -284,6 +285,8 @@ swiftparse_client_node_t SynParser::parse(const char *source) {
   ParserUnit PU(SM, SourceFileKind::Main, bufID, langOpts,
                 "syntax_parse_module", std::move(parseActions),
                 /*SyntaxCache=*/nullptr);
+  // Evaluating pound conditions may lead to unknown syntax.
+  PU.getParser().State->PerformConditionEvaluation = false;
   std::unique_ptr<SynParserDiagConsumer> pConsumer;
   if (DiagHandler) {
     pConsumer = llvm::make_unique<SynParserDiagConsumer>(*this, bufID);

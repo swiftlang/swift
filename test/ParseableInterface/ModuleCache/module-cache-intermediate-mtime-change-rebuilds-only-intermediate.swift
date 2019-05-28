@@ -21,9 +21,9 @@
 // RUN: %{python} %S/Inputs/make-old.py %t/leaf.swift %t/other.swift
 // RUN: %target-swift-frontend -I %t -emit-parseable-module-interface-path %t/LeafModule.swiftinterface -module-name LeafModule %t/leaf.swift -emit-module -o /dev/null
 // RUN: %{python} %S/Inputs/make-old.py %t/LeafModule.swiftinterface
-// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-parseable-module-interface-path %t/OtherModule.swiftinterface -module-name OtherModule %t/other.swift -emit-module -o /dev/null
+// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-parseable-module-interface-path %t/OtherModule.swiftinterface -module-name OtherModule %t/other.swift -emit-module -o /dev/null
 // RUN: %{python} %S/Inputs/make-old.py %t/modulecache/LeafModule-*.swiftmodule %t/OtherModule.swiftinterface
-// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
+// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
 // RUN: %{python} %S/Inputs/make-old.py %t/modulecache/OtherModule-*.swiftmodule
 //
 //
@@ -33,7 +33,7 @@
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
 // RUN: touch %t/OtherModule.swiftinterface
 // RUN: rm %t/TestModule.swiftmodule
-// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
+// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
 // RUN: %{python} %S/Inputs/check-is-new.py %t/modulecache/OtherModule-*.swiftmodule
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/LeafModule-*.swiftmodule
 

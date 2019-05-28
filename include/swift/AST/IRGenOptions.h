@@ -104,14 +104,17 @@ public:
   /// Which sanitizer is turned on.
   OptionSet<SanitizerKind> Sanitizers;
 
+  /// Path prefixes that should be rewritten in debug info.
+  PathRemapper DebugPrefixMap;
+
   /// What level of debug info to generate.
   IRGenDebugInfoLevel DebugInfoLevel : 2;
 
   /// What type of debug info to generate.
   IRGenDebugInfoFormat DebugInfoFormat : 2;
 
-  /// Path prefixes that should be rewritten in debug info.
-  PathRemapper DebugPrefixMap;
+  /// Whether to leave DWARF breadcrumbs pointing to imported Clang modules.
+  unsigned DisableClangModuleSkeletonCUs : 1;
 
   /// Whether we're generating IR for the JIT.
   unsigned UseJIT : 1;
@@ -168,12 +171,14 @@ public:
   /// Emit mangled names of anonymous context descriptors.
   unsigned EnableAnonymousContextMangledNames : 1;
 
-  /// Bypass resilience when accessing resilient frameworks.
-  unsigned EnableResilienceBypass : 1;
-
+  /// Force public linkage for private symbols. Used only by the LLDB
+  /// expression evaluator.
+  unsigned ForcePublicLinkage : 1;
+  
   /// Force lazy initialization of class metadata
   /// Used on Windows to avoid cross-module references.
   unsigned LazyInitializeClassMetadata : 1;
+  unsigned LazyInitializeProtocolConformances : 1;
 
   /// Normally if the -read-legacy-type-info flag is not specified, we look for
   /// a file named "legacy-<arch>.yaml" in SearchPathOpts.RuntimeLibraryPath.
@@ -226,6 +231,7 @@ public:
         Sanitizers(OptionSet<SanitizerKind>()),
         DebugInfoLevel(IRGenDebugInfoLevel::None),
         DebugInfoFormat(IRGenDebugInfoFormat::None),
+        DisableClangModuleSkeletonCUs(false),
         UseJIT(false), IntegratedREPL(false),
         DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
         DisableLLVMSLPVectorizer(false), DisableFPElim(true), Playground(false),
@@ -233,12 +239,12 @@ public:
         EmbedMode(IRGenEmbedMode::None), HasValueNamesSetting(false),
         ValueNames(false), EnableReflectionMetadata(true),
         EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
-        EnableResilienceBypass(false), LazyInitializeClassMetadata(false),
-        DisableLegacyTypeInfo(false),
+        ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
+        LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
         UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
-        DisableRoundTripDebugTypes(false),
-        CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
+        DisableRoundTripDebugTypes(false), CmdArgs(),
+        SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
 
   // Get a hash of all options which influence the llvm compilation but are not

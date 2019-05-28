@@ -383,6 +383,21 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
     }
 
     if (auto classDecl = ED->getSelfClassDecl()) {
+      auto *mod = value->getModuleContext();
+      auto &ctx = mod->getASTContext();
+
+      if (!ctx.LangOpts.EnableObjCResilientClassStubs) {
+        if (classDecl->checkAncestry().contains(
+              AncestryFlags::ResilientOther) ||
+            classDecl->hasResilientMetadata(mod,
+                                            ResilienceExpansion::Maximal)) {
+          if (diagnose) {
+            value->diagnose(diag::objc_in_resilient_extension);
+          }
+          return true;
+        }
+      }
+
       if (classDecl->isGenericContext()) {
         if (!classDecl->usesObjCGenericsModel()) {
           if (diagnose) {
@@ -398,12 +413,20 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
   return false;
 }
 
-/// Determines whether the given type is bridged to an Objective-C class type.
-static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
+/// Determines whether the given type is a valid Objective-C class type that
+/// can be returned as a result of a throwing function.
+static bool isValidObjectiveCErrorResultType(DeclContext *dc, Type type) {
   switch (type->getForeignRepresentableIn(ForeignLanguage::ObjectiveC, dc)
             .first) {
   case ForeignRepresentableKind::Trivial:
   case ForeignRepresentableKind::None:
+    // Special case: If the type is Unmanaged<T>, then return true, because
+    // Unmanaged<T> can be represented in Objective-C (if T can be).
+    if (auto BGT = type->getAs<BoundGenericType>()) {
+      if (BGT->getDecl() == dc->getASTContext().getUnmanagedDecl()) {
+        return true;
+      }
+    }
     return false;
 
   case ForeignRepresentableKind::Object:
@@ -589,12 +612,12 @@ bool swift::isRepresentableInObjC(
 
       errorResultType = boolDecl->getDeclaredType()->getCanonicalType();
     } else if (!resultType->getOptionalObjectType() &&
-               isBridgedToObjectiveCClass(dc, resultType)) {
+               isValidObjectiveCErrorResultType(dc, resultType)) {
       // Functions that return a (non-optional) type bridged to Objective-C
       // can be throwing; they indicate failure with a nil result.
       kind = ForeignErrorConvention::NilResult;
     } else if ((optOptionalType = resultType->getOptionalObjectType()) &&
-               isBridgedToObjectiveCClass(dc, optOptionalType)) {
+               isValidObjectiveCErrorResultType(dc, optOptionalType)) {
       // Cannot return an optional bridged type, because 'nil' is reserved
       // to indicate failure. Call this out in a separate diagnostic.
       if (Diagnose) {
@@ -812,6 +835,16 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   if (checkObjCInForeignClassContext(SD, Reason))
     return false;
 
+  // ObjC doesn't support class subscripts.
+  if (!SD->isInstanceMember()) {
+    if (Diagnose) {
+      SD->diagnose(diag::objc_invalid_on_static_subscript,
+                   SD->getDescriptiveKind(), Reason);
+      describeObjCReason(SD, Reason);
+    }
+    return true;
+  }
+
   if (!SD->hasInterfaceType()) {
     SD->getASTContext().getLazyResolver()->resolveDeclSignature(
                                               const_cast<SubscriptDecl *>(SD));
@@ -993,17 +1026,17 @@ static bool isMemberOfObjCMembersClass(const ValueDecl *VD) {
   auto classDecl = VD->getDeclContext()->getSelfClassDecl();
   if (!classDecl) return false;
 
-  return classDecl->hasObjCMembers();
+  return classDecl->checkAncestry(AncestryFlags::ObjCMembers);
 }
 
 // A class is @objc if it does not have generic ancestry, and it either has
 // an explicit @objc attribute, or its superclass is @objc.
 static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
   ASTContext &ctx = CD->getASTContext();
-  ObjCClassKind kind = CD->checkObjCAncestry();
+  auto ancestry = CD->checkAncestry();
 
   if (auto attr = CD->getAttrs().getAttribute<ObjCAttr>()) {
-    if (kind == ObjCClassKind::ObjCMembers) {
+    if (ancestry.contains(AncestryFlags::Generic)) {
       if (attr->hasName() && !CD->isGenericContext()) {
         // @objc with a name on a non-generic subclass of a generic class is
         // just controlling the runtime name. Don't diagnose this case.
@@ -1016,9 +1049,24 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
         .fixItRemove(attr->getRangeWithAt());
     }
 
+    // If the class has resilient ancestry, @objc just controls the runtime
+    // name unless -enable-resilient-objc-class-stubs is enabled.
+    if (ancestry.contains(AncestryFlags::ResilientOther) &&
+        !ctx.LangOpts.EnableObjCResilientClassStubs) {
+      if (attr->hasName()) {
+        const_cast<ClassDecl *>(CD)->getAttrs().add(
+          new (ctx) ObjCRuntimeNameAttr(*attr));
+        return None;
+      }
+
+      ctx.Diags.diagnose(attr->getLocation(), diag::objc_for_resilient_class)
+        .fixItRemove(attr->getRangeWithAt());
+    }
+
     // Only allow ObjC-rooted classes to be @objc.
     // (Leave a hole for test cases.)
-    if (kind == ObjCClassKind::ObjCWithSwiftRoot) {
+    if (ancestry.contains(AncestryFlags::ObjC) &&
+        !ancestry.contains(AncestryFlags::ClangImported)) {
       if (ctx.LangOpts.EnableObjCAttrRequiresFoundation)
         ctx.Diags.diagnose(attr->getLocation(),
                            diag::invalid_objc_swift_rooted_class)
@@ -1031,9 +1079,18 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
     return ObjCReason(ObjCReason::ExplicitlyObjC);
   }
 
-  if (kind == ObjCClassKind::ObjCWithSwiftRoot ||
-      kind == ObjCClassKind::ObjC)
+  if (ancestry.contains(AncestryFlags::ObjC)) {
+    if (ancestry.contains(AncestryFlags::Generic)) {
+      return None;
+    }
+
+    if (ancestry.contains(AncestryFlags::ResilientOther) &&
+        !ctx.LangOpts.EnableObjCResilientClassStubs) {
+      return None;
+    }
+
     return ObjCReason(ObjCReason::ImplicitlyObjC);
+  }
 
   return None;
 }
@@ -1131,8 +1188,11 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   if (VD->getAttrs().hasAttribute<NSManagedAttr>())
     return ObjCReason(ObjCReason::ExplicitlyNSManaged);
   // A member of an @objc protocol is implicitly @objc.
-  if (isMemberOfObjCProtocol)
+  if (isMemberOfObjCProtocol) {
+    if (!VD->isProtocolRequirement())
+      return None;
     return ObjCReason(ObjCReason::MemberOfObjCProtocol);
+  }
 
   // A @nonobjc is not @objc, even if it is an override of an @objc, so check
   // for @nonobjc first.
@@ -1181,15 +1241,6 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
 
       return ObjCReason(ObjCReason::ExplicitlyDynamic);
     }
-    if (!ctx.isSwiftVersionAtLeast(5)) {
-      // Complain that 'dynamic' requires '@objc', but (quietly) infer @objc
-      // anyway for better recovery.
-      VD->diagnose(diag::dynamic_requires_objc, VD->getDescriptiveKind(),
-                   VD->getFullName())
-          .fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/false),
-                       "@objc ");
-      return ObjCReason(ObjCReason::ImplicitlyObjC);
-    }
   }
 
   // If we aren't provided Swift 3's @objc inference rules, we're done.
@@ -1211,9 +1262,8 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
     if (classDecl->isForeign())
       return None;
 
-    if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC) {
+    if (classDecl->checkAncestry(AncestryFlags::ObjC))
       return ObjCReason(ObjCReason::MemberOfObjCSubclass);
-    }
   }
 
   return None;

@@ -1147,45 +1147,19 @@ static bool doesPlatformUseLegacyLayouts(StringRef platformName,
   return false;
 }
 
-// The following Apple platforms ship an Objective-C runtime supporting
-// the class metadata update hook:
-//
-// - macOS 10.14.4
-// - iOS 12.2
-// - tvOS 12.2
-// - watchOS 5.2
-static bool doesPlatformSupportObjCMetadataUpdateCallback(
-    const llvm::Triple &triple) {
-  if (triple.isMacOSX())
-    return !triple.isMacOSXVersionLT(10, 14, 4);
-  if (triple.isiOS()) // also returns true on tvOS
-    return !triple.isOSVersionLT(12, 2);
-  if (triple.isWatchOS())
-    return !triple.isOSVersionLT(5, 2);
-
-  return false;
-}
-
 TypeConverter::TypeConverter(IRGenModule &IGM)
   : IGM(IGM),
     FirstType(invalidTypeInfo()) {
-  // FIXME: In LLDB, everything is completely fragile, so that IRGen can query
-  // the size of resilient types. Of course this is not the right long term
-  // solution, because it won't work once the swiftmodule file is not in
-  // sync with the binary module. Once LLDB can calculate type layouts at
-  // runtime (using remote mirrors or some other mechanism), we can remove this.
-  if (IGM.IRGen.Opts.EnableResilienceBypass)
-    LoweringMode = Mode::CompletelyFragile;
-
-  const auto &Triple = IGM.Context.LangOpts.Target;
-
-  SupportsObjCMetadataUpdateCallback =
-    ::doesPlatformSupportObjCMetadataUpdateCallback(Triple);
+  // Whether the Objective-C runtime is guaranteed to invoke the class
+  // metadata update callback when realizing a Swift class referenced from
+  // Objective-C.
+  bool supportsObjCMetadataUpdateCallback =
+    IGM.Context.LangOpts.doesTargetSupportObjCMetadataUpdateCallback();
 
   // If our deployment target allows us to rely on the metadata update
   // callback being called, we don't have to emit a legacy layout for a
   // class with resiliently-sized fields.
-  if (SupportsObjCMetadataUpdateCallback)
+  if (supportsObjCMetadataUpdateCallback)
     return;
 
   // We have a bunch of -parse-stdlib tests that pass a -target in the test
@@ -1199,6 +1173,8 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
 
   StringRef path = IGM.IRGen.Opts.ReadLegacyTypeInfoPath;
   if (path.empty()) {
+    const auto &Triple = IGM.Context.LangOpts.Target;
+
     // If the flag was not explicitly specified, look for a file in a
     // platform-specific location, if this platform is known to require
     // one.
@@ -1434,22 +1410,25 @@ const TypeInfo &IRGenFunction::getTypeInfo(SILType T) {
 
 /// Return the SIL-lowering of the given type.
 SILType IRGenModule::getLoweredType(AbstractionPattern orig, Type subst) const {
-  // FIXME: Expansion
   return getSILTypes().getLoweredType(orig, subst,
-                                      ResilienceExpansion::Minimal);
+                                      ResilienceExpansion::Maximal);
 }
 
 /// Return the SIL-lowering of the given type.
 SILType IRGenModule::getLoweredType(Type subst) const {
-  // FIXME: Expansion
   return getSILTypes().getLoweredType(subst,
-                                      ResilienceExpansion::Minimal);
+                                      ResilienceExpansion::Maximal);
+}
+
+/// Return the SIL-lowering of the given type.
+const Lowering::TypeLowering &IRGenModule::getTypeLowering(SILType type) const {
+  return getSILTypes().getTypeLowering(type,
+                                       ResilienceExpansion::Maximal);
 }
 
 bool IRGenModule::isTypeABIAccessible(SILType type) const {
-  // FIXME: Expansion
   return getSILModule().isTypeABIAccessible(type,
-                                            ResilienceExpansion::Minimal);
+                                            ResilienceExpansion::Maximal);
 }
 
 /// Get a pointer to the storage type for the given type.  Note that,
@@ -1782,6 +1761,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
   case TypeKind::NestedArchetype:
+  case TypeKind::OpaqueTypeArchetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));
   case TypeKind::Class:
   case TypeKind::Enum:

@@ -423,7 +423,7 @@ void FunctionSignatureTransformDescriptor::computeOptimizedArgInterface(
       SILType Ty = Node->getType();
       LLVM_DEBUG(llvm::dbgs() << "                " << Ty << "\n");
       // If Ty is trivial, just pass it directly.
-      if (Ty.isTrivial(AD.Arg->getModule())) {
+      if (Ty.isTrivial(*AD.Arg->getFunction())) {
         SILParameterInfo NewInfo(Ty.getASTType(),
                                  ParameterConvention::Direct_Unowned);
         Out.push_back(NewInfo);
@@ -534,7 +534,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   for (auto Arg : NewF->begin()->getFunctionArguments()) {
     SILType MappedTy = Arg->getType();
     auto Ownershipkind =
-        ValueOwnershipKind(M, MappedTy, Arg->getArgumentConvention());
+        ValueOwnershipKind(*NewF, MappedTy, Arg->getArgumentConvention());
     Arg->setOwnershipKind(Ownershipkind);
   }
 
@@ -718,7 +718,7 @@ bool FunctionSignatureTransform::removeDeadArgs(int minPartialAppliedArgs) {
     // parameters (as a replacement for the removed partial_apply).
     //
     // TODO: Maybe we can skip this restriction when we have semantic ARC.
-    if (ArgumentDescList[Idx].Arg->getType().isTrivial(F->getModule()))
+    if (ArgumentDescList[Idx].Arg->getType().isTrivial(*F))
       continue;
     return false;
   }

@@ -217,6 +217,9 @@ TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
 /// 'findLHS(DC, expr, '==')' returns nullptr.
 Expr *TypeChecker::findLHS(DeclContext *DC, Expr *E, Identifier name) {
   auto right = lookupPrecedenceGroupForOperator(*this, DC, name, E->getEndLoc());
+  if (!right)
+    return nullptr;
+
   while (true) {
 
     // Look through implicit conversions.

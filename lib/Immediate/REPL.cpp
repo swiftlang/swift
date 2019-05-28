@@ -176,7 +176,7 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
 
   SmallVector<ModuleDecl::ImportedModule, 8> Imports;
   MostRecentModule->getImportedModules(Imports,
-                                       ModuleDecl::ImportFilter::Private);
+                                       ModuleDecl::ImportFilterKind::Private);
   if (!Imports.empty()) {
     SmallVector<SourceFile::ImportedModuleDesc, 8> ImportsWithOptions;
     for (auto Import : Imports) {
@@ -969,7 +969,8 @@ public:
     ASTContext &Ctx = CI.getASTContext();
     Ctx.LangOpts.EnableAccessControl = false;
     if (!ParseStdlib) {
-      if (!loadSwiftRuntime(Ctx.SearchPathOpts.RuntimeLibraryPath)) {
+      if (!loadSwiftRuntime(Ctx.SearchPathOpts.RuntimeLibraryPath,
+                            Ctx.SearchPathOpts.RuntimeLibraryPathIsDefault)) {
         CI.getDiags().diagnose(SourceLoc(),
                                diag::error_immediate_mode_missing_stdlib);
         return;

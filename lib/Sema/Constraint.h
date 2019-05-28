@@ -132,14 +132,14 @@ enum class ConstraintKind : char {
   /// an existential).
   OpenedExistentialOf,
   /// A relation between three types. The first is the key path type,
-  // the second is the root type, and the third is the projected value type.
-  // The second and third types can be lvalues depending on the kind of key
-  // path.
+  /// the second is the root type, and the third is the projected value type.
+  /// The second and third types can be lvalues depending on the kind of key
+  /// path.
   KeyPathApplication,
   /// A relation between three types. The first is the key path type,
-  // the second is its root type, and the third is the projected value type.
-  // The key path type is chosen based on the selection of overloads for the
-  // member references along the path.
+  /// the second is its root type, and the third is the projected value type.
+  /// The key path type is chosen based on the selection of overloads for the
+  /// member references along the path.
   KeyPath,
   /// The first type is a function type, the second is the function's
   /// input type.
@@ -147,6 +147,9 @@ enum class ConstraintKind : char {
   /// The first type is a function type, the second is the function's
   /// result type.
   FunctionResult,
+  /// The first type is a type that's a candidate to be the underlying type of
+  /// the second opaque archetype.
+  OpaqueUnderlyingType,
 };
 
 /// Classification of the different kinds of constraints.
@@ -339,9 +342,10 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              ConstraintLocator *locator,
              ArrayRef<TypeVariableType *> typeVars);
 
-  /// Construct a new overload-binding constraint.
+  /// Construct a new overload-binding constraint, which might have a fix.
   Constraint(Type type, OverloadChoice choice, DeclContext *useDC,
-             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
+             ConstraintFix *fix, ConstraintLocator *locator,
+             ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a restricted constraint.
   Constraint(ConstraintKind kind, ConversionRestrictionKind restriction,
@@ -398,6 +402,13 @@ public:
   static Constraint *createFixed(ConstraintSystem &cs, ConstraintKind kind,
                                  ConstraintFix *fix, Type first, Type second,
                                  ConstraintLocator *locator);
+
+  /// Create a bind overload choice with a fix.
+  /// Note: This constraint is going to be disabled by default.
+  static Constraint *createFixedChoice(ConstraintSystem &cs, Type type,
+                                       OverloadChoice choice,
+                                       DeclContext *useDC, ConstraintFix *fix,
+                                       ConstraintLocator *locator);
 
   /// Create a new disjunction constraint.
   static Constraint *createDisjunction(ConstraintSystem &cs,
@@ -477,6 +488,7 @@ public:
     case ConstraintKind::DynamicCallableApplicableFunction:
     case ConstraintKind::BindOverload:
     case ConstraintKind::OptionalObject:
+    case ConstraintKind::OpaqueUnderlyingType:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:

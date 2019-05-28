@@ -210,8 +210,9 @@ func func_with_unknown_attr7(x: @unknown (Int) () -> Int) {} // expected-error {
 
 func func_type_attribute_with_space(x: @convention (c) () -> Int) {} // OK. Known attributes can have space before its paren.
 
-// @thin is not supported except in SIL.
-var thinFunc : @thin () -> () // expected-error {{attribute is not supported}}
+// @thin and @pseudogeneric are not supported except in SIL.
+var thinFunc : @thin () -> () // expected-error {{unknown attribute 'thin'}}
+var pseudoGenericFunc : @pseudogeneric () -> () // expected-error {{unknown attribute 'pseudogeneric'}}
 
 @inline(never) func nolineFunc() {}
 @inline(never) var noinlineVar : Int { return 0 }

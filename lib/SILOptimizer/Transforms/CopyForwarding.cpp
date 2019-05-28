@@ -843,11 +843,13 @@ bool CopyForwarding::doesCopyDominateDestUsers(
 // To find all SSA users of storedValue, we first find the RC root, then search
 // past any instructions that may propagate the reference.
 bool CopyForwarding::markStoredValueUsers(SILValue storedValue) {
-  if (storedValue->getType().isTrivial(*storedValue->getModule()))
+  auto *F = storedValue->getFunction();
+
+  if (storedValue->getType().isTrivial(*F))
     return true;
 
   // Find the RC root, peeking past things like struct_extract.
-  RCIdentityFunctionInfo *RCI = RCIAnalysis->get(storedValue->getFunction());
+  RCIdentityFunctionInfo *RCI = RCIAnalysis->get(F);
   SILValue root = RCI->getRCIdentityRoot(storedValue);
 
   SmallVector<SILInstruction *, 8> users;
@@ -868,7 +870,7 @@ bool CopyForwarding::markStoredValueUsers(SILValue storedValue) {
     }
     // A single-valued use is nontransitive if its result is trivial.
     if (auto *SVI = dyn_cast<SingleValueInstruction>(user)) {
-      if (SVI->getType().isTrivial(user->getModule())) {
+      if (SVI->getType().isTrivial(*F)) {
         StoredValueUserInsts.insert(user);
         continue;
       }

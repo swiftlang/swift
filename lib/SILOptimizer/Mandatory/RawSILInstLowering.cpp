@@ -52,7 +52,7 @@ static void lowerAssignInstruction(SILBuilderWithScope &b, AssignInst *inst) {
     qualifier = AssignOwnershipQualifier::Reassign;
 
   if (qualifier == AssignOwnershipQualifier::Init ||
-      inst->getDest()->getType().isTrivial(inst->getModule())) {
+      inst->getDest()->getType().isTrivial(*inst->getFunction())) {
 
     // If this is an initialization, or the storage type is trivial, we
     // can just replace the assignment with a store.

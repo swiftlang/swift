@@ -717,7 +717,8 @@ public:
   TypeConverter &operator=(TypeConverter const &) = delete;
 
   /// Return the CaptureKind to use when capturing a decl.
-  CaptureKind getDeclCaptureKind(CapturedValue capture);
+  CaptureKind getDeclCaptureKind(CapturedValue capture,
+                                 ResilienceExpansion expansion);
 
   /// Return a most-general-possible abstraction pattern.
   AbstractionPattern getMostGeneralAbstraction() {

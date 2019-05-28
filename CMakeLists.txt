@@ -11,12 +11,17 @@ endif()
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
-# Make a job pool for things that can't yet be distributed
-cmake_host_system_information(
-  RESULT localhost_logical_cores QUERY NUMBER_OF_LOGICAL_CORES)
-set_property(GLOBAL PROPERTY JOB_POOLS local_jobs=${localhost_logical_cores})
-# Put linking in that category
-set_property(GLOBAL PROPERTY JOB_POOL_LINK local_jobs)
+if(DEFINED CMAKE_JOB_POOLS)
+  # CMake < 3.11 doesn't support CMAKE_JOB_POOLS. Manually set the property.
+  set_property(GLOBAL PROPERTY JOB_POOLS "${CMAKE_JOB_POOLS}")
+else()
+  # Make a job pool for things that can't yet be distributed
+  cmake_host_system_information(
+    RESULT localhost_logical_cores QUERY NUMBER_OF_LOGICAL_CORES)
+  set_property(GLOBAL PROPERTY JOB_POOLS local_jobs=${localhost_logical_cores})
+  # Put linking in that category
+  set(CMAKE_JOB_POOL_LINK local_jobs)
+endif()
 
 ENABLE_LANGUAGE(C)
 
@@ -88,6 +93,15 @@ option(SWIFT_INCLUDE_DOCS
     "Create targets for building docs."
     TRUE)
 
+set(_swift_include_apinotes_default FALSE)
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(_swift_include_apinotes_default TRUE)
+endif()
+
+option(SWIFT_INCLUDE_APINOTES
+  "Create targets for installing the remaining apinotes in the built toolchain."
+  ${_swift_include_apinotes_default})
+
 #
 # Miscellaneous User-configurable options.
 #
@@ -100,6 +114,60 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
       FORCE)
   message(STATUS "No build type was specified, will default to ${CMAKE_BUILD_TYPE}")
 endif()
+
+set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
+    "Build Swift with code coverage instrumenting enabled [FALSE, NOT-MERGED, MERGED]")
+set_property(CACHE SWIFT_ANALYZE_CODE_COVERAGE PROPERTY
+    STRINGS FALSE "NOT-MERGED" "MERGED")
+
+# SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
+# can be reused when a new version of Swift comes out (assuming the user hasn't
+# manually set it as part of their own CMake configuration).
+set(SWIFT_VERSION "5.1")
+
+set(SWIFT_VENDOR "" CACHE STRING
+    "The vendor name of the Swift compiler")
+set(SWIFT_COMPILER_VERSION "" CACHE STRING
+    "The internal version of the Swift compiler")
+set(CLANG_COMPILER_VERSION "" CACHE STRING
+    "The internal version of the Clang compiler")
+
+# Indicate whether Swift should attempt to use the lld linker.
+set(SWIFT_ENABLE_LLD_LINKER TRUE CACHE BOOL
+    "Enable using the lld linker when available")
+
+# Indicate whether Swift should attempt to use the gold linker.
+# This is not used on Darwin.
+set(SWIFT_ENABLE_GOLD_LINKER TRUE CACHE BOOL
+    "Enable using the gold linker when available")
+
+set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
+    must specify the form of LTO by setting this to one of: 'full', 'thin'. This
+    option only affects the tools that run on the host (the compiler), and has
+    no effect on the target libraries (the standard library and the runtime).")
+
+# The following only works with the Ninja generator in CMake >= 3.0.
+set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
+  "Define the maximum number of linker jobs for swift.")
+
+option(SWIFT_FORCE_OPTIMIZED_TYPECHECKER "Override the optimization setting of
+  the type checker so that it always compiles with optimization. This eases
+  debugging after type checking occurs by speeding up type checking" FALSE)
+
+# Allow building Swift with Clang's Profile Guided Optimization
+if(SWIFT_PROFDATA_FILE AND EXISTS ${SWIFT_PROFDATA_FILE})
+  if(NOT CMAKE_C_COMPILER_ID MATCHES Clang)
+    message(FATAL_ERROR "SWIFT_PROFDATA_FILE can only be specified when compiling with clang")
+  endif()
+  add_definitions("-fprofile-instr-use=${SWIFT_PROFDATA_FILE}")
+endif()
+
+#
+# User-configurable Swift Standard Library specific options.
+#
+# TODO: Once the stdlib/compiler builds are split, this should be sunk into the
+# stdlib cmake.
+#
 
 set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
     "Build type for the Swift standard library and SDK overlays [Debug, RelWithDebInfo, Release, MinSizeRel]")
@@ -120,32 +188,6 @@ option(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER
        "Use the host compiler and not the internal clang to build the swift runtime"
        FALSE)
 
-set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
-    "Build Swift with code coverage instrumenting enabled [FALSE, NOT-MERGED, MERGED]")
-set_property(CACHE SWIFT_ANALYZE_CODE_COVERAGE PROPERTY
-    STRINGS FALSE "NOT-MERGED" "MERGED")
-
-# SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
-# can be reused when a new version of Swift comes out (assuming the user hasn't
-# manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION "5.0")
-
-set(SWIFT_VENDOR "" CACHE STRING
-    "The vendor name of the Swift compiler")
-set(SWIFT_COMPILER_VERSION "" CACHE STRING
-    "The internal version of the Swift compiler")
-set(CLANG_COMPILER_VERSION "" CACHE STRING
-    "The internal version of the Clang compiler")
-
-# Indicate whether Swift should attempt to use the lld linker.
-set(SWIFT_ENABLE_LLD_LINKER TRUE CACHE BOOL
-    "Enable using the lld linker when available")
-
-# Indicate whether Swift should attempt to use the gold linker.
-# This is not used on Darwin.
-set(SWIFT_ENABLE_GOLD_LINKER TRUE CACHE BOOL
-    "Enable using the gold linker when available")
-
 set(SWIFT_SDKS "" CACHE STRING
     "If non-empty, limits building target binaries only to specified SDKs (despite other SDKs being available)")
 
@@ -161,32 +203,15 @@ set(SWIFT_NATIVE_CLANG_TOOLS_PATH "" CACHE STRING
     "Path to the directory that contains Clang tools that are executable on the build machine")
 
 set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "" CACHE STRING
-    "Path to the directory that contains Swift tools that are executable on the build machine")
-
-set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
-    must specify the form of LTO by setting this to one of: 'full', 'thin'. This
-    option only affects the tools that run on the host (the compiler), and has
-    no effect on the target libraries (the standard library and the runtime).")
-
-# The following only works with the Ninja generator in CMake >= 3.0.
-set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
-  "Define the maximum number of linker jobs for swift.")
-
-option(SWIFT_FORCE_OPTIMIZED_TYPECHECKER "Override the optimization setting of
-  the type checker so that it always compiles with optimization. This eases
-  debugging after type checking occurs by speeding up type checking" FALSE)
+   "Path to the directory that contains Swift tools that are executable on the build machine")
 
 option(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES
        "Generate .swiftinterface files alongside .swiftmodule files"
        TRUE)
 
-# Allow building Swift with Clang's Profile Guided Optimization
-if(SWIFT_PROFDATA_FILE AND EXISTS ${SWIFT_PROFDATA_FILE})
-  if(NOT CMAKE_C_COMPILER_ID MATCHES Clang)
-    message(FATAL_ERROR "SWIFT_PROFDATA_FILE can only be specified when compiling with clang")
-  endif()
-  add_definitions("-fprofile-instr-use=${SWIFT_PROFDATA_FILE}")
-endif()
+option(SWIFT_STDLIB_ENABLE_SIB_TARGETS
+       "Should we generate sib targets for the stdlib or not?"
+       FALSE)
 
 #
 # User-configurable Android specific options.
@@ -234,15 +259,17 @@ option(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT
     "Whether to enable CrashReporter integration"
     FALSE)
 
-option(SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
-    "Enable the Swift stable ABI's class marker bit"
-    FALSE)
-
 set(SWIFT_DARWIN_XCRUN_TOOLCHAIN "XcodeDefault" CACHE STRING
     "The name of the toolchain to pass to 'xcrun'")
 
-set(SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR "@rpath" CACHE STRING
+set(SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR "/usr/lib/swift" CACHE STRING
     "The directory of the install_name for standard library dylibs")
+
+# We don't want to use the same install_name_dir as the standard library which
+# will be installed in /usr/lib/swift. These private libraries should continue
+# to use @rpath for now.
+set(SWIFT_DARWIN_STDLIB_PRIVATE_INSTALL_NAME_DIR "@rpath" CACHE STRING
+    "The directory of the install_name for the private standard library dylibs")
 
 set(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX "10.9" CACHE STRING
     "Minimum deployment target version for OS X")
@@ -314,10 +341,6 @@ option(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
 option(SWIFT_STDLIB_USE_NONATOMIC_RC
     "Build the standard libraries and overlays with nonatomic reference count operations enabled"
     FALSE)
-
-option(SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP
-  "Build the standard libraries and overlays with sil ownership enabled."
-  FALSE)
 
 option(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS
   "Enable runtime function counters and expose the API."
@@ -1044,12 +1067,8 @@ endif()
 # https://bugs.swift.org/browse/SR-5975
 add_subdirectory(stdlib)
 
-if(SWIFT_BUILD_SDK_OVERLAY)
-  list_intersect("${SWIFT_APPLE_PLATFORMS}" "${SWIFT_SDKS}"
-                 building_darwin_sdks)
-  if(building_darwin_sdks)
-    add_subdirectory(apinotes)
-  endif()
+if(SWIFT_INCLUDE_APINOTES)
+  add_subdirectory(apinotes)
 endif()
 
 add_subdirectory(include)

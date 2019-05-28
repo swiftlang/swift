@@ -359,19 +359,19 @@ extension Sequence {
 }
 
 class C_25341015 {
-  static func baz(_ x: Int, _ y: Int) {} // expected-note {{'baz' declared here}}
+  static func baz(_ x: Int, _ y: Int) {}
   func baz() {}
   func qux() {
-    baz(1, 2) // expected-error {{use of 'baz' refers to instance method 'baz()' rather than static method 'baz' in class 'C_25341015'}} expected-note {{use 'C_25341015.' to reference the static method}}
+    baz(1, 2) // expected-error {{static member 'baz' cannot be used on instance of type 'C_25341015'}} {{5-5=C_25341015.}}
   }
 }
 
 struct S_25341015 {
-  static func foo(_ x: Int, y: Int) {} // expected-note {{'foo(_:y:)' declared here}}
+  static func foo(_ x: Int, y: Int) {}
 
   func foo(z: Int) {}
   func bar() {
-    foo(1, y: 2) // expected-error {{use of 'foo' refers to instance method 'foo(z:)' rather than static method 'foo(_:y:)' in struct 'S_25341015'}} expected-note {{use 'S_25341015.' to reference the static method}}
+    foo(1, y: 2) // expected-error {{static member 'foo' cannot be used on instance of type 'S_25341015'}} {{5-5=S_25341015.}}
   }
 }
 
@@ -558,10 +558,72 @@ func rdar_48114578() {
   func foo(_ a: [String], _ b: Int) -> S<A> {
     let v = (a, b)
     return .valueOf(v)
-    // expected-error@-1 {{cannot express tuple conversion '([String], Int)' to '(a: [String]?, b: Int)'}}
   }
 
   func bar(_ a: [String], _ b: Int) -> S<A> {
     return .valueOf((a, b)) // Ok
+  }
+}
+
+struct S_Min {
+  var min: Int = 42
+}
+
+func min(_: Int, _: Float) -> Int { return 0 }
+func min(_: Float, _: Int) -> Int { return 0 }
+
+extension S_Min : CustomStringConvertible {
+  public var description: String {
+    return "\(min)" // Ok
+  }
+}
+
+// rdar://problem/50679161
+
+func rdar50679161() {
+  struct Point {}
+
+  struct S {
+    var w, h: Point
+  }
+
+  struct Q {
+    init(a: Int, b: Int) {}
+    init(a: Point, b: Point) {}
+  }
+
+  func foo() {
+    _ = { () -> Void in
+      var foo = S
+      // expected-error@-1 {{expected member name or constructor call after type name}}
+      // expected-note@-2 {{add arguments after the type to construct a value of the type}}
+      // expected-note@-3 {{use '.self' to reference the type object}}
+      if let v = Int?(1) {
+        var _ = Q(
+          a: v + foo.w,
+          // expected-error@-1 {{instance member 'w' cannot be used on type 'S'}}
+          b: v + foo.h
+          // expected-error@-1 {{instance member 'h' cannot be used on type 'S'}}
+        )
+      }
+    }
+  }
+}
+
+
+func rdar_50467583_and_50909555() {
+  // rdar://problem/50467583
+  let _: Set = [Int][]
+  // expected-error@-1 {{instance member 'subscript' cannot be used on type '[Int]'}}
+
+  // rdar://problem/50909555
+  struct S {
+    static subscript(x: Int, y: Int) -> Int {
+      return 1
+    }
+  }
+
+  func test(_ s: S) {
+    s[1] // expected-error {{static member 'subscript' cannot be used on instance of type 'S'}} {{5-6=S}}
   }
 }

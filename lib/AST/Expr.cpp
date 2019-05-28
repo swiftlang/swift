@@ -322,7 +322,8 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
 
   PASS_THROUGH_REFERENCE(ConstructorRefCall, getFn);
   PASS_THROUGH_REFERENCE(Load, getSubExpr);
-  NO_REFERENCE(TupleShuffle);
+  NO_REFERENCE(DestructureTuple);
+  NO_REFERENCE(ArgumentShuffle);
   NO_REFERENCE(UnresolvedTypeConversion);
   PASS_THROUGH_REFERENCE(FunctionConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(CovariantFunctionConversion, getSubExpr);
@@ -347,6 +348,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   PASS_THROUGH_REFERENCE(BridgeToObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(BridgeFromObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(ConditionalBridgeFromObjC, getSubExpr);
+  PASS_THROUGH_REFERENCE(UnderlyingToOpaque, getSubExpr);
   NO_REFERENCE(Coerce);
   NO_REFERENCE(ForcedCheckedCast);
   NO_REFERENCE(ConditionalCheckedCast);
@@ -636,7 +638,8 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
     return false;
 
   case ExprKind::Load:
-  case ExprKind::TupleShuffle:
+  case ExprKind::DestructureTuple:
+  case ExprKind::ArgumentShuffle:
   case ExprKind::UnresolvedTypeConversion:
   case ExprKind::FunctionConversion:
   case ExprKind::CovariantFunctionConversion:
@@ -662,6 +665,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::ConditionalBridgeFromObjC:
   case ExprKind::BridgeFromObjC:
   case ExprKind::BridgeToObjC:
+  case ExprKind::UnderlyingToOpaque:
     // Implicit conversion nodes have no syntax of their own; defer to the
     // subexpression.
     return cast<ImplicitConversionExpr>(this)->getSubExpr()
@@ -1331,22 +1335,32 @@ CaptureListExpr *CaptureListExpr::create(ASTContext &ctx,
   return ::new(mem) CaptureListExpr(captureList, closureBody);
 }
 
-TupleShuffleExpr *TupleShuffleExpr::create(ASTContext &ctx,
-                                           Expr *subExpr,
-                                           ArrayRef<int> elementMapping,
-                                           TypeImpact typeImpact,
-                                           ConcreteDeclRef defaultArgsOwner,
-                                           ArrayRef<unsigned> VariadicArgs,
-                                           Type VarargsArrayTy,
-                                           ArrayRef<Expr *> CallerDefaultArgs,
-                                           Type ty) {
+DestructureTupleExpr *
+DestructureTupleExpr::create(ASTContext &ctx,
+                             ArrayRef<OpaqueValueExpr *> destructuredElements,
+                             Expr *srcExpr, Expr *dstExpr, Type ty) {
+  auto size = totalSizeToAlloc<OpaqueValueExpr *>(destructuredElements.size());
+  auto mem = ctx.Allocate(size, alignof(DestructureTupleExpr));
+  return ::new(mem) DestructureTupleExpr(destructuredElements,
+                                         srcExpr, dstExpr, ty);
+}
+
+ArgumentShuffleExpr *ArgumentShuffleExpr::create(ASTContext &ctx,
+                                                 Expr *subExpr,
+                                                 ArrayRef<int> elementMapping,
+                                                 TypeImpact typeImpact,
+                                                 ConcreteDeclRef defaultArgsOwner,
+                                                 ArrayRef<unsigned> VariadicArgs,
+                                                 Type VarargsArrayTy,
+                                                 ArrayRef<Expr *> CallerDefaultArgs,
+                                                 Type ty) {
   auto size = totalSizeToAlloc<Expr*, int, unsigned>(CallerDefaultArgs.size(),
                                                      elementMapping.size(),
                                                      VariadicArgs.size());
-  auto mem = ctx.Allocate(size, alignof(TupleShuffleExpr));
-  return ::new(mem) TupleShuffleExpr(subExpr, elementMapping, typeImpact,
-                                     defaultArgsOwner, VariadicArgs,
-                                     VarargsArrayTy, CallerDefaultArgs, ty);
+  auto mem = ctx.Allocate(size, alignof(ArgumentShuffleExpr));
+  return ::new(mem) ArgumentShuffleExpr(subExpr, elementMapping, typeImpact,
+                                        defaultArgsOwner, VariadicArgs,
+                                        VarargsArrayTy, CallerDefaultArgs, ty);
 }
 
 SourceRange TupleExpr::getSourceRange() const {

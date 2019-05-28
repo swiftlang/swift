@@ -81,6 +81,10 @@ namespace {
 
     ConstantFolder ConstFolder;
 
+    // True if the function has a large amount of blocks. In this case we turn off some expensive
+    // optimizations.
+    bool isVeryLargeFunction = false;
+
     void constFoldingCallback(SILInstruction *I) {
       // If a terminal instruction gets constant folded (like cond_br), it
       // enables further simplify-CFG optimizations.
@@ -208,7 +212,7 @@ static bool isUsedOutsideOfBlock(SILValue V, SILBasicBlock *BB) {
 /// Helper function to perform SSA updates in case of jump threading.
 void swift::updateSSAAfterCloning(BasicBlockCloner &Cloner,
                                   SILBasicBlock *SrcBB, SILBasicBlock *DestBB) {
-  SILSSAUpdater SSAUp(SrcBB->getParent()->getModule());
+  SILSSAUpdater SSAUp;
   for (auto AvailValPair : Cloner.AvailVals) {
     ValueBase *Inst = AvailValPair.first;
     if (Inst->use_empty())
@@ -1226,11 +1230,13 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
       if (DestBB->getArgument(i) != BI->getArg(i)) {
         SILValue Val = BI->getArg(i);
         DestBB->getArgument(i)->replaceAllUsesWith(Val);
-        if (auto *I = dyn_cast<SingleValueInstruction>(Val)) {
-          // Replacing operands may trigger constant folding which then could
-          // trigger other simplify-CFG optimizations.
-          ConstFolder.addToWorklist(I);
-          ConstFolder.processWorkList();
+        if (!isVeryLargeFunction) {
+          if (auto *I = dyn_cast<SingleValueInstruction>(Val)) {
+            // Replacing operands may trigger constant folding which then could
+            // trigger other simplify-CFG optimizations.
+            ConstFolder.addToWorklist(I);
+            ConstFolder.processWorkList();
+          }
         }
       } else {
         // We must be processing an unreachable part of the cfg with a cycle.
@@ -1290,7 +1296,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   // If this unconditional branch has BBArgs, check to see if duplicating the
   // destination would allow it to be simplified.  This is a simple form of jump
   // threading.
-  if (!BI->getArgs().empty() &&
+  if (!isVeryLargeFunction && !BI->getArgs().empty() &&
       tryJumpThreading(BI))
     return true;
 
@@ -2702,12 +2708,12 @@ bool SimplifyCFG::tailDuplicateObjCMethodCallSuccessorBlocks() {
 
 static void
 deleteTriviallyDeadOperandsOfDeadArgument(MutableArrayRef<Operand> TermOperands,
-                                          unsigned DeadArgIndex, SILModule &M) {
+                                          unsigned DeadArgIndex) {
   Operand &Op = TermOperands[DeadArgIndex];
   auto *I = Op.get()->getDefiningInstruction();
   if (!I)
     return;
-  Op.set(SILUndef::get(Op.get()->getType(), M));
+  Op.set(SILUndef::get(Op.get()->getType(), *I->getFunction()));
   recursivelyDeleteTriviallyDeadInstructions(I);
 }
 
@@ -2729,14 +2735,12 @@ static void removeArgumentFromTerminator(SILBasicBlock *BB, SILBasicBlock *Dest,
       FalseArgs.push_back(A);
 
     if (Dest == CBI->getTrueBB()) {
-      deleteTriviallyDeadOperandsOfDeadArgument(CBI->getTrueOperands(), idx,
-                                                BB->getModule());
+      deleteTriviallyDeadOperandsOfDeadArgument(CBI->getTrueOperands(), idx);
       TrueArgs.erase(TrueArgs.begin() + idx);
     }
 
     if (Dest == CBI->getFalseBB()) {
-      deleteTriviallyDeadOperandsOfDeadArgument(CBI->getFalseOperands(), idx,
-                                                BB->getModule());
+      deleteTriviallyDeadOperandsOfDeadArgument(CBI->getFalseOperands(), idx);
       FalseArgs.erase(FalseArgs.begin() + idx);
     }
 
@@ -2754,8 +2758,7 @@ static void removeArgumentFromTerminator(SILBasicBlock *BB, SILBasicBlock *Dest,
     for (auto A : BI->getArgs())
       Args.push_back(A);
 
-    deleteTriviallyDeadOperandsOfDeadArgument(BI->getAllOperands(), idx,
-                                              BB->getModule());
+    deleteTriviallyDeadOperandsOfDeadArgument(BI->getAllOperands(), idx);
     Args.erase(Args.begin() + idx);
     Builder.createBranch(BI->getLoc(), BI->getDestBB(), Args);
     Branch->eraseFromParent();
@@ -2869,7 +2872,8 @@ void ArgumentSplitter::replaceIncomingArgs(
 }
 
 bool ArgumentSplitter::createNewArguments() {
-  SILModule &Mod = Arg->getModule();
+  auto *F = Arg->getFunction();
+  SILModule &Mod = F->getModule();
   SILBasicBlock *ParentBB = Arg->getParent();
 
   // Grab the incoming values. Return false if we can't find them.
@@ -2891,7 +2895,7 @@ bool ArgumentSplitter::createNewArguments() {
   // We do not want to split arguments that have less than 2 non-trivial
   // projections.
   if (count_if(Projections, [&](const Projection &P) {
-        return !P.getType(Ty, Mod).isTrivial(Mod);
+        return !P.getType(Ty, Mod).isTrivial(*F);
       }) < 2)
     return false;
 
@@ -3068,6 +3072,9 @@ static bool splitBBArguments(SILFunction &Fn) {
 bool SimplifyCFG::run() {
 
   LLVM_DEBUG(llvm::dbgs() << "### Run SimplifyCFG on " << Fn.getName() << '\n');
+
+  // Disable some expensive optimizations if the function is huge.
+  isVeryLargeFunction = (Fn.size() > 10000);
 
   // First remove any block not reachable from the entry.
   bool Changed = removeUnreachableBlocks(Fn);
@@ -3677,7 +3684,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   // Okay, we'll replace the BB arg with one with the right type, replace
   // the uses in this block, and then rewrite the branch operands.
   LLVM_DEBUG(llvm::dbgs() << "unwrap argument:" << *A);
-  A->replaceAllUsesWith(SILUndef::get(A->getType(), BB->getModule()));
+  A->replaceAllUsesWith(SILUndef::get(A->getType(), *BB->getParent()));
   auto *NewArg =
       BB->replacePhiArgument(i, proj->getType(), ValueOwnershipKind::Owned);
   proj->replaceAllUsesWith(NewArg);

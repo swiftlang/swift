@@ -68,39 +68,21 @@ struct AutoclosureEscapeTest {
   @autoclosure let delayed: () -> Int  // expected-error {{attribute can only be applied to types, not declarations}}
 }
 
-// @autoclosure(escaping)
+// @autoclosure(escaping) is no longer a thing; just make sure we don't crash
 // expected-error @+1 {{attribute can only be applied to types, not declarations}}
 func func10(@autoclosure(escaping _: () -> ()) { } // expected-error{{expected parameter name followed by ':'}}
 
-func func11(_: @autoclosure(escaping) @noescape () -> ()) { } // expected-error{{@escaping conflicts with @noescape}}
-  // expected-error@-1{{@autoclosure(escaping) has been removed; use @autoclosure @escaping instead}} {{28-38= @escaping}}
-
-class Super {
-  func f1(_ x: @autoclosure(escaping) () -> ()) { }
-    // expected-error@-1{{@autoclosure(escaping) has been removed; use @autoclosure @escaping instead}} {{28-38= @escaping}}
-  func f2(_ x: @autoclosure(escaping) () -> ()) { } // expected-note {{potential overridden instance method 'f2' here}}
-    // expected-error@-1{{@autoclosure(escaping) has been removed; use @autoclosure @escaping instead}} {{28-38= @escaping}}
-  func f3(x: @autoclosure () -> ()) { }
-}
-
-class Sub : Super {
-  override func f1(_ x: @autoclosure(escaping)() -> ()) { }
-    // expected-error@-1{{@autoclosure(escaping) has been removed; use @autoclosure @escaping instead}} {{37-47= @escaping }}
-  override func f2(_ x: @autoclosure () -> ()) { } // expected-error{{does not override any method}} // expected-note{{type does not match superclass instance method with type '(@autoclosure @escaping () -> ()) -> ()'}}
-  override func f3(_ x: @autoclosure(escaping) () -> ()) { }  // expected-error{{does not override any method}}
-    // expected-error@-1{{@autoclosure(escaping) has been removed; use @autoclosure @escaping instead}} {{37-47= @escaping}}
-}
+func func11(_: @autoclosure(escaping) @noescape () -> ()) { } // expected-error{{use of undeclared type 'escaping'}}
+// expected-error @-1 {{attribute can only be applied to types, not declarations}}
+// expected-error @-2 {{expected ',' separator}}
+// expected-error @-3 {{expected parameter name followed by ':'}}
 
 func func12_sink(_ x: @escaping () -> Int) { }
 
 func func12a(_ x: @autoclosure () -> Int) {
-    // expected-note@-1{{parameter 'x' is implicitly non-escaping}}
+  // expected-note@-1{{parameter 'x' is implicitly non-escaping}}
 
   func12_sink(x) // expected-error {{passing non-escaping parameter 'x' to function expecting an @escaping closure}}
-}
-func func12b(_ x: @autoclosure(escaping) () -> Int) {
-  // expected-error@-1{{@autoclosure(escaping) has been removed; use @autoclosure @escaping instead}} {{31-41= @escaping}}
-  func12_sink(x) // ok
 }
 func func12c(_ x: @autoclosure @escaping () -> Int) {
   func12_sink(x) // ok
@@ -116,7 +98,7 @@ class TestFunc12 {
 
   func test() {
     func12a(x + foo()) // okay
-    func12b(x + foo()) 
+    func12c(x + foo()) 
     // expected-error@-1{{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{13-13=self.}}
     // expected-error@-2{{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{17-17=self.}}
   }
@@ -131,8 +113,6 @@ enum AutoclosureFailableOf<T> {
 let _ : AutoclosureFailableOf<Int> = .Success(42)
 
 let _ : (@autoclosure () -> ()) -> ()
-let _ : (@autoclosure(escaping) () -> ()) -> ()
-  // expected-error@-1{{@autoclosure(escaping) has been removed; use @autoclosure @escaping instead}} {{22-32= @escaping}}
 
 // escaping is the name of param type
 let _ : (@autoclosure(escaping) -> ()) -> ()  // expected-error {{use of undeclared type 'escaping'}}
@@ -208,19 +188,19 @@ func rdar_20591571() {
 
   func id<T>(_: T) -> T {}
   func same<T>(_: T, _: T) {}
+  // expected-note@-1 2 {{generic parameters are always considered '@escaping'}}
 
   func takesAnAutoclosure(_ fn: @autoclosure () -> Int, _ efn: @escaping @autoclosure () -> Int) {
-  // expected-note@-1 2{{parameter 'fn' is implicitly non-escaping}}
-
-    var _ = fn // expected-error {{non-escaping parameter 'fn' may only be called}}
-    let _ = fn // expected-error {{non-escaping parameter 'fn' may only be called}}
+    // These are OK -- they count as non-escaping uses
+    var _ = fn
+    let _ = fn
 
     var _ = efn
     let _ = efn
 
     _ = id(fn)          // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
-    _ = same(fn, { 3 }) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
-    _ = same({ 3 }, fn) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
+    _ = same(fn, { 3 }) // expected-error {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
+    _ = same({ 3 }, fn) // expected-error {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
 
     withoutActuallyEscaping(fn) { _ in }              // Ok
     withoutActuallyEscaping(fn) { (_: () -> Int) in } // Ok
@@ -264,4 +244,33 @@ protocol P_47586626 {
 
   func foo(_: @autoclosure F)
   func bar<T>(_: @autoclosure G<T>)
+}
+
+func overloaded_autoclj<T>(_: @autoclosure () -> T) {}
+func overloaded_autoclj(_: @autoclosure () -> Int) {}
+
+func autoclosure_param_returning_func_type() {
+  func foo(_ fn: @autoclosure () -> (() -> Int)) {}
+  func generic_foo<T>(_ fn: @autoclosure () -> T) {}
+
+  func bar_1(_ fn: @autoclosure @escaping () -> Int) { foo(fn) } // Ok
+  func bar_2(_ fn: @autoclosure () -> Int) { foo(fn) } // expected-note {{parameter 'fn' is implicitly non-escaping}}
+  // expected-error@-1 {{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
+  func baz_1(_ fn: @autoclosure @escaping () -> Int) { generic_foo(fn) }   // Ok (T is inferred as () -> Int)
+  func baz_2(_ fn: @autoclosure @escaping () -> Int) { generic_foo(fn()) } // Ok (T is inferred as Int)
+  func baz_3(_ fn: @autoclosure () -> Int) { generic_foo(fn) } // Fails because fn is not marked as @escaping
+  // expected-error@-1 {{converting non-escaping value to 'T' may allow it to escape}}
+
+  // Let's make sure using `fn` as value works fine in presence of overloading
+  func biz_1(_ fn: @autoclosure @escaping () -> Int) { overloaded_autoclj(fn) }   // Ok
+  func biz_2(_ fn: @autoclosure @escaping () -> Int) { overloaded_autoclj(fn()) } // Ok
+  func biz_3(_ fn: @autoclosure () -> Int) { overloaded_autoclj(fn) } // Fails because fn is not marked as @escaping
+  // expected-error@-1 {{add () to forward @autoclosure parameter}} {{67-67=()}}
+
+  func fiz(_: @autoclosure () -> (() -> Int)) {}
+
+  func biz_4(_ fn: @autoclosure @escaping () -> (() -> Int)) { fiz(fn) } // Can't forward in Swift >= 5 mode
+  // expected-error@-1 {{add () to forward @autoclosure parameter}} {{70-70=()}}
+  func biz_5(_ fn: @escaping () -> (() -> Int)) { fiz(fn) } // Can't forward in Swift >= 5 mode
+  // expected-error@-1 {{add () to forward @autoclosure parameter}} {{57-57=()}}
 }

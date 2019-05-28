@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir  -module-name outcopyaddr -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -module-name outcopyaddr -primary-file %s | %FileCheck %s
 
 public protocol BaseProt {
 }

@@ -161,8 +161,8 @@ CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DestroyValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, ReleaseValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, ReleaseValueAddr)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, StrongRelease)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialRef)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndLifetime)
+CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialRef)
 CONSTANT_OWNERSHIP_INST(Any, MustBeLive, AbortApply)
 CONSTANT_OWNERSHIP_INST(Any, MustBeLive, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(Any, MustBeLive, BeginAccess)
@@ -467,10 +467,10 @@ OperandOwnershipKindClassifier::visitCondBranchInst(CondBranchInst *cbi) {
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitSwitchEnumInst(SwitchEnumInst *sei) {
   auto opTy = sei->getOperand()->getType();
-  auto &mod = sei->getModule();
+
   // If our passed in type is trivial, we shouldn't have any non-trivial
   // successors. Just bail early returning trivial.
-  if (opTy.isTrivial(mod))
+  if (opTy.isTrivial(*sei->getFunction()))
     return Map::allLive();
 
   // Otherwise, go through the ownership constraints of our successor arguments
@@ -534,22 +534,23 @@ OperandOwnershipKindClassifier::visitCheckedCastBranchInst(
 //// FIX THIS HERE
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitReturnInst(ReturnInst *ri) {
+  auto *f =ri->getFunction();
+
   // If we have a trivial value, return allLive().
-  bool isTrivial = ri->getOperand()->getType().isTrivial(mod);
+  bool isTrivial = ri->getOperand()->getType().isTrivial(*f);
   if (isTrivial) {
     return Map::allLive();
   }
 
-  SILFunctionConventions fnConv = ri->getFunction()->getConventions();
+  SILFunctionConventions fnConv = f->getConventions();
 
   auto results = fnConv.getDirectSILResults();
   if (results.empty())
     return Map();
 
-  CanGenericSignature sig = fnConv.funcTy->getGenericSignature();
   auto ownershipKindRange = makeTransformRange(results,
                                                [&](const SILResultInfo &info) {
-                                                 return info.getOwnershipKind(mod, sig);
+                                                 return info.getOwnershipKind(*f);
                                                });
 
   // Then merge all of our ownership kinds. If we fail to merge, return an empty

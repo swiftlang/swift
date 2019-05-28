@@ -20,7 +20,7 @@
 // CHECK-INDIRECT-SAME:   [[TYPE]]* null,
 // CHECK-SAME:   [[OPAQUE]]* @_objc_empty_cache,
 // CHECK-SAME:   [[OPAQUE]]* null,
-// CHECK-SAME:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1A to i64), i64 1),
+// CHECK-SAME:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1A to i64), i64 [[IS_SWIFT_BIT:1|2]]),
 // CHECK-SAME:   i64 ([[A]]*)* @"$s8subclass1AC1fSiyF",
 // CHECK-SAME:   [[A]]* ([[TYPE]]*)* @"$s8subclass1AC1gACyFZ"
 // CHECK-SAME: }>
@@ -34,7 +34,7 @@
 // CHECK-INDIRECT-SAME:   [[TYPE]]* null,
 // CHECK-SAME:   [[OPAQUE]]* @_objc_empty_cache,
 // CHECK-SAME:   [[OPAQUE]]* null,
-// CHECK-SAME:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1B to i64), i64 1),
+// CHECK-SAME:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1B to i64), i64 [[IS_SWIFT_BIT]]),
 // CHECK-SAME:   i64 ([[B]]*)* @"$s8subclass1BC1fSiyF",
 // CHECK-SAME:   [[A]]* ([[TYPE]]*)* @"$s8subclass1AC1gACyFZ"
 // CHECK-SAME: }>

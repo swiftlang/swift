@@ -57,6 +57,25 @@ class A {
     set {
     }
   }
+  
+  // FIXME(SR-10323): The second note is wrong; it should be "potential overridden class subscript 'subscript(_:)' here". This is a preexisting bug.
+  class subscript (i: String) -> String { // expected-note{{overridden declaration is here}} expected-note{{attempt to override subscript here}}
+    get {
+      return "hello"
+    }
+    
+    set {
+    }
+  }
+  
+  class subscript (typeInSuperclass a: [Int]) -> String {
+    get {
+      return "hello"
+    }
+    
+    set {
+    }
+  }
 
   subscript (i: Int8) -> A { // expected-note{{potential overridden subscript 'subscript(_:)' here}}
     get { return self }
@@ -116,6 +135,52 @@ class B : A {
   }
 
   override subscript (f: Float) -> String { // expected-error{{subscript does not override any subscript from its superclass}}
+    get {
+      return "hello"
+    }
+
+    set {
+    }
+  }
+  
+  // FIXME(SR-10323): This error is wrong; it should be "subscript does not override any subscript from its superclass". This is a preexisting bug.
+  override class subscript (i: Int) -> String { // expected-error{{cannot override mutable subscript of type '(Int) -> String' with covariant type '(String) -> String'}}
+    get {
+      return "hello"
+    }
+    
+    set {
+    }
+  }
+  
+  static subscript (i: String) -> String { // expected-error{{overriding declaration requires an 'override' keyword}} {{10-10=override }}
+    get {
+      return "hello"
+    }
+    
+    set {
+    }
+  }
+  
+  static subscript (i: Double) -> String {
+    get {
+      return "hello"
+    }
+    
+    set {
+    }
+  }
+  
+  override class subscript (typeInSuperclass a: [Int]) -> String {
+    get {
+      return "hello"
+    }
+    
+    set {
+    }
+  }
+
+  override subscript (typeInSuperclass a: [Int]) -> String { // expected-error{{subscript does not override any subscript from its superclass}}
     get {
       return "hello"
     }

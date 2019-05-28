@@ -52,11 +52,15 @@ public:
 
   /// addToScope - Register the specified decl as being in the current lexical
   /// scope.
-  void addToScope(ValueDecl *D, Parser &TheParser);
+  void addToScope(ValueDecl *D, Parser &TheParser,
+                  bool diagnoseRedefinitions = true);
 
   bool isInactiveConfigBlock() const;
   
   SavedScope saveCurrentScope();
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "Only for use in the debugger");
 };
 
 enum class ScopeKind {

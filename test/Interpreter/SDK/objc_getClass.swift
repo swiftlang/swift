@@ -1,15 +1,18 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_struct)) -Xfrontend -enable-resilience %S/../../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_struct)) -enable-library-evolution %S/../../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct
 // RUN: %target-codesign %t/%target-library-name(resilient_struct)
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_class)) -Xfrontend -enable-resilience %S/../../Inputs/resilient_class.swift -emit-module -emit-module-path %t/resilient_class.swiftmodule -module-name resilient_class -I%t -L%t -lresilient_struct
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_class)) -enable-library-evolution %S/../../Inputs/resilient_class.swift -emit-module -emit-module-path %t/resilient_class.swiftmodule -module-name resilient_class -I%t -L%t -lresilient_struct
 // RUN: %target-codesign %t/%target-library-name(resilient_class)
 
-// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -lresilient_class -o %t/main %target-rpath(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_objc_class)) -Xfrontend -enable-resilience %S/../../Inputs/resilient_objc_class.swift -emit-module -emit-module-path %t/resilient_objc_class.swiftmodule -module-name resilient_objc_class -I%t -L%t -lresilient_struct
+// RUN: %target-codesign %t/%target-library-name(resilient_objc_class)
+
+// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -lresilient_class -lresilient_objc_class -o %t/main %target-rpath(%t)
 // RUN: %target-codesign %t/main
 
-// RUN: %target-run %t/main %t/%target-library-name(resilient_struct) %t/libresilient_class%{target-shared-library-suffix}
+// RUN: %target-run %t/main %t/%target-library-name(resilient_struct) %t/libresilient_class%{target-shared-library-suffix} %t/libresilient_objc_class%{target-shared-library-suffix}
 
 
 // REQUIRES: executable_test
@@ -22,6 +25,7 @@ import ObjectiveC
 import Foundation
 import resilient_struct
 import resilient_class
+import resilient_objc_class
 
 // Old OS versions do not have this hook.
 let getClassHookMissing = {
@@ -110,6 +114,19 @@ class ResilientFieldSubclassObjC : ResilientFieldSuperclassObjC {
   var subvalue = ResilientInt(i: 4)
 }
 
+class ResilientSubclassOfNSObject :  ResilientNSObjectOutsideParent {
+  var subvalue = ResilientInt(i: 5)
+}
+
+class ResilientSubclassOfGenericNSObject :  ResilientGenericNSObjectOutsideParent<Int> {
+  var subvalue = ResilientInt(i: 6)
+  init() { super.init(property: 0) }
+}
+
+class ResilientSubclassOfConcreteNSObject :  ResilientConcreteNSObjectOutsideChild {
+  var subvalue = ResilientInt(i: 7)
+  init() { super.init(property: "") }
+}
 
 func requireClass(named name: String, demangledName: String) {
   for _ in 1...2 {
@@ -124,14 +141,18 @@ func requireClass(named name: String) {
   return requireClass(named: name, demangledName: name)
 }
 
-testSuite.test("Basic") {
+testSuite.test("Basic")
+  .requireOwnProcess()
+  .code {
   requireClass(named: "main.SwiftSubclass")
   requireClass(named: "main.SwiftSuperclass")
   requireClass(named: "main.ObjCSubclass")
   requireClass(named: "main.ObjCSuperclass")
 }
 
-testSuite.test("BasicMangled") {
+testSuite.test("BasicMangled")
+  .requireOwnProcess()
+  .code {
   requireClass(named:   "_TtC4main20MangledSwiftSubclass",
                demangledName: "main.MangledSwiftSubclass")
   requireClass(named:   "_TtC4main22MangledSwiftSuperclass",
@@ -145,6 +166,7 @@ testSuite.test("BasicMangled") {
 testSuite.test("Generic")
   .skip(.custom({ getClassHookMissing },
                 reason: "objc_getClass hook not present"))
+  .requireOwnProcess()
   .code {
   requireClass(named: "main.ConstrainedSwiftSubclass")
   requireClass(named: "main.ConstrainedSwiftSuperclass")
@@ -155,7 +177,9 @@ testSuite.test("Generic")
 testSuite.test("GenericMangled")
   .skip(.custom({ getClassHookMissing },
                 reason: "objc_getClass hook not present"))
+  .requireOwnProcess()
   .code {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else { return }
   requireClass(named:   "_TtC4main24ConstrainedSwiftSubclass",
                demangledName: "main.ConstrainedSwiftSubclass")
   requireClass(named:   "_TtC4main26ConstrainedSwiftSuperclass",
@@ -169,6 +193,7 @@ testSuite.test("GenericMangled")
 testSuite.test("ResilientSubclass")
   .skip(.custom({ getClassHookMissing },
                 reason: "objc_getClass hook not present"))
+  .requireOwnProcess()
   .code {
   requireClass(named: "main.ResilientSubclass")
   requireClass(named: "main.ResilientSuperclass")
@@ -181,6 +206,7 @@ testSuite.test("ResilientSubclass")
 testSuite.test("ResilientField")
   .skip(.custom({ getClassHookMissing },
                 reason: "objc_getClass hook not present"))
+  .requireOwnProcess()
   .code {
   requireClass(named: "main.ResilientFieldSubclassSwift")
   requireClass(named: "main.ResilientFieldSuperclassSwift")
@@ -195,6 +221,24 @@ testSuite.test("ResilientField")
   expectEqual(ResilientFieldSubclassObjC().subvalue.i, 4)
 }
 
+testSuite.test("ResilientNSObject")
+  .skip(.custom({ getClassHookMissing },
+                reason: "objc_getClass hook not present"))
+  .requireOwnProcess()
+  .code {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else { return }
+  requireClass(named: "_TtC4main27ResilientSubclassOfNSObject",
+               demangledName: "main.ResilientSubclassOfNSObject")
+  requireClass(named: "_TtC4main34ResilientSubclassOfGenericNSObject",
+               demangledName: "main.ResilientSubclassOfGenericNSObject")
+  requireClass(named: "_TtC4main35ResilientSubclassOfConcreteNSObject",
+               demangledName: "main.ResilientSubclassOfConcreteNSObject")
+
+  expectEqual(ResilientSubclassOfNSObject().subvalue.i, 5)
+  expectEqual(ResilientSubclassOfGenericNSObject().subvalue.i, 6)
+  expectEqual(ResilientSubclassOfConcreteNSObject().subvalue.i, 7)
+}
+
 testSuite.test("NotPresent") {
   // This class does not exist.
   expectNil(NSClassFromString("main.ThisClassDoesNotExist"));
@@ -207,4 +251,3 @@ testSuite.test("NotPresent") {
 }
 
 runAllTests()
-

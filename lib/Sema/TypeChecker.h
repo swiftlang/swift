@@ -202,6 +202,7 @@ enum ContextualTypePurpose {
   CTP_Unused,           ///< No contextual type is specified.
   CTP_Initialization,   ///< Pattern binding initialization.
   CTP_ReturnStmt,       ///< Value specified to a 'return' statement.
+  CTP_ReturnSingleExpr, ///< Value implicitly returned from a function.
   CTP_YieldByValue,     ///< By-value yield operand.
   CTP_YieldByReference, ///< By-reference yield operand.
   CTP_ThrowStmt,        ///< Value specified to a 'throw' statement.
@@ -271,6 +272,13 @@ enum class TypeCheckExprFlags {
   /// as part of the expression diagnostics, which is attempting to narrow
   /// down failure location.
   SubExpressionDiagnostics = 0x400,
+  
+  /// If set, the 'convertType' specified to typeCheckExpression is the opaque
+  /// return type of the declaration being checked. The archetype should be
+  /// opened into a type variable to provide context to the expression, and
+  /// the resulting type will be a candidate for binding the underlying
+  /// type.
+  ConvertTypeIsOpaqueReturnType = 0x800,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -606,60 +614,8 @@ public:
   llvm::DenseMap<AnyFunctionRef, std::vector<Expr*>> LocalCFunctionPointers;
 
 private:
-  /// Return statements with functions as return values.
-  llvm::DenseMap<AbstractFunctionDecl *, llvm::DenseSet<ReturnStmt *>>
-    FunctionAsReturnValue;
-
-  /// Function apply expressions with a certain function as an argument.
-  llvm::DenseMap<AbstractFunctionDecl *, llvm::DenseSet<ApplyExpr *>>
-    FunctionAsEscapingArg;
-
   /// The # of times we have performed typo correction.
   unsigned NumTypoCorrections = 0;
-
-public:
-  /// Record an occurrence of a function that captures inout values as an
-  /// argument.
-  ///
-  /// \param decl the function that occurs as an argument.
-  ///
-  /// \param apply the expression in which the function appears.
-  void addEscapingFunctionAsArgument(AbstractFunctionDecl *decl,
-                                     ApplyExpr *apply) {
-    FunctionAsEscapingArg[decl].insert(apply);
-  }
-
-  /// Find occurrences of a function that captures inout values as arguments.
-  ///
-  /// \param decl the function that occurs as an argument.
-  ///
-  /// \returns Expressions in which the function appears as arguments.
-  llvm::DenseSet<ApplyExpr *> &
-  getEscapingFunctionAsArgument(AbstractFunctionDecl *decl) {
-    return FunctionAsEscapingArg[decl];
-  }
-
-  /// Record an occurrence of a function that captures inout values as a return
-  /// value
-  ///
-  /// \param decl the function that occurs as a return value.
-  ///
-  /// \param stmt the expression in which the function appears.
-  void addEscapingFunctionAsReturnValue(AbstractFunctionDecl *decl,
-                                        ReturnStmt *stmt) {
-    FunctionAsReturnValue[decl].insert(stmt);
-  }
-
-  /// Find occurrences of a function that captures inout values as return
-  /// values.
-  ///
-  /// \param decl the function that occurs as a return value.
-  ///
-  /// \returns Expressions in which the function appears as arguments.
-  llvm::DenseSet<ReturnStmt *> &
-  getEscapingFunctionAsReturnValue(AbstractFunctionDecl *decl) {
-    return FunctionAsReturnValue[decl];
-  }
 
 private:
   Type MaxIntegerType;
@@ -1098,6 +1054,7 @@ public:
   void checkDeclAttributesEarly(Decl *D);
   static void addImplicitDynamicAttribute(Decl *D);
   void checkDeclAttributes(Decl *D);
+  void checkParameterAttributes(ParameterList *params);
   void checkDynamicReplacementAttribute(ValueDecl *D);
   static ValueDecl *findReplacedDynamicFunction(const ValueDecl *d);
   void checkTypeModifyingDeclAttributes(VarDecl *var);
@@ -1931,10 +1888,34 @@ public:
     PropertyInitializer
   };
 
-  bool diagnoseInlinableDeclRef(SourceLoc loc, const ValueDecl *D,
+  bool diagnoseInlinableDeclRef(SourceLoc loc, ConcreteDeclRef declRef,
                                 const DeclContext *DC,
                                 FragileFunctionKind Kind,
                                 bool TreatUsableFromInlineAsPublic);
+
+private:
+  bool diagnoseInlinableDeclRefAccess(SourceLoc loc, const ValueDecl *D,
+                                      const DeclContext *DC,
+                                      FragileFunctionKind Kind,
+                                      bool TreatUsableFromInlineAsPublic);
+
+  /// Given that a declaration is used from a particular context which
+  /// exposes it in the interface of the current module, diagnose if it cannot
+  /// reasonably be shared.
+  bool diagnoseDeclRefExportability(SourceLoc loc, ConcreteDeclRef declRef,
+                                    const DeclContext *DC,
+                                    FragileFunctionKind fragileKind);
+
+public:
+  /// Given that a type is used from a particular context which
+  /// exposes it in the interface of the current module, diagnose if its
+  /// generic arguments require the use of conformances that cannot reasonably
+  /// be shared.
+  ///
+  /// This method \e only checks how generic arguments are used; it is assumed
+  /// that the declarations involved have already been checked elsewhere.
+  void diagnoseGenericTypeExportability(const TypeLoc &TL,
+                                        const DeclContext *DC);
 
   /// Given that \p DC is within a fragile context for some reason, describe
   /// why.
@@ -2027,6 +2008,10 @@ public:
                                        const DeclContext *ReferenceDC,
                                        const UnavailabilityReason &Reason);
 
+  void diagnosePotentialOpaqueTypeUnavailability(SourceRange ReferenceRange,
+                                           const DeclContext *ReferenceDC,
+                                           const UnavailabilityReason &Reason);
+  
   /// Emits a diagnostic for a reference to a storage accessor that is
   /// potentially unavailable.
   void diagnosePotentialAccessorUnavailability(
@@ -2133,6 +2118,10 @@ public:
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.
   DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
+  
+  Type getOrCreateOpaqueResultType(TypeResolution resolution,
+                                   ValueDecl *originatingDecl,
+                                   OpaqueReturnTypeRepr *repr);
 };
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic
@@ -2163,6 +2152,21 @@ bool isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
 /// The method is given to be defined as `subscript(dynamicMember:)`.
 bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
                                          TypeChecker &TC);
+
+/// Returns true if the given subscript method is an valid implementation of
+/// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
+/// The method is given to be defined as `subscript(dynamicMember:)` which
+/// takes a single non-variadic parameter that conforms to
+/// `ExpressibleByStringLiteral` protocol.
+bool isValidStringDynamicMemberLookup(SubscriptDecl *decl, DeclContext *DC,
+                                      TypeChecker &TC);
+
+/// Returns true if the given subscript method is an valid implementation of
+/// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
+/// @dynamicMemberLookup.
+/// The method is given to be defined as `subscript(dynamicMember:)` which
+/// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
+bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl, TypeChecker &TC);
 
 /// Whether an overriding declaration requires the 'override' keyword.
 enum class OverrideRequiresKeyword {

@@ -3,14 +3,14 @@
 // RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path %t.swiftinterface %s
 // RUN: %FileCheck %s --check-prefix FROMSOURCE --check-prefix NONRESILIENT --check-prefix COMMON < %t.swiftinterface
 
-// RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path %t-resilient.swiftinterface -enable-resilience %s
+// RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path %t-resilient.swiftinterface -enable-library-evolution %s
 // RUN: %FileCheck %s --check-prefix FROMSOURCE --check-prefix RESILIENT --check-prefix COMMON < %t-resilient.swiftinterface
 
 // RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule %t.swiftinterface -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -module-name Test -emit-parseable-module-interface-path - | %FileCheck %s --check-prefix FROMMODULE --check-prefix NONRESILIENT --check-prefix COMMON
 
-// RUN: %target-swift-frontend -emit-module -o %t/TestResilient.swiftmodule -enable-resilience %t-resilient.swiftinterface -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/TestResilient.swiftmodule -module-name TestResilient -enable-resilience -emit-parseable-module-interface-path - | %FileCheck %s --check-prefix FROMMODULE --check-prefix RESILIENT --check-prefix COMMON
+// RUN: %target-swift-frontend -emit-module -o %t/TestResilient.swiftmodule -enable-library-evolution %t-resilient.swiftinterface -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/TestResilient.swiftmodule -module-name TestResilient -enable-library-evolution -emit-parseable-module-interface-path - | %FileCheck %s --check-prefix FROMMODULE --check-prefix RESILIENT --check-prefix COMMON
 
 // COMMON: @_fixed_layout public struct MyStruct {
 @_fixed_layout

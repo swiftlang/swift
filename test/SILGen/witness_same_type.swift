@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-emit-silgen -module-name witness_same_type -enable-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-emit-ir -module-name witness_same_type -enable-sil-ownership %s
+// RUN: %target-swift-emit-silgen -module-name witness_same_type -verify-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-ir -module-name witness_same_type -verify-sil-ownership %s
 
 protocol Fooable {
   associatedtype Bar

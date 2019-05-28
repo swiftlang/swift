@@ -226,9 +226,9 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
   endif()
 
-  # The standard library and overlays are always built with resilience.
+  # The standard library and overlays are always built resiliently.
   if(SWIFTFILE_IS_STDLIB)
-    list(APPEND swift_flags "-Xfrontend" "-enable-resilience")
+    list(APPEND swift_flags "-enable-library-evolution")
   endif()
 
   if(SWIFT_STDLIB_USE_NONATOMIC_RC)
@@ -236,7 +236,7 @@ function(_compile_swift_files
   endif()
 
   if(SWIFTFILE_IS_STDLIB)
-    list(APPEND swift_flags "-Xfrontend" "-enable-sil-ownership")
+    list(APPEND swift_flags "-Xfrontend" "-verify-sil-ownership")
     list(APPEND swift_flags "-Xfrontend" "-enable-mandatory-semantic-arc-opts")
   endif()
 
@@ -265,7 +265,7 @@ function(_compile_swift_files
 
   # Force swift 4 compatibility mode for overlays.
   if (SWIFTFILE_IS_SDK_OVERLAY)
-    list(APPEND swift_flags "-swift-version" "4")
+    list(APPEND swift_flags "-swift-version" "5")
   endif()
 
   if(SWIFTFILE_IS_SDK_OVERLAY)

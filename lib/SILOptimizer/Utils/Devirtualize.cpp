@@ -221,8 +221,10 @@ static bool isKnownFinalClass(ClassDecl *CD, SILModule &M,
 // can be derived e.g.:
 // - from a constructor or
 // - from a successful outcome of a checked_cast_br [exact] instruction.
-SILValue swift::getInstanceWithExactDynamicType(SILValue S, SILModule &M,
+SILValue swift::getInstanceWithExactDynamicType(SILValue S,
                                                 ClassHierarchyAnalysis *CHA) {
+  auto *F = S->getFunction();
+  auto &M = F->getModule();
 
   while (S) {
     S = stripCasts(S);
@@ -271,9 +273,12 @@ SILValue swift::getInstanceWithExactDynamicType(SILValue S, SILModule &M,
 /// Try to determine the exact dynamic type of an object.
 /// returns the exact dynamic type of the object, or an empty type if the exact
 /// type could not be determined.
-SILType swift::getExactDynamicType(SILValue S, SILModule &M,
+SILType swift::getExactDynamicType(SILValue S,
                                    ClassHierarchyAnalysis *CHA,
                                    bool ForUnderlyingObject) {
+  auto *F = S->getFunction();
+  auto &M = F->getModule();
+
   // Set of values to be checked for their exact types.
   SmallVector<SILValue, 8> WorkList;
   // The detected type of the underlying object.
@@ -337,7 +342,7 @@ SILType swift::getExactDynamicType(SILValue S, SILModule &M,
       auto *CD = FArg->getType().getClassOrBoundGenericClass();
       // If it is not class and it is a trivial type, then it
       // should be the exact type.
-      if (!CD && FArg->getType().isTrivial(M)) {
+      if (!CD && FArg->getType().isTrivial(*F)) {
         if (ResultType && ResultType != FArg->getType())
           return SILType();
         ResultType = FArg->getType();
@@ -395,9 +400,9 @@ SILType swift::getExactDynamicType(SILValue S, SILModule &M,
 /// returns the exact dynamic type of a value, or an empty type if the exact
 /// type could not be determined.
 SILType
-swift::getExactDynamicTypeOfUnderlyingObject(SILValue S, SILModule &M,
+swift::getExactDynamicTypeOfUnderlyingObject(SILValue S,
                                              ClassHierarchyAnalysis *CHA) {
-  return getExactDynamicType(S, M, CHA, /* ForUnderlyingObject */ true);
+  return getExactDynamicType(S, CHA, /* ForUnderlyingObject */ true);
 }
 
 // Start with the substitutions from the apply.
@@ -690,8 +695,7 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
   }
 
   // We need to disable the  “effectively final” opt if a function is inlinable
-  if (isEffectivelyFinalMethod && AI.getFunction()->getResilienceExpansion() ==
-                                      ResilienceExpansion::Minimal) {
+  if (isEffectivelyFinalMethod && AI.getFunction()->isSerialized()) {
     LLVM_DEBUG(llvm::dbgs() << "        FAIL: Could not optimize function "
                                "because it is an effectively-final inlinable: "
                             << AI.getFunction()->getName() << "\n");
@@ -901,7 +905,7 @@ getWitnessMethodSubstitutions(
   auto baseSubMap = conformance->getSubstitutions(mod);
 
   unsigned baseDepth = 0;
-  auto *rootConformance = conformance->getRootNormalConformance();
+  auto *rootConformance = conformance->getRootConformance();
   if (auto *witnessSig = rootConformance->getGenericSignature())
     baseDepth = witnessSig->getGenericParams().back()->getDepth() + 1;
 
@@ -1135,13 +1139,10 @@ ApplySite swift::tryDevirtualizeApply(ApplySite AI,
 
     // Try to check if the exact dynamic type of the instance is statically
     // known.
-    if (auto Instance = getInstanceWithExactDynamicType(CMI->getOperand(),
-                                                        CMI->getModule(),
-                                                        CHA))
+    if (auto Instance = getInstanceWithExactDynamicType(CMI->getOperand(), CHA))
       return tryDevirtualizeClassMethod(FAS, Instance, CD, ORE);
 
-    if (auto ExactTy = getExactDynamicType(CMI->getOperand(), CMI->getModule(),
-                                           CHA)) {
+    if (auto ExactTy = getExactDynamicType(CMI->getOperand(), CHA)) {
       if (ExactTy == CMI->getOperand()->getType())
         return tryDevirtualizeClassMethod(FAS, CMI->getOperand(), CD, ORE);
     }
@@ -1198,13 +1199,10 @@ bool swift::canDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) 
 
     // Try to check if the exact dynamic type of the instance is statically
     // known.
-    if (auto Instance = getInstanceWithExactDynamicType(CMI->getOperand(),
-                                                        CMI->getModule(),
-                                                        CHA))
+    if (auto Instance = getInstanceWithExactDynamicType(CMI->getOperand(), CHA))
       return canDevirtualizeClassMethod(AI, CD);
 
-    if (auto ExactTy = getExactDynamicType(CMI->getOperand(), CMI->getModule(),
-                                           CHA)) {
+    if (auto ExactTy = getExactDynamicType(CMI->getOperand(), CHA)) {
       if (ExactTy == CMI->getOperand()->getType())
         return canDevirtualizeClassMethod(AI, CD);
     }

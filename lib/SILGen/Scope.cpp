@@ -21,7 +21,7 @@ ManagedValue Scope::popPreservingValue(ManagedValue mv) {
   // that we want to make sure that we are not forwarding a cleanup for a
   // stack location that will be destroyed by this scope.
   assert(mv && mv.getType().isObject() &&
-         (mv.getType().isTrivial(cleanups.SGF.getModule()) ||
+         (mv.getType().isTrivial(cleanups.SGF.F) ||
           mv.getOwnershipKind() == ValueOwnershipKind::Any ||
           mv.hasCleanup()));
   CleanupCloner cloner(cleanups.SGF, mv);

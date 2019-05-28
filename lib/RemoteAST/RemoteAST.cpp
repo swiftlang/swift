@@ -109,7 +109,10 @@ public:
   virtual Result<OpenedExistential>
   getDynamicTypeAndAddressForExistential(RemoteAddress object,
                                          Type staticType) = 0;
-
+  virtual Result<Type>
+  getUnderlyingTypeForOpaqueType(remote::RemoteAddress opaqueDescriptor,
+                                 SubstitutionMap substitutions,
+                                 unsigned ordinal) = 0;
   Result<uint64_t>
   getOffsetOfMember(Type type, RemoteAddress optMetadata, StringRef memberName){
     // Sanity check: obviously invalid arguments.
@@ -327,14 +330,20 @@ private:
       return fail<uint64_t>(Failure::TypeHasNoSuchMember, memberName);
 
     // Fast path: element 0 is always at offset 0.
-    if (targetIndex == 0) return uint64_t(0);
+    if (targetIndex == 0)
+      return uint64_t(0);
 
     // Create an IRGen instance.
     auto irgen = getIRGen();
-    if (!irgen) return Result<uint64_t>::emplaceFailure(Failure::Unknown);
+    if (!irgen)
+      return Result<uint64_t>::emplaceFailure(Failure::Unknown);
     auto &IGM = irgen->IGM;
-
     SILType loweredTy = IGM.getLoweredType(type);
+
+    // Only the runtime metadata knows the offsets of resilient members.
+    auto &typeInfo = IGM.getTypeInfo(loweredTy);
+    if (!isa<irgen::FixedTypeInfo>(&typeInfo))
+      return Result<uint64_t>::emplaceFailure(Failure::NotFixedLayout);
 
     // If the type has a statically fixed offset, return that.
     if (auto offset =
@@ -616,6 +625,20 @@ public:
     }
     llvm_unreachable("invalid type kind");
   }
+  
+  Result<Type>
+  getUnderlyingTypeForOpaqueType(remote::RemoteAddress opaqueDescriptor,
+                                 SubstitutionMap substitutions,
+                                 unsigned ordinal) override {
+    auto underlyingType = Reader
+      .readUnderlyingTypeForOpaqueTypeDescriptor(opaqueDescriptor.getAddressData(),
+                                                 ordinal);
+    
+    if (!underlyingType)
+      return getFailure<Type>();
+    
+    return underlyingType.subst(substitutions);
+  }
 };
 
 } // end anonymous namespace
@@ -685,4 +708,13 @@ RemoteASTContext::getDynamicTypeAndAddressForExistential(
     remote::RemoteAddress address, Type staticType) {
   return asImpl(Impl)->getDynamicTypeAndAddressForExistential(address,
                                                               staticType);
+}
+
+Result<Type>
+RemoteASTContext::getUnderlyingTypeForOpaqueType(
+    remote::RemoteAddress opaqueDescriptor,
+    SubstitutionMap substitutions,
+    unsigned ordinal) {
+  return asImpl(Impl)->getUnderlyingTypeForOpaqueType(opaqueDescriptor,
+                                                      substitutions, ordinal);
 }

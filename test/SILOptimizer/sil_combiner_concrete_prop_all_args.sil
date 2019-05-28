@@ -178,7 +178,7 @@ bb0(%0 : $*SomeNoClass):
 sil hidden [signature_optimized_thunk] [always_inline] @$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tF : $@convention(thin) (@in_guaranteed SomeNoClassProtocol) -> Int32 {
 bb0(%0 : $*SomeNoClassProtocol):
   %1 = function_ref @$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 
-  %2 = open_existential_addr mutable_access %0 : $*SomeNoClassProtocol to $*@opened("CC97FCD6-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocol 
+  %2 = open_existential_addr immutable_access %0 : $*SomeNoClassProtocol to $*@opened("CC97FCD6-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocol 
   %3 = apply %1<@opened("CC97FCD6-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocol>(%2) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tF'
@@ -302,7 +302,7 @@ bb0(%0 : $*SomeNoClassComp):
 sil hidden [signature_optimized_thunk] [always_inline] @$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tF : $@convention(thin) (@in_guaranteed SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp) -> Int32 {
 bb0(%0 : $*SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp):
   %1 = function_ref @$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocolComp, τ_0_0 : SomeOtherNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 
-  %2 = open_existential_addr mutable_access %0 : $*SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp to $*@opened("CC983642-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp 
+  %2 = open_existential_addr immutable_access %0 : $*SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp to $*@opened("CC983642-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp 
   %3 = apply %1<@opened("CC983642-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp>(%2) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocolComp, τ_0_0 : SomeOtherNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tF'

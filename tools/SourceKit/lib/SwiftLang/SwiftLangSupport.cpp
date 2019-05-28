@@ -117,6 +117,7 @@ public:
   UID_FOR(Constructor)
   UID_FOR(Destructor)
   UID_FOR(Subscript)
+  UID_FOR(OpaqueType)
 #undef UID_FOR
 };
 
@@ -859,6 +860,7 @@ std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
 
   DWORD success = GetFinalPathNameByHandleA(
       fileHandle, full_path, sizeof(full_path), FILE_NAME_NORMALIZED);
+  CloseHandle(fileHandle);
   return (success ? full_path : InputPath);
 #endif
 }

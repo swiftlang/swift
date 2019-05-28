@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-sil-ownership %s -Onone -Xllvm \
+// RUN: %target-swift-frontend -emit-sil %s -Onone -Xllvm \
 // RUN:   -sil-print-after=allocbox-to-stack -Xllvm \
 // RUN:   -sil-print-only-functions=$s3red19ThrowAddrOnlyStructV016throwsOptionalToG0ACyxGSgSi_tcfC \
 // RUN:   -Xllvm -sil-print-debuginfo -o %t -module-name red 2>&1 | %FileCheck %s

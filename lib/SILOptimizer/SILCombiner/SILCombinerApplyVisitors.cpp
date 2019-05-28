@@ -201,7 +201,7 @@ bool PartialApplyCombiner::allocateTemporaries() {
         return false;
 
       // If the temporary is non-trivial, we need to release it later.
-      if (!Arg->getType().isTrivial(PAI->getModule()))
+      if (!Arg->getType().isTrivial(*PAI->getFunction()))
         needsReleases = true;
       ArgsToHandle.push_back(std::make_pair(Arg, i));
     }
@@ -256,7 +256,7 @@ void PartialApplyCombiner::releaseTemporaries() {
   // its really needed.
   for (auto Op : Tmps) {
     auto TmpType = Op->getType().getObjectType();
-    if (TmpType.isTrivial(PAI->getModule()))
+    if (TmpType.isTrivial(*PAI->getFunction()))
       continue;
     for (auto *EndPoint : PAFrontier) {
       Builder.setInsertionPoint(EndPoint);
@@ -663,6 +663,10 @@ void SILCombiner::replaceWitnessMethodInst(
 // This function determines concrete type of an opened existential argument
 // using ProtocolConformanceAnalysis. The concrete type of the argument can be a
 // class, struct, or an enum.
+//
+// If some ConcreteOpenedExistentialInfo is returned, then new cast instructions
+// have already been added to Builder's tracking list. If the caller can't make
+// real progress then it must reset the Builder.
 Optional<ConcreteOpenedExistentialInfo>
 SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     Operand &ArgOperand) {
@@ -809,11 +813,12 @@ static bool canReplaceCopiedArg(FullApplySite Apply, SILValue Arg,
   if (!IEA)
     return false;
 
-  // If the witness method mutates Arg, we cannot replace Arg with
-  // the source of a copy. Otherwise the call would modify another value than
-  // the original argument.
+  // If the witness method does not take the value as guaranteed, we cannot
+  // replace Arg with the source of a copy. Otherwise the call would modify
+  // another value than the original argument (in the case of indirect mutating)
+  // or create a use-after-free (in the case of indirect consuming).
   auto origConv = Apply.getOrigCalleeConv();
-  if (origConv.getParamInfoForSILArg(ArgIdx).isIndirectMutating())
+  if (!origConv.getParamInfoForSILArg(ArgIdx).isIndirectInGuaranteed())
     return false;
 
   auto *DT = DA->get(Apply.getFunction());
@@ -998,9 +1003,15 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
         });
   }
 
-  if (!UpdatedArgs)
+  if (!UpdatedArgs) {
+    // Remove any new instructions created while attempting to optimize this
+    // apply. Since the apply was never rewritten, if they aren't removed here,
+    // they will be removed later as dead when visited by SILCombine, causing
+    // SILCombine to loop infinitely, creating and destroying the casts.
+    recursivelyDeleteTriviallyDeadInstructions(*Builder.getTrackingList());
+    Builder.getTrackingList()->clear();
     return nullptr;
-
+  }
   // Now create the new apply instruction.
   SILBuilderWithScope ApplyBuilder(Apply.getInstruction(), BuilderCtx);
   FullApplySite NewApply;
@@ -1132,6 +1143,9 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply) {
   if (COEIs.empty())
     return nullptr;
 
+  // At least one COEI is present, so cast instructions may already have been
+  // inserted. We must either rewrite the apply or delete the casts and reset
+  // the Builder's tracking list.
   return createApplyWithConcreteType(Apply, COEIs, BuilderCtx);
 }
 
@@ -1162,7 +1176,11 @@ static bool knowHowToEmitReferenceCountInsts(ApplyInst *Call) {
   if (Call->getNumArguments() != 1)
     return false;
 
-  FunctionRefInst *FRI = cast<FunctionRefInst>(Call->getCallee());
+  // FIXME: We could handle dynamic_function_ref instructions here because the
+  // code only looks at the function type.
+  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Call->getCallee());
+  if (!FRI)
+    return false;
   SILFunction *F = FRI->getReferencedFunction();
   auto FnTy = F->getLoweredFunctionType();
 

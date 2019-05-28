@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -166,9 +167,133 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
   tl.setType(Type());
 }
 
-///
-/// Generic functions
-///
+//
+// Generic functions
+//
+
+/// Get the opaque type representing the return type of a declaration, or
+/// create it if it does not yet exist.
+Type TypeChecker::getOrCreateOpaqueResultType(TypeResolution resolution,
+                                              ValueDecl *originatingDecl,
+                                              OpaqueReturnTypeRepr *repr) {
+  // If the decl already has an opaque type decl for its return type, use it.
+  if (auto existingDecl = originatingDecl->getOpaqueResultTypeDecl()) {
+    return existingDecl->getDeclaredInterfaceType();
+  }
+  
+  // Check the availability of the opaque type runtime support.
+  if (!Context.LangOpts.DisableAvailabilityChecking) {
+    auto runningOS = overApproximateAvailabilityAtLocation(repr->getLoc(),
+                                    originatingDecl->getInnermostDeclContext());
+    auto availability = Context.getOpaqueTypeAvailability();
+    if (!runningOS.isContainedIn(availability)) {
+      diagnosePotentialOpaqueTypeUnavailability(repr->getSourceRange(),
+       originatingDecl->getInnermostDeclContext(),
+       UnavailabilityReason::requiresVersionRange(availability.getOSVersion()));
+    }
+  }
+  
+  // Try to resolve the constraint repr. It should be some kind of existential
+  // type.
+  TypeResolutionOptions options(TypeResolverContext::GenericRequirement);
+  TypeLoc constraintTypeLoc(repr->getConstraint());
+  // Pass along the error type if resolving the repr failed.
+  bool validationError
+    = validateType(constraintTypeLoc, resolution, options);
+  auto constraintType = constraintTypeLoc.getType();
+  if (validationError)
+    return constraintType;
+  
+  // Error out if the constraint type isn't a class or existential type.
+  if (!constraintType->getClassOrBoundGenericClass()
+      && !constraintType->isExistentialType()) {
+    diagnose(repr->getConstraint()->getLoc(),
+             diag::opaque_type_invalid_constraint);
+    return constraintTypeLoc.getType();
+  }
+
+  // Create a generic signature for the opaque environment. This is the outer
+  // generic signature with an added generic parameter representing the opaque
+  // type and its interface constraints.
+  GenericSignatureBuilder builder(Context);
+
+  auto originatingDC = originatingDecl->getInnermostDeclContext();
+  unsigned returnTypeDepth = 0;
+  auto outerGenericSignature = originatingDC->getGenericSignatureOfContext();
+  
+  if (outerGenericSignature) {
+    builder.addGenericSignature(outerGenericSignature);
+    returnTypeDepth =
+               outerGenericSignature->getGenericParams().back()->getDepth() + 1;
+  }
+  
+  auto returnTypeParam = GenericTypeParamType::get(returnTypeDepth, 0,
+                                                   Context);
+
+  builder.addGenericParameter(returnTypeParam);
+
+  if (constraintType->getClassOrBoundGenericClass()) {
+    builder.addRequirement(Requirement(RequirementKind::Superclass,
+                                       returnTypeParam, constraintType),
+             GenericSignatureBuilder::FloatingRequirementSource::forAbstract(),
+             originatingDC->getParentModule());
+  } else {
+    auto constraints = constraintType->getExistentialLayout();
+    if (auto superclass = constraints.getSuperclass()) {
+      builder.addRequirement(Requirement(RequirementKind::Superclass,
+                                         returnTypeParam, superclass),
+             GenericSignatureBuilder::FloatingRequirementSource::forAbstract(),
+             originatingDC->getParentModule());
+    }
+    for (auto protocol : constraints.getProtocols()) {
+      builder.addRequirement(Requirement(RequirementKind::Conformance,
+                                         returnTypeParam, protocol),
+             GenericSignatureBuilder::FloatingRequirementSource::forAbstract(),
+             originatingDC->getParentModule());
+    }
+    if (auto layout = constraints.getLayoutConstraint()) {
+      builder.addRequirement(Requirement(RequirementKind::Layout,
+                                         returnTypeParam, layout),
+             GenericSignatureBuilder::FloatingRequirementSource::forAbstract(),
+             originatingDC->getParentModule());
+    }
+  }
+  
+  auto interfaceSignature = std::move(builder)
+                                          .computeGenericSignature(SourceLoc());
+  
+  // Create the OpaqueTypeDecl for the result type.
+  // It has the same parent context and generic environment as the originating
+  // decl.
+  auto dc = originatingDecl->getDeclContext();
+  
+  auto originatingGenericContext = originatingDecl->getAsGenericContext();
+  GenericParamList *genericParams = originatingGenericContext
+    ? originatingGenericContext->getGenericParams()
+    : nullptr;
+
+  auto opaqueDecl = new (Context) OpaqueTypeDecl(originatingDecl,
+                                                 genericParams,
+                                                 dc,
+                                                 interfaceSignature,
+                                                 returnTypeParam);
+  opaqueDecl->copyFormalAccessFrom(originatingDecl);
+  if (auto originatingEnv = originatingDC->getGenericEnvironmentOfContext()) {
+    opaqueDecl->setGenericEnvironment(originatingEnv);
+  }
+
+  originatingDecl->setOpaqueResultTypeDecl(opaqueDecl);
+  
+  // The declared interface type is an opaque ArchetypeType.
+  SubstitutionMap subs;
+  if (outerGenericSignature) {
+    subs = outerGenericSignature->getIdentitySubstitutionMap();
+  }
+  auto opaqueTy = OpaqueTypeArchetypeType::get(opaqueDecl, subs);
+  auto metatype = MetatypeType::get(opaqueTy);
+  opaqueDecl->setInterfaceType(metatype);
+  return opaqueTy;
+}
 
 /// Check the signature of a generic function.
 static void checkGenericFuncSignature(TypeChecker &tc,
@@ -196,13 +321,26 @@ static void checkGenericFuncSignature(TypeChecker &tc,
 
   // If there is a declared result type, check that as well.
   if (auto fn = dyn_cast<FuncDecl>(func)) {
-    if (!fn->getBodyResultTypeLoc().isNull()) {
+    auto &resultTypeLoc = fn->getBodyResultTypeLoc();
+    if (!resultTypeLoc.isNull()) {
       // Check the result type of the function.
-      TypeResolutionOptions options(fn->hasDynamicSelf()
-          ? TypeResolverContext::DynamicSelfResult
-          : TypeResolverContext::FunctionResult);
+      // It is allowed to be an opaque result type. Create the decl and type
+      // for it if necessary.
+      if (auto opaqueType = dyn_cast_or_null<OpaqueReturnTypeRepr>(
+                                                 resultTypeLoc.getTypeRepr())) {
+        // We don't need to create the opaque type right away for structural
+        // checking.
+        if (resolution.getStage() != TypeResolutionStage::Structural) {
+          resultTypeLoc.setType(
+                    tc.getOrCreateOpaqueResultType(resolution, fn, opaqueType));
+        }
+      } else {
+        TypeResolutionOptions options(fn->hasDynamicSelf()
+            ? TypeResolverContext::DynamicSelfResult
+            : TypeResolverContext::FunctionResult);
 
-      tc.validateType(fn->getBodyResultTypeLoc(), resolution, options);
+        tc.validateType(resultTypeLoc, resolution, options);
+      }
 
       // Infer requirements from it.
       if (builder &&
@@ -498,7 +636,7 @@ computeGenericFuncSignature(TypeChecker &tc, AbstractFunctionDecl *func) {
 
   // The generic signature builder now has all of the requirements, although
   // there might still be errors that have not yet been diagnosed. Revert the
-  // generic function signature and type-check it again, completely.
+  // generic function signature and type-check the function again, completely.
   revertGenericFuncSignature(func);
 
   // Debugging of the generic signature.
@@ -555,9 +693,17 @@ static void checkGenericSubscriptSignature(TypeChecker &tc,
   }
 
   // Check the element type.
-  tc.validateType(subscript->getElementTypeLoc(), resolution,
-                  TypeResolverContext::FunctionResult);
-
+  // It's allowed to be an opaque return type.
+  if (auto opaqueReturn = dyn_cast<OpaqueReturnTypeRepr>(
+                               subscript->getElementTypeLoc().getTypeRepr())) {
+    auto opaqueTy = tc.getOrCreateOpaqueResultType(resolution, subscript,
+                                                   opaqueReturn);
+    subscript->getElementTypeLoc().setType(opaqueTy);
+  } else {
+    tc.validateType(subscript->getElementTypeLoc(), resolution,
+                    TypeResolverContext::FunctionResult);
+  }
+  
   // Infer requirements from it.
   if (builder) {
     auto source =

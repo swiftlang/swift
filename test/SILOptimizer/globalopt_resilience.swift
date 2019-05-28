@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -O -module-name=test -enable-resilience -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend  -O -module-name=test -enable-library-evolution -emit-sil -primary-file %s | %FileCheck %s
 
 // Check if GlobalOpt generates the optimal getter for a static property with a resilient type.
 // The (resilient) getter should just return the literal (and not lazily initialize a global variable).

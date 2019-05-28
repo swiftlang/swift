@@ -22,8 +22,10 @@
 #include "TypoCorrection.h"
 
 #include "swift/Strings.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -55,13 +57,16 @@ TypeResolution TypeResolution::forStructural(DeclContext *dc) {
   return TypeResolution(dc, TypeResolutionStage::Structural);
 }
 
-TypeResolution TypeResolution::forInterface(DeclContext *dc) {
-  return forInterface(dc, dc->getGenericSignatureOfContext());
+TypeResolution TypeResolution::forInterface(DeclContext *dc,
+                                            LazyResolver *resolver) {
+  return forInterface(dc, dc->getGenericSignatureOfContext(), resolver);
 }
 
 TypeResolution TypeResolution::forInterface(DeclContext *dc,
-                                            GenericSignature *genericSig) {
+                                            GenericSignature *genericSig,
+                                            LazyResolver *resolver) {
   TypeResolution result(dc, TypeResolutionStage::Interface);
+  result.Resolver = resolver;
   result.complete.genericSig = genericSig;
   result.complete.builder = nullptr;
   return result;
@@ -1057,10 +1062,25 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       NominalTypeDecl *nominal = nullptr;
       if ((nominalDC = dc->getInnermostTypeContext()) &&
           (nominal = nominalDC->getSelfNominalTypeDecl())) {
-        // Attempt to refer to 'Self' within a non-protocol nominal
-        // type. Fix this by replacing 'Self' with the nominal type name.
         assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
 
+        bool insideClass = nominalDC->getSelfClassDecl() != nullptr;
+        AbstractFunctionDecl *methodDecl = dc->getInnermostMethodContext();
+        bool declaringMethod = methodDecl &&
+          methodDecl->getDeclContext() == dc->getParentForLookup();
+        bool isPropertyOfClass = insideClass &&
+          options.is(TypeResolverContext::PatternBindingDecl);
+
+        if (((!insideClass || !declaringMethod) && !isPropertyOfClass &&
+             !options.is(TypeResolverContext::GenericRequirement)) ||
+            options.is(TypeResolverContext::ExplicitCastExpr)) {
+          Type SelfType = nominal->getSelfInterfaceType();
+          if (insideClass)
+            SelfType = DynamicSelfType::get(SelfType, ctx);
+          return resolution.mapTypeIntoContext(SelfType);
+        }
+
+        // Attempt to refer to 'Self' within a non-protocol nominal type.
         // Produce a Fix-It replacing 'Self' with the nominal type name.
         auto name = getDeclNameFromContext(dc, nominal);
         diags.diagnose(comp->getIdLoc(), diag::self_in_nominal, name)
@@ -1726,6 +1746,13 @@ bool TypeChecker::validateType(TypeLoc &Loc, TypeResolution resolution,
   }
 
   Loc.setType(type);
+  if (!type->hasError()) {
+    const DeclContext *DC = resolution.getDeclContext();
+    if (options.isAnyExpr() || DC->getParent()->isLocalContext())
+      if (DC->getResilienceExpansion() == ResilienceExpansion::Minimal)
+        diagnoseGenericTypeExportability(Loc, DC);
+  }
+
   return type->hasError();
 }
 
@@ -1818,6 +1845,10 @@ namespace {
     Type buildProtocolType(ProtocolTypeRepr *repr,
                            Type instanceType,
                            Optional<MetatypeRepresentation> storedRepr);
+    
+    Type resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
+                                 unsigned ordinal,
+                                 TypeResolutionOptions options);
   };
 } // end anonymous namespace
 
@@ -1920,6 +1951,24 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
 
   case TypeReprKind::Protocol:
     return resolveProtocolType(cast<ProtocolTypeRepr>(repr), options);
+      
+  case TypeReprKind::OpaqueReturn: {
+    // Only valid as the return type of a function, which should be handled
+    // during function decl type checking.
+    auto opaqueRepr = cast<OpaqueReturnTypeRepr>(repr);
+    if (!(options & TypeResolutionFlags::SilenceErrors)) {
+      diagnose(opaqueRepr->getOpaqueLoc(),
+               diag::unsupported_opaque_type);
+    }
+    
+    // Try to resolve the constraint upper bound type as a placeholder.
+    options |= TypeResolutionFlags::SilenceErrors;
+    auto constraintType = resolveType(opaqueRepr->getConstraint(),
+                                      options);
+    
+    return constraintType && !constraintType->hasError()
+      ? ErrorType::get(constraintType) : ErrorType::get(Context);
+  }
 
   case TypeReprKind::Fixed:
     return cast<FixedTypeRepr>(repr)->getType();
@@ -1964,6 +2013,12 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // The type we're working with, in case we want to build it differently
   // based on the attributes we see.
   Type ty;
+  
+  // If this is a reference to an opaque return type, resolve it.
+  if (auto &opaque = attrs.OpaqueReturnTypeOf) {
+    return resolveOpaqueReturnType(repr, opaque->mangledName, opaque->index,
+                                   options);
+  }
   
   // In SIL *only*, allow @thin, @thick, or @objc_metatype to apply to
   // a metatype.
@@ -2038,7 +2093,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
     if (attrs.has(attr)) {
-      diagnose(attrs.getLoc(attr), diag::attribute_not_supported);
+      diagnose(attrs.getLoc(attr), diag::unknown_attribute,
+               TypeAttributes::getAttrName(attr));
       attrs.clearAttribute(attr);
     }
   };
@@ -2046,7 +2102,12 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Some function representation attributes are not supported at source level;
   // only SIL knows how to handle them.  Reject them unless this is a SIL input.
   if (!(options & TypeResolutionFlags::SILType)) {
-    for (auto silOnlyAttr : {TAK_callee_owned, TAK_callee_guaranteed}) {
+    for (auto silOnlyAttr : {TAK_pseudogeneric,
+                             TAK_callee_owned,
+                             TAK_callee_guaranteed,
+                             TAK_noescape,
+                             TAK_yield_once,
+                             TAK_yield_many}) {
       checkUnsupportedAttr(silOnlyAttr);
     }
   }  
@@ -2166,7 +2227,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
 
       // Resolve the function type directly with these attributes.
-      FunctionType::ExtInfo extInfo(rep, attrs.has(TAK_noescape),
+      FunctionType::ExtInfo extInfo(rep, /*noescape=*/false,
                                     fnRepr->throws());
 
       ty = resolveASTFunctionType(fnRepr, options, extInfo);
@@ -2193,7 +2254,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   }
 
   // Handle @escaping
-  if (hasFunctionAttr && ty->is<FunctionType>()) {
+  if (ty->is<FunctionType>()) {
     if (attrs.has(TAK_escaping)) {
       // The attribute is meaningless except on non-variadic parameter types.
       if (!isParam || options.getBaseContext() == TypeResolverContext::EnumElementDecl) {
@@ -2218,9 +2279,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   if (hasFunctionAttr && !fnRepr) {
     if (attrs.has(TAK_autoclosure)) {
-      // @autoclosure usually auto-implies @noescape,
-      // don't complain about both of them.
-      attrs.clearAttribute(TAK_noescape);
       // @autoclosure is going to be diagnosed when type of
       // the parameter is validated, because that attribute
       // applies to the declaration now.
@@ -2377,6 +2435,43 @@ bool TypeResolver::resolveASTFunctionTypeParams(
   }
 
   return false;
+}
+
+Type TypeResolver::resolveOpaqueReturnType(TypeRepr *repr,
+                                           StringRef mangledName,
+                                           unsigned ordinal,
+                                           TypeResolutionOptions options) {
+  // The type repr should be a generic identifier type. We don't really use
+  // the identifier for anything, but we do resolve the generic arguments
+  // to instantiate the possibly-generic opaque type.
+  SmallVector<Type, 4> TypeArgs;
+  if (auto generic = dyn_cast<GenericIdentTypeRepr>(repr)) {
+    for (auto argRepr : generic->getGenericArgs()) {
+      auto argTy = resolveType(argRepr, options);
+      if (!argTy)
+        return Type();
+      TypeArgs.push_back(argTy);
+    }
+  }
+  
+  // Use type reconstruction to summon the opaque type decl.
+  Demangler demangle;
+  auto definingDeclNode = demangle.demangleSymbol(mangledName);
+  if (!definingDeclNode)
+    return Type();
+  if (definingDeclNode->getKind() == Node::Kind::Global)
+    definingDeclNode = definingDeclNode->getChild(0);
+  ASTBuilder builder(Context);
+  builder.Resolver = resolution.Resolver;
+  auto opaqueNode =
+    builder.getNodeFactory().createNode(Node::Kind::OpaqueReturnTypeOf);
+  opaqueNode->addChild(definingDeclNode, builder.getNodeFactory());
+  
+  auto ty = builder.resolveOpaqueType(opaqueNode, TypeArgs, ordinal);
+  if (!ty) {
+    diagnose(repr->getLoc(), diag::no_opaque_return_type_of);
+  }
+  return ty;
 }
 
 Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
@@ -3031,7 +3126,10 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
                                     TypeResolutionOptions options) {
   SmallVector<TupleTypeElt, 8> elements;
   elements.reserve(repr->getNumElements());
-  
+
+  llvm::SmallDenseSet<Identifier> seenEltNames;
+  seenEltNames.reserve(repr->getNumElements());
+
   auto elementOptions = options;
   if (!repr->isParenType()) {
     elementOptions = elementOptions.withoutContext(true);
@@ -3045,14 +3143,31 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     complained = true;
   }
 
+  bool hadError = false;
+  bool foundDupLabel = false;
   for (unsigned i = 0, end = repr->getNumElements(); i != end; ++i) {
     auto *tyR = repr->getElementType(i);
 
     Type ty = resolveType(tyR, elementOptions);
-    if (!ty || ty->hasError()) return ty;
+    if (!ty || ty->hasError())
+      hadError = true;
 
-    elements.emplace_back(ty, repr->getElementName(i), ParameterTypeFlags());
+    auto eltName = repr->getElementName(i);
+
+    elements.emplace_back(ty, eltName, ParameterTypeFlags());
+
+    if (eltName.empty())
+      continue;
+
+    if (seenEltNames.count(eltName) == 1) {
+      foundDupLabel = true;
+    }
+
+    seenEltNames.insert(eltName);
   }
+
+  if (hadError)
+    return ErrorType::get(Context);
 
   // Single-element labeled tuples are not permitted outside of declarations
   // or SIL, either.
@@ -3065,6 +3180,11 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     }
 
     elements[0] = TupleTypeElt(elements[0].getType());
+  }
+
+  // Tuples with duplicate element labels are not permitted
+  if (foundDupLabel) {
+    diagnose(repr->getLoc(), diag::tuple_duplicate_label);
   }
 
   return TupleType::get(elements, Context);
@@ -3317,6 +3437,10 @@ public:
       visit(compound->getComponentRange().back());
       return false;
     }
+    // Arbitrary protocol constraints are OK on opaque types.
+    if (isa<OpaqueReturnTypeRepr>(T))
+      return false;
+    
     visit(T);
     return true;
   }

@@ -348,7 +348,10 @@ public:
 enum class SymbolicReferenceKind : uint8_t {
   /// A symbolic reference to a context descriptor, representing the
   /// (unapplied generic) context.
-  Context,  
+  Context,
+  /// A symbolic reference to an accessor function, which can be executed in
+  /// the process to get a pointer to the referenced entity.
+  AccessorFunctionReference,
 };
 
 using SymbolicReferenceResolver_t = NodePointer (SymbolicReferenceKind,
@@ -559,6 +562,9 @@ protected:
   NodePointer demangleSymbolicReference(unsigned char rawKind,
                                         const void *at);
 
+  bool demangleBoundGenerics(Vector<NodePointer> &TypeListList,
+                             NodePointer &RetroactiveConformances);
+  
   void dump();
 
 public:

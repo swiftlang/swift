@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-sil -module-name OMEStripDeserializationInput %S/Inputs/ome_strip_deserialize_input.sil -emit-module -o %t/OMEStripDeserializationInput.swiftmodule
-// RUN: %target-sil-opt -enable-sil-ownership -non-transparent-func-ownership-model-eliminator -performance-linker -I %t %s | %FileCheck %s
-// RUN: %target-sil-opt -enable-sil-ownership -ownership-model-eliminator -performance-linker -I %t %s | %FileCheck --check-prefix=CHECK-STRIP-ALL %s
+// RUN: %target-sil-opt -verify-sil-ownership -non-transparent-func-ownership-model-eliminator -performance-linker -I %t %s | %FileCheck %s
+// RUN: %target-sil-opt -verify-sil-ownership -ownership-model-eliminator -performance-linker -I %t %s | %FileCheck --check-prefix=CHECK-STRIP-ALL %s
 
 sil_stage canonical
 

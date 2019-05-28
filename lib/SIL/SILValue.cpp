@@ -53,14 +53,14 @@ void ValueBase::replaceAllUsesWith(ValueBase *RHS) {
 }
 
 void ValueBase::replaceAllUsesWithUndef() {
-  SILModule *Mod = getModule();
-  if (!Mod) {
+  auto *F = getFunction();
+  if (!F) {
     llvm_unreachable("replaceAllUsesWithUndef can only be used on ValueBase "
-                     "that have access to the parent module.");
+                     "that have access to the parent function.");
   }
   while (!use_empty()) {
     Operand *Op = *use_begin();
-    Op->set(SILUndef::get(Op->get()->getType(), Mod));
+    Op->set(SILUndef::get(Op->get()->getType(), *F));
   }
 }
 
@@ -141,17 +141,18 @@ SILLocation SILValue::getLoc() const {
   return Value->getFunction()->getLocation();
 }
 
-
 //===----------------------------------------------------------------------===//
 //                             ValueOwnershipKind
 //===----------------------------------------------------------------------===//
 
-ValueOwnershipKind::ValueOwnershipKind(SILModule &M, SILType Type,
+ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
                                        SILArgumentConvention Convention)
     : Value() {
+  auto &M = F.getModule();
+
   // Trivial types can be passed using a variety of conventions. They always
   // have trivial ownership.
-  if (Type.isTrivial(M)) {
+  if (Type.isTrivial(F)) {
     Value = ValueOwnershipKind::Any;
     return;
   }
@@ -233,9 +234,9 @@ ValueOwnershipKind::ValueOwnershipKind(StringRef S) {
 }
 
 ValueOwnershipKind
-ValueOwnershipKind::getProjectedOwnershipKind(SILModule &M,
+ValueOwnershipKind::getProjectedOwnershipKind(const SILFunction &F,
                                               SILType Proj) const {
-  if (Proj.isTrivial(M))
+  if (Proj.isTrivial(F))
     return ValueOwnershipKind::Any;
   return *this;
 }
@@ -243,7 +244,8 @@ ValueOwnershipKind::getProjectedOwnershipKind(SILModule &M,
 #if 0
 /// Map a SILValue mnemonic name to its ValueKind.
 ValueKind swift::getSILValueKind(StringRef Name) {
-#define SINGLE_VALUE_INST(Id, TextualName, Parent, MemoryBehavior, ReleasingBehavior)       \
+#define SINGLE_VALUE_INST(Id, TextualName, Parent, MemoryBehavior,             \
+                          ReleasingBehavior)                                   \
   if (Name == #TextualName)                                                    \
     return ValueKind::Id;
 
@@ -264,7 +266,8 @@ ValueKind swift::getSILValueKind(StringRef Name) {
 /// Map ValueKind to a corresponding mnemonic name.
 StringRef swift::getSILValueName(ValueKind Kind) {
   switch (Kind) {
-#define SINGLE_VALUE_INST(Id, TextualName, Parent, MemoryBehavior, ReleasingBehavior)       \
+#define SINGLE_VALUE_INST(Id, TextualName, Parent, MemoryBehavior,             \
+                          ReleasingBehavior)                                   \
   case ValueKind::Id:                                                          \
     return #TextualName;
 

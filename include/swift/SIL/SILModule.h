@@ -221,7 +221,7 @@ private:
   llvm::DenseMap<Identifier, BuiltinInfo> BuiltinIDCache;
 
   /// This is the set of undef values we've created, for uniquing purposes.
-  llvm::DenseMap<SILType, SILUndef *> UndefValues;
+  llvm::DenseMap<std::pair<SILType, unsigned>, SILUndef *> UndefValues;
 
   /// The stage of processing this module is at.
   SILStage Stage;
@@ -266,15 +266,15 @@ private:
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
 
-  /// Method which returns the SerializedSILLoader, creating the loader if it
-  /// has not been created yet.
-  SerializedSILLoader *getSILLoader();
-
   /// Folding set for key path patterns.
   llvm::FoldingSet<KeyPathPattern> KeyPathPatterns;
 
 public:
   ~SILModule();
+
+  /// Method which returns the SerializedSILLoader, creating the loader if it
+  /// has not been created yet.
+  SerializedSILLoader *getSILLoader();
 
   /// Add a callback for each newly deserialized SIL function body.
   void registerDeserializationNotificationHandler(

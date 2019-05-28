@@ -5,16 +5,12 @@ include(AddSwift)
 # with the variant SDK and ARCH.
 #
 # See add_swift_executable for detailed documentation.
-#
-# Additional parameters:
-#   [LINK_FAT_LIBRARIES lipo_target1 ...]
-#     Fat libraries to link with.
 function(add_swift_target_executable name)
   # Parse the arguments we were given.
   cmake_parse_arguments(SWIFTEXE_TARGET
     "EXCLUDE_FROM_ALL;;BUILD_WITH_STDLIB"
     ""
-    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_FAT_LIBRARIES"
+    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES"
     ${ARGN})
 
   set(SWIFTEXE_TARGET_SOURCES ${SWIFTEXE_TARGET_UNPARSED_ARGUMENTS})
@@ -24,12 +20,12 @@ function(add_swift_target_executable name)
       SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG)
 
   # All Swift executables depend on the standard library.
-  list(APPEND SWIFTEXE_TARGET_LINK_FAT_LIBRARIES swiftCore)
+  list(APPEND SWIFTEXE_TARGET_LINK_LIBRARIES swiftCore)
   # All Swift executables depend on the swiftSwiftOnoneSupport library.
   list(APPEND SWIFTEXE_TARGET_DEPENDS swiftSwiftOnoneSupport)
 
   if(NOT "${SWIFT_BUILD_STDLIB}")
-    list(REMOVE_ITEM SWIFTEXE_TARGET_LINK_FAT_LIBRARIES
+    list(REMOVE_ITEM SWIFTEXE_TARGET_LINK_LIBRARIES
         swiftCore)
   endif()
 
@@ -63,7 +59,7 @@ function(add_swift_target_executable name)
           LLVM_COMPONENT_DEPENDS ${SWIFTEXE_TARGET_LLVM_COMPONENT_DEPENDS}
           SDK "${sdk}"
           ARCHITECTURE "${arch}"
-          LINK_FAT_LIBRARIES ${SWIFTEXE_TARGET_LINK_FAT_LIBRARIES}
+          LINK_LIBRARIES ${SWIFTEXE_TARGET_LINK_LIBRARIES}
           ${SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG_CURRENT})
 
       if(${sdk} IN_LIST SWIFT_APPLE_PLATFORMS)

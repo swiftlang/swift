@@ -216,6 +216,14 @@ namespace swift {
   /// emitted.
   void performWholeModuleTypeChecking(SourceFile &SF);
 
+  /// Checks to see if any of the imports in \p M use `@_implementationOnly` in
+  /// one file and not in another.
+  ///
+  /// Like redeclaration checking, but for imports. This isn't part of
+  /// swift::performWholeModuleTypeChecking because it's linear in the number
+  /// of declarations in the module.
+  void checkInconsistentImplementationOnlyImports(ModuleDecl *M);
+
   /// Incrementally type-check only added external definitions.
   void typeCheckExternalDefinitions(SourceFile &SF);
 
@@ -263,6 +271,18 @@ namespace swift {
   /// Serializes a module or single source file to the given output file.
   void serialize(ModuleOrSourceFile DC, const SerializationOptions &options,
                  const SILModule *M = nullptr);
+
+  /// Serializes a module or single source file to the given output file and
+  /// returns back the file's contents as a memory buffer.
+  ///
+  /// Use this if you intend to immediately load the serialized module, as that
+  /// will both avoid extra filesystem traffic and will ensure you read back
+  /// exactly what was written.
+  void serializeToBuffers(ModuleOrSourceFile DC,
+                          const SerializationOptions &opts,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+                          const SILModule *M = nullptr);
 
   /// Get the CPU, subtarget feature options, and triple to use when emitting code.
   std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>,

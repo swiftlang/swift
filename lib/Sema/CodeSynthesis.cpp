@@ -184,10 +184,8 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
   auto *getterParams = buildIndexForwardingParamList(storage, {}, ctx);
 
   SourceLoc staticLoc;
-  if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (var->isStatic())
-      staticLoc = var->getLoc();
-  }
+  if (storage->isStatic())
+    staticLoc = storage->getLoc();
 
   auto storageInterfaceType = storage->getValueInterfaceType();
 
@@ -322,7 +320,7 @@ static void maybeMarkTransparent(AccessorDecl *accessor, ASTContext &ctx) {
   // Accessors for classes with @objc ancestry are not @_transparent,
   // since they use a field offset variable which is not exported.
   if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
-    if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC)
+    if (classDecl->checkAncestry(AncestryFlags::ObjC))
       return;
 
   // Accessors synthesized on-demand are never transaprent.
@@ -1643,6 +1641,71 @@ void synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   llvm_unreachable("bad synthesized function kind");
 }
 
+static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
+                    SmallVectorImpl<DefaultArgumentInitializer *> &defaultInits,
+                                         unsigned paramSize, ASTContext &ctx) {
+  // First and foremost, if this is a constant don't bother.
+  if (var->isLet())
+    return;
+
+  // We can only provide default values for patterns binding a single variable.
+  // i.e. var (a, b) = getSomeTuple() is not allowed.
+  if (!var->getParentPattern()->getSingleVar())
+    return;
+
+  // If we don't have an expression initializer or silgen can't assign a default
+  // initializer, then we can't generate a default value. An example of where
+  // silgen can assign a default is var x: Int? where the default is nil.
+  // If the variable is lazy, go ahead and give it a default value.
+  if (!var->getAttrs().hasAttribute<LazyAttr>() &&
+      !var->getParentPatternBinding()->isDefaultInitializable())
+    return;
+
+  // We can add a default value now.
+
+  // Give this some bogus context right now, we'll fix it after making
+  // the constructor.
+  auto *initDC = new (ctx) DefaultArgumentInitializer(
+    arg->getDeclContext(), paramSize);
+
+  defaultInits.push_back(initDC);
+
+  // If the variable has a type T? and no initial value, return a nil literal
+  // default arg. All lazy variables return a nil literal as well. *Note* that
+  // the type will always be a sugared T? because we don't default init an
+  // explicit Optional<T>.
+  if ((isa<OptionalType>(var->getValueInterfaceType().getPointer()) &&
+      !var->getParentInitializer()) ||
+      var->getAttrs().hasAttribute<LazyAttr>()) {
+    arg->setDefaultArgumentKind(DefaultArgumentKind::NilLiteral);
+    return;
+  }
+
+  // Set the default value to the variable. When we emit this in silgen
+  // we're going to call the variable's initializer expression.
+  arg->setStoredProperty(var);
+  arg->setDefaultArgumentKind(DefaultArgumentKind::StoredProperty);
+}
+
+bool swift::isMemberwiseInitialized(VarDecl *var) {
+  // Implicit, computed, and static properties are not initialized.
+  // The exception is lazy properties, which due to batch mode we may or
+  // may not have yet finalized, so they may currently be "stored" or
+  // "computed" in the current AST state.
+  if (var->isImplicit() || var->isStatic())
+    return false;
+
+  if (!var->hasStorage() && !var->getAttrs().hasAttribute<LazyAttr>())
+    return false;
+
+  // Initialized 'let' properties have storage, but don't get an argument
+  // to the memberwise initializer since they already have an initial
+  // value that cannot be overridden.
+  if (var->isLet() && var->getParentInitializer())
+    return false;
+
+  return true;
+}
 /// Create an implicit struct or class constructor.
 ///
 /// \param decl The struct or class for which a constructor will be created.
@@ -1655,12 +1718,13 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
                                                   ImplicitConstructorKind ICK) {
   assert(!decl->hasClangNode());
 
-  ASTContext &context = tc.Context;
+  ASTContext &ctx = tc.Context;
   SourceLoc Loc = decl->getLoc();
   auto accessLevel = AccessLevel::Internal;
 
   // Determine the parameter type of the implicit constructor.
   SmallVector<ParamDecl*, 8> params;
+  SmallVector<DefaultArgumentInitializer *, 8> defaultInits;
   if (ICK == ImplicitConstructorKind::Memberwise) {
     assert(isa<StructDecl>(decl) && "Only struct have memberwise constructor");
 
@@ -1668,23 +1732,10 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       auto var = dyn_cast<VarDecl>(member);
       if (!var)
         continue;
-      
-      // Implicit, computed, and static properties are not initialized.
-      // The exception is lazy properties, which due to batch mode we may or
-      // may not have yet finalized, so they may currently be "stored" or
-      // "computed" in the current AST state.
-      if (var->isImplicit() || var->isStatic())
+
+      if (!isMemberwiseInitialized(var))
         continue;
 
-      if (!var->hasStorage() && !var->getAttrs().hasAttribute<LazyAttr>())
-        continue;
-
-      // Initialized 'let' properties have storage, but don't get an argument
-      // to the memberwise initializer since they already have an initial
-      // value that cannot be overridden.
-      if (var->isLet() && var->getParentInitializer())
-        continue;
-      
       accessLevel = std::min(accessLevel, var->getFormalAccess());
 
       tc.validateDecl(var);
@@ -1693,45 +1744,53 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       // If var is a lazy property, its value is provided for the underlying
       // storage.  We thus take an optional of the properties type.  We only
       // need to do this because the implicit constructor is added before all
-      // the properties are type checked.  Perhaps init() synth should be moved
+      // the properties are type checked. Perhaps init() synth should be moved
       // later.
       if (var->getAttrs().hasAttribute<LazyAttr>())
         varInterfaceType = OptionalType::get(varInterfaceType);
 
       // Create the parameter.
-      auto *arg = new (context)
+      auto *arg = new (ctx)
           ParamDecl(VarDecl::Specifier::Default, SourceLoc(), Loc,
                     var->getName(), Loc, var->getName(), decl);
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();
       
+      maybeAddMemberwiseDefaultArg(arg, var, defaultInits, params.size(), ctx);
+      
       params.push_back(arg);
     }
   }
 
-  auto paramList = ParameterList::create(context, params);
+  auto paramList = ParameterList::create(ctx, params);
   
   // Create the constructor.
-  DeclName name(context, DeclBaseName::createConstructor(), paramList);
+  DeclName name(ctx, DeclBaseName::createConstructor(), paramList);
   auto *ctor =
-    new (context) ConstructorDecl(name, Loc,
-                                  OTK_None, /*FailabilityLoc=*/SourceLoc(),
-                                  /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                                  paramList, /*GenericParams=*/nullptr, decl);
+    new (ctx) ConstructorDecl(name, Loc,
+                              OTK_None, /*FailabilityLoc=*/SourceLoc(),
+                              /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                              paramList, /*GenericParams=*/nullptr, decl);
 
   // Mark implicit.
   ctor->setImplicit();
   ctor->setAccess(accessLevel);
 
-  if (ICK == ImplicitConstructorKind::Memberwise)
+  if (ICK == ImplicitConstructorKind::Memberwise) {
     ctor->setIsMemberwiseInitializer();
+
+    // Fix default argument init contexts now that we have a constructor.
+    for (auto initDC : defaultInits) {
+      initDC->changeFunction(ctor, paramList);
+    }
+  }
 
   // If we are defining a default initializer for a class that has a superclass,
   // it overrides the default initializer of its superclass. Add an implicit
   // 'override' attribute.
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
     if (classDecl->getSuperclass())
-      ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*IsImplicit=*/true));
+      ctor->getAttrs().add(new (ctx) OverrideAttr(/*IsImplicit=*/true));
   }
 
   return ctor;
