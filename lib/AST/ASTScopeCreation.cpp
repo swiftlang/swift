@@ -69,6 +69,10 @@ class DeferredNodes final {
 #endif
 
 public:
+  /// \param file is the .cpp file where this object is created in the compiler
+  /// \paran line is the  line in the compiler where created
+  /// \param creator is the scope object for which it is created
+  /// \param forWhat is typically a Decl for which it is created
   DeferredNodes(const char *file, int line, const ASTScopeImpl &creator,
                 const void *forWhat);
   ~DeferredNodes();
@@ -142,51 +146,58 @@ public:
   // Even ignored Decls and Stmts must extend the source range of a scope:
   // E.g. a braceStmt with some definitions that ends in a statement that
   // accesses such a definition must resolve as being IN the scope.
-  // clang-format off
-                          
-  void visitImportDecl(                       ImportDecl *d, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(d); }
-  void visitEnumCaseDecl(                   EnumCaseDecl *d, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(d); }
-  void visitPrecedenceGroupDecl(     PrecedenceGroupDecl *d, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(d); }
-  void visitInfixOperatorDecl(         InfixOperatorDecl *d, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(d); }
-  void visitPrefixOperatorDecl(       PrefixOperatorDecl *d, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(d); }
-  void visitPostfixOperatorDecl(     PostfixOperatorDecl *d, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(d); }
-  void visitGenericTypeParamDecl(   GenericTypeParamDecl *d, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(d); }
-  void visitAssociatedTypeDecl(       AssociatedTypeDecl *d, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(d); }
-  void visitModuleDecl(                       ModuleDecl *d, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(d); }
-  void visitParamDecl(                         ParamDecl *d, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(d); }
-  void visitEnumElementDecl(             EnumElementDecl *d, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(d); }
-  void visitIfConfigDecl(                   IfConfigDecl *d, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(d); }
-  void visitPoundDiagnosticDecl(     PoundDiagnosticDecl *d, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(d); }
-  void visitMissingMemberDecl(         MissingMemberDecl *d, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(d); }
+
+#define VISIT_AND_IGNORE(What)                                                 \
+  void visit##What(What *w, ASTScopeImpl *p, DeferredNodes &) {                \
+    p->widenSourceRangeForIgnoredASTNode(w);                                   \
+  }
+
+  VISIT_AND_IGNORE(ImportDecl)
+  VISIT_AND_IGNORE(EnumCaseDecl)
+  VISIT_AND_IGNORE(PrecedenceGroupDecl)
+  VISIT_AND_IGNORE(InfixOperatorDecl)
+  VISIT_AND_IGNORE(PrefixOperatorDecl)
+  VISIT_AND_IGNORE(PostfixOperatorDecl)
+  VISIT_AND_IGNORE(GenericTypeParamDecl)
+  VISIT_AND_IGNORE(AssociatedTypeDecl)
+  VISIT_AND_IGNORE(ModuleDecl)
+  VISIT_AND_IGNORE(ParamDecl)
+  VISIT_AND_IGNORE(EnumElementDecl)
+  VISIT_AND_IGNORE(IfConfigDecl)
+  VISIT_AND_IGNORE(PoundDiagnosticDecl)
+  VISIT_AND_IGNORE(MissingMemberDecl)
 
   // This declaration is handled from the PatternBindingDecl
-  void visitVarDecl(                VarDecl *d, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(d); }
-                          
-  // This declaration is handled from addChildrenForAllExplicitAccessors
-  void visitAccessorDecl(      AccessorDecl *d, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(d); }
-                          
- void visitBreakStmt(             BreakStmt *s, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(s); }
- void visitContinueStmt(       ContinueStmt *s, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(s); }
- void visitFallthroughStmt( FallthroughStmt *s, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(s); }
- void visitFailStmt(               FailStmt *s, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(s); }
- void visitThrowStmt(             ThrowStmt *s, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(s); }
- void visitPoundAssertStmt( PoundAssertStmt *s, ASTScopeImpl *p, DeferredNodes&) { p->widenSourceRangeForIgnoredASTNode(s); }
+  VISIT_AND_IGNORE(VarDecl)
 
-    // clang-format on
-                          
+  // This declaration is handled from addChildrenForAllExplicitAccessors
+  VISIT_AND_IGNORE(AccessorDecl)
+
+  VISIT_AND_IGNORE(BreakStmt)
+  VISIT_AND_IGNORE(ContinueStmt)
+  VISIT_AND_IGNORE(FallthroughStmt)
+  VISIT_AND_IGNORE(FailStmt)
+  VISIT_AND_IGNORE(ThrowStmt)
+  VISIT_AND_IGNORE(PoundAssertStmt)
+
+#undef VISIT_AND_IGNORE
 
 #pragma mark simple creation ignoring deferred nodes
-// clang-format off
-  void visitSubscriptDecl(SubscriptDecl *e, ASTScopeImpl *p, DeferredNodes &) { p->createSubtree<SubscriptDeclScope>(e); }
 
-  void visitIfStmt(                   IfStmt *e, ASTScopeImpl *p, DeferredNodes &) { p->createSubtree<     IfStmtScope>(e); }
-  void visitRepeatWhileStmt( RepeatWhileStmt *e, ASTScopeImpl *p, DeferredNodes &) { p->createSubtree<RepeatWhileScope>(e); }
-  void visitDoCatchStmt(         DoCatchStmt *e, ASTScopeImpl *p, DeferredNodes &) { p->createSubtree<DoCatchStmtScope>(e); }
-  void visitSwitchStmt(           SwitchStmt *e, ASTScopeImpl *p, DeferredNodes &) { p->createSubtree< SwitchStmtScope>(e); }
-  void visitForEachStmt(         ForEachStmt *e, ASTScopeImpl *p, DeferredNodes &) { p->createSubtree<ForEachStmtScope>(e); }
-  void visitCatchStmt(             CatchStmt *e, ASTScopeImpl *p, DeferredNodes &) { p->createSubtree<  CatchStmtScope>(e); }
-  void visitCaseStmt(               CaseStmt *e, ASTScopeImpl *p, DeferredNodes &) { p->createSubtree<   CaseStmtScope>(e); }
-  // clang-format on
+#define VISIT_AND_CREATE(What, ScopeClass)                                     \
+  void visit##What(What *w, ASTScopeImpl *p, DeferredNodes &) {                \
+    p->createSubtree<ScopeClass>(w);                                           \
+  }
+
+  VISIT_AND_CREATE(SubscriptDecl, SubscriptDeclScope)
+  VISIT_AND_CREATE(IfStmt, IfStmtScope)
+  VISIT_AND_CREATE(RepeatWhileStmt, RepeatWhileScope)
+  VISIT_AND_CREATE(DoCatchStmt, DoCatchStmtScope)
+  VISIT_AND_CREATE(SwitchStmt, SwitchStmtScope)
+  VISIT_AND_CREATE(ForEachStmt, ForEachStmtScope)
+  VISIT_AND_CREATE(CatchStmt, CatchStmtScope)
+  VISIT_AND_CREATE(CaseStmt, CaseStmtScope)
+
   // Why don't AbstractFunctionDeclScopes inherit DeferredNodes and thereby
   // create a subscope in which they are visible?
   // Consider:
@@ -195,32 +206,25 @@ public:
   // So, instead of subscopes, we put the AbstractFunctionDeclScope's for
   // g and h in the same BraceStmtScope and get the local binding mechanism find
   // them.
-  void visitAbstractFunctionDecl(AbstractFunctionDecl *d, ASTScopeImpl *p,
-                                 DeferredNodes &) {
-    p->createSubtree<AbstractFunctionDeclScope>(d);
-  }
+  VISIT_AND_CREATE(AbstractFunctionDecl, AbstractFunctionDeclScope)
+
+#undef VISIT_AND_CREATE
 
 #pragma mark 2D simple creation (ignoring deferred nodes)
 
-  void visitExtensionDecl(ExtensionDecl *e, ASTScopeImpl *p, DeferredNodes &) {
-    p->createSubtree2D<ExtensionScope, GTXWholePortion>(e);
+#define VISIT_AND_CREATE_WHOLE_PORTION(What, WhatScope)                        \
+  void visit##What(What *w, ASTScopeImpl *p, DeferredNodes &) {                \
+    p->createSubtree2D<WhatScope, GTXWholePortion>(w);                         \
   }
-  void visitStructDecl(StructDecl *e, ASTScopeImpl *p, DeferredNodes &) {
-    p->createSubtree2D<NominalTypeScope, GTXWholePortion>(e);
-  }
-  void visitClassDecl(ClassDecl *e, ASTScopeImpl *p, DeferredNodes &) {
-    p->createSubtree2D<NominalTypeScope, GTXWholePortion>(e);
-  }
-  void visitEnumDecl(EnumDecl *e, ASTScopeImpl *p, DeferredNodes &) {
-    p->createSubtree2D<NominalTypeScope, GTXWholePortion>(e);
-  }
-  void visitTypeAliasDecl(TypeAliasDecl *e, ASTScopeImpl *p, DeferredNodes &) {
-    p->createSubtree2D<TypeAliasScope, GTXWholePortion>(e);
-  }
-  void visitOpaqueTypeDecl(OpaqueTypeDecl *e, ASTScopeImpl *p,
-                           DeferredNodes &) {
-    p->createSubtree2D<OpaqueTypeScope, GTXWholePortion>(e);
-  }
+
+  VISIT_AND_CREATE_WHOLE_PORTION(ExtensionDecl, ExtensionScope)
+  VISIT_AND_CREATE_WHOLE_PORTION(StructDecl, NominalTypeScope)
+  VISIT_AND_CREATE_WHOLE_PORTION(ClassDecl, NominalTypeScope)
+  VISIT_AND_CREATE_WHOLE_PORTION(EnumDecl, NominalTypeScope)
+  VISIT_AND_CREATE_WHOLE_PORTION(TypeAliasDecl, TypeAliasScope)
+  VISIT_AND_CREATE_WHOLE_PORTION(OpaqueTypeDecl, OpaqueTypeScope)
+#undef VISIT_AND_CREATE_WHOLE_PORTION
+
   void visitProtocolDecl(ProtocolDecl *e, ASTScopeImpl *p, DeferredNodes &) {
     e->createGenericParamsIfMissing();
     p->createSubtree2D<NominalTypeScope, GTXWholePortion>(e);
@@ -329,6 +333,7 @@ void ASTScopeImpl::dispatchAndCreateIfNeeded(StmtExpr *se,
   if (se)
     ScopeCreator().visit(se, this, deferred);
 }
+
 void ASTScopeImpl::dispatchAndCreateIfNeeded(Decl *d, DeferredNodes &deferred) {
   // Implicit declarations don't have source information for name lookup.
 
@@ -534,11 +539,11 @@ void ConditionalClauseScope::expandMe(DeferredNodes &deferred) {
 
 void IfStmtScope::expandMe(DeferredNodes &deferred) {
   // The first conditional clause or, failing that, the 'then' clause.
-  if (!stmt->getCond().empty()) {
+  if (!stmt->getCond().empty())
     createSubtree<IfConditionalClauseScope>(stmt, 0);
-  } else {
+  else
     dispatchAndCreateIfNeeded(stmt->getThenStmt(), deferred);
-  }
+
   // Add the 'else' branch, if needed.
   dispatchAndCreateIfNeeded(stmt->getElseStmt(), deferred);
 }
@@ -551,9 +556,8 @@ void RepeatWhileScope::expandMe(DeferredNodes &deferred) {
 void DoCatchStmtScope::expandMe(DeferredNodes &deferred) {
   dispatchAndCreateIfNeeded(stmt->getBody(), deferred);
 
-  for (auto catchClause : stmt->getCatches()) {
+  for (auto catchClause : stmt->getCatches())
     ScopeCreator().visitCatchStmt(catchClause, this, deferred);
-  }
 }
 
 void SwitchStmtScope::expandMe(DeferredNodes &deferred) {
@@ -624,7 +628,6 @@ void WholeClosureScope::expandMe(DeferredNodes &) {
     createSubtree<ClosureParametersScope>(captureList, closureExpr);
   createSubtree<ClosureBodyScope>(captureList, closureExpr);
 }
-
 
 void CaptureListScope::expandMe(DeferredNodes &) {
   // Patterns here are implicit, so need to dig out the intializers
@@ -1016,9 +1019,8 @@ void DeferredNodes::setLastAdopter(ASTScopeImpl *s) {
   // we'll always want to add scopes to the deepest adopter.
   if (lastAdopter == s)
     return; // optimization
-  if (!lastAdopter || lastAdopter.get()->depth() <= s->depth()) {
+  if (!lastAdopter || lastAdopter.get()->depth() <= s->depth())
     lastAdopter = s;
-  }
 }
 
 bool DeferredNodes::empty() const { return nodesInReverse.empty(); }

@@ -124,12 +124,10 @@ SourceManager &ASTScopeImpl::getSourceManager() const {
 #pragma mark getASTContext
 
 ASTContext &ASTScopeImpl::getASTContext() const {
-  if (auto d = getDecl()) {
+  if (auto d = getDecl())
     return d.get()->getASTContext();
-  }
-  if (auto dc = getDeclContext()) {
+  if (auto dc = getDeclContext())
     return dc.get()->getASTContext();
-  }
   return getParent().get()->getASTContext();
 }
 

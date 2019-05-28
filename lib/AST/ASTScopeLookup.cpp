@@ -54,9 +54,9 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
   // At present, use legacy code in unqualifiedLookup.cpp to handle module-level
   // lookups
   // TODO: implement module scope someday
-  if (startingContext->getContextKind() == DeclContextKind::Module) {
+  if (startingContext->getContextKind() == DeclContextKind::Module)
     return nullptr;
-  }
+
   auto *const fileScope = sourceFile->getScope()->impl;
   // Parser may have added decls to source file, since previous lookup
   fileScope->addAnyNewDeclsToTree();
@@ -608,16 +608,19 @@ Optional<bool> PatternEntryInitializerScope::resolveIsCascadingUseForThisScope(
   auto *const initContext = getPatternEntry().getInitContext();
   auto *PBI = cast_or_null<PatternBindingInitializer>(initContext);
   auto *isd = PBI ? PBI->getImplicitSelfDecl() : nullptr;
+
   // 'self' is available within the pattern initializer of a 'lazy' variable.
   if (isd)
     return ifUnknownIsCascadingUseAccordingTo(isCascadingUse, PBI);
+
   // initializing stored property of a type
   auto *const patternDeclContext = decl->getDeclContext();
-  if (patternDeclContext->isTypeContext()) {
+  if (patternDeclContext->isTypeContext())
     return isCascadingUseAccordingTo(PBI->getParent());
-  }
+
   // initializing global or local
   if (PBI)
     return ifUnknownIsCascadingUseAccordingTo(isCascadingUse, PBI);
+
   return isCascadingUse;
 }
