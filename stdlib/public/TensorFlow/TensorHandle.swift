@@ -161,6 +161,7 @@ public extension ShapedArray where Scalar : _TensorFlowDataTypeCompatible {
 /// `ResourceHandle` is the type used by ops to represent TensorFlow "resource" 
 /// values.
 public struct ResourceHandle {
+  @usableFromInline
   let handle: _AnyTensorHandle
 
   @inlinable
@@ -175,6 +176,7 @@ public struct ResourceHandle {
 /// `VariantHandle` is the type used by ops to represent TensorFlow "variant"
 /// values.
 public struct VariantHandle {
+  @usableFromInline
   let handle: _AnyTensorHandle
   
   @inlinable
