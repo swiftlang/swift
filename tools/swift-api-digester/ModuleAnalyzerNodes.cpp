@@ -385,7 +385,15 @@ StringRef SDKNodeDecl::getScreenInfo() const {
     OS << "(" << HeaderName << ")";
   if (!OS.str().empty())
     OS << ": ";
-  OS << getDeclKind() << " " << getFullyQualifiedName();
+  bool IsExtension = false;
+  if (auto *TD = dyn_cast<SDKNodeDeclType>(this)) {
+    IsExtension = TD->isExternal();
+  }
+  if (IsExtension)
+    OS << "Extension";
+  else
+    OS << getDeclKind();
+  OS << " " << getFullyQualifiedName();
   return Ctx.buffer(OS.str());
 }
 
