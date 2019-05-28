@@ -25,8 +25,8 @@
 ///   does not get to see the symbols in the class or its ancestors.
 ///
 //===----------------------------------------------------------------------===//
-#ifndef SWIFT_AST_AST_OO_SCOPE_H
-#define SWIFT_AST_AST_OO_SCOPE_H
+#ifndef SWIFT_AST_AST_SCOPE_H
+#define SWIFT_AST_AST_SCOPE_H
 
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/NameLookup.h" // for DeclVisibilityKind
@@ -538,6 +538,7 @@ protected:
     getLookupLimitFor(const GTXScope *) const override;
 };
 
+/// GTX = GenericType or Extension
 class GTXWhereOrBodyPortion : public Portion {
 public:
   GTXWhereOrBodyPortion(const char *n) : Portion(n) {}
@@ -550,7 +551,7 @@ public:
 };
 
 /// Behavior specific to representing the trailing where clause of a
-/// NominalTypeDecl or ExtensionDecl scope.
+/// GenericTypeDecl or ExtensionDecl scope.
 class GTXWherePortion : public GTXWhereOrBodyPortion {
 public:
   GTXWherePortion() : GTXWhereOrBodyPortion("Where") {}
@@ -1404,4 +1405,4 @@ protected:
 } // namespace ast_scope
 } // namespace swift
 
-#endif // SWIFT_AST_AST_OO_SCOPE_H
+#endif // SWIFT_AST_AST_SCOPE_H
