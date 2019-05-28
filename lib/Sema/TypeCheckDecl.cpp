@@ -19,6 +19,7 @@
 #include "DerivedConformances.h"
 #include "TypeChecker.h"
 #include "TypeCheckAccess.h"
+#include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/AccessScope.h"
@@ -2738,6 +2739,8 @@ public:
       checkEnumRawValues(TC, ED);
     }
 
+    checkExplicitAvailability(ED);
+
     TC.checkDeclCircularity(ED);
     TC.ConformanceContexts.push_back(ED);
   }
@@ -2760,6 +2763,8 @@ public:
     checkInheritanceClause(SD);
 
     checkAccessControl(TC, SD);
+
+    checkExplicitAvailability(SD);
 
     TC.checkDeclCircularity(SD);
     TC.ConformanceContexts.push_back(SD);
@@ -2983,6 +2988,8 @@ public:
 
     checkAccessControl(TC, CD);
 
+    checkExplicitAvailability(CD);
+
     TC.checkDeclCircularity(CD);
     TC.ConformanceContexts.push_back(CD);
   }
@@ -3057,6 +3064,8 @@ public:
 
     // Explicity compute the requirement signature to detect errors.
     (void) PD->getRequirementSignature();
+
+    checkExplicitAvailability(PD);
   }
 
   void visitVarDecl(VarDecl *VD) {
@@ -3140,6 +3149,8 @@ public:
     }
 
     TC.checkParameterAttributes(FD->getParameters());
+
+    checkExplicitAvailability(FD);
   }
 
   void visitModuleDecl(ModuleDecl *) { }
@@ -3206,6 +3217,8 @@ public:
       TC.checkDeclAttributes(ED);
 
     checkAccessControl(TC, ED);
+
+    checkExplicitAvailability(ED);
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
