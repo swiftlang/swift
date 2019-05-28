@@ -714,9 +714,8 @@ TypeAliasScope::createTrailingWhereClauseScope(ASTScopeImpl *parent) {
 #pragma mark misc
 
 void ASTScopeImpl::forEachClosureIn(
-    Expr *expr,
-    function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
-        foundClosure) {
+    Expr *expr, function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
+                    foundClosure) {
   assert(expr);
 
   /// AST walker that finds top-level closures in an expression.
@@ -760,9 +759,8 @@ void ASTScopeImpl::forEachClosureIn(
 }
 
 void ASTScopeImpl::forEachUniqueClosureIn(
-    Expr *expr,
-    function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
-        foundUniqueClosure) {
+    Expr *expr, function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
+                    foundUniqueClosure) {
   auto &alreadyHandledClosures = getAlreadyHandledClosures();
   forEachClosureIn(expr, [&](NullablePtr<CaptureListExpr> captureList,
                              ClosureExpr *closureExpr) {

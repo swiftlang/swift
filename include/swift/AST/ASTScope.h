@@ -316,8 +316,9 @@ protected:
       Expr *expr,
       function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>);
 
-  static void forEachSpecializeAttrInSourceOrder(
-      Decl *, function_ref<void(SpecializeAttr *)> fn);
+  static void
+  forEachSpecializeAttrInSourceOrder(Decl *,
+                                     function_ref<void(SpecializeAttr *)> fn);
 
   virtual llvm::DenseSet<ClosureExpr *> &getAlreadyHandledClosures();
 
@@ -446,8 +447,8 @@ protected:
   /// looking into the struct.
   virtual NullablePtr<const ASTScopeImpl> getLookupLimit() const;
 
-  NullablePtr<const ASTScopeImpl> ancestorWithDeclSatisfying(
-      function_ref<bool(const Decl *)> predicate) const;
+  NullablePtr<const ASTScopeImpl>
+  ancestorWithDeclSatisfying(function_ref<bool(const Decl *)> predicate) const;
 
 #pragma mark - general queries
 protected:
