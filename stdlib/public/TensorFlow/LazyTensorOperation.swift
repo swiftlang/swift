@@ -139,6 +139,7 @@ public class LazyTensorOperation : TensorOperation {
   var inputs: [Input]
   var attrs: [String: Attribute]
   var outputs: [TFETensorHandle]?
+  var alias: String?
 
   static public var materializationCallback: (String) -> () = {
     (s: String) in return }
@@ -156,6 +157,7 @@ public class LazyTensorOperation : TensorOperation {
     self.attrs = [:]
     self.outputCount = outputCount
     self.outputs = nil
+    self.alias = nil
     LazyTensorOperation.liveOperations += 1
   }
 
@@ -517,13 +519,75 @@ extension LazyTensorOperation : TFTensorOperation {
   }
 }
 
+
+extension LazyTensorOperation.Attribute : CustomStringConvertible {
+  public var description: String {
+    switch self {
+    case .BoolValue(let v): return "\(v)"
+    case .IntValue(let v): return "Int(\(v))"
+    case .FloatValue(let v): return "Float(\(v))"
+    case .DoubleValue(let v): return "Double(\(v))"
+    case .StringValue(let v): return v
+    case .BoolArray(let values): return arrayAsString("", values)
+    case .IntArray(let values): return arrayAsString("Int", values)
+    case .FloatArray(let values): return arrayAsString("Float", values)
+    case .DoubleArray(let values): return arrayAsString("Double", values)
+    case .StringArray(let values): return arrayAsString("", values)
+    case .ConstTensor(let v): return "Const(\(v))"
+    case .TensorDataTypeValue(let v): return dataTypeAsString(v)
+    }
+  }
+
+  private func arrayAsString<T>(_ desc: String, _ values: [T]) -> String {
+    let arrayDesc = (values.map { "\($0)" }).joined(separator: ",")
+    return "\(desc)[\(arrayDesc)]"
+  }
+
+  private func dataTypeAsString(_ dataType: TensorDataType) -> String {
+    switch dataType._cDataType {
+    case TF_FLOAT: return "float"
+    case TF_DOUBLE: return "double"
+    case TF_INT32: return "int32"
+    case TF_UINT8: return "uint8"
+    case TF_INT16: return "int16"
+    case TF_INT8: return "int8"
+    case TF_STRING: return "string"
+    case TF_COMPLEX64, TF_COMPLEX: return "complex"
+    case TF_INT64: return "int64"
+    case TF_BOOL: return "bool"
+    case TF_QINT8: return "qint8"
+    case TF_QUINT8: return "quint8"
+    case TF_QINT32: return "qint32"
+    case TF_BFLOAT16: return "bfloat16"
+    case TF_QINT16: return "qint16"
+    case TF_QUINT16: return "quint16"
+    case TF_UINT16: return "uint16"
+    case TF_COMPLEX128: return "complex128"
+    case TF_HALF: return "half"
+    case TF_RESOURCE: return "resource"
+    case TF_VARIANT: return "variant"
+    case TF_UINT32: return "uint32"
+    case TF_UINT64: return "uint64"
+    default: assert(false, "Unhandled type: \(dataType._cDataType)")
+    }
+  }
+}
+
 extension LazyTensorOperation : CustomStringConvertible {
   func lazyTensorDescription(_ lazyTensor: LazyTensor) -> String {
     switch lazyTensor.handle {
-      case LazyTensor.Handle.conc(_):
-        return "conc"
-      case LazyTensor.Handle.sym(_, let index, let isLive):
-        return "(sym, \(index), \(isLive))"
+    case LazyTensor.Handle.conc(_):
+      return "conc"
+    case LazyTensor.Handle.sym(let op, let index, let isLive):
+      return "(\(op.nameDescription()), \(index), \(isLive))"
+    }
+  }
+
+  func nameDescription() -> String {
+    if let alias = self.alias {
+      return "\(alias)"
+    } else {
+      return "\(name)_\(ObjectIdentifier(self))"
     }
   }
 
@@ -540,7 +604,7 @@ extension LazyTensorOperation : CustomStringConvertible {
         }
       }
     }
-    var desc = "\(name)["
+    var desc = "\(nameDescription())["
     desc += attrsDesc.joined(separator: ", ")
     desc += "]("
     desc += inputsDesc.joined(separator: ", ")
