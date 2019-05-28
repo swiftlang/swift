@@ -143,9 +143,8 @@ internal extension TensorHandle {
   }
 }
 
-internal extension ShapedArray where Scalar : _TensorFlowDataTypeCompatible {
-  @usableFromInline
-  @inline(never)
+public extension ShapedArray where Scalar : _TensorFlowDataTypeCompatible {
+  @inlinable
   init(cTensorHandle: CTensorHandle) {
     internalConsistencyCheck(TFE_TensorHandleIsConcrete(cTensorHandle) != 0)
     let status = TF_NewStatus()
@@ -164,8 +163,8 @@ internal extension ShapedArray where Scalar : _TensorFlowDataTypeCompatible {
 public struct ResourceHandle {
   let handle: _AnyTensorHandle
 
-  @usableFromInline
-  var _cTensorHandle: CTensorHandle { handle._cTensorHandle }
+  @inlinable
+  public var _cTensorHandle: CTensorHandle { handle._cTensorHandle }
   
   @usableFromInline
   init(owning cTensorHandle: CTensorHandle) {
@@ -178,8 +177,8 @@ public struct ResourceHandle {
 public struct VariantHandle {
   let handle: _AnyTensorHandle
   
-  @usableFromInline
-  var _cTensorHandle: CTensorHandle { handle._cTensorHandle }
+  @inlinable
+  public var _cTensorHandle: CTensorHandle { handle._cTensorHandle }
   
   @usableFromInline
   init(owning cTensorHandle: CTensorHandle) {
