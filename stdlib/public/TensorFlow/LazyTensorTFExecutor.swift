@@ -340,9 +340,13 @@ extension LazyTensorOperation {
 
 
   private static func materializeLiveTensors(_ lazyOp: LazyTensorOperation) {
+    LazyTensorOperation.materializationCallback("lazy")
     let graphDescription = TFGraphDescription(lazyOp)
+    LazyTensorOperation.materializationCallback("graphdesc")
     let function = graphDescription.tfFunction
+    LazyTensorOperation.materializationCallback("tffunction")
     let allOutputs = TFGraphBuilder.execute(function, graphDescription.inputValues)
+    LazyTensorOperation.materializationCallback("execute")
 
     // Slice up the outputs to various lazy tensors
     var start: Int = 0

@@ -134,7 +134,7 @@ public class LazyTensorOperation : TensorOperation {
   var attrs: [String: Attribute]
   var outputs: [TFETensorHandle]?
 
-  static var materializationCallback: (String) -> () = {
+  static public var materializationCallback: (String) -> () = {
     (s: String) in return }
 
   public static func registerMaterializationCallback(

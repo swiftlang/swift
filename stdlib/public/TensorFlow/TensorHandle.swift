@@ -42,12 +42,16 @@ public class TFETensorHandle : _AnyTensorHandle {
 
   public static var liveHandles: Int = 0
 
+  public static var callback: (String) -> () = {(s: String) in return }
+
   public init(_owning base: CTensorHandle) {
+    TFETensorHandle.callback("init")
     self._cTensorHandle = base
     TFETensorHandle.liveHandles += 1
   }
 
   deinit {
+    TFETensorHandle.callback("deinit")
     TFETensorHandle.liveHandles -= 1
     debugLog("De-initializing TensorHandle.")
     TFE_DeleteTensorHandle(_cTensorHandle)
