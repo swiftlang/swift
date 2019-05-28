@@ -367,3 +367,18 @@ var x = 10
 defer {
   let y = x
 }
+
+// IMPLICIT-LABEL: sil [dynamically_replacable] [ossa] @$s23dynamically_replaceable16testWithLocalFunyyF
+// IMPLICIT-LABEL: sil private [ossa] @$s23dynamically_replaceable16testWithLocalFunyyF05localF0L_yyF
+// IMPLICIT-LABEL: sil private [ossa] @$s23dynamically_replaceable16testWithLocalFunyyF05localF0L_yyF0geF0L_yyF
+// IMPLICIT-LABEL: sil private [ossa] @$s23dynamically_replaceable16testWithLocalFunyyFyycfU_
+public func testWithLocalFun() {
+  func localFun() {
+    func localLocalFun() { print("bar") }
+    print("foo")
+    localLocalFun()
+  }
+  localFun()
+  let unamedClosure = { print("foo") }
+  unamedClosure()
+}
