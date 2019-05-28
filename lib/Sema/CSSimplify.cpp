@@ -1611,12 +1611,15 @@ static ConstraintSystem::TypeMatchResult matchDeepTypeArguments(
         last->isTypeParameterRequirement() || last->isConditionalRequirement();
   }
 
-  // Optionals have a lot of special diagnostics and only one generic
-  // argument, Wrapped, so if we're dealing with one, don't produce generic
+  bool hasBase = base1 && base2;
+
+  // Optionals and arrays have a lot of special diagnostics and only one
+  // generic argument so if we're dealing with one, don't produce generic
   // arguments mismatch fixes.
-  // TODO(diagnostics): Move Optional diagnostics over to the new diagnostic
-  // framework.
-  bool isOptional = !forRequirement && base1->getDecl()->isOptionalDecl();
+  // TODO(diagnostics): Move Optional and Array diagnostics over to the
+  // new framework.
+  bool isOptional = hasBase && base1 && base1->getDecl()->isOptionalDecl();
+  bool isArray = hasBase && cs.isArrayType(base1);
 
   for (unsigned i = 0, n = args1.size(); i != n; ++i) {
     auto result = cs.matchTypes(
@@ -1624,7 +1627,8 @@ static ConstraintSystem::TypeMatchResult matchDeepTypeArguments(
         locator.withPathElement(LocatorPathElt::getGenericArgument(i)));
 
     if (result.isFailure()) {
-      if (!cs.shouldAttemptFixes() || forRequirement || isOptional)
+      if (!cs.shouldAttemptFixes() || !hasBase || forRequirement ||
+          isOptional || isArray)
         return result;
 
       fullMatchResult = result;

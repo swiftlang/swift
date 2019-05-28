@@ -429,13 +429,21 @@ void GenericArgumentsMismatchFailure::emitDiagnosticForMismatch(
   auto genericTypeDecl = getActual()->getCanonicalType()->getAnyGeneric();
   auto param = genericTypeDecl->getGenericParams()->getParams()[position];
 
-  auto lhs = resolveType(getActual()->getGenericArgs()[position]);
-  auto rhs = resolveType(getRequired()->getGenericArgs()[position]);
+  auto lhs = resolveType(getActual()->getGenericArgs()[position])
+                 ->reconstituteSugar(/*recursive=*/false);
+  auto rhs = resolveType(getRequired()->getGenericArgs()[position])
+                 ->reconstituteSugar(/*recursive=*/false);
 
-  emitDiagnostic(getAnchor()->getLoc(), diagnostic, resolveType(getActual()),
-                 resolveType(getRequired()), param->getName(), lhs, rhs);
-  emitDiagnostic(param->getLoc(), diag::kind_declname_declared_here,
-                 DescriptiveDeclKind::GenericTypeParam, param->getName());
+  emitDiagnostic(
+      getAnchor()->getLoc(), diagnostic,
+      resolveType(getActual())->reconstituteSugar(/*recursive=*/false),
+      resolveType(getRequired())->reconstituteSugar(/*recursive=*/false),
+      param->getName(), lhs, rhs);
+
+  if (param->getLoc().isValid()) {
+    emitDiagnostic(param->getLoc(), diag::kind_declname_declared_here,
+                   DescriptiveDeclKind::GenericTypeParam, param->getName());
+  }
 }
 
 bool GenericArgumentsMismatchFailure::diagnoseAsError() {

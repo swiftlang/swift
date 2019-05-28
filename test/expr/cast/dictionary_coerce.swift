@@ -24,11 +24,13 @@ dictCC = dictDC
 dictCC = dictDD
 
 dictCD = dictDD
-dictCD = dictCC // expected-error{{cannot assign value of type '[C : C]' to type '[C : D]'}}
+dictCD = dictCC // expected-error{{cannot convert value of type '[C : C]' to '[C : D]' in assignment, arguments to generic parameter 'Value' ('C' and 'D') are expected to be equal}}
 
 
 dictDC = dictDD
-dictDC = dictCD // expected-error{{cannot assign value of type '[C : D]' to type '[D : C]'}}
+dictDC = dictCD // expected-error {{cannot convert value of type '[C : D]' to '[D : C]' in assignment, arguments to generic parameter 'Key' ('C' and 'D') are expected to be equal}}
+// expected-error@-1 {{cannot convert value of type '[C : D]' to '[D : C]' in assignment, arguments to generic parameter 'Value' ('D' and 'C') are expected to be equal}}
 
-dictDD = dictCC // expected-error{{cannot assign value of type '[C : C]' to type '[D : D]'}}
+dictDD = dictCC // expected-error{{cannot convert value of type '[C : C]' to '[D : D]' in assignment, arguments to generic parameter 'Key' ('C' and 'D') are expected to be equal}}
+// expected-error@-1 {{cannot convert value of type '[C : C]' to '[D : D]' in assignment, arguments to generic parameter 'Value' ('C' and 'D') are expected to be equal}}
 

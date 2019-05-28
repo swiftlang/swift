@@ -13,6 +13,12 @@ class Generic<T> : Concrete {
 
   func genericMethod(_: GenericAlias) {}
 }
+// expected-note@-5 {{generic parameter 'T' declared here}}
+// expected-note@-6 {{generic parameter 'T' declared here}}
+// expected-note@-7 {{generic parameter 'T' declared here}}
+// expected-note@-8 {{generic parameter 'T' declared here}}
+// expected-note@-9 {{generic parameter 'T' declared here}}
+// expected-note@-10 {{generic parameter 'T' declared here}}
 
 protocol BaseProto {}
 
@@ -44,7 +50,7 @@ extension ProtoRefinesClass {
     let _: BaseProto & Concrete = self
 
     let _: Generic<String> = self
-    // expected-error@-1 {{cannot convert value of type 'Self' to specified type 'Generic<String>'}}
+    // expected-error@-1 {{cannot convert value of type 'Generic<Int>' to 'Generic<String>' in assignment, arguments to generic parameter 'T' ('Int' and 'String') are expected to be equal}}
   }
 }
 
@@ -68,7 +74,7 @@ func usesProtoRefinesClass1(_ t: ProtoRefinesClass) {
   let _: BaseProto & Concrete = t
 
   let _: Generic<String> = t
-  // expected-error@-1 {{cannot convert value of type 'ProtoRefinesClass' to specified type 'Generic<String>'}}
+  // expected-error@-1 {{cannot convert value of type 'Generic<Int>' to 'Generic<String>' in assignment, arguments to generic parameter 'T' ('Int' and 'String') are expected to be equal}}
 }
 
 func usesProtoRefinesClass2<T : ProtoRefinesClass>(_ t: T) {
@@ -91,7 +97,7 @@ func usesProtoRefinesClass2<T : ProtoRefinesClass>(_ t: T) {
   let _: BaseProto & Concrete = t
 
   let _: Generic<String> = t
-  // expected-error@-1 {{cannot convert value of type 'T' to specified type 'Generic<String>'}}
+  // expected-error@-1 {{cannot convert value of type 'Generic<Int>' to 'Generic<String>' in assignment, arguments to generic parameter 'T' ('Int' and 'String') are expected to be equal}}
 }
 
 class BadConformingClass1 : ProtoRefinesClass {
@@ -147,7 +153,7 @@ extension ProtoRefinesProtoWithClass {
     let _: BaseProto & Concrete = self
 
     let _: Generic<String> = self
-    // expected-error@-1 {{cannot convert value of type 'Self' to specified type 'Generic<String>'}}
+    // expected-error@-1 {{cannot convert value of type 'Generic<Int>' to 'Generic<String>' in assignment, arguments to generic parameter 'T' ('Int' and 'String') are expected to be equal}}
   }
 }
 
@@ -171,7 +177,7 @@ func usesProtoRefinesProtoWithClass1(_ t: ProtoRefinesProtoWithClass) {
   let _: BaseProto & Concrete = t
 
   let _: Generic<String> = t
-  // expected-error@-1 {{cannot convert value of type 'ProtoRefinesProtoWithClass' to specified type 'Generic<String>'}}
+  // expected-error@-1 {{cannot convert value of type 'Generic<Int>' to 'Generic<String>' in assignment, arguments to generic parameter 'T' ('Int' and 'String') are expected to be equal}}
 }
 
 func usesProtoRefinesProtoWithClass2<T : ProtoRefinesProtoWithClass>(_ t: T) {
@@ -194,7 +200,7 @@ func usesProtoRefinesProtoWithClass2<T : ProtoRefinesProtoWithClass>(_ t: T) {
   let _: BaseProto & Concrete = t
 
   let _: Generic<String> = t
-  // expected-error@-1 {{cannot convert value of type 'T' to specified type 'Generic<String>'}}
+  // expected-error@-1 {{cannot convert value of type 'Generic<Int>' to 'Generic<String>' in assignment, arguments to generic parameter 'T' ('Int' and 'String') are expected to be equal}}
 }
 
 class ClassWithInits<T> {

@@ -3,6 +3,11 @@
 struct MyType<TyA, TyB> { // expected-note {{generic type 'MyType' declared here}}
   var a : TyA, b : TyB
 }
+// expected-note@-3 {{generic parameter 'TyA' declared here}}
+// expected-note@-4 {{generic parameter 'TyA' declared here}}
+// expected-note@-5 {{generic parameter 'TyA' declared here}}
+// expected-note@-6 {{generic parameter 'TyA' declared here}}
+// expected-note@-7 {{generic parameter 'TyB' declared here}}
 
 //
 // Type aliases that reference unbound generic types -- not really generic,
@@ -152,7 +157,7 @@ class GenericClass<T> {
   }
 
   func testCaptureInvalid1<S>(s: S, t: T) -> TA<Int> {
-    return TA<S>(a: t, b: s) // expected-error {{cannot convert return expression of type 'GenericClass<T>.TA<S>' (aka 'MyType<T, S>') to return type 'MyType<T, Int>'}}
+    return TA<S>(a: t, b: s) // expected-error {{cannot convert return expression of type 'MyType<T, S>' to return type 'MyType<T, Int>', arguments to generic parameter 'TyB' ('S' and 'Int') are expected to be equal}}
   }
 
   func testCaptureInvalid2<S>(s: Int, t: T) -> TA<S> {
@@ -260,8 +265,8 @@ let _: GenericClass.TA = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
 let _: GenericClass<Int>.TA = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Double, Int>' to specified type 'GenericClass<Int>.TA'}}
 let _: GenericClass<Int>.TA = GenericClass.TA(a: 1, b: 4.0)
 
-let _: GenericClass<Int>.TA = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Float, Int>' to specified type 'GenericClass<Int>.TA'}}
-let _: GenericClass<Int>.TA = GenericClass.TA<Float>(a: 1, b: 4.0) // FIXME // expected-error {{cannot convert value of type 'MyType<Float, Double>' to specified type 'GenericClass<Int>.TA'}}
+let _: GenericClass<Int>.TA = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Float, Int>' to 'MyType<Int, Int>' in assignment, arguments to generic parameter 'TyA' ('Float' and 'Int') are expected to be equal}}
+let _: GenericClass<Int>.TA = GenericClass.TA<Float>(a: 1, b: 4.0) // expected-error {{cannot convert value of type 'MyType<Float, Double>' to 'MyType<Int, Double>' in assignment, arguments to generic parameter 'TyA' ('Float' and 'Int') are expected to be equal}}
 
 let _: GenericClass<Int>.TA = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: GenericClass<Int>.TA = GenericClass<Int>.TA(a: 1, b: 4.0)
@@ -272,8 +277,8 @@ let _: GenericClass<Int>.TA = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
 let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Double, Int>' to specified type 'GenericClass<Int>.TA<Float>' (aka 'MyType<Int, Float>')}}
 let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 1, b: 4.0)
 
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Float, Int>' to specified type 'GenericClass<Int>.TA<Float>' (aka 'MyType<Int, Float>')}}
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 1, b: 4.0) // FIXME // expected-error {{cannot convert value of type 'MyType<Float, Double>' to specified type 'GenericClass<Int>.TA<Float>' (aka 'MyType<Int, Float>')}}
+let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Float, Float>' to 'MyType<Int, Float>' in assignment, arguments to generic parameter 'TyA' ('Float' and 'Int') are expected to be equal}}
+let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 1, b: 4.0) // expected-error {{cannot convert value of type 'MyType<Float, Float>' to 'MyType<Int, Float>' in assignment, arguments to generic parameter 'TyA' ('Float' and 'Int') are expected to be equal}}
 
 let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA(a: 1, b: 4.0)
