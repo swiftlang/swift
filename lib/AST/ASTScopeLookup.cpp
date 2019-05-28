@@ -174,7 +174,9 @@ ASTScopeImpl::lookup(const NullablePtr<DeclContext> selfDC,
                      const NullablePtr<const Decl> haveAlreadyLookedHere,
                      const Optional<bool> isCascadingUseArg,
                      DeclConsumer consumer) const {
+#ifndef NDEBUG
   consumer.stopForDebuggingIfTargetLookup();
+#endif
 
   // Certain illegal nestings, e.g. protocol nestled inside a struct,
   // require that lookup stop at the outer scope.

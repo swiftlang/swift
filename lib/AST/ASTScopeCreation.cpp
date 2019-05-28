@@ -47,7 +47,8 @@ namespace ast_scope {
 
 class DeferredNodes final {
   /// The nodes that must be passed down to deeper levels in the scope tree.
-  std::deque<ASTNode> nodes;
+  /// In reverse order!
+  std::vector<ASTNode> nodesInReverse;
 
   /// The number of \c Decls in the \c SourceFile that were already processed
   /// into scopes. Since parsing can be interleaved with type-checking, on every
@@ -59,11 +60,13 @@ class DeferredNodes final {
   /// was originally built, add them as children of this scope.
   NullablePtr<ASTScopeImpl> lastAdopter;
 
+#ifndef NDEBUG
   /// Information about how this object was created for debugging.
   const char *const file;
   const int line;
   const ASTScopeImpl &creator;
   const void *const forWhat;
+#endif
 
 public:
   DeferredNodes(const char *file, int line, const ASTScopeImpl &creator,
@@ -981,17 +984,22 @@ ASTScopeImpl::createSubtreeWithDeferrals2D(DeferredNodes &deferred,
 
 #pragma mark DeferredNodes definitions
 
+#ifndef NDEBUG
 DeferredNodes::DeferredNodes(const char *file, int line,
                              const ASTScopeImpl &creator, const void *forWhat)
     : file(file), line(line), creator(creator), forWhat(forWhat) {}
+#else
+DeferredNodes::DeferredNodes(const char, int, const ASTScopeImpl, const void) {}
+#endif
+
 DeferredNodes::~DeferredNodes() {
-  assert(nodes.empty() && "Should have consumed all nodes");
+  assert(nodesInReverse.empty() && "Should have consumed all nodes");
 }
 
 ASTNode DeferredNodes::popNextDeferredNodeForAdoptionBy(ASTScopeImpl *s) {
   setLastAdopter(s);
-  auto f = nodes.front();
-  nodes.pop_front();
+  auto f = nodesInReverse.back();
+  nodesInReverse.pop_back();
   return f;
 }
 
@@ -1013,7 +1021,7 @@ void DeferredNodes::setLastAdopter(ASTScopeImpl *s) {
   }
 }
 
-bool DeferredNodes::empty() const { return nodes.empty(); }
+bool DeferredNodes::empty() const { return nodesInReverse.empty(); }
 
 void DeferredNodes::pushIfNecessary(ASTNode n) {
   // Do not defer VarDecls or Accessors because
@@ -1025,8 +1033,8 @@ void DeferredNodes::pushIfNecessary(ASTNode n) {
   // An optimization; will be ignored later anyway.
   if (ASTScopeImpl::isCreatedDirectly(n))
     return;
-  
-  nodes.push_front(n);
+
+  nodesInReverse.push_back(n);
 }
 
 template <typename ASTNodelike>
@@ -1047,13 +1055,16 @@ NullablePtr<ASTScopeImpl> DeferredNodes::getLastAdopter() const {
 void DeferredNodes::dump() const { print(llvm::errs()); }
 
 void DeferredNodes::print(raw_ostream &out) const {
+#ifndef NDEBUG
   out << "From " << file << ": " << line << " for: " << forWhat << "\n";
   out << "Scope: ";
   creator.print(out);
   out << "\n";
-  for (const auto i : indices(nodes)) {
-    out << i << ": ";
-    nodes[i].dump(out);
+#endif
+  int i = 0;
+  for (auto n : reverse(nodesInReverse)) {
+    out << i++ << ": ";
+    n.dump(out);
     out << "\n";
   }
 }

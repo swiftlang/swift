@@ -138,7 +138,8 @@ namespace {
     };
     
     enum class AddGenericParameters { Yes, No };
-    
+
+#ifndef NDEBUG
     /// A consumer for debugging that lets the UnqualifiedLookupFactory know when
     /// finding something.
     class InstrumentedNamedDeclConsumer : public NamedDeclConsumer {
@@ -161,7 +162,7 @@ namespace {
           factory->addedResult(results.back());
       }
     };
-    
+#endif
     // Inputs
     const DeclName Name;
     DeclContext *const DC;
@@ -178,17 +179,21 @@ namespace {
     const bool isOriginallyTypeLookup;
     const NLOptions baseNLOptions;
     // Transputs
+#ifndef NDEBUG
     InstrumentedNamedDeclConsumer Consumer;
+#else
+    NamedDeclConsumer Consumer;
+#endif
     // Outputs
     SmallVectorImpl<LookupResultEntry> &Results;
     size_t &IndexOfFirstOuterResult;
     ResultsVector UnavailableInnerResults;
-    
-    /// For debugging:
-    bool involvedANominalOrExtensionWhereClause = false;
+
+#ifndef NDEBUG
     static unsigned lookupCounter;
     static const unsigned targetLookup;
-    
+#endif
+
   public: // for exp debugging
     SourceFile const *recordedSF = nullptr;
     bool recordedIsCascadingUse = false;
@@ -370,15 +375,15 @@ namespace {
     
     /// Legacy lookup is wrong here; we should NOT find this symbol.
     bool shouldDiffer() const;
-    
-    /// For debugging:
+    StringRef getSourceFileName() const;
+
+#ifndef NDEBUG
     void stopForDebuggingIfStartingTargetLookup(bool isASTScopeLookup) const;
     void stopForDebuggingIfDuringTargetLookup(bool isASTScopeLookup) const;
     void
     stopForDebuggingIfAddingTargetLookupResult(const LookupResultEntry &) const;
-    LookupResultEntry addingResult(LookupResultEntry &&) const;
     void addedResult(const LookupResultEntry &) const;
-    StringRef getSourceFileName() const;
+#endif
   };
 
 } // namespace
@@ -404,9 +409,11 @@ public:
                    NominalTypeDecl *const nominal,
                    Optional<bool> isCascadingUse) override;
 
+#ifndef NDEBUG
   void stopForDebuggingIfTargetLookup() override {
     factory.stopForDebuggingIfDuringTargetLookup(true);
   }
+#endif
   };
 } // namespace
 
@@ -453,9 +460,11 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
 // clang-format on
 
 void UnqualifiedLookupFactory::performUnqualifiedLookup() {
+#ifdef NDEBUG
   ++lookupCounter;
   stopForDebuggingIfStartingTargetLookup(false);
-  
+#endif
+
   const Optional<bool> isCascadingUseInitial =
   options.contains(Flags::KnownPrivate) ? Optional<bool>(false) : None;
 
@@ -537,7 +546,9 @@ void UnqualifiedLookupFactory::lookupOperatorInDeclContexts(
 // TODO: Unify with LookupVisibleDecls.cpp::lookupVisibleDeclsImpl
 void UnqualifiedLookupFactory::lookupNamesIntroducedBy(
     const ContextAndUnresolvedIsCascadingUse contextAndIsCascadingUseArg) {
+#ifdef NDEBUG
   stopForDebuggingIfDuringTargetLookup(false);
+#endif
   DeclContext *const dc = contextAndIsCascadingUseArg.whereToLook;
   const auto isCascadingUseSoFar = contextAndIsCascadingUseArg.isCascadingUse;
   if (dc->isModuleScopeContext())
@@ -762,7 +773,9 @@ void UnqualifiedLookupFactory::finishLookingInContext(
        DeclContext *const lookupContextForThisContext,
        Optional<ResultFinderForTypeContext> &&resultFinderForTypeContext,
        const Optional<bool> isCascadingUse) {
+#ifdef NDEBUG
   stopForDebuggingIfDuringTargetLookup(false);
+#endif
   // When a generic has the same name as a member, Swift prioritizes the generic
   // because the member could still be named by qualifying it. But there is no
   // corresponding way to qualify a generic parameter.
@@ -892,9 +905,12 @@ void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
 
   SmallVector<ValueDecl *, 4> Lookup;
   contextForLookup->lookupQualified(selfBounds, Name, options, Lookup);
-  for (auto Result : Lookup)
-    results.push_back(factory->addingResult(
-      LookupResultEntry(whereValueIsMember(Result), Result)));
+  for (auto Result : Lookup) {
+    results.push_back(LookupResultEntry(whereValueIsMember(Result), Result));
+#ifndef NDEBUG
+    factory->addedResult(results.back());
+#endif
+  }
 }
 
 // TODO (someday): Instead of adding unavailable entries to Results,
@@ -959,8 +975,12 @@ void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
     removeShadowedDecls(CurModuleResults, &M);
   }
 
-  for (auto VD : CurModuleResults)
-    Results.push_back(addingResult(LookupResultEntry(VD)));
+  for (auto VD : CurModuleResults) {
+    Results.push_back(LookupResultEntry(VD));
+#ifndef NDEBUG
+    addedResult(Results.back());
+#endif
+  }
 
   filterForDiscriminator(Results, DebugClient);
 }
@@ -983,7 +1003,10 @@ void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
 
   // Look for a module with the given name.
   if (Name.isSimpleName(M.getName())) {
-    Results.push_back(addingResult(LookupResultEntry(&M)));
+    Results.push_back(LookupResultEntry(&M));
+#ifndef NDEBUG
+    addedResult(Results.back());
+#endif
     return;
   }
   ModuleDecl *desiredModule = Ctx.getLoadedModule(Name.getBaseIdentifier());
@@ -993,7 +1016,10 @@ void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
     forAllVisibleModules(
         dc, [&](const ModuleDecl::ImportedModule &import) -> bool {
           if (import.second == desiredModule) {
-            Results.push_back(addingResult(LookupResultEntry(import.second)));
+            Results.push_back(LookupResultEntry(import.second));
+#ifndef NDEBUG
+            addedResult(Results.back());
+#endif
             return false;
           }
           return true;
@@ -1081,7 +1107,9 @@ void UnqualifiedLookupFactory::experimentallyLookInASTScopes(
 
   ASTScopeDeclConsumerForUnqualifiedLookup consumer(*this);
 
+#ifdef NDEBUG
   stopForDebuggingIfStartingTargetLookup(true);
+#endif
 
   Optional<bool> isCascadingUseResult = ASTScope::unqualifiedLookup(
       DC->getParentSourceFile(), Name, Loc,
@@ -1105,7 +1133,9 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
       continue;
     if (value->getFullName().matchesRef(factory.Name)) {
       factory.Results.push_back(LookupResultEntry(value));
+#ifdef NDEBUG
       factory.stopForDebuggingIfAddingTargetLookupResult(factory.Results.back());
+#endif
     }
   }
 
@@ -1168,8 +1198,9 @@ TypeDecl *UnqualifiedLookup::getSingleTypeResult() const {
 }
 
 #pragma mark debugging
-
+#ifndef NDEBUG
 void UnqualifiedLookupFactory::InstrumentedNamedDeclConsumer::anchor() {}
+#endif
 
 void UnqualifiedLookupFactory::ResultFinderForTypeContext::dump() const {
   llvm::errs() << "dynamicContext: ";
@@ -1184,7 +1215,7 @@ void UnqualifiedLookupFactory::ResultFinderForTypeContext::dump() const {
 
 void UnqualifiedLookupFactory::dumpScopes() const {
   llvm::errs() << "\n\nScopes:\n";
-  DC->getParentSourceFile()->getScope()->dump();
+  DC->getParentSourceFile()->getScope()->print(llvm::errs());
   llvm::errs() << "\n";
 }
 
@@ -1206,12 +1237,15 @@ void UnqualifiedLookupFactory::dumpResults() const {
 }
 
 void UnqualifiedLookupFactory::print(raw_ostream &OS) const {
-
-  OS << "Look up (" << lookupCounter << ") '" << Name << "' at: ";
+  OS << "Look up";
+#ifndef DEBUG
+  OS << " (" << lookupCounter << ")";
+#endif
+  OS << " '" << Name << "' at: ";
   Loc.print(OS, DC->getASTContext().SourceMgr);
   OS << "\nStarting in: ";
   DC->printContext(OS);
-  OS << (involvedANominalOrExtensionWhereClause ? " w/" : " w/o") << " where\n";
+  OS << "\n";
 }
 
 #pragma mark debugging: output utilities for grepping
@@ -1329,6 +1363,7 @@ bool UnqualifiedLookupFactory::shouldDiffer() const {
 }
 
 #pragma mark breakpointing
+#ifndef NDEBUG
 
 void UnqualifiedLookupFactory::stopForDebuggingIfStartingTargetLookup(const bool isASTScopeLookup) const {
   if (lookupCounter != targetLookup)
@@ -1347,7 +1382,7 @@ void UnqualifiedLookupFactory::stopForDebuggingIfDuringTargetLookup(const bool i
   else
     llvm::errs() << "during target context-based lookup\n";
 }
-// TODO: factor with dumpResults
+
 void UnqualifiedLookupFactory::stopForDebuggingIfAddingTargetLookupResult(const LookupResultEntry& e) const {
   if (lookupCounter != targetLookup)
     return;
@@ -1355,12 +1390,6 @@ void UnqualifiedLookupFactory::stopForDebuggingIfAddingTargetLookupResult(const 
   out << "\nresult for Target lookup:\n";
   e.print(out);
   out << "\n";
-}
-
-LookupResultEntry
-UnqualifiedLookupFactory::addingResult(LookupResultEntry &&e) const {
-  stopForDebuggingIfAddingTargetLookupResult(e);
-  return e;
 }
 
 void UnqualifiedLookupFactory::addedResult(const LookupResultEntry &e) const {
@@ -1371,3 +1400,5 @@ unsigned UnqualifiedLookupFactory::lookupCounter = 0;
 
 // set to ~0 when not debugging
 const unsigned UnqualifiedLookupFactory::targetLookup = ~0;
+
+#endif // NDEBUG

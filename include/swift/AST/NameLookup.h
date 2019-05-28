@@ -22,6 +22,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/SourceLoc.h"
 
@@ -599,7 +600,9 @@ public:
                    NominalTypeDecl *const nominal,
                    Optional<bool> isCascadingUse) = 0;
 
+#ifndef NDEBUG
   virtual void stopForDebuggingIfTargetLookup() = 0;
+#endif
 };
   
 /// Just used to print
@@ -621,7 +624,9 @@ public:
     return std::make_pair(false, isCascadingUse);
   }
 
+#ifndef NDEBUG
   void stopForDebuggingIfTargetLookup() override {}
+#endif
 
   ArrayRef<ValueDecl *> getDecls() { return values; }
 };
@@ -641,7 +646,8 @@ public:
                     Optional<bool> isCascadingUse,
                     namelookup::AbstractASTScopeDeclConsumer &);
 
-  void dump() const;
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger");
   void print(llvm::raw_ostream &) const;
   void dumpOneScopeMapLocation(std::pair<unsigned, unsigned>) const;
 

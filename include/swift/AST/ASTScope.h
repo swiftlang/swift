@@ -30,6 +30,7 @@
 
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/NameLookup.h" // for DeclVisibilityKind
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/SourceManager.h"
@@ -221,7 +222,9 @@ protected:
   virtual NullablePtr<const void> addressForPrinting() const;
 
 public:
-  void dump() const;
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger");
+
   void dumpOneScopeMapLocation(std::pair<unsigned, unsigned> lineColumn) const;
 
 private:
