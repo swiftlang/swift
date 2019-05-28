@@ -57,6 +57,20 @@ cake1: Var C1.CIIns1 changes from weak to strong
 cake1: Var C1.CIIns2 changes from strong to weak
 cake1: Var GlobalLetChangedToVar changes from let to var
 cake1: Var GlobalVarChangedToLet changes from var to let
+cake2: Accessor GlobalLetChangedToVar.Set() is a new API without @available attribute
+cake2: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Set() is a new API without @available attribute
+cake2: AssociatedType RequiementChanges.addedTypeWithDefault is a new API without @available attribute
+cake2: AssociatedType RequiementChanges.addedTypeWithoutDefault is a new API without @available attribute
+cake2: Class C0 is a new API without @available attribute
+cake2: Class C8 is a new API without @available attribute
+cake2: Constructor C1.init(_:) is a new API without @available attribute
+cake2: EnumElement FrozenKind.AddedCase is a new API without @available attribute
+cake2: Func RequiementChanges.addedFunc() is a new API without @available attribute
+cake2: Func fixedLayoutStruct.OKChange() is a new API without @available attribute
+cake2: Protocol P4 is a new API without @available attribute
+cake2: Var RequiementChanges.addedVar is a new API without @available attribute
+cake2: Var fixedLayoutStruct.$__lazy_storage_$_lazy_d is a new API without @available attribute
+cake2: Var fixedLayoutStruct.c is a new API without @available attribute
 
 /* Fixed-layout Type changes */
 cake1: EnumElement FrozenKind.Fixed in a non-resilient type changes position from 1 to 2

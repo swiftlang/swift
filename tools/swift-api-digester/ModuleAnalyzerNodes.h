@@ -293,6 +293,9 @@ struct PlatformIntroVersion {
   StringRef tvos;
   StringRef watchos;
   StringRef swift;
+  bool hasOSAvailability() const {
+    return !macos.empty() || !ios.empty() || !tvos.empty() || !watchos.empty();
+  }
 };
 
 class SDKNodeDecl: public SDKNode {
@@ -347,6 +350,7 @@ public:
   StringRef getScreenInfo() const;
   bool hasFixedBinaryOrder() const { return FixedBinaryOrder.hasValue(); }
   uint8_t getFixedBinaryOrder() const { return *FixedBinaryOrder; }
+  PlatformIntroVersion getIntroducingVersion() const { return introVersions; }
   virtual void jsonize(json::Output &Out) override;
   virtual void diagnose(SDKNode *Right) override;
 
