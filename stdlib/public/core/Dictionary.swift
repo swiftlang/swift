@@ -1678,7 +1678,7 @@ extension Collection {
   internal func _makeKeyValuePairDescription<K, V>(
     withTypeName type: String? = nil
   ) -> String where Element == (key: K, value: V) {
-    if self.count == 0 {
+    if self.isEmpty {
       return "[:]"
     }
     
