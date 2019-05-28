@@ -368,6 +368,10 @@ def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
          ArgumentIsPath]>,
   MetaVarName<"<path>">, HelpText<"Emit an Objective-C header file to <path>">;
 
+def emit_archive : Flag<["-"], "emit-archive">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit module as a static archive">;
+
 def import_cf_types : Flag<["-"], "import-cf-types">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Recognize and import CF types as class types">;

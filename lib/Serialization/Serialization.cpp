@@ -828,6 +828,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, IS_TESTABLE);
   BLOCK_RECORD(options_block, ARE_PRIVATE_IMPORTS_ENABLED);
   BLOCK_RECORD(options_block, RESILIENCE_STRATEGY);
+  BLOCK_RECORD(options_block, IS_STATIC_LIBRARY);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -991,6 +992,11 @@ void Serializer::writeHeader(const SerializationOptions &options) {
       if (M->getResilienceStrategy() != ResilienceStrategy::Default) {
         options_block::ResilienceStrategyLayout Strategy(Out);
         Strategy.emit(ScratchRecord, unsigned(M->getResilienceStrategy()));
+      }
+
+      if (M->isStaticLibrary()) {
+        options_block::IsStaticLibraryLayout IsStaticLibrary(Out);
+        IsStaticLibrary.emit(ScratchRecord);
       }
 
       if (options.SerializeOptionsForDebugging) {

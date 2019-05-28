@@ -602,7 +602,7 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1,
     /// If the module was or is being compiled with `-enable-testing`.
     TestingEnabled : 1,
 
@@ -624,7 +624,10 @@ protected:
     ImplicitDynamicEnabled : 1,
 
     // Whether the module is a system module.
-    IsSystemModule : 1
+    IsSystemModule : 1,
+                        
+    // If the module is a static library.
+    IsStaticLibrary : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,

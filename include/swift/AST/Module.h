@@ -338,6 +338,14 @@ public:
     return getResilienceStrategy() != ResilienceStrategy::Default;
   }
 
+  bool isStaticLibrary() const {
+    return Bits.ModuleDecl.IsStaticLibrary;
+  }
+
+  void setIsStaticLibrary(bool isStaticLibrary = true) {
+    Bits.ModuleDecl.IsStaticLibrary = isStaticLibrary;
+  }
+
   /// Look up a (possibly overloaded) value set at top-level scope
   /// (but with the specified access path, which may come from an import decl)
   /// within the current module.

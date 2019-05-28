@@ -228,6 +228,9 @@ public:
   /// the Objective-C half should implicitly be visible to the Swift sources.
   bool ImportUnderlyingModule = false;
 
+  /// If set, this module should be built and linked as a static library.
+  bool IsStaticLibrary = false;
+
   /// If set, the header provided in ImplicitObjCHeaderPath will be rewritten
   /// by the Clang importer as part of semantic analysis.
   bool SerializeBridgingHeader = false;

@@ -98,6 +98,7 @@ class ExtendedValidationInfo {
     unsigned IsSIB : 1;
     unsigned IsTestable : 1;
     unsigned ResilienceStrategy : 2;
+    unsigned IsStaticLibrary : 1;
   } Bits;
 public:
   ExtendedValidationInfo() : Bits() {}
@@ -134,6 +135,11 @@ public:
   }
   void setResilienceStrategy(ResilienceStrategy resilience) {
     Bits.ResilienceStrategy = unsigned(resilience);
+  }
+
+  bool isStaticLibrary() const { return Bits.IsStaticLibrary; }
+  void setIsStaticLibrary(bool isStaticLibrary) {
+    Bits.IsStaticLibrary = isStaticLibrary;
   }
 };
 

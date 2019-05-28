@@ -600,7 +600,8 @@ namespace options_block {
     IS_SIB,
     IS_TESTABLE,
     RESILIENCE_STRATEGY,
-    ARE_PRIVATE_IMPORTS_ENABLED
+    ARE_PRIVATE_IMPORTS_ENABLED,
+    IS_STATIC_LIBRARY
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -629,6 +630,10 @@ namespace options_block {
   using ResilienceStrategyLayout = BCRecordLayout<
     RESILIENCE_STRATEGY,
     BCFixed<2>
+  >;
+
+  using IsStaticLibraryLayout = BCRecordLayout<
+    IS_STATIC_LIBRARY
   >;
 }
 

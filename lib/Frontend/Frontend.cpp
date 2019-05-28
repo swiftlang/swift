@@ -535,6 +535,8 @@ ModuleDecl *CompilerInstance::getMainModule() {
       MainModule->setPrivateImportsEnabled();
     if (Invocation.getFrontendOptions().EnableImplicitDynamic)
       MainModule->setImplicitDynamicEnabled();
+    if (Invocation.getFrontendOptions().IsStaticLibrary)
+      MainModule->setIsStaticLibrary();
 
     if (Invocation.getFrontendOptions().EnableLibraryEvolution)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);

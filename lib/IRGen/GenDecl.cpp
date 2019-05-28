@@ -1605,7 +1605,8 @@ void IRGenModule::emitVTableStubs() {
 static IRLinkage
 getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
              ForDefinition_t isDefinition,
-             bool isWeakImported) {
+             bool isWeakImported,
+             bool isStaticLibrary) {
 #define RESULT(LINKAGE, VISIBILITY, DLL_STORAGE)                               \
   IRLinkage{llvm::GlobalValue::LINKAGE##Linkage,                               \
             llvm::GlobalValue::VISIBILITY##Visibility,                         \
@@ -1615,15 +1616,17 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
   // doesn't support relative relocations at load time, which interferes with
   // our metadata formats.  Default visibility should suffice for other object
   // formats.
+  bool useDLLStorage = info.UseDLLStorage && !isStaticLibrary;
+
   llvm::GlobalValue::VisibilityTypes PublicDefinitionVisibility =
       info.IsELFObject ? llvm::GlobalValue::ProtectedVisibility
                        : llvm::GlobalValue::DefaultVisibility;
   llvm::GlobalValue::DLLStorageClassTypes ExportedStorage =
-      info.UseDLLStorage ? llvm::GlobalValue::DLLExportStorageClass
-                         : llvm::GlobalValue::DefaultStorageClass;
+      useDLLStorage ? llvm::GlobalValue::DLLExportStorageClass
+                    : llvm::GlobalValue::DefaultStorageClass;
   llvm::GlobalValue::DLLStorageClassTypes ImportedStorage =
-      info.UseDLLStorage ? llvm::GlobalValue::DLLImportStorageClass
-                         : llvm::GlobalValue::DefaultStorageClass;
+      (useDLLStorage && !isDefinition) ? llvm::GlobalValue::DLLImportStorageClass
+                                       : llvm::GlobalValue::DefaultStorageClass;
 
   switch (linkage) {
   case SILLinkage::Public:
@@ -1645,7 +1648,7 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
   case SILLinkage::Private: {
     if (info.forcePublicDecls() && !isDefinition)
       return getIRLinkage(info, SILLinkage::PublicExternal, isDefinition,
-                          isWeakImported);
+                          isWeakImported, isStaticLibrary);
     auto linkage = info.needLinkerToMergeDuplicateSymbols()
                        ? llvm::GlobalValue::LinkOnceODRLinkage
                        : llvm::GlobalValue::InternalLinkage;
@@ -1687,9 +1690,10 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
   UniversalLinkageInfo linkInfo(IGM);
   bool weakImported = entity.isWeakImported(IGM.getSwiftModule(),
                                             IGM.getAvailabilityContext());
+  bool isStaticLibrary = IGM.getSwiftModule()->isStaticLibrary();
   auto IRL =
       getIRLinkage(linkInfo, entity.getLinkage(ForDefinition),
-                   ForDefinition, weakImported);
+                   ForDefinition, weakImported, isStaticLibrary);
   ApplyIRLinkage(IRL).to(global);
 
   // Everything externally visible is considered used in Swift.
@@ -1729,19 +1733,21 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
 
   entity.mangle(result.Name);
   bool weakImported = entity.isWeakImported(swiftModule, availabilityContext);
+  bool isStaticLibrary = swiftModule->isStaticLibrary();
   result.IRL = getIRLinkage(linkInfo, entity.getLinkage(isStdlibOrDefinition),
-                            isDefinition, weakImported);
+                            isDefinition, weakImported, isStaticLibrary);
   result.ForDefinition = isDefinition;
   return result;
 }
 
 LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo, StringRef name,
                        SILLinkage linkage, ForDefinition_t isDefinition,
-                       bool isWeakImported) {
+                       bool isWeakImported, bool isStaticLibrary) {
   LinkInfo result;
 
   result.Name += name;
-  result.IRL = getIRLinkage(linkInfo, linkage, isDefinition, isWeakImported);
+  result.IRL = getIRLinkage(linkInfo, linkage, isDefinition, isWeakImported,
+                            isStaticLibrary);
   result.ForDefinition = isDefinition;
   return result;
 }

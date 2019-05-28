@@ -1177,7 +1177,7 @@ public:
 
   static LinkInfo get(const UniversalLinkageInfo &linkInfo, StringRef name,
                       SILLinkage linkage, ForDefinition_t isDefinition,
-                      bool isWeakImported);
+                      bool isWeakImported, bool isStaticLibrary);
 
   StringRef getName() const {
     return Name.str();
