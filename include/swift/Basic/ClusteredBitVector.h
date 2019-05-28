@@ -539,48 +539,6 @@ public:
     return !any();
   }
 
-  /// A class for scanning for set bits, from low indices to high ones.
-  class SetBitEnumerator {
-    ChunkType CurChunk;
-    const ChunkType *Chunks;
-    unsigned CurChunkIndex;
-    unsigned NumChunks;
-  public:
-    explicit SetBitEnumerator(const ClusteredBitVector &vector) {
-      if (vector.isInlineAndAllClear()) {
-        CurChunkIndex = 0;
-        NumChunks = 0;
-      } else {
-        Chunks = vector.getChunksPtr();
-        CurChunk = Chunks[0];
-        CurChunkIndex = 0;
-        NumChunks = vector.getLengthInChunks();
-      }
-    }
-
-    /// Search for another bit.  Returns false if it can't find one.
-    Optional<size_t> findNext() {
-      if (CurChunkIndex == NumChunks) return None;
-      auto cur = CurChunk;
-      while (!cur) {
-        if (++CurChunkIndex == NumChunks) return None;
-        cur = Chunks[CurChunkIndex];
-      }
-
-      // Find the index of the lowest set bit.
-      size_t bitIndex = llvm::countTrailingZeros(cur, llvm::ZB_Undefined);
-
-      // Clear that bit in the current chunk.
-      CurChunk = cur ^ (ChunkType(1) << bitIndex);
-      assert(!(CurChunk & (ChunkType(1) << bitIndex)));
-
-      return (CurChunkIndex * ChunkSizeInBits + bitIndex);
-    }
-  };
-  SetBitEnumerator enumerateSetBits() const {
-    return SetBitEnumerator(*this);
-  }
-
   friend bool operator==(const ClusteredBitVector &lhs,
                          const ClusteredBitVector &rhs) {
     if (lhs.size() != rhs.size())

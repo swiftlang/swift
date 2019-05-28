@@ -3,7 +3,7 @@
 // RUN: %target-codesign %t/%target-library-name(resilient_struct)
 // RUN: %target-swiftc_driver -I %t -L %t %s -o %t/switch_resilience -lresilient_struct %target-rpath(%t)
 // RUN: %target-codesign %t/switch_resilience
-// RUN: %target-run %t/switch_resilience
+// RUN: %target-run %t/switch_resilience %t/%target-library-name(resilient_struct)
 
 // REQUIRES: executable_test
 

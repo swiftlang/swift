@@ -368,7 +368,7 @@ static bool initDocEntityInfo(const Decl *D,
       StringRef DocRef = (StringRef)DocBuffer;
       if (IsSynthesizedExtension &&
           DocRef.find("<Declaration>") != StringRef::npos) {
-        StringRef Open = "<Declaration>extension ";
+        StringRef Open = "extension ";
         assert(DocRef.find(Open) != StringRef::npos);
         auto FirstPart = DocRef.substr(0, DocRef.find(Open) + (Open).size());
         auto SecondPart = DocRef.substr(FirstPart.size());

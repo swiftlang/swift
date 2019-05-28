@@ -313,7 +313,7 @@
                 "cmark": "master",
                 "llbuild": "swift-5.1-branch",
                 "swiftpm": "swift-5.1-branch",
-                "swift-syntax": "swift-5.1-branch",
+                "swift-syntax": "swift-5.1-branch-04-24-2019",
                 "swift-stress-tester": "swift-5.1-branch",
                 "swift-corelibs-xctest": "swift-5.1-branch",
                 "swift-corelibs-foundation": "swift-5.1-branch",

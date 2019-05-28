@@ -40,3 +40,22 @@ struct Container {
     }
   }
 }
+
+protocol Q {}
+
+struct NewType : Q {}
+
+extension Int : Q {}
+
+public protocol Assoc {
+  associatedtype A = Int
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  func act() -> A
+}
+
+struct Test : Assoc {
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  func act() -> some Q {
+    return 1
+  }
+}

@@ -1005,6 +1005,9 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::ResolveImports)
     return Context.hadError();
 
+  if (observer)
+    observer->performedSemanticAnalysis(Instance);
+
   if (Stats)
     countStatsPostSema(*Stats, Instance);
 
@@ -1238,6 +1241,9 @@ static bool performCompileStepsPostSILGen(
   if (auto *SF = MSF.dyn_cast<SourceFile *>())
     ricd.emplace(*SF);
 
+  if (observer)
+    observer->performedSILGeneration(*SM);
+
   if (Stats)
     countStatsPostSILGen(*Stats, *SM);
 
@@ -1283,6 +1289,9 @@ static bool performCompileStepsPostSILGen(
   // Perform optimizations and mandatory/diagnostic passes.
   if (Instance.performSILProcessing(SM.get(), Stats))
     return true;
+
+  if (observer)
+    observer->performedSILProcessing(*SM);
 
   emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance, Invocation,
                                                       moduleIsPublic);
@@ -1847,3 +1856,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
 void FrontendObserver::parsedArgs(CompilerInvocation &invocation) {}
 void FrontendObserver::configuredCompiler(CompilerInstance &instance) {}
+void FrontendObserver::performedSemanticAnalysis(CompilerInstance &instance) {}
+void FrontendObserver::performedSILGeneration(SILModule &module) {}
+void FrontendObserver::performedSILProcessing(SILModule &module) {}

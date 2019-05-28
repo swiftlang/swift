@@ -117,3 +117,9 @@ public class FutureContainer {
 extension FutureContainer: P1 {}
 
 extension FutureContainer: P2 {}
+
+@available(macOS 10.1, iOS 10.2, tvOS 10.3, watchOS 3.4, *)
+public class PlatformIntroClass {}
+
+@available(swift, introduced: 5)
+public class SwiftIntroClass {}
