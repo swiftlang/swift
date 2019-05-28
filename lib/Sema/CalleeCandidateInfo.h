@@ -125,10 +125,6 @@ namespace swift {
         return funcTy->getResult();
       return Type();
     }
-    
-    /// Retrieve the argument labels that should be used to invoke this
-    /// candidate.
-    ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
 
     void dump() const LLVM_ATTRIBUTE_USED;
   };
