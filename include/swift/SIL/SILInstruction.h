@@ -1854,9 +1854,13 @@ public:
 
   /// Return the referenced function if the callee is a function_ref like
   /// instruction.
+  ///
   /// WARNING: This not necessarily the function that will be called at runtime.
-  /// If this is a (prev_)dynamic_function_ref the actuall function called might
-  /// be different.
+  /// If the callee is a (prev_)dynamic_function_ref the actual function called
+  /// might be different because it could be dynamically replaced at runtime.
+  ///
+  /// If the client of this API wants to look at the content of the returned SIL
+  /// function it should call getReferencedFunctionOrNull() instead.
   SILFunction *getInitiallyReferencedFunction() const {
     if (auto *FRI = dyn_cast<FunctionRefBaseInst>(getCallee()))
       return FRI->getInitiallyReferencedFunction();
@@ -2319,10 +2323,14 @@ public:
     return nullptr;
   }
 
-  /// Return the referenced function.
+  /// Return the initially referenced function.
+  ///
   /// WARNING: This not necessarily the function that will be called at runtime.
-  /// If this is a (prev_)dynamic_function_ref the actuall function called might
-  /// be different.
+  /// If the callee is a (prev_)dynamic_function_ref the actual function called
+  /// might be different because it could be dynamically replaced at runtime.
+  ///
+  /// If the client of this API wants to look at the content of the returned SIL
+  /// function it should call getReferencedFunctionOrNull() instead.
   SILFunction *getInitiallyReferencedFunction() const { return f; }
 
   void dropReferencedFunction();
