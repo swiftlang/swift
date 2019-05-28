@@ -7205,7 +7205,7 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
 }
 
 /// Retrieve parameter declaration from the given source at given index.
-const ParamDecl *getParameterAt(ValueDecl *source, unsigned index);
+const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
 
 /// Display Decl subclasses.
 void simple_display(llvm::raw_ostream &out, const Decl *decl);

@@ -370,20 +370,9 @@ static Type getAdjustedParamType(const AnyFunctionType::Param &param) {
 
 // Is a particular parameter of a function or subscript declaration
 // declared to be an IUO?
-static bool paramIsIUO(Decl *decl, int paramNum) {
-  if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl)) {
-    auto *paramList = fn->getParameters();
-    auto *param = paramList->get(paramNum);
-    return param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-  }
-  if (auto *ee = dyn_cast<EnumElementDecl>(decl)) {
-    auto *param = ee->getParameterList()->get(paramNum);
-    return param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-  }
-
-  auto *subscript = cast<SubscriptDecl>(decl);
-  auto *index = subscript->getIndices()->get(paramNum);
-  return index->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+static bool paramIsIUO(const ValueDecl *decl, int paramNum) {
+  return swift::getParameterAt(decl, paramNum)->getAttrs()
+      .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
 }
 
 /// Determine whether the first declaration is as "specialized" as

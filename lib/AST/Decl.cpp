@@ -5990,7 +5990,7 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
   return DeclName();
 }
 
-const ParamDecl *swift::getParameterAt(ValueDecl *source, unsigned index) {
+const ParamDecl *swift::getParameterAt(const ValueDecl *source, unsigned index) {
   const ParameterList *paramList;
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(source)) {
     paramList = AFD->getParameters();
