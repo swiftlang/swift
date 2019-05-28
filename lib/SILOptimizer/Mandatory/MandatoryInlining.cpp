@@ -680,7 +680,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
   if (!FRI)
     return nullptr;
 
-  SILFunction *CalleeFunction = FRI->getReferencedFunction();
+  SILFunction *CalleeFunction = FRI->getReferencedFunctionOrNull();
 
   switch (CalleeFunction->getRepresentation()) {
   case SILFunctionTypeRepresentation::Thick:
