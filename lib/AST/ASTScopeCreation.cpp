@@ -731,11 +731,11 @@ void ASTScopeImpl::forEachClosureIn(
         : foundClosure(foundClosure) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (auto closure = dyn_cast<ClosureExpr>(E)) {
+      if (auto *closure = dyn_cast<ClosureExpr>(E)) {
         foundClosure(nullptr, closure);
         return {false, E};
       }
-      if (auto capture = dyn_cast<CaptureListExpr>(E)) {
+      if (auto *capture = dyn_cast<CaptureListExpr>(E)) {
         foundClosure(capture, capture->getClosureBody());
         return {false, E};
       }

@@ -37,8 +37,6 @@ namespace swift {
   class TypeDecl;
   class ValueDecl;
   struct SelfBounds;
-  class PatternBindingInitializer;
-  class DefaultArgumentInitializer;
   class NominalTypeDecl;
 
   namespace ast_scope {
@@ -103,25 +101,25 @@ namespace swift {
     /// outer DCs. if you're inside a type it should never be an extension of
     /// that type. And if you're inside an extension it will always be an
     /// extension (if it found something at that level).
-    DeclContext *BaseDC;
+  DeclContext *BaseDC;
 
-    /// The declaration corresponds to the given name; i.e. the decl we are
-    /// looking up.
-    ValueDecl *Value;
+  /// The declaration corresponds to the given name; i.e. the decl we are
+  /// looking up.
+  ValueDecl *Value;
 
-  public:
-    LookupResultEntry(ValueDecl *value) : BaseDC(nullptr), Value(value) {}
+public:
+  LookupResultEntry(ValueDecl *value) : BaseDC(nullptr), Value(value) {}
 
-    LookupResultEntry(DeclContext *baseDC, ValueDecl *value)
-        : BaseDC(baseDC), Value(value) {}
+  LookupResultEntry(DeclContext *baseDC, ValueDecl *value)
+    : BaseDC(baseDC), Value(value) {}
 
-    ValueDecl *getValueDecl() const { return Value; }
+  ValueDecl *getValueDecl() const { return Value; }
 
-    DeclContext *getDeclContext() const { return BaseDC; }
+  DeclContext *getDeclContext() const { return BaseDC; }
 
-    ValueDecl *getBaseDecl() const;
+  ValueDecl *getBaseDecl() const;
 
-    void print(llvm::raw_ostream &) const;
+  void print(llvm::raw_ostream &) const;
 };
 
 /// This class implements and represents the result of performing
@@ -150,8 +148,10 @@ public:
   /// is used to determine which declarations in that body are visible.
   UnqualifiedLookup(DeclName Name, DeclContext *DC, LazyResolver *TypeResolver,
                     SourceLoc Loc = SourceLoc(), Options options = Options());
+  
   using ResultsVector = SmallVector<LookupResultEntry, 4>;
   ResultsVector Results;
+  
   /// The index of the first result that isn't from the innermost scope
   /// with results.
   ///
