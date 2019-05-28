@@ -607,7 +607,6 @@ EXPECTED_OPTIONS = [
     PathOption('--tensorflow-host-include-dir'),
     PathOption('--tensorflow-target-lib-dir'),
     PathOption('--tensorflow-target-include-dir'),
-    PathOption('--tensorflow-swift-bindings'),
     PathOption('--tensorflow-swift-apis'),
     PathOption('--host-bazel'),
     AppendOption('--tensorflow-bazel-options'),
