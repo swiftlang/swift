@@ -303,6 +303,136 @@ class TFGraphDescription {
   }
 }
 
+class LazyTraceDescription {
+  // inputs will be "placeholder" nodes.
+  var inputs: [LazyTensorOperation] = []
+  var inputValues: [TFETensorHandle] = []
+  var operations: [LazyTensorOperation] = []
+  var outputs: [LazyTensorOperation] = []
+
+  /// A status object to pass to TF graph building operations.
+  private let status: CTFStatus = TF_NewStatus()
+
+  init(_ lazyOp: LazyTensorOperation) {
+    // LazyTensor.onLiveOperations { let _ = collectLazyOp($0) }
+    let _ = collectLazyOp(lazyOp)
+    lazyOpsCache.removeAll()
+  }
+
+  deinit {
+    TF_DeleteStatus(status)
+  }
+
+  func debugPrint() {
+    print("Trace")
+    print("Inputs (\(inputs.count)):")
+    for input in inputs {
+      print("  \(input)")
+    }
+    print("Outputs (\(outputs.count)):")
+    for output in outputs {
+      for i in 0..<output.outputCount {
+        if let alias = output.alias {
+          print("  \(alias):\(i)")
+        } else {
+          print("  \(output.name)_\(ObjectIdentifier(output)):\(i)")
+        }
+      }
+    }
+    print("Operations (\(operations.count)):")
+    for op in operations {
+      print("  \(op)")
+    }
+  }
+
+  private var lazyOpsCache: [ObjectIdentifier: LazyTensorOperation] = [:]
+
+  private func updateCacheAndOperations(
+    _ id: ObjectIdentifier, _ node: LazyTensorOperation) {
+    lazyOpsCache[id] = node
+    node.alias = "\(node.name)_\(operations.count)"
+    operations.append(node)
+  }
+
+  private func newConstTensor(_ conc: TFETensorHandle) -> LazyTensor {
+    let cTensorHandle = conc._cTensorHandle
+    let result = LazyTensorOperation("Const", 1)
+    let dtype = TensorDataType(TFE_TensorHandleDataType(cTensorHandle))
+    let dtypeAttr = LazyTensorOperation.Attribute.TensorDataTypeValue(dtype)
+    let cTensor = TFE_TensorHandleResolve(cTensorHandle, status)
+    checkOk(status)
+    result.attrs = [
+      "dtype": dtypeAttr,
+      "value": LazyTensorOperation.Attribute.ConstTensor(cTensor!)]
+    updateCacheAndOperations(ObjectIdentifier(conc), result)
+    return LazyTensor(_lazy: result, index: 0)
+  }
+
+  private func newPlaceholderTensor(_ conc: TFETensorHandle) -> LazyTensor {
+    let cTensorHandle = conc._cTensorHandle
+    let dtype = TensorDataType(TFE_TensorHandleDataType(cTensorHandle))
+    let dtypeAttr = LazyTensorOperation.Attribute.TensorDataTypeValue(dtype)
+    let placeholder = LazyTensorOperation("Placeholder", 1)
+    placeholder.attrs = ["dtype": dtypeAttr]
+    updateCacheAndOperations(ObjectIdentifier(conc), placeholder)
+    inputs.append(placeholder)
+    inputValues.append(conc)
+    return LazyTensor(_lazy: placeholder, index: 0)
+  }
+
+  private func maybePromotedTensor(
+    _ conc: TFETensorHandle, asConst: Bool) -> LazyTensor {
+    let id = ObjectIdentifier(conc)
+    if let lazyOp = lazyOpsCache[id] {
+      return LazyTensor(_lazy: lazyOp, index: 0)
+    }
+    return asConst ? newConstTensor(conc) : newPlaceholderTensor(conc)
+  }
+
+  private func maybePromotedTensor(
+    _ lazyHandle: LazyTensor) -> LazyTensor {
+    switch lazyHandle.handle {
+      case LazyTensor.Handle.conc(let h, let materialized):
+        return maybePromotedTensor(h, asConst: !materialized)
+      case LazyTensor.Handle.sym(let lazyOp, let index, _): do {
+        if let outputs = lazyOp.outputs {
+          return maybePromotedTensor(outputs[index], asConst: false)
+        } else {
+          return LazyTensor(_lazy: collectLazyOp(lazyOp), index: index)
+        }
+      }
+    }
+  }
+
+  private func maybePromotedInput(
+    _ input: LazyTensorOperation.Input) -> LazyTensorOperation.Input {
+    switch input {
+      case LazyTensorOperation.Input.single(let h):
+        return LazyTensorOperation.Input.single(maybePromotedTensor(h))
+      case LazyTensorOperation.Input.list(let elements):
+        return LazyTensorOperation.Input.list(
+          elements.map { maybePromotedTensor($0) })
+    }
+  }
+
+  private func collectLazyOp(_ lazyOp: LazyTensorOperation) -> LazyTensorOperation {
+    let id = ObjectIdentifier(lazyOp)
+    if let cachedLazyOp = lazyOpsCache[id] {
+      return cachedLazyOp
+    }
+
+    let newLazyOp = LazyTensorOperation(lazyOp.name, lazyOp.outputCount)
+    newLazyOp.attrs = lazyOp.attrs
+    newLazyOp.inputs = lazyOp.inputs.map { maybePromotedInput($0) }
+    updateCacheAndOperations(id, newLazyOp)
+
+    if LazyTensor.isLive(lazyOp) { outputs.append(newLazyOp) }
+
+    return newLazyOp
+  }
+}
+
+
 extension LazyTensorOperation {
   func materialized(index: Int) -> TFETensorHandle {
     return materialized()[index]
@@ -345,6 +475,9 @@ extension LazyTensorOperation {
 
 
   private static func materializeLiveTensors(_ lazyOp: LazyTensorOperation) {
+    let lazyDescription = LazyTraceDescription(lazyOp)
+    lazyDescription.debugPrint()
+
     LazyTensorOperation.materializationCallback("lazy")
     let graphDescription = TFGraphDescription(lazyOp)
     LazyTensorOperation.materializationCallback("graphdesc")
