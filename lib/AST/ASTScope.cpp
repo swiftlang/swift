@@ -1,5 +1,4 @@
-//===--- ASTScopeImpl.cpp - Swift Object-Oriented AST Scope
-//-------------------===//
+//===--- ASTScopeImpl.cpp - Swift Object-Oriented AST Scope ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,9 +9,9 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file implements the common functions of the ASTScopeImpl ontology.
-//
+///
+/// This file implements the common functions of the ASTScopeImpl ontology.
+///
 //===----------------------------------------------------------------------===//
 #include "swift/AST/ASTScope.h"
 

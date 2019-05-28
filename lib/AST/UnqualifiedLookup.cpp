@@ -9,10 +9,10 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file implements the construction of an UnqualifiedLookup, which entails
-// performing the lookup.
-//
+///
+/// This file implements the construction of an UnqualifiedLookup, which entails
+/// performing the lookup.
+///
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"

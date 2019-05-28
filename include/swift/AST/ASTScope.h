@@ -1,5 +1,4 @@
-//===--- ASTScopeImpl.h - Swift AST Object-Oriented Scope -----------*- C++
-//-*-===//
+//===--- ASTScopeImpl.h - Swift AST Object-Oriented Scope --------*- C++-*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,21 +9,21 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file defines the ASTScopeImpl class ontology, which
-// describes the scopes that exist within a Swift AST.
-//
-// Each scope has four basic functions: printing for debugging, creation of
-// itself and its children, obtaining its SourceRange (for lookup), and looking
-// up names accessible from that scope.
-//
-// Invarients:
-//   a child's source range is a subset (proper or improper) of its parent's,
-//   children are ordered by source range, and do not overlap,
-//   all the names visible within a parent are visible within the child, unless
-//   the nesting is illegal. For instance, a protocol nested inside of a class
-//   does not get to see the symbols in the class or its ancestors.
-//
+///
+/// This file defines the ASTScopeImpl class ontology, which
+/// describes the scopes that exist within a Swift AST.
+///
+/// Each scope has four basic functions: printing for debugging, creation of
+/// itself and its children, obtaining its SourceRange (for lookup), and looking
+/// up names accessible from that scope.
+///
+/// Invarients:
+///   a child's source range is a subset (proper or improper) of its parent's,
+///   children are ordered by source range, and do not overlap,
+///   all the names visible within a parent are visible within the child, unless
+///   the nesting is illegal. For instance, a protocol nested inside of a class
+///   does not get to see the symbols in the class or its ancestors.
+///
 //===----------------------------------------------------------------------===//
 #ifndef SWIFT_AST_AST_OO_SCOPE_H
 #define SWIFT_AST_AST_OO_SCOPE_H

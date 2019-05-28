@@ -9,9 +9,9 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file implements the printing functions of the ASTScopeImpl ontology.
-//
+///
+/// This file implements the printing functions of the ASTScopeImpl ontology.
+///
 //===----------------------------------------------------------------------===//
 #include "swift/AST/ASTScope.h"
 
