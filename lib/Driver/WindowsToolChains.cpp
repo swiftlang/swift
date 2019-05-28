@@ -61,6 +61,9 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
   case LinkKind::DynamicLibrary:
     Arguments.push_back("-shared");
     break;
+  case LinkKind::StaticLibrary:
+    // Nothing extra needed.
+    break;
   }
 
   // Select the linker to use.

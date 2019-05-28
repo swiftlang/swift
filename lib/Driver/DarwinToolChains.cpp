@@ -284,6 +284,9 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   case LinkKind::DynamicLibrary:
     Arguments.push_back("-dylib");
     break;
+  case LinkKind::StaticLibrary:
+    Arguments.push_back(".a");
+    break;
   }
 
   assert(Triple.isOSDarwin());

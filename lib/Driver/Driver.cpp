@@ -1255,6 +1255,8 @@ static bool maybeBuildingExecutable(const OutputInfo &OI,
     return true;
   case LinkKind::DynamicLibrary:
     return false;
+  case LinkKind::StaticLibrary:
+    return false;
   case LinkKind::None:
     break;
   }
@@ -1371,7 +1373,13 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       break;
 
     case options::OPT_emit_library:
-      OI.LinkAction = LinkKind::DynamicLibrary;
+      if (OI.LinkAction != LinkKind::StaticLibrary)
+        OI.LinkAction = LinkKind::DynamicLibrary;
+      OI.CompilerOutputType = file_types::TY_Object;
+      break;
+
+    case options::OPT_emit_archive:
+      OI.LinkAction = LinkKind::StaticLibrary;
       OI.CompilerOutputType = file_types::TY_Object;
       break;
 
@@ -1550,7 +1558,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     OI.ModuleName = "REPL";
   } else if (const Arg *A = Args.getLastArg(options::OPT_o)) {
     OI.ModuleName = llvm::sys::path::stem(A->getValue());
-    if (OI.LinkAction == LinkKind::DynamicLibrary &&
+    if ((OI.LinkAction == LinkKind::DynamicLibrary ||
+        OI.LinkAction == LinkKind::StaticLibrary) &&
         !llvm::sys::path::extension(A->getValue()).empty() &&
         StringRef(OI.ModuleName).startswith("lib")) {
       // Chop off a "lib" prefix if we're building a library.
@@ -2180,18 +2189,32 @@ static StringRef baseNameForImage(const JobAction *JA, const OutputInfo &OI,
   auto link = dyn_cast<LinkJobAction>(JA);
   if (!link)
     return BaseName;
-  if (link->getKind() != LinkKind::DynamicLibrary)
+  if (link->getKind() != LinkKind::DynamicLibrary &&
+      link->getKind() != LinkKind::StaticLibrary)
     return BaseName;
 
   Buffer = Triple.isOSWindows() ? "" : "lib";
   Buffer.append(BaseName);
 
-  if (Triple.isOSDarwin())
-    Buffer.append(".dylib");
-  else if (Triple.isOSWindows())
-    Buffer.append(".dll");
-  else
-    Buffer.append(".so");
+  switch (link->getKind()) {
+    case LinkKind::DynamicLibrary:
+      if (Triple.isOSDarwin())
+        Buffer.append( ".dylib");
+      else if (Triple.isOSWindows())
+        Buffer.append(".dll");
+      else
+        Buffer.append(".so");
+      break;
+    case LinkKind::StaticLibrary:
+      if (Triple.isOSWindows())
+        Buffer.append( ".lib");
+      else
+        Buffer.append(".a");
+      break;
+    default:
+      llvm_unreachable("unhandled LinkKind");
+  }
+  
   return Buffer.str();
 }
 

@@ -368,9 +368,9 @@ def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
          ArgumentIsPath]>,
   MetaVarName<"<path>">, HelpText<"Emit an Objective-C header file to <path>">;
 
-def emit_archive : Flag<["-"], "emit-archive">,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Emit module as a static archive">;
+def static_library : Flag<["-"], "static">,
+  Flags<[FrontendOption, ModuleInterfaceOption, NoInteractiveOption]>,
+  HelpText<"Make this module statically linkable and make the output of -emit-library a static library.">;
 
 def import_cf_types : Flag<["-"], "import-cf-types">,
   Flags<[FrontendOption, HelpHidden]>,
