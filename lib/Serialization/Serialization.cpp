@@ -2520,20 +2520,20 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     // SWIFT_ENABLE_TENSORFLOW
     case DAK_Differentiable: {
-      auto abbrCode = DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
+      auto abbrCode = S.DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
       auto attr = cast<DifferentiableAttr>(DA);
 
       IdentifierID jvpName = 0;
       DeclID jvpRef = 0;
       if (auto jvp = attr->getJVP()) {
-        jvpName = addDeclBaseNameRef(jvp->Name.getBaseName());
-        jvpRef = addDeclRef(attr->getJVPFunction());
+        jvpName = S.addDeclBaseNameRef(jvp->Name.getBaseName());
+        jvpRef = S.addDeclRef(attr->getJVPFunction());
       }
       IdentifierID vjpName = 0;
       DeclID vjpRef = 0;
       if (auto vjp = attr->getVJP()) {
-        vjpName = addDeclBaseNameRef(vjp->Name.getBaseName());
-        vjpRef = addDeclRef(attr->getVJPFunction());
+        vjpName = S.addDeclBaseNameRef(vjp->Name.getBaseName());
+        vjpRef = S.addDeclRef(attr->getVJPFunction());
       }
 
       auto paramIndices = attr->getParameterIndices();
@@ -2543,10 +2543,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         indices.push_back(paramIndices->parameters[i]);
 
       DifferentiableDeclAttrLayout::emitRecord(
-          Out, ScratchRecord, abbrCode, attr->isImplicit(),
+          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
           jvpName, jvpRef, vjpName, vjpRef, indices);
 
-      writeGenericRequirements(attr->getRequirements(), DeclTypeAbbrCodes);
+      S.writeGenericRequirements(attr->getRequirements(), S.DeclTypeAbbrCodes);
       return;
     }
     }
