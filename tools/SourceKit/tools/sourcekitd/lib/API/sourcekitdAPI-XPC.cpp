@@ -380,8 +380,8 @@ sourcekitd::createErrorRequestInvalid(const char *Description) {
 }
 sourcekitd_response_t
 sourcekitd::createErrorRequestFailed(StringRef DescRef) {
-  const char *Description = DescRef.str().c_str();
-  return CustomXPCData::createErrorRequestFailed(Description).getXObj();
+  std::string Desc = DescRef.str();
+  return CustomXPCData::createErrorRequestFailed(Desc.c_str()).getXObj();
 }
 sourcekitd_response_t
 sourcekitd::createErrorRequestInterrupted(const char *Description) {
