@@ -571,6 +571,9 @@ public:
   /// sequence in a for ... in ... loop.
   bool isForSequenceElementType() const;
 
+  /// Determine whether this locator points to the contextual type.
+  bool isForContextualType() const;
+
   /// If this locator points to generic parameter return its type.
   GenericTypeParamType *getGenericParameter() const;
 
