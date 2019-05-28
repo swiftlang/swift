@@ -1,3 +1,8 @@
+import CTensorFlow
+
+/// The `TF_Tensor *` type.
+typealias CTFTensor = OpaquePointer
+
 public class LazyTensor : _AnyTensorHandle {
   enum Handle {
     // Bool indicates if this was a result of materialization.
@@ -125,6 +130,7 @@ public class LazyTensorOperation : TensorOperation {
     case FloatArray([Float])
     case DoubleArray([Double])
     case StringArray([String])
+    case ConstTensor(CTFTensor)
     case TensorDataTypeValue(TensorDataType)
   }
 

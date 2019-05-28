@@ -53,6 +53,9 @@ class TFGraphBuilder {
           TF_SetAttrIntList(desc, name, buffer.baseAddress, Int32(buffer.count))
         }
       }
+      case LazyTensorOperation.Attribute.ConstTensor(let value): do {
+        TF_SetAttrTensor(desc, name, value, status)
+      }
       default:
         assert(false, "Unhandled attribute \(name):\(attrValue)")
     }
