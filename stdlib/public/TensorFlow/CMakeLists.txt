@@ -33,18 +33,10 @@ list(APPEND swift_stdlib_compile_flags "-DCOMPILING_TENSORFLOW_MODULE")
 
 set(SOURCES "")
 
-# Copy TensorFlow bindings file, if it exists.
-if (TENSORFLOW_SWIFT_BINDINGS)
-  file(GLOB_RECURSE TENSORFLOW_SWIFT_BINDINGS_SOURCES
-    "${TENSORFLOW_SWIFT_BINDINGS}/*.swift")
-  list(APPEND SOURCES "${TENSORFLOW_SWIFT_BINDINGS_SOURCES}")
-endif()
-
 # Copy TensorFlow high-level API sources, if they exist.
 if (TENSORFLOW_SWIFT_APIS)
   file(GLOB_RECURSE TENSORFLOW_SWIFT_API_SOURCES
-    "${TENSORFLOW_SWIFT_APIS}/Sources/*.swift"
-    "${TENSORFLOW_SWIFT_APIS}/Sources/Core/*.swift")
+    "${TENSORFLOW_SWIFT_APIS}/Sources/*.swift")
   message(STATUS "Using TensorFlow high-level APIs library.")
   list(APPEND SOURCES "${TENSORFLOW_SWIFT_API_SOURCES}")
 endif()
