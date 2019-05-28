@@ -274,8 +274,7 @@ public:
   /// \param otherSig Another generic signature whose generic parameters are
   /// equivalent to or a subset of the generic parameters in this signature.
   SmallVector<Requirement, 4>
-  requirementsNotSatisfiedBy(GenericSignature *otherSig,
-                             SubstitutionMap subMap = SubstitutionMap());
+  requirementsNotSatisfiedBy(GenericSignature *otherSig);
 
   /// Return the canonical version of the given type under this generic
   /// signature.

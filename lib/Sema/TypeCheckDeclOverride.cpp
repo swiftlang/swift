@@ -20,7 +20,9 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -929,6 +931,84 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
   }
 }
 
+static GenericSignature *getNewGenericSignature(ValueDecl *base,
+                                                ValueDecl *derived) {
+  auto baseGenericCtx = base->getAsGenericContext();
+  auto derivedGenericCtx = derived->getAsGenericContext();
+  auto &ctx = base->getASTContext();
+
+  auto baseClass =
+      baseGenericCtx->getInnermostTypeContext()->getSelfClassDecl();
+  auto derivedClass =
+      derivedGenericCtx->getInnermostTypeContext()->getSelfClassDecl();
+
+  auto subMap = derivedClass->getInterfaceType()->getContextSubstitutionMap(
+      derivedClass->getModuleContext(), baseClass);
+
+  auto *genericParams = baseGenericCtx->getGenericParams();
+  if (genericParams) {
+    SmallVector<GenericTypeParamDecl *, 4> newParams;
+
+    // First, clone the superclass constructor's generic parameter list,
+    // but change the depth of the generic parameters to be one greater
+    // than the depth of the subclass.
+    unsigned depth = 0;
+    if (auto *genericSig = baseClass->getGenericSignature())
+      depth = genericSig->getGenericParams().back()->getDepth() + 1;
+
+    for (auto *param : genericParams->getParams()) {
+      auto *newParam = new (ctx) GenericTypeParamDecl(
+          baseClass, param->getName(), SourceLoc(), depth, param->getIndex());
+      newParams.push_back(newParam);
+    }
+
+    GenericSignatureBuilder builder(ctx);
+    builder.addGenericSignature(derivedClass->getGenericSignature());
+
+    auto source =
+        GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
+    auto *baseClassSig = baseClass->getGenericSignature();
+
+    unsigned superclassDepth = 0;
+    if (baseClassSig)
+      superclassDepth =
+          baseGenericCtx->getGenericParams()->getParams().back()->getDepth() +
+          1;
+
+    // We're going to be substituting the requirements of the base class
+    // initializer to form the requirements of the derived class initializer.
+    auto substFn = [&](SubstitutableType *type) -> Type {
+      auto *gp = cast<GenericTypeParamType>(type);
+      if (gp->getDepth() < superclassDepth)
+        return Type(gp).subst(subMap);
+      return CanGenericTypeParamType::get(
+          gp->getDepth() - superclassDepth + depth, gp->getIndex(), ctx);
+    };
+
+    auto lookupConformanceFn =
+        [&](CanType depTy, Type substTy,
+            ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
+      if (auto conf = subMap.lookupConformance(depTy, proto))
+        return conf;
+
+      return ProtocolConformanceRef(proto);
+    };
+
+    for (auto reqt : baseClassSig->getRequirements())
+      if (auto substReqt = reqt.subst(substFn, lookupConformanceFn))
+        builder.addRequirement(*substReqt, source, nullptr);
+
+    // Now form the substitution map that will be used to remap parameter
+    // types.
+    subMap = SubstitutionMap::get(baseClassSig, substFn, lookupConformanceFn);
+
+    auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
+    return genericSig;
+  }
+
+  return nullptr;
+}
+
 bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
                                     OverrideCheckingAttempt attempt) {
   auto &diags = ctx.Diags;
@@ -946,44 +1026,23 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     emittedMatchError = true;
   }
 
-  auto baseGenericCtx = baseDecl->getAsGenericContext();
   auto derivedGenericCtx = decl->getAsGenericContext();
 
   // If the generic signatures are different, then complain.
-  if (baseGenericCtx && derivedGenericCtx) {
-    auto baseGenericSig = baseGenericCtx->getGenericSignature();
-    auto derivedGenericSig = derivedGenericCtx->getGenericSignature();
+  auto newSig = getNewGenericSignature(baseDecl, decl);
 
-    auto baseClass = baseGenericCtx->getInnermostTypeContext();
-    auto derivedClass = derivedGenericCtx->getInnermostTypeContext();
+  if (newSig && derivedGenericCtx) {
+    auto derivedSig = derivedGenericCtx->getGenericSignature();
 
-    if (baseClass && derivedClass) {
-      if (isa<ClassDecl>(baseClass) && isa<ClassDecl>(derivedClass)) {
-        auto derivedSuperclass =
-            derivedClass->getSelfClassDecl()->getSuperclass();
-        auto derivedSubMap = derivedSuperclass
-                                 ? derivedSuperclass->getContextSubstitutionMap(
-                                       decl->getModuleContext(), baseClass)
-                                 : SubstitutionMap();
+    if (derivedSig) {
+      auto satOne = derivedSig->requirementsNotSatisfiedBy(newSig).empty();
+      auto satTwo = newSig->requirementsNotSatisfiedBy(derivedSig).empty();
 
-        if (baseGenericSig && derivedGenericSig) {
-          auto baseReqsNotSatisfied = !baseGenericSig
-                                           ->requirementsNotSatisfiedBy(
-                                               derivedGenericSig, derivedSubMap)
-                                           .empty();
-
-          auto derivedReqsNotSatisfied =
-              !derivedGenericSig
-                   ->requirementsNotSatisfiedBy(baseGenericSig, derivedSubMap)
-                   .empty();
-
-          if (baseReqsNotSatisfied || derivedReqsNotSatisfied) {
-            diags.diagnose(decl, diag::override_method_different_generic_sig,
-                           decl->getBaseName());
-            diags.diagnose(baseDecl, diag::overridden_here);
-            emittedMatchError = true;
-          }
-        }
+      if (!satOne && !satTwo) {
+        diags.diagnose(decl, diag::override_method_different_generic_sig,
+                       decl->getBaseName());
+        diags.diagnose(baseDecl, diag::overridden_here);
+        emittedMatchError = true;
       }
     }
   }

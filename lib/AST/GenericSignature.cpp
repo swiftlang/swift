@@ -588,8 +588,7 @@ bool GenericSignature::isRequirementSatisfied(Requirement requirement) {
 }
 
 SmallVector<Requirement, 4>
-GenericSignature::requirementsNotSatisfiedBy(GenericSignature *otherSig,
-                                             SubstitutionMap subMap) {
+GenericSignature::requirementsNotSatisfiedBy(GenericSignature *otherSig) {
   SmallVector<Requirement, 4> result;
 
   // If the signatures are the same, all requirements are satisfied.
@@ -604,16 +603,8 @@ GenericSignature::requirementsNotSatisfiedBy(GenericSignature *otherSig,
 
   // Find the requirements that aren't satisfied.
   for (const auto &req : getRequirements()) {
-    auto reqToCheck = req;
-
-    if (subMap) {
-      auto subsReq = req.subst(subMap);
-      assert(subsReq.hasValue() && "using unsubstituted req?");
-      reqToCheck = subsReq.getValue();
-    }
-
-    if (!otherSig->isRequirementSatisfied(reqToCheck))
-      result.push_back(reqToCheck);
+    if (!otherSig->isRequirementSatisfied(req))
+      result.push_back(req);
   }
 
   return result;
